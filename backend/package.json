@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -15,6 +15,7 @@
     "test:watch": "vitest",
     "db:generate": "tsx scripts/prisma-cli.ts generate",
     "db:migrate": "tsx scripts/prisma-cli.ts migrate dev",
+    "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "npm run db:generate && tsx scripts/prisma-cli.ts migrate deploy && npm run db:seed",
     "db:studio": "tsx scripts/prisma-cli.ts studio"
@@ -28,8 +29,10 @@
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "prisma": "^6.9.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "typescript": "^5.8.3",
     "uuid": "^11.1.0",
     "zod": "^3.25.67"
   },
@@ -42,10 +45,8 @@
     "@types/supertest": "^6.0.3",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
-    "prisma": "^6.9.0",
     "supertest": "^7.1.1",
     "tsx": "^4.19.4",
-    "typescript": "^5.8.3",
     "vitest": "^3.2.3"
   },
   "prisma": {

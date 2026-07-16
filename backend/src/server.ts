@@ -7,8 +7,8 @@ async function main(): Promise<void> {
   await connectDatabase()
   const app = createApp()
 
-  const server = app.listen(env.PORT, () => {
-    logger.info(`FOS ERP backend listening on http://localhost:${env.PORT}`)
+  const server = app.listen(env.PORT, '0.0.0.0', () => {
+    logger.info(`FOS ERP backend listening on 0.0.0.0:${env.PORT}`)
     if (env.isDev) {
       logger.info(`Swagger docs: http://localhost:${env.PORT}/api/docs`)
     }
