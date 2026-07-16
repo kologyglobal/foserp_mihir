@@ -1,7 +1,4 @@
-import 'dotenv/config'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '../src/config/database.js'
 
 const phase4Modules = ['item_category', 'hsn', 'gst_group', 'gst_rate', 'item', 'vendor']
 

@@ -1,5 +1,8 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
+  // Rust-free JS/Wasm engine — avoids Hostinger/cPanel "PANIC: timer has gone away"
+  // (native query engine exceeds shared-hosting process/thread limits).
+  engineType = "client"
 }
 
 datasource db {

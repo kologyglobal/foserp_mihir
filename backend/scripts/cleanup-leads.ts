@@ -18,24 +18,8 @@
  *   TENANT_SLUG=vasant-trailers   (default; use ALL to wipe every tenant)
  *   DRY_RUN=1                     (counts only, no writes)
  */
-import { config } from 'dotenv'
-import { PrismaClient, CrmEntityType, Prisma } from '@prisma/client'
-
-config()
-
-function buildDatabaseUrl(): string {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL
-  const host = process.env.DB_HOST ?? 'localhost'
-  const port = process.env.DB_PORT ?? '3306'
-  const name = process.env.DB_NAME ?? 'fos_erp'
-  const user = process.env.DB_USER ?? 'root'
-  const pass = encodeURIComponent(process.env.DB_PASS ?? '')
-  return `mysql://${user}:${pass}@${host}:${port}/${name}`
-}
-
-process.env.DATABASE_URL = buildDatabaseUrl()
-
-const prisma = new PrismaClient()
+import { CrmEntityType, Prisma } from '@prisma/client'
+import { prisma } from '../src/config/database.js'
 const slugArg = process.env.TENANT_SLUG ?? 'vasant-trailers'
 const allTenants = slugArg.toUpperCase() === 'ALL'
 const dryRun = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true'

@@ -14,24 +14,8 @@
  *   DRY_RUN=1                            (counts only, no writes)
  *   KEEP_TEMPLATE_CODE=STANDARD-TRAILER  (preferred keep code)
  */
-import { config } from 'dotenv'
-import { PrismaClient, CrmEntityType } from '@prisma/client'
-
-config()
-
-function buildDatabaseUrl(): string {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL
-  const host = process.env.DB_HOST ?? 'localhost'
-  const port = process.env.DB_PORT ?? '3306'
-  const name = process.env.DB_NAME ?? 'fos_erp'
-  const user = process.env.DB_USER ?? 'root'
-  const pass = encodeURIComponent(process.env.DB_PASS ?? '')
-  return `mysql://${user}:${pass}@${host}:${port}/${name}`
-}
-
-process.env.DATABASE_URL = buildDatabaseUrl()
-
-const prisma = new PrismaClient()
+import { CrmEntityType } from '@prisma/client'
+import { prisma } from '../src/config/database.js'
 const slug = process.env.TENANT_SLUG ?? 'vasant-trailers'
 const dryRun = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true'
 const preferredTemplateCode = process.env.KEEP_TEMPLATE_CODE ?? 'STANDARD-TRAILER'

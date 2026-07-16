@@ -1,24 +1,7 @@
-import { config } from 'dotenv'
-import { PrismaClient } from '@prisma/client'
 import { PERMISSIONS, ROLE_PERMISSIONS, DEFAULT_PIPELINE_STAGES } from '../src/constants/permissions.js'
+import { prisma } from '../src/config/database.js'
 import { hashPassword } from '../src/utils/password.js'
 import { initTenantCodeSeries } from '../src/services/codeSeries.service.js'
-
-config()
-
-function buildDatabaseUrl(): string {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL
-  const host = process.env.DB_HOST ?? 'localhost'
-  const port = process.env.DB_PORT ?? '3306'
-  const name = process.env.DB_NAME ?? 'fos_erp'
-  const user = process.env.DB_USER ?? 'root'
-  const pass = encodeURIComponent(process.env.DB_PASS ?? '')
-  return `mysql://${user}:${pass}@${host}:${port}/${name}`
-}
-
-process.env.DATABASE_URL = buildDatabaseUrl()
-
-const prisma = new PrismaClient()
 
 async function seedPermissions(): Promise<Map<string, string>> {
   const map = new Map<string, string>()

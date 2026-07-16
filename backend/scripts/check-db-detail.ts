@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client'
-
-const p = new PrismaClient()
+import { prisma as p } from '../src/config/database.js'
 
 async function main() {
   const tid = (await p.tenant.findFirst({ where: { slug: 'vasant-trailers' } }))!.id

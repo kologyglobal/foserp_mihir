@@ -3,10 +3,7 @@
  * Run: npx tsx scripts/audit-leads-ui.ts
  * Loads DB_* / DATABASE_URL the same way the server does.
  */
-import '../src/config/env.js'
-import { PrismaClient } from '@prisma/client'
-
-const p = new PrismaClient()
+import { prisma as p } from '../src/config/database.js'
 
 async function main() {
   const tenants = await p.tenant.findMany({
