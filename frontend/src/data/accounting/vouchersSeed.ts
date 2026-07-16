@@ -1,0 +1,548 @@
+/**
+ * Accounting Vouchers — Indian manufacturing demo seed.
+ * Session-only; mutate via vouchersService. Reuses CoA account codes as refs.
+ */
+import type {
+  AccountingVoucher,
+  AccountingVoucherLine,
+  VoucherCostCentreOption,
+  VoucherPartyOption,
+} from '../../types/vouchers'
+import { sumVoucherDebitCredit } from '../../types/vouchers'
+
+const USER = 'Priya Sharma'
+const ACCOUNTANT = 'Rahul Mehta'
+const MANAGER = 'Ananya Iyer'
+
+export const VOUCHER_PARTY_OPTIONS: VoucherPartyOption[] = [
+  { id: 'party-v-01', name: 'Bharat Steel Traders', type: 'vendor', gstin: '27AABCB1234A1Z5', city: 'Pune' },
+  { id: 'party-v-02', name: 'Precision Fasteners Pvt Ltd', type: 'vendor', gstin: '27AADCP5678B1Z2', city: 'Nashik' },
+  { id: 'party-v-03', name: 'Western Logistics Co', type: 'vendor', gstin: '27AAACW9012C1Z8', city: 'Mumbai' },
+  { id: 'party-c-01', name: 'Maharashtra Fleet Services', type: 'customer', gstin: '27AADCM3456D1Z3', city: 'Nagpur' },
+  { id: 'party-c-02', name: 'Deccan Trailer Rentals', type: 'customer', gstin: '27AAACD7890E1Z1', city: 'Aurangabad' },
+  { id: 'party-c-03', name: 'Konkan Cargo Movers', type: 'customer', gstin: '27AABCK2345F1Z7', city: 'Kolhapur' },
+  { id: 'party-e-01', name: 'Suresh Patil', type: 'employee', city: 'Pune' },
+  { id: 'party-o-01', name: 'Axis Bank — Current A/c', type: 'other', city: 'Pune' },
+]
+
+export const VOUCHER_COST_CENTRES: VoucherCostCentreOption[] = [
+  { id: 'cc-prod', code: 'PROD', name: 'Production' },
+  { id: 'cc-maint', code: 'MAINT', name: 'Maintenance' },
+  { id: 'cc-admin', code: 'ADMIN', name: 'Administration' },
+  { id: 'cc-sales', code: 'SALES', name: 'Sales & Marketing' },
+]
+
+/** Stable CoA ids from chartOfAccountsSeed (coa-{code}). */
+function acc(code: string, name: string) {
+  return { id: `coa-${code}`, code, name }
+}
+
+function line(
+  lineNo: number,
+  account: ReturnType<typeof acc>,
+  debit: number,
+  credit: number,
+  narration: string,
+  extras: Partial<AccountingVoucherLine> = {},
+): AccountingVoucherLine {
+  return {
+    id: `vl-${lineNo}-${account.code}`,
+    lineNo,
+    accountId: account.id,
+    accountCode: account.code,
+    accountName: account.name,
+    debit,
+    credit,
+    narration,
+    partyType: extras.partyType ?? null,
+    partyId: extras.partyId ?? null,
+    partyName: extras.partyName ?? null,
+    costCentreId: extras.costCentreId ?? null,
+    costCentreName: extras.costCentreName ?? null,
+    projectId: extras.projectId ?? null,
+    projectName: extras.projectName ?? null,
+    dimension1: extras.dimension1 ?? null,
+    dimension2: extras.dimension2 ?? null,
+    gst: extras.gst ?? { enabled: false, treatment: 'none' },
+    tds: extras.tds ?? { enabled: false },
+  }
+}
+
+function voucher(
+  partial: Omit<AccountingVoucher, 'totalDebit' | 'totalCredit' | 'difference' | 'isBalanced' | 'currency'> & {
+    lines: AccountingVoucherLine[]
+  },
+): AccountingVoucher {
+  const sums = sumVoucherDebitCredit(partial.lines)
+  return {
+    ...partial,
+    ...sums,
+    currency: 'INR',
+  }
+}
+
+const BANK = acc('1112', 'HDFC Bank — Current A/c')
+const CASH = acc('1111', 'Cash in Hand')
+const EXP_TRAVEL = acc('6200', 'Selling and Distribution Expenses')
+const EXP_POWER = acc('5300', 'Factory Overheads')
+const EXP_PROF = acc('6100', 'Administrative Expenses')
+const AR = acc('1131', 'Trade Debtors')
+const AP = acc('2111', 'Trade Creditors')
+const SALARY = acc('6300', 'Employee Expenses')
+const TDS_PAY = acc('2140', 'TDS Payable')
+const ROUND = acc('4900', 'Other Income')
+const CAP_RES = acc('3100', 'Share Capital')
+const FG = acc('1143', 'Finished Goods Inventory')
+const HIRE = acc('4500', 'Service Income')
+
+export function seedAccountingVouchers(): AccountingVoucher[] {
+  return [
+    voucher({
+      id: 'vch-001',
+      voucherNumber: 'PMT-2026-00012',
+      voucherType: 'payment',
+      status: 'posted',
+      voucherDate: '2026-07-02',
+      postingDate: '2026-07-02',
+      fiscalPeriod: '2026-07',
+      narration: 'Vendor payment — Bharat Steel Traders against PI-7781',
+      referenceNo: 'UTR-AX7728192',
+      partyType: 'vendor',
+      partyId: 'party-v-01',
+      partyName: 'Bharat Steel Traders',
+      partyGstin: '27AABCB1234A1Z5',
+      paymentMode: 'neft',
+      bankAccountId: BANK.id,
+      bankAccountName: BANK.name,
+      transactionRef: 'UTR-AX7728192',
+      lines: [
+        line(1, AP, 245000, 0, 'Settle AP — PI-7781', {
+          partyType: 'vendor',
+          partyId: 'party-v-01',
+          partyName: 'Bharat Steel Traders',
+        }),
+        line(2, BANK, 0, 245000, 'NEFT outflow'),
+      ],
+      createdBy: ACCOUNTANT,
+      createdAt: '2026-07-02T05:10:00.000Z',
+      updatedBy: MANAGER,
+      updatedAt: '2026-07-02T07:40:00.000Z',
+      submittedAt: '2026-07-02T05:30:00.000Z',
+      submittedBy: ACCOUNTANT,
+      approvedAt: '2026-07-02T06:15:00.000Z',
+      approvedBy: MANAGER,
+      postedAt: '2026-07-02T07:40:00.000Z',
+      postedBy: MANAGER,
+      attachments: [
+        {
+          id: 'att-001',
+          name: 'neft-advice-ax7728192.pdf',
+          sizeKb: 186,
+          uploadedAt: '2026-07-02T05:12:00.000Z',
+          uploadedBy: ACCOUNTANT,
+        },
+      ],
+      notes: [
+        {
+          id: 'note-001',
+          body: 'Matched to PO-5003 / GRN-2210. Partial retention held separately.',
+          createdAt: '2026-07-02T05:20:00.000Z',
+          createdBy: ACCOUNTANT,
+        },
+      ],
+      approvalTrail: [
+        { id: 'ae-1', action: 'submitted', at: '2026-07-02T05:30:00.000Z', by: ACCOUNTANT },
+        { id: 'ae-2', action: 'approved', at: '2026-07-02T06:15:00.000Z', by: MANAGER, comment: 'Within payment authority.' },
+        { id: 'ae-3', action: 'posted', at: '2026-07-02T07:40:00.000Z', by: MANAGER },
+      ],
+      auditTrail: [
+        { id: 'au-1', at: '2026-07-02T05:10:00.000Z', by: ACCOUNTANT, action: 'Created' },
+        { id: 'au-2', at: '2026-07-02T07:40:00.000Z', by: MANAGER, action: 'Posted (demo)' },
+      ],
+    }),
+    voucher({
+      id: 'vch-002',
+      voucherNumber: 'RCT-2026-00008',
+      voucherType: 'receipt',
+      status: 'approved',
+      voucherDate: '2026-07-08',
+      postingDate: '2026-07-08',
+      fiscalPeriod: '2026-07',
+      narration: 'Customer receipt — Maharashtra Fleet Services (trailer hire)',
+      referenceNo: 'CHQ-884421',
+      partyType: 'customer',
+      partyId: 'party-c-01',
+      partyName: 'Maharashtra Fleet Services',
+      partyGstin: '27AADCM3456D1Z3',
+      paymentMode: 'cheque',
+      bankAccountId: BANK.id,
+      bankAccountName: BANK.name,
+      chequeNo: '884421',
+      chequeDate: '2026-07-07',
+      lines: [
+        line(1, BANK, 375500, 0, 'Cheque deposit'),
+        line(2, AR, 0, 375500, 'Reduce AR', {
+          partyType: 'customer',
+          partyId: 'party-c-01',
+          partyName: 'Maharashtra Fleet Services',
+        }),
+      ],
+      createdBy: ACCOUNTANT,
+      createdAt: '2026-07-08T04:00:00.000Z',
+      updatedBy: MANAGER,
+      updatedAt: '2026-07-09T09:00:00.000Z',
+      submittedAt: '2026-07-08T04:20:00.000Z',
+      submittedBy: ACCOUNTANT,
+      approvedAt: '2026-07-09T09:00:00.000Z',
+      approvedBy: MANAGER,
+      attachments: [],
+      notes: [],
+      approvalTrail: [
+        { id: 'ae-4', action: 'submitted', at: '2026-07-08T04:20:00.000Z', by: ACCOUNTANT },
+        { id: 'ae-5', action: 'approved', at: '2026-07-09T09:00:00.000Z', by: MANAGER },
+      ],
+      auditTrail: [
+        { id: 'au-3', at: '2026-07-08T04:00:00.000Z', by: ACCOUNTANT, action: 'Created' },
+        { id: 'au-4', at: '2026-07-09T09:00:00.000Z', by: MANAGER, action: 'Approved' },
+      ],
+    }),
+    voucher({
+      id: 'vch-003',
+      voucherNumber: 'JV-2026-00021',
+      voucherType: 'journal',
+      status: 'pending_approval',
+      voucherDate: '2026-07-10',
+      postingDate: '2026-07-10',
+      fiscalPeriod: '2026-07',
+      narration: 'Reclass power charges to factory overhead + travel accrual',
+      referenceNo: 'JE-RECLASS-0710',
+      lines: [
+        line(1, EXP_POWER, 42800, 0, 'Power allocation — production', {
+          costCentreId: 'cc-prod',
+          costCentreName: 'Production',
+        }),
+        line(2, EXP_TRAVEL, 12200, 0, 'Site travel accrual', {
+          costCentreId: 'cc-sales',
+          costCentreName: 'Sales & Marketing',
+        }),
+        line(3, AP, 0, 55000, 'Accrue vendor liability', {
+          partyType: 'vendor',
+          partyId: 'party-v-03',
+          partyName: 'Western Logistics Co',
+        }),
+      ],
+      createdBy: USER,
+      createdAt: '2026-07-10T06:45:00.000Z',
+      updatedBy: USER,
+      updatedAt: '2026-07-10T07:00:00.000Z',
+      submittedAt: '2026-07-10T07:00:00.000Z',
+      submittedBy: USER,
+      attachments: [],
+      notes: [
+        {
+          id: 'note-002',
+          body: 'Please verify cost centre split before approval.',
+          createdAt: '2026-07-10T07:01:00.000Z',
+          createdBy: USER,
+        },
+      ],
+      approvalTrail: [{ id: 'ae-6', action: 'submitted', at: '2026-07-10T07:00:00.000Z', by: USER }],
+      auditTrail: [{ id: 'au-5', at: '2026-07-10T06:45:00.000Z', by: USER, action: 'Created' }],
+    }),
+    voucher({
+      id: 'vch-004',
+      voucherNumber: 'CTR-2026-00003',
+      voucherType: 'contra',
+      status: 'draft',
+      voucherDate: '2026-07-12',
+      postingDate: '2026-07-12',
+      fiscalPeriod: '2026-07',
+      narration: 'Cash withdrawn from bank for petty cash replenishment',
+      fromAccountId: BANK.id,
+      fromAccountName: BANK.name,
+      toAccountId: CASH.id,
+      toAccountName: CASH.name,
+      lines: [
+        line(1, CASH, 50000, 0, 'Petty cash replenish'),
+        line(2, BANK, 0, 50000, 'Cash withdrawal'),
+      ],
+      createdBy: ACCOUNTANT,
+      createdAt: '2026-07-12T03:30:00.000Z',
+      updatedBy: ACCOUNTANT,
+      updatedAt: '2026-07-12T03:35:00.000Z',
+      attachments: [],
+      notes: [],
+      approvalTrail: [],
+      auditTrail: [{ id: 'au-6', at: '2026-07-12T03:30:00.000Z', by: ACCOUNTANT, action: 'Created' }],
+    }),
+    voucher({
+      id: 'vch-005',
+      voucherNumber: 'DN-2026-00002',
+      voucherType: 'debit_note',
+      status: 'sent_back',
+      voucherDate: '2026-07-05',
+      postingDate: '2026-07-05',
+      fiscalPeriod: '2026-07',
+      narration: 'Debit note — short supply / quality claim on Fasteners',
+      partyType: 'vendor',
+      partyId: 'party-v-02',
+      partyName: 'Precision Fasteners Pvt Ltd',
+      partyGstin: '27AADCP5678B1Z2',
+      originalInvoiceNo: 'VINV-4412',
+      originalInvoiceDate: '2026-06-28',
+      reasonCode: 'Quality / short supply',
+      sentBackReason: 'Attach QC rejection report before resubmitting.',
+      lines: [
+        line(1, AP, 18500, 0, 'Reduce AP for DN', {
+          partyType: 'vendor',
+          partyId: 'party-v-02',
+          partyName: 'Precision Fasteners Pvt Ltd',
+        }),
+        line(2, FG, 0, 18500, 'Inventory write-down / claim'),
+      ],
+      createdBy: ACCOUNTANT,
+      createdAt: '2026-07-05T08:00:00.000Z',
+      updatedBy: MANAGER,
+      updatedAt: '2026-07-06T05:00:00.000Z',
+      submittedAt: '2026-07-05T08:30:00.000Z',
+      submittedBy: ACCOUNTANT,
+      attachments: [],
+      notes: [],
+      approvalTrail: [
+        { id: 'ae-7', action: 'submitted', at: '2026-07-05T08:30:00.000Z', by: ACCOUNTANT },
+        {
+          id: 'ae-8',
+          action: 'sent_back',
+          at: '2026-07-06T05:00:00.000Z',
+          by: MANAGER,
+          comment: 'Attach QC rejection report before resubmitting.',
+        },
+      ],
+      auditTrail: [
+        { id: 'au-7', at: '2026-07-05T08:00:00.000Z', by: ACCOUNTANT, action: 'Created' },
+        { id: 'au-8', at: '2026-07-06T05:00:00.000Z', by: MANAGER, action: 'Sent back' },
+      ],
+    }),
+    voucher({
+      id: 'vch-006',
+      voucherNumber: 'CN-2026-00001',
+      voucherType: 'credit_note',
+      status: 'rejected',
+      voucherDate: '2026-07-03',
+      postingDate: '2026-07-03',
+      fiscalPeriod: '2026-07',
+      narration: 'Credit note — rate revision to Deccan Trailer Rentals',
+      partyType: 'customer',
+      partyId: 'party-c-02',
+      partyName: 'Deccan Trailer Rentals',
+      partyGstin: '27AAACD7890E1Z1',
+      originalInvoiceNo: 'SI-9021',
+      originalInvoiceDate: '2026-06-15',
+      reasonCode: 'Commercial rate revision',
+      rejectedReason: 'Commercial approval missing from Sales Head.',
+      lines: [
+        line(1, AR, 0, 27750, 'Reduce AR for CN', {
+          partyType: 'customer',
+          partyId: 'party-c-02',
+          partyName: 'Deccan Trailer Rentals',
+        }),
+        line(2, HIRE, 27750, 0, 'Reverse hire income'),
+      ],
+      createdBy: USER,
+      createdAt: '2026-07-03T09:00:00.000Z',
+      updatedBy: MANAGER,
+      updatedAt: '2026-07-04T04:00:00.000Z',
+      submittedAt: '2026-07-03T09:20:00.000Z',
+      submittedBy: USER,
+      attachments: [],
+      notes: [],
+      approvalTrail: [
+        { id: 'ae-9', action: 'submitted', at: '2026-07-03T09:20:00.000Z', by: USER },
+        {
+          id: 'ae-10',
+          action: 'rejected',
+          at: '2026-07-04T04:00:00.000Z',
+          by: MANAGER,
+          comment: 'Commercial approval missing from Sales Head.',
+        },
+      ],
+      auditTrail: [
+        { id: 'au-9', at: '2026-07-03T09:00:00.000Z', by: USER, action: 'Created' },
+        { id: 'au-10', at: '2026-07-04T04:00:00.000Z', by: MANAGER, action: 'Rejected' },
+      ],
+    }),
+    voucher({
+      id: 'vch-007',
+      voucherNumber: 'JV-2026-00018',
+      voucherType: 'journal',
+      status: 'draft',
+      voucherDate: '2026-07-14',
+      postingDate: '2026-07-14',
+      fiscalPeriod: '2026-07',
+      narration: 'Unbalanced draft — professional fee accrual (incomplete)',
+      lines: [
+        line(1, EXP_PROF, 85000, 0, 'Consultant fee accrual', {
+          gst: {
+            enabled: true,
+            treatment: 'taxable',
+            hsnSac: '9983',
+            taxableAmount: 85000,
+            gstPercent: 18,
+            cgst: 7650,
+            sgst: 7650,
+            igst: 0,
+            placeOfSupply: 'Maharashtra',
+          },
+          tds: { enabled: true, section: '194J', ratePercent: 10, baseAmount: 85000, tdsAmount: 8500 },
+        }),
+        line(2, TDS_PAY, 0, 8500, 'TDS 194J'),
+      ],
+      createdBy: ACCOUNTANT,
+      createdAt: '2026-07-14T10:00:00.000Z',
+      updatedBy: ACCOUNTANT,
+      updatedAt: '2026-07-14T10:15:00.000Z',
+      attachments: [],
+      notes: [
+        {
+          id: 'note-003',
+          body: 'Need balancing credit to Sundry Creditors before submit.',
+          createdAt: '2026-07-14T10:15:00.000Z',
+          createdBy: ACCOUNTANT,
+        },
+      ],
+      approvalTrail: [],
+      auditTrail: [{ id: 'au-11', at: '2026-07-14T10:00:00.000Z', by: ACCOUNTANT, action: 'Created' }],
+    }),
+    voucher({
+      id: 'vch-008',
+      voucherNumber: 'OB-2026-00001',
+      voucherType: 'opening_balance',
+      status: 'posted',
+      voucherDate: '2026-04-01',
+      postingDate: '2026-04-01',
+      fiscalPeriod: '2026-04',
+      narration: 'FY opening balances — equity & cash brought forward',
+      openingBalanceAsOf: '2026-04-01',
+      lines: [
+        line(1, CASH, 125000, 0, 'Opening cash'),
+        line(2, BANK, 850000, 0, 'Opening bank'),
+        line(3, CAP_RES, 0, 975000, 'Opening equity'),
+      ],
+      createdBy: MANAGER,
+      createdAt: '2026-04-01T02:00:00.000Z',
+      updatedBy: MANAGER,
+      updatedAt: '2026-04-01T03:00:00.000Z',
+      submittedAt: '2026-04-01T02:10:00.000Z',
+      submittedBy: MANAGER,
+      approvedAt: '2026-04-01T02:30:00.000Z',
+      approvedBy: MANAGER,
+      postedAt: '2026-04-01T03:00:00.000Z',
+      postedBy: MANAGER,
+      attachments: [],
+      notes: [],
+      approvalTrail: [
+        { id: 'ae-11', action: 'submitted', at: '2026-04-01T02:10:00.000Z', by: MANAGER },
+        { id: 'ae-12', action: 'approved', at: '2026-04-01T02:30:00.000Z', by: MANAGER },
+        { id: 'ae-13', action: 'posted', at: '2026-04-01T03:00:00.000Z', by: MANAGER },
+      ],
+      auditTrail: [{ id: 'au-12', at: '2026-04-01T03:00:00.000Z', by: MANAGER, action: 'Posted opening balances (demo)' }],
+    }),
+    voucher({
+      id: 'vch-009',
+      voucherNumber: 'PMT-2026-00009',
+      voucherType: 'payment',
+      status: 'reversed',
+      voucherDate: '2026-06-18',
+      postingDate: '2026-06-18',
+      fiscalPeriod: '2026-06',
+      narration: 'Duplicate salary advance — reversed',
+      partyType: 'employee',
+      partyId: 'party-e-01',
+      partyName: 'Suresh Patil',
+      paymentMode: 'upi',
+      bankAccountId: BANK.id,
+      bankAccountName: BANK.name,
+      transactionRef: 'UPI-991122',
+      reversedByVoucherId: 'vch-010',
+      reversedByVoucherNumber: 'PMT-2026-00010',
+      lines: [
+        line(1, SALARY, 15000, 0, 'Salary advance'),
+        line(2, BANK, 0, 15000, 'UPI payment'),
+      ],
+      createdBy: ACCOUNTANT,
+      createdAt: '2026-06-18T05:00:00.000Z',
+      updatedBy: MANAGER,
+      updatedAt: '2026-06-20T06:00:00.000Z',
+      submittedAt: '2026-06-18T05:10:00.000Z',
+      submittedBy: ACCOUNTANT,
+      approvedAt: '2026-06-18T06:00:00.000Z',
+      approvedBy: MANAGER,
+      postedAt: '2026-06-18T06:30:00.000Z',
+      postedBy: MANAGER,
+      attachments: [],
+      notes: [],
+      approvalTrail: [
+        { id: 'ae-14', action: 'posted', at: '2026-06-18T06:30:00.000Z', by: MANAGER },
+        { id: 'ae-15', action: 'reversed', at: '2026-06-20T06:00:00.000Z', by: MANAGER, comment: 'Duplicate entry' },
+      ],
+      auditTrail: [{ id: 'au-13', at: '2026-06-20T06:00:00.000Z', by: MANAGER, action: 'Reversed' }],
+    }),
+    voucher({
+      id: 'vch-010',
+      voucherNumber: 'PMT-2026-00010',
+      voucherType: 'payment',
+      status: 'posted',
+      voucherDate: '2026-06-20',
+      postingDate: '2026-06-20',
+      fiscalPeriod: '2026-06',
+      narration: 'Reversal of PMT-2026-00009 — Duplicate salary advance',
+      partyType: 'employee',
+      partyId: 'party-e-01',
+      partyName: 'Suresh Patil',
+      paymentMode: 'upi',
+      bankAccountId: BANK.id,
+      bankAccountName: BANK.name,
+      reversalOfVoucherId: 'vch-009',
+      reversalOfVoucherNumber: 'PMT-2026-00009',
+      lines: [
+        line(1, BANK, 15000, 0, 'Reversal bank'),
+        line(2, SALARY, 0, 15000, 'Reversal salary advance'),
+      ],
+      createdBy: MANAGER,
+      createdAt: '2026-06-20T06:00:00.000Z',
+      updatedBy: MANAGER,
+      updatedAt: '2026-06-20T06:00:00.000Z',
+      postedAt: '2026-06-20T06:00:00.000Z',
+      postedBy: MANAGER,
+      attachments: [],
+      notes: [],
+      approvalTrail: [{ id: 'ae-16', action: 'posted', at: '2026-06-20T06:00:00.000Z', by: MANAGER }],
+      auditTrail: [{ id: 'au-14', at: '2026-06-20T06:00:00.000Z', by: MANAGER, action: 'Auto-posted reversal (demo)' }],
+    }),
+    voucher({
+      id: 'vch-011',
+      voucherNumber: 'JV-2026-00015',
+      voucherType: 'journal',
+      status: 'cancelled',
+      voucherDate: '2026-06-01',
+      postingDate: '2026-06-01',
+      fiscalPeriod: '2026-06',
+      narration: 'Draft round-off — cancelled (superseded)',
+      cancelledReason: 'Superseded by month-end JV.',
+      lines: [
+        line(1, ROUND, 12, 0, 'Round off'),
+        line(2, BANK, 0, 12, 'Bank'),
+      ],
+      createdBy: USER,
+      createdAt: '2026-06-01T04:00:00.000Z',
+      updatedBy: USER,
+      updatedAt: '2026-06-02T04:00:00.000Z',
+      attachments: [],
+      notes: [],
+      approvalTrail: [
+        { id: 'ae-17', action: 'cancelled', at: '2026-06-02T04:00:00.000Z', by: USER, comment: 'Superseded by month-end JV.' },
+      ],
+      auditTrail: [{ id: 'au-15', at: '2026-06-02T04:00:00.000Z', by: USER, action: 'Cancelled' }],
+    }),
+  ]
+}

@@ -1,0 +1,293 @@
+/* vite-tailwind-layer-shim: keep @layer valid when Vite HMR processes this file alone */
+@tailwind components;
+
+/* Mobile Operations App — touch-first factory floor UI */
+@layer components {
+  .mob-app {
+    --mob-header-h: 52px;
+    --mob-nav-h: 64px;
+    --mob-tap-min: 44px;
+    --mob-brand: #0078d4;
+    --mob-bg: #f3f2f1;
+    --mob-card: #ffffff;
+    --mob-border: #edebe9;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--mob-bg);
+    color: #242424;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mob-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: var(--mob-header-h);
+    padding: 8px 12px;
+    background: var(--mob-brand);
+    color: #fff;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+  }
+
+  .mob-header-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .mob-header-sub {
+    font-size: 0.6875rem;
+    opacity: 0.9;
+  }
+
+  .mob-header-scan {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--mob-tap-min);
+    min-height: var(--mob-tap-min);
+    border-radius: 8px;
+    background: rgb(255 255 255 / 0.15);
+    border: 1px solid rgb(255 255 255 / 0.25);
+  }
+
+  .mob-main {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 12px calc(var(--mob-nav-h) + 16px);
+  }
+
+  .mob-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    min-height: var(--mob-nav-h);
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--mob-card);
+    border-top: 1px solid var(--mob-border);
+    box-shadow: 0 -2px 8px rgb(0 0 0 / 0.06);
+  }
+
+  .mob-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: var(--mob-tap-min);
+    font-size: 0.625rem;
+    font-weight: 500;
+    color: #605e5c;
+    text-decoration: none;
+    position: relative;
+  }
+
+  .mob-nav-item.active {
+    color: var(--mob-brand);
+    font-weight: 600;
+  }
+
+  .mob-nav-badge {
+    position: absolute;
+    top: 6px;
+    right: calc(50% - 22px);
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: #c42b2f;
+    color: #fff;
+    font-size: 0.625rem;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+  }
+
+  .mob-card {
+    background: var(--mob-card);
+    border: 1px solid var(--mob-border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  }
+
+  .mob-task-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .mob-task-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .mob-task-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+
+  .mob-task-meta {
+    font-size: 0.75rem;
+    color: #605e5c;
+  }
+
+  .mob-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .mob-chip-green { background: #dff6e8; color: #0a5c2e; }
+  .mob-chip-amber { background: #fff4d6; color: #8f5800; }
+  .mob-chip-red { background: #fde8e9; color: #8e1f22; }
+  .mob-chip-blue { background: #deecf9; color: #004578; }
+  .mob-chip-gray { background: #f3f2f1; color: #605e5c; }
+
+  .mob-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: var(--mob-tap-min);
+    padding: 0 16px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+  }
+
+  .mob-btn-primary {
+    background: var(--mob-brand);
+    color: #fff;
+  }
+
+  .mob-btn-secondary {
+    background: #fff;
+    color: var(--mob-brand);
+    border: 1px solid var(--mob-border);
+  }
+
+  .mob-btn-danger {
+    background: #c42b2f;
+    color: #fff;
+  }
+
+  .mob-sticky-bar {
+    position: sticky;
+    bottom: calc(var(--mob-nav-h) + 8px);
+    z-index: 30;
+    padding: 12px 0 0;
+    background: linear-gradient(transparent, var(--mob-bg) 20%);
+  }
+
+  .mob-scan-input {
+    width: 100%;
+    min-height: var(--mob-tap-min);
+    padding: 10px 14px;
+    border: 2px solid var(--mob-brand);
+    border-radius: 10px;
+    font-size: 1rem;
+    font-family: ui-monospace, monospace;
+  }
+
+  .mob-stepper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .mob-stepper button {
+    min-width: var(--mob-tap-min);
+    min-height: var(--mob-tap-min);
+    border-radius: 8px;
+    border: 1px solid var(--mob-border);
+    background: #fff;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  .mob-stepper-value {
+    flex: 1;
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+
+  .mob-offline-banner {
+    padding: 8px 12px;
+    background: #fff4d6;
+    color: #8f5800;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-align: center;
+    border-bottom: 1px solid #f0d090;
+  }
+
+  .mob-section-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #605e5c;
+    margin: 16px 0 8px;
+  }
+
+  .mob-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .mob-field label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #605e5c;
+    margin-bottom: 4px;
+  }
+
+  .mob-field input,
+  .mob-field select,
+  .mob-field textarea {
+    width: 100%;
+    min-height: var(--mob-tap-min);
+    padding: 8px 12px;
+    border: 1px solid var(--mob-border);
+    border-radius: 8px;
+    font-size: 1rem;
+  }
+
+  .mob-checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: var(--mob-tap-min);
+    padding: 10px 0;
+    border-bottom: 1px solid var(--mob-border);
+  }
+
+  .mob-checklist-item:last-child {
+    border-bottom: none;
+  }
+}

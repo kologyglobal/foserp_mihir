@@ -1,0 +1,1 @@
+export { seedDemoFinance } from './demoDispatchSeed'

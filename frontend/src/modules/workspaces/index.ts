@@ -1,0 +1,8 @@
+export { ExecutiveWorkspacePage } from './ExecutiveWorkspace'
+export { SalesWorkspacePage } from './SalesWorkspace'
+export { InventoryWorkspacePage } from './InventoryWorkspace'
+export { PurchaseWorkspacePage } from './PurchaseWorkspace'
+export { ProductionWorkspacePage } from './ProductionWorkspace'
+export { QualityWorkspacePage } from './QualityWorkspace'
+export { DispatchWorkspacePage } from './DispatchWorkspace'
+export { FinanceWorkspacePage } from './FinanceWorkspace'

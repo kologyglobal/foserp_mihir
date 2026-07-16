@@ -1,0 +1,38 @@
+﻿node.exe : npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm 
+help npmrc` for supported config options.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...config options.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+> trailer-erp@0.0.0 test:advanced-crm
+> tsx scripts/test-advanced-crm.ts
+
+
+Advanced CRM Tests
+
+  Γ£ô 1. CRM dashboard shows pipeline value and follow-ups ΓÇö pipeline Γé╣65238000
+  Γ£ô 2. Opportunity Kanban renders all stages ΓÇö 10 stages
+  Γ£ô 3. Opportunity card moves between stages
+  Γ£ô 4. Lost opportunity requires lost reason
+  Γ£ô 5. Quick follow-up creates follow-up and activity
+  Γ£ô 6. Follow-up completion updates activity timeline
+  Γ£ô 7. Customer list shows open opportunities and last activity ΓÇö 31 customers
+  Γ£ô 8. Opportunity 360 shows summary, activities, quotations and timeline
+  Γ£ô 9. Quotation can be created from opportunity ΓÇö quo-4f615d4f
+  Γ£ô 10. Quotation editor loads template sections ΓÇö 16 sections
+  Γ£ô 11. User can add/edit/remove/reorder quotation sections
+  Γ£ô 12. Price table calculates totals ΓÇö Γé╣224200
+  Γ£ô 13. Quotation revision locks previous revision
+  Γ£ô 14. Approved quotation locks editing
+  Γ£ù 15. Quotation preview renders document view
+  Γ£ô 16. Quotation can convert to SO only after approval
+  Γ£ô 17. SO stores quotation revision reference
+  Γ£ô 18. CRM sample data has 40+ opportunities and 100+ activities ΓÇö 41 opps, 114 acts
+  Γ£ô 19. CRM routes include dashboard and kanban
+  Γ£ô 20. Quotation templates seeded ΓÇö 10 templates
+
+19 passed, 1 failed
+

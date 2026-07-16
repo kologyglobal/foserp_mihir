@@ -1,0 +1,75 @@
+/* Microsoft Fluent–inspired typography & semantic tokens */
+:root {
+  /* Fluent neutral palette (harmonized with ERP brand) */
+  --erp-text: #242424;
+  --erp-text-secondary: #424242;
+  --erp-muted: #616161;
+  --erp-muted-subtle: #8a8886;
+  --erp-border: #e1dfdd;
+  --erp-border-strong: #c8c6c4;
+  --erp-bg-subtle: #faf9f8;
+  --erp-surface-alt: #f3f2f1;
+
+  /* Type scale — 16px root, Fluent rhythm */
+  --erp-font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --erp-font-family-mono: 'Cascadia Mono', Consolas, 'Segoe UI Mono', ui-monospace, monospace;
+
+  --erp-font-2xs: 0.6875rem;  /* 11px */
+  --erp-font-xs: 0.75rem;     /* 12px */
+  --erp-font-sm: 0.8125rem;   /* 13px — caption */
+  --erp-font-nav: 1rem;       /* 16px — nav & body */
+  --erp-font-base: 1rem;      /* 16px */
+  --erp-font-md: 1.0625rem;   /* 17px */
+  --erp-font-lg: 1.125rem;    /* 18px — title 3 */
+  --erp-font-xl: 1.375rem;    /* 22px — page title */
+  --erp-font-2xl: 1.625rem;   /* 26px */
+
+  --erp-lh-tight: 1.25;
+  --erp-lh-snug: 1.333;
+  --erp-lh-normal: 1.5;
+  --erp-lh-relaxed: 1.5;
+
+  --erp-fw-regular: 400;
+  --erp-fw-medium: 500;
+  --erp-fw-semibold: 600;
+  --erp-fw-bold: 700;
+
+  --erp-tracking-tight: -0.01em;
+  --erp-tracking-normal: 0;
+  --erp-tracking-wide: 0.02em;
+  --erp-tracking-caps: 0.06em;
+
+  /* Named roles */
+  --erp-font-page-title: var(--erp-font-xl);
+  --erp-font-section-title: var(--erp-font-base);
+  --erp-font-card-title: var(--erp-font-base);
+  --erp-font-kpi: var(--erp-font-2xl);
+  --erp-font-label: var(--erp-font-xs);
+  --erp-font-doc-no: var(--erp-font-sm);
+  --erp-font-nav-item: var(--erp-font-nav);
+  --erp-font-nav-group: var(--erp-font-xs);
+  --erp-font-nav-category: var(--erp-font-base);
+
+  /* Shadows & radius (existing) */
+  --erp-primary-dark: #083d6f;
+  --erp-released: #4f46a8;
+  --erp-qc-hold: #e86c00;
+  --erp-blocked: #c42b2f;
+  --erp-shadow-card: 0 1px 3px rgb(10 77 140 / 0.06), 0 1px 2px rgb(10 77 140 / 0.04);
+  --erp-shadow-hover: 0 4px 12px rgb(10 77 140 / 0.1);
+  --erp-shadow-drawer: 0 8px 24px rgb(10 77 140 / 0.14);
+  --erp-shadow-command: 0 2px 8px rgb(10 77 140 / 0.08);
+  --erp-radius-card: 8px;
+  --erp-radius-button: 6px;
+  --erp-radius-input: 6px;
+  --erp-radius-badge: 4px;
+  --erp-section-gap: 16px;
+  --erp-grid-gap: 16px;
+
+  /* Sidebar — Fluent shell */
+  --erp-sidebar-bg: #faf9f8;
+  --erp-sidebar-bg-elevated: #ffffff;
+  --erp-nav-hover: #f3f2f1;
+  --erp-nav-active-bg: #edf3f8;
+  --erp-nav-active-border: var(--erp-primary);
+}

@@ -1,0 +1,5 @@
+/**
+ * ERP theme token bridge — imported by src/index.css
+ * Maps TypeScript token names to CSS custom properties.
+ */
+@import './tokens-bridge.css';

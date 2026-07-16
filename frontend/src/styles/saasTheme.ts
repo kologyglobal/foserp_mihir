@@ -1,0 +1,53 @@
+/** FOS ERP SaaS Theme — design token source */
+export const saasTheme = {
+  name: 'FOS ERP',
+  color: {
+    primary: '#3730a3',
+    primaryHover: '#312e81',
+    primarySoft: '#eef2ff',
+    accent: '#06b6d4',
+    accentSoft: '#ecfeff',
+    background: '#f1f5f9',
+    backgroundSubtle: '#f8fafc',
+    surface: '#ffffff',
+    surfaceElevated: '#ffffff',
+    border: '#e2e8f0',
+    borderStrong: '#cbd5e1',
+    text: '#0f172a',
+    textSecondary: '#475569',
+    muted: '#64748b',
+    navy: '#0f172a',
+    indigo: '#4f46e5',
+    live: '#06b6d4',
+    success: '#059669',
+    successSoft: '#ecfdf5',
+    warning: '#d97706',
+    warningSoft: '#fffbeb',
+    danger: '#dc2626',
+    dangerSoft: '#fef2f2',
+    info: '#2563eb',
+    infoSoft: '#eff6ff',
+    qcHold: '#ea580c',
+    released: '#4f46e5',
+  },
+  shadow: {
+    sm: '0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06)',
+    md: '0 4px 6px rgb(15 23 42 / 0.04), 0 10px 24px rgb(15 23 42 / 0.06)',
+    lg: '0 12px 32px rgb(15 23 42 / 0.08)',
+    glow: '0 0 0 1px rgb(99 102 241 / 0.08), 0 8px 24px rgb(99 102 241 / 0.12)',
+  },
+  radius: {
+    sm: '6px',
+    md: '10px',
+    lg: '14px',
+    xl: '18px',
+    full: '9999px',
+  },
+  motion: {
+    fast: '120ms ease',
+    base: '180ms ease',
+    slow: '280ms ease',
+  },
+} as const
+
+export type SaasAccent = 'primary' | 'accent' | 'success' | 'warning' | 'danger' | 'info' | 'indigo' | 'live' | 'neutral'

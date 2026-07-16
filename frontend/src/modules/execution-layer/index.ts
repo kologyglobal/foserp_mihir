@@ -1,0 +1,6 @@
+export { WorkOrder360Page } from './WorkOrder360Page'
+export { JobCardWorkbenchPage } from './JobCardWorkbenchPage'
+export { JobWorkOrderRegisterPage } from './JobWorkOrderRegisterPage'
+export { JobWorkOrderDetailPage } from './JobWorkOrderDetailPage'
+export { JobWorkChallanPrintPage } from './JobWorkChallanPrintPage'
+export { VendorJobWorkWorkspacePage } from './VendorJobWorkWorkspacePage'

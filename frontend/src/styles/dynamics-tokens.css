@@ -1,0 +1,78 @@
+/* Microsoft Dynamics 365 — enterprise ERP design tokens (FOS ERP) */
+:root {
+  /* Top bar */
+  --dyn-navy: #001b3a;
+  --dyn-navy-text: #ffffff;
+
+  /* Primary */
+  --dyn-primary: #0078d4;
+  --dyn-primary-hover: #106ebe;
+  --dyn-primary-soft: #eff6fc;
+
+  /* Surfaces */
+  --dyn-bg-app: #f5f6f8;
+  --dyn-bg-sidebar: #f3f4f6;
+  --dyn-bg-card: #ffffff;
+  --dyn-border: #e1e4e8;
+  --dyn-border-strong: #c8cdd3;
+
+  /* Text */
+  --dyn-text: #1f2933;
+  --dyn-text-secondary: #5f6b7a;
+  --dyn-text-muted: #8a94a6;
+
+  /* Status */
+  --dyn-success: #107c10;
+  --dyn-warning: #f59e0b;
+  --dyn-critical: #d13438;
+  --dyn-info: #0078d4;
+  --dyn-live: #00a6a6;
+  --dyn-pending: #ca5010;
+  --dyn-closed: #395e1a;
+
+  /* Spacing & density */
+  --dyn-space-page: 20px;
+  --dyn-space-section: 16px;
+  --dyn-space-card: 16px;
+  --dyn-row-height: 40px;
+  --dyn-kpi-height: 96px;
+  --dyn-filter-height: 36px;
+  --dyn-command-height: 44px;
+  --dyn-live-strip-height: 0px;
+
+  /* Compact typography (13px base inside .d365-app) */
+  --dyn-font-micro: 0.692rem;   /* ~11px */
+  --dyn-font-xs: 0.769rem;      /* ~12px */
+  --dyn-font-sm: 0.846rem;      /* ~13px */
+  --dyn-font-body: 0.846rem;    /* 13px */
+  --dyn-font-section: 0.923rem; /* ~14px */
+  --dyn-font-title: 1.231rem;   /* ~16px */
+  --dyn-font-page: 1.385rem;    /* ~18px */
+  --dyn-font-kpi: 1.846rem;     /* ~24px */
+
+  /* Bridge Dynamics tokens → existing ERP/SaaS vars */
+  --d365-suite-bg: var(--dyn-navy);
+  --d365-brand: var(--dyn-primary);
+  --d365-brand-hover: var(--dyn-primary-hover);
+  --d365-brand-soft: var(--dyn-primary-soft);
+  --d365-workspace-bg: var(--dyn-bg-app);
+  --d365-nav-bg: var(--dyn-bg-sidebar);
+  --d365-surface: var(--dyn-bg-card);
+  --d365-border: var(--dyn-border);
+  --d365-border-strong: var(--dyn-border-strong);
+  --d365-text: var(--dyn-text);
+  --d365-text-secondary: var(--dyn-text-secondary);
+  --d365-muted: var(--dyn-text-muted);
+  --erp-primary: var(--dyn-primary);
+  --erp-primary-hover: var(--dyn-primary-hover);
+  --erp-primary-soft: var(--dyn-primary-soft);
+  --erp-bg: var(--dyn-bg-app);
+  --erp-sidebar-bg: var(--dyn-bg-sidebar);
+  --erp-surface: var(--dyn-bg-card);
+  --erp-border: var(--dyn-border);
+  --erp-text: var(--dyn-text);
+  --erp-muted: var(--dyn-text-secondary);
+  --saas-primary: var(--dyn-primary);
+  --saas-bg: var(--dyn-bg-app);
+  --saas-border: var(--dyn-border);
+}

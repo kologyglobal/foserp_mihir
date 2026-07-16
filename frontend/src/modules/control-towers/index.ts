@@ -1,0 +1,5 @@
+export { ProductionControlTowerPage } from './ProductionControlTowerPage'
+export { MrpPlannerWorkbenchPage } from './MrpPlannerWorkbenchPage'
+export { ExecutiveDashboardPage } from './ExecutiveDashboardPage'
+export { UnifiedInboxPage } from './UnifiedInboxPage'
+export { ShopFloorJobQueuePage } from './ShopFloorJobQueuePage'

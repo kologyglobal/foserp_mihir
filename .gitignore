@@ -4,6 +4,8 @@
 *.env
 **/.env
 **/.env.*
+!.env.example
+!**/.env.example
 
 # Hosting / live infra docs (DB usernames, domain, seed logins) — keep private for now
 docs/HOSTING_FINAL_UPLOAD.md
@@ -17,6 +19,13 @@ deploy/host-package/README.md
 /body*.txt
 /headers*.txt
 /tsc-*.txt
+frontend/tsc*.txt
+frontend/typecheck*.txt
+frontend/tc-errors.txt
+frontend/wo-flow-out.txt
+frontend/.oxlint-out.txt
+frontend/.tsc-out.txt
+frontend/uat-manual-api-results.json
 
 # Mac archive junk
 __MACOSX/
@@ -37,8 +46,13 @@ release/*.zip
 # Dependencies / build
 node_modules/
 dist/
+dist-ssr/
 build/
 coverage/
+
+# Nested-repo backups (never commit)
+frontend/.git.bak-nested-*/
+**/.git.bak-*/
 
 # Editor
 .idea/
@@ -47,3 +61,5 @@ coverage/
 *.njsproj
 *.sln
 *.sw?
+.vscode/*
+!.vscode/extensions.json

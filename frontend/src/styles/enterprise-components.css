@@ -1,0 +1,1320 @@
+/* Enterprise SaaS components — CRM & Sales */
+
+/* ── Compact page header ── */
+.erp-page--enterprise .erp-page-hero {
+  border-radius: var(--ent-radius-card);
+  box-shadow: var(--ent-shadow-sm);
+  border-color: rgb(226 232 240 / 0.8);
+}
+
+.erp-page--enterprise .erp-page-hero-band {
+  padding: var(--ent-hero-band-py) var(--ent-hero-band-px);
+  border-bottom: none;
+  background: var(--erp-surface);
+}
+
+.erp-page--enterprise .erp-page-title {
+  font-size: var(--ent-font-page-title);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.erp-page--enterprise .erp-page-hero-filter {
+  padding: var(--ent-filter-row-py) var(--ent-hero-band-px);
+  border-top: 1px solid var(--erp-border);
+}
+
+.erp-page--enterprise .erp-page-hero-insights {
+  padding: 8px var(--ent-hero-band-px) 10px;
+  border-top: 1px solid var(--erp-border);
+  background: var(--erp-surface);
+}
+
+.erp-page-hero-enterprise-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.erp-page-hero-enterprise-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.erp-page-hero--workspace-merged {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+}
+
+.erp-page-hero--workspace-merged .erp-page-hero-insights {
+  margin-top: 0;
+  padding: 6px 16px 8px;
+  border-top: none;
+  background: transparent;
+}
+
+.dyn-page-shell .erp-page-hero--workspace-merged {
+  border: none !important;
+}
+
+/* ── Enterprise KPI strip — BC / D365 compact insight cards ── */
+.ent-kpi-strip {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin-bottom: 10px;
+}
+
+.ent-kpi-strip[style*='--ent-kpi-columns: 4'] {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+@media (min-width: 1280px) {
+  .ent-kpi-strip[style*='--ent-kpi-columns: 5'] {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .ent-kpi-strip[style*='--ent-kpi-columns: 4'] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1024px) {
+  .ent-kpi-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .ent-kpi-strip {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ent-kpi-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 0;
+  padding: 10px 12px 10px 14px;
+  border-radius: var(--ent-radius-card);
+  border: 1px solid #e4e7ec;
+  border-left-width: 3px;
+  border-left-color: #e4e7ec;
+  background: #fff;
+  box-shadow: var(--ent-shadow-xs);
+  text-align: left;
+  cursor: default;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  overflow: hidden;
+}
+
+.ent-kpi-card--accent-blue { border-left-color: var(--erp-primary, #0078d4); }
+.ent-kpi-card--accent-green { border-left-color: #16a34a; }
+.ent-kpi-card--accent-amber { border-left-color: #d97706; }
+.ent-kpi-card--accent-red { border-left-color: #dc2626; }
+.ent-kpi-card--accent-slate { border-left-color: #94a3b8; }
+
+.ent-kpi-card--clickable {
+  cursor: pointer;
+}
+
+.ent-kpi-card--clickable:hover {
+  border-color: color-mix(in srgb, var(--erp-primary) 35%, #e4e7ec);
+  box-shadow: var(--ent-shadow-sm);
+  transform: translateY(-1px);
+}
+
+.ent-kpi-card--active {
+  border-color: var(--erp-primary);
+  border-left-color: var(--erp-primary);
+  background: color-mix(in srgb, var(--erp-primary) 4%, #fff);
+  box-shadow: var(--ent-shadow-sm);
+}
+
+.ent-kpi-card__head {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 16px;
+}
+
+.ent-kpi-card__label {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #667085;
+}
+
+.ent-kpi-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #98a2b3;
+  opacity: 0.85;
+}
+
+.ent-kpi-card__value-row {
+  display: flex;
+  width: 100%;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 28px;
+  margin-top: 2px;
+}
+
+.ent-kpi-card__value {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  color: #101828;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.ent-kpi-card__value--currency {
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+.ent-kpi-card__sparkline {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+  font-size: 9px;
+  line-height: 1;
+  color: #98a2b3;
+  letter-spacing: -0.05em;
+  padding-bottom: 2px;
+  flex-shrink: 0;
+}
+
+.ent-kpi-card__foot {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 16px;
+  margin-top: 2px;
+}
+
+.ent-kpi-card__trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.ent-kpi-card__trend svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ent-kpi-card__trend--up { color: #16a34a; }
+.ent-kpi-card__trend--down { color: #dc2626; }
+.ent-kpi-card__trend--neutral { color: #2563eb; }
+
+.ent-kpi-card__context {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: #667085;
+  text-align: right;
+}
+
+.ent-kpi-card__updated {
+  margin: 0;
+  font-size: 12px;
+  color: #98a2b3;
+  line-height: 1.2;
+}
+
+/* Legacy aliases */
+.ent-kpi-card__helper {
+  font-size: 13px;
+  color: #667085;
+}
+
+/* ── Enterprise record cell ── */
+.ent-record-cell {
+  min-width: 0;
+}
+
+.ent-record-cell__primary {
+  font-size: var(--ent-font-body);
+  font-weight: 600;
+  color: var(--erp-text);
+  line-height: 1.35;
+}
+
+.ent-record-cell__meta {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #667085;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ent-record-cell__meta > span:not(:last-child)::after {
+  content: ' · ';
+  color: #98a2b3;
+}
+
+.ent-record-cell__id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--ent-font-body);
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+/* ── Global status badge standard ── */
+.ent-status-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 24px;
+  white-space: nowrap;
+}
+
+.ent-status-chip--open { background: var(--ent-status-open-bg); color: var(--ent-status-open); }
+.ent-status-chip--qualified { background: var(--ent-status-qualified-bg); color: var(--ent-status-qualified); }
+.ent-status-chip--converted { background: var(--ent-status-converted-bg); color: var(--ent-status-converted); }
+.ent-status-chip--lost { background: var(--ent-status-lost-bg); color: var(--ent-status-lost); }
+.ent-status-chip--closed { background: var(--ent-status-closed-bg); color: var(--ent-status-closed); }
+.ent-status-chip--hold { background: var(--ent-status-hold-bg); color: var(--ent-status-hold); }
+
+/* ── Probability badge (compact single-line) ── */
+.ent-prob-badge {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.ent-prob-badge__value {
+  font-size: var(--ent-font-body);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--erp-text);
+}
+
+.ent-prob-badge--high .ent-prob-badge__value { color: var(--ent-status-qualified); }
+.ent-prob-badge--medium .ent-prob-badge__value { color: var(--ent-status-hold); }
+.ent-prob-badge--low .ent-prob-badge__value { color: var(--ent-status-lost); }
+
+/* ── Row actions menu ── */
+.ent-row-actions {
+  position: relative;
+}
+
+.ent-row-actions__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ent-radius-button);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--erp-muted);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.ent-row-actions__trigger:hover {
+  background: var(--erp-surface-alt);
+  border-color: var(--erp-border);
+  color: var(--erp-text);
+}
+
+.ent-row-actions__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 40;
+  min-width: 180px;
+  padding: 4px;
+  border-radius: var(--ent-radius-input);
+  border: 1px solid var(--erp-border);
+  background: var(--erp-surface);
+  box-shadow: var(--ent-shadow-sm);
+}
+
+.ent-row-actions__menu--portal {
+  position: fixed;
+  right: auto;
+  top: auto;
+  z-index: 10050;
+  max-height: min(70vh, 420px);
+  overflow-y: auto;
+}
+
+.ent-row-actions__item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: var(--ent-font-body);
+  color: var(--erp-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ent-row-actions__item:hover:not(:disabled) {
+  background: var(--erp-surface-alt);
+}
+
+.ent-row-actions__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ent-row-actions__item--danger {
+  color: var(--erp-danger-solid, #c42b2f);
+}
+
+.ent-row-actions__item--primary {
+  color: #0078d4;
+  font-weight: 600;
+}
+
+.ent-row-actions__item--primary:hover:not(:disabled) {
+  background: rgba(0, 120, 212, 0.08);
+  box-shadow: inset 0 0 0 1px #0078d4;
+}
+
+.ent-row-actions__separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--erp-border);
+}
+
+/* ── Activity indicators ── */
+.ent-activity-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ent-activity-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--erp-muted);
+  background: var(--erp-surface-alt);
+}
+
+.ent-activity-pill--active {
+  color: var(--erp-primary);
+  background: var(--erp-primary-soft);
+}
+
+/* ── Bulk action bar ── */
+.ent-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: var(--ent-radius-input);
+  border: 1px solid color-mix(in srgb, var(--erp-primary) 25%, var(--erp-border));
+  background: color-mix(in srgb, var(--erp-primary) 5%, #fff);
+}
+
+.ent-bulk-bar--toolbar {
+  margin-bottom: 0;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+}
+
+.ent-bulk-bar__count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--erp-primary);
+  white-space: nowrap;
+}
+
+.ent-bulk-bar__sep {
+  width: 1px;
+  height: 20px;
+  background: var(--erp-border);
+}
+
+.ent-bulk-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1;
+}
+
+.ent-bulk-bar__action-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ent-bulk-bar__dot {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--erp-muted);
+  user-select: none;
+  line-height: 1;
+}
+
+.ent-bulk-bar__btn {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--erp-border);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--erp-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.ent-bulk-bar__btn:hover:not(:disabled) {
+  background: var(--erp-surface-alt);
+  border-color: color-mix(in srgb, var(--erp-primary) 30%, var(--erp-border));
+}
+
+.ent-bulk-bar__btn--danger {
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.ent-bulk-bar__btn--danger:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
+.ent-bulk-bar__clear {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--erp-muted);
+}
+
+.ent-bulk-bar__clear:hover {
+  color: var(--erp-text);
+}
+
+/* ── Enterprise pagination ── */
+.ent-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.ent-pagination__summary {
+  margin: 0;
+  font-size: 13px;
+  color: #667085;
+}
+
+.ent-pagination__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.ent-pagination__page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #667085;
+}
+
+.ent-pagination__select {
+  appearance: none;
+  height: 32px;
+  min-width: 4rem;
+  padding: 0 28px 0 10px;
+  border-radius: 8px;
+  border: 1px solid #e4e7ec;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  color: #344054;
+}
+
+.ent-pagination__nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ent-pagination__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid #e4e7ec;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #344054;
+}
+
+.ent-pagination__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ent-pagination__btn:not(:disabled):hover {
+  background: #f8fafc;
+}
+
+.ent-pagination__page {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #667085;
+}
+
+.ent-pagination__page--active {
+  background: color-mix(in srgb, var(--erp-primary) 10%, #fff);
+  border-color: color-mix(in srgb, var(--erp-primary) 25%, #e4e7ec);
+  color: var(--erp-primary);
+}
+
+.ent-pagination__ellipsis {
+  padding: 0 4px;
+  font-size: 13px;
+  color: #98a2b3;
+}
+
+.ent-data-grid__footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  border-top: 1px solid #e4e7ec;
+  background: #f8fafc;
+  padding: 10px 16px;
+}
+
+.ent-data-grid__record-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #344054;
+  white-space: nowrap;
+}
+
+.ent-data-grid__record-label span {
+  font-weight: 500;
+  color: #667085;
+}
+
+/* ── Enterprise controls (CRM/Sales/dynamics pages) ── */
+.dyn-page-shell .erp-btn,
+.dyn-page-shell .erp-command-btn-primary,
+.dyn-page-shell .erp-command-bar button,
+.erp-page--enterprise .erp-btn {
+  min-height: 40px;
+  border-radius: var(--ent-radius-button);
+  font-size: 14px;
+}
+
+.dyn-page-shell:not(:has(.enterprise-workspace--dynamics-form)) .erp-input:not(.erp-search-field__input),
+.dyn-page-shell:not(:has(.enterprise-workspace--dynamics-form)) input.erp-input:not(.erp-search-field__input),
+.dyn-page-shell:not(:has(.enterprise-workspace--dynamics-form)) select.erp-input,
+.dyn-page-shell:not(:has(.enterprise-workspace--dynamics-form)) textarea.erp-input,
+.erp-page--enterprise:not(:has(.enterprise-workspace--dynamics-form)) .erp-input:not(.erp-search-field__input),
+.erp-page--enterprise:not(:has(.enterprise-workspace--dynamics-form)) .ent-search-wrap input:not(.erp-search-field__input) {
+  min-height: 40px;
+  border-radius: var(--ent-radius-input);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+/* Dynamics card forms — Fiori 34px fields (beats dyn-page-shell defaults) */
+.dyn-page-shell .enterprise-workspace--dynamics-form .erp-input:not(textarea):not(.erp-search-field__input),
+.dyn-page-shell .enterprise-workspace--dynamics-form input.erp-input:not([type='checkbox']):not([type='radio']):not(textarea):not(.erp-search-field__input),
+.dyn-page-shell .enterprise-workspace--dynamics-form select.erp-input,
+.dyn-page-shell .enterprise-workspace--dynamics-form .erp-select,
+.dyn-page-shell .enterprise-workspace--dynamics-form .erp-smart-select__anchor {
+  height: 34px;
+  min-height: 34px;
+  max-height: 34px;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 10px;
+  padding-right: 10px;
+  font-size: 13px;
+  line-height: 1.25;
+  box-sizing: border-box;
+}
+
+.dyn-page-shell .enterprise-workspace--dynamics-form select.erp-input,
+.dyn-page-shell .enterprise-workspace--dynamics-form .erp-select {
+  padding-right: 2rem;
+}
+
+.dyn-page-shell .enterprise-workspace--dynamics-form .erp-search-field .erp-search-field__input.erp-input {
+  height: 34px;
+  min-height: 34px;
+  max-height: 34px;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 2.25rem;
+  padding-right: 10px;
+  font-size: 13px;
+  line-height: 1.25;
+  box-sizing: border-box;
+}
+
+.dyn-page-shell .enterprise-workspace--dynamics-form .erp-search-field .erp-search-field__icon {
+  left: 10px;
+  width: 16px;
+  height: 16px;
+}
+
+.dyn-page-shell .enterprise-workspace--dynamics-form textarea.erp-input {
+  height: auto;
+  min-height: 64px;
+  max-height: none;
+  padding: 6px 10px;
+  line-height: 1.45;
+}
+
+.dyn-page-shell .erp-input::placeholder,
+.erp-page--enterprise .erp-input::placeholder {
+  color: #98a2b3;
+}
+
+/* Icon buttons 36×36 */
+.dyn-page-shell .ent-row-actions__trigger,
+.erp-page--enterprise .ent-row-actions__trigger {
+  width: 36px;
+  height: 36px;
+}
+
+/* Lucide icons — consistent 18px stroke */
+.dyn-page-shell .lucide,
+.erp-page--enterprise .lucide {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.75;
+}
+
+.erp-command-bar--inline {
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.erp-command-bar--inline .flex.items-center.gap-1 {
+  border-right: none;
+  padding: 0;
+}
+
+.ent-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  max-width: 560px;
+}
+
+.ent-search-wrap .erp-search-input,
+.ent-search-wrap input {
+  width: 100%;
+  padding-right: 4.5rem;
+}
+
+.ent-search-kbd {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--erp-border);
+  background: var(--erp-surface-alt);
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--erp-muted);
+  pointer-events: none;
+}
+
+@media (min-width: 768px) {
+  .ent-search-kbd { display: inline-flex; }
+}
+
+/* ── Enterprise table density ── */
+.ent-data-grid--comfortable tbody tr { height: var(--ent-row-height-comfortable); }
+.ent-data-grid--compact tbody tr { height: var(--ent-row-height-compact); }
+.ent-data-grid--expanded tbody tr { height: var(--ent-row-height-expanded); }
+
+.ent-data-grid thead th {
+  font-size: var(--ent-font-table-header);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── Empty state ── */
+.ent-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  border-radius: var(--ent-radius-card);
+  border: 1px dashed var(--erp-border);
+  background: var(--erp-surface-alt);
+}
+
+.ent-empty-state__title {
+  font-size: var(--ent-font-section);
+  font-weight: 600;
+  color: var(--erp-text);
+}
+
+.ent-empty-state__desc {
+  font-size: var(--ent-font-body);
+  color: var(--erp-muted);
+  max-width: 360px;
+}
+
+/* ── Sidebar enterprise ── */
+.erp-sidebar--enterprise .erp-sidebar-nav-link {
+  padding-left: 1rem;
+  margin-left: 0.25rem;
+  border-left: 3px solid transparent;
+  border-radius: 0 8px 8px 0;
+}
+
+.erp-sidebar--enterprise .erp-sidebar-nav-link.active,
+.erp-sidebar--enterprise .erp-sidebar-nav-link[aria-current="page"] {
+  background: color-mix(in srgb, var(--erp-primary) 8%, transparent);
+  border-left-color: var(--erp-primary);
+  font-weight: 600;
+}
+
+.erp-sidebar--enterprise .erp-sidebar-group {
+  margin-bottom: 1.25rem;
+}
+
+/* ── Command bar More menu ── */
+.erp-command-more {
+  position: relative;
+}
+
+.erp-command-more__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 50;
+  min-width: 200px;
+  padding: 4px;
+  border-radius: var(--ent-radius-input);
+  border: 1px solid var(--erp-border);
+  background: var(--erp-surface);
+  box-shadow: var(--ent-shadow-sm);
+}
+
+.erp-command-more__item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: var(--ent-font-body);
+  color: var(--erp-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.erp-command-more__item:hover {
+  background: var(--erp-surface-alt);
+}
+
+.erp-command-more__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.erp-command-more__item--danger {
+  color: var(--erp-danger, #a4262c);
+}
+
+.erp-command-more__item--danger:hover {
+  background: rgb(164 38 44 / 0.08);
+}
+
+.erp-command-more__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--erp-border, #e1dfdd);
+  background: var(--erp-surface, #fff);
+  color: var(--erp-text, #242424);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.erp-command-more__icon-btn:hover,
+.erp-command-more__icon-btn--open {
+  border-color: color-mix(in srgb, var(--erp-primary, #0078d4) 35%, var(--erp-border, #e1dfdd));
+  background: var(--erp-primary-soft, #f3f9fd);
+  color: var(--erp-primary, #0078d4);
+}
+
+.erp-command-more__icon-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--erp-primary, #0078d4) 30%, transparent);
+}
+
+/* ── Sticky CRM record header (Lead 360) ── */
+.crm-sticky-record-header {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.crm-sticky-record-header__identity {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.crm-sticky-record-header__title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.crm-sticky-record-header__title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 650;
+  line-height: 1.25;
+  color: var(--erp-text, #242424);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-sticky-record-header__fav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--erp-muted, #605e5c);
+  cursor: pointer;
+}
+
+.crm-sticky-record-header__fav:hover {
+  border-color: var(--erp-border, #e1dfdd);
+  color: var(--erp-primary, #0078d4);
+}
+
+.crm-sticky-record-header__fav--on {
+  color: #d97706;
+}
+
+.crm-sticky-record-header__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 4px;
+}
+
+.crm-sticky-record-header__id {
+  font-family: var(--erp-font-family-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--erp-muted, #605e5c);
+}
+
+.crm-sticky-record-header__sep {
+  color: var(--erp-border, #c8c6c4);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.crm-sticky-record-header__owner {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.2rem;
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--erp-text-secondary, #484644);
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.crm-sticky-record-header__owner-label {
+  margin-right: 0;
+  font-weight: 650;
+  color: var(--erp-muted, #605e5c);
+}
+
+.crm-sticky-record-header__owner-label::after {
+  content: ':';
+}
+
+.crm-sticky-record-header__actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
+.crm-sticky-record-header__actions .erp-btn,
+.crm-sticky-record-header__actions button {
+  white-space: nowrap;
+}
+
+.d365-workspace-unified-head:has(.crm-sticky-record-header),
+.d365-workspace-unified-head--record {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 6px 16px;
+}
+
+.d365-workspace-unified-head:has(.crm-sticky-record-header) .d365-workspace-unified-title,
+.d365-workspace-unified-head--record .d365-workspace-unified-title {
+  display: none;
+}
+
+.d365-workspace-unified-head:has(.crm-sticky-record-header) .d365-workspace-unified-main,
+.d365-workspace-unified-head--record .d365-workspace-unified-main {
+  width: 100%;
+  min-width: 0;
+}
+
+.d365-workspace-unified-head:has(.crm-sticky-record-header) .d365-workspace-unified-breadcrumbs,
+.d365-workspace-unified-head--record .d365-workspace-unified-breadcrumbs {
+  margin: 0;
+  line-height: 1.2;
+}
+
+.d365-workspace-unified-head:has(.crm-sticky-record-header) .d365-workspace-unified-breadcrumbs nav,
+.d365-workspace-unified-head--record .d365-workspace-unified-breadcrumbs nav {
+  font-size: 0.75rem;
+}
+
+.d365-workspace-unified-head:has(.crm-sticky-record-header) .d365-workspace-unified-actions,
+.d365-workspace-unified-head--record .d365-workspace-unified-actions {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  justify-content: stretch;
+  flex-wrap: nowrap;
+  align-self: stretch;
+  flex: 0 0 auto;
+}
+
+.d365-workspace-unified-head:has(.crm-sticky-record-header) .d365-workspace-unified-actions .crm-sticky-record-header,
+.d365-workspace-unified-head--record .d365-workspace-unified-actions .crm-sticky-record-header {
+  width: 100%;
+}
+
+.d365-workspace-unified-head:has(.crm-sticky-record-header) .erp-card-form-page__header-actions--merged,
+.d365-workspace-unified-head--record .erp-card-form-page__header-actions--merged,
+.d365-workspace-unified-head:has(.crm-sticky-record-header) .erp-card-form-page__record-no,
+.d365-workspace-unified-head--record .erp-card-form-page__record-no {
+  display: none !important;
+}
+
+@media (max-width: 1023px) {
+  .crm-sticky-record-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .crm-sticky-record-header__actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .crm-sticky-record-header__title {
+    white-space: normal;
+  }
+}
+
+/* ── Stage stepper (inline) ── */
+.ent-stage-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.ent-stage-stepper__step {
+  font-size: var(--ent-font-caption);
+  font-weight: 500;
+  color: var(--erp-muted);
+  white-space: nowrap;
+}
+
+.ent-stage-stepper__step--current {
+  font-weight: 700;
+  color: var(--erp-primary);
+}
+
+.ent-stage-stepper__sep {
+  color: var(--erp-border);
+  font-size: 0.625rem;
+}
+
+/* ── Unified workspace page header (title + breadcrumbs + actions) ── */
+.d365-workspace-unified-header {
+  background: #ffffff;
+  border-bottom: 1px solid var(--erp-border, #edebe9);
+}
+
+.d365-workspace-unified-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px 8px;
+}
+
+.d365-workspace-unified-head--with-actions {
+  align-items: center;
+}
+
+.d365-workspace-unified-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.d365-workspace-unified-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 28px;
+}
+
+.d365-workspace-unified-title-row--with-actions {
+  align-items: center;
+}
+
+.d365-workspace-unified-subrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 4px;
+  min-height: 32px;
+}
+
+.d365-workspace-unified-title-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.d365-workspace-unified-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.d365-workspace-unified-title-text {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--erp-text, #323130);
+  letter-spacing: -0.02em;
+}
+
+.d365-workspace-unified-breadcrumbs {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+}
+
+.d365-workspace-unified-breadcrumbs nav {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.d365-workspace-unified-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-self: center;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.d365-workspace-unified-actions .erp-command-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.d365-workspace-unified-actions .erp-command-bar--inline {
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.d365-workspace-unified-actions .erp-card-form-command-bar > .flex.items-center.gap-1 {
+  border-right: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.d365-workspace-unified-actions .erp-card-form-command-bar .erp-command-group-label {
+  display: none;
+}
+
+.d365-workspace-unified-actions .erp-card-form-page__header-actions--merged {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 8px;
+  margin-left: 2px;
+  border-left: 1px solid var(--erp-border, #edebe9);
+}
+
+.d365-workspace-unified-actions .erp-card-form-page__record-no {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--erp-muted, #605e5c);
+  white-space: nowrap;
+}
+
+.d365-workspace-unified-tabs-row {
+  padding: 0 16px;
+  border-top: 1px solid var(--erp-border, #edebe9);
+  background: #ffffff;
+}
+
+.d365-workspace-unified-tabs-row .dyn-tabs {
+  border-bottom: none;
+  background: transparent;
+}
+
+@media (max-width: 1023px) {
+  .d365-workspace-unified-head--with-actions {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .d365-workspace-unified-actions {
+    flex: 1 1 100%;
+    align-self: stretch;
+    justify-content: flex-end;
+  }
+}

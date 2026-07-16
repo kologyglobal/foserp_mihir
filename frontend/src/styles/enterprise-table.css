@@ -1,0 +1,491 @@
+/**
+ * Enterprise table typography & layout — BC / D365 standard.
+ * Scoped to `.ent-data-grid` so all CRM/Sales grids inherit identical styling.
+ */
+
+/* ── Table shell ── */
+.ent-data-grid {
+  --ent-th-size: 13px;
+  --ent-th-weight: 600;
+  --ent-th-lh: 20px;
+  --ent-th-color: #475467;
+  --ent-th-bg: #f8fafc;
+  --ent-td-size: 14px;
+  --ent-td-weight: 400;
+  --ent-td-lh: 22px;
+  --ent-td-color: #344054;
+  --ent-num-weight: 500;
+  --ent-id-size: 13px;
+  --ent-id-weight: 500;
+  --ent-meta-size: 12px;
+  --ent-row-pad-x: 16px;
+  --ent-row-pad-y: 0;
+}
+
+.ent-data-grid .erp-table {
+  font-size: var(--ent-td-size);
+  line-height: var(--ent-td-lh);
+}
+
+/* ── Header ── */
+.ent-data-grid .erp-table thead th {
+  height: 44px;
+  padding: 0 var(--ent-row-pad-x);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--ent-th-size);
+  font-weight: var(--ent-th-weight);
+  line-height: var(--ent-th-lh);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ent-th-color);
+  background: var(--ent-th-bg);
+  border-bottom: 1px solid #e4e7ec;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.ent-data-grid .erp-table thead th button {
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  color: inherit;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ── Body rows ── */
+.ent-data-grid .erp-table tbody tr {
+  height: var(--ent-row-height-comfortable, 56px);
+  transition: background-color 0.12s ease;
+}
+
+.ent-data-grid.ent-data-grid--compact .erp-table tbody tr {
+  height: var(--ent-row-height-compact, 48px);
+}
+
+.ent-data-grid.ent-data-grid--expanded .erp-table tbody tr {
+  height: var(--ent-row-height-expanded, 64px);
+}
+
+.ent-data-grid .erp-table td {
+  padding: var(--ent-row-pad-y) var(--ent-row-pad-x);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--ent-td-size);
+  font-weight: var(--ent-td-weight);
+  line-height: var(--ent-td-lh);
+  color: var(--ent-td-color);
+  vertical-align: middle;
+  border-bottom: 1px solid #f2f4f7;
+}
+
+.ent-data-grid .erp-table tbody tr:hover {
+  background-color: #f0f7ff;
+}
+
+.ent-data-grid .erp-table-zebra tbody tr:nth-child(even) {
+  background-color: #f8fafc;
+}
+
+.ent-data-grid .erp-table-zebra tbody tr:nth-child(even):hover {
+  background-color: #eef4fc;
+}
+
+.ent-data-grid .erp-table tbody tr.erp-row-selected,
+.ent-data-grid .erp-table tbody tr.erp-row-selected:hover {
+  background-color: color-mix(in srgb, var(--erp-primary, #0078d4) 6%, #fff);
+}
+
+/* ── Numeric cells ── */
+.ent-data-grid .erp-table td.num,
+.ent-data-grid .erp-table td.ent-td-numeric,
+.ent-data-grid .ent-td-numeric {
+  text-align: right;
+  font-weight: var(--ent-num-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.ent-data-grid .ent-td-numeric {
+  font-size: var(--ent-td-size);
+  line-height: var(--ent-td-lh);
+  color: var(--ent-td-color);
+}
+
+/* ── Center align (checkboxes, icons, actions) ── */
+.ent-data-grid .erp-table td.ent-align-center,
+.ent-data-grid .erp-table th.ent-align-center {
+  text-align: center;
+}
+
+.ent-data-grid .erp-table td.ent-align-right,
+.ent-data-grid .erp-table th.ent-align-right {
+  text-align: right;
+}
+
+/* ── Record cell typography ── */
+.ent-data-grid .ent-record-cell__primary {
+  font-size: var(--ent-td-size);
+  font-weight: 500;
+  line-height: var(--ent-td-lh);
+  color: var(--ent-td-color);
+}
+
+.ent-data-grid .ent-record-cell__meta {
+  font-size: var(--ent-meta-size);
+  font-weight: 400;
+  line-height: 18px;
+  color: #667085;
+  gap: 0.375rem;
+}
+
+.ent-data-grid .ent-record-cell__id,
+.ent-data-grid .ent-td-id {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--ent-id-size);
+  font-weight: var(--ent-id-weight);
+  line-height: 20px;
+  color: var(--erp-primary, #0078d4);
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+
+/* ── Status badges in tables ── */
+.ent-data-grid .ent-status-chip {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+/* ── Probability badge ── */
+.ent-data-grid .ent-prob-badge__value {
+  font-size: var(--ent-td-size);
+  font-weight: var(--ent-num-weight);
+  line-height: 1.25;
+}
+
+/* ── Row actions ── */
+.ent-data-grid .ent-row-actions__trigger {
+  width: 36px;
+  height: 36px;
+}
+
+/* ── Sticky header (per-cell — avoids thead/body bleed-through) ── */
+.ent-data-grid .erp-table-wrap .erp-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background-color: var(--ent-th-bg, #f8fafc);
+}
+
+/* ── Sticky columns ── */
+.ent-data-grid .erp-table-sticky-first th:first-child,
+.ent-data-grid .erp-table-sticky-first td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background-color: #fff;
+  box-shadow: 2px 0 4px rgb(15 23 42 / 0.04);
+}
+
+.ent-data-grid .erp-table-sticky-first thead th:first-child {
+  z-index: 21;
+  background-color: var(--ent-th-bg, #f8fafc);
+}
+
+/* Selectable rows: checkbox stays narrow; first data column is sticky */
+.ent-data-grid .erp-table-sticky-first--with-select .erp-table-select-cell {
+  position: sticky;
+  left: 0;
+  z-index: 8;
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  padding-left: 12px;
+  padding-right: 4px;
+  background-color: #fff;
+  box-shadow: 2px 0 6px rgb(15 23 42 / 0.08);
+}
+
+.ent-data-grid .erp-table-sticky-first--with-select thead .erp-table-select-cell {
+  z-index: 32;
+  background-color: var(--ent-th-bg, #f8fafc);
+}
+
+.ent-data-grid .erp-table-sticky-first .erp-table-sticky-data-cell {
+  position: sticky;
+  left: 0;
+  z-index: 7;
+  background-color: #fff;
+  box-shadow: 4px 0 10px -4px rgb(15 23 42 / 0.14);
+}
+
+.ent-data-grid .erp-table-sticky-first--with-select .erp-table-sticky-data-cell {
+  left: 40px;
+}
+
+.ent-data-grid .erp-table-sticky-first thead .erp-table-sticky-data-cell {
+  z-index: 31;
+  background-color: var(--ent-th-bg, #f8fafc);
+}
+
+.ent-data-grid .erp-table-sticky-first--with-select th:first-child,
+.ent-data-grid .erp-table-sticky-first--with-select td:first-child {
+  position: static;
+  box-shadow: none;
+  min-width: unset;
+  max-width: unset;
+  background-color: transparent;
+}
+
+.ent-data-grid .erp-table-sticky-first.erp-table-zebra tbody tr:nth-child(even) .erp-table-select-cell,
+.ent-data-grid .erp-table-sticky-first.erp-table-zebra tbody tr:nth-child(even) .erp-table-sticky-data-cell {
+  background-color: #f8fafc;
+}
+
+.ent-data-grid .erp-table-sticky-first.erp-table-zebra tbody tr:hover .erp-table-select-cell,
+.ent-data-grid .erp-table-sticky-first.erp-table-zebra tbody tr:hover .erp-table-sticky-data-cell {
+  background-color: #f0f7ff;
+}
+
+.ent-data-grid .erp-table-sticky-first.erp-table-zebra tbody tr.erp-row-selected .erp-table-select-cell,
+.ent-data-grid .erp-table-sticky-first.erp-table-zebra tbody tr.erp-row-selected .erp-table-sticky-data-cell {
+  background-color: #ecfdf5;
+}
+
+.ent-data-grid .erp-table-sticky-first tbody tr.erp-row-selected:hover .erp-table-select-cell,
+.ent-data-grid .erp-table-sticky-first tbody tr.erp-row-selected:hover .erp-table-sticky-data-cell {
+  background-color: #ecfdf5;
+}
+
+/* Sticky compact actions column (⋯ menu) */
+.ent-data-grid .erp-table-has-actions-col .erp-table-actions-cell {
+  position: sticky;
+  right: 0;
+  z-index: 4;
+  width: 52px;
+  min-width: 52px;
+  max-width: 52px;
+  padding-left: 8px;
+  padding-right: 8px;
+  text-align: center;
+  vertical-align: middle;
+  cursor: default;
+  background-color: #fff;
+  box-shadow: -4px 0 8px rgb(15 23 42 / 0.06);
+}
+
+.ent-data-grid .erp-table-has-actions-col thead .erp-table-actions-cell {
+  z-index: 30;
+  background: var(--ent-th-bg, #f8fafc);
+}
+
+.ent-data-grid .erp-table-has-actions-col.erp-table-zebra tbody tr:nth-child(even) .erp-table-actions-cell {
+  background-color: #f8fafc;
+}
+
+.ent-data-grid .erp-table-has-actions-col tbody tr:hover .erp-table-actions-cell {
+  background-color: #f9fafb;
+}
+
+.ent-data-grid .erp-table-has-actions-col tbody tr.erp-row-selected .erp-table-actions-cell,
+.ent-data-grid .erp-table-has-actions-col tbody tr.erp-row-selected:hover .erp-table-actions-cell {
+  background-color: color-mix(in srgb, var(--erp-primary, #0078d4) 6%, #fff);
+}
+
+.ent-data-grid .erp-table-actions-cell .ent-row-actions {
+  display: inline-flex;
+  justify-content: center;
+  width: 100%;
+}
+
+/* ── Register filter bar (embedded in table shell) ── */
+.ent-data-grid__register-bar {
+  padding: 10px 16px;
+  border-bottom: 1px solid #e4e7ec;
+  background: #ffffff;
+}
+
+.ent-data-grid__register-bar--merged .ent-data-grid__register-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+}
+
+.ent-data-grid__register-bar--merged .ent-data-grid__record-label--inline {
+  margin: 0;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  color: #344054;
+  white-space: nowrap;
+}
+
+.ent-data-grid__register-bar--merged .ent-data-grid__record-label--inline span {
+  font-weight: 500;
+  color: #667085;
+}
+
+.ent-data-grid__register-bar-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ent-data-grid__register-bar--merged .ent-data-grid__columns-btn {
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded {
+  width: 100%;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded > .erp-smart-filter > .flex.items-center {
+  gap: 8px;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .erp-smart-filter-fields {
+  flex: 1;
+  min-width: 0;
+  gap: 8px;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .ent-search-wrap {
+  flex: 1 1 320px;
+  min-width: min(100%, 280px);
+  max-width: none;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .ent-search-wrap input {
+  height: 36px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .ent-search-kbd {
+  right: 10px;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__btn {
+  height: 36px;
+  padding-inline: 12px;
+  font-size: 13px;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__sort-select {
+  height: 36px;
+  min-width: 10.5rem;
+  max-width: 12rem;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .erp-smart-filter-meta {
+  gap: 8px;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .erp-smart-filter-meta .erp-select-wrap select {
+  height: 36px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .erp-filter-chip {
+  margin-top: 0;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .erp-smart-filter > .mt-2 {
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.erp-register-table-shell .ent-data-grid {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  box-shadow: none;
+}
+
+/* ── Toolbar in grid ── */
+.ent-data-grid .erp-list-toolbar {
+  min-height: 52px;
+  padding: 8px 16px;
+  gap: 16px;
+  border-bottom: 1px solid #e4e7ec;
+}
+
+.ent-data-grid .erp-list-toolbar .erp-input {
+  height: 40px;
+  font-size: 14px;
+  border-radius: 8px;
+}
+
+/* Override legacy page-specific grid font overrides */
+.erp-data-grid.ent-data-grid .erp-table th,
+.dyn-data-grid.ent-data-grid .erp-table th {
+  font-size: var(--ent-th-size) !important;
+  font-weight: var(--ent-th-weight) !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+.erp-data-grid.ent-data-grid .erp-table td,
+.dyn-data-grid.ent-data-grid .erp-table td {
+  font-size: var(--ent-td-size) !important;
+}
+
+.erp-data-grid.ent-data-grid .erp-table tbody tr,
+.dyn-data-grid.ent-data-grid .erp-table tbody tr {
+  min-height: var(--ent-row-height-comfortable, 56px) !important;
+}
+
+/* CRM module tables on dynamics pages without ent-data-grid class yet */
+.dyn-page-shell .dyn-data-grid:not(.ent-data-grid) .erp-table th {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #475467;
+  background: #f8fafc;
+}
+
+.dyn-page-shell .dyn-data-grid:not(.ent-data-grid) .erp-table td {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  color: #344054;
+  vertical-align: middle;
+}
+
+.dyn-page-shell .dyn-data-grid:not(.ent-data-grid) .erp-table tbody tr {
+  height: 56px;
+}
+
+.dyn-page-shell .erp-data-grid:not(.ent-data-grid) .erp-table th {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #475467;
+  background: #f8fafc;
+}
+
+.dyn-page-shell .erp-data-grid:not(.ent-data-grid) .erp-table td {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  color: #344054;
+}
+
+.dyn-page-shell .erp-data-grid:not(.ent-data-grid) .erp-table tbody tr {
+  height: 56px;
+  min-height: 56px;
+}

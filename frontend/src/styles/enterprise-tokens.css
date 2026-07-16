@@ -1,0 +1,63 @@
+/* Enterprise SaaS design tokens — BC + D365 + Linear + Attio */
+:root {
+  /* Typography scale */
+  --ent-font-page-title: 1.75rem;    /* 28px */
+  --ent-font-section: 1.125rem;      /* 18px */
+  --ent-font-card: 1rem;             /* 16px */
+  --ent-font-body: 0.875rem;         /* 14px */
+  --ent-font-caption: 0.75rem;       /* 12px */
+  --ent-font-table-header: 0.8125rem; /* 13px */
+
+  /* Radius */
+  --ent-radius-input: 8px;
+  --ent-radius-card: 12px;
+  --ent-radius-button: 8px;
+  --ent-radius-drawer: 12px;
+
+  /* Spacing grid (8px base) */
+  --ent-space-1: 8px;
+  --ent-space-2: 16px;
+  --ent-space-3: 24px;
+  --ent-space-4: 32px;
+  --ent-gap-component: 16px;
+  --ent-gap-card: 20px;
+  --ent-gap-section: 24px;
+  --ent-page-padding: 24px;
+
+  /* Table density */
+  --ent-row-height-compact: 48px;
+  --ent-row-height-comfortable: 56px;
+  --ent-row-height-expanded: 64px;
+
+  /* Shadows — very soft */
+  --ent-shadow-xs: 0 1px 2px rgb(15 23 42 / 0.04);
+  --ent-shadow-sm: 0 2px 8px rgb(15 23 42 / 0.06);
+  --ent-shadow-card: 0 1px 3px rgb(15 23 42 / 0.05), 0 4px 16px rgb(15 23 42 / 0.04);
+
+  /* Status palette */
+  --ent-status-open: #2563eb;
+  --ent-status-open-bg: #eff6ff;
+  --ent-status-qualified: #16a34a;
+  --ent-status-qualified-bg: #f0fdf4;
+  --ent-status-converted: #059669;
+  --ent-status-converted-bg: #ecfdf5;
+  --ent-status-lost: #dc2626;
+  --ent-status-lost-bg: #fef2f2;
+  --ent-status-closed: #64748b;
+  --ent-status-closed-bg: #f8fafc;
+  --ent-status-hold: #d97706;
+  --ent-status-hold-bg: #fffbeb;
+
+  /* Hero compact */
+  --ent-hero-band-py: 10px;
+  --ent-hero-band-px: 20px;
+  --ent-filter-row-py: 10px;
+}
+
+.dyn-page-shell,
+.erp-page--enterprise {
+  --erp-font-page-title: var(--ent-font-page-title);
+  --dyn-row-height: var(--ent-row-height-comfortable);
+  --dyn-kpi-height: 88px;
+  --dyn-command-height: 36px;
+}

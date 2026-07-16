@@ -1,0 +1,276 @@
+import type { AdminPermission, AdminRoleDetail, AdminRoleSummary, AdminTenant, AdminUser } from '../../types/admin'
+
+/** Mirrors backend/src/constants/permissions.ts — demo-mode catalog only, not the source of truth. */
+export const DEMO_PERMISSION_NAMES = [
+  'tenant.view', 'tenant.create', 'tenant.update', 'tenant.delete', 'tenant.manage',
+  'user.view', 'user.create', 'user.update', 'user.delete', 'user.assign_role',
+  'role.view', 'role.create', 'role.update', 'role.delete',
+  'crm.lead.view', 'crm.lead.create', 'crm.lead.update', 'crm.lead.delete', 'crm.lead.assign', 'crm.lead.qualify', 'crm.lead.convert',
+  'crm.contact.view', 'crm.contact.create', 'crm.contact.update', 'crm.contact.delete',
+  'crm.company.view', 'crm.company.create', 'crm.company.update', 'crm.company.delete',
+  'crm.activity.view', 'crm.activity.create', 'crm.activity.update', 'crm.activity.complete', 'crm.activity.delete',
+  'crm.pipeline.view', 'crm.pipeline.manage',
+  'crm.opportunity.view', 'crm.opportunity.create', 'crm.opportunity.update', 'crm.opportunity.close', 'crm.opportunity.delete',
+  'crm.quotation.view', 'crm.quotation.create', 'crm.quotation.update', 'crm.quotation.delete', 'crm.quotation.approve', 'crm.quotation.convert',
+  'crm.sales_order.view', 'crm.sales_order.create', 'crm.sales_order.update', 'crm.sales_order.delete', 'crm.sales_order.confirm',
+  'crm.follow_up.view', 'crm.follow_up.create', 'crm.follow_up.update', 'crm.follow_up.delete',
+  'crm.import.view', 'crm.import.execute',
+  'crm.master.view', 'crm.master.create', 'crm.master.update', 'crm.master.delete',
+  'crm.dashboard.view', 'crm.report.view', 'crm.search.view', 'crm.export.view', 'crm.export.execute',
+  'crm.note.view', 'crm.note.create', 'crm.note.update', 'crm.note.delete',
+  'crm.attachment.view', 'crm.attachment.create', 'crm.attachment.delete',
+  'master.lookup.view',
+  'master.country.view', 'master.country.create', 'master.country.update', 'master.country.delete',
+  'master.state.view', 'master.state.create', 'master.state.update', 'master.state.delete',
+  'master.city.view', 'master.city.create', 'master.city.update', 'master.city.delete',
+  'master.uom.view', 'master.uom.create', 'master.uom.update', 'master.uom.delete',
+  'master.warehouse.view', 'master.warehouse.create', 'master.warehouse.update', 'master.warehouse.delete',
+  'master.location.view', 'master.location.create', 'master.location.update', 'master.location.delete',
+  'master.item_category.view', 'master.item_category.create', 'master.item_category.update', 'master.item_category.delete',
+  'master.hsn.view', 'master.hsn.create', 'master.hsn.update', 'master.hsn.delete', 'master.hsn.import',
+  'master.gst_group.view', 'master.gst_group.create', 'master.gst_group.update', 'master.gst_group.delete',
+  'master.gst_rate.view', 'master.gst_rate.create', 'master.gst_rate.update', 'master.gst_rate.delete',
+  'master.item.view', 'master.item.create', 'master.item.update', 'master.item.delete', 'master.item.import',
+  'master.product.view', 'master.product.create', 'master.product.update', 'master.product.delete',
+  'master.vendor.view', 'master.vendor.create', 'master.vendor.update', 'master.vendor.delete', 'master.vendor.import',
+  // Purchase catalog (FE soft-gate today; backend must enforce when purchase API ships)
+  'purchase.view',
+  'purchase.dashboard.view',
+  'purchase.requisition.view', 'purchase.requisition.create', 'purchase.requisition.edit', 'purchase.requisition.submit', 'purchase.requisition.approve',
+  'purchase.rfq.view', 'purchase.rfq.create', 'purchase.rfq.send',
+  'purchase.quotation.view', 'purchase.quotation.create', 'purchase.quotation.compare',
+  'purchase.order.view', 'purchase.order.create', 'purchase.order.edit', 'purchase.order.approve', 'purchase.order.release', 'purchase.order.cancel',
+  'purchase.grn.view', 'purchase.grn.create', 'purchase.grn.post',
+  'purchase.quality.view', 'purchase.quality.inspect',
+  'purchase.invoice.view', 'purchase.invoice.create', 'purchase.invoice.verify', 'purchase.invoice.approve', 'purchase.invoice.post',
+  'purchase.return.view', 'purchase.return.create', 'purchase.return.post',
+  'purchase.reports.view',
+  'purchase.setup.manage',
+] as const
+
+export const seedPermissionCatalog: AdminPermission[] = DEMO_PERMISSION_NAMES.map((name, i) => ({
+  id: `perm-${i}`,
+  name,
+  module: name.split('.')[0],
+  description: null,
+}))
+
+const ALL_PERMS = DEMO_PERMISSION_NAMES as readonly string[]
+const MASTER_VIEW = ALL_PERMS.filter((p) => p.startsWith('master.') && p.endsWith('.view'))
+const PURCHASE_ALL = ALL_PERMS.filter((p) => p.startsWith('purchase.'))
+const PURCHASE_OPS = PURCHASE_ALL.filter((p) => p !== 'purchase.setup.manage')
+
+const ROLE_PERMISSION_DEMO: Record<string, string[]> = {
+  'Super Admin': [...ALL_PERMS],
+  'Tenant Admin': ALL_PERMS.filter((p) => p !== 'tenant.manage' && p !== 'tenant.create' && p !== 'tenant.delete'),
+  /** Alias some tenants may use — same grant set as Tenant Admin. */
+  Admin: ALL_PERMS.filter((p) => p !== 'tenant.manage' && p !== 'tenant.create' && p !== 'tenant.delete'),
+  Administrator: ALL_PERMS.filter((p) => p !== 'tenant.manage' && p !== 'tenant.create' && p !== 'tenant.delete'),
+  'Master Data Manager': ALL_PERMS.filter((p) => p.startsWith('master.')),
+  'Purchase Manager': [...MASTER_VIEW, 'master.vendor.create', 'master.vendor.update', 'master.vendor.delete', 'master.vendor.import', ...PURCHASE_OPS],
+  'Purchase Executive': [
+    ...MASTER_VIEW,
+    'purchase.view', 'purchase.dashboard.view',
+    'purchase.requisition.view', 'purchase.requisition.create', 'purchase.requisition.edit', 'purchase.requisition.submit',
+    'purchase.rfq.view', 'purchase.rfq.create', 'purchase.rfq.send',
+    'purchase.quotation.view', 'purchase.quotation.create', 'purchase.quotation.compare',
+    'purchase.order.view', 'purchase.order.create', 'purchase.order.edit',
+    'purchase.grn.view', 'purchase.quality.view', 'purchase.invoice.view', 'purchase.return.view', 'purchase.reports.view',
+  ],
+  Requester: [
+    'purchase.view', 'purchase.dashboard.view',
+    'purchase.requisition.view', 'purchase.requisition.create', 'purchase.requisition.edit', 'purchase.requisition.submit',
+    'master.lookup.view', 'master.item.view',
+  ],
+  'Department Head': [
+    'purchase.view', 'purchase.dashboard.view',
+    'purchase.requisition.view', 'purchase.requisition.create', 'purchase.requisition.edit', 'purchase.requisition.submit', 'purchase.requisition.approve',
+    'purchase.reports.view', 'master.lookup.view', 'master.item.view',
+  ],
+  'Store Executive': [
+    ...MASTER_VIEW,
+    'purchase.view', 'purchase.dashboard.view', 'purchase.order.view',
+    'purchase.grn.view', 'purchase.grn.create', 'purchase.grn.post',
+    'purchase.quality.view', 'purchase.return.view', 'purchase.return.create', 'purchase.return.post', 'purchase.reports.view',
+  ],
+  'Quality Inspector': [
+    'purchase.view', 'purchase.dashboard.view', 'purchase.grn.view', 'purchase.quality.view', 'purchase.quality.inspect', 'purchase.return.view',
+    'master.lookup.view', 'master.item.view',
+  ],
+  'Finance Executive': [
+    'purchase.view', 'purchase.dashboard.view', 'purchase.order.view', 'purchase.grn.view',
+    'purchase.invoice.view', 'purchase.invoice.create', 'purchase.invoice.verify',
+    'purchase.return.view', 'purchase.reports.view', 'master.lookup.view', 'master.vendor.view',
+  ],
+  'Finance Manager': [
+    'purchase.view', 'purchase.dashboard.view', 'purchase.order.view', 'purchase.grn.view',
+    'purchase.invoice.view', 'purchase.invoice.create', 'purchase.invoice.verify', 'purchase.invoice.approve', 'purchase.invoice.post',
+    'purchase.return.view', 'purchase.reports.view', 'master.lookup.view', 'master.vendor.view',
+  ],
+  Management: [
+    'purchase.view', 'purchase.dashboard.view',
+    'purchase.requisition.view', 'purchase.requisition.approve',
+    'purchase.rfq.view', 'purchase.quotation.view', 'purchase.quotation.compare',
+    'purchase.order.view', 'purchase.order.approve', 'purchase.order.release', 'purchase.order.cancel',
+    'purchase.grn.view', 'purchase.quality.view',
+    'purchase.invoice.view', 'purchase.invoice.approve',
+    'purchase.return.view', 'purchase.reports.view',
+  ],
+  'Sales Manager': ALL_PERMS.filter((p) => p.startsWith('crm.') || p === 'user.view'),
+  'CRM Admin': ALL_PERMS.filter((p) => p.startsWith('crm.') || p === 'user.view'),
+  'Sales Executive': [
+    'crm.lead.view', 'crm.lead.create', 'crm.lead.update',
+    'crm.contact.view', 'crm.contact.create', 'crm.contact.update',
+    'crm.company.view', 'crm.opportunity.view', 'crm.opportunity.create', 'crm.opportunity.update',
+    'crm.quotation.view', 'crm.quotation.create', 'crm.quotation.update',
+    'crm.dashboard.view', 'crm.report.view',
+  ],
+  Viewer: [...MASTER_VIEW, 'crm.lead.view', 'crm.contact.view', 'crm.company.view', 'crm.dashboard.view', 'user.view'],
+}
+
+function makeRole(name: string, description: string, isSystem: boolean, tenantId: string | null): AdminRoleDetail {
+  const permissions = (ROLE_PERMISSION_DEMO[name] ?? []).slice().sort()
+  return {
+    id: `role-demo-${name.toLowerCase().replace(/\s+/g, '-')}`,
+    tenantId,
+    name,
+    description,
+    isSystem,
+    userCount: 0,
+    permissions,
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+  }
+}
+
+export const seedRoleDetails: AdminRoleDetail[] = [
+  makeRole('Super Admin', 'Full platform access across all tenants', true, null),
+  makeRole('Tenant Admin', 'Full access within the tenant workspace', true, 'demo-tenant'),
+  makeRole('Administrator', 'Full tenant access including purchase setup', true, 'demo-tenant'),
+  makeRole('Master Data Manager', 'Manage master data records', false, 'demo-tenant'),
+  makeRole('Purchase Manager', 'Full purchase operations except setup', false, 'demo-tenant'),
+  makeRole('Purchase Executive', 'Day-to-day purchase execution', false, 'demo-tenant'),
+  makeRole('Requester', 'Raise and submit purchase requisitions', false, 'demo-tenant'),
+  makeRole('Department Head', 'Approve department purchase requisitions', false, 'demo-tenant'),
+  makeRole('Store Executive', 'GRN receipt and returns', false, 'demo-tenant'),
+  makeRole('Quality Inspector', 'Incoming quality inspection', false, 'demo-tenant'),
+  makeRole('Finance Executive', 'Purchase invoice verify / create', false, 'demo-tenant'),
+  makeRole('Finance Manager', 'Invoice approve and post', false, 'demo-tenant'),
+  makeRole('Management', 'Purchase approvals and visibility', false, 'demo-tenant'),
+  makeRole('Sales Manager', 'Full CRM access for the sales team', false, 'demo-tenant'),
+  makeRole('CRM Admin', 'Administers CRM configuration and data', false, 'demo-tenant'),
+  makeRole('Sales Executive', 'Day-to-day CRM operations', false, 'demo-tenant'),
+  makeRole('Viewer', 'Read-only access across modules', false, 'demo-tenant'),
+]
+
+export const seedRoles: AdminRoleSummary[] = seedRoleDetails.map((r) => ({
+  id: r.id,
+  tenantId: r.tenantId,
+  name: r.name,
+  description: r.description,
+  isSystem: r.isSystem,
+  permissionCount: r.permissions.length,
+}))
+
+function roleRef(id: string) {
+  const role = seedRoleDetails.find((r) => r.id === id)
+  return role ? { id: role.id, name: role.name, description: role.description, isSystem: role.isSystem } : null
+}
+
+export const seedAdminUsers: AdminUser[] = [
+  {
+    id: 'admin-user-1',
+    tenantId: 'demo-tenant',
+    firstName: 'Asha',
+    lastName: 'Verma',
+    email: 'admin@vasant-trailers.com',
+    mobile: '9876500001',
+    designation: 'Tenant Administrator',
+    department: 'Management',
+    status: 'ACTIVE',
+    emailVerified: true,
+    lastLoginAt: '2026-07-14T09:00:00.000Z',
+    createdBy: null,
+    updatedBy: null,
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+    roles: [roleRef('role-demo-tenant-admin')].filter(Boolean) as AdminUser['roles'],
+  },
+  {
+    id: 'admin-user-2',
+    tenantId: 'demo-tenant',
+    firstName: 'Rahul',
+    lastName: 'Shah',
+    email: 'rahul.shah@vasant-trailers.com',
+    mobile: '9876500002',
+    designation: 'Sales Manager',
+    department: 'Sales',
+    status: 'ACTIVE',
+    emailVerified: true,
+    lastLoginAt: '2026-07-13T11:30:00.000Z',
+    createdBy: 'admin-user-1',
+    updatedBy: null,
+    createdAt: '2025-02-10T00:00:00.000Z',
+    updatedAt: '2025-02-10T00:00:00.000Z',
+    roles: [roleRef('role-demo-sales-manager')].filter(Boolean) as AdminUser['roles'],
+  },
+  {
+    id: 'admin-user-3',
+    tenantId: 'demo-tenant',
+    firstName: 'Priya',
+    lastName: 'Nair',
+    email: 'priya.nair@vasant-trailers.com',
+    mobile: '9876500003',
+    designation: 'Sales Executive',
+    department: 'Sales',
+    status: 'INVITED',
+    emailVerified: false,
+    lastLoginAt: null,
+    createdBy: 'admin-user-1',
+    updatedBy: null,
+    createdAt: '2025-06-01T00:00:00.000Z',
+    updatedAt: '2025-06-01T00:00:00.000Z',
+    roles: [roleRef('role-demo-sales-executive')].filter(Boolean) as AdminUser['roles'],
+  },
+]
+
+export const seedTenants: AdminTenant[] = [
+  {
+    id: 'demo-tenant',
+    name: 'Vasant Trailers',
+    slug: 'vasant-trailers',
+    legalName: 'Vasant Trailers Pvt. Ltd.',
+    email: 'admin@vasant-trailers.com',
+    phone: '9876543210',
+    country: 'India',
+    state: 'Maharashtra',
+    city: 'Pune',
+    timezone: 'Asia/Kolkata',
+    currency: 'INR',
+    status: 'ACTIVE',
+    subscriptionPlan: 'Enterprise',
+    subscriptionStatus: 'active',
+    trialEndsAt: null,
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'demo-tenant-2',
+    name: 'Konkan Fabricators',
+    slug: 'konkan-fabricators',
+    legalName: null,
+    email: 'admin@konkan-fab.example.com',
+    phone: '9876511111',
+    country: 'India',
+    state: 'Maharashtra',
+    city: 'Ratnagiri',
+    timezone: 'Asia/Kolkata',
+    currency: 'INR',
+    status: 'TRIAL',
+    subscriptionPlan: 'Starter',
+    subscriptionStatus: 'trialing',
+    trialEndsAt: '2026-08-15T00:00:00.000Z',
+    createdAt: '2026-06-01T00:00:00.000Z',
+    updatedAt: '2026-06-01T00:00:00.000Z',
+  },
+]
