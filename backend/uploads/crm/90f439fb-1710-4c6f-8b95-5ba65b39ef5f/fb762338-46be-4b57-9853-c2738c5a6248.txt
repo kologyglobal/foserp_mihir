@@ -1,0 +1,1 @@
+CRM-P0-2 attachment smoke test

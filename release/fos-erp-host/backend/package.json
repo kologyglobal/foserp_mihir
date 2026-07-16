@@ -1,0 +1,56 @@
+﻿{
+    "name":  "fos-erp-backend",
+    "version":  "1.0.0",
+    "private":  true,
+    "type":  "module",
+    "scripts":  {
+                    "dev":  "tsx watch src/server.ts",
+                    "build":  "tsc",
+                    "start":  "tsx src/server.ts",
+                    "typecheck":  "tsc --noEmit",
+                    "test":  "vitest run",
+                    "test:crm-live":  "tsx scripts/run-crm-live-tests.ts",
+                    "test:backend-structure":  "tsx scripts/test-backend-structure.ts",
+                    "db:purge-business":  "tsx scripts/purge-business-data.ts",
+                    "test:watch":  "vitest",
+                    "db:generate":  "tsx scripts/prisma-cli.ts generate",
+                    "db:migrate":  "tsx scripts/prisma-cli.ts migrate dev",
+                    "db:seed":  "tsx prisma/seed.ts",
+                    "db:setup":  "npm run db:generate \u0026\u0026 tsx scripts/prisma-cli.ts migrate deploy \u0026\u0026 npm run db:seed",
+                    "db:studio":  "tsx scripts/prisma-cli.ts studio",
+                    "start:prod":  "NODE_ENV=production tsx src/server.ts"
+                },
+    "dependencies":  {
+                         "@prisma/client":  "^6.9.0",
+                         "bcryptjs":  "^3.0.2",
+                         "cors":  "^2.8.5",
+                         "dotenv":  "^16.5.0",
+                         "express":  "^5.1.0",
+                         "express-rate-limit":  "^7.5.0",
+                         "helmet":  "^8.1.0",
+                         "jsonwebtoken":  "^9.0.2",
+                         "swagger-jsdoc":  "^6.2.8",
+                         "swagger-ui-express":  "^5.0.1",
+                         "uuid":  "^11.1.0",
+                         "zod":  "^3.25.67",
+                         "tsx":  "^4.19.4"
+                     },
+    "devDependencies":  {
+                            "@types/bcryptjs":  "^2.4.6",
+                            "@types/cors":  "^2.8.18",
+                            "@types/express":  "^5.0.2",
+                            "@types/jsonwebtoken":  "^9.0.9",
+                            "@types/node":  "^22.15.30",
+                            "@types/supertest":  "^6.0.3",
+                            "@types/swagger-jsdoc":  "^6.0.4",
+                            "@types/swagger-ui-express":  "^4.1.8",
+                            "prisma":  "^6.9.0",
+                            "supertest":  "^7.1.1",
+                            "tsx":  "^4.19.4",
+                            "typescript":  "^5.8.3",
+                            "vitest":  "^3.2.3"
+                        },
+    "prisma":  {
+                   "seed":  "tsx prisma/seed.ts"
+               }
+}

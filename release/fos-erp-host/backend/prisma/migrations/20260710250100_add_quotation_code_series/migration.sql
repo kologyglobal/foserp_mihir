@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `code_series` MODIFY `entityType` ENUM('USER', 'LEAD', 'CONTACT', 'CRM_COMPANY', 'OPPORTUNITY', 'QUOTATION') NOT NULL;

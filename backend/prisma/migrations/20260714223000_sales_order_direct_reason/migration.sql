@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `crm_sales_orders` ADD COLUMN `directSoReason` TEXT NULL;

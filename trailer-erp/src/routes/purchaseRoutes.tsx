@@ -1,0 +1,128 @@
+import { Navigate } from 'react-router-dom'
+import { RouteErrorPage } from '../components/system/AppErrorBoundary'
+import { PurchaseModuleDashboard } from '../modules/purchase/PurchaseModuleDashboard'
+import {
+  PurchaseRequisitionListPage,
+  PurchaseRequisitionDetailPage,
+  RfqListPage,
+  RfqDetailPage,
+  PurchaseOrderListPage,
+  PurchaseOrderDetailPage,
+} from '../modules/purchase/PurchasePages'
+import {
+  PurchaseRequisitionFormPage,
+  PurchaseRequisitionEditPage,
+  ManualPrFormPage,
+} from '../modules/purchase/PurchaseFormPages'
+import { PoAmendFormPage } from '../modules/purchase/PoAmendFormPage'
+import { PoCreateDocumentPage } from '../modules/purchase/PoFormPages'
+import { RfqCreateDocumentPage } from '../modules/purchase/RfqFormPages'
+import {
+  GrnRegisterPage,
+  GrnDetailPage,
+  PurchaseReportsPage,
+  PoPrintPage,
+} from '../modules/purchase/PurchaseProductionPages'
+import {
+  VendorQuotationListPage,
+  VendorQuotationDetailPage,
+  QuotationComparisonPage,
+  PurchaseComparisonIndexPage,
+  PurchaseReturnListPage,
+  PurchaseReturnDetailPage,
+  VendorPerformancePage,
+} from '../modules/purchase/PurchaseExtendedPages'
+import { PurchaseMastersHubPage } from '../modules/purchase/masters/PurchaseMastersHubPage'
+import {
+  PurchaseMasterListPage,
+  PurchaseMasterFormPage,
+  PurchaseMasterDetailPage,
+  PurchaseLinkedMasterPage,
+} from '../modules/purchase/masters/PurchaseMasterPages'
+
+export const purchaseRouteChildren = [
+  { index: true, element: <PurchaseModuleDashboard /> },
+  { path: 'requisitions', element: <PurchaseRequisitionListPage /> },
+  { path: 'requisitions/new', element: <PurchaseRequisitionFormPage /> },
+  { path: 'requisitions/:id/edit', element: <PurchaseRequisitionEditPage /> },
+  { path: 'requisitions/:id', element: <PurchaseRequisitionDetailPage /> },
+  { path: 'rfqs', element: <RfqListPage /> },
+  { path: 'rfqs/new', element: <RfqCreateDocumentPage /> },
+  { path: 'rfqs/:id/edit', element: <RfqDetailPage /> },
+  { path: 'rfqs/:id', element: <RfqDetailPage /> },
+  { path: 'vendor-quotations', element: <VendorQuotationListPage /> },
+  { path: 'vendor-quotations/new', element: <Navigate to="/purchase/rfqs" replace /> },
+  { path: 'vendor-quotations/:id/edit', element: <VendorQuotationDetailPage /> },
+  { path: 'vendor-quotations/:id', element: <VendorQuotationDetailPage /> },
+  { path: 'comparison', element: <PurchaseComparisonIndexPage /> },
+  { path: 'comparison/:rfqId', element: <QuotationComparisonPage /> },
+  { path: 'orders', element: <PurchaseOrderListPage /> },
+  { path: 'orders/new', element: <PoCreateDocumentPage /> },
+  { path: 'orders/:id/edit', element: <PoAmendFormPage /> },
+  { path: 'orders/:id/amend', element: <PoAmendFormPage /> },
+  { path: 'orders/:id/print', element: <PoPrintPage /> },
+  { path: 'orders/:id', element: <PurchaseOrderDetailPage /> },
+  { path: 'grn', element: <GrnRegisterPage /> },
+  { path: 'grn/new', element: <Navigate to="/purchase/grn" replace /> },
+  { path: 'grn/:id/edit', element: <GrnDetailPage /> },
+  { path: 'grn/:id/print', element: <GrnDetailPage /> },
+  { path: 'grn/:id', element: <GrnDetailPage /> },
+  { path: 'grns', element: <Navigate to="/purchase/grn" replace /> },
+  { path: 'grns/:id', element: <GrnDetailPage /> },
+  { path: 'returns', element: <PurchaseReturnListPage /> },
+  { path: 'returns/new', element: <Navigate to="/purchase/grn" replace /> },
+  { path: 'returns/:id/edit', element: <PurchaseReturnDetailPage /> },
+  { path: 'returns/:id', element: <PurchaseReturnDetailPage /> },
+  { path: 'vendor-performance', element: <VendorPerformancePage /> },
+  { path: 'reports', element: <PurchaseReportsPage /> },
+  { path: 'masters', element: <PurchaseMastersHubPage /> },
+  { path: 'masters/vendors', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/vendors/new', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/vendors/:id', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/vendors/:id/edit', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/items', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/items/new', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/items/:id', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/items/:id/edit', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/item-categories', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/item-categories/new', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/item-categories/:id', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/item-categories/:id/edit', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/warehouses', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/warehouses/new', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/warehouses/:id', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/warehouses/:id/edit', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/locations', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/locations/new', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/locations/:id', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/locations/:id/edit', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/uom', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/uom/new', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/uom/:id', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/uom/:id/edit', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/payment-terms', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/payment-terms/new', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/payment-terms/:id', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/payment-terms/:id/edit', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/delivery-terms', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/delivery-terms/new', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/delivery-terms/:id', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/delivery-terms/:id/edit', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/approval-matrix', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/qc-parameters', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/qc-parameters/new', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/inspection-plans', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/inspection-plans/new', element: <PurchaseLinkedMasterPage /> },
+  { path: 'masters/:kind', element: <PurchaseMasterListPage /> },
+  { path: 'masters/:kind/new', element: <PurchaseMasterFormPage /> },
+  { path: 'masters/:kind/:id/edit', element: <PurchaseMasterFormPage /> },
+  { path: 'masters/:kind/:id', element: <PurchaseMasterDetailPage /> },
+  // Legacy manual PR route
+  { path: 'manual-pr', element: <ManualPrFormPage /> },
+]
+
+export const purchaseRouteTree = {
+  path: 'purchase',
+  errorElement: <RouteErrorPage />,
+  children: purchaseRouteChildren,
+}

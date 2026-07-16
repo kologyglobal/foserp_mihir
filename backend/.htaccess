@@ -1,0 +1,23 @@
+# Hostinger — SPA fallback + Passenger/Node for API
+# Place this file in the SAME folder as cpanel-start.mjs and package.json
+#
+# Critical: /api/* must NOT be rewritten to public/ — otherwise Apache returns
+# index.html for API routes and the CRM UI sees HTML instead of JSON (empty leads).
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Let Node/Passenger handle the API (do not map to public/)
+  RewriteRule ^api(?:/|$) - [L]
+
+  # Existing files/dirs under the app root (e.g. public/assets/* via later rules)
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # SPA: serve built frontend from public/
+  RewriteRule ^$ public/index.html [L]
+  RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>

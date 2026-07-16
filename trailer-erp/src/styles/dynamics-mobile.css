@@ -1,0 +1,179 @@
+/* Mobile & tablet responsive overrides for Dynamics shell */
+@layer components {
+  @media (max-width: 767px) {
+    .d365-main,
+    .erp-main {
+      padding-left: 0 !important;
+    }
+
+    .erp-sidebar.d365-nav-pane {
+      transform: translateX(-100%);
+      z-index: 50;
+      box-shadow: none;
+    }
+
+    .erp-sidebar.d365-nav-pane.erp-sidebar-mobile-open {
+      transform: translateX(0);
+      box-shadow: 4px 0 24px rgb(0 0 0 / 0.18);
+    }
+
+    .d365-nav-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 45;
+      border: none;
+      padding: 0;
+      margin: 0;
+      background: rgb(0 0 0 / 0.45);
+      cursor: pointer;
+      animation: d365-backdrop-in 0.2s ease;
+    }
+
+    @keyframes d365-backdrop-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .d365-suite-bar {
+      padding: 0 8px;
+      gap: 8px;
+    }
+
+    .d365-suite-title {
+      max-width: 7rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .d365-suite-context {
+      display: none;
+    }
+
+    .d365-suite-quick-action {
+      display: none;
+    }
+
+    .d365-suite-actions {
+      gap: 2px;
+    }
+
+    .d365-workspace-content {
+      padding: 12px 12px 20px;
+    }
+
+    .dyn-command-bar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      padding: 8px 12px;
+    }
+
+    .dyn-command-bar-meta {
+      order: -1;
+      margin-left: 0;
+      width: 100%;
+      font-size: 0.75rem;
+      line-height: 1.35;
+      white-space: normal;
+    }
+
+    .dyn-command-bar-actions {
+      overflow-x: auto;
+      flex-wrap: nowrap;
+      padding-bottom: 2px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .dyn-command-btn {
+      flex-shrink: 0;
+      min-height: 36px;
+    }
+
+    .d365-subnav {
+      overflow-x: auto;
+      flex-wrap: nowrap;
+      padding: 0 8px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .d365-subnav-link {
+      flex-shrink: 0;
+      min-height: 44px;
+    }
+
+    .dyn-tabs {
+      padding: 0 12px;
+    }
+
+    .dyn-tab {
+      min-height: 44px;
+      padding: 0 12px;
+    }
+
+    .erp-page-hero-band {
+      padding: 10px 12px;
+    }
+
+    .erp-page-title {
+      font-size: 1.125rem;
+    }
+
+    .erp-list-toolbar {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .erp-list-toolbar .relative.min-w-\[200px\] {
+      min-width: 100%;
+      flex: 1 1 100%;
+    }
+
+    .erp-table-wrap {
+      max-height: none;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .erp-detail-panel {
+      top: calc(var(--d365-suite-height) + var(--dyn-live-strip-height));
+      height: calc(100vh - var(--d365-suite-height) - var(--dyn-live-strip-height));
+      max-width: 100%;
+      width: 100%;
+    }
+
+    .d365-metric-strip {
+      flex-wrap: nowrap;
+    }
+
+    .d365-metric-tile {
+      min-width: 120px;
+      flex: 0 0 auto;
+    }
+
+    .erp-nav-module-header,
+    .erp-nav-item,
+    .erp-nav-icon-menu-item {
+      min-height: 44px;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .erp-sidebar.d365-nav-pane {
+      transform: none !important;
+    }
+  }
+
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .d365-workspace-content {
+      padding: 14px 16px 20px;
+    }
+
+    .dyn-command-bar-meta {
+      max-width: 40%;
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+}

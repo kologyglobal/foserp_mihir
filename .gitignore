@@ -1,0 +1,49 @@
+# Environment / secrets — never commit
+.env
+.env.*
+*.env
+**/.env
+**/.env.*
+
+# Hosting / live infra docs (DB usernames, domain, seed logins) — keep private for now
+docs/HOSTING_FINAL_UPLOAD.md
+docs/HOSTING_ERP_DHURANDHARCRM.md
+deploy/FINAL-UPLOAD/HOSTINGER_403_FIX.txt
+deploy/FINAL-UPLOAD/README-UPLOAD.txt
+deploy/FINAL-UPLOAD/README.md
+deploy/host-package/README.md
+
+# Local HTTP / debug dumps
+/body*.txt
+/headers*.txt
+/tsc-*.txt
+
+# Mac archive junk
+__MACOSX/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large deploy archives (GitHub max file size 100 MB)
+*.zip
+deploy/*.zip
+deploy/**/*.zip
+release/*.zip
+
+# Dependencies / build
+node_modules/
+dist/
+build/
+coverage/
+
+# Editor
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

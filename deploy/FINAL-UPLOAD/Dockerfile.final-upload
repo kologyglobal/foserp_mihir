@@ -1,0 +1,25 @@
+# Builds a complete Linux (glibc) upload folder — no SSH/npm on the server.
+# Output: deploy/FINAL-UPLOAD/
+#
+# Requires Docker Desktop running.
+
+FROM node:22-bookworm-slim AS app
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY tsconfig.json ./
+COPY prisma ./prisma
+COPY scripts ./scripts
+COPY src ./src
+COPY cpanel-start.mjs ./
+
+RUN npx prisma generate && npm run build \
+  && npm install prisma@6.9.0 tsx@4.19.4 --no-save \
+  && mkdir -p uploads public
+
+# Keep full node_modules + dist + prisma for cPanel upload

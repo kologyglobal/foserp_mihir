@@ -1,0 +1,6 @@
+# If Apache serves public_html and Node listens on 5000 (Passenger / proxy setup).
+# Prefer cPanel "Application Manager" / Node.js selector pointing at backend/.
+# Example reverse proxy (requires mod_proxy) — adjust port if needed:
+#
+# RewriteEngine On
+# RewriteRule ^(.*)$ http://127.0.0.1:5000/$1 [P,L]

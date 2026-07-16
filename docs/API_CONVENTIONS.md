@@ -1,0 +1,252 @@
+# API Conventions
+
+Authoritative patterns from `backend/src/app.ts` and module routes. Base URL: **`/api/v1`**.
+
+## Base URL & health
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /health` | No | `{ database, environment }` inside `data` |
+| `GET /docs` | No | Swagger UI (development only) |
+
+Frontend default: `VITE_API_BASE_URL=http://localhost:5000/api/v1`
+
+## Authentication
+
+Prefix: **`/api/v1/auth`**
+
+| Method | Path | Auth | Body / notes |
+|--------|------|------|--------------|
+| POST | `/login` | No | `{ email, password, tenantSlug }` — rate limited (30/15min) |
+| POST | `/refresh-token` | No | `{ refreshToken }` |
+| POST | `/forgot-password` | No | `{ email, tenantSlug }` |
+| POST | `/reset-password` | No | `{ token, password }` |
+| POST | `/logout` | Bearer | `{ refreshToken? }` |
+| POST | `/change-password` | Bearer | `{ currentPassword, newPassword }` |
+| GET | `/me` | Bearer | Current user + roles + permissions |
+
+**Headers:** `Authorization: Bearer <accessToken>`
+
+Login response `data` includes: `accessToken`, `refreshToken`, `tenantId`, `tenantSlug`, `user` (id, name, email, roles, permissions).
+
+## Tenant routes (authoritative pattern)
+
+Two equivalent mounts (same router, `mergeParams: true`):
+
+```
+/api/v1/tenants/:tenantId/{resource}
+/api/v1/t/:tenantSlug/{resource}
+```
+
+**Frontend uses slug form** via `tenantPath('/crm/leads')` → `/t/vasant-trailers/crm/leads`.
+
+### Platform admin (no tenant in path)
+
+| Prefix | Permission | Resources |
+|--------|------------|-----------|
+| `/tenants` | `tenant.manage` (Super Admin) | POST/GET list, GET/PATCH/DELETE `/:tenantId` |
+
+### Tenant-scoped resources
+
+| Prefix | Module |
+|--------|--------|
+| `/t/:tenantSlug/users` | User CRUD + role assignment |
+| `/t/:tenantSlug/roles` | Role CRUD + permissions |
+| `/t/:tenantSlug/crm/*` | Full CRM module |
+| `/t/:tenantSlug/masters/*` | Generic master CRUD |
+| `/t/:tenantSlug/masters/items` | Item CRUD + import |
+| `/t/:tenantSlug/masters/vendors` | Vendor CRUD + import |
+| `/t/:tenantSlug/masters/imports` | Batch import |
+| `/t/:tenantSlug/masters/exports` | Batch export |
+| `/t/:tenantSlug/lookups/*` | Lightweight lookup endpoints |
+
+## CRM routes (`/crm`)
+
+All require auth + tenant context + appropriate `crm.*` permission.
+
+| Sub-path | Methods | Permission examples |
+|----------|---------|---------------------|
+| `/companies` | GET, POST | `crm.company.view`, `.create` — POST with `contactPerson` also upserts primary contact |
+| `/companies/:id` | GET, PATCH, DELETE | `.view`, `.update`, `.delete` — PATCH contact fields sync primary contact |
+| `/contacts` | GET, POST | `crm.contact.*` |
+| `/contacts/:id` | GET, PATCH, DELETE | |
+| `/leads` | GET, POST | `crm.lead.*` |
+| `/leads/:id` | GET, PATCH, DELETE | |
+| `/leads/:id/assign` | POST | `crm.lead.assign` |
+| `/leads/:id/qualify` | POST | `crm.lead.qualify` |
+| `/leads/:id/disqualify` | POST | `crm.lead.qualify` |
+| `/leads/:id/convert` | POST | `crm.lead.convert` — requires qualified; 422 if not |
+| `/leads/bulk-assign` | POST | `crm.lead.assign` |
+| `/activities` | GET, POST | `crm.activity.*` |
+| `/activities/:id` | GET, PATCH, DELETE | |
+| `/activities/:id/complete` | POST | `crm.activity.complete` |
+| `/pipelines` | GET | `crm.pipeline.view` |
+| `/opportunities` | GET, POST | `crm.opportunity.*` |
+| `/opportunities/:id` | GET, PATCH, DELETE | |
+| `/opportunities/:id/win` | POST | `crm.opportunity.close` |
+| `/opportunities/:id/lose` | POST | `crm.opportunity.close` |
+| `/follow-ups` | GET, POST | `crm.follow_up.*` |
+| `/follow-ups/:id` | GET, PATCH, DELETE | |
+| `/quotations` | GET, POST | `crm.quotation.view` / `.create` |
+| `/quotations/:id` | GET, PATCH, DELETE | `.view` / `.update` / `.delete` |
+| `/quotations/:id/revisions` | POST | `crm.quotation.update` |
+| `/quotations/:id/documents/:docId` | PATCH | `crm.quotation.update` |
+| `/quotations/:id/documents/:docId/submit-approval` | POST | `crm.quotation.update` |
+| `/quotations/:id/documents/:docId/approve` | POST | `crm.quotation.approve` — also sets `customerApproval=approved` (no separate Accept API) |
+| `/quotations/:id/documents/:docId/reject` | POST | `crm.quotation.approve` |
+| `/quotations/:id/documents/:docId/mark-sent` | POST | `crm.quotation.update` |
+| `/quotations/:id/convert-to-sales-order` | POST | `crm.quotation.convert` + `crm.sales_order.create` — creates Open SO, wins linked opportunity; 409 on already-converted |
+| `/quotation-templates` | GET, POST | `crm.quotation.view` / `.create` |
+| `/quotation-templates/:id` | GET, PATCH, DELETE | |
+| `/quotation-templates/:id/duplicate` | POST | `crm.quotation.create` |
+| `/sales-orders` | GET | `crm.sales_order.view` — list (from conversion) |
+| `/sales-orders/:id` | GET | `crm.sales_order.view` |
+| `/imports/:entity` | POST | `crm.import.execute` |
+| `/exports/:resource` | GET (CSV blob) | `crm.export.execute` |
+| `/dashboard/metrics` | GET | `crm.dashboard.view` — query `?period=month`; response `data` includes KPIs, `panels`, and `charts` (pipeline/funnel/trend/urgency/owner series) |
+| `/reports?reportId=` | GET | `crm.report.view` |
+| `/search` | GET | `crm.search.view` |
+| `/masters/:kind` | GET, POST | `crm.master.*` |
+| `/masters/:kind/lookup` | GET | Active options for dropdowns |
+| `/masters/:kind/:id` | GET, PATCH, DELETE | |
+| `/masters/:kind/:id/activate` \| `deactivate` | POST | |
+| `/entities/:entityType/:entityId/notes` | GET, POST | `crm.note.*` |
+| `/entities/notes/:noteId` | PATCH, DELETE | |
+| `/entities/:entityType/:entityId/attachments` | GET, POST | `crm.attachment.*` |
+| `/entities/attachments/:attachmentId/download` | GET (blob) | `crm.attachment.view` |
+| `/entities/attachments/:attachmentId` | DELETE | `crm.attachment.delete` |
+
+**Export resources:** `companies`, `contacts`, `leads`, `opportunities`, `quotations`, `activities`, `follow-ups`
+
+**Report IDs:** `pipeline`, `stage-wise`, `follow-up-due`, `sales-activity`, `quotation-revision`, `quotation-approval`, `won-lost`, `customer-pipeline`, `conversion-funnel`, `lead-register`, `lead-owner`, `lead-priority`, `lead-stage`, `lead-conversion`, `closed-leads`, `lead-active-inactive`
+
+**Entity types (notes/attachments):** `COMPANY`, `CONTACT`, `LEAD`, `OPPORTUNITY`, `ACTIVITY`, `FOLLOW_UP`, `QUOTATION`
+
+**CRM master kinds (`/crm/masters/:kind`):** `lead-sources`, `industries`, `territories`, `designations`, `departments`, `lead-stages`, `lead-priorities`, `lead-reasons`, `opportunity-stages`, `opportunity-priorities`, `activity-types`, `lost-reasons`, `commercial-terms`, `payment-terms`, `delivery-terms`, `warranty-terms`, `approval-rules`, `document-types`
+
+## Master routes (`/masters/:resource`)
+
+Registry resources: `countries`, `states`, `cities`, `uom`, `warehouses`, `locations`, `item-categories`, `hsn-sac`, `gst-groups`, `gst-rates`, `products`
+
+| Method | Path | Action |
+|--------|------|--------|
+| GET | `/:resource` | List (paginated) |
+| POST | `/:resource` | Create |
+| GET | `/:resource/:id` | Get by id |
+| PATCH | `/:resource/:id` | Update |
+| DELETE | `/:resource/:id` | Soft delete |
+| POST | `/:resource/:id/activate` | Set ACTIVE |
+| POST | `/:resource/:id/deactivate` | Set INACTIVE |
+
+Items: `/masters/items` — dedicated controller.  
+Vendors: `/masters/vendors` — dedicated controller.
+
+## Response format
+
+### Success
+
+```json
+{
+  "success": true,
+  "message": "Human-readable message",
+  "data": { },
+  "meta": { "page": 1, "limit": 20, "total": 100, "totalPages": 5 }
+}
+```
+
+- `meta` is `null` for single-resource responses.
+- `201 Created` uses same shape via `sendCreated()`.
+
+### Error
+
+```json
+{
+  "success": false,
+  "message": "Error summary",
+  "errors": [{ "field": "email", "message": "Invalid email" }]
+}
+```
+
+| Status | Typical cause |
+|--------|---------------|
+| 400 | Validation (Zod / business rule) |
+| 401 | Missing/invalid token |
+| 403 | Missing permission / tenant mismatch |
+| 404 | Not found / unknown resource slug |
+| 409 | Unique constraint (Prisma P2002) |
+| 429 | Auth rate limit |
+| 500 | Unhandled / DB error |
+
+## Pagination & list queries
+
+Standard query params (via `paginationSchema`):
+
+| Param | Default | Max |
+|-------|---------|-----|
+| `page` | 1 | — |
+| `limit` | 20 | 100 |
+| `search` | — | trim string |
+| `sortBy` | — | field name |
+| `sortOrder` | `desc` | `asc` \| `desc` |
+
+## Auth & permissions summary
+
+1. Extract JWT → `req.context` (userId, tenantId).
+2. `attachRequestContext` loads roles + permissions from DB.
+3. `resolveTenant` sets `req.tenantId` from route slug/id.
+4. `requirePermission('x.y.z')` — Super Admin (`tenant.manage`) bypasses all checks.
+
+**Never accept `tenantId` in request bodies** — tenant scope comes from route + JWT only.
+
+Optional header: `x-tenant-id` (Super Admin context switching).
+
+## Lifecycle action endpoints (explicit transitions)
+
+Do not change protected lifecycle fields through generic PATCH. Use dedicated endpoints:
+
+| Entity | Endpoint | Action |
+|--------|----------|--------|
+| Lead | `POST /leads/:id/assign` | Assign owner |
+| Lead | `POST /leads/:id/qualify` | Qualify |
+| Lead | `POST /leads/:id/disqualify` | Disqualify |
+| Lead | `POST /leads/:id/convert` | Convert qualified lead to opportunity |
+| Activity | `POST /activities/:id/complete` | Mark complete |
+| Opportunity | `POST /opportunities/:id/win` | Win deal |
+| Opportunity | `POST /opportunities/:id/lose` | Lose deal |
+| Opportunity | `POST /opportunities/:id/move-stage` | Stage transition |
+| Quotation | `POST /quotations/:id/revisions` | New revision |
+| Quotation doc | `POST …/documents/:docId/submit-approval` | Submit |
+| Quotation doc | `POST …/documents/:docId/approve` \| `reject` | Approval (approve = commercial + customerApproval) |
+| Quotation doc | `POST …/documents/:docId/mark-sent` | Mark sent |
+| Quotation | `POST /quotations/:id/convert-to-sales-order` | Create sales order (convert-only) |
+| Quotation template | `POST /quotation-templates/:id/duplicate` | Duplicate |
+| Master | `POST /masters/:resource/:id/activate` | Activate |
+| Master | `POST /masters/:resource/:id/deactivate` | Deactivate |
+
+## Lookup endpoints
+
+Lightweight read-only lists under `/t/:tenantSlug/lookups/` — used by transactional forms (`useItemLookup`, `useVendorLookup`). Cached via `lookupCache.ts`.
+
+## Frontend client usage
+
+```typescript
+import { apiRequest, tenantPath } from './client'
+
+// GET list
+await apiRequest<Lead[]>(`${tenantPath('/crm/leads')}?page=1&limit=50`)
+
+// POST create
+await apiRequest<Lead>(tenantPath('/crm/leads'), {
+  method: 'POST',
+  body: JSON.stringify(payload),
+})
+
+// CSV / file download
+await apiDownloadBlob(tenantPath('/crm/exports/leads'))
+```
+
+Session stored in `localStorage` key `fos-erp-auth`.
+
+## Field naming: API ↔ frontend
+
+Backend CRM DTOs often use **frontend-compatible aliases** (e.g. `customerName` → company `name`, `customerId` → `companyId`). Mapping documented in `FRONTEND_BACKEND_INTEGRATION.md`. When adding fields, update **both** validation schema and bridge mapper.

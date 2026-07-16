@@ -1,0 +1,41 @@
+---
+description: FOS ERP project conventions for AI agents — dual-mode frontend, multi-tenant API, completion criteria
+alwaysApply: true
+---
+
+# FOS ERP Project Rules
+
+## Session start
+
+1. Read `docs/PROJECT_MEMORY.md`, `docs/PROJECT_STATUS.md`, `docs/REMAINING_WORK.md`, and the latest `docs/SESSION_CHANGELOG.md` entry.
+2. Inspect existing code before creating new modules, API clients, stores, services, validators, or components.
+3. Verify current state against code — not chat summaries alone.
+
+## Architecture & data
+
+4. **Dual-mode frontend:** `VITE_USE_API=false` → Zustand demo; `VITE_USE_API=true` → API hydration. **Never mix demo and API data.**
+5. **Multi-tenant:** Every query filters `tenantId`. Routes use `/api/v1/t/:tenantSlug/…`. Never trust `tenantId` from request bodies.
+6. **Code is source of truth.** When docs disagree with code, trust code and update docs.
+7. **Use bridge modules** for CRM/master writes (`crmApiBridge`, `masterApiBridge`, `masterBatchApiBridge`). Do not duplicate field mapping in pages.
+8. **Prisma changes require migrations.** CI uses `npx tsx scripts/prisma-cli.ts migrate deploy` — not interactive `db:migrate`.
+9. **UUID ids, soft delete, Zod validation** on all new routes and params.
+10. **Thin controllers, business logic in services, DB access in repositories.** Use explicit lifecycle endpoints — not generic PATCH for workflow transitions.
+
+## Completion criteria
+
+11. **Never mark a module complete** without UI + API + DB + permissions + tenant isolation + tests. Demo-only frontend ≠ complete.
+12. **Never claim completion without test evidence.** Skipped live tests are not passes.
+13. **Never store secrets** in docs or rules — env var names only.
+
+## CRM-specific
+
+14. **Notes/attachments:** `/crm/entities/:entityType/:entityId/…` via `useEntityNotes` / `useEntityAttachments`. Types: COMPANY, CONTACT, LEAD, OPPORTUNITY, ACTIVITY, FOLLOW_UP, QUOTATION. Activity/follow-up Notes use `CrmEntityDetailDrawer` on all required 360 pages.
+15. **Quotation backend:** CRUD + lifecycle + convert-to-SO + entity notes/attachments + quotation templates shipped.
+16. **Transactional ERP** (purchase, inventory, production, quality, finance, sales orders beyond CRM conversion) is **deferred by design** — demo frontend only.
+
+## Quality & maintenance
+
+17. **Run tests after CRM/backend changes:** `typecheck`, `npm test`, `npm run test:crm-live` (when MySQL available).
+18. **Update project memory** when shipping significant work: `SESSION_CHANGELOG.md`, `PROJECT_STATUS.md`, `REMAINING_WORK.md`, `TESTING_STATUS.md`.
+19. **Minimize diff scope** — match existing patterns; no drive-by refactors.
+20. **Preserve demo mode** — shared store changes must keep `VITE_USE_API=false` working unless explicitly migrating that module.

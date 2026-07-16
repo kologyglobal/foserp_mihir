@@ -1,0 +1,14 @@
+{
+  "name": "fos-erp",
+  "private": true,
+  "version": "1.0.0",
+  "description": "FOS ERP monorepo — frontend (Vite) + backend (Express/Prisma)",
+  "scripts": {
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File ./build.ps1 -SkipInstall",
+    "build:all": "powershell -NoProfile -ExecutionPolicy Bypass -File ./build.ps1",
+    "build:frontend": "powershell -NoProfile -ExecutionPolicy Bypass -File ./build.ps1 -FrontendOnly -SkipInstall",
+    "build:backend": "powershell -NoProfile -ExecutionPolicy Bypass -File ./build.ps1 -BackendOnly -SkipInstall",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev"
+  }
+}

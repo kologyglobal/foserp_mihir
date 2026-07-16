@@ -1,0 +1,1419 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  TRIAL
+  ARCHIVED
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  INACTIVE
+  BLOCKED
+  ARCHIVED
+}
+
+enum CodeSeriesEntity {
+  USER
+  LEAD
+  CONTACT
+  CRM_COMPANY
+  OPPORTUNITY
+  QUOTATION
+  SALES_ORDER
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  MEETING
+  WHATSAPP
+  FOLLOW_UP
+  NOTE
+  DEMO
+  TASK
+  SITE_VISIT
+  STAGE_CHANGE
+}
+
+enum ActivityStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  OVERDUE
+}
+
+enum OpportunityStatus {
+  OPEN
+  WON
+  LOST
+  ON_HOLD
+  ARCHIVED
+}
+
+enum PipelineStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+// ─── Tenants ─────────────────────────────────────────────────────────────────
+
+model Tenant {
+  id                 String       @id @default(uuid())
+  name               String       @db.VarChar(200)
+  slug               String       @unique @db.VarChar(100)
+  legalName          String?      @db.VarChar(300)
+  email              String       @db.VarChar(255)
+  phone              String?      @db.VarChar(30)
+  country            String?      @db.VarChar(100)
+  state              String?      @db.VarChar(100)
+  city               String?      @db.VarChar(100)
+  timezone           String       @default("Asia/Kolkata") @db.VarChar(64)
+  currency           String       @default("INR") @db.VarChar(8)
+  status             TenantStatus @default(TRIAL)
+  subscriptionPlan   String?      @db.VarChar(64)
+  subscriptionStatus String?      @db.VarChar(64)
+  trialEndsAt        DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  deletedAt          DateTime?
+
+  users              User[]
+  roles              Role[]
+  codeSeries         CodeSeries[]
+  auditLogs          AuditLog[]
+  crmCompanies       CrmCompany[]
+  crmContacts        CrmContact[]
+  crmLeads           CrmLead[]
+  crmActivities      CrmActivity[]
+  crmPipelines       CrmPipeline[]
+  crmPipelineStages  CrmPipelineStage[]
+  crmOpportunities   CrmOpportunity[]
+  crmFollowUps       CrmFollowUp[]
+  crmMasters         CrmMaster[]
+  crmNotes              CrmNote[]
+  crmAttachments        CrmAttachment[]
+  crmQuotations         CrmQuotation[]
+  crmQuotationDocuments CrmQuotationDocument[]
+  crmQuotationTemplates CrmQuotationTemplate[]
+  crmSalesOrders        CrmSalesOrder[]
+  masterCountries      MasterCountry[]
+  masterStates         MasterState[]
+  masterCities         MasterCity[]
+  masterProducts       MasterProduct[]
+  masterUoms           MasterUom[]
+  masterWarehouses     MasterWarehouse[]
+  masterLocations      MasterLocation[]
+  masterItemCategories MasterItemCategory[]
+  masterHsnCodes       MasterHsnCode[]
+  masterGstGroups      MasterGstGroup[]
+  masterGstRates       MasterGstRate[]
+  masterItems          MasterItem[]
+  masterVendors        MasterVendor[]
+
+  @@index([status])
+  @@index([deletedAt])
+  @@map("tenants")
+}
+
+// ─── Auth & Users ────────────────────────────────────────────────────────────
+
+model User {
+  id            String     @id @default(uuid())
+  tenantId      String
+  firstName     String     @db.VarChar(100)
+  lastName      String     @db.VarChar(100)
+  email         String     @db.VarChar(255)
+  mobile        String?    @db.VarChar(20)
+  passwordHash  String     @db.VarChar(255)
+  designation   String?    @db.VarChar(100)
+  department    String?    @db.VarChar(100)
+  status        UserStatus @default(INVITED)
+  emailVerified Boolean    @default(false)
+  lastLoginAt   DateTime?
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime?
+
+  tenant        Tenant     @relation(fields: [tenantId], references: [id])
+  userRoles     UserRole[]
+  refreshTokens RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  tenantId    String?  // null = global system role (Super Admin)
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  isSystem    Boolean  @default(false)
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  tenant           Tenant?          @relation(fields: [tenantId], references: [id])
+  userRoles        UserRole[]
+  rolePermissions  RolePermission[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique @db.VarChar(100)
+  module      String   @db.VarChar(64)
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String
+  roleId    String
+  tenantId  String
+  createdAt DateTime @default(now())
+  createdBy String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([tenantId])
+  @@index([userId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id           String @id @default(uuid())
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tenantId  String
+  tokenHash String   @db.VarChar(255)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  userAgent String?  @db.VarChar(512)
+  ipAddress String?  @db.VarChar(64)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([tokenHash])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @db.VarChar(255)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String?
+  userId    String?
+  module    String   @db.VarChar(64)
+  entity    String   @db.VarChar(64)
+  entityId  String?  @db.VarChar(36)
+  action    String   @db.VarChar(64)
+  oldValues Json?
+  newValues Json?
+  ipAddress String?  @db.VarChar(64)
+  userAgent String?  @db.VarChar(512)
+  createdAt DateTime @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, module])
+  @@index([tenantId, entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model CodeSeries {
+  id           String           @id @default(uuid())
+  tenantId     String
+  entityType   CodeSeriesEntity
+  prefix       String           @db.VarChar(20)
+  currentValue Int              @default(0)
+  padLength    Int              @default(6)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, entityType])
+  @@index([tenantId])
+  @@map("code_series")
+}
+
+// ─── CRM ─────────────────────────────────────────────────────────────────────
+
+model CrmCompany {
+  id            String   @id @default(uuid())
+  tenantId      String
+  companyCode   String   @db.VarChar(32)
+  name          String   @db.VarChar(300)
+  customerType  String   @default("corporate") @db.VarChar(32)
+  website       String?  @db.VarChar(255)
+  industry      String?  @db.VarChar(100)
+  turnoverRange String?  @db.VarChar(64)
+  employeeRange String?  @db.VarChar(64)
+  email         String?  @db.VarChar(255)
+  phone         String?  @db.VarChar(30)
+  addressLine1  String?  @db.VarChar(500)
+  addressLine2  String?  @db.VarChar(500)
+  city          String?  @db.VarChar(100)
+  state         String?  @db.VarChar(100)
+  pincode       String?  @db.VarChar(20)
+  country       String?  @default("India") @db.VarChar(100)
+  gstin         String?  @db.VarChar(20)
+  pan           String?  @db.VarChar(20)
+  contactPerson String?  @db.VarChar(200)
+  contactPhone  String?  @db.VarChar(30)
+  contactEmail  String?  @db.VarChar(255)
+  creditDays    Int      @default(0)
+  creditLimit   Decimal? @db.Decimal(18, 2)
+  salesTerritory String? @db.VarChar(32)
+  source        String?  @db.VarChar(64)
+  ownerId       String?
+  status        String   @default("active") @db.VarChar(32)
+  isActive      Boolean  @default(true)
+  notes         String?  @db.Text
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  contacts      CrmContact[]
+  leads         CrmLead[]
+  activities    CrmActivity[]
+  opportunities CrmOpportunity[]
+  quotations    CrmQuotation[]
+  salesOrders   CrmSalesOrder[]
+
+  @@unique([tenantId, companyCode])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, name])
+  @@map("crm_companies")
+}
+
+model CrmContact {
+  id              String   @id @default(uuid())
+  tenantId        String
+  contactCode     String   @db.VarChar(32)
+  companyId       String
+  firstName       String   @db.VarChar(100)
+  lastName        String   @default("") @db.VarChar(100)
+  designation     String?  @db.VarChar(100)
+  department      String?  @db.VarChar(100)
+  email           String?  @db.VarChar(255)
+  mobile          String?  @db.VarChar(20)
+  alternateMobile String?  @db.VarChar(20)
+  linkedInUrl     String?  @db.VarChar(255)
+  ownerId         String?
+  isPrimary       Boolean  @default(false)
+  status          String   @default("active") @db.VarChar(32)
+  isActive        Boolean  @default(true)
+  masterContactId String?
+  notes           String?  @db.Text
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  company       CrmCompany     @relation(fields: [companyId], references: [id])
+  leads         CrmLead[]
+  activities    CrmActivity[]
+  opportunities CrmOpportunity[]
+
+  @@unique([tenantId, contactCode])
+  @@index([tenantId])
+  @@index([tenantId, companyId])
+  @@index([tenantId, email])
+  @@index([tenantId, deletedAt])
+  @@map("crm_contacts")
+}
+
+model CrmLead {
+  id                  String    @id @default(uuid())
+  tenantId            String
+  leadCode            String    @db.VarChar(32)
+  prospectName        String    @db.VarChar(300)
+  companyName         String?   @db.VarChar(300)
+  companyId           String?
+  contactId           String?
+  designation         String?   @db.VarChar(100)
+  email               String?   @db.VarChar(255)
+  mobile              String?   @db.VarChar(20)
+  contactPerson       String?   @db.VarChar(200)
+  source              String    @default("other") @db.VarChar(64)
+  industry            String?   @db.VarChar(100)
+  turnoverRange       String?   @db.VarChar(64)
+  productRequirement  String?   @db.Text
+  expectedQty         Int?
+  expectedValue       Decimal   @default(0) @db.Decimal(18, 2)
+  probability         Int       @default(0)
+  stage               String    @default("new") @db.VarChar(64)
+  priority            String    @default("medium") @db.VarChar(32)
+  lifecycleStatus     String    @default("open") @db.VarChar(32)
+  activityStatus      String    @default("active") @db.VarChar(32)
+  qualificationStatus String?   @db.VarChar(32)
+  temperature         String?   @db.VarChar(16)
+  assignedTo          String?
+  ownerId             String?
+  lastContactedAt     DateTime?
+  nextFollowUpAt      DateTime?
+  expectedCloseDate   DateTime?
+  inactiveReason      String?   @db.VarChar(64)
+  notQualifiedReason  String?   @db.VarChar(64)
+  closedReason        String?   @db.VarChar(64)
+  closedDate          DateTime?
+  lostReason          String?   @db.Text
+  remarks             String?   @db.Text
+  followUpType        String?   @db.VarChar(64)
+  followUpNotes       String?   @db.Text
+  opportunityId       String?
+  convertedAt         DateTime?
+  isArchived          Boolean   @default(false)
+  locationId          String?
+  createdBy           String?
+  updatedBy           String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+
+  tenant       Tenant              @relation(fields: [tenantId], references: [id])
+  company      CrmCompany?         @relation(fields: [companyId], references: [id])
+  contact      CrmContact?         @relation(fields: [contactId], references: [id])
+  activities   CrmActivity[]
+  statusHistory CrmLeadStatusHistory[]
+  assignments  CrmLeadAssignment[]
+
+  @@unique([tenantId, leadCode])
+  @@index([tenantId])
+  @@index([tenantId, stage])
+  @@index([tenantId, assignedTo])
+  @@index([tenantId, ownerId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, deletedAt])
+  @@map("crm_leads")
+}
+
+model CrmLeadStatusHistory {
+  id        String   @id @default(uuid())
+  tenantId  String
+  leadId    String
+  fromStage String?  @db.VarChar(64)
+  toStage   String   @db.VarChar(64)
+  changedBy String?
+  reason    String?  @db.Text
+  createdAt DateTime @default(now())
+
+  lead CrmLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, leadId])
+  @@map("crm_lead_status_history")
+}
+
+model CrmLeadAssignment {
+  id         String   @id @default(uuid())
+  tenantId   String
+  leadId     String
+  assignedTo String
+  assignedBy String?
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  lead CrmLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, leadId])
+  @@index([tenantId, assignedTo])
+  @@map("crm_lead_assignments")
+}
+
+model CrmActivity {
+  id            String         @id @default(uuid())
+  tenantId      String
+  activityType  ActivityType
+  subject       String         @db.VarChar(500)
+  description   String?        @db.Text
+  leadId        String?
+  contactId     String?
+  companyId     String?
+  opportunityId String?
+  assignedTo    String?
+  scheduledAt   DateTime?
+  completedAt   DateTime?
+  priority      String?        @db.VarChar(32)
+  status        ActivityStatus @default(PLANNED)
+  outcome       String?        @db.Text
+  nextAction    String?        @db.Text
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  lead        CrmLead?        @relation(fields: [leadId], references: [id])
+  contact     CrmContact?     @relation(fields: [contactId], references: [id])
+  company     CrmCompany?     @relation(fields: [companyId], references: [id])
+  opportunity CrmOpportunity? @relation(fields: [opportunityId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, leadId])
+  @@index([tenantId, opportunityId])
+  @@index([tenantId, assignedTo])
+  @@index([tenantId, deletedAt])
+  @@map("crm_activities")
+}
+
+model CrmPipeline {
+  id          String         @id @default(uuid())
+  tenantId    String
+  name        String         @db.VarChar(200)
+  description String?        @db.Text
+  isDefault   Boolean        @default(false)
+  status      PipelineStatus @default(ACTIVE)
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?
+
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+  stages        CrmPipelineStage[]
+  opportunities CrmOpportunity[]
+
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@map("crm_pipelines")
+}
+
+model CrmPipelineStage {
+  id           String   @id @default(uuid())
+  tenantId     String
+  pipelineId   String
+  name         String   @db.VarChar(100)
+  slug         String   @db.VarChar(64)
+  sequence     Int      @default(0)
+  probability  Int      @default(0)
+  isClosedWon  Boolean  @default(false)
+  isClosedLost Boolean  @default(false)
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+  pipeline      CrmPipeline        @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  opportunities CrmOpportunity[]
+
+  @@unique([tenantId, pipelineId, slug])
+  @@index([tenantId, pipelineId])
+  @@map("crm_pipeline_stages")
+}
+
+model CrmOpportunity {
+  id                String            @id @default(uuid())
+  tenantId          String
+  opportunityCode   String            @db.VarChar(32)
+  name              String            @db.VarChar(300)
+  companyId         String
+  contactId         String?
+  leadId            String?
+  pipelineId        String
+  stageId           String
+  ownerId           String?
+  amount            Decimal           @default(0) @db.Decimal(18, 2)
+  expectedCloseDate DateTime?
+  probability       Int               @default(0)
+  status            OpportunityStatus @default(OPEN)
+  requirement       String?           @db.Text
+  competitor        String?           @db.VarChar(200)
+  winReason         String?           @db.Text
+  lostReason        String?           @db.Text
+  healthScore       Int               @default(60)
+  priority          String            @default("medium") @db.VarChar(32)
+  lastActivityAt    DateTime?
+  nextFollowUpAt    DateTime?
+  locationId        String?
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+
+  tenant     Tenant           @relation(fields: [tenantId], references: [id])
+  company    CrmCompany       @relation(fields: [companyId], references: [id])
+  contact    CrmContact?      @relation(fields: [contactId], references: [id])
+  pipeline   CrmPipeline      @relation(fields: [pipelineId], references: [id])
+  stage      CrmPipelineStage @relation(fields: [stageId], references: [id])
+  lines       CrmOpportunityLine[]
+  activities  CrmActivity[]
+  quotations  CrmQuotation[]
+
+  @@unique([tenantId, opportunityCode])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, stageId])
+  @@index([tenantId, ownerId])
+  @@index([tenantId, deletedAt])
+  @@map("crm_opportunities")
+}
+
+model CrmOpportunityLine {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  opportunityId       String
+  lineNo              Int
+  productId           String?
+  itemId              String?
+  itemCode            String   @default("") @db.VarChar(64)
+  productOrItem       String   @db.VarChar(300)
+  description         String?  @db.Text
+  productFamily       String?  @db.VarChar(100)
+  itemType            String?  @db.VarChar(64)
+  qty                 Decimal  @default(1) @db.Decimal(18, 4)
+  uom                 String   @default("NOS") @db.VarChar(16)
+  unitPrice           Decimal  @default(0) @db.Decimal(18, 2)
+  discountPct         Decimal  @default(0) @db.Decimal(5, 2)
+  discountAmount      Decimal  @default(0) @db.Decimal(18, 2)
+  taxableValue        Decimal  @default(0) @db.Decimal(18, 2)
+  taxPct              Decimal  @default(0) @db.Decimal(5, 2)
+  gstAmount           Decimal  @default(0) @db.Decimal(18, 2)
+  lineTotal           Decimal  @default(0) @db.Decimal(18, 2)
+  expectedDeliveryDate DateTime?
+  remarks             String?  @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  opportunity CrmOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, opportunityId])
+  @@map("crm_opportunity_lines")
+}
+
+model CrmFollowUp {
+  id            String    @id @default(uuid())
+  tenantId      String
+  followUpType  String    @db.VarChar(64)
+  companyId     String?
+  contactId     String?
+  opportunityId String?
+  leadId        String?
+  assignedTo    String?
+  dueDate       DateTime  @db.Date
+  dueTime       String    @default("10:00") @db.VarChar(8)
+  priority      String    @default("medium") @db.VarChar(32)
+  status        String    @default("pending") @db.VarChar(32)
+  outcome       String?   @db.Text
+  notes         String?   @db.Text
+  reminder      Boolean   @default(false)
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, assignedTo])
+  @@index([tenantId, dueDate])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, leadId])
+  @@index([tenantId, opportunityId])
+  @@map("crm_follow_ups")
+}
+
+enum CrmEntityType {
+  COMPANY
+  CONTACT
+  LEAD
+  OPPORTUNITY
+  ACTIVITY
+  FOLLOW_UP
+  QUOTATION
+}
+
+model CrmMaster {
+  id          String   @id @default(uuid())
+  tenantId    String
+  kind        String   @db.VarChar(64)
+  code        String   @db.VarChar(64)
+  name        String   @db.VarChar(200)
+  description String?  @db.Text
+  status      String   @default("active") @db.VarChar(32)
+  sortOrder   Int      @default(0)
+  attributes  Json     @default("{}")
+  isSystem    Boolean  @default(false)
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, kind, code])
+  @@index([tenantId, kind])
+  @@index([tenantId, kind, status])
+  @@index([tenantId, deletedAt])
+  @@map("crm_masters")
+}
+
+model CrmNote {
+  id         String        @id @default(uuid())
+  tenantId   String
+  entityType CrmEntityType
+  entityId   String
+  content    String        @db.Text
+  createdBy  String?
+  updatedBy  String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  deletedAt  DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, deletedAt])
+  @@map("crm_notes")
+}
+
+model CrmAttachment {
+  id               String        @id @default(uuid())
+  tenantId         String
+  entityType       CrmEntityType
+  entityId         String
+  originalFilename String        @db.VarChar(500)
+  storedFilename   String        @db.VarChar(500)
+  mimeType         String        @db.VarChar(128)
+  fileSize         Int           @default(0)
+  storageKey       String        @db.VarChar(500)
+  documentType     String?       @db.VarChar(64)
+  uploadedBy       String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  deletedAt        DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, deletedAt])
+  @@map("crm_attachments")
+}
+
+model CrmOpportunityStageHistory {
+  id            String   @id @default(uuid())
+  tenantId      String
+  opportunityId String
+  fromStageId   String?
+  toStageId     String
+  changedBy     String?
+  reason        String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, opportunityId])
+  @@map("crm_opportunity_stage_history")
+}
+
+model CrmOpportunityAssignmentHistory {
+  id            String   @id @default(uuid())
+  tenantId      String
+  opportunityId String
+  fromOwnerId   String?
+  toOwnerId     String?
+  changedBy     String?
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, opportunityId])
+  @@map("crm_opportunity_assignment_history")
+}
+
+model CrmOpportunityAmountHistory {
+  id            String   @id @default(uuid())
+  tenantId      String
+  opportunityId String
+  oldAmount     Decimal  @db.Decimal(18, 2)
+  newAmount     Decimal  @db.Decimal(18, 2)
+  changedBy     String?
+  reason        String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, opportunityId])
+  @@map("crm_opportunity_amount_history")
+}
+
+model CrmOpportunityStatusHistory {
+  id            String   @id @default(uuid())
+  tenantId      String
+  opportunityId String
+  fromStatus    String?  @db.VarChar(32)
+  toStatus      String   @db.VarChar(32)
+  changedBy     String?
+  reason        String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, opportunityId])
+  @@map("crm_opportunity_status_history")
+}
+
+model CrmQuotation {
+  id                      String    @id @default(uuid())
+  tenantId                String
+  quotationCode           String    @db.VarChar(32)
+  companyId               String
+  opportunityId           String?
+  productId               String?
+  qty                     Decimal   @default(1) @db.Decimal(18, 4)
+  validityDate            DateTime? @db.Date
+  salesOwnerId            String?
+  salesOwnerName          String?   @db.VarChar(200)
+  status                  String    @default("draft") @db.VarChar(32)
+  revisionNo              Int       @default(1)
+  locked                  Boolean   @default(false)
+  terms                   String?   @db.Text
+  paymentTerms            String?   @db.VarChar(500)
+  deliveryTerms           String?   @db.VarChar(500)
+  locationId              String?
+  pricing                 Json      @default("{}")
+  changeHistory           Json      @default("[]")
+  customerApproval        String    @default("pending") @db.VarChar(32)
+  customerApprovalAt      DateTime?
+  customerApprovalBy      String?
+  customerRejectionReason String?   @db.Text
+  salesOrderId            String?
+  salesOrderNo            String?   @db.VarChar(64)
+  createdBy               String?
+  updatedBy               String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  deletedAt               DateTime?
+
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id])
+  company     CrmCompany             @relation(fields: [companyId], references: [id])
+  opportunity CrmOpportunity?        @relation(fields: [opportunityId], references: [id])
+  documents   CrmQuotationDocument[]
+
+  @@unique([tenantId, quotationCode])
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, companyId])
+  @@index([tenantId, opportunityId])
+  @@index([tenantId, salesOwnerId])
+  @@map("crm_quotations")
+}
+
+model CrmQuotationTemplate {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  code               String    @db.VarChar(64)
+  templateName       String    @db.VarChar(200)
+  productFamily      String    @db.VarChar(100)
+  version            Int       @default(1)
+  sections           Json      @default("[]")
+  defaultTerms       String    @default("") @db.Text
+  defaultWarranty    String    @default("") @db.Text
+  defaultExclusions  String    @default("") @db.Text
+  printLayout        Json?
+  isActive           Boolean   @default(true)
+  createdBy          String?
+  updatedBy          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, isActive])
+  @@index([tenantId, productFamily])
+  @@map("crm_quotation_templates")
+}
+
+model CrmQuotationDocument {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  quotationId        String
+  revisionNo         Int      @default(1)
+  templateId         String?
+  opportunityId      String?
+  status             String   @default("draft") @db.VarChar(32)
+  totalAmount        Decimal  @default(0) @db.Decimal(18, 2)
+  freightAmount      Decimal  @default(0) @db.Decimal(18, 2)
+  installationAmount Decimal  @default(0) @db.Decimal(18, 2)
+  customCharges      Decimal  @default(0) @db.Decimal(18, 2)
+  revisionReason     String?  @db.Text
+  locked             Boolean  @default(false)
+  approvalHistory    Json     @default("[]")
+  sections           Json     @default("[]")
+  priceLines         Json     @default("[]")
+  commercialNotes    String?  @db.Text
+  technicalNotes     String?  @db.Text
+  locationId         String?
+  salesOrderId       String?
+  salesOrderNo       String?  @db.VarChar(64)
+  contactId          String?
+  salesOwnerId       String?
+  salesOwnerName     String?  @db.VarChar(200)
+  createdBy          String?
+  createdByName      String?  @db.VarChar(200)
+  updatedBy          String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  deletedAt          DateTime?
+
+  tenant    Tenant       @relation(fields: [tenantId], references: [id])
+  quotation CrmQuotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, quotationId, revisionNo])
+  @@index([tenantId])
+  @@index([tenantId, quotationId])
+  @@index([tenantId, status])
+  @@index([tenantId, salesOwnerId])
+  @@index([tenantId, deletedAt])
+  @@map("crm_quotation_documents")
+}
+
+model CrmSalesOrder {
+  id                          String    @id @default(uuid())
+  tenantId                    String
+  salesOrderNo                String    @db.VarChar(64)
+  companyId                   String
+  productId                   String?
+  qty                         Decimal   @default(1) @db.Decimal(18, 4)
+  status                      String    @default("open") @db.VarChar(32)
+  source                      String    @default("quotation") @db.VarChar(32)
+  orderDate                   DateTime  @default(now()) @db.Date
+  requiredDate                DateTime? @db.Date
+  expectedDeliveryDate        DateTime? @db.Date
+  remarks                     String?   @db.Text
+  quotationId                 String?
+  quotationNo                 String?   @db.VarChar(64)
+  quotationRevisionNo         Int?
+  quotationDocumentId         String?
+  quotationDocumentRevisionNo Int?
+  opportunityId               String?
+  contactId                   String?
+  unitPrice                   Decimal?  @db.Decimal(18, 2)
+  discountPct                 Decimal?  @db.Decimal(5, 2)
+  grandTotal                  Decimal?  @db.Decimal(18, 2)
+  basicAmount                 Decimal?  @db.Decimal(18, 2)
+  gstAmount                   Decimal?  @db.Decimal(18, 2)
+  paymentTerms                String?   @db.VarChar(500)
+  deliveryTerms               String?   @db.VarChar(500)
+  warrantyTerms               String?   @db.VarChar(500)
+  commercialNotes             String?   @db.Text
+  technicalNotes              String?   @db.Text
+  customerCode                String?   @db.VarChar(64)
+  customerPoNumber            String?   @db.VarChar(100)
+  customerPoDate                DateTime? @db.Date
+  deliveryLocation            String?   @db.VarChar(500)
+  billingAddress              String?   @db.Text
+  shippingAddress             String?   @db.Text
+  salesOwnerId                String?
+  salesOwnerName              String?   @db.VarChar(200)
+  internalRemarks             String?   @db.Text
+  directSoReason              String?   @db.Text
+  locationId                  String?
+  lines                       Json      @default("[]")
+  createdBy                   String?
+  updatedBy                   String?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
+  deletedAt                   DateTime?
+
+  tenant  Tenant     @relation(fields: [tenantId], references: [id])
+  company CrmCompany @relation(fields: [companyId], references: [id])
+
+  @@unique([tenantId, salesOrderNo])
+  @@index([tenantId])
+  @@index([tenantId, companyId])
+  @@index([tenantId, quotationId])
+  @@index([tenantId, opportunityId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("crm_sales_orders")
+}
+
+// ─── Master data ─────────────────────────────────────────────────────────────
+
+enum MasterRecordStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model MasterCountry {
+  id        String             @id @default(uuid())
+  tenantId  String
+  code      String             @db.VarChar(16)
+  name      String             @db.VarChar(200)
+  status    MasterRecordStatus @default(ACTIVE)
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  deletedAt DateTime?
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id])
+  vendors MasterVendor[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("master_countries")
+}
+
+model MasterState {
+  id        String             @id @default(uuid())
+  tenantId  String
+  code      String             @db.VarChar(16)
+  name      String             @db.VarChar(200)
+  status    MasterRecordStatus @default(ACTIVE)
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  deletedAt DateTime?
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id])
+  vendors MasterVendor[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("master_states")
+}
+
+model MasterCity {
+  id        String             @id @default(uuid())
+  tenantId  String
+  stateId   String
+  name      String             @db.VarChar(200)
+  status    MasterRecordStatus @default(ACTIVE)
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  deletedAt DateTime?
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id])
+  vendors MasterVendor[]
+
+  @@unique([tenantId, stateId, name])
+  @@index([tenantId])
+  @@index([tenantId, stateId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("master_cities")
+}
+
+model MasterProduct {
+  id               String             @id @default(uuid())
+  tenantId         String
+  code             String             @db.VarChar(64)
+  name             String             @db.VarChar(300)
+  productFamily    String             @default("bulker_trailer") @db.VarChar(64)
+  productType      String             @default("bulker") @db.VarChar(32)
+  fgItemId         String?            @db.VarChar(64)
+  capacity         String             @default("") @db.VarChar(100)
+  axleConfig       String             @default("") @db.VarChar(100)
+  tareWeightKg     Decimal            @default(0) @db.Decimal(18, 2)
+  gvwKg            Decimal            @default(0) @db.Decimal(18, 2)
+  standardPrice    Decimal            @default(0) @db.Decimal(18, 2)
+  standardLeadDays Int                @default(0)
+  baseUomId        String?            @db.VarChar(64)
+  hsnCode          String             @default("") @db.VarChar(16)
+  specifications   String             @default("") @db.Text
+  productStatus    String             @default("draft") @db.VarChar(32)
+  details          Json               @default("{}")
+  status           MasterRecordStatus @default(ACTIVE)
+  createdBy        String?
+  updatedBy        String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  deletedAt        DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, productStatus])
+  @@index([tenantId, deletedAt])
+  @@map("master_products")
+}
+
+model MasterUom {
+  id            String             @id @default(uuid())
+  tenantId      String
+  code          String             @db.VarChar(32)
+  name          String             @db.VarChar(200)
+  description   String?            @db.VarChar(500)
+  uomType       String             @default("integer") @db.VarChar(32)
+  decimalPlaces Int                @default(0)
+  isBaseUnit    Boolean            @default(false)
+  status        MasterRecordStatus @default(ACTIVE)
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  deletedAt     DateTime?
+
+  tenant           Tenant       @relation(fields: [tenantId], references: [id])
+  itemsBaseUom     MasterItem[] @relation("ItemBaseUom")
+  itemsPurchaseUom MasterItem[] @relation("ItemPurchaseUom")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("master_uoms")
+}
+
+model MasterWarehouse {
+  id            String             @id @default(uuid())
+  tenantId      String
+  code          String             @db.VarChar(32)
+  name          String             @db.VarChar(200)
+  warehouseType String             @default("main") @db.VarChar(32)
+  plantCode     String             @default("PUNE") @db.VarChar(32)
+  address       String?            @db.Text
+  status        MasterRecordStatus @default(ACTIVE)
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  deletedAt     DateTime?
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id])
+  locations MasterLocation[]
+  categories MasterItemCategory[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("master_warehouses")
+}
+
+model MasterLocation {
+  id                  String             @id @default(uuid())
+  tenantId            String
+  warehouseId         String
+  code                String             @db.VarChar(32)
+  name                String             @db.VarChar(200)
+  addressLine1        String?            @db.VarChar(300)
+  addressLine2        String?            @db.VarChar(300)
+  city                String?            @db.VarChar(100)
+  state               String?            @db.VarChar(100)
+  pincode             String?            @db.VarChar(16)
+  country             String?            @db.VarChar(100)
+  gstin               String?            @db.VarChar(15)
+  registeredType      String?            @db.VarChar(64)
+  allowSales          Boolean            @default(true)
+  allowPurchase       Boolean            @default(true)
+  allowProduction     Boolean            @default(true)
+  allowInventory      Boolean            @default(true)
+  status              MasterRecordStatus @default(ACTIVE)
+  createdBy           String?
+  updatedBy           String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  deletedAt           DateTime?
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id])
+  warehouse MasterWarehouse @relation(fields: [warehouseId], references: [id])
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, warehouseId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("master_locations")
+}
+
+model MasterItemCategory {
+  id                 String             @id @default(uuid())
+  tenantId           String
+  code               String             @db.VarChar(32)
+  name               String             @db.VarChar(200)
+  parentId           String?
+  level              Int                @default(1)
+  defaultWarehouseId String?
+  status             MasterRecordStatus @default(ACTIVE)
+  createdBy          String?
+  updatedBy          String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  deletedAt          DateTime?
+
+  tenant           Tenant               @relation(fields: [tenantId], references: [id])
+  parent           MasterItemCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children         MasterItemCategory[] @relation("CategoryHierarchy")
+  defaultWarehouse MasterWarehouse?     @relation(fields: [defaultWarehouseId], references: [id])
+  items            MasterItem[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, parentId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("master_item_categories")
+}
+
+model MasterGstGroup {
+  id          String             @id @default(uuid())
+  tenantId    String
+  code        String             @db.VarChar(32)
+  goodsType   String             @default("goods") @db.VarChar(16)
+  description String             @db.VarChar(500)
+  status      MasterRecordStatus @default(ACTIVE)
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deletedAt   DateTime?
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id])
+  hsnCodes MasterHsnCode[]
+  gstRates MasterGstRate[]
+  items    MasterItem[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("master_gst_groups")
+}
+
+model MasterHsnCode {
+  id          String             @id @default(uuid())
+  tenantId    String
+  code        String             @db.VarChar(16)
+  gstGroupId  String
+  description String             @db.VarChar(500)
+  status      MasterRecordStatus @default(ACTIVE)
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deletedAt   DateTime?
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id])
+  gstGroup MasterGstGroup @relation(fields: [gstGroupId], references: [id])
+  items    MasterItem[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, gstGroupId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("master_hsn_codes")
+}
+
+model MasterGstRate {
+  id                  String             @id @default(uuid())
+  tenantId            String
+  code                String             @db.VarChar(32)
+  gstGroupId          String
+  fromState           String             @db.VarChar(100)
+  locationStateCode   String             @db.VarChar(100)
+  dateFrom            DateTime           @db.Date
+  dateTo              DateTime?          @db.Date
+  sgst                Decimal            @default(0) @db.Decimal(5, 2)
+  cgst                Decimal            @default(0) @db.Decimal(5, 2)
+  igst                Decimal            @default(0) @db.Decimal(5, 2)
+  status              MasterRecordStatus @default(ACTIVE)
+  createdBy           String?
+  updatedBy           String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  deletedAt           DateTime?
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id])
+  gstGroup MasterGstGroup @relation(fields: [gstGroupId], references: [id])
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, gstGroupId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("master_gst_rates")
+}
+
+model MasterItem {
+  id                   String             @id @default(uuid())
+  tenantId             String
+  code                 String             @db.VarChar(64)
+  name                 String             @db.VarChar(300)
+  itemName2            String?            @db.VarChar(300)
+  itemDescription      String             @default("") @db.Text
+  categoryId           String
+  baseUomId            String
+  itemType             String             @db.VarChar(32)
+  productType          String?            @db.VarChar(32)
+  inventoryType        String?            @default("inventory") @db.VarChar(32)
+  codeSeriesMode       String?            @default("manual") @db.VarChar(16)
+  materialGrade        String             @default("") @db.VarChar(100)
+  hsnCode              String             @default("") @db.VarChar(16)
+  hsnId                String?
+  gstGroupId           String?
+  reorderLevel         Decimal            @default(0) @db.Decimal(18, 4)
+  reorderQty           Decimal            @default(0) @db.Decimal(18, 4)
+  standardRate         Decimal            @default(0) @db.Decimal(18, 2)
+  isPurchasable        Boolean            @default(true)
+  isStockable          Boolean            @default(true)
+  isBlocked            Boolean            @default(false)
+  quantityPerUom       Decimal            @default(1) @db.Decimal(18, 4)
+  purchaseUomId        String?
+  purchaseQtyPerUom    Decimal            @default(1) @db.Decimal(18, 4)
+  qcRequired           Boolean            @default(false)
+  qualityTestGroupCode String?            @db.VarChar(32)
+  productionBomId      String?            @db.VarChar(36)
+  routingNo            String?            @db.VarChar(64)
+  drawingNo            String?            @db.VarChar(64)
+  subAssemblyRule      String?            @db.VarChar(32)
+  status               MasterRecordStatus @default(ACTIVE)
+  createdBy            String?
+  updatedBy            String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  deletedAt            DateTime?
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id])
+  category    MasterItemCategory @relation(fields: [categoryId], references: [id])
+  baseUom     MasterUom          @relation("ItemBaseUom", fields: [baseUomId], references: [id])
+  purchaseUom MasterUom?         @relation("ItemPurchaseUom", fields: [purchaseUomId], references: [id])
+  hsn         MasterHsnCode?     @relation(fields: [hsnId], references: [id])
+  gstGroup    MasterGstGroup?    @relation(fields: [gstGroupId], references: [id])
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, categoryId])
+  @@index([tenantId, itemType])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("master_items")
+}
+
+model MasterVendor {
+  id                  String             @id @default(uuid())
+  tenantId            String
+  code                String             @db.VarChar(32)
+  name                String             @db.VarChar(300)
+  searchName          String?            @db.VarChar(50)
+  isBlocked           Boolean            @default(false)
+  address             String?            @db.Text
+  address2            String?            @db.VarChar(500)
+  city                String             @default("") @db.VarChar(100)
+  state               String             @default("") @db.VarChar(100)
+  pincode             String?            @db.VarChar(20)
+  country             String?            @db.VarChar(100)
+  countryId           String?
+  stateId             String?
+  cityId              String?
+  email               String?            @db.VarChar(255)
+  gstin               String             @default("") @db.VarChar(20)
+  gstVendorType       String?            @default("registered") @db.VarChar(32)
+  pan                 String?            @db.VarChar(10)
+  panStatus           String?            @default("pan_applied") @db.VarChar(32)
+  paymentMethod       String?            @db.VarChar(64)
+  bankDetails         String?            @db.Text
+  vendorType          String             @default("manufacturer") @db.VarChar(32)
+  contactPerson       String             @default("") @db.VarChar(200)
+  contactPhone        String             @default("") @db.VarChar(30)
+  paymentTermsDays    Int                @default(30)
+  defaultLeadTimeDays Int                @default(7)
+  suppliedCategories  Json               @default("[]")
+  rating              Decimal            @default(4) @db.Decimal(3, 1)
+  status              MasterRecordStatus @default(ACTIVE)
+  createdBy           String?
+  updatedBy           String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  deletedAt           DateTime?
+
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
+  countryRef  MasterCountry? @relation(fields: [countryId], references: [id])
+  stateRef    MasterState?   @relation(fields: [stateId], references: [id])
+  cityRef     MasterCity?    @relation(fields: [cityId], references: [id])
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, countryId])
+  @@index([tenantId, stateId])
+  @@index([tenantId, cityId])
+  @@map("master_vendors")
+}

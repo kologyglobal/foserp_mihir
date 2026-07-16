@@ -1,0 +1,50 @@
+import { config as loadEnv } from 'dotenv'
+import { z } from 'zod'
+
+loadEnv()
+
+function buildDatabaseUrl(): string {
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL
+  }
+  const host = process.env.DB_HOST ?? 'localhost'
+  const port = process.env.DB_PORT ?? '3306'
+  const name = process.env.DB_NAME ?? 'fos_erp'
+  const user = process.env.DB_USER ?? 'root'
+  const pass = encodeURIComponent(process.env.DB_PASS ?? '')
+  return `mysql://${user}:${pass}@${host}:${port}/${name}`
+}
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().default(5000),
+  DB_HOST: z.string().default('localhost'),
+  DB_PORT: z.coerce.number().default(3306),
+  DB_NAME: z.string().default('fos_erp'),
+  DB_USER: z.string().default('root'),
+  DB_PASS: z.string().default(''),
+  JWT_ACCESS_SECRET: z.string().min(32),
+  JWT_REFRESH_SECRET: z.string().min(32),
+  JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+  FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+  CRM_UPLOAD_DIR: z.string().optional(),
+  CRM_MAX_UPLOAD_BYTES: z.coerce.number().default(10 * 1024 * 1024),
+})
+
+const parsed = envSchema.safeParse(process.env)
+
+if (!parsed.success) {
+  console.error('Invalid environment variables:', parsed.error.flatten().fieldErrors)
+  process.exit(1)
+}
+
+export const env = {
+  ...parsed.data,
+  DATABASE_URL: buildDatabaseUrl(),
+  isDev: parsed.data.NODE_ENV === 'development',
+  isTest: parsed.data.NODE_ENV === 'test',
+  isProd: parsed.data.NODE_ENV === 'production',
+}
+
+process.env.DATABASE_URL = env.DATABASE_URL

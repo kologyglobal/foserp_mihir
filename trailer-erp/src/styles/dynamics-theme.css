@@ -1,0 +1,1242 @@
+/* Microsoft Dynamics 365–inspired layout & tokens */
+:root {
+  --d365-suite-height: 52px;
+  --d365-suite-bg: #001a33;
+  --d365-suite-text: #ffffff;
+  --d365-brand: #0078d4;
+  --d365-brand-hover: #106ebe;
+  --d365-brand-soft: #deecf9;
+  --d365-nav-bg: #faf9f8;
+  --d365-nav-hover: #f3f2f1;
+  --d365-nav-active: #edebe9;
+  --d365-workspace-bg: #f3f2f1;
+  --d365-surface: #ffffff;
+  --d365-border: #edebe9;
+  --d365-border-strong: #c8c6c4;
+  --d365-text: #323130;
+  --d365-text-secondary: #605e5c;
+  --d365-muted: #8a8886;
+  --d365-tab-active: #0078d4;
+  --d365-radius: 2px;
+
+  /* Dynamics typography — 16px base, Segoe UI (readable scale) */
+  --d365-font-family: 'Segoe UI', 'Segoe UI Web (West European)', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --d365-font-micro: 0.75rem;   /* 12px — badges, timestamps */
+  --d365-font-xs: 0.8125rem;    /* 13px — captions, filters, section labels */
+  --d365-font-sm: 0.9375rem;    /* 15px — command bar, search */
+  --d365-font-base: 1rem;       /* 16px — nav, body, tabs, sub-nav */
+  --d365-font-md: 1.125rem;     /* 18px — secondary headings */
+  --d365-font-lg: 1.375rem;    /* 22px — page / report title */
+  --d365-font-kpi: 2rem;        /* 32px — metric values */
+  --d365-lh-tight: 1.25;
+  --d365-lh-snug: 1.333;
+  --d365-lh-normal: 1.5;
+  --d365-fw-regular: 400;
+  --d365-fw-semibold: 600;
+
+  /* Bridge to existing ERP tokens */
+  --erp-primary: var(--d365-brand);
+  --erp-primary-hover: var(--d365-brand-hover);
+  --erp-primary-soft: var(--d365-brand-soft);
+  --erp-bg: var(--d365-workspace-bg);
+  --erp-bg-subtle: var(--d365-nav-bg);
+  --erp-sidebar-bg: var(--d365-nav-bg);
+  --erp-sidebar-bg-elevated: var(--d365-surface);
+  --erp-nav-hover: var(--d365-nav-hover);
+  --erp-nav-active-bg: var(--d365-brand-soft);
+  --erp-nav-active-border: var(--d365-brand);
+  --erp-border: var(--d365-border);
+  --erp-border-strong: var(--d365-border-strong);
+  --erp-text: var(--d365-text);
+  --erp-muted: var(--d365-text-secondary);
+  --erp-surface: var(--d365-surface);
+  --erp-font-family: var(--d365-font-family);
+  --erp-font-base: var(--d365-font-base);
+  --erp-font-nav: var(--d365-font-base);
+  --erp-font-nav-item: var(--d365-font-base);
+  --erp-font-nav-group: var(--d365-font-xs);
+  --erp-font-nav-category: var(--d365-font-base);
+  --erp-font-page-title: var(--d365-font-lg);
+  --erp-font-kpi: var(--d365-font-kpi);
+  --erp-radius-sm: var(--d365-radius);
+  --erp-radius: var(--d365-radius);
+  --saas-primary: var(--d365-brand);
+  --saas-bg: var(--d365-workspace-bg);
+  --saas-surface: var(--d365-surface);
+  --saas-border: var(--d365-border);
+}
+
+@layer components {
+  /* ── Global Dynamics shell typography ── */
+  .d365-app,
+  .d365-app button,
+  .d365-app input,
+  .d365-app select,
+  .d365-app textarea {
+    font-family: var(--d365-font-family);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ── App shell ── */
+  .d365-app {
+    min-height: 100vh;
+    background: var(--d365-workspace-bg);
+    font-size: var(--d365-font-base);
+    font-weight: var(--d365-fw-regular);
+    line-height: var(--d365-lh-normal);
+    color: var(--d365-text);
+  }
+
+  .d365-body {
+    display: flex;
+    height: calc(100vh - var(--d365-suite-height) - var(--dyn-live-strip-height));
+    min-height: 0;
+    padding-top: calc(var(--d365-suite-height) + var(--dyn-live-strip-height));
+    overflow: hidden;
+  }
+
+  .d365-main {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: margin-left 0.2s ease;
+  }
+
+  /* ── Suite bar (full-width navy header) ── */
+  .d365-suite-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    height: var(--d365-suite-height);
+    background: linear-gradient(180deg, #00294d 0%, var(--d365-suite-bg) 55%, #001428 100%);
+    color: var(--d365-suite-text);
+    padding: 0 12px;
+    gap: 10px;
+    font-family: var(--d365-font-family);
+    border-bottom: 1px solid rgb(255 255 255 / 0.1);
+    box-shadow: 0 1px 0 rgb(0 120 212 / 0.35), 0 2px 8px rgb(0 0 0 / 0.18);
+  }
+
+  .d365-suite-leading {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .d365-suite-brand {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    border-radius: var(--d365-radius);
+    padding: 2px 4px;
+    transition: background 0.1s ease;
+  }
+
+  .d365-suite-brand:hover {
+    background: rgb(255 255 255 / 0.06);
+  }
+
+  .d365-suite-divider {
+    width: 1px;
+    height: 1.5rem;
+    flex-shrink: 0;
+    background: rgb(255 255 255 / 0.18);
+  }
+
+  .d365-suite-context {
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    max-width: 16rem;
+    padding-right: 4px;
+  }
+
+  .d365-suite-context-title {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-sm);
+    font-weight: var(--d365-fw-semibold);
+    line-height: var(--d365-lh-tight);
+    color: #fff;
+  }
+
+  .d365-suite-context-sub {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-micro);
+    font-weight: var(--d365-fw-regular);
+    line-height: 14px;
+    color: rgb(255 255 255 / 0.68);
+  }
+
+  .d365-suite-chips {
+    align-items: center;
+    gap: 6px;
+    margin-right: 4px;
+  }
+
+  .d365-suite-chip {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-micro);
+    font-weight: var(--d365-fw-semibold);
+    line-height: 16px;
+    padding: 3px 8px;
+    border-radius: var(--d365-radius);
+    border: 1px solid rgb(255 255 255 / 0.14);
+    background: rgb(255 255 255 / 0.06);
+    color: rgb(255 255 255 / 0.88);
+    white-space: nowrap;
+  }
+
+  .d365-suite-date {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-micro);
+    font-weight: var(--d365-fw-regular);
+    line-height: 16px;
+    color: rgb(255 255 255 / 0.72);
+    white-space: nowrap;
+    padding: 0 4px;
+  }
+
+  .d365-suite-quick-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: var(--d365-radius);
+    border: 1px solid rgb(255 255 255 / 0.22);
+    background: rgb(255 255 255 / 0.1);
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-xs);
+    font-weight: var(--d365-fw-semibold);
+    line-height: 16px;
+    color: #fff;
+    white-space: nowrap;
+    transition: background 0.1s ease, border-color 0.1s ease;
+  }
+
+  .d365-suite-quick-action:hover {
+    background: rgb(255 255 255 / 0.16);
+    border-color: rgb(255 255 255 / 0.3);
+  }
+
+  .d365-suite-live-dot {
+    width: 6px;
+    height: 6px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: #92c353;
+    box-shadow: 0 0 0 2px rgb(146 195 83 / 0.25);
+    animation: d365-live-pulse 2.4s ease-in-out infinite;
+  }
+
+  @keyframes d365-live-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(0.92); }
+  }
+
+  .d365-suite-notify {
+    position: relative;
+  }
+
+  .d365-suite-notify .absolute {
+    border: 1px solid var(--d365-suite-bg);
+  }
+
+  .d365-suite-user-chevron {
+    color: rgb(255 255 255 / 0.65);
+    flex-shrink: 0;
+  }
+
+  .d365-suite-waffle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--d365-radius);
+    color: var(--d365-suite-text);
+    transition: background 0.1s ease;
+  }
+
+  .d365-suite-waffle:hover {
+    background: rgb(255 255 255 / 0.08);
+  }
+
+  .d365-suite-title {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-base);
+    font-weight: var(--d365-fw-semibold);
+    line-height: var(--d365-lh-tight);
+    letter-spacing: 0;
+    color: var(--d365-suite-text);
+    white-space: nowrap;
+  }
+
+  .d365-suite-subtitle {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-xs);
+    font-weight: var(--d365-fw-regular);
+    line-height: var(--d365-lh-tight);
+    color: rgb(255 255 255 / 0.75);
+    margin-left: 12px;
+    padding-left: 12px;
+    border-left: 1px solid rgb(255 255 255 / 0.2);
+  }
+
+  .d365-suite-search {
+    flex: 1;
+    max-width: 32rem;
+    margin: 0 auto;
+  }
+
+  .d365-suite-search .d365-search-trigger {
+    width: 100%;
+    height: 36px;
+    border-radius: var(--d365-radius);
+    border: 1px solid rgb(255 255 255 / 0.15);
+    background: rgb(255 255 255 / 0.08);
+    color: rgb(255 255 255 / 0.85);
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-sm);
+    font-weight: var(--d365-fw-regular);
+    line-height: 36px;
+    padding: 0 12px;
+    text-align: left;
+    transition: background 0.1s ease;
+  }
+
+  .d365-suite-search .d365-search-trigger:hover {
+    background: rgb(255 255 255 / 0.12);
+    border-color: rgb(255 255 255 / 0.25);
+  }
+
+  .d365-suite-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: auto;
+  }
+
+  .d365-suite-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--d365-radius);
+    color: rgb(255 255 255 / 0.9);
+    transition: background 0.1s ease;
+  }
+
+  .d365-suite-icon-btn:hover {
+    background: rgb(255 255 255 / 0.1);
+  }
+
+  .d365-suite-user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: 0.5rem;
+    padding: 0.25rem 0.5rem 0.25rem 0.25rem;
+    border-radius: var(--d365-radius);
+    transition: background 0.1s ease;
+  }
+
+  .d365-suite-user:hover {
+    background: rgb(255 255 255 / 0.08);
+  }
+
+  .d365-suite-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    background: var(--d365-brand);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .d365-suite-user-name {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-xs);
+    font-weight: var(--d365-fw-semibold);
+    color: #fff;
+    line-height: 16px;
+  }
+
+  .d365-suite-user-role {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-micro);
+    font-weight: var(--d365-fw-regular);
+    line-height: 14px;
+    color: rgb(255 255 255 / 0.7);
+  }
+
+  .d365-suite-badge {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-micro);
+    font-weight: var(--d365-fw-semibold);
+    line-height: 16px;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: var(--d365-radius);
+    background: rgb(16 124 16 / 0.35);
+    color: #dff6dd;
+    border: 1px solid rgb(255 255 255 / 0.15);
+    white-space: nowrap;
+  }
+
+  /* ── Sidebar (Dynamics nav pane) ── */
+  .erp-sidebar.d365-nav-pane {
+    top: calc(var(--d365-suite-height) + var(--dyn-live-strip-height));
+    height: calc(100vh - var(--d365-suite-height) - var(--dyn-live-strip-height));
+    background: var(--d365-nav-bg);
+    border-right: 1px solid var(--d365-border);
+    box-shadow: none;
+  }
+
+  .d365-nav-pane .erp-sidebar-brand {
+    background: var(--d365-nav-bg);
+    border-bottom: 1px solid var(--d365-border);
+    min-height: 40px;
+    padding: 0 8px;
+  }
+
+  /* Dynamics nav — sentence case section headers, 14px items, 36px row height */
+  .d365-nav-pane .erp-nav-section-label,
+  .d365-nav-pane .erp-nav-group-label {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-xs);
+    font-weight: var(--d365-fw-semibold);
+    line-height: 16px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--d365-text-secondary);
+    padding: 8px 16px 4px;
+    margin-bottom: 0;
+  }
+
+  .d365-nav-pane .erp-nav-group-label {
+    padding: 12px 16px 4px;
+  }
+
+  .d365-nav-pane .erp-nav-group + .erp-nav-group {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 4px;
+  }
+
+  .d365-nav-pane .erp-nav-item {
+    min-height: 40px;
+    padding: 0 12px 0 8px;
+    margin: 0 4px;
+    gap: 12px;
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-base);
+    font-weight: var(--d365-fw-regular);
+    line-height: 40px;
+    border-radius: var(--d365-radius);
+  }
+
+  .d365-nav-pane .erp-nav-item-active {
+    background: var(--d365-nav-active);
+    color: var(--d365-brand);
+    font-weight: var(--d365-fw-semibold);
+  }
+
+  .d365-nav-pane .erp-nav-item-active::before {
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    border-radius: 0;
+    background: var(--d365-brand);
+    box-shadow: none;
+  }
+
+  .d365-nav-pane .erp-nav-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .d365-nav-pane .erp-nav-category-header {
+    min-height: 36px;
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-base);
+    font-weight: var(--d365-fw-regular);
+    padding: 0 12px 0 8px;
+  }
+
+  .d365-nav-pane .erp-nav-search-input {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-base);
+    height: 36px;
+  }
+
+  .d365-nav-pane .erp-nav-quick-link {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-xs);
+    font-weight: var(--d365-fw-regular);
+    height: 32px;
+    padding: 0 10px;
+  }
+
+  .d365-nav-pane .erp-sidebar-footer {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-micro);
+    font-weight: var(--d365-fw-regular);
+    line-height: 16px;
+    padding: 8px 16px;
+  }
+
+  .d365-nav-pane .erp-nav-item:hover {
+    background: var(--d365-nav-hover);
+  }
+
+  .d365-nav-pane .erp-nav-category-expanded {
+    background: var(--d365-surface);
+    box-shadow: none;
+    border: 1px solid var(--d365-border);
+  }
+
+  .d365-nav-pane .erp-nav-icon-active {
+    color: var(--d365-brand);
+  }
+
+  /* ── Icon rail menu (vertical icon + label) ── */
+  .erp-sidebar--icon-menu {
+    --erp-sidebar-width: 72px;
+    --erp-sidebar-collapsed: 48px;
+  }
+
+  .erp-sidebar-brand--icon-menu {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 6px 0;
+    border-bottom: none;
+  }
+
+  .erp-sidebar-toggle--icon-menu {
+    color: var(--d365-text-tertiary, #a19f9d);
+  }
+
+  .erp-nav-icon-menu {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1px;
+    padding: 4px 6px 8px;
+  }
+
+  .erp-nav-icon-menu-item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 8px 2px 6px;
+    border-radius: 8px;
+    color: var(--d365-text-secondary, #8a8886);
+    text-decoration: none;
+    transition: background-color 0.12s ease, color 0.12s ease;
+  }
+
+  .erp-nav-icon-menu-item:hover {
+    background: var(--d365-surface-hover, rgb(0 0 0 / 0.04));
+    color: var(--d365-text-primary, #323130);
+  }
+
+  .erp-nav-icon-menu-item-active {
+    background: var(--d365-brand-soft, #deecf9);
+    color: var(--d365-brand-primary, #0078d4);
+    font-weight: var(--d365-fw-semibold, 600);
+  }
+
+  .erp-nav-icon-menu-item-active:hover {
+    background: var(--d365-brand-soft, #deecf9);
+    color: var(--d365-brand-primary, #0078d4);
+  }
+
+  .erp-nav-icon-menu-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+  }
+
+  .erp-nav-icon-menu-item-active .erp-nav-icon-menu-icon {
+    color: var(--d365-brand-primary, #0078d4);
+  }
+
+  .erp-nav-icon-menu-label {
+    font-family: var(--d365-font-family);
+    font-size: 10px;
+    font-weight: inherit;
+    line-height: 1.15;
+    text-align: center;
+    letter-spacing: -0.01em;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .erp-nav-icon-menu-badge {
+    position: absolute;
+    top: -2px;
+    right: -6px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 99px;
+    background: #e81123;
+    color: #ffffff;
+    font-family: var(--d365-font-family);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+    box-shadow: 0 0 0 1.5px var(--d365-nav-bg, #faf9f8);
+    pointer-events: none;
+  }
+
+  /* Collapsed: icon-only, hide labels */
+  .erp-sidebar--icon-menu:not(.erp-sidebar-mobile-open) .erp-nav-icon-menu-item {
+    padding: 10px 2px;
+  }
+
+  /* ── Workspace chrome ── */
+  .d365-workspace {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--d365-workspace-bg);
+  }
+
+  /* Tabs + command bar + sub-nav — pinned above scrolling page content */
+  .d365-workspace-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    flex-shrink: 0;
+    background: var(--d365-surface);
+    box-shadow: 0 1px 0 var(--d365-border), 0 4px 12px rgb(0 0 0 / 0.04);
+  }
+
+  .d365-workspace-context {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+    padding: 8px 16px;
+    background: linear-gradient(180deg, #ffffff 0%, #faf9f8 100%);
+    border-bottom: 1px solid var(--d365-border);
+  }
+
+  .d365-workspace-context-title {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-md);
+    font-weight: var(--d365-fw-semibold);
+    line-height: var(--d365-lh-tight);
+    color: var(--d365-text);
+  }
+
+  .d365-workspace-context-sub {
+    margin-top: 2px;
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-xs);
+    font-weight: var(--d365-fw-regular);
+    line-height: 16px;
+    color: var(--d365-text-secondary);
+  }
+
+  .d365-workspace-sticky .dyn-tabs {
+    background: var(--d365-surface);
+  }
+
+  .d365-workspace-sticky .dyn-command-bar {
+    background: var(--d365-surface);
+  }
+
+  .d365-workspace-sticky .d365-subnav {
+    background: var(--d365-surface);
+  }
+
+  /* Unified workspace header — page title + module tabs + actions in one band */
+  .d365-workspace-unified-header {
+    background: var(--d365-surface);
+    border-bottom: 1px solid var(--d365-border);
+  }
+
+  .d365-workspace-unified-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 16px 6px;
+  }
+
+  .d365-workspace-unified-head--with-actions {
+    align-items: center;
+  }
+
+  .d365-workspace-unified-main {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 4px;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .d365-workspace-unified-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 28px;
+  }
+
+  .d365-workspace-unified-subrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 4px;
+    min-height: 32px;
+  }
+
+  .d365-workspace-unified-title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .d365-workspace-unified-breadcrumbs {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0;
+  }
+
+  .d365-workspace-unified-breadcrumbs nav {
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .d365-workspace-unified-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .d365-workspace-unified-title-text {
+    margin: 0;
+    font-family: var(--d365-font-family);
+    font-size: 20px;
+    font-weight: var(--d365-fw-semibold);
+    line-height: 1.25;
+    color: var(--d365-text);
+    letter-spacing: -0.02em;
+  }
+
+  .d365-workspace-unified-badge {
+    border-radius: 999px;
+    border: 1px solid rgb(0 120 212 / 0.2);
+    background: rgb(0 120 212 / 0.08);
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #0078d4;
+  }
+
+  .d365-workspace-unified-fav {
+    display: inline-flex;
+    height: 28px;
+    width: 28px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: 1px solid var(--d365-border);
+    background: var(--d365-surface);
+    color: var(--d365-text-secondary);
+    transition: all 0.12s ease;
+  }
+
+  .d365-workspace-unified-fav:hover {
+    border-color: rgb(0 120 212 / 0.3);
+    color: #0078d4;
+  }
+
+  .d365-workspace-unified-fav--active {
+    border-color: #fcd34d;
+    background: #fffbeb;
+    color: #f59e0b;
+  }
+
+  .d365-workspace-unified-tabs-row {
+    padding: 0 16px;
+    border-top: 1px solid var(--d365-border);
+    background: var(--d365-surface);
+  }
+
+  .d365-workspace-unified-tabs-row .dyn-tabs {
+    min-height: 40px;
+    padding: 0;
+    background: transparent;
+    border-bottom: none;
+  }
+
+  .d365-workspace-unified-tabs-row .dyn-tab {
+    height: 40px;
+    padding: 0 14px;
+    font-size: 13px;
+  }
+
+  .d365-workspace-unified-actions {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+    align-self: center;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .d365-workspace-unified-actions .erp-command-bar--inline {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    width: auto;
+  }
+
+  .d365-workspace-unified-actions .erp-command-bar--inline .flex.items-center.gap-1 {
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  @media (max-width: 1023px) {
+    .d365-workspace-unified-head--with-actions {
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .d365-workspace-unified-actions {
+      flex: 1 1 100%;
+      align-self: stretch;
+      justify-content: flex-end;
+    }
+  }
+
+  .d365-tab-strip {
+    display: flex;
+    align-items: flex-end;
+    gap: 0;
+    background: var(--d365-surface);
+    border-bottom: 1px solid var(--d365-border);
+    padding: 0 8px;
+    min-height: 44px;
+  }
+
+  .d365-tab-strip-scroll {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .d365-tab-strip-scroll::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .d365-tab-strip-scroll::-webkit-scrollbar-thumb {
+    background: var(--d365-border-strong);
+    border-radius: 2px;
+  }
+
+  .d365-tab {
+    display: inline-flex;
+    align-items: center;
+    height: 44px;
+    gap: 6px;
+    padding: 0 16px;
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-base);
+    font-weight: var(--d365-fw-regular);
+    line-height: 44px;
+    color: var(--d365-text-secondary);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: color 0.1s ease, border-color 0.1s ease;
+  }
+
+  .d365-tab-active {
+    font-weight: var(--d365-fw-semibold);
+    color: var(--d365-text);
+    border-bottom-color: var(--d365-brand);
+  }
+
+  .d365-command-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    background: var(--d365-surface);
+    border-bottom: 1px solid var(--d365-border);
+    padding: 6px 16px;
+    min-height: 40px;
+  }
+
+  .d365-command-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 10px;
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-base);
+    font-weight: var(--d365-fw-regular);
+    line-height: 36px;
+    color: var(--d365-brand);
+    border-radius: var(--d365-radius);
+    transition: background 0.1s ease;
+  }
+
+  .d365-command-btn:hover {
+    background: var(--d365-brand-soft);
+  }
+
+  .d365-subnav {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--d365-surface);
+    border-bottom: 1px solid var(--d365-border);
+    padding: 0 1rem;
+  }
+
+  .d365-subnav-link {
+    height: 44px;
+    padding: 0 16px;
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-base);
+    font-weight: var(--d365-fw-regular);
+    line-height: 44px;
+    color: var(--d365-text-secondary);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.1s ease;
+  }
+
+  .d365-subnav-link-active {
+    font-weight: var(--d365-fw-semibold);
+    color: var(--d365-text);
+    border-bottom-color: var(--d365-brand);
+  }
+
+  .dyn-subnav-secondary {
+    flex-wrap: wrap;
+    row-gap: 0;
+    overflow-x: auto;
+  }
+
+  .d365-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    background: var(--d365-surface);
+    border-bottom: 1px solid var(--d365-border);
+    padding: 8px 16px;
+    min-height: 44px;
+  }
+
+  .d365-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 36px;
+    padding: 0 10px;
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-xs);
+    font-weight: var(--d365-fw-regular);
+    line-height: 36px;
+    color: var(--d365-text);
+    background: var(--d365-surface);
+    border: 1px solid var(--d365-border-strong);
+    border-radius: var(--d365-radius);
+  }
+
+  .d365-workspace-content {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px 20px 24px;
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-base);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Dynamics KPI metric strip ── */
+  .d365-metric-strip {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0;
+    background: var(--d365-surface);
+    border: 1px solid var(--d365-border);
+    border-radius: var(--d365-radius);
+    overflow-x: auto;
+    margin-bottom: 16px;
+  }
+
+  .d365-metric-tile {
+    flex: 1 1 0;
+    min-width: 130px;
+    padding: 12px 16px;
+    border-right: 1px solid var(--d365-border);
+    background: var(--d365-surface);
+    text-align: left;
+    transition: background 0.1s ease;
+  }
+
+  .d365-metric-tile:last-child {
+    border-right: none;
+  }
+
+  .d365-metric-tile-interactive:hover {
+    background: var(--d365-nav-hover);
+    cursor: pointer;
+  }
+
+  .d365-metric-label {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-xs);
+    font-weight: var(--d365-fw-regular);
+    line-height: 16px;
+    color: var(--d365-text-secondary);
+  }
+
+  .d365-metric-value {
+    margin-top: 4px;
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-kpi);
+    font-weight: var(--d365-fw-semibold);
+    letter-spacing: 0;
+    color: var(--d365-text);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+
+  .d365-metric-helper {
+    margin-top: 2px;
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-micro);
+    font-weight: var(--d365-fw-regular);
+    line-height: 14px;
+    color: var(--d365-muted);
+  }
+
+  .d365-panel-title {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-lg);
+    font-weight: var(--d365-fw-semibold);
+    line-height: 28px;
+    color: var(--d365-text);
+  }
+
+  .d365-panel-header {
+    padding: 12px 16px;
+  }
+
+  .d365-panel-body {
+    padding: 16px;
+  }
+
+  /* ── Panels (flat Dynamics cards) ── */
+  .d365-panel {
+    background: var(--d365-surface);
+    border: 1px solid var(--d365-border);
+    border-radius: var(--d365-radius);
+    box-shadow: none;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .d365-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--d365-border);
+    background: var(--d365-surface);
+  }
+
+  /* SaaS → Dynamics typography overrides inside workspace */
+  .d365-workspace-content .saas-panel-title,
+  .d365-workspace-content .saas-panel-header h2 {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-base);
+    font-weight: var(--d365-fw-semibold);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .d365-workspace-content .saas-hero-title {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-lg);
+    font-weight: var(--d365-fw-semibold);
+    letter-spacing: 0;
+    line-height: 28px;
+  }
+
+  .d365-workspace-content .saas-hero-subtitle {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-base);
+    font-weight: var(--d365-fw-regular);
+    line-height: 20px;
+    color: var(--d365-text-secondary);
+  }
+
+  .d365-workspace-content .saas-kpi-label {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-xs);
+    font-weight: var(--d365-fw-regular);
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--d365-text-secondary);
+  }
+
+  .d365-workspace-content .saas-kpi-value {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-kpi);
+    font-weight: var(--d365-fw-semibold);
+    letter-spacing: 0;
+    line-height: 1.2;
+  }
+
+  .d365-workspace-content .saas-kpi-helper {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-micro);
+    line-height: 14px;
+    color: var(--d365-muted);
+  }
+
+  .d365-workspace-content .saas-btn-primary,
+  .d365-workspace-content .saas-btn-secondary {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-base);
+    font-weight: var(--d365-fw-regular);
+    height: 36px;
+    padding: 0 14px;
+    border-radius: var(--d365-radius);
+  }
+
+  .d365-workspace-content .d365-panel-title.text-base {
+    font-size: var(--d365-font-lg);
+  }
+
+  .d365-page-subtitle {
+    margin-top: 4px;
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-base);
+    font-weight: var(--d365-fw-regular);
+    line-height: 20px;
+    color: var(--d365-text-secondary);
+  }
+
+  .d365-workspace-meta {
+    margin-left: auto;
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-xs);
+    font-weight: var(--d365-fw-regular);
+    line-height: 16px;
+    color: var(--d365-muted);
+  }
+
+  .d365-suite-search .d365-search-trigger span {
+    font-family: var(--d365-font-family);
+    font-size: var(--d365-font-sm);
+    font-weight: var(--d365-fw-regular);
+  }
+
+  .d365-workspace-content .erp-live-rail {
+    margin: -16px -20px 16px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    font-family: var(--d365-font-family);
+  }
+
+  .d365-workspace-content .erp-live-rail-title {
+    font-size: var(--d365-font-xs);
+    font-weight: var(--d365-fw-semibold);
+    line-height: 16px;
+  }
+
+  .d365-workspace-content .erp-live-stat-value {
+    font-size: var(--d365-font-base);
+    font-weight: var(--d365-fw-semibold);
+    line-height: 20px;
+  }
+
+  .d365-workspace-content .erp-live-stat-label {
+    font-size: var(--d365-font-micro);
+    font-weight: var(--d365-fw-regular);
+    line-height: 14px;
+  }
+
+  .d365-workspace-content .erp-live-ticker-item {
+    font-size: var(--d365-font-xs);
+    line-height: 16px;
+  }
+
+  .d365-subnav-link:hover {
+    color: var(--d365-text);
+    background: var(--d365-nav-hover);
+  }
+  .d365-workspace-content .saas-panel,
+  .d365-workspace-content .saas-hero {
+    border-radius: var(--d365-radius);
+    box-shadow: none;
+    border: 1px solid var(--d365-border);
+  }
+
+  .d365-workspace-content .saas-hero-glow {
+    display: none;
+  }
+
+  .d365-workspace-content .saas-kpi-card {
+    border-radius: var(--d365-radius);
+    box-shadow: none;
+  }
+
+  .d365-workspace-content .erp-page-canvas {
+    background: transparent;
+    padding: 0;
+    min-height: auto;
+  }
+}

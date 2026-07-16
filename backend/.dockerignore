@@ -1,0 +1,13 @@
+node_modules
+dist
+coverage
+.env
+.env.*
+!.env.example
+*.md
+tests
+uploads
+.tmp
+.DS_Store
+.git
+**/*.test.ts
