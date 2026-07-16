@@ -35,9 +35,7 @@
     "swagger-ui-express": "^5.0.1",
     "typescript": "^5.8.3",
     "uuid": "^11.1.0",
-    "zod": "^3.25.67"
-  },
-  "devDependencies": {
+    "zod": "^3.25.67",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
