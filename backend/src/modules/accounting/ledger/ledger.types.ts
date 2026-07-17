@@ -145,9 +145,13 @@ export interface LedgerQueryFilters {
 }
 
 export interface LedgerSchemaStatus {
-  phase: '2A'
+  phase: '2B'
   modelsPresent: boolean
-  postingEngine: false
+  postingEngine: true
+  publicPostingWorkflow: false
+  journalWorkflow: false
+  reversalWorkflow: false
+  foundationReady: true
   tables: string[]
 }
 

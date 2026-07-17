@@ -71,6 +71,35 @@ export async function findByEventKey(
   return prisma.postingEvent.findFirst({ where: { tenantId, legalEntityId, eventKey } })
 }
 
+export async function findById(tenantId: string, id: string): Promise<PostingEvent | null> {
+  return prisma.postingEvent.findFirst({ where: { id, tenantId } })
+}
+
+export async function findByIdOrThrow(tenantId: string, id: string): Promise<PostingEvent> {
+  const event = await findById(tenantId, id)
+  if (!event) throw new NotFoundError('Posting event not found')
+  return event
+}
+
+export async function saveNumberReservation(
+  tenantId: string,
+  id: string,
+  data: { numberSeriesId: string; reservedVoucherNumber: string },
+): Promise<PostingEvent> {
+  const event = await findByIdOrThrow(tenantId, id)
+  if (event.reservedVoucherNumber && event.numberSeriesId) {
+    return event
+  }
+  return prisma.postingEvent.update({
+    where: { id, tenantId },
+    data: {
+      numberSeriesId: data.numberSeriesId,
+      reservedVoucherNumber: data.reservedVoucherNumber,
+      numberReservedAt: new Date(),
+    },
+  })
+}
+
 async function transitionStatus(
   tenantId: string,
   id: string,
@@ -102,6 +131,8 @@ export async function markPosted(tenantId: string, id: string, voucherId?: strin
   return transitionStatus(tenantId, id, 'POSTED', {
     ...(voucherId ? { voucher: { connect: { id: voucherId } } } : {}),
     processedAt: new Date(),
+    errorCode: null,
+    errorMessage: null,
   })
 }
 

@@ -257,7 +257,8 @@ export const moduleCategories: NavCategory[] = [
     items: [
       { label: 'Dashboard', path: '/accounting', icon: LayoutDashboard, end: true, workspace: true },
       { label: 'Chart of Accounts', path: '/accounting/chart-of-accounts', icon: BookOpen },
-      { label: 'Vouchers', path: '/accounting/vouchers', icon: FileText },
+      { label: 'Journals', path: '/accounting/entries/journals', icon: FileText },
+      { label: 'Vouchers (demo)', path: '/accounting/vouchers', icon: FileText, subNav: false as const },
       { label: 'Receivables', path: '/accounting/receivables', icon: ArrowDownToLine },
       {
         label: 'Commercial Commitments',

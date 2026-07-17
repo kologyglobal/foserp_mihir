@@ -15,6 +15,7 @@ import type {
   LegalEntity,
   SetupStatus,
 } from '../../types/financeSetup'
+import type { Journal, JournalAuditEntry, JournalListFilters, JournalValidationReport } from '../../types/journals'
 import { apiRequest, tenantPath } from './client'
 
 function buildQuery(params?: Record<string, string | number | boolean | undefined | null>): string {
@@ -346,4 +347,49 @@ export async function updateApprovalRule(id: string, data: Record<string, unknow
     method: 'PUT',
     body: JSON.stringify(data),
   })
+}
+
+// ─── Manual journals (Phase 2C1) ──────────────────────────────────────────────
+
+export async function listJournals(params: JournalListFilters) {
+  return apiRequest<Journal[]>(
+    `${tenantPath('/accounting/journals')}${buildQuery(params as unknown as Record<string, string | number | boolean | undefined>)}`,
+  )
+}
+
+export async function getJournal(id: string) {
+  return apiRequest<Journal>(tenantPath(`/accounting/journals/${id}`))
+}
+
+export async function createJournal(data: Record<string, unknown>) {
+  return apiRequest<Journal>(tenantPath('/accounting/journals'), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateJournal(id: string, data: Record<string, unknown>) {
+  return apiRequest<Journal>(tenantPath(`/accounting/journals/${id}`), {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function validateJournal(id: string) {
+  return apiRequest<JournalValidationReport>(tenantPath(`/accounting/journals/${id}/validate`), { method: 'POST' })
+}
+
+export async function submitJournal(id: string) {
+  return apiRequest<Journal>(tenantPath(`/accounting/journals/${id}/submit`), { method: 'POST' })
+}
+
+export async function cancelJournal(id: string, cancellationReason: string) {
+  return apiRequest<Journal>(tenantPath(`/accounting/journals/${id}/cancel`), {
+    method: 'POST',
+    body: JSON.stringify({ cancellationReason }),
+  })
+}
+
+export async function getJournalAudit(id: string) {
+  return apiRequest<JournalAuditEntry[]>(tenantPath(`/accounting/journals/${id}/audit`))
 }

@@ -10,9 +10,13 @@ const LEDGER_TABLES = [
 
 export function getLedgerSchemaStatus(): LedgerSchemaStatus {
   return {
-    phase: '2A',
+    phase: '2B',
     modelsPresent: true,
-    postingEngine: false,
+    postingEngine: true,
+    publicPostingWorkflow: false,
+    journalWorkflow: false,
+    reversalWorkflow: false,
+    foundationReady: true,
     tables: [...LEDGER_TABLES],
   }
 }

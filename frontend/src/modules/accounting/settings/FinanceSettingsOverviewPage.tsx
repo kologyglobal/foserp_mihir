@@ -182,12 +182,15 @@ export function FinanceSettingsOverviewPage() {
           </div>
           <SetupCard
             title="Ledger engine"
-            description="Core ledger tables and validators are in place. Voucher posting arrives in the next phase."
+            description="Central double-entry posting engine for finance transactions."
             status="complete"
             action={
-              <span className="text-[12px] font-semibold text-emerald-700">
-                Foundation ready — posting available in the next phase
-              </span>
+              <div className="space-y-1 text-[12px] font-semibold text-emerald-700">
+                <p>Ledger foundation: Ready</p>
+                <p>Posting engine: Ready</p>
+                <p>Manual journals: Next phase</p>
+                <p>Receipts and payments: Not connected</p>
+              </div>
             }
           />
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

@@ -2187,6 +2187,10 @@ model PostingEvent {
 
   voucherId            String?
 
+  numberSeriesId       String?
+  reservedVoucherNumber String?           @db.VarChar(64)
+  numberReservedAt     DateTime?
+
   attemptCount         Int                @default(0)
   lastAttemptAt        DateTime?
   processedAt          DateTime?
@@ -2208,6 +2212,7 @@ model PostingEvent {
   @@index([sourceModule, sourceDocumentType, sourceDocumentId], map: "post_evt_src_doc_idx")
   @@index([voucherId])
   @@index([createdAt])
+  @@index([numberSeriesId])
   @@map("posting_events")
 }
 

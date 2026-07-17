@@ -33,6 +33,11 @@ export const FINANCE_PERMISSIONS = [
   'finance.approval_rule.manage',
   'finance.activate',
   'finance.audit.view',
+  'finance.voucher.view',
+  'finance.voucher.create',
+  'finance.voucher.edit',
+  'finance.voucher.submit',
+  'finance.voucher.cancel',
 ] as const
 
 export type FinancePermission = (typeof FINANCE_PERMISSIONS)[number]
@@ -52,6 +57,7 @@ const VIEWER: FinancePermission[] = [
   'finance.cost_centre.view',
   'finance.approval_rule.view',
   'finance.audit.view',
+  'finance.voucher.view',
 ]
 
 const MANAGER: FinancePermission[] = [
@@ -69,6 +75,10 @@ const MANAGER: FinancePermission[] = [
   'finance.cost_centre.manage',
   'finance.approval_rule.manage',
   'finance.activate',
+  'finance.voucher.create',
+  'finance.voucher.edit',
+  'finance.voucher.submit',
+  'finance.voucher.cancel',
 ]
 
 const ROLE_PACKS: Partial<Record<ErpRole, FinancePermission[]>> = {
@@ -118,6 +128,11 @@ export function useFinancePermissions() {
       canManageCostCentres: can('finance.cost_centre.manage'),
       canManageApprovalRules: can('finance.approval_rule.manage'),
       canActivate: can('finance.activate'),
+      canViewVouchers: can('finance.voucher.view'),
+      canCreateVoucher: can('finance.voucher.create'),
+      canEditVoucher: can('finance.voucher.edit'),
+      canSubmitVoucher: can('finance.voucher.submit'),
+      canCancelVoucher: can('finance.voucher.cancel'),
       can,
     }
   }, [user.role])

@@ -224,7 +224,7 @@ export const PERMISSIONS = [
   'finance.activate',
   'finance.audit.view',
 
-  // Finance Phase 2A — ledger foundation (no posting engine)
+  // Finance Phase 2A/2B — ledger foundation + internal posting engine
   'finance.voucher.view',
   'finance.voucher.create',
   'finance.voucher.edit',

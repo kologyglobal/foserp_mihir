@@ -70,6 +70,11 @@ async function createFinanceTenant() {
 }
 
 async function cleanupTenant(tenantId: string) {
+  await prisma.generalLedgerEntry.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.accountingVoucherLine.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.accountingVoucher.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.postingEvent.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.postingRule.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.defaultAccountMapping.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.financeNumberSeries.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.financeApprovalRule.deleteMany({ where: { tenantId } }).catch(() => {})

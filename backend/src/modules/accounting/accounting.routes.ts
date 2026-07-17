@@ -10,6 +10,9 @@ import costCentreRoutes from './cost-centres/cost-centre.routes.js'
 import financeNumberSeriesRoutes from './finance-number-series/finance-number-series.routes.js'
 import financeApprovalRuleRoutes from './finance-approval-rules/finance-approval-rule.routes.js'
 import ledgerRoutes from './ledger/ledger.routes.js'
+import voucherRoutes from './posting/voucher.routes.js'
+import postingEventRoutes from './posting/posting-event.routes.js'
+import journalRoutes from './journals/journal.routes.js'
 
 const router = Router({ mergeParams: true })
 
@@ -27,5 +30,8 @@ router.use('/cost-centres', costCentreRoutes)
 router.use('/number-series', financeNumberSeriesRoutes)
 router.use('/approval-rules', financeApprovalRuleRoutes)
 router.use('/ledger', ledgerRoutes)
+router.use('/vouchers', voucherRoutes)
+router.use('/journals', journalRoutes)
+router.use('/posting-events', postingEventRoutes)
 
 export default router

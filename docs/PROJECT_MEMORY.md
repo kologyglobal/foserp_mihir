@@ -14,8 +14,8 @@
 | **Architecture** | React SPA + Node.js/Express API + MySQL 8 |
 | **Tenancy** | Multi-tenant SaaS — shared database, shared schema |
 | **Tenant scope** | Every tenant-owned record scoped by `tenantId` |
-| **Current backend scope** | Auth, RBAC, CRM core, master data (Phase 1–4); **finance setup Phase 1**; **finance ledger foundation Phase 2A** (voucher/GL/posting-event/rule models + repos — no posting engine) |
-| **Deferred backend** | Purchase, inventory, production, quality; finance **posting engine Phase 2B+** (vouchers/GL write path, AR/AP); SO MRP/dispatch/invoice beyond CRM Phase 1. Accounting operational FE remains UI/preview except Finance Settings (+ ledger “Foundation ready” status) |
+| **Current backend scope** | Auth, RBAC, CRM, masters; finance Phase 1 setup; Phase 2A ledger foundation; Phase 2B internal posting engine; **Phase 2C1 manual journal drafts** (create/edit/validate/submit/cancel — no posting) |
+| **Deferred backend** | Finance **Phase 2C2** approve/post journals via posting engine; purchase/inventory/production; SO MRP/dispatch/invoice beyond CRM Phase 1 |
 
 ---
 

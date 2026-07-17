@@ -6,6 +6,7 @@ import { buildPaginationMeta } from '../../../utils/pagination.js'
 import { sendCreated, sendPaginated, sendSuccess } from '../../../utils/response.js'
 import { getLedgerSchemaStatus } from './ledger-schema.service.js'
 import * as postingRuleService from './posting-rule.service.js'
+import * as postingReadService from '../posting/posting-read.service.js'
 
 function requireFinanceGlView(req: Request, _res: Response, next: NextFunction): void {
   if (!req.context) {
@@ -27,6 +28,35 @@ export const getSchemaStatus = [
     return sendSuccess(res, 'ledger schema status', status)
   }),
 ]
+
+export const getPostingEngineStatus = [
+  requireFinanceGlView,
+  asyncHandler(async (_req: Request, res: Response) => {
+    const status = getLedgerSchemaStatus()
+    return sendSuccess(res, 'posting engine status', status)
+  }),
+]
+
+export const getPostingEvent = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const item = await postingReadService.getPostingEvent(tenantId, id)
+  return sendSuccess(res, 'posting event fetched', item)
+})
+
+export const getVoucher = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const item = await postingReadService.getVoucher(tenantId, id)
+  return sendSuccess(res, 'voucher fetched', item)
+})
+
+export const getVoucherLedger = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const items = await postingReadService.getVoucherLedger(tenantId, id)
+  return sendSuccess(res, 'voucher ledger fetched', items)
+})
 
 export const listPostingRules = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)

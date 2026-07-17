@@ -1,3 +1,45 @@
+## 2026-07-17 — Accounting Phase 2C1: Manual journal draft / validate / submit
+
+### Why
+Phase 2B posting engine is internal-only; operators need a manual journal workflow (draft → validate → submit) without triggering GL posting or voucher number issuance.
+
+### Change
+- **Backend:** `backend/src/modules/accounting/journals/*` — CRUD draft journals on `AccountingVoucher` (`JOURNAL` / `MANUAL_JOURNAL`), validate report, submit → `PENDING_APPROVAL` or `APPROVED`, cancel; approval resolution via `FinanceApprovalRule` + `journalApprovalLimit`; audit logs; routes at `/accounting/journals`
+- **Frontend:** `/accounting/entries/journals` workspace (list, create/edit form, detail + validation panel); `journalApiBridge` + `journalDemoStore`; nav **Journals** (legacy `/accounting/vouchers` demo retained)
+- **Tests:** `backend/tests/finance/finance-journals.test.ts` (11 cases)
+
+### Explicitly NOT in 2C1
+- No `postingService.post()`, no `PostingEvent`, no `GeneralLedgerEntry`, no voucher number / number-series consumption on submit
+- No approve / reject / sendBack / post / reverse routes or UI buttons
+
+### How to verify
+1. `cd backend && npm run typecheck && npm test -- tests/finance/` → 43/43 pass
+2. `cd frontend && npm run typecheck`
+3. API: `POST /accounting/journals` → DRAFT; `POST …/submit` → APPROVED (or PENDING_APPROVAL); `voucherNumber` stays null
+
+---
+
+## 2026-07-17 — Accounting Phase 2B: Central double-entry posting engine
+
+### Why
+Phase 2A ledger foundation needed a transactional posting service (idempotency, period enforcement, number series, GL insert) before module integrations or manual journals.
+
+### Change
+- **Prisma:** migration `20260717190000_finance_phase2b_posting_engine` — `PostingEvent.numberSeriesId`, `reservedVoucherNumber`, `numberReservedAt`
+- **Backend:** `backend/src/modules/accounting/posting/*` — `post()`, validation pipeline, idempotency, atomic number reservation, GL insert in single transaction; read-only `GET /vouchers/:id`, `/vouchers/:id/ledger`, `/posting-events/:id`; `GET /ledger/posting-engine-status` (phase 2B)
+- **Frontend:** Finance settings overview ledger card — foundation/posting ready; manual journals + receipts/payments marked next/not connected
+- **Tests:** `backend/tests/finance/finance-posting-engine.test.ts`
+
+### Out of scope (Phase 2C+)
+Public `POST /accounting/postings`, manual journal UI, reversal workflow, receipt/payment document integration
+
+### How to verify
+1. `cd backend && npx tsx scripts/prisma-cli.ts migrate deploy && npx prisma generate`
+2. `npm test -- tests/finance/`
+3. `GET /api/v1/t/:slug/accounting/ledger/posting-engine-status` → `phase: 2B`, `postingEngine: true`, `publicPostingWorkflow: false`
+
+---
+
 ## 2026-07-17 — Accounting Phase 2A: Core ledger foundation
 
 ### Why

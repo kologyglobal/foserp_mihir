@@ -57,3 +57,27 @@ export function convertToBase(amount: DecimalInput, exchangeRate: DecimalInput):
 export function sumDecimals(values: DecimalInput[]): Prisma.Decimal {
   return values.reduce<Prisma.Decimal>((acc, v) => acc.add(toDecimal(v)), new Prisma.Decimal(0))
 }
+
+export function multiply(a: DecimalInput, b: DecimalInput): Prisma.Decimal {
+  return toDecimal(a).mul(toDecimal(b))
+}
+
+/** Parse and validate a decimal string — rejects non-numeric input. */
+export function parseDecimalString(value: string, label = 'Amount'): Prisma.Decimal {
+  const trimmed = value.trim()
+  if (!/^-?\d+(\.\d+)?$/.test(trimmed)) {
+    throw new Error(`${label} must be a valid decimal string`)
+  }
+  return new Prisma.Decimal(trimmed)
+}
+
+/** Persist monetary amounts at 4 decimal places. */
+export function formatForPersistence(value: DecimalInput, precision: 2 | 4 = 4): string {
+  return roundAmount(value, precision).toFixed(precision)
+}
+
+/** Exchange rates stored at 8 decimal places. */
+export function roundExchangeRate(value: DecimalInput): Prisma.Decimal {
+  const d = toDecimal(value)
+  return new Prisma.Decimal(d.toFixed(8, Prisma.Decimal.ROUND_HALF_UP))
+}

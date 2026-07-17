@@ -203,6 +203,12 @@ import {
   NumberSeriesPage,
   PeriodsPage,
 } from '@/modules/accounting/settings'
+import {
+  JournalDetailPage,
+  JournalEditPage,
+  JournalListPage,
+  JournalNewPage,
+} from '@/modules/accounting/journals'
 
 /**
  * Accounting module routes — demo/UI-only (no backend posting engine).
@@ -220,6 +226,13 @@ export const accountingRouteChildren: RouteObject[] = [
   { path: 'accounting/vouchers/new', element: <VoucherNewPage /> },
   { path: 'accounting/vouchers/:voucherId/edit', element: <VoucherEditPage /> },
   { path: 'accounting/vouchers/:voucherId', element: <VoucherDetailPage /> },
+
+  /** Manual journals — Phase 2C1 API + demo dual-mode */
+  { path: 'accounting/entries', element: <Navigate to="/accounting/entries/journals" replace /> },
+  { path: 'accounting/entries/journals', element: <JournalListPage /> },
+  { path: 'accounting/entries/journals/new', element: <JournalNewPage /> },
+  { path: 'accounting/entries/journals/:id', element: <JournalDetailPage /> },
+  { path: 'accounting/entries/journals/:id/edit', element: <JournalEditPage /> },
   { path: 'accounting/receivables', element: <ReceivablesDashboardPage /> },
   { path: 'accounting/commercial-commitments', element: <CommercialCommitmentsPage /> },
   { path: 'accounting/receivables/customers', element: <CustomerOutstandingPage /> },

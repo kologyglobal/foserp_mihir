@@ -23,6 +23,7 @@ router.use(
 )
 
 router.get('/schema-status', ...controller.getSchemaStatus)
+router.get('/posting-engine-status', ...controller.getPostingEngineStatus)
 
 router.get(
   '/posting-rules',

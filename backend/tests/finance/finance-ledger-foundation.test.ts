@@ -259,8 +259,9 @@ describe.skipIf(!dbAvailable)('Finance ledger foundation (Phase 2A)', () => {
       .get(`/api/v1/t/${ctx.slug}/accounting/ledger/schema-status`)
       .set('Authorization', `Bearer ${ctx.token}`)
     expect(res.status).toBe(200)
-    expect(res.body.data.phase).toBe('2A')
-    expect(res.body.data.postingEngine).toBe(false)
+    expect(res.body.data.phase).toBe('2B')
+    expect(res.body.data.postingEngine).toBe(true)
+    expect(res.body.data.foundationReady).toBe(true)
     expect(res.body.data.modelsPresent).toBe(true)
   })
 
