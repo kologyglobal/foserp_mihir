@@ -171,6 +171,7 @@ export type ReceivableWorkspaceTab =
   | 'credit_notes'
   | 'disputes'
   | 'reminders'
+  | 'commercial_commitments'
 
 export type CreditHoldReason =
   | 'Over Credit Limit'
@@ -219,6 +220,11 @@ export const RECEIVABLE_WORKSPACE_TABS: { id: ReceivableWorkspaceTab; label: str
   { id: 'credit_notes', label: 'Credit Notes', path: '/accounting/receivables/credit-notes' },
   { id: 'disputes', label: 'Disputes', path: '/accounting/receivables/disputes' },
   { id: 'reminders', label: 'Reminders', path: '/accounting/receivables/reminders' },
+  {
+    id: 'commercial_commitments',
+    label: 'Commercial Commitments',
+    path: '/accounting/commercial-commitments',
+  },
 ]
 
 export const RECEIPT_PAYMENT_MODES: ReceiptPaymentMode[] = [

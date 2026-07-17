@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Package, RefreshCw, Save } from 'lucide-react'
+import { Package, RefreshCw, Save, ShieldOff } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { SearchInput } from '@/components/ui/SearchInput'
@@ -14,7 +14,6 @@ import { SaveViewDialog } from '@/components/design-system/SaveViewDialog'
 import { SmartFilterBar } from '@/components/design-system/SmartFilterBar'
 import { getStockAvailability, INVENTORY_SAVED_VIEW_PRESETS } from '@/services/inventory'
 import type { StockAvailability } from '@/types/inventoryDomain'
-import { INVENTORY_ITEM_TYPE_LABELS } from '@/utils/inventoryItemLabels'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { useInventoryPermissions } from '@/utils/permissions/inventory'
 import { StockDetailsDrawer } from '@/components/inventory/StockDetailsDrawer'
@@ -55,8 +54,12 @@ export function StockAvailabilityPage() {
     },
   })
 
+  const [loadError, setLoadError] = useState(false)
+
   const load = useCallback(async () => {
+    void refreshToken
     setLoading(true)
+    setLoadError(false)
     try {
       setRows(await getStockAvailability({
         search,
@@ -64,6 +67,9 @@ export function StockAvailabilityPage() {
         lowStock: lowStock || undefined,
         outOfStock: outOfStock || undefined,
       }))
+    } catch {
+      setRows([])
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -74,36 +80,57 @@ export function StockAvailabilityPage() {
   const columns = useMemo<ColumnDef<StockAvailability>[]>(() => [
     {
       accessorKey: 'itemCode',
-      header: 'Item',
+      header: 'Item Code',
+      cell: ({ row }) => (
+        <button type="button" className="font-mono text-xs text-erp-primary" onClick={() => setDrawerItemId(row.original.itemId)}>
+          {row.original.itemCode}
+        </button>
+      ),
+    },
+    {
+      accessorKey: 'itemName',
+      header: 'Item Name',
       cell: ({ row }) => (
         <button type="button" className="text-left" onClick={() => setDrawerItemId(row.original.itemId)}>
-          <span className="font-mono text-xs text-erp-primary">{row.original.itemCode}</span>
-          <span className="ml-2">{row.original.itemName}</span>
+          {row.original.itemName}
         </button>
       ),
     },
     { accessorKey: 'warehouseName', header: 'Warehouse' },
-    { accessorKey: 'itemType', header: 'Type', cell: ({ row }) => INVENTORY_ITEM_TYPE_LABELS[row.original.itemType] },
     { accessorKey: 'onHand', header: 'On Hand', cell: ({ row }) => <span className="font-mono">{row.original.onHand}</span> },
-    { accessorKey: 'available', header: 'Available', cell: ({ row }) => <span className="font-mono">{row.original.available}</span> },
+    { accessorKey: 'qualityHold', header: 'Quality Hold', cell: ({ row }) => <span className="font-mono">{row.original.qualityHold}</span> },
+    { accessorKey: 'blocked', header: 'Blocked', cell: ({ row }) => <span className="font-mono">{row.original.blocked}</span> },
     { accessorKey: 'reserved', header: 'Reserved', cell: ({ row }) => <span className="font-mono">{row.original.reserved}</span> },
-    { accessorKey: 'qualityHold', header: 'QH', cell: ({ row }) => <span className="font-mono">{row.original.qualityHold}</span> },
+    { accessorKey: 'available', header: 'Available', cell: ({ row }) => <span className="font-mono">{row.original.available}</span> },
+    { accessorKey: 'expectedReceipt', header: 'Expected Receipt', cell: ({ row }) => <span className="font-mono">{row.original.expectedReceipt}</span> },
+    { accessorKey: 'plannedIssue', header: 'Planned Issue', cell: ({ row }) => <span className="font-mono">{row.original.plannedIssue}</span> },
     {
       accessorKey: 'stockValue',
-      header: 'Value',
-      cell: ({ row }) => perms.canViewCost ? formatCurrency(row.original.stockValue) : '—',
+      header: 'Stock Value',
+      cell: ({ row }) => (perms.canViewCost ? formatCurrency(row.original.stockValue) : '—'),
     },
     {
       accessorKey: 'status',
       header: 'Status',
-      cell: ({ row }) => <StatusDot label={row.original.status.replace('_', ' ')} tone={statusToneFromLabel(row.original.status)} />,
+      cell: ({ row }) => (
+        <StatusDot label={row.original.status.replace('_', ' ')} tone={statusToneFromLabel(row.original.status)} />
+      ),
     },
     {
       id: 'actions',
-      header: '',
+      header: 'Actions',
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <TableLink to={`/inventory/stock/${row.original.itemId}`}>Detail</TableLink>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="text-[12px] font-semibold text-erp-primary hover:underline"
+            onClick={() => setDrawerItemId(row.original.itemId)}
+          >
+            View Stock Details
+          </button>
+          <TableLink to={`/inventory/stock/${row.original.itemId}`}>Full</TableLink>
+          <TableLink to="/inventory/movements/receipts">Receive</TableLink>
+          <TableLink to="/inventory/movements/issues">Issue</TableLink>
           {perms.canViewItemLedger ? (
             <TableLink to={`/inventory/items/${row.original.itemId}/ledger`}>Ledger</TableLink>
           ) : null}
@@ -114,8 +141,19 @@ export function StockAvailabilityPage() {
 
   if (!perms.canViewStock) {
     return (
-      <OperationalPageShell variant="dynamics" layout="enterprise" badge="Inventory" title="Stock Availability" breadcrumbs={[{ label: 'Inventory', to: '/inventory' }, { label: 'Stock' }]} autoBreadcrumbs={false}>
-        <EmptyState icon={Package} title="Access denied" />
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Inventory & Warehouse"
+        title="Stock Availability"
+        breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Stock Availability' }]}
+        autoBreadcrumbs={false}
+      >
+        <EmptyState
+          icon={ShieldOff}
+          title="Access denied"
+          description="You do not have permission to view stock availability (inventory.stock.view)."
+        />
       </OperationalPageShell>
     )
   }
@@ -153,8 +191,24 @@ export function StockAvailabilityPage() {
         <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={outOfStock} onChange={(e) => setOutOfStock(e.target.checked)} /> Out of stock</label>
       </div>
       {loading ? <LoadingState variant="table" /> : null}
-      {!loading && rows.length === 0 ? <EmptyState icon={Package} title="No stock rows" /> : null}
-      {!loading && rows.length > 0 ? <DataTable columns={columns} data={rows} /> : null}
+      {!loading && loadError ? (
+        <EmptyState
+          icon={Package}
+          title="Could not load stock"
+          description="Something went wrong while loading stock availability. Try again."
+          action={(
+            <button
+              type="button"
+              className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"
+              onClick={() => setRefreshToken((n) => n + 1)}
+            >
+              Retry
+            </button>
+          )}
+        />
+      ) : null}
+      {!loading && !loadError && rows.length === 0 ? <EmptyState icon={Package} title="No stock rows" /> : null}
+      {!loading && !loadError && rows.length > 0 ? <DataTable columns={columns} data={rows} /> : null}
       <StockDetailsDrawer itemId={drawerItemId} onClose={() => setDrawerItemId(null)} onOpenFull={(itemId) => navigate(`/inventory/stock/${itemId}`)} />
       <p className="mt-4 text-xs text-erp-muted">Demo mode — click item row to open stock details drawer.</p>
       <SaveViewDialog

@@ -38,6 +38,10 @@ import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared
 import { PurchaseOrderLinesTable } from '@/components/purchase/PurchaseOrderLinesTable'
 import { PurchaseDocumentWorkflowStrip } from '@/components/purchase/PurchaseDocumentWorkflowStrip'
 import {
+  PurchaseOrderOriginBanner,
+  PurchaseOrderOriginPicker,
+} from '@/components/purchase/PurchaseOrderOriginPicker'
+import {
   PurchaseDocumentAttachments,
   purchaseAttachmentIdsFromRows,
   purchaseAttachmentRowsFromIds,
@@ -121,7 +125,6 @@ import {
   validatePurchaseOrderForm,
 } from '@/utils/purchaseOrderValidation'
 import { notify } from '@/store/toastStore'
-import { cn } from '@/utils/cn'
 
 const ACTOR = { id: 'user-buyer-01', code: 'BUY01', name: 'Rahul Patil' }
 const LOCATION_OPTIONS = [PURCHASE_DEMO_LOCATION, PURCHASE_DEMO_LOCATION_FG]
@@ -815,7 +818,11 @@ export function PurchaseOrderEditorPage() {
       setVendors(vendorRows.filter((v) => v.isActive))
       setCatalogItems(items)
       setPurchaseSetup(setup)
-      setApprovedPrs(prs.filter((p) => p.status === 'approved'))
+      setApprovedPrs(
+        prs
+          .filter((p) => p.status === 'approved' || p.status === 'converted_to_rfq')
+          .sort((a, b) => Number(!a.rfqRequired) - Number(!b.rfqRequired)),
+      )
       setApprovedVqs(vqs.filter((q) => q.status === 'selected'))
       setActiveBlankets(blankets.filter((b) => b.status === 'active'))
 
@@ -1305,57 +1312,18 @@ export function PurchaseOrderEditorPage() {
     >
       {isNew ? (
         !originChosen ? (
-          <div className="mb-3 rounded border border-erp-border bg-erp-surface px-3 py-2.5">
-            <p className="mb-2 text-[12px] font-medium text-erp-text">Create Purchase Order From</p>
-            <div
-              className="flex flex-wrap gap-1.5"
-              role="tablist"
-              aria-label="Create purchase order from"
-            >
-              {(Object.entries(PURCHASE_ORDER_ORIGIN_LABELS) as [PurchaseOrderOrigin, string][]).map(
-                ([mode, label]) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    role="tab"
-                    aria-selected={false}
-                    className={cn(
-                      'rounded border px-2.5 py-1 text-[12px] font-medium transition-colors',
-                      'border-erp-border bg-erp-surface text-erp-text hover:border-erp-primary hover:bg-erp-primary-soft',
-                    )}
-                    onClick={() => selectOrigin(mode)}
-                  >
-                    {label}
-                  </button>
-                ),
-              )}
-            </div>
-          </div>
+          <PurchaseOrderOriginPicker
+            className="mb-4"
+            onSelect={selectOrigin}
+            pendingPoCount={approvedPrs.filter((p) => !p.rfqRequired && !p.convertedPoId).length}
+          />
         ) : (
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded border border-erp-border bg-erp-surface-alt px-3 py-2 text-[13px]">
-            <span>
-              <span className="text-erp-muted">Origin:</span>{' '}
-              <span className="font-medium text-erp-text">{PURCHASE_ORDER_ORIGIN_LABELS[originMode]}</span>
-            </span>
-            <div className="flex flex-wrap items-center gap-3">
-              {originMode !== 'manual' ? (
-                <button
-                  type="button"
-                  className="text-[12px] font-medium text-erp-primary hover:underline"
-                  onClick={() => setOriginLookupOpen(true)}
-                >
-                  Select source…
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="text-[12px] font-medium text-erp-primary hover:underline"
-                onClick={reopenOriginSelector}
-              >
-                Change source
-              </button>
-            </div>
-          </div>
+          <PurchaseOrderOriginBanner
+            originLabel={PURCHASE_ORDER_ORIGIN_LABELS[originMode]}
+            showSelectSource={originMode !== 'manual'}
+            onSelectSource={() => setOriginLookupOpen(true)}
+            onChangeSource={reopenOriginSelector}
+          />
         )
       ) : null}
 
@@ -2033,6 +2001,13 @@ export function PurchaseOrderEditorPage() {
               {approvedPrs.map((pr) => (
                 <option key={pr.id} value={pr.id}>
                   {pr.documentNumber} · {pr.department} · {formatCurrency(pr.totalAmount)}
+                  {pr.status === 'approved' && !pr.rfqRequired
+                    ? ' · Ready for PO'
+                    : pr.status === 'converted_to_rfq'
+                      ? ' · Via RFQ'
+                      : pr.rfqRequired
+                        ? ' · RFQ required'
+                        : ''}
                 </option>
               ))}
             </Select>

@@ -28,12 +28,18 @@ import {
   seedProductionOutputs,
   seedProductionReworks,
   seedProductionScraps,
+  seedQualityReviews,
   seedWorkOrderActivity,
   seedWorkOrderMaterials,
   seedWorkOrders,
   seedWorkOrderSourceDocuments,
 } from '../../data/manufacturing/workOrderSeed'
 import { getManufacturingSettings } from './manufacturingSettingsService'
+import { getRouteSnapshotForWorkOrder } from './routeService'
+import type { ManufacturingRoute, WorkOrderOperation, WorkOrderOperationStatus } from '../../types/manufacturingRoute'
+import { buildSeedOperationsForWo, seedManufacturingRoutes } from '../../data/manufacturing/routeSeed'
+import type { ManufacturingControlDashboard } from '../../types/manufacturing'
+import { WO_MATERIAL_STATUS_LABELS, WO_STATUS_LABELS, getWorkOrderListStatus, getWorkOrderOwnerLine } from '../../types/manufacturingWorkOrder'
 
 const delay = (ms = 80) => new Promise((r) => setTimeout(r, ms))
 
@@ -43,8 +49,55 @@ let activities: WorkOrderActivity[] = structuredClone(seedWorkOrderActivity)
 let outputs: ProductionOutputEntry[] = structuredClone(seedProductionOutputs)
 let scraps: ProductionScrap[] = structuredClone(seedProductionScraps)
 let reworks: ProductionRework[] = structuredClone(seedProductionReworks)
-let qualityReviews: ProductionQualityReview[] = []
+let qualityReviews: ProductionQualityReview[] = structuredClone(seedQualityReviews)
 let woSeq = 50
+let operations: WorkOrderOperation[] = []
+
+function seedDemoOperations() {
+  const axleRoute = seedManufacturingRoutes.find((r) => r.id === 'mfg-route-axle-01')
+  const tankRoute = seedManufacturingRoutes.find((r) => r.id === 'mfg-route-tank-01')
+  const axleWo = workOrders.find((w) => w.id === 'mfg-wo-001')
+  const tankWo = workOrders.find((w) => w.id === 'mfg-wo-007')
+  if (axleRoute && axleWo) {
+    operations = [...operations, ...buildSeedOperationsForWo(axleWo.id, axleWo.plannedQty, axleRoute, 'mid')]
+    applyRouteMeta(axleWo.id, axleRoute)
+  }
+  if (tankRoute && tankWo) {
+    operations = [...operations, ...buildSeedOperationsForWo(tankWo.id, tankWo.plannedQty, tankRoute, 'ready')]
+    applyRouteMeta(tankWo.id, tankRoute)
+  }
+}
+
+function applyRouteMeta(workOrderId: string, route: ManufacturingRoute) {
+  const idx = workOrders.findIndex((w) => w.id === workOrderId)
+  if (idx < 0) return
+  const { current, next } = currentNextOpNames(workOrderId)
+  workOrders[idx] = {
+    ...workOrders[idx],
+    routeId: route.id,
+    routeNo: route.routeNo,
+    routeName: route.routeName,
+    routeVersion: route.version,
+    routeSnapshotAt: now(),
+    currentOperationName: current,
+    nextOperationName: next,
+  }
+}
+
+function currentNextOpNames(workOrderId: string): { current?: string; next?: string } {
+  const ops = operations
+    .filter((o) => o.workOrderId === workOrderId)
+    .sort((a, b) => a.sequenceNo - b.sequenceNo)
+  const current =
+    ops.find((o) => ['in_progress', 'on_hold', 'qc_pending', 'rework'].includes(o.status))
+    ?? ops.find((o) => o.status === 'ready')
+    ?? ops.find((o) => o.status === 'pending')
+  const currentIdx = current ? ops.findIndex((o) => o.id === current.id) : -1
+  const next = currentIdx >= 0 ? ops.slice(currentIdx + 1).find((o) => !['accepted', 'completed', 'skipped', 'rejected'].includes(o.status)) : ops.find((o) => o.status === 'pending' || o.status === 'ready')
+  return { current: current?.operationName, next: next?.operationName }
+}
+
+seedDemoOperations()
 
 interface WorkOrderRegisterSummary {
   open: number
@@ -105,12 +158,14 @@ function matchesFilter(wo: WorkOrder, filter?: WorkOrderFilter): boolean {
   if (!filter) return true
   const q = filter.search?.trim().toLowerCase()
   if (q) {
-    const hay = `${wo.woNumber} ${wo.finishedItemCode} ${wo.finishedItemName} ${wo.sourceDocumentNo} ${wo.customerName ?? ''}`.toLowerCase()
+    const hay = `${wo.woNumber} ${wo.finishedItemCode} ${wo.finishedItemName} ${wo.sourceDocumentNo} ${wo.customerName ?? ''} ${wo.supervisor ?? ''} ${wo.workstation ?? ''}`.toLowerCase()
     if (!hay.includes(q)) return false
   }
   if (filter.finishedItem) {
     const f = filter.finishedItem.toLowerCase()
-    if (!wo.finishedItemCode.toLowerCase().includes(f) && !wo.finishedItemName.toLowerCase().includes(f)) return false
+    if (!wo.finishedItemCode.toLowerCase().includes(f) && !wo.finishedItemName.toLowerCase().includes(f) && wo.finishedItemId !== filter.finishedItem) {
+      return false
+    }
   }
   if (filter.productionMethod && wo.productionMethod !== filter.productionMethod) return false
   if (filter.source && wo.source !== filter.source) return false
@@ -118,8 +173,15 @@ function matchesFilter(wo: WorkOrder, filter?: WorkOrderFilter): boolean {
   if (filter.customer && !(wo.customerName ?? '').toLowerCase().includes(filter.customer.toLowerCase())) return false
   if (filter.plant && !wo.plantName.toLowerCase().includes(filter.plant.toLowerCase())) return false
   if (filter.status && wo.status !== filter.status) return false
+  if (filter.listStatus && getWorkOrderListStatus(wo) !== filter.listStatus) return false
   if (filter.priority && wo.priority !== filter.priority) return false
   if (filter.materialStatus && wo.materialStatus !== filter.materialStatus) return false
+  if (filter.qcRequired === true && !wo.qualityRequired) return false
+  if (filter.qcRequired === false && wo.qualityRequired) return false
+  if (filter.ownerLine) {
+    const owner = getWorkOrderOwnerLine(wo).toLowerCase()
+    if (!owner.includes(filter.ownerLine.toLowerCase())) return false
+  }
   if (filter.dueDateFrom && wo.dueDate < filter.dueDateFrom) return false
   if (filter.dueDateTo && wo.dueDate > filter.dueDateTo) return false
   if (filter.startDateFrom && wo.startDate < filter.startDateFrom) return false
@@ -127,17 +189,23 @@ function matchesFilter(wo: WorkOrder, filter?: WorkOrderFilter): boolean {
 
   switch (filter.tab) {
     case 'draft':
-      return wo.status === 'draft'
+      return getWorkOrderListStatus(wo) === 'draft'
+    case 'ready':
+      return getWorkOrderListStatus(wo) === 'ready'
     case 'in_progress':
-      return wo.status === 'in_progress'
+      return getWorkOrderListStatus(wo) === 'in_progress'
     case 'on_hold':
-      return wo.status === 'on_hold'
+      return getWorkOrderListStatus(wo) === 'on_hold'
     case 'completed':
-      return wo.status === 'completed'
+      return getWorkOrderListStatus(wo) === 'completed'
+    case 'qc_pending':
+      return getWorkOrderListStatus(wo) === 'qc_pending'
+    case 'qc_hold':
+      return getWorkOrderListStatus(wo) === 'qc_hold'
     case 'closed':
-      return wo.status === 'closed'
+      return getWorkOrderListStatus(wo) === 'closed'
     case 'cancelled':
-      return wo.status === 'cancelled'
+      return getWorkOrderListStatus(wo) === 'cancelled'
     case 'material_shortage':
       return wo.materialStatus === 'shortage' || wo.materialStatus === 'partial'
     case 'delayed':
@@ -227,6 +295,298 @@ export async function getWorkOrderRegisterSummary(): Promise<WorkOrderRegisterSu
     materialShortage: workOrders.filter((w) => w.materialStatus === 'shortage' || w.materialStatus === 'partial').length,
     plannedQty: workOrders.reduce((s, w) => s + w.plannedQty, 0),
     producedQty: workOrders.reduce((s, w) => s + w.producedQty, 0),
+  }
+}
+
+/** Manager-level production control dashboard — live demo aggregates. */
+export async function getManufacturingControlDashboard(): Promise<ManufacturingControlDashboard> {
+  await delay()
+  const { getJobWorkOrders } = await import('./jobWorkService')
+  const t = today()
+  const active = workOrders.filter((w) => w.status !== 'cancelled')
+  const delayed = active.filter(isDelayed)
+  const inProgress = active.filter((w) => w.status === 'in_progress')
+  const onHold = active.filter((w) => w.status === 'on_hold')
+  const completed = active.filter((w) => w.status === 'completed' || (w.completedAt?.startsWith(t) ?? false))
+  const completedToday = active.filter((w) => w.completedAt?.startsWith(t) || (w.status === 'completed' && w.dueDate === t))
+  const plannedToday = active.filter(
+    (w) => w.dueDate === t || w.startDate === t || ['draft', 'in_progress', 'on_hold'].includes(w.status),
+  )
+  const plannedQtyToday = plannedToday.reduce((s, w) => s + w.plannedQty, 0)
+  const goodQtyToday =
+    outputs.filter((o) => o.productionDate === t || o.at.startsWith(t)).reduce((s, o) => s + o.goodQty, 0)
+    || completedToday.reduce((s, w) => s + w.producedQty, 0)
+    || inProgress.reduce((s, w) => s + w.producedQty, 0)
+
+  const shortageWos = active.filter((w) => w.materialStatus === 'shortage' || w.materialStatus === 'partial')
+  const pendingQc = qualityReviews.filter((q) => q.result === 'pending')
+  const qcWos = active.filter((w) => w.qualityHold || pendingQc.some((q) => q.workOrderId === w.id))
+
+  const jw = await getJobWorkOrders()
+  const materialSent = jw.filter((j) => j.status === 'material_sent').length
+  const partiallyReceived = jw.filter((j) => j.status === 'partially_received').length
+  const pendingReconciliation = jw.filter((j) => j.status === 'reconciliation_pending').length
+  const jwPending = materialSent + partiallyReceived + pendingReconciliation
+
+  const efficiency =
+    plannedQtyToday > 0
+      ? Math.round((goodQtyToday / plannedQtyToday) * 100)
+      : active.reduce((s, w) => s + w.progressPercent, 0) / Math.max(1, active.length)
+
+  const materialRisks = materials
+    .filter((m) => m.shortageQty > 0)
+    .map((m) => {
+      const wo = workOrders.find((w) => w.id === m.workOrderId)
+      const suggested =
+        m.availableQty === 0
+          ? 'Create purchase requisition'
+          : m.availableQty < m.requiredQty
+            ? 'Transfer from another warehouse or raise PR'
+            : 'Reserve available stock'
+      return {
+        id: m.id,
+        itemCode: m.componentItemCode,
+        itemName: m.componentItemName,
+        requiredQty: m.requiredQty,
+        availableQty: m.availableQty,
+        shortageQty: m.shortageQty,
+        workOrderNo: wo?.woNumber ?? '—',
+        workOrderId: m.workOrderId,
+        suggestedAction: suggested,
+        href: `/manufacturing/work-orders/${m.workOrderId}?tab=materials`,
+      }
+    })
+    .slice(0, 8)
+
+  const readyToStart = active.filter(
+    (w) => w.status === 'draft' && (w.materialStatus === 'available' || w.materialStatus === 'reserved'),
+  )
+
+  const aiInsights: string[] = []
+  const shortageItemCodes = new Set(
+    materials.filter((m) => m.shortageQty > 0).map((m) => m.componentItemCode),
+  )
+  if (delayed.length) {
+    aiInsights.push(
+      `${delayed.length} work order${delayed.length === 1 ? '' : 's'} ${delayed.length === 1 ? 'is' : 'are'} delayed.`,
+    )
+  }
+  if (shortageItemCodes.size) {
+    aiInsights.push(
+      `${shortageItemCodes.size} item${shortageItemCodes.size === 1 ? '' : 's'} have material shortage.`,
+    )
+  }
+  const qcPendingQty = pendingQc.reduce((s, q) => s + (q.producedQty ?? 0), 0)
+  if (pendingQc.length) {
+    aiInsights.push(
+      qcPendingQty > 0
+        ? `QC pending quantity increased today (${qcPendingQty} units awaiting review).`
+        : 'QC pending quantity increased today.',
+    )
+  }
+  if (readyToStart.length) {
+    const sample = readyToStart[0]
+    aiInsights.push(`${sample.woNumber} can start because all materials are available.`)
+  }
+  if (jwPending) {
+    aiInsights.push(`${jwPending} job-work document(s) need vendor follow-up.`)
+  }
+  if (!aiInsights.length) {
+    aiInsights.push('Shopfloor looks balanced. Review today’s plan and push ready work orders to Start.')
+  }
+
+  const hrefWo = '/manufacturing/work-orders'
+  const hrefJw = '/manufacturing/job-work'
+  const hrefFloor = '/manufacturing/shopfloor'
+
+  return {
+    asOfDate: t,
+    kpis: [
+      {
+        id: 'planned-today',
+        label: "Today's Planned Production",
+        value: plannedQtyToday,
+        helper: `${plannedToday.length} WO(s)`,
+        tone: 'primary',
+        href: hrefWo,
+      },
+      {
+        id: 'good-today',
+        label: "Today's Good Quantity",
+        value: goodQtyToday,
+        helper: 'Accepted / produced',
+        tone: 'success',
+        href: hrefWo,
+      },
+      {
+        id: 'in-progress',
+        label: 'Work Orders In Progress',
+        value: inProgress.length,
+        tone: 'warning',
+        href: `${hrefFloor}`,
+      },
+      {
+        id: 'shortage',
+        label: 'Material Shortage',
+        value: shortageWos.length,
+        tone: shortageWos.length ? 'danger' : 'neutral',
+        href: hrefWo,
+      },
+      {
+        id: 'qc-pending',
+        label: 'QC Pending',
+        value: pendingQc.length || qcWos.length,
+        tone: (pendingQc.length || qcWos.length) ? 'warning' : 'neutral',
+        href: hrefWo,
+      },
+      {
+        id: 'jw-pending',
+        label: 'Job Work Pending',
+        value: jwPending,
+        tone: jwPending ? 'warning' : 'neutral',
+        href: hrefJw,
+      },
+      {
+        id: 'delayed',
+        label: 'Delayed Work Orders',
+        value: delayed.length,
+        tone: delayed.length ? 'danger' : 'success',
+        href: hrefWo,
+      },
+      {
+        id: 'efficiency',
+        label: 'Production Efficiency',
+        value: `${Math.min(100, Math.round(efficiency))}%`,
+        helper: 'Good vs planned (demo)',
+        tone: efficiency >= 80 ? 'success' : efficiency >= 50 ? 'warning' : 'danger',
+        href: '/manufacturing/reports',
+      },
+    ],
+    todaysPlan: plannedToday.slice(0, 10).map((w) => ({
+      id: w.id,
+      woNumber: w.woNumber,
+      finishedItemCode: w.finishedItemCode,
+      finishedItemName: w.finishedItemName,
+      plannedQty: w.plannedQty,
+      dueDate: w.dueDate,
+      status: WO_STATUS_LABELS[w.status],
+      materialStatus:
+        w.materialStatus in WO_MATERIAL_STATUS_LABELS
+          ? WO_MATERIAL_STATUS_LABELS[w.materialStatus as keyof typeof WO_MATERIAL_STATUS_LABELS]
+          : String(w.materialStatus),
+      href: `/manufacturing/work-orders/${w.id}`,
+    })),
+    runningOrders: inProgress.slice(0, 12).map((w) => ({
+      id: w.id,
+      woNumber: w.woNumber,
+      finishedItemCode: w.finishedItemCode,
+      finishedItemName: w.finishedItemName,
+      plannedQty: w.plannedQty,
+      dueDate: w.dueDate,
+      status: WO_STATUS_LABELS[w.status],
+      materialStatus:
+        w.materialStatus in WO_MATERIAL_STATUS_LABELS
+          ? WO_MATERIAL_STATUS_LABELS[w.materialStatus as keyof typeof WO_MATERIAL_STATUS_LABELS]
+          : String(w.materialStatus),
+      href: `/manufacturing/work-orders/${w.id}`,
+    })),
+    delayedOrders: delayed.slice(0, 12).map((w) => ({
+      id: w.id,
+      woNumber: w.woNumber,
+      finishedItemCode: w.finishedItemCode,
+      finishedItemName: w.finishedItemName,
+      plannedQty: w.plannedQty,
+      dueDate: w.dueDate,
+      status: WO_STATUS_LABELS[w.status],
+      materialStatus:
+        w.materialStatus in WO_MATERIAL_STATUS_LABELS
+          ? WO_MATERIAL_STATUS_LABELS[w.materialStatus as keyof typeof WO_MATERIAL_STATUS_LABELS]
+          : String(w.materialStatus),
+      href: `/manufacturing/work-orders/${w.id}`,
+    })),
+    liveStatus: [
+      {
+        id: 'running',
+        label: 'Running',
+        count: inProgress.length,
+        href: hrefFloor,
+        items: inProgress.slice(0, 4).map((w) => ({
+          id: w.id,
+          woNumber: w.woNumber,
+          item: w.finishedItemCode,
+          href: `/manufacturing/work-orders/${w.id}`,
+        })),
+      },
+      {
+        id: 'on_hold',
+        label: 'On Hold',
+        count: onHold.length,
+        href: hrefFloor,
+        items: onHold.slice(0, 4).map((w) => ({
+          id: w.id,
+          woNumber: w.woNumber,
+          item: w.finishedItemCode,
+          href: `/manufacturing/work-orders/${w.id}`,
+        })),
+      },
+      {
+        id: 'qc_pending',
+        label: 'QC Pending',
+        count: pendingQc.length || qcWos.length,
+        href: hrefWo,
+        items: (qcWos.length ? qcWos : active.filter((w) => pendingQc.some((q) => q.workOrderId === w.id)))
+          .slice(0, 4)
+          .map((w) => ({
+            id: w.id,
+            woNumber: w.woNumber,
+            item: w.finishedItemCode,
+            href: `/manufacturing/work-orders/${w.id}?action=quality`,
+          })),
+      },
+      {
+        id: 'completed',
+        label: 'Completed',
+        count: completed.filter((w) => w.status === 'completed').length,
+        href: hrefWo,
+        items: completed
+          .filter((w) => w.status === 'completed')
+          .slice(0, 4)
+          .map((w) => ({
+            id: w.id,
+            woNumber: w.woNumber,
+            item: w.finishedItemCode,
+            href: `/manufacturing/work-orders/${w.id}`,
+          })),
+      },
+    ],
+    materialRisks,
+    qcAttention: pendingQc.map((q) => {
+      const wo = workOrders.find((w) => w.id === q.workOrderId)
+      return {
+        id: q.id,
+        workOrderId: q.workOrderId,
+        woNumber: wo?.woNumber ?? '—',
+        finishedItem: `${q.finishedItemCode} — ${q.finishedItemName}`,
+        pendingQty: q.producedQty - q.acceptedQty,
+        href: `/manufacturing/work-orders/${q.workOrderId}?action=quality`,
+      }
+    }),
+    jobWork: {
+      materialSent,
+      partiallyReceived,
+      pendingReconciliation,
+      rows: jw
+        .filter((j) => ['material_sent', 'partially_received', 'reconciliation_pending'].includes(j.status))
+        .slice(0, 6)
+        .map((j) => ({
+          id: j.id,
+          jwNumber: j.jwNumber,
+          vendorName: j.vendorName,
+          status: j.status.replace(/_/g, ' '),
+          href: `/manufacturing/job-work/${j.id}`,
+        })),
+    },
+    aiInsights,
   }
 }
 
@@ -321,6 +681,21 @@ function buildMaterialsFromBom(woId: string, bomId: string | null, qty: number):
   })
 }
 
+/** Preview BOM materials before the WO is saved (Quick Mode). */
+export async function previewWorkOrderMaterials(
+  bomId: string | null,
+  plannedQty: number,
+): Promise<{ materials: WorkOrderMaterial[]; estimatedCost: number; materialReady: boolean }> {
+  await delay()
+  const materialsPreview = buildMaterialsFromBom('preview', bomId, plannedQty)
+  const bom = seedManufacturingBoms.find((b) => b.id === bomId)
+  const estimatedCost = bom
+    ? Math.round(bom.estimatedCost * Math.max(1, plannedQty))
+    : materialsPreview.reduce((s, m) => s + m.requiredQty * 80, 0)
+  const materialReady = materialsPreview.length > 0 && materialsPreview.every((m) => m.shortageQty <= 0)
+  return { materials: materialsPreview, estimatedCost, materialReady }
+}
+
 export async function createWorkOrder(input: CreateWorkOrderInput): Promise<{ ok: boolean; workOrder?: WorkOrder; error?: string }> {
   await delay()
   const defaults = await getFinishedItemDefaults(input.finishedItemId)
@@ -369,8 +744,12 @@ export async function createWorkOrder(input: CreateWorkOrderInput): Promise<{ ok
     progressPercent: 0,
     status: 'draft',
     priority: input.priority ?? defaults.priority,
-    consumptionMode: 'automatic',
+    consumptionMode: input.consumptionMode ?? 'automatic',
+    workstation: input.workstation,
+    supervisor: input.supervisor,
+    notes: input.notes,
     qualityHold: false,
+    routeId: null,
     createdAt: now(),
     updatedAt: now(),
     createdBy: 'Demo User',
@@ -378,8 +757,30 @@ export async function createWorkOrder(input: CreateWorkOrderInput): Promise<{ ok
   workOrders = [wo, ...workOrders]
   materials = [...buildMaterialsFromBom(id, wo.bomId, wo.plannedQty), ...materials]
   refreshMaterialStatus(id)
+  await attachRouteAndOperations(
+    id,
+    input.finishedItemId,
+    input.plannedQty,
+    input.routeId,
+    input.overrideRoute,
+    input.bomId,
+  )
   pushActivity(id, 'Work Order Created', { relatedDocument: wo.sourceDocumentNo })
   return { ok: true, workOrder: workOrders.find((w) => w.id === id)! }
+}
+
+/** Create (or update draft) then check materials so list status becomes Ready when stock is OK. */
+export async function createWorkOrderAndMarkReady(
+  input: CreateWorkOrderInput,
+  existingId?: string,
+): Promise<{ ok: boolean; workOrder?: WorkOrder; warnings: string[]; error?: string }> {
+  const saved = existingId
+    ? await updateWorkOrder(existingId, input)
+    : await createWorkOrder(input)
+  if (!saved.ok || !saved.workOrder) return { ok: false, warnings: [], error: saved.error ?? 'Save failed' }
+  const checked = await checkWorkOrderMaterialAvailability(saved.workOrder.id)
+  const wo = await getWorkOrderById(saved.workOrder.id)
+  return { ok: true, workOrder: wo ?? saved.workOrder, warnings: checked.warnings }
 }
 
 export async function updateWorkOrder(
@@ -400,6 +801,19 @@ export async function updateWorkOrder(
     materials = materials.filter((m) => m.workOrderId !== id)
     materials = [...buildMaterialsFromBom(id, next.bomId, next.plannedQty), ...materials]
     refreshMaterialStatus(id)
+  }
+  if (
+    existing.status === 'draft'
+    && (patch.finishedItemId || patch.routeId !== undefined || patch.plannedQty || patch.overrideRoute || patch.bomId !== undefined)
+  ) {
+    await attachRouteAndOperations(
+      id,
+      next.finishedItemId,
+      next.plannedQty,
+      patch.routeId ?? next.routeId,
+      patch.overrideRoute,
+      next.bomId,
+    )
   }
   pushActivity(id, 'Work Order Updated')
   return { ok: true, workOrder: workOrders[idx] }
@@ -584,6 +998,47 @@ export async function resumeWorkOrderDemo(
   return { ok: true }
 }
 
+/** Shopfloor: mark WO for QC review (creates pending review if needed). */
+export async function sendWorkOrderToQcDemo(
+  workOrderId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await delay()
+  const idx = workOrders.findIndex((w) => w.id === workOrderId)
+  if (idx < 0) return { ok: false, error: 'Not found' }
+  const wo = workOrders[idx]
+  if (!['in_progress', 'completed'].includes(wo.status)) {
+    return { ok: false, error: 'Only in-progress or completed WOs can be sent to QC' }
+  }
+  if (wo.producedQty <= 0) return { ok: false, error: 'Produce quantity before sending to QC' }
+  workOrders[idx] = {
+    ...wo,
+    qualityRequired: true,
+    qualityHold: true,
+    updatedAt: now(),
+  }
+  const existing = qualityReviews.find((q) => q.workOrderId === workOrderId && q.result === 'pending')
+  if (!existing) {
+    qualityReviews = [
+      {
+        id: `qc-${crypto.randomUUID().slice(0, 8)}`,
+        workOrderId,
+        outputEntryId: outputs.find((o) => o.workOrderId === workOrderId)?.id ?? 'out-shopfloor',
+        finishedItemCode: wo.finishedItemCode,
+        finishedItemName: wo.finishedItemName,
+        producedQty: wo.producedQty,
+        acceptedQty: 0,
+        rejectedQty: 0,
+        reworkQty: 0,
+        result: 'pending',
+        at: now(),
+      },
+      ...qualityReviews,
+    ]
+  }
+  pushActivity(workOrderId, 'Sent to QC', { quantity: wo.producedQty, comment: 'From shopfloor board' })
+  return { ok: true }
+}
+
 export async function getWorkOrderActivity(workOrderId: string): Promise<WorkOrderActivity[]> {
   await delay()
   return activities.filter((a) => a.workOrderId === workOrderId)
@@ -682,7 +1137,18 @@ export async function confirmAutomaticConsumptionDemo(workOrderId: string, outpu
 
 export async function saveProductionProgressDemo(
   workOrderId: string,
-  input: { goodQty: number; rejectedQty?: number; scrapQty?: number; reworkQty?: number; productionDate?: string; batchNo?: string; serialNos?: string[]; comment?: string },
+  input: {
+    goodQty: number
+    rejectedQty?: number
+    scrapQty?: number
+    reworkQty?: number
+    productionDate?: string
+    batchNo?: string
+    serialNos?: string[]
+    comment?: string
+    /** Override WO consumption mode for this booking. */
+    autoConsume?: boolean
+  },
 ): Promise<{ ok: boolean; error?: string }> {
   await delay()
   const idx = workOrders.findIndex((w) => w.id === workOrderId)
@@ -706,14 +1172,16 @@ export async function saveProductionProgressDemo(
   }
   outputs = [entry, ...outputs]
   const producedQty = wo.producedQty + input.goodQty
+  const useAuto = input.autoConsume ?? wo.consumptionMode === 'automatic'
   workOrders[idx] = recompute({
     ...wo,
     producedQty,
     rejectedQty: wo.rejectedQty + (input.rejectedQty ?? 0),
     scrapQty: wo.scrapQty + (input.scrapQty ?? 0),
     reworkQty: wo.reworkQty + (input.reworkQty ?? 0),
+    consumptionMode: useAuto ? 'automatic' : 'manual_issue',
   })
-  if (wo.consumptionMode === 'automatic') applyConsumption(workOrderId, input.goodQty)
+  if (useAuto) applyConsumption(workOrderId, input.goodQty)
   if (wo.qualityRequired) {
     qualityReviews = [
       {
@@ -1058,4 +1526,306 @@ export const getWorkOrderOutputs = getProductionOutputs
 export async function getProductionReworks(workOrderId: string): Promise<ProductionRework[]> {
   await delay()
   return reworks.filter((r) => r.workOrderId === workOrderId)
+}
+
+/* -------------------------------------------------------------------------- */
+/* Work Order operation stages (folded into WO — not Job Cards)               */
+/* -------------------------------------------------------------------------- */
+
+async function attachRouteAndOperations(
+  workOrderId: string,
+  finishedItemId: string,
+  plannedQty: number,
+  routeId?: string | null,
+  overrideRoute?: boolean,
+  bomId?: string | null,
+) {
+  /* Snapshot copy — never live-link to Route Master after this point. */
+  const route = await getRouteSnapshotForWorkOrder(finishedItemId, {
+    bomId,
+    routeId,
+    overrideRoute,
+  })
+  if (!route) return
+  generateOperationsFromRoute(workOrderId, plannedQty, route)
+  applyRouteMeta(workOrderId, route)
+}
+
+/**
+ * Copy Route Master lines into WO-local operations.
+ * Later edits to Route Master or to these WO ops do not cross-update.
+ */
+function generateOperationsFromRoute(workOrderId: string, plannedQty: number, route: ManufacturingRoute) {
+  operations = operations.filter((o) => o.workOrderId !== workOrderId)
+  const lines = [...route.operations].sort((a, b) => a.sequenceNo - b.sequenceNo)
+  const generated: WorkOrderOperation[] = lines.map((op, idx) => ({
+    id: `wo-op-${workOrderId}-${op.sequenceNo}-${crypto.randomUUID().slice(0, 6)}`,
+    workOrderId,
+    routeId: route.id,
+    routeOperationId: op.id,
+    routeVersion: route.version,
+    sequenceNo: op.sequenceNo,
+    operationName: op.operationName,
+    workCenter: op.workCenter,
+    plannedQty,
+    completedQty: 0,
+    pendingQty: plannedQty,
+    scrapQty: 0,
+    reworkQty: 0,
+    rejectedQty: 0,
+    qcRequired: op.qcRequired,
+    jobWorkRequired: op.jobWorkRequired,
+    defaultVendorName: op.defaultVendorName,
+    status: idx === 0 ? 'ready' : 'pending',
+    allowScrap: op.allowScrap,
+    allowRework: op.allowRework,
+    allowReject: op.allowReject,
+    plannedTimeMinutes: op.plannedTimeMinutes,
+    remarks: op.remarks,
+  }))
+  operations = [...operations, ...generated]
+}
+
+function refreshOpDerived(workOrderId: string) {
+  const { current, next } = currentNextOpNames(workOrderId)
+  const idx = workOrders.findIndex((w) => w.id === workOrderId)
+  if (idx < 0) return
+  workOrders[idx] = {
+    ...workOrders[idx],
+    currentOperationName: current,
+    nextOperationName: next,
+    updatedAt: now(),
+  }
+  syncWorkOrderStatusFromOperations(workOrderId)
+}
+
+function syncWorkOrderStatusFromOperations(workOrderId: string) {
+  const idx = workOrders.findIndex((w) => w.id === workOrderId)
+  if (idx < 0) return
+  const wo = workOrders[idx]
+  if (wo.status === 'closed' || wo.status === 'cancelled') return
+  const ops = operations.filter((o) => o.workOrderId === workOrderId)
+  if (!ops.length) return
+
+  const anyHold = ops.some((o) => o.status === 'on_hold')
+  const anyProgress = ops.some((o) => ['in_progress', 'qc_pending', 'rework'].includes(o.status))
+  const allDone = ops.every((o) => ['accepted', 'completed', 'skipped'].includes(o.status))
+  const allPending = ops.every((o) => o.status === 'pending' || o.status === 'ready')
+
+  let status = wo.status
+  let qualityHold = wo.qualityHold
+  if (anyHold) status = 'on_hold'
+  else if (anyProgress) {
+    status = 'in_progress'
+    qualityHold = ops.some((o) => o.status === 'qc_pending')
+  } else if (allDone) {
+    status = 'completed'
+    qualityHold = false
+  } else if (allPending) {
+    status = 'draft'
+    qualityHold = false
+  }
+
+  const completedFromOps = ops.reduce((s, o) => Math.max(s, o.completedQty), 0)
+  workOrders[idx] = recompute({
+    ...wo,
+    status,
+    qualityHold,
+    producedQty: Math.max(wo.producedQty, allDone ? wo.plannedQty : completedFromOps),
+    startedAt: wo.startedAt ?? (status === 'in_progress' || status === 'on_hold' ? now() : undefined),
+    completedAt: allDone ? (wo.completedAt ?? now()) : wo.completedAt,
+  })
+}
+
+export async function getWorkOrderOperations(workOrderId: string): Promise<WorkOrderOperation[]> {
+  await delay()
+  return operations
+    .filter((o) => o.workOrderId === workOrderId)
+    .sort((a, b) => a.sequenceNo - b.sequenceNo)
+    .map((o) => ({ ...o }))
+}
+
+export async function startWorkOrderOperationDemo(
+  workOrderId: string,
+  operationId: string,
+  operator?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await delay()
+  const op = operations.find((o) => o.id === operationId && o.workOrderId === workOrderId)
+  if (!op) return { ok: false, error: 'Operation not found' }
+  if (!['ready', 'pending', 'on_hold'].includes(op.status)) return { ok: false, error: 'Cannot start in current status' }
+  /* Only one in progress at a time (simple) */
+  const busy = operations.some((o) => o.workOrderId === workOrderId && o.status === 'in_progress' && o.id !== operationId)
+  if (busy) return { ok: false, error: 'Another operation is already in progress' }
+  operations = operations.map((o) =>
+    o.id === operationId
+      ? { ...o, status: 'in_progress' as const, startedAt: o.startedAt ?? now(), operator: operator || o.operator || 'Shopfloor' }
+      : o,
+  )
+  pushActivity(workOrderId, 'Operation Started', { comment: op.operationName })
+  refreshOpDerived(workOrderId)
+  return { ok: true }
+}
+
+export async function holdWorkOrderOperationDemo(
+  workOrderId: string,
+  operationId: string,
+  reason?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await delay()
+  const op = operations.find((o) => o.id === operationId && o.workOrderId === workOrderId)
+  if (!op || op.status !== 'in_progress') return { ok: false, error: 'Only in-progress operations can hold' }
+  operations = operations.map((o) =>
+    o.id === operationId ? { ...o, status: 'on_hold' as const, holdReason: reason || 'Held' } : o,
+  )
+  pushActivity(workOrderId, 'Operation On Hold', { comment: `${op.operationName}: ${reason || 'Held'}` })
+  refreshOpDerived(workOrderId)
+  return { ok: true }
+}
+
+export async function resumeWorkOrderOperationDemo(
+  workOrderId: string,
+  operationId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await delay()
+  const op = operations.find((o) => o.id === operationId && o.workOrderId === workOrderId)
+  if (!op || op.status !== 'on_hold') return { ok: false, error: 'Only held operations can resume' }
+  operations = operations.map((o) =>
+    o.id === operationId ? { ...o, status: 'in_progress' as const, holdReason: undefined } : o,
+  )
+  pushActivity(workOrderId, 'Operation Resumed', { comment: op.operationName })
+  refreshOpDerived(workOrderId)
+  return { ok: true }
+}
+
+export async function completeWorkOrderOperationDemo(
+  workOrderId: string,
+  operationId: string,
+  values: { completedQty: number; scrapQty?: number; reworkQty?: number; rejectedQty?: number },
+): Promise<{ ok: boolean; error?: string }> {
+  await delay()
+  const op = operations.find((o) => o.id === operationId && o.workOrderId === workOrderId)
+  if (!op) return { ok: false, error: 'Operation not found' }
+  if (!['in_progress', 'ready', 'rework'].includes(op.status)) return { ok: false, error: 'Cannot complete in current status' }
+  const completedQty = Math.max(0, values.completedQty)
+  const scrapQty = values.scrapQty ?? 0
+  const reworkQty = values.reworkQty ?? 0
+  const rejectedQty = values.rejectedQty ?? 0
+  const nextStatus: WorkOrderOperationStatus = op.qcRequired ? 'qc_pending' : 'accepted'
+  operations = operations.map((o) =>
+    o.id === operationId
+      ? {
+          ...o,
+          completedQty,
+          scrapQty,
+          reworkQty,
+          rejectedQty,
+          pendingQty: Math.max(0, o.plannedQty - completedQty),
+          status: nextStatus,
+          endedAt: nextStatus === 'accepted' ? now() : o.endedAt,
+        }
+      : o,
+  )
+  if (nextStatus === 'accepted') unlockNextOperation(workOrderId, op.sequenceNo)
+  pushActivity(workOrderId, 'Operation Completed', { quantity: completedQty, comment: op.operationName })
+  refreshOpDerived(workOrderId)
+  return { ok: true }
+}
+
+export async function sendWorkOrderOperationToQcDemo(
+  workOrderId: string,
+  operationId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await delay()
+  const op = operations.find((o) => o.id === operationId && o.workOrderId === workOrderId)
+  if (!op) return { ok: false, error: 'Not found' }
+  if (op.completedQty <= 0 && op.status !== 'in_progress') return { ok: false, error: 'Complete quantity first' }
+  operations = operations.map((o) =>
+    o.id === operationId
+      ? {
+          ...o,
+          status: 'qc_pending' as const,
+          completedQty: o.completedQty || o.plannedQty,
+          pendingQty: 0,
+        }
+      : o,
+  )
+  pushActivity(workOrderId, 'Operation Sent to QC', { comment: op.operationName })
+  refreshOpDerived(workOrderId)
+  return { ok: true }
+}
+
+export async function resolveWorkOrderOperationQcDemo(
+  workOrderId: string,
+  operationId: string,
+  result: 'accepted' | 'rejected' | 'rework',
+): Promise<{ ok: boolean; error?: string }> {
+  await delay()
+  const op = operations.find((o) => o.id === operationId && o.workOrderId === workOrderId)
+  if (!op || op.status !== 'qc_pending') return { ok: false, error: 'No QC pending' }
+  if (result === 'accepted') {
+    operations = operations.map((o) =>
+      o.id === operationId ? { ...o, status: 'accepted' as const, endedAt: now() } : o,
+    )
+    unlockNextOperation(workOrderId, op.sequenceNo)
+  } else if (result === 'rejected') {
+    operations = operations.map((o) =>
+      o.id === operationId
+        ? { ...o, status: 'rejected' as const, rejectedQty: o.rejectedQty || o.completedQty, endedAt: now() }
+        : o,
+    )
+  } else {
+    operations = operations.map((o) =>
+      o.id === operationId
+        ? { ...o, status: 'rework' as const, reworkQty: o.reworkQty || o.completedQty, completedQty: 0, pendingQty: o.plannedQty }
+        : o,
+    )
+  }
+  pushActivity(workOrderId, `Operation QC ${result}`, { comment: op.operationName })
+  refreshOpDerived(workOrderId)
+  return { ok: true }
+}
+
+export async function markWorkOrderOperationJobWorkDemo(
+  workOrderId: string,
+  operationId: string,
+  action: 'send' | 'receive',
+): Promise<{ ok: boolean; error?: string }> {
+  await delay()
+  const op = operations.find((o) => o.id === operationId && o.workOrderId === workOrderId)
+  if (!op || !op.jobWorkRequired) return { ok: false, error: 'Job work not enabled on this operation' }
+  if (action === 'send') {
+    operations = operations.map((o) =>
+      o.id === operationId
+        ? { ...o, status: 'in_progress' as const, startedAt: o.startedAt ?? now(), remarks: 'Sent to job work vendor' }
+        : o,
+    )
+    pushActivity(workOrderId, 'Operation Sent to Job Work', { comment: op.operationName })
+  } else {
+    operations = operations.map((o) =>
+      o.id === operationId
+        ? {
+            ...o,
+            completedQty: o.plannedQty,
+            pendingQty: 0,
+            status: o.qcRequired ? 'qc_pending' as const : 'accepted' as const,
+            endedAt: o.qcRequired ? o.endedAt : now(),
+            remarks: 'Received from job work',
+          }
+        : o,
+    )
+    const updated = operations.find((o) => o.id === operationId)!
+    if (updated.status === 'accepted') unlockNextOperation(workOrderId, op.sequenceNo)
+    pushActivity(workOrderId, 'Operation Received from Job Work', { comment: op.operationName })
+  }
+  refreshOpDerived(workOrderId)
+  return { ok: true }
+}
+
+function unlockNextOperation(workOrderId: string, completedSeq: number) {
+  const next = operations
+    .filter((o) => o.workOrderId === workOrderId && o.sequenceNo > completedSeq)
+    .sort((a, b) => a.sequenceNo - b.sequenceNo)[0]
+  if (!next || next.status !== 'pending') return
+  operations = operations.map((o) => (o.id === next.id ? { ...o, status: 'ready' as const } : o))
 }

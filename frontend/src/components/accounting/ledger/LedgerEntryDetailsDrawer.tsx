@@ -3,6 +3,7 @@ import { Download, ExternalLink, Printer, ScrollText, Shield } from 'lucide-reac
 import { Link } from 'react-router-dom'
 import { LedgerDrawerShell } from './LedgerDrawerShell'
 import { LedgerStatusBadge } from './LedgerStatusBadge'
+import { CrmSourceDocumentPanel } from '@/components/accounting/commercial'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDateTime } from '@/utils/dates/format'
 import type { LedgerEntry, LedgerEntryAuditEvent } from '@/types/ledgerEntries'
@@ -271,6 +272,36 @@ export function LedgerEntryDetailsDrawer({
                   )
                 }
               />
+              {entry.sourceDocument.crmTrace ? (
+                <div className="col-span-full mt-2">
+                  <CrmSourceDocumentPanel
+                    title="CRM source chain"
+                    source={{
+                      customerId: entry.sourceDocument.crmTrace.customerId,
+                      customerName: entry.sourceDocument.partyName ?? entry.party?.partyName,
+                      opportunityId: entry.sourceDocument.crmTrace.opportunityId,
+                      opportunityNo: entry.sourceDocument.crmTrace.opportunityNo,
+                      quotationId: entry.sourceDocument.crmTrace.quotationId,
+                      quotationNo: entry.sourceDocument.crmTrace.quotationNo,
+                      quotationRevision: entry.sourceDocument.crmTrace.quotationRevision,
+                      salesOrderId: entry.sourceDocument.crmTrace.salesOrderId,
+                      salesOrderNo: entry.sourceDocument.crmTrace.salesOrderNo,
+                      ownerName: entry.sourceDocument.crmTrace.ownerName,
+                      accountingStatus: 'posted',
+                    }}
+                  />
+                  <dl className="mt-2 grid grid-cols-2 gap-2 text-[12px]">
+                    <div>
+                      <dt className="text-erp-muted">Sales Invoice</dt>
+                      <dd>{entry.sourceDocument.crmTrace.salesInvoiceNo ?? 'Not available'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-erp-muted">G/L Entry</dt>
+                      <dd>{entry.entryNumber}</dd>
+                    </div>
+                  </dl>
+                </div>
+              ) : null}
             </>
           ) : (
             <Field label="Source document" value="—" />

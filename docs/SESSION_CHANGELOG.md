@@ -1,4 +1,381 @@
-## 2026-07-16 — Manufacturing & Production Phase 1 (planning foundation)
+## 2026-07-17 — Backend OpenAPI / API docs aligned to shipped routes
+
+### Why
+Swagger (`/api/docs`) was still at 1.1.0 and omitted ~55 endpoints that already exist in route modules (users/roles detail, CRM lifecycle, imports/exports, lookups).
+
+### Change
+- `backend/src/config/swagger.ts` → OpenAPI **1.2.0** — Users/Roles CRUD, lead/opp/follow-up lifecycle + history, pipelines CRUD, CRM imports, CRM master row CRUD + sync, entity note/attachment delete, master import/export, dedicated `/lookups/items|vendors`, fixed registry lookup enum
+- `docs/API_CONVENTIONS.md` — matching route table updates
+
+### How to verify
+Restart backend if running, open http://localhost:5000/api/docs — confirm new tags (CRM Imports, CRM Pipelines, Master Imports/Exports) and Users `{userId}` paths.
+
+---
+
+## 2026-07-17 — Create ISO Tank BOM from traveler preview data
+
+### Why
+Traveler sample should exist as a real BOM (masters tree + manufacturing components), not only a preview page.
+
+### Change
+- Masters items for ISO traveler assemblies/components
+- Released masters BOM `bom-iso-a` = `BOM-ISO26K-TRAVELER-001` multilevel lines
+- Manufacturing BOM `mfg-bom-003` same number — material lines for WO
+- BOM detail **Traveler** tab keeps PROC sheet; `/traveler-preview` redirects to this BOM
+- WO `WO-2026-0043` linked
+
+### How to verify
+1. `/manufacturing/bom` → open `BOM-ISO26K-TRAVELER-001`
+2. Traveler tab shows PROC rows; Components tab shows WO materials
+3. `/masters/bom/bom-iso-a/manage` shows multilevel tree
+
+---
+
+### Why
+Stakeholders need to see multilevel BOM + PROC (process) rows in the product UI even though WO execution does not run traveler ops yet.
+
+### Change
+- Sample document: 26 KL ISO Tank Container traveler BOM (`isoTankTravelerSeed.ts`)
+- Preview page: `/manufacturing/bom/traveler-preview` (amber PROC rows, levels 0–3)
+- Links from BOM register + BOM-MFG-0003 detail; material BOM/WO seeds aligned to FG-ISO-TANK-26K
+- Masters `bom-iso-a` marked released for tree preview
+
+### How to verify
+1. Open `/manufacturing/bom` → **ISO Tank Traveler Preview**
+2. Confirm yellow PROC rows under shell / dish ends / frame
+3. Jump to material BOM `mfg-bom-003` and WO `WO-2026-0043`
+
+---
+
+## 2026-07-17 — Route Master as reusable template (WO snapshot)
+
+### Why
+Users must not rebuild Cutting → Welding → … on every Work Order.
+
+### Change
+- Route Master = create once, attach to Finished Item / BOM, version Draft/Active/Inactive
+- WO create auto-finds active BOM + Route and **snapshots** operations onto the WO
+- Create form shows a review table of stages before save; override is permission-only
+- WO Operations edits and later master edits do not cross-update (snapshot + version stamped)
+
+### How to verify
+1. Routes → Tank Assembly active for FG-TANK-ISO
+2. New WO → pick item/qty → section “Route Operations” lists stages (no manual add)
+3. Create WO → Operations tab shows snapshot; edit master route → existing WO stages unchanged
+
+---
+
+## 2026-07-17 — Routing / operation stages inside Work Order
+
+### Why
+Shopfloor needs a clear Cutting → Welding → … path without a heavy MES document chain.
+
+### Change
+- Route Master at `/manufacturing/routes` (Draft / Active / Inactive) with operation lines
+- WO create auto-loads active Route + generates stages; override gated by permission
+- WO Detail **Operations** tab: tracker + Start/Hold/Resume/Complete/QC/Job Work actions
+- WO status derived from operations; Shopfloor shows Current / Next Operation
+- Still no Job Card / Material Issue / FG Receipt / Scrap / Rework / standalone QC modules
+
+### How to verify
+1. Open `/manufacturing/routes` — Tank Assembly Route with 5 stages
+2. Create WO for FG-TANK-ISO → Operations tab shows Cutting → … → Final QC
+3. Start / Complete an operation → WO status and Shopfloor current/next update
+
+---
+
+## 2026-07-17 — Keep manufacturing light (no document chain)
+
+### Why
+Heavy ERP chains (Job Card → Material Issue → Operation → FG → Scrap → QC → Rework) overwhelm SME users.
+
+### Change
+- Canonical map is only: BOM → Plan → Work Order → Start/Hold/Complete/QC/Close → Shopfloor + Reports
+- UI copy explicitly rejects the multi-document chain
+- Material/scrap/QC stay WO actions, not primary documents
+
+### How to verify
+1. Control Room / any manufacturing page — pipeline shows five light steps
+2. Banner text mentions “not Job Card → Material Issue → …”
+
+---
+
+## 2026-07-17 — Production Control Room (owner / manager)
+
+### Why
+Owners need one attention board — not to hunt across registers.
+
+### Change
+- New screen `/manufacturing/control-room` with six panels: Today's Plan, Running WOs, Material Shortage, QC Pending, Delayed WOs, Job Work Pending
+- Nav primary: Control Room; `/manufacturing` and `/dashboard` redirect here
+- Execute still opens Work Orders; QC Accept/Reject/Rework available on pending rows
+
+### How to verify
+1. Open `/manufacturing` → lands on Control Room
+2. Six summary chips + matching panels
+3. Click a WO → Work Order detail; QC buttons update demo review
+
+---
+
+## 2026-07-17 — Manufacturing as one production command center
+
+### Why
+The module must feel WO-centric — not a pile of separate ERP documents.
+
+### Change
+- Nav: Command Center → Work Orders → Shopfloor → Plan → BOM → Job Work → Reports → Settings
+- Command map shows canonical pipeline: BOM → Demand → WO → Material → Start → Complete → QC → Close → Reports/Shopfloor
+- Per-screen role line on other pages
+
+### How to verify
+1. Open `/manufacturing/dashboard` — vertical flow with Work Order highlighted
+2. Steps Material → Close are labeled “Inside the Work Order”
+3. Nav shows Work Orders under Command Center
+
+---
+
+## 2026-07-17 — Manufacturing Settings (simple sections)
+
+### Why
+Normal users need a short settings page; advanced MRP/routing must stay hidden.
+
+### Change
+- Sections: General, Work Order, Material, Quality, Job Work, Advanced (collapsed)
+- New toggles: auto BOM/warehouse/QC fill, allow close without QC, production without full material, negative stock warning, allow reject, vendor invoice placeholder
+- Advanced keeps complex options OFF by default
+
+### How to verify
+1. `/manufacturing/settings` — toggle Quick Mode / Auto Consumption → Save
+2. Advanced section starts collapsed
+3. View-only users without `settings.manage` cannot save
+
+---
+
+## 2026-07-17 — Manufacturing Reports (8 cards)
+
+### Why
+Supervisors need simple, export-friendly production reports without a heavy BI UI.
+
+### Change
+- Report cards: WO Status, Daily Production, Material Consumption, Scrap & Rework, QC Pending, Job Work Pending, Delayed WOs, Production Efficiency
+- Shared filters: Date, Item, Status, Warehouse + Export CSV + Print
+- Column sets for WO Status / Daily Production / Material Consumption as specified
+- Demo data from work order + job work stores
+
+### How to verify
+1. `/manufacturing/reports` — open Daily Production → apply date/item filters
+2. Export downloads CSV; Print opens printable table
+3. Material Consumption shows Required / Consumed / Variance / Warehouse
+
+---
+
+## 2026-07-17 — Job Work UI (simple subcontract)
+
+### Why
+Outside processing needs a clear WO-linked flow without accounting complexity.
+
+### Change
+- List columns: JW No, Linked WO, Vendor, Process, Material Sent Date, Sent/Received/Balance, Status, Actions
+- Create form: WO, Vendor, Process, Material to Send, Qty, Expected Return, Rate placeholder, Remarks
+- Detail tabs: Overview, Material Sent, Receipts, Reconciliation, Vendor Invoice Placeholder, Timeline, Documents
+- `materialSentDate` / `materialToSend` / `remarks` on demo JobWork model
+
+### How to verify
+1. `/manufacturing/job-work` — filter by status; open JW-2026-0012
+2. Create Job Work → save draft → Send Material → Receive → Reconcile → Link Invoice → Close
+3. Invoice tab stays placeholder (no AP posting)
+
+---
+
+## 2026-07-17 — Work Order execution drawers
+
+### Why
+Operators need simple right-side drawers for the main WO actions — not cluttered page forms.
+
+### Change
+- Drawers: Check Material, Start Production, Hold, Complete Production, QC Action, Close
+- Hold reasons: Material Shortage, Machine Breakdown, Labour Issue, Quality Issue, Management Hold, Other
+- Close shows final qty / material / QC / cost summary; Confirm Close → read-only
+- Complete supports Auto Consumption toggle
+
+### How to verify
+1. Open WO detail → Check Materials drawer shows shortage + PR suggestion
+2. Start / Hold / Complete drawers capture required fields
+3. QC Action Accept / Reject / Rework; Close Confirm → page read-only
+
+---
+
+## 2026-07-17 — Work Order Detail (execution screen)
+
+### Why
+Supervisors need one powerful but simple screen to run the WO end-to-end.
+
+### Change
+- Header: WO No, item, status, planned/good qty, due, material/QC status, source ref
+- Status actions: Check/Reserve Materials, Start, Hold, Resume, Complete Production, Send to QC, Close, Cancel
+- Stepper: Draft → Ready → In Progress → Completed → [QC Pending] → Closed
+- Tabs: Overview, Materials, Production, Quality, Job Work, Costing, Timeline, Documents
+- `WorkOrderExecutionStepper` uses derived `listStatus` + `qualityRequired`
+
+### How to verify
+1. Open a Ready WO → Start → Complete Production → Close (or Send to QC if quality required)
+2. Materials tab shows required/available/reserved/consumed/shortage
+3. Timeline lists created / checked / started / held / completed / QC / closed events
+
+---
+
+## 2026-07-17 — Work Order Quick Mode create/edit
+
+### Why
+Planners should create WOs with minimal fields; BOM and warehouses auto-fill.
+
+### Change
+- Quick Mode ON by default; Basic Details + auto BOM/materials/warehouse/QC/notes sections
+- System Suggestions side panel (BOM, materials, QC, auto consumption, cost)
+- Actions: Save Draft, Check Materials, Create & Mark Ready
+- `previewWorkOrderMaterials`, `createWorkOrderAndMarkReady`
+
+### How to verify
+1. `/manufacturing/work-orders/new` — pick SO source → qty/dates/line auto-filled
+2. Check Materials shows shortages if any
+3. Create & Mark Ready opens WO detail as Ready when stock OK
+
+---
+
+## 2026-07-17 — Accounting UI: Commercial Commitments (CRM-aligned)
+
+### Why
+Accounting must not treat CRM quotations / Sales Orders as posted financials. Phase 1 SO posting is deferred.
+
+### Change (frontend only)
+- Types + mock seed: `CommercialCommitment`, accounting status display unions
+- Reusable: `CrmSourceDocumentPanel`, `CrmDocumentLink`, `SalesOrderAccountingSummary`, `ExpectedAccountingEntryDrawer`, badges, smart context, table/KPIs
+- Page `/accounting/commercial-commitments` under Receivables workspace tabs
+- Accounting dashboard: Commercial Commitments section (non-posted KPIs → `/crm/sales-orders?status=…`)
+- Receivables / Outstanding: Pending Commercial Value card (excluded from AR KPIs)
+- Financial report banner: posted entries only; CRM pipeline / unbilled SOs excluded
+- CRM Sales Order 360 (`/crm/sales-orders/:id`): Accounting Summary + expected-entry drawer
+- Ledger entry source type optional `crmTrace` for future invoice chain display
+- Nav: Receivables stays highlighted on commercial-commitments route
+
+### How to verify
+1. `/accounting` — Commercial Commitments cards; confirmed SO link opens CRM list
+2. `/accounting/commercial-commitments` — tabs, amber non-posted labels, smart context, expected entry drawer
+3. `/accounting/receivables` — Pending Commercial Value does not change Total Receivables
+4. `/accounting/reports` (Trial Balance / P&L) — banner excludes CRM commercial values
+5. `/crm/sales-orders/:id` — Accounting Summary shows Not posted / Financial Impact None
+
+---
+
+## 2026-07-17 — Work Order register (core list)
+
+### Why
+Work Order is the core manufacturing document — supervisors need a rich filtered register with status chips.
+
+### Change
+- List columns: WO No, Source, Finished Item, Planned/Good Qty, Due, Material, QC, Production Status, Owner/Line
+- Filters + status tabs including Ready / QC Pending / QC Hold
+- Top actions: Create, Import from Plan, View Shopfloor, Export CSV
+- Derived `getWorkOrderListStatus` / QC helpers; color progress bars
+
+### How to verify
+1. `/manufacturing/work-orders` — filter by source, QC, owner/line
+2. Status chips show Ready vs Draft; QC columns for quality WOs
+3. Export downloads CSV; Import opens Production Plan
+
+---
+
+## 2026-07-17 — Production Plan (list / create / detail)
+
+### Why
+Planners need a document to turn demand into draft WOs without mixing in shopfloor execution.
+
+### Change
+- `/manufacturing/production-plan` list (Plan No, date, source, items, qty, WOs, status, owner)
+- New plan form + AI tips; detail with line Create WO and Generate Work Orders
+- Plan sources/statuses; demo store plans with where-used style lines
+
+### How to verify
+1. Open plan list → filter by source/status
+2. New Plan → add lines → Save → Generate Work Orders
+3. AI panel shows due-date / inactive BOM / shortage tips
+
+---
+
+## 2026-07-17 — Simple BOM UI
+
+### Why
+BOM create should be quick for supervisors/planners — not a heavy engineering form.
+
+### Change
+- List: BOM No, Finished Item, Version, Status, Components, Last Updated, Created By + filters
+- Form: header + component table (wastage %, issue Auto/Manual, remarks); Save Draft / Activate / Duplicate / Cost
+- Detail tabs: Overview, Components, Cost Estimate, Where Used, Timeline
+- Types: `autoConsumption`, `issueMethod`, `remarks`; `getBomWhereUsed`
+
+### How to verify
+1. `/manufacturing/bom` — filter and open a row
+2. New BOM — add 2 materials → Save Draft → Activate
+3. Detail tabs show where-used WOs and timeline
+
+---
+
+## 2026-07-17 — Shopfloor View (3 tabs)
+
+### Why
+Supervisors need a simple live production board without a full MES.
+
+### Change
+- `/manufacturing/shopfloor`: Live Board, Machine/Line View, Daily Production Summary
+- Card fields + Start / Hold / Resume / Complete / Send to QC / Close (demo store)
+- `sendWorkOrderToQcDemo`; seed workstations on more WOs
+- Docs: `MANUFACTURING_SIMPLE.md` shopfloor section
+
+### How to verify
+1. Open `/manufacturing/shopfloor` — switch all three tabs
+2. Live Board: Start a draft WO; Hold / Resume; Complete; Send to QC; Close
+3. Machine/Line shows workstation rows; Summary shows 8 KPI cards
+
+---
+
+## 2026-07-17 — Inventory Phase 1 foundation alignment
+
+### Why
+Confirm Inventory & Warehouse Phase 1 (nav, overview, items, stock availability, stock details) against acceptance; close remaining gaps without demoting later-phase movement demos.
+
+### Change
+- `/inventory/stock/:itemId` now uses domain mock `InventoryStockDetailPage` (not legacy Zustand page).
+- `StockDetailsDrawer` tabs: Availability, Warehouses, Batch or Serial, Reservations, Recent Movements, Valuation, Planning.
+- Items Register: Default Warehouse, Reorder Level, Current Cost (permission-gated), row actions menu.
+
+### How to verify
+1. `/inventory` — KPIs drill to stock/items filters; quick actions open movement routes.
+2. `/inventory/items` — tabs, New/Edit/Detail, cost column hidden without `inventory.view_cost`.
+3. `/inventory/stock` — drawer tabs + Full opens domain stock detail.
+
+---
+
+## 2026-07-16 — Hostinger: rust-free Prisma (timer panic fix)
+
+### Why
+Deployed API on Hostinger failed at startup with `PANIC: timer has gone away` — Prisma’s native Rust query engine exceeds shared-hosting process/thread limits.
+
+### Change
+- Prisma **6.19.3** with `engineType = "client"` in `schema.prisma`
+- `@prisma/adapter-mariadb` wired in `src/config/database.ts` (pool limit 5 in prod)
+- Seed/cleanup scripts use shared `prisma` singleton (adapter required)
+- Note in `docs/HOSTING_ERP_DHURANDHARCRM.md`
+
+### How to verify
+- Local: `npm run typecheck`; server starts and `/api/v1/health` shows DB connected
+- Hostinger: rebuild/upload, start `dist/server.js`, confirm no timer panic in logs
+
+### Remaining
+Redeploy host package to production; confirm `/api/v1/health` JSON on erp.dhurandharcrm.com.
+
+---
+
+
 
 ### Why
 Ship demo-FE **Manufacturing & Production** Phase 1: navigation shell, dashboard, BOM register/form/detail with versioning, production plan with WO draft creation, and placeholders for WO/Job Work/Reports/Settings. No backend/Prisma.
@@ -23,6 +400,29 @@ Phase 2+ per `docs/MANUFACTURING_SIMPLE.md`: WO execution (select → confirm qt
 
 ---
 
+## 2026-07-16 — Manufacturing Phases 2–4 (WO, Complete, Job Work, Reports, Settings)
+
+### Why
+Finish the simplified Manufacturing & Production module (demo FE): Work Order as the central screen, complete production inside WO, Job Work subcontracting, reports, and settings.
+
+### Change
+- Phase 2: WO register/new/detail; start/hold/resume; materials availability/reservation; activity timeline
+- Phase 3: Complete Production (good qty), partial output, auto consumption, optional manual issue/return, quality/scrap/rework, close, cost/variance — all in-WO dialogs
+- Phase 4: Job Work register/detail (dispatch/receive/reconcile/invoice link), `/manufacturing/reports`, `/manufacturing/settings` (advanced features off by default)
+- Permissions: `manufacturing.work_orders.*`, `manufacturing.production.*`, `manufacturing.job_work.*`, `manufacturing.reports.*`, `manufacturing.settings.*`
+- Docs: `MANUFACTURING_SIMPLE.md` updated; route baseline refreshed (717 paths)
+
+### How to verify
+- `/manufacturing/work-orders` → New WO from SO → Start → Complete (good qty) → Close
+- `/manufacturing/job-work` → Send → Receive → Reconcile
+- Settings: Automatic Consumption Yes, Job Cards / Operations No
+- `npx tsc -b` / `npm run build` / `npm run test:route-integrity`
+
+### Remaining
+Manufacturing **backend** still deferred by design.
+
+---
+
 ## 2026-07-16 — Manufacturing & Production Phase 1 (shell + dashboard)
 
 ### Why
@@ -43,6 +443,47 @@ Introduce ERPNext-style **Simple Manufacturing & Production** navigation and das
 
 ### Remaining
 Phases 2–6 per `MANUFACTURING_SIMPLE.md` (BOM polish, Production Plan engine, simple WO complete flow, Job Work, Reports/Settings). Backend still deferred by design.
+
+---
+
+## 2026-07-17 — Manufacturing Production Dashboard (manager view)
+
+### Why
+Owners/managers need visual production visibility — planned vs good qty, shortages, QC, job work — without a dense ERP grid.
+
+### Change
+- Route `/manufacturing/dashboard` ( `/manufacturing` redirects here ); nav Dashboard updated.
+- Live aggregates via `getManufacturingControlDashboard()` from WO + materials + QC + job work stores.
+- KPI strip (8): Planned today, Good qty, In progress, Shortage, QC pending, Job work pending, Delayed, Efficiency.
+- Panels: Today's plan table, Live status cards, Material risk, QC Accept/Reject/Rework, Job work snapshot, AI insights.
+- Seed: pending QC reviews on WO-0040 / WO-0035 for demo actions.
+
+### How to verify
+Open http://127.0.0.1:5173/manufacturing/dashboard — KPIs + panels; Accept QC on attention row; Shopfloor CTA.
+
+---
+
+## 2026-07-17 — Manufacturing Shopfloor + AI-assisted UX
+
+### Why
+Indian SME users need a modern production control UI — not SAP-style manufacturing. Work Order stays the only primary execution document; shopfloor needs a touch-friendly board.
+
+### Change
+- Nav: **Shopfloor View** (`/manufacturing/shopfloor`) after Dashboard.
+- Shared UX: `ManufacturingAiAssist`, execution stepper, demo banner, quick-action cards.
+- Dashboard: Quick Mode / auto-consumption chips, AI suggestions, primary Shopfloor CTA.
+- WO create: visual Source → Item & Qty → Confirm stepper + auto-fill assist.
+- WO detail: execution stepper + next-best-action AI strip (Start / Complete / QC / Close stay on WO).
+- Settings defaults unchanged: Quick Mode ON, auto consumption ON, advanced Job Cards OFF.
+
+### How to verify
+1. `/manufacturing` — AI tips + Shopfloor quick card
+2. `/manufacturing/shopfloor` — Start / Complete from lane cards
+3. `/manufacturing/work-orders/new` — stepper + system-filled BOM/warehouses
+4. Open an in-progress WO — Complete Production dialog still on the same page
+
+### Remaining
+No manufacturing backend. Accounting Setup stub unrelated.
 
 ---
 
@@ -315,7 +756,22 @@ Financial Reports (done) → Budgeting & Forecasting → Period Close (done) →
 
 ---
 
-## 2026-07-16 — Period Close & Year-End Closing (frontend UI)
+## 2026-07-17 — Inventory Phase 1 foundation alignment
+
+### Why
+Confirm Inventory & Warehouse Phase 1 (nav, overview, items, stock availability, stock details) against acceptance; close remaining gaps without demoting later-phase movement demos.
+
+### Change
+- `/inventory/stock/:itemId` now uses domain mock `InventoryStockDetailPage` (not legacy Zustand page).
+- `StockDetailsDrawer` tabs: Availability, Warehouses, Batch or Serial, Reservations, Recent Movements, Valuation, Planning.
+- Items Register: Default Warehouse, Reorder Level, Current Cost (permission-gated), row actions menu.
+
+### How to verify
+1. `/inventory` — KPIs drill to stock/items filters; quick actions open movement routes.
+2. `/inventory/items` — tabs, New/Edit/Detail, cost column hidden without `inventory.view_cost`.
+3. `/inventory/stock` — drawer tabs + Full opens domain stock detail.
+
+---
 
 ### Why
 Accounting needed a full month-end / year-end close workspace (checklist, reconciliations, locks, year-end wizard) instead of a placeholder.

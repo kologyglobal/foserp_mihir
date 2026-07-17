@@ -485,6 +485,10 @@ function normalizeSeedPr(raw: Record<string, unknown>): PurchaseRequisition {
     lines,
     attachmentPlaceholders: (raw.attachmentPlaceholders as PurchaseRequisition['attachmentPlaceholders']) ?? [],
     approvalIds: (raw.approvalIds as string[]) ?? [],
+    rfqRequired:
+      raw.rfqRequired !== undefined && raw.rfqRequired !== null
+        ? Boolean(raw.rfqRequired)
+        : true,
     convertedRfqId: (raw.convertedRfqId as string | null) ?? null,
     convertedPoId: (raw.convertedPoId as string | null) ?? null,
     createdBy: String(raw.createdBy ?? ACTOR.buyer.name),
@@ -628,11 +632,11 @@ export const PURCHASE_DOMAIN_REQUISITIONS: PurchaseRequisition[] = (
     id: 'prd-pr-1003',
     documentNumber: 'PR-2526-1003',
     documentDate: '2026-07-08',
-    status: 'draft',
+    status: 'approved',
     location: { ...PURCHASE_DEMO_LOCATION },
     department: 'Stores',
     requester: ACTOR.buyer,
-    approver: null,
+    approver: ACTOR.purchaseHead,
     expectedDeliveryDate: '2026-07-25',
     paymentTerms: 'Net 15',
     deliveryTerms: 'Door Delivery',
@@ -640,6 +644,7 @@ export const PURCHASE_DOMAIN_REQUISITIONS: PurchaseRequisition[] = (
     source: 'reorder',
     priority: 'normal',
     purpose: 'Consumable reorder',
+    rfqRequired: false,
     ...moneyIntra(19950, 0, 0, 0, 18),
     lines: [
       {
@@ -677,11 +682,11 @@ export const PURCHASE_DOMAIN_REQUISITIONS: PurchaseRequisition[] = (
         remarks: '',
       },
     ],
-    approvalIds: [],
+    approvalIds: ['prd-appr-03'],
     convertedRfqId: null,
     convertedPoId: null,
     ...audit(ACTOR.buyer.name, '2026-07-08T08:40:00.000Z'),
-    remarks: '',
+    remarks: 'Preferred vendor known — skip RFQ, create PO after approval',
     attachmentIds: [],
   },
   {

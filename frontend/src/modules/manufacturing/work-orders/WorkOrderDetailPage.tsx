@@ -1,31 +1,55 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { MoreHorizontal } from 'lucide-react'
+import {
+  Ban,
+  CheckCircle2,
+  ClipboardCheck,
+  Pause,
+  Play,
+  Package,
+  ShieldCheck,
+  XCircle,
+} from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { FormField } from '@/components/forms/FormField'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
+import { TableLink } from '@/components/ui/AppLink'
 import { DataTable } from '@/components/tables/DataTable'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
 import {
+  CheckMaterialDrawer,
+  CloseWorkOrderDrawer,
+  CompleteProductionDrawer,
+  HoldWorkOrderDrawer,
+  ManufacturingAiRail,
+  ManufacturingDemoBanner,
+  ManufacturingStickyActionBar,
+  ManufacturingStickyActionSpacer,
+  MfgTouchBtn,
+  QcActionDrawer,
+  ShopfloorStatusChip,
+  StartProductionDrawer,
+  WorkOrderExecutionStepper,
+  WorkOrderOperationsPanel,
+} from '@/components/manufacturing'
+import {
   cancelWorkOrderDemo,
   checkWorkOrderMaterialAvailability,
   closeWorkOrderDemo,
   closeWorkOrderWithDifferenceDemo,
-  completeAndCloseWorkOrderDemo,
   completeProductionQuantityDemo,
   confirmManualMaterialIssueDemo,
   createProductionReworkDemo,
   createPurchaseRequisitionFromShortageDemo,
   createTransferFromShortageDemo,
-  getAutomaticConsumptionPreview,
+  getJobWorkOrders,
   getManualMaterialIssuePreview,
   getMaterialReturnPreview,
   getManufacturingSettings,
-  getProductionCompletionPreview,
   getProductionCostPreview,
   getProductionQualityReview,
   getProductionVariancePreview,
@@ -33,24 +57,31 @@ import {
   getWorkOrderById,
   getWorkOrderClosingPreview,
   getWorkOrderMaterials,
+  getWorkOrderOperations,
   getWorkOrderOutputs,
   holdWorkOrderDemo,
+  holdWorkOrderOperationDemo,
+  markWorkOrderOperationJobWorkDemo,
+  completeWorkOrderOperationDemo,
+  resolveWorkOrderOperationQcDemo,
+  resumeWorkOrderOperationDemo,
+  sendWorkOrderOperationToQcDemo,
+  startWorkOrderOperationDemo,
   recordProductionScrapDemo,
   releaseWorkOrderReservationsDemo,
   reserveWorkOrderMaterialsDemo,
   resumeWorkOrderDemo,
   returnUnusedMaterialDemo,
-  saveProductionProgressDemo,
+  sendWorkOrderToQcDemo,
   startWorkOrderDemo,
   updateProductionQualityResultDemo,
 } from '@/services/manufacturing'
 import type { ManufacturingSettings } from '@/types/manufacturingSettings'
+import type { JobWorkOrder } from '@/types/manufacturingJobWork'
+import type { WorkOrderOperation } from '@/types/manufacturingRoute'
 import type {
-  HoldReason,
-  MaterialConsumptionPreview,
   MaterialIssueLine,
   MaterialReturnLine,
-  ProductionCompletionPreview,
   ProductionCostPreview,
   ProductionOutputEntry,
   ProductionQualityReview,
@@ -62,21 +93,36 @@ import type {
   WorkOrderMaterial,
 } from '@/types/manufacturingWorkOrder'
 import {
-  HOLD_REASON_LABELS,
   SCRAP_REASON_LABELS,
   WO_MATERIAL_STATUS_LABELS,
+  WO_QC_STATUS_LABELS,
   WO_SOURCE_LABELS,
-  WO_STATUS_LABELS,
+  getWorkOrderListStatus,
+  getWorkOrderOwnerLine,
+  getWorkOrderQcStatus,
 } from '@/types/manufacturingWorkOrder'
 import { PRODUCTION_METHOD_LABELS } from '@/types/manufacturing'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate, formatDateTime } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { useManufacturingPermissions } from '@/utils/permissions/manufacturing'
+import { buildWorkOrderAiInsights } from '@/utils/manufacturing/insights'
 import { cn } from '@/utils/cn'
+
+type DetailTab =
+  | 'overview'
+  | 'materials'
+  | 'operations'
+  | 'production'
+  | 'quality'
+  | 'job_work'
+  | 'costing'
+  | 'timeline'
+  | 'documents'
 
 type Dialog =
   | null
+  | 'check'
   | 'start'
   | 'hold'
   | 'resume'
@@ -88,14 +134,32 @@ type Dialog =
   | 'scrap'
   | 'rework'
   | 'quality'
-  | 'cost'
-  | 'more'
+
+const TABS: Array<{ id: DetailTab; label: string }> = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'materials', label: 'Materials' },
+  { id: 'operations', label: 'Operations' },
+  { id: 'production', label: 'Production' },
+  { id: 'quality', label: 'Quality' },
+  { id: 'job_work', label: 'Job Work' },
+  { id: 'costing', label: 'Costing' },
+  { id: 'timeline', label: 'Timeline' },
+  { id: 'documents', label: 'Documents' },
+]
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <div className="text-[11px] font-medium uppercase tracking-wide text-erp-muted">{label}</div>
       <div className="mt-0.5 text-[13px] font-medium text-erp-text">{value ?? '—'}</div>
+    </div>
+  )
+}
+
+function ProgressBar({ pct }: { pct: number }) {
+  return (
+    <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+      <div className="h-full rounded-full bg-erp-primary transition-all" style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
     </div>
   )
 }
@@ -108,12 +172,14 @@ export function WorkOrderDetailPage() {
 
   const [wo, setWo] = useState<WorkOrder | null>(null)
   const [mats, setMats] = useState<WorkOrderMaterial[]>([])
+  const [operations, setOperations] = useState<WorkOrderOperation[]>([])
   const [acts, setActs] = useState<WorkOrderActivity[]>([])
   const [outputs, setOutputs] = useState<ProductionOutputEntry[]>([])
   const [quality, setQuality] = useState<ProductionQualityReview | null>(null)
+  const [jobWorks, setJobWorks] = useState<JobWorkOrder[]>([])
   const [settings, setSettings] = useState<ManufacturingSettings | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'overview' | 'materials' | 'activity'>('overview')
+  const [tab, setTab] = useState<DetailTab>('overview')
   const [dialog, setDialog] = useState<Dialog>(null)
   const [busy, setBusy] = useState(false)
 
@@ -122,18 +188,11 @@ export function WorkOrderDetailPage() {
   const [shift, setShift] = useState('A')
   const [workstation, setWorkstation] = useState('')
   const [remarks, setRemarks] = useState('')
-  const [holdReason, setHoldReason] = useState<HoldReason>('material_shortage')
   const [expectedResume, setExpectedResume] = useState('')
-  const [goodQty, setGoodQty] = useState(1)
-  const [rejectedQty, setRejectedQty] = useState(0)
   const [scrapQty, setScrapQty] = useState(0)
   const [reworkQty, setReworkQty] = useState(0)
-  const [productionDate, setProductionDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [batchNo, setBatchNo] = useState('')
-  const [serialText, setSerialText] = useState('')
-  const [differenceReason, setDifferenceReason] = useState('')
-  const [completionPreview, setCompletionPreview] = useState<ProductionCompletionPreview | null>(null)
-  const [consumption, setConsumption] = useState<MaterialConsumptionPreview | null>(null)
+  const productionDate = new Date().toISOString().slice(0, 10)
+  const differenceReason = ''
   const [closingPreview, setClosingPreview] = useState<WorkOrderClosingPreview | null>(null)
   const [costPreview, setCostPreview] = useState<ProductionCostPreview | null>(null)
   const [variancePreview, setVariancePreview] = useState<ProductionVariancePreview | null>(null)
@@ -143,18 +202,22 @@ export function WorkOrderDetailPage() {
   const [startWarnings, setStartWarnings] = useState<string[]>([])
 
   const readOnly = wo?.status === 'closed' || wo?.status === 'cancelled'
+  const listStatus = wo ? getWorkOrderListStatus(wo) : 'draft'
+  const qcStatus = wo ? getWorkOrderQcStatus(wo) : 'not_required'
 
   const reload = useCallback(async () => {
     if (!workOrderId) return
     setLoading(true)
     try {
-      const [w, m, a, o, q, s] = await Promise.all([
+      const [w, m, a, o, q, s, jws, ops] = await Promise.all([
         getWorkOrderById(workOrderId),
         getWorkOrderMaterials(workOrderId),
         getWorkOrderActivity(workOrderId),
         getWorkOrderOutputs(workOrderId),
         getProductionQualityReview(workOrderId),
         getManufacturingSettings(),
+        getJobWorkOrders(),
+        getWorkOrderOperations(workOrderId),
       ])
       if (!w) {
         notify.error('Work order not found')
@@ -167,11 +230,22 @@ export function WorkOrderDetailPage() {
       setOutputs(o)
       setQuality(q)
       setSettings(s)
-      setGoodQty(Math.max(1, w.remainingQty || 1))
+      setOperations(ops)
+      setJobWorks(jws.filter((j) => j.workOrderId === workOrderId))
+      setSupervisor(w.supervisor ?? '')
+      setWorkstation(w.workstation ?? '')
+      if (perms.canViewCost) {
+        const [c, v] = await Promise.all([
+          getProductionCostPreview(workOrderId),
+          getProductionVariancePreview(workOrderId),
+        ])
+        setCostPreview(c)
+        setVariancePreview(v)
+      }
     } finally {
       setLoading(false)
     }
-  }, [navigate, workOrderId])
+  }, [navigate, perms.canViewCost, workOrderId])
 
   useEffect(() => {
     void reload()
@@ -179,34 +253,38 @@ export function WorkOrderDetailPage() {
 
   useEffect(() => {
     const action = searchParams.get('action') as Dialog
-    if (action && action !== 'more') {
+    if (action) {
       setDialog(action)
       searchParams.delete('action')
       setSearchParams(searchParams, { replace: true })
     }
-    const t = searchParams.get('tab')
-    if (t === 'materials' || t === 'activity' || t === 'overview') setTab(t)
+    const t = searchParams.get('tab') as DetailTab | null
+    if (t && TABS.some((x) => x.id === t)) setTab(t)
   }, [searchParams, setSearchParams])
-
-  useEffect(() => {
-    if (dialog === 'complete' && workOrderId) {
-      void getProductionCompletionPreview(workOrderId, goodQty).then(setCompletionPreview)
-      void getAutomaticConsumptionPreview(workOrderId, goodQty).then(setConsumption)
-    }
-  }, [dialog, goodQty, workOrderId])
 
   useEffect(() => {
     if (dialog === 'close' && workOrderId) void getWorkOrderClosingPreview(workOrderId).then(setClosingPreview)
   }, [dialog, workOrderId])
 
   useEffect(() => {
-    if (dialog === 'cost' && workOrderId && perms.canViewCost) {
-      void Promise.all([getProductionCostPreview(workOrderId), getProductionVariancePreview(workOrderId)]).then(([c, v]) => {
-        setCostPreview(c)
-        setVariancePreview(v)
-      })
-    }
-  }, [dialog, perms.canViewCost, workOrderId])
+    if (dialog !== 'check' || !workOrderId) return
+    void (async () => {
+      setBusy(true)
+      try {
+        const r = await checkWorkOrderMaterialAvailability(workOrderId)
+        if (!r.ok) notify.error('Material check failed')
+        else {
+          r.warnings?.forEach((w) => notify.warning(w))
+          notify.success('Materials checked')
+        }
+        const [w, m] = await Promise.all([getWorkOrderById(workOrderId), getWorkOrderMaterials(workOrderId)])
+        if (w) setWo(w)
+        setMats(m)
+      } finally {
+        setBusy(false)
+      }
+    })()
+  }, [dialog, workOrderId])
 
   useEffect(() => {
     if (dialog === 'issue' && workOrderId) void getManualMaterialIssuePreview(workOrderId).then(setIssueLines)
@@ -220,22 +298,20 @@ export function WorkOrderDetailPage() {
     () => [
       {
         id: 'comp',
-        header: 'Component',
+        header: 'Item',
         cell: ({ row }: { row: { original: WorkOrderMaterial } }) => (
           <div>
-            <div className="font-medium">{row.original.componentItemCode}</div>
+            <div className="font-mono font-medium">{row.original.componentItemCode}</div>
             <div className="text-[11px] text-erp-muted">{row.original.componentItemName}</div>
           </div>
         ),
       },
-      { accessorKey: 'requiredQty', header: 'Required' },
-      { accessorKey: 'availableQty', header: 'Available' },
-      { accessorKey: 'reservedQty', header: 'Reserved' },
-      { accessorKey: 'consumedQty', header: 'Consumed' },
-      { accessorKey: 'returnedQty', header: 'Returned' },
-      { accessorKey: 'shortageQty', header: 'Shortage' },
+      { accessorKey: 'requiredQty', header: 'Required Qty' },
+      { accessorKey: 'availableQty', header: 'Available Qty' },
+      { accessorKey: 'reservedQty', header: 'Reserved Qty' },
+      { accessorKey: 'consumedQty', header: 'Consumed Qty' },
+      { accessorKey: 'shortageQty', header: 'Shortage Qty' },
       { accessorKey: 'warehouseName', header: 'Warehouse' },
-      { accessorKey: 'tracking', header: 'Tracking' },
       {
         accessorKey: 'status',
         header: 'Status',
@@ -246,8 +322,6 @@ export function WorkOrderDetailPage() {
     ],
     [],
   )
-
-  if (loading || !wo) return <LoadingState />
 
   const run = async (fn: () => Promise<{ ok: boolean; error?: string; warnings?: string[] }>, okMsg: string) => {
     setBusy(true)
@@ -268,14 +342,35 @@ export function WorkOrderDetailPage() {
     }
   }
 
-  const primaryAction =
-    !readOnly && wo.status === 'draft' && perms.canStartWo
-      ? { id: 'start', label: 'Start', onClick: () => setDialog('start') }
-      : !readOnly && wo.status === 'in_progress' && perms.canCompleteProduction
-        ? { id: 'complete', label: 'Complete Production', onClick: () => setDialog('complete') }
-        : !readOnly && wo.status === 'on_hold' && perms.canResumeWo
-          ? { id: 'resume', label: 'Resume', onClick: () => setDialog('resume') }
-          : undefined
+  const aiSuggestions = useMemo(() => {
+    if (!wo) return []
+    return buildWorkOrderAiInsights(wo, mats)
+  }, [mats, wo])
+
+  if (loading || !wo) return <LoadingState variant="card" />
+
+  const canCheck = !readOnly && ['draft', 'in_progress', 'on_hold'].includes(wo.status) && perms.canViewMaterials
+  const canReserve = !readOnly && wo.status === 'draft' && perms.canReserveMaterials
+  const canStart = !readOnly && wo.status === 'draft' && perms.canStartWo
+  const canHold = !readOnly && wo.status === 'in_progress' && perms.canHoldWo
+  const canResume = !readOnly && wo.status === 'on_hold' && perms.canResumeWo
+  const canComplete = !readOnly && wo.status === 'in_progress' && perms.canCompleteProduction
+  const canSendQc = !readOnly && ['in_progress', 'completed'].includes(wo.status) && wo.producedQty > 0 && !wo.qualityHold && wo.qualityRequired && (perms.canInspectQuality || perms.canViewQuality)
+  const canQcAction = !readOnly && Boolean(quality?.result === 'pending') && perms.canInspectQuality
+  const canClose = !readOnly && wo.status === 'completed' && !wo.qualityHold && perms.canCloseWo
+  const canCancel = !readOnly && perms.canCancelWo
+
+  const primaryAction = canStart
+    ? { id: 'start', label: 'Start', icon: Play, onClick: () => setDialog('start') }
+    : canResume
+      ? { id: 'resume', label: 'Resume', icon: Play, onClick: () => setDialog('resume') }
+      : canComplete
+        ? { id: 'complete', label: 'Complete Production', icon: CheckCircle2, onClick: () => setDialog('complete') }
+        : canQcAction
+          ? { id: 'qc', label: 'QC Action', icon: ShieldCheck, onClick: () => setDialog('quality') }
+          : canClose
+            ? { id: 'close', label: 'Close', icon: CheckCircle2, onClick: () => setDialog('close') }
+            : undefined
 
   return (
     <OperationalPageShell
@@ -297,142 +392,680 @@ export function WorkOrderDetailPage() {
           sticky
           primaryAction={primaryAction}
           secondaryActions={[
-            ...(!readOnly && wo.status === 'in_progress' && perms.canHoldWo
-              ? [{ id: 'hold', label: 'Put on Hold', onClick: () => setDialog('hold') }]
+            ...(canCheck
+              ? [{ id: 'check', label: 'Check Materials', icon: ClipboardCheck, onClick: () => setDialog('check'), disabled: busy }]
               : []),
-            ...(!readOnly && ['completed', 'in_progress'].includes(wo.status) && perms.canCloseWo
-              ? [{ id: 'close', label: 'Close', onClick: () => setDialog('close') }]
+            ...(canReserve
+              ? [{ id: 'reserve', label: 'Reserve Materials', icon: Package, onClick: () => void run(async () => { const r = await reserveWorkOrderMaterialsDemo(wo.id); return { ok: r.ok, error: r.error } }, 'Materials reserved'), disabled: busy }]
               : []),
-            { id: 'more', label: 'More', icon: MoreHorizontal, onClick: () => setDialog('more') },
+            ...(canHold
+              ? [{ id: 'hold', label: 'Hold', icon: Pause, onClick: () => setDialog('hold') }]
+              : []),
+            ...(canSendQc
+              ? [{ id: 'send-qc', label: 'Send to QC', icon: ShieldCheck, onClick: () => void run(() => sendWorkOrderToQcDemo(wo.id), 'Sent to QC'), disabled: busy }]
+              : []),
+            ...(canQcAction
+              ? [{ id: 'qc', label: 'QC Action', icon: ShieldCheck, onClick: () => setDialog('quality') }]
+              : []),
+            ...(canCancel
+              ? [{ id: 'cancel', label: 'Cancel', icon: Ban, onClick: () => setDialog('cancel') }]
+              : []),
             { id: 'back', label: 'Back', onClick: () => navigate('/manufacturing/work-orders') },
           ]}
         />
       )}
     >
-      <div className="sticky top-0 z-10 mb-4 grid grid-cols-2 gap-2 rounded-lg border border-erp-border bg-erp-surface p-3 shadow-sm sm:grid-cols-4 lg:grid-cols-8">
-        <Field label="Work Order" value={wo.woNumber} />
-        <Field label="Finished Item" value={wo.finishedItemCode} />
-        <Field label="Planned" value={wo.plannedQty} />
-        <Field label="Produced" value={wo.producedQty} />
-        <Field label="Remaining" value={wo.remainingQty} />
-        <Field label="Due Date" value={formatDate(wo.dueDate)} />
-        <Field label="Progress" value={`${wo.progressPercent}%`} />
-        <Field label="Status" value={<StatusDot tone={statusToneFromLabel(wo.status)} label={WO_STATUS_LABELS[wo.status]} />} />
-      </div>
+      <ManufacturingAiRail title="Work Order Insights" suggestions={aiSuggestions}>
+      <div className="space-y-3">
+        <ManufacturingDemoBanner message="Work Order is the center — materials, production, QC, and close stay on this page. Not separate ERP documents." />
 
-      {readOnly ? (
-        <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900" role="status">
-          This work order is {WO_STATUS_LABELS[wo.status]} and read-only.
-        </p>
-      ) : null}
+        <WorkOrderExecutionStepper
+          listStatus={listStatus}
+          qualityRequired={wo.qualityRequired}
+        />
 
-      <div className="mb-3 flex gap-1 border-b border-erp-border" role="tablist">
-        {(['overview', 'materials', 'activity'] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            aria-selected={tab === t}
-            onClick={() => setTab(t)}
-            className={cn(
-              'px-3 py-2 text-[13px] font-medium capitalize',
-              tab === t ? 'border-b-2 border-erp-primary text-erp-primary' : 'text-erp-muted',
-            )}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'overview' ? (
-        <div className="grid gap-3 rounded-lg border border-erp-border p-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Finished Item" value={`${wo.finishedItemCode} — ${wo.finishedItemName}`} />
-          <Field label="Source" value={WO_SOURCE_LABELS[wo.source]} />
-          <Field label="Source Document" value={wo.sourceDocumentNo || '—'} />
-          <Field label="Method" value={PRODUCTION_METHOD_LABELS[wo.productionMethod]} />
-          <Field label="Plant" value={wo.plantName} />
-          <Field label="BOM" value={`${wo.bomNumber} ${wo.bomVersion}`} />
-          <Field label="Material Warehouse" value={wo.materialWarehouseName} />
-          <Field label="FG Warehouse" value={wo.fgWarehouseName} />
-          <Field label="Customer" value={wo.customerName || '—'} />
-          <Field label="Quality" value={wo.qualityRequired ? (wo.qualityHold ? 'Hold' : 'Required') : 'Not required'} />
-        </div>
-      ) : null}
-
-      {tab === 'materials' ? (
-        <div className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" disabled={!perms.canViewMaterials || readOnly} onClick={() => void run(async () => { const r = await checkWorkOrderMaterialAvailability(wo.id); return { ok: r.ok, warnings: 'warnings' in r ? (r as { warnings?: string[] }).warnings : undefined } }, 'Availability checked')}>Check Availability</Button>
-            <Button size="sm" variant="secondary" disabled={!perms.canReserveMaterials || readOnly} onClick={() => void run(async () => { const r = await reserveWorkOrderMaterialsDemo(wo.id); return { ok: r.ok, error: r.error } }, 'Materials reserved')}>Reserve All Available</Button>
-            <Button size="sm" variant="secondary" disabled={!perms.canReserveMaterials || readOnly} onClick={() => void run(() => releaseWorkOrderReservationsDemo(wo.id), 'Reservation released')}>Release Reservation</Button>
-            <Button size="sm" variant="secondary" disabled={!perms.canCreateRequirement || readOnly} onClick={() => void run(async () => createPurchaseRequisitionFromShortageDemo(wo.id), 'PR draft created')}>Create PR Draft</Button>
-            <Button size="sm" variant="secondary" disabled={!perms.canCreateRequirement || readOnly} onClick={() => void run(async () => createTransferFromShortageDemo(wo.id), 'Transfer draft created')}>Create Transfer Draft</Button>
-          </div>
-          <div className="overflow-x-auto"><DataTable columns={materialColumns as never} data={mats} /></div>
-        </div>
-      ) : null}
-
-      {tab === 'activity' ? (
-        <div className="space-y-4">
-          <ol className="relative space-y-3 border-l border-erp-border pl-4">
-            {acts.map((a) => (
-              <li key={a.id}>
-                <div className="text-[12px] text-erp-muted">{formatDateTime(a.at)}</div>
-                <div className="text-[13px] font-medium">{a.action}</div>
-                <div className="text-[12px] text-erp-muted">{a.userName}{a.quantity != null ? ` · Qty ${a.quantity}` : ''}</div>
-                {a.comment ? <p className="text-[12px]">{a.comment}</p> : null}
-              </li>
-            ))}
-          </ol>
-          {outputs.length > 0 ? (
-            <div className="rounded-lg border border-erp-border p-3">
-              <h3 className="text-[13px] font-semibold">Previous output</h3>
-              <ul className="mt-2 divide-y divide-erp-border text-[13px]">
-                {outputs.map((o) => (
-                  <li key={o.id} className="flex justify-between py-2">
-                    <span>{formatDateTime(o.at)} — Good {o.goodQty}, Rejected {o.rejectedQty}, Scrap {o.scrapQty}</span>
-                    <span className="text-erp-muted">{o.userName}</span>
-                  </li>
-                ))}
-              </ul>
+        <div className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="font-mono text-lg font-semibold text-erp-primary">{wo.woNumber}</p>
+              <p className="text-[14px] font-medium text-erp-text">{wo.finishedItemCode} — {wo.finishedItemName}</p>
+              <p className="mt-1 text-[12px] text-erp-muted">
+                Source: {WO_SOURCE_LABELS[wo.source]} · {wo.sourceDocumentNo || '—'}
+              </p>
             </div>
+            <ShopfloorStatusChip status={listStatus} />
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+            <Field label="Status" value={<ShopfloorStatusChip status={listStatus} />} />
+            <Field label="Planned Qty" value={`${wo.plannedQty} ${wo.uom}`} />
+            <Field label="Good Qty" value={`${wo.producedQty} ${wo.uom}`} />
+            <Field label="Due Date" value={formatDate(wo.dueDate)} />
+            <Field
+              label="Material Status"
+              value={(
+                <StatusDot
+                  tone={statusToneFromLabel(wo.materialStatus)}
+                  label={
+                    wo.materialStatus in WO_MATERIAL_STATUS_LABELS
+                      ? WO_MATERIAL_STATUS_LABELS[wo.materialStatus as keyof typeof WO_MATERIAL_STATUS_LABELS]
+                      : wo.materialStatus
+                  }
+                />
+              )}
+            />
+            <Field
+              label="QC Status"
+              value={(
+                <span className="inline-flex rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-800 ring-1 ring-violet-200">
+                  {WO_QC_STATUS_LABELS[qcStatus]}
+                </span>
+              )}
+            />
+            <Field label="Source Reference" value={wo.sourceDocumentNo || '—'} />
+            <Field label="Owner / Line" value={getWorkOrderOwnerLine(wo)} />
+          </div>
+          <div className="mt-3">
+            <div className="flex justify-between text-[11px] text-erp-muted">
+              <span>Progress</span>
+              <span className="tabular-nums">{wo.progressPercent}%</span>
+            </div>
+            <ProgressBar pct={wo.progressPercent} />
+          </div>
+        </div>
+
+        <div className="hidden flex-wrap gap-1.5 lg:flex">
+          {canCheck ? (
+            <button type="button" className="erp-btn erp-btn-secondary h-9 px-3 text-[12px]" disabled={busy} onClick={() => setDialog('check')}>
+              Check Materials
+            </button>
+          ) : null}
+          {canReserve ? (
+            <button type="button" className="erp-btn erp-btn-secondary h-9 px-3 text-[12px]" disabled={busy} onClick={() => void run(async () => { const r = await reserveWorkOrderMaterialsDemo(wo.id); return { ok: r.ok, error: r.error } }, 'Materials reserved')}>
+              Reserve Materials
+            </button>
+          ) : null}
+          {canStart ? (
+            <button type="button" className="erp-btn erp-btn-primary h-9 px-3 text-[12px]" onClick={() => setDialog('start')}>Start</button>
+          ) : null}
+          {canHold ? (
+            <button type="button" className="erp-btn erp-btn-secondary h-9 px-3 text-[12px]" onClick={() => setDialog('hold')}>Hold</button>
+          ) : null}
+          {canResume ? (
+            <button type="button" className="erp-btn erp-btn-primary h-9 px-3 text-[12px]" onClick={() => setDialog('resume')}>Resume</button>
+          ) : null}
+          {canComplete ? (
+            <button type="button" className="erp-btn erp-btn-primary h-9 px-3 text-[12px]" onClick={() => setDialog('complete')}>Complete Production</button>
+          ) : null}
+          {canSendQc ? (
+            <button type="button" className="erp-btn erp-btn-secondary h-9 px-3 text-[12px]" disabled={busy} onClick={() => void run(() => sendWorkOrderToQcDemo(wo.id), 'Sent to QC')}>Send to QC</button>
+          ) : null}
+          {canQcAction ? (
+            <button type="button" className="erp-btn erp-btn-secondary h-9 px-3 text-[12px]" onClick={() => setDialog('quality')}>QC Action</button>
+          ) : null}
+          {canClose ? (
+            <button type="button" className="erp-btn erp-btn-secondary h-9 px-3 text-[12px]" onClick={() => setDialog('close')}>Close</button>
+          ) : null}
+          {canCancel ? (
+            <button type="button" className="erp-btn erp-btn-ghost h-9 px-3 text-[12px] text-rose-700" onClick={() => setDialog('cancel')}>
+              <XCircle className="mr-1 inline h-3.5 w-3.5" /> Cancel
+            </button>
           ) : null}
         </div>
+
+        {/* Mobile / tablet: compact secondary actions only (primary lives in sticky footer) */}
+        <div className="flex flex-wrap gap-2 lg:hidden">
+          {canCheck ? (
+            <MfgTouchBtn variant="secondary" disabled={busy} onClick={() => setDialog('check')} className="flex-none min-w-[44%]">
+              Check Materials
+            </MfgTouchBtn>
+          ) : null}
+          {canReserve ? (
+            <MfgTouchBtn
+              variant="secondary"
+              disabled={busy}
+              className="flex-none min-w-[44%]"
+              onClick={() => void run(async () => { const r = await reserveWorkOrderMaterialsDemo(wo.id); return { ok: r.ok, error: r.error } }, 'Materials reserved')}
+            >
+              Reserve
+            </MfgTouchBtn>
+          ) : null}
+          {canSendQc ? (
+            <MfgTouchBtn
+              variant="secondary"
+              disabled={busy}
+              className="flex-none min-w-[44%]"
+              onClick={() => void run(() => sendWorkOrderToQcDemo(wo.id), 'Sent to QC')}
+            >
+              Send to QC
+            </MfgTouchBtn>
+          ) : null}
+        </div>
+
+        {readOnly ? (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900" role="status">
+            This work order is read-only.
+          </p>
+        ) : null}
+
+        <div role="tablist" aria-label="Work order tabs" className="flex gap-1 overflow-x-auto rounded-xl border border-erp-border bg-white p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                'min-h-11 shrink-0 rounded-lg px-3 py-2 text-[13px] font-semibold transition touch-manipulation sm:min-h-0 sm:py-1.5 sm:text-[12px]',
+                tab === t.id ? 'bg-erp-primary text-white' : 'text-erp-muted hover:bg-slate-50 hover:text-erp-text',
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'overview' ? (
+          <div className="grid gap-4 lg:grid-cols-3">
+            <section className="rounded-xl border border-erp-border bg-white p-4 shadow-sm lg:col-span-2">
+              <h3 className="mb-3 text-sm font-semibold">Basic info</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Finished Item" value={`${wo.finishedItemCode} — ${wo.finishedItemName}`} />
+                <Field label="Source" value={`${WO_SOURCE_LABELS[wo.source]} · ${wo.sourceDocumentNo || '—'}`} />
+                <Field label="Method" value={PRODUCTION_METHOD_LABELS[wo.productionMethod]} />
+                <Field label="BOM" value={`${wo.bomNumber} ${wo.bomVersion}`} />
+                <Field
+                  label="Route snapshot"
+                  value={
+                    wo.routeNo
+                      ? `${wo.routeNo} — ${wo.routeName || ''}${wo.routeVersion ? ` (${wo.routeVersion})` : ''}`
+                      : '— (no route snapshot)'
+                  }
+                />
+                <Field
+                  label="Snapshot at"
+                  value={wo.routeSnapshotAt ? formatDateTime(wo.routeSnapshotAt) : '—'}
+                />
+                <Field label="Current Operation" value={wo.currentOperationName || '—'} />
+                <Field label="Next Operation" value={wo.nextOperationName || '—'} />
+                <Field label="Due Date" value={formatDate(wo.dueDate)} />
+                <Field label="Owner / Line" value={getWorkOrderOwnerLine(wo)} />
+                <Field label="Plant" value={wo.plantName} />
+                <Field label="Customer" value={wo.customerName || '—'} />
+              </div>
+            </section>
+            <section className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-semibold">Quantity summary</h3>
+              <dl className="space-y-2 text-[13px]">
+                <div className="flex justify-between"><dt className="text-erp-muted">Planned</dt><dd className="tabular-nums font-semibold">{wo.plannedQty}</dd></div>
+                <div className="flex justify-between"><dt className="text-erp-muted">Good</dt><dd className="tabular-nums font-semibold">{wo.producedQty}</dd></div>
+                <div className="flex justify-between"><dt className="text-erp-muted">Scrap</dt><dd className="tabular-nums">{wo.scrapQty}</dd></div>
+                <div className="flex justify-between"><dt className="text-erp-muted">Rework</dt><dd className="tabular-nums">{wo.reworkQty}</dd></div>
+                <div className="flex justify-between"><dt className="text-erp-muted">Rejected</dt><dd className="tabular-nums">{wo.rejectedQty}</dd></div>
+                <div className="flex justify-between border-t border-erp-border pt-2"><dt className="text-erp-muted">Remaining</dt><dd className="tabular-nums font-semibold">{wo.remainingQty}</dd></div>
+              </dl>
+              <div className="mt-3">
+                <ProgressBar pct={wo.progressPercent} />
+              </div>
+            </section>
+          </div>
+        ) : null}
+
+        {tab === 'operations' ? (
+          <section className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold">Operation stages (WO snapshot)</h3>
+                <p className="text-[12px] text-erp-muted">
+                  Copied from Route Master at create. Actions here change this Work Order only — the master template stays unchanged.
+                </p>
+              </div>
+              {wo.routeNo ? (
+                <div className="text-right text-[12px]">
+                  <TableLink to={`/manufacturing/routes/${wo.routeId}`}>{wo.routeNo}</TableLink>
+                  {wo.routeVersion ? <p className="text-erp-muted">v {wo.routeVersion}</p> : null}
+                </div>
+              ) : null}
+            </div>
+            <WorkOrderOperationsPanel
+              operations={operations}
+              readOnly={readOnly}
+              busy={busy}
+              onStart={(opId, operator) => void run(() => startWorkOrderOperationDemo(wo.id, opId, operator), 'Operation started')}
+              onHold={(opId) => void run(() => holdWorkOrderOperationDemo(wo.id, opId, 'Held from shopfloor'), 'Operation held')}
+              onResume={(opId) => void run(() => resumeWorkOrderOperationDemo(wo.id, opId), 'Operation resumed')}
+              onComplete={(opId, qty, scrap, rework, rejected) =>
+                void run(
+                  () => completeWorkOrderOperationDemo(wo.id, opId, {
+                    completedQty: qty,
+                    scrapQty: scrap,
+                    reworkQty: rework,
+                    rejectedQty: rejected,
+                  }),
+                  'Operation completed',
+                )}
+              onSendQc={(opId) => void run(() => sendWorkOrderOperationToQcDemo(wo.id, opId), 'Sent to QC')}
+              onQc={(opId, result) => void run(() => resolveWorkOrderOperationQcDemo(wo.id, opId, result), `QC ${result}`)}
+              onJobWork={(opId, action) =>
+                void run(() => markWorkOrderOperationJobWorkDemo(wo.id, opId, action), action === 'send' ? 'Sent to job work' : 'Received from job work')}
+            />
+          </section>
+        ) : null}
+
+        {tab === 'materials' ? (
+          <section className="space-y-3 rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" disabled={!perms.canViewMaterials || readOnly || busy} onClick={() => setDialog('check')}>Check Availability</Button>
+              <Button size="sm" variant="secondary" disabled={!perms.canReserveMaterials || readOnly || busy} onClick={() => void run(async () => { const r = await reserveWorkOrderMaterialsDemo(wo.id); return { ok: r.ok, error: r.error } }, 'Materials reserved')}>Reserve</Button>
+              <Button size="sm" variant="secondary" disabled={!perms.canReserveMaterials || readOnly || busy} onClick={() => void run(() => releaseWorkOrderReservationsDemo(wo.id), 'Reservation released')}>Release</Button>
+              <Button size="sm" variant="secondary" disabled={!perms.canCreateRequirement || readOnly || busy} onClick={() => void run(async () => createPurchaseRequisitionFromShortageDemo(wo.id), 'PR draft created')}>Create PR</Button>
+              <Button size="sm" variant="secondary" disabled={!perms.canCreateRequirement || readOnly || busy} onClick={() => void run(async () => createTransferFromShortageDemo(wo.id), 'Transfer draft created')}>Transfer Draft</Button>
+              {settings?.materialConsumption.manualMaterialIssue ? (
+                <Button size="sm" variant="secondary" disabled={!perms.canIssueMaterials || readOnly} onClick={() => setDialog('issue')}>Issue Material</Button>
+              ) : null}
+            </div>
+            {/* Mobile: material cards */}
+            <ul className="space-y-2 md:hidden">
+              {mats.length === 0 ? (
+                <li className="rounded-lg border border-dashed border-erp-border px-3 py-8 text-center text-[13px] text-erp-muted">
+                  No material lines
+                </li>
+              ) : (
+                mats.map((m) => (
+                  <li
+                    key={m.id}
+                    className={cn(
+                      'rounded-xl border border-erp-border p-3',
+                      m.shortageQty > 0 ? 'border-amber-200 bg-amber-50/50' : 'bg-white',
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-mono text-[14px] font-semibold">{m.componentItemCode}</p>
+                        <p className="text-[12px] text-erp-muted">{m.componentItemName}</p>
+                      </div>
+                      <StatusDot tone={statusToneFromLabel(m.status)} label={WO_MATERIAL_STATUS_LABELS[m.status]} />
+                    </div>
+                    <dl className="mt-2 grid grid-cols-2 gap-2 text-[13px]">
+                      <div>
+                        <dt className="text-erp-muted">Required</dt>
+                        <dd className="font-semibold tabular-nums">{m.requiredQty} {m.uom}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-erp-muted">Available</dt>
+                        <dd className="font-semibold tabular-nums">{m.availableQty}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-erp-muted">Shortage</dt>
+                        <dd className={cn('font-semibold tabular-nums', m.shortageQty > 0 && 'text-amber-800')}>{m.shortageQty}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-erp-muted">Warehouse</dt>
+                        <dd className="font-medium">{m.warehouseName || '—'}</dd>
+                      </div>
+                    </dl>
+                  </li>
+                ))
+              )}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
+              <DataTable columns={materialColumns as never} data={mats} />
+            </div>
+          </section>
+        ) : null}
+
+        {tab === 'production' ? (
+          <section className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-semibold">Production quantities</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Planned Qty" value={wo.plannedQty} />
+                <Field label="Good Qty" value={wo.producedQty} />
+                <Field label="Scrap Qty" value={wo.scrapQty} />
+                <Field label="Rework Qty" value={wo.reworkQty} />
+                <Field label="Rejected Qty" value={wo.rejectedQty} />
+                <Field label="Remaining" value={wo.remainingQty} />
+                <Field label="Start" value={wo.startedAt ? formatDateTime(wo.startedAt) : '—'} />
+                <Field label="End" value={wo.completedAt ? formatDateTime(wo.completedAt) : '—'} />
+                <Field label="Operator / Line" value={getWorkOrderOwnerLine(wo)} />
+                <Field label="Completion notes" value={wo.notes || '—'} />
+              </div>
+              {!readOnly && wo.status === 'in_progress' ? (
+                <Button className="mt-4" onClick={() => setDialog('complete')}>Complete Production</Button>
+              ) : null}
+            </div>
+            <div className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-semibold">Output history</h3>
+              {outputs.length === 0 ? (
+                <p className="text-[13px] text-erp-muted">No production output recorded yet.</p>
+              ) : (
+                <ul className="divide-y divide-erp-border text-[13px]">
+                  {outputs.map((o) => (
+                    <li key={o.id} className="flex justify-between gap-2 py-2">
+                      <span>{formatDateTime(o.at)} · Good {o.goodQty} · Scrap {o.scrapQty} · Rework {o.reworkQty}</span>
+                      <span className="text-erp-muted">{o.userName}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" variant="secondary" disabled={!perms.canRecordScrap || readOnly} onClick={() => setDialog('scrap')}>Record Scrap</Button>
+                <Button size="sm" variant="secondary" disabled={!perms.canManageRework || readOnly} onClick={() => setDialog('rework')}>Record Rework</Button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {tab === 'quality' ? (
+          <section className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+            <Field label="QC Required" value={wo.qualityRequired ? 'Yes' : 'No'} />
+            {!wo.qualityRequired ? (
+              <p className="mt-3 text-[13px] text-erp-muted">QC is not required for this item. Close after Completed.</p>
+            ) : (
+              <div className="mt-4 space-y-3">
+                <p className="text-[13px]">
+                  Current: <strong>{WO_QC_STATUS_LABELS[qcStatus]}</strong>
+                  {quality ? ` · Review ${quality.result}` : ''}
+                </p>
+                {quality && quality.result === 'pending' && perms.canInspectQuality ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={() => setDialog('quality')}>Open QC Action</Button>
+                  </div>
+                ) : canSendQc ? (
+                  <Button disabled={busy} onClick={() => void run(() => sendWorkOrderToQcDemo(wo.id), 'Sent to QC')}>Send to QC</Button>
+                ) : (
+                  <p className="text-[13px] text-erp-muted">No pending QC review.</p>
+                )}
+              </div>
+            )}
+          </section>
+        ) : null}
+
+        {tab === 'job_work' ? (
+          <section className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+            {jobWorks.length === 0 ? (
+              <div className="text-center">
+                <p className="text-[13px] text-erp-muted">No job-work documents linked to this work order.</p>
+                {perms.canCreateJobWork ? (
+                  <Button className="mt-3" variant="secondary" onClick={() => navigate(`/manufacturing/job-work/new?workOrderId=${wo.id}`)}>
+                    Create Job Work
+                  </Button>
+                ) : null}
+              </div>
+            ) : (
+              <table className="erp-table w-full text-[12px]">
+                <thead>
+                  <tr>
+                    <th>JW No</th>
+                    <th>Vendor</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {jobWorks.map((j) => (
+                    <tr key={j.id}>
+                      <td>
+                        <TableLink to={`/manufacturing/job-work/${j.id}`} className="font-semibold">
+                          {j.jwNumber}
+                        </TableLink>
+                      </td>
+                      <td>{j.vendorName}</td>
+                      <td className="capitalize">{j.status.replace(/_/g, ' ')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        ) : null}
+
+        {tab === 'costing' ? (
+          <section className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+            {!perms.canViewCost ? (
+              <p className="text-[13px] text-erp-muted">Cost hidden by permission.</p>
+            ) : costPreview ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <dl className="space-y-2 text-[13px]">
+                  <div className="flex justify-between"><dt className="text-erp-muted">Material</dt><dd className="tabular-nums">{formatCurrency(costPreview.materialCost)}</dd></div>
+                  <div className="flex justify-between"><dt className="text-erp-muted">Labour</dt><dd className="tabular-nums">{formatCurrency(costPreview.labourCost)}</dd></div>
+                  <div className="flex justify-between"><dt className="text-erp-muted">Machine</dt><dd className="tabular-nums">{formatCurrency(costPreview.machineCost)}</dd></div>
+                  <div className="flex justify-between"><dt className="text-erp-muted">Job Work</dt><dd className="tabular-nums">{formatCurrency(costPreview.jobWorkCost)}</dd></div>
+                  <div className="flex justify-between border-t border-erp-border pt-2 font-semibold">
+                    <dt>Total</dt>
+                    <dd className="tabular-nums">{formatCurrency(costPreview.totalProductionCost)}</dd>
+                  </div>
+                  <div className="flex justify-between text-erp-muted">
+                    <dt>Per good unit</dt>
+                    <dd className="tabular-nums">{formatCurrency(costPreview.costPerGoodUnit)}</dd>
+                  </div>
+                </dl>
+                {variancePreview ? (
+                  <dl className="space-y-2 text-[13px]">
+                    <Field label="Planned vs Consumed Material" value={`${variancePreview.plannedMaterial} / ${variancePreview.consumedMaterial}`} />
+                    <Field label="Planned vs Actual Output" value={`${variancePreview.plannedOutput} / ${variancePreview.actualOutput}`} />
+                    <Field label="Yield Diff" value={variancePreview.yieldDiff} />
+                    <Field label="Scrap Diff" value={variancePreview.scrapDiff} />
+                  </dl>
+                ) : null}
+              </div>
+            ) : (
+              <LoadingState variant="card" rows={3} />
+            )}
+          </section>
+        ) : null}
+
+        {tab === 'timeline' ? (
+          <section className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+            {acts.length === 0 ? (
+              <p className="text-center text-[13px] text-erp-muted">No activities yet.</p>
+            ) : (
+              <ol className="space-y-3">
+                {acts.map((a) => (
+                  <li key={a.id} className="flex gap-3 border-b border-erp-border/70 pb-3 last:border-0">
+                    <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-erp-primary" />
+                    <div>
+                      <p className="text-[13px] font-semibold text-erp-text">{a.action}</p>
+                      <p className="text-[12px] text-erp-muted">
+                        {a.userName} · {formatDateTime(a.at)}
+                        {a.quantity != null ? ` · Qty ${a.quantity}` : ''}
+                      </p>
+                      {a.comment ? <p className="text-[12px] text-erp-text">{a.comment}</p> : null}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        ) : null}
+
+        {tab === 'documents' ? (
+          <section className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+            <Field label="Notes" value={wo.notes || 'No notes'} />
+            <p className="mt-4 text-[13px] text-erp-muted">
+              Attachments are demo-only until the manufacturing API ships. Source document: {wo.sourceDocumentNo || '—'}.
+            </p>
+            {wo.salesOrderId ? (
+              <p className="mt-2 text-[13px]">
+                Sales order:{' '}
+                <TableLink to={`/sales/orders/${wo.salesOrderId}`}>{wo.salesOrderNo}</TableLink>
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+
+        <ManufacturingStickyActionSpacer />
+      </div>
+      </ManufacturingAiRail>
+
+      {!readOnly && (canStart || canHold || canResume || canComplete || canQcAction || canClose) ? (
+        <ManufacturingStickyActionBar className="lg:hidden">
+          {canStart ? (
+            <MfgTouchBtn variant="primary" disabled={busy} onClick={() => setDialog('start')}>
+              <Play className="h-4 w-4" /> Start
+            </MfgTouchBtn>
+          ) : null}
+          {canHold ? (
+            <MfgTouchBtn variant="secondary" disabled={busy} onClick={() => setDialog('hold')}>
+              <Pause className="h-4 w-4" /> Hold
+            </MfgTouchBtn>
+          ) : null}
+          {canResume ? (
+            <MfgTouchBtn variant="primary" disabled={busy} onClick={() => setDialog('resume')}>
+              <Play className="h-4 w-4" /> Resume
+            </MfgTouchBtn>
+          ) : null}
+          {canComplete ? (
+            <MfgTouchBtn variant="primary" disabled={busy} onClick={() => setDialog('complete')}>
+              <CheckCircle2 className="h-4 w-4" /> Complete
+            </MfgTouchBtn>
+          ) : null}
+          {canQcAction ? (
+            <MfgTouchBtn variant="primary" disabled={busy} onClick={() => setDialog('quality')}>
+              <ShieldCheck className="h-4 w-4" /> QC Accept
+            </MfgTouchBtn>
+          ) : null}
+          {canClose ? (
+            <MfgTouchBtn variant="secondary" disabled={busy} onClick={() => setDialog('close')}>
+              <CheckCircle2 className="h-4 w-4" /> Close
+            </MfgTouchBtn>
+          ) : null}
+        </ManufacturingStickyActionBar>
       ) : null}
 
-      <Modal open={dialog === 'start'} onClose={() => setDialog(null)} title="Start Production" closeDisabled={busy} footer={(
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDialog(null)} disabled={busy}>Cancel</Button>
-          <Button disabled={busy} onClick={() => void run(async () => { const r = await startWorkOrderDemo({ workOrderId: wo.id, startAt: new Date(startAt).toISOString(), supervisor, shift, workstation, remarks }); setStartWarnings(r.warnings); return { ok: r.ok, error: r.error, warnings: r.warnings } }, 'Production started')}>Start</Button>
-        </div>
-      )}>
-        <div className="grid gap-3">
-          <FormField label="Work Order"><Input id="st-wo" value={wo.woNumber} readOnly /></FormField>
-          <FormField label="Start Date and Time" required><Input id="st-at" type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} /></FormField>
-          <FormField label="Supervisor"><Input id="st-sup" value={supervisor} onChange={(e) => setSupervisor(e.target.value)} /></FormField>
-          <FormField label="Shift"><Input id="st-shift" value={shift} onChange={(e) => setShift(e.target.value)} /></FormField>
-          <FormField label="Workstation"><Input id="st-ws" value={workstation} onChange={(e) => setWorkstation(e.target.value)} /></FormField>
-          <FormField label="Remarks"><Textarea id="st-rm" value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2} /></FormField>
-          {startWarnings.length > 0 ? <ul className="list-disc pl-4 text-[12px] text-amber-800" role="alert">{startWarnings.map((w) => <li key={w}>{w}</li>)}</ul> : null}
-        </div>
-      </Modal>
+      {/* Quick action drawers */}
+      <CheckMaterialDrawer
+        open={dialog === 'check'}
+        onClose={() => setDialog(null)}
+        woNumber={wo.woNumber}
+        materials={mats}
+        busy={busy}
+        canReserve={canReserve}
+        canCreatePr={perms.canCreateRequirement && !readOnly}
+        onReserve={() => void run(async () => {
+          const r = await reserveWorkOrderMaterialsDemo(wo.id)
+          return { ok: r.ok, error: r.error }
+        }, 'Materials reserved')}
+        onCreatePr={() => void run(async () => createPurchaseRequisitionFromShortageDemo(wo.id), 'PR draft created')}
+        onRecheck={() => {
+          setDialog(null)
+          queueMicrotask(() => setDialog('check'))
+        }}
+      />
 
-      <Modal open={dialog === 'hold'} onClose={() => setDialog(null)} title="Put on Hold" footer={(
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDialog(null)}>Cancel</Button>
-          <Button disabled={busy} onClick={() => void run(() => holdWorkOrderDemo({ workOrderId: wo.id, holdAt: new Date().toISOString(), reason: holdReason, expectedResumeDate: expectedResume || undefined, remarks }), 'Work order on hold')}>Hold</Button>
-        </div>
-      )}>
-        <div className="grid gap-3">
-          <FormField label="Reason" required>
-            <Select id="h-reason" value={holdReason} onChange={(e) => setHoldReason(e.target.value as HoldReason)}>
-              {(Object.keys(HOLD_REASON_LABELS) as HoldReason[]).map((r) => <option key={r} value={r}>{HOLD_REASON_LABELS[r]}</option>)}
-            </Select>
-          </FormField>
-          <FormField label="Expected Resume Date"><Input id="h-exp" type="date" value={expectedResume} onChange={(e) => setExpectedResume(e.target.value)} /></FormField>
-          <FormField label="Remarks"><Textarea id="h-rm" value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2} /></FormField>
-        </div>
-      </Modal>
+      <StartProductionDrawer
+        open={dialog === 'start'}
+        onClose={() => setDialog(null)}
+        woNumber={wo.woNumber}
+        busy={busy}
+        warnings={startWarnings}
+        initial={{
+          startAt,
+          operator: supervisor,
+          machineLine: workstation,
+          shift,
+          remarks,
+        }}
+        onConfirm={(v) => {
+          setSupervisor(v.operator)
+          setWorkstation(v.machineLine)
+          setShift(v.shift)
+          setStartAt(v.startAt)
+          setRemarks(v.remarks)
+          void run(async () => {
+            const r = await startWorkOrderDemo({
+              workOrderId: wo.id,
+              startAt: new Date(v.startAt).toISOString(),
+              supervisor: v.operator,
+              shift: v.shift,
+              workstation: v.machineLine,
+              remarks: v.remarks,
+            })
+            setStartWarnings(r.warnings)
+            return { ok: r.ok, error: r.error, warnings: r.warnings }
+          }, 'Production started')
+        }}
+      />
+
+      <HoldWorkOrderDrawer
+        open={dialog === 'hold'}
+        onClose={() => setDialog(null)}
+        woNumber={wo.woNumber}
+        busy={busy}
+        onConfirm={(v) => {
+          setExpectedResume(v.expectedResumeDate)
+          setRemarks(v.remarks)
+          void run(
+            () => holdWorkOrderDemo({
+              workOrderId: wo.id,
+              holdAt: new Date().toISOString(),
+              reason: v.reason,
+              expectedResumeDate: v.expectedResumeDate || undefined,
+              remarks: v.remarks,
+            }),
+            'Work order on hold',
+          )
+        }}
+      />
+
+      <CompleteProductionDrawer
+        open={dialog === 'complete'}
+        onClose={() => setDialog(null)}
+        wo={wo}
+        busy={busy}
+        defaultAutoConsume={settings?.materialConsumption.automaticConsumption ?? wo.consumptionMode === 'automatic'}
+        onConfirm={(v) => {
+          setRemarks(v.remarks)
+          void run(
+            async () => completeProductionQuantityDemo(wo.id, {
+              goodQty: v.goodQty,
+              scrapQty: v.scrapQty,
+              reworkQty: v.reworkQty,
+              rejectedQty: v.rejectedQty,
+              productionDate: v.completionAt.slice(0, 10),
+              comment: v.remarks,
+              autoConsume: v.autoConsume,
+              differenceReason: differenceReason || undefined,
+            }),
+            'Production completed',
+          )
+        }}
+      />
+
+      <QcActionDrawer
+        open={dialog === 'quality'}
+        onClose={() => setDialog(null)}
+        woNumber={wo.woNumber}
+        review={quality}
+        busy={busy}
+        onAction={(action, v) => {
+          void run(
+            () => updateProductionQualityResultDemo(wo.id, {
+              result: action,
+              acceptedQty: v.acceptedQty,
+              rejectedQty: v.rejectedQty,
+              reworkQty: v.reworkQty,
+              remarks: v.remarks,
+              inspector: 'QC User',
+            }),
+            action === 'accepted' ? 'QC Accepted' : action === 'rejected' ? 'QC Rejected' : 'Sent to Rework',
+          )
+        }}
+      />
+
+      <CloseWorkOrderDrawer
+        open={dialog === 'close'}
+        onClose={() => setDialog(null)}
+        wo={wo}
+        preview={closingPreview}
+        cost={costPreview}
+        busy={busy}
+        onConfirm={() => void run(async () => {
+          if (closingPreview && Math.abs(closingPreview.materialDifference) > 0.01) {
+            return closeWorkOrderWithDifferenceDemo(wo.id, differenceReason || 'Approved difference')
+          }
+          return closeWorkOrderDemo(wo.id)
+        }, 'Work order closed')}
+      />
 
       <Modal open={dialog === 'resume'} onClose={() => setDialog(null)} title="Resume Production" footer={(
         <div className="flex justify-end gap-2">
@@ -440,73 +1073,7 @@ export function WorkOrderDetailPage() {
           <Button disabled={busy} onClick={() => void run(() => resumeWorkOrderDemo({ workOrderId: wo.id, resumeAt: new Date().toISOString(), resolutionNote: remarks }), 'Production resumed')}>Resume</Button>
         </div>
       )}>
-        <FormField label="Resolution Note"><Textarea id="rs-note" value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} /></FormField>
-      </Modal>
-
-      <Modal open={dialog === 'complete'} onClose={() => setDialog(null)} title="Complete Production" size="lg" description="Enter good quantity to complete. Everything else is optional." closeDisabled={busy} footer={(
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDialog(null)} disabled={busy}>Cancel</Button>
-          <Button variant="secondary" disabled={busy || !perms.canCompleteProduction} onClick={() => void run(async () => saveProductionProgressDemo(wo.id, { goodQty, rejectedQty, scrapQty, reworkQty, productionDate, batchNo: batchNo || undefined, serialNos: serialText ? serialText.split(/[\s,]+/).filter(Boolean) : undefined, comment: remarks }), 'Progress saved')}>Save Progress</Button>
-          <Button disabled={busy || !perms.canCompleteProduction} onClick={() => void run(async () => completeProductionQuantityDemo(wo.id, { goodQty, rejectedQty, scrapQty, reworkQty, productionDate, differenceReason: differenceReason || undefined, comment: remarks }), 'Quantity completed')}>Complete Quantity</Button>
-          <Button disabled={busy || !perms.canCompleteAndClose} onClick={() => void run(async () => completeAndCloseWorkOrderDemo(wo.id, { goodQty, rejectedQty, scrapQty, reworkQty, productionDate, differenceReason: differenceReason || undefined }), 'Completed and closed')}>Complete and Close</Button>
-        </div>
-      )}>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <FormField label="Good Quantity" required><Input id="cp-good" type="number" min={0.001} step="any" value={goodQty} onChange={(e) => setGoodQty(Number(e.target.value))} className="text-lg" /></FormField>
-          <FormField label="Production Date"><Input id="cp-date" type="date" value={productionDate} onChange={(e) => setProductionDate(e.target.value)} /></FormField>
-          <FormField label="Rejected Quantity"><Input id="cp-rej" type="number" min={0} value={rejectedQty} onChange={(e) => setRejectedQty(Number(e.target.value))} /></FormField>
-          <FormField label="Scrap Quantity"><Input id="cp-scr" type="number" min={0} value={scrapQty} onChange={(e) => setScrapQty(Number(e.target.value))} /></FormField>
-          <FormField label="Rework Quantity"><Input id="cp-rw" type="number" min={0} value={reworkQty} onChange={(e) => setReworkQty(Number(e.target.value))} /></FormField>
-          {wo.batchRequired ? <FormField label="Finished Batch"><Input id="cp-batch" value={batchNo} onChange={(e) => setBatchNo(e.target.value)} /></FormField> : null}
-          {wo.serialRequired ? <FormField label="Serial Numbers"><Textarea id="cp-ser" value={serialText} onChange={(e) => setSerialText(e.target.value)} rows={2} /></FormField> : null}
-          <FormField label="Difference Reason (if under/over)" className="sm:col-span-2"><Input id="cp-diff" value={differenceReason} onChange={(e) => setDifferenceReason(e.target.value)} /></FormField>
-        </div>
-        {completionPreview ? (
-          <dl className="mt-4 grid grid-cols-2 gap-2 rounded-md border border-erp-border p-3 text-[12px] sm:grid-cols-4">
-            <div><dt className="text-erp-muted">Planned</dt><dd>{completionPreview.plannedQty}</dd></div>
-            <div><dt className="text-erp-muted">Previously Produced</dt><dd>{completionPreview.previouslyProduced}</dd></div>
-            <div><dt className="text-erp-muted">Remaining</dt><dd>{completionPreview.remainingQty}</dd></div>
-            <div><dt className="text-erp-muted">FG Warehouse</dt><dd>{completionPreview.fgWarehouseName}</dd></div>
-          </dl>
-        ) : null}
-        {consumption && settings?.materialConsumption.automaticConsumption ? (
-          <div className="mt-3">
-            <h3 className="text-[13px] font-semibold">Material consumption preview</h3>
-            <ul className="mt-1 max-h-40 overflow-auto text-[12px]">
-              {consumption.lines.map((l) => (
-                <li key={l.componentItemCode} className="flex justify-between border-b border-erp-border py-1">
-                  <span>{l.componentItemCode}</span>
-                  <span>{l.requiredForOutput} {l.uom}{l.shortage > 0 ? ` · short ${l.shortage}` : ''}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </Modal>
-
-      <Modal open={dialog === 'close'} onClose={() => setDialog(null)} title="Close Work Order" size="lg" footer={(
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDialog(null)}>Return to Production</Button>
-          <Button disabled={busy} onClick={() => void run(async () => {
-            if (closingPreview && Math.abs(closingPreview.materialDifference) > 0.01) {
-              return closeWorkOrderWithDifferenceDemo(wo.id, differenceReason || 'Approved difference')
-            }
-            return closeWorkOrderDemo(wo.id)
-          }, 'Work order closed')}>Close Work Order</Button>
-        </div>
-      )}>
-        {closingPreview ? (
-          <div className="grid gap-2 text-[13px] sm:grid-cols-2">
-            <Field label="Planned" value={closingPreview.plannedQty} />
-            <Field label="Good" value={closingPreview.goodQty} />
-            <Field label="Material Difference" value={closingPreview.materialDifference} />
-            <Field label="Quality" value={closingPreview.qualityStatus} />
-            {Math.abs(closingPreview.materialDifference) > 0.01 ? (
-              <FormField label="Difference Reason" className="sm:col-span-2"><Input id="cl-diff" value={differenceReason} onChange={(e) => setDifferenceReason(e.target.value)} /></FormField>
-            ) : null}
-            {closingPreview.blockers.length ? <p className="sm:col-span-2 text-red-700" role="alert">{closingPreview.blockers.join('; ')}</p> : null}
-          </div>
-        ) : <LoadingState />}
+        <FormField label="Resolution Note"><Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} /></FormField>
       </Modal>
 
       <Modal open={dialog === 'cancel'} onClose={() => setDialog(null)} title="Cancel Work Order" footer={(
@@ -515,45 +1082,24 @@ export function WorkOrderDetailPage() {
           <Button disabled={busy || !perms.canCancelWo} onClick={() => void run(() => cancelWorkOrderDemo(wo.id, remarks), 'Cancelled')}>Confirm Cancel</Button>
         </div>
       )}>
-        <FormField label="Reason"><Textarea id="cn-rm" value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} /></FormField>
-      </Modal>
-
-      <Modal open={dialog === 'more'} onClose={() => setDialog(null)} title="More actions" size="sm">
-        <div className="flex flex-col gap-1">
-          {[
-            { id: 'issue' as const, label: 'Issue Material', show: Boolean(settings?.materialConsumption.manualMaterialIssue && perms.canIssueMaterials) },
-            { id: 'return' as const, label: 'Return Material', show: perms.canReturnMaterials },
-            { id: 'scrap' as const, label: 'Record Scrap', show: perms.canRecordScrap },
-            { id: 'rework' as const, label: 'Record Rework', show: perms.canManageRework },
-            { id: 'quality' as const, label: 'Quality Review', show: perms.canInspectQuality && Boolean(quality) },
-            { id: 'cost' as const, label: 'View Cost', show: perms.canViewCost },
-            { id: 'cancel' as const, label: 'Cancel', show: perms.canCancelWo && !readOnly },
-          ].filter((x) => x.show).map((x) => (
-            <Button key={x.id} variant="secondary" className="justify-start" onClick={() => setDialog(x.id)}>{x.label}</Button>
-          ))}
-          <p className="mt-2 text-[11px] text-erp-muted">Print Job Card is optional and disabled by default.</p>
-        </div>
+        <FormField label="Reason"><Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} /></FormField>
       </Modal>
 
       <Modal open={dialog === 'issue'} onClose={() => setDialog(null)} title="Material Issue" size="lg" footer={(
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setDialog(null)}>Cancel</Button>
-          <Button disabled={busy} onClick={() => void run(() => confirmManualMaterialIssueDemo(wo.id, issueLines.map((l) => ({ materialId: l.id, issueQty: l.issueQty, batchOrSerial: l.batchOrSerial }))), 'Material issued')}>Confirm Issue Demo</Button>
+          <Button disabled={busy} onClick={() => void run(() => confirmManualMaterialIssueDemo(wo.id, issueLines.map((l) => ({ materialId: l.id, issueQty: l.issueQty, batchOrSerial: l.batchOrSerial }))), 'Material issued')}>Confirm Issue</Button>
         </div>
       )}>
-        {!settings?.materialConsumption.manualMaterialIssue ? (
-          <p className="text-[13px] text-erp-muted">Manual material issue is disabled. Automatic consumption is the default.</p>
-        ) : (
-          <ul className="space-y-2 text-[13px]">
-            {issueLines.map((l, idx) => (
-              <li key={l.id} className="grid gap-2 border-b border-erp-border pb-2 sm:grid-cols-3">
-                <span className="font-medium">{l.componentItemCode} · pending {l.pendingQty}</span>
-                <FormField label="Issue Qty"><Input id={`iss-${l.id}`} type="number" value={l.issueQty} onChange={(e) => { const next = [...issueLines]; next[idx] = { ...l, issueQty: Number(e.target.value) }; setIssueLines(next) }} /></FormField>
-                <FormField label="Batch/Serial"><Input id={`issb-${l.id}`} value={l.batchOrSerial ?? ''} onChange={(e) => { const next = [...issueLines]; next[idx] = { ...l, batchOrSerial: e.target.value }; setIssueLines(next) }} /></FormField>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ul className="space-y-2 text-[13px]">
+          {issueLines.map((l, idx) => (
+            <li key={l.id} className="grid gap-2 border-b border-erp-border pb-2 sm:grid-cols-3">
+              <span className="font-medium">{l.componentItemCode} · pending {l.pendingQty}</span>
+              <FormField label="Issue Qty"><Input type="number" value={l.issueQty} onChange={(e) => { const next = [...issueLines]; next[idx] = { ...l, issueQty: Number(e.target.value) }; setIssueLines(next) }} /></FormField>
+              <FormField label="Batch/Serial"><Input value={l.batchOrSerial ?? ''} onChange={(e) => { const next = [...issueLines]; next[idx] = { ...l, batchOrSerial: e.target.value }; setIssueLines(next) }} /></FormField>
+            </li>
+          ))}
+        </ul>
       </Modal>
 
       <Modal open={dialog === 'return'} onClose={() => setDialog(null)} title="Return Unused Material" size="lg" footer={(
@@ -566,8 +1112,8 @@ export function WorkOrderDetailPage() {
           {returnLines.map((l, idx) => (
             <li key={l.id} className="grid gap-2 border-b border-erp-border pb-2 sm:grid-cols-3">
               <span>{l.componentItemCode} · returnable {l.returnableQty}</span>
-              <FormField label="Return Qty"><Input id={`ret-${l.id}`} type="number" value={l.returnQty} onChange={(e) => { const next = [...returnLines]; next[idx] = { ...l, returnQty: Number(e.target.value) }; setReturnLines(next) }} /></FormField>
-              <FormField label="Reason"><Input id={`retr-${l.id}`} value={l.reason ?? ''} onChange={(e) => { const next = [...returnLines]; next[idx] = { ...l, reason: e.target.value }; setReturnLines(next) }} /></FormField>
+              <FormField label="Return Qty"><Input type="number" value={l.returnQty} onChange={(e) => { const next = [...returnLines]; next[idx] = { ...l, returnQty: Number(e.target.value) }; setReturnLines(next) }} /></FormField>
+              <FormField label="Reason"><Input value={l.reason ?? ''} onChange={(e) => { const next = [...returnLines]; next[idx] = { ...l, reason: e.target.value }; setReturnLines(next) }} /></FormField>
             </li>
           ))}
         </ul>
@@ -580,9 +1126,9 @@ export function WorkOrderDetailPage() {
         </div>
       )}>
         <div className="grid gap-3">
-          <FormField label="Scrap Quantity" required><Input id="sc-qty" type="number" min={0} value={scrapQty} onChange={(e) => setScrapQty(Number(e.target.value))} /></FormField>
-          <FormField label="Reason"><Select id="sc-reason" value={scrapReason} onChange={(e) => setScrapReason(e.target.value as ScrapReason)}>{(Object.keys(SCRAP_REASON_LABELS) as ScrapReason[]).map((r) => <option key={r} value={r}>{SCRAP_REASON_LABELS[r]}</option>)}</Select></FormField>
-          <FormField label="Remarks"><Textarea id="sc-rm" value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2} /></FormField>
+          <FormField label="Scrap Quantity" required><Input type="number" min={0} value={scrapQty} onChange={(e) => setScrapQty(Number(e.target.value))} /></FormField>
+          <FormField label="Reason"><Select value={scrapReason} onChange={(e) => setScrapReason(e.target.value as ScrapReason)}>{(Object.keys(SCRAP_REASON_LABELS) as ScrapReason[]).map((r) => <option key={r} value={r}>{SCRAP_REASON_LABELS[r]}</option>)}</Select></FormField>
+          <FormField label="Remarks"><Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2} /></FormField>
         </div>
       </Modal>
 
@@ -593,47 +1139,11 @@ export function WorkOrderDetailPage() {
         </div>
       )}>
         <div className="grid gap-3">
-          <FormField label="Rework Quantity" required><Input id="rw-qty" type="number" min={0} value={reworkQty} onChange={(e) => setReworkQty(Number(e.target.value))} /></FormField>
-          <FormField label="Expected Completion"><Input id="rw-exp" type="date" value={expectedResume} onChange={(e) => setExpectedResume(e.target.value)} /></FormField>
-          <FormField label="Workstation"><Input id="rw-ws" value={workstation} onChange={(e) => setWorkstation(e.target.value)} /></FormField>
-          <FormField label="Reason / Remarks"><Textarea id="rw-rm" value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2} /></FormField>
+          <FormField label="Rework Quantity" required><Input type="number" min={0} value={reworkQty} onChange={(e) => setReworkQty(Number(e.target.value))} /></FormField>
+          <FormField label="Expected Completion"><Input type="date" value={expectedResume} onChange={(e) => setExpectedResume(e.target.value)} /></FormField>
+          <FormField label="Workstation"><Input value={workstation} onChange={(e) => setWorkstation(e.target.value)} /></FormField>
+          <FormField label="Reason / Remarks"><Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2} /></FormField>
         </div>
-      </Modal>
-
-      <Modal open={dialog === 'quality'} onClose={() => setDialog(null)} title="Quality Review" size="lg">
-        {quality ? (
-          <div className="space-y-3 text-[13px]">
-            <div className="font-medium">{quality.finishedItemCode} · Produced {quality.producedQty} · {quality.result}</div>
-            <div className="flex flex-wrap gap-2">
-              {(['accepted', 'partially_accepted', 'rejected', 'rework', 'accepted_under_deviation'] as const).map((result) => (
-                <Button key={result} size="sm" variant="secondary" disabled={busy || !perms.canInspectQuality || (result === 'accepted_under_deviation' && !perms.canAcceptDeviation)} onClick={() => void run(() => updateProductionQualityResultDemo(wo.id, { result, acceptedQty: result === 'rejected' ? 0 : quality.producedQty, rejectedQty: result === 'rejected' ? quality.producedQty : 0, reworkQty: result === 'rework' ? quality.producedQty : 0, inspector: 'QC User' }), `Quality ${result.replace(/_/g, ' ')}`)}>{result.replace(/_/g, ' ')}</Button>
-              ))}
-            </div>
-          </div>
-        ) : <p className="text-erp-muted">No quality reviews pending.</p>}
-      </Modal>
-
-      <Modal open={dialog === 'cost'} onClose={() => setDialog(null)} title="Cost & Variance Preview" size="lg">
-        {costPreview ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <dl className="space-y-1 text-[13px]">
-              <Field label="Material Cost" value={formatCurrency(costPreview.materialCost)} />
-              <Field label="Labour Cost" value={formatCurrency(costPreview.labourCost)} />
-              <Field label="Machine Cost" value={formatCurrency(costPreview.machineCost)} />
-              <Field label="Job Work Cost" value={formatCurrency(costPreview.jobWorkCost)} />
-              <Field label="Total" value={formatCurrency(costPreview.totalProductionCost)} />
-              <Field label="Cost / Good Unit" value={formatCurrency(costPreview.costPerGoodUnit)} />
-            </dl>
-            {variancePreview ? (
-              <dl className="space-y-1 text-[13px]">
-                <Field label="Planned vs Consumed Material" value={`${variancePreview.plannedMaterial} / ${variancePreview.consumedMaterial}`} />
-                <Field label="Planned vs Actual Output" value={`${variancePreview.plannedOutput} / ${variancePreview.actualOutput}`} />
-                <Field label="Yield Diff" value={variancePreview.yieldDiff} />
-                <Field label="Scrap Diff" value={variancePreview.scrapDiff} />
-              </dl>
-            ) : null}
-          </div>
-        ) : <LoadingState />}
       </Modal>
     </OperationalPageShell>
   )

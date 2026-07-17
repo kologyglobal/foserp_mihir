@@ -154,11 +154,14 @@ export async function createJobWorkOrder(
     itemId: string
     itemCode: string
     itemName: string
+    materialToSend?: string
+    remarks?: string
   },
 ): Promise<{ ok: boolean; jobWork?: JobWorkOrder; error?: string }> {
   await delay()
   jwSeq += 1
   const id = `mfg-jw-${crypto.randomUUID().slice(0, 8)}`
+  const materialLabel = input.materialToSend?.trim() || 'Job work material'
   const jw: JobWorkOrder = {
     id,
     jwNumber: `JW-2026-${String(jwSeq).padStart(4, '0')}`,
@@ -186,6 +189,8 @@ export async function createJobWorkOrder(
     expectedReturnDate: input.expectedReturnDate,
     status: 'draft',
     invoiceStatus: 'none',
+    materialToSend: materialLabel,
+    remarks: input.remarks,
     plantId: input.plantId ?? 'plant-chakan',
     plantName: input.plantName ?? 'Chakan',
     materialWarehouseId: input.materialWarehouseId ?? 'wh-rm',
@@ -203,27 +208,26 @@ export async function createJobWorkOrder(
     updatedAt: now(),
     createdBy: 'Demo User',
   }
-  pushAct(jw, 'Job Work Created')
+  pushAct(jw, 'Job Work Created', { comment: input.remarks })
   orders = [jw, ...orders]
-  // seed one material line from item context
   materials = [
     {
       id: `jwm-${id}-RM`,
       jobWorkId: id,
-      materialItemId: 'item-rm-plate',
-      materialCode: 'RM-MS-PLATE-10MM',
-      materialName: 'MS Plate 10 MM',
-      requiredQty: input.quantity * 100,
-      availableQty: 2000,
+      materialItemId: 'item-rm-jw',
+      materialCode: materialLabel.slice(0, 24).toUpperCase().replace(/\s+/g, '-') || 'JW-MAT',
+      materialName: materialLabel,
+      requiredQty: input.quantity,
+      availableQty: Math.max(input.quantity * 2, 10),
       sentQty: 0,
       additionalSentQty: 0,
       consumedQty: 0,
       returnedQty: 0,
       scrapReturnedQty: 0,
       balanceWithVendor: 0,
-      uom: 'KG',
+      uom: input.uom ?? 'NOS',
       status: 'pending',
-      tracking: 'batch',
+      tracking: 'none',
     },
     ...materials,
   ]
@@ -247,6 +251,16 @@ export async function updateJobWorkOrder(
 export async function getJobWorkMaterials(jobWorkId: string): Promise<JobWorkMaterial[]> {
   await delay()
   return mats(jobWorkId).map((m) => ({ ...m }))
+}
+
+export async function getJobWorkDispatches(jobWorkId: string): Promise<JobWorkDispatch[]> {
+  await delay()
+  return dispatches.filter((d) => d.jobWorkId === jobWorkId).map((d) => ({ ...d, lines: [...d.lines] }))
+}
+
+export async function getJobWorkReceipts(jobWorkId: string): Promise<JobWorkReceipt[]> {
+  await delay()
+  return receipts.filter((r) => r.jobWorkId === jobWorkId).map((r) => ({ ...r }))
 }
 
 export async function dispatchJobWorkMaterialDemo(
@@ -299,9 +313,11 @@ export async function dispatchJobWorkMaterialDemo(
     },
     ...dispatches,
   ]
+  const dispatchAt = input.dispatchAt ?? now()
   orders[idx] = {
     ...jw,
-    sentQty: Math.min(jw.orderedQty, jw.sentQty + 1),
+    sentQty: jw.status === 'draft' ? jw.orderedQty : Math.max(jw.sentQty, 1),
+    materialSentDate: jw.materialSentDate ?? dispatchAt.slice(0, 10),
     status: jw.status === 'draft' ? 'material_sent' : jw.status,
     vendorChallan: input.vendorChallan ?? jw.vendorChallan,
     vehicle: input.vehicle ?? jw.vehicle,

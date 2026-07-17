@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   FileText,
   IndianRupee,
+  Info,
   Landmark,
   Plus,
   Wallet,
@@ -18,14 +19,15 @@ import {
   DynamicsDashboardGrid,
   DynamicsCommandButton,
 } from '../../components/dynamics'
-import { AccountingRoleBar } from '../../components/accounting'
+import { AccountingRoleBar, AccountingStatusBadge } from '../../components/accounting'
 import { TableLink } from '../../components/ui/AppLink'
 import { useAccountingStore } from '../../store/accountingStore'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { computeAgeingBuckets, computeAccountBalance } from '../../utils/accounting/ledgerEngine'
 import { VOUCHER_TYPE_LABELS } from '../../types/accounting'
-import { AccountingStatusBadge } from '../../components/accounting'
+import { getCommercialCommitmentSummary } from '../../data/accounting/commercialCommitmentsSeed'
+import type { CommercialCommitmentSummary } from '../../types/commercialCommitments'
 
 export function AccountingDashboardPage() {
   const navigate = useNavigate()
@@ -37,6 +39,11 @@ export function AccountingDashboardPage() {
   const bankAccounts = useAccountingStore((s) => s.bankAccounts)
   const bankReconciliations = useAccountingStore((s) => s.bankReconciliations)
   const periodCloseChecklists = useAccountingStore((s) => s.periodCloseChecklists)
+  const [commercialSummary, setCommercialSummary] = useState<CommercialCommitmentSummary | null>(null)
+
+  useEffect(() => {
+    void getCommercialCommitmentSummary().then(setCommercialSummary)
+  }, [])
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -148,6 +155,75 @@ export function AccountingDashboardPage() {
       alert={<AccountingRoleBar />}
     >
       <DynamicsDashboardGrid>
+        {commercialSummary ? (
+          <DynamicsDashboardPanel
+            title="Commercial Commitments"
+            actions={
+              <button
+                type="button"
+                className="text-[12px] font-semibold text-erp-primary hover:underline"
+                onClick={() => navigate('/accounting/commercial-commitments')}
+              >
+                View all →
+              </button>
+            }
+          >
+            <p className="mb-3 flex items-start gap-2 text-[12px] text-erp-muted">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              Non-posted commercial value only — excluded from receivables, revenue, GST, and financial reports.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(
+                [
+                  {
+                    label: 'Open Sales Order Value',
+                    value: commercialSummary.openSalesOrdersValue,
+                    helper: `${commercialSummary.openSalesOrdersCount} open orders`,
+                    href: '/crm/sales-orders?status=open',
+                  },
+                  {
+                    label: 'Confirmed Sales Order Value',
+                    value: commercialSummary.confirmedSalesOrdersValue,
+                    helper: `${commercialSummary.confirmedSalesOrdersCount} confirmed orders · Not financially posted`,
+                    href: '/crm/sales-orders?status=confirmed',
+                    tip: 'Confirmed Sales Orders are commercial commitments. Accounting entries will be created only after invoice posting is implemented.',
+                  },
+                  {
+                    label: 'Orders Pending Invoice',
+                    value: commercialSummary.pendingInvoiceValue,
+                    helper: `${commercialSummary.pendingInvoiceCount} orders`,
+                    href: '/accounting/commercial-commitments',
+                  },
+                  {
+                    label: 'Potential Receivable',
+                    value: commercialSummary.potentialReceivable,
+                    helper: 'Confirmed but not invoiced',
+                    href: '/accounting/commercial-commitments',
+                  },
+                ] as const
+              ).map((card) => (
+                <button
+                  key={card.label}
+                  type="button"
+                  title={'tip' in card ? card.tip : undefined}
+                  onClick={() => navigate(card.href)}
+                  className="rounded-md border border-amber-200 bg-amber-50/50 p-3 text-left hover:border-amber-300"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-erp-muted">{card.label}</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-erp-text">
+                    {formatCurrency(card.value)}
+                  </p>
+                  <p className="mt-0.5 text-[10px] font-medium text-amber-900">Non-posted commercial value</p>
+                  <p className="mt-1 text-[11px] text-erp-muted">{card.helper}</p>
+                  {card.href.includes('confirmed') ? (
+                    <p className="mt-2 text-[11px] font-semibold text-erp-primary">View Confirmed Sales Orders →</p>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          </DynamicsDashboardPanel>
+        ) : null}
+
         <DynamicsDashboardPanel title="Recent Vouchers" actions={<span className="dyn-entity-list-meta">{vouchers.length} total</span>} noPadding>
           <table className="erp-table">
             <thead><tr><th>Voucher No</th><th>Type</th><th>Date</th><th>Status</th><th className="text-right">Amount</th></tr></thead>

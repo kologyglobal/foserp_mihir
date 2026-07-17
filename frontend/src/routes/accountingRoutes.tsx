@@ -7,6 +7,7 @@ function LegacyReceivablesCustomerRedirect() {
   return <Navigate to={partyId ? `/accounting/receivables/customer/${partyId}` : '/accounting/receivables/outstanding'} replace />
 }
 import { AccountingDashboardPage } from '@/modules/accounting/AccountingDashboardPage'
+import { CommercialCommitmentsPage } from '@/modules/accounting/CommercialCommitmentsPage'
 import { AccountingPlaceholderPage } from '@/modules/accounting/AccountingPlaceholderPage'
 import { ChartOfAccountsPage } from '@/modules/accounting/ChartOfAccountsPage'
 import { AccountCardPage } from '@/modules/accounting/AccountCardPage'
@@ -207,6 +208,7 @@ export const accountingRouteChildren: RouteObject[] = [
   { path: 'accounting/vouchers/:voucherId/edit', element: <VoucherEditPage /> },
   { path: 'accounting/vouchers/:voucherId', element: <VoucherDetailPage /> },
   { path: 'accounting/receivables', element: <ReceivablesDashboardPage /> },
+  { path: 'accounting/commercial-commitments', element: <CommercialCommitmentsPage /> },
   { path: 'accounting/receivables/customers', element: <CustomerOutstandingPage /> },
   { path: 'accounting/receivables/outstanding', element: <CustomerOutstandingPage /> },
   { path: 'accounting/receivables/invoices', element: <ReceivableInvoicesPage /> },

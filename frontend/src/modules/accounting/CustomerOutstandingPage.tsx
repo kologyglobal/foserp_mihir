@@ -32,6 +32,8 @@ import {
   ReceivablesServiceError,
   saveReceivableView,
 } from '@/services/accounting/receivablesService'
+import { getCommercialCommitmentSummary } from '@/data/accounting/commercialCommitmentsSeed'
+import type { CommercialCommitmentSummary } from '@/types/commercialCommitments'
 import type {
   CustomerCreditStatus,
   CustomerOutstandingSummary,
@@ -101,6 +103,7 @@ export function CustomerOutstandingPage() {
   const [statementOpen, setStatementOpen] = useState(false)
   const [statementCustomerId, setStatementCustomerId] = useState<string>()
   const [statementCustomerName, setStatementCustomerName] = useState<string>()
+  const [commercialSummary, setCommercialSummary] = useState<CommercialCommitmentSummary | null>(null)
 
   useEffect(() => {
     setFilter((f) => ({ ...f, ...filterFromSearchParams(searchParams) }))
@@ -145,6 +148,10 @@ export function CustomerOutstandingPage() {
       signal.cancelled = true
     }
   }, [load, refreshToken])
+
+  useEffect(() => {
+    void getCommercialCommitmentSummary().then(setCommercialSummary)
+  }, [refreshToken])
 
   const sorted = useMemo(() => sortOutstandingRows(rows, sortKey, sortDir), [rows, sortKey, sortDir])
   const paged = useMemo(() => sorted.slice(page * pageSize, page * pageSize + pageSize), [sorted, page])
@@ -314,8 +321,24 @@ export function CustomerOutstandingPage() {
     >
       <ReceivablesWorkspaceTabs active="outstanding" />
 
-      <div className="mt-3">
+      <div className="mt-3 space-y-3">
         <ReceivablesSummaryCards items={kpiItems} />
+        {commercialSummary ? (
+          <Link
+            to="/accounting/commercial-commitments"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5 text-[12px] hover:border-amber-300"
+          >
+            <span>
+              <span className="font-semibold text-amber-900">Pending Commercial Value</span>
+              {' · '}
+              <span className="tabular-nums font-semibold">
+                {formatCurrency(commercialSummary.potentialReceivable)}
+              </span>
+              <span className="text-erp-muted"> confirmed but not invoiced (excluded from outstanding)</span>
+            </span>
+            <span className="font-semibold text-erp-primary">Commercial Commitments →</span>
+          </Link>
+        ) : null}
       </div>
 
       <div className="mb-2 mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-erp-border bg-erp-surface/40 px-3 py-2">

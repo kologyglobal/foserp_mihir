@@ -10,6 +10,7 @@ import { ConvertQuotationToSOAction } from './ConvertQuotationToSOAction'
 import { validateQuotationForPrint } from '../../utils/quotationEngine/validation'
 import { printQuotationDocument, saveQuotationPdfToDms } from '../../utils/quotationEngine/pdfExport'
 import { resolveQuotationPrintLayout } from '../../utils/quotationEngine/printLayout'
+import { notify } from '../../store/toastStore'
 
 interface QuotationPreviewProps {
   documentId: string
@@ -46,7 +47,7 @@ export function QuotationPreview({ documentId }: QuotationPreviewProps) {
       documentId: doc.id,
       customerId: quotation.customerId,
     })
-    if (r.ok) alert('Saved to DMS')
+    if (r.ok) notify.success('Saved to DMS')
   }
 
   return (

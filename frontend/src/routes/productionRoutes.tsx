@@ -37,8 +37,8 @@ export const mrpRouteChildren: RouteObject[] = [
  * Detail / scan pages remain until later phases delete or fold them.
  */
 export const productionRouteChildren: RouteObject[] = [
-  { path: 'production/control-tower', element: <Navigate to="/manufacturing" replace /> },
-  { path: 'production', element: <Navigate to="/manufacturing" replace /> },
+  { path: 'production/control-tower', element: <Navigate to="/manufacturing/control-room" replace /> },
+  { path: 'production', element: <Navigate to="/manufacturing/control-room" replace /> },
   {
     path: 'production/job-cards',
     element: <Navigate to="/manufacturing/work-orders" replace />,

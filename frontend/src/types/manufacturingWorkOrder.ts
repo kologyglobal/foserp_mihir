@@ -10,6 +10,25 @@ export type WorkOrderStatus =
   | 'closed'
   | 'cancelled'
 
+/** Board/list production status (derived from WO + QC/material flags). */
+export type WorkOrderListStatus =
+  | 'draft'
+  | 'ready'
+  | 'in_progress'
+  | 'on_hold'
+  | 'completed'
+  | 'qc_pending'
+  | 'qc_hold'
+  | 'closed'
+  | 'cancelled'
+
+export type WorkOrderQcStatus =
+  | 'not_required'
+  | 'required'
+  | 'pending'
+  | 'hold'
+  | 'cleared'
+
 export type WorkOrderSource =
   | 'sales_order'
   | 'production_plan'
@@ -31,11 +50,9 @@ export type MaterialConsumptionMode = 'automatic' | 'manual_issue'
 export type HoldReason =
   | 'material_shortage'
   | 'machine_breakdown'
-  | 'quality_hold'
-  | 'operator_unavailable'
-  | 'power_failure'
-  | 'tooling_issue'
-  | 'planning_change'
+  | 'labour_issue'
+  | 'quality_issue'
+  | 'management_hold'
   | 'other'
 
 export type ScrapReason =
@@ -324,6 +341,21 @@ export interface WorkOrder {
   createdAt: string
   updatedAt: string
   createdBy: string
+  notes?: string
+  /**
+   * Route Master reference (template). Operations on the WO are a snapshot —
+   * editing the master later does not change this Work Order.
+   */
+  routeId?: string | null
+  routeNo?: string
+  routeName?: string
+  /** Version string copied from Route Master at create/attach time. */
+  routeVersion?: string
+  /** When route operations were snapshotted onto this WO. */
+  routeSnapshotAt?: string
+  /** Derived from operation stages for shopfloor. */
+  currentOperationName?: string
+  nextOperationName?: string
 }
 
 export interface WorkOrderFilter {
@@ -339,15 +371,21 @@ export interface WorkOrderFilter {
   startDateTo?: string
   dueDateFrom?: string
   dueDateTo?: string
-  materialStatus?: string
+  materialStatus?: WorkOrderMaterialStatus | 'not_checked' | ''
   status?: WorkOrderStatus | ''
+  listStatus?: WorkOrderListStatus | ''
+  qcRequired?: boolean | ''
+  ownerLine?: string
   priority?: WorkOrderPriority | ''
   tab?:
     | 'all'
     | 'draft'
+    | 'ready'
     | 'in_progress'
     | 'on_hold'
     | 'completed'
+    | 'qc_pending'
+    | 'qc_hold'
     | 'closed'
     | 'cancelled'
     | 'material_shortage'
@@ -446,6 +484,13 @@ export interface CreateWorkOrderInput {
   qualityRequired?: boolean
   batchRequired?: boolean
   serialRequired?: boolean
+  workstation?: string
+  supervisor?: string
+  notes?: string
+  consumptionMode?: MaterialConsumptionMode
+  routeId?: string | null
+  /** Allow selecting a non-default route (permission-gated in UI). */
+  overrideRoute?: boolean
 }
 
 export const WO_STATUS_LABELS: Record<WorkOrderStatus, string> = {
@@ -455,6 +500,59 @@ export const WO_STATUS_LABELS: Record<WorkOrderStatus, string> = {
   completed: 'Completed',
   closed: 'Closed',
   cancelled: 'Cancelled',
+}
+
+export const WO_LIST_STATUS_LABELS: Record<WorkOrderListStatus, string> = {
+  draft: 'Draft',
+  ready: 'Ready',
+  in_progress: 'In Progress',
+  on_hold: 'On Hold',
+  completed: 'Completed',
+  qc_pending: 'QC Pending',
+  qc_hold: 'QC Hold',
+  closed: 'Closed',
+  cancelled: 'Cancelled',
+}
+
+export const WO_QC_STATUS_LABELS: Record<WorkOrderQcStatus, string> = {
+  not_required: 'Not Required',
+  required: 'QC Required',
+  pending: 'QC Pending',
+  hold: 'QC Hold',
+  cleared: 'QC Cleared',
+}
+
+/** Derive supervisor list status from lifecycle + QC/material flags. */
+export function getWorkOrderListStatus(wo: WorkOrder): WorkOrderListStatus {
+  if (wo.status === 'cancelled') return 'cancelled'
+  if (wo.status === 'closed') return 'closed'
+  if (wo.qualityHold) {
+    if (wo.status === 'on_hold' || wo.holdReason === 'quality_issue') return 'qc_hold'
+    return 'qc_pending'
+  }
+  if (wo.status === 'on_hold') return 'on_hold'
+  if (wo.status === 'in_progress') return 'in_progress'
+  if (wo.status === 'completed') return 'completed'
+  if (wo.status === 'draft') {
+    if (wo.materialStatus === 'available' || wo.materialStatus === 'reserved') return 'ready'
+    return 'draft'
+  }
+  return 'draft'
+}
+
+export function getWorkOrderQcStatus(wo: WorkOrder): WorkOrderQcStatus {
+  if (!wo.qualityRequired) return 'not_required'
+  if (wo.qualityHold) {
+    if (wo.status === 'on_hold' || wo.holdReason === 'quality_issue') return 'hold'
+    return 'pending'
+  }
+  if (wo.status === 'closed' || wo.status === 'completed') return 'cleared'
+  return 'required'
+}
+
+export function getWorkOrderOwnerLine(wo: WorkOrder): string {
+  const parts = [wo.supervisor, wo.workstation].filter(Boolean)
+  return parts.length ? parts.join(' · ') : wo.createdBy || '—'
 }
 
 export const WO_SOURCE_LABELS: Record<WorkOrderSource, string> = {
@@ -483,11 +581,9 @@ export const WO_MATERIAL_STATUS_LABELS: Record<WorkOrderMaterialStatus, string> 
 export const HOLD_REASON_LABELS: Record<HoldReason, string> = {
   material_shortage: 'Material Shortage',
   machine_breakdown: 'Machine Breakdown',
-  quality_hold: 'Quality Hold',
-  operator_unavailable: 'Operator Unavailable',
-  power_failure: 'Power Failure',
-  tooling_issue: 'Tooling Issue',
-  planning_change: 'Planning Change',
+  labour_issue: 'Labour Issue',
+  quality_issue: 'Quality Issue',
+  management_hold: 'Management Hold',
   other: 'Other',
 }
 

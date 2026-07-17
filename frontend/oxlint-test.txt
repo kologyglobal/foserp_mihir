@@ -1,0 +1,10 @@
+﻿node.exe : npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm 
+help npmrc` for supported config options.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...config options.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+src/modules/inventory/items/InventoryItemsListPage.tsx:43:6: warning react-hooks(exhaustive-deps): React Hook useCallback has unnecessary dependency: refreshToken help: Either include it or remove the dependency array.
+src/modules/inventory/items/InventoryItemsListPage.tsx:156:68: warning react-hooks(exhaustive-deps): React Hook useMemo has missing dependencies: 'onDuplicate', and 'onDeactivate' help: Either include it or remove the dependency array.

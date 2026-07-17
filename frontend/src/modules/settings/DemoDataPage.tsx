@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button'
 import { resetDemoData } from '../../demo/resetDemoData'
 import { clearDemoData, validateDemoData } from '../../demo/loadDemoData'
 import { isDemoLoaded } from '../../demo/demoStorage'
+import { systemConfirm } from '../../utils/systemConfirm'
 
 export function DemoDataPage() {
   const [loading, setLoading] = useState(false)
@@ -13,10 +14,14 @@ export function DemoDataPage() {
   const [validation, setValidation] = useState<string | null>(null)
   const demoLoaded = isDemoLoaded()
 
-  function handleReset() {
-    const confirmed = window.confirm(
-      'This will reset all demo data and reload a full connected factory dataset. Continue?',
-    )
+  async function handleReset() {
+    const confirmed = await systemConfirm({
+      title: 'Reset demo data?',
+      description: 'This will reset all demo data and reload a full connected factory dataset. Continue?',
+      confirmLabel: 'Reset & reload',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    })
     if (!confirmed) return
     setLoading(true)
     setMessage(null)
@@ -42,8 +47,14 @@ export function DemoDataPage() {
     setValidation(summary)
   }
 
-  function handleClear() {
-    const confirmed = window.confirm('Clear all local ERP data without reloading demo?')
+  async function handleClear() {
+    const confirmed = await systemConfirm({
+      title: 'Clear local ERP data?',
+      description: 'Clear all local ERP data without reloading demo?',
+      confirmLabel: 'Clear data',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    })
     if (!confirmed) return
     clearDemoData()
     setMessage('Local demo data cleared.')

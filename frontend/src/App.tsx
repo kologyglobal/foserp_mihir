@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router-dom'
 import { router } from './routes'
 import { bootstrapErpStartup, type IntegrityReport } from './bootstrap/erpStartup'
 import { IntegrityBanner } from './components/system/IntegrityBanner'
+import { SystemConfirmDialogHost } from './components/system/SystemConfirmDialogHost'
 import { ToastHost } from './components/ui/ToastHost'
 import { clearErpLocalStorage } from './demo/demoStorage'
 
@@ -70,6 +71,7 @@ function App() {
       {integrity && !integrity.ok && <IntegrityBanner report={integrity} />}
       <RouterProvider router={router} />
       <ToastHost />
+      <SystemConfirmDialogHost />
     </>
   )
 }

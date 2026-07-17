@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Pencil } from 'lucide-react'
+import { Package, Pencil, ShieldOff } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { getItemById, getInventoryAuditTrail, getStockDetails, deactivateItem, duplicateItem } from '@/services/inventory'
 import type { InventoryAuditEntry, InventoryItem, StockDetailsData } from '@/types/inventoryDomain'
@@ -16,6 +17,8 @@ import { TraceabilityDrawer } from '@/components/inventory/TraceabilityDrawer'
 import { BATCH_STATUS_LABELS } from '@/utils/inventoryTraceabilityLabels'
 import { useInventoryPermissions } from '@/utils/permissions/inventory'
 
+type LoadState = 'loading' | 'ready' | 'error'
+
 export function InventoryItemDetailPage() {
   const { id, itemId } = useParams()
   const recordId = id ?? itemId
@@ -24,21 +27,102 @@ export function InventoryItemDetailPage() {
   const [item, setItem] = useState<InventoryItem | null>(null)
   const [stock, setStock] = useState<StockDetailsData | null>(null)
   const [audit, setAudit] = useState<InventoryAuditEntry[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loadState, setLoadState] = useState<LoadState>('loading')
+  const [reloadToken, setReloadToken] = useState(0)
   const [traceOpen, setTraceOpen] = useState(false)
 
   useEffect(() => {
-    if (!recordId) return
-    Promise.all([getItemById(recordId), getStockDetails(recordId), getInventoryAuditTrail(recordId)]).then(([i, s, a]) => {
-      if (!i) { navigate('/inventory/items'); return }
-      setItem(i)
-      setStock(s)
-      setAudit(a)
-      setLoading(false)
-    })
-  }, [recordId, navigate])
+    if (!perms.canViewItems || !recordId) return
+    let cancelled = false
+    setLoadState('loading')
+    setItem(null)
+    setStock(null)
+    setAudit([])
+    Promise.all([getItemById(recordId), getStockDetails(recordId), getInventoryAuditTrail(recordId)])
+      .then(([i, s, a]) => {
+        if (cancelled) return
+        if (!i) {
+          navigate('/inventory/items')
+          return
+        }
+        setItem(i)
+        setStock(s)
+        setAudit(a)
+        setLoadState('ready')
+      })
+      .catch(() => {
+        if (!cancelled) setLoadState('error')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [recordId, navigate, perms.canViewItems, reloadToken])
 
-  if (loading || !item) return <LoadingState variant="card" />
+  if (!perms.canViewItems) {
+    return (
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Inventory & Warehouse"
+        title="Item Details"
+        breadcrumbs={[
+          { label: 'Inventory & Warehouse', to: '/inventory' },
+          { label: 'Items', to: '/inventory/items' },
+          { label: 'Details' },
+        ]}
+        autoBreadcrumbs={false}
+      >
+        <EmptyState
+          icon={ShieldOff}
+          title="Access denied"
+          description="You do not have permission to view inventory items (inventory.items.view)."
+        />
+      </OperationalPageShell>
+    )
+  }
+
+  if (loadState === 'loading') return <LoadingState variant="card" />
+
+  if (loadState === 'error' || !item) {
+    return (
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Inventory & Warehouse"
+        title="Item Details"
+        breadcrumbs={[
+          { label: 'Inventory & Warehouse', to: '/inventory' },
+          { label: 'Items', to: '/inventory/items' },
+          { label: 'Details' },
+        ]}
+        autoBreadcrumbs={false}
+      >
+        <EmptyState
+          icon={Package}
+          title="Could not load item"
+          description="Something went wrong while loading this item. Try again or return to the items register."
+          action={(
+            <div className="flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"
+                onClick={() => setReloadToken((n) => n + 1)}
+              >
+                Retry
+              </button>
+              <button
+                type="button"
+                className="erp-btn erp-btn-secondary h-9 px-3 text-[13px]"
+                onClick={() => navigate('/inventory/items')}
+              >
+                Back to Items
+              </button>
+            </div>
+          )}
+        />
+      </OperationalPageShell>
+    )
+  }
 
   return (
     <OperationalPageShell

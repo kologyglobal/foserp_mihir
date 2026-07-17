@@ -32,6 +32,9 @@ import { formatCompactCurrency, formatCurrency } from '@/utils/formatters/curren
 import { formatDateTime } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
+import { CrmSourceDocumentPanel } from '@/components/accounting/commercial'
+import { listCommercialCommitments } from '@/data/accounting/commercialCommitmentsSeed'
+import type { CommercialCommitment } from '@/types/commercialCommitments'
 
 type CardTab =
   | 'overview'
@@ -72,6 +75,7 @@ export function CustomerReceivableCardPage() {
   const navigate = useNavigate()
   const perms = useReceivablesPermissions()
   const [card, setCard] = useState<CustomerReceivableCard | null>(null)
+  const [commercialForCustomer, setCommercialForCustomer] = useState<CommercialCommitment[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<CardTab>('overview')
   const [collectionOpen, setCollectionOpen] = useState(false)
@@ -82,9 +86,21 @@ export function CustomerReceivableCardPage() {
     if (!customerId) return
     setLoading(true)
     try {
-      setCard(await getCustomerReceivableCard(customerId))
+      const [cardResult, commitments] = await Promise.all([
+        getCustomerReceivableCard(customerId),
+        listCommercialCommitments(),
+      ])
+      setCard(cardResult)
+      setCommercialForCustomer(
+        commitments.filter(
+          (c) =>
+            c.customerId === customerId ||
+            c.customerName === cardResult.customer.customerName,
+        ),
+      )
     } catch {
       setCard(null)
+      setCommercialForCustomer([])
     } finally {
       setLoading(false)
     }
@@ -361,7 +377,73 @@ export function CustomerReceivableCardPage() {
           ) : null}
         </div>
 
-        <aside className="rounded-lg border border-erp-border bg-erp-surface-alt/30 p-4">
+        <aside className="space-y-4">
+          {commercialForCustomer[0] ? (
+            <>
+              <CrmSourceDocumentPanel
+                source={{
+                  customerId: commercialForCustomer[0].customerId,
+                  customerName: commercialForCustomer[0].customerName,
+                  opportunityId: commercialForCustomer[0].opportunityId,
+                  opportunityNo: commercialForCustomer[0].opportunityName,
+                  opportunityStage: commercialForCustomer[0].opportunityStage,
+                  quotationId: commercialForCustomer[0].quotationId,
+                  quotationNo: commercialForCustomer[0].quotationNo,
+                  quotationRevision: commercialForCustomer[0].quotationRevision,
+                  quotationHeaderStatus: commercialForCustomer[0].quotationHeaderStatus,
+                  quotationDocumentStatus: commercialForCustomer[0].quotationDocumentStatus,
+                  customerApprovalStatus: commercialForCustomer[0].customerApprovalStatus,
+                  salesOrderId: commercialForCustomer[0].salesOrderId,
+                  salesOrderNo: commercialForCustomer[0].salesOrderNo,
+                  salesOrderStatus: commercialForCustomer[0].salesOrderStatus,
+                  ownerName: commercialForCustomer[0].ownerName,
+                  accountingStatus: commercialForCustomer[0].accountingStatus,
+                }}
+              />
+              <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-[12px]">
+                <p className="font-semibold text-amber-900">Pending Commercial Value</p>
+                <p className="mt-1 tabular-nums font-semibold">
+                  {formatCurrency(
+                    commercialForCustomer
+                      .filter((c) => c.accountingStatus !== 'posted')
+                      .reduce((s, c) => s + c.commercialValue, 0),
+                  )}
+                </p>
+                <p className="mt-1 text-erp-muted">Not included in posted outstanding.</p>
+                {(commercialForCustomer[0].latestActivityLabel || commercialForCustomer[0].nextFollowUpLabel) && (
+                  <dl className="mt-2 space-y-1 border-t border-amber-200/80 pt-2">
+                    {commercialForCustomer[0].latestActivityLabel ? (
+                      <div>
+                        <dt className="text-erp-muted">Latest activity</dt>
+                        <dd>{commercialForCustomer[0].latestActivityLabel}</dd>
+                      </div>
+                    ) : null}
+                    {commercialForCustomer[0].nextFollowUpLabel ? (
+                      <div>
+                        <dt className="text-erp-muted">Next follow-up</dt>
+                        <dd>
+                          {commercialForCustomer[0].nextFollowUpLabel}
+                          {commercialForCustomer[0].nextFollowUpDue
+                            ? ` · due ${commercialForCustomer[0].nextFollowUpDue}`
+                            : ''}
+                          {commercialForCustomer[0].nextFollowUpStatus
+                            ? ` · ${commercialForCustomer[0].nextFollowUpStatus}`
+                            : ''}
+                        </dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                )}
+                <Link
+                  to="/accounting/commercial-commitments"
+                  className="mt-2 inline-block font-semibold text-erp-primary hover:underline"
+                >
+                  View Commercial Commitments →
+                </Link>
+              </div>
+            </>
+          ) : null}
+          <div className="rounded-lg border border-erp-border bg-erp-surface-alt/30 p-4">
           <h3 className="mb-3 text-[13px] font-semibold">Fact box</h3>
           <dl className="space-y-3">
             <Field label="Contact" value={`${customer.contactPerson} · ${customer.mobile}`} />
@@ -380,6 +462,7 @@ export function CustomerReceivableCardPage() {
             <Field label="Salesperson" value={customer.salesperson} />
             <Field label="Collection owner" value={customer.collectionOwner} />
           </dl>
+        </div>
         </aside>
       </div>
 

@@ -26,7 +26,7 @@ import { ErpCardSection } from '../../../components/erp/card-form'
 import { useMasterStore } from '../../../store/masterStore'
 import { resolveMaybeId, resolveMaybeVoid } from '../../../store/storeAction'
 import { formatApiError } from '../../../services/api/apiErrors'
-import { notifyMasterSaved } from '../../../store/toastStore'
+import { notify, notifyMasterSaved } from '../../../store/toastStore'
 import { useBomStore } from '../../../store/bomStore'
 import { useRoutingStore } from '../../../store/routingStore'
 import { useLeafCategories, useActiveUoms, useEnrichedItems } from '../../../hooks/useMasterLists'
@@ -144,7 +144,7 @@ export function ItemListPage() {
 
   async function handleExport() {
     if (!isApiMode()) {
-      window.alert('Export downloads the current register from the tenant database in API mode.')
+      notify.info('Export downloads the current register from the tenant database in API mode.')
       return
     }
     try {
@@ -153,7 +153,7 @@ export function ItemListPage() {
         status: status === 'all' ? undefined : status === 'active' ? 'ACTIVE' : 'INACTIVE',
       })
     } catch (err) {
-      window.alert(formatApiError(err))
+      notify.error(formatApiError(err))
     }
   }
 

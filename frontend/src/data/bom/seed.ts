@@ -1,5 +1,9 @@
 import type { BomHeader, BomLine } from '../../types/bom'
 import { seedCategories, seedItems } from '../masters/seed'
+import {
+  isoTravelerMastersBomHeader,
+  isoTravelerMastersBomLines,
+} from './isoTravelerBomSeed'
 
 const now = () => new Date().toISOString()
 const ts = now()
@@ -80,34 +84,16 @@ export const seedBomHeaders: BomHeader[] = [
     createdAt: ts,
     updatedAt: ts,
   },
-  {
-    id: 'bom-iso-a',
-    bomNo: 'BOM-ISO26K-001',
-    productId: 'prod-iso',
-    revision: 'Rev-A',
-    description: '26 KL ISO Tank — Standard BOM',
-    status: 'submitted',
-    previousRevisionId: null,
-    effectiveFrom: '2026-05-01',
-    approvedBy: null,
-    approvedAt: null,
-    submittedAt: '2026-06-20T11:00:00Z',
-    submittedBy: 'Kavita Rao',
-    totalCost: 0,
-    createdAt: ts,
-    updatedAt: ts,
-  },
+  isoTravelerMastersBomHeader,
 ]
 
 export const seedBomLines: BomLine[] = [
-  // 45 M3 Bulker — Running Gear → Axle, Suspension
   line('bl-b-a-20', 'bom-bulker-a', null, 'item-sa-run-gear', 'assembly', 1, 0, 'make', 21, 0, 20),
   line('bl-b-a-21', 'bom-bulker-a', 'bl-b-a-20', 'item-bo-axl', 'component', 1, 0, 'buy', 21, 485000, 21),
   line('bl-b-a-22', 'bom-bulker-a', 'bl-b-a-20', 'item-bo-susp', 'component', 1, 0, 'buy', 21, 125000, 22),
   line('bl-b-a-23', 'bom-bulker-a', 'bl-b-a-20', 'item-bo-tyre', 'component', 12, 0, 'buy', 7, 22500, 23),
   line('bl-b-a-24', 'bom-bulker-a', 'bl-b-a-20', 'item-bo-rim', 'component', 12, 0, 'buy', 7, 8200, 24),
 
-  // Tank Assembly → Shell Plate (MS Plate), Pipe
   line('bl-b-a-10', 'bom-bulker-a', null, 'item-sa-tank-asm', 'assembly', 1, 0, 'make', 30, 0, 10),
   line('bl-b-a-11', 'bom-bulker-a', 'bl-b-a-10', 'item-rm-plt', 'component', 4200, 5, 'buy', 10, 68.5, 11, { issueWarehouseId: 'wh-rm-main' }),
   line('bl-b-a-12', 'bom-bulker-a', 'bl-b-a-10', 'item-rm-pipe', 'component', 48, 3, 'buy', 10, 1850, 12, { issueWarehouseId: 'wh-rm-main' }),
@@ -128,15 +114,6 @@ export const seedBomLines: BomLine[] = [
   line('bl-b-b-23', 'bom-bulker-b', 'bl-b-b-20', 'item-bo-tyre', 'component', 14, 0, 'buy', 7, 22500, 23),
   line('bl-b-b-24', 'bom-bulker-b', 'bl-b-b-20', 'item-bo-rim', 'component', 14, 0, 'buy', 7, 8200, 24),
 
-  line('bl-i-a-10', 'bom-iso-a', null, 'item-sa-tank-asm', 'assembly', 1, 0, 'make', 45, 0, 10),
-  line('bl-i-a-11', 'bom-iso-a', 'bl-i-a-10', 'item-rm-plt', 'sub_assembly', 6800, 5, 'buy', 10, 68.5, 11),
-  line('bl-i-a-12', 'bom-iso-a', 'bl-i-a-10', 'item-rm-pipe', 'component', 60, 3, 'buy', 10, 1850, 12),
-  line('bl-i-a-13', 'bom-iso-a', 'bl-i-a-10', 'item-bo-valve', 'component', 2, 0, 'buy', 14, 28500, 13),
-
-  line('bl-i-a-20', 'bom-iso-a', null, 'item-sa-paint', 'assembly', 1, 0, 'subcontract', 5, 0, 20),
-  line('bl-i-a-21', 'bom-iso-a', 'bl-i-a-20', 'item-rm-primer', 'component', 60, 10, 'buy', 5, 285, 21),
-
-  line('bl-i-a-30', 'bom-iso-a', null, 'item-sa-run-gear', 'assembly', 1, 0, 'make', 21, 0, 30),
-  line('bl-i-a-31', 'bom-iso-a', 'bl-i-a-30', 'item-bo-axl', 'component', 1, 0, 'buy', 21, 485000, 31),
-  line('bl-i-a-32', 'bom-iso-a', 'bl-i-a-30', 'item-bo-susp', 'component', 1, 0, 'buy', 21, 125000, 32),
+  // 26 KL ISO Tank — created from traveler preview data
+  ...isoTravelerMastersBomLines,
 ]

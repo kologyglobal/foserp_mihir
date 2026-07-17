@@ -38,6 +38,7 @@ import { previewNextCode, validateUniqueActiveEntity, adminResetSeries } from '.
 import { canCodeSeriesPermission, CODE_SERIES_PERMISSION_LABELS } from '../../../utils/codeSeriesPermissions'
 import { getSessionUser } from '../../../utils/permissions'
 import { EnterpriseMasterWorkspace, MasterForm, MasterStickyFooter } from '../shared/EnterpriseMasterShell'
+import { notify } from '../../../store/toastStore'
 
 const schema = z.object({
   seriesCode: z.string().min(1).max(20),
@@ -234,7 +235,7 @@ export function CodeSeriesFormPage() {
   function save(mode: 'default' | 'new' | 'close' = 'default') {
     void handleSubmit((data) => {
       if (data.isActive && !validateUniqueActiveEntity(data.entityType as CodeSeriesEntityType, id)) {
-        window.alert('Another active series already exists for this entity type.')
+        notify.warning('Another active series already exists for this entity type.')
         return
       }
       const user = getSessionUser().name

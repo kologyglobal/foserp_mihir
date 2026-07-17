@@ -265,7 +265,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Description | Incremental backend per module |
 | Reason | **Accepted deferral** — large scope; demo frontend may exist. Not a CRM funnel gap (report G3). |
 | Dependencies | Purchase, SO Phase 1 |
-| Next step | Module-by-module planning when prioritized. Manufacturing FE: **Phase 1 planning foundation shipped** 2026-07-16 (dashboard, BOM, production plan, placeholders); Phases 2–6 remain demo FE before any production API (`docs/MANUFACTURING_SIMPLE.md`). |
+| Next step | Module-by-module planning when prioritized. Manufacturing FE: **Phases 1–6 + Route/Operations demo shipped** (Control Room, shopfloor, BOM, routes, plan, WO ops stages, job work, reports, settings) — production API still deferred (`docs/MANUFACTURING_SIMPLE.md`). |
 | Test required | Per-module production-ready scripts |
 | Status | open (accepted deferral) |
 
@@ -274,12 +274,12 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Field | Value |
 |-------|-------|
 | Module | Manufacturing & Production |
-| Description | ERPNext-style simple manufacturing: BOM → Production Plan → Work Order (select → confirm qty → complete inside WO) → Job Work → Reports/Settings |
+| Description | ERPNext-style simple manufacturing: BOM → Route → Plan → Work Order (ops stages inside WO) → Job Work → Reports/Settings |
 | Reason | Replace complex Production nav with a simpler operator flow; demo FE only until backend phase |
 | Dependencies | None for FE phases |
-| Next step | Phase 2 BOM polish / Phase 3 Production Plan / Phase 4 Simple Work Order (see `MANUFACTURING_SIMPLE.md`) |
+| Next step | Manufacturing **backend** when prioritized; FE polish/smoke scripts optional |
 | Test required | Route integrity + typecheck; later phase-specific smoke scripts |
-| Status | Phase 1 **done** (2026-07-16); Phases 2–6 open |
+| Status | Phases 1–6 + Route/Operations **done** (2026-07-17); manufacturing backend still deferred |
 
 ### P3-4: Attachment cloud storage
 
@@ -315,7 +315,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Dependencies | None — mock Promise services; legacy `accountingStore` still used by dashboard KPIs |
 | Next step | Accounting Setup & Controls; later swap mock services for Node/MySQL API |
 | Test required | Demo script per screen once built; still UI-only (no finance backend) |
-| Status | open (Budgeting & Forecasting FE done 2026-07-16; Accounting Setup remains) |
+| Status | open (Budgeting & Forecasting FE done 2026-07-16; Commercial Commitments FE done 2026-07-17 — commercial vs posted financials; Accounting Setup remains) |
 
 ### P3-6: Commercial terms single source
 

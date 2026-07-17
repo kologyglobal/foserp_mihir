@@ -76,17 +76,24 @@ All require auth + tenant context + appropriate `crm.*` permission.
 | `/leads/:id/qualify` | POST | `crm.lead.qualify` |
 | `/leads/:id/disqualify` | POST | `crm.lead.qualify` |
 | `/leads/:id/convert` | POST | `crm.lead.convert` — requires qualified; 422 if not |
-| `/leads/bulk-assign` | POST | `crm.lead.assign` |
+| `/leads/:id/change-stage` | POST | Change lead stage |
+| `/leads/:id/status-history` \| `assignment-history` | GET | Audit trails |
+| `/leads/bulk-assign` \| `bulk-status` \| `bulk-archive` \| `bulk-restore` | POST | Bulk ops |
 | `/activities` | GET, POST | `crm.activity.*` |
 | `/activities/:id` | GET, PATCH, DELETE | |
 | `/activities/:id/complete` | POST | `crm.activity.complete` |
-| `/pipelines` | GET | `crm.pipeline.view` |
 | `/opportunities` | GET, POST | `crm.opportunity.*` |
 | `/opportunities/:id` | GET, PATCH, DELETE | |
-| `/opportunities/:id/win` | POST | `crm.opportunity.close` |
-| `/opportunities/:id/lose` | POST | `crm.opportunity.close` |
+| `/opportunities/:id/win` \| `lose` \| `reopen` | POST | `crm.opportunity.close` |
+| `/opportunities/:id/assign` \| `move-stage` | POST | Assign / stage transition |
+| `/opportunities/:id/*-history` | GET | stage / assignment / amount / status history |
 | `/follow-ups` | GET, POST | `crm.follow_up.*` |
 | `/follow-ups/:id` | GET, PATCH, DELETE | |
+| `/follow-ups/:id/complete` \| `reschedule` \| `snooze` \| `cancel` | POST | Follow-up lifecycle |
+| `/pipelines` | GET, POST | `crm.pipeline.view` / `.manage` |
+| `/pipelines/:id` | GET, PATCH, DELETE | |
+| `/imports/{companies\|contacts\|leads}` | POST | `crm.import.execute` |
+| `/imports/…/template` | GET | `crm.import.view` — CSV template |
 | `/quotations` | GET, POST | `crm.quotation.view` / `.create` |
 | `/quotations/:id` | GET, PATCH, DELETE | `.view` / `.update` / `.delete` |
 | `/quotations/:id/revisions` | POST | `crm.quotation.update` |
@@ -99,13 +106,14 @@ All require auth + tenant context + appropriate `crm.*` permission.
 | `/quotation-templates` | GET, POST | `crm.quotation.view` / `.create` |
 | `/quotation-templates/:id` | GET, PATCH, DELETE | |
 | `/quotation-templates/:id/duplicate` | POST | `crm.quotation.create` |
-| `/sales-orders` | GET | `crm.sales_order.view` — list (from conversion) |
-| `/sales-orders/:id` | GET | `crm.sales_order.view` |
-| `/imports/:entity` | POST | `crm.import.execute` |
+| `/sales-orders` | GET, POST | `crm.sales_order.view` / `.create` — list + draft create |
+| `/sales-orders/:id` | GET, PATCH, DELETE | Draft update/delete when status open |
+| `/sales-orders/:id/confirm` \| `close` | POST | Confirm / close lifecycle |
 | `/exports/:resource` | GET (CSV blob) | `crm.export.execute` |
 | `/dashboard/metrics` | GET | `crm.dashboard.view` — query `?period=month`; response `data` includes KPIs, `panels`, and `charts` (pipeline/funnel/trend/urgency/owner series) |
 | `/reports?reportId=` | GET | `crm.report.view` |
-| `/search` | GET | `crm.search.view` |
+| `/search` | GET | `crm.search.view` — optional `limit` 1–50 (default 25) |
+| `/masters/sync` | GET | Sync/seed CRM masters |
 | `/masters/:kind` | GET, POST | `crm.master.*` |
 | `/masters/:kind/lookup` | GET | Active options for dropdowns |
 | `/masters/:kind/:id` | GET, PATCH, DELETE | |
@@ -140,6 +148,9 @@ Registry resources: `countries`, `states`, `cities`, `uom`, `warehouses`, `locat
 
 Items: `/masters/items` — dedicated controller.  
 Vendors: `/masters/vendors` — dedicated controller.
+
+Master CSV import: `/masters/imports/{items|vendors|hsn-sac}` (+ `/template` GET).  
+Master CSV export: `/masters/exports/{items|vendors|hsn-sac}`.
 
 ## Response format
 
@@ -225,7 +236,15 @@ Do not change protected lifecycle fields through generic PATCH. Use dedicated en
 
 ## Lookup endpoints
 
-Lightweight read-only lists under `/t/:tenantSlug/lookups/` — used by transactional forms (`useItemLookup`, `useVendorLookup`). Cached via `lookupCache.ts`.
+Lightweight read-only lists under `/t/:tenantSlug/lookups/`:
+
+| Path | Notes |
+|------|--------|
+| `/lookups/{resource}` | Registry slugs only (`countries`, `states`, `cities`, `uom`, `warehouses`, `locations`, `item-categories`, `hsn-sac`, `gst-groups`, `gst-rates`, `products`) |
+| `/lookups/items` | Dedicated item dropdown lookup |
+| `/lookups/vendors` | Dedicated vendor dropdown lookup |
+
+Used by transactional forms (`useItemLookup`, `useVendorLookup`). Cached via `lookupCache.ts`.
 
 ## Frontend client usage
 

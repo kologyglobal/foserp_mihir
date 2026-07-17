@@ -4,10 +4,12 @@ import {
   ArrowLeft,
   ArrowRight,
   Banknote,
+  Eye,
+  FileSpreadsheet,
   Layers,
-  MoreHorizontal,
   Package,
   Paperclip,
+  Plus,
   Printer,
   Save,
   Send,
@@ -92,6 +94,7 @@ import {
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
+import { systemConfirm } from '@/utils/systemConfirm'
 import { usePurchasePermissions } from '@/utils/permissions'
 
 const ACTOR = { id: 'user-buyer-01', code: 'BUY01', name: 'Rahul Patil' }
@@ -199,6 +202,7 @@ function defaultHeader(): PrEditorHeader {
     referenceNumber: '',
     purpose: '',
     remarks: '',
+    rfqRequired: true,
   }
 }
 
@@ -225,6 +229,7 @@ function headerFromPr(pr: PurchaseRequisition): PrEditorHeader {
     referenceNumber: pr.referenceNumber,
     purpose: pr.purpose ?? '',
     remarks: pr.remarks,
+    rfqRequired: pr.rfqRequired !== false,
   }
 }
 
@@ -262,7 +267,6 @@ export function PurchaseRequisitionEditorPage() {
   const [catalogItems, setCatalogItems] = useState<PurchaseItem[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [attemptedSubmit, setAttemptedSubmit] = useState(false)
-  const [moreOpen, setMoreOpen] = useState(false)
   const [workspace, setWorkspace] = useState<PrEditorWorkspace>('requisition')
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const [forceOpenAdditionalKey, setForceOpenAdditionalKey] = useState(0)
@@ -354,6 +358,7 @@ export function PurchaseRequisitionEditorPage() {
         header.department.trim() || false,
         PURCHASE_REQUISITION_PRIORITY_LABELS[header.priority],
         PURCHASE_REQUISITION_TYPE_LABELS[header.requisitionType],
+        header.rfqRequired ? 'RFQ after approval' : 'PO after approval',
         header.locationName || false,
         formatFastTabDate(header.expectedDeliveryDate)
           ? `Need-by ${formatFastTabDate(header.expectedDeliveryDate)}`
@@ -363,6 +368,7 @@ export function PurchaseRequisitionEditorPage() {
       header.department,
       header.priority,
       header.requisitionType,
+      header.rfqRequired,
       header.locationName,
       header.expectedDeliveryDate,
     ],
@@ -541,6 +547,7 @@ export function PurchaseRequisitionEditorPage() {
       referenceNumber: header.referenceNumber,
       purpose: header.purpose || null,
       remarks: header.remarks,
+      rfqRequired: header.rfqRequired,
       attachmentPlaceholders: attachments,
       estimatedTaxPct: summary.estimatedTaxPct,
       lines: lines
@@ -678,7 +685,13 @@ export function PurchaseRequisitionEditorPage() {
       navigate('/purchase/requisitions')
       return
     }
-    if (!window.confirm('Delete this draft requisition?')) return
+    if (!(await systemConfirm({
+      title: 'Delete draft requisition?',
+      description: 'This draft will be permanently removed.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    }))) return
     try {
       await deletePurchaseRequisition(recordId)
       resetDirty()
@@ -825,12 +838,39 @@ export function PurchaseRequisitionEditorPage() {
                 onClick: () => void saveDraft(true),
                 disabled: !editable || saving,
                 disabledReason: editable ? undefined : 'Document is read-only',
+                pin: true,
               },
               {
                 id: 'print',
                 label: 'Print',
                 icon: Printer,
                 onClick: () => window.print(),
+              },
+            ]}
+            moreActions={[
+              {
+                id: 'add-line',
+                label: 'Add blank line',
+                icon: Plus,
+                onClick: () => setLinesDirty([...lines, emptyLine()]),
+                disabled: !editable,
+              },
+              {
+                id: 'import',
+                label: 'Import from Excel / CSV',
+                icon: FileSpreadsheet,
+                onClick: () => fileInputRef.current?.click(),
+                disabled: !editable,
+              },
+              {
+                id: 'view-doc',
+                label: 'View document',
+                icon: Eye,
+                onClick: () => {
+                  if (recordId) navigate(`/purchase/requisitions/${recordId}`)
+                },
+                disabled: !recordId,
+                disabledReason: 'Save the requisition first',
               },
             ]}
             destructiveActions={[
@@ -860,51 +900,6 @@ export function PurchaseRequisitionEditorPage() {
                 : undefined
             }
           />
-          <div className="relative">
-            <ErpButton
-              type="button"
-              variant="outline"
-              size="sm"
-              icon={MoreHorizontal}
-              onClick={() => setMoreOpen((o) => !o)}
-            >
-              More Actions
-            </ErpButton>
-            {moreOpen ? (
-              <div className="absolute right-0 z-20 mt-1 min-w-[200px] rounded-md border border-erp-border bg-white py-1 shadow-lg">
-                <button
-                  type="button"
-                  className="block w-full px-3 py-2 text-left text-[13px] hover:bg-erp-primary-soft"
-                  onClick={() => {
-                    setMoreOpen(false)
-                    setLinesDirty([...lines, emptyLine()])
-                  }}
-                >
-                  Add blank line
-                </button>
-                <button
-                  type="button"
-                  className="block w-full px-3 py-2 text-left text-[13px] hover:bg-erp-primary-soft"
-                  onClick={() => {
-                    setMoreOpen(false)
-                    fileInputRef.current?.click()
-                  }}
-                >
-                  Import from Excel / CSV
-                </button>
-                <button
-                  type="button"
-                  className="block w-full px-3 py-2 text-left text-[13px] hover:bg-erp-primary-soft"
-                  onClick={() => {
-                    setMoreOpen(false)
-                    if (recordId) navigate(`/purchase/requisitions/${recordId}`)
-                  }}
-                >
-                  View document
-                </button>
-              </div>
-            ) : null}
-          </div>
           <input
             ref={fileInputRef}
             type="file"
@@ -935,6 +930,11 @@ export function PurchaseRequisitionEditorPage() {
               label: 'Priority',
               value: PURCHASE_REQUISITION_PRIORITY_LABELS[header.priority],
               highlight: header.priority === 'urgent',
+            },
+            {
+              label: 'After approval',
+              value: header.rfqRequired ? 'Create RFQ' : 'Create Purchase Order',
+              highlight: !header.rfqRequired,
             },
             {
               label: 'Est. Total',
@@ -1113,6 +1113,24 @@ export function PurchaseRequisitionEditorPage() {
                     {label}
                   </option>
                 ))}
+              </Select>
+            </ErpFieldRow>
+            <ErpFieldRow
+              label="RFQ required?"
+              required
+              hint={
+                header.rfqRequired
+                  ? 'After approval, create an RFQ and collect vendor quotations.'
+                  : 'After approval, this PR is ready for a Purchase Order (skip RFQ).'
+              }
+            >
+              <Select
+                value={header.rfqRequired ? 'yes' : 'no'}
+                disabled={!editable}
+                onChange={(e) => patchHeader({ rfqRequired: e.target.value === 'yes' })}
+              >
+                <option value="yes">Yes — create RFQ after approval</option>
+                <option value="no">No — ready for Purchase Order after approval</option>
               </Select>
             </ErpFieldRow>
 

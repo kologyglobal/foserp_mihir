@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Pencil, Printer } from 'lucide-react'
+import { ArrowLeft, Pencil, Printer, ShoppingCart, Truck } from 'lucide-react'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '../../components/erp/ErpCommandBar'
 import { ErpViewField } from '../../components/erp/card-form/ErpViewField'
@@ -9,6 +9,8 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingState } from '../../design-system/components/LoadingState'
 import { TableLink } from '../../components/ui/AppLink'
 import {
+  convertPurchaseRequisitionToPo,
+  convertPurchaseRequisitionToRfq,
   getPurchaseRequisitionById,
   getRFQById,
   getPurchaseOrderById,
@@ -16,12 +18,19 @@ import {
   PURCHASE_REQUISITION_PRIORITY_LABELS,
   PURCHASE_REQUISITION_SOURCE_LABELS,
   PURCHASE_REQUISITION_STATUS_LABELS,
+  PurchaseServiceError,
 } from '../../services/purchase'
 import type { PurchaseRequisition } from '../../types/purchaseDomain'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { notify } from '../../store/toastStore'
 import { usePurchasePermissions } from '../../utils/permissions'
+import {
+  canConvertPrToPo,
+  canConvertPrToRfq,
+  isPrPendingPo,
+  prProcurementPathLabel,
+} from '../../utils/purchaseRequisitionNextStep'
 import { PurchaseRequisitionDocumentPage } from './PurchaseFormPages'
 
 export function PurchaseRequisitionDomainDetailPage({
@@ -41,9 +50,40 @@ export function PurchaseRequisitionDomainDetailPage({
   const [remarks, setRemarks] = useState('')
   const [department, setDepartment] = useState('')
   const [saving, setSaving] = useState(false)
+  const [converting, setConverting] = useState(false)
 
   const readOnly = mode === 'view' || pr?.status === 'cancelled' || pr?.status === 'pending_approval'
   const canEdit = pr && (pr.status === 'draft' || pr.status === 'rejected')
+  const showCreatePo = pr ? canConvertPrToPo(pr) && perms.canCreateOrder : false
+  const showCreateRfq = pr ? canConvertPrToRfq(pr) && perms.canCreateRfq : false
+
+  const createPurchaseOrder = async () => {
+    if (!pr) return
+    setConverting(true)
+    try {
+      const po = await convertPurchaseRequisitionToPo(pr.id)
+      notify.success(`Purchase Order ${po.documentNumber} created`)
+      navigate(`/purchase/orders/${po.id}`)
+    } catch (err) {
+      notify.error(err instanceof PurchaseServiceError ? err.message : 'Could not create PO')
+    } finally {
+      setConverting(false)
+    }
+  }
+
+  const createRfq = async () => {
+    if (!pr) return
+    setConverting(true)
+    try {
+      const rfq = await convertPurchaseRequisitionToRfq(pr.id)
+      notify.success(`RFQ ${rfq.documentNumber} created`)
+      navigate(`/purchase/rfqs/${rfq.id}`)
+    } catch (err) {
+      notify.error(err instanceof PurchaseServiceError ? err.message : 'Could not create RFQ')
+    } finally {
+      setConverting(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -161,6 +201,17 @@ export function PurchaseRequisitionDomainDetailPage({
                   },
                 ]
               : []),
+            ...(showCreateRfq
+              ? [
+                  {
+                    id: 'rfq',
+                    label: converting ? 'Creating…' : 'Create RFQ',
+                    icon: ShoppingCart,
+                    onClick: () => void createRfq(),
+                    disabled: converting,
+                  },
+                ]
+              : []),
             {
               id: 'print',
               label: 'Print',
@@ -175,7 +226,15 @@ export function PurchaseRequisitionDomainDetailPage({
                   label: saving ? 'Saving…' : 'Save',
                   onClick: () => void save(),
                 }
-              : undefined
+              : showCreatePo
+                ? {
+                    id: 'create-po',
+                    label: converting ? 'Creating…' : 'Create Purchase Order',
+                    icon: Truck,
+                    onClick: () => void createPurchaseOrder(),
+                    disabled: converting,
+                  }
+                : undefined
           }
         />
       }
@@ -202,7 +261,18 @@ export function PurchaseRequisitionDomainDetailPage({
           <ErpViewField label="Required By" value={requiredBy ? formatDate(requiredBy) : '—'} />
           <ErpViewField label="Priority" value={PURCHASE_REQUISITION_PRIORITY_LABELS[pr.priority]} />
           <ErpViewField label="Source" value={PURCHASE_REQUISITION_SOURCE_LABELS[pr.source]} />
+          <ErpViewField label="Procurement path" value={prProcurementPathLabel(pr)} />
           <ErpViewField label="Estimated Value" value={formatCurrency(pr.totalAmount)} />
+          {isPrPendingPo(pr) ? (
+            <ErpViewField
+              label="Next step"
+              value={
+                <span className="font-semibold text-emerald-700">
+                  Ready for Purchase Order — use Create Purchase Order above
+                </span>
+              }
+            />
+          ) : null}
           <ErpViewField
             label="Linked RFQ"
             value={

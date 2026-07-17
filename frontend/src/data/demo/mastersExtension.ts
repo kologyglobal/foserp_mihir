@@ -6,6 +6,7 @@ import type { MasterPersistSlice } from '../../utils/persistMigration'
 
 const DEMO_RELEASED_BOM = 'bom-bulker-a'
 const DEMO_RELEASED_ROUTING = 'rtg-bulker-a'
+const ISO_RELEASED_BOM = 'bom-iso-a'
 
 /** Ensure scenario anchor products have released BOM/routing for MRP → WO creation. */
 function patchReleasedEngineering(products: Product[]): Product[] {
@@ -16,7 +17,7 @@ function patchReleasedEngineering(products: Product[]): Product[] {
       ...p,
       manufacturing: {
         ...p.manufacturing,
-        releasedBomHeaderId: DEMO_RELEASED_BOM,
+        releasedBomHeaderId: p.id === 'prod-iso' ? ISO_RELEASED_BOM : DEMO_RELEASED_BOM,
         releasedRoutingHeaderId: DEMO_RELEASED_ROUTING,
       },
     }

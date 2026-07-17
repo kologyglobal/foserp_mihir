@@ -30,7 +30,7 @@ import { ErpCardSection } from '../../../components/erp/card-form'
 import { useMasterStore } from '../../../store/masterStore'
 import { resolveMaybeId, resolveMaybeVoid } from '../../../store/storeAction'
 import { formatApiError } from '../../../services/api/apiErrors'
-import { notifyMasterSaved } from '../../../store/toastStore'
+import { notify, notifyMasterSaved } from '../../../store/toastStore'
 import { useActiveBanks } from '../../../hooks/useMasterLists'
 import { panFromGstin } from '../../../utils/customerUtils'
 import { getSessionUser } from '../../../utils/permissions'
@@ -136,7 +136,7 @@ export function VendorListPage() {
 
   async function handleExport() {
     if (!isApiMode()) {
-      window.alert('Export downloads the current register from the tenant database in API mode.')
+      notify.info('Export downloads the current register from the tenant database in API mode.')
       return
     }
     try {
@@ -145,7 +145,7 @@ export function VendorListPage() {
         status: status === 'all' ? undefined : status === 'active' ? 'ACTIVE' : 'INACTIVE',
       })
     } catch (err) {
-      window.alert(formatApiError(err))
+      notify.error(formatApiError(err))
     }
   }
 

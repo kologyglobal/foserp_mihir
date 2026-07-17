@@ -10,5 +10,8 @@
     "build:backend": "powershell -NoProfile -ExecutionPolicy Bypass -File ./build.ps1 -BackendOnly -SkipInstall",
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:backend": "npm --prefix backend run dev"
+  },
+  "dependencies": {
+    "docx": "^9.5.0"
   }
 }

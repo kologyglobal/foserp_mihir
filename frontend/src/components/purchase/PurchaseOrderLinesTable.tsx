@@ -7,7 +7,7 @@ import {
   type PurchaseItemCodeCatalogOption,
 } from '@/components/purchase/PurchaseItemCodeCell'
 import { PurchaseDocumentLineCards } from '@/components/purchase/PurchaseDocumentLineCards'
-import { PurchaseLineDetailsDrawer } from '@/components/purchase/PurchaseLineDetailsDrawer'
+import { PurchaseLineDetailsDrawer, PurchaseLineDrawerSection, PurchaseLineDrawerStat } from '@/components/purchase/PurchaseLineDetailsDrawer'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { CommandBarOverflowMenu } from '@/components/ui/CommandBar'
 import { Input, Textarea } from '@/components/forms/Inputs'
@@ -454,112 +454,121 @@ export function PurchaseOrderLinesTable({
         }
         subtitle={detailsLine?.itemName || detailsLine?.description || undefined}
         footer={
-          <ErpButton type="button" size="sm" variant="secondary" onClick={closeDetails}>
+          <ErpButton type="button" size="sm" variant="primary" onClick={closeDetails}>
             Done
           </ErpButton>
         }
       >
         {detailsLine ? (
-          <div className="space-y-3">
-            <ErpFieldRow label="HSN / SAC">
-              <Input
-                className="font-mono"
-                disabled={!editable}
-                value={detailsLine.hsnCode || detailsLine.sacCode || ''}
-                onChange={(e) => onPatchLine(detailsLine.key, { hsnCode: e.target.value })}
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Required delivery date">
-              <Input
-                type="date"
-                disabled={!editable}
-                value={detailsLine.requiredDate}
-                onChange={(e) =>
-                  onPatchLine(detailsLine.key, {
-                    requiredDate: e.target.value,
-                    expectedDeliveryDate: e.target.value,
-                  })
-                }
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Warehouse">
-              <select
-                className="erp-input h-9 w-full text-[13px]"
-                disabled={!editable}
-                value={detailsLine.warehouseId}
-                onChange={(e) => {
-                  const loc = warehouseOptions.find((l) => l.id === e.target.value)
-                  onPatchLine(detailsLine.key, {
-                    warehouseId: loc?.id ?? e.target.value,
-                    warehouseName: loc?.name ?? '',
-                    locationId: loc?.id ?? e.target.value,
-                    locationName: loc?.name ?? '',
-                  })
-                }}
-              >
-                {warehouseOptions.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </ErpFieldRow>
-            <ErpFieldRow label="Cost centre">
-              <Input
-                disabled={!editable}
-                value={detailsLine.costCentre}
-                onChange={(e) => onPatchLine(detailsLine.key, { costCentre: e.target.value })}
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Project">
-              <Input
-                disabled={!editable}
-                value={detailsLine.project}
-                onChange={(e) => onPatchLine(detailsLine.key, { project: e.target.value })}
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Production order">
-              <Input
-                disabled={!editable}
-                value={detailsLine.productionOrder}
-                onChange={(e) => onPatchLine(detailsLine.key, { productionOrder: e.target.value })}
-              />
-            </ErpFieldRow>
-            {isInterstate ? (
-              <ErpFieldRow label="IGST" readOnly>
-                <Input value={formatCurrency(detailsLine.igst)} readOnly className="bg-erp-surface-alt" />
+          <div className="space-y-4">
+            <div className={cn('grid gap-3', isInterstate ? 'grid-cols-1' : 'grid-cols-2')}>
+              {isInterstate ? (
+                <PurchaseLineDrawerStat label="IGST" value={formatCurrency(detailsLine.igst)} />
+              ) : (
+                <>
+                  <PurchaseLineDrawerStat label="CGST" value={formatCurrency(detailsLine.cgst)} />
+                  <PurchaseLineDrawerStat label="SGST" value={formatCurrency(detailsLine.sgst)} />
+                </>
+              )}
+            </div>
+
+            <PurchaseLineDrawerSection
+              title="Delivery"
+              description="Warehouse and schedule for this line."
+            >
+              <ErpFieldRow label="Required delivery date" horizontal={false}>
+                <Input
+                  type="date"
+                  disabled={!editable}
+                  value={detailsLine.requiredDate}
+                  onChange={(e) =>
+                    onPatchLine(detailsLine.key, {
+                      requiredDate: e.target.value,
+                      expectedDeliveryDate: e.target.value,
+                    })
+                  }
+                />
               </ErpFieldRow>
-            ) : (
-              <>
-                <ErpFieldRow label="CGST" readOnly>
-                  <Input value={formatCurrency(detailsLine.cgst)} readOnly className="bg-erp-surface-alt" />
-                </ErpFieldRow>
-                <ErpFieldRow label="SGST" readOnly>
-                  <Input value={formatCurrency(detailsLine.sgst)} readOnly className="bg-erp-surface-alt" />
-                </ErpFieldRow>
-              </>
-            )}
-            <ErpFieldRow label="Delivery schedule">
-              <Input
-                disabled={!editable}
-                value={detailsLine.deliverySchedule}
-                onChange={(e) => onPatchLine(detailsLine.key, { deliverySchedule: e.target.value })}
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Remarks">
-              <Textarea
-                disabled={!editable}
-                value={detailsLine.remarks}
-                onChange={(e) => onPatchLine(detailsLine.key, { remarks: e.target.value })}
-                rows={2}
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Attachments">
+              <ErpFieldRow label="Warehouse" horizontal={false}>
+                <select
+                  className="erp-input h-9 w-full text-[13px]"
+                  disabled={!editable}
+                  value={detailsLine.warehouseId}
+                  title={detailsLine.warehouseName || undefined}
+                  onChange={(e) => {
+                    const loc = warehouseOptions.find((l) => l.id === e.target.value)
+                    onPatchLine(detailsLine.key, {
+                      warehouseId: loc?.id ?? e.target.value,
+                      warehouseName: loc?.name ?? '',
+                      locationId: loc?.id ?? e.target.value,
+                      locationName: loc?.name ?? '',
+                    })
+                  }}
+                >
+                  {warehouseOptions.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
+              </ErpFieldRow>
+              <ErpFieldRow label="Delivery schedule" horizontal={false}>
+                <Input
+                  disabled={!editable}
+                  value={detailsLine.deliverySchedule}
+                  onChange={(e) => onPatchLine(detailsLine.key, { deliverySchedule: e.target.value })}
+                  placeholder="e.g. Week 30 / staggered"
+                />
+              </ErpFieldRow>
+            </PurchaseLineDrawerSection>
+
+            <PurchaseLineDrawerSection title="Accounting & tax">
+              <ErpFieldRow label="HSN / SAC" horizontal={false}>
+                <Input
+                  className="font-mono"
+                  disabled={!editable}
+                  value={detailsLine.hsnCode || detailsLine.sacCode || ''}
+                  onChange={(e) => onPatchLine(detailsLine.key, { hsnCode: e.target.value })}
+                />
+              </ErpFieldRow>
+              <ErpFieldRow label="Cost centre" horizontal={false}>
+                <Input
+                  disabled={!editable}
+                  value={detailsLine.costCentre}
+                  onChange={(e) => onPatchLine(detailsLine.key, { costCentre: e.target.value })}
+                />
+              </ErpFieldRow>
+              <ErpFieldRow label="Project" horizontal={false}>
+                <Input
+                  disabled={!editable}
+                  value={detailsLine.project}
+                  onChange={(e) => onPatchLine(detailsLine.key, { project: e.target.value })}
+                />
+              </ErpFieldRow>
+              <ErpFieldRow label="Production order" horizontal={false}>
+                <Input
+                  disabled={!editable}
+                  value={detailsLine.productionOrder}
+                  onChange={(e) => onPatchLine(detailsLine.key, { productionOrder: e.target.value })}
+                />
+              </ErpFieldRow>
+            </PurchaseLineDrawerSection>
+
+            <PurchaseLineDrawerSection title="Notes">
+              <ErpFieldRow label="Remarks" horizontal={false}>
+                <Textarea
+                  disabled={!editable}
+                  value={detailsLine.remarks}
+                  onChange={(e) => onPatchLine(detailsLine.key, { remarks: e.target.value })}
+                  rows={3}
+                  placeholder="Optional line remarks"
+                />
+              </ErpFieldRow>
               <p className="text-[12px] text-erp-muted">
-                Line-level attachments are not configured in demo mode. Use document attachments on Terms &amp;
+                Line-level file uploads are not configured in demo mode. Use document attachments on Terms &amp;
                 Notes.
               </p>
-            </ErpFieldRow>
+            </PurchaseLineDrawerSection>
           </div>
         ) : null}
       </PurchaseLineDetailsDrawer>
@@ -589,9 +598,11 @@ export function PurchaseOrderLinesTable({
           position: sticky;
           left: 2.5rem;
           z-index: 11;
-          min-width: 11rem;
+          min-width: 10.5rem;
+          max-width: 14rem;
           background: #fff;
           box-shadow: 4px 0 8px -4px rgb(15 23 42 / 0.12);
+          overflow: visible;
         }
         .purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-item,
         .purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-item {

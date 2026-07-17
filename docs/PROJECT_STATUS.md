@@ -26,7 +26,7 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | **Completed (API mode)** | CRM companies, contacts, leads, opportunities, activities, follow-ups; **quotations** (CRUD + lifecycle + convert→SO); quotation templates; **sales orders Phase 1** (convert + draft CRUD + confirm/close); masters (geography→vendor + products); search; reports (read); exports; dashboard metrics/charts/approval panel; notes/attachments; forecast |
 | **Partially completed** | Auth UI; mobile CRM (API hydrate, no offline); sales-order fulfilment beyond confirm/close; **user/role/tenant admin UI (frontend wired 2026-07-15, not test-verified)** |
 | **Not started** | Login activity module |
-| **Scaffolding (not shipped)** | — (Accounting: most FE modules done incl. Financial Reports + Manufacturing Accounting + **Budgeting & Forecasting**; **Accounting Setup & Controls** remains stub). Manufacturing Phases 2–6 FE pending after Phase 1 shell |
+| **Scaffolding (not shipped)** | — (Accounting: most FE modules done incl. Financial Reports + Manufacturing Accounting + **Budgeting & Forecasting** + **Commercial Commitments** (`/accounting/commercial-commitments`, CRM commercial vs posted financials separation); **Accounting Setup & Controls** remains stub) |
 | **Blocked** | — (none currently) |
 | **Deferred by design** | Purchase / inventory / production / quality / maintenance / finance **backends**; SO MRP / dispatch / invoice posting |
 
@@ -387,14 +387,14 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ✅ | Rich demo UIs; Finance nav → `/invoices` (invoice register demo). **2026-07-16:** Manufacturing & Production Phase 1 shell — nav + `/manufacturing` dashboard + placeholders (see `MANUFACTURING_SIMPLE.md`); legacy `/production` / `/work-orders` / `/job-work` hubs redirect |
+| Frontend | ✅ | Rich demo UIs; Finance nav → `/invoices`. **2026-07-17:** Manufacturing Phases 1–6 demo FE + **Route Master / WO Operations** (`/manufacturing/routes`, Operations tab on WO, Shopfloor current/next op) — see `MANUFACTURING_SIMPLE.md`. Legacy `/production` hubs redirect |
 | Backend | 🔒 | Deferred by design |
 | DB | 🔒 | — |
 | API | 🔒 | — |
-| Tests | ⚠️ | Demo scripts where present |
-| Demo mode | ✅ | Manufacturing Phase 1 demo FE; other inventory/quality demos unchanged |
+| Tests | ⚠️ | Demo scripts where present; route integrity baseline includes `/manufacturing/*` |
+| Demo mode | ✅ | Full simple manufacturing shell |
 | API mode | ❌ | |
-| Remaining gap | Manufacturing Phases 2–6 (FE); per-module backend phases |
+| Remaining gap | Manufacturing backend when prioritized |
 
 ### Accounting (nav/route wired — dashboard + CoA + Vouchers + Ledger FE live; other sub-screens stubbed)
 

@@ -30,6 +30,8 @@ check('BOM register route', routesSrc.includes('BomRegisterPage'))
 check('BOM form route', routesSrc.includes('BomFormPage'))
 check('BOM detail route', routesSrc.includes('BomDetailPage'))
 check('Production plan route', routesSrc.includes('ProductionPlanPage'))
+check('Production plan form route', routesSrc.includes('ProductionPlanFormPage'))
+check('Production plan detail route', routesSrc.includes('ProductionPlanDetailPage'))
 check('Work orders placeholder', routesSrc.includes('manufacturing/work-orders'))
 check('Job work placeholder', routesSrc.includes('manufacturing/job-work'))
 

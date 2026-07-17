@@ -75,6 +75,8 @@ export function buildPrFilterFields(input: {
           label,
         })),
         { value: 'converted', label: 'Converted (RFQ / PO)' },
+        { value: 'pending_po', label: 'Pending PO (approved, no RFQ)' },
+        { value: 'pending_rfq', label: 'Pending RFQ (approved, RFQ required)' },
       ],
     },
     {

@@ -55,6 +55,11 @@ export interface JobWorkOrder {
   expectedReturnDate: string
   status: JobWorkStatus
   invoiceStatus: JobWorkInvoiceStatus
+  /** First material dispatch date (list column). */
+  materialSentDate?: string
+  /** Free-text material description for simple create. */
+  materialToSend?: string
+  remarks?: string
   plantId: string
   plantName: string
   materialWarehouseId: string
@@ -348,32 +353,19 @@ export interface ManufacturingSavedView {
 }
 
 export type ManufacturingReportId =
-  | 'work_order_register'
-  | 'production_status'
-  | 'production_output'
+  | 'work_order_status'
+  | 'daily_production'
   | 'material_consumption'
-  | 'material_shortage'
-  | 'material_return'
-  | 'production_delay'
-  | 'work_in_progress'
-  | 'finished_goods_output'
-  | 'scrap_and_rejection'
-  | 'rework_register'
-  | 'production_cost_summary'
-  | 'production_variance'
-  | 'job_work_register'
-  | 'material_sent_to_vendor'
-  | 'material_with_vendor'
-  | 'job_work_receipt'
-  | 'job_work_ageing'
-  | 'job_work_reconciliation'
-  | 'job_work_cost'
-  | 'vendor_invoice_link_status'
+  | 'scrap_rework'
+  | 'qc_pending'
+  | 'job_work_pending'
+  | 'delayed_work_orders'
+  | 'production_efficiency'
 
 export interface ManufacturingReportDefinition {
   id: ManufacturingReportId
   name: string
-  category: 'production' | 'material' | 'job_work' | 'cost'
+  category: 'production' | 'material' | 'quality' | 'job_work'
   requiresCostPermission: boolean
   description: string
 }

@@ -69,8 +69,18 @@ export type {
 } from './PurchaseTermsNotesTabs'
 export { PurchaseRequisitionsTable } from './PurchaseRequisitionsTable'
 export { PurchaseOrdersTable } from './PurchaseOrdersTable'
+export { PurchaseInvoicesTable } from './PurchaseInvoicesTable'
 export { PurchaseRegisterContextPanel } from './PurchaseRegisterContextPanel'
 export type { PurchaseRegisterOverviewRow } from './PurchaseRegisterContextPanel'
+export {
+  PurchaseAiInsightsShell,
+  PurchaseAiOverviewBlock,
+  PurchaseAiSuggestionsBlock,
+} from './PurchaseAiInsightsPanel'
+export type {
+  PurchaseAiOverviewRow,
+  PurchaseAiSuggestion,
+} from './PurchaseAiInsightsPanel'
 export {
   PurchaseDocumentFactBox,
   buildPurchaseRelatedLinks,

@@ -6,38 +6,66 @@ import {
   ArrowUpFromLine,
   ClipboardList,
   Package,
+  ShieldOff,
   SlidersHorizontal,
 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { DynamicsDashboardGrid, DynamicsDashboardPanel } from '@/components/dynamics'
 import { getInventoryDashboard } from '@/services/inventory'
 import type { InventoryDashboardData } from '@/types/inventoryDomain'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
+import { useInventoryPermissions } from '@/utils/permissions/inventory'
 
 type LoadState = 'loading' | 'ready' | 'error'
 
 export function InventoryOverviewPage() {
   const navigate = useNavigate()
+  const perms = useInventoryPermissions()
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [data, setData] = useState<InventoryDashboardData | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
+    if (!perms.canView) return
     let cancelled = false
+    setLoadState('loading')
+    setData(null)
     getInventoryDashboard()
       .then((d) => {
-        if (!cancelled) {
-          setData(d)
-          setLoadState('ready')
-        }
+        if (cancelled) return
+        setData(d)
+        setLoadState('ready')
       })
       .catch(() => {
         if (!cancelled) setLoadState('error')
       })
-    return () => { cancelled = true }
-  }, [])
+    return () => {
+      cancelled = true
+    }
+  }, [perms.canView, reloadToken])
+
+  if (!perms.canView) {
+    return (
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Inventory & Warehouse"
+        title="Inventory & Warehouse"
+        breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }]}
+        autoBreadcrumbs={false}
+      >
+        <EmptyState
+          icon={ShieldOff}
+          title="Access denied"
+          description="You do not have permission to view Inventory & Warehouse (inventory.view)."
+        />
+      </OperationalPageShell>
+    )
+  }
 
   const accentMap = {
     primary: 'blue',
@@ -72,6 +100,11 @@ export function InventoryOverviewPage() {
           primaryAction={{ id: 'items', label: 'Items', onClick: () => navigate('/inventory/items') }}
           secondaryActions={[
             { id: 'stock', label: 'Stock Availability', onClick: () => navigate('/inventory/stock') },
+            {
+              id: 'retry',
+              label: 'Refresh',
+              onClick: () => setReloadToken((n) => n + 1),
+            },
           ]}
         />
       )}
@@ -79,7 +112,20 @@ export function InventoryOverviewPage() {
     >
       {loadState === 'loading' ? <LoadingState variant="dashboard" /> : null}
       {loadState === 'error' ? (
-        <p className="text-sm text-red-600">Failed to load inventory dashboard.</p>
+        <EmptyState
+          icon={Package}
+          title="Could not load inventory dashboard"
+          description="Something went wrong while loading overview data. Try again."
+          action={(
+            <button
+              type="button"
+              className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"
+              onClick={() => setReloadToken((n) => n + 1)}
+            >
+              Retry
+            </button>
+          )}
+        />
       ) : null}
       {loadState === 'ready' && data ? (
         <>

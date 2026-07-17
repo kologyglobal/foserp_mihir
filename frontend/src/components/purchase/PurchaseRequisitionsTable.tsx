@@ -32,6 +32,13 @@ import {
   canPurchasePermission,
   getPurchasePermissionDenialReason,
 } from '../../utils/permissions'
+import {
+  canConvertPrToPo,
+  canConvertPrToRfq,
+  isPrPendingPo,
+  prNextActionHint,
+  prProcurementPathLabel,
+} from '../../utils/purchaseRequisitionNextStep'
 
 function priorityColor(priority: PurchaseRequisitionPriority): 'gray' | 'blue' | 'orange' | 'red' {
   if (priority === 'urgent') return 'red'
@@ -68,7 +75,8 @@ function buildRowActions(
   const isConverted = status === 'converted_to_rfq' || status === 'converted_to_po'
   const canEdit = status === 'draft' || status === 'rejected'
   const canSubmit = status === 'draft' || status === 'rejected'
-  const canConvert = status === 'approved'
+  const canRfq = canConvertPrToRfq(row)
+  const canPo = canConvertPrToPo(row)
   const canCancel = !isCancelled && !isConverted && status !== 'closed'
 
   const canEditPerm = canPurchasePermission('purchase.requisition.edit')
@@ -117,20 +125,24 @@ function buildRowActions(
       label: 'Convert to RFQ',
       icon: ShoppingCart,
       onClick: () => handlers.onConvertRfq(row),
-      disabled: !canCreateRfq || !canConvert,
+      disabled: !canCreateRfq || !canRfq,
       disabledReason: !canCreateRfq
         ? getPurchasePermissionDenialReason('purchase.rfq.create')
-        : 'Only Approved requisitions can convert to RFQ',
+        : row.status === 'approved' && !row.rfqRequired
+          ? 'This PR is marked for direct Purchase Order'
+          : 'Only approved PRs that require RFQ can convert',
     },
     {
       id: 'to-po',
-      label: 'Convert to Purchase Order',
+      label: isPrPendingPo(row) ? 'Create Purchase Order' : 'Convert to Purchase Order',
       icon: Truck,
       onClick: () => handlers.onConvertPo(row),
-      disabled: !canCreatePo || !canConvert,
+      disabled: !canCreatePo || !canPo,
       disabledReason: !canCreatePo
         ? getPurchasePermissionDenialReason('purchase.order.create')
-        : 'Only Approved requisitions can convert to PO',
+        : row.status === 'approved' && row.rfqRequired
+          ? 'RFQ is required first for this requisition'
+          : 'Only approved (direct PO) or RFQ-converted PRs can create a PO',
     },
     { id: 'print', label: 'Print', icon: Printer, onClick: () => handlers.onPrint(row) },
     {
@@ -188,8 +200,20 @@ export function PurchaseRequisitionsTable({
             >
               {row.original.documentNumber}
             </TableLink>
-            {(row.original.convertedRfqNumber || row.original.convertedPoNumber) && (
+            {(row.original.convertedRfqNumber ||
+              row.original.convertedPoNumber ||
+              prNextActionHint(row.original)) && (
               <div className="ent-record-cell__meta mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                {prNextActionHint(row.original) ? (
+                  <span
+                    className={cn(
+                      'text-[11px] font-medium',
+                      isPrPendingPo(row.original) ? 'text-emerald-700' : 'text-sky-700',
+                    )}
+                  >
+                    {prNextActionHint(row.original)}
+                  </span>
+                ) : null}
                 {row.original.convertedRfqNumber ? (
                   <TableLink to={`/purchase/rfqs/${row.original.convertedRfqId}`} className="font-mono">
                     RFQ {row.original.convertedRfqNumber}
@@ -202,6 +226,14 @@ export function PurchaseRequisitionsTable({
                 ) : null}
               </div>
             )}
+            {!row.original.convertedRfqNumber &&
+            !row.original.convertedPoNumber &&
+            !prNextActionHint(row.original) &&
+            row.original.status === 'draft' ? (
+              <div className="ent-record-cell__meta mt-0.5 text-[11px] text-erp-muted">
+                {prProcurementPathLabel(row.original)}
+              </div>
+            ) : null}
           </div>
         ),
       },
@@ -305,10 +337,17 @@ export function PurchaseRequisitionsTable({
         header: 'Status',
         meta: { columnLabel: 'Status' },
         cell: ({ row }) => (
-          <StatusDot
-            label={row.original.statusLabel}
-            tone={statusToneFromLabel(row.original.statusLabel)}
-          />
+          <div className="space-y-0.5">
+            <StatusDot
+              label={row.original.statusLabel}
+              tone={statusToneFromLabel(row.original.statusLabel)}
+            />
+            {isPrPendingPo(row.original) ? (
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                Pending PO
+              </div>
+            ) : null}
+          </div>
         ),
       },
       {

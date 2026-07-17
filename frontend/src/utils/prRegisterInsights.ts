@@ -10,6 +10,7 @@ import type { ReactNode } from 'react'
 import type { EnterpriseQuickAction } from '../design-system/workspace/EnterpriseFormContextPanel'
 import type { PurchaseRequisitionListRow } from '../types/purchaseDomain'
 import { formatCompactCurrency } from './formatters/currency'
+import { isPrPendingPo, isPrPendingRfq } from './purchaseRequisitionNextStep'
 
 export interface PrRegisterOverviewRow {
   label: string
@@ -88,6 +89,7 @@ export function buildPrRegisterSuggestions(input: {
   const today = todayIsoDate()
   const pendingApproval = rows.filter((r) => r.status === 'pending_approval').length
   const approved = rows.filter((r) => r.status === 'approved').length
+  const pendingPo = rows.filter(isPrPendingPo).length
   const draft = rows.filter((r) => r.status === 'draft').length
   const overdue = rows.filter((r) => isOverdueNeedBy(r, today)).length
   const actions: EnterpriseQuickAction[] = []
@@ -101,13 +103,29 @@ export function buildPrRegisterSuggestions(input: {
       onClick: () => onApplyStatus(toggleStatus(activeStatus, 'pending_approval')),
     })
   }
-  if (approved > 0) {
+  if (pendingPo > 0) {
     actions.push({
-      id: 'approved',
-      label: `${approved} approved — convert to RFQ/PO`,
+      id: 'pending-po',
+      label: `${pendingPo} approved — ready for PO`,
       icon: Rocket,
       primary: true,
-      onClick: () => onApplyStatus(toggleStatus(activeStatus, 'approved')),
+      onClick: () => onApplyStatus(toggleStatus(activeStatus, 'pending_po')),
+    })
+  }
+  if (approved > 0) {
+    const pendingRfq = rows.filter(isPrPendingRfq).length
+    actions.push({
+      id: 'approved',
+      label:
+        pendingRfq > 0
+          ? `${pendingRfq} approved — convert to RFQ`
+          : `${approved} approved — convert to RFQ/PO`,
+      icon: Rocket,
+      primary: pendingPo === 0,
+      onClick: () =>
+        onApplyStatus(
+          toggleStatus(activeStatus, pendingRfq > 0 ? 'pending_rfq' : 'approved'),
+        ),
     })
   }
   if (overdue > 0 && onReviewOverdue) {

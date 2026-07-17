@@ -47,6 +47,7 @@ import type { GoodsReceiptNote, GrnInput, PurchaseOrder } from '@/types/purchase
 import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
+import { systemConfirm } from '@/utils/systemConfirm'
 import { cn } from '@/utils/cn'
 
 type LineDraft = {
@@ -537,7 +538,13 @@ export function GrnEditorPage() {
       resetDirty()
     } catch (err) {
       if (err instanceof PurchaseServiceError && err.code === 'EXCESS_QTY_REQUIRES_PERMISSION') {
-        const ok = window.confirm(`${err.message}\n\nAllow excess receipt for this GRN?`)
+        const ok = await systemConfirm({
+          title: 'Allow excess receipt?',
+          description: `${err.message}\n\nAllow excess receipt for this GRN?`,
+          confirmLabel: 'Allow excess',
+          cancelLabel: 'Cancel',
+          variant: 'danger',
+        })
         if (ok) {
           setAllowExcess(true)
           setLines((prev) => prev.map((l) => ({ ...l, allowExcess: true })))
@@ -579,7 +586,13 @@ export function GrnEditorPage() {
       navigate(`/purchase/grn/${submitted.id}`)
     } catch (err) {
       if (err instanceof PurchaseServiceError && err.code === 'EXCESS_QTY_REQUIRES_PERMISSION') {
-        const ok = window.confirm(`${err.message}\n\nAllow excess receipt?`)
+        const ok = await systemConfirm({
+          title: 'Allow excess receipt?',
+          description: `${err.message}\n\nAllow excess receipt?`,
+          confirmLabel: 'Allow excess',
+          cancelLabel: 'Cancel',
+          variant: 'danger',
+        })
         if (ok) {
           setAllowExcess(true)
           notify.info('Allow Excess enabled — submit again')

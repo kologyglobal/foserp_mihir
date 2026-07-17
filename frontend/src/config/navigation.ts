@@ -202,12 +202,14 @@ export const moduleCategories: NavCategory[] = [
   },
   {
     id: 'production',
-    title: 'Manufacturing & Production',
+    title: 'Manufacturing',
     items: [
-      { label: 'Dashboard', path: '/manufacturing', icon: LayoutDashboard, end: true, workspace: true },
-      { label: 'BOM', path: '/manufacturing/bom', icon: Layers },
-      { label: 'Production Plan', path: '/manufacturing/production-plan', icon: ClipboardList },
+      { label: 'Control Room', path: '/manufacturing/control-room', icon: LayoutDashboard, end: true, workspace: true },
       { label: 'Work Orders', path: '/manufacturing/work-orders', icon: Wrench },
+      { label: 'Shopfloor', path: '/manufacturing/shopfloor', icon: Factory },
+      { label: 'Production Plan', path: '/manufacturing/production-plan', icon: ClipboardList },
+      { label: 'BOM', path: '/manufacturing/bom', icon: Layers },
+      { label: 'Routes', path: '/manufacturing/routes', icon: GitBranch },
       { label: 'Job Work', path: '/manufacturing/job-work', icon: Truck },
       { label: 'Reports', path: '/manufacturing/reports', icon: BarChart3 },
       { label: 'Settings', path: '/manufacturing/settings', icon: Settings2 },
@@ -255,6 +257,13 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Chart of Accounts', path: '/accounting/chart-of-accounts', icon: BookOpen },
       { label: 'Vouchers', path: '/accounting/vouchers', icon: FileText },
       { label: 'Receivables', path: '/accounting/receivables', icon: ArrowDownToLine },
+      {
+        label: 'Commercial Commitments',
+        path: '/accounting/commercial-commitments',
+        icon: Handshake,
+        /** Discover via Receivables workspace tabs; keep for search / deep links */
+        subNav: false as const,
+      },
       { label: 'Payables', path: '/accounting/payables', icon: ArrowUpFromLine },
       { label: 'Bank & Cash', path: '/accounting/bank-cash', icon: Landmark },
       { label: 'Fixed Assets', path: '/accounting/fixed-assets', icon: Building2 },
@@ -357,6 +366,14 @@ export const searchablePages: SearchablePage[] = moduleCategories.flatMap((cat) 
 
 export function navItemIsActive(item: NavItem, pathname: string): boolean {
   if (item.disabled) return false
+  /** Commercial commitments live under Receivables conceptually */
+  if (
+    item.path === '/accounting/receivables' &&
+    (pathname === '/accounting/commercial-commitments' ||
+      pathname.startsWith('/accounting/commercial-commitments/'))
+  ) {
+    return true
+  }
   return item.end ? pathname === item.path : pathname === item.path || pathname.startsWith(`${item.path}/`)
 }
 

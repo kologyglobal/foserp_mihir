@@ -3,12 +3,16 @@ import type { LucideIcon } from 'lucide-react'
 import { Circle } from 'lucide-react'
 import {
   EnterpriseBusinessFactBox,
-  EnterpriseFormContextPanel,
   EnterpriseFormMetrics,
   EnterpriseFormSectionNav,
   type EnterpriseFormMetric,
 } from '../../design-system/workspace'
 import type { EnterpriseDocumentStripField } from '../../design-system/workspace/types'
+import {
+  PurchaseAiInsightsShell,
+  PurchaseAiOverviewBlock,
+  PurchaseAiSuggestionsBlock,
+} from './PurchaseAiInsightsPanel'
 
 export const PURCHASE_SECTION_ID_PREFIX = 'purchase-section'
 
@@ -87,7 +91,7 @@ export function PurchaseEnterpriseFactBox({
   metrics,
   summary,
   actions,
-  title = 'Purchase insight',
+  title = 'Purchase Insights',
   children,
 }: {
   metrics?: EnterpriseFormMetric[]
@@ -100,15 +104,21 @@ export function PurchaseEnterpriseFactBox({
     <>
       {metrics?.length ? <EnterpriseFormMetrics metrics={metrics} className="dyn-form-metrics--factbox" /> : null}
       <EnterpriseBusinessFactBox title={title}>
-        <EnterpriseFormContextPanel
-          summaryTitle="Summary"
-          actionsTitle="Quick Actions"
-          summary={summary}
-          actions={actions?.map((action) => ({
-            ...action,
-            icon: action.icon ?? Circle,
-          }))}
-        />
+        <PurchaseAiInsightsShell
+          embedded
+          title="AI Insights"
+          subtitle="Suggested summary and next actions for this document."
+        >
+          <PurchaseAiOverviewBlock title="Overview" rows={summary} />
+          {actions?.length ? (
+            <PurchaseAiSuggestionsBlock
+              suggestions={actions.map((action) => ({
+                ...action,
+                icon: action.icon ?? Circle,
+              }))}
+            />
+          ) : null}
+        </PurchaseAiInsightsShell>
         {children}
       </EnterpriseBusinessFactBox>
     </>

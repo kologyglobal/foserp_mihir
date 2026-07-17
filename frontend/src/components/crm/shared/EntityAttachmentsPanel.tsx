@@ -7,6 +7,7 @@ import { AttachmentUploadDialog } from './AttachmentUploadDialog'
 import { ErpButton } from '../../erp/ErpButton'
 import { formatDateTime } from '../../../utils/dates/format'
 import { useCrmMasterStore } from '../../../store/crmMasterStore'
+import { systemConfirm } from '../../../utils/systemConfirm'
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -124,7 +125,15 @@ export function EntityAttachmentsPanel({
                       icon={Trash2}
                       disabled={pending}
                       onClick={() => {
-                        if (window.confirm(`Delete "${doc.originalFilename}"?`)) void deleteAttachment(doc.id)
+                        void systemConfirm({
+                          title: 'Delete attachment?',
+                          description: `Delete “${doc.originalFilename}”? This cannot be undone.`,
+                          confirmLabel: 'Delete',
+                          cancelLabel: 'Cancel',
+                          variant: 'danger',
+                        }).then((ok) => {
+                          if (ok) void deleteAttachment(doc.id)
+                        })
                       }}
                     >
                       Delete

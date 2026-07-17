@@ -12,7 +12,7 @@ import {
   PurchaseItemCodeCell,
   type PurchaseItemCodeCatalogOption,
 } from '@/components/purchase/PurchaseItemCodeCell'
-import { PurchaseLineDetailsDrawer } from '@/components/purchase/PurchaseLineDetailsDrawer'
+import { PurchaseLineDetailsDrawer, PurchaseLineDrawerSection, PurchaseLineDrawerStat } from '@/components/purchase/PurchaseLineDetailsDrawer'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Input, Textarea } from '@/components/forms/Inputs'
 import { ErpFieldRow } from '@/components/erp/card-form'
@@ -330,104 +330,121 @@ export function PurchaseRequisitionLinesTable({
         }
         subtitle={detailsLine?.itemName || undefined}
         footer={
-          <ErpButton type="button" size="sm" variant="secondary" onClick={closeDetails}>
+          <ErpButton type="button" size="sm" variant="primary" onClick={closeDetails}>
             Done
           </ErpButton>
         }
       >
         {detailsLine ? (
-          <div className="space-y-3">
-            <ErpFieldRow label="HSN / SAC">
-              <Input
-                className="font-mono"
-                disabled={!editable}
-                value={detailsLine.hsnCode || detailsLine.sacCode || ''}
-                onChange={(e) =>
-                  onPatchLine(detailsLine.key, {
-                    hsnCode: detailsLine.itemType === 'service' ? '' : e.target.value,
-                    sacCode: detailsLine.itemType === 'service' ? e.target.value : detailsLine.sacCode,
-                  })
-                }
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Required delivery date">
-              <Input
-                type="date"
-                disabled={!editable}
-                value={detailsLine.requiredDate}
-                onChange={(e) => onPatchLine(detailsLine.key, { requiredDate: e.target.value })}
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Delivery location">
-              <select
-                className="erp-input h-9 w-full text-[13px]"
-                disabled={!editable}
-                value={detailsLine.locationId}
-                onChange={(e) => {
-                  const loc = locationOptions.find((l) => l.id === e.target.value)
-                  onPatchLine(detailsLine.key, {
-                    locationId: loc?.id ?? e.target.value,
-                    locationName: loc?.name ?? '',
-                  })
-                }}
-              >
-                {locationOptions.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </ErpFieldRow>
-            <ErpFieldRow label="Preferred vendor">
-              <select
-                className="erp-input h-9 w-full text-[13px]"
-                disabled={!editable}
-                value={detailsLine.preferredVendorId ?? ''}
-                onChange={(e) => {
-                  const vendor = vendors.find((v) => v.id === e.target.value)
-                  onPatchLine(detailsLine.key, {
-                    preferredVendorId: vendor?.id ?? null,
-                    preferredVendorName: vendor?.vendorName ?? null,
-                  })
-                }}
-              >
-                <option value="">—</option>
-                {vendors.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.vendorName}
-                  </option>
-                ))}
-              </select>
-            </ErpFieldRow>
-            <ErpFieldRow label="Available stock" readOnly>
-              <Input value={String(detailsLine.currentStock)} readOnly className="bg-erp-surface-alt" />
-            </ErpFieldRow>
-            <ErpFieldRow label="Open PO qty" readOnly>
-              <Input value={String(detailsLine.openPoQty)} readOnly className="bg-erp-surface-alt" />
-            </ErpFieldRow>
-            <ErpFieldRow label="Purpose">
-              <Input
-                disabled={!editable}
-                value={detailsLine.purpose}
-                onChange={(e) => onPatchLine(detailsLine.key, { purpose: e.target.value })}
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Remarks">
-              <Textarea
-                disabled={!editable}
-                value={detailsLine.remarks}
-                onChange={(e) => onPatchLine(detailsLine.key, { remarks: e.target.value })}
-                rows={2}
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Attachments">
-              <Input
-                disabled={!editable}
-                value={detailsLine.attachmentNote}
-                onChange={(e) => onPatchLine(detailsLine.key, { attachmentNote: e.target.value })}
-                placeholder="File ref / note"
-              />
-            </ErpFieldRow>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <PurchaseLineDrawerStat label="Available stock" value={detailsLine.currentStock} />
+              <PurchaseLineDrawerStat label="Open PO qty" value={detailsLine.openPoQty} />
+            </div>
+
+            <PurchaseLineDrawerSection
+              title="Delivery"
+              description="When and where this line should be received."
+            >
+              <ErpFieldRow label="Required delivery date" horizontal={false}>
+                <Input
+                  type="date"
+                  disabled={!editable}
+                  value={detailsLine.requiredDate}
+                  onChange={(e) => onPatchLine(detailsLine.key, { requiredDate: e.target.value })}
+                />
+              </ErpFieldRow>
+              <ErpFieldRow label="Delivery location" horizontal={false}>
+                <select
+                  className="erp-input h-9 w-full text-[13px]"
+                  disabled={!editable}
+                  value={detailsLine.locationId}
+                  title={detailsLine.locationName || undefined}
+                  onChange={(e) => {
+                    const loc = locationOptions.find((l) => l.id === e.target.value)
+                    onPatchLine(detailsLine.key, {
+                      locationId: loc?.id ?? e.target.value,
+                      locationName: loc?.name ?? '',
+                    })
+                  }}
+                >
+                  {locationOptions.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
+              </ErpFieldRow>
+            </PurchaseLineDrawerSection>
+
+            <PurchaseLineDrawerSection
+              title="Sourcing"
+              description="Tax code and preferred supplier for this line."
+            >
+              <ErpFieldRow label="HSN / SAC" horizontal={false}>
+                <Input
+                  className="font-mono"
+                  disabled={!editable}
+                  value={detailsLine.hsnCode || detailsLine.sacCode || ''}
+                  onChange={(e) =>
+                    onPatchLine(detailsLine.key, {
+                      hsnCode: detailsLine.itemType === 'service' ? '' : e.target.value,
+                      sacCode: detailsLine.itemType === 'service' ? e.target.value : detailsLine.sacCode,
+                    })
+                  }
+                />
+              </ErpFieldRow>
+              <ErpFieldRow label="Preferred vendor" horizontal={false}>
+                <select
+                  className="erp-input h-9 w-full text-[13px]"
+                  disabled={!editable}
+                  value={detailsLine.preferredVendorId ?? ''}
+                  title={detailsLine.preferredVendorName ?? undefined}
+                  onChange={(e) => {
+                    const vendor = vendors.find((v) => v.id === e.target.value)
+                    onPatchLine(detailsLine.key, {
+                      preferredVendorId: vendor?.id ?? null,
+                      preferredVendorName: vendor?.vendorName ?? null,
+                    })
+                  }}
+                >
+                  <option value="">No preferred vendor</option>
+                  {vendors.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.vendorName}
+                    </option>
+                  ))}
+                </select>
+              </ErpFieldRow>
+            </PurchaseLineDrawerSection>
+
+            <PurchaseLineDrawerSection title="Notes & attachments">
+              <ErpFieldRow label="Purpose" horizontal={false}>
+                <Input
+                  disabled={!editable}
+                  value={detailsLine.purpose}
+                  onChange={(e) => onPatchLine(detailsLine.key, { purpose: e.target.value })}
+                  placeholder="Why this line is needed"
+                />
+              </ErpFieldRow>
+              <ErpFieldRow label="Remarks" horizontal={false}>
+                <Textarea
+                  disabled={!editable}
+                  value={detailsLine.remarks}
+                  onChange={(e) => onPatchLine(detailsLine.key, { remarks: e.target.value })}
+                  rows={3}
+                  placeholder="Optional line remarks"
+                />
+              </ErpFieldRow>
+              <ErpFieldRow label="Attachments" horizontal={false}>
+                <Input
+                  disabled={!editable}
+                  value={detailsLine.attachmentNote}
+                  onChange={(e) => onPatchLine(detailsLine.key, { attachmentNote: e.target.value })}
+                  placeholder="File reference or note"
+                />
+              </ErpFieldRow>
+            </PurchaseLineDrawerSection>
           </div>
         ) : null}
       </PurchaseLineDetailsDrawer>
@@ -457,9 +474,11 @@ export function PurchaseRequisitionLinesTable({
           position: sticky;
           left: 2.5rem;
           z-index: 11;
-          min-width: 11rem;
+          min-width: 10.5rem;
+          max-width: 14rem;
           background: #fff;
           box-shadow: 4px 0 8px -4px rgb(15 23 42 / 0.12);
+          overflow: visible;
         }
         .purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-item,
         .purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-item {

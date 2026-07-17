@@ -230,6 +230,10 @@ export function PurchaseRequisitionListPage() {
       list = list.filter((r) =>
         ['converted_to_rfq', 'converted_to_po'].includes(r.status),
       )
+    } else if (filters.status === 'pending_po') {
+      list = list.filter((r) => r.status === 'approved' && !r.rfqRequired && !r.convertedPoId)
+    } else if (filters.status === 'pending_rfq') {
+      list = list.filter((r) => r.status === 'approved' && r.rfqRequired && !r.convertedRfqId)
     } else if (filters.status) {
       list = list.filter((r) => r.status === filters.status)
     }
@@ -551,6 +555,8 @@ export function PurchaseRequisitionListPage() {
           </EnterpriseRegisterTableShell>
           <PurchaseRegisterContextPanel
             ariaLabel="Purchase requisition overview and suggestions"
+            title="Requisition Insights"
+            subtitle="AI suggested bottlenecks and next actions for this register."
             overview={registerOverview}
             suggestions={registerSuggestions}
           />

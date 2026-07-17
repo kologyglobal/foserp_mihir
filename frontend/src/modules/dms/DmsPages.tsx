@@ -21,6 +21,7 @@ import { DmsCategoryBadge, DmsLatestBadge, DmsWorkflowBadge } from '../../compon
 import { DocumentUploadDrawer } from '../../components/dms/DocumentUploadDrawer'
 import { formatDate } from '../../utils/dates/format'
 import { getFileContent, triggerDownload } from '../../utils/fileStorage'
+import { notify } from '../../store/toastStore'
 
 const ALL_TYPES = Object.entries(DMS_DOCUMENT_TYPE_LABELS).filter(([k]) =>
   !['customer_drawing', 'vendor_drawing', 'certificate', 'test_report', 'photo'].includes(k),
@@ -199,7 +200,7 @@ export function DocumentDetailPage() {
           )}
           <Button variant="secondary" size="sm" onClick={() => approveDocument(doc.id)}>Approve</Button>
           <Button variant="secondary" size="sm" onClick={() => markObsolete(doc.id)}>Mark Obsolete</Button>
-          <Button variant="secondary" size="sm" onClick={() => { const r = deleteDocument(doc.id); if (!r.ok) alert(r.error) }}>Delete</Button>
+          <Button variant="secondary" size="sm" onClick={() => { const r = deleteDocument(doc.id); if (!r.ok) notify.error(r.error ?? 'Delete failed') }}>Delete</Button>
         </div>
       }
     >

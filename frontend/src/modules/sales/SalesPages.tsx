@@ -77,6 +77,7 @@ import {
   buildSalesOrderEditUrl,
   resolveSalesOrderDetailPath,
 } from '../../utils/crmSalesOrderNavigation'
+import { systemConfirm } from '../../utils/systemConfirm'
 import { QuickCreateSelect } from '../../components/quick-create/QuickCreateSelect'
 import { useQuickCreate } from '../../hooks/useQuickCreate'
 import { usePendingCustomerApprovals } from '../../hooks/useStableStoreData'
@@ -930,18 +931,26 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
   }
 
   function handleDeleteSalesOrder(so: SalesOrder) {
-    if (!window.confirm(`Delete draft ${so.salesOrderNo}?`)) return
-    void (async () => {
-      const { isApiMode } = await import('../../config/apiConfig')
-      if (isApiMode()) {
-        const { apiDeleteSalesOrder } = await import('../../services/bridges/salesOrderApiBridge')
-        const r = await apiDeleteSalesOrder(so.id)
+    void systemConfirm({
+      title: 'Delete draft sales order?',
+      description: `Delete draft ${so.salesOrderNo}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    }).then((ok) => {
+      if (!ok) return
+      void (async () => {
+        const { isApiMode } = await import('../../config/apiConfig')
+        if (isApiMode()) {
+          const { apiDeleteSalesOrder } = await import('../../services/bridges/salesOrderApiBridge')
+          const r = await apiDeleteSalesOrder(so.id)
+          setToast(r.ok ? `${so.salesOrderNo} deleted` : r.error ?? 'Delete failed')
+          return
+        }
+        const r = deleteSalesOrderDraft(so.id)
         setToast(r.ok ? `${so.salesOrderNo} deleted` : r.error ?? 'Delete failed')
-        return
-      }
-      const r = deleteSalesOrderDraft(so.id)
-      setToast(r.ok ? `${so.salesOrderNo} deleted` : r.error ?? 'Delete failed')
-    })()
+      })()
+    })
   }
 
   function handlePrintSalesOrder(so: SalesOrder) {

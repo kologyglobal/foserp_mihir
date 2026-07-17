@@ -85,7 +85,7 @@ const DASHBOARD_PAGES: { name: string; route: string; file: string }[] = [
   { name: 'MRP Planner', route: '/mrp/planner', file: 'src/modules/control-towers/MrpPlannerWorkbenchPage.tsx' },
   { name: 'Purchase Workspace', route: '/purchase', file: 'src/modules/workspaces/PurchaseWorkspace.tsx' },
   { name: 'Inventory Workspace', route: '/inventory', file: 'src/modules/workspaces/InventoryWorkspace.tsx' },
-  { name: 'Inventory Analytics', route: '/inventory/dashboard', file: 'src/modules/inventory/InventoryDashboard.tsx' },
+  { name: 'Inventory Overview', route: '/inventory', file: 'src/modules/inventory/overview/InventoryOverviewPage.tsx' },
   { name: 'Production Control Tower', route: '/production/control-tower', file: 'src/modules/control-towers/ProductionControlTowerPage.tsx' },
   { name: 'Quality Workspace', route: '/quality', file: 'src/modules/workspaces/QualityWorkspace.tsx' },
   { name: 'Dispatch Workspace', route: '/dispatch', file: 'src/modules/workspaces/DispatchWorkspace.tsx' },

@@ -36,6 +36,7 @@ import { useRoutingStore } from '../../store/routingStore'
 import { useSerialStore } from '../../store/serialStore'
 import { usePurchaseMasterStore } from '../../store/purchaseMasterStore'
 import { useUIStore } from '../../store/uiStore'
+import { notify } from '../../store/toastStore'
 import {
   buildMasterRecentModified,
   masterSummaryMetrics,
@@ -442,8 +443,8 @@ export function MastersHomePage() {
           primaryAction={{ id: 'quick-create', label: 'New Item', icon: Plus, onClick: () => { window.location.href = '/masters/items/new' } }}
           secondaryActions={[
             { id: 'code-series', label: 'Code Series', icon: Hash, onClick: () => { window.location.href = '/masters/code-series' } },
-            { id: 'import', label: 'Import', icon: Upload, onClick: () => window.alert('Open a master register and use Import on its list page.') },
-            { id: 'export', label: 'Export', icon: Download, onClick: () => window.alert('Open a master register and use Export on its list page.') },
+            { id: 'import', label: 'Import', icon: Upload, onClick: () => notify.info('Open a master register and use Import on its list page.') },
+            { id: 'export', label: 'Export', icon: Download, onClick: () => notify.info('Open a master register and use Export on its list page.') },
           ]}
         />
       )}

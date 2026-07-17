@@ -33,6 +33,7 @@ import { cn } from '../../utils/cn'
 import { crmBreadcrumbs } from '../../utils/crmNavigation'
 import { CrmTypedDocumentUpload } from '@/components/crm/CrmTypedDocumentUpload'
 import { useQuotationAttachmentStore } from '../../store/quotationAttachmentStore'
+import { notify } from '../../store/toastStore'
 import type { CrmTypedAttachment } from '../../types/crmDocuments'
 
 const VALIDITY_PERIOD_OPTIONS = [15, 30, 45, 60, 90] as const
@@ -190,7 +191,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
 
   async function handleSubmitApprovalClick() {
     const r = await resolveStoreAction(submitApproval(documentId))
-    if (!r.ok) alert(r.error ?? 'Could not submit for approval')
+    if (!r.ok) notify.error(r.error ?? 'Could not submit for approval')
   }
 
   function handleSavePdfToDms() {
@@ -202,8 +203,8 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
       documentId: doc.id,
       customerId: quotation.customerId,
     })
-    if (r.ok) alert('Quotation PDF saved to DMS')
-    else alert(r.error ?? 'Failed to save PDF')
+    if (r.ok) notify.success('Quotation PDF saved to DMS')
+    else notify.error(r.error ?? 'Failed to save PDF')
   }
 
   const secondaryActions = [

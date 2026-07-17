@@ -20,6 +20,7 @@ import { printQuotationDocument } from '../../utils/quotationEngine/pdfExport'
 import { EnterpriseDocumentStrip } from '../../design-system/workspace'
 import { cn } from '../../utils/cn'
 import { crmBreadcrumbs } from '../../utils/crmNavigation'
+import { notify } from '../../store/toastStore'
 
 interface QuotationTemplateDesignerProps {
   templateId: string
@@ -200,7 +201,7 @@ export function QuotationTemplateDesigner({ templateId, previewMode }: Quotation
         version: (tpl?.version ?? 1) + 1,
       }),
     )
-    if (!r.ok) alert(r.error ?? 'Could not save template')
+    if (!r.ok) notify.error(r.error ?? 'Could not save template')
   }
 
   function scrollToSection(sectionId: string) {

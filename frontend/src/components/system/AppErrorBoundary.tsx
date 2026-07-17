@@ -4,6 +4,7 @@ import { AlertTriangle, Home, RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { ERP_STORAGE_KEYS } from '../../store/persistConfig'
 import { getSessionUser, getSessionUserRoleLabel } from '../../utils/permissions'
+import { systemConfirm } from '../../utils/systemConfirm'
 
 interface AppErrorBoundaryProps {
   children: ReactNode
@@ -76,8 +77,15 @@ function ErrorFallback({
   const navigate = useNavigate()
   const user = getSessionUser()
 
-  function clearLocalData() {
-    if (!window.confirm('Clear all locally saved ERP data? You will need to reload the app.')) return
+  async function clearLocalData() {
+    const ok = await systemConfirm({
+      title: 'Clear local ERP data?',
+      description: 'Clear all locally saved ERP data? You will need to reload the app.',
+      confirmLabel: 'Clear data',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    })
+    if (!ok) return
     for (const key of Object.values(ERP_STORAGE_KEYS)) {
       localStorage.removeItem(key)
     }

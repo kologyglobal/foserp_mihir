@@ -4,14 +4,12 @@ import { type ColumnDef } from '@tanstack/react-table'
 import {
   Copy,
   Eye,
-  FilePlus2,
   Layers,
   Pencil,
   Plus,
   Power,
   PowerOff,
   RefreshCw,
-  Wrench,
 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
@@ -26,41 +24,39 @@ import {
   EnterpriseRowActionsMenu,
   type RowActionItem,
 } from '@/design-system/enterprise/EnterpriseTablePrimitives'
+import { ManufacturingDemoBanner } from '@/components/manufacturing'
 import {
   activateBom,
-  createBomVersion,
   deactivateBom,
   duplicateBom,
   getBoms,
 } from '@/services/manufacturing'
-import type { BillOfMaterial, BomStatus, ManufacturingFilter, ProductionMethod } from '@/types/manufacturing'
-import {
-  BOM_STATUS_LABELS,
-  PRODUCTION_METHOD_LABELS,
-} from '@/types/manufacturing'
-import { formatCurrency } from '@/utils/formatters/currency'
+import type { BillOfMaterial, BomStatus } from '@/types/manufacturing'
+import { BOM_STATUS_LABELS } from '@/types/manufacturing'
+import { seedManufacturingBoms } from '@/data/manufacturing/seed'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { useManufacturingPermissions } from '@/utils/permissions/manufacturing'
-import { cn } from '@/utils/cn'
 
-const BOM_TABS: { id: NonNullable<ManufacturingFilter['tab']>; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'draft', label: 'Draft' },
-  { id: 'active', label: 'Active' },
-  { id: 'inactive', label: 'Inactive' },
-  { id: 'in_house', label: 'In-House' },
-  { id: 'job_work', label: 'Job Work' },
-  { id: 'mixed', label: 'Mixed' },
-]
+const FINISHED_ITEM_OPTIONS = Array.from(
+  new Map(
+    seedManufacturingBoms.map((b) => [
+      b.finishedItemCode,
+      `${b.finishedItemCode} — ${b.finishedItemName}`,
+    ]),
+  ).entries(),
+)
+
+const VERSION_OPTIONS = [...new Set(seedManufacturingBoms.map((b) => b.version))].sort()
 
 export function BomRegisterPage() {
   const navigate = useNavigate()
   const perms = useManufacturingPermissions()
-  const [tab, setTab] = useState<NonNullable<ManufacturingFilter['tab']>>('all')
   const [search, setSearch] = useState('')
+  const [finishedItem, setFinishedItem] = useState('')
   const [status, setStatus] = useState<BomStatus | ''>('')
-  const [method, setMethod] = useState<ProductionMethod | ''>('')
+  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [version, setVersion] = useState('')
   const [rows, setRows] = useState<BillOfMaterial[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -69,10 +65,10 @@ export function BomRegisterPage() {
     setLoading(true)
     try {
       const list = await getBoms({
-        tab,
         search: search || undefined,
-        status: status || undefined,
-        productionMethod: method || undefined,
+        finishedItem: finishedItem || undefined,
+        status: status || (activeFilter === 'all' ? undefined : activeFilter),
+        version: version || undefined,
       })
       setRows(list)
     } catch {
@@ -81,14 +77,19 @@ export function BomRegisterPage() {
     } finally {
       setLoading(false)
     }
-  }, [tab, search, status, method])
+  }, [search, finishedItem, status, activeFilter, version])
 
   useEffect(() => {
     void load()
   }, [load])
 
   const runAction = useCallback(
-    async (id: string, action: () => Promise<{ ok: boolean; error?: string; bom?: BillOfMaterial }>, successMsg: string, goToBom?: boolean) => {
+    async (
+      id: string,
+      action: () => Promise<{ ok: boolean; error?: string; bom?: BillOfMaterial }>,
+      successMsg: string,
+      goToBom?: boolean,
+    ) => {
       setBusyId(id)
       try {
         const r = await action()
@@ -106,136 +107,104 @@ export function BomRegisterPage() {
     [load, navigate],
   )
 
-  const columns = useMemo<ColumnDef<BillOfMaterial>[]>(() => {
-    const cols: ColumnDef<BillOfMaterial>[] = [
-      {
-        accessorKey: 'bomNumber',
-        header: 'BOM Number',
-        cell: ({ row }) => (
-          <TableLink to={`/manufacturing/bom/${row.original.id}`} className="font-mono">
-            {row.original.bomNumber}
-          </TableLink>
-        ),
-      },
-      { accessorKey: 'finishedItemCode', header: 'Finished Item', cell: ({ row }) => (
+  const columns = useMemo<ColumnDef<BillOfMaterial>[]>(() => [
+    {
+      accessorKey: 'bomNumber',
+      header: 'BOM No',
+      cell: ({ row }) => (
+        <TableLink to={`/manufacturing/bom/${row.original.id}`} className="font-mono font-semibold">
+          {row.original.bomNumber}
+        </TableLink>
+      ),
+    },
+    {
+      accessorKey: 'finishedItemCode',
+      header: 'Finished Item',
+      cell: ({ row }) => (
         <div>
           <div className="font-mono text-[12px]">{row.original.finishedItemCode}</div>
           <div className="text-[12px] text-erp-muted">{row.original.finishedItemName}</div>
         </div>
-      ) },
-      { accessorKey: 'itemCategory', header: 'Category' },
-      { accessorKey: 'version', header: 'Version' },
-      {
-        accessorKey: 'productionMethod',
-        header: 'Method',
-        cell: ({ row }) => PRODUCTION_METHOD_LABELS[row.original.productionMethod],
-      },
-      {
-        accessorKey: 'status',
-        header: 'Status',
-        cell: ({ row }) => (
-          <StatusDot
-            label={BOM_STATUS_LABELS[row.original.status]}
-            tone={statusToneFromLabel(row.original.status)}
-          />
-        ),
-      },
-      {
-        accessorKey: 'componentCount',
-        header: 'Components',
-        cell: ({ row }) => <span className="tabular-nums">{row.original.componentCount}</span>,
-      },
-    ]
-
-    if (perms.canViewCost) {
-      cols.push({
-        accessorKey: 'estimatedCost',
-        header: 'Estimated Cost',
-        cell: ({ row }) => (
-          <span className="tabular-nums">{formatCurrency(row.original.estimatedCost)}</span>
-        ),
-      })
-    }
-
-    cols.push(
-      {
-        accessorKey: 'effectiveFrom',
-        header: 'Effective From',
-        cell: ({ row }) => formatDate(row.original.effectiveFrom),
-      },
-      {
-        id: 'actions',
-        header: '',
-        cell: ({ row }) => {
-          const bom = row.original
-          const busy = busyId === bom.id
-          const actions: RowActionItem[] = [
-            {
-              id: 'view',
-              label: 'View',
-              icon: Eye,
-              onClick: () => navigate(`/manufacturing/bom/${bom.id}`),
-            },
-          ]
-          if (perms.canEditBom) {
-            actions.push({
-              id: 'edit',
-              label: 'Edit',
-              icon: Pencil,
-              onClick: () => navigate(`/manufacturing/bom/${bom.id}/edit`),
-              disabled: bom.status === 'active',
-              disabledReason: bom.status === 'active' ? 'Deactivate before editing, or create a new version' : undefined,
-            })
-          }
-          if (perms.canCreateBom) {
-            actions.push(
-              {
-                id: 'duplicate',
-                label: 'Duplicate',
-                icon: Copy,
-                onClick: () => void runAction(bom.id, () => duplicateBom(bom.id), 'BOM duplicated', true),
-              },
-              {
-                id: 'version',
-                label: 'Create New Version',
-                icon: FilePlus2,
-                onClick: () => void runAction(bom.id, () => createBomVersion(bom.id), 'New version created', true),
-              },
-            )
-          }
-          if (perms.canActivateBom && bom.status !== 'active') {
-            actions.push({
-              id: 'activate',
-              label: 'Activate',
-              icon: Power,
-              onClick: () => void runAction(bom.id, () => activateBom(bom.id), 'BOM activated'),
-            })
-          }
-          if (perms.canDeactivateBom && bom.status === 'active') {
-            actions.push({
-              id: 'deactivate',
-              label: 'Deactivate',
-              icon: PowerOff,
-              onClick: () => void runAction(bom.id, () => deactivateBom(bom.id), 'BOM deactivated'),
-            })
-          }
+      ),
+    },
+    { accessorKey: 'version', header: 'Version' },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => (
+        <StatusDot
+          label={BOM_STATUS_LABELS[row.original.status]}
+          tone={statusToneFromLabel(row.original.status)}
+        />
+      ),
+    },
+    {
+      accessorKey: 'componentCount',
+      header: 'Components Count',
+      cell: ({ row }) => <span className="tabular-nums">{row.original.componentCount}</span>,
+    },
+    {
+      accessorKey: 'updatedAt',
+      header: 'Last Updated',
+      cell: ({ row }) => formatDate(row.original.updatedAt.slice(0, 10)),
+    },
+    { accessorKey: 'createdBy', header: 'Created By' },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => {
+        const bom = row.original
+        const busy = busyId === bom.id
+        const actions: RowActionItem[] = [
+          {
+            id: 'view',
+            label: 'View',
+            icon: Eye,
+            onClick: () => navigate(`/manufacturing/bom/${bom.id}`),
+          },
+        ]
+        if (perms.canEditBom) {
           actions.push({
-            id: 'wo',
-            label: 'Create Work Order',
-            icon: Wrench,
-            onClick: () => navigate(`/manufacturing/work-orders/new?bomId=${bom.id}`),
+            id: 'edit',
+            label: 'Edit',
+            icon: Pencil,
+            onClick: () => navigate(`/manufacturing/bom/${bom.id}/edit`),
+            disabled: bom.status === 'active',
+            disabledReason: bom.status === 'active' ? 'Deactivate before editing, or duplicate' : undefined,
           })
-          return (
-            <div className={busy ? 'pointer-events-none opacity-50' : undefined} onClick={(e) => e.stopPropagation()}>
-              <EnterpriseRowActionsMenu actions={actions} />
-            </div>
-          )
-        },
+        }
+        if (perms.canCreateBom) {
+          actions.push({
+            id: 'duplicate',
+            label: 'Duplicate',
+            icon: Copy,
+            onClick: () => void runAction(bom.id, () => duplicateBom(bom.id), 'BOM duplicated', true),
+          })
+        }
+        if (perms.canActivateBom && bom.status !== 'active') {
+          actions.push({
+            id: 'activate',
+            label: 'Activate',
+            icon: Power,
+            onClick: () => void runAction(bom.id, () => activateBom(bom.id), 'BOM activated'),
+          })
+        }
+        if (perms.canDeactivateBom && bom.status === 'active') {
+          actions.push({
+            id: 'deactivate',
+            label: 'Deactivate',
+            icon: PowerOff,
+            onClick: () => void runAction(bom.id, () => deactivateBom(bom.id), 'BOM deactivated'),
+          })
+        }
+        return (
+          <div className={busy ? 'pointer-events-none opacity-50' : undefined} onClick={(e) => e.stopPropagation()}>
+            <EnterpriseRowActionsMenu actions={actions} />
+          </div>
+        )
       },
-    )
-
-    return cols
-  }, [busyId, navigate, perms, runAction])
+    },
+  ], [busyId, navigate, perms, runAction])
 
   if (!perms.canViewBom) {
     return (
@@ -261,7 +230,7 @@ export function BomRegisterPage() {
       layout="enterprise"
       badge="Manufacturing"
       title="Bill of Materials"
-      description="Define finished goods structure, materials and production method."
+      description="Tells what is needed — recipes that Work Orders consume. Not a separate production document."
       breadcrumbs={[
         { label: 'Manufacturing & Production', to: '/manufacturing' },
         { label: 'BOM' },
@@ -283,55 +252,83 @@ export function BomRegisterPage() {
               : undefined
           }
           secondaryActions={[
+            {
+              id: 'traveler',
+              label: 'ISO Tank Traveler BOM',
+              icon: Layers,
+              onClick: () => navigate('/manufacturing/bom/mfg-bom-003'),
+            },
             { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load() },
           ]}
         />
       )}
     >
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap gap-1" role="tablist" aria-label="BOM tabs">
-          {BOM_TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              className={cn(
-                'erp-btn h-8 px-3 text-[12px]',
-                tab === t.id ? 'erp-btn-primary' : 'erp-btn-ghost',
-              )}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+      <ManufacturingDemoBanner message="BOM tells what is needed. Execution stays on the Work Order." />
+      <div className="mb-4 flex flex-wrap items-end gap-2">
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="Search BOM / item / category…"
-          className="ml-auto max-w-xs"
+          placeholder="Search BOM / item…"
+          className="max-w-xs"
         />
-        <Select
-          value={status}
-          onChange={(e) => setStatus(e.target.value as BomStatus | '')}
-          className="w-36"
-        >
-          <option value="">All statuses</option>
-          {(Object.keys(BOM_STATUS_LABELS) as BomStatus[]).map((s) => (
-            <option key={s} value={s}>{BOM_STATUS_LABELS[s]}</option>
-          ))}
-        </Select>
-        <Select
-          value={method}
-          onChange={(e) => setMethod(e.target.value as ProductionMethod | '')}
-          className="w-40"
-        >
-          <option value="">All methods</option>
-          {(Object.keys(PRODUCTION_METHOD_LABELS) as ProductionMethod[]).map((m) => (
-            <option key={m} value={m}>{PRODUCTION_METHOD_LABELS[m]}</option>
-          ))}
-        </Select>
+        <label className="text-[11px] font-medium text-erp-muted">
+          Finished Item
+          <Select
+            value={finishedItem}
+            onChange={(e) => setFinishedItem(e.target.value)}
+            className="mt-0.5 block w-56"
+          >
+            <option value="">All items</option>
+            {FINISHED_ITEM_OPTIONS.map(([id, label]) => (
+              <option key={id} value={id}>{label}</option>
+            ))}
+          </Select>
+        </label>
+        <label className="text-[11px] font-medium text-erp-muted">
+          Status
+          <Select
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as BomStatus | '')
+              setActiveFilter('all')
+            }}
+            className="mt-0.5 block w-36"
+          >
+            <option value="">All statuses</option>
+            {(Object.keys(BOM_STATUS_LABELS) as BomStatus[]).map((s) => (
+              <option key={s} value={s}>{BOM_STATUS_LABELS[s]}</option>
+            ))}
+          </Select>
+        </label>
+        <label className="text-[11px] font-medium text-erp-muted">
+          Active / Inactive
+          <Select
+            value={activeFilter}
+            onChange={(e) => {
+              const v = e.target.value as 'all' | 'active' | 'inactive'
+              setActiveFilter(v)
+              if (v !== 'all') setStatus('')
+            }}
+            className="mt-0.5 block w-40"
+          >
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+        </label>
+        <label className="text-[11px] font-medium text-erp-muted">
+          Version
+          <Select
+            value={version}
+            onChange={(e) => setVersion(e.target.value)}
+            className="mt-0.5 block w-28"
+          >
+            <option value="">All</option>
+            {VERSION_OPTIONS.map((v) => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </Select>
+        </label>
       </div>
 
       {loading ? <LoadingState variant="table" rows={8} /> : null}

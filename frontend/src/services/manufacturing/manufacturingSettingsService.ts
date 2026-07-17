@@ -87,123 +87,257 @@ export function listManufacturingReportDefinitions() {
   return MANUFACTURING_REPORTS
 }
 
+function daysBetween(from: string, to: string): number {
+  const a = new Date(`${from}T00:00:00`)
+  const b = new Date(`${to}T00:00:00`)
+  return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86_400_000))
+}
+
+function inDateRange(date: string | undefined, from?: string, to?: string): boolean {
+  if (!date) return true
+  const d = date.slice(0, 10)
+  if (from && d < from) return false
+  if (to && d > to) return false
+  return true
+}
+
 export async function getManufacturingReports(
   reportId: ManufacturingReportId,
   filter?: ManufacturingReportFilter,
 ): Promise<ManufacturingReportResult> {
   await delay()
-  const { getWorkOrders } = await import('./workOrderService')
+  const { getWorkOrders, getWorkOrderMaterials } = await import('./workOrderService')
   const { getJobWorkOrders } = await import('./jobWorkService')
-  const wos = await getWorkOrders({
-    search: filter?.workOrder || filter?.finishedItem,
-    status: (filter?.status as never) || undefined,
-  })
-  const jwos = await getJobWorkOrders({
-    search: filter?.jobWorkOrder || filter?.vendor,
+  const {
+    getWorkOrderListStatus,
+    getWorkOrderOwnerLine,
+    WO_SOURCE_LABELS,
+    WO_LIST_STATUS_LABELS,
+  } = await import('../../types/manufacturingWorkOrder')
+  const { JW_STATUS_LABELS } = await import('../../types/manufacturingJobWork')
+
+  const today = new Date().toISOString().slice(0, 10)
+  const itemQ = (filter?.item || filter?.finishedItem || '').trim().toLowerCase()
+  const statusQ = (filter?.status || '').trim().toLowerCase()
+  const warehouseQ = (filter?.warehouse || '').trim().toLowerCase()
+
+  let wos = await getWorkOrders({
+    search: filter?.workOrder || filter?.finishedItem || filter?.item,
   })
 
-  const costReports = new Set(
-    MANUFACTURING_REPORTS.filter((r) => r.requiresCostPermission).map((r) => r.id),
-  )
+  wos = wos.filter((w) => {
+    if (itemQ) {
+      const hay = `${w.finishedItemCode} ${w.finishedItemName}`.toLowerCase()
+      if (!hay.includes(itemQ)) return false
+    }
+    if (statusQ && statusQ !== 'all') {
+      const list = getWorkOrderListStatus(w)
+      if (w.status !== statusQ && list !== statusQ) return false
+    }
+    if (warehouseQ) {
+      const wh = `${w.materialWarehouseName ?? ''} ${w.fgWarehouseName ?? ''}`.toLowerCase()
+      if (!wh.includes(warehouseQ)) return false
+    }
+    const dateRef = w.completedAt?.slice(0, 10) || w.startedAt?.slice(0, 10) || w.dueDate || w.createdAt.slice(0, 10)
+    if (!inDateRange(dateRef, filter?.dateFrom, filter?.dateTo)) return false
+    return true
+  })
+
+  let jwos = await getJobWorkOrders({
+    search: filter?.jobWorkOrder || filter?.vendor,
+  })
+  jwos = jwos.filter((j) => {
+    if (statusQ && statusQ !== 'all' && j.status !== statusQ) return false
+    if (!inDateRange(j.expectedReturnDate, filter?.dateFrom, filter?.dateTo)
+      && !inDateRange(j.materialSentDate, filter?.dateFrom, filter?.dateTo)
+      && !inDateRange(j.createdAt.slice(0, 10), filter?.dateFrom, filter?.dateTo)) {
+      return false
+    }
+    return true
+  })
 
   let columns: string[] = []
   let rows: ManufacturingReportResult['rows'] = []
 
   switch (reportId) {
-    case 'work_order_register':
-    case 'production_status':
-    case 'production_delay':
-    case 'work_in_progress':
-      columns = ['Work Order', 'Item', 'Planned', 'Produced', 'Status', 'Due Date']
-      rows = wos.map((w) => ({
-        id: w.id,
-        cells: {
-          'Work Order': w.woNumber,
-          Item: w.finishedItemCode,
-          Planned: w.plannedQty,
-          Produced: w.producedQty,
-          Status: w.status,
-          'Due Date': w.dueDate,
-        },
-      }))
+    case 'work_order_status': {
+      columns = ['WO No', 'Item', 'Source', 'Planned Qty', 'Completed Qty', 'Pending Qty', 'Due Date', 'Status', 'Delay Days']
+      rows = wos.map((w) => {
+        const listStatus = getWorkOrderListStatus(w)
+        const open = !['closed', 'cancelled'].includes(w.status)
+        const delayDays = open && w.dueDate < today ? daysBetween(w.dueDate, today) : 0
+        return {
+          id: w.id,
+          cells: {
+            'WO No': w.woNumber,
+            Item: `${w.finishedItemCode} — ${w.finishedItemName}`,
+            Source: WO_SOURCE_LABELS[w.source],
+            'Planned Qty': w.plannedQty,
+            'Completed Qty': w.producedQty,
+            'Pending Qty': w.remainingQty,
+            'Due Date': w.dueDate,
+            Status: WO_LIST_STATUS_LABELS[listStatus] ?? w.status,
+            'Delay Days': delayDays,
+          },
+        }
+      })
       break
-    case 'production_output':
-    case 'finished_goods_output':
-      columns = ['Work Order', 'Item', 'Good Qty', 'Rejected', 'Scrap', 'Rework']
-      rows = wos.map((w) => ({
-        id: w.id,
-        cells: {
-          'Work Order': w.woNumber,
-          Item: w.finishedItemCode,
-          'Good Qty': w.producedQty,
-          Rejected: w.rejectedQty,
-          Scrap: w.scrapQty,
-          Rework: w.reworkQty,
-        },
-      }))
+    }
+    case 'daily_production': {
+      columns = ['Date', 'WO No', 'Item', 'Planned Qty', 'Good Qty', 'Scrap Qty', 'Rework Qty', 'Reject Qty', 'Operator / Line', 'Status']
+      rows = wos.map((w) => {
+        const listStatus = getWorkOrderListStatus(w)
+        const date = (w.completedAt || w.startedAt || w.createdAt).slice(0, 10)
+        return {
+          id: w.id,
+          cells: {
+            Date: date,
+            'WO No': w.woNumber,
+            Item: `${w.finishedItemCode} — ${w.finishedItemName}`,
+            'Planned Qty': w.plannedQty,
+            'Good Qty': w.producedQty,
+            'Scrap Qty': w.scrapQty,
+            'Rework Qty': w.reworkQty,
+            'Reject Qty': w.rejectedQty,
+            'Operator / Line': getWorkOrderOwnerLine(w),
+            Status: WO_LIST_STATUS_LABELS[listStatus] ?? w.status,
+          },
+        }
+      })
       break
-    case 'material_shortage':
-      columns = ['Work Order', 'Item', 'Material Status']
+    }
+    case 'material_consumption': {
+      columns = ['WO No', 'Raw Material', 'Required Qty', 'Consumed Qty', 'Variance', 'Warehouse']
+      const materialRows: ManufacturingReportResult['rows'] = []
+      for (const w of wos) {
+        const mats = await getWorkOrderMaterials(w.id)
+        for (const m of mats) {
+          if (warehouseQ && !(m.warehouseName ?? '').toLowerCase().includes(warehouseQ)) continue
+          const variance = Math.round((m.consumedQty - m.requiredQty) * 1000) / 1000
+          materialRows.push({
+            id: `${w.id}-${m.id}`,
+            cells: {
+              'WO No': w.woNumber,
+              'Raw Material': `${m.componentItemCode} — ${m.componentItemName}`,
+              'Required Qty': m.requiredQty,
+              'Consumed Qty': m.consumedQty,
+              Variance: variance,
+              Warehouse: m.warehouseName || w.materialWarehouseName || '—',
+            },
+          })
+        }
+      }
+      rows = materialRows
+      break
+    }
+    case 'scrap_rework': {
+      columns = ['WO No', 'Item', 'Good Qty', 'Scrap Qty', 'Rework Qty', 'Reject Qty', 'Operator / Line', 'Status']
       rows = wos
-        .filter((w) => w.materialStatus === 'shortage' || w.materialStatus === 'partial')
+        .filter((w) => w.scrapQty > 0 || w.reworkQty > 0 || w.rejectedQty > 0)
         .map((w) => ({
           id: w.id,
           cells: {
-            'Work Order': w.woNumber,
-            Item: w.finishedItemCode,
-            'Material Status': w.materialStatus,
+            'WO No': w.woNumber,
+            Item: `${w.finishedItemCode} — ${w.finishedItemName}`,
+            'Good Qty': w.producedQty,
+            'Scrap Qty': w.scrapQty,
+            'Rework Qty': w.reworkQty,
+            'Reject Qty': w.rejectedQty,
+            'Operator / Line': getWorkOrderOwnerLine(w),
+            Status: WO_LIST_STATUS_LABELS[getWorkOrderListStatus(w)] ?? w.status,
           },
         }))
       break
-    case 'scrap_and_rejection':
-      columns = ['Work Order', 'Scrap', 'Rejected']
+    }
+    case 'qc_pending': {
+      columns = ['WO No', 'Item', 'Good Qty', 'QC Status', 'Due Date', 'Operator / Line', 'Status']
       rows = wos
-        .filter((w) => w.scrapQty > 0 || w.rejectedQty > 0)
+        .filter((w) => {
+          const list = getWorkOrderListStatus(w)
+          return w.qualityHold || list === 'qc_pending' || list === 'qc_hold'
+        })
         .map((w) => ({
           id: w.id,
-          cells: { 'Work Order': w.woNumber, Scrap: w.scrapQty, Rejected: w.rejectedQty },
+          cells: {
+            'WO No': w.woNumber,
+            Item: `${w.finishedItemCode} — ${w.finishedItemName}`,
+            'Good Qty': w.producedQty,
+            'QC Status': w.qualityHold ? 'Pending / Hold' : 'Required',
+            'Due Date': w.dueDate,
+            'Operator / Line': getWorkOrderOwnerLine(w),
+            Status: WO_LIST_STATUS_LABELS[getWorkOrderListStatus(w)] ?? w.status,
+          },
         }))
       break
-    case 'job_work_register':
-    case 'job_work_ageing':
-    case 'material_sent_to_vendor':
-    case 'material_with_vendor':
-    case 'job_work_receipt':
-    case 'job_work_reconciliation':
-    case 'vendor_invoice_link_status':
-      columns = ['Job Work', 'Work Order', 'Vendor', 'Ordered', 'Received', 'Status', 'Invoice']
-      rows = jwos.map((j) => ({
-        id: j.id,
-        cells: {
-          'Job Work': j.jwNumber,
-          'Work Order': j.workOrderNo,
-          Vendor: j.vendorName,
-          Ordered: j.orderedQty,
-          Received: j.receivedQty,
-          Status: j.status,
-          Invoice: j.invoiceStatus,
-        },
-      }))
+    }
+    case 'job_work_pending': {
+      columns = ['Job Work No', 'Linked WO', 'Vendor', 'Process', 'Sent Qty', 'Received Qty', 'Balance Qty', 'Expected Return', 'Status']
+      rows = jwos
+        .filter((j) => !['closed', 'cancelled', 'received'].includes(j.status))
+        .map((j) => ({
+          id: j.id,
+          cells: {
+            'Job Work No': j.jwNumber,
+            'Linked WO': j.workOrderNo,
+            Vendor: j.vendorName,
+            Process: j.process,
+            'Sent Qty': j.sentQty,
+            'Received Qty': j.receivedQty,
+            'Balance Qty': j.pendingQty,
+            'Expected Return': j.expectedReturnDate,
+            Status: JW_STATUS_LABELS[j.status],
+          },
+        }))
       break
-    case 'production_cost_summary':
-    case 'production_variance':
-    case 'job_work_cost':
-      columns = ['Document', 'Item', 'Qty', 'Est. Cost']
-      rows = (costReports.has(reportId) ? wos : wos).map((w) => ({
-        id: w.id,
-        cells: {
-          Document: w.woNumber,
-          Item: w.finishedItemCode,
-          Qty: w.producedQty,
-          'Est. Cost': w.producedQty * 28000,
-        },
-      }))
+    }
+    case 'delayed_work_orders': {
+      columns = ['WO No', 'Item', 'Source', 'Planned Qty', 'Completed Qty', 'Pending Qty', 'Due Date', 'Status', 'Delay Days']
+      rows = wos
+        .filter((w) => !['closed', 'cancelled'].includes(w.status) && w.dueDate < today)
+        .map((w) => ({
+          id: w.id,
+          cells: {
+            'WO No': w.woNumber,
+            Item: `${w.finishedItemCode} — ${w.finishedItemName}`,
+            Source: WO_SOURCE_LABELS[w.source],
+            'Planned Qty': w.plannedQty,
+            'Completed Qty': w.producedQty,
+            'Pending Qty': w.remainingQty,
+            'Due Date': w.dueDate,
+            Status: WO_LIST_STATUS_LABELS[getWorkOrderListStatus(w)] ?? w.status,
+            'Delay Days': daysBetween(w.dueDate, today),
+          },
+        }))
       break
+    }
+    case 'production_efficiency': {
+      columns = ['WO No', 'Item', 'Planned Qty', 'Good Qty', 'Scrap Qty', 'Yield %', 'Efficiency %', 'Operator / Line', 'Status']
+      rows = wos.map((w) => {
+        const output = w.producedQty + w.scrapQty + w.rejectedQty + w.reworkQty
+        const yieldPct = output > 0 ? Math.round((w.producedQty / output) * 1000) / 10 : 0
+        const efficiencyPct = w.plannedQty > 0 ? Math.round((w.producedQty / w.plannedQty) * 1000) / 10 : 0
+        return {
+          id: w.id,
+          cells: {
+            'WO No': w.woNumber,
+            Item: `${w.finishedItemCode} — ${w.finishedItemName}`,
+            'Planned Qty': w.plannedQty,
+            'Good Qty': w.producedQty,
+            'Scrap Qty': w.scrapQty,
+            'Yield %': yieldPct,
+            'Efficiency %': efficiencyPct,
+            'Operator / Line': getWorkOrderOwnerLine(w),
+            Status: WO_LIST_STATUS_LABELS[getWorkOrderListStatus(w)] ?? w.status,
+          },
+        }
+      })
+      break
+    }
     default:
-      columns = ['Work Order', 'Item', 'Status']
+      columns = ['WO No', 'Item', 'Status']
       rows = wos.map((w) => ({
         id: w.id,
-        cells: { 'Work Order': w.woNumber, Item: w.finishedItemCode, Status: w.status },
+        cells: { 'WO No': w.woNumber, Item: w.finishedItemCode, Status: w.status },
       }))
   }
 
@@ -214,22 +348,44 @@ export async function exportManufacturingReport(
   reportId: ManufacturingReportId,
   format: 'excel' | 'csv' | 'pdf',
   filter?: ManufacturingReportFilter,
-): Promise<{ ok: boolean; fileName: string }> {
+): Promise<{ ok: boolean; fileName: string; csv?: string }> {
   await delay()
   const result = await getManufacturingReports(reportId, filter)
-  return {
-    ok: true,
-    fileName: `${reportId}-${result.generatedAt.slice(0, 10)}.${format === 'excel' ? 'xlsx' : format}`,
-  }
+  const header = result.columns.join(',')
+  const body = result.rows
+    .map((row) =>
+      result.columns
+        .map((col) => {
+          const raw = row.cells[col]
+          const text = raw == null ? '' : String(raw)
+          return `"${text.replace(/"/g, '""')}"`
+        })
+        .join(','),
+    )
+    .join('\n')
+  const csv = `${header}\n${body}`
+  const fileName = `${reportId}-${result.generatedAt.slice(0, 10)}.${format === 'excel' ? 'csv' : format === 'pdf' ? 'csv' : 'csv'}`
+  return { ok: true, fileName, csv }
 }
 
 export async function getManufacturingPrintPreview(
   reportId: ManufacturingReportId,
-): Promise<{ ok: boolean; html: string }> {
+  filter?: ManufacturingReportFilter,
+): Promise<{ ok: boolean; html: string; title: string }> {
   await delay()
-  const result = await getManufacturingReports(reportId)
+  const def = MANUFACTURING_REPORTS.find((r) => r.id === reportId)
+  const result = await getManufacturingReports(reportId, filter)
+  const title = def?.label ?? reportId
+  const head = result.columns.map((c) => `<th>${c}</th>`).join('')
+  const body = result.rows
+    .map(
+      (row) =>
+        `<tr>${result.columns.map((c) => `<td>${row.cells[c] ?? ''}</td>`).join('')}</tr>`,
+    )
+    .join('')
   return {
     ok: true,
-    html: `<h1>${reportId}</h1><p>${result.rows.length} rows · ${result.generatedAt}</p>`,
+    title,
+    html: `<h1>${title}</h1><p>${result.rows.length} rows · ${result.generatedAt}</p><table border="1" cellpadding="4" cellspacing="0"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`,
   }
 }

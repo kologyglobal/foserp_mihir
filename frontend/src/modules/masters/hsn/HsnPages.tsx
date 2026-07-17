@@ -19,7 +19,7 @@ import { MasterBatchImportDialog } from '../../../components/masters/MasterBatch
 import { isApiMode } from '../../../config/apiConfig'
 import { downloadMasterExport } from '../../../services/api/masterBatchApi'
 import { formatApiError } from '../../../services/api/apiErrors'
-import { notifyMasterSaved } from '../../../store/toastStore'
+import { notify, notifyMasterSaved } from '../../../store/toastStore'
 import type { HsnMaster } from '../../../types/taxMaster'
 import { buildMasterBreadcrumbs } from '../../../utils/masterNavigation'
 import { formatDate } from '../../../utils/dates/format'
@@ -76,7 +76,7 @@ export function HsnListPage() {
 
   async function handleExport() {
     if (!isApiMode()) {
-      window.alert('Export downloads the current register from the tenant database in API mode.')
+      notify.info('Export downloads the current register from the tenant database in API mode.')
       return
     }
     try {
@@ -85,7 +85,7 @@ export function HsnListPage() {
         status: status === 'all' ? undefined : status === 'active' ? 'ACTIVE' : 'INACTIVE',
       })
     } catch (err) {
-      window.alert(formatApiError(err))
+      notify.error(formatApiError(err))
     }
   }
 

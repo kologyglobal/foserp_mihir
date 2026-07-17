@@ -21,6 +21,7 @@ import { findFeaturedQuotationTemplate } from '../../utils/quotationTemplates'
 import { useSalesStore } from '../../store/salesStore'
 import { useMasterStore } from '../../store/masterStore'
 import { useUIStore } from '../../store/uiStore'
+import { notify } from '@/store/toastStore'
 import { exportRowsToCsv } from '../../utils/exportCsv'
 import { runCrmExport } from '../../utils/crmServerExport'
 import { useSavedViews } from '../../hooks/useSavedViews'
@@ -42,7 +43,6 @@ import { Quotation360Page } from './Quotation360Page'
 import { Toast } from '../../components/ui/Toast'
 import { resolveCreateSalesOrderGateForQuotationDocument } from '../../utils/opportunitySalesOrderDraft'
 import { resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
-import { notify } from '../../store/toastStore'
 import { useQuotationConversion } from '../crm/hooks/useQuotationConversion'
 import { QuotationConversionDialog } from '@/components/quotations/QuotationConversionDialog'
 
@@ -661,7 +661,7 @@ export function CrmQuotationTemplatesPage() {
     if (!name) return
     const r = await resolveStoreAction(duplicateTemplate(sourceId, name))
     if (r.ok && r.templateId) navigate(`/crm/quotation-templates/${r.templateId}/editor`)
-    else if (!r.ok) alert(r.error ?? 'Could not duplicate template')
+    else if (!r.ok) notify.error(r.error ?? 'Could not duplicate template')
   }
 
   if (id && tpl) {
@@ -886,7 +886,7 @@ export function CrmQuotationTemplateNewPage() {
     if (!name) return
     const r = await resolveStoreAction(createTemplate({ templateName: name, productFamily: 'Custom', sections: [] }))
     if (r.ok && r.templateId) navigate(`/crm/quotation-templates/${r.templateId}/editor`)
-    else if (!r.ok) alert(r.error ?? 'Could not create template')
+    else if (!r.ok) notify.error(r.error ?? 'Could not create template')
   }
 
   async function handleFromBase(baseId: string) {
@@ -898,7 +898,7 @@ export function CrmQuotationTemplateNewPage() {
       createTemplate({ templateName: name, productFamily: base.productFamily, sourceTemplateId: baseId }),
     )
     if (r.ok && r.templateId) navigate(`/crm/quotation-templates/${r.templateId}/editor`)
-    else if (!r.ok) alert(r.error ?? 'Could not create template')
+    else if (!r.ok) notify.error(r.error ?? 'Could not create template')
   }
 
   const featured = findFeaturedQuotationTemplate(templates)

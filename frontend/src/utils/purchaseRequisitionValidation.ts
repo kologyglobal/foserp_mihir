@@ -27,6 +27,8 @@ export type PrEditorHeader = {
   referenceNumber: string
   purpose: string
   remarks: string
+  /** true = create RFQ after approval; false = ready for direct PO */
+  rfqRequired: boolean
 }
 
 export type PrEditorLine = PurchaseRequisitionLine & { key: string }

@@ -1,7 +1,7 @@
 /**
  * OpenAPI 3.0 spec for Swagger UI at `/api/docs` (development).
  * Keep in sync with route modules under `src/modules/`.
- * Last aligned: 2026-07-14 — attachments documentType, opportunity-stages ensure, locationId optionalUuid.
+ * Last aligned: 2026-07-17 — Users/Roles CRUD, CRM lifecycle/imports, master import/export, lookups.
  */
 
 const tenantIdParam = {
@@ -25,6 +25,129 @@ const idParam = {
   required: true,
   schema: { type: 'string', format: 'uuid' },
 }
+
+const userIdParam = {
+  name: 'userId',
+  in: 'path' as const,
+  required: true,
+  schema: { type: 'string', format: 'uuid' },
+}
+
+const roleIdParam = {
+  name: 'roleId',
+  in: 'path' as const,
+  required: true,
+  schema: { type: 'string', format: 'uuid' },
+}
+
+const noteIdParam = {
+  name: 'noteId',
+  in: 'path' as const,
+  required: true,
+  schema: { type: 'string', format: 'uuid' },
+}
+
+const attachmentIdParam = {
+  name: 'attachmentId',
+  in: 'path' as const,
+  required: true,
+  schema: { type: 'string', format: 'uuid' },
+}
+
+const CRM_MASTER_KIND_ENUM = [
+  'lead-sources',
+  'industries',
+  'territories',
+  'designations',
+  'departments',
+  'lead-stages',
+  'lead-priorities',
+  'lead-reasons',
+  'opportunity-stages',
+  'opportunity-priorities',
+  'activity-types',
+  'lost-reasons',
+  'commercial-terms',
+  'payment-terms',
+  'delivery-terms',
+  'warranty-terms',
+  'approval-rules',
+  'document-types',
+] as const
+
+const CRM_REPORT_ID_ENUM = [
+  'pipeline',
+  'stage-wise',
+  'follow-up-due',
+  'sales-activity',
+  'quotation-revision',
+  'quotation-approval',
+  'won-lost',
+  'customer-pipeline',
+  'conversion-funnel',
+  'lead-register',
+  'lead-owner',
+  'lead-priority',
+  'lead-stage',
+  'lead-conversion',
+  'closed-leads',
+  'lead-active-inactive',
+] as const
+
+const MASTER_REGISTRY_SLUG_ENUM = [
+  'countries',
+  'states',
+  'cities',
+  'uom',
+  'warehouses',
+  'locations',
+  'item-categories',
+  'hsn-sac',
+  'gst-groups',
+  'gst-rates',
+  'products',
+] as const
+
+const ENTITY_TYPE_ENUM = [
+  'COMPANY',
+  'CONTACT',
+  'LEAD',
+  'OPPORTUNITY',
+  'ACTIVITY',
+  'FOLLOW_UP',
+  'QUOTATION',
+] as const
+
+const crmMasterKindParam = {
+  name: 'kind',
+  in: 'path' as const,
+  required: true,
+  schema: { type: 'string', enum: [...CRM_MASTER_KIND_ENUM] },
+}
+
+const entityTypeParam = {
+  name: 'entityType',
+  in: 'path' as const,
+  required: true,
+  schema: { type: 'string', enum: [...ENTITY_TYPE_ENUM] },
+}
+
+const entityIdParam = {
+  name: 'entityId',
+  in: 'path' as const,
+  required: true,
+  schema: { type: 'string', format: 'uuid' },
+}
+
+const exportFilterParams = [
+  { name: 'search', in: 'query' as const, schema: { type: 'string' } },
+  { name: 'ownerId', in: 'query' as const, schema: { type: 'string', format: 'uuid' } },
+  { name: 'status', in: 'query' as const, schema: { type: 'string' } },
+  { name: 'stage', in: 'query' as const, schema: { type: 'string' } },
+  { name: 'source', in: 'query' as const, schema: { type: 'string' } },
+  { name: 'from', in: 'query' as const, schema: { type: 'string', format: 'date-time' } },
+  { name: 'to', in: 'query' as const, schema: { type: 'string', format: 'date-time' } },
+]
 
 function crudPaths(tag: string, resource: string, extra: Record<string, unknown> = {}) {
   const base = `/t/{tenantSlug}/crm/${resource}`
@@ -123,21 +246,46 @@ function masterResourcePaths(resource: string, tag = 'Masters') {
   }
 }
 
+function importTemplateAndPost(tag: string, basePath: string, entity: string) {
+  return {
+    [`${basePath}/${entity}/template`]: {
+      get: {
+        tags: [tag],
+        summary: `Download ${entity} import CSV template`,
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'CSV template' } },
+      },
+    },
+    [`${basePath}/${entity}`]: {
+      post: {
+        tags: [tag],
+        summary: `Import ${entity} (CSV payload)`,
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Import result' }, 400: { description: 'Validation errors' } },
+      },
+    },
+  }
+}
+
 export const swaggerSpec = {
   openapi: '3.0.3',
   info: {
     title: 'FOS ERP API',
-    version: '1.1.0',
+    version: '1.2.0',
     description: [
-      'Multi-tenant ERP backend — Auth, RBAC, CRM (companies → sales orders), masters, lookups.',
+      'Multi-tenant ERP backend — Auth, RBAC, CRM (companies → sales orders), masters, lookups, imports/exports.',
       '',
       '**Tenant routes:** prefer `/api/v1/t/{tenantSlug}/…` (frontend default). Equivalent UUID form: `/api/v1/tenants/{tenantId}/…`.',
       '',
       '**Auth:** `Authorization: Bearer <accessToken>`. Never send `tenantId` in request bodies.',
       '',
-      '**Shipped (2026-07):** CRM quotations CRUD + lifecycle, quotation templates, sales-order conversion,',
-      'product master, geography seed (countries/states/cities), CRM masters incl. designations & departments,',
-      'entity notes/attachments including `QUOTATION`.',
+      '**Shipped (API):** Auth, users/roles, CRM core + quotations/templates/sales orders, CRM masters, entity notes/attachments,',
+      'dashboard/forecast/reports/search/exports, master registry + items/vendors, CRM & master CSV import/export, lookups.',
+      '',
+      '**Deferred:** Purchase, inventory, production, quality, finance backends (demo frontend only).',
+      '',
+      '**Aligned:** 2026-07-17 — OpenAPI 1.2.0 fills Users/Roles detail, CRM lifecycle/history/imports, CRM master row CRUD,',
+      'entity note/attachment delete, master import/export, dedicated item/vendor lookups.',
     ].join('\n'),
   },
   servers: [{ url: '/api/v1', description: 'API v1' }],
@@ -151,6 +299,7 @@ export const swaggerSpec = {
     { name: 'CRM Contacts' },
     { name: 'CRM Leads' },
     { name: 'CRM Opportunities' },
+    { name: 'CRM Pipelines' },
     { name: 'CRM Activities' },
     { name: 'CRM Follow-ups' },
     { name: 'CRM Quotations' },
@@ -159,9 +308,12 @@ export const swaggerSpec = {
     { name: 'CRM Dashboard' },
     { name: 'CRM Reports' },
     { name: 'CRM Search' },
+    { name: 'CRM Imports' },
     { name: 'CRM Masters' },
     { name: 'CRM Entities' },
     { name: 'Masters' },
+    { name: 'Master Imports' },
+    { name: 'Master Exports' },
     { name: 'Lookups' },
   ],
   components: {
@@ -267,6 +419,43 @@ export const swaggerSpec = {
         responses: { 201: { description: 'Created' } },
       },
     },
+    '/t/{tenantSlug}/users/{userId}': {
+      get: {
+        tags: ['Users'],
+        summary: 'Get user',
+        parameters: [tenantSlugParam, userIdParam],
+        responses: { 200: { description: 'User' }, 404: { description: 'Not found' } },
+      },
+      patch: {
+        tags: ['Users'],
+        summary: 'Update user',
+        parameters: [tenantSlugParam, userIdParam],
+        responses: { 200: { description: 'Updated' } },
+      },
+      delete: {
+        tags: ['Users'],
+        summary: 'Soft-delete user',
+        parameters: [tenantSlugParam, userIdParam],
+        responses: { 200: { description: 'Deleted' } },
+      },
+    },
+    '/t/{tenantSlug}/users/{userId}/roles': {
+      post: {
+        tags: ['Users'],
+        summary: 'Assign role to user',
+        parameters: [tenantSlugParam, userIdParam],
+        responses: { 200: { description: 'Role assigned' } },
+      },
+    },
+    '/t/{tenantSlug}/users/{userId}/roles/{roleId}': {
+      delete: {
+        tags: ['Users'],
+        summary: 'Remove role from user',
+        parameters: [tenantSlugParam, userIdParam, roleIdParam],
+        responses: { 200: { description: 'Role removed' } },
+      },
+    },
+
     '/t/{tenantSlug}/roles': {
       get: {
         tags: ['Roles'],
@@ -279,6 +468,34 @@ export const swaggerSpec = {
         summary: 'Create role',
         parameters: [tenantSlugParam],
         responses: { 201: { description: 'Created' } },
+      },
+    },
+    '/t/{tenantSlug}/roles/permissions/catalog': {
+      get: {
+        tags: ['Roles'],
+        summary: 'List permission catalog',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Permission keys' } },
+      },
+    },
+    '/t/{tenantSlug}/roles/{roleId}': {
+      get: {
+        tags: ['Roles'],
+        summary: 'Get role',
+        parameters: [tenantSlugParam, roleIdParam],
+        responses: { 200: { description: 'Role' }, 404: { description: 'Not found' } },
+      },
+      patch: {
+        tags: ['Roles'],
+        summary: 'Update role',
+        parameters: [tenantSlugParam, roleIdParam],
+        responses: { 200: { description: 'Updated' } },
+      },
+      delete: {
+        tags: ['Roles'],
+        summary: 'Delete role',
+        parameters: [tenantSlugParam, roleIdParam],
+        responses: { 200: { description: 'Deleted' } },
       },
     },
 
@@ -322,12 +539,60 @@ export const swaggerSpec = {
         },
       },
     },
+    '/t/{tenantSlug}/crm/leads/{id}/change-stage': {
+      post: {
+        tags: ['CRM Leads'],
+        summary: 'Change lead stage',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Stage updated' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/leads/{id}/status-history': {
+      get: {
+        tags: ['CRM Leads'],
+        summary: 'Lead status audit trail',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Status history' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/leads/{id}/assignment-history': {
+      get: {
+        tags: ['CRM Leads'],
+        summary: 'Lead owner assignment history',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Assignment history' } },
+      },
+    },
     '/t/{tenantSlug}/crm/leads/bulk-assign': {
       post: {
         tags: ['CRM Leads'],
         summary: 'Bulk assign leads',
         parameters: [tenantSlugParam],
         responses: { 200: { description: 'Assigned' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/leads/bulk-status': {
+      post: {
+        tags: ['CRM Leads'],
+        summary: 'Bulk update lead status',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Updated' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/leads/bulk-archive': {
+      post: {
+        tags: ['CRM Leads'],
+        summary: 'Bulk archive leads',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Archived' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/leads/bulk-restore': {
+      post: {
+        tags: ['CRM Leads'],
+        summary: 'Bulk restore archived leads',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Restored' } },
       },
     },
 
@@ -348,12 +613,95 @@ export const swaggerSpec = {
         responses: { 200: { description: 'Lost' } },
       },
     },
-    '/t/{tenantSlug}/crm/pipelines': {
+    '/t/{tenantSlug}/crm/opportunities/{id}/reopen': {
+      post: {
+        tags: ['CRM Opportunities'],
+        summary: 'Reopen closed opportunity',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Reopened' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/opportunities/{id}/assign': {
+      post: {
+        tags: ['CRM Opportunities'],
+        summary: 'Assign opportunity owner',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Assigned' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/opportunities/{id}/move-stage': {
+      post: {
+        tags: ['CRM Opportunities'],
+        summary: 'Move opportunity to pipeline stage',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Stage moved' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/opportunities/{id}/stage-history': {
       get: {
         tags: ['CRM Opportunities'],
+        summary: 'Opportunity stage change history',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Stage history' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/opportunities/{id}/assignment-history': {
+      get: {
+        tags: ['CRM Opportunities'],
+        summary: 'Opportunity owner assignment history',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Assignment history' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/opportunities/{id}/amount-history': {
+      get: {
+        tags: ['CRM Opportunities'],
+        summary: 'Opportunity amount change history',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Amount history' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/opportunities/{id}/status-history': {
+      get: {
+        tags: ['CRM Opportunities'],
+        summary: 'Opportunity win/lose/reopen history',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Status history' } },
+      },
+    },
+
+    '/t/{tenantSlug}/crm/pipelines': {
+      get: {
+        tags: ['CRM Pipelines'],
         summary: 'List pipelines',
         parameters: [tenantSlugParam],
         responses: { 200: { description: 'Pipelines' } },
+      },
+      post: {
+        tags: ['CRM Pipelines'],
+        summary: 'Create pipeline',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Created' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/pipelines/{id}': {
+      get: {
+        tags: ['CRM Pipelines'],
+        summary: 'Get pipeline',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Pipeline' } },
+      },
+      patch: {
+        tags: ['CRM Pipelines'],
+        summary: 'Update pipeline',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Updated' } },
+      },
+      delete: {
+        tags: ['CRM Pipelines'],
+        summary: 'Delete pipeline',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Deleted' } },
       },
     },
 
@@ -368,6 +716,38 @@ export const swaggerSpec = {
     },
 
     ...crudPaths('CRM Follow-ups', 'follow-ups'),
+    '/t/{tenantSlug}/crm/follow-ups/{id}/complete': {
+      post: {
+        tags: ['CRM Follow-ups'],
+        summary: 'Mark follow-up complete',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Completed' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/follow-ups/{id}/reschedule': {
+      post: {
+        tags: ['CRM Follow-ups'],
+        summary: 'Reschedule follow-up',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Rescheduled' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/follow-ups/{id}/snooze': {
+      post: {
+        tags: ['CRM Follow-ups'],
+        summary: 'Snooze follow-up',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Snoozed' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/follow-ups/{id}/cancel': {
+      post: {
+        tags: ['CRM Follow-ups'],
+        summary: 'Cancel follow-up',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Cancelled' } },
+      },
+    },
 
     '/t/{tenantSlug}/crm/quotations': {
       get: {
@@ -629,7 +1009,20 @@ export const swaggerSpec = {
         summary: 'Run CRM report',
         parameters: [
           tenantSlugParam,
-          { name: 'reportId', in: 'query', required: true, schema: { type: 'string' } },
+          {
+            name: 'reportId',
+            in: 'query',
+            required: true,
+            schema: { type: 'string', enum: [...CRM_REPORT_ID_ENUM] },
+          },
+          { name: 'from', in: 'query', schema: { type: 'string', format: 'date-time' } },
+          { name: 'to', in: 'query', schema: { type: 'string', format: 'date-time' } },
+          { name: 'ownerId', in: 'query', schema: { type: 'string', format: 'uuid' } },
+          { name: 'stage', in: 'query', schema: { type: 'string' } },
+          { name: 'status', in: 'query', schema: { type: 'string' } },
+          { name: 'source', in: 'query', schema: { type: 'string' } },
+          { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 20, maximum: 100 } },
         ],
         responses: { 200: { description: 'Report rows' } },
       },
@@ -641,6 +1034,11 @@ export const swaggerSpec = {
         parameters: [
           tenantSlugParam,
           { name: 'q', in: 'query', required: true, schema: { type: 'string' } },
+          {
+            name: 'limit',
+            in: 'query',
+            schema: { type: 'integer', minimum: 1, maximum: 50, default: 25 },
+          },
         ],
         responses: { 200: { description: 'Search hits' } },
       },
@@ -660,52 +1058,35 @@ export const swaggerSpec = {
               enum: ['companies', 'contacts', 'leads', 'opportunities', 'quotations', 'activities', 'follow-ups'],
             },
           },
+          ...exportFilterParams,
         ],
         responses: { 200: { description: 'CSV blob' } },
       },
     },
 
+    ...importTemplateAndPost('CRM Imports', '/t/{tenantSlug}/crm/imports', 'companies'),
+    ...importTemplateAndPost('CRM Imports', '/t/{tenantSlug}/crm/imports', 'contacts'),
+    ...importTemplateAndPost('CRM Imports', '/t/{tenantSlug}/crm/imports', 'leads'),
+
+    '/t/{tenantSlug}/crm/masters/sync': {
+      get: {
+        tags: ['CRM Masters'],
+        summary: 'Sync/seed all CRM master kinds',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Sync result' } },
+      },
+    },
     '/t/{tenantSlug}/crm/masters/{kind}': {
       get: {
         tags: ['CRM Masters'],
         summary: 'List CRM master rows by kind',
-        parameters: [
-          tenantSlugParam,
-          {
-            name: 'kind',
-            in: 'path',
-            required: true,
-            schema: {
-              type: 'string',
-              enum: [
-                'lead-sources',
-                'industries',
-                'territories',
-                'designations',
-                'departments',
-                'lead-stages',
-                'lead-priorities',
-                'lead-reasons',
-                'opportunity-stages',
-                'opportunity-priorities',
-                'activity-types',
-                'lost-reasons',
-                'commercial-terms',
-                'payment-terms',
-                'delivery-terms',
-                'warranty-terms',
-                'approval-rules',
-                'document-types',
-              ],
-            },
-          },
-        ],
+        parameters: [tenantSlugParam, crmMasterKindParam],
         responses: { 200: { description: 'Master rows' } },
       },
       post: {
         tags: ['CRM Masters'],
         summary: 'Create CRM master row',
-        parameters: [tenantSlugParam, { name: 'kind', in: 'path', required: true, schema: { type: 'string' } }],
+        parameters: [tenantSlugParam, crmMasterKindParam],
         responses: { 201: { description: 'Created' } },
       },
     },
@@ -713,8 +1094,44 @@ export const swaggerSpec = {
       get: {
         tags: ['CRM Masters'],
         summary: 'Active lookup options for kind',
-        parameters: [tenantSlugParam, { name: 'kind', in: 'path', required: true, schema: { type: 'string' } }],
+        parameters: [tenantSlugParam, crmMasterKindParam],
         responses: { 200: { description: 'Lookup options' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/masters/{kind}/{id}': {
+      get: {
+        tags: ['CRM Masters'],
+        summary: 'Get CRM master row',
+        parameters: [tenantSlugParam, crmMasterKindParam, idParam],
+        responses: { 200: { description: 'Master row' } },
+      },
+      patch: {
+        tags: ['CRM Masters'],
+        summary: 'Update CRM master row',
+        parameters: [tenantSlugParam, crmMasterKindParam, idParam],
+        responses: { 200: { description: 'Updated' } },
+      },
+      delete: {
+        tags: ['CRM Masters'],
+        summary: 'Soft-delete CRM master row',
+        parameters: [tenantSlugParam, crmMasterKindParam, idParam],
+        responses: { 200: { description: 'Deleted' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/masters/{kind}/{id}/activate': {
+      post: {
+        tags: ['CRM Masters'],
+        summary: 'Activate CRM master row',
+        parameters: [tenantSlugParam, crmMasterKindParam, idParam],
+        responses: { 200: { description: 'Activated' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/masters/{kind}/{id}/deactivate': {
+      post: {
+        tags: ['CRM Masters'],
+        summary: 'Deactivate CRM master row',
+        parameters: [tenantSlugParam, crmMasterKindParam, idParam],
+        responses: { 200: { description: 'Deactivated' } },
       },
     },
 
@@ -722,30 +1139,28 @@ export const swaggerSpec = {
       get: {
         tags: ['CRM Entities'],
         summary: 'List notes',
-        parameters: [
-          tenantSlugParam,
-          {
-            name: 'entityType',
-            in: 'path',
-            required: true,
-            schema: {
-              type: 'string',
-              enum: ['COMPANY', 'CONTACT', 'LEAD', 'OPPORTUNITY', 'ACTIVITY', 'FOLLOW_UP', 'QUOTATION'],
-            },
-          },
-          { name: 'entityId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
-        ],
+        parameters: [tenantSlugParam, entityTypeParam, entityIdParam],
         responses: { 200: { description: 'Notes' } },
       },
       post: {
         tags: ['CRM Entities'],
         summary: 'Create note',
-        parameters: [
-          tenantSlugParam,
-          { name: 'entityType', in: 'path', required: true, schema: { type: 'string' } },
-          { name: 'entityId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
-        ],
+        parameters: [tenantSlugParam, entityTypeParam, entityIdParam],
         responses: { 201: { description: 'Created' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/entities/notes/{noteId}': {
+      patch: {
+        tags: ['CRM Entities'],
+        summary: 'Update note',
+        parameters: [tenantSlugParam, noteIdParam],
+        responses: { 200: { description: 'Updated' } },
+      },
+      delete: {
+        tags: ['CRM Entities'],
+        summary: 'Delete note',
+        parameters: [tenantSlugParam, noteIdParam],
+        responses: { 200: { description: 'Deleted' } },
       },
     },
     '/t/{tenantSlug}/crm/entities/{entityType}/{entityId}/attachments': {
@@ -754,11 +1169,7 @@ export const swaggerSpec = {
         summary: 'List attachments',
         description:
           'Each row includes `documentType` (CRM `document-types` master code) and `documentTypeName` (resolved label).',
-        parameters: [
-          tenantSlugParam,
-          { name: 'entityType', in: 'path', required: true, schema: { type: 'string' } },
-          { name: 'entityId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
-        ],
+        parameters: [tenantSlugParam, entityTypeParam, entityIdParam],
         responses: {
           200: {
             description: 'Attachments with documentType + documentTypeName',
@@ -771,11 +1182,7 @@ export const swaggerSpec = {
         description:
           'Requires `documentType` — active code from CRM Document Type / Attachment Master (`document-types`). ' +
           'JSON body limit is sized for CRM_MAX_UPLOAD_BYTES (default 25MB decoded). Oversized payloads return 413.',
-        parameters: [
-          tenantSlugParam,
-          { name: 'entityType', in: 'path', required: true, schema: { type: 'string' } },
-          { name: 'entityId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
-        ],
+        parameters: [tenantSlugParam, entityTypeParam, entityIdParam],
         requestBody: {
           required: true,
           content: {
@@ -807,11 +1214,16 @@ export const swaggerSpec = {
       get: {
         tags: ['CRM Entities'],
         summary: 'Download attachment',
-        parameters: [
-          tenantSlugParam,
-          { name: 'attachmentId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
-        ],
+        parameters: [tenantSlugParam, attachmentIdParam],
         responses: { 200: { description: 'File blob' } },
+      },
+    },
+    '/t/{tenantSlug}/crm/entities/attachments/{attachmentId}': {
+      delete: {
+        tags: ['CRM Entities'],
+        summary: 'Delete attachment',
+        parameters: [tenantSlugParam, attachmentIdParam],
+        responses: { 200: { description: 'Deleted' } },
       },
     },
 
@@ -829,10 +1241,42 @@ export const swaggerSpec = {
     ...masterResourcePaths('items'),
     ...masterResourcePaths('vendors'),
 
+    ...importTemplateAndPost('Master Imports', '/t/{tenantSlug}/masters/imports', 'items'),
+    ...importTemplateAndPost('Master Imports', '/t/{tenantSlug}/masters/imports', 'vendors'),
+    ...importTemplateAndPost('Master Imports', '/t/{tenantSlug}/masters/imports', 'hsn-sac'),
+
+    '/t/{tenantSlug}/masters/exports/items': {
+      get: {
+        tags: ['Master Exports'],
+        summary: 'Export items CSV',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'CSV blob' } },
+      },
+    },
+    '/t/{tenantSlug}/masters/exports/vendors': {
+      get: {
+        tags: ['Master Exports'],
+        summary: 'Export vendors CSV',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'CSV blob' } },
+      },
+    },
+    '/t/{tenantSlug}/masters/exports/hsn-sac': {
+      get: {
+        tags: ['Master Exports'],
+        summary: 'Export HSN/SAC CSV',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'CSV blob' } },
+      },
+    },
+
     '/t/{tenantSlug}/lookups/{resource}': {
       get: {
         tags: ['Lookups'],
-        summary: 'Lightweight dropdown lookup',
+        summary: 'Lightweight dropdown lookup (registry masters)',
+        description:
+          'Valid `{resource}` values are registry slugs only (countries, states, cities, uom, warehouses, locations, item-categories, hsn-sac, gst-groups, gst-rates, products). ' +
+          'Use `/lookups/items` and `/lookups/vendors` for item/vendor dropdowns.',
         parameters: [
           tenantSlugParam,
           {
@@ -841,11 +1285,27 @@ export const swaggerSpec = {
             required: true,
             schema: {
               type: 'string',
-              description: 'Registry slug, e.g. countries, states, cities, products, items, vendors',
+              enum: [...MASTER_REGISTRY_SLUG_ENUM],
             },
           },
         ],
         responses: { 200: { description: '[{ id, code, name, … }]' } },
+      },
+    },
+    '/t/{tenantSlug}/lookups/items': {
+      get: {
+        tags: ['Lookups'],
+        summary: 'Item dropdown lookup',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Item lookup rows' } },
+      },
+    },
+    '/t/{tenantSlug}/lookups/vendors': {
+      get: {
+        tags: ['Lookups'],
+        summary: 'Vendor dropdown lookup',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Vendor lookup rows' } },
       },
     },
   },

@@ -48,6 +48,7 @@ import type {
 } from '@/types/purchaseDomain'
 import { approvalsListBreadcrumbs } from '@/utils/purchaseNavigation'
 import { notify } from '@/store/toastStore'
+import { systemPrompt } from '@/utils/systemConfirm'
 import { cn } from '@/utils/cn'
 
 const TABS: PurchaseApprovalQueueTab[] = [
@@ -203,42 +204,50 @@ export function PurchaseApprovalsPage() {
     setReviewId(id)
   }
 
-  const promptComment = (label: string) => {
-    const value = window.prompt(`${label} (mandatory)`)
-    return value
-  }
-
   const runQuickAction = useCallback(
     async (
       row: PurchaseApprovalQueueRow,
       kind: 'approve' | 'reject' | 'send_back' | 'delegate',
     ) => {
-      setBusyId(row.approvalId)
       try {
-        if (kind === 'approve') {
-          await approvePurchaseDocument(row.documentType, row.documentId, 'Approved')
-          notify.success(`${row.documentNumber} approved`)
-        } else if (kind === 'reject') {
-          const remarks = promptComment('Rejection comments')
+        if (kind === 'reject') {
+          const remarks = await systemPrompt({
+            title: 'Reject document',
+            description: `Reject ${row.documentNumber}? Comments are required and will be shared with the requester.`,
+            fieldLabel: 'Rejection comments',
+            placeholder: 'Explain why this request is being rejected…',
+            confirmLabel: 'Reject',
+            cancelLabel: 'Cancel',
+            variant: 'danger',
+            required: true,
+          })
           if (remarks == null) return
-          if (!remarks.trim()) {
-            notify.error('Rejection comments are mandatory')
-            return
-          }
-          await rejectPurchaseDocument(row.documentType, row.documentId, remarks.trim())
+          setBusyId(row.approvalId)
+          await rejectPurchaseDocument(row.documentType, row.documentId, remarks)
           notify.success(`${row.documentNumber} rejected`)
         } else if (kind === 'send_back') {
-          const remarks = promptComment('Send-back comments')
+          const remarks = await systemPrompt({
+            title: 'Send back for correction',
+            description: `Return ${row.documentNumber} to the requester. Comments are mandatory so they know what to fix.`,
+            fieldLabel: 'Send-back comments',
+            placeholder: 'Describe what needs to be corrected…',
+            confirmLabel: 'Send Back',
+            cancelLabel: 'Cancel',
+            required: true,
+          })
           if (remarks == null) return
-          if (!remarks.trim()) {
-            notify.error('Send-back comments are mandatory')
-            return
-          }
-          await sendBackPurchaseDocument(row.documentType, row.documentId, remarks.trim())
+          setBusyId(row.approvalId)
+          await sendBackPurchaseDocument(row.documentType, row.documentId, remarks)
           notify.success(`${row.documentNumber} sent back`)
         } else {
-          await delegatePurchaseApproval(row.approvalId, 'finance_head', 'Delegated to Finance Head')
-          notify.success(`${row.documentNumber} delegated`)
+          setBusyId(row.approvalId)
+          if (kind === 'approve') {
+            await approvePurchaseDocument(row.documentType, row.documentId, 'Approved')
+            notify.success(`${row.documentNumber} approved`)
+          } else {
+            await delegatePurchaseApproval(row.approvalId, 'finance_head', 'Delegated to Finance Head')
+            notify.success(`${row.documentNumber} delegated`)
+          }
         }
         setRefreshToken((n) => n + 1)
       } catch (err) {
@@ -465,6 +474,8 @@ export function PurchaseApprovalsPage() {
           </EnterpriseRegisterTableShell>
           <PurchaseRegisterContextPanel
             ariaLabel="Approval queue overview and suggestions"
+            title="Approval Insights"
+            subtitle="AI suggested bottlenecks and next actions for this queue."
             overview={registerOverview}
             suggestions={registerSuggestions}
           />

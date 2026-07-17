@@ -7,6 +7,8 @@ export function hasModernCommandCenter(src: string): boolean {
     src.includes('CommandCenterHeader') ||
     (src.includes('PremiumPageShell') && src.includes('commandHero')) ||
     (src.includes('OperationalPageShell') && src.includes('insights')) ||
+    (src.includes('OperationalPageShell') &&
+      (src.includes('DynamicsDashboardPanel') || src.includes('DynamicsDashboardGrid'))) ||
     (src.includes("from '../../design-system'") && src.includes('insights'))
   )
 }

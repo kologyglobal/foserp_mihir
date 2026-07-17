@@ -6,56 +6,118 @@ import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
 import { FormField } from '@/components/forms/FormField'
 import { Input, Textarea } from '@/components/forms/Inputs'
-import { DataTable } from '@/components/tables/DataTable'
+import { TableLink } from '@/components/ui/AppLink'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
 import {
+  ManufacturingAiRail,
+  ManufacturingDemoBanner,
+} from '@/components/manufacturing'
+import {
+  approveJobWorkDifferenceDemo,
+  cancelJobWorkOrderDemo,
   closeJobWorkOrderDemo,
   dispatchJobWorkMaterialDemo,
+  getJobWorkDispatches,
   getJobWorkMaterials,
   getJobWorkOrderById,
+  getJobWorkReceipts,
   getJobWorkReconciliation,
   linkJobWorkVendorInvoiceDemo,
   receiveJobWorkDemo,
-  returnJobWorkMaterialDemo,
-  cancelJobWorkOrderDemo,
-  approveJobWorkDifferenceDemo,
 } from '@/services/manufacturing'
-import type { JobWorkMaterial, JobWorkOrder } from '@/types/manufacturingJobWork'
+import type {
+  JobWorkDispatch,
+  JobWorkMaterial,
+  JobWorkOrder,
+  JobWorkReceipt,
+  JobWorkReconciliation,
+} from '@/types/manufacturingJobWork'
 import { JW_STATUS_LABELS } from '@/types/manufacturingJobWork'
+import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate, formatDateTime } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { useManufacturingPermissions } from '@/utils/permissions/manufacturing'
+import { buildJobWorkDetailAiInsights } from '@/utils/manufacturing/insights'
+import { cn } from '@/utils/cn'
 
-type Dialog = 'dispatch' | 'receive' | 'return' | 'reconcile' | 'invoice' | 'close' | 'cancel' | null
+type Tab =
+  | 'overview'
+  | 'material_sent'
+  | 'receipts'
+  | 'reconciliation'
+  | 'invoice'
+  | 'timeline'
+  | 'documents'
+
+type Dialog = 'dispatch' | 'receive' | 'reconcile' | 'invoice' | 'close' | 'cancel' | null
+
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'material_sent', label: 'Material Sent' },
+  { id: 'receipts', label: 'Receipts' },
+  { id: 'reconciliation', label: 'Reconciliation' },
+  { id: 'invoice', label: 'Vendor Invoice Placeholder' },
+  { id: 'timeline', label: 'Timeline' },
+  { id: 'documents', label: 'Documents' },
+]
+
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[11px] font-medium uppercase tracking-wide text-erp-muted">{label}</div>
+      <div className="mt-0.5 text-[13px] font-medium text-erp-text">{value ?? '—'}</div>
+    </div>
+  )
+}
 
 export function JobWorkDetailPage() {
   const { jobWorkId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const perms = useManufacturingPermissions()
+
   const [jobWork, setJobWork] = useState<JobWorkOrder | null>(null)
   const [materials, setMaterials] = useState<JobWorkMaterial[]>([])
-  const [tab, setTab] = useState<'overview' | 'materials' | 'activity'>('overview')
+  const [dispatches, setDispatches] = useState<JobWorkDispatch[]>([])
+  const [receipts, setReceipts] = useState<JobWorkReceipt[]>([])
+  const [recon, setRecon] = useState<JobWorkReconciliation | null>(null)
+  const [tab, setTab] = useState<Tab>('overview')
   const [dialog, setDialog] = useState<Dialog>(null)
-  const [qty, setQty] = useState(0)
+  const [qty, setQty] = useState(1)
   const [note, setNote] = useState('')
+  const [invoiceNo, setInvoiceNo] = useState('')
+  const [invoiceAmount, setInvoiceAmount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [reconSummary, setReconSummary] = useState('')
+  const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
     if (!jobWorkId) return
     setLoading(true)
-    const [item, lines] = await Promise.all([getJobWorkOrderById(jobWorkId), getJobWorkMaterials(jobWorkId)])
-    if (!item) {
-      notify.error('Job work not found')
-      navigate('/manufacturing/job-work')
-      return
+    try {
+      const [item, lines, d, r, rec] = await Promise.all([
+        getJobWorkOrderById(jobWorkId),
+        getJobWorkMaterials(jobWorkId),
+        getJobWorkDispatches(jobWorkId),
+        getJobWorkReceipts(jobWorkId),
+        getJobWorkReconciliation(jobWorkId),
+      ])
+      if (!item) {
+        notify.error('Job work not found')
+        navigate('/manufacturing/job-work')
+        return
+      }
+      setJobWork(item)
+      setMaterials(lines)
+      setDispatches(d)
+      setReceipts(r)
+      setRecon(rec)
+      setQty(Math.max(1, item.pendingQty || 1))
+      setInvoiceAmount(item.invoiceAmount ?? item.expectedCost)
+      setInvoiceNo(item.invoiceNo ?? '')
+    } finally {
+      setLoading(false)
     }
-    setJobWork(item)
-    setMaterials(lines)
-    setQty(Math.max(1, item.pendingQty || 1))
-    setLoading(false)
   }, [jobWorkId, navigate])
 
   useEffect(() => {
@@ -64,29 +126,48 @@ export function JobWorkDetailPage() {
 
   useEffect(() => {
     const action = searchParams.get('action') as Dialog
-    if (action && ['dispatch', 'receive', 'return', 'reconcile', 'invoice', 'close', 'cancel'].includes(action)) {
+    if (action && ['dispatch', 'receive', 'reconcile', 'invoice', 'close', 'cancel'].includes(action)) {
       setDialog(action)
-      setSearchParams({}, { replace: true })
+    }
+    const t = searchParams.get('tab') as Tab | null
+    if (t && TABS.some((x) => x.id === t)) setTab(t)
+    if (action || t) {
+      searchParams.delete('action')
+      searchParams.delete('tab')
+      setSearchParams(searchParams, { replace: true })
     }
   }, [searchParams, setSearchParams])
 
-  if (loading || !jobWork) return <LoadingState />
+  if (loading || !jobWork) return <LoadingState variant="card" />
 
   const readOnly = jobWork.readOnly || ['closed', 'cancelled'].includes(jobWork.status)
+  const canSend = !readOnly && perms.canDispatchJobWork && ['draft', 'material_sent'].includes(jobWork.status)
+  const canReceive = !readOnly && perms.canReceiveJobWork && !['draft', 'closed', 'cancelled'].includes(jobWork.status)
+  const canReconcile = !readOnly && perms.canReconcileJobWork && ['received', 'reconciliation_pending', 'partially_received'].includes(jobWork.status)
+  const canInvoice = !readOnly && perms.canLinkJwInvoice
+  const canClose = !readOnly && perms.canCloseJobWork && ['received', 'reconciliation_pending'].includes(jobWork.status)
+  const canCancel = !readOnly && perms.canCancelJobWork
+
+  const tips = buildJobWorkDetailAiInsights(jobWork)
 
   const act = async (fn: () => Promise<{ ok: boolean; error?: string }>, success: string) => {
-    const r = await fn()
-    if (!r.ok) {
-      notify.error(r.error ?? 'Action failed')
-      return
+    setBusy(true)
+    try {
+      const r = await fn()
+      if (!r.ok) {
+        notify.error(r.error ?? 'Action failed')
+        return
+      }
+      notify.success(success)
+      setDialog(null)
+      setNote('')
+      await load()
+    } finally {
+      setBusy(false)
     }
-    notify.success(success)
-    setDialog(null)
-    setNote('')
-    await load()
   }
 
-  const doAction = () => {
+  const confirmDialog = () => {
     if (dialog === 'dispatch') {
       void act(
         () =>
@@ -97,7 +178,7 @@ export function JobWorkDetailPage() {
             })),
             remarks: note,
           }),
-        'Materials dispatched',
+        'Material sent to vendor',
       )
     }
     if (dialog === 'receive') {
@@ -109,64 +190,61 @@ export function JobWorkDetailPage() {
             vendorChallan: note || undefined,
             reconcileAfter: qty >= jobWork.pendingQty,
           }),
-        'Receipt confirmed',
-      )
-    }
-    if (dialog === 'return') {
-      void act(
-        () =>
-          returnJobWorkMaterialDemo(
-            jobWork.id,
-            materials.map((line) => ({ materialId: line.id, returnQty: Math.max(0, line.balanceWithVendor) })),
-          ),
-        'Material return recorded',
+        'Receipt recorded',
       )
     }
     if (dialog === 'invoice') {
       void act(
         () =>
           linkJobWorkVendorInvoiceDemo(jobWork.id, {
-            invoiceId: `inv-${Date.now()}`,
-            invoiceNo: note || `PI-${jobWork.jwNumber}`,
-            invoiceAmount: qty || jobWork.expectedCost,
+            invoiceId: `inv-placeholder-${Date.now()}`,
+            invoiceNo: invoiceNo || `PI-${jobWork.jwNumber}`,
+            invoiceAmount: invoiceAmount || jobWork.expectedCost,
           }),
-        'Vendor invoice linked',
+        'Vendor invoice placeholder linked',
       )
     }
     if (dialog === 'close') void act(() => closeJobWorkOrderDemo(jobWork.id), 'Job work closed')
     if (dialog === 'cancel') void act(() => cancelJobWorkOrderDemo(jobWork.id, note), 'Job work cancelled')
     if (dialog === 'reconcile') {
-      void getJobWorkReconciliation(jobWork.id).then(async (r) => {
-        if (!r) return
-        setReconSummary(
-          r.lines.map((l) => `${l.materialCode}: bal ${l.actualBalance} (${l.status})`).join(' · ') || 'No lines',
-        )
-        if (!r.canClose && note.trim()) {
-          await approveJobWorkDifferenceDemo(jobWork.id, note)
-          notify.success('Difference approved')
+      void (async () => {
+        setBusy(true)
+        try {
+          const r = await getJobWorkReconciliation(jobWork.id)
+          if (!r) return
+          setRecon(r)
+          if (!r.canClose && note.trim()) {
+            await approveJobWorkDifferenceDemo(jobWork.id, note)
+            notify.success('Difference approved')
+          } else if (r.warnings.length) {
+            notify.warning(r.warnings.join('; '))
+          } else {
+            notify.success('Reconciliation reviewed')
+          }
+          setDialog(null)
+          setNote('')
           await load()
-        } else {
-          notify.info(r.warnings.join(', ') || 'Reconciliation reviewed')
+        } finally {
+          setBusy(false)
         }
-        setDialog(null)
-      })
+      })()
     }
   }
 
   const dialogTitle =
     dialog === 'dispatch'
-      ? 'Dispatch Material'
+      ? 'Send Material'
       : dialog === 'receive'
-        ? 'Receive Job Work'
+        ? 'Receive Quantity'
         : dialog === 'invoice'
-          ? 'Link Vendor Invoice'
+          ? 'Link Vendor Invoice (Placeholder)'
           : dialog === 'reconcile'
-            ? 'Reconcile Material'
+            ? 'Reconcile'
             : dialog === 'close'
               ? 'Close Job Work'
               : dialog === 'cancel'
                 ? 'Cancel Job Work'
-                : 'Return Material'
+                : ''
 
   return (
     <OperationalPageShell
@@ -181,168 +259,394 @@ export function JobWorkDetailPage() {
         { label: jobWork.jwNumber },
       ]}
       autoBreadcrumbs={false}
+      favoritePath={`/manufacturing/job-work/${jobWork.id}`}
       commandBar={(
         <ErpCommandBar
           inline
           sticky
           primaryAction={
-            !readOnly && perms.canDispatchJobWork
-              ? { id: 'dispatch', label: 'Send Material', onClick: () => setDialog('dispatch') }
-              : undefined
+            canSend
+              ? { id: 'send', label: 'Send Material', onClick: () => setDialog('dispatch') }
+              : canReceive
+                ? { id: 'receive', label: 'Receive', onClick: () => setDialog('receive') }
+                : canClose
+                  ? { id: 'close', label: 'Close', onClick: () => setDialog('close') }
+                  : undefined
           }
           secondaryActions={[
-            ...(!readOnly && perms.canReceiveJobWork
+            ...(!readOnly && jobWork.status === 'draft' && perms.canEditJobWork
+              ? [{ id: 'edit', label: 'Edit', onClick: () => navigate(`/manufacturing/job-work/${jobWork.id}/edit`) }]
+              : []),
+            ...(canReceive && canSend
               ? [{ id: 'receive', label: 'Receive', onClick: () => setDialog('receive') }]
               : []),
-            ...(!readOnly && perms.canReturnJobWorkMaterial
-              ? [{ id: 'return', label: 'Return Material', onClick: () => setDialog('return') }]
+            ...(canReconcile
+              ? [{ id: 'reconcile', label: 'Reconcile', onClick: () => { setTab('reconciliation'); setDialog('reconcile') } }]
               : []),
-            ...(!readOnly && perms.canReconcileJobWork
-              ? [{ id: 'reconcile', label: 'Reconcile', onClick: () => setDialog('reconcile') }]
+            ...(canInvoice
+              ? [{ id: 'invoice', label: 'Link Invoice', onClick: () => { setTab('invoice'); setDialog('invoice') } }]
               : []),
-            ...(!readOnly && perms.canLinkJwInvoice
-              ? [{ id: 'invoice', label: 'Link Invoice', onClick: () => setDialog('invoice') }]
-              : []),
-            ...(!readOnly && perms.canCloseJobWork
+            ...(canClose && (canSend || canReceive)
               ? [{ id: 'close', label: 'Close', onClick: () => setDialog('close') }]
+              : []),
+            ...(canCancel
+              ? [{ id: 'cancel', label: 'Cancel', onClick: () => setDialog('cancel') }]
               : []),
             { id: 'back', label: 'Back', onClick: () => navigate('/manufacturing/job-work') },
           ]}
         />
       )}
     >
-      <div className="mb-4 grid grid-cols-2 gap-2 rounded border border-erp-border p-3 sm:grid-cols-3 lg:grid-cols-6">
-        {[
-          ['Work Order', jobWork.workOrderNo],
-          ['Ordered', jobWork.orderedQty],
-          ['Sent', jobWork.sentQty],
-          ['Received', jobWork.receivedQty],
-          ['Pending', jobWork.pendingQty],
-          ['Return by', formatDate(jobWork.expectedReturnDate)],
-        ].map(([label, value]) => (
-          <div key={String(label)}>
-            <div className="text-xs text-erp-muted">{label}</div>
-            <div className="font-medium">{value}</div>
-          </div>
-        ))}
-        <div>
-          <div className="text-xs text-erp-muted">Status</div>
-          <StatusDot label={JW_STATUS_LABELS[jobWork.status]} tone={statusToneFromLabel(jobWork.status)} />
-        </div>
-      </div>
+      <ManufacturingAiRail title="Job Work Insights" suggestions={tips}>
+      <div className="space-y-3">
+        <ManufacturingDemoBanner message="Select WO → Vendor → Send Material → Receive → Reconcile → Invoice placeholder → Close. No complex subcontracting accounting." />
 
-      <div className="mb-3 flex gap-2 border-b border-erp-border" role="tablist">
-        {(['overview', 'materials', 'activity'] as const).map((item) => (
-          <button
-            key={item}
-            type="button"
-            role="tab"
-            aria-selected={tab === item}
-            onClick={() => setTab(item)}
-            className={tab === item ? 'border-b-2 border-erp-primary px-3 py-2 text-sm font-medium' : 'px-3 py-2 text-sm text-erp-muted'}
-          >
-            {item[0].toUpperCase() + item.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'overview' ? (
-        <div className="grid gap-3 rounded border border-erp-border p-4 sm:grid-cols-2">
-          <div>
-            <div className="text-xs text-erp-muted">Item</div>
-            {jobWork.itemCode} — {jobWork.itemName}
-          </div>
-          <div>
-            <div className="text-xs text-erp-muted">Rate</div>
-            {jobWork.rate} ({jobWork.rateBasis}) · Expected {jobWork.expectedCost}
-          </div>
-          <div>
-            <div className="text-xs text-erp-muted">Material warehouse</div>
-            {jobWork.materialWarehouseName}
-          </div>
-          <div>
-            <div className="text-xs text-erp-muted">Receipt warehouse</div>
-            {jobWork.receiptWarehouseName}
-          </div>
-          <div>
-            <div className="text-xs text-erp-muted">Invoice</div>
-            {jobWork.invoiceNo ?? 'Not linked'} ({jobWork.invoiceStatus})
-          </div>
-          {reconSummary ? (
-            <div className="sm:col-span-2">
-              <div className="text-xs text-erp-muted">Last reconciliation</div>
-              {reconSummary}
+        <div className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="font-mono text-lg font-semibold text-erp-primary">{jobWork.jwNumber}</p>
+              <p className="text-[14px] font-medium text-erp-text">{jobWork.process} · {jobWork.vendorName}</p>
+              <p className="mt-1 text-[12px] text-erp-muted">
+                Linked WO:{' '}
+                <TableLink to={`/manufacturing/work-orders/${jobWork.workOrderId}`} className="font-mono font-semibold">
+                  {jobWork.workOrderNo}
+                </TableLink>
+              </p>
             </div>
-          ) : null}
+            <StatusDot tone={statusToneFromLabel(jobWork.status)} label={JW_STATUS_LABELS[jobWork.status]} />
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+            <Field label="Ordered Qty" value={`${jobWork.orderedQty} ${jobWork.uom}`} />
+            <Field label="Sent Qty" value={jobWork.sentQty} />
+            <Field label="Received Qty" value={jobWork.receivedQty} />
+            <Field label="Balance Qty" value={jobWork.pendingQty} />
+            <Field label="Material Sent" value={jobWork.materialSentDate ? formatDate(jobWork.materialSentDate) : '—'} />
+            <Field label="Expected Return" value={formatDate(jobWork.expectedReturnDate)} />
+          </div>
         </div>
-      ) : null}
 
-      {tab === 'materials' ? (
-        <div className="overflow-x-auto">
-          <DataTable
-            data={materials}
-            columns={[
-              { accessorKey: 'materialCode', header: 'Material' },
-              { accessorKey: 'requiredQty', header: 'Required' },
-              { accessorKey: 'availableQty', header: 'Available' },
-              { accessorKey: 'sentQty', header: 'Sent' },
-              { accessorKey: 'additionalSentQty', header: 'Additional' },
-              { accessorKey: 'consumedQty', header: 'Consumed' },
-              { accessorKey: 'returnedQty', header: 'Returned' },
-              { accessorKey: 'scrapReturnedQty', header: 'Scrap Returned' },
-              { accessorKey: 'balanceWithVendor', header: 'Balance' },
-              { accessorKey: 'status', header: 'Status' },
-            ]}
-          />
-        </div>
-      ) : null}
+        {readOnly ? (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900" role="status">
+            This job work is read-only.
+          </p>
+        ) : null}
 
-      {tab === 'activity' ? (
-        <ol className="space-y-3 border-l border-erp-border pl-4">
-          {jobWork.activity.map((item) => (
-            <li key={item.id}>
-              <div className="text-xs text-erp-muted">
-                {formatDateTime(item.at)} · {item.userName}
-              </div>
-              <div className="font-medium">{item.action}</div>
-              {item.comment ? <div className="text-sm text-erp-muted">{item.comment}</div> : null}
-            </li>
+        <div role="tablist" aria-label="Job work tabs" className="flex flex-wrap gap-1 rounded-xl border border-erp-border bg-white p-1">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                'rounded-lg px-3 py-1.5 text-[12px] font-semibold transition',
+                tab === t.id ? 'bg-erp-primary text-white' : 'text-erp-muted hover:bg-slate-50 hover:text-erp-text',
+              )}
+            >
+              {t.label}
+            </button>
           ))}
-        </ol>
-      ) : null}
+        </div>
+
+        {tab === 'overview' ? (
+          <section className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-semibold">Basic info</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Vendor" value={jobWork.vendorName} />
+                <Field label="Process" value={jobWork.process} />
+                <Field label="Item" value={`${jobWork.itemCode} — ${jobWork.itemName}`} />
+                <Field label="Material to send" value={jobWork.materialToSend || materials[0]?.materialName || '—'} />
+                <Field label="Rate (placeholder)" value={formatCurrency(jobWork.rate)} />
+                <Field label="Expected cost" value={formatCurrency(jobWork.expectedCost)} />
+                <Field label="Remarks" value={jobWork.remarks || '—'} />
+              </div>
+            </div>
+            <div className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-semibold">Simple flow</h3>
+              <ol className="list-decimal space-y-2 pl-4 text-[13px] text-erp-text">
+                <li className={jobWork.status !== 'draft' ? 'text-emerald-700' : ''}>Select Work Order + Vendor</li>
+                <li className={['material_sent', 'partially_received', 'received', 'reconciliation_pending', 'closed'].includes(jobWork.status) ? 'text-emerald-700' : ''}>Send Material</li>
+                <li className={['partially_received', 'received', 'reconciliation_pending', 'closed'].includes(jobWork.status) ? 'text-emerald-700' : ''}>Receive Qty</li>
+                <li className={['reconciliation_pending', 'closed'].includes(jobWork.status) || jobWork.differenceApproved ? 'text-emerald-700' : ''}>Reconcile</li>
+                <li className={jobWork.invoiceStatus !== 'none' ? 'text-emerald-700' : ''}>Link Vendor Invoice (placeholder)</li>
+                <li className={jobWork.status === 'closed' ? 'text-emerald-700' : ''}>Close</li>
+              </ol>
+            </div>
+          </section>
+        ) : null}
+
+        {tab === 'material_sent' ? (
+          <section className="space-y-3 rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold">Material sent to vendor</h3>
+              {canSend ? (
+                <Button size="sm" onClick={() => setDialog('dispatch')}>Send Material</Button>
+              ) : null}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="erp-table w-full text-[12px]">
+                <thead>
+                  <tr>
+                    <th>Material</th>
+                    <th className="text-right">Required</th>
+                    <th className="text-right">Sent</th>
+                    <th className="text-right">Balance @ Vendor</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {materials.length === 0 ? (
+                    <tr><td colSpan={5} className="py-6 text-center text-erp-muted">No material lines</td></tr>
+                  ) : (
+                    materials.map((m) => (
+                      <tr key={m.id}>
+                        <td>
+                          <div className="font-mono font-medium">{m.materialCode}</div>
+                          <div className="text-[11px] text-erp-muted">{m.materialName}</div>
+                        </td>
+                        <td className="tabular-nums text-right">{m.requiredQty} {m.uom}</td>
+                        <td className="tabular-nums text-right">{m.sentQty}</td>
+                        <td className="tabular-nums text-right">{m.balanceWithVendor}</td>
+                        <td className="capitalize">{m.status.replace(/_/g, ' ')}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {dispatches.length > 0 ? (
+              <div>
+                <h4 className="mb-2 text-[12px] font-semibold uppercase text-erp-muted">Dispatch history</h4>
+                <ul className="divide-y divide-erp-border text-[13px]">
+                  {dispatches.map((d) => (
+                    <li key={d.id} className="flex justify-between gap-2 py-2">
+                      <span>{formatDateTime(d.dispatchAt)} · {d.userName}</span>
+                      <span className="text-erp-muted">{d.remarks || '—'}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {tab === 'receipts' ? (
+          <section className="space-y-3 rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold">Receipts from vendor</h3>
+              {canReceive ? (
+                <Button size="sm" onClick={() => setDialog('receive')}>Receive Qty</Button>
+              ) : null}
+            </div>
+            {receipts.length === 0 ? (
+              <p className="py-6 text-center text-[13px] text-erp-muted">No receipts yet.</p>
+            ) : (
+              <table className="erp-table w-full text-[12px]">
+                <thead>
+                  <tr>
+                    <th>Received At</th>
+                    <th className="text-right">Received</th>
+                    <th className="text-right">Accepted</th>
+                    <th className="text-right">Rejected</th>
+                    <th>Challan</th>
+                    <th>User</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {receipts.map((r) => (
+                    <tr key={r.id}>
+                      <td>{formatDateTime(r.receivedAt)}</td>
+                      <td className="tabular-nums text-right">{r.receivedQty}</td>
+                      <td className="tabular-nums text-right">{r.acceptedQty}</td>
+                      <td className="tabular-nums text-right">{r.rejectedQty}</td>
+                      <td>{r.vendorChallan || '—'}</td>
+                      <td>{r.userName}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        ) : null}
+
+        {tab === 'reconciliation' ? (
+          <section className="space-y-3 rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold">Material reconciliation</h3>
+              {canReconcile ? (
+                <Button size="sm" onClick={() => setDialog('reconcile')}>Reconcile</Button>
+              ) : null}
+            </div>
+            {!recon || recon.lines.length === 0 ? (
+              <p className="py-6 text-center text-[13px] text-erp-muted">No reconciliation data yet. Send and receive material first.</p>
+            ) : (
+              <>
+                <table className="erp-table w-full text-[12px]">
+                  <thead>
+                    <tr>
+                      <th>Material</th>
+                      <th className="text-right">Sent</th>
+                      <th className="text-right">Consumed</th>
+                      <th className="text-right">Returned</th>
+                      <th className="text-right">Balance</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recon.lines.map((l) => (
+                      <tr key={l.materialId}>
+                        <td className="font-mono">{l.materialCode}</td>
+                        <td className="tabular-nums text-right">{l.sent}</td>
+                        <td className="tabular-nums text-right">{l.consumed}</td>
+                        <td className="tabular-nums text-right">{l.returned}</td>
+                        <td className="tabular-nums text-right">{l.actualBalance}</td>
+                        <td className="capitalize">{l.status.replace(/_/g, ' ')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {recon.warnings.length > 0 ? (
+                  <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+                    {recon.warnings.join('; ')}
+                  </p>
+                ) : (
+                  <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">
+                    Material balances look clear for close.
+                  </p>
+                )}
+              </>
+            )}
+          </section>
+        ) : null}
+
+        {tab === 'invoice' ? (
+          <section className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+            <h3 className="mb-2 text-sm font-semibold">Vendor invoice placeholder</h3>
+            <p className="mb-4 text-[13px] text-erp-muted">
+              Link a vendor invoice reference for tracking only. This does not post AP / GST / TDS.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Invoice status" value={jobWork.invoiceStatus} />
+              <Field label="Invoice No" value={jobWork.invoiceNo || 'Not linked'} />
+              <Field label="Invoice Amount" value={jobWork.invoiceAmount != null ? formatCurrency(jobWork.invoiceAmount) : '—'} />
+              <Field label="Expected service amount" value={formatCurrency(jobWork.expectedCost)} />
+            </div>
+            {canInvoice ? (
+              <Button className="mt-4" size="sm" variant="secondary" onClick={() => setDialog('invoice')}>
+                Link Vendor Invoice
+              </Button>
+            ) : null}
+          </section>
+        ) : null}
+
+        {tab === 'timeline' ? (
+          <section className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+            {jobWork.activity.length === 0 ? (
+              <p className="text-center text-[13px] text-erp-muted">No activities yet.</p>
+            ) : (
+              <ol className="space-y-3">
+                {jobWork.activity.map((a) => (
+                  <li key={a.id} className="flex gap-3 border-b border-erp-border/70 pb-3 last:border-0">
+                    <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-erp-primary" />
+                    <div>
+                      <p className="text-[13px] font-semibold text-erp-text">{a.action}</p>
+                      <p className="text-[12px] text-erp-muted">
+                        {a.userName} · {formatDateTime(a.at)}
+                        {a.quantity != null ? ` · Qty ${a.quantity}` : ''}
+                      </p>
+                      {a.comment ? <p className="text-[12px] text-erp-text">{a.comment}</p> : null}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        ) : null}
+
+        {tab === 'documents' ? (
+          <section className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+            <Field label="Remarks" value={jobWork.remarks || 'No remarks'} />
+            <p className="mt-4 text-[13px] text-erp-muted">
+              Attachments are demo-only until the manufacturing API ships. Vendor challan: {jobWork.vendorChallan || '—'}.
+            </p>
+          </section>
+        ) : null}
+      </div>
+      </ManufacturingAiRail>
 
       <Modal
         open={dialog !== null}
         onClose={() => setDialog(null)}
         title={dialogTitle}
+        closeDisabled={busy}
         footer={(
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setDialog(null)}>Cancel</Button>
-            <Button onClick={doAction}>Confirm</Button>
+            <Button variant="secondary" disabled={busy} onClick={() => setDialog(null)}>Cancel</Button>
+            <Button disabled={busy} onClick={confirmDialog}>Confirm</Button>
           </div>
         )}
       >
-        {(dialog === 'receive' || dialog === 'invoice') && (
-          <FormField label={dialog === 'invoice' ? 'Invoice Amount' : 'Received Quantity'}>
-            <Input id="jw-qty" type="number" min="0" value={qty} onChange={(e) => setQty(Number(e.target.value))} />
-          </FormField>
-        )}
-        {(dialog === 'dispatch' || dialog === 'invoice' || dialog === 'reconcile' || dialog === 'cancel') && (
-          <FormField
-            label={dialog === 'invoice' ? 'Invoice Number' : dialog === 'reconcile' ? 'Difference reason (if needed)' : 'Remarks'}
-          >
-            <Textarea id="jw-note" value={note} onChange={(e) => setNote(e.target.value)} rows={3} />
-          </FormField>
-        )}
         {dialog === 'dispatch' ? (
-          <p className="mt-2 text-[13px] text-erp-muted">
-            System will send required quantities (or available stock) for each BOM material line.
-          </p>
+          <div className="space-y-3">
+            <p className="text-[13px] text-erp-muted">
+              Send required material quantities to {jobWork.vendorName}.
+            </p>
+            <ul className="text-[12px]">
+              {materials.map((m) => (
+                <li key={m.id} className="flex justify-between border-b border-erp-border py-1">
+                  <span>{m.materialName}</span>
+                  <span className="tabular-nums">{Math.max(0, m.requiredQty - m.sentQty)} {m.uom}</span>
+                </li>
+              ))}
+            </ul>
+            <FormField label="Remarks">
+              <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
+            </FormField>
+          </div>
+        ) : null}
+        {dialog === 'receive' ? (
+          <div className="grid gap-3">
+            <FormField label="Received Qty" required>
+              <Input type="number" min={0.001} step="any" value={qty} onChange={(e) => setQty(Number(e.target.value))} />
+            </FormField>
+            <FormField label="Vendor challan / remarks">
+              <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
+            </FormField>
+          </div>
+        ) : null}
+        {dialog === 'reconcile' ? (
+          <div className="space-y-3">
+            <p className="text-[13px] text-erp-muted">
+              Review material balance. If there is an unexplained difference, enter a reason to approve it.
+            </p>
+            <FormField label="Difference reason (if needed)">
+              <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} />
+            </FormField>
+          </div>
+        ) : null}
+        {dialog === 'invoice' ? (
+          <div className="grid gap-3">
+            <p className="text-[13px] text-erp-muted">Placeholder only — does not create an accounting voucher.</p>
+            <FormField label="Invoice No">
+              <Input value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder={`PI-${jobWork.jwNumber}`} />
+            </FormField>
+            <FormField label="Invoice Amount">
+              <Input type="number" min={0} value={invoiceAmount} onChange={(e) => setInvoiceAmount(Number(e.target.value))} />
+            </FormField>
+          </div>
         ) : null}
         {dialog === 'close' ? (
           <p className="text-[13px] text-erp-muted">
-            Closing requires material reconciliation. Unexplained vendor balances must be approved first.
+            Closing makes this job work read-only. Ensure receive + reconcile are done
+            {recon && !recon.canClose ? ' (approve material difference first)' : ''}.
           </p>
+        ) : null}
+        {dialog === 'cancel' ? (
+          <FormField label="Cancel reason">
+            <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} />
+          </FormField>
         ) : null}
       </Modal>
     </OperationalPageShell>

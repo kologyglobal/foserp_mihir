@@ -6,6 +6,7 @@ import type { CrmEntityTypeApi, DemoEntityNote } from '../../../types/crmEntity'
 import { EntityNoteEditor } from './EntityNoteEditor'
 import { ErpButton } from '../../erp/ErpButton'
 import { formatDateTime } from '../../../utils/dates/format'
+import { systemConfirm } from '../../../utils/systemConfirm'
 interface EntityNotesPanelProps {
   entityType: CrmEntityTypeApi
   entityId: string
@@ -123,7 +124,15 @@ export function EntityNotesPanel({
                           icon={Trash2}
                           disabled={pending}
                           onClick={() => {
-                            if (window.confirm('Delete this note?')) void deleteNote(note.id)
+                            void systemConfirm({
+                              title: 'Delete this note?',
+                              description: 'The note will be removed from this record.',
+                              confirmLabel: 'Delete',
+                              cancelLabel: 'Cancel',
+                              variant: 'danger',
+                            }).then((ok) => {
+                              if (ok) void deleteNote(note.id)
+                            })
                           }}
                         >
                           Delete

@@ -82,7 +82,7 @@ export function FinancialReportAccessDeniedState({
 }
 
 export function FinancialReportDemoBanner({
-  message = 'Demo financial reports — figures are illustrative and not statutory filings.',
+  message = 'Demo financial reports — figures are illustrative and not statutory filings. Financial reports include posted accounting entries only. CRM pipeline and unbilled Sales Orders are excluded.',
   className,
 }: {
   message?: string
@@ -95,6 +95,7 @@ export function FinancialReportDemoBanner({
         className,
       )}
       role="status"
+      title="Financial reports include posted accounting entries only. CRM pipeline and unbilled Sales Orders are excluded."
     >
       <BarChart3 className="h-4 w-4 shrink-0 text-amber-600" />
       <span>{message}</span>

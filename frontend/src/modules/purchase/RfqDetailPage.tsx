@@ -39,6 +39,7 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { purchaseActionGate } from '@/utils/permissions'
 import { notify } from '@/store/toastStore'
+import { systemConfirm } from '@/utils/systemConfirm'
 import { cn } from '@/utils/cn'
 
 function inviteBadgeColor(
@@ -113,7 +114,13 @@ export function RfqDetailPage() {
 
   const onCancel = async () => {
     if (!rfq) return
-    if (!window.confirm('Cancel this RFQ?')) return
+    if (!(await systemConfirm({
+      title: 'Cancel this RFQ?',
+      description: 'Vendors will no longer be able to respond. This cannot be undone from the register.',
+      confirmLabel: 'Cancel RFQ',
+      cancelLabel: 'Keep RFQ',
+      variant: 'danger',
+    }))) return
     try {
       setRfq(await cancelRFQ(rfq.id))
       notify.success('RFQ cancelled')

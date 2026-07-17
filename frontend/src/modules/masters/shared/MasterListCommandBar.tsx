@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Download, LayoutGrid, Plus, Upload } from 'lucide-react'
 import { ErpCommandBar, type ErpCommandAction } from '../../../components/erp/ErpCommandBar'
+import { notify } from '../../../store/toastStore'
 
 export interface MasterListCommandBarProps {
   createLabel: string
@@ -38,13 +39,13 @@ export function MasterListCommandBar({
           id: 'import',
           label: 'Import',
           icon: Upload,
-          onClick: onImport ?? (() => window.alert('Download the import template from the register command bar, then upload CSV or Excel.')),
+          onClick: onImport ?? (() => notify.info('Download the import template from the register command bar, then upload CSV or Excel.')),
         },
         {
           id: 'export',
           label: 'Export',
           icon: Download,
-          onClick: onExport ?? (() => window.alert('Export will download the current filtered register as CSV.')),
+          onClick: onExport ?? (() => notify.info('Export will download the current filtered register as CSV.')),
         },
         ...extraSecondary,
       ]}

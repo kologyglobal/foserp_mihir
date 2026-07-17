@@ -3,11 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { z } from 'zod'
 import { useForm, useWatch, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { ShieldOff } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpCardSection } from '@/components/erp/card-form'
 import { FormField } from '@/components/forms/FormField'
 import { Input, Select, Checkbox } from '@/components/forms/Inputs'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { createItem, getInventoryAuditTrail, getItemById, updateItem, InventoryServiceError } from '@/services/inventory'
 import type { InventoryAuditEntry, InventoryItemInput, InventoryItemType } from '@/types/inventoryDomain'
@@ -181,17 +183,29 @@ export function InventoryItemFormPage() {
     }
   })
 
-  if (!perms.canCreateItem && !isEdit) {
+  if ((!perms.canCreateItem && !isEdit) || (isEdit && !perms.canEditItem)) {
     return (
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
         badge="Inventory & Warehouse"
-        title="New Item"
-        breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Items', to: '/inventory/items' }, { label: 'New' }]}
+        title={isEdit ? 'Edit Item' : 'New Item'}
+        breadcrumbs={[
+          { label: 'Inventory & Warehouse', to: '/inventory' },
+          { label: 'Items', to: '/inventory/items' },
+          { label: isEdit ? 'Edit' : 'New' },
+        ]}
         autoBreadcrumbs={false}
       >
-        <p className="text-sm text-red-600">Access denied</p>
+        <EmptyState
+          icon={ShieldOff}
+          title="Access denied"
+          description={
+            isEdit
+              ? 'You do not have permission to edit inventory items (inventory.items.edit).'
+              : 'You do not have permission to create inventory items (inventory.items.create).'
+          }
+        />
       </OperationalPageShell>
     )
   }

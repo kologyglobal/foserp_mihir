@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Sparkles } from 'lucide-react'
 import { FactBox, FactBoxPanel } from '@/components/design-system/FactBox'
 import { ErpFactBoxPanel } from '@/components/erp/card-form/ErpFactBoxPanel'
 import { formatCurrency } from '@/utils/formatters/currency'
@@ -229,35 +230,48 @@ export function PurchaseDocumentFactBox({
 
   return (
     <ErpFactBoxPanel title={title} sticky className={cn('purchase-document-factbox', className)}>
-      <FactBoxPanel className="space-y-2">
-        <FactBox title="Vendor Summary" fields={vendorFields} defaultOpen />
-        <FactBox title="Purchase History" fields={historyFields} defaultOpen />
-        <FactBox title="Document Status" fields={statusFields} defaultOpen />
-        <FactBox
-          title="Related Documents"
-          defaultOpen
-          fields={
-            related.length === 0
-              ? [{ label: 'Linked', value: 'None' }]
-              : related.map((doc) => ({
-                  label: RELATED_LABEL[doc.kind],
-                  value: (
-                    <span className="inline-flex flex-col items-end gap-0.5">
-                      <Link
-                        to={RELATED_PATH[doc.kind](doc.id)}
-                        className="font-mono text-erp-primary hover:underline"
-                      >
-                        {doc.number}
-                      </Link>
-                      {doc.status ? (
-                        <span className="text-[10px] font-normal text-erp-muted">{doc.status}</span>
-                      ) : null}
-                    </span>
-                  ),
-                }))
-          }
-        />
-      </FactBoxPanel>
+      <div className="purchase-ai-panel purchase-ai-panel--embedded">
+        <header className="purchase-ai-panel__head">
+          <span className="purchase-ai-panel__badge" aria-hidden>
+            <Sparkles className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="purchase-ai-panel__title">Document Insights</p>
+            <p className="purchase-ai-panel__subtitle">
+              AI suggested vendor, history, and linked documents for this record.
+            </p>
+          </div>
+        </header>
+        <FactBoxPanel className="space-y-2">
+          <FactBox title="Vendor Summary" fields={vendorFields} defaultOpen />
+          <FactBox title="Purchase History" fields={historyFields} defaultOpen />
+          <FactBox title="Document Status" fields={statusFields} defaultOpen />
+          <FactBox
+            title="Related Documents"
+            defaultOpen
+            fields={
+              related.length === 0
+                ? [{ label: 'Linked', value: 'None' }]
+                : related.map((doc) => ({
+                    label: RELATED_LABEL[doc.kind],
+                    value: (
+                      <span className="inline-flex flex-col items-end gap-0.5">
+                        <Link
+                          to={RELATED_PATH[doc.kind](doc.id)}
+                          className="font-mono text-erp-primary hover:underline"
+                        >
+                          {doc.number}
+                        </Link>
+                        {doc.status ? (
+                          <span className="text-[10px] font-normal text-erp-muted">{doc.status}</span>
+                        ) : null}
+                      </span>
+                    ),
+                  }))
+            }
+          />
+        </FactBoxPanel>
+      </div>
     </ErpFactBoxPanel>
   )
 }

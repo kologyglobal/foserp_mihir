@@ -55,6 +55,13 @@ export function moduleHeaderIsActive(category: NavCategory, pathname: string): b
 }
 
 export function subNavItemIsActive(pathname: string, item: ModuleSubNavItem): boolean {
+  if (
+    item.path === '/accounting/receivables' &&
+    (pathname === '/accounting/commercial-commitments' ||
+      pathname.startsWith('/accounting/commercial-commitments/'))
+  ) {
+    return true
+  }
   if (item.end) return pathname === item.path
   return pathname === item.path || pathname.startsWith(`${item.path}/`)
 }

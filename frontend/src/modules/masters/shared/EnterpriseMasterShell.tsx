@@ -26,6 +26,7 @@ import {
   resolveRecordCreatedDate,
 } from '../../../utils/masterAudit'
 import { formatDateTime } from '../../../utils/dates/format'
+import { notify } from '../../../store/toastStore'
 const GROUP_ACCENT_CLASS: Record<string, string> = {
   blue: 'masters-module-chip-blue',
   green: 'masters-module-chip-green',
@@ -63,8 +64,8 @@ export function MasterFormCommandBar({
         ...(isEdit ? [] : [{ id: 'save-new', label: 'Save & New', icon: Plus, disabled: isSubmitting, onClick: onSaveNew }]),
       ]}
       moreActions={[
-        { id: 'import', label: 'Import', icon: Upload, onClick: () => window.alert('Import wizard — connect CSV template in backend phase.') },
-        { id: 'export', label: 'Export', icon: Download, onClick: () => window.alert('Export queued — download from list page.') },
+        { id: 'import', label: 'Import', icon: Upload, onClick: () => notify.info('Import wizard — connect CSV template in backend phase.') },
+        { id: 'export', label: 'Export', icon: Download, onClick: () => notify.info('Export queued — download from list page.') },
         { id: 'cancel', label: 'Cancel', icon: X, onClick: onCancel },
         { id: 'list', label: 'Back to list', onClick: () => { window.location.href = listPath } },
       ]}

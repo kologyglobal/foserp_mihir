@@ -13,12 +13,20 @@ export interface ManufacturingSettings {
     productionPlanMandatory: boolean
     bomMandatory: boolean
     quickModeDefault: boolean
+    /** Auto-fill BOM when creating a work order (Quick Mode). */
+    autoBomFill: boolean
+    /** Auto-fill material / FG warehouses from defaults. */
+    autoWarehouseFill: boolean
+    /** Detect QC requirement from item master. */
+    autoQcDetection: boolean
     allowManualWorkOrder: boolean
     allowPartialProduction: boolean
     allowOverproduction: boolean
     overproductionTolerancePercent: number
     allowUnderCompletion: boolean
     requireWorkOrderClosing: boolean
+    /** Allow close when QC is still open / not required path. */
+    allowCloseWithoutQc: boolean
   }
   numberSeries: {
     workOrderPrefix: string
@@ -37,6 +45,10 @@ export interface ManufacturingSettings {
     allowMaterialReturn: boolean
     requireReservation: boolean
     blockStartOnShortage: boolean
+    /** Allow start / production when material is incomplete. */
+    allowProductionWithoutFullMaterial: boolean
+    /** Warn (do not hard-block) on negative stock scenarios. */
+    allowNegativeStockWarning: boolean
   }
   operations: {
     operationsEnabled: boolean
@@ -51,8 +63,11 @@ export interface ManufacturingSettings {
     qualityInspectionEnabled: boolean
     itemBasedQuality: boolean
     qualityHoldOnOutput: boolean
+    /** Require QC clearance before WO close. */
+    requireQcBeforeClose: boolean
     allowAcceptanceUnderDeviation: boolean
     reworkEnabled: boolean
+    allowReject: boolean
     rejectionWarehouseId: string
     rejectionWarehouseName: string
     qualityHoldWarehouseId: string
@@ -70,6 +85,8 @@ export interface ManufacturingSettings {
     materialReconciliationRequired: boolean
     qualityOnJobWorkReceipt: boolean
     vendorInvoiceLinkRequiredBeforeClosing: boolean
+    /** Show vendor invoice placeholder link on Job Work (no AP posting). */
+    vendorInvoicePlaceholderEnabled: boolean
     materialDifferenceTolerancePercent: number
     processLossTolerancePercent: number
     defaultVendorMaterialWarehouseId: string
@@ -122,32 +139,20 @@ export interface ManufacturingSettings {
 }
 
 export type ManufacturingReportId =
-  | 'work_order_register'
-  | 'production_status'
-  | 'production_output'
+  | 'work_order_status'
+  | 'daily_production'
   | 'material_consumption'
-  | 'material_shortage'
-  | 'material_return'
-  | 'production_delay'
-  | 'work_in_progress'
-  | 'finished_goods_output'
-  | 'scrap_and_rejection'
-  | 'rework_register'
-  | 'production_cost_summary'
-  | 'production_variance'
-  | 'job_work_register'
-  | 'material_sent_to_vendor'
-  | 'material_with_vendor'
-  | 'job_work_receipt'
-  | 'job_work_ageing'
-  | 'job_work_reconciliation'
-  | 'job_work_cost'
-  | 'vendor_invoice_link_status'
+  | 'scrap_rework'
+  | 'qc_pending'
+  | 'job_work_pending'
+  | 'delayed_work_orders'
+  | 'production_efficiency'
 
 export interface ManufacturingReportDefinition {
   id: ManufacturingReportId
   label: string
-  category: 'production' | 'material' | 'job_work' | 'cost'
+  description: string
+  category: 'production' | 'material' | 'quality' | 'job_work'
   requiresCostPermission: boolean
 }
 
@@ -164,6 +169,7 @@ export interface ManufacturingReportFilter {
   vendor?: string
   jobWorkOrder?: string
   status?: string
+  item?: string
 }
 
 export interface ManufacturingReportRow {
@@ -200,12 +206,16 @@ export const DEFAULT_MANUFACTURING_SETTINGS: ManufacturingSettings = {
     productionPlanMandatory: false,
     bomMandatory: true,
     quickModeDefault: true,
+    autoBomFill: true,
+    autoWarehouseFill: true,
+    autoQcDetection: true,
     allowManualWorkOrder: true,
     allowPartialProduction: true,
     allowOverproduction: true,
     overproductionTolerancePercent: 5,
     allowUnderCompletion: true,
     requireWorkOrderClosing: true,
+    allowCloseWithoutQc: false,
   },
   numberSeries: {
     workOrderPrefix: 'WO-MFG-',
@@ -224,22 +234,26 @@ export const DEFAULT_MANUFACTURING_SETTINGS: ManufacturingSettings = {
     allowMaterialReturn: true,
     requireReservation: false,
     blockStartOnShortage: false,
+    allowProductionWithoutFullMaterial: true,
+    allowNegativeStockWarning: true,
   },
   operations: {
-    operationsEnabled: false,
+    operationsEnabled: true,
     jobCardsEnabled: false,
-    workstationsEnabled: false,
+    workstationsEnabled: true,
     detailedLabourEntry: false,
     detailedMachineEntry: false,
-    startStopTracking: false,
+    startStopTracking: true,
     routingMandatory: false,
   },
   quality: {
     qualityInspectionEnabled: true,
     itemBasedQuality: true,
     qualityHoldOnOutput: true,
+    requireQcBeforeClose: true,
     allowAcceptanceUnderDeviation: true,
     reworkEnabled: true,
+    allowReject: true,
     rejectionWarehouseId: 'wh-rej',
     rejectionWarehouseName: 'Rejection Store',
     qualityHoldWarehouseId: 'wh-qh',
@@ -257,6 +271,7 @@ export const DEFAULT_MANUFACTURING_SETTINGS: ManufacturingSettings = {
     materialReconciliationRequired: true,
     qualityOnJobWorkReceipt: true,
     vendorInvoiceLinkRequiredBeforeClosing: false,
+    vendorInvoicePlaceholderEnabled: true,
     materialDifferenceTolerancePercent: 2,
     processLossTolerancePercent: 1,
     defaultVendorMaterialWarehouseId: 'wh-vendor',
@@ -309,25 +324,60 @@ export const DEFAULT_MANUFACTURING_SETTINGS: ManufacturingSettings = {
 }
 
 export const MANUFACTURING_REPORTS: ManufacturingReportDefinition[] = [
-  { id: 'work_order_register', label: 'Work Order Register', category: 'production', requiresCostPermission: false },
-  { id: 'production_status', label: 'Production Status', category: 'production', requiresCostPermission: false },
-  { id: 'production_output', label: 'Production Output', category: 'production', requiresCostPermission: false },
-  { id: 'material_consumption', label: 'Material Consumption', category: 'material', requiresCostPermission: false },
-  { id: 'material_shortage', label: 'Material Shortage', category: 'material', requiresCostPermission: false },
-  { id: 'material_return', label: 'Material Return', category: 'material', requiresCostPermission: false },
-  { id: 'production_delay', label: 'Production Delay', category: 'production', requiresCostPermission: false },
-  { id: 'work_in_progress', label: 'Work in Progress', category: 'production', requiresCostPermission: false },
-  { id: 'finished_goods_output', label: 'Finished Goods Output', category: 'production', requiresCostPermission: false },
-  { id: 'scrap_and_rejection', label: 'Scrap and Rejection', category: 'production', requiresCostPermission: false },
-  { id: 'rework_register', label: 'Rework Register', category: 'production', requiresCostPermission: false },
-  { id: 'production_cost_summary', label: 'Production Cost Summary', category: 'cost', requiresCostPermission: true },
-  { id: 'production_variance', label: 'Production Variance', category: 'cost', requiresCostPermission: true },
-  { id: 'job_work_register', label: 'Job Work Register', category: 'job_work', requiresCostPermission: false },
-  { id: 'material_sent_to_vendor', label: 'Material Sent to Vendor', category: 'job_work', requiresCostPermission: false },
-  { id: 'material_with_vendor', label: 'Material with Vendor', category: 'job_work', requiresCostPermission: false },
-  { id: 'job_work_receipt', label: 'Job Work Receipt', category: 'job_work', requiresCostPermission: false },
-  { id: 'job_work_ageing', label: 'Job Work Ageing', category: 'job_work', requiresCostPermission: false },
-  { id: 'job_work_reconciliation', label: 'Job Work Reconciliation', category: 'job_work', requiresCostPermission: false },
-  { id: 'job_work_cost', label: 'Job Work Cost', category: 'cost', requiresCostPermission: true },
-  { id: 'vendor_invoice_link_status', label: 'Vendor Invoice Link Status', category: 'job_work', requiresCostPermission: false },
+  {
+    id: 'work_order_status',
+    label: 'Work Order Status Report',
+    description: 'WO progress, pending qty, due date and delay days',
+    category: 'production',
+    requiresCostPermission: false,
+  },
+  {
+    id: 'daily_production',
+    label: 'Daily Production Report',
+    description: 'Planned vs good / scrap / rework / reject by day and line',
+    category: 'production',
+    requiresCostPermission: false,
+  },
+  {
+    id: 'material_consumption',
+    label: 'Material Consumption Report',
+    description: 'Required vs consumed raw material with variance',
+    category: 'material',
+    requiresCostPermission: false,
+  },
+  {
+    id: 'scrap_rework',
+    label: 'Scrap & Rework Report',
+    description: 'Scrap, rework and rejection quantities by work order',
+    category: 'quality',
+    requiresCostPermission: false,
+  },
+  {
+    id: 'qc_pending',
+    label: 'QC Pending Report',
+    description: 'Work orders waiting for quality inspection',
+    category: 'quality',
+    requiresCostPermission: false,
+  },
+  {
+    id: 'job_work_pending',
+    label: 'Job Work Pending Report',
+    description: 'Open outside-processing documents with vendor balances',
+    category: 'job_work',
+    requiresCostPermission: false,
+  },
+  {
+    id: 'delayed_work_orders',
+    label: 'Delayed Work Orders Report',
+    description: 'Past-due work orders still open on the floor',
+    category: 'production',
+    requiresCostPermission: false,
+  },
+  {
+    id: 'production_efficiency',
+    label: 'Production Efficiency Report',
+    description: 'Yield and efficiency % by work order / line',
+    category: 'production',
+    requiresCostPermission: false,
+  },
 ]

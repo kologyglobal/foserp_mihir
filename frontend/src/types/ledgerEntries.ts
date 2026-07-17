@@ -177,6 +177,25 @@ export interface LedgerEntrySourceDocument {
   status: string
   /** Existing app route, or null when not available */
   href: string | null
+  /**
+   * Optional CRM / commercial chain for future posted sales invoices (display only).
+   * Not persisted to a backend in Phase 1.
+   */
+  crmTrace?: {
+    customerId?: string | null
+    opportunityId?: string | null
+    opportunityNo?: string | null
+    quotationId?: string | null
+    quotationNo?: string | null
+    quotationRevisionId?: string | null
+    quotationRevision?: number | null
+    salesOrderId?: string | null
+    salesOrderNo?: string | null
+    salesInvoiceId?: string | null
+    salesInvoiceNo?: string | null
+    ownerName?: string | null
+    sourceModule?: string | null
+  } | null
 }
 
 export interface LedgerEntryReversalReference {

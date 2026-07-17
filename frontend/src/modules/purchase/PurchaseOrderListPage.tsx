@@ -544,6 +544,8 @@ export function PurchaseOrderListPage() {
           </EnterpriseRegisterTableShell>
           <PurchaseRegisterContextPanel
             ariaLabel="Purchase order overview and suggestions"
+            title="Order Insights"
+            subtitle="AI suggested bottlenecks and next actions for this register."
             overview={registerOverview}
             suggestions={registerSuggestions}
           />

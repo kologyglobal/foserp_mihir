@@ -68,6 +68,10 @@ import type { DispatchPlan } from '../../types/dispatch'
 import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
 import { buildProformaNewUrl } from '../../utils/proformaInvoicePrefill'
 import { ReservationsPanel } from '../../components/inventory/ReservationsPanel'
+import {
+  ExpectedAccountingEntryDrawer,
+  SalesOrderAccountingSummary,
+} from '../../components/accounting/commercial'
 
 type SoTab = 'overview' | 'production' | 'dispatch' | 'commercial'
 
@@ -107,6 +111,7 @@ export function SalesOrder360Page() {
   const [tab, setTab] = useState<SoTab>('overview')
   const [activeSection, setActiveSection] = useState<SoTab>('overview')
   const [toast, setToast] = useState<string | null>(null)
+  const [expectedEntryOpen, setExpectedEntryOpen] = useState(false)
 
   const customer = so ? customers.find((c) => c.id === so.customerId) : undefined
   const product = so ? products.find((p) => p.id === so.productId) : undefined
@@ -395,6 +400,14 @@ export function SalesOrder360Page() {
 
             <div className="so-360-overview-grid">
               <OrderCommercialSummary order={so} product={product} />
+              {crmMode ? (
+                <SalesOrderAccountingSummary
+                  salesOrderNo={so.salesOrderNo}
+                  status={so.status}
+                  value={displayValue}
+                  onViewExpectedEntry={() => setExpectedEntryOpen(true)}
+                />
+              ) : null}
               <div className="so-360-overview-aside">
                 <Entity360Panel title="Next best action" subtitle="Recommended from order state">
                   <div className="p-4">
@@ -512,6 +525,14 @@ export function SalesOrder360Page() {
           <div className="so-360-commercial-tab">
             <div className="so-360-commercial-tab__main">
               <OrderCommercialSummary order={so} product={product} />
+              {crmMode ? (
+                <SalesOrderAccountingSummary
+                  salesOrderNo={so.salesOrderNo}
+                  status={so.status}
+                  value={displayValue}
+                  onViewExpectedEntry={() => setExpectedEntryOpen(true)}
+                />
+              ) : null}
               <OrderDeliveryCard order={so} />
               <OrderLineItemsPanel order={so} />
             </div>
@@ -547,6 +568,14 @@ export function SalesOrder360Page() {
           </div>
         )}
       </SalesCardFormShell>
+      {crmMode ? (
+        <ExpectedAccountingEntryDrawer
+          open={expectedEntryOpen}
+          onClose={() => setExpectedEntryOpen(false)}
+          documentLabel={so.salesOrderNo}
+          showIllustrativeAmounts
+        />
+      ) : null}
       {toast ? <Toast message={toast} variant="success" /> : null}
     </>
   )

@@ -18,6 +18,7 @@ import {
   buildApprovalTimelineEvents,
 } from '../../utils/approvalEngine'
 import { getSessionUser, ERP_ROLE_LABELS } from '../../utils/permissions'
+import { systemPrompt } from '../../utils/systemConfirm'
 import { ApprovalTimeline } from '../../components/approval/ApprovalTimeline'
 import { formatDate } from '../../utils/dates/format'
 function entityLink(request: ApprovalRequest): string {
@@ -140,20 +141,30 @@ export function ApprovalDetailPage() {
     )
   }
 
-  const step = getCurrentStep(request)
+  const approval = request
+  const step = getCurrentStep(approval)
   const canAct = step ? canUserApproveStep(user, step, approvers) : false
-  const timeline = buildApprovalTimelineEvents(request)
-  const docType = request.documentType
-  const entityId = request.entityId
+  const timeline = buildApprovalTimelineEvents(approval)
+  const docType = approval.documentType
+  const entityId = approval.entityId
 
   function handleApprove() {
     advanceApprovalStep(docType, entityId, user)
     window.location.reload()
   }
 
-  function handleReject() {
-    const remarks = window.prompt('Rejection remarks (required):')
-    if (!remarks) return
+  async function handleReject() {
+    const remarks = await systemPrompt({
+      title: 'Reject approval',
+      description: `Reject ${approval.entityLabel}? Comments are required.`,
+      fieldLabel: 'Rejection remarks',
+      placeholder: 'Explain why this request is being rejected…',
+      confirmLabel: 'Reject',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+      required: true,
+    })
+    if (remarks == null) return
     rejectApprovalStep(docType, entityId, user, remarks)
     window.location.reload()
   }

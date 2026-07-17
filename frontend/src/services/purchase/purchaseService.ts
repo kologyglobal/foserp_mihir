@@ -1186,6 +1186,7 @@ export async function createPurchaseRequisition(
     maintenanceOrderNo: input.maintenanceOrderNo ?? '',
     referenceNumber: input.referenceNumber ?? '',
     purpose: input.purpose ?? null,
+    rfqRequired: input.rfqRequired ?? true,
     ...money,
     lines,
     attachmentPlaceholders: input.attachmentPlaceholders ?? [],
@@ -1342,6 +1343,7 @@ export async function duplicatePurchaseRequisition(id: string): Promise<Purchase
     priority: source.priority,
     purpose: source.purpose ? `Copy of ${source.documentNumber}` : `Copy of ${source.documentNumber}`,
     remarks: `Duplicated from ${source.documentNumber}`,
+    rfqRequired: source.rfqRequired,
     lines: source.lines.map((l) => ({
       itemId: l.itemId,
       quantity: l.quantity,
@@ -1359,6 +1361,12 @@ export async function convertPurchaseRequisitionToRfq(id: string): Promise<Reque
   if (!pr) throw new PurchaseServiceError('PR_NOT_FOUND', `Purchase requisition not found: ${id}`)
   if (pr.status !== 'approved') {
     throw new PurchaseServiceError('PR_NOT_APPROVED', 'Only approved requisitions can convert to RFQ')
+  }
+  if (!pr.rfqRequired) {
+    throw new PurchaseServiceError(
+      'PR_DIRECT_PO',
+      'This requisition is marked for direct Purchase Order — convert to PO instead of RFQ',
+    )
   }
   const preferredVendorIds = [
     ...new Set(
@@ -1571,8 +1579,17 @@ export async function convertPurchaseRequisitionToPo(id: string): Promise<Purcha
   await delay()
   const pr = state.requisitions.find((r) => r.id === id)
   if (!pr) throw new PurchaseServiceError('PR_NOT_FOUND', `Purchase requisition not found: ${id}`)
-  if (pr.status !== 'approved') {
-    throw new PurchaseServiceError('PR_NOT_APPROVED', 'Only approved requisitions can convert to PO')
+  if (pr.status === 'approved' && pr.rfqRequired) {
+    throw new PurchaseServiceError(
+      'RFQ_REQUIRED',
+      'This requisition requires an RFQ before a Purchase Order can be created',
+    )
+  }
+  if (pr.status !== 'approved' && pr.status !== 'converted_to_rfq') {
+    throw new PurchaseServiceError(
+      'PR_NOT_READY_FOR_PO',
+      'Only approved (direct PO) or RFQ-converted requisitions can create a PO',
+    )
   }
   const preferred =
     pr.lines
@@ -3266,6 +3283,12 @@ export async function createPurchaseOrderFromPr(
   await delay()
   const pr = state.requisitions.find((r) => r.id === prId)
   if (!pr) throw new PurchaseServiceError('PR_NOT_FOUND', `Purchase requisition not found: ${prId}`)
+  if (pr.status === 'approved' && pr.rfqRequired) {
+    throw new PurchaseServiceError(
+      'RFQ_REQUIRED',
+      'This requisition requires an RFQ before a Purchase Order can be created',
+    )
+  }
   if (pr.status !== 'approved' && pr.status !== 'converted_to_rfq') {
     throw new PurchaseServiceError('PR_NOT_APPROVED', 'Only approved PRs can create a PO')
   }

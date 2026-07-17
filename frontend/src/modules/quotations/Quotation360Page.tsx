@@ -27,6 +27,7 @@ import { useCrmStore } from '../../store/crmStore'
 import { resolveStoreAction } from '../../store/storeAction'
 import { useSalesStore } from '../../store/salesStore'
 import { useMasterStore } from '../../store/masterStore'
+import { notify } from '@/store/toastStore'
 import {
   QuotationLineItemsEditor,
   QuotationApprovalPanel,
@@ -49,7 +50,6 @@ import { useApiMode } from '../../hooks/useApiMode'
 import { resolveCreateSalesOrderGateForQuotationDocument } from '../../utils/opportunitySalesOrderDraft'
 import { resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
 import { OpportunityQuotationValueMismatchBanner } from '../../components/crm/OpportunityQuotationValueMismatchBanner'
-import { notify } from '../../store/toastStore'
 import { buildUnifiedFeed } from '../../utils/crmUnifiedFeed'
 import { canCrmPermission } from '../../utils/permissions/crm'
 import { useQuotationConversion } from '../crm/hooks/useQuotationConversion'
@@ -295,17 +295,17 @@ export function Quotation360Page() {
 
   async function handleSubmitApproval() {
     const r = await resolveStoreAction(submitForApproval(quoDoc.id))
-    if (!r.ok) alert(r.error ?? 'Could not submit')
+    if (!r.ok) notify.error(r.error ?? 'Could not submit')
   }
 
   async function handleMarkSent() {
     const r = await resolveStoreAction(markSent(quoDoc.id))
-    if (!r.ok) alert(r.error ?? 'Could not mark sent')
+    if (!r.ok) notify.error(r.error ?? 'Could not mark sent')
   }
 
   async function handleApprove() {
     const r = await resolveStoreAction(approveDocument(quoDoc.id, 'Approved from Quotation 360'))
-    if (!r.ok) alert(r.error ?? 'Could not approve')
+    if (!r.ok) notify.error(r.error ?? 'Could not approve')
   }
 
   async function handleNewRevision() {
@@ -314,7 +314,7 @@ export function Quotation360Page() {
     if (r.ok && r.documentId) {
       navigate(`/crm/quotations/${quoId}/editor?doc=${r.documentId}`)
     } else {
-      alert(r.error ?? 'Could not create revision')
+      notify.error(r.error ?? 'Could not create revision')
     }
   }
 

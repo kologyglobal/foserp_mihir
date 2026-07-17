@@ -1165,6 +1165,11 @@ export interface PurchaseRequisition extends PurchaseMoneyTotals, PurchaseAuditF
   lines: PurchaseRequisitionLine[]
   attachmentPlaceholders: PurchaseRequisitionAttachmentPlaceholder[]
   approvalIds: string[]
+  /**
+   * When true, approved PR should go through RFQ / vendor quotation.
+   * When false, approved PR is ready for direct Purchase Order creation.
+   */
+  rfqRequired: boolean
   convertedRfqId: string | null
   convertedPoId: string | null
   /** Soft-estimated tax on subtotal (demo GST %). */

@@ -30,7 +30,7 @@ import {
   StockAdjustmentPage,
 } from '@/modules/inventory/InventoryTxnPages'
 import { StockLedgerPage } from '@/modules/inventory/StockLedgerPage'
-import { ItemStockDetailPage } from '@/modules/inventory/ItemStockDetailPage'
+import { InventoryStockDetailPage } from '@/modules/inventory/stock/InventoryStockDetailPage'
 import { ReservationsPage } from '@/modules/inventory/ReservationsPage'
 import { ScanToReceivePage, ScanToIssuePage, ScanToTransferPage } from '@/modules/barcode'
 
@@ -45,7 +45,7 @@ export const inventoryRouteChildren: RouteObject[] = [
   { path: 'inventory/items/:itemId', element: <InventoryItemDetailPage /> },
   { path: 'inventory/items/:id', element: <InventoryItemDetailPage /> },
   { path: 'inventory/stock', element: <StockAvailabilityPage /> },
-  { path: 'inventory/stock/:itemId', element: <ItemStockDetailPage /> },
+  { path: 'inventory/stock/:itemId', element: <InventoryStockDetailPage /> },
 
   { path: 'inventory/movements/receipts', element: <ReceiptsRegisterPage /> },
   { path: 'inventory/movements/receipts/new', element: <QuickReceiptPage /> },

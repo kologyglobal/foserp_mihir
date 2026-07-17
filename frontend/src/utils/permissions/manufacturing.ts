@@ -1,10 +1,11 @@
 /**
- * Manufacturing fine-grained frontend permissions (Phases 1–4).
- * UI gating only — backend authorization must enforce the same permission rules.
+ * Manufacturing fine-grained frontend permissions (UI planning / placeholder).
+ * Gates actions and routes in the SPA only — backend authorization is not implemented yet.
  */
 
 import { useMemo } from 'react'
-import { getSessionUser, type ErpRole } from './index'
+import type { ManufacturingUiRole } from '@/types/manufacturingRoles'
+import { getManufacturingUiRole, useManufacturingUiRole } from '@/utils/manufacturing/uiRoleStore'
 
 export const MANUFACTURING_PERMISSIONS = [
   'manufacturing.view',
@@ -58,19 +59,50 @@ export const MANUFACTURING_PERMISSIONS = [
   'manufacturing.reports.export',
   'manufacturing.settings.view',
   'manufacturing.settings.manage',
+  'manufacturing.routes.view',
+  'manufacturing.routes.create',
+  'manufacturing.routes.edit',
+  'manufacturing.routes.activate',
+  'manufacturing.work_orders.override_route',
 ] as const
 
 export type ManufacturingPermission = (typeof MANUFACTURING_PERMISSIONS)[number]
 
-const ALL: ManufacturingPermission[] = [...MANUFACTURING_PERMISSIONS]
-
-const WO_CORE: ManufacturingPermission[] = [
+const READ_BASE: ManufacturingPermission[] = [
   'manufacturing.view',
-  'manufacturing.dashboard.view',
+  'manufacturing.work_orders.view',
+  'manufacturing.materials.view',
   'manufacturing.bom.view',
   'manufacturing.production_plan.view',
+  'manufacturing.job_work.view',
+  'manufacturing.routes.view',
+]
+
+/** 1. Owner / Management — dashboard, reports, all WOs, performance */
+const OWNER: ManufacturingPermission[] = [
+  ...READ_BASE,
+  'manufacturing.dashboard.view',
+  'manufacturing.quality.view',
+  'manufacturing.reports.view',
+  'manufacturing.reports.export',
+  'manufacturing.cost.view',
+  'manufacturing.variance.view',
+  'manufacturing.bom.view_cost',
+  'manufacturing.job_work.view_cost',
+  'manufacturing.view_audit',
+  'manufacturing.settings.view',
+]
+
+/** 2. Production Manager — plans, WOs, start/hold/complete/close */
+const PRODUCTION_MANAGER: ManufacturingPermission[] = [
+  ...READ_BASE,
+  'manufacturing.dashboard.view',
+  'manufacturing.bom.create',
+  'manufacturing.bom.edit',
+  'manufacturing.bom.activate',
+  'manufacturing.bom.deactivate',
+  'manufacturing.bom.view_cost',
   'manufacturing.production_plan.create_work_order',
-  'manufacturing.work_orders.view',
   'manufacturing.work_orders.create',
   'manufacturing.work_orders.edit',
   'manufacturing.work_orders.start',
@@ -80,34 +112,32 @@ const WO_CORE: ManufacturingPermission[] = [
   'manufacturing.work_orders.close',
   'manufacturing.work_orders.close_with_difference',
   'manufacturing.work_orders.reopen',
-  'manufacturing.materials.view',
   'manufacturing.materials.reserve',
   'manufacturing.materials.create_requirement',
   'manufacturing.production.complete',
   'manufacturing.production.complete_and_close',
   'manufacturing.scrap.record',
   'manufacturing.rework.manage',
+  'manufacturing.quality.view',
   'manufacturing.cost.view',
   'manufacturing.variance.view',
-  'manufacturing.job_work.view',
   'manufacturing.job_work.create',
   'manufacturing.job_work.edit',
-  'manufacturing.job_work.dispatch',
-  'manufacturing.job_work.receive',
-  'manufacturing.job_work.return_material',
-  'manufacturing.job_work.reconcile',
-  'manufacturing.job_work.approve_difference',
-  'manufacturing.job_work.link_invoice',
-  'manufacturing.job_work.close',
-  'manufacturing.job_work.cancel',
   'manufacturing.job_work.view_cost',
   'manufacturing.reports.view',
   'manufacturing.reports.export',
   'manufacturing.settings.view',
+  'manufacturing.settings.manage',
   'manufacturing.view_audit',
+  'manufacturing.routes.view',
+  'manufacturing.routes.create',
+  'manufacturing.routes.edit',
+  'manufacturing.routes.activate',
+  'manufacturing.work_orders.override_route',
 ]
 
-const SHOP_FLOOR: ManufacturingPermission[] = [
+/** 3. Supervisor — start, hold, resume, complete */
+const SUPERVISOR: ManufacturingPermission[] = [
   'manufacturing.view',
   'manufacturing.dashboard.view',
   'manufacturing.work_orders.view',
@@ -118,30 +148,10 @@ const SHOP_FLOOR: ManufacturingPermission[] = [
   'manufacturing.production.complete',
   'manufacturing.scrap.record',
   'manufacturing.job_work.view',
-  'manufacturing.job_work.receive',
 ]
 
-const PLANNING: ManufacturingPermission[] = [
-  'manufacturing.view',
-  'manufacturing.dashboard.view',
-  'manufacturing.bom.view',
-  'manufacturing.bom.create',
-  'manufacturing.bom.edit',
-  'manufacturing.bom.activate',
-  'manufacturing.production_plan.view',
-  'manufacturing.production_plan.create_work_order',
-  'manufacturing.work_orders.view',
-  'manufacturing.work_orders.create',
-  'manufacturing.work_orders.edit',
-  'manufacturing.materials.view',
-  'manufacturing.job_work.view',
-  'manufacturing.job_work.create',
-  'manufacturing.job_work.edit',
-  'manufacturing.reports.view',
-  'manufacturing.view_audit',
-]
-
-const STORE: ManufacturingPermission[] = [
+/** 4. Store User — material requirement, reserve, issue */
+const STORE_USER: ManufacturingPermission[] = [
   'manufacturing.view',
   'manufacturing.work_orders.view',
   'manufacturing.materials.view',
@@ -154,97 +164,119 @@ const STORE: ManufacturingPermission[] = [
   'manufacturing.job_work.return_material',
 ]
 
-const QUALITY: ManufacturingPermission[] = [
+/** 5. QC User — QC pending, accept / reject / rework */
+const QC_USER: ManufacturingPermission[] = [
   'manufacturing.view',
+  'manufacturing.dashboard.view',
   'manufacturing.work_orders.view',
   'manufacturing.quality.view',
   'manufacturing.quality.inspect',
   'manufacturing.quality.accept_deviation',
   'manufacturing.rework.manage',
   'manufacturing.job_work.view',
-  'manufacturing.job_work.receive',
 ]
 
-const READ_ONLY: ManufacturingPermission[] = [
+/** 6. Job Work User — create, send, receive, reconcile */
+const JOB_WORK_USER: ManufacturingPermission[] = [
   'manufacturing.view',
-  'manufacturing.dashboard.view',
-  'manufacturing.bom.view',
-  'manufacturing.production_plan.view',
   'manufacturing.work_orders.view',
   'manufacturing.materials.view',
   'manufacturing.job_work.view',
-  'manufacturing.reports.view',
+  'manufacturing.job_work.create',
+  'manufacturing.job_work.edit',
+  'manufacturing.job_work.dispatch',
+  'manufacturing.job_work.receive',
+  'manufacturing.job_work.return_material',
+  'manufacturing.job_work.reconcile',
+  'manufacturing.job_work.approve_difference',
+  'manufacturing.job_work.link_invoice',
+  'manufacturing.job_work.close',
+  'manufacturing.job_work.cancel',
+  'manufacturing.job_work.view_cost',
 ]
 
-const ROLE_MAP: Partial<Record<ErpRole, ManufacturingPermission[]>> = {
-  admin: ALL,
-  ceo: [...READ_ONLY, 'manufacturing.cost.view', 'manufacturing.variance.view'],
-  director: [...READ_ONLY, 'manufacturing.cost.view'],
-  production_head: [...WO_CORE, 'manufacturing.settings.manage', 'manufacturing.bom.view', 'manufacturing.bom.create', 'manufacturing.bom.edit', 'manufacturing.bom.activate', 'manufacturing.bom.deactivate', 'manufacturing.bom.view_cost', 'manufacturing.quality.view', 'manufacturing.quality.inspect'],
-  production_supervisor: WO_CORE,
-  planning_manager: PLANNING,
-  shop_floor: SHOP_FLOOR,
-  engineering_head: [
-    'manufacturing.view',
-    'manufacturing.dashboard.view',
-    'manufacturing.bom.view',
-    'manufacturing.bom.create',
-    'manufacturing.bom.edit',
-    'manufacturing.bom.activate',
-    'manufacturing.bom.deactivate',
-    'manufacturing.bom.view_cost',
-    'manufacturing.view_audit',
-  ],
-  store_manager: STORE,
-  store_user: ['manufacturing.view', 'manufacturing.materials.view', 'manufacturing.materials.issue', 'manufacturing.materials.return', 'manufacturing.job_work.dispatch'],
-  purchase_head: [...READ_ONLY, 'manufacturing.materials.create_requirement', 'manufacturing.job_work.link_invoice'],
-  quality_head: QUALITY,
-  sales_manager: READ_ONLY,
+/** 7. Viewer — read-only */
+const VIEWER: ManufacturingPermission[] = [
+  ...READ_BASE,
+  'manufacturing.dashboard.view',
+  'manufacturing.quality.view',
+  'manufacturing.reports.view',
+  'manufacturing.cost.view',
+  'manufacturing.settings.view',
+]
+
+const UI_ROLE_MAP: Record<ManufacturingUiRole, ManufacturingPermission[]> = {
+  owner: OWNER,
+  production_manager: PRODUCTION_MANAGER,
+  supervisor: SUPERVISOR,
+  store_user: STORE_USER,
+  qc_user: QC_USER,
+  job_work_user: JOB_WORK_USER,
+  viewer: VIEWER,
 }
 
 const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: ManufacturingPermission }> = [
+  { prefix: '/manufacturing/routes', permission: 'manufacturing.routes.view' },
+  { prefix: '/manufacturing/control-room', permission: 'manufacturing.dashboard.view' },
+  { prefix: '/manufacturing/dashboard', permission: 'manufacturing.dashboard.view' },
   { prefix: '/manufacturing/bom', permission: 'manufacturing.bom.view' },
   { prefix: '/manufacturing/production-plan', permission: 'manufacturing.production_plan.view' },
+  { prefix: '/manufacturing/shopfloor', permission: 'manufacturing.work_orders.view' },
   { prefix: '/manufacturing/work-orders', permission: 'manufacturing.work_orders.view' },
   { prefix: '/manufacturing/job-work', permission: 'manufacturing.job_work.view' },
   { prefix: '/manufacturing/reports', permission: 'manufacturing.reports.view' },
   { prefix: '/manufacturing/settings', permission: 'manufacturing.settings.view' },
-  { prefix: '/manufacturing', permission: 'manufacturing.dashboard.view' },
+  { prefix: '/manufacturing', permission: 'manufacturing.view' },
 ]
 
-export function getManufacturingPermissionsForRole(role: ErpRole): ManufacturingPermission[] {
-  return ROLE_MAP[role] ?? READ_ONLY
+export function getManufacturingPermissionsForUiRole(role: ManufacturingUiRole): ManufacturingPermission[] {
+  return UI_ROLE_MAP[role] ?? VIEWER
 }
 
-export function canManufacturingPermission(permission: ManufacturingPermission, role?: ErpRole): boolean {
-  const r = role ?? getSessionUser().role
-  if (r === 'admin') return true
-  return getManufacturingPermissionsForRole(r).includes(permission)
+/** @deprecated Prefer getManufacturingPermissionsForUiRole — kept for any ErpRole callers */
+export function getManufacturingPermissionsForRole(_role: string): ManufacturingPermission[] {
+  return getManufacturingPermissionsForUiRole(getManufacturingUiRole())
 }
 
-export function canAccessManufacturingShell(role?: ErpRole): boolean {
-  return canManufacturingPermission('manufacturing.view', role)
+export function canManufacturingPermission(
+  permission: ManufacturingPermission,
+  uiRole?: ManufacturingUiRole,
+): boolean {
+  const role = uiRole ?? getManufacturingUiRole()
+  return getManufacturingPermissionsForUiRole(role).includes(permission)
 }
 
-export function canManufacturingRoute(pathname: string, role?: ErpRole): boolean {
-  if (!canAccessManufacturingShell(role)) return false
-  const match = [...ROUTE_PERMISSION_MAP].sort((a, b) => b.prefix.length - a.prefix.length).find(
-    (entry) => pathname === entry.prefix || pathname.startsWith(`${entry.prefix}/`),
-  )
+export function canAccessManufacturingShell(uiRole?: ManufacturingUiRole): boolean {
+  return canManufacturingPermission('manufacturing.view', uiRole)
+}
+
+export function canManufacturingRoute(pathname: string, uiRole?: ManufacturingUiRole): boolean {
+  if (!canAccessManufacturingShell(uiRole)) return false
+  const match = [...ROUTE_PERMISSION_MAP]
+    .sort((a, b) => b.prefix.length - a.prefix.length)
+    .find((entry) => pathname === entry.prefix || pathname.startsWith(`${entry.prefix}/`))
   if (!match) return true
-  return canManufacturingPermission(match.permission, role)
+  return canManufacturingPermission(match.permission, uiRole)
 }
 
 export function isManufacturingPath(pathname: string): boolean {
   return pathname === '/manufacturing' || pathname.startsWith('/manufacturing/')
 }
 
+export function isManufacturingUiReadOnly(uiRole?: ManufacturingUiRole): boolean {
+  const role = uiRole ?? getManufacturingUiRole()
+  return role === 'viewer' || role === 'owner'
+}
+
 export function useManufacturingPermissions() {
-  const role = getSessionUser().role
+  const uiRole = useManufacturingUiRole()
   return useMemo(() => {
-    const can = (p: ManufacturingPermission) => canManufacturingPermission(p, role)
+    const can = (p: ManufacturingPermission) => canManufacturingPermission(p, uiRole)
     return {
-      role,
+      /** Active manufacturing UI planning role (demo switcher). */
+      role: uiRole,
+      uiRole,
+      isReadOnlyRole: isManufacturingUiReadOnly(uiRole),
       canView: can('manufacturing.view'),
       canViewDashboard: can('manufacturing.dashboard.view'),
       canViewBom: can('manufacturing.bom.view'),
@@ -295,6 +327,11 @@ export function useManufacturingPermissions() {
       canExportReports: can('manufacturing.reports.export'),
       canViewSettings: can('manufacturing.settings.view'),
       canManageSettings: can('manufacturing.settings.manage'),
+      canViewRoute: can('manufacturing.routes.view'),
+      canCreateRoute: can('manufacturing.routes.create'),
+      canEditRoute: can('manufacturing.routes.edit'),
+      canActivateRoute: can('manufacturing.routes.activate'),
+      canOverrideRoute: can('manufacturing.work_orders.override_route'),
     }
-  }, [role])
+  }, [uiRole])
 }

@@ -28,6 +28,8 @@ import {
 } from '@/services/accounting/receivablesService'
 import type { ReceivablesDashboardData } from '@/types/receivables'
 import { useReceivablesPermissions } from '@/utils/permissions/receivables'
+import { getCommercialCommitmentSummary } from '@/data/accounting/commercialCommitmentsSeed'
+import type { CommercialCommitmentSummary } from '@/types/commercialCommitments'
 import { formatCurrency, formatCompactCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
@@ -47,6 +49,7 @@ export function ReceivablesDashboardPage() {
   const navigate = useNavigate()
   const perms = useReceivablesPermissions()
   const [data, setData] = useState<ReceivablesDashboardData | null>(null)
+  const [commercialSummary, setCommercialSummary] = useState<CommercialCommitmentSummary | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
@@ -57,9 +60,13 @@ export function ReceivablesDashboardPage() {
     setLoadState('loading')
     setErrorMessage(null)
     try {
-      const result = await getReceivablesDashboard()
+      const [result, commercial] = await Promise.all([
+        getReceivablesDashboard(),
+        getCommercialCommitmentSummary(),
+      ])
       if (signal?.cancelled) return
       setData(result)
+      setCommercialSummary(commercial)
       setLoadState('ready')
     } catch (err) {
       if (signal?.cancelled) return
@@ -257,6 +264,26 @@ export function ReceivablesDashboardPage() {
       {loadState === 'ready' && data ? (
         <div className="mt-4 space-y-4">
           <ReceivablesSummaryCards items={kpiItems} activeId={kpiActive} />
+          {commercialSummary ? (
+            <Link
+              to="/accounting/commercial-commitments"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 transition-colors hover:border-amber-300"
+            >
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-900">
+                  Pending Commercial Value
+                </p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-erp-text">
+                  {formatCurrency(commercialSummary.potentialReceivable)}
+                </p>
+                <p className="mt-0.5 text-[12px] text-erp-muted">
+                  {formatCurrency(commercialSummary.confirmedSalesOrdersValue)} confirmed but not invoiced · Not included in
+                  customer outstanding
+                </p>
+              </div>
+              <span className="text-[12px] font-semibold text-erp-primary">View Commercial Commitments →</span>
+            </Link>
+          ) : null}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="rounded-lg border border-erp-border bg-white p-3">
