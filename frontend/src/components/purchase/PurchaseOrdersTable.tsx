@@ -9,25 +9,22 @@ import {
   Printer,
   RotateCw,
   Send,
+  Trash2,
 } from 'lucide-react'
 import { ErpDataGrid } from '../erp/ErpDataGrid'
 import { TableLink } from '../ui/AppLink'
-import { Badge } from '../ui/Badge'
-import { StatusDot, type StatusDotTone } from '../design-system/StatusDot'
+import { StatusBadge } from '../../design-system/list-page'
 import {
   EnterpriseRowActionsMenu,
   type RowActionItem,
   useDensityClass,
 } from '../../design-system/enterprise'
 import { CrmListFilterBar, type CrmListFilterBarProps } from '../crm/CrmListFilterBar'
-import { purchaseStatusTone } from './purchaseCardFormShared'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { cn } from '../../utils/cn'
 import type {
-  PurchaseOrderApprovalStatus,
   PurchaseOrderDomainStatus,
-  PurchaseOrderInvoiceStatus,
   PurchaseOrderListRow,
 } from '../../types/purchaseDomain'
 import {
@@ -41,37 +38,6 @@ const REVISABLE_STATUSES: PurchaseOrderDomainStatus[] = [
   'fully_received',
   'invoiced',
 ]
-
-function poStatusDotTone(status: string): StatusDotTone {
-  const tone = purchaseStatusTone(status)
-  if (tone === 'critical') return 'danger'
-  if (status === 'pending_approval') return 'warning'
-  if (
-    status === 'partially_received' ||
-    status === 'fully_received' ||
-    status === 'invoiced'
-  ) {
-    return 'info'
-  }
-  return tone
-}
-
-function invoiceStatusColor(
-  status: PurchaseOrderInvoiceStatus,
-): 'gray' | 'blue' | 'green' {
-  if (status === 'fully_invoiced') return 'green'
-  if (status === 'partially_invoiced') return 'blue'
-  return 'gray'
-}
-
-function approvalStatusColor(
-  status: PurchaseOrderApprovalStatus,
-): 'gray' | 'yellow' | 'green' | 'red' {
-  if (status === 'approved') return 'green'
-  if (status === 'pending') return 'yellow'
-  if (status === 'rejected') return 'red'
-  return 'gray'
-}
 
 export interface PurchaseOrderRowHandlers {
   onView: (row: PurchaseOrderListRow) => void
@@ -97,6 +63,9 @@ function buildRowActions(
   const canApprove = status === 'pending_approval'
   const canRelease = status === 'approved'
   const canCancel = !isCancelled && !isClosed
+  /** Hard delete only for draft; otherwise cancel is the destructive path. */
+  const canDelete = status === 'draft'
+  const statusLabel = row.statusLabel || status
 
   const canEditPerm = canPurchasePermission('purchase.order.edit')
   const canApprovePerm = canPurchasePermission('purchase.order.approve')
@@ -113,9 +82,18 @@ function buildRowActions(
       disabled: !canEditPerm || !canEdit,
       disabledReason: !canEditPerm
         ? getPurchasePermissionDenialReason('purchase.order.edit')
-        : canEdit
-          ? undefined
-          : 'Edit is only available for Draft orders',
+        : `${statusLabel} purchase orders cannot be edited`,
+    },
+    {
+      id: 'delete',
+      label: 'Delete',
+      icon: Trash2,
+      danger: true,
+      onClick: () => handlers.onCancel(row),
+      disabled: !canCancelPerm || !canDelete,
+      disabledReason: !canCancelPerm
+        ? getPurchasePermissionDenialReason('purchase.order.cancel')
+        : `${statusLabel} purchase orders cannot be deleted`,
     },
     {
       id: 'revise',
@@ -172,14 +150,16 @@ function buildRowActions(
       icon: Ban,
       onClick: () => handlers.onCancel(row),
       danger: true,
-      disabled: !canCancelPerm || !canCancel,
+      disabled: !canCancelPerm || !canCancel || canDelete,
       disabledReason: !canCancelPerm
         ? getPurchasePermissionDenialReason('purchase.order.cancel')
-        : isCancelled
-          ? 'Already cancelled'
-          : isClosed
-            ? 'Closed orders cannot be cancelled'
-            : 'Cannot cancel this status',
+        : canDelete
+          ? 'Use Delete for draft orders'
+          : isCancelled
+            ? 'Already cancelled'
+            : isClosed
+              ? 'Closed orders cannot be cancelled'
+              : `${statusLabel} purchase orders cannot be cancelled`,
     },
   ]
 }
@@ -317,12 +297,7 @@ export function PurchaseOrdersTable({
         header: 'Invoice',
         meta: { columnLabel: 'Invoice Status' },
         cell: ({ row }) => (
-          <Badge
-            color={invoiceStatusColor(row.original.invoiceStatus)}
-            className="ent-status-chip !normal-case tracking-normal"
-          >
-            {row.original.invoiceStatusLabel}
-          </Badge>
+          <StatusBadge label={row.original.invoiceStatusLabel} status={row.original.invoiceStatus} />
         ),
       },
       {
@@ -330,12 +305,10 @@ export function PurchaseOrdersTable({
         header: 'Approval',
         meta: { columnLabel: 'Approval Status' },
         cell: ({ row }) => (
-          <Badge
-            color={approvalStatusColor(row.original.approvalStatus)}
-            className="ent-status-chip !normal-case tracking-normal"
-          >
-            {row.original.approvalStatusLabel}
-          </Badge>
+          <StatusBadge
+            label={row.original.approvalStatusLabel}
+            status={row.original.approvalStatus}
+          />
         ),
       },
       {
@@ -343,10 +316,7 @@ export function PurchaseOrdersTable({
         header: 'Status',
         meta: { columnLabel: 'PO Status' },
         cell: ({ row }) => (
-          <StatusDot
-            label={row.original.statusLabel}
-            tone={poStatusDotTone(row.original.status)}
-          />
+          <StatusBadge label={row.original.statusLabel} status={row.original.status} />
         ),
       },
       {
@@ -379,7 +349,6 @@ export function PurchaseOrdersTable({
       className={cn('erp-po-table', densityClass)}
       data={rows}
       columns={columns}
-      recordLabel="Purchase Orders"
       emptyMessage={emptyMessage}
       emptyAction={
         emptyAction ??
@@ -402,7 +371,11 @@ export function PurchaseOrdersTable({
       onRowQuickView={handlers.onView}
       registerBar={
         registerFilter ? (
-          <CrmListFilterBar {...registerFilter} className="crm-list-filter-bar--embedded" />
+          <CrmListFilterBar
+            {...registerFilter}
+            showCommandPaletteHint={false}
+            className="crm-list-filter-bar--embedded"
+          />
         ) : undefined
       }
     />

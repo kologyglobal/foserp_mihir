@@ -312,7 +312,7 @@ export function PurchaseInvoiceListPage() {
         breadcrumbs={shellBreadcrumbs}
         favoritePath="/purchase/invoices"
       >
-        <LoadingState variant="table" rows={8} />
+        <LoadingState variant="table" rows={8} cols={8} />
       </OperationalPageShell>
     )
   }
@@ -406,7 +406,7 @@ export function PurchaseInvoiceListPage() {
         }
         kpiStrip={invoiceKpiStrip}
       >
-        <div className="grid gap-6 xl:grid-cols-[1fr_280px]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
           <EnterpriseRegisterTableShell className="min-w-0">
             <PurchaseInvoicesTable
               rows={filtered}
@@ -427,6 +427,7 @@ export function PurchaseInvoiceListPage() {
                 onSavedViewChange: savedViews.selectView,
                 savedViews: savedViews.viewNames,
                 onSaveView: savedViews.openSaveDialog,
+                showCommandPaletteHint: false,
                 sort: (
                   <CrmListSortSelect
                     value={sortBy}

@@ -62,7 +62,7 @@ export function SmartFilterBar({
             )}
             {onSavedViewChange && (
               <label className="flex items-center gap-1.5 whitespace-nowrap text-[11px] text-erp-muted">
-                <span className="font-medium text-erp-text">View</span>
+                <span className="font-medium text-erp-text">Saved view</span>
                 <Select
                   value={savedView}
                   onChange={(e) => onSavedViewChange(e.target.value)}
@@ -79,9 +79,9 @@ export function SmartFilterBar({
               <button
                 type="button"
                 onClick={onSaveView}
-                className="whitespace-nowrap text-[11px] font-semibold text-erp-primary hover:underline"
+                className="whitespace-nowrap rounded-md border border-erp-primary/25 bg-erp-primary-soft/40 px-2 py-1 text-[11px] font-semibold text-erp-primary hover:bg-erp-primary-soft"
               >
-                Save as…
+                Save view
               </button>
             )}
           </div>

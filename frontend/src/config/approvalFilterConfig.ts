@@ -2,17 +2,21 @@ import type { CrmFilterField, CrmFilterValues } from '../types/crmListFilters'
 import {
   PURCHASE_APPROVAL_AGEING_LABELS,
   PURCHASE_APPROVAL_DOCUMENT_TYPE_LABELS,
+  PURCHASE_APPROVAL_QUEUE_TAB_LABELS,
   PURCHASE_REQUISITION_PRIORITY_LABELS,
 } from '../services/purchase'
 import type {
   PurchaseApprovalAgeingBucket,
   PurchaseApprovalDocumentType,
   PurchaseApprovalQueueRow,
+  PurchaseApprovalQueueTab,
   PurchaseRequisitionPriority,
 } from '../types/purchaseDomain'
 
 export interface ApprovalListFilters {
   search: string
+  /** Queue view — formerly the Approvals tab strip */
+  queue: string
   documentType: string
   requester: string
   department: string
@@ -28,6 +32,8 @@ export interface ApprovalListFilters {
 
 export const DEFAULT_APPROVAL_LIST_FILTERS: ApprovalListFilters = {
   search: '',
+  /** Empty = Pending My Approval (default queue; not counted as an active filter chip) */
+  queue: '',
   documentType: '',
   requester: '',
   department: '',
@@ -72,6 +78,22 @@ export function buildApprovalFilterFields(input: {
   locationOptions: { id: string; name: string }[]
 }): CrmFilterField[] {
   return [
+    { type: 'section', label: 'Queue' },
+    {
+      type: 'select',
+      key: 'queue',
+      label: 'Approval queue',
+      options: [
+        { value: '', label: PURCHASE_APPROVAL_QUEUE_TAB_LABELS.pending_mine },
+        ...(
+          ['approved_by_me', 'rejected_by_me', 'all_history'] as PurchaseApprovalQueueTab[]
+        ).map((value) => ({
+          value,
+          label: PURCHASE_APPROVAL_QUEUE_TAB_LABELS[value],
+        })),
+      ],
+    },
+    { type: 'section', label: 'Status & parties' },
     {
       type: 'select',
       key: 'documentType',
@@ -145,6 +167,7 @@ export function crmValuesToApprovalFilters(values: CrmFilterValues): ApprovalLis
   }
   return {
     search: str('search'),
+    queue: str('queue'),
     documentType: str('documentType'),
     requester: str('requester'),
     department: str('department'),
@@ -156,6 +179,13 @@ export function crmValuesToApprovalFilters(values: CrmFilterValues): ApprovalLis
     priority: str('priority'),
     ageing: str('ageing'),
   }
+}
+
+export function resolveApprovalQueueTab(queue: string): PurchaseApprovalQueueTab {
+  if (queue === 'approved_by_me' || queue === 'rejected_by_me' || queue === 'all_history') {
+    return queue
+  }
+  return 'pending_mine'
 }
 
 export function hasActiveApprovalFilters(filters: ApprovalListFilters): boolean {
@@ -170,6 +200,9 @@ export function approvalFilterChipLabelResolver(
   value: string,
   lookups?: { locations?: { id: string; name: string }[] },
 ): string | undefined {
+  if (key === 'queue') {
+    return PURCHASE_APPROVAL_QUEUE_TAB_LABELS[resolveApprovalQueueTab(value)]
+  }
   if (key === 'documentType') {
     return (
       PURCHASE_APPROVAL_DOCUMENT_TYPE_LABELS[value as PurchaseApprovalDocumentType] ?? value

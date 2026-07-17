@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RefreshCw, Settings2, ShieldCheck } from 'lucide-react'
+import { RefreshCw, Settings2 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -21,6 +21,7 @@ import {
   crmValuesToApprovalFilters,
   filterApprovalRows,
   hasActiveApprovalFilters,
+  resolveApprovalQueueTab,
   sortApprovalRows,
   type ApprovalListFilters,
   type ApprovalSortKey,
@@ -37,7 +38,6 @@ import {
   approvePurchaseDocument,
   delegatePurchaseApproval,
   getPurchaseApprovalQueue,
-  PURCHASE_APPROVAL_QUEUE_TAB_LABELS,
   PurchaseServiceError,
   rejectPurchaseDocument,
   sendBackPurchaseDocument,
@@ -48,21 +48,12 @@ import type {
 } from '@/types/purchaseDomain'
 import { approvalsListBreadcrumbs } from '@/utils/purchaseNavigation'
 import { notify } from '@/store/toastStore'
-import { systemPrompt } from '@/utils/systemConfirm'
-import { cn } from '@/utils/cn'
-
-const TABS: PurchaseApprovalQueueTab[] = [
-  'pending_mine',
-  'approved_by_me',
-  'rejected_by_me',
-  'all_history',
-]
+import { appConfirm, appPromptNote } from '@/store/confirmDialogStore'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'empty'
 
 export function PurchaseApprovalsPage() {
   const navigate = useNavigate()
-  const [tab, setTab] = useState<PurchaseApprovalQueueTab>('pending_mine')
   const [filters, setFilters] = useState<ApprovalListFilters>(DEFAULT_APPROVAL_LIST_FILTERS)
   const [sortBy, setSortBy] = useState<ApprovalSortKey>('submittedDate')
   const [rows, setRows] = useState<PurchaseApprovalQueueRow[]>([])
@@ -75,6 +66,16 @@ export function PurchaseApprovalsPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [reviewId, setReviewId] = useState<string | null>(null)
   const [drawerMode, setDrawerMode] = useState<'review' | 'history'>('review')
+
+  const tab = resolveApprovalQueueTab(filters.queue)
+
+  const setQueueTab = useCallback((next: PurchaseApprovalQueueTab, ageing?: string) => {
+    setFilters((f) => ({
+      ...f,
+      queue: next === 'pending_mine' ? '' : next,
+      ageing: ageing !== undefined ? ageing : next === 'pending_mine' ? f.ageing : '',
+    }))
+  }, [])
 
   const load = useCallback(async (signal?: { cancelled: boolean }) => {
     setLoadState('loading')
@@ -156,14 +157,9 @@ export function PurchaseApprovalsPage() {
 
   const applyKpiSelection = useCallback(
     (next: { tab: PurchaseApprovalQueueTab; ageing?: string }) => {
-      setTab(next.tab)
-      if (next.ageing !== undefined) {
-        setFilters((f) => ({ ...f, ageing: next.ageing ?? '' }))
-      } else if (next.tab !== 'pending_mine') {
-        setFilters((f) => ({ ...f, ageing: '' }))
-      }
+      setQueueTab(next.tab, next.ageing)
     },
-    [],
+    [setQueueTab],
   )
 
   const kpiStrip = useMemo(
@@ -185,18 +181,12 @@ export function PurchaseApprovalsPage() {
         rows: filtered,
         activeTab: tab,
         activeAgeing: filters.ageing,
-        onSelectTab: (next) => {
-          setTab(next)
-          setFilters((f) => ({ ...f, ageing: '' }))
-        },
+        onSelectTab: (next) => setQueueTab(next),
         onShowOverdue: () => applyKpiSelection({ tab: 'pending_mine', ageing: 'overdue' }),
-        onShowHistory: () => {
-          setTab('all_history')
-          setFilters((f) => ({ ...f, ageing: '' }))
-        },
+        onShowHistory: () => setQueueTab('all_history'),
         onOpenSetup: () => navigate('/purchase/setup'),
       }),
-    [filtered, tab, filters.ageing, applyKpiSelection, navigate],
+    [filtered, tab, filters.ageing, applyKpiSelection, navigate, setQueueTab],
   )
 
   const openReview = (id: string, mode: 'review' | 'history' = 'review') => {
@@ -210,30 +200,47 @@ export function PurchaseApprovalsPage() {
       kind: 'approve' | 'reject' | 'send_back' | 'delegate',
     ) => {
       try {
-        if (kind === 'reject') {
-          const remarks = await systemPrompt({
-            title: 'Reject document',
-            description: `Reject ${row.documentNumber}? Comments are required and will be shared with the requester.`,
-            fieldLabel: 'Rejection comments',
-            placeholder: 'Explain why this request is being rejected…',
+        if (kind === 'approve') {
+          const ok = await appConfirm({
+            title: 'Approve document?',
+            description: 'This will move the document to the next approval / release step.',
+            detail: row.documentNumber,
+            tone: 'success',
+            confirmLabel: 'Approve',
+          })
+          if (!ok) return
+          setBusyId(row.approvalId)
+          await approvePurchaseDocument(row.documentType, row.documentId, 'Approved')
+          notify.success(`${row.documentNumber} approved`)
+        } else if (kind === 'reject') {
+          const remarks = await appPromptNote({
+            title: 'Reject document?',
+            description: 'The requester will be notified. Comments are required for the audit trail.',
+            detail: row.documentNumber,
+            tone: 'danger',
             confirmLabel: 'Reject',
-            cancelLabel: 'Cancel',
-            variant: 'danger',
-            required: true,
+            note: {
+              required: true,
+              label: 'Rejection comments',
+              placeholder: 'Explain why this document is being rejected…',
+            },
           })
           if (remarks == null) return
           setBusyId(row.approvalId)
           await rejectPurchaseDocument(row.documentType, row.documentId, remarks)
           notify.success(`${row.documentNumber} rejected`)
         } else if (kind === 'send_back') {
-          const remarks = await systemPrompt({
-            title: 'Send back for correction',
-            description: `Return ${row.documentNumber} to the requester. Comments are mandatory so they know what to fix.`,
-            fieldLabel: 'Send-back comments',
-            placeholder: 'Describe what needs to be corrected…',
-            confirmLabel: 'Send Back',
-            cancelLabel: 'Cancel',
-            required: true,
+          const remarks = await appPromptNote({
+            title: 'Send back for revision?',
+            description: 'The document returns to the previous step. Comments are required.',
+            detail: row.documentNumber,
+            tone: 'warning',
+            confirmLabel: 'Send back',
+            note: {
+              required: true,
+              label: 'Send-back comments',
+              placeholder: 'What should the requester change before resubmitting…',
+            },
           })
           if (remarks == null) return
           setBusyId(row.approvalId)
@@ -241,13 +248,8 @@ export function PurchaseApprovalsPage() {
           notify.success(`${row.documentNumber} sent back`)
         } else {
           setBusyId(row.approvalId)
-          if (kind === 'approve') {
-            await approvePurchaseDocument(row.documentType, row.documentId, 'Approved')
-            notify.success(`${row.documentNumber} approved`)
-          } else {
-            await delegatePurchaseApproval(row.approvalId, 'finance_head', 'Delegated to Finance Head')
-            notify.success(`${row.documentNumber} delegated`)
-          }
+          await delegatePurchaseApproval(row.approvalId, 'finance_head', 'Delegated to Finance Head')
+          notify.success(`${row.documentNumber} delegated`)
         }
         setRefreshToken((n) => n + 1)
       } catch (err) {
@@ -278,41 +280,6 @@ export function PurchaseApprovalsPage() {
   const activeFilters = hasActiveApprovalFilters(filters)
   const shellBreadcrumbs = approvalsListBreadcrumbs()
 
-  const tabStrip = (
-    <div className="mb-3 flex flex-wrap gap-1.5 border-b border-erp-border pb-2.5">
-      {TABS.map((t) => (
-        <button
-          key={t}
-          type="button"
-          onClick={() => {
-            setTab(t)
-            if (t !== 'pending_mine') {
-              setFilters((f) => ({ ...f, ageing: '' }))
-            }
-          }}
-          className={cn(
-            'rounded-md px-2.5 py-1 text-[12.5px] font-medium transition-colors',
-            tab === t
-              ? 'bg-erp-primary text-white'
-              : 'bg-erp-surface-alt text-erp-text hover:bg-erp-primary-soft',
-          )}
-        >
-          {PURCHASE_APPROVAL_QUEUE_TAB_LABELS[t]}
-          {t === 'pending_mine' && kpiSummary.pending > 0 ? (
-            <span
-              className={cn(
-                'ml-1.5 inline-flex min-w-[1.15rem] justify-center rounded-full px-1 text-[11px] tabular-nums',
-                tab === t ? 'bg-white/20' : 'bg-erp-warning-soft text-erp-warning-fg',
-              )}
-            >
-              {kpiSummary.pending}
-            </span>
-          ) : null}
-        </button>
-      ))}
-    </div>
-  )
-
   if (loadState === 'loading' && rows.length === 0) {
     return (
       <OperationalPageShell
@@ -323,7 +290,7 @@ export function PurchaseApprovalsPage() {
         breadcrumbs={shellBreadcrumbs}
         favoritePath="/purchase/approvals"
       >
-        <LoadingState variant="table" rows={8} />
+        <LoadingState variant="table" rows={8} cols={8} />
       </OperationalPageShell>
     )
   }
@@ -384,21 +351,15 @@ export function PurchaseApprovalsPage() {
             inline
             sticky={false}
             primaryAction={{
-              id: 'pending',
-              label: 'Pending Queue',
-              icon: ShieldCheck,
-              onClick: () => applyKpiSelection({ tab: 'pending_mine', ageing: '' }),
+              id: 'refresh',
+              label: 'Refresh',
+              icon: RefreshCw,
+              onClick: () => {
+                setRefreshToken((n) => n + 1)
+                notify.info('Approvals refreshed')
+              },
             }}
             secondaryActions={[
-              {
-                id: 'refresh',
-                label: 'Refresh',
-                icon: RefreshCw,
-                onClick: () => {
-                  setRefreshToken((n) => n + 1)
-                  notify.info('Approvals refreshed')
-                },
-              },
               {
                 id: 'setup',
                 label: 'Purchase Setup',
@@ -410,8 +371,7 @@ export function PurchaseApprovalsPage() {
         }
         kpiStrip={kpiStrip}
       >
-        {tabStrip}
-        <div className="grid gap-6 xl:grid-cols-[1fr_280px]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
           <EnterpriseRegisterTableShell className="min-w-0">
             <PurchaseApprovalsTable
               rows={filtered}
@@ -428,7 +388,7 @@ export function PurchaseApprovalsPage() {
                 chips: filterDrawer.chips,
                 onRemoveChip: filterDrawer.removeChip,
                 onClearAll: clearFilters,
-                resultCount: filtered.length,
+                showCommandPaletteHint: false,
                 sort: (
                   <CrmListSortSelect
                     value={sortBy}

@@ -402,7 +402,7 @@ export function PurchaseRequisitionListPage() {
         breadcrumbs={shellBreadcrumbs}
         favoritePath="/purchase/requisitions"
       >
-        <LoadingState variant="table" rows={8} />
+        <LoadingState variant="table" rows={8} cols={8} />
       </OperationalPageShell>
     )
   }
@@ -458,6 +458,7 @@ export function PurchaseRequisitionListPage() {
         variant="dynamics"
         breadcrumbs={shellBreadcrumbs}
         favoritePath="/purchase/requisitions"
+        pageGuide={null}
         commandBar={
           <ErpCommandBar
             inline
@@ -496,63 +497,66 @@ export function PurchaseRequisitionListPage() {
         }
         kpiStrip={prKpiStrip}
       >
-        <div className="grid gap-6 xl:grid-cols-[1fr_280px]">
-          <EnterpriseRegisterTableShell className="min-w-0">
-            <PurchaseRequisitionsTable
-              rows={filtered}
-              busyId={busyId}
-              handlers={rowHandlers}
-              hasActiveFilters={activeFilters}
-              onClearFilters={clearFilters}
-              onExport={exportList}
-              registerFilter={{
-                search: filters.search,
-                onSearchChange: (search) => setFilters((f) => ({ ...f, search })),
-                searchPlaceholder: 'Search PR number, item, requester, department…',
-                activeFilterCount: filterDrawer.activeCount,
-                onOpenFilters: filterDrawer.openDrawer,
-                chips: filterDrawer.chips,
-                onRemoveChip: filterDrawer.removeChip,
-                onClearAll: clearFilters,
-                savedView: savedViews.activeView,
-                onSavedViewChange: savedViews.selectView,
-                savedViews: savedViews.viewNames,
-                onSaveView: savedViews.openSaveDialog,
-                sort: (
-                  <CrmListSortSelect
-                    value={sortBy}
-                    onChange={(v) => setSortBy(v as PrSortKey)}
-                    aria-label="Sort purchase requisitions"
-                    options={PR_SORT_OPTIONS}
-                  />
-                ),
-              }}
-              emptyAction={
-                filtered.length === 0 ? (
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {rows.length === 0 && perms.canCreateRequisition ? (
-                      <button
-                        type="button"
-                        className="erp-btn erp-btn--primary text-[13px]"
-                        onClick={() => navigate('/purchase/requisitions/new')}
-                      >
-                        Create Requisition
-                      </button>
-                    ) : null}
-                    {activeFilters ? (
-                      <button
-                        type="button"
-                        className="erp-btn erp-btn--secondary text-[13px]"
-                        onClick={clearFilters}
-                      >
-                        Clear Filters
-                      </button>
-                    ) : null}
-                  </div>
-                ) : undefined
-              }
-            />
-          </EnterpriseRegisterTableShell>
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
+          <div className="min-w-0 space-y-3">
+            <EnterpriseRegisterTableShell className="min-w-0">
+              <PurchaseRequisitionsTable
+                rows={filtered}
+                busyId={busyId}
+                handlers={rowHandlers}
+                hasActiveFilters={activeFilters}
+                onClearFilters={clearFilters}
+                onExport={exportList}
+                registerFilter={{
+                  search: filters.search,
+                  onSearchChange: (search) => setFilters((f) => ({ ...f, search })),
+                  searchPlaceholder: 'Search PR number, item, requester, department…',
+                  activeFilterCount: filterDrawer.activeCount,
+                  onOpenFilters: filterDrawer.openDrawer,
+                  chips: filterDrawer.chips,
+                  onRemoveChip: filterDrawer.removeChip,
+                  onClearAll: clearFilters,
+                  savedView: savedViews.activeView,
+                  onSavedViewChange: savedViews.selectView,
+                  savedViews: savedViews.viewNames,
+                  onSaveView: savedViews.openSaveDialog,
+                  showCommandPaletteHint: false,
+                  sort: (
+                    <CrmListSortSelect
+                      value={sortBy}
+                      onChange={(v) => setSortBy(v as PrSortKey)}
+                      aria-label="Sort purchase requisitions"
+                      options={PR_SORT_OPTIONS}
+                    />
+                  ),
+                }}
+                emptyAction={
+                  filtered.length === 0 ? (
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {rows.length === 0 && perms.canCreateRequisition ? (
+                        <button
+                          type="button"
+                          className="erp-btn erp-btn--primary text-[13px]"
+                          onClick={() => navigate('/purchase/requisitions/new')}
+                        >
+                          Create Requisition
+                        </button>
+                      ) : null}
+                      {activeFilters ? (
+                        <button
+                          type="button"
+                          className="erp-btn erp-btn--secondary text-[13px]"
+                          onClick={clearFilters}
+                        >
+                          Clear Filters
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : undefined
+                }
+              />
+            </EnterpriseRegisterTableShell>
+          </div>
           <PurchaseRegisterContextPanel
             ariaLabel="Purchase requisition overview and suggestions"
             title="Requisition Insights"

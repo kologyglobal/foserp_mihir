@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Download, FileText, Plus, RefreshCw, Save } from 'lucide-react'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
+import { ErpPageGuide } from '../../components/erp/ErpPageGuide'
 import { SaveViewDialog } from '../../components/design-system/SaveViewDialog'
 import { EnterpriseRegisterTableShell } from '../../design-system/list-page/EnterpriseRegisterTableShell'
 import { ErpCommandBar } from '../../components/erp/ErpCommandBar'
@@ -390,8 +391,9 @@ export function PurchaseOrderListPage() {
         variant="dynamics"
         breadcrumbs={shellBreadcrumbs}
         favoritePath="/purchase/orders"
+        pageGuide={null}
       >
-        <LoadingState variant="table" rows={8} />
+        <LoadingState variant="table" rows={8} cols={8} />
       </OperationalPageShell>
     )
   }
@@ -405,6 +407,7 @@ export function PurchaseOrderListPage() {
         variant="dynamics"
         breadcrumbs={shellBreadcrumbs}
         favoritePath="/purchase/orders"
+        pageGuide={null}
         commandBar={
           <ErpCommandBar
             inline
@@ -447,6 +450,7 @@ export function PurchaseOrderListPage() {
         variant="dynamics"
         breadcrumbs={shellBreadcrumbs}
         favoritePath="/purchase/orders"
+        pageGuide={null}
         commandBar={
           <ErpCommandBar
             inline
@@ -485,63 +489,70 @@ export function PurchaseOrderListPage() {
         }
         kpiStrip={poKpiStrip}
       >
-        <div className="grid gap-6 xl:grid-cols-[1fr_280px]">
-          <EnterpriseRegisterTableShell className="min-w-0">
-            <PurchaseOrdersTable
-              rows={filtered}
-              busyId={busyId}
-              handlers={rowHandlers}
-              hasActiveFilters={activeFilters}
-              onClearFilters={clearFilters}
-              onExport={exportList}
-              registerFilter={{
-                search: filters.search,
-                onSearchChange: (search) => setFilters((f) => ({ ...f, search })),
-                searchPlaceholder: 'Search PO number, vendor, GST, buyer…',
-                activeFilterCount: filterDrawer.activeCount,
-                onOpenFilters: filterDrawer.openDrawer,
-                chips: filterDrawer.chips,
-                onRemoveChip: filterDrawer.removeChip,
-                onClearAll: clearFilters,
-                savedView: savedViews.activeView,
-                onSavedViewChange: savedViews.selectView,
-                savedViews: savedViews.viewNames,
-                onSaveView: savedViews.openSaveDialog,
-                sort: (
-                  <CrmListSortSelect
-                    value={sortBy}
-                    onChange={(v) => setSortBy(v as PoSortKey)}
-                    aria-label="Sort purchase orders"
-                    options={PO_SORT_OPTIONS}
-                  />
-                ),
-              }}
-              emptyAction={
-                filtered.length === 0 ? (
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {rows.length === 0 && perms.canCreateOrder ? (
-                      <button
-                        type="button"
-                        className="erp-btn erp-btn--primary text-[13px]"
-                        onClick={() => navigate('/purchase/orders/new')}
-                      >
-                        New Purchase Order
-                      </button>
-                    ) : null}
-                    {activeFilters ? (
-                      <button
-                        type="button"
-                        className="erp-btn erp-btn--secondary text-[13px]"
-                        onClick={clearFilters}
-                      >
-                        Clear Filters
-                      </button>
-                    ) : null}
-                  </div>
-                ) : undefined
-              }
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
+          <div className="min-w-0 space-y-3">
+            <ErpPageGuide
+              purpose="Purchase orders — create, approve and release, then track delivery."
+              nextStep="Approve and release PO, await vendor confirmation, then record gate entry & GRN."
             />
-          </EnterpriseRegisterTableShell>
+            <EnterpriseRegisterTableShell className="min-w-0">
+              <PurchaseOrdersTable
+                rows={filtered}
+                busyId={busyId}
+                handlers={rowHandlers}
+                hasActiveFilters={activeFilters}
+                onClearFilters={clearFilters}
+                onExport={exportList}
+                registerFilter={{
+                  search: filters.search,
+                  onSearchChange: (search) => setFilters((f) => ({ ...f, search })),
+                  searchPlaceholder: 'Search PO number, vendor, GST, buyer…',
+                  activeFilterCount: filterDrawer.activeCount,
+                  onOpenFilters: filterDrawer.openDrawer,
+                  chips: filterDrawer.chips,
+                  onRemoveChip: filterDrawer.removeChip,
+                  onClearAll: clearFilters,
+                  savedView: savedViews.activeView,
+                  onSavedViewChange: savedViews.selectView,
+                  savedViews: savedViews.viewNames,
+                  onSaveView: savedViews.openSaveDialog,
+                  showCommandPaletteHint: false,
+                  sort: (
+                    <CrmListSortSelect
+                      value={sortBy}
+                      onChange={(v) => setSortBy(v as PoSortKey)}
+                      aria-label="Sort purchase orders"
+                      options={PO_SORT_OPTIONS}
+                    />
+                  ),
+                }}
+                emptyAction={
+                  filtered.length === 0 ? (
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {rows.length === 0 && perms.canCreateOrder ? (
+                        <button
+                          type="button"
+                          className="erp-btn erp-btn--primary text-[13px]"
+                          onClick={() => navigate('/purchase/orders/new')}
+                        >
+                          New Purchase Order
+                        </button>
+                      ) : null}
+                      {activeFilters ? (
+                        <button
+                          type="button"
+                          className="erp-btn erp-btn--secondary text-[13px]"
+                          onClick={clearFilters}
+                        >
+                          Clear Filters
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : undefined
+                }
+              />
+            </EnterpriseRegisterTableShell>
+          </div>
           <PurchaseRegisterContextPanel
             ariaLabel="Purchase order overview and suggestions"
             title="Order Insights"
@@ -555,11 +566,18 @@ export function PurchaseOrderListPage() {
       <CrmFilterDrawer
         open={filterDrawer.open}
         onClose={filterDrawer.closeDrawer}
+        title="Filter purchase orders"
         fields={poFilterFields}
         values={filterDrawer.draft}
         onChange={(next) => filterDrawer.setDraft({ ...filterDrawer.draft, ...next })}
         onApply={filterDrawer.applyFilters}
         onReset={filterDrawer.resetDraft}
+        savedViewsSlot={
+          <p className="text-[12px] leading-snug text-erp-muted">
+            Apply filters, then use <span className="font-semibold text-erp-text">Save view</span> on
+            the register bar to reuse this setup later.
+          </p>
+        }
       />
       <SaveViewDialog
         open={savedViews.saveDialogOpen}

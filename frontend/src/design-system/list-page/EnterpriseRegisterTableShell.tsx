@@ -13,7 +13,7 @@ export function EnterpriseRegisterTableShell({
   className?: string
 }) {
   return (
-    <div className={cn('erp-page-panel erp-register-table-shell overflow-hidden p-0', className)}>
+    <div className={cn('erp-page-panel erp-register-table-shell overflow-visible p-0', className)}>
       {children}
     </div>
   )
