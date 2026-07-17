@@ -138,6 +138,11 @@ model Tenant {
   financeFeatureControls FinanceFeatureControl[]
   financeApprovalRules FinanceApprovalRule[]
   financeNumberSeries  FinanceNumberSeries[]
+  accountingVouchers     AccountingVoucher[]
+  accountingVoucherLines AccountingVoucherLine[]
+  generalLedgerEntries GeneralLedgerEntry[]
+  postingEvents        PostingEvent[]
+  postingRules         PostingRule[]
 
   @@index([status])
   @@index([deletedAt])
@@ -1607,6 +1612,11 @@ model LegalEntity {
   financeFeatureControls FinanceFeatureControl[]
   financeApprovalRules   FinanceApprovalRule[]
   financeNumberSeries    FinanceNumberSeries[]
+  accountingVouchers     AccountingVoucher[]
+  accountingVoucherLines AccountingVoucherLine[]
+  generalLedgerEntries   GeneralLedgerEntry[]
+  postingEvents          PostingEvent[]
+  postingRules           PostingRule[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1637,6 +1647,8 @@ model Branch {
 
   tenant      Tenant      @relation(fields: [tenantId], references: [id])
   legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+  accountingVouchers AccountingVoucher[]
+  generalLedgerEntries GeneralLedgerEntry[]
 
   @@unique([legalEntityId, code])
   @@index([tenantId])
@@ -1664,6 +1676,8 @@ model FinancialYear {
   legalEntity       LegalEntity        @relation(fields: [legalEntityId], references: [id])
   periods           AccountingPeriod[]
   financeNumberSeries FinanceNumberSeries[]
+  accountingVouchers AccountingVoucher[]
+  generalLedgerEntries GeneralLedgerEntry[]
 
   @@index([tenantId])
   @@index([legalEntityId])
@@ -1693,6 +1707,8 @@ model AccountingPeriod {
   tenant        Tenant        @relation(fields: [tenantId], references: [id])
   legalEntity   LegalEntity   @relation(fields: [legalEntityId], references: [id])
   financialYear FinancialYear @relation(fields: [financialYearId], references: [id])
+  accountingVouchers AccountingVoucher[]
+  generalLedgerEntries GeneralLedgerEntry[]
 
   @@unique([financialYearId, periodNumber])
   @@index([tenantId])
@@ -1731,6 +1747,8 @@ model Account {
   parent      Account?                 @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
   children    Account[]                @relation("AccountHierarchy")
   mappings    DefaultAccountMapping[]
+  voucherLines AccountingVoucherLine[]
+  generalLedgerEntries GeneralLedgerEntry[]
 
   @@unique([legalEntityId, accountCode])
   @@index([tenantId])
@@ -1815,6 +1833,8 @@ model CostCentre {
   legalEntity LegalEntity  @relation(fields: [legalEntityId], references: [id])
   parent      CostCentre?  @relation("CostCentreHierarchy", fields: [parentId], references: [id])
   children    CostCentre[] @relation("CostCentreHierarchy")
+  voucherLines AccountingVoucherLine[]
+  generalLedgerEntries GeneralLedgerEntry[]
 
   @@unique([legalEntityId, code])
   @@index([tenantId])
@@ -1892,3 +1912,337 @@ model FinanceNumberSeries {
   @@index([legalEntityId])
   @@map("finance_number_series")
 }
+
+// ─── Accounting Phase 2A — Core ledger foundation (no posting engine) ─────────
+
+enum AccountingVoucherType {
+  JOURNAL
+  RECEIPT
+  PAYMENT
+  CONTRA
+  DEBIT_NOTE
+  CREDIT_NOTE
+  OPENING_BALANCE
+  REVERSAL
+  SYSTEM
+}
+
+enum AccountingVoucherStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  POSTED
+  SENT_BACK
+  REJECTED
+  REVERSED
+  CANCELLED
+}
+
+enum AccountingPartyType {
+  CUSTOMER
+  VENDOR
+  EMPLOYEE
+  OTHER
+}
+
+enum PostingEventStatus {
+  RECEIVED
+  VALIDATING
+  VALIDATED
+  PROCESSING
+  POSTED
+  FAILED
+  REVERSED
+  IGNORED
+}
+
+model AccountingVoucher {
+  id                   String                   @id @default(uuid())
+  tenantId             String
+  legalEntityId        String
+  branchId             String?
+  financialYearId      String
+  accountingPeriodId   String
+
+  voucherType          AccountingVoucherType
+  voucherNumber        String?                  @db.VarChar(64)
+  status               AccountingVoucherStatus  @default(DRAFT)
+
+  documentDate         DateTime                 @db.Date
+  postingDate          DateTime                 @db.Date
+  referenceNumber      String?                  @db.VarChar(100)
+  externalReference    String?                  @db.VarChar(100)
+  narration            String?                  @db.Text
+
+  currencyCode         String                   @default("INR") @db.VarChar(8)
+  exchangeRate         Decimal                  @default(1) @db.Decimal(18, 8)
+
+  totalDebit           Decimal                  @default(0) @db.Decimal(18, 4)
+  totalCredit          Decimal                  @default(0) @db.Decimal(18, 4)
+  baseTotalDebit       Decimal                  @default(0) @db.Decimal(18, 4)
+  baseTotalCredit      Decimal                  @default(0) @db.Decimal(18, 4)
+
+  sourceModule         String?                  @db.VarChar(64)
+  sourceDocumentType   String?                  @db.VarChar(64)
+  sourceDocumentId     String?
+  sourceDocumentLineId String?
+
+  reversalOfVoucherId  String?
+  reversedByVoucherId  String?
+  reversalReason       String?                  @db.VarChar(500)
+
+  approvalRequired     Boolean                  @default(false)
+  currentApprovalLevel Int                      @default(0)
+
+  postedAt             DateTime?
+  postedBy             String?
+  reversedAt           DateTime?
+  reversedBy           String?
+  cancelledAt          DateTime?
+  cancelledBy          String?
+  cancellationReason   String?                  @db.VarChar(500)
+
+  createdBy            String?
+  updatedBy            String?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  tenant             Tenant             @relation(fields: [tenantId], references: [id])
+  legalEntity        LegalEntity        @relation(fields: [legalEntityId], references: [id])
+  branch             Branch?            @relation(fields: [branchId], references: [id])
+  financialYear      FinancialYear      @relation(fields: [financialYearId], references: [id])
+  accountingPeriod   AccountingPeriod   @relation(fields: [accountingPeriodId], references: [id])
+
+  /// This voucher reverses the target voucher (reversalOfVoucherId → original).
+  reversalOf         AccountingVoucher? @relation("VoucherReversalOf", fields: [reversalOfVoucherId], references: [id])
+  reversedByOriginal AccountingVoucher[] @relation("VoucherReversalOf")
+
+  /// Original voucher points at its effective reversing voucher.
+  reversedByVoucher  AccountingVoucher? @relation("VoucherReversedBy", fields: [reversedByVoucherId], references: [id])
+  reversesTarget     AccountingVoucher[] @relation("VoucherReversedBy")
+
+  lines              AccountingVoucherLine[]
+  generalLedgerEntries GeneralLedgerEntry[]
+  postingEvents      PostingEvent[]
+
+  @@unique([tenantId, legalEntityId, financialYearId, voucherType, voucherNumber], map: "acc_vch_tenant_le_fy_type_num_key")
+  @@index([tenantId])
+  @@index([tenantId, legalEntityId])
+  @@index([legalEntityId, postingDate])
+  @@index([legalEntityId, voucherType])
+  @@index([legalEntityId, status])
+  @@index([legalEntityId, voucherNumber])
+  @@index([accountingPeriodId, status])
+  @@index([sourceModule, sourceDocumentType, sourceDocumentId], map: "acc_vch_src_doc_idx")
+  @@index([reversalOfVoucherId])
+  @@index([createdBy])
+  @@map("accounting_vouchers")
+}
+
+model AccountingVoucherLine {
+  id                     String               @id @default(uuid())
+  tenantId               String
+  legalEntityId          String
+  voucherId              String
+  lineNumber             Int
+
+  accountId              String
+
+  partyType              AccountingPartyType?
+  partyId                String?
+  partyNameSnapshot      String?              @db.VarChar(300)
+
+  debitAmount            Decimal              @default(0) @db.Decimal(18, 4)
+  creditAmount           Decimal              @default(0) @db.Decimal(18, 4)
+  baseDebitAmount        Decimal              @default(0) @db.Decimal(18, 4)
+  baseCreditAmount       Decimal              @default(0) @db.Decimal(18, 4)
+
+  currencyCode           String               @default("INR") @db.VarChar(8)
+  exchangeRate           Decimal              @default(1) @db.Decimal(18, 8)
+
+  costCentreId           String?
+  /// Soft reference until a shared Project model exists — not a foreign key.
+  projectReference       String?              @db.VarChar(64)
+  departmentReference    String?              @db.VarChar(64)
+
+  referenceDocumentType  String?              @db.VarChar(64)
+  referenceDocumentId    String?
+  referenceDocumentLineId String?
+
+  dueDate                DateTime?            @db.Date
+  lineNarration          String?              @db.VarChar(500)
+  metadataJson           Json?
+
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  legalEntity  LegalEntity       @relation(fields: [legalEntityId], references: [id])
+  voucher      AccountingVoucher @relation(fields: [voucherId], references: [id])
+  account      Account           @relation(fields: [accountId], references: [id])
+  costCentre   CostCentre?       @relation(fields: [costCentreId], references: [id])
+  generalLedgerEntry GeneralLedgerEntry?
+
+  @@unique([voucherId, lineNumber])
+  @@index([tenantId])
+  @@index([voucherId])
+  @@index([accountId])
+  @@index([partyType, partyId])
+  @@index([costCentreId])
+  @@index([referenceDocumentType, referenceDocumentId], map: "acc_vch_line_ref_doc_idx")
+  @@map("accounting_voucher_lines")
+}
+
+/// Immutable posted ledger rows. Application repositories must not update or delete.
+model GeneralLedgerEntry {
+  id                   String                 @id @default(uuid())
+  tenantId             String
+  legalEntityId        String
+  branchId             String?
+  financialYearId      String
+  accountingPeriodId   String
+
+  voucherId            String
+  voucherLineId        String                 @unique
+  voucherType          AccountingVoucherType
+  voucherNumber        String                 @db.VarChar(64)
+  lineNumber           Int
+
+  postingDate          DateTime               @db.Date
+  documentDate         DateTime               @db.Date
+
+  accountId            String
+  partyType            AccountingPartyType?
+  partyId              String?
+  partyNameSnapshot    String?                @db.VarChar(300)
+
+  debitAmount          Decimal                @default(0) @db.Decimal(18, 4)
+  creditAmount         Decimal                @default(0) @db.Decimal(18, 4)
+  baseDebitAmount      Decimal                @default(0) @db.Decimal(18, 4)
+  baseCreditAmount     Decimal                @default(0) @db.Decimal(18, 4)
+
+  currencyCode         String                 @default("INR") @db.VarChar(8)
+  exchangeRate         Decimal                @default(1) @db.Decimal(18, 8)
+
+  costCentreId         String?
+  projectReference     String?                @db.VarChar(64)
+  departmentReference  String?                @db.VarChar(64)
+
+  sourceModule         String?                @db.VarChar(64)
+  sourceDocumentType   String?                @db.VarChar(64)
+  sourceDocumentId     String?
+  sourceDocumentLineId String?
+
+  isReversal           Boolean                @default(false)
+  reversalOfEntryId    String?
+  reversedByEntryId    String?
+
+  postedBy             String?
+  postedAt             DateTime               @default(now())
+  createdAt            DateTime               @default(now())
+
+  tenant           Tenant              @relation(fields: [tenantId], references: [id])
+  legalEntity      LegalEntity         @relation(fields: [legalEntityId], references: [id])
+  branch           Branch?             @relation(fields: [branchId], references: [id])
+  financialYear    FinancialYear       @relation(fields: [financialYearId], references: [id])
+  accountingPeriod AccountingPeriod    @relation(fields: [accountingPeriodId], references: [id])
+  voucher          AccountingVoucher   @relation(fields: [voucherId], references: [id])
+  voucherLine      AccountingVoucherLine @relation(fields: [voucherLineId], references: [id])
+  account          Account             @relation(fields: [accountId], references: [id])
+  costCentre       CostCentre?         @relation(fields: [costCentreId], references: [id])
+
+  reversalOf       GeneralLedgerEntry? @relation("GlEntryReversalOf", fields: [reversalOfEntryId], references: [id])
+  reversedEntries  GeneralLedgerEntry[] @relation("GlEntryReversalOf")
+  reversedByEntry  GeneralLedgerEntry? @relation("GlEntryReversedBy", fields: [reversedByEntryId], references: [id])
+  reversesEntries  GeneralLedgerEntry[] @relation("GlEntryReversedBy")
+
+  @@index([tenantId, legalEntityId, postingDate])
+  @@index([accountId, postingDate])
+  @@index([partyType, partyId, postingDate])
+  @@index([voucherId])
+  @@index([accountingPeriodId])
+  @@index([sourceModule, sourceDocumentType, sourceDocumentId], map: "gl_src_doc_idx")
+  @@index([costCentreId, postingDate])
+  @@index([reversalOfEntryId])
+  @@map("general_ledger_entries")
+}
+
+model PostingEvent {
+  id                   String             @id @default(uuid())
+  tenantId             String
+  legalEntityId        String
+
+  eventKey             String             @db.VarChar(200)
+  eventType            String             @db.VarChar(100)
+  eventVersion         Int                @default(1)
+  status               PostingEventStatus @default(RECEIVED)
+
+  sourceModule         String?            @db.VarChar(64)
+  sourceDocumentType   String?            @db.VarChar(64)
+  sourceDocumentId     String?
+  sourceDocumentLineId String?
+
+  payloadHash          String             @db.VarChar(64)
+  payloadJson          Json?
+
+  voucherId            String?
+
+  attemptCount         Int                @default(0)
+  lastAttemptAt        DateTime?
+  processedAt          DateTime?
+
+  errorCode            String?            @db.VarChar(64)
+  errorMessage         String?            @db.VarChar(500)
+
+  createdBy            String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity        @relation(fields: [legalEntityId], references: [id])
+  voucher     AccountingVoucher? @relation(fields: [voucherId], references: [id])
+
+  @@unique([tenantId, legalEntityId, eventKey])
+  @@index([status])
+  @@index([eventType])
+  @@index([sourceModule, sourceDocumentType, sourceDocumentId], map: "post_evt_src_doc_idx")
+  @@index([voucherId])
+  @@index([createdAt])
+  @@map("posting_events")
+}
+
+model PostingRule {
+  id                   String    @id @default(uuid())
+  tenantId             String
+  legalEntityId        String
+
+  ruleCode             String    @db.VarChar(64)
+  ruleName             String    @db.VarChar(200)
+  eventType            String    @db.VarChar(100)
+  version              Int       @default(1)
+  priority             Int       @default(100)
+
+  effectiveFrom        DateTime  @db.Date
+  effectiveTo          DateTime? @db.Date
+
+  conditionsJson       Json?
+  lineDefinitionsJson  Json
+
+  isSystemRule         Boolean   @default(false)
+  isActive             Boolean   @default(true)
+
+  createdBy            String?
+  updatedBy            String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@unique([legalEntityId, ruleCode, version])
+  @@index([tenantId])
+  @@index([legalEntityId, eventType, isActive])
+  @@index([legalEntityId, priority])
+  @@map("posting_rules")
+}
+

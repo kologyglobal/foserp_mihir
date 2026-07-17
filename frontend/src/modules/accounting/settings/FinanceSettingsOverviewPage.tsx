@@ -180,6 +180,16 @@ export function FinanceSettingsOverviewPage() {
                   : `${status.missing.length} required step${status.missing.length === 1 ? '' : 's'} remaining before activation.`}
             </p>
           </div>
+          <SetupCard
+            title="Ledger engine"
+            description="Core ledger tables and validators are in place. Voucher posting arrives in the next phase."
+            status="complete"
+            action={
+              <span className="text-[12px] font-semibold text-emerald-700">
+                Foundation ready — posting available in the next phase
+              </span>
+            }
+          />
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {CARD_DEFS.map((def) => {
               const st = cardStatus(def, status.missing, status.financeActivated)

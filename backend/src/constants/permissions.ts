@@ -223,6 +223,20 @@ export const PERMISSIONS = [
   'finance.approval_rule.manage',
   'finance.activate',
   'finance.audit.view',
+
+  // Finance Phase 2A — ledger foundation (no posting engine)
+  'finance.voucher.view',
+  'finance.voucher.create',
+  'finance.voucher.edit',
+  'finance.voucher.submit',
+  'finance.voucher.approve',
+  'finance.voucher.post',
+  'finance.voucher.reverse',
+  'finance.voucher.cancel',
+  'finance.gl.view',
+  'finance.posting_event.view',
+  'finance.posting_rule.view',
+  'finance.posting_rule.manage',
 ] as const
 
 export type PermissionName = (typeof PERMISSIONS)[number]
@@ -240,6 +254,12 @@ const FINANCE_EXECUTIVE_MANAGE: PermissionName[] = [
   'finance.default_mapping.manage',
   'finance.cost_centre.manage',
   'finance.number_series.manage',
+  'finance.voucher.create',
+  'finance.voucher.edit',
+  'finance.voucher.submit',
+  'finance.gl.view',
+  'finance.posting_event.view',
+  'finance.posting_rule.view',
 ]
 
 export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {

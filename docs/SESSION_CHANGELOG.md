@@ -1,3 +1,24 @@
+## 2026-07-17 — Accounting Phase 2A: Core ledger foundation
+
+### Why
+Phase 1 finance setup (LE, FY, CoA) needed immutable GL tables, draft voucher storage, posting-event idempotency, and posting-rule config before a posting engine can ship.
+
+### Change
+- **Prisma:** `AccountingVoucher`, `AccountingVoucherLine`, `GeneralLedgerEntry`, `PostingEvent`, `PostingRule` (+ enums); migration `20260717180000_finance_phase2a_ledger_foundation`
+- **Backend:** Decimal utilities, ledger validators/repositories (no posting service), `GET /accounting/ledger/schema-status`, posting-rule CRUD/activate/deactivate, new `finance.voucher.*` / `finance.gl.*` / `finance.posting_*` permissions
+- **Frontend:** Finance settings overview shows informational “Ledger engine — Foundation ready” card (no voucher actions)
+- **Tests:** `backend/tests/finance/finance-ledger-foundation.test.ts`
+
+### Out of scope (Phase 2B+)
+Voucher posting, number issuance, GL seed data, AR/AP engines
+
+### How to verify
+1. `cd backend && npx prisma validate && npx tsx scripts/prisma-cli.ts migrate deploy`
+2. `npm test -- tests/finance/finance-ledger-foundation.test.ts tests/finance/finance-setup.test.ts`
+3. `GET /api/v1/t/:slug/accounting/ledger/schema-status` → `phase: 2A`, `postingEngine: false`
+
+---
+
 ## 2026-07-17 — Accounting Phase 1A–1C: Legal Entity + finance setup
 
 ### Why

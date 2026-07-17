@@ -313,9 +313,9 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Description | **Finance Settings Phase 1 done 2026-07-17** (`/accounting/settings/**` + APIs). Remaining operational Accounting FE (vouchers, AR/AP, bank, etc.) still mock until Phase 2 posting. |
 | Reason | Nav/routes wired; setup foundation shipped; posting deferred by design |
 | Dependencies | Phase 2 GL/voucher design |
-| Next step | Phase 2: AccountingVoucher + GeneralLedgerEntry + posting service (do not start until prioritized) |
-| Test required | Finance setup live tests pass; Phase 2 needs posting suite |
-| Status | partial (setup Phase 1 done; posting/open operational backends open) |
+| Next step | Phase 2B: central transactional posting service (do not start until prioritized). Phase 2A ledger foundation shipped 2026-07-17. |
+| Test required | Finance setup + ledger-foundation live tests pass; Phase 2B needs posting suite |
+| Status | partial (setup Phase 1 + ledger foundation Phase 2A done; posting engine open) |
 
 ### P3-6: Commercial terms single source
 

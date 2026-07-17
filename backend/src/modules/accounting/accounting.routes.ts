@@ -9,6 +9,7 @@ import financeSettingsRoutes, { activateRouter, setupStatusRouter } from './fina
 import costCentreRoutes from './cost-centres/cost-centre.routes.js'
 import financeNumberSeriesRoutes from './finance-number-series/finance-number-series.routes.js'
 import financeApprovalRuleRoutes from './finance-approval-rules/finance-approval-rule.routes.js'
+import ledgerRoutes from './ledger/ledger.routes.js'
 
 const router = Router({ mergeParams: true })
 
@@ -25,5 +26,6 @@ router.use('/activate', activateRouter)
 router.use('/cost-centres', costCentreRoutes)
 router.use('/number-series', financeNumberSeriesRoutes)
 router.use('/approval-rules', financeApprovalRuleRoutes)
+router.use('/ledger', ledgerRoutes)
 
 export default router

@@ -23,7 +23,7 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Category | Modules |
 |----------|---------|
-| **Completed (API mode)** | CRM companies, contacts, leads, opportunities, activities, follow-ups; **quotations** (CRUD + lifecycle + convert→SO); quotation templates; **sales orders Phase 1** (convert + draft CRUD + confirm/close); masters (geography→vendor + products); search; reports (read); exports; dashboard metrics/charts/approval panel; notes/attachments; forecast; **finance setup Phase 1** (legal entities, branches, FY, periods, CoA hierarchy, default mappings, settings, number series, cost centres, approval-rule config, activate) |
+| **Completed (API mode)** | CRM companies, contacts, leads, opportunities, activities, follow-ups; **quotations** (CRUD + lifecycle + convert→SO); quotation templates; **sales orders Phase 1** (convert + draft CRUD + confirm/close); masters (geography→vendor + products); search; reports (read); exports; dashboard metrics/charts/approval panel; notes/attachments; forecast; **finance setup Phase 1**; **finance ledger foundation Phase 2A** (models/repos/validators/posting-rule config — no posting) |
 | **Partially completed** | Auth UI; mobile CRM (API hydrate, no offline); sales-order fulfilment beyond confirm/close; **user/role/tenant admin UI (frontend wired 2026-07-15, not test-verified)** |
 | **Not started** | Login activity module |
 | **Scaffolding (not shipped)** | — (Accounting operational screens: CoA demo, Vouchers, AR/AP, Bank, FA, Manufacturing Accounting, Tax, Reports, Budgeting, Commercial Commitments, Period Close — UI/mock only; **Finance Settings** at `/accounting/settings` is Phase 1 dual-mode, not a stub) |
@@ -400,14 +400,14 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ⚠️ | **2026-07-17:** **Finance Settings** (`/accounting/settings/**`) dual-mode Phase 1. Other workspaces (CoA demo path, Vouchers, Ledger, AR/AP, Bank, FA, Mfg Acc, Tax, Reports, Budgeting, Commercial Commitments, Period Close) still UI/mock only |
-| Backend | ⚠️ | **Phase 1 setup APIs** under `/api/v1/t/:tenantSlug/accounting/*` — no GL/voucher posting |
-| DB | ⚠️ | LegalEntity, Branch, FY, Periods, Account, mappings, settings, cost centres, approval rules, finance number series — **no GL tables** |
-| API | ⚠️ | Setup + activate only |
-| Tests | ⚠️ | `tests/finance/finance-setup.test.ts` 8/8 live; FE typecheck clean |
-| Demo mode | ✅ | Settings workspace + wizard via Zustand bridge |
-| API mode | ⚠️ | Setup APIs usable after migrate + seed permissions; posting deferred |
-| Remaining gap | Phase 2: vouchers, double-entry posting, period-close enforcement; operational demo screens stay mock until then |
+| Frontend | ⚠️ | **2026-07-17:** Finance Settings dual-mode Phase 1 + ledger “Foundation ready” card (Phase 2A). Other workspaces still UI/mock |
+| Backend | ⚠️ | **Phase 1 setup** + **Phase 2A ledger foundation** (models/repos/validators; no posting engine) |
+| DB | ⚠️ | Setup tables + AccountingVoucher/Line, GeneralLedgerEntry, PostingEvent, PostingRule — **no production GL seed; no posting** |
+| API | ⚠️ | Setup + activate; ledger schema-status + posting-rule config only |
+| Tests | ⚠️ | finance-setup 8 + finance-ledger-foundation 11 live; FE typecheck clean |
+| Demo mode | ✅ | Settings workspace + foundation status card |
+| API mode | ⚠️ | Setup + posting-rule config; posting deferred to Phase 2B |
+| Remaining gap | Phase 2B: central posting service (idempotency, number series, GL insert, transactions) |
 
 ### Mobile CRM
 
