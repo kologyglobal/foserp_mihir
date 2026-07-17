@@ -201,7 +201,7 @@ export function OperationalPageShell({
       {/* Back always above Purpose / guide — never after or inside the guide. */}
       {backLink ? <PageBackLink to={backLink.to} label={backLink.label} /> : null}
 
-      {guide ? <ErpPageGuide purpose={guide.purpose} nextStep={guide.nextStep} className="mb-3" /> : null}
+      {guide ? <ErpPageGuide purpose={guide.purpose} nextStep={guide.nextStep} className="mb-2" /> : null}
 
       {children}
     </div>

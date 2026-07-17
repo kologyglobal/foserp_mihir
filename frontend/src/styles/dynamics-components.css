@@ -11939,7 +11939,8 @@ a.crm-companies-table__name:hover {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  gap: 0.75rem;
+  /* Keep Back / Purpose / form tight — 0.75rem felt like padding around Back */
+  gap: 0.375rem;
 }
 
 /* Neutralize .erp-page space-y margins — they fight flex height fill */
@@ -14364,14 +14365,24 @@ a.crm-companies-table__name:hover {
 
 /* -- In-page back link (view/detail) -- */
 .erp-page-back {
-  margin: 0 0 8px;
+  margin: 0;
+}
+
+/* Empty merged hero still occupies a flex slot + gap above Back — hide it */
+.erp-page-hero--workspace-merged:not(:has(*)) {
+  display: none;
+}
+
+.d365-workspace-content:has(.erp-card-form-page__footer-sticky) .erp-page-back {
+  margin: 0;
+  flex-shrink: 0;
 }
 
 .erp-page-back__link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 2px 0;
+  padding: 0;
   font-size: 12px;
   font-weight: 600;
   line-height: 1.2;
