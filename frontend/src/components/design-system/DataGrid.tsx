@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import {
   flexRender,
   getCoreRowModel,
@@ -7,6 +7,7 @@ import {
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
+  type ColumnOrderState,
   type OnChangeFn,
   type RowSelectionState,
   type SortingState,
@@ -21,6 +22,7 @@ import {
   ChevronDown,
   Eye,
   Filter,
+  GripVertical,
   History,
   Pencil,
   Printer,
@@ -36,7 +38,6 @@ import { Checkbox } from '../forms/Inputs'
 import { entMetaToClasses, type EnterpriseColumnMeta } from '../../design-system/enterprise/tableMeta'
 import { useDensityClass } from '../../design-system/enterprise/DensityProvider'
 import { EnterprisePagination } from '../../design-system/list-page/EnterprisePagination'
-import type { ReactNode } from 'react'
 
 export interface DataGridProps<T> {
   data: T[]
@@ -149,6 +150,8 @@ export function DataGrid<T>({
   const [sorting, setSorting] = useState<SortingState>([])
   const [internalSearch, setInternalSearch] = useState('')
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+  const [columnOrder, setColumnOrder] = useState<ColumnOrderState>([])
+  const [dragColumnId, setDragColumnId] = useState<string | null>(null)
   const [showColumnChooser, setShowColumnChooser] = useState(false)
   const [showViewMenu, setShowViewMenu] = useState(false)
   const [internalRowSelection, setInternalRowSelection] = useState<RowSelectionState>({})
@@ -197,10 +200,12 @@ export function DataGrid<T>({
     state: {
       sorting,
       columnVisibility,
+      columnOrder,
       ...(selectable ? { rowSelection: rowSelection ?? {} } : {}),
     },
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
+    onColumnOrderChange: setColumnOrder,
     onRowSelectionChange: selectable ? setRowSelection : undefined,
     enableRowSelection: selectable,
     enableSorting: enableColumnSorting,
@@ -211,6 +216,26 @@ export function DataGrid<T>({
     getPaginationRowModel: getPaginationRowModel(),
     initialState: { pagination: { pageSize: currentPageSize } },
   })
+
+  function currentColumnOrderIds() {
+    return columnOrder.length > 0
+      ? [...columnOrder]
+      : table.getAllLeafColumns().map((col) => col.id)
+  }
+
+  function reorderColumn(dragId: string, dropId: string) {
+    if (dragId === dropId) return
+    const order = currentColumnOrderIds()
+    const movable = order.filter((id) => table.getColumn(id)?.getCanHide())
+    const fixedTail = order.filter((id) => !table.getColumn(id)?.getCanHide())
+    const from = movable.indexOf(dragId)
+    const to = movable.indexOf(dropId)
+    if (from < 0 || to < 0) return
+    const next = [...movable]
+    const [item] = next.splice(from, 1)
+    next.splice(to, 0, item)
+    setColumnOrder([...next, ...fixedTail])
+  }
 
   useEffect(() => {
     table.setPageSize(currentPageSize)
@@ -289,6 +314,8 @@ export function DataGrid<T>({
 
   const showGridToolbar = toolbarMode !== 'none' && !registerBar
 
+  const reorderableColumns = table.getAllLeafColumns().filter((col) => col.getCanHide())
+
   const columnChooser = toolbarMode !== 'none' ? (
     <div className="relative shrink-0" ref={columnMenuRef}>
       <Button
@@ -303,23 +330,70 @@ export function DataGrid<T>({
         <Columns3 className="h-3.5 w-3.5" /> Columns
       </Button>
       {showColumnChooser && (
-        <div className="absolute right-0 top-full z-20 mt-1 max-h-64 w-52 overflow-y-auto rounded-lg border border-erp-border bg-erp-surface p-2 shadow-erp-md">
-          {table.getAllLeafColumns().filter((col) => col.getCanHide()).map((col) => (
-            <Checkbox
-              key={col.id}
-              label={columnChooserLabel(col.id, col.columnDef.header, col.columnDef.meta)}
-              checked={col.getIsVisible()}
-              onChange={col.getToggleVisibilityHandler()}
-              className="w-full rounded-md px-2 py-1.5 hover:bg-erp-surface-alt"
-            />
-          ))}
+        <div
+          className="ent-data-grid__column-chooser absolute right-0 top-full z-[80] mt-1 max-h-80 w-72 overflow-y-auto rounded-lg border border-erp-border bg-erp-surface p-2 shadow-erp-md"
+          role="dialog"
+          aria-label="Show and reorder columns"
+        >
+          <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-erp-muted">
+            Drag to reorder · toggle to show/hide
+          </p>
+          {reorderableColumns.map((col) => {
+            const label = columnChooserLabel(col.id, col.columnDef.header, col.columnDef.meta)
+            return (
+              <div
+                key={col.id}
+                draggable
+                onDragStart={(e) => {
+                  setDragColumnId(col.id)
+                  e.dataTransfer.effectAllowed = 'move'
+                  e.dataTransfer.setData('text/plain', col.id)
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  const from = e.dataTransfer.getData('text/plain') || dragColumnId
+                  if (from) reorderColumn(from, col.id)
+                  setDragColumnId(null)
+                }}
+                onDragEnd={() => setDragColumnId(null)}
+                className={cn(
+                  'ent-data-grid__column-chooser-row flex items-center gap-1 rounded-md px-1 py-1 hover:bg-erp-surface-alt',
+                  dragColumnId === col.id && 'ent-data-grid__column-chooser-row--dragging',
+                )}
+              >
+                <span
+                  className="ent-data-grid__column-drag cursor-grab text-erp-muted active:cursor-grabbing"
+                  title="Drag to reorder"
+                  aria-hidden
+                >
+                  <GripVertical className="h-4 w-4" />
+                </span>
+                <Checkbox
+                  label={label}
+                  checked={col.getIsVisible()}
+                  onChange={col.getToggleVisibilityHandler()}
+                  className="min-w-0 flex-1"
+                />
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
   ) : null
 
   if (loading) {
-    return <SkeletonTable rows={currentPageSize > 10 ? 10 : currentPageSize} cols={Math.min(columns.length, 6)} />
+    return (
+      <SkeletonTable
+        rows={currentPageSize > 10 ? 10 : currentPageSize}
+        cols={Math.min(columns.length, 8)}
+        showToolbar={false}
+      />
+    )
   }
 
   return (
@@ -327,7 +401,10 @@ export function DataGrid<T>({
       'ent-data-grid ent-data-grid--comfortable',
       registerBar && 'ent-data-grid--register',
       densityClass,
-      'overflow-hidden rounded-erp border border-erp-border bg-erp-surface shadow-erp',
+      // Register grids keep overflow visible so the Columns panel is not clipped
+      // under sticky table headers (thead th uses z-20 inside .erp-table-wrap).
+      registerBar ? 'overflow-visible' : 'overflow-hidden',
+      'rounded-erp border border-erp-border bg-erp-surface shadow-erp',
     )}>
       {registerBar ? (
         <div className="ent-data-grid__register-bar ent-data-grid__register-bar--merged">
@@ -338,9 +415,13 @@ export function DataGrid<T>({
               </p>
             ) : null}
             <div className="ent-data-grid__register-bar-body">
-              {registerBar}
+              {isValidElement(registerBar)
+                ? cloneElement(
+                    registerBar as ReactElement<{ columnsControl?: ReactNode }>,
+                    { columnsControl: columnChooser },
+                  )
+                : registerBar}
             </div>
-            {columnChooser}
           </div>
         </div>
       ) : null}

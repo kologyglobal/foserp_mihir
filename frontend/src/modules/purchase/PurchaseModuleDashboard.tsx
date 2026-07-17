@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -14,12 +14,12 @@ import {
   Truck,
 } from 'lucide-react'
 import {
-  DynamicsModuleDashboard,
   DynamicsDashboardPanel,
   DynamicsDashboardGrid,
-  DynamicsCommandButton,
   DynamicsFilterRow,
 } from '../../components/dynamics'
+import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
+import { ErpCommandBar } from '../../components/erp/ErpCommandBar'
 import {
   PurchaseByCategoryChart,
   PurchaseMonthlyTrendChart,
@@ -28,11 +28,13 @@ import {
 import { TableLink } from '../../components/ui/AppLink'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingState } from '../../design-system/components/LoadingState'
+import type { EnterpriseKpiItem } from '../../design-system/enterprise/enterpriseKpiTypes'
 import { getPurchaseDashboard, PurchaseServiceError } from '../../services/purchase'
 import type { PurchaseDashboardData, PurchaseDashboardFilters } from '../../types/purchaseDomain'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { cn } from '../../utils/cn'
+import { notify } from '../../store/toastStore'
 
 function financialYearStart(iso = new Date().toISOString().slice(0, 10)): string {
   const year = Number(iso.slice(0, 4))
@@ -42,6 +44,11 @@ function financialYearStart(iso = new Date().toISOString().slice(0, 10)): string
 }
 
 type LoadState = 'loading' | 'ready' | 'error' | 'empty'
+
+const DASHBOARD_BREADCRUMBS = [
+  { label: 'Home', to: '/home' },
+  { label: 'Purchase' },
+]
 
 function StatusCountList({
   title,
@@ -75,6 +82,32 @@ function StatusCountList({
         ))}
       </ul>
     </DynamicsDashboardPanel>
+  )
+}
+
+function DashboardShell({
+  commandBar,
+  kpiStrip,
+  children,
+}: {
+  commandBar: ReactNode
+  kpiStrip?: EnterpriseKpiItem[]
+  children: ReactNode
+}) {
+  return (
+    <OperationalPageShell
+      title="Purchase Dashboard"
+      description="Monitor requisitions, orders, receipts, invoices and vendor performance"
+      badge="Purchase"
+      variant="dynamics"
+      breadcrumbs={DASHBOARD_BREADCRUMBS}
+      favoritePath="/purchase"
+      pageGuide={null}
+      commandBar={commandBar}
+      kpiStrip={kpiStrip}
+    >
+      {children}
+    </OperationalPageShell>
   )
 }
 
@@ -134,6 +167,33 @@ export function PurchaseModuleDashboard() {
     }
   }, [load, refreshToken])
 
+  const refresh = useCallback(() => {
+    if (loadState === 'loading') return
+    setRefreshToken((n) => n + 1)
+    notify.info('Purchase dashboard refreshed')
+  }, [loadState])
+
+  const commandBar = (
+    <ErpCommandBar
+      inline
+      sticky={false}
+      primaryAction={{
+        id: 'create-pr',
+        label: 'Create Purchase Requisition',
+        icon: Plus,
+        onClick: () => navigate('/purchase/requisitions/new'),
+      }}
+      secondaryActions={[
+        {
+          id: 'refresh',
+          label: 'Refresh',
+          icon: RefreshCw,
+          onClick: refresh,
+        },
+      ]}
+    />
+  )
+
   const filterBar = (
     <DynamicsFilterRow
       onClear={() =>
@@ -181,226 +241,182 @@ export function PurchaseModuleDashboard() {
     </DynamicsFilterRow>
   )
 
-  const actions = (
-    <div className="flex flex-wrap items-center gap-2">
-      <DynamicsCommandButton
-        icon={<RefreshCw className={cn('h-4 w-4', loadState === 'loading' && 'animate-spin')} />}
-        onClick={() => {
-          if (loadState === 'loading') return
-          setRefreshToken((n) => n + 1)
-        }}
-      >
-        Refresh
-      </DynamicsCommandButton>
-      <DynamicsCommandButton
-        primary
-        icon={<Plus className="h-4 w-4" />}
-        onClick={() => navigate('/purchase/requisitions/new')}
-      >
-        Create Purchase Requisition
-      </DynamicsCommandButton>
-    </div>
-  )
-
   if (loadState === 'loading' && !data) {
     return (
-      <DynamicsModuleDashboard
-        title="Purchase Dashboard"
-        subtitle="Monitor requisitions, orders, receipts, invoices and vendor performance"
-        badge="Purchase"
-        favoritePath="/purchase"
-        heroMetrics={[
-          { id: 'loading', label: 'Loading', value: '…', icon: ClipboardList, accent: 'blue' },
-        ]}
-        actions={actions}
-      >
+      <DashboardShell commandBar={commandBar}>
         {filterBar}
         <LoadingState variant="dashboard" rows={6} />
-      </DynamicsModuleDashboard>
+      </DashboardShell>
     )
   }
 
   if (loadState === 'error') {
     return (
-      <DynamicsModuleDashboard
-        title="Purchase Dashboard"
-        subtitle="Monitor requisitions, orders, receipts, invoices and vendor performance"
-        badge="Purchase"
-        favoritePath="/purchase"
-        heroMetrics={[
-          { id: 'error', label: 'Unavailable', value: '—', icon: AlertTriangle, accent: 'red' },
-        ]}
-        actions={actions}
-      >
+      <DashboardShell commandBar={commandBar}>
         {filterBar}
-        <DynamicsDashboardPanel title="Could not load dashboard">
-          <p className="text-[13px] text-erp-muted">{errorMessage}</p>
-          <div className="mt-3">
-            <DynamicsCommandButton primary onClick={() => setRefreshToken((n) => n + 1)}>
+        <EmptyState
+          icon={AlertTriangle}
+          title="Could not load dashboard"
+          description={errorMessage ?? 'Unknown error'}
+          action={
+            <button
+              type="button"
+              className="erp-btn erp-btn--primary text-[13px]"
+              onClick={() => setRefreshToken((n) => n + 1)}
+            >
               Retry
-            </DynamicsCommandButton>
-          </div>
-        </DynamicsDashboardPanel>
-      </DynamicsModuleDashboard>
+            </button>
+          }
+        />
+      </DashboardShell>
     )
   }
 
   if (!data || loadState === 'empty') {
     return (
-      <DynamicsModuleDashboard
-        title="Purchase Dashboard"
-        subtitle="Monitor requisitions, orders, receipts, invoices and vendor performance"
-        badge="Purchase"
-        favoritePath="/purchase"
-        heroMetrics={[
-          { id: 'empty', label: 'Open PRs', value: 0, icon: ClipboardList, accent: 'blue' },
+      <DashboardShell
+        commandBar={commandBar}
+        kpiStrip={[
+          {
+            id: 'empty-pr',
+            label: 'Open Purchase Requisitions',
+            value: 0,
+            icon: ClipboardList,
+            accent: 'blue',
+            href: '/purchase/requisitions',
+          },
         ]}
-        actions={actions}
-        emptyState={
-          <EmptyState
-            icon={ShoppingCart}
-            title="No purchase activity for this filter"
-            description="Widen the date range or clear the location filter. You can also create a purchase requisition to start the flow."
-            action={
-              <DynamicsCommandButton primary onClick={() => navigate('/purchase/requisitions/new')}>
-                Create Purchase Requisition
-              </DynamicsCommandButton>
-            }
-          />
-        }
       >
         {filterBar}
-      </DynamicsModuleDashboard>
+        <EmptyState
+          icon={ShoppingCart}
+          title="No purchase activity for this filter"
+          description="Widen the date range or clear the location filter. You can also create a purchase requisition to start the flow."
+          action={
+            <button
+              type="button"
+              className="erp-btn erp-btn--primary text-[13px]"
+              onClick={() => navigate('/purchase/requisitions/new')}
+            >
+              Create Purchase Requisition
+            </button>
+          }
+        />
+      </DashboardShell>
     )
   }
 
   const { kpis, kpiHrefs } = data
-  const pendingHealth =
-    data.pendingActions.reduce((s, a) => s + (a.severity === 'critical' ? 2 : 1) * a.count, 0) > 4
-      ? 72
-      : 90
+
+  const kpiStrip: EnterpriseKpiItem[] = [
+    {
+      id: 'open-pr',
+      label: 'Open Purchase Requisitions',
+      value: kpis.openRequisitions,
+      icon: ClipboardList,
+      accent: 'blue',
+      href: kpiHrefs.openRequisitions,
+    },
+    {
+      id: 'pr-approval',
+      label: 'Pending PR Approvals',
+      value: kpis.pendingPrApprovals,
+      icon: FileText,
+      accent: kpis.pendingPrApprovals ? 'amber' : 'green',
+      href: kpiHrefs.pendingPrApprovals,
+    },
+    {
+      id: 'rfq',
+      label: 'Open RFQs',
+      value: kpis.openRfqs,
+      icon: ShoppingCart,
+      accent: 'blue',
+      href: kpiHrefs.openRfqs,
+    },
+    {
+      id: 'month-value',
+      label: 'Monthly Purchase Value',
+      value: formatCurrency(kpis.monthlyPurchaseValue),
+      icon: IndianRupee,
+      accent: 'slate',
+      href: kpiHrefs.monthlyPurchaseValue,
+    },
+    {
+      id: 'po-month',
+      label: 'POs This Month',
+      value: kpis.purchaseOrdersThisMonth,
+      icon: Truck,
+      accent: 'blue',
+      href: kpiHrefs.purchaseOrdersThisMonth,
+    },
+    {
+      id: 'pending-del',
+      label: 'Pending Deliveries',
+      value: kpis.pendingDeliveries,
+      icon: Truck,
+      accent: kpis.pendingDeliveries ? 'amber' : 'green',
+      href: kpiHrefs.pendingDeliveries,
+    },
+    {
+      id: 'pending-grn',
+      label: 'Pending GRNs',
+      value: kpis.pendingGrns,
+      icon: PackageCheck,
+      accent: kpis.pendingGrns ? 'amber' : 'slate',
+      href: kpiHrefs.pendingGrns,
+    },
+    {
+      id: 'pending-inv',
+      label: 'Pending Invoices',
+      value: kpis.pendingPurchaseInvoices,
+      icon: FileText,
+      accent: kpis.pendingPurchaseInvoices ? 'amber' : 'slate',
+      href: kpiHrefs.pendingPurchaseInvoices,
+    },
+  ]
 
   return (
-    <DynamicsModuleDashboard
-      title="Purchase Dashboard"
-      subtitle="Monitor requisitions, orders, receipts, invoices and vendor performance"
-      badge="Purchase"
-      favoritePath="/purchase"
-      healthScore={pendingHealth}
-      healthLabel="Procurement health"
-      healthSublabel={data.pendingActions.length ? `${data.pendingActions.length} action queue(s)` : 'Queues clear'}
-      actions={actions}
-      heroMetrics={[
-        {
-          id: 'open-pr',
-          label: 'Open Purchase Requisitions',
-          value: kpis.openRequisitions,
-          icon: ClipboardList,
-          accent: 'blue',
-          href: kpiHrefs.openRequisitions,
-        },
-        {
-          id: 'pr-approval',
-          label: 'Pending PR Approvals',
-          value: kpis.pendingPrApprovals,
-          icon: FileText,
-          accent: kpis.pendingPrApprovals ? 'amber' : 'green',
-          href: kpiHrefs.pendingPrApprovals,
-        },
-        {
-          id: 'rfq',
-          label: 'Open RFQs',
-          value: kpis.openRfqs,
-          icon: ShoppingCart,
-          accent: 'indigo',
-          href: kpiHrefs.openRfqs,
-        },
-        {
-          id: 'month-value',
-          label: 'Monthly Purchase Value',
-          value: formatCurrency(kpis.monthlyPurchaseValue),
-          icon: IndianRupee,
-          accent: 'purple',
-          href: kpiHrefs.monthlyPurchaseValue,
-        },
-      ]}
-      kpiStrip={[
-        {
-          id: 'po-month',
-          label: 'Purchase Orders This Month',
-          value: kpis.purchaseOrdersThisMonth,
-          href: kpiHrefs.purchaseOrdersThisMonth,
-          tone: 'primary',
-          icon: Truck,
-        },
-        {
-          id: 'pending-del',
-          label: 'Pending Deliveries',
-          value: kpis.pendingDeliveries,
-          href: kpiHrefs.pendingDeliveries,
-          tone: kpis.pendingDeliveries ? 'warning' : 'success',
-          icon: Truck,
-        },
-        {
-          id: 'pending-grn',
-          label: 'Pending GRNs',
-          value: kpis.pendingGrns,
-          href: kpiHrefs.pendingGrns,
-          tone: kpis.pendingGrns ? 'warning' : 'neutral',
-          icon: PackageCheck,
-        },
-        {
-          id: 'pending-inv',
-          label: 'Pending Purchase Invoices',
-          value: kpis.pendingPurchaseInvoices,
-          href: kpiHrefs.pendingPurchaseInvoices,
-          tone: kpis.pendingPurchaseInvoices ? 'warning' : 'neutral',
-          icon: FileText,
-        },
-      ]}
-      kpiColumns={4}
-      liveSections={
-        <DynamicsDashboardPanel title="Pending Actions">
-          {data.pendingActions.length === 0 ? (
-            <p className="flex items-center gap-2 text-[13px] text-erp-success-fg">
-              <CheckCircle2 className="h-4 w-4" />
-              No pending approvals, inspections, mismatches or overdue deliveries.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {data.pendingActions.map((action) => (
-                <li key={action.id}>
-                  <button
-                    type="button"
-                    onClick={() => navigate(action.href)}
-                    className="flex w-full items-center justify-between rounded-md border border-erp-border px-3 py-2 text-left text-[13px] hover:border-erp-primary/40 hover:bg-erp-primary-soft"
-                  >
-                    <span className="flex items-center gap-2">
-                      <AlertTriangle
-                        className={cn(
-                          'h-4 w-4',
-                          action.severity === 'critical'
-                            ? 'text-erp-danger-fg'
-                            : action.severity === 'warning'
-                              ? 'text-erp-warning-fg'
-                              : 'text-erp-primary',
-                        )}
-                      />
-                      <span>
-                        {action.label}
-                        <span className="ml-2 font-semibold tabular-nums text-erp-text">{action.count}</span>
-                      </span>
-                    </span>
-                    <span className="text-erp-primary">Open →</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </DynamicsDashboardPanel>
-      }
-    >
+    <DashboardShell commandBar={commandBar} kpiStrip={kpiStrip}>
       {filterBar}
+
+      <DynamicsDashboardPanel title="Pending Actions">
+        {data.pendingActions.length === 0 ? (
+          <p className="flex items-center gap-2 text-[13px] text-erp-success-fg">
+            <CheckCircle2 className="h-4 w-4" />
+            No pending approvals, inspections, mismatches or overdue deliveries.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {data.pendingActions.map((action) => (
+              <li key={action.id}>
+                <button
+                  type="button"
+                  onClick={() => navigate(action.href)}
+                  className="flex w-full items-center justify-between rounded-md border border-erp-border px-3 py-2 text-left text-[13px] hover:border-erp-primary/40 hover:bg-erp-primary-soft"
+                >
+                  <span className="flex items-center gap-2">
+                    <AlertTriangle
+                      className={cn(
+                        'h-4 w-4',
+                        action.severity === 'critical'
+                          ? 'text-erp-danger-fg'
+                          : action.severity === 'warning'
+                            ? 'text-erp-warning-fg'
+                            : 'text-erp-primary',
+                      )}
+                    />
+                    <span>
+                      {action.label}
+                      <span className="ml-2 font-semibold tabular-nums text-erp-text">{action.count}</span>
+                    </span>
+                  </span>
+                  <span className="text-erp-primary">Open →</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </DynamicsDashboardPanel>
 
       <DynamicsDashboardGrid>
         <StatusCountList title="Purchase Requisition Status" buckets={data.prStatus} />
@@ -486,6 +502,6 @@ export function PurchaseModuleDashboard() {
       <p className="text-[11px] text-erp-muted">
         Demo data via purchase service · {data.currency} · as of {new Date(data.asOf).toLocaleString('en-IN')}
       </p>
-    </DynamicsModuleDashboard>
+    </DashboardShell>
   )
 }

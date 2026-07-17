@@ -188,7 +188,11 @@ export function EnterpriseStageStepper({
     <div className="ent-stage-stepper" aria-label="Stage progression">
       {stages.map((step, i) => (
         <span key={step.id} className="contents">
-          {i > 0 ? <span className="ent-stage-stepper__sep" aria-hidden>›</span> : null}
+          {i > 0 ? (
+            <span className="ent-stage-stepper__sep" aria-hidden>
+              ›
+            </span>
+          ) : null}
           <span
             className={cn(
               'ent-stage-stepper__step',

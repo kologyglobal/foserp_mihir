@@ -8,6 +8,8 @@ export interface CrmDrawerShellProps {
   onClose: () => void
   title: string
   subtitle?: string
+  /** Module eyebrow above the title (e.g. CRM, Purchase). Omit to hide. */
+  eyebrow?: string | null
   children: ReactNode
   footer?: ReactNode
   width?: 'md' | 'lg' | 'filter'
@@ -22,6 +24,7 @@ export function CrmDrawerShell({
   onClose,
   title,
   subtitle,
+  eyebrow = 'CRM',
   children,
   footer,
   width = 'md',
@@ -68,7 +71,7 @@ export function CrmDrawerShell({
       >
         <header className="crm-drawer-header">
           <div className="min-w-0 flex-1 pr-3">
-            {variant !== 'filter' ? <p className="crm-drawer-eyebrow">CRM</p> : null}
+            {variant !== 'filter' && eyebrow ? <p className="crm-drawer-eyebrow">{eyebrow}</p> : null}
             <h2 id="crm-drawer-title" className="crm-drawer-title">
               {title}
             </h2>

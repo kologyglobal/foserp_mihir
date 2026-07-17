@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Eye, Pencil, Printer } from 'lucide-react'
+import { Eye, Pencil, Printer, Trash2 } from 'lucide-react'
 import { ErpDataGrid } from '../erp/ErpDataGrid'
 import { TableLink } from '../ui/AppLink'
 import { Badge } from '../ui/Badge'
@@ -65,29 +65,37 @@ function buildRowActions(
   handlers: PurchaseInvoiceRowHandlers,
 ): RowActionItem[] {
   const canEdit = row.status === 'draft' || row.status === 'pending_verification'
-  const actions: RowActionItem[] = [
+  const statusLabel = row.statusLabel || row.status
+  return [
     {
       id: 'view',
       label: 'View',
       icon: Eye,
       onClick: () => handlers.onView(row),
     },
-  ]
-  if (canEdit) {
-    actions.push({
+    {
       id: 'edit',
       label: 'Edit',
       icon: Pencil,
       onClick: () => handlers.onEdit(row),
-    })
-  }
-  actions.push({
-    id: 'print',
-    label: 'Print',
-    icon: Printer,
-    onClick: () => handlers.onPrint(row),
-  })
-  return actions
+      disabled: !canEdit,
+      disabledReason: `${statusLabel} purchase invoices cannot be edited`,
+    },
+    {
+      id: 'delete',
+      label: 'Delete',
+      icon: Trash2,
+      danger: true,
+      disabled: row.status !== 'draft',
+      disabledReason: `${statusLabel} purchase invoices cannot be deleted`,
+    },
+    {
+      id: 'print',
+      label: 'Print',
+      icon: Printer,
+      onClick: () => handlers.onPrint(row),
+    },
+  ]
 }
 
 export interface PurchaseInvoicesTableProps {
@@ -262,7 +270,7 @@ export function PurchaseInvoicesTable({
       className={cn('erp-invoice-table', densityClass)}
       data={rows}
       columns={columns}
-      recordLabel="Purchase Invoices"
+      recordLabel={undefined}
       emptyMessage={emptyMessage}
       emptyAction={
         emptyAction ??
@@ -285,7 +293,11 @@ export function PurchaseInvoicesTable({
       onRowQuickView={handlers.onView}
       registerBar={
         registerFilter ? (
-          <CrmListFilterBar {...registerFilter} className="crm-list-filter-bar--embedded" />
+          <CrmListFilterBar
+            {...registerFilter}
+            showCommandPaletteHint={false}
+            className="crm-list-filter-bar--embedded"
+          />
         ) : undefined
       }
     />
