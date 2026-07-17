@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import type { ColumnDef, RowSelectionState } from '@tanstack/react-table'
 import { OperationalPageShell } from '../../../components/design-system/OperationalPageShell'
-import { SmartFilterBar } from '../../../components/design-system/SmartFilterBar'
+import { CrmListFilterBar, CrmListSortSelect } from '../../../components/crm/CrmListFilterBar'
 import { ErpDataGrid } from '../../../components/erp/ErpDataGrid'
 import { ErpCommandBar } from '../../../components/erp/ErpCommandBar'
 import { ErpButton, ErpButtonGroup } from '../../../components/erp/ErpButton'
@@ -23,7 +23,6 @@ import {
 } from '../../../components/erp/card-form'
 import { ErpCardCommandBar } from '../../../components/erp/card-form/ErpCardCommandBar'
 import { Input, Select, Textarea } from '../../../components/forms/Inputs'
-import { SearchInput } from '../../../components/ui/SearchInput'
 import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { TableLink } from '../../../components/ui/AppLink'
 import { DetailLayout, DetailSection } from '../../../components/masters/MasterLayouts'
@@ -247,23 +246,62 @@ export function PurchaseMasterListPage() {
         { label: 'Filtered', value: filtered.length, accent: 'amber' },
       ]}
       filterBar={(
-        <SmartFilterBar resultCount={filtered.length}>
-          <SearchInput value={search} onChange={setSearch} placeholder={`Search ${catalog.title.toLowerCase()}…`} className="w-48 sm:w-60" />
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 w-32 text-[13px]">
-            <option value="">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </Select>
-          <Select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} className="h-9 w-36 text-[13px]">
-            <option value="sortOrder">Sort: Sequence</option>
-            <option value="name">Sort: Name</option>
-            <option value="code">Sort: Code</option>
-          </Select>
-          <div className="flex items-center gap-1 text-[12px] text-erp-muted">
-            <Columns3 className="h-4 w-4" />
-            <label className="flex items-center gap-1"><input type="checkbox" checked={showCols.usage} onChange={(e) => setShowCols((s) => ({ ...s, usage: e.target.checked }))} /> In Use</label>
-          </div>
-        </SmartFilterBar>
+        <CrmListFilterBar
+          className="crm-list-filter-bar--purchase"
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder={`Search ${catalog.title.toLowerCase()}…`}
+          showCommandPaletteHint={false}
+          onClearAll={() => {
+            setSearch('')
+            setStatusFilter('')
+          }}
+          chips={[
+            ...(statusFilter
+              ? [{ id: 'status', label: statusFilter === 'active' ? 'Active' : 'Inactive' }]
+              : []),
+          ]}
+          onRemoveChip={(id) => {
+            if (id === 'status') setStatusFilter('')
+          }}
+          sort={
+            <CrmListSortSelect
+              value={statusFilter}
+              onChange={setStatusFilter}
+              aria-label="Filter by status"
+              options={[
+                { value: '', label: 'All statuses' },
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+              ]}
+            />
+          }
+          trailing={
+            <>
+              <CrmListSortSelect
+                value={sortKey}
+                onChange={(v) => setSortKey(v as SortKey)}
+                aria-label="Sort masters"
+                options={[
+                  { value: 'sortOrder', label: 'Sort: Sequence' },
+                  { value: 'name', label: 'Sort: Name' },
+                  { value: 'code', label: 'Sort: Code' },
+                ]}
+              />
+              <div className="flex items-center gap-1 text-[12px] text-erp-muted">
+                <Columns3 className="h-4 w-4" />
+                <label className="flex items-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={showCols.usage}
+                    onChange={(e) => setShowCols((s) => ({ ...s, usage: e.target.checked }))}
+                  />{' '}
+                  In Use
+                </label>
+              </div>
+            </>
+          }
+        />
       )}
     >
       <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={(e) => {

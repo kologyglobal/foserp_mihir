@@ -180,17 +180,12 @@ export function PurchaseRequisitionDomainDetailPage({
       badge="Purchase"
       variant="dynamics"
       favoritePath={`/purchase/requisitions/${pr.id}`}
+      backLink={{ to: '/purchase/requisitions', label: 'Back to Requisitions' }}
       commandBar={
         <ErpCommandBar
           inline
           sticky={false}
           secondaryActions={[
-            {
-              id: 'back',
-              label: 'Back',
-              icon: ArrowLeft,
-              onClick: () => navigate('/purchase/requisitions'),
-            },
             ...(canEdit && mode === 'view' && perms.canEditRequisition
               ? [
                   {

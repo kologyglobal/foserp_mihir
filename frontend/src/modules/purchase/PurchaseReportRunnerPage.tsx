@@ -11,8 +11,7 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
-import { SmartFilterBar } from '@/components/design-system/SmartFilterBar'
-import { SearchInput } from '@/components/ui/SearchInput'
+import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFilterBar'
 import { Select } from '@/components/forms/Inputs'
 import { TableLink } from '@/components/ui/AppLink'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -333,7 +332,12 @@ export function PurchaseReportRunnerPage() {
         })) ?? []
       }
       filterBar={
-        <SmartFilterBar
+        <CrmListFilterBar
+          className="crm-list-filter-bar--purchase"
+          search={draftFilters.search ?? ''}
+          onSearchChange={(v) => setDraftFilters((f) => ({ ...f, search: v }))}
+          searchPlaceholder="Search…"
+          showCommandPaletteHint={false}
           chips={chipList}
           onRemoveChip={(id) => {
             if (id === 'dateFrom') setDraftFilters((f) => ({ ...f, dateFrom: '' }))
@@ -347,114 +351,124 @@ export function PurchaseReportRunnerPage() {
             else if (id === 'search') setDraftFilters((f) => ({ ...f, search: '' }))
           }}
           onClearAll={resetFilters}
-          resultCount={result?.rows.length}
-        >
-          <label className="flex items-center gap-1.5 text-[12px] text-erp-muted">
-            From
-            <input
-              type="date"
-              className="erp-input h-9 min-w-[9.5rem] text-[12px]"
-              value={draftFilters.dateFrom ?? ''}
-              onChange={(e) => setDraftFilters((f) => ({ ...f, dateFrom: e.target.value }))}
+          sort={
+            <CrmListSortSelect
+              value={draftFilters.status ?? ''}
+              onChange={(v) => setDraftFilters((f) => ({ ...f, status: v }))}
+              aria-label="Filter by status"
+              options={[
+                { value: '', label: 'All statuses' },
+                ...(options?.statuses ?? []).map((s) => ({ value: s.value, label: s.label })),
+              ]}
             />
-          </label>
-          <label className="flex items-center gap-1.5 text-[12px] text-erp-muted">
-            To
-            <input
-              type="date"
-              className="erp-input h-9 min-w-[9.5rem] text-[12px]"
-              value={draftFilters.dateTo ?? ''}
-              onChange={(e) => setDraftFilters((f) => ({ ...f, dateTo: e.target.value }))}
-            />
-          </label>
-          <Select
-            value={draftFilters.vendorId ?? ''}
-            onChange={(e) => setDraftFilters((f) => ({ ...f, vendorId: e.target.value }))}
-            className="h-9 w-44 text-[13px]"
-          >
-            <option value="">All vendors</option>
-            {(options?.vendors ?? []).map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={draftFilters.itemId ?? ''}
-            onChange={(e) => setDraftFilters((f) => ({ ...f, itemId: e.target.value }))}
-            className="h-9 w-48 text-[13px]"
-          >
-            <option value="">All items</option>
-            {(options?.items ?? []).map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.code} — {i.name}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={draftFilters.category ?? ''}
-            onChange={(e) =>
-              setDraftFilters((f) => ({
-                ...f,
-                category: e.target.value as PurchaseReportFilters['category'],
-              }))
-            }
-            className="h-9 w-44 text-[13px]"
-          >
-            <option value="">All categories</option>
-            {(options?.categories ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={draftFilters.locationId ?? ''}
-            onChange={(e) => setDraftFilters((f) => ({ ...f, locationId: e.target.value }))}
-            className="h-9 w-44 text-[13px]"
-          >
-            <option value="">All locations</option>
-            {(options?.locations ?? []).map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={draftFilters.department ?? ''}
-            onChange={(e) => setDraftFilters((f) => ({ ...f, department: e.target.value }))}
-            className="h-9 w-44 text-[13px]"
-          >
-            <option value="">All departments</option>
-            {(options?.departments ?? []).map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={draftFilters.status ?? ''}
-            onChange={(e) => setDraftFilters((f) => ({ ...f, status: e.target.value }))}
-            className="h-9 w-44 text-[13px]"
-          >
-            <option value="">All statuses</option>
-            {(options?.statuses ?? []).map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </Select>
-          <SearchInput
-            value={draftFilters.search ?? ''}
-            onChange={(v) => setDraftFilters((f) => ({ ...f, search: v }))}
-            placeholder="Search…"
-            className="w-full sm:w-56"
-          />
-        </SmartFilterBar>
+          }
+          afterFilters={
+            <>
+              <label className="flex shrink-0 items-center gap-1.5 text-[12px] text-erp-muted">
+                From
+                <input
+                  type="date"
+                  className="erp-input crm-list-filter-bar__control min-w-[9.5rem] text-[12px]"
+                  value={draftFilters.dateFrom ?? ''}
+                  onChange={(e) => setDraftFilters((f) => ({ ...f, dateFrom: e.target.value }))}
+                />
+              </label>
+              <label className="flex shrink-0 items-center gap-1.5 text-[12px] text-erp-muted">
+                To
+                <input
+                  type="date"
+                  className="erp-input crm-list-filter-bar__control min-w-[9.5rem] text-[12px]"
+                  value={draftFilters.dateTo ?? ''}
+                  onChange={(e) => setDraftFilters((f) => ({ ...f, dateTo: e.target.value }))}
+                />
+              </label>
+              <Select
+                native
+                value={draftFilters.vendorId ?? ''}
+                onChange={(e) => setDraftFilters((f) => ({ ...f, vendorId: e.target.value }))}
+                wrapClassName="crm-list-filter-bar__select-wrap shrink-0"
+                className="crm-list-filter-bar__control"
+                aria-label="Filter by vendor"
+              >
+                <option value="">All vendors</option>
+                {(options?.vendors ?? []).map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                native
+                value={draftFilters.itemId ?? ''}
+                onChange={(e) => setDraftFilters((f) => ({ ...f, itemId: e.target.value }))}
+                wrapClassName="crm-list-filter-bar__select-wrap shrink-0"
+                className="crm-list-filter-bar__control"
+                aria-label="Filter by item"
+              >
+                <option value="">All items</option>
+                {(options?.items ?? []).map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.code} — {i.name}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                native
+                value={draftFilters.category ?? ''}
+                onChange={(e) =>
+                  setDraftFilters((f) => ({
+                    ...f,
+                    category: e.target.value as PurchaseReportFilters['category'],
+                  }))
+                }
+                wrapClassName="crm-list-filter-bar__select-wrap shrink-0"
+                className="crm-list-filter-bar__control"
+                aria-label="Filter by category"
+              >
+                <option value="">All categories</option>
+                {(options?.categories ?? []).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                native
+                value={draftFilters.locationId ?? ''}
+                onChange={(e) => setDraftFilters((f) => ({ ...f, locationId: e.target.value }))}
+                wrapClassName="crm-list-filter-bar__select-wrap shrink-0"
+                className="crm-list-filter-bar__control"
+                aria-label="Filter by location"
+              >
+                <option value="">All locations</option>
+                {(options?.locations ?? []).map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                native
+                value={draftFilters.department ?? ''}
+                onChange={(e) => setDraftFilters((f) => ({ ...f, department: e.target.value }))}
+                wrapClassName="crm-list-filter-bar__select-wrap shrink-0"
+                className="crm-list-filter-bar__control"
+                aria-label="Filter by department"
+              >
+                <option value="">All departments</option>
+                {(options?.departments ?? []).map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </Select>
+            </>
+          }
+        />
       }
     >
       {loadState === 'loading' ? (
-        <LoadingState variant="table" rows={8} />
+        <LoadingState variant="table" rows={8} cols={8} />
       ) : loadState === 'error' ? (
         <EmptyState
           icon={Filter}

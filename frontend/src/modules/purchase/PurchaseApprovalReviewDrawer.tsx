@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle, CornerDownLeft, XCircle } from 'lucide-react'
+import { CheckCircle, CornerDownLeft, Forward, XCircle } from 'lucide-react'
 import { CrmDrawerShell } from '@/components/crm/CrmDrawerShell'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { Select, Textarea } from '@/components/forms/Inputs'
@@ -19,11 +19,17 @@ import type {
   PurchaseApprovalReviewDetail,
   PurchaseApprovalRole,
 } from '@/types/purchaseDomain'
+import { actorForApprovalRole } from '@/utils/purchaseApprovalMatrix'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 
 type DrawerMode = 'review' | 'history'
+
+function delegateOptionLabel(role: PurchaseApprovalRole): string {
+  const actor = actorForApprovalRole(role)
+  return `${actor.name} — ${PURCHASE_APPROVAL_ROLE_LABELS[role]}`
+}
 
 export function PurchaseApprovalReviewDrawer({
   open,
@@ -94,7 +100,7 @@ export function PurchaseApprovalReviewDrawer({
         notify.success('Sent back for correction')
       } else {
         await delegatePurchaseApproval(id, delegateRole, comment.trim())
-        notify.success(`Delegated to ${PURCHASE_APPROVAL_ROLE_LABELS[delegateRole]}`)
+        notify.success(`Delegated to ${delegateOptionLabel(delegateRole)}`)
       }
       onChanged()
       onClose()
@@ -109,6 +115,7 @@ export function PurchaseApprovalReviewDrawer({
     <CrmDrawerShell
       open={open}
       onClose={onClose}
+      eyebrow="Purchase"
       title={mode === 'history' ? 'Approval History' : 'Approval Review'}
       subtitle={detail ? `${detail.row.documentTypeLabel} · ${detail.row.documentNumber}` : undefined}
       width="lg"
@@ -117,7 +124,7 @@ export function PurchaseApprovalReviewDrawer({
           <div className="flex flex-wrap gap-2">
             <ErpButton
               type="button"
-              variant="primary"
+              variant="success"
               icon={CheckCircle}
               disabled={busy}
               onClick={() => void runAction('approve')}
@@ -135,7 +142,7 @@ export function PurchaseApprovalReviewDrawer({
             </ErpButton>
             <ErpButton
               type="button"
-              variant="outline"
+              variant="secondary"
               icon={CornerDownLeft}
               disabled={busy}
               onClick={() => void runAction('send_back')}
@@ -308,19 +315,25 @@ export function PurchaseApprovalReviewDrawer({
                     Delegate to
                   </label>
                   <Select
+                    native
                     value={delegateRole}
                     onChange={(e) => setDelegateRole(e.target.value as PurchaseApprovalRole)}
+                    aria-label="Delegate to approver"
                   >
                     {PURCHASE_APPROVAL_ROLES.map((role) => (
                       <option key={role} value={role}>
-                        {PURCHASE_APPROVAL_ROLE_LABELS[role]}
+                        {delegateOptionLabel(role)}
                       </option>
                     ))}
                   </Select>
+                  <p className="mt-1 text-[11px] text-erp-muted">
+                    Approvers from Purchase Setup matrix (demo users).
+                  </p>
                 </div>
                 <ErpButton
                   type="button"
-                  variant="secondary"
+                  variant="outline"
+                  icon={Forward}
                   disabled={busy}
                   onClick={() => void runAction('delegate')}
                 >
