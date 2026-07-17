@@ -539,6 +539,7 @@ export function RfqEditorPage() {
         { label: 'RFQs', to: '/purchase/rfqs' },
         { label: isNew ? 'New' : documentNumber ?? 'Edit' },
       ]}
+      backLink={{ to: '/purchase/rfqs', label: 'Back to RFQs' }}
       factBox={documentFactBox}
       commandBar={
         <ErpCommandBar
@@ -570,15 +571,16 @@ export function RfqEditorPage() {
           }}
         />
       }
+      stickyFooter
       footer={
         <ErpStickySaveBar
-          sticky={false}
+          sticky
           onSaveDraft={() => void saveDraft()}
           saveDraftLabel={saving ? 'Saving…' : 'Save Draft'}
           onSave={() => void saveAndSend()}
           submitLabel="Save & Send RFQ"
           isSubmitting={saving}
-          cancelLabel="Back"
+          cancelLabel="Cancel"
           onCancel={() => navigate('/purchase/rfqs')}
         />
       }
@@ -847,7 +849,6 @@ export function RfqEditorPage() {
           >
             Add line
           </ErpButton>
-          {dirty ? <span className="text-[12px] text-erp-muted">Unsaved changes</span> : null}
         </div>
         <div className="overflow-x-auto rounded-md border border-erp-border">
           <table className="erp-table text-[12px]">

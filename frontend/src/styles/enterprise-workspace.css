@@ -2194,7 +2194,17 @@
 .enterprise-workspace--dynamics-detail .erp-card-form-page__layout {
   align-items: flex-start;
   gap: 16px;
-  padding: 0 4px 24px;
+  padding: 0 4px 8px;
+}
+
+/* View pages have no sticky save bar — don't stretch the form into empty bottom space */
+.enterprise-workspace--dynamics-detail .erp-card-form-page__form.erp-form-shell-body {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.enterprise-workspace--dynamics-detail .erp-card-form-page__body {
+  padding-bottom: 0;
 }
 
 .enterprise-workspace--dynamics-detail .erp-card-form-page__main {

@@ -831,6 +831,7 @@ export function VendorQuotationEditorPage() {
           { label: 'Vendor Quotations', to: '/purchase/vendor-quotations' },
           { label: 'Loading' },
         ]}
+        backLink={{ to: '/purchase/vendor-quotations', label: 'Back to Vendor Quotations' }}
         footer={null}
       >
         <LoadingState variant="form" rows={8} />
@@ -856,6 +857,7 @@ export function VendorQuotationEditorPage() {
         { label: 'Vendor Quotations', to: '/purchase/vendor-quotations' },
         { label: isNew ? 'New' : documentNumber ?? 'Edit' },
       ]}
+      backLink={{ to: '/purchase/vendor-quotations', label: 'Back to Vendor Quotations' }}
       factBox={documentFactBox}
       collapsibleFactBox
       commandBar={
@@ -882,16 +884,15 @@ export function VendorQuotationEditorPage() {
           }}
         />
       }
+      stickyFooter
       footer={
         <ErpStickySaveBar
-          sticky={false}
-          hint={dirty ? 'Unsaved changes' : undefined}
-          onSaveDraft={() => void saveDraft()}
-          saveDraftLabel={saving ? 'Saving…' : 'Save Draft'}
-          onSave={() => void saveAndSubmit()}
-          submitLabel="Save & Submit"
+          sticky
+          onSave={() => void saveDraft()}
+          submitLabel={saving ? 'Saving…' : 'Save Draft'}
           isSubmitting={saving}
-          cancelLabel="Back"
+          submitDisabled={saving || status !== 'draft'}
+          cancelLabel="Cancel"
           onCancel={() => navigate('/purchase/vendor-quotations')}
         />
       }

@@ -21,7 +21,7 @@ import {
 } from '@/components/purchase/PurchaseDocumentFactBox'
 import { ErpCardSection, ErpFieldRow, ErpFormSpan, ErpStickySaveBar } from '@/components/erp/card-form'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { ErpButton } from '@/components/erp/ErpButton'
+import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
 import { Checkbox, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -557,6 +557,7 @@ export function PurchaseReturnEditorPage() {
           { label: 'Loading' },
         ]}
         footer={null}
+        backLink={{ to: '/purchase/returns', label: 'Back to Returns' }}
       >
         <LoadingState variant="form" rows={8} />
       </PurchaseCardFormShell>
@@ -580,6 +581,7 @@ export function PurchaseReturnEditorPage() {
       statusKey={status}
       recordHeaderFacts={recordHeaderFacts}
       favoritePath={recordId ? `/purchase/returns/${recordId}/edit` : '/purchase/returns/new'}
+      backLink={{ to: '/purchase/returns', label: 'Back to Returns' }}
       breadcrumbs={[
         { label: 'Returns', to: '/purchase/returns' },
         { label: isNew ? 'New' : documentNumber ?? 'Edit' },
@@ -607,18 +609,32 @@ export function PurchaseReturnEditorPage() {
           }}
         />
       }
+      stickyFooter
       footer={
         <ErpStickySaveBar
-          sticky={false}
-          hint={dirty ? 'Unsaved changes' : undefined}
-          onSaveDraft={() => void saveDraft(false)}
-          saveDraftLabel={saving ? 'Saving…' : 'Save Draft'}
-          onSave={() => void saveDraft(true)}
-          submitLabel="Submit for Approval"
+          sticky
           isSubmitting={saving}
-          submitDisabled={!editable || saving}
-          cancelLabel="Back"
-          onCancel={() => navigate(recordId ? `/purchase/returns/${recordId}` : '/purchase/returns')}
+          actions={
+            <ErpButtonGroup>
+              <ErpButton
+                type="button"
+                variant="ghost"
+                disabled={saving}
+                onClick={() => navigate('/purchase/returns')}
+              >
+                Cancel
+              </ErpButton>
+              <ErpButton
+                type="button"
+                variant="secondary"
+                icon={Save}
+                disabled={!editable || saving}
+                onClick={() => void saveDraft(false)}
+              >
+                {saving ? 'Saving…' : 'Save Draft'}
+              </ErpButton>
+            </ErpButtonGroup>
+          }
         />
       }
       onSaveShortcut={() => void saveDraft(false)}
@@ -1120,7 +1136,6 @@ export function PurchaseReturnEditorPage() {
                 <Link2 className="h-3.5 w-3.5" />
                 Origin: {PURCHASE_RETURN_ORIGIN_LABELS[origin]}
               </span>
-              {dirty ? <span className="font-medium text-erp-warning-fg">Unsaved changes</span> : null}
             </div>
           }
         />
