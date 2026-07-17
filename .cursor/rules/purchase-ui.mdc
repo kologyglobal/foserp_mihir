@@ -1,0 +1,22 @@
+---
+description: Purchase module UI consistency — Dynamics/ERP look, no one-off AI styling
+globs: frontend/src/modules/purchase/**/*,frontend/src/components/purchase/**/*,frontend/src/styles/purchase-process.css
+alwaysApply: false
+---
+
+# Purchase UI Consistency
+
+Full rules: `docs/PURCHASE_UI_CONSISTENCY.md`, `docs/UI_VIEW_PAGE_STANDARD.md`, and **list registers**: `docs/PURCHASE_LIST_PAGE_STANDARD.md` (gold path: `/purchase/orders`).
+
+## Must follow
+
+1. **Reuse shells** — lists: `OperationalPageShell` + `EnterpriseRegisterTableShell` + `CrmListFilterBar` + `CrmFilterDrawer`; documents: `PurchaseCardFormShell`; confirms: `appConfirm` / `appPromptNote`. Do not invent new page chrome.
+2. **View pages** — in-page **Back** via shell `backLink` / `PageBackLink` **always above Purpose / `ErpPageGuide`** (e.g. “Back to Requisitions”). Do **not** put Back in the command bar or footer. No bulky “Current status / Next action” meta — use lifecycle stepper + **(i)** hover tip for Purpose/Status/Next. View pages must not reserve sticky-footer padding when `footer` is empty. See `docs/UI_VIEW_PAGE_STANDARD.md`.
+3. **No AI-demo look** — no purple/indigo gradients, glow, glass, emoji, oversized marketing cards, or stacked shadows. Use Dynamics tokens (`dynamics-tokens.css`) and flat `border-erp-border` / white surfaces.
+4. **Shared language** — status from domain / `purchaseStatusLabels`; right rail = “Smart context / Details”; actions via `ErpCommandBar` / `ErpButton`.
+5. **No browser dialogs** — never `window.prompt` / `confirm` / `alert` on purchase flows (in-app leave = `ConfirmDialog` via `useUnsavedChangesGuard`).
+6. **List filters** — embedded `CrmListFilterBar` in `ErpDataGrid` `registerBar` (gold path `/purchase/orders`); Search → Sort → View → Columns → Filters; **no ⌘K**; drawer + Columns. Do not leave a standalone filter strip above the table.
+7. **Row actions** — pin **View / Edit / Delete** as icon buttons (`id`: `view` | `edit` | `delete`); put other actions in the ⋯ menu.
+8. **Density** — collapse Commercial/Remarks by default on create; line grids start empty + Add line; match PR/PO register chrome when touching older lists.
+
+When adding UI, match an existing Purchase screen (PO list, PR list, PO detail, Approvals) before inventing layout.
