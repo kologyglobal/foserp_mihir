@@ -1,6 +1,6 @@
 # FOS ERP — Project Memory
 
-> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-16**.
+> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-17**.
 
 ---
 
@@ -14,8 +14,8 @@
 | **Architecture** | React SPA + Node.js/Express API + MySQL 8 |
 | **Tenancy** | Multi-tenant SaaS — shared database, shared schema |
 | **Tenant scope** | Every tenant-owned record scoped by `tenantId` |
-| **Current backend scope** | Auth, RBAC, CRM core, master data (Phase 1–4) |
-| **Deferred backend** | Purchase, inventory, production, quality, finance (rich demo frontend exists); SO MRP/dispatch/invoice beyond CRM Phase 1 convert + confirm/close. Accounting FE: CoA + Vouchers + Ledger + AR/AP + Bank & Cash + Fixed Assets + Manufacturing Accounting + Tax + Financial Reports + **Budgeting & Forecasting** (`/accounting/budgeting`) + **Commercial Commitments** (`/accounting/commercial-commitments` — non-posted CRM quotes/SOs, never mixed into AR/GL/reports) + Period Close (UI/preview only); Accounting Setup remains stub — still no finance backend |
+| **Current backend scope** | Auth, RBAC, CRM core, master data (Phase 1–4); **finance setup Phase 1** (LegalEntity/Branch, FY, periods, CoA, mappings, settings, activation — no GL posting) |
+| **Deferred backend** | Purchase, inventory, production, quality; finance **posting** (vouchers/GL/AR/AP engines); SO MRP/dispatch/invoice beyond CRM Phase 1 convert + confirm/close. Accounting FE: CoA + Vouchers + Ledger + AR/AP + Bank & Cash + Fixed Assets + Manufacturing Accounting + Tax + Financial Reports + **Budgeting & Forecasting** + **Commercial Commitments** + Period Close remain UI/preview except **Finance Settings** (`/accounting/settings/**`) which is dual-mode against Phase 1 APIs |
 
 ---
 

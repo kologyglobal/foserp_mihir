@@ -2,15 +2,18 @@ import type { ReactNode } from 'react'
 import { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { getModuleFromPath, getPageTitle } from '../../utils/moduleContext'
+import { buildRouteBreadcrumbs } from '../../utils/pageNavigation'
 import { getModuleSubNavForPath, subNavItemIsActive } from '../../config/moduleWorkspaceNav'
 import { useUIStore } from '../../store/uiStore'
 import { DynamicsTabs } from '../dynamics/DynamicsTabs'
 import { shouldNavigate } from '../../utils/safeState'
 import { cn } from '../../utils/cn'
-import { CrmPageTip } from '../crm/CrmPageTip'
-import { WorkspacePageHeaderProvider, useWorkspacePageHeader } from '../../context/WorkspacePageHeaderContext'
+import {
+  WorkspacePageHeaderProvider,
+  useWorkspacePageHeader,
+  type WorkspacePageHeaderMeta,
+} from '../../context/WorkspacePageHeaderContext'
 import { WorkspaceUnifiedHeader } from '../../context/WorkspaceUnifiedHeader'
-import { isCrmPath } from '../../utils/crmPageTipStorage'
 
 function isTabActive(pathname: string, tabPath: string) {
   if (pathname === tabPath) return true
@@ -41,18 +44,20 @@ function DynamicsWorkspaceChromeInner({ children }: { children: ReactNode }) {
     actions: null,
   }
 
-  const workspaceTabs = useMemo(() => {
+  type WorkspaceTab = { path: string; label: string; group?: string; visitedAt: string }
+  const workspaceTabs = useMemo((): WorkspaceTab[] => {
     if (moduleSubNav && moduleSubNav.items.length > 1) {
       return moduleSubNav.items.map((item) => ({
         path: item.path,
         label: item.label,
+        group: item.group,
         visitedAt: '',
       }))
     }
-    // Prefer clean module nav over visit-history tabs (avoids UUID / Edit noise).
     const tabs = recentPages
       .filter((t) => isUsableWorkspaceTab(t.label, t.path))
       .slice(0, 6)
+      .map((t): WorkspaceTab => ({ path: t.path, label: t.label, visitedAt: t.visitedAt }))
     if (tabs.length === 0) {
       return [{ path: pathname, label: pageTitle || 'Page', visitedAt: new Date().toISOString() }]
     }
@@ -61,11 +66,25 @@ function DynamicsWorkspaceChromeInner({ children }: { children: ReactNode }) {
 
   const useModuleTabs = Boolean(moduleSubNav && moduleSubNav.items.length > 1)
   const activeTabLabel = workspaceTabs.find((t) => isTabActive(pathname, t.path))?.label ?? ''
-  const showLegacyContextHead = Boolean(!mergedMeta && pageTitle && pageTitle !== activeTabLabel)
+
+  /** Always show Leads-style structured header — never a blank sticky band. */
+  const headerMeta: WorkspacePageHeaderMeta = useMemo(() => {
+    if (mergedMeta) return mergedMeta
+    return {
+      title: pageTitle || activeTabLabel || 'Page',
+      badge: module || undefined,
+      favoritePath: pathname,
+      breadcrumbs: buildRouteBreadcrumbs(pathname),
+    }
+  }, [mergedMeta, pageTitle, activeTabLabel, module, pathname])
 
   const tabsNode = workspaceTabs.length > 0 ? (
     <DynamicsTabs
-      items={workspaceTabs.map((t) => ({ label: t.label, path: t.path }))}
+      items={workspaceTabs.map((t) => ({
+        label: t.label,
+        path: t.path,
+        group: t.group,
+      }))}
       activePath={
         useModuleTabs
           ? (moduleSubNav!.items.find((item) => subNavItemIsActive(pathname, item))?.path ?? pathname)
@@ -80,29 +99,14 @@ function DynamicsWorkspaceChromeInner({ children }: { children: ReactNode }) {
   return (
     <div className="d365-workspace">
       <div className="d365-workspace-sticky">
-        {mergedMeta ? (
-          <WorkspaceUnifiedHeader
-            meta={mergedMeta}
-            commandBar={commandBar}
-            actions={actions}
-            tabs={tabsNode}
-          />
-        ) : (
-          <>
-            {showLegacyContextHead && (
-              <div className="d365-workspace-context">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h1 className="d365-workspace-context-title">{pageTitle}</h1>
-                    {isCrmPath(pathname) ? <CrmPageTip /> : null}
-                  </div>
-                  <p className="d365-workspace-context-sub">{module}</p>
-                </div>
-              </div>
-            )}
-            {tabsNode}
-          </>
-        )}
+        <WorkspaceUnifiedHeader
+          meta={headerMeta}
+          commandBar={commandBar}
+          actions={actions}
+          tabs={tabsNode}
+          pageTitle={pageTitle || activeTabLabel}
+          moduleName={module}
+        />
 
         {!mergedMeta && !useModuleTabs && moduleSubNav && moduleSubNav.items.length > 1 && (
           <nav className="d365-subnav dyn-subnav-secondary" aria-label={`${moduleSubNav.categoryTitle} navigation`}>
@@ -128,7 +132,7 @@ function DynamicsWorkspaceChromeInner({ children }: { children: ReactNode }) {
   )
 }
 
-/** Dynamics workspace chrome — module tabs + optional merged page header */
+/** Dynamics workspace chrome — structured page header + module tabs for every route */
 export function DynamicsWorkspaceChrome({ children }: { children: ReactNode }) {
   return (
     <WorkspacePageHeaderProvider>

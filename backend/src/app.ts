@@ -16,6 +16,7 @@ import masterExportRoutes from './modules/masters/exports/export.routes.js'
 import lookupRoutes from './modules/masters/lookups.routes.js'
 import itemRoutes, { itemLookupRouter } from './modules/items/item.routes.js'
 import vendorRoutes, { vendorLookupRouter } from './modules/vendors/vendor.routes.js'
+import accountingRoutes from './modules/accounting/accounting.routes.js'
 import roleRoutes from './modules/roles/role.routes.js'
 import tenantRoutes from './modules/tenants/tenant.routes.js'
 import userRoutes from './modules/users/user.routes.js'
@@ -96,6 +97,7 @@ export function createApp() {
   app.use('/api/v1/tenants/:tenantId/lookups/items', itemLookupRouter)
   app.use('/api/v1/tenants/:tenantId/lookups/vendors', vendorLookupRouter)
   app.use('/api/v1/tenants/:tenantId/lookups', lookupRoutes)
+  app.use('/api/v1/tenants/:tenantId/accounting', accountingRoutes)
 
   // Tenant slug aliases
   app.use('/api/v1/t/:tenantSlug/users', userRoutes)
@@ -109,6 +111,7 @@ export function createApp() {
   app.use('/api/v1/t/:tenantSlug/lookups/items', itemLookupRouter)
   app.use('/api/v1/t/:tenantSlug/lookups/vendors', vendorLookupRouter)
   app.use('/api/v1/t/:tenantSlug/lookups', lookupRoutes)
+  app.use('/api/v1/t/:tenantSlug/accounting', accountingRoutes)
 
   // Single-host production: serve Vite build from public/ (same origin as /api).
   // Docker Compose leaves this unused (frontend nginx container serves the SPA).

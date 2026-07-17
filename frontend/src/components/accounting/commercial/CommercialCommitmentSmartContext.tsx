@@ -1,9 +1,19 @@
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { AlertTriangle, ExternalLink, FileSpreadsheet } from 'lucide-react'
 import type { CommercialCommitment } from '@/types/commercialCommitments'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { crmSalesOrderPath } from '@/utils/crmSalesOrderNavigation'
 import { CrmDocumentLink } from './CommercialBadges'
 import { AccountingStatusBadge, SalesOrderPhaseBadge } from './CommercialBadges'
+import {
+  PurchaseAiInsightsRestoreButton,
+  PurchaseAiInsightsShell,
+  PurchaseAiOverviewBlock,
+  PurchaseAiSuggestionsBlock,
+  usePurchaseAiInsightsOpen,
+} from '@/components/purchase/PurchaseAiInsightsPanel'
+
+const STORAGE_KEY = 'accounting.commercial-commitments.insights.collapsed'
 
 export function CommercialCommitmentSmartContext({
   row,
@@ -12,29 +22,64 @@ export function CommercialCommitmentSmartContext({
   row: CommercialCommitment | null
   onExpectedEntry?: () => void
 }) {
+  const navigate = useNavigate()
+  const [open, setOpen] = usePurchaseAiInsightsOpen(STORAGE_KEY)
+
+  if (!open) {
+    return (
+      <div className="flex justify-end">
+        <PurchaseAiInsightsRestoreButton label="Commercial Insights" onClick={() => setOpen(true)} />
+      </div>
+    )
+  }
+
   if (!row) {
     return (
-      <aside className="rounded border border-erp-border bg-erp-surface/40 p-3 text-[12px] text-erp-muted">
-        Select a commitment row to see commercial summary and accounting readiness.
-      </aside>
+      <PurchaseAiInsightsShell
+        title="Commercial Insights"
+        subtitle="Select a commitment row to see summary and accounting readiness."
+        onClose={() => setOpen(false)}
+      >
+        <p className="purchase-ai-panel__prose text-erp-muted">No row selected.</p>
+      </PurchaseAiInsightsShell>
     )
   }
 
   const confirmed = row.salesOrderStatus === 'confirmed'
-  const open = row.salesOrderStatus === 'open'
+  const openSo = row.salesOrderStatus === 'open'
 
   return (
-    <aside className="space-y-3 rounded border border-erp-border bg-white p-3 text-[12px]">
-      <section>
-        <h3 className="text-[11px] font-bold uppercase tracking-wide text-erp-muted">Commercial Summary</h3>
-        <dl className="mt-2 space-y-1.5">
-          <div className="flex justify-between gap-2">
-            <dt className="text-erp-muted">Customer</dt>
-            <dd className="text-right font-medium">{row.customerName}</dd>
-          </div>
-          <div className="flex justify-between gap-2">
-            <dt className="text-erp-muted">Opportunity</dt>
-            <dd className="text-right">
+    <PurchaseAiInsightsShell
+      title="Commercial Insights"
+      subtitle="AI suggested commercial summary and accounting readiness for this commitment."
+      onClose={() => setOpen(false)}
+    >
+      <PurchaseAiOverviewBlock
+        rows={[
+          { label: 'Customer', value: row.customerName },
+          {
+            label: 'Commercial value',
+            value: formatCurrency(row.commercialValue),
+            highlight: true,
+          },
+          {
+            label: 'SO status',
+            value: <SalesOrderPhaseBadge status={row.salesOrderStatus} />,
+          },
+          {
+            label: 'Accounting',
+            value: <AccountingStatusBadge status={row.accountingStatus} />,
+            highlight: row.accountingStatus !== 'not_posted',
+          },
+        ]}
+      />
+
+      <section className="purchase-ai-panel__section" aria-label="Linked documents">
+        <p className="purchase-ai-panel__section-title">Linked documents</p>
+        <dl className="purchase-ai-panel__metrics">
+          <div className="purchase-ai-panel__metric">
+            <dt>Opportunity</dt>
+            <dd>
               {row.opportunityId ? (
                 <CrmDocumentLink
                   to={`/crm/opportunities/${row.opportunityId}`}
@@ -46,9 +91,9 @@ export function CommercialCommitmentSmartContext({
               )}
             </dd>
           </div>
-          <div className="flex justify-between gap-2">
-            <dt className="text-erp-muted">Approved quotation</dt>
-            <dd className="text-right">
+          <div className="purchase-ai-panel__metric">
+            <dt>Quotation</dt>
+            <dd>
               {row.quotationId ? (
                 <CrmDocumentLink
                   to={`/crm/quotations/${row.quotationId}`}
@@ -60,9 +105,9 @@ export function CommercialCommitmentSmartContext({
               )}
             </dd>
           </div>
-          <div className="flex justify-between gap-2">
-            <dt className="text-erp-muted">Sales Order</dt>
-            <dd className="text-right">
+          <div className="purchase-ai-panel__metric">
+            <dt>Sales order</dt>
+            <dd>
               {row.salesOrderId ? (
                 <CrmDocumentLink
                   to={crmSalesOrderPath(row.salesOrderId)}
@@ -74,72 +119,47 @@ export function CommercialCommitmentSmartContext({
               )}
             </dd>
           </div>
-          <div className="flex justify-between gap-2">
-            <dt className="text-erp-muted">Commercial Value</dt>
-            <dd className="font-semibold tabular-nums">{formatCurrency(row.commercialValue)}</dd>
+          <div className="purchase-ai-panel__metric">
+            <dt>Pipeline</dt>
+            <dd>{confirmed ? 'Confirmed SO' : openSo ? 'Open SO' : row.salesOrderStatus}</dd>
           </div>
         </dl>
       </section>
 
-      <section>
-        <h3 className="text-[11px] font-bold uppercase tracking-wide text-erp-muted">Accounting Readiness</h3>
-        <ul className="mt-2 space-y-1 text-erp-text">
-          <li className="flex items-center justify-between gap-2">
-            <span>Sales Order confirmed</span>
-            <span>{confirmed ? 'Yes' : 'No'}</span>
-          </li>
-          <li className="flex items-center justify-between gap-2">
-            <span>Invoice not created</span>
-            <span>Yes</span>
-          </li>
-          <li className="flex items-center justify-between gap-2">
-            <span>Accounting not posted</span>
-            <AccountingStatusBadge status={row.accountingStatus} />
-          </li>
-          {row.salesOrderStatus ? (
-            <li className="flex items-center justify-between gap-2">
-              <span>SO status</span>
-              <SalesOrderPhaseBadge status={row.salesOrderStatus} />
-            </li>
-          ) : null}
-        </ul>
-      </section>
-
-      <section>
-        <h3 className="text-[11px] font-bold uppercase tracking-wide text-erp-muted">Next Best Action</h3>
-        {open ? (
-          <p className="mt-2 text-erp-text">Confirm the Sales Order in CRM (commercial only — no posting).</p>
-        ) : confirmed ? (
-          <p className="mt-2 text-erp-text">
-            Create Sales Invoice — <span className="font-medium text-amber-900">not available in Phase 1.</span>
-          </p>
-        ) : (
-          <p className="mt-2 text-erp-muted">No accounting action available for this commercial document.</p>
-        )}
-        <button
-          type="button"
-          disabled
-          title="Sales Invoice posting will be added in a future phase."
-          className="mt-2 w-full rounded border border-erp-border bg-erp-surface px-2 py-1.5 text-[11px] font-semibold text-erp-muted opacity-60"
-        >
-          Create Sales Invoice
-        </button>
-        {onExpectedEntry ? (
-          <button
-            type="button"
-            onClick={onExpectedEntry}
-            className="mt-1.5 w-full rounded border border-erp-border px-2 py-1.5 text-[11px] font-semibold hover:bg-erp-surface"
-          >
-            View Expected Entry
-          </button>
-        ) : null}
-        <Link
-          to="/crm"
-          className="mt-2 block text-center text-[11px] font-semibold text-erp-primary hover:underline"
-        >
-          Open CRM Dashboard
-        </Link>
-      </section>
-    </aside>
+      <PurchaseAiSuggestionsBlock
+        suggestions={[
+          ...(onExpectedEntry
+            ? [
+                {
+                  id: 'expected-entry',
+                  label: 'Preview expected accounting entry',
+                  icon: FileSpreadsheet,
+                  onClick: onExpectedEntry,
+                  primary: true as const,
+                },
+              ]
+            : []),
+          {
+            id: 'open-so',
+            label: row.salesOrderId ? 'Open sales order' : 'No sales order linked',
+            icon: ExternalLink,
+            disabled: !row.salesOrderId,
+            onClick: () => {
+              if (row.salesOrderId) navigate(crmSalesOrderPath(row.salesOrderId))
+            },
+          },
+          ...(!confirmed
+            ? [
+                {
+                  id: 'confirm-hint',
+                  label: 'SO not confirmed — posting not available',
+                  icon: AlertTriangle,
+                  disabled: true,
+                },
+              ]
+            : []),
+        ]}
+      />
+    </PurchaseAiInsightsShell>
   )
 }

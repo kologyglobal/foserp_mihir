@@ -22,7 +22,7 @@ export function getCategoryWorkspacePath(category: NavCategory): string {
   return first?.path ?? '/home'
 }
 
-export type ModuleSubNavItem = { label: string; path: string; end?: boolean }
+export type ModuleSubNavItem = { label: string; path: string; end?: boolean; group?: string }
 
 /** Workspace sub-menu for the active module — drives Dynamics sub-nav in the work area */
 export function getModuleSubNavForPath(pathname: string): {
@@ -31,6 +31,9 @@ export function getModuleSubNavForPath(pathname: string): {
   base: string
   items: ModuleSubNavItem[]
 } | null {
+  /** Finance settings uses local DynamicsTabs in FinanceSettingsShell — avoid conflicting module tabs. */
+  if (pathname.startsWith('/accounting/settings')) return null
+
   const categoryId = findActiveCategoryId(pathname)
   if (!categoryId) return null
   const category = moduleCategories.find((c) => c.id === categoryId)
@@ -45,7 +48,7 @@ export function getModuleSubNavForPath(pathname: string): {
       if (category.id === 'inventory') return canViewInventoryNavItem(item.path)
       return true
     })
-    .map((item) => ({ label: item.label, path: item.path, end: item.end }))
+    .map((item) => ({ label: item.label, path: item.path, end: item.end, group: item.group }))
 
   return { categoryId, categoryTitle: category.title, base, items }
 }

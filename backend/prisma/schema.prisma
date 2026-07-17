@@ -127,6 +127,17 @@ model Tenant {
   masterGstRates       MasterGstRate[]
   masterItems          MasterItem[]
   masterVendors        MasterVendor[]
+  legalEntities        LegalEntity[]
+  branches             Branch[]
+  financialYears       FinancialYear[]
+  accountingPeriods    AccountingPeriod[]
+  accounts             Account[]
+  defaultAccountMappings DefaultAccountMapping[]
+  financeSettings      FinanceSettings[]
+  costCentres          CostCentre[]
+  financeFeatureControls FinanceFeatureControl[]
+  financeApprovalRules FinanceApprovalRule[]
+  financeNumberSeries  FinanceNumberSeries[]
 
   @@index([status])
   @@index([deletedAt])
@@ -1419,4 +1430,465 @@ model MasterVendor {
   @@index([tenantId, stateId])
   @@index([tenantId, cityId])
   @@map("master_vendors")
+}
+
+// ─── Finance Phase 1 — Legal entity / setup (no GL posting) ───────────────────
+
+enum LegalEntityType {
+  PRIVATE_LIMITED
+  PUBLIC_LIMITED
+  LLP
+  PARTNERSHIP
+  PROPRIETORSHIP
+  TRUST
+  OTHER
+}
+
+enum BranchType {
+  HEAD_OFFICE
+  FACTORY
+  WAREHOUSE
+  SALES_OFFICE
+  SERVICE_CENTRE
+  OTHER
+}
+
+enum FinancialYearStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+enum AccountingPeriodStatus {
+  OPEN
+  UNDER_REVIEW
+  CLOSED
+  REOPENED
+}
+
+enum AccountCategory {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum AccountType {
+  GENERAL
+  BANK
+  CASH
+  CUSTOMER_RECEIVABLE
+  VENDOR_PAYABLE
+  RAW_MATERIAL_INVENTORY
+  WIP_INVENTORY
+  FINISHED_GOODS_INVENTORY
+  FIXED_ASSET
+  ACCUMULATED_DEPRECIATION
+  GST_INPUT
+  GST_OUTPUT
+  TDS_RECEIVABLE
+  TDS_PAYABLE
+  SALES
+  SALES_RETURN
+  PURCHASE
+  PURCHASE_RETURN
+  EXPENSE
+  OTHER_INCOME
+  PRODUCTION_VARIANCE
+  RETAINED_EARNINGS
+}
+
+enum NormalBalance {
+  DEBIT
+  CREDIT
+}
+
+enum DefaultAccountMappingKey {
+  CUSTOMER_RECEIVABLE
+  VENDOR_PAYABLE
+  SALES_REVENUE
+  SALES_RETURN
+  PURCHASE
+  PURCHASE_RETURN
+  RAW_MATERIAL_INVENTORY
+  WIP_INVENTORY
+  FINISHED_GOODS_INVENTORY
+  STOCK_ADJUSTMENT
+  MATERIAL_CONSUMPTION
+  PRODUCTION_VARIANCE
+  SCRAP_INVENTORY
+  SCRAP_LOSS
+  SUBCONTRACTING_EXPENSE
+  FREIGHT_INWARD
+  FREIGHT_OUTWARD
+  GST_INPUT_CGST
+  GST_INPUT_SGST
+  GST_INPUT_IGST
+  GST_OUTPUT_CGST
+  GST_OUTPUT_SGST
+  GST_OUTPUT_IGST
+  TDS_RECEIVABLE
+  TDS_PAYABLE
+  BANK_CHARGES
+  ROUNDING
+  DEPRECIATION_EXPENSE
+  ACCUMULATED_DEPRECIATION
+  ASSET_DISPOSAL_GAIN
+  ASSET_DISPOSAL_LOSS
+  RETAINED_EARNINGS
+}
+
+enum FinanceFeatureKey {
+  RECEIVABLES
+  PAYABLES
+  BANK_RECONCILIATION
+  GST
+  TDS
+  FIXED_ASSETS
+  MANUFACTURING_ACCOUNTING
+  BUDGETING
+  MULTI_CURRENCY
+  COST_CENTRES
+  PROJECT_ACCOUNTING
+  APPROVALS
+}
+
+enum FinanceDocumentType {
+  JOURNAL
+  RECEIPT
+  PAYMENT
+  CONTRA
+  CREDIT_NOTE
+  DEBIT_NOTE
+  OPENING_BALANCE
+  REVERSAL
+}
+
+enum RoundingMethod {
+  ROUND_HALF_UP
+  ROUND_HALF_EVEN
+  ROUND_DOWN
+  ROUND_UP
+}
+
+/// ERP organisation using FOS — distinct from CrmCompany (customer account).
+model LegalEntity {
+  id                    String          @id @default(uuid())
+  tenantId              String
+  code                  String          @db.VarChar(32)
+  legalName             String          @db.VarChar(300)
+  displayName           String          @db.VarChar(300)
+  entityType            LegalEntityType @default(PRIVATE_LIMITED)
+  pan                   String?         @db.VarChar(10)
+  cin                   String?         @db.VarChar(21)
+  gstin                 String?         @db.VarChar(15)
+  baseCurrency          String          @default("INR") @db.VarChar(8)
+  countryCode           String          @default("IN") @db.VarChar(2)
+  stateCode             String?         @db.VarChar(8)
+  registeredAddressJson Json?
+  billingAddressJson    Json?
+  fiscalYearStartMonth  Int             @default(4)
+  isDefault             Boolean         @default(false)
+  isActive              Boolean         @default(true)
+  createdBy             String?
+  updatedBy             String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id])
+  branches               Branch[]
+  financialYears         FinancialYear[]
+  accountingPeriods      AccountingPeriod[]
+  accounts               Account[]
+  defaultAccountMappings DefaultAccountMapping[]
+  financeSettings        FinanceSettings?
+  costCentres            CostCentre[]
+  financeFeatureControls FinanceFeatureControl[]
+  financeApprovalRules   FinanceApprovalRule[]
+  financeNumberSeries    FinanceNumberSeries[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, isDefault])
+  @@index([tenantId, isActive])
+  @@map("legal_entities")
+}
+
+model Branch {
+  id            String     @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+  code          String     @db.VarChar(32)
+  name          String     @db.VarChar(200)
+  branchType    BranchType @default(HEAD_OFFICE)
+  gstin         String?    @db.VarChar(15)
+  stateCode     String?    @db.VarChar(8)
+  addressJson   Json?
+  phone         String?    @db.VarChar(30)
+  email         String?    @db.VarChar(255)
+  isHeadOffice  Boolean    @default(false)
+  isDefault     Boolean    @default(false)
+  isActive      Boolean    @default(true)
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@unique([legalEntityId, code])
+  @@index([tenantId])
+  @@index([tenantId, legalEntityId])
+  @@index([legalEntityId, isHeadOffice])
+  @@index([legalEntityId, isDefault])
+  @@map("branches")
+}
+
+model FinancialYear {
+  id            String              @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+  name          String              @db.VarChar(64)
+  startDate     DateTime            @db.Date
+  endDate       DateTime            @db.Date
+  status        FinancialYearStatus @default(DRAFT)
+  isCurrent     Boolean             @default(false)
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  legalEntity       LegalEntity        @relation(fields: [legalEntityId], references: [id])
+  periods           AccountingPeriod[]
+  financeNumberSeries FinanceNumberSeries[]
+
+  @@index([tenantId])
+  @@index([legalEntityId])
+  @@index([legalEntityId, startDate, endDate])
+  @@index([legalEntityId, isCurrent])
+  @@map("financial_years")
+}
+
+model AccountingPeriod {
+  id              String                 @id @default(uuid())
+  tenantId        String
+  legalEntityId   String
+  financialYearId String
+  periodNumber    Int
+  name            String                 @db.VarChar(64)
+  startDate       DateTime               @db.Date
+  endDate         DateTime               @db.Date
+  status          AccountingPeriodStatus @default(OPEN)
+  closedAt        DateTime?
+  closedBy        String?
+  reopenedAt      DateTime?
+  reopenedBy      String?
+  reopenReason    String?                @db.VarChar(500)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  legalEntity   LegalEntity   @relation(fields: [legalEntityId], references: [id])
+  financialYear FinancialYear @relation(fields: [financialYearId], references: [id])
+
+  @@unique([financialYearId, periodNumber])
+  @@index([tenantId])
+  @@index([legalEntityId])
+  @@index([financialYearId])
+  @@index([legalEntityId, startDate, endDate])
+  @@map("accounting_periods")
+}
+
+model Account {
+  id                   String          @id @default(uuid())
+  tenantId             String
+  legalEntityId        String
+  accountCode          String          @db.VarChar(32)
+  accountName          String          @db.VarChar(200)
+  parentAccountId      String?
+  category             AccountCategory
+  accountType          AccountType     @default(GENERAL)
+  level                Int             @default(1)
+  isGroup              Boolean         @default(false)
+  isControlAccount     Boolean         @default(false)
+  allowManualPosting   Boolean         @default(true)
+  normalBalance        NormalBalance   @default(DEBIT)
+  currencyCode         String?         @db.VarChar(8)
+  requiresParty        Boolean         @default(false)
+  requiresReconciliation Boolean       @default(false)
+  isActive             Boolean         @default(true)
+  description          String?         @db.Text
+  createdBy            String?
+  updatedBy            String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  tenant      Tenant                   @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity              @relation(fields: [legalEntityId], references: [id])
+  parent      Account?                 @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
+  children    Account[]                @relation("AccountHierarchy")
+  mappings    DefaultAccountMapping[]
+
+  @@unique([legalEntityId, accountCode])
+  @@index([tenantId])
+  @@index([legalEntityId])
+  @@index([legalEntityId, category])
+  @@index([parentAccountId])
+  @@index([legalEntityId, isActive])
+  @@map("accounts")
+}
+
+model DefaultAccountMapping {
+  id            String                   @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+  mappingKey    DefaultAccountMappingKey
+  accountId     String
+  isMandatory   Boolean                  @default(false)
+  description   String?                  @db.VarChar(500)
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+  account     Account     @relation(fields: [accountId], references: [id])
+
+  @@unique([legalEntityId, mappingKey])
+  @@index([tenantId])
+  @@index([legalEntityId])
+  @@index([accountId])
+  @@map("default_account_mappings")
+}
+
+model FinanceSettings {
+  id                             String         @id @default(uuid())
+  tenantId                       String
+  legalEntityId                  String         @unique
+  baseCurrency                   String         @default("INR") @db.VarChar(8)
+  dateFormat                     String         @default("DD/MM/YYYY") @db.VarChar(32)
+  amountPrecision                Int            @default(2)
+  quantityPrecision              Int            @default(3)
+  roundingMethod                 RoundingMethod @default(ROUND_HALF_UP)
+  roundingTolerance              Decimal        @default(1) @db.Decimal(18, 4)
+  allowBackdatedPosting          Boolean        @default(false)
+  backdatedDaysLimit             Int            @default(0)
+  requireAttachmentAbove         Decimal?       @db.Decimal(18, 4)
+  receiptApprovalLimit           Decimal?       @db.Decimal(18, 4)
+  paymentApprovalLimit           Decimal?       @db.Decimal(18, 4)
+  journalApprovalLimit           Decimal?       @db.Decimal(18, 4)
+  writeOffTolerance              Decimal?       @db.Decimal(18, 4)
+  bankChargeTolerance            Decimal?       @db.Decimal(18, 4)
+  allowManualControlAccountPosting Boolean      @default(false)
+  financeActivated               Boolean        @default(false)
+  activatedAt                    DateTime?
+  activatedBy                    String?
+  createdAt                      DateTime       @default(now())
+  updatedAt                      DateTime       @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@index([tenantId])
+  @@map("finance_settings")
+}
+
+model CostCentre {
+  id            String   @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+  code          String   @db.VarChar(32)
+  name          String   @db.VarChar(200)
+  parentId      String?
+  isGroup       Boolean  @default(false)
+  managerUserId String?
+  isActive      Boolean  @default(true)
+  description   String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity  @relation(fields: [legalEntityId], references: [id])
+  parent      CostCentre?  @relation("CostCentreHierarchy", fields: [parentId], references: [id])
+  children    CostCentre[] @relation("CostCentreHierarchy")
+
+  @@unique([legalEntityId, code])
+  @@index([tenantId])
+  @@index([legalEntityId])
+  @@index([parentId])
+  @@map("cost_centres")
+}
+
+model FinanceFeatureControl {
+  id                String            @id @default(uuid())
+  tenantId          String
+  legalEntityId     String
+  featureKey        FinanceFeatureKey
+  isEnabled         Boolean           @default(false)
+  configurationJson Json?
+  updatedBy         String?
+  updatedAt         DateTime          @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@unique([legalEntityId, featureKey])
+  @@index([tenantId])
+  @@map("finance_feature_controls")
+}
+
+model FinanceApprovalRule {
+  id             String   @id @default(uuid())
+  tenantId       String
+  legalEntityId  String
+  documentType   String   @db.VarChar(64)
+  ruleName       String   @db.VarChar(200)
+  amountFrom     Decimal  @default(0) @db.Decimal(18, 4)
+  amountTo       Decimal? @db.Decimal(18, 4)
+  conditionJson  Json?
+  approverRoleId String?
+  approverUserId String?
+  approvalLevel  Int      @default(1)
+  isActive       Boolean  @default(true)
+  createdBy      String?
+  updatedBy      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@index([tenantId])
+  @@index([legalEntityId])
+  @@index([legalEntityId, documentType])
+  @@map("finance_approval_rules")
+}
+
+/// Finance voucher numbering scoped by legal entity (+ optional FY). Does not replace CRM CodeSeries.
+model FinanceNumberSeries {
+  id              String              @id @default(uuid())
+  tenantId        String
+  legalEntityId   String
+  documentType    FinanceDocumentType
+  financialYearId String?
+  prefix          String              @db.VarChar(20)
+  currentValue    Int                 @default(0)
+  padLength       Int                 @default(6)
+  resetEachYear   Boolean             @default(true)
+  isActive        Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  legalEntity   LegalEntity    @relation(fields: [legalEntityId], references: [id])
+  financialYear FinancialYear? @relation(fields: [financialYearId], references: [id])
+
+  @@unique([legalEntityId, documentType])
+  @@index([tenantId])
+  @@index([legalEntityId])
+  @@map("finance_number_series")
 }

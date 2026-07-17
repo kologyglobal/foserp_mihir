@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified against codebase: **2026-07-15** (Purchase frontend quality review: umbrella E2E smoke PASS; purchase oxlint clean; repo lint/typecheck still fail on pre-existing CRM/BOM/demo issues; accounting nav wired; admin UI wired but not live-tested).
+Last verified against codebase: **2026-07-17** (Accounting Phase 1A–1C: LegalEntity/Branch + finance setup API/DB/FE; migration deployed; finance tests 8/8 pass; purchase/CRM status unchanged from 2026-07-15 notes).
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
@@ -23,12 +23,12 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Category | Modules |
 |----------|---------|
-| **Completed (API mode)** | CRM companies, contacts, leads, opportunities, activities, follow-ups; **quotations** (CRUD + lifecycle + convert→SO); quotation templates; **sales orders Phase 1** (convert + draft CRUD + confirm/close); masters (geography→vendor + products); search; reports (read); exports; dashboard metrics/charts/approval panel; notes/attachments; forecast |
+| **Completed (API mode)** | CRM companies, contacts, leads, opportunities, activities, follow-ups; **quotations** (CRUD + lifecycle + convert→SO); quotation templates; **sales orders Phase 1** (convert + draft CRUD + confirm/close); masters (geography→vendor + products); search; reports (read); exports; dashboard metrics/charts/approval panel; notes/attachments; forecast; **finance setup Phase 1** (legal entities, branches, FY, periods, CoA hierarchy, default mappings, settings, number series, cost centres, approval-rule config, activate) |
 | **Partially completed** | Auth UI; mobile CRM (API hydrate, no offline); sales-order fulfilment beyond confirm/close; **user/role/tenant admin UI (frontend wired 2026-07-15, not test-verified)** |
 | **Not started** | Login activity module |
-| **Scaffolding (not shipped)** | — (Accounting: most FE modules done incl. Financial Reports + Manufacturing Accounting + **Budgeting & Forecasting** + **Commercial Commitments** (`/accounting/commercial-commitments`, CRM commercial vs posted financials separation); **Accounting Setup & Controls** remains stub) |
+| **Scaffolding (not shipped)** | — (Accounting operational screens: CoA demo, Vouchers, AR/AP, Bank, FA, Manufacturing Accounting, Tax, Reports, Budgeting, Commercial Commitments, Period Close — UI/mock only; **Finance Settings** at `/accounting/settings` is Phase 1 dual-mode, not a stub) |
 | **Blocked** | — (none currently) |
-| **Deferred by design** | Purchase / inventory / production / quality / maintenance / finance **backends**; SO MRP / dispatch / invoice posting |
+| **Deferred by design** | Purchase / inventory / production / quality / maintenance backends; finance **GL posting / vouchers / AR-AP engines**; SO MRP / dispatch / invoice posting |
 
 ---
 
@@ -396,18 +396,18 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | API mode | ❌ | |
 | Remaining gap | Manufacturing backend when prioritized |
 
-### Accounting (nav/route wired — dashboard + CoA + Vouchers + Ledger FE live; other sub-screens stubbed)
+### Accounting (finance setup Phase 1 live; operational screens mostly demo FE)
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ⚠️ | **2026-07-16:** Dashboard live; CoA, Vouchers, Ledger, Receivables, Payables, Bank & Cash, Fixed Assets, Manufacturing Accounting, GST/TDS, Financial Reports, **Budgeting & Forecasting** (`/accounting/budgeting/**`), Period Close — UI/mock only. Accounting Setup remains stub |
-| Backend | 🔒 | Deferred (finance) |
-| DB | 🔒 | — |
-| API | 🔒 | — |
-| Tests | ❌ | FE modules covered by typecheck/lint/build |
-| Demo mode | ⚠️ | Dashboard + CoA + Vouchers + Ledger + Receivables + Payables + Bank & Cash + Fixed Assets + Manufacturing Accounting + GST/TDS + Financial Reports + Budgeting & Forecasting + Period Close interactive (mock/session); Setup stub remains |
-| API mode | ❌ | |
-| Remaining gap | Build remaining stub screens; tax compliance needs backend engine + portal connectors later; still no finance posting backend by design |
+| Frontend | ⚠️ | **2026-07-17:** **Finance Settings** (`/accounting/settings/**`) dual-mode Phase 1. Other workspaces (CoA demo path, Vouchers, Ledger, AR/AP, Bank, FA, Mfg Acc, Tax, Reports, Budgeting, Commercial Commitments, Period Close) still UI/mock only |
+| Backend | ⚠️ | **Phase 1 setup APIs** under `/api/v1/t/:tenantSlug/accounting/*` — no GL/voucher posting |
+| DB | ⚠️ | LegalEntity, Branch, FY, Periods, Account, mappings, settings, cost centres, approval rules, finance number series — **no GL tables** |
+| API | ⚠️ | Setup + activate only |
+| Tests | ⚠️ | `tests/finance/finance-setup.test.ts` 8/8 live; FE typecheck clean |
+| Demo mode | ✅ | Settings workspace + wizard via Zustand bridge |
+| API mode | ⚠️ | Setup APIs usable after migrate + seed permissions; posting deferred |
+| Remaining gap | Phase 2: vouchers, double-entry posting, period-close enforcement; operational demo screens stay mock until then |
 
 ### Mobile CRM
 

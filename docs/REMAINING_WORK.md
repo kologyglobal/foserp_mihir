@@ -267,7 +267,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Dependencies | Purchase, SO Phase 1 |
 | Next step | Module-by-module planning when prioritized. Manufacturing FE: **Phases 1–6 + Route/Operations demo shipped** (Control Room, shopfloor, BOM, routes, plan, WO ops stages, job work, reports, settings) — production API still deferred (`docs/MANUFACTURING_SIMPLE.md`). |
 | Test required | Per-module production-ready scripts |
-| Status | open (accepted deferral) |
+| Status | open (accepted deferral; finance **setup** Phase 1 carved out 2026-07-17 — posting still deferred) |
 
 ### P3-3b: Manufacturing & Production FE (simple mode)
 
@@ -310,12 +310,12 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Field | Value |
 |-------|-------|
 | Module | Accounting |
-| Description | Replace remaining stub (**Accounting Setup & Controls**). Fixed Assets + Bank & Cash + Manufacturing Accounting + Financial Reports + Period Close + **Budgeting & Forecasting** FE done 2026-07-16. Other Accounting FE modules already shipped (UI/mock only — no finance backend). |
-| Reason | Nav/routes wired; most Accounting FE workspaces live; remaining Accounting stubs shell-only |
-| Dependencies | None — mock Promise services; legacy `accountingStore` still used by dashboard KPIs |
-| Next step | Accounting Setup & Controls; later swap mock services for Node/MySQL API |
-| Test required | Demo script per screen once built; still UI-only (no finance backend) |
-| Status | open (Budgeting & Forecasting FE done 2026-07-16; Commercial Commitments FE done 2026-07-17 — commercial vs posted financials; Accounting Setup remains) |
+| Description | **Finance Settings Phase 1 done 2026-07-17** (`/accounting/settings/**` + APIs). Remaining operational Accounting FE (vouchers, AR/AP, bank, etc.) still mock until Phase 2 posting. |
+| Reason | Nav/routes wired; setup foundation shipped; posting deferred by design |
+| Dependencies | Phase 2 GL/voucher design |
+| Next step | Phase 2: AccountingVoucher + GeneralLedgerEntry + posting service (do not start until prioritized) |
+| Test required | Finance setup live tests pass; Phase 2 needs posting suite |
+| Status | partial (setup Phase 1 done; posting/open operational backends open) |
 
 ### P3-6: Commercial terms single source
 
@@ -333,4 +333,4 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ## Recommended next task
 
-See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) open risks. Highest ops: **redeploy production `.htaccess`** so `/api` returns JSON. Product backlog: **verify P1-1/P1-2 admin UIs** (run `npm run typecheck`, smoke test with `admin@vasant-trailers.com` — see `SESSION_CHANGELOG.md` 2026-07-15), then P2 mobile API E2E. Do not start purchase/finance backends until transactional ERP phase.
+See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) open risks. Highest ops: **redeploy production `.htaccess`** so `/api` returns JSON. Product backlog: **verify P1-1/P1-2 admin UIs**; then P2 mobile API E2E. Finance **setup** Phase 1 is shipped — do not start Phase 2 GL posting or purchase backends until prioritized.

@@ -63,3 +63,5 @@ frontend/.git.bak-nested-*/
 *.sw?
 .vscode/*
 !.vscode/extensions.json
+
+/backups/

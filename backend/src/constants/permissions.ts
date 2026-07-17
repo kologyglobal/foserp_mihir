@@ -196,6 +196,33 @@ export const PERMISSIONS = [
   'purchase.return.post',
   'purchase.reports.view',
   'purchase.setup.manage',
+
+  // Finance / Accounting Phase 1 — setup only (no GL posting)
+  'finance.view',
+  'finance.settings.view',
+  'finance.settings.manage',
+  'finance.legal_entity.view',
+  'finance.legal_entity.manage',
+  'finance.branch.view',
+  'finance.branch.manage',
+  'finance.financial_year.view',
+  'finance.financial_year.manage',
+  'finance.period.view',
+  'finance.period.manage',
+  'finance.period.close',
+  'finance.period.reopen',
+  'finance.coa.view',
+  'finance.coa.manage',
+  'finance.default_mapping.view',
+  'finance.default_mapping.manage',
+  'finance.number_series.view',
+  'finance.number_series.manage',
+  'finance.cost_centre.view',
+  'finance.cost_centre.manage',
+  'finance.approval_rule.view',
+  'finance.approval_rule.manage',
+  'finance.activate',
+  'finance.audit.view',
 ] as const
 
 export type PermissionName = (typeof PERMISSIONS)[number]
@@ -203,6 +230,17 @@ export type PermissionName = (typeof PERMISSIONS)[number]
 const MASTER_VIEW_PERMISSIONS = PERMISSIONS.filter((p) => p.startsWith('master.') && p.endsWith('.view'))
 const PURCHASE_PERMISSIONS = PERMISSIONS.filter((p) => p.startsWith('purchase.'))
 const PURCHASE_OPS = PURCHASE_PERMISSIONS.filter((p) => p !== 'purchase.setup.manage')
+const FINANCE_PERMISSIONS = PERMISSIONS.filter((p) => p.startsWith('finance.'))
+const FINANCE_VIEW_PERMISSIONS = FINANCE_PERMISSIONS.filter(
+  (p) => p.endsWith('.view') || p === 'finance.view' || p === 'finance.audit.view',
+)
+const FINANCE_EXECUTIVE_MANAGE: PermissionName[] = [
+  'finance.settings.manage',
+  'finance.coa.manage',
+  'finance.default_mapping.manage',
+  'finance.cost_centre.manage',
+  'finance.number_series.manage',
+]
 
 export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
   'Super Admin': [...PERMISSIONS],
@@ -291,6 +329,8 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'master.item.view',
   ],
   'Finance Executive': [
+    ...FINANCE_VIEW_PERMISSIONS,
+    ...FINANCE_EXECUTIVE_MANAGE,
     'purchase.view',
     'purchase.dashboard.view',
     'purchase.order.view',
@@ -304,6 +344,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'master.vendor.view',
   ],
   'Finance Manager': [
+    ...FINANCE_PERMISSIONS,
     'purchase.view',
     'purchase.dashboard.view',
     'purchase.order.view',

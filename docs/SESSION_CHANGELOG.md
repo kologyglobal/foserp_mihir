@@ -1,3 +1,25 @@
+## 2026-07-17 — Accounting Phase 1A–1C: Legal Entity + finance setup
+
+### Why
+Transactional accounting needs a real ERP organisation structure (`Tenant → LegalEntity → Branch`), separate from CRM `CrmCompany`, plus finance setup (FY, periods, CoA, mappings, settings, activation) before any GL posting.
+
+### Change
+- **Prisma:** `LegalEntity`, `Branch`, `FinancialYear`, `AccountingPeriod`, `Account`, `DefaultAccountMapping`, `FinanceSettings`, `CostCentre`, `FinanceFeatureControl`, `FinanceApprovalRule`, `FinanceNumberSeries` (+ enums); migration `20260717120000_finance_phase1_setup` deployed
+- **Backend:** `/api/v1/t/:tenantSlug/accounting/*` modules (controller→service→repository), `finance.*` permissions, setup-status + activate validation, audit via existing `AuditLog` (`module: finance`); CoA templates; LE-scoped number series (CRM `CodeSeries` unchanged)
+- **Frontend:** `/accounting/settings/**` workspace + wizard; `financeApiBridge` dual-mode; demo Zustand store; Setup nav → settings
+- **Tests:** `backend/tests/finance/finance-setup.test.ts` (8 live tests pass with MySQL)
+
+### Out of scope (Phase 2+)
+GL posting, vouchers, receipts/payments, AR/AP outstanding, bank recon, GST returns, FA, financial reports, period-close engine
+
+### How to verify
+1. `cd backend && npx tsx scripts/prisma-cli.ts migrate deploy` then `npm run db:seed` (permissions)
+2. `npm test -- tests/finance/finance-setup.test.ts`
+3. Demo: `/accounting/settings` and `/accounting/settings/setup`
+4. API mode: create legal entity → FY → periods → CoA → mappings → activate
+
+---
+
 ## 2026-07-17 — Backend OpenAPI / API docs aligned to shipped routes
 
 ### Why

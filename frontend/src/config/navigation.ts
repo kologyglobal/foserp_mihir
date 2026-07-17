@@ -58,6 +58,8 @@ export type NavItem = {
   subNav?: boolean
   /** Section label for grouped master navigation */
   section?: string
+  /** Workspace tab dropdown group (e.g. Procurement, Warehouse) */
+  group?: string
 }
 
 export type NavCategory = {
@@ -182,22 +184,22 @@ export const moduleCategories: NavCategory[] = [
   },
   {
     id: 'purchase',
-    title: 'Purchase',
+    title: 'Procurement',
     items: [
       { label: 'Dashboard', path: '/purchase', icon: LayoutDashboard, end: true, workspace: true },
       { label: 'Approvals', path: '/purchase/approvals', icon: ShieldCheck },
-      { label: 'Requisitions (PR)', path: '/purchase/requisitions', icon: FileText },
-      { label: 'RFQs', path: '/purchase/rfqs', icon: ShoppingCart },
-      { label: 'Vendor Quotations', path: '/purchase/vendor-quotations', icon: Receipt },
-      { label: 'Quote Comparison', path: '/purchase/comparison', icon: SlidersHorizontal },
-      { label: 'Purchase Orders', path: '/purchase/orders', icon: Truck },
-      { label: 'Purchase Invoices', path: '/purchase/invoices', icon: Receipt },
-      { label: 'Gate Entry & GRN', path: '/purchase/grn', icon: PackageCheck },
-      { label: 'Purchase Returns', path: '/purchase/returns', icon: RotateCcw },
-      { label: 'Vendor Performance', path: '/purchase/vendor-performance', icon: TrendingUp },
+      { label: 'PR', path: '/purchase/requisitions', icon: FileText, group: 'Procurement' },
+      { label: 'RFQ', path: '/purchase/rfqs', icon: ShoppingCart, group: 'Procurement' },
+      { label: 'Quote Comparison', path: '/purchase/comparison', icon: SlidersHorizontal, group: 'Procurement' },
+      { label: 'PO', path: '/purchase/orders', icon: Truck, group: 'Procurement' },
+      { label: 'GRN', path: '/purchase/grn', icon: PackageCheck, group: 'Warehouse' },
+      { label: 'Purchase Return', path: '/purchase/returns', icon: RotateCcw, group: 'Warehouse' },
+      { label: 'Purchase Invoice', path: '/purchase/invoices', icon: Receipt, group: 'Accounts' },
+      { label: 'Vendor Quotation', path: '/purchase/vendor-quotations', icon: Receipt, group: 'Vendors' },
+      { label: 'Vendor Performance', path: '/purchase/vendor-performance', icon: TrendingUp, group: 'Vendors' },
       { label: 'Reports', path: '/purchase/reports', icon: BarChart3 },
-      { label: 'Setup', path: '/purchase/setup', icon: Settings2 },
       { label: 'Masters', path: '/purchase/masters', icon: Settings2 },
+      { label: 'Setup', path: '/purchase/setup', icon: Settings2 },
     ],
   },
   {
@@ -205,11 +207,11 @@ export const moduleCategories: NavCategory[] = [
     title: 'Manufacturing',
     items: [
       { label: 'Control Room', path: '/manufacturing/control-room', icon: LayoutDashboard, end: true, workspace: true },
-      { label: 'Work Orders', path: '/manufacturing/work-orders', icon: Wrench },
       { label: 'Shopfloor', path: '/manufacturing/shopfloor', icon: Factory },
-      { label: 'Production Plan', path: '/manufacturing/production-plan', icon: ClipboardList },
       { label: 'BOM', path: '/manufacturing/bom', icon: Layers },
       { label: 'Routes', path: '/manufacturing/routes', icon: GitBranch },
+      { label: 'Production Plan', path: '/manufacturing/production-plan', icon: ClipboardList },
+      { label: 'Work Orders', path: '/manufacturing/work-orders', icon: Wrench },
       { label: 'Job Work', path: '/manufacturing/job-work', icon: Truck },
       { label: 'Reports', path: '/manufacturing/reports', icon: BarChart3 },
       { label: 'Settings', path: '/manufacturing/settings', icon: Settings2 },
@@ -314,7 +316,7 @@ export const moduleCategories: NavCategory[] = [
         subNav: false as const,
       })),
       { label: 'Period Close', path: '/accounting/period-close', icon: CalendarCheck },
-      { label: 'Setup', path: '/accounting/setup', icon: Settings2 },
+      { label: 'Setup', path: '/accounting/settings', icon: Settings2 },
     ],
   },
   {

@@ -6,9 +6,8 @@ function LegacyReceivablesCustomerRedirect() {
   const { partyId } = useParams()
   return <Navigate to={partyId ? `/accounting/receivables/customer/${partyId}` : '/accounting/receivables/outstanding'} replace />
 }
-import { AccountingDashboardPage } from '@/modules/accounting/AccountingDashboardPage'
 import { CommercialCommitmentsPage } from '@/modules/accounting/CommercialCommitmentsPage'
-import { AccountingPlaceholderPage } from '@/modules/accounting/AccountingPlaceholderPage'
+import { AccountingDashboardPage } from '@/modules/accounting/AccountingDashboardPage'
 import { ChartOfAccountsPage } from '@/modules/accounting/ChartOfAccountsPage'
 import { AccountCardPage } from '@/modules/accounting/AccountCardPage'
 import { VouchersRegisterPage } from '@/modules/accounting/VouchersRegisterPage'
@@ -190,6 +189,20 @@ import { ManufacturingProductCostSheetPage } from '@/modules/accounting/Manufact
 import { ManufacturingProductionLedgerPage } from '@/modules/accounting/ManufacturingProductionLedgerPage'
 import { ManufacturingCostingReportsPage } from '@/modules/accounting/ManufacturingCostingReportsPage'
 import { ManufacturingCostingSetupPage } from '@/modules/accounting/ManufacturingCostingSetupPage'
+import {
+  ApprovalRulesPage,
+  BranchesPage,
+  ChartOfAccountsSetupPage,
+  CostCentresPage,
+  DefaultMappingsPage,
+  FeaturesPage,
+  FinanceSettingsOverviewPage,
+  FinanceSetupWizardPage,
+  FinancialYearsPage,
+  LegalEntitiesPage,
+  NumberSeriesPage,
+  PeriodsPage,
+} from '@/modules/accounting/settings'
 
 /**
  * Accounting module routes — demo/UI-only (no backend posting engine).
@@ -396,14 +409,19 @@ export const accountingRouteChildren: RouteObject[] = [
   { path: 'accounting/period-close/reports', element: <CloseReportsPage /> },
   { path: 'accounting/period-close/setup', element: <CloseSetupPage /> },
 
-  {
-    path: 'accounting/setup',
-    element: (
-      <AccountingPlaceholderPage
-        title="Accounting Setup"
-        breadcrumbLabel="Setup"
-        description="Posting setup rules, accounting dimensions and fiscal period configuration."
-      />
-    ),
-  },
+  { path: 'accounting/setup', element: <Navigate to="/accounting/settings" replace /> },
+
+  /** Finance settings — Phase 1C setup workspace */
+  { path: 'accounting/settings', element: <FinanceSettingsOverviewPage /> },
+  { path: 'accounting/settings/setup', element: <FinanceSetupWizardPage /> },
+  { path: 'accounting/settings/legal-entities', element: <LegalEntitiesPage /> },
+  { path: 'accounting/settings/branches', element: <BranchesPage /> },
+  { path: 'accounting/settings/financial-years', element: <FinancialYearsPage /> },
+  { path: 'accounting/settings/periods', element: <PeriodsPage /> },
+  { path: 'accounting/settings/chart-of-accounts', element: <ChartOfAccountsSetupPage /> },
+  { path: 'accounting/settings/default-mappings', element: <DefaultMappingsPage /> },
+  { path: 'accounting/settings/number-series', element: <NumberSeriesPage /> },
+  { path: 'accounting/settings/cost-centres', element: <CostCentresPage /> },
+  { path: 'accounting/settings/approval-rules', element: <ApprovalRulesPage /> },
+  { path: 'accounting/settings/features', element: <FeaturesPage /> },
 ]
