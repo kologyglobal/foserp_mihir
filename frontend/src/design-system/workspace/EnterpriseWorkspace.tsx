@@ -67,6 +67,7 @@ export function EnterpriseWorkspace({
   statusStrip,
   insights,
   workspaceRecordHeader = false,
+  backLink,
 }: EnterpriseWorkspaceProps) {
   const { pathname } = useLocation()
   const useCollapsibleFactBox = Boolean(factBox && collapsibleFactBox)
@@ -206,6 +207,7 @@ export function EnterpriseWorkspace({
       onSaveCloseShortcut={onSaveCloseShortcut}
       onSaveAndNewShortcut={onSaveAndNewShortcut}
       workspaceRecordHeader={workspaceRecordHeader}
+      backLink={backLink}
       className={cn(
         'enterprise-workspace',
         headerInFactbox && 'enterprise-workspace--record-in-factbox',

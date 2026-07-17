@@ -156,6 +156,8 @@ export interface EnterpriseWorkspaceProps {
   suppressFactBoxRecord?: boolean
   /** Hide chrome title/fav — commandBar is the sticky record header */
   workspaceRecordHeader?: boolean
+  /** View/detail back — top of workspace header */
+  backLink?: { to: string; label: string }
   /** Optional tab strip (purchase PO, legacy CRM edit flows) */
   tabs?: ErpCardTab[]
   activeTab?: string

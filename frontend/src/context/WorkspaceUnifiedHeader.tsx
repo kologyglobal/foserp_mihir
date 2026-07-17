@@ -3,6 +3,7 @@ import { Star } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { CrmPageTip } from '../components/crm/CrmPageTip'
 import { Breadcrumbs } from '../components/ui/Breadcrumbs'
+import { PageBackLink } from '../components/ui/PageBackLink'
 import { getPageLabel } from '../utils/pageNavigation'
 import { isCrmPath } from '../utils/crmPageTipStorage'
 import { useUIStore } from '../store/uiStore'
@@ -40,6 +41,11 @@ export function WorkspaceUnifiedHeader({
 
   return (
     <div className="d365-workspace-unified-header">
+      {meta.backLink ? (
+        <div className="d365-workspace-unified-back">
+          <PageBackLink to={meta.backLink.to} label={meta.backLink.label} />
+        </div>
+      ) : null}
       <div
         className={cn(
           'd365-workspace-unified-head',
