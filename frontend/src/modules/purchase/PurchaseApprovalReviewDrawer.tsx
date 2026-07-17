@@ -121,9 +121,10 @@ export function PurchaseApprovalReviewDrawer({
       width="lg"
       footer={
         canAct ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <ErpButton
               type="button"
+              size="sm"
               variant="success"
               icon={CheckCircle}
               disabled={busy}
@@ -133,6 +134,7 @@ export function PurchaseApprovalReviewDrawer({
             </ErpButton>
             <ErpButton
               type="button"
+              size="sm"
               variant="danger"
               icon={XCircle}
               disabled={busy}
@@ -142,6 +144,7 @@ export function PurchaseApprovalReviewDrawer({
             </ErpButton>
             <ErpButton
               type="button"
+              size="sm"
               variant="secondary"
               icon={CornerDownLeft}
               disabled={busy}
@@ -309,13 +312,14 @@ export function PurchaseApprovalReviewDrawer({
                   placeholder="Required for Reject and Send Back"
                 />
               </section>
-              <section className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
-                <div>
-                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
-                    Delegate to
-                  </label>
+              <section>
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
+                  Delegate to
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
                   <Select
                     native
+                    className="min-w-0 flex-1 sm:max-w-[14rem]"
                     value={delegateRole}
                     onChange={(e) => setDelegateRole(e.target.value as PurchaseApprovalRole)}
                     aria-label="Delegate to approver"
@@ -326,19 +330,20 @@ export function PurchaseApprovalReviewDrawer({
                       </option>
                     ))}
                   </Select>
-                  <p className="mt-1 text-[11px] text-erp-muted">
-                    Approvers from Purchase Setup matrix (demo users).
-                  </p>
+                  <ErpButton
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    icon={Forward}
+                    disabled={busy}
+                    onClick={() => void runAction('delegate')}
+                  >
+                    Delegate
+                  </ErpButton>
                 </div>
-                <ErpButton
-                  type="button"
-                  variant="outline"
-                  icon={Forward}
-                  disabled={busy}
-                  onClick={() => void runAction('delegate')}
-                >
-                  Delegate
-                </ErpButton>
+                <p className="mt-1 text-[11px] text-erp-muted">
+                  Approvers from Purchase Setup matrix (demo users).
+                </p>
               </section>
             </>
           ) : null}
