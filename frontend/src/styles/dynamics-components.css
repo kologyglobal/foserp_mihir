@@ -11915,16 +11915,53 @@ a.crm-companies-table__name:hover {
   width: 100%;
 }
 
-/* Sticky footer — same content width as Purpose / sections (no side bleed mismatch) */
+/*
+ * Sticky form footer — pin via flex height chain (not CSS sticky alone).
+ *
+ * Workspace content is the outer scroller. If the page/form grow with content,
+ * the footer sits below the fold and `position: sticky` never brings it on-screen
+ * (sticky only resists scrolling away; it does not pull distant end content up).
+ * When a sticky footer is present, lock the workspace height and scroll the
+ * form body instead so Cancel/Save stay visible.
+ */
+.d365-workspace-content:has(.erp-card-form-page__footer-sticky) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 0.5rem;
+}
+
+.d365-workspace-content:has(.erp-card-form-page__footer-sticky) > .erp-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  gap: 0.75rem;
+}
+
+/* Neutralize .erp-page space-y margins — they fight flex height fill */
+.d365-workspace-content:has(.erp-card-form-page__footer-sticky) > .erp-page > * + * {
+  margin-top: 0;
+}
+
+.d365-workspace-content:has(.erp-card-form-page__footer-sticky) .erp-card-form-page__form {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .erp-card-form-page__footer-sticky {
-  position: sticky;
-  bottom: 0;
+  position: relative;
   z-index: 30;
-  margin: 12px 0 0;
+  flex-shrink: 0;
+  margin: 8px 0 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-height: 3.25rem;
+  min-height: 2.75rem;
   padding: 0.5rem 0;
   background: #fff;
   border-top: 1px solid #edebe9;
@@ -11944,11 +11981,11 @@ a.crm-companies-table__name:hover {
 }
 
 .erp-card-form-page__body--sticky-footer {
-  padding-bottom: 0.5rem;
-}
-
-.d365-workspace-content:has(.erp-card-form-page__footer-sticky) {
-  padding-bottom: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.75rem;
 }
 
 .erp-form-status-strip {

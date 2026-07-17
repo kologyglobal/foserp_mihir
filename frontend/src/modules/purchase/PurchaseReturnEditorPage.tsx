@@ -21,7 +21,7 @@ import {
 } from '@/components/purchase/PurchaseDocumentFactBox'
 import { ErpCardSection, ErpFieldRow, ErpFormSpan, ErpStickySaveBar } from '@/components/erp/card-form'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { ErpButton } from '@/components/erp/ErpButton'
+import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
 import { Checkbox, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -613,12 +613,28 @@ export function PurchaseReturnEditorPage() {
       footer={
         <ErpStickySaveBar
           sticky
-          onSave={() => void saveDraft(false)}
-          submitLabel={saving ? 'Saving…' : 'Save'}
           isSubmitting={saving}
-          submitDisabled={!editable || saving}
-          cancelLabel="Cancel"
-          onCancel={() => navigate(recordId ? `/purchase/returns/${recordId}` : '/purchase/returns')}
+          actions={
+            <ErpButtonGroup>
+              <ErpButton
+                type="button"
+                variant="ghost"
+                disabled={saving}
+                onClick={() => navigate('/purchase/returns')}
+              >
+                Cancel
+              </ErpButton>
+              <ErpButton
+                type="button"
+                variant="secondary"
+                icon={Save}
+                disabled={!editable || saving}
+                onClick={() => void saveDraft(false)}
+              >
+                {saving ? 'Saving…' : 'Save Draft'}
+              </ErpButton>
+            </ErpButtonGroup>
+          }
         />
       }
       onSaveShortcut={() => void saveDraft(false)}
