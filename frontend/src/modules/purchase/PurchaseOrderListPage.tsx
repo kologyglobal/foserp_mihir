@@ -27,10 +27,7 @@ import {
   type PoListFilters,
   type PoSortKey,
 } from '../../config/poFilterConfig'
-import {
-  buildPoRegisterKpiItems,
-  PO_RELEASED_OR_LATER_STATUSES,
-} from '../../utils/poKpiItems'
+import { PO_RELEASED_OR_LATER_STATUSES } from '../../utils/poKpiItems'
 import {
   buildPoRegisterOverview,
   buildPoRegisterSuggestions,
@@ -201,16 +198,6 @@ export function PurchaseOrderListPage() {
     chipLabelResolver: (key, value) => poFilterChipLabelResolver(key, value),
   })
 
-  const summary = useMemo(() => {
-    const draft = rows.filter((r) => r.status === 'draft').length
-    const pendingApproval = rows.filter((r) => r.status === 'pending_approval').length
-    const releasedOrLater = rows.filter((r) =>
-      (PO_RELEASED_OR_LATER_STATUSES as readonly string[]).includes(r.status),
-    ).length
-    const totalValue = rows.reduce((s, r) => s + r.totalAmount, 0)
-    return { draft, pendingApproval, releasedOrLater, totalValue }
-  }, [rows])
-
   const filtered = useMemo(() => {
     let list = [...rows]
     const q = filters.search.trim().toLowerCase()
@@ -262,14 +249,6 @@ export function PurchaseOrderListPage() {
     }
     return sortPoRows(list, sortBy)
   }, [rows, filters, sortBy])
-
-  const poKpiStrip = useMemo(
-    () =>
-      buildPoRegisterKpiItems(rows, summary, filters.status, (status) =>
-        setFilters((f) => ({ ...f, status })),
-      ),
-    [rows, summary, filters.status],
-  )
 
   const applyStatusFilter = useCallback((status: string) => {
     setFilters((f) => ({ ...f, status }))
@@ -487,7 +466,6 @@ export function PurchaseOrderListPage() {
             ]}
           />
         }
-        kpiStrip={poKpiStrip}
       >
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
           <div className="min-w-0 space-y-3">

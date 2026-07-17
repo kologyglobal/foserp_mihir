@@ -207,19 +207,6 @@ export function PurchaseReturnListPage() {
     breadcrumbs: purchaseBreadcrumbs('Returns'),
     favoritePath: '/purchase/returns',
     pageGuide: null,
-    insights: [
-      { label: 'Returns', value: rows.length, accent: 'blue' as const },
-      {
-        label: 'Draft',
-        value: rows.filter((r) => r.status === 'draft').length,
-        accent: 'slate' as const,
-      },
-      {
-        label: 'Posted',
-        value: rows.filter((r) => r.status === 'posted').length,
-        accent: 'green' as const,
-      },
-    ],
   }
 
   const commandBar = (
