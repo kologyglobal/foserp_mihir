@@ -4,6 +4,8 @@ export class AppError extends Error {
     message: string,
     public readonly code?: string,
     public readonly errors?: Array<{ field: string; message: string }>,
+    /** Extra payload fields (e.g. `missingFields` for stage gates). */
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message)
     this.name = this.constructor.name

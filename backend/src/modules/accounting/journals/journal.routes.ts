@@ -91,5 +91,17 @@ router.post(
   validateBody(rejectSchema),
   approvalController.rejectJournal,
 )
+router.post(
+  '/:id/post',
+  validateParams(uuidParamSchema),
+  requirePermission('finance.voucher.post'),
+  controller.postJournal,
+)
+router.get(
+  '/:id/ledger',
+  validateParams(uuidParamSchema),
+  requireAnyPermission('finance.gl.view', 'finance.voucher.view'),
+  controller.getJournalLedger,
+)
 
 export default router

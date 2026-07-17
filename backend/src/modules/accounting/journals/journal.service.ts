@@ -8,6 +8,7 @@ import {
   submitJournalWithoutApproval,
 } from '../approvals/approval-request.service.js'
 import { resolveJournalWorkflowActions } from '../approvals/approval.allowed-actions.js'
+import { canPostJournal, countLedgerEntries, findPostingEventIdForJournal } from './journal-posting.service.js'
 import type {
   CreateJournalInput,
   CancelJournalInput,
@@ -67,12 +68,27 @@ async function buildAllowedActions(req: Request, journal: JournalWithLines): Pro
     approve: workflow.approve,
     reject: workflow.reject,
     sendBack: workflow.sendBack,
-    post: false,
+    post:
+      journal.status === 'APPROVED' &&
+      !journal.voucherNumber &&
+      hasPerm(req, 'finance.voucher.post') &&
+      (await canPostJournal(req, journal)),
     reverse: false,
   }
 }
 
 async function serializeJournal(journal: JournalWithLines, req?: Request): Promise<JournalDetailDto> {
+  const postedExtras =
+    journal.status === 'POSTED'
+      ? {
+          postedAt: journal.postedAt?.toISOString() ?? null,
+          postedBy: journal.postedBy,
+          postingEventId: await findPostingEventIdForJournal(journal.tenantId, journal.id),
+          ledgerEntryCount: await countLedgerEntries(journal.tenantId, journal.id),
+          generalLedgerLink: `/accounting/entries/journals/${journal.id}#ledger`,
+        }
+      : {}
+
   return {
     id: journal.id,
     tenantId: journal.tenantId,
@@ -104,6 +120,7 @@ async function serializeJournal(journal: JournalWithLines, req?: Request): Promi
     createdAt: journal.createdAt.toISOString(),
     updatedAt: journal.updatedAt.toISOString(),
     lines: journal.lines.map(serializeLine),
+    ...postedExtras,
     allowedActions: req
       ? await buildAllowedActions(req, journal)
       : {

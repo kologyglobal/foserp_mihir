@@ -310,10 +310,10 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Field | Value |
 |-------|-------|
 | Module | Accounting |
-| Description | **Finance Settings Phase 1** + **Phase 2C1 manual journals** + **Phase 2C2A journal approvals** (`/accounting/entries/journals`, `/accounting/entries/approvals`, APIs). Remaining operational Accounting FE (legacy vouchers demo, AR/AP, bank, etc.) still mock until document hooks. |
-| Next step | Phase **2C2B**: post approved journals to GL via posting engine; receipt/payment module hooks. Phase 2C2A approvals shipped 2026-07-17. |
-| Test required | Finance tests 52/52 (`tests/finance/`) |
-| Status | partial (setup 1 + ledger 2A + posting 2B + journals 2C1 + **approvals 2C2A** done; post-to-GL + document hooks open) |
+| Description | **Finance Settings Phase 1** + **Phase 2C1 manual journals** + **Phase 2C2A journal approvals** + **Phase 2C2B journal posting** (`/accounting/entries/journals`, post + ledger). Remaining operational Accounting FE (legacy vouchers demo, AR/AP, bank, etc.) still mock until document hooks. |
+| Next step | Phase **2C3**: journal reversal workflow; receipt/payment module hooks. Phase 2C2B posting shipped 2026-07-17. |
+| Test required | Finance tests 59/59 (`tests/finance/`) |
+| Status | partial (setup 1 + ledger 2A + posting 2B + journals 2C1 + approvals 2C2A + **posting 2C2B** done; reversal + document hooks open) |
 
 ### P3-6: Commercial terms single source
 

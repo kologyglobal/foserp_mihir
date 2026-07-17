@@ -33,6 +33,10 @@ export async function beginIdempotentPosting(
       return { event: existing, idempotentReplay: true, isRetry: false }
     }
     if (IN_PROGRESS_STATUSES.has(existing.status)) {
+      const refreshed = await postingEventRepo.findByEventKey(tenantId, request.legalEntityId, request.eventKey)
+      if (refreshed?.status === 'POSTED' && refreshed.voucherId) {
+        return { event: refreshed, idempotentReplay: true, isRetry: false }
+      }
       throw new PostingError('POSTING_EVENT_IN_PROGRESS', 'A posting with this event key is already in progress')
     }
     if (existing.status === 'FAILED') {

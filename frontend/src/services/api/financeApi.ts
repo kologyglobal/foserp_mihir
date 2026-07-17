@@ -431,3 +431,40 @@ export async function rejectJournal(journalId: string, comments: string) {
     body: JSON.stringify({ comments }),
   })
 }
+
+export interface JournalPostResponse {
+  journal: Journal
+  posting: {
+    success: boolean
+    idempotentReplay: boolean
+    postingEventId: string
+    voucherId: string
+    voucherNumber: string
+    voucherStatus: 'POSTED'
+    postingDate: string
+    totalDebit: string
+    totalCredit: string
+    ledgerEntryCount: number
+    status: string
+  }
+}
+
+export interface JournalLedgerEntry {
+  id: string
+  voucherId: string
+  voucherLineId: string | null
+  lineNumber: number
+  accountId: string
+  debitAmount: string
+  creditAmount: string
+  postingDate: string
+  voucherNumber: string
+}
+
+export async function postJournal(id: string) {
+  return apiRequest<JournalPostResponse>(tenantPath(`/accounting/journals/${id}/post`), { method: 'POST' })
+}
+
+export async function getJournalLedger(id: string) {
+  return apiRequest<JournalLedgerEntry[]>(tenantPath(`/accounting/journals/${id}/ledger`))
+}

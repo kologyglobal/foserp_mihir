@@ -53,6 +53,7 @@ Two equivalent mounts (same router, `mergeParams: true`):
 | `/t/:tenantSlug/users` | User CRUD + role assignment |
 | `/t/:tenantSlug/roles` | Role CRUD + permissions |
 | `/t/:tenantSlug/crm/*` | Full CRM module |
+| `/t/:tenantSlug/accounting/*` | Finance setup + journals + approvals (see below) |
 | `/t/:tenantSlug/masters/*` | Generic master CRUD |
 | `/t/:tenantSlug/masters/items` | Item CRUD + import |
 | `/t/:tenantSlug/masters/vendors` | Vendor CRUD + import |
@@ -152,6 +153,58 @@ Vendors: `/masters/vendors` — dedicated controller.
 Master CSV import: `/masters/imports/{items|vendors|hsn-sac}` (+ `/template` GET).  
 Master CSV export: `/masters/exports/{items|vendors|hsn-sac}`.
 
+## Accounting routes (`/accounting`)
+
+Prefix: **`/api/v1/t/:tenantSlug/accounting`**. Auth + tenant context required. Never send `tenantId` in bodies.
+
+Live OpenAPI: `/api/docs` (tags **Accounting Journals**, **Accounting Approvals**, **Accounting Vouchers**, **Accounting Posting Events**).
+
+### Manual journals (`/journals`)
+
+| Method | Path | Permission | Notes |
+|--------|------|------------|-------|
+| GET | `/journals` | `finance.voucher.view` | Requires `legalEntityId`; optional `status`, date range, pagination |
+| POST | `/journals` | `finance.voucher.create` | Create DRAFT voucher + lines (no number, no GL) |
+| GET | `/journals/:id` | `finance.voucher.view` | Detail + `allowedActions` |
+| PUT | `/journals/:id` | `finance.voucher.edit` | DRAFT / SENT_BACK only |
+| POST | `/journals/:id/validate` | `finance.voucher.view` | Validation report + approval requirement |
+| POST | `/journals/:id/submit` | `finance.voucher.submit` | → `PENDING_APPROVAL` or `APPROVED`; no GL |
+| POST | `/journals/:id/cancel` | `finance.voucher.cancel` | Body `{ cancellationReason }` |
+| GET | `/journals/:id/audit` | `finance.audit.view` | Audit trail |
+| GET | `/journals/:id/approvals` | view / approve / audit | Approval timeline (all cycles) |
+| POST | `/journals/:id/approve` | `finance.voucher.approve` | Optional `{ comments }`; maker-checker |
+| POST | `/journals/:id/send-back` | `finance.voucher.approve` | Required `{ comments }` → SENT_BACK |
+| POST | `/journals/:id/reject` | `finance.voucher.approve` | Required `{ comments }` → REJECTED |
+| POST | `/journals/:id/post` | `finance.voucher.post` | Post **existing** approved journal to GL (2C2B) |
+| GET | `/journals/:id/ledger` | `finance.gl.view` \| `finance.voucher.view` | Read-only GL rows |
+
+**Post response (`POST …/post`):** `{ journal, posting }` where `posting` includes `voucherNumber`, `postingEventId`, `idempotentReplay`, `ledgerEntryCount`.  
+Idempotent event key: `MANUAL_JOURNAL_POST:{voucherId}:V1`. Does **not** create a second voucher.
+
+**Status flow:** `DRAFT` → submit → `PENDING_APPROVAL` / `APPROVED` → (approve levels) → `APPROVED` → post → `POSTED`.  
+Send-back → `SENT_BACK` (editable, resubmit creates new approval cycle). Reject → `REJECTED` (read-only).
+
+**Not exposed:** `POST /accounting/postings`, `POST /accounting/vouchers/:id/post`, reverse workflow.
+
+### Approval inbox (`/approvals`)
+
+| Method | Path | Permission | Notes |
+|--------|------|------------|-------|
+| GET | `/approvals` | approve / view / audit | Query `legalEntityId` + `view=my_pending\|submitted_by_me\|completed_by_me\|all` |
+| GET | `/approvals/:id` | approve / view / audit | Request + steps + `allowedActions` |
+
+`view=all` requires broader finance management (`finance.settings.manage` / `tenant.manage`).
+
+### Read-only ledger surfaces
+
+| Method | Path | Permission |
+|--------|------|------------|
+| GET | `/vouchers/:id` | `finance.voucher.view` |
+| GET | `/vouchers/:id/ledger` | `finance.gl.view` |
+| GET | `/posting-events/:id` | `finance.posting_event.view` |
+
+Finance setup (legal entities, branches, FY, periods, COA, settings, number series, approval **rules** config) lives under the same `/accounting` prefix — see Swagger and finance module routes.
+
 ## Response format
 
 ### Success
@@ -231,6 +284,9 @@ Do not change protected lifecycle fields through generic PATCH. Use dedicated en
 | Quotation doc | `POST …/documents/:docId/mark-sent` | Mark sent |
 | Quotation | `POST /quotations/:id/convert-to-sales-order` | Create sales order (convert-only) |
 | Quotation template | `POST /quotation-templates/:id/duplicate` | Duplicate |
+| Journal | `POST /accounting/journals/:id/submit` | Submit draft (approval or auto-approve) |
+| Journal | `POST /accounting/journals/:id/approve` \| `send-back` \| `reject` | Approval decisions |
+| Journal | `POST /accounting/journals/:id/post` | Post approved journal to GL |
 | Master | `POST /masters/:resource/:id/activate` | Activate |
 | Master | `POST /masters/:resource/:id/deactivate` | Deactivate |
 

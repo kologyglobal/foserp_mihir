@@ -1,7 +1,7 @@
 /**
  * OpenAPI 3.0 spec for Swagger UI at `/api/docs` (development).
  * Keep in sync with route modules under `src/modules/`.
- * Last aligned: 2026-07-17 — Users/Roles CRUD, CRM lifecycle/imports, master import/export, lookups.
+ * Last aligned: 2026-07-17 — Accounting journals (2C1–2C2B), approvals (2C2A), read-only vouchers/GL/posting-events.
  */
 
 const tenantIdParam = {
@@ -271,21 +271,24 @@ export const swaggerSpec = {
   openapi: '3.0.3',
   info: {
     title: 'FOS ERP API',
-    version: '1.2.0',
+    version: '1.3.0',
     description: [
-      'Multi-tenant ERP backend — Auth, RBAC, CRM (companies → sales orders), masters, lookups, imports/exports.',
+      'Multi-tenant ERP backend — Auth, RBAC, CRM (companies → sales orders), masters, lookups, imports/exports, finance setup + journals.',
       '',
       '**Tenant routes:** prefer `/api/v1/t/{tenantSlug}/…` (frontend default). Equivalent UUID form: `/api/v1/tenants/{tenantId}/…`.',
       '',
       '**Auth:** `Authorization: Bearer <accessToken>`. Never send `tenantId` in request bodies.',
       '',
       '**Shipped (API):** Auth, users/roles, CRM core + quotations/templates/sales orders, CRM masters, entity notes/attachments,',
-      'dashboard/forecast/reports/search/exports, master registry + items/vendors, CRM & master CSV import/export, lookups.',
+      'dashboard/forecast/reports/search/exports, master registry + items/vendors, CRM & master CSV import/export, lookups,',
+      'finance setup (legal entities, periods, COA, settings), manual journals (draft → approve → post to GL), approval inbox.',
       '',
-      '**Deferred:** Purchase, inventory, production, quality, finance backends (demo frontend only).',
+      '**Accounting note:** Journal `POST …/journals/{id}/post` posts the **existing** approved voucher (no second voucher).',
+      'There is no public generic `POST /accounting/postings` endpoint. Reversal is not shipped (Phase 2C3).',
       '',
-      '**Aligned:** 2026-07-17 — OpenAPI 1.2.0 fills Users/Roles detail, CRM lifecycle/history/imports, CRM master row CRUD,',
-      'entity note/attachment delete, master import/export, dedicated item/vendor lookups.',
+      '**Deferred:** Purchase, inventory, production, quality, AR/AP, bank, journal reversal.',
+      '',
+      '**Aligned:** 2026-07-17 — OpenAPI 1.3.0 adds Accounting Journals / Approvals / Vouchers / Posting Events.',
     ].join('\n'),
   },
   servers: [{ url: '/api/v1', description: 'API v1' }],
@@ -315,6 +318,10 @@ export const swaggerSpec = {
     { name: 'Master Imports' },
     { name: 'Master Exports' },
     { name: 'Lookups' },
+    { name: 'Accounting Journals' },
+    { name: 'Accounting Approvals' },
+    { name: 'Accounting Vouchers' },
+    { name: 'Accounting Posting Events' },
   ],
   components: {
     securitySchemes: {
@@ -1306,6 +1313,317 @@ export const swaggerSpec = {
         summary: 'Vendor dropdown lookup',
         parameters: [tenantSlugParam],
         responses: { 200: { description: 'Vendor lookup rows' } },
+      },
+    },
+
+    // ─── Accounting — Manual journals (Phases 2C1–2C2B) ─────────────────────
+    '/t/{tenantSlug}/accounting/journals': {
+      get: {
+        tags: ['Accounting Journals'],
+        summary: 'List manual journals',
+        description: 'Permission: `finance.voucher.view`. Requires `legalEntityId` query.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'legalEntityId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },
+          {
+            name: 'status',
+            in: 'query',
+            schema: {
+              type: 'string',
+              enum: ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'POSTED', 'SENT_BACK', 'REJECTED', 'REVERSED', 'CANCELLED'],
+            },
+          },
+          { name: 'postingDateFrom', in: 'query', schema: { type: 'string', format: 'date' } },
+          { name: 'postingDateTo', in: 'query', schema: { type: 'string', format: 'date' } },
+          { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 20 } },
+        ],
+        responses: { 200: { description: 'Paginated journal list' } },
+      },
+      post: {
+        tags: ['Accounting Journals'],
+        summary: 'Create journal draft',
+        description: 'Permission: `finance.voucher.create`. Creates DRAFT AccountingVoucher + lines (no voucher number, no GL).',
+        parameters: [tenantSlugParam],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['legalEntityId', 'documentDate', 'postingDate', 'lines'],
+                properties: {
+                  legalEntityId: { type: 'string', format: 'uuid' },
+                  branchId: { type: 'string', format: 'uuid', nullable: true },
+                  documentDate: { type: 'string', format: 'date' },
+                  postingDate: { type: 'string', format: 'date' },
+                  referenceNumber: { type: 'string', nullable: true },
+                  narration: { type: 'string', nullable: true },
+                  currencyCode: { type: 'string', example: 'INR' },
+                  lines: {
+                    type: 'array',
+                    minItems: 2,
+                    items: {
+                      type: 'object',
+                      required: ['accountId'],
+                      properties: {
+                        accountId: { type: 'string', format: 'uuid' },
+                        debitAmount: { type: 'string', example: '1000.0000' },
+                        creditAmount: { type: 'string', example: '0' },
+                        lineNarration: { type: 'string', nullable: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: { 201: { description: 'Journal draft created' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/journals/{id}': {
+      get: {
+        tags: ['Accounting Journals'],
+        summary: 'Get journal detail',
+        description: 'Permission: `finance.voucher.view`. Includes `allowedActions` (server-calculated).',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Journal with lines + allowedActions' } },
+      },
+      put: {
+        tags: ['Accounting Journals'],
+        summary: 'Update journal draft',
+        description: 'Permission: `finance.voucher.edit`. Editable when status is DRAFT or SENT_BACK.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Journal updated' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/journals/{id}/validate': {
+      post: {
+        tags: ['Accounting Journals'],
+        summary: 'Validate journal',
+        description: 'Permission: `finance.voucher.view`. Returns validation report + approval requirement.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Validation report' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/journals/{id}/submit': {
+      post: {
+        tags: ['Accounting Journals'],
+        summary: 'Submit journal',
+        description:
+          'Permission: `finance.voucher.submit`. → PENDING_APPROVAL (creates FinanceApprovalRequest) or APPROVED when approval not required. Does not post to GL.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Journal submitted' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/journals/{id}/cancel': {
+      post: {
+        tags: ['Accounting Journals'],
+        summary: 'Cancel journal',
+        description: 'Permission: `finance.voucher.cancel`. Body: `{ cancellationReason }`.',
+        parameters: [tenantSlugParam, idParam],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['cancellationReason'],
+                properties: { cancellationReason: { type: 'string', minLength: 1, maxLength: 500 } },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'Journal cancelled' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/journals/{id}/audit': {
+      get: {
+        tags: ['Accounting Journals'],
+        summary: 'Journal audit trail',
+        description: 'Permission: `finance.audit.view`.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Audit log entries' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/journals/{id}/approvals': {
+      get: {
+        tags: ['Accounting Journals'],
+        summary: 'Journal approval timeline',
+        description: 'Permission: `finance.voucher.view` | `finance.voucher.approve` | `finance.audit.view`. All cycles preserved.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Approval cycles + steps' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/journals/{id}/approve': {
+      post: {
+        tags: ['Accounting Journals'],
+        summary: 'Approve journal (current level)',
+        description:
+          'Permission: `finance.voucher.approve`. Maker-checker enforced. Final level → APPROVED (no GL). Body comments optional.',
+        parameters: [tenantSlugParam, idParam],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: { comments: { type: 'string', maxLength: 1000 } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Journal after approval action' },
+          403: { description: 'SELF_APPROVAL_NOT_ALLOWED / not eligible' },
+          409: { description: 'APPROVAL_CONCURRENT_ACTION' },
+        },
+      },
+    },
+    '/t/{tenantSlug}/accounting/journals/{id}/send-back': {
+      post: {
+        tags: ['Accounting Journals'],
+        summary: 'Send journal back for correction',
+        description: 'Permission: `finance.voucher.approve`. Comments required. Status → SENT_BACK (editable).',
+        parameters: [tenantSlugParam, idParam],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['comments'],
+                properties: { comments: { type: 'string', minLength: 1, maxLength: 1000 } },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'Journal sent back' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/journals/{id}/reject': {
+      post: {
+        tags: ['Accounting Journals'],
+        summary: 'Reject journal',
+        description: 'Permission: `finance.voucher.approve`. Comments required. Status → REJECTED (read-only).',
+        parameters: [tenantSlugParam, idParam],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['comments'],
+                properties: { comments: { type: 'string', minLength: 1, maxLength: 1000 } },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'Journal rejected' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/journals/{id}/post': {
+      post: {
+        tags: ['Accounting Journals'],
+        summary: 'Post approved journal to General Ledger',
+        description: [
+          'Permission: `finance.voucher.post`.',
+          'Posts the **existing** approved AccountingVoucher (Phase 2C2B).',
+          'Does **not** create a second voucher or line set.',
+          'Reserves voucher number, inserts immutable GL rows, status → POSTED.',
+          'Idempotent via event key `MANUAL_JOURNAL_POST:{voucherId}:V1`.',
+          'No request body — all data loaded server-side from the journal.',
+        ].join(' '),
+        parameters: [tenantSlugParam, idParam],
+        responses: {
+          200: {
+            description:
+              '`{ journal, posting }` — journal detail + posting result (voucherNumber, postingEventId, idempotentReplay, ledgerEntryCount)',
+          },
+          403: { description: 'Missing finance.voucher.post' },
+          409: { description: 'JOURNAL_POSTING_IN_PROGRESS / concurrent / payload mismatch' },
+          422: { description: 'JOURNAL_NOT_APPROVED / period closed / validation failed' },
+        },
+      },
+    },
+    '/t/{tenantSlug}/accounting/journals/{id}/ledger': {
+      get: {
+        tags: ['Accounting Journals'],
+        summary: 'GL entries for posted journal',
+        description: 'Permission: `finance.gl.view` | `finance.voucher.view`. Read-only.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'General ledger entry rows' } },
+      },
+    },
+
+    // ─── Accounting — Approval inbox (Phase 2C2A) ───────────────────────────
+    '/t/{tenantSlug}/accounting/approvals': {
+      get: {
+        tags: ['Accounting Approvals'],
+        summary: 'List approval requests (inbox)',
+        description:
+          'Permission: `finance.voucher.approve` | `finance.voucher.view` | `finance.audit.view`. View `all` requires finance settings manage.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'legalEntityId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },
+          {
+            name: 'view',
+            in: 'query',
+            schema: {
+              type: 'string',
+              enum: ['my_pending', 'submitted_by_me', 'completed_by_me', 'all'],
+              default: 'my_pending',
+            },
+          },
+          {
+            name: 'status',
+            in: 'query',
+            schema: { type: 'string', enum: ['PENDING', 'APPROVED', 'SENT_BACK', 'REJECTED', 'CANCELLED'] },
+          },
+          { name: 'documentType', in: 'query', schema: { type: 'string', enum: ['JOURNAL'] } },
+          { name: 'search', in: 'query', schema: { type: 'string' } },
+          { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 20 } },
+        ],
+        responses: { 200: { description: 'Paginated approval requests' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/approvals/{id}': {
+      get: {
+        tags: ['Accounting Approvals'],
+        summary: 'Get approval request detail',
+        description: 'Permission: `finance.voucher.approve` | `finance.voucher.view` | `finance.audit.view`.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Approval request with steps + allowedActions' } },
+      },
+    },
+
+    // ─── Accounting — Read-only voucher / posting event ─────────────────────
+    '/t/{tenantSlug}/accounting/vouchers/{id}': {
+      get: {
+        tags: ['Accounting Vouchers'],
+        summary: 'Get accounting voucher (read-only)',
+        description: 'Permission: `finance.voucher.view`. No public post endpoint on vouchers.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Accounting voucher' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/vouchers/{id}/ledger': {
+      get: {
+        tags: ['Accounting Vouchers'],
+        summary: 'GL entries for voucher (read-only)',
+        description: 'Permission: `finance.gl.view`.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'General ledger entry rows' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/posting-events/{id}': {
+      get: {
+        tags: ['Accounting Posting Events'],
+        summary: 'Get posting event (read-only)',
+        description: 'Permission: `finance.posting_event.view`. No public create/post.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'PostingEvent' } },
       },
     },
   },

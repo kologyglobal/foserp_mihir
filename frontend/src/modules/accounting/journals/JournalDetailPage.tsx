@@ -14,6 +14,8 @@ import {
   cancelJournal,
   getJournal,
   getJournalAudit,
+  getJournalLedger,
+  postJournal,
   submitJournal,
   validateJournal,
 } from '@/services/bridges/journalApiBridge'
@@ -32,7 +34,9 @@ function statusMessage(status: Journal['status']) {
     case 'REJECTED':
       return 'Rejected by approver — read-only.'
     case 'APPROVED':
-      return 'Approved — ready for posting in Phase 2C2B (posting not available yet).'
+      return 'Approved — Ready to Post'
+    case 'POSTED':
+      return 'Posted to the general ledger — read-only.'
     default:
       return null
   }
@@ -51,6 +55,15 @@ export function JournalDetailPage() {
   const [showCancel, setShowCancel] = useState(false)
   const [decisionComments, setDecisionComments] = useState('')
   const [acting, setActing] = useState(false)
+  const [showPostConfirm, setShowPostConfirm] = useState(false)
+  const [ledgerRows, setLedgerRows] = useState<Array<{
+    id: string
+    lineNumber: number
+    accountId: string
+    debitAmount: string
+    creditAmount: string
+    voucherNumber?: string
+  }>>([])
 
   const load = useCallback(async () => {
     if (!id) return
@@ -59,6 +72,15 @@ export function JournalDetailPage() {
       const [j, a] = await Promise.all([getJournal(id), getJournalAudit(id)])
       setJournal(j)
       setAudit(a)
+      if (j.status === 'POSTED' && (perms.canViewGl || perms.canViewVouchers)) {
+        try {
+          setLedgerRows(await getJournalLedger(id))
+        } catch {
+          setLedgerRows([])
+        }
+      } else {
+        setLedgerRows([])
+      }
       if (j.status !== 'DRAFT' || j.approvalRequired) {
         try {
           setTimeline(await getJournalApprovals(id))
@@ -73,7 +95,7 @@ export function JournalDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, perms.canViewGl, perms.canViewVouchers])
 
   useEffect(() => {
     if (perms.canViewVouchers) void load()
@@ -167,6 +189,32 @@ export function JournalDetailPage() {
     }
   }
 
+  const runPost = async () => {
+    if (!id) return
+    setActing(true)
+    try {
+      const result = await postJournal(id)
+      setJournal(result.journal)
+      setShowPostConfirm(false)
+      notify.success(
+        result.posting.idempotentReplay
+          ? `Already posted as ${result.posting.voucherNumber}`
+          : `Posted as ${result.posting.voucherNumber}`,
+      )
+      void load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Post failed')
+    } finally {
+      setActing(false)
+    }
+  }
+
+  const statusLabel = (status: Journal['status']) => {
+    if (status === 'APPROVED') return 'Approved (Ready to Post)'
+    if (status === 'POSTED') return 'Posted'
+    return status.replace(/_/g, ' ')
+  }
+
   if (!perms.canViewVouchers) {
     return (
       <JournalsWorkspaceShell title="Journal">
@@ -189,7 +237,7 @@ export function JournalDetailPage() {
   return (
     <JournalsWorkspaceShell
       title={journal.referenceNumber ?? 'Journal'}
-      description={`Status: ${journal.status.replace(/_/g, ' ')} · Voucher number: ${journal.voucherNumber ?? 'Not assigned (no posting in 2C2A)'}`}
+      description={`Status: ${statusLabel(journal.status)} · Voucher number: ${journal.voucherNumber ?? 'Not assigned'}`}
       actions={
         <div className="flex flex-wrap gap-2">
           {actions?.edit && perms.canEditVoucher ? (
@@ -227,6 +275,11 @@ export function JournalDetailPage() {
               Cancel
             </ErpButton>
           ) : null}
+          {actions?.post && perms.canPostVoucher ? (
+            <ErpButton variant="primary" disabled={acting} onClick={() => setShowPostConfirm(true)}>
+              Post to GL
+            </ErpButton>
+          ) : null}
         </div>
       }
     >
@@ -241,6 +294,12 @@ export function JournalDetailPage() {
         <div><span className="text-erp-muted">Total debit</span><div className="font-medium tabular-nums">{journal.totalDebit}</div></div>
         <div><span className="text-erp-muted">Total credit</span><div className="font-medium tabular-nums">{journal.totalCredit}</div></div>
         <div><span className="text-erp-muted">Approval required</span><div className="font-medium">{journal.approvalRequired ? `Yes (level ${journal.currentApprovalLevel})` : 'No'}</div></div>
+        {journal.status === 'POSTED' ? (
+          <>
+            <div><span className="text-erp-muted">Posted at</span><div className="font-medium">{journal.postedAt ? new Date(journal.postedAt).toLocaleString() : '—'}</div></div>
+            <div><span className="text-erp-muted">Ledger entries</span><div className="font-medium">{journal.ledgerEntryCount ?? ledgerRows.length}</div></div>
+          </>
+        ) : null}
       </div>
 
       {journal.narration ? <p className="mb-4 text-[13px] text-erp-text">{journal.narration}</p> : null}
@@ -325,6 +384,51 @@ export function JournalDetailPage() {
         </div>
       ) : null}
 
+      {showPostConfirm ? (
+        <div className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-[13px] text-amber-950">
+          <div className="mb-2 font-medium">Confirm GL posting</div>
+          <p className="mb-2">
+            This will assign a voucher number and create immutable general ledger entries for debit{' '}
+            <span className="font-semibold tabular-nums">{journal.totalDebit}</span> and credit{' '}
+            <span className="font-semibold tabular-nums">{journal.totalCredit}</span>. Posted journals cannot be edited — only reversed in a later phase.
+          </p>
+          <div className="flex gap-2">
+            <ErpButton variant="secondary" onClick={() => setShowPostConfirm(false)}>Cancel</ErpButton>
+            <ErpButton variant="primary" disabled={acting} onClick={() => void runPost()}>Confirm post</ErpButton>
+          </div>
+        </div>
+      ) : null}
+
+      {journal.status === 'POSTED' && ledgerRows.length > 0 ? (
+        <div id="ledger" className="mb-4 rounded border border-erp-border p-3 text-[12px]">
+          <div className="mb-2 font-medium">Ledger entries</div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse">
+              <thead>
+                <tr className="border-b border-erp-border text-left text-erp-muted">
+                  <th className="px-2 py-2">#</th>
+                  <th className="px-2 py-2">Account</th>
+                  <th className="px-2 py-2 text-right">Debit</th>
+                  <th className="px-2 py-2 text-right">Credit</th>
+                  <th className="px-2 py-2">Voucher #</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ledgerRows.map((row) => (
+                  <tr key={row.id} className="border-b border-erp-border/70">
+                    <td className="px-2 py-2">{row.lineNumber}</td>
+                    <td className="px-2 py-2 font-mono text-[11px]">{row.accountId.slice(0, 8)}…</td>
+                    <td className="px-2 py-2 text-right tabular-nums">{row.debitAmount}</td>
+                    <td className="px-2 py-2 text-right tabular-nums">{row.creditAmount}</td>
+                    <td className="px-2 py-2">{row.voucherNumber ?? journal.voucherNumber ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+
       {showCancel ? (
         <div className="mb-4 rounded border border-rose-200 bg-rose-50 p-3">
           <div className="mb-2 text-[13px] font-medium text-rose-900">Cancel journal</div>
@@ -351,10 +455,6 @@ export function JournalDetailPage() {
           </ul>
         )}
       </div>
-
-      <p className="mt-4 text-[11px] text-erp-muted">
-        Phase 2C2A: Approve / send back / reject are available when allowed. Post is disabled until Phase 2C2B — no GL posting or voucher number assignment in this phase.
-      </p>
 
       <Link className="mt-3 inline-block text-[12px] text-sky-700 hover:underline" to="/accounting/entries/journals">
         ← Back to journals

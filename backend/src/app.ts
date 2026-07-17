@@ -124,6 +124,8 @@ export function createApp() {
   const frontendDist = frontendCandidates.find((dir) => fs.existsSync(path.join(dir, 'index.html')))
   if (frontendDist) {
     app.use(express.static(frontendDist, { index: false, maxAge: env.isProd ? '1h' : 0 }))
+    // SPA fallback for browser refresh on deep routes (/crm/leads, /sales/orders/:id, …).
+    // Never apply to /api — those must stay JSON.
     app.get(/^(?!\/api(?:\/|$)).*/, (_req, res) => {
       res.sendFile(path.join(frontendDist, 'index.html'))
     })

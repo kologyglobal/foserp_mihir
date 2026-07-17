@@ -123,7 +123,7 @@ export interface PostingEngineStatus {
   modelsPresent: boolean
   postingEngine: true
   publicPostingWorkflow: false
-  journalWorkflow: false
+  journalWorkflow: true
   reversalWorkflow: false
   foundationReady: true
   tables: string[]

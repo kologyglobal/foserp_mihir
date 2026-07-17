@@ -41,11 +41,13 @@ export function sendError(
   message: string,
   errors?: Array<{ field: string; message: string }>,
   code?: string,
+  details?: Record<string, unknown>,
 ): Response {
   return res.status(statusCode).json({
     success: false,
     message,
     code: code ?? null,
     errors: errors ?? null,
+    ...(details && Object.keys(details).length > 0 ? details : {}),
   })
 }

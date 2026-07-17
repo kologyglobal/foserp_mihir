@@ -58,3 +58,13 @@ export async function getJournalAudit(id: string): Promise<JournalAuditEntry[]> 
   if (isApiMode()) return unwrap(await api.getJournalAudit(id))
   return getJournalDemoState().getJournalAudit(id)
 }
+
+export async function postJournal(id: string) {
+  if (isApiMode()) return unwrap(await api.postJournal(id))
+  return getJournalDemoState().postJournal(id)
+}
+
+export async function getJournalLedger(id: string) {
+  if (isApiMode()) return unwrap(await api.getJournalLedger(id))
+  return getJournalDemoState().getJournalLedger(id)
+}

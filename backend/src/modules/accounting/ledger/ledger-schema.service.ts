@@ -14,7 +14,7 @@ export function getLedgerSchemaStatus(): LedgerSchemaStatus {
     modelsPresent: true,
     postingEngine: true,
     publicPostingWorkflow: false,
-    journalWorkflow: false,
+    journalWorkflow: true,
     reversalWorkflow: false,
     foundationReady: true,
     tables: [...LEDGER_TABLES],

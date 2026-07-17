@@ -31,7 +31,7 @@ function toIsoDate(d: Date): string {
   return d.toISOString().slice(0, 10)
 }
 
-async function buildResultFromVoucher(
+export async function buildPostedResult(
   tenantId: string,
   postingEventId: string,
   voucherId: string,
@@ -70,7 +70,7 @@ export async function post(request: PostingRequest, context: PostingContext): Pr
   const idempotency = await beginIdempotentPosting(context.tenantId, request, context.userId)
   if (idempotency.idempotentReplay) {
     const replay = buildReplayResult(idempotency.event)
-    return buildResultFromVoucher(context.tenantId, replay.postingEventId, replay.voucherId, true)
+    return buildPostedResult(context.tenantId, replay.postingEventId, replay.voucherId, true)
   }
 
   let event = idempotency.event
@@ -119,7 +119,7 @@ export async function post(request: PostingRequest, context: PostingContext): Pr
       userAgent: context.userAgent ?? null,
     })
 
-    return buildResultFromVoucher(context.tenantId, event.id, txResult.voucherId, false)
+    return buildPostedResult(context.tenantId, event.id, txResult.voucherId, false)
   } catch (error) {
     const code = error instanceof PostingError ? error.code ?? 'POSTING_TRANSACTION_FAILED' : 'POSTING_TRANSACTION_FAILED'
     const message = error instanceof Error ? error.message : 'Posting failed'

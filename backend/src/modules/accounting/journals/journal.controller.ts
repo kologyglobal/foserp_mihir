@@ -4,6 +4,7 @@ import { asyncHandler } from '../../../utils/asyncHandler.js'
 import { buildPaginationMeta } from '../../../utils/pagination.js'
 import { sendCreated, sendPaginated, sendSuccess } from '../../../utils/response.js'
 import * as service from './journal.service.js'
+import * as postingService from './journal-posting.service.js'
 
 export const listJournals = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
@@ -57,4 +58,19 @@ export const getJournalAudit = asyncHandler(async (req: Request, res: Response) 
   const id = getRouteParam(req, 'id')
   const items = await service.getJournalAudit(req, tenantId, id)
   return sendSuccess(res, 'journal audit fetched', items)
+})
+
+export const postJournal = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const posting = await postingService.postJournal(req, tenantId, id)
+  const journal = await service.getJournal(req, tenantId, id)
+  return sendSuccess(res, 'journal posted', { journal, posting })
+})
+
+export const getJournalLedger = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const items = await postingService.getJournalLedger(tenantId, id)
+  return sendSuccess(res, 'journal ledger fetched', items)
 })

@@ -103,6 +103,10 @@ function allowedActions(journal: Journal): Journal['allowedActions'] {
   const editable = journal.status === 'DRAFT' || journal.status === 'SENT_BACK'
   const pending = journal.status === 'PENDING_APPROVAL'
   const canApprove = pending && hasFinancePermission('finance.voucher.approve')
+  const canPost =
+    journal.status === 'APPROVED' &&
+    !journal.voucherNumber &&
+    hasFinancePermission('finance.voucher.post')
   return {
     edit: editable,
     validate: true,
@@ -111,14 +115,28 @@ function allowedActions(journal: Journal): Journal['allowedActions'] {
     approve: canApprove,
     reject: canApprove,
     sendBack: canApprove,
-    post: false,
+    post: canPost,
     reverse: false,
   }
+}
+
+interface DemoLedgerEntry {
+  id: string
+  voucherId: string
+  voucherLineId: string
+  lineNumber: number
+  accountId: string
+  debitAmount: string
+  creditAmount: string
+  postingDate: string
+  voucherNumber: string
 }
 
 interface JournalDemoState {
   journals: Journal[]
   audit: Record<string, JournalAuditEntry[]>
+  ledger: Record<string, DemoLedgerEntry[]>
+  postedEvents: Record<string, { voucherNumber: string; postedAt: string }>
   listJournals: (filters: JournalListFilters) => Journal[]
   getJournal: (id: string) => Journal | undefined
   createJournal: (input: CreateJournalInput) => Journal
@@ -126,6 +144,8 @@ interface JournalDemoState {
   validateJournal: (id: string) => JournalValidationReport
   submitJournal: (id: string) => Journal
   cancelJournal: (id: string, reason: string) => Journal
+  postJournal: (id: string) => { journal: Journal; posting: { idempotentReplay: boolean; voucherNumber: string } }
+  getJournalLedger: (id: string) => DemoLedgerEntry[]
   getJournalAudit: (id: string) => JournalAuditEntry[]
 }
 
@@ -134,6 +154,8 @@ export const useJournalDemoStore = create<JournalDemoState>()(
     (set, get) => ({
       journals: [],
       audit: {},
+      ledger: {},
+      postedEvents: {},
 
       listJournals(filters) {
         let rows = get().journals.filter((j) => j.legalEntityId === filters.legalEntityId)
@@ -152,7 +174,18 @@ export const useJournalDemoStore = create<JournalDemoState>()(
 
       getJournal(id) {
         const journal = get().journals.find((j) => j.id === id)
-        return journal ? { ...journal, allowedActions: allowedActions(journal) } : undefined
+        if (!journal) return undefined
+        const enriched: Journal = {
+          ...journal,
+          allowedActions: allowedActions(journal),
+        }
+        if (journal.status === 'POSTED') {
+          const meta = get().postedEvents[id]
+          enriched.postedAt = meta?.postedAt ?? journal.updatedAt
+          enriched.ledgerEntryCount = get().ledger[id]?.length ?? journal.lines.length
+          enriched.generalLedgerLink = `/accounting/entries/journals/${id}#ledger`
+        }
+        return enriched
       },
 
       createJournal(input) {
@@ -296,6 +329,66 @@ export const useJournalDemoStore = create<JournalDemoState>()(
           },
         }))
         return updated
+      },
+
+      postJournal(journalId) {
+        const journal = get().journals.find((j) => j.id === journalId)
+        if (!journal) throw new Error('Journal not found')
+        if (journal.status !== 'APPROVED' && journal.status !== 'POSTED') {
+          throw new Error(`Journal in status ${journal.status} cannot be posted`)
+        }
+
+        const existingNumber = get().postedEvents[journalId]?.voucherNumber ?? journal.voucherNumber
+        if (journal.status === 'POSTED' && existingNumber) {
+          return {
+            journal: get().getJournal(journalId)!,
+            posting: { idempotentReplay: true, voucherNumber: existingNumber },
+          }
+        }
+
+        const now = new Date().toISOString()
+        const voucherNumber = `JRN-DEMO-${journalId.slice(0, 8).toUpperCase()}`
+        const ledgerRows: DemoLedgerEntry[] = journal.lines.map((line) => ({
+          id: id(),
+          voucherId: journalId,
+          voucherLineId: line.id ?? id(),
+          lineNumber: line.lineNumber ?? 0,
+          accountId: line.accountId,
+          debitAmount: line.debitAmount,
+          creditAmount: line.creditAmount,
+          postingDate: journal.postingDate,
+          voucherNumber,
+        }))
+
+        const updated: Journal = {
+          ...journal,
+          status: 'POSTED',
+          voucherNumber,
+          postedAt: now,
+          updatedAt: now,
+          ledgerEntryCount: ledgerRows.length,
+          generalLedgerLink: `/accounting/entries/journals/${journalId}#ledger`,
+        }
+        updated.allowedActions = allowedActions(updated)
+
+        set((s) => ({
+          journals: s.journals.map((j) => (j.id === journalId ? updated : j)),
+          ledger: { ...s.ledger, [journalId]: ledgerRows },
+          postedEvents: { ...s.postedEvents, [journalId]: { voucherNumber, postedAt: now } },
+          audit: {
+            ...s.audit,
+            [journalId]: [...(s.audit[journalId] ?? []), { id: id(), action: 'POST', createdAt: now }],
+          },
+        }))
+
+        return {
+          journal: updated,
+          posting: { idempotentReplay: false, voucherNumber },
+        }
+      },
+
+      getJournalLedger(journalId) {
+        return get().ledger[journalId] ?? []
       },
 
       getJournalAudit(journalId) {

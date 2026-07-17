@@ -149,7 +149,7 @@ export interface LedgerSchemaStatus {
   modelsPresent: boolean
   postingEngine: true
   publicPostingWorkflow: false
-  journalWorkflow: false
+  journalWorkflow: true
   reversalWorkflow: false
   foundationReady: true
   tables: string[]

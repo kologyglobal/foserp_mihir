@@ -136,6 +136,11 @@ export interface JournalDetailDto {
   updatedBy: string | null
   createdAt: string
   updatedAt: string
+  postedAt?: string | null
+  postedBy?: string | null
+  postingEventId?: string | null
+  ledgerEntryCount?: number
+  generalLedgerLink?: string | null
   lines: JournalLineDto[]
   allowedActions: JournalAllowedActions
 }

@@ -13,7 +13,7 @@ function isPayloadTooLargeError(err: unknown): err is Error & { status: number; 
 
 export function errorMiddleware(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof AppError) {
-    sendError(res, err.statusCode, err.message, err.errors, err.code)
+    sendError(res, err.statusCode, err.message, err.errors, err.code, err.details)
     return
   }
 

@@ -76,6 +76,11 @@ export interface Journal {
   updatedAt: string
   lines: JournalLine[]
   allowedActions?: JournalAllowedActions
+  postedAt?: string | null
+  postedBy?: string | null
+  postingEventId?: string | null
+  ledgerEntryCount?: number
+  generalLedgerLink?: string | null
 }
 
 export interface JournalValidationError {
