@@ -27,10 +27,6 @@ import {
   type ApprovalSortKey,
 } from '@/config/approvalFilterConfig'
 import {
-  buildApprovalRegisterKpiItems,
-  summarizeApprovalKpis,
-} from '@/utils/approvalKpiItems'
-import {
   buildApprovalRegisterOverview,
   buildApprovalRegisterSuggestions,
 } from '@/utils/approvalRegisterInsights'
@@ -57,9 +53,6 @@ export function PurchaseApprovalsPage() {
   const [filters, setFilters] = useState<ApprovalListFilters>(DEFAULT_APPROVAL_LIST_FILTERS)
   const [sortBy, setSortBy] = useState<ApprovalSortKey>('submittedDate')
   const [rows, setRows] = useState<PurchaseApprovalQueueRow[]>([])
-  const [pendingRows, setPendingRows] = useState<PurchaseApprovalQueueRow[]>([])
-  const [approvedRows, setApprovedRows] = useState<PurchaseApprovalQueueRow[]>([])
-  const [rejectedRows, setRejectedRows] = useState<PurchaseApprovalQueueRow[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
@@ -81,25 +74,14 @@ export function PurchaseApprovalsPage() {
     setLoadState('loading')
     setErrorMessage(null)
     try {
-      const [tabRows, pending, approved, rejected] = await Promise.all([
-        getPurchaseApprovalQueue(tab),
-        getPurchaseApprovalQueue('pending_mine'),
-        getPurchaseApprovalQueue('approved_by_me'),
-        getPurchaseApprovalQueue('rejected_by_me'),
-      ])
+      const tabRows = await getPurchaseApprovalQueue(tab)
       if (signal?.cancelled) return
       setRows(tabRows)
-      setPendingRows(pending)
-      setApprovedRows(approved)
-      setRejectedRows(rejected)
       setLoadState(tabRows.length === 0 ? 'empty' : 'ready')
     } catch (err) {
       if (signal?.cancelled) return
       setErrorMessage(err instanceof Error ? err.message : 'Failed to load approvals')
       setRows([])
-      setPendingRows([])
-      setApprovedRows([])
-      setRejectedRows([])
       setLoadState('error')
     }
   }, [tab])
@@ -145,35 +127,6 @@ export function PurchaseApprovalsPage() {
     [rows, filters, sortBy],
   )
 
-  const kpiSummary = useMemo(
-    () =>
-      summarizeApprovalKpis({
-        pending: pendingRows,
-        approved: approvedRows,
-        rejected: rejectedRows,
-      }),
-    [pendingRows, approvedRows, rejectedRows],
-  )
-
-  const applyKpiSelection = useCallback(
-    (next: { tab: PurchaseApprovalQueueTab; ageing?: string }) => {
-      setQueueTab(next.tab, next.ageing)
-    },
-    [setQueueTab],
-  )
-
-  const kpiStrip = useMemo(
-    () =>
-      buildApprovalRegisterKpiItems(
-        pendingRows,
-        kpiSummary,
-        tab,
-        filters.ageing,
-        applyKpiSelection,
-      ),
-    [pendingRows, kpiSummary, tab, filters.ageing, applyKpiSelection],
-  )
-
   const registerOverview = useMemo(() => buildApprovalRegisterOverview(filtered), [filtered])
   const registerSuggestions = useMemo(
     () =>
@@ -182,11 +135,11 @@ export function PurchaseApprovalsPage() {
         activeTab: tab,
         activeAgeing: filters.ageing,
         onSelectTab: (next) => setQueueTab(next),
-        onShowOverdue: () => applyKpiSelection({ tab: 'pending_mine', ageing: 'overdue' }),
+        onShowOverdue: () => setQueueTab('pending_mine', 'overdue'),
         onShowHistory: () => setQueueTab('all_history'),
         onOpenSetup: () => navigate('/purchase/setup'),
       }),
-    [filtered, tab, filters.ageing, applyKpiSelection, navigate, setQueueTab],
+    [filtered, tab, filters.ageing, navigate, setQueueTab],
   )
 
   const openReview = (id: string, mode: 'review' | 'history' = 'review') => {
@@ -369,7 +322,6 @@ export function PurchaseApprovalsPage() {
             ]}
           />
         }
-        kpiStrip={kpiStrip}
       >
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
           <EnterpriseRegisterTableShell className="min-w-0">
@@ -414,7 +366,7 @@ export function PurchaseApprovalsPage() {
                       <button
                         type="button"
                         className="erp-btn erp-btn--primary text-[13px]"
-                        onClick={() => applyKpiSelection({ tab: 'pending_mine', ageing: '' })}
+                        onClick={() => setQueueTab('pending_mine', '')}
                       >
                         Go to Pending Queue
                       </button>
