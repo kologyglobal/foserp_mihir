@@ -596,6 +596,7 @@ export function PurchaseInvoiceEditorPage() {
       collapsibleFactBox
       footer={
         <ErpStickySaveBar
+          sticky
           onSaveDraft={() => void saveDraft()}
           onSave={() => void saveAndVerify()}
           submitLabel="Save & Verify"

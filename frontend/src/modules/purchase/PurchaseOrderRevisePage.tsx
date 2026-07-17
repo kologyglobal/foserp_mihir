@@ -274,7 +274,7 @@ export function PurchaseOrderRevisePage() {
       }
       footer={
         <ErpStickySaveBar
-          sticky={false}
+          sticky
           onSave={() => void save()}
           submitLabel={`Save as Rev ${po.revisionNo + 1}`}
           isSubmitting={saving}

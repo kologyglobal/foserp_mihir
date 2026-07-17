@@ -557,6 +557,7 @@ export function PurchaseReturnEditorPage() {
           { label: 'Loading' },
         ]}
         footer={null}
+        backLink={{ to: '/purchase/returns', label: 'Back to Returns' }}
       >
         <LoadingState variant="form" rows={8} />
       </PurchaseCardFormShell>
@@ -580,6 +581,7 @@ export function PurchaseReturnEditorPage() {
       statusKey={status}
       recordHeaderFacts={recordHeaderFacts}
       favoritePath={recordId ? `/purchase/returns/${recordId}/edit` : '/purchase/returns/new'}
+      backLink={{ to: '/purchase/returns', label: 'Back to Returns' }}
       breadcrumbs={[
         { label: 'Returns', to: '/purchase/returns' },
         { label: isNew ? 'New' : documentNumber ?? 'Edit' },
@@ -607,17 +609,15 @@ export function PurchaseReturnEditorPage() {
           }}
         />
       }
+      stickyFooter
       footer={
         <ErpStickySaveBar
-          sticky={false}
-          hint={dirty ? 'Unsaved changes' : undefined}
-          onSaveDraft={() => void saveDraft(false)}
-          saveDraftLabel={saving ? 'Saving…' : 'Save Draft'}
-          onSave={() => void saveDraft(true)}
-          submitLabel="Submit for Approval"
+          sticky
+          onSave={() => void saveDraft(false)}
+          submitLabel={saving ? 'Saving…' : 'Save'}
           isSubmitting={saving}
           submitDisabled={!editable || saving}
-          cancelLabel="Back"
+          cancelLabel="Cancel"
           onCancel={() => navigate(recordId ? `/purchase/returns/${recordId}` : '/purchase/returns')}
         />
       }
@@ -1120,7 +1120,6 @@ export function PurchaseReturnEditorPage() {
                 <Link2 className="h-3.5 w-3.5" />
                 Origin: {PURCHASE_RETURN_ORIGIN_LABELS[origin]}
               </span>
-              {dirty ? <span className="font-medium text-erp-warning-fg">Unsaved changes</span> : null}
             </div>
           }
         />

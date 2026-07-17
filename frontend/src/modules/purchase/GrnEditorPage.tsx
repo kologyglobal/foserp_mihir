@@ -665,7 +665,7 @@ export function GrnEditorPage() {
       }
       footer={
         <ErpStickySaveBar
-          sticky={false}
+          sticky
           isSubmitting={saving}
           onSaveDraft={() => void saveDraft()}
           saveDraftLabel={saving ? 'Saving…' : 'Save Draft'}

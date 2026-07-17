@@ -884,8 +884,7 @@ export function VendorQuotationEditorPage() {
       }
       footer={
         <ErpStickySaveBar
-          sticky={false}
-          hint={dirty ? 'Unsaved changes' : undefined}
+          sticky
           onSaveDraft={() => void saveDraft()}
           saveDraftLabel={saving ? 'Saving…' : 'Save Draft'}
           onSave={() => void saveAndSubmit()}

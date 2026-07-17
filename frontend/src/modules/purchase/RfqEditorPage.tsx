@@ -572,7 +572,7 @@ export function RfqEditorPage() {
       }
       footer={
         <ErpStickySaveBar
-          sticky={false}
+          sticky
           onSaveDraft={() => void saveDraft()}
           saveDraftLabel={saving ? 'Saving…' : 'Save Draft'}
           onSave={() => void saveAndSend()}
@@ -847,7 +847,6 @@ export function RfqEditorPage() {
           >
             Add line
           </ErpButton>
-          {dirty ? <span className="text-[12px] text-erp-muted">Unsaved changes</span> : null}
         </div>
         <div className="overflow-x-auto rounded-md border border-erp-border">
           <table className="erp-table text-[12px]">

@@ -429,7 +429,7 @@ export function PurchaseOrderEditorPage() {
   const [forceOpenSections, setForceOpenSections] = useState<
     Partial<Record<'general' | 'commercial' | 'lines', number>>
   >({})
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+  const [, setLastSavedAt] = useState<Date | null>(null)
   const attachmentIds = purchaseAttachmentIdsFromRows(attachments)
 
   const [vendors, setVendors] = useState<Vendor[]>([])
@@ -1237,21 +1237,6 @@ export function PurchaseOrderEditorPage() {
       footer={
         <ErpStickySaveBar
           sticky
-          hint={
-            <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
-              {dirty ? (
-                <span className="font-medium text-erp-warning-fg">Unsaved changes</span>
-              ) : (
-                <span className="text-erp-muted">All changes saved</span>
-              )}
-              {lastSavedAt ? (
-                <span className="text-erp-muted">
-                  Last saved{' '}
-                  {lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              ) : null}
-            </span>
-          }
           onSaveDraft={() => void saveDraft(false)}
           saveDraftLabel={saving ? 'Saving…' : 'Save Draft'}
           onSave={() => void submitForApproval()}
