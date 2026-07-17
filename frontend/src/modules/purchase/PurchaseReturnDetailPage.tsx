@@ -96,7 +96,9 @@ export function PurchaseReturnDetailPage() {
         status="…"
         favoritePath="/purchase/returns"
         breadcrumbs={[{ label: 'Returns', to: '/purchase/returns' }, { label: 'Loading' }]}
+        backLink={{ to: '/purchase/returns', label: 'Back to Returns' }}
         footer={null}
+        detailMode
       >
         <LoadingState variant="form" rows={8} />
       </PurchaseCardFormShell>
@@ -150,6 +152,7 @@ export function PurchaseReturnDetailPage() {
           { label: 'Returns', to: '/purchase/returns' },
           { label: doc.documentNumber },
         ]}
+        backLink={{ to: '/purchase/returns', label: 'Back to Returns' }}
         createdBy={doc.createdBy}
         createdDate={formatDate(doc.createdAt.slice(0, 10))}
         modifiedBy={doc.updatedBy ?? undefined}
@@ -172,6 +175,7 @@ export function PurchaseReturnDetailPage() {
           doc.warehouseName || 'Warehouse',
         ]}
         factBox={documentFactBox}
+        detailMode
         commandBar={
           <ErpCommandBar
             inline

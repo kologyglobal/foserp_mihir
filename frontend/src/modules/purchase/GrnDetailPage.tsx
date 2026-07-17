@@ -103,6 +103,7 @@ export function GrnDetailPage() {
           { label: 'GRN / Receipts', to: '/purchase/grn' },
           { label: 'Loading' },
         ]}
+        backLink={{ to: '/purchase/grn', label: 'Back to Goods Receipts' }}
         footer={null}
         detailMode
       >
@@ -168,6 +169,7 @@ export function GrnDetailPage() {
         { label: 'GRN / Receipts', to: '/purchase/grn' },
         { label: grn.documentNumber },
       ]}
+      backLink={{ to: '/purchase/grn', label: 'Back to Goods Receipts' }}
       documentIdentity={{
         moduleLabel: 'GOODS RECEIPT NOTE',
         title: grn.documentNumber,
