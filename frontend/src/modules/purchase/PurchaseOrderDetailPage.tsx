@@ -269,6 +269,7 @@ export function PurchaseOrderDetailPage() {
           { label: 'Loading' },
         ]}
         footer={null}
+        stickyFooter={false}
         detailMode
       >
         <LoadingState variant="form" rows={8} />

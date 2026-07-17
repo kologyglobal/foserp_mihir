@@ -205,9 +205,12 @@ html {
 
   .d365-body {
     display: flex;
-    height: calc(100vh - var(--d365-suite-height) - var(--dyn-live-strip-height));
+    /* border-box: height must be 100vh so padding-top (suite bar) does not
+       shrink the shell and leave a dead strip above the Windows taskbar */
+    height: 100vh;
     min-height: 0;
     padding-top: calc(var(--d365-suite-height) + var(--dyn-live-strip-height));
+    box-sizing: border-box;
     overflow: hidden;
   }
 
@@ -1248,6 +1251,11 @@ html {
     font-family: var(--d365-font-family);
     font-size: var(--d365-font-base);
     -webkit-overflow-scrolling: touch;
+  }
+
+  /* View/detail pages — no sticky save bar, keep bottom tight */
+  .d365-workspace-content:has(.enterprise-workspace--dynamics-detail) {
+    padding-bottom: 12px;
   }
 
   /* ── Dynamics KPI metric strip ── */

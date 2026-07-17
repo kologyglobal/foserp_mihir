@@ -8,6 +8,7 @@ import {
   GitCompare,
   Package,
   Plus,
+  Save,
   Send,
   StickyNote,
   Trash2,
@@ -32,7 +33,7 @@ import {
   ErpStickySaveBar,
 } from '@/components/erp/card-form'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { ErpButton } from '@/components/erp/ErpButton'
+import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { Badge } from '@/components/ui/Badge'
 import {
@@ -558,6 +559,7 @@ export function PurchaseInvoiceEditorPage() {
         { label: 'Invoices', to: '/purchase/invoices' },
         { label: isNew ? 'New' : invoice?.documentNumber ?? 'Edit' },
       ]}
+      backLink={{ to: '/purchase/invoices', label: 'Back to Invoices' }}
       commandBar={
         <ErpCommandBar
           inline
@@ -594,14 +596,32 @@ export function PurchaseInvoiceEditorPage() {
       }
       factBox={documentFactBox}
       collapsibleFactBox
+      stickyFooter
       footer={
         <ErpStickySaveBar
           sticky
-          onSaveDraft={() => void saveDraft()}
-          onSave={() => void saveAndVerify()}
-          submitLabel="Save & Verify"
           isSubmitting={saving}
-          cancelTo="/purchase/invoices"
+          actions={
+            <ErpButtonGroup>
+              <ErpButton
+                type="button"
+                variant="ghost"
+                disabled={saving}
+                onClick={() => navigate('/purchase/invoices')}
+              >
+                Cancel
+              </ErpButton>
+              <ErpButton
+                type="button"
+                variant="secondary"
+                icon={Save}
+                disabled={saving}
+                onClick={() => void saveDraft()}
+              >
+                {saving ? 'Saving…' : 'Save Draft'}
+              </ErpButton>
+            </ErpButtonGroup>
+          }
         />
       }
     >

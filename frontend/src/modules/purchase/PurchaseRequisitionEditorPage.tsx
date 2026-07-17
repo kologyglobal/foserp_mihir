@@ -46,7 +46,7 @@ import {
 } from '@/components/erp/card-form'
 import { EnterpriseFormMetrics } from '@/design-system/workspace'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { ErpButton } from '@/components/erp/ErpButton'
+import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
 import { Input, Textarea, Select } from '@/components/forms/Inputs'
 import {
   approvalActivitySummary,
@@ -980,21 +980,58 @@ export function PurchaseRequisitionEditorPage() {
       footer={
         <ErpStickySaveBar
           sticky
-          onSaveDraft={() => void saveDraft(true)}
-          saveDraftLabel={saving ? 'Saving…' : 'Save Draft'}
-          onSave={() => void submitForApproval()}
-          submitLabel="Submit for Approval"
           isSubmitting={saving}
-          submitDisabled={!editable || saving || (attemptedSubmit && validation.errors.length > 0)}
-          submitDisabledReason={
-            !editable
-              ? 'Document is read-only'
-              : attemptedSubmit && validation.errors.length
-                ? 'Fix validation errors first'
-                : undefined
-          }
-          cancelLabel="Back"
+          cancelLabel="Cancel"
           onCancel={() => navigate('/purchase/requisitions')}
+          actions={
+            <ErpButtonGroup>
+              <ErpButton
+                type="button"
+                variant="ghost"
+                disabled={saving}
+                onClick={() => navigate('/purchase/requisitions')}
+              >
+                Cancel
+              </ErpButton>
+              <ErpButton
+                type="button"
+                variant="secondary"
+                icon={Save}
+                disabled={!editable || saving}
+                onClick={() => void saveDraft(true)}
+              >
+                {saving ? 'Saving…' : 'Save Draft'}
+              </ErpButton>
+              {workspace === 'requisition' ? (
+                <ErpButton
+                  type="button"
+                  variant="primary"
+                  icon={ArrowRight}
+                  disabled={!editable || saving}
+                  onClick={() => setWorkspace('line_items')}
+                >
+                  Continue to Line Items
+                </ErpButton>
+              ) : (
+                <ErpButton
+                  type="button"
+                  variant="primary"
+                  icon={Send}
+                  disabled={!editable || saving || (attemptedSubmit && validation.errors.length > 0)}
+                  disabledReason={
+                    !editable
+                      ? 'Document is read-only'
+                      : attemptedSubmit && validation.errors.length
+                        ? 'Fix validation errors first'
+                        : undefined
+                  }
+                  onClick={() => void submitForApproval()}
+                >
+                  Submit for Approval
+                </ErpButton>
+              )}
+            </ErpButtonGroup>
+          }
         />
       }
       onSaveShortcut={() => void saveDraft(true)}
@@ -1325,26 +1362,6 @@ export function PurchaseRequisitionEditorPage() {
               )}
             </div>
           </ErpCardSection>
-
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-erp-border pt-3">
-            <ErpButton
-              type="button"
-              variant="secondary"
-              icon={Save}
-              disabled={!editable || saving}
-              onClick={() => void saveDraft(true)}
-            >
-              {saving ? 'Saving…' : 'Save Draft'}
-            </ErpButton>
-            <ErpButton
-              type="button"
-              variant="primary"
-              icon={ArrowRight}
-              onClick={() => setWorkspace('line_items')}
-            >
-              Continue to Line Items
-            </ErpButton>
-          </div>
         </div>
       ) : (
         <div

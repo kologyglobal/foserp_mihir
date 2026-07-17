@@ -23,6 +23,7 @@ import {
 import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
 import { ErpCardSection, ErpFieldRow, ErpFormSpan, ErpStickySaveBar } from '@/components/erp/card-form'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EnterpriseFormMetrics } from '@/design-system/workspace'
@@ -640,6 +641,7 @@ export function GrnEditorPage() {
       recordHeaderFacts={recordHeaderFacts}
       favoritePath={recordId ? `/purchase/grn/${recordId}/edit` : '/purchase/grn/new'}
       breadcrumbs={breadcrumbs}
+      backLink={{ to: '/purchase/grn', label: 'Back to Goods Receipts' }}
       factBox={documentFactBox}
       commandBar={
         <ErpCommandBar
@@ -663,16 +665,32 @@ export function GrnEditorPage() {
           ]}
         />
       }
+      stickyFooter
       footer={
         <ErpStickySaveBar
           sticky
           isSubmitting={saving}
-          onSaveDraft={() => void saveDraft()}
-          saveDraftLabel={saving ? 'Saving…' : 'Save Draft'}
-          onSave={() => void submit()}
-          submitLabel="Submit"
-          cancelLabel="Back"
-          onCancel={() => navigate('/purchase/grn')}
+          actions={
+            <ErpButtonGroup>
+              <ErpButton
+                type="button"
+                variant="ghost"
+                disabled={saving}
+                onClick={() => navigate('/purchase/grn')}
+              >
+                Cancel
+              </ErpButton>
+              <ErpButton
+                type="button"
+                variant="secondary"
+                icon={Save}
+                disabled={saving}
+                onClick={() => void saveDraft()}
+              >
+                {saving ? 'Saving…' : 'Save Draft'}
+              </ErpButton>
+            </ErpButtonGroup>
+          }
         />
       }
       onSaveShortcut={() => void saveDraft()}

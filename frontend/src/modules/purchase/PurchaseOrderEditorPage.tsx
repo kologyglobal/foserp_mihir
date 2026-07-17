@@ -1,7 +1,6 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft,
   ArrowRight,
   Banknote,
   Building2,
@@ -1237,29 +1236,18 @@ export function PurchaseOrderEditorPage() {
       footer={
         <ErpStickySaveBar
           sticky
-          onSaveDraft={() => void saveDraft(false)}
-          saveDraftLabel={saving ? 'Saving…' : 'Save Draft'}
-          onSave={() => void submitForApproval()}
-          submitLabel="Submit for Approval"
           isSubmitting={saving}
-          submitDisabled={
-            awaitingOriginCreate || !editable || saving || (showErrors && validation.errors.length > 0)
-          }
-          submitDisabledReason={
-            showErrors && validation.errors.length > 0 ? 'Fix validation errors first' : undefined
-          }
-          cancelLabel="Back"
+          cancelLabel="Cancel"
           onCancel={() => navigate('/purchase/orders')}
           actions={
             <ErpButtonGroup>
               <ErpButton
                 type="button"
                 variant="ghost"
-                icon={ArrowLeft}
                 disabled={saving}
                 onClick={() => navigate('/purchase/orders')}
               >
-                Back
+                Cancel
               </ErpButton>
               <ErpButton
                 type="button"
@@ -1270,30 +1258,43 @@ export function PurchaseOrderEditorPage() {
               >
                 {saving ? 'Saving…' : 'Save Draft'}
               </ErpButton>
-              <ErpButton
-                type="button"
-                variant="primary"
-                icon={Send}
-                disabled={
-                  awaitingOriginCreate ||
-                  !editable ||
-                  saving ||
-                  (showErrors && validation.errors.length > 0)
-                }
-                disabledReason={
-                  showErrors && validation.errors.length > 0
-                    ? 'Fix validation errors first'
-                    : undefined
-                }
-                onClick={() => void submitForApproval()}
-              >
-                Submit for Approval
-              </ErpButton>
+              {workspace === 'vendor_order' ? (
+                <ErpButton
+                  type="button"
+                  variant="primary"
+                  icon={ArrowRight}
+                  disabled={awaitingOriginCreate || !editable || saving}
+                  onClick={() => setWorkspace('items_financials')}
+                >
+                  Continue to Items &amp; Financials
+                </ErpButton>
+              ) : (
+                <ErpButton
+                  type="button"
+                  variant="primary"
+                  icon={Send}
+                  disabled={
+                    awaitingOriginCreate ||
+                    !editable ||
+                    saving ||
+                    (showErrors && validation.errors.length > 0)
+                  }
+                  disabledReason={
+                    showErrors && validation.errors.length > 0
+                      ? 'Fix validation errors first'
+                      : undefined
+                  }
+                  onClick={() => void submitForApproval()}
+                >
+                  Submit for Approval
+                </ErpButton>
+              )}
             </ErpButtonGroup>
           }
         />
       }
       onSaveShortcut={() => void saveDraft(false)}
+      backLink={{ to: '/purchase/orders', label: 'Back to Purchase Orders' }}
     >
       {isNew ? (
         !originChosen ? (
@@ -1669,26 +1670,6 @@ export function PurchaseOrderEditorPage() {
               </ErpFieldRow>
             ) : null}
           </ErpCardSection>
-
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-erp-border pt-3">
-            <ErpButton
-              type="button"
-              variant="secondary"
-              icon={Save}
-              disabled={awaitingOriginCreate || !editable || saving}
-              onClick={() => void saveDraft(false)}
-            >
-              {saving ? 'Saving…' : 'Save Draft'}
-            </ErpButton>
-            <ErpButton
-              type="button"
-              variant="primary"
-              icon={ArrowRight}
-              onClick={() => setWorkspace('items_financials')}
-            >
-              Continue to Items &amp; Financials
-            </ErpButton>
-          </div>
             </div>
           ) : (
             <div

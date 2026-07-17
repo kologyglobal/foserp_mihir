@@ -539,6 +539,7 @@ export function RfqEditorPage() {
         { label: 'RFQs', to: '/purchase/rfqs' },
         { label: isNew ? 'New' : documentNumber ?? 'Edit' },
       ]}
+      backLink={{ to: '/purchase/rfqs', label: 'Back to RFQs' }}
       factBox={documentFactBox}
       commandBar={
         <ErpCommandBar
@@ -570,6 +571,7 @@ export function RfqEditorPage() {
           }}
         />
       }
+      stickyFooter
       footer={
         <ErpStickySaveBar
           sticky
@@ -578,7 +580,7 @@ export function RfqEditorPage() {
           onSave={() => void saveAndSend()}
           submitLabel="Save & Send RFQ"
           isSubmitting={saving}
-          cancelLabel="Back"
+          cancelLabel="Cancel"
           onCancel={() => navigate('/purchase/rfqs')}
         />
       }
