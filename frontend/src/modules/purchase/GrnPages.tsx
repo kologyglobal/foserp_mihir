@@ -14,9 +14,7 @@ import {
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '../../components/tables/DataTable'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
-import { SmartFilterBar } from '../../components/design-system/SmartFilterBar'
-import { SearchInput } from '../../components/ui/SearchInput'
-import { Select } from '../../components/forms/Inputs'
+import { CrmListFilterBar, CrmListSortSelect } from '../../components/crm/CrmListFilterBar'
 import { Input } from '../../components/forms/Inputs'
 import { TableLink } from '../../components/ui/AppLink'
 import { CommandBar, CommandBarButton, CommandBarGroup } from '../../components/ui/CommandBar'
@@ -532,14 +530,21 @@ export function GrnRegisterPage() {
           { label: 'Posted Today', value: grns.filter((g) => g.grnDate === new Date().toISOString().slice(0, 10)).length, accent: 'slate' },
         ]}
         filterBar={
-          <SmartFilterBar
+          <CrmListFilterBar
+            className="crm-list-filter-bar--purchase"
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder={
+              activeTab === 'receive' ? 'Search PO, item, vendor…' : 'Search GRN, PO, vendor…'
+            }
+            showCommandPaletteHint={false}
             chips={[
-              ...(activeTab === 'register' && statusFilter ? [{ id: 'status', label: formatStatus(statusFilter) }] : []),
-              ...(search ? [{ id: 'search', label: `Search: ${search}` }] : []),
+              ...(activeTab === 'register' && statusFilter
+                ? [{ id: 'status', label: formatStatus(statusFilter) }]
+                : []),
             ]}
             onRemoveChip={(id) => {
               if (id === 'status') setStatusFilter('')
-              if (id === 'search') setSearch('')
             }}
             onClearAll={() => {
               setStatusFilter('')
@@ -547,24 +552,24 @@ export function GrnRegisterPage() {
             }}
             savedView={savedView}
             onSavedViewChange={setSavedView}
-            resultCount={activeTab === 'receive' ? filteredReceiveRows.length : filteredGrns.length}
-          >
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder={activeTab === 'receive' ? 'Search PO, item, vendor…' : 'Search GRN, PO, vendor…'}
-              className="w-full sm:w-72"
-            />
-            {activeTab === 'register' ? (
-              <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 w-40 text-[13px]">
-                <option value="">All Statuses</option>
-                <option value="posted">Posted</option>
-                <option value="pending_qc">Pending QC</option>
-                <option value="draft">Draft</option>
-                <option value="cancelled">Cancelled</option>
-              </Select>
-            ) : null}
-          </SmartFilterBar>
+            savedViews={['My View']}
+            sort={
+              activeTab === 'register' ? (
+                <CrmListSortSelect
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  aria-label="Filter GRNs by status"
+                  options={[
+                    { value: '', label: 'All statuses' },
+                    { value: 'posted', label: 'Posted' },
+                    { value: 'pending_qc', label: 'Pending QC' },
+                    { value: 'draft', label: 'Draft' },
+                    { value: 'cancelled', label: 'Cancelled' },
+                  ]}
+                />
+              ) : undefined
+            }
+          />
         }
       >
         <div className="mb-3 flex gap-2 border-b border-erp-border pb-2">

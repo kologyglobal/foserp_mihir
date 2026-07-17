@@ -273,48 +273,22 @@ a.purchase-process-map__step:hover {
 /* ── PO / purchase document lifecycle strip ─────────────────────────────── */
 .po-workflow-strip {
   margin-bottom: 12px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid var(--erp-border);
-  border-radius: 6px;
-  background: linear-gradient(180deg, var(--erp-surface) 0%, var(--erp-surface-alt) 100%);
+  border-radius: 8px;
+  background: var(--erp-surface);
 }
 
 .po-workflow-strip--dense {
-  padding: 8px 10px;
+  padding: 6px 8px;
   margin-bottom: 10px;
 }
 
-.po-workflow-strip__meta {
+.po-workflow-strip__row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-  margin-bottom: 8px;
-}
-
-.po-workflow-strip__eyebrow {
-  display: block;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--erp-muted);
-  margin-bottom: 2px;
-}
-
-.po-workflow-strip__status {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--erp-text);
-  line-height: 1.25;
-}
-
-.po-workflow-strip__next {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--erp-primary);
-  line-height: 1.3;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .po-workflow-strip__track {
@@ -326,8 +300,71 @@ a.purchase-process-map__step:hover {
   padding: 0;
   list-style: none;
   overflow-x: auto;
+  overflow-y: hidden;
+  flex: 1 1 auto;
+  min-width: 0;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
+}
+
+.po-workflow-strip__guide {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.po-workflow-strip__guide-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--erp-border);
+  background: var(--erp-surface);
+  color: var(--erp-primary);
+  cursor: help;
+}
+
+.po-workflow-strip__guide-btn:hover,
+.po-workflow-strip__guide-btn:focus-visible {
+  background: var(--erp-primary-soft, #deecf9);
+  outline: none;
+}
+
+.po-workflow-strip__tooltip {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  width: min(20rem, 70vw);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--erp-border);
+  background: var(--erp-surface);
+  box-shadow: 0 8px 24px rgb(16 24 40 / 12%);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--erp-text);
+}
+
+.po-workflow-strip__tooltip p {
+  margin: 0;
+}
+
+.po-workflow-strip__tooltip p + p {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--erp-border);
+}
+
+.po-workflow-strip__tooltip-label {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--erp-muted);
 }
 
 .po-workflow-strip__item {

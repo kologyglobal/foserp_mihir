@@ -173,6 +173,7 @@ export function RfqDetailPage() {
         description="Loading…"
         status="…"
         favoritePath="/purchase/rfqs"
+        backLink={{ to: '/purchase/rfqs', label: 'Back to RFQs' }}
         breadcrumbs={[
           { label: 'Purchase', to: '/purchase' },
           { label: 'RFQs', to: '/purchase/rfqs' },
@@ -260,6 +261,7 @@ export function RfqDetailPage() {
         statusTone={purchaseStatusTone(rfq.status)}
         company={sourcePrLabel === 'Manual' ? 'Manual RFQ' : `From ${sourcePrLabel}`}
         favoritePath={`/purchase/rfqs/${rfq.id}`}
+        backLink={{ to: '/purchase/rfqs', label: 'Back to RFQs' }}
         breadcrumbs={[
           { label: 'Purchase', to: '/purchase' },
           { label: 'RFQs', to: '/purchase/rfqs' },
@@ -374,7 +376,7 @@ export function RfqDetailPage() {
             </p>
             <p className="text-[12px] text-erp-muted">Sent / viewed</p>
           </div>
-          <div className="rounded-md border border-erp-border bg-gradient-to-br from-erp-surface to-white px-4 py-3">
+          <div className="rounded-md border border-erp-border bg-white px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
               Estimated Value
             </p>

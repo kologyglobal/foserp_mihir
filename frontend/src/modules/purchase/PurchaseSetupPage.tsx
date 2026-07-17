@@ -305,6 +305,9 @@ export function PurchaseSetupPage() {
     <OperationalPageShell
       title="Purchase Setup"
       description="Company-wide purchase configuration — general defaults, numbering, approvals, tax, matching, receiving, quality, print, and notifications"
+      badge="Purchase"
+      variant="dynamics"
+      showDescription
       favoritePath="/purchase/setup"
       breadcrumbs={[
         { label: 'Purchase', to: '/purchase' },
@@ -329,12 +332,16 @@ export function PurchaseSetupPage() {
         />
       }
     >
+      <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+        Demo mode — Purchase Setup is saved in browser memory only until the purchase API is wired.
+      </p>
+
+      <TabStrip tabs={tabItems} active={tab} onChange={setTab} className="mb-4" />
+
       {loading || !setup ? (
         <LoadingState variant="form" rows={8} />
       ) : (
         <div className="space-y-4">
-          <TabStrip tabs={tabItems} active={tab} onChange={setTab} className="rounded-md border border-erp-border" />
-
           {tab === 'general' && (
             <SectionCard
               title="General Setup"
