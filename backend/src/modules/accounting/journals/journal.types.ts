@@ -42,10 +42,20 @@ export interface JournalTotalsSummary {
   lineCount: number
 }
 
+export interface JournalApprovalLevel {
+  level: number
+  ruleId: string
+  ruleName: string
+  approverRoleId: string | null
+  approverUserId: string | null
+}
+
 export interface JournalApprovalInfo {
   required: boolean
   canSubmit: boolean
   amount: string
+  levels: JournalApprovalLevel[]
+  totalLevels: number
   matchedRuleId?: string | null
   matchedRuleName?: string | null
   approvalLevel?: number
@@ -66,11 +76,11 @@ export interface JournalAllowedActions {
   validate: boolean
   submit: boolean
   cancel: boolean
-  approve: false
-  reject: false
-  sendBack: false
-  post: false
-  reverse: false
+  approve: boolean
+  reject: boolean
+  sendBack: boolean
+  post: boolean
+  reverse: boolean
 }
 
 export interface JournalLineDto {

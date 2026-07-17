@@ -5,6 +5,12 @@ import { ErpButton } from '@/components/erp/ErpButton'
 import { Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import {
+  approveJournal,
+  getJournalApprovals,
+  rejectJournal,
+  sendBackJournal,
+} from '@/services/bridges/approvalApiBridge'
+import {
   cancelJournal,
   getJournal,
   getJournalAudit,
@@ -12,9 +18,25 @@ import {
   validateJournal,
 } from '@/services/bridges/journalApiBridge'
 import type { Journal, JournalAuditEntry, JournalValidationReport } from '@/types/journals'
+import type { JournalApprovalTimelineEntry } from '@/types/approvals'
 import { useFinancePermissions } from '@/utils/permissions/finance'
 import { notify } from '@/store/toastStore'
 import { JournalsWorkspaceShell } from './JournalsWorkspaceShell'
+
+function statusMessage(status: Journal['status']) {
+  switch (status) {
+    case 'PENDING_APPROVAL':
+      return 'Submitted and awaiting approver action at the current level.'
+    case 'SENT_BACK':
+      return 'Sent back by approver — edit and resubmit when ready.'
+    case 'REJECTED':
+      return 'Rejected by approver — read-only.'
+    case 'APPROVED':
+      return 'Approved — ready for posting in Phase 2C2B (posting not available yet).'
+    default:
+      return null
+  }
+}
 
 export function JournalDetailPage() {
   const { id } = useParams()
@@ -23,9 +45,12 @@ export function JournalDetailPage() {
   const [journal, setJournal] = useState<Journal | null>(null)
   const [report, setReport] = useState<JournalValidationReport | null>(null)
   const [audit, setAudit] = useState<JournalAuditEntry[]>([])
+  const [timeline, setTimeline] = useState<JournalApprovalTimelineEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [cancelReason, setCancelReason] = useState('')
   const [showCancel, setShowCancel] = useState(false)
+  const [decisionComments, setDecisionComments] = useState('')
+  const [acting, setActing] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -34,6 +59,15 @@ export function JournalDetailPage() {
       const [j, a] = await Promise.all([getJournal(id), getJournalAudit(id)])
       setJournal(j)
       setAudit(a)
+      if (j.status !== 'DRAFT' || j.approvalRequired) {
+        try {
+          setTimeline(await getJournalApprovals(id))
+        } catch {
+          setTimeline([])
+        }
+      } else {
+        setTimeline([])
+      }
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Failed to load journal')
     } finally {
@@ -82,6 +116,57 @@ export function JournalDetailPage() {
     }
   }
 
+  const runApprove = async () => {
+    if (!id) return
+    setActing(true)
+    try {
+      const updated = await approveJournal(id, decisionComments.trim() || undefined)
+      setJournal(updated)
+      notify.success('Journal approved')
+      void load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Approve failed')
+    } finally {
+      setActing(false)
+    }
+  }
+
+  const runSendBack = async () => {
+    if (!id || !decisionComments.trim()) {
+      notify.error('Comments are required when sending back')
+      return
+    }
+    setActing(true)
+    try {
+      const updated = await sendBackJournal(id, decisionComments.trim())
+      setJournal(updated)
+      notify.success('Journal sent back')
+      void load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Send back failed')
+    } finally {
+      setActing(false)
+    }
+  }
+
+  const runReject = async () => {
+    if (!id || !decisionComments.trim()) {
+      notify.error('Comments are required when rejecting')
+      return
+    }
+    setActing(true)
+    try {
+      const updated = await rejectJournal(id, decisionComments.trim())
+      setJournal(updated)
+      notify.success('Journal rejected')
+      void load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Reject failed')
+    } finally {
+      setActing(false)
+    }
+  }
+
   if (!perms.canViewVouchers) {
     return (
       <JournalsWorkspaceShell title="Journal">
@@ -99,11 +184,12 @@ export function JournalDetailPage() {
   }
 
   const actions = journal.allowedActions
+  const banner = statusMessage(journal.status)
 
   return (
     <JournalsWorkspaceShell
       title={journal.referenceNumber ?? 'Journal'}
-      description={`Status: ${journal.status.replace(/_/g, ' ')} · Voucher number: ${journal.voucherNumber ?? 'Not assigned (Phase 2C1 — no posting)'}`}
+      description={`Status: ${journal.status.replace(/_/g, ' ')} · Voucher number: ${journal.voucherNumber ?? 'Not assigned (no posting in 2C2A)'}`}
       actions={
         <div className="flex flex-wrap gap-2">
           {actions?.edit && perms.canEditVoucher ? (
@@ -121,6 +207,21 @@ export function JournalDetailPage() {
               Submit
             </ErpButton>
           ) : null}
+          {actions?.approve && perms.canApproveVoucher ? (
+            <ErpButton variant="primary" disabled={acting} onClick={() => void runApprove()}>
+              Approve
+            </ErpButton>
+          ) : null}
+          {actions?.sendBack && perms.canApproveVoucher ? (
+            <ErpButton variant="secondary" disabled={acting} onClick={() => void runSendBack()}>
+              Send back
+            </ErpButton>
+          ) : null}
+          {actions?.reject && perms.canApproveVoucher ? (
+            <ErpButton variant="secondary" disabled={acting} onClick={() => void runReject()}>
+              Reject
+            </ErpButton>
+          ) : null}
           {actions?.cancel && perms.canCancelVoucher ? (
             <ErpButton variant="secondary" onClick={() => setShowCancel(true)}>
               Cancel
@@ -129,16 +230,32 @@ export function JournalDetailPage() {
         </div>
       }
     >
+      {banner ? (
+        <div className="mb-4 rounded border border-sky-200 bg-sky-50 p-3 text-[13px] text-sky-900">{banner}</div>
+      ) : null}
+
       <div className="mb-4 grid gap-3 md:grid-cols-3 text-[12px]">
         <div><span className="text-erp-muted">Posting date</span><div className="font-medium">{journal.postingDate}</div></div>
         <div><span className="text-erp-muted">Document date</span><div className="font-medium">{journal.documentDate}</div></div>
         <div><span className="text-erp-muted">Draft reference</span><div className="font-medium">{journal.referenceNumber ?? '—'}</div></div>
         <div><span className="text-erp-muted">Total debit</span><div className="font-medium tabular-nums">{journal.totalDebit}</div></div>
         <div><span className="text-erp-muted">Total credit</span><div className="font-medium tabular-nums">{journal.totalCredit}</div></div>
-        <div><span className="text-erp-muted">Approval required</span><div className="font-medium">{journal.approvalRequired ? 'Yes' : 'No'}</div></div>
+        <div><span className="text-erp-muted">Approval required</span><div className="font-medium">{journal.approvalRequired ? `Yes (level ${journal.currentApprovalLevel})` : 'No'}</div></div>
       </div>
 
       {journal.narration ? <p className="mb-4 text-[13px] text-erp-text">{journal.narration}</p> : null}
+
+      {(actions?.approve || actions?.sendBack || actions?.reject) && journal.status === 'PENDING_APPROVAL' ? (
+        <div className="mb-4">
+          <label className="mb-1 block text-[12px] font-medium">Approver comments</label>
+          <Textarea
+            rows={2}
+            value={decisionComments}
+            onChange={(e) => setDecisionComments(e.target.value)}
+            placeholder="Optional for approve; required for send back or reject"
+          />
+        </div>
+      ) : null}
 
       <div className="mb-4 overflow-x-auto rounded border border-erp-border">
         <table className="w-full min-w-[720px] border-collapse text-[12px]">
@@ -178,17 +295,33 @@ export function JournalDetailPage() {
               ))}
             </ul>
           ) : null}
-          {report.warnings.length ? (
-            <ul className="mt-2 list-disc pl-5 text-amber-700">
-              {report.warnings.map((e, i) => (
-                <li key={i}>{e.message}</li>
-              ))}
-            </ul>
-          ) : null}
           <div className="mt-2 text-erp-muted">
-            Approval: {report.approval.required ? `required (level ${report.approval.approvalLevel ?? 1})` : 'not required'}
+            Approval: {report.approval.required ? `required (${report.approval.totalLevels ?? 1} level(s))` : 'not required'}
             {report.approval.blockReason ? ` — ${report.approval.blockReason}` : ''}
           </div>
+        </div>
+      ) : null}
+
+      {timeline.length > 0 ? (
+        <div className="mb-4 rounded border border-erp-border p-3 text-[12px]">
+          <div className="mb-2 font-medium">Approval timeline</div>
+          <ul className="space-y-2">
+            {timeline.map((cycle) => (
+              <li key={cycle.requestId}>
+                <div className="font-medium">
+                  Cycle {cycle.cycleNumber} — {cycle.status.replace(/_/g, ' ')}
+                </div>
+                <ul className="mt-1 pl-4 text-erp-muted">
+                  {cycle.steps.map((step) => (
+                    <li key={step.id}>
+                      Level {step.level}: {step.status}
+                      {step.comments ? ` — ${step.comments}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 
@@ -220,7 +353,7 @@ export function JournalDetailPage() {
       </div>
 
       <p className="mt-4 text-[11px] text-erp-muted">
-        Phase 2C1: Approve, post, and reverse are not available. Submit moves to APPROVED or PENDING_APPROVAL only — no GL posting or voucher number assignment.
+        Phase 2C2A: Approve / send back / reject are available when allowed. Post is disabled until Phase 2C2B — no GL posting or voucher number assignment in this phase.
       </p>
 
       <Link className="mt-3 inline-block text-[12px] text-sky-700 hover:underline" to="/accounting/entries/journals">

@@ -1,3 +1,29 @@
+## 2026-07-17 — Accounting Phase 2C2A: Journal approval workflow (no posting)
+
+### Why
+Phase 2C1 submitted journals to `PENDING_APPROVAL` but had no runtime approval transactions, eligibility, or approve/send-back/reject actions.
+
+### Change
+- **Prisma:** migration `20260717200000_finance_phase2c2a_approvals` — `FinanceApprovalRequest`, `FinanceApprovalStep` + enums
+- **Backend:** `backend/src/modules/accounting/approvals/*` — create request on submit (multi-level steps, cycle on resubmit), eligibility (maker-checker, role/user approver), approve/send-back/reject (conditional step updates, no GL); audit actions `APPROVAL_REQUEST_CREATED` / `APPROVE` / `SEND_BACK` / `REJECT` / `RESUBMIT` / `APPROVAL_LEVEL_ADVANCED` / `APPROVAL_COMPLETED`; inbox views `my_pending` | `submitted_by_me` | `completed_by_me` | `all`
+- **Frontend:** `/accounting/entries/approvals` inbox (segments + summary cards) + detail; journal timeline for viewers; approve/send-back/reject when `allowedActions` allow; `approvalApiBridge` + `approvalDemoStore`
+- **Script:** `backend/scripts/backfill-finance-approval-requests.ts` (idempotent for stuck `PENDING_APPROVAL` journals)
+- **Tests:** `backend/tests/finance/finance-approvals.test.ts` (9 cases)
+
+### Explicitly NOT in 2C2A
+- No `postingService.post()`, no `PostingEvent`, no `GeneralLedgerEntry`, no voucher number assignment, no functional Post button
+
+### How to verify
+1. `cd backend && npx tsx scripts/prisma-cli.ts migrate deploy && npx prisma generate`
+2. `npm run typecheck && npm test -- tests/finance/` → 52/52 pass
+3. `cd frontend && npm run typecheck`
+4. Submit journal over rule threshold → `PENDING_APPROVAL` + `FinanceApprovalRequest`; approver approve → `APPROVED` (no GL)
+
+### Next
+Phase **2C2B** — post approved journals to GL via posting engine
+
+---
+
 ## 2026-07-17 — Accounting Phase 2C1: Manual journal draft / validate / submit
 
 ### Why

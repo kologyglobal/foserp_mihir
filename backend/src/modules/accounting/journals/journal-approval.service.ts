@@ -1,6 +1,6 @@
 import { prisma } from '../../../config/database.js'
 import { compare, toDecimal } from '../shared/finance-decimal.js'
-import type { JournalApprovalInfo } from './journal.types.js'
+import type { JournalApprovalInfo, JournalApprovalLevel } from './journal.types.js'
 
 export async function resolveJournalApproval(
   tenantId: string,
@@ -31,15 +31,31 @@ export async function resolveJournalApproval(
     return true
   })
 
-  if (matched.length > 0) {
-    const rule = matched[0]!
+  const levels: JournalApprovalLevel[] = []
+  const seenLevels = new Set<number>()
+  for (const rule of matched) {
+    if (seenLevels.has(rule.approvalLevel)) continue
+    seenLevels.add(rule.approvalLevel)
+    levels.push({
+      level: rule.approvalLevel,
+      ruleId: rule.id,
+      ruleName: rule.ruleName,
+      approverRoleId: rule.approverRoleId,
+      approverUserId: rule.approverUserId,
+    })
+  }
+
+  if (levels.length > 0) {
+    const first = levels[0]!
     return {
       required: true,
       canSubmit: true,
       amount: amountStr,
-      matchedRuleId: rule.id,
-      matchedRuleName: rule.ruleName,
-      approvalLevel: rule.approvalLevel,
+      levels,
+      totalLevels: levels.length,
+      matchedRuleId: first.ruleId,
+      matchedRuleName: first.ruleName,
+      approvalLevel: first.level,
     }
   }
 
@@ -51,6 +67,8 @@ export async function resolveJournalApproval(
       required: true,
       canSubmit: false,
       amount: amountStr,
+      levels: [],
+      totalLevels: 0,
       journalApprovalLimit: limit.toFixed(4),
       blockReason: `Journal amount ${amountStr} exceeds the approval limit (${limit.toFixed(4)}) and no matching approval rule is configured`,
     }
@@ -60,6 +78,8 @@ export async function resolveJournalApproval(
     required: false,
     canSubmit: true,
     amount: amountStr,
+    levels: [],
+    totalLevels: 0,
     journalApprovalLimit: limit?.toFixed(4) ?? null,
   }
 }

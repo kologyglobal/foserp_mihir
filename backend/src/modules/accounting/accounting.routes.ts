@@ -13,6 +13,7 @@ import ledgerRoutes from './ledger/ledger.routes.js'
 import voucherRoutes from './posting/voucher.routes.js'
 import postingEventRoutes from './posting/posting-event.routes.js'
 import journalRoutes from './journals/journal.routes.js'
+import approvalRoutes from './approvals/approval.routes.js'
 
 const router = Router({ mergeParams: true })
 
@@ -32,6 +33,7 @@ router.use('/approval-rules', financeApprovalRuleRoutes)
 router.use('/ledger', ledgerRoutes)
 router.use('/vouchers', voucherRoutes)
 router.use('/journals', journalRoutes)
+router.use('/approvals', approvalRoutes)
 router.use('/posting-events', postingEventRoutes)
 
 export default router

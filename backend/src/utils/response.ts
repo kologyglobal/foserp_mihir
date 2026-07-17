@@ -40,10 +40,12 @@ export function sendError(
   statusCode: number,
   message: string,
   errors?: Array<{ field: string; message: string }>,
+  code?: string,
 ): Response {
   return res.status(statusCode).json({
     success: false,
     message,
+    code: code ?? null,
     errors: errors ?? null,
   })
 }

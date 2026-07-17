@@ -16,6 +16,7 @@ import type {
   SetupStatus,
 } from '../../types/financeSetup'
 import type { Journal, JournalAuditEntry, JournalListFilters, JournalValidationReport } from '../../types/journals'
+import type { ApprovalListFilters, ApprovalRequest, JournalApprovalTimelineEntry } from '../../types/approvals'
 import { apiRequest, tenantPath } from './client'
 
 function buildQuery(params?: Record<string, string | number | boolean | undefined | null>): string {
@@ -392,4 +393,41 @@ export async function cancelJournal(id: string, cancellationReason: string) {
 
 export async function getJournalAudit(id: string) {
   return apiRequest<JournalAuditEntry[]>(tenantPath(`/accounting/journals/${id}/audit`))
+}
+
+// ─── Journal approvals (Phase 2C2A) ─────────────────────────────────────────
+
+export async function listApprovalRequests(params: ApprovalListFilters) {
+  return apiRequest<ApprovalRequest[]>(
+    `${tenantPath('/accounting/approvals')}${buildQuery(params as unknown as Record<string, string | number | boolean | undefined>)}`,
+  )
+}
+
+export async function getApprovalRequest(id: string) {
+  return apiRequest<ApprovalRequest>(tenantPath(`/accounting/approvals/${id}`))
+}
+
+export async function getJournalApprovals(journalId: string) {
+  return apiRequest<JournalApprovalTimelineEntry[]>(tenantPath(`/accounting/journals/${journalId}/approvals`))
+}
+
+export async function approveJournal(journalId: string, comments?: string) {
+  return apiRequest<Journal>(tenantPath(`/accounting/journals/${journalId}/approve`), {
+    method: 'POST',
+    body: JSON.stringify({ comments }),
+  })
+}
+
+export async function sendBackJournal(journalId: string, comments: string) {
+  return apiRequest<Journal>(tenantPath(`/accounting/journals/${journalId}/send-back`), {
+    method: 'POST',
+    body: JSON.stringify({ comments }),
+  })
+}
+
+export async function rejectJournal(journalId: string, comments: string) {
+  return apiRequest<Journal>(tenantPath(`/accounting/journals/${journalId}/reject`), {
+    method: 'POST',
+    body: JSON.stringify({ comments }),
+  })
 }

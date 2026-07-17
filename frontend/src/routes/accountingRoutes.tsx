@@ -204,6 +204,8 @@ import {
   PeriodsPage,
 } from '@/modules/accounting/settings'
 import {
+  ApprovalDetailPage,
+  ApprovalInboxPage,
   JournalDetailPage,
   JournalEditPage,
   JournalListPage,
@@ -233,6 +235,8 @@ export const accountingRouteChildren: RouteObject[] = [
   { path: 'accounting/entries/journals/new', element: <JournalNewPage /> },
   { path: 'accounting/entries/journals/:id', element: <JournalDetailPage /> },
   { path: 'accounting/entries/journals/:id/edit', element: <JournalEditPage /> },
+  { path: 'accounting/entries/approvals', element: <ApprovalInboxPage /> },
+  { path: 'accounting/entries/approvals/:id', element: <ApprovalDetailPage /> },
   { path: 'accounting/receivables', element: <ReceivablesDashboardPage /> },
   { path: 'accounting/commercial-commitments', element: <CommercialCommitmentsPage /> },
   { path: 'accounting/receivables/customers', element: <CustomerOutstandingPage /> },

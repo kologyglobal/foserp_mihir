@@ -38,6 +38,7 @@ export const FINANCE_PERMISSIONS = [
   'finance.voucher.edit',
   'finance.voucher.submit',
   'finance.voucher.cancel',
+  'finance.voucher.approve',
 ] as const
 
 export type FinancePermission = (typeof FINANCE_PERMISSIONS)[number]
@@ -79,6 +80,7 @@ const MANAGER: FinancePermission[] = [
   'finance.voucher.edit',
   'finance.voucher.submit',
   'finance.voucher.cancel',
+  'finance.voucher.approve',
 ]
 
 const ROLE_PACKS: Partial<Record<ErpRole, FinancePermission[]>> = {
@@ -133,6 +135,7 @@ export function useFinancePermissions() {
       canEditVoucher: can('finance.voucher.edit'),
       canSubmitVoucher: can('finance.voucher.submit'),
       canCancelVoucher: can('finance.voucher.cancel'),
+      canApproveVoucher: can('finance.voucher.approve'),
       can,
     }
   }, [user.role])

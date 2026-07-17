@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified against codebase: **2026-07-17** (Accounting Phase 2C1 manual journals draft/validate/submit + Phase 2B posting engine; finance tests 43/43 pass).
+Last verified against codebase: **2026-07-17** (Accounting Phase 2C2A journal approval workflow + Phase 2C1 journals + Phase 2B posting engine; finance tests 52/52 pass).
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
@@ -23,7 +23,7 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Category | Modules |
 |----------|---------|
-| **Completed (API mode)** | … **finance ledger foundation Phase 2A**; **manual journals Phase 2C1** (draft/validate/submit — no GL post) |
+| **Completed (API mode)** | … **finance ledger foundation Phase 2A**; **manual journals Phase 2C1**; **journal approval Phase 2C2A** (approve/send-back/reject — no GL post) |
 | **Partially completed** | Auth UI; mobile CRM (API hydrate, no offline); sales-order fulfilment beyond confirm/close; **user/role/tenant admin UI (frontend wired 2026-07-15, not test-verified)** |
 | **Not started** | Login activity module |
 | **Scaffolding (not shipped)** | — (Accounting operational screens: CoA demo, Vouchers, AR/AP, Bank, FA, Manufacturing Accounting, Tax, Reports, Budgeting, Commercial Commitments, Period Close — UI/mock only; **Finance Settings** at `/accounting/settings` is Phase 1 dual-mode, not a stub) |
@@ -400,14 +400,14 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ⚠️ | **2026-07-17:** Finance Settings Phase 1 + **Journals workspace** (`/accounting/entries/journals`, dual-mode). Other operational workspaces still UI/mock |
-| Backend | ⚠️ | Phase 1 setup + 2A ledger + 2B posting engine + **2C1 manual journals** (draft/validate/submit — no `post()`) |
-| DB | ⚠️ | Setup + ledger + manual journal drafts on `AccountingVoucher`; GL only via internal posting engine |
-| API | ⚠️ | Setup + `/accounting/journals` CRUD/validate/submit/cancel + read-only voucher/GL/posting-event GET |
-| Tests | ⚠️ | finance-setup 8 + ledger-foundation 11 + posting-engine 13 + **journals 11** = **43/43** pass |
-| Demo mode | ✅ | Settings + journals demo store |
-| API mode | ⚠️ | Setup + journals workflow (submit → APPROVED/PENDING_APPROVAL, no voucher number) |
-| Remaining gap | Phase 2C2+: journal approve/reject/post, receipt/payment hooks, reversal |
+| Frontend | ⚠️ | **2026-07-17:** Finance Settings Phase 1 + **Journals + Approvals** workspaces (`/accounting/entries/journals`, `/accounting/entries/approvals`, dual-mode). Other operational workspaces still UI/mock |
+| Backend | ⚠️ | Phase 1 setup + 2A ledger + 2B posting engine + **2C1 journals** + **2C2A approval workflow** (no `post()`) |
+| DB | ⚠️ | Setup + ledger + `FinanceApprovalRequest`/`FinanceApprovalStep` + manual journals on `AccountingVoucher`; GL only via internal posting engine |
+| API | ⚠️ | Setup + `/accounting/journals` + `/accounting/approvals` + approve/send-back/reject; read-only voucher/GL/posting-event GET |
+| Tests | ⚠️ | finance-setup 8 + ledger-foundation 11 + posting-engine 13 + journals 11 + **approvals 9** = **52/52** pass |
+| Demo mode | ✅ | Settings + journals + approvals demo stores |
+| API mode | ⚠️ | Setup + journals workflow + multi-level approval (final approve → APPROVED, no voucher number) |
+| Remaining gap | Phase **2C2B**: post approved journals to GL; receipt/payment hooks, reversal |
 
 ### Mobile CRM
 

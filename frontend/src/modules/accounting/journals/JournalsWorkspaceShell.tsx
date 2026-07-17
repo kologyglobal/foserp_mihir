@@ -8,7 +8,7 @@ import { shouldNavigate } from '@/utils/safeState'
 const TABS = [
   { label: 'Journals', path: '/accounting/entries/journals' },
   { label: 'All Entries', path: '/accounting/ledger-entries' },
-  { label: 'Approvals', path: '/accounting/entries/journals?tab=approvals' },
+  { label: 'Approvals', path: '/accounting/entries/approvals' },
   { label: 'General Ledger', path: '/accounting/ledger-entries' },
 ]
 
@@ -18,18 +18,23 @@ export function JournalsWorkspaceShell({
   children,
   actions,
   commandBar,
+  activeTab,
 }: {
   title: string
   description?: string
   children: ReactNode
   actions?: ReactNode
   commandBar?: ReactNode
+  activeTab?: 'journals' | 'approvals'
 }) {
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
-  const activePath = pathname.startsWith('/accounting/entries/journals')
-    ? '/accounting/entries/journals'
-    : pathname
+  const activePath =
+    activeTab === 'approvals' || pathname.startsWith('/accounting/entries/approvals')
+      ? '/accounting/entries/approvals'
+      : pathname.startsWith('/accounting/entries/journals')
+        ? '/accounting/entries/journals'
+        : pathname
 
   return (
     <OperationalPageShell
@@ -37,7 +42,10 @@ export function JournalsWorkspaceShell({
       layout="enterprise"
       badge="Accounting"
       title={title}
-      description={description ?? 'Create, validate, and submit manual journal entries — draft workflow only (no posting in this phase).'}
+      description={
+        description ??
+        'Create, validate, submit, and approve manual journal entries — posting is deferred to Phase 2C2B.'
+      }
       breadcrumbs={[
         { label: 'Accounting', to: '/accounting' },
         { label: 'Entries', to: '/accounting/entries/journals' },
@@ -59,18 +67,9 @@ export function JournalsWorkspaceShell({
           items={TABS}
           activePath={activePath}
           onChange={(path) => {
-            if (path.includes('?tab=approvals')) {
-              navigate('/accounting/entries/journals')
-              return
-            }
             if (shouldNavigate(pathname, path)) navigate(path)
           }}
         />
-        {search.includes('tab=approvals') ? (
-          <div className="rounded border border-amber-200 bg-amber-50 p-4 text-[13px] text-amber-900">
-            Journal approvals will be available in the next phase. Submitted journals route to approval status only — no approve/reject actions yet.
-          </div>
-        ) : null}
         <div className="min-w-0 rounded border border-erp-border bg-white p-3">{children}</div>
       </div>
     </OperationalPageShell>

@@ -255,6 +255,8 @@ function balancedLines(accountAId: string, accountBId: string, amount = '1000.00
 }
 
 async function cleanupTenant(tenantId: string) {
+  await prisma.financeApprovalStep.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.financeApprovalRequest.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.generalLedgerEntry.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.accountingVoucherLine.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.accountingVoucher.deleteMany({ where: { tenantId } }).catch(() => {})

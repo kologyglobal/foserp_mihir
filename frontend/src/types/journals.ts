@@ -36,11 +36,11 @@ export interface JournalAllowedActions {
   validate: boolean
   submit: boolean
   cancel: boolean
-  approve: false
-  reject: false
-  sendBack: false
-  post: false
-  reverse: false
+  approve: boolean
+  reject: boolean
+  sendBack: boolean
+  post: boolean
+  reverse: boolean
 }
 
 export interface Journal {
@@ -99,6 +99,14 @@ export interface JournalValidationReport {
     required: boolean
     canSubmit: boolean
     amount: string
+    levels?: Array<{
+      level: number
+      ruleId: string
+      ruleName: string
+      approverRoleId: string | null
+      approverUserId: string | null
+    }>
+    totalLevels?: number
     matchedRuleId?: string | null
     matchedRuleName?: string | null
     approvalLevel?: number

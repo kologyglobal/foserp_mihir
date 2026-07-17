@@ -62,6 +62,24 @@ export function requirePermission(...required: string[]) {
   }
 }
 
+/** Pass if the user has any one of the listed permissions (or tenant.manage). */
+export function requireAnyPermission(...required: string[]) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    if (!req.context) {
+      next(new AuthenticationError())
+      return
+    }
+    const hasAny = required.some(
+      (p) => req.context!.permissions.includes(p) || req.context!.permissions.includes('tenant.manage'),
+    )
+    if (!hasAny) {
+      next(new AuthorizationError(`Missing permission: one of ${required.join(', ')}`))
+      return
+    }
+    next()
+  }
+}
+
 export function requireSuperAdmin(req: Request, _res: Response, next: NextFunction): void {
   if (!req.context?.isSuperAdmin) {
     next(new AuthorizationError('Super Admin access required'))

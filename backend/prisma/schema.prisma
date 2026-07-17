@@ -143,6 +143,8 @@ model Tenant {
   generalLedgerEntries GeneralLedgerEntry[]
   postingEvents        PostingEvent[]
   postingRules         PostingRule[]
+  financeApprovalRequests FinanceApprovalRequest[]
+  financeApprovalSteps    FinanceApprovalStep[]
 
   @@index([status])
   @@index([deletedAt])
@@ -1617,6 +1619,8 @@ model LegalEntity {
   generalLedgerEntries   GeneralLedgerEntry[]
   postingEvents          PostingEvent[]
   postingRules           PostingRule[]
+  financeApprovalRequests FinanceApprovalRequest[]
+  financeApprovalSteps    FinanceApprovalStep[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2249,5 +2253,113 @@ model PostingRule {
   @@index([legalEntityId, eventType, isActive])
   @@index([legalEntityId, priority])
   @@map("posting_rules")
+}
+
+// ─── Accounting Phase 2C2A — Runtime approval requests (not posting) ──────────
+
+enum FinanceApprovalDocumentType {
+  JOURNAL
+  PAYMENT
+  RECEIPT
+  CREDIT_NOTE
+  DEBIT_NOTE
+  PERIOD_REOPEN
+}
+
+enum FinanceApprovalRequestStatus {
+  PENDING
+  APPROVED
+  SENT_BACK
+  REJECTED
+  CANCELLED
+}
+
+enum FinanceApprovalStepStatus {
+  WAITING
+  PENDING
+  APPROVED
+  SENT_BACK
+  REJECTED
+  SKIPPED
+  CANCELLED
+}
+
+/// Runtime approval transaction — distinct from FinanceApprovalRule (configuration).
+model FinanceApprovalRequest {
+  id                      String                        @id @default(uuid())
+  tenantId                String
+  legalEntityId           String
+
+  documentType            FinanceApprovalDocumentType
+  documentId              String
+  documentNumberSnapshot  String?                       @db.VarChar(64)
+  documentStatusSnapshot  String?                       @db.VarChar(32)
+
+  cycleNumber             Int                           @default(1)
+  status                  FinanceApprovalRequestStatus  @default(PENDING)
+
+  amountBasis             Decimal                       @db.Decimal(18, 4)
+  currencyCode            String                        @default("INR") @db.VarChar(8)
+
+  currentLevel            Int                           @default(1)
+  totalLevels             Int                           @default(1)
+
+  requestedBy             String?
+  requestedAt             DateTime                      @default(now())
+
+  completedAt             DateTime?
+  completedBy             String?
+
+  ruleSnapshotJson        Json?
+  workflowSnapshotJson    Json?
+
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity            @relation(fields: [legalEntityId], references: [id])
+  steps       FinanceApprovalStep[]
+
+  @@unique([tenantId, legalEntityId, documentType, documentId, cycleNumber], map: "fin_appr_req_doc_cycle_key")
+  @@index([tenantId, legalEntityId, status], map: "fin_appr_req_le_status_idx")
+  @@index([documentType, documentId], map: "fin_appr_req_doc_idx")
+  @@index([requestedBy, requestedAt], map: "fin_appr_req_requester_idx")
+  @@index([currentLevel, status], map: "fin_appr_req_level_status_idx")
+  @@map("finance_approval_requests")
+}
+
+model FinanceApprovalStep {
+  id                  String                     @id @default(uuid())
+  tenantId            String
+  legalEntityId       String
+  approvalRequestId   String
+
+  level               Int
+  sequence            Int                        @default(1)
+
+  approverRoleId      String?
+  approverUserId      String?
+
+  status              FinanceApprovalStepStatus  @default(WAITING)
+
+  actedBy             String?
+  actedAt             DateTime?
+  comments            String?                    @db.VarChar(1000)
+
+  delegatedFromUserId String?
+  metadataJson        Json?
+
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id])
+  legalEntity     LegalEntity            @relation(fields: [legalEntityId], references: [id])
+  approvalRequest FinanceApprovalRequest @relation(fields: [approvalRequestId], references: [id])
+
+  @@unique([approvalRequestId, level, sequence], map: "fin_appr_step_level_seq_key")
+  @@index([tenantId])
+  @@index([approvalRequestId, status], map: "fin_appr_step_req_status_idx")
+  @@index([approverUserId, status], map: "fin_appr_step_user_status_idx")
+  @@map("finance_approval_steps")
 }
 

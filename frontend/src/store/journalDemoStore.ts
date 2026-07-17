@@ -9,6 +9,8 @@ import type {
   UpdateJournalInput,
 } from '../types/journals'
 import type { JournalLine } from '../types/journals'
+import { getApprovalDemoState } from './approvalDemoStore'
+import { hasFinancePermission } from '../utils/permissions/finance'
 import { resolveLegalEntityId } from '../services/bridges/financeApiBridge'
 
 function id() {
@@ -87,6 +89,10 @@ function validateDemoJournal(journal: Journal, mode: 'draft' | 'submit'): Journa
       required: approvalRequired,
       canSubmit: !(mode === 'submit' && approvalRequired && amount >= 50000),
       amount: amount.toFixed(4),
+      levels: approvalRequired
+        ? [{ level: 1, ruleId: 'demo-rule', ruleName: 'Demo large journal rule', approverRoleId: null, approverUserId: null }]
+        : [],
+      totalLevels: approvalRequired ? 1 : 0,
       matchedRuleName: approvalRequired ? 'Demo large journal rule' : null,
       approvalLevel: approvalRequired ? 1 : 0,
     },
@@ -95,14 +101,16 @@ function validateDemoJournal(journal: Journal, mode: 'draft' | 'submit'): Journa
 
 function allowedActions(journal: Journal): Journal['allowedActions'] {
   const editable = journal.status === 'DRAFT' || journal.status === 'SENT_BACK'
+  const pending = journal.status === 'PENDING_APPROVAL'
+  const canApprove = pending && hasFinancePermission('finance.voucher.approve')
   return {
     edit: editable,
     validate: true,
     submit: editable,
     cancel: editable,
-    approve: false,
-    reject: false,
-    sendBack: false,
+    approve: canApprove,
+    reject: canApprove,
+    sendBack: canApprove,
     post: false,
     reverse: false,
   }
@@ -252,6 +260,9 @@ export const useJournalDemoStore = create<JournalDemoState>()(
           voucherNumber: null,
         }
         updated.allowedActions = allowedActions(updated)
+        if (report.approval.required) {
+          getApprovalDemoState().createOnSubmit(updated)
+        }
         set((s) => ({
           journals: s.journals.map((j) => (j.id === journalId ? updated : j)),
           audit: {
@@ -297,6 +308,16 @@ export const useJournalDemoStore = create<JournalDemoState>()(
 
 export function getJournalDemoState() {
   return useJournalDemoStore.getState()
+}
+
+export function patchJournalInDemo(id: string, patch: Partial<Journal>) {
+  useJournalDemoStore.setState((s) => ({
+    journals: s.journals.map((j) => {
+      if (j.id !== id) return j
+      const merged = { ...j, ...patch }
+      return { ...merged, allowedActions: allowedActions(merged) }
+    }),
+  }))
 }
 
 export function demoListJournals(filters?: Partial<JournalListFilters>) {
