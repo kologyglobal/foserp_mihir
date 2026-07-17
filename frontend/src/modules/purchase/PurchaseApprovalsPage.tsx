@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RefreshCw, Settings2 } from 'lucide-react'
+import { RefreshCw, Settings2, ShieldCheck } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { EmptyState } from '@/components/ui/EmptyState'

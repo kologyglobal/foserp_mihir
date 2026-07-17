@@ -156,7 +156,7 @@ export function PurchaseReturnEditorPage() {
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([])
   const [inspections, setInspections] = useState<QualityInspection[]>([])
 
-  const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(true)
+  const { markDirty, resetDirty } = useUnsavedChangesGuard(true)
   const locations = [PURCHASE_DEMO_LOCATION, PURCHASE_DEMO_LOCATION_FG]
 
   const selectedVendor = useMemo(() => vendors.find((v) => v.id === vendorId), [vendors, vendorId])
