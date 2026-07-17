@@ -146,7 +146,7 @@ export function RfqEditorPage() {
   const [catalogItems, setCatalogItems] = useState<PurchaseItem[]>([])
   const [allVendors, setAllVendors] = useState<Vendor[]>([])
 
-  const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(true)
+  const { markDirty, resetDirty } = useUnsavedChangesGuard(true)
 
   const locations = [PURCHASE_DEMO_LOCATION, PURCHASE_DEMO_LOCATION_FG]
 
