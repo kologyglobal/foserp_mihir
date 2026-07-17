@@ -6,6 +6,7 @@ import { buildRouteBreadcrumbs, getPageLabel } from '../../utils/pageNavigation'
 import { useUIStore } from '../../store/uiStore'
 import { useWorkspacePageHeaderSetters } from '../../context/WorkspacePageHeaderContext'
 import { Breadcrumbs } from '../ui/Breadcrumbs'
+import { PageBackLink } from '../ui/PageBackLink'
 import { StickyCommandBar } from './StickyCommandBar'
 import { PageInsightsStrip, type PageInsight } from './PageInsightsStrip'
 import { EnterpriseKpiStrip } from '../../design-system/enterprise/EnterpriseKpiStrip'
@@ -47,6 +48,8 @@ interface OperationalPageShellProps {
   mergeHeaderWithWorkspace?: boolean
   /** Hide chrome title/fav — page commandBar supplies sticky record header */
   workspaceRecordHeader?: boolean
+  /** In-page back link above content (preferred on view/detail pages). */
+  backLink?: { to: string; label: string }
 }
 
 /**
@@ -74,6 +77,7 @@ export function OperationalPageShell({
   showDescription = false,
   mergeHeaderWithWorkspace,
   workspaceRecordHeader = false,
+  backLink,
 }: OperationalPageShellProps) {
   const { pathname } = useLocation()
   const toggleFavorite = useUIStore((s) => s.toggleFavorite)
@@ -99,6 +103,8 @@ export function OperationalPageShell({
       badge,
       favoritePath: path,
       recordHeader: workspaceRecordHeader || undefined,
+      // Back stays in page content — not the workspace suite / status-bar chrome
+      backLink: undefined,
     }),
     [crumbItems, title, badge, path, workspaceRecordHeader],
   )
@@ -191,6 +197,9 @@ export function OperationalPageShell({
           </div>
         )}
       </header>
+
+      {/* Back always above Purpose / guide — never after or inside the guide. */}
+      {backLink ? <PageBackLink to={backLink.to} label={backLink.label} /> : null}
 
       {guide ? <ErpPageGuide purpose={guide.purpose} nextStep={guide.nextStep} className="mb-3" /> : null}
 

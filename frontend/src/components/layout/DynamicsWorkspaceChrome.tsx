@@ -77,6 +77,20 @@ function DynamicsWorkspaceChromeInner({ children }: { children: ReactNode }) {
     />
   ) : null
 
+  /** Module pages: label + spaced tab strip (not flush under suite bar). */
+  const moduleTabsBand =
+    useModuleTabs && tabsNode ? (
+      <div className="d365-module-nav-band">
+        <div className="d365-module-nav-band__head">
+          <span className="d365-module-nav-band__eyebrow">Module</span>
+          <span className="d365-module-nav-band__title">{moduleSubNav!.categoryTitle}</span>
+        </div>
+        <div className="d365-module-nav-band__tabs">{tabsNode}</div>
+      </div>
+    ) : null
+
+  const stickyTabs = moduleTabsBand ?? tabsNode
+
   return (
     <div className="d365-workspace">
       <div className="d365-workspace-sticky">
@@ -85,7 +99,15 @@ function DynamicsWorkspaceChromeInner({ children }: { children: ReactNode }) {
             meta={mergedMeta}
             commandBar={commandBar}
             actions={actions}
-            tabs={tabsNode}
+            tabs={
+              useModuleTabs && tabsNode ? (
+                <div className="d365-module-nav-band d365-module-nav-band--embedded">
+                  <div className="d365-module-nav-band__tabs">{tabsNode}</div>
+                </div>
+              ) : (
+                tabsNode
+              )
+            }
           />
         ) : (
           <>
@@ -100,7 +122,7 @@ function DynamicsWorkspaceChromeInner({ children }: { children: ReactNode }) {
                 </div>
               </div>
             )}
-            {tabsNode}
+            {stickyTabs}
           </>
         )}
 

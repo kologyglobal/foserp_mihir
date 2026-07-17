@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useBeforeUnload, useBlocker } from 'react-router-dom'
-import { systemConfirm } from '@/utils/systemConfirm'
+import { appConfirm } from '@/store/confirmDialogStore'
 
 /**
  * Blocks in-app navigation and browser unload when the form has unsaved changes.
  * Call `resetDirty()` after a successful save.
  *
- * In-app leave uses the ERP confirm dialog. Browser tab close still uses the
- * native beforeunload prompt (browsers do not allow custom UI there).
+ * In-app leave uses `ConfirmDialog` via `appConfirm` — never `window.confirm`.
+ * Tab/window close still uses the native beforeunload prompt (browsers require it).
  */
 export function useUnsavedChangesGuard(enabled: boolean) {
   const dirtyRef = useRef(false)
@@ -43,12 +43,12 @@ export function useUnsavedChangesGuard(enabled: boolean) {
   useEffect(() => {
     if (blocker.state !== 'blocked') return
     let cancelled = false
-    void systemConfirm({
+    void appConfirm({
       title: 'Unsaved changes',
       description: 'You have unsaved changes. Leave this page and discard them?',
       confirmLabel: 'Leave page',
       cancelLabel: 'Keep editing',
-      variant: 'danger',
+      tone: 'danger',
     }).then((leave) => {
       if (cancelled) return
       if (leave) blocker.proceed()

@@ -14,6 +14,8 @@ export type WorkspacePageHeaderMeta = {
   favoritePath?: string
   /** When true, hide chrome title/badge/fav — page supplies its own sticky record header */
   recordHeader?: boolean
+  /** In-page back — rendered at top of workspace header (view/detail pages) */
+  backLink?: { to: string; label: string }
 }
 
 export type WorkspacePageHeaderChrome = {
@@ -45,6 +47,8 @@ function metaEqual(a: WorkspacePageHeaderMeta | null, b: WorkspacePageHeaderMeta
     || a.badge !== b.badge
     || a.favoritePath !== b.favoritePath
     || a.recordHeader !== b.recordHeader
+    || a.backLink?.to !== b.backLink?.to
+    || a.backLink?.label !== b.backLink?.label
   ) return false
   const aCrumbs = a.breadcrumbs ?? []
   const bCrumbs = b.breadcrumbs ?? []

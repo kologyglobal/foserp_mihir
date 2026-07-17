@@ -38,8 +38,10 @@ export function ErpFormFooter({
   return (
     <div
       className={cn(
-        'erp-form-footer flex flex-wrap items-center justify-between gap-3 border border-erp-border bg-erp-surface/95 px-4 py-3 shadow-[var(--erp-shadow-card)] backdrop-blur-sm',
-        sticky && 'erp-form-footer-sticky',
+        'erp-form-footer flex flex-wrap items-center justify-between gap-3 px-4 py-3',
+        sticky
+          ? 'erp-form-footer-sticky'
+          : 'border border-erp-border bg-erp-surface/95 shadow-[var(--erp-shadow-card)] backdrop-blur-sm',
         className,
       )}
     >
