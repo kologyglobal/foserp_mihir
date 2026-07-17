@@ -119,7 +119,6 @@ export function PurchaseMastersHubPage() {
   const locations = useMasterStore((s) => s.locations)
   const uoms = useMasterStore((s) => s.uoms)
   const categories = useMasterStore((s) => s.categories)
-  const activeCount = entries.filter((e) => e.status === 'active').length
 
   const linkedCounts: Record<string, number> = {
     vendors: vendors.length,
@@ -178,12 +177,6 @@ export function PurchaseMastersHubPage() {
           ]}
         />
       )}
-      insights={[
-        { label: 'Registers Used', value: PURCHASE_MASTERS_CATALOG.length + PURCHASE_LINKED_MASTERS.length, accent: 'blue' },
-        { label: 'Purchase Values', value: activeCount, accent: 'green' },
-        { label: 'Vendors', value: vendors.length, accent: 'slate' },
-        { label: 'Items', value: items.length, accent: 'amber' },
-      ]}
     >
       <div className="space-y-8">
         {grouped.map(({ group, label, items: groupItems }) =>

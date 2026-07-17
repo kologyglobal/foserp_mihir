@@ -26,7 +26,6 @@ import {
   type PrListFilters,
   type PrSortKey,
 } from '../../config/prFilterConfig'
-import { buildPrRegisterKpiItems } from '../../utils/prKpiItems'
 import {
   buildPrRegisterOverview,
   buildPrRegisterSuggestions,
@@ -36,7 +35,6 @@ import {
   convertPurchaseRequisitionToPo,
   convertPurchaseRequisitionToRfq,
   duplicatePurchaseRequisition,
-  getPurchaseRequisitionListSummary,
   getPurchaseRequisitions,
   PurchaseServiceError,
   submitPurchaseRequisition,
@@ -90,13 +88,6 @@ export function PurchaseRequisitionListPage() {
   }))
   const [sortBy, setSortBy] = useState<PrSortKey>('documentDate')
   const [rows, setRows] = useState<PurchaseRequisitionListRow[]>([])
-  const [summary, setSummary] = useState({
-    total: 0,
-    draft: 0,
-    pendingApproval: 0,
-    approved: 0,
-    converted: 0,
-  })
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
@@ -106,13 +97,9 @@ export function PurchaseRequisitionListPage() {
     setLoadState('loading')
     setErrorMessage(null)
     try {
-      const [list, stats] = await Promise.all([
-        getPurchaseRequisitions(),
-        getPurchaseRequisitionListSummary(),
-      ])
+      const list = await getPurchaseRequisitions()
       if (signal?.cancelled) return
       setRows(list)
-      setSummary(stats)
       setLoadState(list.length === 0 ? 'empty' : 'ready')
     } catch (err) {
       if (signal?.cancelled) return
@@ -256,14 +243,6 @@ export function PurchaseRequisitionListPage() {
     if (filters.source) list = list.filter((r) => r.source === filters.source)
     return sortPrRows(list, sortBy)
   }, [rows, filters, sortBy])
-
-  const prKpiStrip = useMemo(
-    () =>
-      buildPrRegisterKpiItems(rows, summary, filters.status, (status) =>
-        setFilters((f) => ({ ...f, status })),
-      ),
-    [rows, summary, filters.status],
-  )
 
   const applyStatusFilter = useCallback((status: string) => {
     setFilters((f) => ({ ...f, status }))
@@ -495,7 +474,6 @@ export function PurchaseRequisitionListPage() {
             ]}
           />
         }
-        kpiStrip={prKpiStrip}
       >
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
           <div className="min-w-0 space-y-3">
