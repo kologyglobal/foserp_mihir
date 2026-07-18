@@ -78,6 +78,13 @@ import {
   resolveSalesOrderDetailPath,
   resolveSalesOrderPrintPath,
 } from '../../utils/crmSalesOrderNavigation'
+import {
+  buildPendingSoCreateUrl,
+  isPendingSalesOrderHandover,
+  listPendingQuotationSoHandovers,
+  PENDING_SO_STATUS,
+} from '../../utils/pendingSalesOrderHandover'
+import { salesOrderStatusLabel } from '../../utils/salesOrderStatus'
 import { buildProformaNewUrl } from '../../utils/proformaInvoicePrefill'
 import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
 import { systemConfirm } from '../../utils/systemConfirm'
@@ -721,6 +728,7 @@ const CRM_SO_FILTER_FIELDS: CrmFilterField[] = [
     key: 'status',
     label: 'Status',
     options: [
+      { value: 'pending_so', label: 'Pending SO' },
       { value: 'open', label: 'Draft SO' },
       { value: 'confirmed', label: 'Confirmed' },
       { value: 'in_production', label: 'In Production' },
@@ -756,13 +764,28 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
   const salesOrders = useMrpStore((s) => s.salesOrders) ?? []
   const deleteSalesOrderDraft = useMrpStore((s) => s.deleteSalesOrderDraft)
   const triggerProduction = useSalesStore((s) => s.triggerProductionForOrder)
+  const quotations = useSalesStore((s) => s.quotations) ?? []
   const workOrders = useWorkOrderStore((s) => s.workOrders)
-  const quotationDocuments = useCrmStore((s) => s.quotationDocuments)
+  const quotationDocuments = useCrmStore((s) => s.quotationDocuments) ?? []
+  const opportunities = useCrmStore((s) => s.opportunities) ?? []
   const { customerName, productName, products } = useMasterLabels()
   const openDetailPanel = useUIStore((s) => s.openDetailPanel)
   const pendingApprovals = useMemo(
     () => quotationDocuments.filter((d) => d.status === 'pending_approval').length,
     [quotationDocuments],
+  )
+  const pendingHandoverRows = useMemo(
+    () => listPendingQuotationSoHandovers({
+      quotationDocuments,
+      quotations,
+      opportunities,
+      salesOrders,
+    }),
+    [quotationDocuments, quotations, opportunities, salesOrders],
+  )
+  const registerRows = useMemo(
+    () => [...pendingHandoverRows, ...salesOrders],
+    [pendingHandoverRows, salesOrders],
   )
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<SalesOrderSortKey>('orderDate')
@@ -806,19 +829,20 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
   const directOrders = salesOrders.filter((o) => o.source === 'direct' && !o.quotationId).length
   const draftCount = salesOrders.filter((o) => o.status === 'open').length
   const confirmedCount = salesOrders.filter((o) => o.status === 'confirmed').length
-  const totalValue = salesOrders.reduce(
+  const pendingSoCount = pendingHandoverRows.length
+  const totalValue = registerRows.reduce(
     (s, o) => s + resolveSalesOrderValue(o, products.find((p) => p.id === o.productId)),
     0,
   )
 
   const filtered = useMemo(() => {
-    let list = [...salesOrders]
+    let list = [...registerRows]
     if (statusFilter) list = list.filter((o) => o.status === statusFilter)
     if (sourceFilter === 'quotation') {
       list = list.filter((o) => o.source === 'quotation' || Boolean(o.quotationId))
     }
     if (sourceFilter === 'direct') {
-      list = list.filter((o) => o.source === 'direct' && !o.quotationId)
+      list = list.filter((o) => o.source === 'direct' && !o.quotationId && !isPendingSalesOrderHandover(o))
     }
     if (search) {
       const s = search.toLowerCase()
@@ -832,7 +856,7 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
       )
     }
     return list
-  }, [salesOrders, statusFilter, sourceFilter, search, customerName, productName])
+  }, [registerRows, statusFilter, sourceFilter, search, customerName, productName])
 
   const sorted = useMemo(() => {
     const resolveValue = (so: SalesOrder) =>
@@ -850,7 +874,11 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
     fields: CRM_SO_FILTER_FIELDS,
     defaults: { search: '', status: '', source: '' },
     chipLabelResolver: (key, value) => {
-      if (key === 'status') return formatStatus(value)
+      if (key === 'status') {
+        if (value === PENDING_SO_STATUS) return 'Pending SO'
+        if (value === 'open') return 'Draft SO'
+        return formatStatus(value)
+      }
       if (key === 'source') return `Source: ${value}`
       return undefined
     },
@@ -869,9 +897,10 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
   const salesOrderKpiStrip = useMemo(
     () =>
       buildSalesOrderRegisterKpis({
-        total: salesOrders.length,
+        total: salesOrders.length + pendingSoCount,
         draftCount,
         confirmedCount,
+        pendingSoCount,
         fromQuotation,
         directOrders,
         totalValue,
@@ -881,10 +910,63 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
           if (patch.source !== undefined) setSourceFilter(patch.source)
         },
       }),
-    [salesOrders.length, draftCount, confirmedCount, fromQuotation, directOrders, totalValue, statusFilter, sourceFilter],
+    [
+      salesOrders.length,
+      pendingSoCount,
+      draftCount,
+      confirmedCount,
+      fromQuotation,
+      directOrders,
+      totalValue,
+      statusFilter,
+      sourceFilter,
+    ],
   )
 
   function openSalesOrderPreview(so: SalesOrder) {
+    if (isPendingSalesOrderHandover(so)) {
+      const product = products.find((p) => p.id === so.productId)
+      const value = resolveSalesOrderValue(so, product)
+      openDetailPanel({
+        title: so.quotationNo ?? so.salesOrderNo,
+        subtitle: customerName(so.customerId),
+        fields: [
+          { label: 'Status', value: 'Pending SO' },
+          { label: 'Fulfillment', value: 'Awaiting SO' },
+          { label: 'Company', value: customerName(so.customerId) },
+          { label: 'Product', value: productName(so.productId) },
+          { label: 'Qty', value: formatNumber(so.qty) },
+          { label: 'Value', value: value > 0 ? formatCurrency(value) : '—' },
+          { label: 'Source', value: 'Won / approved quotation' },
+          { label: 'Quotation', value: so.quotationNo ? `${so.quotationNo} Rev ${so.quotationRevisionNo ?? 1}` : '—' },
+        ],
+        links: [
+          ...(so.quotationId
+            ? [{ label: 'Open Quotation', href: crmQuotationPath(so.quotationId) }]
+            : []),
+        ],
+        timeline: [
+          {
+            id: 'status',
+            label: 'Pending SO',
+            time: formatDate(so.orderDate ?? so.createdAt),
+            status: 'current',
+          },
+        ],
+        aiSummary: `Approved quotation ${so.quotationNo ?? ''} for ${customerName(so.customerId)} is awaiting sales order conversion (${value > 0 ? formatCurrency(value) : 'TBD'}).`,
+        actions: [
+          {
+            label: 'Create Sales Order',
+            onClick: () => navigate(buildPendingSoCreateUrl(so, { fromCrm: crmMode })),
+            primary: true,
+          },
+          ...(so.quotationId
+            ? [{ label: 'View Quotation', onClick: () => navigate(crmQuotationPath(so.quotationId!)) }]
+            : []),
+        ],
+      })
+      return
+    }
     const product = products.find((p) => p.id === so.productId)
     const value = resolveSalesOrderValue(so, product)
     const woCount = workOrders.filter((w) => w.salesOrderId === so.id).length
@@ -892,7 +974,7 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
       title: so.salesOrderNo,
       subtitle: customerName(so.customerId),
       fields: [
-        { label: 'Status', value: so.status === 'open' ? 'Draft SO' : formatStatus(so.status) },
+        { label: 'Status', value: salesOrderStatusLabel(so.status) },
         { label: 'Fulfillment', value: getSalesOrderFulfillmentLabel(so, workOrders) },
         { label: 'Company', value: customerName(so.customerId) },
         { label: 'Product', value: productName(so.productId) },
@@ -917,12 +999,12 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
       timeline: [
         {
           id: 'status',
-          label: so.status === 'open' ? 'Draft SO' : formatStatus(so.status),
+          label: salesOrderStatusLabel(so.status),
           time: formatDate(so.requiredDate),
           status: 'current',
         },
       ],
-      aiSummary: `${so.salesOrderNo} for ${customerName(so.customerId)} is ${so.status === 'open' ? 'draft' : formatStatus(so.status).toLowerCase()} worth ${value > 0 ? formatCurrency(value) : 'TBD'}. Fulfillment: ${getSalesOrderFulfillmentLabel(so, workOrders).toLowerCase()}.`,
+      aiSummary: `${so.salesOrderNo} for ${customerName(so.customerId)} is ${salesOrderStatusLabel(so.status).toLowerCase()} worth ${value > 0 ? formatCurrency(value) : 'TBD'}. Fulfillment: ${getSalesOrderFulfillmentLabel(so, workOrders).toLowerCase()}.`,
       actions: [
         { label: 'Open 360', onClick: () => navigate(resolveSalesOrderDetailPath(so.id, crmMode)), primary: true },
         ...(so.status === 'open'
@@ -933,6 +1015,7 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
   }
 
   function handleDeleteSalesOrder(so: SalesOrder) {
+    if (isPendingSalesOrderHandover(so)) return
     void systemConfirm({
       title: 'Delete draft sales order?',
       description: `Delete draft ${so.salesOrderNo}? This cannot be undone.`,
@@ -956,10 +1039,18 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
   }
 
   function handlePrintSalesOrder(so: SalesOrder) {
+    if (isPendingSalesOrderHandover(so)) {
+      if (so.quotationId) navigate(crmQuotationPath(so.quotationId))
+      return
+    }
     navigate(resolveSalesOrderPrintPath(so.id, crmMode))
   }
 
   function handleCreateProforma(so: SalesOrder) {
+    if (isPendingSalesOrderHandover(so)) {
+      setToast('Create the sales order from this quotation before raising a proforma.')
+      return
+    }
     const active = useProformaInvoiceStore
       .getState()
       .proformaInvoices.find((p) => p.salesOrderId === so.id && p.status !== 'cancelled')
@@ -979,6 +1070,10 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
   }
 
   function handleConvertSalesOrder(so: SalesOrder) {
+    if (isPendingSalesOrderHandover(so)) {
+      navigate(buildPendingSoCreateUrl(so, { fromCrm: crmMode }))
+      return
+    }
     if (so.status === 'open') {
       navigate(`${resolveSalesOrderDetailPath(so.id, crmMode)}?confirm=1`)
       return
@@ -992,6 +1087,10 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
   }
 
   function handleDuplicateSalesOrder(so: SalesOrder) {
+    if (isPendingSalesOrderHandover(so)) {
+      navigate(buildPendingSoCreateUrl(so, { fromCrm: crmMode }))
+      return
+    }
     // Duplicate is always a Sales-side create — never a CRM blank Direct funnel bypass.
     const params = new URLSearchParams({
       customerId: so.customerId,
@@ -1000,6 +1099,23 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
     })
     if (so.quotationId) params.set('quotationId', so.quotationId)
     navigate(`/sales/orders/new?${params.toString()}`)
+  }
+
+  function handleViewSalesOrder(so: SalesOrder) {
+    if (isPendingSalesOrderHandover(so)) {
+      if (so.quotationId) navigate(crmQuotationPath(so.quotationId))
+      else navigate(buildPendingSoCreateUrl(so, { fromCrm: crmMode }))
+      return
+    }
+    navigate(resolveSalesOrderDetailPath(so.id, crmMode))
+  }
+
+  function handleEditSalesOrder(so: SalesOrder) {
+    if (isPendingSalesOrderHandover(so)) {
+      navigate(buildPendingSoCreateUrl(so, { fromCrm: crmMode }))
+      return
+    }
+    navigate(buildSalesOrderEditUrl(so.id, { fromCrm: crmMode }))
   }
 
   function exportSelectedSalesOrders(selected: SalesOrder[]) {
@@ -1149,8 +1265,8 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
               </div>
             ) : undefined
           }
-          onView={(row) => navigate(resolveSalesOrderDetailPath(row.id, crmMode))}
-          onEdit={(row) => navigate(buildSalesOrderEditUrl(row.id, { fromCrm: crmMode }))}
+          onView={handleViewSalesOrder}
+          onEdit={handleEditSalesOrder}
           onPreview={openSalesOrderPreview}
           onBulkExport={exportSelectedSalesOrders}
           onDelete={handleDeleteSalesOrder}

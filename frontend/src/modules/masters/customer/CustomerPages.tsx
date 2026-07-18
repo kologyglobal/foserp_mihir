@@ -37,6 +37,7 @@ import { normalizeEmail } from '../../../utils/validation/email'
 import { optionalEmailField } from '../../../utils/validation/emailZod'
 import { StateSelect, CitySelect, CountrySelect } from '../../../components/masters/GeographySelects'
 import { DEFAULT_CUSTOMER_COUNTRY } from '../../../config/countries'
+import { focusAndHighlightField } from '../../../utils/formValidation'
 import { ErpCardCommandBar } from '../../../components/erp/card-form/ErpCardCommandBar'
 import {
   ErpCardSection,
@@ -375,15 +376,7 @@ export function CustomerFormPage() {
 
   function focusFormField(fieldName?: string) {
     if (!fieldName) return
-    window.setTimeout(() => {
-      const root = formRootRef.current ?? document
-      const byName = root.querySelector<HTMLElement>(`[name="${fieldName}"]`)
-      if (byName) {
-        byName.focus()
-        return
-      }
-      root.querySelector<HTMLElement>(`#cust-focus-${fieldName}`)?.focus()
-    }, 80)
+    focusAndHighlightField(fieldName, { root: formRootRef.current, delayMs: 100 })
   }
 
   function selectAdditionalSection(sectionId: string) {
@@ -709,6 +702,7 @@ export function CustomerFormPage() {
           <ErpFieldRow
             label={COMPANY_TERMINOLOGY.name}
             required
+            dataField="customerName"
             fieldState={errors.customerName ? 'error' : 'idle'}
             fieldError={errors.customerName?.message}
           >
@@ -729,7 +723,7 @@ export function CustomerFormPage() {
             </div>
           </ErpFieldRow>
           <ErpFieldRow label="Sales Territory">
-            <div id="cust-focus-salesTerritory">
+            <div id="cust-focus-salesTerritory" data-field="salesTerritory">
               <TerritoryPicker
                 value={watched.salesTerritory ?? 'West'}
                 onChange={(v) => setValue('salesTerritory', v, { shouldDirty: true })}
@@ -779,6 +773,7 @@ export function CustomerFormPage() {
               <ErpFieldRow
                 label="GSTIN"
                 required
+                dataField="gstin"
                 fieldState={errors.gstin ? 'error' : 'idle'}
                 fieldError={errors.gstin?.message}
                 hint="15-character GST identification number"
@@ -829,7 +824,7 @@ export function CustomerFormPage() {
               accent="teal"
               columns={3}
             >
-              <ErpFieldRow label="Address Line 1" colSpan={2}>
+              <ErpFieldRow label="Address Line 1" colSpan={2} dataField="addressLine1">
                 <Input {...register('addressLine1')} placeholder="Plot no., industrial area, road" className="erp-input" />
               </ErpFieldRow>
               <ErpFieldRow

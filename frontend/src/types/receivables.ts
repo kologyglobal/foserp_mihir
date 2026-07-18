@@ -171,7 +171,6 @@ export type ReceivableWorkspaceTab =
   | 'credit_notes'
   | 'disputes'
   | 'reminders'
-  | 'commercial_commitments'
 
 export type CreditHoldReason =
   | 'Over Credit Limit'
@@ -211,20 +210,15 @@ export const RECEIVABLE_AGEING_BUCKETS: ReceivableAgeingBucket[] = [
 
 export const RECEIVABLE_WORKSPACE_TABS: { id: ReceivableWorkspaceTab; label: string; path: string }[] = [
   { id: 'overview', label: 'Overview', path: '/accounting/receivables' },
-  { id: 'outstanding', label: 'Outstanding', path: '/accounting/receivables/outstanding' },
-  { id: 'invoices', label: 'Invoices', path: '/accounting/receivables/invoices' },
+  { id: 'outstanding', label: 'Customer Outstanding', path: '/accounting/receivables/outstanding' },
+  { id: 'invoices', label: 'Receivable Invoices', path: '/accounting/receivables/invoices' },
   { id: 'ageing', label: 'Ageing', path: '/accounting/receivables/ageing' },
-  { id: 'collections', label: 'Collections', path: '/accounting/receivables/collections' },
-  { id: 'receipts', label: 'Receipts', path: '/accounting/receivables/receipts' },
-  { id: 'allocations', label: 'Allocations', path: '/accounting/receivables/allocations' },
+  { id: 'collections', label: 'Collection Worklist', path: '/accounting/receivables/collections' },
+  { id: 'receipts', label: 'Customer Receipts', path: '/accounting/receivables/receipts' },
+  { id: 'allocations', label: 'Receipt Allocations', path: '/accounting/receivables/allocations' },
   { id: 'credit_notes', label: 'Credit Notes', path: '/accounting/receivables/credit-notes' },
   { id: 'disputes', label: 'Disputes', path: '/accounting/receivables/disputes' },
-  { id: 'reminders', label: 'Reminders', path: '/accounting/receivables/reminders' },
-  {
-    id: 'commercial_commitments',
-    label: 'Commercial Commitments',
-    path: '/accounting/commercial-commitments',
-  },
+  { id: 'reminders', label: 'Payment Reminders', path: '/accounting/receivables/reminders' },
 ]
 
 export const RECEIPT_PAYMENT_MODES: ReceiptPaymentMode[] = [

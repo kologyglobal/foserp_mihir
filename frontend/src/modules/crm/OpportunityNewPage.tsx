@@ -529,11 +529,11 @@ export function OpportunityNewPage() {
       signals={buildOpportunitySmartSignals(smartOverviewInput)}
       nextAction={nextAction}
       onNextAction={() => {
-        if (nextAction.id === 'link_company') scrollToSection('general')
-        else if (nextAction.id === 'add_lines') scrollToSection('products')
-        else if (nextAction.id === 'set_value') scrollToSection('commercial')
-        else if (nextAction.id === 'create_quotation') createDeal('quotation')
-        else scrollToSection('general')
+        if (nextAction.id === 'create_quotation') {
+          createDeal('quotation')
+          return
+        }
+        scrollToSection(nextAction.sectionId ?? 'general')
       }}
       quickActions={[
         {
@@ -741,6 +741,7 @@ export function OpportunityNewPage() {
 
       <ErpCardSection
         id="opp-section-products"
+        nbaTarget="products"
         title="Product / Item Lines"
         subtitle="Pick products and set qty, price, and tax per line."
         icon={ClipboardList}

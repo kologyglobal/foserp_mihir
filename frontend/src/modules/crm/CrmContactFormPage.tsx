@@ -442,10 +442,7 @@ export function CrmContactFormPage() {
       signals={buildContactSmartSignals(smartOverviewInput)}
       nextAction={nextAction}
       onNextAction={() => {
-        if (nextAction.id === 'enter_name') scrollToSection('quick')
-        else if (nextAction.id === 'link_company') scrollToSection('quick')
-        else if (nextAction.id === 'add_reach') scrollToSection('quick')
-        else scrollToSection('quick')
+        scrollToSection(nextAction.sectionId ?? 'quick')
       }}
       quickActions={[
         {

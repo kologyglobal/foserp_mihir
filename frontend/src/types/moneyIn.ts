@@ -290,6 +290,9 @@ export interface CustomerReceivableSummaryRow {
   openItemCount: number
   outstandingAmount: string
   baseOutstandingAmount: string
+  debitOutstandingBase?: string
+  creditOutstandingBase?: string
+  netReceivableBase?: string
   oldestDueDate: string | null
   maxDaysOverdue: number | null
   disputedCount: number

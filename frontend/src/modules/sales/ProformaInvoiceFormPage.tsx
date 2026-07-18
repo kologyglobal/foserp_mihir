@@ -52,12 +52,6 @@ type PiLineRow = {
 
 const GST_RATE_OPTIONS = [0, 5, 12, 18, 28] as const
 
-function addDays(isoDate: string, days: number): string {
-  const d = new Date(isoDate.slice(0, 10))
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
-}
-
 function round2(n: number) {
   return Math.round(n * 100) / 100
 }
@@ -119,17 +113,17 @@ export function ProformaInvoiceFormPage() {
   const [salesOrderId, setSalesOrderId] = useState(initialSoId)
   const [customerId, setCustomerId] = useState(() => {
     const prefill = initialSoId ? resolveSalesOrderProformaPrefill(initialSoId) : null
-    return prefill?.customerId ?? customers[0]?.id ?? ''
+    return prefill?.customerId ?? ''
   })
   const [proformaDate, setProformaDate] = useState(today)
-  const [validUntil, setValidUntil] = useState(addDays(today, 30))
+  const [validUntil, setValidUntil] = useState('')
   const [paymentTerms, setPaymentTerms] = useState(() => {
     const prefill = initialSoId ? resolveSalesOrderProformaPrefill(initialSoId) : null
-    return prefill?.paymentTerms ?? '30% advance, balance before dispatch'
+    return prefill?.paymentTerms ?? ''
   })
   const [deliveryTerms, setDeliveryTerms] = useState(() => {
     const prefill = initialSoId ? resolveSalesOrderProformaPrefill(initialSoId) : null
-    return prefill?.deliveryTerms ?? 'Ex-works Pune'
+    return prefill?.deliveryTerms ?? ''
   })
   const [customerPoNumber, setCustomerPoNumber] = useState(() => {
     const prefill = initialSoId ? resolveSalesOrderProformaPrefill(initialSoId) : null
@@ -143,12 +137,11 @@ export function ProformaInvoiceFormPage() {
   const [lineRows, setLineRows] = useState<PiLineRow[]>(() => {
     const prefill = initialSoId ? resolveSalesOrderProformaPrefill(initialSoId) : null
     if (prefill?.lines.length) return toLineRows(prefill.lines)
-    const p = products[0]
     return [{
       key: crypto.randomUUID(),
-      productId: p?.id ?? '',
+      productId: '',
       qty: '1',
-      unitPrice: String(p?.standardPrice ?? 0),
+      unitPrice: '0',
       discountPct: '0',
       taxPct: '18',
     }]
@@ -248,15 +241,13 @@ export function ProformaInvoiceFormPage() {
   }
 
   function addLine() {
-    const last = lineRows[lineRows.length - 1]
-    const p = getProduct(last?.productId ?? products[0]?.id ?? '')
     setLineRows([
       ...lineRows,
       {
         key: crypto.randomUUID(),
-        productId: last?.productId ?? products[0]?.id ?? '',
+        productId: '',
         qty: '1',
-        unitPrice: String(p?.standardPrice ?? 0),
+        unitPrice: '0',
         discountPct: '0',
         taxPct: '18',
       },
@@ -637,19 +628,47 @@ export function ProformaInvoiceFormPage() {
             />
           </ErpFieldRow>
           {customer ? (
-            <div className="col-span-2 so-direct-customer-chip">
-              <div className="flex items-start gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-erp-primary/10 text-erp-primary">
-                  <Building2 className="h-4 w-4" />
+            <aside className="so-customer-card" aria-label="Selected customer">
+              <div className="so-customer-card__header">
+                <div className="so-customer-card__avatar" aria-hidden>
+                  {customer.customerName
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((w) => w[0])
+                    .join('')
+                    .toUpperCase()}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold text-erp-text">{customer.customerName}</p>
-                  <p className="mt-0.5 text-[12px] text-erp-muted">
-                    {customer.customerCode} · GSTIN {customer.gstin || '—'} · {customer.state}
+                <div className="so-customer-card__identity">
+                  <div className="so-customer-card__title-row">
+                    <h3 className="so-customer-card__name">{customer.customerName}</h3>
+                    <span className="so-customer-card__code">{customer.customerCode}</span>
+                  </div>
+                  <p className="so-customer-card__location">
+                    <span>
+                      {[customer.city, customer.state, customer.pincode].filter(Boolean).join(', ')}
+                    </span>
                   </p>
                 </div>
               </div>
-            </div>
+              <dl className="so-customer-card__facts">
+                <div className="so-customer-card__fact">
+                  <dt>GSTIN</dt>
+                  <dd className="tabular-nums">{customer.gstin?.trim() || '—'}</dd>
+                </div>
+                <div className="so-customer-card__fact">
+                  <dt>Credit days</dt>
+                  <dd className="tabular-nums">{customer.creditDays} days</dd>
+                </div>
+                <div className="so-customer-card__fact">
+                  <dt>Credit limit</dt>
+                  <dd className="tabular-nums">
+                    {customer.creditLimit != null && customer.creditLimit > 0
+                      ? formatCurrency(customer.creditLimit)
+                      : 'No limit'}
+                  </dd>
+                </div>
+              </dl>
+            </aside>
           ) : null}
           <ErpFieldRow label="Customer PO">
             <Input value={customerPoNumber} onChange={(e) => setCustomerPoNumber(e.target.value)} placeholder="Optional customer PO reference" />

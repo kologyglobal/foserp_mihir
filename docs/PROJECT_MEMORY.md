@@ -1,6 +1,6 @@
 # FOS ERP — Project Memory
 
-> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-18** (Phase 3B3 customer receipt draft workflow).
+> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-18** (Phase 3C5 credit-note allocation backend).
 
 ---
 
@@ -14,8 +14,8 @@
 | **Architecture** | React SPA + Node.js/Express API + MySQL 8 |
 | **Tenancy** | Multi-tenant SaaS — shared database, shared schema |
 | **Tenant scope** | Every tenant-owned record scoped by `tenantId` |
-| **Current backend scope** | Auth, RBAC, CRM, masters; finance Phase 1 setup; Phase 2A ledger foundation; Phase 2B internal posting engine; Phase 2C1 manual journal drafts; Phase 2C2A approvals; Phase 2C2B post approved journals to GL; Phase 3A1 AR database foundation; Phase 3A2 AR sales invoice calculation engine; Phase 3A3 AR sales invoice draft workflow; Phase 3A4 AR atomic sales invoice posting; Phase 3A5 AR reporting; Phase 3A6 Money In AR frontend; Phase 3B1 customer receipt & allocation DB foundation; Phase 3B2 customer receipt calculation & validation preview; **Phase 3B3 customer receipt draft workflow** (create/update/validate/mark-ready/cancel/list/detail APIs) |
-| **Deferred backend** | Finance **Phase 3B4+** receipt posting/GL/number-issuance/allocation-persistence APIs + credit notes; **Phase 2C3** journal reversal; purchase/inventory/production; SO MRP/dispatch/invoice beyond CRM Phase 1 |
+| **Current backend scope** | Auth, RBAC, CRM, masters; finance Phase 1 setup; Phase 2A ledger foundation; Phase 2B internal posting engine; Phase 2C1 manual journal drafts; Phase 2C2A approvals; Phase 2C2B post approved journals to GL; Phase 3A1–3A6 AR sales invoice + Money In FE; Phase 3B1–3B5 customer receipt/allocation; Phase 3C1–3C4 customer credit-note foundation through atomic posting; **Phase 3C5 credit-note allocation (subledger-only, applies posted CN credit to invoice DEBIT open items, unified with receipt allocation read APIs)** |
+| **Deferred backend** | Finance **Phase 3B6** receipt workspace UI; **Phase 3C6** credit-note frontend; receipt/allocation/credit-note reversal; **Phase 2C3** journal reversal; purchase/inventory/production; SO MRP/dispatch/invoice beyond CRM Phase 1 |
 
 ---
 

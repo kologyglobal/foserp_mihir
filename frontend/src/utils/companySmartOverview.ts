@@ -52,6 +52,8 @@ export function resolveCompanyNextBestAction(input: CompanySmartOverviewInput): 
       title: 'Enter Company Name',
       description: 'Required before this company can be used in CRM and transactions.',
       ctaLabel: 'Enter Company Name',
+      focusField: 'customerName',
+      sectionId: 'quick',
     }
   }
   if (!input.hasBillingAddress || !input.city.trim() || !input.state.trim()) {
@@ -60,6 +62,8 @@ export function resolveCompanyNextBestAction(input: CompanySmartOverviewInput): 
       title: 'Complete Billing Address',
       description: 'City, state, and address are needed for tax and logistics.',
       ctaLabel: 'Complete Billing Address',
+      focusField: 'addressLine1',
+      sectionId: 'billing',
     }
   }
   if (!input.gstin.trim()) {
@@ -68,6 +72,8 @@ export function resolveCompanyNextBestAction(input: CompanySmartOverviewInput): 
       title: 'Add GSTIN',
       description: 'Capture GSTIN for compliant quotations and invoices.',
       ctaLabel: 'Add GSTIN',
+      focusField: 'gstin',
+      sectionId: 'tax',
     }
   }
   if (!input.salesTerritory.trim()) {
@@ -76,6 +82,8 @@ export function resolveCompanyNextBestAction(input: CompanySmartOverviewInput): 
       title: 'Set Territory',
       description: 'Assign a sales territory for ownership and reporting.',
       ctaLabel: 'Set Territory',
+      focusField: 'salesTerritory',
+      sectionId: 'quick',
     }
   }
   return {

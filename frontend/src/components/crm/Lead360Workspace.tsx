@@ -36,7 +36,6 @@ import { useApiMode } from '@/hooks/useApiMode'
 import type { CrmActivity, FollowUp } from '@/types/crm'
 import { Lead360RecordHeader } from '@/components/crm/Lead360RecordHeader'
 import { LeadChangeStageControl } from '@/components/crm/LeadChangeStageControl'
-import { StageCompletenessPanel } from '@/components/crm/StageCompletenessPanel'
 import { LeadSummaryCard, resolveLeadContactDesignation } from '@/components/crm/LeadSummaryCard'
 import { LeadNotesCard } from '@/components/crm/LeadNotesCard'
 import { LeadSmartOverviewPanel } from '@/components/crm/LeadSmartOverviewPanel'
@@ -79,7 +78,6 @@ import {
 import {
   formatMissingStageFieldsMessage,
   getLeadStageCompleteness,
-  type StageRequirementField,
 } from '@/config/crmStageRequirements'
 import { canOpenLeadEditor, resolveLeadEditPolicy } from '@/utils/leadEditPolicy'
 import { formatCurrency } from '@/utils/formatters/currency'
@@ -120,8 +118,6 @@ export function Lead360Workspace() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [activeAdditionalSection, setActiveAdditionalSection] = useState<string | null>('requirement')
   const [notesComposerOpen, setNotesComposerOpen] = useState(false)
-  const [gateMissingFields, setGateMissingFields] = useState<StageRequirementField[] | null>(null)
-  const [gateStageLabel, setGateStageLabel] = useState<string | null>(null)
   const deleteActivity = useCrmStore((s) => s.deleteActivity)
   const deleteFollowUp = useCrmStore((s) => s.deleteFollowUp)
 
@@ -327,17 +323,6 @@ export function Lead360Workspace() {
     tone: pipelineTone,
   } = buildLeadCrmPipeline(lead, leadActivities)
   const canChangeStage = editPolicy.canChangeStage && canCrmPermission('crm.lead.update')
-  const stageCompleteness = getLeadStageCompleteness(currentLead, currentLead.stage)
-  const panelMissing = gateMissingFields ?? stageCompleteness.missingFields
-  const panelCompleted = gateMissingFields
-    ? Math.max(0, stageCompleteness.requiredCount - gateMissingFields.length)
-    : stageCompleteness.completedCount
-  const panelPercent = gateMissingFields
-    ? (stageCompleteness.requiredCount === 0
-      ? 100
-      : Math.round((panelCompleted / stageCompleteness.requiredCount) * 100))
-    : stageCompleteness.percent
-  const panelStageLabel = gateStageLabel ?? leadStageLabel(currentLead.stage)
   const systemEvents = buildLeadSystemEvents(
     lead,
     customerQuotations.length > 0,
@@ -592,27 +577,13 @@ export function Lead360Workspace() {
                 <LeadChangeStageControl
                   leadId={currentLead.id}
                   currentStage={currentLead.stage}
-                  onDone={(msg) => {
-                    if (msg.startsWith('Stage updated')) {
-                      setGateMissingFields(null)
-                      setGateStageLabel(null)
-                    }
-                    setToast(msg)
-                  }}
+                  onDone={(msg) => setToast(msg)}
                   onBlocked={(missing, target) => {
-                    setGateMissingFields(missing)
-                    setGateStageLabel(leadStageLabel(target))
+                    setToast(formatMissingStageFieldsMessage(missing, leadStageLabel(target)))
                   }}
                 />
               ) : null
             }
-          />
-          <StageCompletenessPanel
-            percent={panelPercent}
-            requiredCount={stageCompleteness.requiredCount}
-            completedCount={panelCompleted}
-            missingFields={panelMissing}
-            stageLabel={panelStageLabel}
           />
         </div>
 
@@ -754,23 +725,11 @@ export function Lead360Workspace() {
                               const target = stage as Lead['stage']
                               const missing = getLeadStageCompleteness(currentLead, target).missingFields
                               if (missing.length > 0) {
-                                setGateMissingFields(missing)
-                                setGateStageLabel(leadStageLabel(target))
                                 setToast(formatMissingStageFieldsMessage(missing, leadStageLabel(target)))
                                 return
                               }
                               const r = await resolveStoreAction(advanceLeadStage(lead.id, target))
-                              if (r.ok) {
-                                setGateMissingFields(null)
-                                setGateStageLabel(null)
-                                setToast(`Moved to ${leadStageLabel(target)}`)
-                              } else {
-                                if (r.missingFields?.length) {
-                                  setGateMissingFields(r.missingFields)
-                                  setGateStageLabel(leadStageLabel(target))
-                                }
-                                setToast(r.error ?? 'Failed')
-                              }
+                              setToast(r.ok ? `Moved to ${leadStageLabel(target)}` : (r.error ?? 'Failed'))
                             })()
                           }}
                         >

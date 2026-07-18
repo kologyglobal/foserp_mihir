@@ -6,6 +6,7 @@ import { sendCreated, sendPaginated, sendSuccess } from '../../../../utils/respo
 import type { ListCustomerReceiptsQueryInput } from './customer-receipt.schemas.js'
 import * as draftService from './customer-receipt-draft.service.js'
 import * as readService from './customer-receipt-read.service.js'
+import * as postingService from './posting/customer-receipt-posting.service.js'
 
 export const listCustomerReceipts = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
@@ -56,4 +57,11 @@ export const cancelCustomerReceipt = asyncHandler(async (req: Request, res: Resp
   const id = getRouteParam(req, 'id')
   const item = await draftService.cancelCustomerReceiptDraft(req, tenantId, id, req.body)
   return sendSuccess(res, 'customer receipt cancelled', item)
+})
+
+export const postCustomerReceipt = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const result = await postingService.postCustomerReceiptFromRequest(req, tenantId, id)
+  return sendSuccess(res, 'customer receipt posted', result)
 })

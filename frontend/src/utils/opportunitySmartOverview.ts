@@ -238,6 +238,8 @@ export function resolveOpportunityNextBestAction(input: OpportunitySmartOverview
       title: 'Link Company',
       description: 'Select the customer account before you build the deal.',
       ctaLabel: 'Link Company',
+      focusField: 'customerId',
+      sectionId: 'general',
     }
   }
   if (!input.hasValidLine) {
@@ -246,6 +248,8 @@ export function resolveOpportunityNextBestAction(input: OpportunitySmartOverview
       title: 'Add Product Lines',
       description: 'Capture at least one product or item line to size the opportunity.',
       ctaLabel: 'Add Lines',
+      focusField: 'products',
+      sectionId: 'products',
     }
   }
   if (input.dealValue <= 0) {
@@ -254,6 +258,8 @@ export function resolveOpportunityNextBestAction(input: OpportunitySmartOverview
       title: 'Set Deal Value',
       description: 'Enter commercial value so pipeline and forecast stay accurate.',
       ctaLabel: 'Set Value',
+      focusField: 'products',
+      sectionId: 'products',
     }
   }
   if (input.overdueFollowUp || !input.nextFollowUpDate) {

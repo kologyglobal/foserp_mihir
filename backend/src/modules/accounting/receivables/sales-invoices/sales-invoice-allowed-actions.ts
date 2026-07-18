@@ -8,6 +8,7 @@ export interface SalesInvoiceAllowedActions {
   cancel: boolean
   post: boolean
   viewAccounting?: boolean
+  viewAllocations?: boolean
 }
 
 const EDITABLE_STATUSES: SalesInvoiceStatus[] = ['DRAFT', 'READY_TO_POST']
@@ -23,6 +24,7 @@ export function resolveSalesInvoiceAllowedActions(
   status: SalesInvoiceStatus,
 ): SalesInvoiceAllowedActions {
   const canView = hasPerm(req, 'finance.ar.invoice.view') || hasPerm(req, 'finance.ar.view')
+  const canViewAlloc = hasPerm(req, 'finance.ar.allocation.view')
   const editable = EDITABLE_STATUSES.includes(status)
   const cancellable = CANCELLABLE_STATUSES.includes(status)
   const canPost = status === 'READY_TO_POST' && hasPerm(req, 'finance.ar.invoice.post')
@@ -35,6 +37,7 @@ export function resolveSalesInvoiceAllowedActions(
       cancel: false,
       post: false,
       viewAccounting: canView,
+      viewAllocations: canViewAlloc,
     }
   }
 
@@ -44,5 +47,6 @@ export function resolveSalesInvoiceAllowedActions(
     markReady: status === 'DRAFT' && hasPerm(req, 'finance.ar.invoice.edit'),
     cancel: cancellable && hasPerm(req, 'finance.ar.invoice.cancel'),
     post: canPost,
+    viewAllocations: false,
   }
 }

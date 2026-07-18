@@ -37,20 +37,23 @@ export async function serializeSalesInvoiceDetail(
 
   let receivableOpenItemId: string | null = null
   let outstandingAmount = base.outstandingAmount
+  let amountPaid = base.amountPaid
   if (invoice.status === 'POSTED') {
     const openItem = await prisma.receivableOpenItem.findFirst({
-      where: { tenantId: invoice.tenantId, salesInvoiceId: invoice.id },
-      select: { id: true, openAmount: true },
+      where: { tenantId: invoice.tenantId, salesInvoiceId: invoice.id, side: 'DEBIT' },
+      select: { id: true, openAmount: true, allocatedAmount: true },
     })
     if (openItem) {
       receivableOpenItemId = openItem.id
       outstandingAmount = formatForPersistence(openItem.openAmount)
+      amountPaid = formatForPersistence(openItem.allocatedAmount)
     }
   }
 
   return {
     ...base,
     outstandingAmount,
+    amountPaid,
     receivableOpenItemId,
     allowedActions,
     validationSummary,

@@ -254,6 +254,14 @@ export const PERMISSIONS = [
   'finance.ar.allocation.view',
   'finance.ar.allocation.create',
   'finance.ar.allocation.reverse',
+  'finance.ar.credit_note.view',
+  'finance.ar.credit_note.create',
+  'finance.ar.credit_note.edit',
+  'finance.ar.credit_note.submit',
+  'finance.ar.credit_note.approve',
+  'finance.ar.credit_note.cancel',
+  'finance.ar.credit_note.post',
+  'finance.ar.credit_note.mark_ready',
 ] as const
 
 export type PermissionName = (typeof PERMISSIONS)[number]
@@ -284,6 +292,11 @@ const FINANCE_EXECUTIVE_MANAGE: PermissionName[] = [
   'finance.ar.receipt.edit',
   'finance.ar.receipt.cancel',
   'finance.ar.allocation.create',
+  'finance.ar.credit_note.create',
+  'finance.ar.credit_note.edit',
+  'finance.ar.credit_note.submit',
+  'finance.ar.credit_note.cancel',
+  'finance.ar.credit_note.mark_ready',
 ]
 
 export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {

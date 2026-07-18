@@ -37,11 +37,11 @@ export function QuotationSmartOverviewPanel({
       return
     }
     if (action.id === 'add_lines') {
-      onGoToSection('products')
+      onGoToSection(action.sectionId ?? 'products')
       return
     }
     if (action.id === 'set_validity' || action.id === 'link_customer') {
-      onGoToSection('summary')
+      onGoToSection(action.sectionId ?? 'summary')
       return
     }
     if (action.id === 'review') {

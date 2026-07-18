@@ -18,6 +18,7 @@ import { AccountLedgerPage } from '@/modules/accounting/AccountLedgerPage'
 import { VoucherLedgerPage } from '@/modules/accounting/VoucherLedgerPage'
 import { PartyLedgerPage } from '@/modules/accounting/PartyLedgerPage'
 import { LedgerEntryDetailPage } from '@/modules/accounting/LedgerEntryDetailPage'
+import { ReceivablesDashboardPage } from '@/modules/accounting/ReceivablesDashboardPage'
 import { CustomerOutstandingPage } from '@/modules/accounting/CustomerOutstandingPage'
 import { ReceivableInvoicesPage } from '@/modules/accounting/ReceivableInvoicesPage'
 import { ReceivablesAgeingPage } from '@/modules/accounting/ReceivablesAgeingPage'
@@ -260,7 +261,7 @@ export const accountingRouteChildren: RouteObject[] = [
   { path: 'accounting/money-in/ageing', element: <MoneyInAgeingPage /> },
   { path: 'accounting/money-in/reconciliation', element: <MoneyInReconciliationPage /> },
 
-  { path: 'accounting/receivables', element: <Navigate to="/accounting/money-in" replace /> },
+  { path: 'accounting/receivables', element: <ReceivablesDashboardPage /> },
   { path: 'accounting/commercial-commitments', element: <CommercialCommitmentsPage /> },
   { path: 'accounting/receivables/customers', element: <CustomerOutstandingPage /> },
   { path: 'accounting/receivables/outstanding', element: <CustomerOutstandingPage /> },

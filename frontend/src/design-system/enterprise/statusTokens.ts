@@ -40,6 +40,7 @@ const STATUS_ALIASES: Record<string, EnterpriseStatusTone> = {
   archived: 'closed',
   hold: 'hold',
   pending: 'hold',
+  pending_so: 'hold',
   on_hold: 'hold',
   not_invoiced: 'hold',
 }

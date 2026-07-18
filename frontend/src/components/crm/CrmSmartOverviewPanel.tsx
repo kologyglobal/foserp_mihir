@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import { Lightbulb, Sparkles } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import { focusAndHighlightField } from '../../utils/formValidation'
 
 export type CrmSmartChipTone = 'info' | 'success' | 'warning' | 'critical' | 'neutral'
 export type CrmSmartSignalTone = 'ok' | 'warn'
@@ -27,6 +28,13 @@ export interface CrmSmartNextAction {
   title: string
   description: string
   ctaLabel: string
+  /**
+   * Form field key (`data-field` / `data-nba-target`) to scroll, focus, and highlight
+   * when the primary CTA is clicked. Omit for navigate/save/drawer actions.
+   */
+  focusField?: string
+  /** Optional section id for pages that expand/scroll before focusing. */
+  sectionId?: string
 }
 
 export interface CrmSmartQuickAction {
@@ -118,6 +126,13 @@ export function CrmSmartOverviewPanel({
   const clamped = Math.max(0, Math.min(100, Math.round(progressPercent)))
   const lean = variant === 'lean'
   const tone = readinessTone(clamped)
+
+  function handleNextActionClick() {
+    onNextAction()
+    if (nextAction.focusField) {
+      focusAndHighlightField(nextAction.focusField, { delayMs: 140 })
+    }
+  }
   const visibleSignals = lean
     ? signals.filter((s) => s.tone === 'warn').slice(0, 2)
     : signals.filter((s) => s.tone === 'warn').slice(0, 3)
@@ -285,7 +300,7 @@ export function CrmSmartOverviewPanel({
         {showActionDescription ? (
           <p className="crm-smart-overview__action-desc">{nextAction.description}</p>
         ) : null}
-        <button type="button" className="crm-smart-overview__cta" onClick={onNextAction}>
+        <button type="button" className="crm-smart-overview__cta" onClick={handleNextActionClick}>
           {nextAction.ctaLabel}
         </button>
 

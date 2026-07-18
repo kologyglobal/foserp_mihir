@@ -6,7 +6,7 @@ export function ReceivablesWorkspaceTabs({
   active,
   preserveQuery,
 }: {
-  active: ReceivableWorkspaceTab
+  active?: ReceivableWorkspaceTab
   /** Optional query string (without ?) preserved across tab navigation */
   preserveQuery?: string
 }) {

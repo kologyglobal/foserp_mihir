@@ -207,6 +207,8 @@ export function resolveQuotationNextBestAction(input: QuotationSmartOverviewInpu
       title: 'Link Customer',
       description: 'Select the company this quotation is for.',
       ctaLabel: 'Link Customer',
+      focusField: 'customerId',
+      sectionId: 'quick',
     }
   }
   if (!input.hasValidLine) {
@@ -215,6 +217,8 @@ export function resolveQuotationNextBestAction(input: QuotationSmartOverviewInpu
       title: 'Add Line Items',
       description: 'Add products or services so the quotation has a commercial offer.',
       ctaLabel: 'Add Lines',
+      focusField: 'products',
+      sectionId: 'products',
     }
   }
   if (!input.validUntil) {
@@ -223,6 +227,8 @@ export function resolveQuotationNextBestAction(input: QuotationSmartOverviewInpu
       title: 'Set Validity',
       description: 'Define how long this quotation remains valid for the customer.',
       ctaLabel: 'Set Validity',
+      focusField: 'validUntil',
+      sectionId: 'commercial',
     }
   }
   if (!input.salesOrderId && ['accepted', 'approved'].includes(input.status.toLowerCase())) {

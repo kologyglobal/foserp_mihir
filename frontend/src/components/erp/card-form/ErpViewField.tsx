@@ -70,15 +70,25 @@ export function ErpViewPhone({
   value,
   colSpan,
   className,
+  emptyLabel,
 }: {
   label?: string
   value?: string | null
   colSpan?: 1 | 2 | 3
   className?: string
+  emptyLabel?: string
 }) {
   const phone = value?.trim()
   if (!phone) {
-    return <ErpViewField label={label} colSpan={colSpan} className={className} value={undefined} />
+    return (
+      <ErpViewField
+        label={label}
+        colSpan={colSpan}
+        className={className}
+        value={undefined}
+        emptyLabel={emptyLabel}
+      />
+    )
   }
   return (
     <ErpViewField label={label} colSpan={colSpan} className={className}>
@@ -94,15 +104,25 @@ export function ErpViewEmail({
   value,
   colSpan,
   className,
+  emptyLabel,
 }: {
   label?: string
   value?: string | null
   colSpan?: 1 | 2 | 3
   className?: string
+  emptyLabel?: string
 }) {
   const email = value?.trim()
   if (!email) {
-    return <ErpViewField label={label} colSpan={colSpan} className={className} value={undefined} />
+    return (
+      <ErpViewField
+        label={label}
+        colSpan={colSpan}
+        className={className}
+        value={undefined}
+        emptyLabel={emptyLabel}
+      />
+    )
   }
   return (
     <ErpViewField label={label} colSpan={colSpan} className={className}>

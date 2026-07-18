@@ -1,6 +1,32 @@
+# 2026-07-18 — Finance Phase 3C5 credit-note allocation
+
+- Added focused test: `finance-ar-credit-note-allocation.test.ts` — **11/11 pass** (full/partial settlement, multi-invoice from one CN, multiple CNs against one invoice, multiple batches on one CN, unallocated CN stays a customer advance, over-allocation/empty/zero rejection, cross-customer rejection, idempotent replay, permission boundary, invoice outstanding unchanged until allocation + reconciliation MATCHED).
+- `npx prisma generate` — pass; `npx tsx scripts/prisma-cli.ts migrate deploy` (migration `20260718130000_finance_phase3c5_credit_note_allocations`) — pass; backend `npx tsc --noEmit -p tsconfig.json` — pass.
+- Regression re-run: `finance-ar-credit-note-posting.test.ts` (5/5), `finance-ar-credit-note-foundation.test.ts` (3/3), `finance-ar-receipt-allocation.test.ts` (11/11), `finance-ar-reporting.test.ts` (10/10), `finance-ar-receipt-drafts.test.ts` (12/12) — all pass; `finance-ar-receipt-posting.test.ts` — 11/12 (the one pre-existing Phase 3B4 `allowedActions.allocate` expectation noted below, unrelated to this phase).
+- **Bug fix uncovered by the new reconciliation assertion:** `receivable-reconciliation.service.ts`'s `CONTROL_ACCOUNT_MANUAL_POSTING` exception check excluded `CUSTOMER_CREDIT_NOTE` from its allowed `sourceDocumentType` list, so any tenant with a posted credit note against the AR control account always reported `MISMATCH`. Fixed by adding `CUSTOMER_CREDIT_NOTE` alongside `SALES_INVOICE` / `CUSTOMER_RECEIPT`.
+
+# 2026-07-18 — Finance Phase 3C1-3C4 customer credit notes
+
+- Added focused tests: `finance-ar-credit-note-foundation.test.ts` and `finance-ar-credit-note-posting.test.ts` — **8/8 pass**.
+- Prisma format/generate — pass; migration deploy to local MySQL — pass; backend `npx tsc --noEmit` — pass.
+- Full finance suite — **232/233 pass**. The only failure is an older Phase 3B4 receipt-posting assertion expecting `allowedActions.allocate=false`; Phase 3B5 intentionally makes it true when unallocated credit remains.
+
+---
+
 # Testing Status
 
-Last run: **2026-07-18** (Finance Phase 3B3 customer receipt draft workflow).
+Last run: **2026-07-18** (Finance Phase 3B4 atomic customer receipt posting).
+
+### 2026-07-18 — Finance Phase 3B4: Atomic customer receipt posting
+
+| Suite / check | Result |
+|---------------|--------|
+| `npx vitest run tests/finance/finance-ar-receipt-posting.test.ts --hookTimeout=120000` (new) | **12/12** |
+| `npx vitest run tests/finance --hookTimeout=120000` (full finance suite) | **218/218** (17 files) |
+| `npx tsc --noEmit` (backend) | **PASS** |
+| `npm run typecheck` (frontend) | **PASS** |
+| Fix applied during verification | `finance-ar-receipt-drafts.test.ts` mark-ready test asserted `allowedActions.post === false`; now `true` once `READY_TO_POST` + `finance.ar.receipt.post` permission (expected behavior change from 3B4) |
+| Flake observed (unrelated) | `finance-journals.test.ts` hit a MariaDB `P2034` transaction write-conflict on one mixed parallel run across all 17 finance files; re-ran green both in isolation and in a subsequent full-suite run — pre-existing DB-contention flake, not caused by this phase |
 
 ### 2026-07-18 — Finance Phase 3B3: Customer receipt draft workflow
 

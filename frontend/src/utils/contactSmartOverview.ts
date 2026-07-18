@@ -61,6 +61,8 @@ export function resolveContactNextBestAction(input: ContactSmartOverviewInput): 
       title: 'Enter Contact Name',
       description: 'Start with the person’s full name so this contact can be found later.',
       ctaLabel: 'Enter Name',
+      focusField: 'name',
+      sectionId: 'quick',
     }
   }
   if (!input.customerId) {
@@ -69,6 +71,8 @@ export function resolveContactNextBestAction(input: ContactSmartOverviewInput): 
       title: 'Link Company',
       description: 'Attach this contact to a company for 360 history and outreach.',
       ctaLabel: 'Link Company',
+      focusField: 'customerId',
+      sectionId: 'quick',
     }
   }
   if (!input.phone.trim() && !input.email.trim()) {
@@ -77,6 +81,8 @@ export function resolveContactNextBestAction(input: ContactSmartOverviewInput): 
       title: 'Add Phone or Email',
       description: 'Without a reach channel, follow-ups and activities cannot land.',
       ctaLabel: 'Add Contact Info',
+      focusField: 'phone',
+      sectionId: 'quick',
     }
   }
   return {

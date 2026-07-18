@@ -4,6 +4,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   BarChart3,
+  Bell,
   Bookmark,
   BookOpen,
   Calendar,
@@ -45,6 +46,7 @@ import {
 import { buildMasterNavItems } from './masterModuleStructure'
 import { TAX_COMPLIANCE_NAV } from './taxComplianceNav'
 import { BUDGETING_NAV } from './budgetingNav'
+import { RECEIVABLES_NAV, RECEIVABLES_NAV_GROUP } from './receivablesNav'
 
 export type NavItem = {
   label: string
@@ -259,13 +261,39 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Chart of Accounts', path: '/accounting/chart-of-accounts', icon: BookOpen },
       { label: 'Journals', path: '/accounting/entries/journals', icon: FileText },
       { label: 'Vouchers (demo)', path: '/accounting/vouchers', icon: FileText, subNav: false as const },
-      { label: 'Money In', path: '/accounting/money-in', icon: ArrowDownToLine },
-      { label: 'Receivables (legacy)', path: '/accounting/receivables/invoices', icon: ArrowDownToLine, subNav: false as const },
+      /** Receivables workspace — DynamicsTabs dropdown group */
+      ...RECEIVABLES_NAV.map((item) => ({
+        label: item.label,
+        path: item.path,
+        icon:
+          item.id === 'overview'
+            ? LayoutDashboard
+            : item.id === 'outstanding'
+              ? Users
+              : item.id === 'invoices'
+                ? Receipt
+                : item.id === 'ageing'
+                  ? Clock
+                  : item.id === 'collections'
+                    ? ClipboardList
+                    : item.id === 'receipts'
+                      ? ArrowDownToLine
+                      : item.id === 'allocations'
+                        ? Layers
+                        : item.id === 'credit-notes'
+                          ? FileText
+                          : item.id === 'disputes'
+                            ? ShieldAlert
+                            : Bell,
+        end: item.end,
+        group: RECEIVABLES_NAV_GROUP,
+      })),
+      /** API-backed Money In (Phase 3A) — discover via deep link / search */
+      { label: 'Money In (API)', path: '/accounting/money-in', icon: ArrowDownToLine, subNav: false as const },
       {
         label: 'Commercial Commitments',
         path: '/accounting/commercial-commitments',
         icon: Handshake,
-        /** Discover via Receivables workspace tabs; keep for search / deep links */
         subNav: false as const,
       },
       { label: 'Payables', path: '/accounting/payables', icon: ArrowUpFromLine },
@@ -370,14 +398,6 @@ export const searchablePages: SearchablePage[] = moduleCategories.flatMap((cat) 
 
 export function navItemIsActive(item: NavItem, pathname: string): boolean {
   if (item.disabled) return false
-  /** Commercial commitments live under Money In / receivables conceptually */
-  if (
-    (item.path === '/accounting/money-in' || item.path === '/accounting/receivables/invoices') &&
-    (pathname === '/accounting/commercial-commitments' ||
-      pathname.startsWith('/accounting/commercial-commitments/'))
-  ) {
-    return true
-  }
   return item.end ? pathname === item.path : pathname === item.path || pathname.startsWith(`${item.path}/`)
 }
 

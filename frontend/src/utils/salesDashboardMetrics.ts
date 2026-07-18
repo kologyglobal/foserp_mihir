@@ -264,6 +264,7 @@ export function sumActiveOrderBook(salesOrders: SalesOrder[]): number {
 }
 
 export function getSalesOrderFulfillmentLabel(so: SalesOrder, workOrders: WorkOrder[]): string {
+  if (so.status === 'pending_so') return 'Awaiting SO'
   if (so.status === 'open') return 'Draft'
   if (so.status === 'confirmed' && !workOrders.some((w) => w.salesOrderId === so.id)) return 'Awaiting MRP'
   if (so.status === 'in_production' || workOrders.some((w) => w.salesOrderId === so.id)) return 'Production'
@@ -274,6 +275,7 @@ export function getSalesOrderFulfillmentLabel(so: SalesOrder, workOrders: WorkOr
 }
 
 export function isSalesOrderOverdue(so: SalesOrder): boolean {
+  if (so.status === 'pending_so') return false
   const required = so.requiredDate?.slice(0, 10)
   if (!required) return false
   const today = new Date().toISOString().slice(0, 10)
@@ -281,6 +283,7 @@ export function isSalesOrderOverdue(so: SalesOrder): boolean {
 }
 
 const SALES_ORDER_STATUS_ORDER: SalesOrder['status'][] = [
+  'pending_so',
   'open',
   'confirmed',
   'in_production',

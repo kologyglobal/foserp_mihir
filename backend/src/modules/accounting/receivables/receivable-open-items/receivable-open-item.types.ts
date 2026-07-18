@@ -1,6 +1,7 @@
 export type ReceivableDocumentType =
   | 'SALES_INVOICE'
   | 'CREDIT_NOTE'
+  | 'CUSTOMER_CREDIT_NOTE'
   | 'DEBIT_NOTE'
   | 'OPENING_BALANCE'
   | 'CUSTOMER_RECEIPT'
@@ -18,6 +19,7 @@ export interface ReceivableOpenItemDto {
   documentNumberSnapshot: string | null
   salesInvoiceId: string | null
   customerReceiptId: string | null
+  customerCreditNoteId: string | null
   customerId: string
   customerNameSnapshot: string | null
   receivableAccountId: string | null

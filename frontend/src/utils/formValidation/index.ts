@@ -29,4 +29,6 @@ export {
 export { resolveFieldElement, pickFocusable } from './resolveFieldElement'
 export { scrollToInvalidField } from './scrollToInvalidField'
 export { focusFirstInvalidField, invalidSubmitMessages } from './focusFirstInvalidField'
+export { focusAndHighlightField } from './focusAndHighlightField'
+export type { FocusAndHighlightOptions } from './focusAndHighlightField'
 export { handleInvalidSubmit } from './handleInvalidSubmit'

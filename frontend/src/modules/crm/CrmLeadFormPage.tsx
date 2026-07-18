@@ -1412,7 +1412,7 @@ export function CrmLeadFormPage() {
 
           <ErpFieldGroup label="Contact">
             {company.customerId ? (
-              <ErpFieldRow label="Contact Person" colSpan={3}>
+              <ErpFieldRow label="Contact Person" colSpan={3} dataField="contactPerson">
                 <LeadContactSelect
                   customerId={company.customerId}
                   contactId={contactId || null}
@@ -1421,7 +1421,7 @@ export function CrmLeadFormPage() {
                 />
               </ErpFieldRow>
             ) : (
-              <ErpFieldRow label="Contact Person">
+              <ErpFieldRow label="Contact Person" dataField="contactPerson">
                 <Input
                   value={contactPerson}
                   onChange={(e) => {
@@ -1665,7 +1665,7 @@ export function CrmLeadFormPage() {
               accent="green"
               columns={3}
             >
-              <ErpFieldRow label="Expected Revenue (₹)" fieldState={inlineValidation.fieldState('expectedValue')}>
+              <ErpFieldRow label="Expected Revenue (₹)" dataField="expectedValue" fieldState={inlineValidation.fieldState('expectedValue')}>
                 <Input
                   type="number"
                   min={0}

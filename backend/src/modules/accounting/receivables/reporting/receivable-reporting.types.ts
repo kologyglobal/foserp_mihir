@@ -20,6 +20,21 @@ export type ReconciliationExceptionCode =
   | 'OPEN_ITEM_WITHOUT_VOUCHER'
   | 'OPEN_ITEM_GL_AMOUNT_MISMATCH'
   | 'CONTROL_ACCOUNT_MANUAL_POSTING'
+  | 'ALLOCATION_WITHOUT_BATCH'
+  | 'ALLOCATION_WITHOUT_RECEIPT'
+  | 'ALLOCATION_WITHOUT_INVOICE'
+  | 'ALLOCATION_RECEIPT_OPEN_ITEM_MISMATCH'
+  | 'ALLOCATION_INVOICE_OPEN_ITEM_MISMATCH'
+  | 'ALLOCATION_CUSTOMER_MISMATCH'
+  | 'ALLOCATION_CURRENCY_MISMATCH'
+  | 'ALLOCATION_AMOUNT_EXCEEDS_RECEIPT'
+  | 'ALLOCATION_AMOUNT_EXCEEDS_INVOICE'
+  | 'RECEIPT_BALANCE_MISMATCH'
+  | 'INVOICE_BALANCE_MISMATCH'
+  | 'CREDIT_OPEN_ITEM_BALANCE_MISMATCH'
+  | 'DEBIT_OPEN_ITEM_BALANCE_MISMATCH'
+  | 'ALLOCATION_BASE_AMOUNT_MISMATCH'
+  | 'ALLOCATION_FOREX_REQUIRED'
 
 export const OUTSTANDING_ACTIVE_STATUSES: ReceivableOpenItemStatus[] = [
   'OPEN',
@@ -127,6 +142,9 @@ export interface CustomerReceivableSummaryRow {
   openItemCount: number
   outstandingAmount: string
   baseOutstandingAmount: string
+  debitOutstandingBase: string
+  creditOutstandingBase: string
+  netReceivableBase: string
   oldestDueDate: string | null
   maxDaysOverdue: number | null
   disputedCount: number

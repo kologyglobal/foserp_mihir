@@ -157,7 +157,7 @@ Master CSV export: `/masters/exports/{items|vendors|hsn-sac}`.
 
 Prefix: **`/api/v1/t/:tenantSlug/accounting`**. Auth + tenant context required. Never send `tenantId` in bodies.
 
-Live OpenAPI: `/api/docs` (tags **Accounting Journals**, **Accounting Receivables**, **Sales Invoices**, **Accounting Approvals**, **Accounting Vouchers**, **Accounting Posting Events**).
+Live OpenAPI: `/api/docs` (tags **Accounting Journals**, **Accounting Receivables**, **Sales Invoices**, **Customer Receipts**, **Accounting Approvals**, **Accounting Vouchers**, **Accounting Posting Events**).
 
 ### Sales invoices (`/receivables/invoices`) — Phase 3A3 + 3A4
 
@@ -177,6 +177,32 @@ Live OpenAPI: `/api/docs` (tags **Accounting Journals**, **Accounting Receivable
 **Posted `allowedActions`:** all writes false; `viewAccounting: true` when user has view permission.  
 **Stale update:** `409` code `SALES_INVOICE_STALE_UPDATE` when `updatedAt` mismatch.  
 **Source types:** `DIRECT` or `SALES_ORDER` (+ `sourceDocumentId`); SO adapter read-only with duplicate-invoice warning.
+
+### Customer receipts (`/receivables/receipts`) — Phase 3B3–3B5
+
+| Method | Path | Permission | Notes |
+|--------|------|------------|-------|
+| GET | `/receivables/receipts` | `finance.ar.receipt.view` | Requires `legalEntityId`; filters status, customer, paymentMethod, dates, search |
+| POST | `/receivables/receipts` | `finance.ar.receipt.create` | Create DRAFT; server recalculates via Phase 3B2; `draftReference` only (`receiptNumber` null) |
+| GET | `/receivables/receipts/:id` | `finance.ar.receipt.view` | Detail + TDS + bankCharges/otherDeductions + `allowedActions` + `validationSummary`; when POSTED also `receiptNumber`, `creditOpenItem`, `ledgerEntryCount` |
+| PUT | `/receivables/receipts/:id` | `finance.ar.receipt.edit` | DRAFT / READY_TO_POST; body includes `updatedAt` (optimistic lock); READY edit → DRAFT |
+| POST | `/receivables/receipts/:id/validate` | `finance.ar.receipt.view` | Phase 3B2 validation preview; optional `proposedAllocations` (not persisted) |
+| POST | `/receivables/receipts/:id/mark-ready` | `finance.ar.receipt.edit` | Full validation + CUSTOMER_RECEIPT series preview (non-consuming) → READY_TO_POST |
+| POST | `/receivables/receipts/:id/post` | `finance.ar.receipt.post` | Atomic post READY_TO_POST→POSTED; empty body OK; idempotent `CUSTOMER_RECEIPT_POST:{id}:V1` |
+| POST | `/receivables/receipts/:id/cancel` | `finance.ar.receipt.cancel` | Body `{ cancellationReason }` → CANCELLED |
+| POST | `/receivables/receipts/:receiptId/allocations/preview` | `finance.ar.allocation.view` | Read-only preview; no writes |
+| POST | `/receivables/receipts/:receiptId/allocations` | `finance.ar.allocation.create` | Atomic multi-invoice allocation; requires `Idempotency-Key`; **no GL** |
+| GET | `/receivables/receipts/:receiptId/allocations` | `finance.ar.allocation.view` | Allocation history for receipt |
+| GET | `/receivables/invoices/:invoiceId/allocations` | `finance.ar.allocation.view` | Allocations applied to invoice |
+| GET | `/receivables/customer-credits` | `finance.ar.view` | Outstanding CREDIT open items (customer advances) |
+
+**Lifecycle:** `DRAFT` → mark-ready → `READY_TO_POST` → post → `POSTED` → allocate (optional, multiple batches). Edit from READY reopens to `DRAFT`. Cancel from DRAFT/READY.  
+**Post response (`POST …/post`):** `{ receipt, posting, creditOpenItemId, idempotentReplay }`. Dr bank/cash (+ TDS + bank charges + other deductions), Cr customer receivable = gross receipt amount; creates a `CREDIT`-side `ReceivableOpenItem`.  
+**Allocation (`POST …/allocations`):** Updates debit/credit open items + receipt allocated/unallocated only. Does **not** create AccountingVoucher, GL, PostingEvent, or consume number series. Same-customer / same-legal-entity / same-currency; forex base incompatibility blocked. Remaining credit = customer advance.  
+**Posted `allowedActions`:** `allocate: true` when credit outstanding > 0 + `finance.ar.allocation.create`; `viewAllocations` with view perm; `reverse` always false.  
+**Not yet implemented:** allocation reversal, receipt reversal, frontend allocation screens (Phase 3B6).  
+**Stale update:** `409` code `CUSTOMER_RECEIPT_STALE_UPDATE`. Concurrent post: `409` code `CUSTOMER_RECEIPT_CONCURRENT_POST`. Concurrent allocation: `409` `RECEIPT_ALLOCATION_CONCURRENT_CHANGE`.  
+**Draft reference:** `RCPT-DRAFT-YYYYMMDD-XXXXXX` (does not consume FinanceNumberSeries); `receiptNumber` issued from `CUSTOMER_RECEIPT` series at post time.
 
 ### AR reporting (`/receivables/*`) — Phase 3A5 (read-only GET)
 

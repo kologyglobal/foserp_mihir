@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified against codebase: **2026-07-18** (Accounting Phase 3B3 receipt draft workflow; finance suite 206/206 backend + `test:money-in` 20/20 frontend).
+Last verified against codebase: **2026-07-18** (Accounting Phase 3C5 credit-note allocation backend; focused tests 11/11 and backend typecheck pass).
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
@@ -23,12 +23,12 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Category | Modules |
 |----------|---------|
-| **Completed (API mode)** | … **AR reporting Phase 3A5**; **Money In AR frontend Phase 3A6**; **AR receipt DB foundation Phase 3B1**; **AR receipt calculation/validation Phase 3B2**; **AR receipt draft workflow Phase 3B3** (create/update/validate/mark-ready/cancel/list/detail APIs — no posting/GL/number/allocation, no frontend) |
+| **Completed (API mode)** | … **AR reporting Phase 3A5**; **Money In AR frontend Phase 3A6**; **AR receipt DB foundation Phase 3B1**; **AR receipt calculation/validation Phase 3B2**; **AR receipt draft workflow Phase 3B3**; **AR atomic receipt posting Phase 3B4**; **AR atomic receipt allocation Phase 3B5** (preview + allocate + history + customer-credits; no GL; no frontend); **customer credit notes Phase 3C1–3C4** (draft, minimal approval, atomic GL/open-item posting); **AR atomic credit-note allocation Phase 3C5** (preview + allocate + history, unified with receipt allocation history/customer-credits; no GL; no frontend) |
 | **Partially completed** | Auth UI; mobile CRM (API hydrate, no offline); sales-order fulfilment beyond confirm/close; **user/role/tenant admin UI (frontend wired 2026-07-15, not test-verified)** |
 | **Not started** | Login activity module |
 | **Scaffolding (not shipped)** | — (Accounting operational screens: CoA demo, Vouchers, AR/AP, Bank, FA, Manufacturing Accounting, Tax, Reports, Budgeting, Commercial Commitments, Period Close — UI/mock only; **Finance Settings** at `/accounting/settings` is Phase 1 dual-mode, not a stub) |
 | **Blocked** | — (none currently) |
-| **Deferred by design** | Purchase / inventory / production / quality / maintenance backends; finance **Phase 3B4+ receipt posting/GL/allocation APIs + credit notes**; SO MRP / dispatch |
+| **Deferred by design** | Purchase / inventory / production / quality / maintenance backends; finance **Phase 3B6 receipt UI + Phase 3C6 credit-note UI + receipt/allocation/credit-note reversal**; SO MRP / dispatch |
 
 ---
 
@@ -401,13 +401,13 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | Aspect | Status | Notes |
 |--------|--------|-------|
 | Frontend | ⚠️ | **2026-07-17:** Finance Settings Phase 1 + **Journals + Approvals** workspaces (`/accounting/entries/journals`, `/accounting/entries/approvals`, dual-mode). Post + GL drill-down on journal detail. Other operational workspaces still UI/mock |
-| Backend | ⚠️ | Phase 1 setup + 2A ledger + 2B posting engine + **2C1 journals** + **2C2A approval** + **2C2B posting** (`postExistingApprovedVoucher`) |
-| DB | ⚠️ | Setup + ledger + approval tables + manual journals on `AccountingVoucher`; GL via existing-voucher post path |
-| API | ⚠️ | Setup + `/accounting/journals` (+ `post`, `ledger`) + `/accounting/approvals` + approve/send-back/reject; read-only voucher/GL/posting-event GET |
-| Tests | ⚠️ | finance-setup 8 + ledger 11 + posting-engine 13 + journals 11 + approvals 9 + journal-posting 8 + **ar-foundation 18** = **78/78** pass |
+| Backend | ⚠️ | Phase 1 setup + 2A ledger + 2B posting engine + **2C1 journals** + **2C2A approval** + **2C2B posting** + **3A1–3A5 AR sales invoice** + **3B1–3B5 customer receipt/allocation** + **3C1–3C4 customer credit notes** (draft, minimal approval, atomic GL/open-item posting) + **3C5 credit-note allocation** (subledger-only, unified with receipt allocation read APIs) |
+| DB | ⚠️ | Setup + ledger + approval tables + manual journals on `AccountingVoucher`; GL via existing-voucher post path; `ReceivableOpenItem` DEBIT (invoice) / CREDIT (receipt/credit-note) rows on post; `CustomerCreditNoteAllocationBatch` / `CustomerCreditNoteAllocation` subledger tables (no GL) |
+| API | ⚠️ | Setup + `/accounting/journals` (+ `post`, `ledger`) + `/accounting/approvals` + approve/send-back/reject; read-only voucher/GL/posting-event GET; `/accounting/receivables/invoices/:id/post`; `/accounting/receivables/receipts/:id/post`; `/accounting/receivables/credit-notes/:id/allocations` (+ `/preview`) |
+| Tests | ⚠️ | finance-setup 8 + ledger 11 + posting-engine 13 + journals 11 + approvals 9 + journal-posting 8 + ar-foundation 18 + receipt-drafts 12 + receipt-posting 12 + receipt-allocation 11 + credit-note-foundation 3 + credit-note-posting 5 + **credit-note-allocation (new) 11/11** — see `TESTING_STATUS.md` for latest run counts |
 | Demo mode | ✅ | Settings + journals + approvals + demo journal posting |
-| API mode | ⚠️ | Journals workflow + multi-level approval + post approved journal to GL (same voucher id) |
-| Remaining gap | Phase **2C3**: journal reversal; receipt/payment hooks |
+| API mode | ⚠️ | Journals workflow + multi-level approval + post approved journal to GL (same voucher id); AR invoice/receipt/credit-note atomic posting to GL; receipt + credit-note subledger allocation to invoice open items |
+| Remaining gap | Phase **2C3** journal reversal; **3B6** receipt UI; **3C6** credit-note UI; receipt/allocation/credit-note reversal |
 
 ### Mobile CRM
 

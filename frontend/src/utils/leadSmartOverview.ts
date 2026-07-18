@@ -28,6 +28,8 @@ export interface LeadNextBestAction {
   ctaLabel: string
   /** Form section to expand/scroll, or null for conversion action */
   sectionId: string | null
+  /** Field to focus/highlight after scroll (`data-field` / `data-nba-target`) */
+  focusField?: string
 }
 
 export interface LeadSmartOverviewInput {
@@ -121,6 +123,7 @@ export function resolveLeadNextBestAction(input: LeadSmartOverviewInput): LeadNe
       description: 'Add or select a company so this lead can be worked and converted.',
       ctaLabel: 'Link Company',
       sectionId: 'quick',
+      focusField: 'prospectName',
     }
   }
   if (!hasContact(input)) {
@@ -130,6 +133,7 @@ export function resolveLeadNextBestAction(input: LeadSmartOverviewInput): LeadNe
       description: 'Add a contact person, mobile, or email to reach this lead.',
       ctaLabel: 'Complete Contact',
       sectionId: 'quick',
+      focusField: input.contactPerson.trim() ? 'mobile' : 'contactPerson',
     }
   }
   if (!hasRequirement(input)) {
@@ -139,6 +143,7 @@ export function resolveLeadNextBestAction(input: LeadSmartOverviewInput): LeadNe
       description: 'Capture what the customer needs before you qualify this lead.',
       ctaLabel: 'Add Requirement',
       sectionId: 'quick',
+      focusField: 'productRequirement',
     }
   }
   if (!hasCommercial(input)) {
@@ -148,6 +153,7 @@ export function resolveLeadNextBestAction(input: LeadSmartOverviewInput): LeadNe
       description: 'Enter expected value so pipeline forecasting stays accurate.',
       ctaLabel: 'Add Commercial Details',
       sectionId: 'commercial',
+      focusField: 'expectedValue',
     }
   }
   if (!hasFollowUp(input)) {
@@ -157,6 +163,7 @@ export function resolveLeadNextBestAction(input: LeadSmartOverviewInput): LeadNe
       description: 'No follow-up is currently planned for this lead.',
       ctaLabel: 'Schedule Follow-up',
       sectionId: 'followup',
+      focusField: 'nextFollowUpDate',
     }
   }
   if (input.hasLinkedOpportunity) {
@@ -183,6 +190,7 @@ export function resolveLeadNextBestAction(input: LeadSmartOverviewInput): LeadNe
     description: 'Basics look solid. Review stage and next follow-up to move the deal forward.',
     ctaLabel: 'Review Follow-up',
     sectionId: 'followup',
+    focusField: 'nextFollowUpDate',
   }
 }
 

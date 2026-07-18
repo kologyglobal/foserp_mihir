@@ -6,12 +6,13 @@ export interface CustomerReceiptAllowedActions {
   validate: boolean
   markReady: boolean
   cancel: boolean
-  /** Always false in Phase 3B3 — posting ships in Phase 3B4. */
   post: boolean
-  /** Always false in Phase 3B3 — allocation persistence ships alongside posting. */
   allocate: boolean
+  viewAllocations?: boolean
   viewAccounting?: boolean
   viewCreditOpenItem?: boolean
+  /** Always false — receipt reversal is deferred beyond Phase 3B5. */
+  reverse?: boolean
 }
 
 const EDITABLE_STATUSES: CustomerReceiptStatus[] = ['DRAFT', 'READY_TO_POST']
@@ -25,12 +26,33 @@ function hasPerm(req: Request, permission: string): boolean {
 export function resolveCustomerReceiptAllowedActions(
   req: Request,
   status: CustomerReceiptStatus,
+  options?: { creditOutstanding?: string | number | null },
 ): CustomerReceiptAllowedActions {
   const canView = hasPerm(req, 'finance.ar.receipt.view')
+  const canViewAlloc = hasPerm(req, 'finance.ar.allocation.view')
+  const canAllocate = hasPerm(req, 'finance.ar.allocation.create')
   const editable = EDITABLE_STATUSES.includes(status)
   const cancellable = CANCELLABLE_STATUSES.includes(status)
+  const canPost = status === 'READY_TO_POST' && hasPerm(req, 'finance.ar.receipt.post')
+  const creditOutstanding = Number(options?.creditOutstanding ?? 0)
+  const hasCredit = Number.isFinite(creditOutstanding) && creditOutstanding > 0
 
-  if (status === 'POSTED' || status === 'CANCELLED') {
+  if (status === 'POSTED') {
+    return {
+      edit: false,
+      validate: false,
+      markReady: false,
+      cancel: false,
+      post: false,
+      allocate: canAllocate && hasCredit,
+      viewAllocations: canViewAlloc,
+      viewAccounting: canView,
+      viewCreditOpenItem: canView,
+      reverse: false,
+    }
+  }
+
+  if (status === 'CANCELLED') {
     return {
       edit: false,
       validate: false,
@@ -38,8 +60,10 @@ export function resolveCustomerReceiptAllowedActions(
       cancel: false,
       post: false,
       allocate: false,
+      viewAllocations: canViewAlloc,
       viewAccounting: canView,
       viewCreditOpenItem: canView,
+      reverse: false,
     }
   }
 
@@ -48,9 +72,11 @@ export function resolveCustomerReceiptAllowedActions(
     validate: canView,
     markReady: status === 'DRAFT' && hasPerm(req, 'finance.ar.receipt.edit'),
     cancel: cancellable && hasPerm(req, 'finance.ar.receipt.cancel'),
-    post: false,
+    post: canPost,
     allocate: false,
+    viewAllocations: false,
     viewAccounting: false,
     viewCreditOpenItem: false,
+    reverse: false,
   }
 }

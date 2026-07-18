@@ -12,7 +12,7 @@ import { leadStageLabel } from '../../utils/leadUtils'
 
 export interface LeadSmartOverviewPanelProps {
   input: LeadSmartOverviewInput
-  onGoToSection: (sectionId: string) => void
+  onGoToSection: (sectionId: string, focusField?: string) => void
   onCreateOpportunity: () => void
   onCreateQuotation?: () => void
   onScheduleFollowUp?: () => void
@@ -41,7 +41,7 @@ export function LeadSmartOverviewPanel({
       onScheduleFollowUp()
       return
     }
-    if (action.sectionId) onGoToSection(action.sectionId)
+    if (action.sectionId) onGoToSection(action.sectionId, action.focusField)
   }
 
   const stageOwner = `${leadStageLabel(input.leadStage)} · ${input.ownerName || '—'}`
@@ -54,7 +54,14 @@ export function LeadSmartOverviewPanel({
       contextLine={stageOwner}
       progressPercent={computeLeadQualificationPercent(input)}
       signals={buildLeadSmartSignals(input)}
-      nextAction={nextAction}
+      nextAction={{
+        id: nextAction.id,
+        title: nextAction.title,
+        description: nextAction.description,
+        ctaLabel: nextAction.ctaLabel,
+        focusField: nextAction.focusField,
+        sectionId: nextAction.sectionId ?? undefined,
+      }}
       onNextAction={() => runAction(nextAction)}
       aiInsight={buildLeadAiInsight(input)}
     />

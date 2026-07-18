@@ -117,7 +117,7 @@ export function CommercialCommitmentsPage() {
         />
       }
     >
-      <ReceivablesWorkspaceTabs active="commercial_commitments" />
+      <ReceivablesWorkspaceTabs />
       <div className="mt-2 space-y-3">
         <CommercialAccountingExplanation />
         {loading ? <LoadingState /> : null}

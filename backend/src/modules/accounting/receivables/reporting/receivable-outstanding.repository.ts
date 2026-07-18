@@ -1,7 +1,7 @@
 import type { Prisma, ReceivableOpenItem } from '@prisma/client'
 import { prisma } from '../../../../config/database.js'
 import { getPagination } from '../../../../utils/pagination.js'
-import { formatForPersistence, roundExchangeRate } from '../../shared/finance-decimal.js'
+import { formatForPersistence, roundExchangeRate, toDecimal } from '../../shared/finance-decimal.js'
 import { getLegalEntityOrThrow } from '../../shared/finance.helpers.js'
 import {
   classifyDueDateBucket,
@@ -260,17 +260,37 @@ export async function aggregateSubledgerByAccount(
   ctx: ReceivableReportingContext,
   includeSettled?: boolean,
 ): Promise<Map<string, import('@prisma/client/runtime/library').Decimal>> {
-  const where = buildOutstandingWhere(ctx, { legalEntityId: ctx.legalEntityId, includeSettled })
-  const groups = await prisma.receivableOpenItem.groupBy({
-    by: ['receivableAccountId'],
-    where: { ...where, receivableAccountId: { not: null } },
-    _sum: { baseOpenAmount: true },
-  })
+  const statusFilter = buildOutstandingStatusFilter(includeSettled)
+  const baseWhere = {
+    tenantId: ctx.tenantId,
+    legalEntityId: ctx.legalEntityId,
+    receivableAccountId: { not: null },
+    ...statusFilter,
+  } as const
+
+  const [debitGroups, creditGroups] = await Promise.all([
+    prisma.receivableOpenItem.groupBy({
+      by: ['receivableAccountId'],
+      where: { ...baseWhere, ...DEBIT_OPEN_ITEM_SIDE_FILTER },
+      _sum: { baseOpenAmount: true },
+    }),
+    prisma.receivableOpenItem.groupBy({
+      by: ['receivableAccountId'],
+      where: { ...baseWhere, side: 'CREDIT' },
+      _sum: { baseOpenAmount: true },
+    }),
+  ])
+
   const map = new Map<string, import('@prisma/client/runtime/library').Decimal>()
-  for (const row of groups) {
+  for (const row of debitGroups) {
     if (row.receivableAccountId && row._sum.baseOpenAmount) {
       map.set(row.receivableAccountId, row._sum.baseOpenAmount)
     }
+  }
+  for (const row of creditGroups) {
+    if (!row.receivableAccountId || !row._sum.baseOpenAmount) continue
+    const current = map.get(row.receivableAccountId) ?? toDecimal(0)
+    map.set(row.receivableAccountId, current.sub(row._sum.baseOpenAmount))
   }
   return map
 }

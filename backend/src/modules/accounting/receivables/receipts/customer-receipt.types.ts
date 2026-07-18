@@ -109,6 +109,15 @@ export interface CustomerReceiptDto {
   allowedActions?: CustomerReceiptAllowedActions
   validationSummary?: Pick<CustomerReceiptValidationPreview, 'valid' | 'errors' | 'warnings'> | null
   metaWarnings?: Array<{ code: string; message: string }>
+  /** Credit-side ReceivableOpenItem summary — populated only when status=POSTED (Phase 3B4). */
+  creditOpenItem?: {
+    id: string
+    status: string
+    outstandingAmount: string
+    originalAmount: string
+  } | null
+  /** GeneralLedgerEntry count for the posted voucher — populated only when status=POSTED (Phase 3B4). */
+  ledgerEntryCount?: number
 }
 
 export interface CustomerReceiptDetailDto extends CustomerReceiptDto {

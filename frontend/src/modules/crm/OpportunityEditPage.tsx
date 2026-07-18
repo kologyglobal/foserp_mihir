@@ -330,11 +330,15 @@ export function OpportunityEditPage() {
       nextAction={resolveOpportunityNextBestAction(smartInput)}
       onNextAction={() => {
         const action = resolveOpportunityNextBestAction(smartInput)
-        if (action.id === 'add_lines') scrollToSection('products')
-        else if (action.id === 'set_value') scrollToSection('commercial')
-        else if (action.id === 'create_quotation') void executeAction('saveAndQuotation')
-        else if (action.id === 'create_so') navigate(buildSalesOrderNewUrl(oppId, undefined, { fromCrm: true }))
-        else scrollToSection('general')
+        if (action.id === 'create_quotation') {
+          void executeAction('saveAndQuotation')
+          return
+        }
+        if (action.id === 'create_so') {
+          navigate(buildSalesOrderNewUrl(oppId, undefined, { fromCrm: true }))
+          return
+        }
+        scrollToSection(action.sectionId ?? 'general')
       }}
       quickActions={[
         {
@@ -473,6 +477,7 @@ export function OpportunityEditPage() {
 
         <ErpCardSection
           id="opp-section-products"
+          nbaTarget="products"
           title="Product / Item Lines"
           subtitle="Pick products and set qty, price, and tax per line."
           icon={ClipboardList}

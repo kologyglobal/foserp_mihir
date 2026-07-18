@@ -23,6 +23,7 @@ export function mapReceivableOpenItemToDto(item: ReceivableOpenItem): Receivable
     documentNumberSnapshot: item.documentNumberSnapshot,
     salesInvoiceId: item.salesInvoiceId,
     customerReceiptId: item.customerReceiptId,
+    customerCreditNoteId: item.customerCreditNoteId,
     customerId: item.customerId,
     customerNameSnapshot: item.customerNameSnapshot,
     receivableAccountId: item.receivableAccountId,
@@ -123,4 +124,75 @@ export async function findCreditOpenItems(
     orderBy: { documentDate: 'desc' },
   })
   return items.map(mapReceivableOpenItemToDto)
+}
+
+type AllocationTx = Prisma.TransactionClient
+
+export interface ApplyOpenItemAllocationInput {
+  tenantId: string
+  legalEntityId: string
+  openItemId: string
+  expectedOpenAmount: Prisma.Decimal | string
+  expectedAllocatedAmount: Prisma.Decimal | string
+  expectedBaseOpenAmount: Prisma.Decimal | string
+  expectedBaseAllocatedAmount: Prisma.Decimal | string
+  allocationAmount: Prisma.Decimal | string
+  baseAllocationAmount: Prisma.Decimal | string
+  newStatus: 'OPEN' | 'PARTIALLY_SETTLED' | 'SETTLED'
+  settledAt: Date | null
+  updatedBy?: string | null
+}
+
+/** Internal: conditional debit open-item balance update for receipt allocation. Not HTTP-routable. */
+export async function applyDebitAllocation(tx: AllocationTx, input: ApplyOpenItemAllocationInput): Promise<number> {
+  const result = await tx.receivableOpenItem.updateMany({
+    where: {
+      id: input.openItemId,
+      tenantId: input.tenantId,
+      legalEntityId: input.legalEntityId,
+      side: 'DEBIT',
+      openAmount: input.expectedOpenAmount,
+      allocatedAmount: input.expectedAllocatedAmount,
+      baseOpenAmount: input.expectedBaseOpenAmount,
+      baseAllocatedAmount: input.expectedBaseAllocatedAmount,
+      status: { in: ['OPEN', 'PARTIALLY_SETTLED'] },
+    },
+    data: {
+      openAmount: { decrement: input.allocationAmount },
+      allocatedAmount: { increment: input.allocationAmount },
+      baseOpenAmount: { decrement: input.baseAllocationAmount },
+      baseAllocatedAmount: { increment: input.baseAllocationAmount },
+      status: input.newStatus,
+      settledAt: input.settledAt,
+      updatedBy: input.updatedBy ?? null,
+    },
+  })
+  return result.count
+}
+
+/** Internal: conditional credit open-item balance update for receipt allocation. Not HTTP-routable. */
+export async function applyCreditAllocation(tx: AllocationTx, input: ApplyOpenItemAllocationInput): Promise<number> {
+  const result = await tx.receivableOpenItem.updateMany({
+    where: {
+      id: input.openItemId,
+      tenantId: input.tenantId,
+      legalEntityId: input.legalEntityId,
+      side: 'CREDIT',
+      openAmount: input.expectedOpenAmount,
+      allocatedAmount: input.expectedAllocatedAmount,
+      baseOpenAmount: input.expectedBaseOpenAmount,
+      baseAllocatedAmount: input.expectedBaseAllocatedAmount,
+      status: { in: ['OPEN', 'PARTIALLY_SETTLED'] },
+    },
+    data: {
+      openAmount: { decrement: input.allocationAmount },
+      allocatedAmount: { increment: input.allocationAmount },
+      baseOpenAmount: { decrement: input.baseAllocationAmount },
+      baseAllocatedAmount: { increment: input.baseAllocationAmount },
+      status: input.newStatus,
+      settledAt: input.settledAt,
+      updatedBy: input.updatedBy ?? null,
+    },
+  })
+  return result.count
 }

@@ -77,43 +77,68 @@ async function findReconciliationExceptions(
     where: {
       tenantId,
       legalEntityId,
-      ...DEBIT_OPEN_ITEM_SIDE_FILTER,
       ...statusFilter,
       accountingVoucherId: { not: null },
       receivableAccountId: { not: null },
     },
     select: {
       id: true,
+      side: true,
+      baseOriginalAmount: true,
       baseOpenAmount: true,
+      baseAllocatedAmount: true,
+      baseAdjustedAmount: true,
+      baseWrittenOffAmount: true,
       receivableAccountId: true,
       accountingVoucherId: true,
       documentNumberSnapshot: true,
+      customerId: true,
     },
     take: 200,
   })
 
   for (const item of openItemsWithVoucher) {
     if (!item.accountingVoucherId || !item.receivableAccountId) continue
-    const glDebit = await prisma.generalLedgerEntry.aggregate({
+    const glAgg = await prisma.generalLedgerEntry.aggregate({
       where: {
         tenantId,
         legalEntityId,
         voucherId: item.accountingVoucherId,
         accountId: item.receivableAccountId,
       },
-      _sum: { baseDebitAmount: true },
+      _sum: { baseDebitAmount: true, baseCreditAmount: true },
     })
-    const debitTotal = glDebit._sum.baseDebitAmount ?? toDecimal(0)
-    if (compare(debitTotal, item.baseOpenAmount) !== 0) {
+    const glAmount =
+      item.side === 'CREDIT'
+        ? (glAgg._sum.baseCreditAmount ?? toDecimal(0))
+        : (glAgg._sum.baseDebitAmount ?? toDecimal(0))
+    if (compare(glAmount, item.baseOriginalAmount) !== 0) {
       exceptions.push({
         code: 'OPEN_ITEM_GL_AMOUNT_MISMATCH',
-        message: `Open item ${item.documentNumberSnapshot ?? item.id} base amount does not match receivable GL debit on voucher`,
+        message: `Open item ${item.documentNumberSnapshot ?? item.id} original base amount does not match receivable GL on voucher`,
         openItemId: item.id,
         voucherId: item.accountingVoucherId,
         receivableAccountId: item.receivableAccountId,
         details: {
-          openItemBaseAmount: formatForPersistence(item.baseOpenAmount),
-          glDebitAmount: formatForPersistence(debitTotal),
+          openItemBaseOriginalAmount: formatForPersistence(item.baseOriginalAmount),
+          glAmount: formatForPersistence(glAmount),
+        },
+      })
+    }
+
+    const reconstructed = item.baseOpenAmount
+      .add(item.baseAllocatedAmount)
+      .add(item.baseAdjustedAmount)
+      .add(item.baseWrittenOffAmount)
+    if (compare(reconstructed, item.baseOriginalAmount) !== 0) {
+      exceptions.push({
+        code: item.side === 'CREDIT' ? 'CREDIT_OPEN_ITEM_BALANCE_MISMATCH' : 'DEBIT_OPEN_ITEM_BALANCE_MISMATCH',
+        message: `Open item ${item.documentNumberSnapshot ?? item.id} balances do not reconcile to original amount`,
+        openItemId: item.id,
+        receivableAccountId: item.receivableAccountId ?? undefined,
+        details: {
+          baseOriginalAmount: formatForPersistence(item.baseOriginalAmount),
+          reconstructed: formatForPersistence(reconstructed),
         },
       })
     }
@@ -130,7 +155,10 @@ async function findReconciliationExceptions(
         tenantId,
         legalEntityId,
         accountId: { in: receivableAccountIds },
-        OR: [{ sourceDocumentType: { not: 'SALES_INVOICE' } }, { sourceDocumentType: null }],
+        OR: [
+          { sourceDocumentType: { notIn: ['SALES_INVOICE', 'CUSTOMER_RECEIPT', 'CUSTOMER_CREDIT_NOTE'] } },
+          { sourceDocumentType: null },
+        ],
       },
       select: { id: true, accountId: true, voucherId: true, sourceModule: true, sourceDocumentType: true },
       take: 50,
@@ -138,9 +166,36 @@ async function findReconciliationExceptions(
     for (const entry of manualGl) {
       exceptions.push({
         code: 'CONTROL_ACCOUNT_MANUAL_POSTING',
-        message: `Receivable control account has non-sales-invoice GL posting (${entry.sourceModule ?? 'null'}/${entry.sourceDocumentType ?? 'null'})`,
+        message: `Receivable control account has non-AR GL posting (${entry.sourceModule ?? 'null'}/${entry.sourceDocumentType ?? 'null'})`,
         receivableAccountId: entry.accountId,
         voucherId: entry.voucherId,
+      })
+    }
+  }
+
+  const orphanAllocations = await prisma.customerReceiptAllocation.findMany({
+    where: {
+      tenantId,
+      legalEntityId,
+      status: 'POSTED',
+      OR: [{ batchId: null }, { invoiceId: null }],
+    },
+    select: { id: true, batchId: true, receiptId: true, invoiceId: true },
+    take: 50,
+  })
+  for (const row of orphanAllocations) {
+    if (!row.batchId) {
+      exceptions.push({
+        code: 'ALLOCATION_WITHOUT_BATCH',
+        message: `Allocation ${row.id} has no batch`,
+        details: { allocationId: row.id },
+      })
+    }
+    if (!row.invoiceId) {
+      exceptions.push({
+        code: 'ALLOCATION_WITHOUT_INVOICE',
+        message: `Allocation ${row.id} has no invoice`,
+        details: { allocationId: row.id },
       })
     }
   }

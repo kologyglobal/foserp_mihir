@@ -520,7 +520,8 @@ describe.skipIf(!dbAvailable)('Finance Phase 3B3 — AR customer receipt drafts'
     expect(ready.body.data.status).toBe('READY_TO_POST')
     expect(ready.body.data.receiptNumber).toBeNull()
     expect(ready.body.data.allowedActions.markReady).toBe(false)
-    expect(ready.body.data.allowedActions.post).toBe(false)
+    // Phase 3B4: post becomes available once READY_TO_POST + permission (posting itself is out of scope here).
+    expect(ready.body.data.allowedActions.post).toBe(true)
     expect(ready.body.data.allowedActions.allocate).toBe(false)
 
     await assertNoAccountingArtifacts(fx.tenantId, fx.numberSeriesId)
