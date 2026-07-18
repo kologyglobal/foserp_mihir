@@ -1,14 +1,18 @@
-import { useMemo, useRef, useState } from 'react'
-import { Upload } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { ErpButton } from '../../erp/ErpButton'
 import { ErpSmartSelect } from '../../erp/ErpSmartSelect'
+import {
+  ErpDocumentUpload,
+  type DocumentUploadHandler,
+  type ErpDocumentFileMeta,
+} from '../../erp/ErpDocumentUpload'
+import { getDocumentUploadCategory } from '../../../config/documentUploadCategories'
 import { useDocumentTypeOptions } from '../../../hooks/useCrmMasters'
 import { useCrmMasterStore } from '../../../store/crmMasterStore'
 import {
-  buildAcceptAttribute,
   documentTypeUploadHint,
+  mimeTypesForExtensions,
   parseAllowedFileTypes,
-  validateCrmUploadFile,
 } from '../../../utils/crmDocumentUploadUtils'
 import { CRM_MAX_ATTACHMENT_BYTES } from '../../../hooks/useEntityAttachments'
 
@@ -23,23 +27,34 @@ interface AttachmentUploadDialogProps {
 export function AttachmentUploadDialog({
   open,
   pending = false,
-  uploadProgress,
   onClose,
   onUpload,
 }: AttachmentUploadDialogProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
   const documentTypeOptions = useDocumentTypeOptions()
   const getByCode = useCrmMasterStore((s) => s.getByCode)
   const [documentTypeCode, setDocumentTypeCode] = useState('')
+  const [staged, setStaged] = useState<ErpDocumentFileMeta[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const selectedType = documentTypeCode ? getByCode('document-types', documentTypeCode) : undefined
-  const allowedExtensions = useMemo(
-    () => (selectedType ? parseAllowedFileTypes(selectedType.attributes.fileTypes) : []),
-    [selectedType],
+  const category = getDocumentUploadCategory(documentTypeCode || 'general_document')
+
+  const allowedExtensions = useMemo(() => {
+    if (selectedType) return parseAllowedFileTypes(selectedType.attributes.fileTypes)
+    return category?.acceptedExtensions ?? []
+  }, [selectedType, category])
+
+  const acceptedMimeTypes = useMemo(() => {
+    if (selectedType) return mimeTypesForExtensions(allowedExtensions)
+    return category?.acceptedMimeTypes ?? mimeTypesForExtensions(allowedExtensions)
+  }, [selectedType, allowedExtensions, category])
+
+  const maxFileSizeMb = Math.min(
+    selectedType
+      ? Number(selectedType.attributes.maxSizeMb) || category?.maxFileSizeMb || 10
+      : category?.maxFileSizeMb || 10,
+    Math.round(CRM_MAX_ATTACHMENT_BYTES / (1024 * 1024)),
   )
-  const acceptAttr = useMemo(() => buildAcceptAttribute(allowedExtensions), [allowedExtensions])
-  const canChooseFile = Boolean(selectedType) && !pending
 
   const typeSelectOptions = useMemo(
     () =>
@@ -53,36 +68,18 @@ export function AttachmentUploadDialog({
 
   if (!open) return null
 
-  async function handleFile(file: File) {
+  const handleUpload: DocumentUploadHandler = async ({ file, onProgress }) => {
     if (!selectedType) {
-      setError('Select an attachment type before uploading.')
-      return
+      throw new Error('Select an attachment type before uploading.')
     }
-    const validation = validateCrmUploadFile(file, selectedType)
-    if (validation) {
-      setError(validation)
-      return
-    }
-    if (file.size > CRM_MAX_ATTACHMENT_BYTES) {
-      setError(`File exceeds ${Math.round(CRM_MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB limit.`)
-      return
-    }
-    setError(null)
+    onProgress(20)
     const result = await onUpload(file, selectedType.code)
-    if (result.ok) {
-      setDocumentTypeCode('')
-      onClose()
-    } else {
-      setError(result.error ?? 'Upload failed')
+    onProgress(90)
+    if (!result.ok) {
+      throw new Error(result.error ?? 'Upload failed')
     }
-  }
-
-  function handleChooseFile() {
-    if (!canChooseFile) {
-      setError('Select an attachment type before uploading.')
-      return
-    }
-    inputRef.current?.click()
+    onProgress(100)
+    return { uploadStatus: 'uploaded' as const, uploadProgress: 100 }
   }
 
   return (
@@ -91,7 +88,7 @@ export function AttachmentUploadDialog({
         <h3 className="text-[15px] font-semibold text-erp-text">Upload attachment</h3>
         <p className="mt-1 text-[13px] text-erp-muted">
           Choose attachment type from master, then upload. Max{' '}
-          {Math.round(CRM_MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB.
+          {Math.round(CRM_MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB platform limit.
         </p>
 
         <div className="mt-4 space-y-3">
@@ -103,6 +100,7 @@ export function AttachmentUploadDialog({
             value={documentTypeCode}
             onChange={(v) => {
               setDocumentTypeCode(v ?? '')
+              setStaged([])
               setError(null)
             }}
             placeholder="Choose from Document Type Master…"
@@ -118,39 +116,41 @@ export function AttachmentUploadDialog({
             </p>
           )}
 
-          <input
-            ref={inputRef}
-            type="file"
-            className="hidden"
-            accept={acceptAttr || undefined}
-            disabled={!canChooseFile}
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file) void handleFile(file)
-              e.target.value = ''
+          <ErpDocumentUpload
+            category={category?.code || documentTypeCode || 'general_document'}
+            acceptedMimeTypes={acceptedMimeTypes}
+            acceptedExtensions={allowedExtensions}
+            maxFileSizeMb={maxFileSizeMb}
+            maxFiles={1}
+            allowPreview
+            allowRemove
+            allowDownload
+            allowRetry
+            files={staged}
+            onChange={(next) => {
+              setStaged(next)
+              if (next.some((f) => f.uploadStatus === 'uploaded')) {
+                setDocumentTypeCode('')
+                setError(null)
+                // Defer close so ErpDocumentUpload can finish status patch.
+                queueMicrotask(() => onClose())
+              }
             }}
+            onUpload={selectedType ? handleUpload : undefined}
+            disabled={pending || !selectedType}
+            documentTypeCode={selectedType?.code}
+            documentTypeName={selectedType?.name}
+            error={error}
+            hideDropzoneWhenFull
+            dropzoneTitle={
+              selectedType ? 'Drag and drop or click to upload' : 'Select document type first'
+            }
+            hint={
+              selectedType
+                ? documentTypeUploadHint(selectedType)
+                : 'Select a document type to enable upload'
+            }
           />
-
-          <ErpButton
-            type="button"
-            icon={Upload}
-            disabled={!canChooseFile}
-            onClick={handleChooseFile}
-          >
-            {pending
-              ? uploadProgress != null
-                ? `Uploading… ${uploadProgress}%`
-                : 'Uploading…'
-              : canChooseFile
-                ? 'Choose file'
-                : 'Select type first'}
-          </ErpButton>
-
-          {error ? (
-            <p className="text-[13px] text-red-600" role="alert">
-              {error}
-            </p>
-          ) : null}
         </div>
 
         <div className="mt-4 flex justify-end">
@@ -160,6 +160,7 @@ export function AttachmentUploadDialog({
             size="sm"
             onClick={() => {
               setDocumentTypeCode('')
+              setStaged([])
               setError(null)
               onClose()
             }}

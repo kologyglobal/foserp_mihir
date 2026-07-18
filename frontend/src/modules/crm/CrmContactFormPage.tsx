@@ -47,21 +47,59 @@ import {
   contactOverviewTitle,
   resolveContactNextBestAction,
 } from '../../utils/contactSmartOverview'
-import { phoneDigitsField } from '../../utils/phoneValidationZod'
+import { DEFAULT_CUSTOMER_COUNTRY } from '../../config/countries'
+import { mobileDigitsOnly, validateMobileForCountry } from '../../utils/validation/mobilePhone'
+import { normalizeEmail } from '../../utils/validation/email'
+import { optionalEmailField } from '../../utils/validation/emailZod'
+import {
+  handleInvalidSubmit,
+  rhfErrorsToFieldMap,
+} from '../../utils/formValidation'
 
-const schema = z.object({
-  contactCode: z.string().min(1, 'Contact code is required'),
-  customerId: z.string().min(1, 'Company is required'),
-  name: z.string().min(1, 'Contact name is required'),
-  designation: z.string().optional(),
-  department: z.string().optional(),
-  email: z.string().trim().email('Invalid email').max(255).optional().or(z.literal('')),
-  phone: phoneDigitsField.optional(),
-  isPrimary: z.boolean().optional(),
-  isActive: z.boolean().optional(),
-})
+function buildContactSchema(getCountry: () => string | null | undefined) {
+  return z.object({
+    contactCode: z.string().min(1, 'Contact code is required'),
+    customerId: z.string().min(1, 'Company is required'),
+    name: z.string().min(1, 'Contact name is required'),
+    designation: z.string().optional(),
+    department: z.string().optional(),
+    email: optionalEmailField,
+    phone: z
+      .string()
+      .trim()
+      .transform((s) => mobileDigitsOnly(s))
+      .superRefine((digits, ctx) => {
+        if (!digits) return
+        const message = validateMobileForCountry(digits, getCountry() ?? DEFAULT_CUSTOMER_COUNTRY)
+        if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, message })
+      })
+      .optional(),
+    isPrimary: z.boolean().optional(),
+    isActive: z.boolean().optional(),
+  })
+}
 
-type FormData = z.infer<typeof schema>
+type FormData = z.infer<ReturnType<typeof buildContactSchema>>
+
+const CONTACT_FIELD_ORDER = [
+  'contactCode',
+  'name',
+  'customerId',
+  'phone',
+  'email',
+  'designation',
+  'department',
+] as const
+
+const CONTACT_SECTION_BY_FIELD: Record<string, string> = {
+  contactCode: 'contact-section-quick',
+  name: 'contact-section-quick',
+  customerId: 'contact-section-quick',
+  phone: 'contact-section-quick',
+  email: 'contact-section-quick',
+  designation: 'contact-section-quick',
+  department: 'contact-section-details',
+}
 
 export function CrmContactFormPage() {
   const { id } = useParams()
@@ -81,6 +119,9 @@ export function CrmContactFormPage() {
   const isEdit = Boolean(id && existing)
   const prefill = existing ?? duplicateSource
   const codeSeriesRef = useRef<MasterCodeSeriesHandle | null>(null)
+  const formRootRef = useRef<HTMLDivElement | null>(null)
+  const [sectionForceOpenKey, setSectionForceOpenKey] = useState(0)
+  const phoneCountryRef = useRef<string>(DEFAULT_CUSTOMER_COUNTRY)
 
   const [activeSection, setActiveSection] = useState('quick')
 
@@ -100,8 +141,13 @@ export function CrmContactFormPage() {
     setContactAttachments(attachmentScopeId, next)
   }
 
+  const contactSchema = useMemo(
+    () => buildContactSchema(() => phoneCountryRef.current),
+    [],
+  )
+
   const { register, handleSubmit, control, setValue, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
-    resolver: zodResolver(schema) as Resolver<FormData>,
+    resolver: zodResolver(contactSchema) as Resolver<FormData>,
     defaultValues: prefill
       ? {
           contactCode: duplicateSource && !existing ? '' : (prefill.contactCode ?? ''),
@@ -134,6 +180,7 @@ export function CrmContactFormPage() {
     () => customers.find((c) => c.id === watched.customerId),
     [customers, watched.customerId],
   )
+  phoneCountryRef.current = customer?.country?.trim() || DEFAULT_CUSTOMER_COUNTRY
 
   const companyOptions = useMemo(
     () => customers
@@ -240,9 +287,25 @@ export function CrmContactFormPage() {
     navigate('/crm/contacts')
   }
 
+  function onContactInvalid(rhfErrors: Record<string, unknown>) {
+    handleInvalidSubmit({
+      errors: rhfErrorsToFieldMap(rhfErrors),
+      fieldOrder: [...CONTACT_FIELD_ORDER],
+      sectionByField: CONTACT_SECTION_BY_FIELD,
+      root: formRootRef.current,
+      expandSection: (sectionId) => {
+        if (sectionId === 'contact-section-details' && !showAdditionalDetails) {
+          setShowAdditionalDetails(true)
+        }
+        setActiveSection(sectionId === 'contact-section-details' ? 'details' : 'quick')
+        setSectionForceOpenKey((k) => k + 1)
+      },
+    })
+  }
+
   const submit = handleSubmit(async (data) => {
     await saveContact('default', data)
-  })
+  }, onContactInvalid)
 
   async function saveContact(
     mode: 'default' | 'new' | 'close',
@@ -263,7 +326,7 @@ export function CrmContactFormPage() {
         name: formData.name.trim(),
         designation: formData.designation?.trim() ?? '',
         department: formData.department?.trim() ?? '',
-        email: formData.email?.trim() ?? '',
+        email: formData.email?.trim() ? normalizeEmail(formData.email) : '',
         phone: formData.phone?.trim() ?? '',
         isPrimary: formData.isPrimary ?? false,
         isActive: formData.isActive ?? true,
@@ -326,7 +389,7 @@ export function CrmContactFormPage() {
       await run(data)
       return
     }
-    await handleSubmit((formData) => run(formData))()
+    await handleSubmit((formData) => run(formData), onContactInvalid)()
   }
 
   const recordTitle = watched.name?.trim() || (isEdit ? 'Edit Contact' : 'New Contact')
@@ -453,7 +516,7 @@ export function CrmContactFormPage() {
         factBox={factBox}
         suppressFactBoxRecord
         collapsibleFactBox
-        factBoxLabel="Details"
+        factBoxLabel="Smart Context"
         onSubmit={submit}
         onSaveShortcut={() => void saveContact('default')}
         onSaveCloseShortcut={() => void saveContact('close')}
@@ -489,27 +552,30 @@ export function CrmContactFormPage() {
 
         <EnterpriseFormMetrics metrics={formMetrics} />
 
-        <div className="erp-form-body">
+        <div ref={formRootRef} className="erp-form-body">
         <ErpQuickEntrySection
           id="contact-section-quick"
           title="Quick Entry"
           subtitle="Name, company, and reach — enough to create the contact."
         >
-          <MasterCodeField
-            key={`contact-code-${formInstanceKey}`}
-            entityType="contact"
-            isEdit={isEdit}
-            existingCode={existing?.contactCode}
-            value={watched.contactCode ?? ''}
-            onChange={(v) => setValue('contactCode', v, { shouldValidate: true, shouldDirty: true })}
-            onSeriesReady={(h) => { codeSeriesRef.current = h }}
-            label="Contact Code"
-            error={errors.contactCode?.message}
-            required
-          />
+          <div data-field="contactCode">
+            <MasterCodeField
+              key={`contact-code-${formInstanceKey}`}
+              entityType="contact"
+              isEdit={isEdit}
+              existingCode={existing?.contactCode}
+              value={watched.contactCode ?? ''}
+              onChange={(v) => setValue('contactCode', v, { shouldValidate: true, shouldDirty: true })}
+              onSeriesReady={(h) => { codeSeriesRef.current = h }}
+              label="Contact Code"
+              error={errors.contactCode?.message}
+              required
+            />
+          </div>
           <ErpFieldRow
             label="Full Name"
             required
+            dataField="name"
             fieldState={errors.name ? 'error' : 'idle'}
             fieldError={errors.name?.message}
           >
@@ -518,6 +584,7 @@ export function CrmContactFormPage() {
           <ErpFieldRow
             label={COMPANY_TERMINOLOGY.singular}
             required
+            dataField="customerId"
             fieldState={errors.customerId ? 'error' : 'idle'}
             fieldError={errors.customerId?.message}
           >
@@ -530,19 +597,34 @@ export function CrmContactFormPage() {
               emptyMessage={`No ${COMPANY_TERMINOLOGY.plural.toLowerCase()} found`}
             />
           </ErpFieldRow>
-          <ErpFieldRow label="Mobile / Phone" fieldState={errors.phone ? 'error' : 'idle'} fieldError={errors.phone?.message}>
+          <ErpFieldRow
+            label="Mobile / Phone"
+            dataField="phone"
+            fieldState={errors.phone ? 'error' : 'idle'}
+            fieldError={errors.phone?.message}
+          >
             <div className="relative">
               <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-erp-muted" />
               <MobileInput {...register('phone')} className="erp-input pl-9" placeholder="10-digit mobile" />
             </div>
           </ErpFieldRow>
-          <ErpFieldRow label="Email" fieldState={errors.email ? 'error' : 'idle'} fieldError={errors.email?.message}>
+          <ErpFieldRow
+            label="Email"
+            dataField="email"
+            fieldState={errors.email ? 'error' : 'idle'}
+            fieldError={errors.email?.message}
+          >
             <div className="relative">
               <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-erp-muted" />
               <Input type="email" {...register('email')} className="erp-input pl-9" placeholder="name@company.com" />
             </div>
           </ErpFieldRow>
-          <ErpFieldRow label="Designation" fieldState={errors.designation ? 'error' : 'idle'} fieldError={errors.designation?.message}>
+          <ErpFieldRow
+            label="Designation"
+            dataField="designation"
+            fieldState={errors.designation ? 'error' : 'idle'}
+            fieldError={errors.designation?.message}
+          >
             <Select {...register('designation')} className="erp-input">
               <option value="">— Select designation —</option>
               {designationOptions.map((o) => (
@@ -583,8 +665,14 @@ export function CrmContactFormPage() {
           columns={3}
           collapsible
           defaultOpen
+          forceOpenKey={sectionForceOpenKey}
         >
-          <ErpFieldRow label="Department" fieldState={errors.department ? 'error' : 'idle'} fieldError={errors.department?.message}>
+          <ErpFieldRow
+            label="Department"
+            dataField="department"
+            fieldState={errors.department ? 'error' : 'idle'}
+            fieldError={errors.department?.message}
+          >
             <Select {...register('department')} className="erp-input">
               <option value="">— Select department —</option>
               {departmentOptions.map((o) => (

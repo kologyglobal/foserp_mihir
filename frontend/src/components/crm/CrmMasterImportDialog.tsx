@@ -208,6 +208,28 @@ export function CrmMasterImportDialog({
             <p className="mb-2 text-[12px] font-medium text-erp-text">
               Preview — {validCount} ready{errorCount > 0 ? `, ${errorCount} with errors` : ''}
             </p>
+            {errorCount > 0 ? (
+              <div className="mb-3 max-h-36 overflow-auto rounded-md border border-red-200 bg-red-50/80">
+                <table className="erp-table w-full text-[12px]">
+                  <thead>
+                    <tr>
+                      <th>Error row</th>
+                      <th>Code</th>
+                      <th>Issue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.filter((r) => r.errors.length > 0).slice(0, 25).map((row) => (
+                      <tr key={`err-${row.rowNo}`}>
+                        <td>{row.rowNo}</td>
+                        <td className="font-mono text-[11px]">{row.input.code || '—'}</td>
+                        <td className="text-red-800">{row.errors.join('; ')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
             <div className="max-h-64 overflow-auto rounded-md border border-erp-border">
               <table className="erp-table w-full text-[12px]">
                 <thead>

@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { useLocation, useNavigate, useParams, Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import {
   Play,
@@ -12,6 +12,7 @@ import {
   Receipt,
   LayoutGrid,
   Banknote,
+  Printer,
 } from 'lucide-react'
 import { Entity360Panel } from '../../components/design-system/Entity360Shell'
 import { ErpCardCommandBar } from '../../components/erp/card-form/ErpCardCommandBar'
@@ -42,6 +43,7 @@ import {
   CRM_SALES_ORDERS_PATH,
   buildSalesOrderEditUrl,
   resolveSalesOrderDetailPath,
+  resolveSalesOrderPrintPath,
 } from '../../utils/crmSalesOrderNavigation'
 import { formatNumber, formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
@@ -72,8 +74,47 @@ import {
   ExpectedAccountingEntryDrawer,
   SalesOrderAccountingSummary,
 } from '../../components/accounting/commercial'
+import {
+  SalesOrderConfirmDialog,
+  type SalesOrderConfirmValues,
+} from '../../components/sales/SalesOrderConfirmDialog'
 
 type SoTab = 'overview' | 'production' | 'dispatch' | 'commercial'
+
+async function persistSalesOrderConfirmDocument(
+  salesOrderId: string,
+  values: SalesOrderConfirmValues,
+) {
+  if (!values.documentFile) return
+  const { useCrmMasterStore } = await import('../../store/crmMasterStore')
+  const { useSalesOrderAttachmentStore } = await import('../../store/salesOrderAttachmentStore')
+  const { readFileAsDataUrl, isPreviewableImage, isPreviewablePdf } = await import(
+    '../../utils/crmDocumentUploadUtils'
+  )
+  const docType = useCrmMasterStore.getState().getByCode('document-types', values.documentTypeCode)
+  let previewUrl: string | null = null
+  if (
+    isPreviewableImage(values.documentFile.type) ||
+    isPreviewablePdf(values.documentFile.type, values.documentFile.name)
+  ) {
+    try {
+      previewUrl = await readFileAsDataUrl(values.documentFile)
+    } catch {
+      previewUrl = null
+    }
+  }
+  useSalesOrderAttachmentStore.getState().add({
+    id: `so-att-${crypto.randomUUID().slice(0, 8)}`,
+    salesOrderId,
+    documentTypeCode: values.documentTypeCode,
+    documentTypeName: docType?.name ?? values.documentTypeCode,
+    fileName: values.documentFile.name,
+    mimeType: values.documentFile.type || 'application/octet-stream',
+    sizeBytes: values.documentFile.size,
+    previewUrl,
+    uploadedAt: new Date().toISOString(),
+  })
+}
 
 function healthScore(so: ReturnType<ReturnType<typeof useMrpStore.getState>['getSalesOrder']>): number {
   if (!so) return 0
@@ -87,6 +128,7 @@ export function SalesOrder360Page() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const crmMode = pathname.startsWith('/crm/sales-orders')
   const listPath = crmMode ? CRM_SALES_ORDERS_PATH : '/sales/orders'
   const detailPath = id ? resolveSalesOrderDetailPath(id, crmMode) : listPath
@@ -112,11 +154,23 @@ export function SalesOrder360Page() {
   const [activeSection, setActiveSection] = useState<SoTab>('overview')
   const [toast, setToast] = useState<string | null>(null)
   const [expectedEntryOpen, setExpectedEntryOpen] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmBusy, setConfirmBusy] = useState(false)
+  const updateSalesOrderDraft = useMrpStore((s) => s.updateSalesOrderDraft)
 
   const customer = so ? customers.find((c) => c.id === so.customerId) : undefined
   const product = so ? products.find((p) => p.id === so.productId) : undefined
   const quo = so?.quotationId ? getQuotation(so.quotationId) : undefined
   const crmDoc = so?.quotationId ? getLatestQuotationDocument(so.quotationId) : undefined
+
+  useEffect(() => {
+    if (!so || so.status !== 'open') return
+    if (searchParams.get('confirm') !== '1') return
+    setConfirmOpen(true)
+    const next = new URLSearchParams(searchParams)
+    next.delete('confirm')
+    setSearchParams(next, { replace: true })
+  }, [so, searchParams, setSearchParams])
 
   const orderWos = useMemo(
     () => (id ? workOrders.filter((w) => w.salesOrderId === id) : []),
@@ -216,16 +270,97 @@ export function SalesOrder360Page() {
 
   const order = so
 
-  async function handleConfirm() {
-    const { isApiMode } = await import('../../config/apiConfig')
-    if (isApiMode()) {
-      const { apiConfirmSalesOrder } = await import('../../services/bridges/salesOrderApiBridge')
-      const r = await apiConfirmSalesOrder(order.id)
-      setToast(r.ok ? 'Order confirmed' : r.error ?? 'Failed')
-      return
+  function openConfirmDialog() {
+    setConfirmOpen(true)
+  }
+
+  async function handleConfirmSubmit(values: SalesOrderConfirmValues) {
+    setConfirmBusy(true)
+    try {
+      const patch = {
+        customerPoNumber: values.customerPoNumber.trim(),
+        customerPoDate: values.customerPoDate || null,
+        paymentTerms: values.paymentTerms.trim(),
+        deliveryTerms: values.deliveryTerms.trim(),
+        requiredDate: values.requiredDate || order.requiredDate,
+        expectedDeliveryDate: values.requiredDate || order.expectedDeliveryDate,
+        directSoReason: values.directSoReason.trim() || null,
+      }
+
+      const { isApiMode } = await import('../../config/apiConfig')
+      if (isApiMode()) {
+        const { apiUpdateSalesOrder, apiConfirmSalesOrder } = await import(
+          '../../services/bridges/salesOrderApiBridge'
+        )
+        const updated = await apiUpdateSalesOrder(order.id, patch)
+        if (!updated.ok) {
+          setToast(updated.error ?? 'Could not save confirmation details')
+          return
+        }
+
+        if (values.documentFile) {
+          const uploadTarget = order.quotationId
+            ? ({ entityType: 'QUOTATION' as const, entityId: order.quotationId })
+            : order.opportunityId
+              ? ({ entityType: 'OPPORTUNITY' as const, entityId: order.opportunityId })
+              : null
+          if (uploadTarget) {
+            const { createEntityAttachmentApi } = await import('../../services/api/crmApi')
+            const contentBase64 = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader()
+              reader.onload = () => {
+                const result = String(reader.result ?? '')
+                resolve(result.includes(',') ? result.split(',')[1]! : result)
+              }
+              reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'))
+              reader.readAsDataURL(values.documentFile!)
+            })
+            try {
+              await createEntityAttachmentApi(uploadTarget.entityType, uploadTarget.entityId, {
+                originalFilename: values.documentFile.name,
+                mimeType: values.documentFile.type || 'application/octet-stream',
+                contentBase64,
+                documentType: values.documentTypeCode.trim(),
+              })
+            } catch {
+              setToast('Order details saved, but document upload failed. Confirm aborted.')
+              return
+            }
+          } else {
+            await persistSalesOrderConfirmDocument(order.id, values)
+          }
+        }
+
+        const r = await apiConfirmSalesOrder(order.id)
+        if (!r.ok) {
+          setToast(r.error ?? 'Failed to confirm order')
+          return
+        }
+        setConfirmOpen(false)
+        setToast('Order confirmed')
+        return
+      }
+
+      const saved = updateSalesOrderDraft(order.id, patch)
+      if (!saved.ok) {
+        setToast(saved.error ?? 'Could not save confirmation details')
+        return
+      }
+
+      if (values.documentFile) {
+        await persistSalesOrderConfirmDocument(order.id, values)
+      }
+
+      const r = confirmSalesOrder(order.id)
+      if (!r.ok) {
+        setToast(r.error ?? 'Failed to confirm order')
+        return
+      }
+      setConfirmOpen(false)
+      setToast('Order confirmed')
+    } finally {
+      setConfirmBusy(false)
     }
-    const r = confirmSalesOrder(order.id)
-    setToast(r.ok ? 'Order confirmed' : r.error ?? 'Failed')
   }
 
   function handleMrp() {
@@ -277,12 +412,13 @@ export function SalesOrder360Page() {
     <ErpCardCommandBar
       inline
       homeActions={[
-        ...(so.status === 'open' ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: handleConfirm }] : []),
+        ...(so.status === 'open' ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }] : []),
         ...(so.status === 'confirmed' ? [{ id: 'mrp', label: 'Trigger MRP', icon: Play, primary: true, onClick: handleMrp }] : []),
         ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit', icon: Pencil, onClick: () => navigate(editPath) }] : []),
         ...(so.status !== 'open' && !activeProforma ? [{ id: 'proforma', label: 'Create Proforma', icon: Receipt, onClick: () => navigate(buildProformaNewUrl(so.id)) }] : []),
       ]}
       moreActions={[
+        { id: 'print', label: 'Print', icon: Printer, onClick: () => navigate(resolveSalesOrderPrintPath(so.id, pathname)) },
         ...(activeProforma ? [{ id: 'view-proforma', label: `Proforma ${activeProforma.proformaNo}`, icon: Receipt, onClick: () => navigate(`/sales/proforma-invoices/${activeProforma.id}`) }] : []),
         ...(quo ? [{ id: 'quotation', label: 'Quotation', icon: FileText, onClick: () => navigate(crmQuotationPath(quo.id)) }] : []),
         ...(crmDoc ? [{ id: 'quote-360', label: 'CRM Quote 360', icon: ExternalLink, onClick: () => navigate(`/crm/quotations/${so.quotationId}`) }] : []),
@@ -319,7 +455,7 @@ export function SalesOrder360Page() {
           { label: 'Quotation', value: so.quotationNo ? `${so.quotationNo} Rev ${so.quotationRevisionNo ?? 1}` : '—' },
         ]}
         actions={[
-          ...(so.status === 'open' ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: handleConfirm }] : []),
+          ...(so.status === 'open' ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }] : []),
           ...(so.status === 'confirmed' ? [{ id: 'mrp', label: 'Trigger MRP', icon: Play, primary: true, onClick: handleMrp }] : []),
           ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit Draft', icon: Pencil, onClick: () => navigate(editPath) }] : []),
         ]}
@@ -355,7 +491,7 @@ export function SalesOrder360Page() {
         documentStrip={documentStrip}
         factBox={factBox}
         collapsibleFactBox
-        factBoxLabel="Details"
+        factBoxLabel="Smart Context"
         stickyFooter={false}
       >
         <EnterpriseFormSectionNav
@@ -414,7 +550,7 @@ export function SalesOrder360Page() {
                     <OrderNextActionPanel
                       status={so.status}
                       overdue={overdue}
-                      onConfirm={so.status === 'open' ? handleConfirm : undefined}
+                      onConfirm={so.status === 'open' ? openConfirmDialog : undefined}
                       onTriggerMrp={so.status === 'confirmed' ? handleMrp : undefined}
                     />
                   </div>
@@ -576,6 +712,14 @@ export function SalesOrder360Page() {
           showIllustrativeAmounts
         />
       ) : null}
+      <SalesOrderConfirmDialog
+        open={confirmOpen}
+        order={so}
+        customerName={customer?.customerName}
+        isSubmitting={confirmBusy}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={handleConfirmSubmit}
+      />
       {toast ? <Toast message={toast} variant="success" /> : null}
     </>
   )

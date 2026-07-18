@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
-import { isRouteErrorResponse, useNavigate, useRouteError } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Home, RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { ERP_STORAGE_KEYS } from '../../store/persistConfig'
@@ -51,7 +51,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   render() {
     if (this.state.error) {
       return (
-        <ErrorFallback
+        <TreeCrashFallback
           routePath={this.state.routePath}
           message={this.state.error.message}
           caughtAt={this.state.caughtAt}
@@ -63,7 +63,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   }
 }
 
-function ErrorFallback({
+function TreeCrashFallback({
   routePath,
   message,
   caughtAt,
@@ -116,7 +116,9 @@ function ErrorFallback({
           </div>
           <div>
             <dt className="font-medium text-erp-muted">User / Role</dt>
-            <dd className="text-erp-text">{user.name} · {getSessionUserRoleLabel()}</dd>
+            <dd className="text-erp-text">
+              {user.name} · {getSessionUserRoleLabel()}
+            </dd>
           </div>
           {caughtAt ? (
             <div>
@@ -145,22 +147,5 @@ function ErrorFallback({
   )
 }
 
-/** React Router errorElement — route loader / render failures. */
-export function RouteErrorPage() {
-  const error = useRouteError()
-  const routePath = window.location.pathname
-  const message = isRouteErrorResponse(error)
-    ? `${error.status} ${error.statusText}${error.data ? `: ${String(error.data)}` : ''}`
-    : error instanceof Error
-      ? error.message
-      : String(error)
-
-  return (
-    <ErrorFallback
-      routePath={routePath}
-      message={message}
-      caughtAt={new Date().toISOString()}
-      onReload={() => window.location.reload()}
-    />
-  )
-}
+/** @deprecated Prefer importing from `./RouteErrorBoundary`. */
+export { RouteErrorBoundary, RouteErrorPage } from './RouteErrorBoundary'

@@ -76,7 +76,10 @@ import {
   buildBlankSalesOrderNewUrl,
   buildSalesOrderEditUrl,
   resolveSalesOrderDetailPath,
+  resolveSalesOrderPrintPath,
 } from '../../utils/crmSalesOrderNavigation'
+import { buildProformaNewUrl } from '../../utils/proformaInvoicePrefill'
+import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
 import { systemConfirm } from '../../utils/systemConfirm'
 import { QuickCreateSelect } from '../../components/quick-create/QuickCreateSelect'
 import { useQuickCreate } from '../../hooks/useQuickCreate'
@@ -752,7 +755,6 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
   const [searchParams] = useSearchParams()
   const salesOrders = useMrpStore((s) => s.salesOrders) ?? []
   const deleteSalesOrderDraft = useMrpStore((s) => s.deleteSalesOrderDraft)
-  const confirmSalesOrder = useSalesStore((s) => s.confirmSalesOrder)
   const triggerProduction = useSalesStore((s) => s.triggerProductionForOrder)
   const workOrders = useWorkOrderStore((s) => s.workOrders)
   const quotationDocuments = useCrmStore((s) => s.quotationDocuments)
@@ -954,22 +956,31 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
   }
 
   function handlePrintSalesOrder(so: SalesOrder) {
-    window.open(resolveSalesOrderDetailPath(so.id, crmMode), '_blank', 'noopener,noreferrer')
+    navigate(resolveSalesOrderPrintPath(so.id, crmMode))
+  }
+
+  function handleCreateProforma(so: SalesOrder) {
+    const active = useProformaInvoiceStore
+      .getState()
+      .proformaInvoices.find((p) => p.salesOrderId === so.id && p.status !== 'cancelled')
+    if (active) {
+      navigate(`/sales/proforma-invoices/${active.id}`)
+      return
+    }
+    if (so.status === 'open') {
+      setToast('Confirm the sales order before creating a proforma invoice.')
+      return
+    }
+    if (so.status === 'closed') {
+      setToast('Cannot create proforma for a closed sales order.')
+      return
+    }
+    navigate(buildProformaNewUrl(so.id))
   }
 
   function handleConvertSalesOrder(so: SalesOrder) {
     if (so.status === 'open') {
-      void (async () => {
-        const { isApiMode } = await import('../../config/apiConfig')
-        if (isApiMode()) {
-          const { apiConfirmSalesOrder } = await import('../../services/bridges/salesOrderApiBridge')
-          const r = await apiConfirmSalesOrder(so.id)
-          setToast(r.ok ? `${so.salesOrderNo} confirmed` : r.error ?? 'Confirm failed')
-          return
-        }
-        const r = confirmSalesOrder(so.id)
-        setToast(r.ok ? `${so.salesOrderNo} confirmed` : r.error ?? 'Confirm failed')
-      })()
+      navigate(`${resolveSalesOrderDetailPath(so.id, crmMode)}?confirm=1`)
       return
     }
     if (so.status === 'confirmed') {
@@ -1146,6 +1157,7 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
           onPrint={handlePrintSalesOrder}
           onConvert={handleConvertSalesOrder}
           onDuplicate={handleDuplicateSalesOrder}
+          onCreateProforma={handleCreateProforma}
         />
       </EnterpriseRegisterTableShell>
       {toast ? <Toast message={toast} /> : null}

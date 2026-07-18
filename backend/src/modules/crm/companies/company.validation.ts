@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { paginationSchema } from '../../../utils/pagination.js'
 import { CUSTOMER_TYPES } from './company.constants.js'
 import { optionalPhoneSchema } from '../../../utils/phoneValidation.js'
+import { optionalEmailSchema } from '../../../utils/emailValidation.js'
 
 export const listCompaniesQuerySchema = paginationSchema.extend({
   status: z.string().optional(),
@@ -17,7 +18,7 @@ export const createCompanySchema = z.object({
   website: z.string().trim().max(255).optional(),
   turnoverRange: z.string().trim().max(64).optional(),
   employeeRange: z.string().trim().max(64).optional(),
-  email: z.string().trim().email().max(255).optional().or(z.literal('')),
+  email: optionalEmailSchema.optional().or(z.literal('')),
   phone: optionalPhoneSchema,
   addressLine1: z.string().trim().max(500).optional(),
   addressLine2: z.string().trim().max(500).optional(),
@@ -29,7 +30,7 @@ export const createCompanySchema = z.object({
   pan: z.string().trim().max(20).optional(),
   contactPerson: z.string().trim().max(200).optional(),
   contactPhone: optionalPhoneSchema,
-  contactEmail: z.string().trim().email().max(255).optional().or(z.literal('')),
+  contactEmail: optionalEmailSchema.optional().or(z.literal('')),
   creditDays: z.coerce.number().int().min(0).optional(),
   creditLimit: z.coerce.number().min(0).optional(),
   salesTerritory: z.string().trim().max(32).optional(),

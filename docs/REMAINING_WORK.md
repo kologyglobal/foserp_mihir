@@ -310,10 +310,10 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Field | Value |
 |-------|-------|
 | Module | Accounting |
-| Description | **Finance Settings Phase 1** + **Phase 2C1 manual journals** + **Phase 2C2A journal approvals** + **Phase 2C2B journal posting** (`/accounting/entries/journals`, post + ledger). Remaining operational Accounting FE (legacy vouchers demo, AR/AP, bank, etc.) still mock until document hooks. |
-| Next step | Phase **2C3**: journal reversal workflow; receipt/payment module hooks. Phase 2C2B posting shipped 2026-07-17. |
-| Test required | Finance tests 59/59 (`tests/finance/`) |
-| Status | partial (setup 1 + ledger 2A + posting 2B + journals 2C1 + approvals 2C2A + **posting 2C2B** done; reversal + document hooks open) |
+| Description | **Finance Settings Phase 1** + **Phase 2C1 manual journals** + **Phase 2C2A journal approvals** + **Phase 2C2B journal posting** + **Phase 3A1–3A6 AR backend/frontend** + **Phase 3B1 receipt DB** + **Phase 3B2 receipt calculation/validation**. Remaining: receipt draft/post APIs (3B3+), legacy demo receipts UI until API wired. |
+| Next step | Phase **3B3**: receipt draft CRUD + validate + mark-ready + cancel + list/detail. Then posting/allocation, frontend Money In receipts tab. Then **2C3** journal reversal. |
+| Test required | Finance tests (`tests/finance/`) + `npm run test:money-in` |
+| Status | partial (… + **3B1 receipt DB** + **3B2 calculation** done; **3B3 draft APIs** next) |
 
 ### P3-6: Commercial terms single source
 
@@ -331,4 +331,4 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ## Recommended next task
 
-See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) open risks. Highest ops: **redeploy production `.htaccess`** so `/api` returns JSON. Product backlog: **verify P1-1/P1-2 admin UIs**; then P2 mobile API E2E. Finance **setup** Phase 1 is shipped — do not start Phase 2 GL posting or purchase backends until prioritized.
+See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) open risks. Highest ops: **redeploy production `.htaccess`** so `/api` returns JSON. Product backlog: **verify P1-1/P1-2 admin UIs**; then P2 mobile API E2E. Finance **next:** **Phase 3B3** receipt draft CRUD APIs.

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { CRM_NOTE_TYPES } from './note.types.js'
 
 export const CRM_ENTITY_TYPES = [
   'COMPANY',
@@ -15,12 +16,27 @@ export const entityParamsSchema = z.object({
   entityId: z.string().uuid(),
 })
 
+const stageCodeSchema = z.string().trim().min(1).max(64)
+const noteTypeSchema = z.enum(CRM_NOTE_TYPES)
+
+/**
+ * Create always inserts a new row. stageCode / noteType are set at create time only —
+ * stage changes must POST a new note, never PATCH an older stage's note identity.
+ */
 export const createNoteSchema = z.object({
+  content: z.string().trim().min(1).max(10000),
+  stageCode: stageCodeSchema.optional().nullable(),
+  noteType: noteTypeSchema.optional().nullable(),
+})
+
+/** Content-only update — stageCode and noteType are immutable after create. */
+export const updateNoteSchema = z.object({
   content: z.string().trim().min(1).max(10000),
 })
 
-export const updateNoteSchema = z.object({
-  content: z.string().trim().min(1).max(10000),
+export const listNotesQuerySchema = z.object({
+  stageCode: stageCodeSchema.optional(),
+  noteType: noteTypeSchema.optional(),
 })
 
 export const createAttachmentSchema = z.object({
@@ -37,4 +53,5 @@ export const noteIdParamSchema = z.object({
 
 export type CreateNoteInput = z.infer<typeof createNoteSchema>
 export type UpdateNoteInput = z.infer<typeof updateNoteSchema>
+export type ListNotesQuery = z.infer<typeof listNotesQuerySchema>
 export type CreateAttachmentInput = z.infer<typeof createAttachmentSchema>

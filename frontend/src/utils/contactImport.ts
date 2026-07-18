@@ -3,6 +3,7 @@ import type { CrmContact } from '../types/crm'
 import { parseCsvText } from './leadImport'
 import { reserveCode, confirmCode } from '../services/codeSeriesService'
 import { sanitizePhoneDigits } from './phoneValidation'
+import { normalizeEmail, validateEmail } from './validation/email'
 
 export const CONTACT_IMPORT_HEADERS = [
   'Company Code',
@@ -160,10 +161,12 @@ export function parseContactImportCsv(
       errors.push(`Company not found: ${companyCode || companyName}`)
     }
 
-    const email = obj[normalizeKey('Email')] ?? ''
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.push('Invalid email format')
+    const emailRaw = obj[normalizeKey('Email')] ?? ''
+    const emailError = validateEmail(emailRaw)
+    if (emailError) {
+      errors.push(emailError)
     }
+    const email = emailRaw.trim() ? normalizeEmail(emailRaw) : ''
 
     rows.push({
       rowNo: i + 1,
@@ -235,9 +238,11 @@ export function importContactRows(
     }
 
     if (row.input.email) {
+      const emailKey = normalizeEmail(row.input.email)
       const emailDup = working.find(
         (c) => c.customerId === row.input.customerId
-          && c.email.toLowerCase() === row.input.email.toLowerCase(),
+          && c.email
+          && normalizeEmail(c.email) === emailKey,
       )
       if (emailDup) {
         errors.push({ row: row.rowNo, message: `Email ${row.input.email} already exists for this company` })

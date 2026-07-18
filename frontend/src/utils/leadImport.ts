@@ -3,6 +3,7 @@ import { getActiveLeadUsers } from '../data/crm/leadUsers'
 import { getSessionUser } from './permissions'
 import { resolveLeadStageOptions, resolveLeadPriorityOptions } from './leadUtils'
 import { sanitizePhoneDigits } from './phoneValidation'
+import { normalizeEmail, validateEmail } from './validation/email'
 
 export const LEAD_IMPORT_HEADERS = [
   'Prospect Name',
@@ -279,6 +280,11 @@ export function parseLeadImportCsv(text: string): { rows: LeadImportPreviewRow[]
       }
     }
 
+    const emailRaw = obj[normalizeKey('Email')] ?? ''
+    const emailError = validateEmail(emailRaw)
+    if (emailError) errors.push(emailError)
+    const email = emailRaw.trim() ? normalizeEmail(emailRaw) : null
+
     rows.push({
       rowNo: i + 1,
       input: {
@@ -293,7 +299,7 @@ export function parseLeadImportCsv(text: string): { rows: LeadImportPreviewRow[]
         stage: stage ?? 'new',
         contactPerson: obj[normalizeKey('Contact Person')] || null,
         mobile: sanitizePhoneDigits(obj[normalizeKey('Mobile')] ?? '') || null,
-        email: obj[normalizeKey('Email')] || null,
+        email,
         productRequirement: obj[normalizeKey('Product Requirement')] || 'Imported lead',
         remarks: obj[normalizeKey('Remarks')] ?? '',
         expectedCloseDate,

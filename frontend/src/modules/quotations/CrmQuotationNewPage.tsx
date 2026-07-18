@@ -38,7 +38,11 @@ import {
   resolveOpportunityLines,
   syncOpportunityLines,
   validateOpportunityLines,
+  opportunityLineUnitPriceFieldKey,
+  UNIT_PRICE_REQUIRED_MESSAGE,
 } from '../../utils/opportunityLineCalc'
+import { opportunityRowErrorsToFieldMap } from '../../utils/opportunityLineValidationFocus'
+import { handleInvalidSubmit } from '../../utils/formValidation'
 import {
   decodeLeadRequirementLines,
   hasLeadRequirementLines,
@@ -166,6 +170,7 @@ export function CrmQuotationNewPage() {
   const [deliveryTerms, setDeliveryTerms] = useState(() => resolveDefaultCommercialTerm('delivery-terms').text)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [rowErrors, setRowErrors] = useState<Record<string, string[]>>({})
+  const [forceOpenProductsKey, setForceOpenProductsKey] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   function handleQuotationDateChange(value: string) {
@@ -320,7 +325,39 @@ export function CrmQuotationNewPage() {
     })
     setValidationErrors(errors)
     setRowErrors(rErr)
-    if (errors.length) return
+    if (errors.length || Object.keys(rErr).length) {
+      const fieldMap = opportunityRowErrorsToFieldMap(rErr)
+      const lineKeys = Object.keys(fieldMap)
+      if (!lineKeys.length && Object.keys(rErr).length) {
+        const firstLineId = Object.keys(rErr)[0]!
+        fieldMap[opportunityLineUnitPriceFieldKey(firstLineId)] = UNIT_PRICE_REQUIRED_MESSAGE
+      }
+      const keys = Object.keys(fieldMap)
+      const fieldLabels: Record<string, string> = {}
+      const sectionByField: Record<string, string> = {}
+      for (const key of keys) {
+        sectionByField[key] = 'quote-section-products'
+        if (key.startsWith('unitPrice-')) fieldLabels[key] = 'Unit Price'
+        else if (key.startsWith('qty-')) fieldLabels[key] = 'Quantity'
+        else if (key.startsWith('product-')) fieldLabels[key] = 'Product / Item'
+        else fieldLabels[key] = 'Line item'
+      }
+      const headerOnly = errors.filter((e) => !/line|product|unit price/i.test(e))
+      const merged: Record<string, string> = { ...fieldMap }
+      headerOnly.forEach((e, i) => { if (!Object.values(merged).includes(e)) merged[`_msg_${i}`] = e })
+      handleInvalidSubmit({
+        errors: Object.keys(merged).length ? merged : errors,
+        fieldOrder: [...keys, ...Object.keys(merged).filter((k) => k.startsWith('_msg_'))],
+        fieldLabels,
+        sectionByField,
+        expandSection: (sectionId) => {
+          if (sectionId === 'quote-section-products') setForceOpenProductsKey((k) => k + 1)
+          document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        },
+        delayMs: 120,
+      })
+      return
+    }
 
     setIsSubmitting(true)
     const primaryUnitPrice = syncedLines[0]?.unitPrice ?? 0
@@ -614,7 +651,7 @@ export function CrmQuotationNewPage() {
       factBox={factBox}
       suppressFactBoxRecord
       collapsibleFactBox
-      factBoxLabel="Details"
+      factBoxLabel="Smart Context"
       onSubmit={handleSubmit}
       onSaveShortcut={() => createQuotation('editor')}
       onSaveCloseShortcut={() => createQuotation('close')}
@@ -843,6 +880,7 @@ export function CrmQuotationNewPage() {
 
       <ErpCardSection
         id="quote-section-products"
+        forceOpenKey={forceOpenProductsKey || undefined}
         title="Product / Item Lines"
         subtitle="Search products, set qty and pricing — totals roll up to the quotation."
         icon={ClipboardList}

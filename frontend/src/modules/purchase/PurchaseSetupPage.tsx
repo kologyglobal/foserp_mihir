@@ -306,6 +306,8 @@ export function PurchaseSetupPage() {
       title="Purchase Setup"
       description="Company-wide purchase configuration — general defaults, numbering, approvals, tax, matching, receiving, quality, print, and notifications"
       favoritePath="/purchase/setup"
+      variant="dynamics"
+      layout="enterprise"
       breadcrumbs={[
         { label: 'Purchase', to: '/purchase' },
         { label: 'Masters', to: '/purchase/masters' },

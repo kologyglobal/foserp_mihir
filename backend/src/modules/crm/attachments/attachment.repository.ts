@@ -8,20 +8,8 @@ import {
   saveCrmAttachmentFile,
 } from '../../../services/fileStorage.service.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
+import { ValidationError } from '../../../utils/errors.js'
 import type { CreateAttachmentInput } from '../notes/note.validation.js'
-
-const ALLOWED_MIME = new Set([
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/plain',
-  'text/csv',
-])
 
 export async function listAttachments(tenantId: string, entityType: CrmEntityType, entityId: string) {
   return prisma.crmAttachment.findMany({
@@ -34,20 +22,24 @@ export async function findAttachmentById(tenantId: string, attachmentId: string)
   return prisma.crmAttachment.findFirst({ where: { id: attachmentId, ...tenantActiveFilter(tenantId) } })
 }
 
+/**
+ * Persist attachment after service-layer MIME/size validation.
+ * Final size guard against CRM_MAX_UPLOAD_BYTES remains as a safety net.
+ */
 export async function createAttachment(
   tenantId: string,
   entityType: CrmEntityType,
   entityId: string,
   userId: string,
   input: CreateAttachmentInput,
+  decodedBuffer?: Buffer,
 ) {
-  if (!ALLOWED_MIME.has(input.mimeType)) {
-    throw new Error('File type not allowed')
-  }
-  const buffer = Buffer.from(input.contentBase64, 'base64')
+  const buffer = decodedBuffer ?? Buffer.from(input.contentBase64, 'base64')
   if (buffer.length > env.CRM_MAX_UPLOAD_BYTES) {
     const maxMb = Math.round(env.CRM_MAX_UPLOAD_BYTES / (1024 * 1024))
-    throw new Error(`File exceeds maximum size of ${maxMb} MB`)
+    throw new ValidationError(`File exceeds maximum size of ${maxMb} MB`, [
+      { field: 'contentBase64', message: `Maximum size is ${maxMb} MB` },
+    ])
   }
   const id = randomUUID()
   const ext = getAttachmentExtension(input.originalFilename)

@@ -18,6 +18,10 @@ import {
   assertOpportunityOpen,
   assertOpportunityReopenable,
 } from './opportunity.workflow.js'
+import {
+  assertOpportunityStageRequirements,
+  opportunityEntityForStageGate,
+} from '../stage-requirements.js'
 
 async function mapOpportunityWithNames(
   tenantId: string,
@@ -134,11 +138,22 @@ export async function winOpportunity(tenantId: string, id: string, userId: strin
   assertOpportunityClosable(existing)
 
   let stageId = input.stageId
+  let targetSlug = 'won'
   if (!stageId) {
     const wonStage = await repo.findWonStage(tenantId, existing.pipelineId)
     if (!wonStage) throw new InvalidStateError('No won stage configured in pipeline')
     stageId = wonStage.id
+    targetSlug = wonStage.slug
+  } else {
+    const stage = await prisma.crmPipelineStage.findFirst({
+      where: { id: stageId, tenantId, pipelineId: existing.pipelineId, deletedAt: null },
+      select: { slug: true },
+    })
+    if (!stage) throw new NotFoundError('Pipeline stage not found')
+    targetSlug = stage.slug
   }
+
+  assertOpportunityStageRequirements(opportunityEntityForStageGate(existing), targetSlug)
 
   const opportunity = await repo.winOpportunity(tenantId, id, userId, { ...input, stageId })
   await repo.recordStatusHistory(tenantId, id, existing.status, 'WON', userId, input.winReason)
@@ -159,11 +174,25 @@ export async function loseOpportunity(tenantId: string, id: string, userId: stri
   assertOpportunityClosable(existing)
 
   let stageId = input.stageId
+  let targetSlug = 'lost'
   if (!stageId) {
     const lostStage = await repo.findLostStage(tenantId, existing.pipelineId)
     if (!lostStage) throw new InvalidStateError('No lost stage configured in pipeline')
     stageId = lostStage.id
+    targetSlug = lostStage.slug
+  } else {
+    const stage = await prisma.crmPipelineStage.findFirst({
+      where: { id: stageId, tenantId, pipelineId: existing.pipelineId, deletedAt: null },
+      select: { slug: true },
+    })
+    if (!stage) throw new NotFoundError('Pipeline stage not found')
+    targetSlug = stage.slug
   }
+
+  assertOpportunityStageRequirements(
+    opportunityEntityForStageGate(existing, { lostReason: input.lostReason ?? existing.lostReason }),
+    targetSlug,
+  )
 
   const opportunity = await repo.loseOpportunity(tenantId, id, userId, { ...input, stageId })
   await repo.recordStatusHistory(tenantId, id, existing.status, 'LOST', userId, input.lostReason)
@@ -212,6 +241,22 @@ export async function moveOpportunityStage(
   const existing = await repo.findOpportunityById(tenantId, id)
   if (!existing) throw new NotFoundError('Opportunity not found')
   assertOpportunityOpen(existing)
+
+  const targetStage = await prisma.crmPipelineStage.findFirst({
+    where: {
+      id: input.stageId,
+      tenantId,
+      pipelineId: existing.pipelineId,
+      deletedAt: null,
+    },
+    select: { id: true, slug: true },
+  })
+  if (!targetStage) {
+    throw new ValidationError('Pipeline stage not found', [{ field: 'stageId', message: 'Invalid stage' }])
+  }
+
+  assertOpportunityStageRequirements(opportunityEntityForStageGate(existing), targetStage.slug)
+
   const opportunity = await repo.moveOpportunityStage(tenantId, id, userId, input.stageId, input.reason)
   return mapOpportunityWithNames(tenantId, opportunity)
 }

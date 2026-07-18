@@ -4,7 +4,7 @@ import { syncQuotationsFromApi } from './quotationApiBridge'
 import { syncQuotationTemplatesFromApi } from './quotationTemplateApiBridge'
 import { syncSalesOrdersFromApi } from './salesOrderApiBridge'
 import type { Customer } from '../../types/master'
-import { formatApiError } from '../api/apiErrors'
+import { formatApiError, stageMissingFieldsFromApiError } from '../api/apiErrors'
 import { getStoredSession } from '../api/client'
 import * as api from '../api/crmApi'
 import type { PipelineDto } from '../api/crmApi'
@@ -15,7 +15,12 @@ import type { StoreActionResult } from '../../store/storeAction'
 import { sanitizePhoneDigits } from '../../utils/phoneValidation'
 import { getLeadUser } from '../../data/crm/leadUsers'
 import { opportunityStageLabel } from '../../utils/opportunityUtils'
-import { resolveLeadConvertToOpportunityGate } from '../../utils/leadUtils'
+import { normalizeLead, resolveLeadConvertToOpportunityGate, leadStageLabel } from '../../utils/leadUtils'
+import {
+  formatMissingStageFieldsMessage,
+  getMissingLeadStageFields,
+  getMissingOpportunityStageFields,
+} from '../../config/crmStageRequirements'
 
 const submitLocks = new Set<string>()
 let defaultPipelineCache: PipelineDto | null = null
@@ -35,7 +40,15 @@ async function withSubmitLock<T>(key: string, fn: () => Promise<T>): Promise<T> 
 }
 
 function fail(err: unknown): StoreActionResult {
-  return { ok: false, error: formatApiError(err) }
+  const missingFields = stageMissingFieldsFromApiError(err)
+  return {
+    ok: false,
+    error: formatApiError(err),
+    ...(err instanceof Error && 'code' in err && typeof (err as { code?: string }).code === 'string'
+      ? { code: (err as { code: string }).code }
+      : {}),
+    ...(missingFields ? { missingFields } : {}),
+  }
 }
 
 function isUuid(value: string | null | undefined): boolean {
@@ -68,12 +81,18 @@ function upsertLead(lead: Lead): void {
     || (lead.leadOwnerId ? getLeadUser(lead.leadOwnerId)?.name : undefined)
     || sessionName
     || ''
-  const normalized: Lead = {
+  const normalized = normalizeLead({
     ...lead,
     leadOwnerName: ownerName || lead.leadOwnerName,
     salesOwner: ownerName || lead.salesOwner || lead.leadOwnerName,
-  }
+  })
   useSalesStore.setState((s) => ({ leads: [normalized, ...s.leads.filter((l) => l.id !== lead.id)] }))
+}
+
+/** Zustand equivalent of React Query `invalidateQueries(["crm","leads"])` — refetch leads slice only. */
+export async function syncLeadsFromApi(): Promise<void> {
+  const leads = await api.fetchAllCrmPages<Lead>('/crm/leads')
+  useSalesStore.setState({ leads: leads.map((l) => normalizeLead(l)) })
 }
 
 function removeLead(id: string): void {
@@ -172,7 +191,10 @@ export async function syncAllCrmFromApi(): Promise<void> {
       syncQuotationTemplatesFromApi(),
     ])
   await syncSalesOrdersFromApi()
-  useSalesStore.setState({ leads, quotations: quotationData.quotationHeaders })
+  useSalesStore.setState({
+    leads: leads.map((l) => normalizeLead(l)),
+    quotations: quotationData.quotationHeaders,
+  })
   useMasterStore.setState({ customers: companies })
   useCrmStore.setState({
     contacts: Array.isArray(contacts) ? contacts : [],
@@ -216,14 +238,30 @@ async function getDefaultPipeline(): Promise<PipelineDto> {
   return pipeline
 }
 
+const API_LEAD_SOURCES = new Set([
+  'website',
+  'referral',
+  'trade_show',
+  'cold_call',
+  'existing_customer',
+  'other',
+  'indiamart',
+  'justdial',
+  'field_visit',
+  'other_channel',
+])
+
 function mapLeadCreatePayload(input: Record<string, unknown>): Record<string, unknown> {
+  const rawSource = String(input.source ?? 'other')
+  const source = API_LEAD_SOURCES.has(rawSource) ? rawSource : 'other'
+  const email = String(input.email ?? '').trim()
   return {
     prospectName: input.prospectName,
-    customerId: input.customerId ?? null,
+    customerId: isUuid(input.customerId as string) ? input.customerId : null,
     contactId: isUuid(input.contactId as string) ? input.contactId : null,
-    source: input.source ?? 'other',
+    source,
     industry: input.industry ?? '',
-    email: input.email ?? '',
+    email,
     mobile: sanitizePhoneDigits(String(input.mobile ?? '')) || '',
     contactPerson: input.contactPerson ?? '',
     productRequirement: input.productRequirement ?? input.remarks ?? '',
@@ -478,6 +516,23 @@ export async function apiAdvanceLeadStage(
   if (stage === 'converted_to_opportunity') {
     return { ok: false, error: 'Use Convert to Opportunity to advance this lead' }
   }
+  const lead = useSalesStore.getState().getLead(id) ?? useSalesStore.getState().leads.find(l => l.id === id)
+  if (lead) {
+    const gateLead = {
+      ...lead,
+      ...(extras?.notQualifiedReason !== undefined ? { notQualifiedReason: extras.notQualifiedReason } : {}),
+      ...(extras?.closedReason !== undefined ? { closedReason: extras.closedReason } : {}),
+    }
+    const missing = getMissingLeadStageFields(gateLead, stage)
+    if (missing.length > 0) {
+      return {
+        ok: false,
+        error: formatMissingStageFieldsMessage(missing, leadStageLabel(stage)),
+        code: 'STAGE_REQUIREMENTS_INCOMPLETE',
+        missingFields: missing,
+      }
+    }
+  }
   if (stage === 'qualified') return apiQualifyLead(id, stage, extras?.remarks)
   if (stage === 'not_qualified') {
     return apiDisqualifyLead(id, extras?.notQualifiedReason?.trim() || 'other', extras?.remarks)
@@ -726,6 +781,13 @@ export async function apiUpdateOpportunity(
 export async function apiMoveOpportunityStage(opportunityId: string, stage: OpportunityStage, lostReason?: string): Promise<StoreActionResult> {
   const before = useCrmStore.getState().opportunities.find((o) => o.id === opportunityId)
   const fromStage = before?.stage
+  if (before) {
+    const gateOpp = { ...before, ...(stage === 'lost' && lostReason !== undefined ? { lostReason } : {}) }
+    const missing = getMissingOpportunityStageFields(gateOpp, stage)
+    if (missing.length > 0) {
+      return { ok: false, error: formatMissingStageFieldsMessage(missing, opportunityStageLabel(stage)), code: 'STAGE_REQUIREMENTS_INCOMPLETE', missingFields: missing }
+    }
+  }
 
   if (stage === 'won') {
     return withSubmitLock(lockKey('opportunity:win', opportunityId), async () => {

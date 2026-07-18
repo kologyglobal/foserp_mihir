@@ -31,7 +31,7 @@ export function Toast({ message, variant = 'info', onDismiss, floating = true }:
       role="status"
     >
       <Icon className="mt-0.5 h-4 w-4 shrink-0" />
-      <p className="flex-1 text-[13px] font-medium">{message}</p>
+      <p className="flex-1 whitespace-pre-line text-[13px] font-medium">{message}</p>
       {onDismiss ? (
         <button
           type="button"

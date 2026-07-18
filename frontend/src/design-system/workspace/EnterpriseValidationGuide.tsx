@@ -6,7 +6,7 @@ import type { EnterpriseValidationItem } from './types'
  * Plain string errors are handled as toasts via ErpValidationSummary — not inline banners.
  */
 export function EnterpriseValidationGuide({
-  title = 'Complete before saving',
+  title = 'Please complete the required fields',
   items,
 }: {
   title?: string
@@ -14,7 +14,7 @@ export function EnterpriseValidationGuide({
   /** @deprecated Errors surface as toasts via ErpValidationSummary */
   errors?: string[]
 }) {
-  const missing = items?.filter((i) => i.message) ?? []
+  const missing = items?.filter((i) => i.label || i.message) ?? []
   if (missing.length === 0) return null
 
   return (
@@ -24,18 +24,26 @@ export function EnterpriseValidationGuide({
         <p className="ent-ws-validation__title">{title}</p>
       </div>
       <ul className="ent-ws-validation__list">
-        {missing.map((item) => (
-          <li key={item.id}>
-            {item.onClick ? (
-              <button type="button" className="ent-ws-validation__link" onClick={item.onClick}>
-                {item.label}
-              </button>
-            ) : (
-              <span>{item.label}</span>
-            )}
-            {item.message ? <span className="ent-ws-validation__hint"> — {item.message}</span> : null}
-          </li>
-        ))}
+        {missing.map((item) => {
+          const label = (item.label || item.message || '').trim()
+          const hint =
+            item.message
+            && item.message.trim().toLowerCase() !== label.toLowerCase()
+              ? item.message
+              : null
+          return (
+            <li key={item.id}>
+              {item.onClick ? (
+                <button type="button" className="ent-ws-validation__link" onClick={item.onClick}>
+                  {label}
+                </button>
+              ) : (
+                <span>{label}</span>
+              )}
+              {hint ? <span className="ent-ws-validation__hint"> — {hint}</span> : null}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+﻿import type { ReactNode } from 'react'
 import { useEffect, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Star } from 'lucide-react'
@@ -16,7 +16,6 @@ import { cn } from '../../utils/cn'
 import { resolvePageGuide } from '../../config/pageGuideRegistry'
 import { CrmPageTip } from '../crm/CrmPageTip'
 import { ErpPageGuide } from '../erp/ErpPageGuide'
-import { isCrmPath } from '../../utils/crmPageTipStorage'
 
 interface OperationalPageShellProps {
   title: string
@@ -27,7 +26,7 @@ interface OperationalPageShellProps {
   actions?: ReactNode
   commandBar?: ReactNode
   insights?: PageInsight[]
-  /** Enterprise KPI cards — preferred for CRM/Sales list pages */
+  /** Enterprise KPI cards â€” preferred for CRM/Sales list pages */
   kpiStrip?: EnterpriseKpiItem[]
   filterBar?: ReactNode
   favoritePath?: string
@@ -37,7 +36,7 @@ interface OperationalPageShellProps {
   className?: string
   variant?: 'default' | 'dynamics'
   /**
-   * enterprise — compact BC/D365 header: title + actions same row, filters below.
+   * enterprise â€” compact BC/D365 header: title + actions same row, filters below.
    * Default for dynamics variant.
    */
   layout?: 'default' | 'enterprise'
@@ -45,13 +44,13 @@ interface OperationalPageShellProps {
   showDescription?: boolean
   /** Merge breadcrumbs + title + actions into workspace tab header (Dynamics) */
   mergeHeaderWithWorkspace?: boolean
-  /** Hide chrome title/fav — page commandBar supplies sticky record header */
+  /** Hide chrome title/fav â€” page commandBar supplies sticky record header */
   workspaceRecordHeader?: boolean
 }
 
 /**
  * Standard ERP list page layout.
- * Enterprise: Breadcrumb → Title + Actions → Search/Filters → Content
+ * Enterprise: Breadcrumb â†’ Title + Actions â†’ Search/Filters â†’ Content
  */
 export function OperationalPageShell({
   title,
@@ -88,9 +87,14 @@ export function OperationalPageShell({
   )
   const guide = pageGuide === null ? null : (pageGuide ?? resolvePageGuide(pathname))
   const isEnterprise = layout === 'enterprise' || (layout !== 'default' && variant === 'dynamics')
-  const mergeHeader = mergeHeaderWithWorkspace ?? (variant === 'dynamics' && isEnterprise)
+  /**
+   * Dynamics pages merge into the sticky Leads-style chrome (breadcrumbs, title,
+   * badge, fav, help, actions). Opt out with mergeHeaderWithWorkspace={false}.
+   * Auto-on for sticky record headers.
+   */
+  const mergeHeader = mergeHeaderWithWorkspace ?? (variant === 'dynamics' || Boolean(workspaceRecordHeader))
   /** Tip lives in WorkspaceUnifiedHeader when header is merged; local hero otherwise. */
-  const showLocalCrmTip = !mergeHeader && (badge === 'CRM' || isCrmPath(pathname))
+  const showLocalPageTip = !mergeHeader && !workspaceHeaderSetters
 
   const headerMeta = useMemo(
     () => ({
@@ -157,7 +161,7 @@ export function OperationalPageShell({
                 >
                   <Star className={cn('h-3.5 w-3.5', fav && 'fill-current')} />
                 </button>
-                {showLocalCrmTip ? <CrmPageTip /> : null}
+                {showLocalPageTip ? <CrmPageTip /> : null}
               </div>
               {description && (!isEnterprise || showDescription) ? (
                 <p className="erp-page-subtitle mt-0.5 max-w-2xl">{description}</p>
@@ -198,3 +202,5 @@ export function OperationalPageShell({
     </div>
   )
 }
+
+

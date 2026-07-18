@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMemo } from 'react'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
 import { DataGrid } from '../../components/design-system/DataGrid'
@@ -79,6 +79,7 @@ export function EcoRegisterPage() {
 }
 
 export function EcoNewPage() {
+  const navigate = useNavigate()
   const createEcr = useEcoStore((s) => s.createEcr)
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
@@ -91,7 +92,7 @@ export function EcoNewPage() {
       reason: fd.get('reason') as string,
       priority: (fd.get('priority') as 'medium') || 'medium',
     })
-    window.location.href = '/engineering/eco'
+    navigate('/engineering/eco')
   }
 
   return (

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ShieldCheck } from 'lucide-react'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
 import { EnterpriseRegisterTableShell } from '../../design-system/list-page/EnterpriseRegisterTableShell'
@@ -16,6 +16,7 @@ function masterAdminBreadcrumbs(pageTitle: string) {
 }
 
 export function RoleMasterPage() {
+  const navigate = useNavigate()
   const rows = PRIMARY_ERP_ROLES.map((role) => ({
     role,
     label: ERP_ROLE_LABELS[role],
@@ -44,7 +45,7 @@ export function RoleMasterPage() {
               id: 'permissions',
               label: 'Role Permission Matrix',
               icon: ShieldCheck,
-              onClick: () => { window.location.href = '/masters/role-permissions' },
+              onClick: () => navigate('/masters/role-permissions'),
             },
           ]}
         />

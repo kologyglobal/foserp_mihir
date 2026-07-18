@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom'
-import { RouteErrorPage } from '../components/system/AppErrorBoundary'
+import { RouteErrorBoundary } from '../components/system/RouteErrorBoundary'
 import { PurchaseModuleDashboard } from '../modules/purchase/PurchaseModuleDashboard'
 import {
   PurchaseRequisitionListPage,
@@ -156,6 +156,6 @@ export const purchaseRouteChildren = [
 
 export const purchaseRouteTree = {
   path: 'purchase',
-  errorElement: <RouteErrorPage />,
+  errorElement: <RouteErrorBoundary />,
   children: purchaseRouteChildren,
 }

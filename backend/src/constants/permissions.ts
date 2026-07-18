@@ -237,6 +237,23 @@ export const PERMISSIONS = [
   'finance.posting_event.view',
   'finance.posting_rule.view',
   'finance.posting_rule.manage',
+
+  // Finance Phase 3A1 — AR foundation (DB + repos; no HTTP invoice routes in 3A1)
+  'finance.ar.view',
+  'finance.ar.invoice.view',
+  'finance.ar.invoice.create',
+  'finance.ar.invoice.edit',
+  'finance.ar.invoice.post',
+  'finance.ar.invoice.cancel',
+  'finance.ar.reconcile.view',
+  'finance.ar.receipt.view',
+  'finance.ar.receipt.create',
+  'finance.ar.receipt.edit',
+  'finance.ar.receipt.post',
+  'finance.ar.receipt.cancel',
+  'finance.ar.allocation.view',
+  'finance.ar.allocation.create',
+  'finance.ar.allocation.reverse',
 ] as const
 
 export type PermissionName = (typeof PERMISSIONS)[number]
@@ -260,6 +277,13 @@ const FINANCE_EXECUTIVE_MANAGE: PermissionName[] = [
   'finance.gl.view',
   'finance.posting_event.view',
   'finance.posting_rule.view',
+  'finance.ar.invoice.create',
+  'finance.ar.invoice.edit',
+  'finance.ar.invoice.cancel',
+  'finance.ar.receipt.create',
+  'finance.ar.receipt.edit',
+  'finance.ar.receipt.cancel',
+  'finance.ar.allocation.create',
 ]
 
 export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {

@@ -1,30 +1,56 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
-import { FileText, ImageIcon, Paperclip, Trash2, Upload } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { ErpSmartSelect } from '../erp/ErpSmartSelect'
+import {
+  ErpDocumentUpload,
+  type ErpDocumentFileMeta,
+} from '../erp/ErpDocumentUpload'
+import { getDocumentUploadCategory } from '../../config/documentUploadCategories'
 import { useDocumentTypeOptions } from '../../hooks/useCrmMasters'
 import { useCrmMasterStore } from '../../store/crmMasterStore'
 import type { CrmTypedAttachment } from '../../types/crmDocuments'
 import {
-  buildAcceptAttribute,
   documentTypeUploadHint,
-  formatFileSize,
-  isPreviewableImage,
-  isPreviewablePdf,
+  mimeTypesForExtensions,
   parseAllowedFileTypes,
-  readFileAsDataUrl,
-  validateCrmUploadFile,
 } from '../../utils/crmDocumentUploadUtils'
 import { cn } from '../../utils/cn'
-
-function genAttachmentId() {
-  return `att-${crypto.randomUUID().slice(0, 8)}`
-}
 
 export interface CrmTypedDocumentUploadProps {
   attachments: CrmTypedAttachment[]
   onChange: (attachments: CrmTypedAttachment[]) => void
   disabled?: boolean
   className?: string
+  /** Prefer a category preset when no master type selected yet. */
+  defaultCategory?: string
+}
+
+function toMeta(att: CrmTypedAttachment): ErpDocumentFileMeta {
+  return {
+    id: att.id,
+    fileName: att.fileName,
+    mimeType: att.mimeType,
+    sizeBytes: att.sizeBytes,
+    previewUrl: att.previewUrl,
+    documentTypeCode: att.documentTypeCode,
+    documentTypeName: att.documentTypeName,
+    uploadedAt: att.uploadedAt,
+    category: att.documentTypeCode || 'crm-attachment',
+    uploadStatus: 'uploaded',
+    downloadUrl: att.previewUrl,
+  }
+}
+
+function toAttachment(meta: ErpDocumentFileMeta, fallbackType?: { code: string; name: string }): CrmTypedAttachment {
+  return {
+    id: meta.id,
+    documentTypeCode: meta.documentTypeCode || fallbackType?.code || '',
+    documentTypeName: meta.documentTypeName || fallbackType?.name || '',
+    fileName: meta.fileName,
+    mimeType: meta.mimeType,
+    sizeBytes: meta.sizeBytes,
+    previewUrl: meta.previewUrl ?? null,
+    uploadedAt: meta.uploadedAt || new Date().toISOString(),
+  }
 }
 
 export function CrmTypedDocumentUpload({
@@ -32,96 +58,40 @@ export function CrmTypedDocumentUpload({
   onChange,
   disabled = false,
   className,
+  defaultCategory = 'general_document',
 }: CrmTypedDocumentUploadProps) {
   const documentTypeOptions = useDocumentTypeOptions()
   const getByCode = useCrmMasterStore((s) => s.getByCode)
   const [selectedTypeCode, setSelectedTypeCode] = useState('')
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  const [isReading, setIsReading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const selectedType = selectedTypeCode ? getByCode('document-types', selectedTypeCode) : undefined
-  const allowedExtensions = useMemo(
-    () => (selectedType ? parseAllowedFileTypes(selectedType.attributes.fileTypes) : []),
-    [selectedType],
-  )
-  const acceptAttr = useMemo(() => buildAcceptAttribute(allowedExtensions), [allowedExtensions])
-  const canUpload = Boolean(selectedType) && !disabled && !isReading
+  const category = getDocumentUploadCategory(selectedTypeCode || defaultCategory)
+
+  const allowedExtensions = useMemo(() => {
+    if (selectedType) return parseAllowedFileTypes(selectedType.attributes.fileTypes)
+    return category?.acceptedExtensions ?? []
+  }, [selectedType, category])
+
+  const acceptedMimeTypes = useMemo(() => {
+    if (selectedType) return mimeTypesForExtensions(allowedExtensions)
+    return category?.acceptedMimeTypes ?? []
+  }, [selectedType, allowedExtensions, category])
+
+  const maxFileSizeMb = selectedType
+    ? Number(selectedType.attributes.maxSizeMb) || category?.maxFileSizeMb || 10
+    : category?.maxFileSizeMb || 10
 
   const typeSelectOptions = useMemo(
-    () => documentTypeOptions.map((o) => ({
-      value: o.value,
-      label: o.label,
-      searchText: o.label.toLowerCase(),
-    })),
+    () =>
+      documentTypeOptions.map((o) => ({
+        value: o.value,
+        label: o.label,
+        searchText: o.label.toLowerCase(),
+      })),
     [documentTypeOptions],
   )
 
-  const processFiles = useCallback(async (files: FileList | File[]) => {
-    if (!selectedType) {
-      setUploadError('Select a document type before uploading.')
-      return
-    }
-
-    setUploadError(null)
-    setIsReading(true)
-    const next = [...attachments]
-    const errors: string[] = []
-
-    try {
-      for (const file of Array.from(files)) {
-        const validationError = validateCrmUploadFile(file, selectedType)
-        if (validationError) {
-          errors.push(validationError)
-          continue
-        }
-
-        let previewUrl: string | null = null
-        if (isPreviewableImage(file.type) || isPreviewablePdf(file.type, file.name)) {
-          try {
-            previewUrl = await readFileAsDataUrl(file)
-          } catch {
-            previewUrl = null
-          }
-        }
-
-        next.push({
-          id: genAttachmentId(),
-          documentTypeCode: selectedType.code,
-          documentTypeName: selectedType.name,
-          fileName: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          sizeBytes: file.size,
-          previewUrl,
-          uploadedAt: new Date().toISOString(),
-        })
-      }
-
-      if (errors.length) setUploadError(errors[0])
-      if (next.length > attachments.length) onChange(next)
-    } finally {
-      setIsReading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-    }
-  }, [attachments, onChange, selectedType])
-
-  function handlePickFiles() {
-    if (!canUpload) {
-      setUploadError('Select a document type before uploading.')
-      return
-    }
-    fileInputRef.current?.click()
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault()
-    if (!canUpload) return
-    void processFiles(e.dataTransfer.files)
-  }
-
-  function removeAttachment(id: string) {
-    onChange(attachments.filter((a) => a.id !== id))
-  }
+  const files = useMemo(() => attachments.map(toMeta), [attachments])
 
   return (
     <div className={cn('crm-typed-doc-upload col-span-2', className)}>
@@ -132,10 +102,7 @@ export function CrmTypedDocumentUpload({
         <ErpSmartSelect
           options={typeSelectOptions}
           value={selectedTypeCode}
-          onChange={(v) => {
-            setSelectedTypeCode(v ?? '')
-            setUploadError(null)
-          }}
+          onChange={(v) => setSelectedTypeCode(v ?? '')}
           placeholder="Choose from Document Type / Attachment Master…"
           appearance="dropdown"
           disabled={disabled}
@@ -150,118 +117,36 @@ export function CrmTypedDocumentUpload({
         )}
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        accept={acceptAttr || undefined}
-        multiple
-        disabled={!canUpload}
-        onChange={(e) => void processFiles(e.target.files ?? [])}
-      />
-
-      <div
-        className={cn(
-          'crm-typed-doc-upload__dropzone',
-          canUpload && 'crm-typed-doc-upload__dropzone--ready',
-          !canUpload && 'crm-typed-doc-upload__dropzone--disabled',
-        )}
-        onDragOver={(e) => {
-          e.preventDefault()
-          if (canUpload) e.dataTransfer.dropEffect = 'copy'
+      <ErpDocumentUpload
+        category={category?.code || selectedTypeCode || defaultCategory}
+        acceptedMimeTypes={acceptedMimeTypes}
+        acceptedExtensions={allowedExtensions}
+        maxFileSizeMb={maxFileSizeMb}
+        maxFiles={50}
+        allowPreview
+        allowRemove
+        allowDownload
+        files={files}
+        onChange={(next) => {
+          const fallback = selectedType
+            ? { code: selectedType.code, name: selectedType.name }
+            : category?.documentTypeCode
+              ? { code: category.documentTypeCode, name: category.label }
+              : undefined
+          onChange(next.map((m) => toAttachment(m, fallback)))
         }}
-        onDrop={handleDrop}
-        onClick={handlePickFiles}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            handlePickFiles()
-          }
-        }}
-        role="button"
-        tabIndex={canUpload ? 0 : -1}
-        aria-disabled={!canUpload}
-      >
-        <Upload className="crm-typed-doc-upload__dropzone-icon" aria-hidden />
-        <span className="crm-typed-doc-upload__dropzone-title">
-          {isReading ? 'Reading file…' : canUpload ? 'Drag and drop or click to upload' : 'Select document type first'}
-        </span>
-        <span className="crm-typed-doc-upload__dropzone-hint">
-          {selectedType
+        disabled={disabled || !selectedType}
+        documentTypeCode={selectedType?.code ?? category?.documentTypeCode}
+        documentTypeName={selectedType?.name ?? category?.label}
+        hint={
+          selectedType
             ? documentTypeUploadHint(selectedType)
-            : 'Document type master controls allowed formats and size'}
-        </span>
-      </div>
-
-      {uploadError ? (
-        <p className="crm-typed-doc-upload__error" role="alert">{uploadError}</p>
-      ) : null}
-
-      {attachments.length > 0 ? (
-        <div className="crm-typed-doc-upload__gallery">
-          <div className="crm-typed-doc-upload__gallery-head">
-            <Paperclip className="h-4 w-4" aria-hidden />
-            <span>{attachments.length} file{attachments.length === 1 ? '' : 's'} attached</span>
-          </div>
-          <ul className="crm-typed-doc-upload__list">
-            {attachments.map((att) => (
-              <li key={att.id} className="crm-typed-doc-upload__item">
-                <CrmAttachmentPreview attachment={att} />
-                <div className="crm-typed-doc-upload__meta">
-                  <p className="crm-typed-doc-upload__filename">{att.fileName}</p>
-                  <p className="crm-typed-doc-upload__filemeta">
-                    {att.documentTypeName}
-                    {' · '}
-                    {formatFileSize(att.sizeBytes)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="crm-typed-doc-upload__remove"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    removeAttachment(att.id)
-                  }}
-                  disabled={disabled}
-                  aria-label={`Remove ${att.fileName}`}
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-function CrmAttachmentPreview({ attachment }: { attachment: CrmTypedAttachment }) {
-  const { previewUrl, mimeType, fileName } = attachment
-
-  if (previewUrl && isPreviewableImage(mimeType)) {
-    return (
-      <div className="crm-typed-doc-upload__preview crm-typed-doc-upload__preview--image">
-        <img src={previewUrl} alt={fileName} />
-      </div>
-    )
-  }
-
-  if (previewUrl && isPreviewablePdf(mimeType, fileName)) {
-    return (
-      <div className="crm-typed-doc-upload__preview crm-typed-doc-upload__preview--pdf">
-        <iframe src={previewUrl} title={`Preview of ${fileName}`} />
-      </div>
-    )
-  }
-
-  return (
-    <div className="crm-typed-doc-upload__preview crm-typed-doc-upload__preview--file">
-      {isPreviewableImage(mimeType) ? (
-        <ImageIcon className="h-6 w-6" aria-hidden />
-      ) : (
-        <FileText className="h-6 w-6" aria-hidden />
-      )}
+            : 'Document type master controls allowed formats and size'
+        }
+        dropzoneTitle={
+          selectedType ? 'Drag and drop or click to upload' : 'Select document type first'
+        }
+      />
     </div>
   )
 }

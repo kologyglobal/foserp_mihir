@@ -694,14 +694,14 @@
 
   .d365-workspace-unified-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
-    padding: 10px 16px 6px;
+    padding: 10px 16px 10px;
   }
 
   .d365-workspace-unified-head--with-actions {
-    align-items: center;
+    align-items: flex-start;
   }
 
   .d365-workspace-unified-main {
@@ -739,27 +739,30 @@
   }
 
   .d365-workspace-unified-breadcrumbs {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     min-width: 0;
     padding: 0;
+    order: -1;
   }
 
   .d365-workspace-unified-breadcrumbs nav {
     font-size: 12px;
     line-height: 16px;
+    color: var(--d365-text-secondary);
   }
 
   .d365-workspace-unified-title {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
-    flex-shrink: 0;
+    min-width: 0;
   }
 
   .d365-workspace-unified-title-text {
     margin: 0;
     font-family: var(--d365-font-family);
-    font-size: 20px;
+    font-size: 22px;
     font-weight: var(--d365-fw-semibold);
     line-height: 1.25;
     color: var(--d365-text);
@@ -822,11 +825,12 @@
   .d365-workspace-unified-actions {
     display: flex;
     flex-shrink: 0;
-    flex-wrap: nowrap;
-    align-self: center;
+    flex-wrap: wrap;
+    align-self: flex-end;
     align-items: center;
     justify-content: flex-end;
     gap: 6px;
+    padding-top: 18px;
   }
 
   .d365-workspace-unified-actions .erp-command-bar--inline {
@@ -1026,6 +1030,86 @@
     font-family: var(--d365-font-family);
     font-size: var(--d365-font-base);
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--d365-brand) 28%, var(--d365-border-strong)) transparent;
+  }
+
+  .d365-workspace-content::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .d365-workspace-content::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .d365-workspace-content::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--d365-brand) 22%, var(--d365-border-strong));
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .d365-workspace-content::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--d365-brand) 38%, var(--d365-border-strong));
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  /* Back-to-top — bottom-right, below drawers/modals, clear of rare status toasts */
+  .d365-back-to-top {
+    position: fixed;
+    right: 1.25rem;
+    bottom: 5.25rem;
+    z-index: 35;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: var(--d365-radius);
+    border: 1px solid var(--d365-border-strong);
+    background: var(--d365-surface);
+    color: var(--d365-text-secondary);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.1), 0 2px 8px rgb(0 0 0 / 0.06);
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(6px);
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease,
+      visibility 0.18s,
+      background 0.12s ease,
+      border-color 0.12s ease,
+      color 0.12s ease;
+  }
+
+  .d365-back-to-top--visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .d365-back-to-top:hover {
+    background: var(--d365-brand-soft);
+    border-color: var(--d365-brand);
+    color: var(--d365-brand);
+  }
+
+  .d365-back-to-top:focus-visible {
+    outline: 2px solid var(--d365-brand);
+    outline-offset: 2px;
+  }
+
+  @media (min-width: 768px) {
+    .d365-back-to-top {
+      right: 1.5rem;
+      bottom: 5.5rem;
+    }
   }
 
   /* ── Dynamics KPI metric strip ── */

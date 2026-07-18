@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Building2,
   Users,
@@ -101,6 +101,7 @@ function MasterCard({
 }
 
 export function CrmMastersHubPage() {
+  const navigate = useNavigate()
   const entries = useCrmMasterStore((s) => s.entries)
   const customers = useMasterStore((s) => s.customers)
   const contacts = useCrmStore((s) => s.contacts)
@@ -154,8 +155,8 @@ export function CrmMastersHubPage() {
             onClick: () => document.getElementById('crm-masters-setup-guide')?.scrollIntoView({ behavior: 'smooth' }),
           }}
           secondaryActions={[
-            { id: 'companies', label: 'Company Master', onClick: () => { window.location.href = '/masters/companies' } },
-            { id: 'lead-stages', label: 'Lead Stages', onClick: () => { window.location.href = '/crm/masters/lead-stages' } },
+            { id: 'companies', label: 'Company Master', onClick: () => navigate('/masters/companies') },
+            { id: 'lead-stages', label: 'Lead Stages', onClick: () => navigate('/crm/masters/lead-stages') },
           ]}
         />
       )}

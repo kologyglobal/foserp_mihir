@@ -1,5 +1,5 @@
 import type { NavigateFunction } from 'react-router-dom'
-import { Copy, Eye, History, Pencil, Trash2, CircleOff } from 'lucide-react'
+import { Copy, Eye, History, Pencil, Trash2, CircleOff, CircleCheck } from 'lucide-react'
 import type { RowActionItem } from '../../../design-system/enterprise/EnterpriseTablePrimitives'
 import type { CrmMasterEntry } from '../../../types/crmMasters'
 import { canDeleteMasterEntry } from '../../../utils/crmMasterUtils'
@@ -12,7 +12,10 @@ type MasterRowActionHandlers = {
   navigate: NavigateFunction
   duplicateEntry: (id: string) => MasterMutationResult
   deactivateEntry: (id: string) => MasterMutationResult | Promise<MasterMutationResult>
+  activateEntry?: (id: string) => MasterMutationResult | Promise<MasterMutationResult>
   deleteEntry: (id: string) => MasterMutationResult | Promise<MasterMutationResult>
+  /** When set, Edit opens drawer/custom UI instead of navigating to the form page. */
+  onEdit?: (entry: CrmMasterEntry) => void
   onFeedback: (message: string, variant?: 'success' | 'error') => void
 }
 
@@ -21,7 +24,16 @@ export function buildCrmMasterRowActions(
   entry: CrmMasterEntry,
   handlers: MasterRowActionHandlers,
 ): RowActionItem[] {
-  const { basePath, navigate, duplicateEntry, deactivateEntry, deleteEntry, onFeedback } = handlers
+  const {
+    basePath,
+    navigate,
+    duplicateEntry,
+    deactivateEntry,
+    activateEntry,
+    deleteEntry,
+    onEdit,
+    onFeedback,
+  } = handlers
   const deleteCheck = canDeleteMasterEntry(entry)
   const detailPath = `${basePath}/${entry.id}`
   const editPath = `${detailPath}/edit`
@@ -32,8 +44,13 @@ export function buildCrmMasterRowActions(
       id: 'edit',
       label: 'Edit',
       icon: Pencil,
-      to: entry.systemControlled ? undefined : editPath,
+      to: entry.systemControlled || onEdit ? undefined : editPath,
       disabled: entry.systemControlled,
+      onClick: entry.systemControlled
+        ? undefined
+        : onEdit
+          ? () => onEdit(entry)
+          : undefined,
     },
     {
       id: 'duplicate',
@@ -52,16 +69,15 @@ export function buildCrmMasterRowActions(
       to: `${detailPath}#crm-master-audit`,
     },
     {
-      id: 'delete',
-      label: 'Delete',
-      icon: Trash2,
-      danger: true,
-      disabled: !deleteCheck.ok,
+      id: 'activate',
+      label: 'Activate',
+      icon: CircleCheck,
+      disabled: entry.status !== 'inactive' || !activateEntry,
       onClick: () => {
+        if (!activateEntry) return
         void (async () => {
-          const result = await Promise.resolve(deleteEntry(entry.id))
-          if (result.ok) onFeedback('Record deleted', 'success')
-          else onFeedback(result.error ?? 'Delete blocked', 'error')
+          const result = await Promise.resolve(activateEntry(entry.id))
+          onFeedback(result.ok ? 'Activated' : (result.error ?? 'Activate failed'), result.ok ? 'success' : 'error')
         })()
       },
     },
@@ -74,6 +90,20 @@ export function buildCrmMasterRowActions(
         void (async () => {
           const result = await Promise.resolve(deactivateEntry(entry.id))
           onFeedback(result.ok ? 'Deactivated' : (result.error ?? 'Deactivate failed'), result.ok ? 'success' : 'error')
+        })()
+      },
+    },
+    {
+      id: 'delete',
+      label: 'Delete',
+      icon: Trash2,
+      danger: true,
+      disabled: !deleteCheck.ok,
+      onClick: () => {
+        void (async () => {
+          const result = await Promise.resolve(deleteEntry(entry.id))
+          if (result.ok) onFeedback('Record deleted', 'success')
+          else onFeedback(result.error ?? 'Delete blocked', 'error')
         })()
       },
     },

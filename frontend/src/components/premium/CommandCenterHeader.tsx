@@ -5,10 +5,8 @@ import { LiveStatusBadge } from './LiveStatusBadge'
 import { HealthScoreCard } from './HealthScoreCard'
 import { PremiumKpiCard } from './PremiumKpiCard'
 import type { PremiumKpiProps } from './types'
-import { CrmPageTip } from '../crm/CrmPageTip'
 import { useUIStore } from '../../store/uiStore'
 import { getPageLabel } from '../../utils/pageNavigation'
-import { isCrmPath } from '../../utils/crmPageTipStorage'
 import { cn } from '../../utils/cn'
 
 export interface CommandCenterMetric extends PremiumKpiProps {
@@ -72,7 +70,6 @@ export function CommandCenterHeader({
               >
                 <Star className={cn('h-3.5 w-3.5', fav && 'fill-current')} />
               </button>
-              {badge === 'CRM' || isCrmPath(pathname) ? <CrmPageTip /> : null}
             </div>
             <p className="erp-command-hero-subtitle mt-1.5">
               {subtitle ?? `${plant} · ${shift} · Vasant Trailers`}

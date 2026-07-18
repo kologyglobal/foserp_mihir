@@ -531,7 +531,7 @@ export function ProformaInvoiceFormPage() {
         validationErrors={validationGuideItems.length ? undefined : errors}
         factBox={factBox}
         collapsibleFactBox
-        factBoxLabel="Details"
+        factBoxLabel="Smart Context"
         onSubmit={(e) => { handleSubmit(e) }}
         onSaveShortcut={() => { handleSubmit({ preventDefault: () => {} } as React.FormEvent) }}
         footer={(

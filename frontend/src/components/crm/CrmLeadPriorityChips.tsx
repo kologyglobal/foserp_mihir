@@ -6,6 +6,7 @@ interface CrmLeadPriorityChipsProps {
   value: LeadPriority
   onChange: (value: LeadPriority) => void
   options: { value: LeadPriority; label: string }[]
+  disabled?: boolean
 }
 
 const TONE: Record<LeadPriority, string> = {
@@ -16,7 +17,7 @@ const TONE: Record<LeadPriority, string> = {
 }
 
 /** Visual priority picker — faster than a dropdown for sales users */
-export function CrmLeadPriorityChips({ value, onChange, options }: CrmLeadPriorityChipsProps) {
+export function CrmLeadPriorityChips({ value, onChange, options, disabled }: CrmLeadPriorityChipsProps) {
   const groupRef = useRef<HTMLDivElement>(null)
 
   function focusChip(index: number) {
@@ -25,6 +26,7 @@ export function CrmLeadPriorityChips({ value, onChange, options }: CrmLeadPriori
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (disabled) return
     const idx = options.findIndex((o) => o.value === value)
     if (idx < 0) return
 
@@ -62,6 +64,7 @@ export function CrmLeadPriorityChips({ value, onChange, options }: CrmLeadPriori
       className="crm-lead-priority-chips"
       role="radiogroup"
       aria-label="Lead priority"
+      aria-disabled={disabled || undefined}
       onKeyDown={onKeyDown}
     >
       {options.map((opt) => (
@@ -71,6 +74,7 @@ export function CrmLeadPriorityChips({ value, onChange, options }: CrmLeadPriori
           role="radio"
           aria-checked={value === opt.value}
           tabIndex={value === opt.value ? 0 : -1}
+          disabled={disabled}
           className={cn(
             'crm-lead-priority-chip',
             TONE[opt.value],

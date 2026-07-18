@@ -20,7 +20,6 @@ import {
 } from 'lucide-react'
 import { Entity360Panel } from '../../components/design-system/Entity360Shell'
 import { DataGrid } from '../../components/design-system/DataGrid'
-import { FactBox } from '../../components/design-system/FactBox'
 import { Timeline } from '../../components/design-system/Timeline'
 import { ActivityFeed } from '../../components/design-system/Timeline'
 import { Customer360Hero } from '../../components/entity360/Customer360Hero'
@@ -64,8 +63,10 @@ import { useWorkOrderStore } from '../../store/workOrderStore'
 import { CrmCardFormShell, ENTERPRISE_FORM_DETAIL_CLASS } from '@/components/crm/CrmCardFormShell'
 import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
 import {
+  EnterpriseFormMetrics,
   EnterpriseFormSectionNav,
 } from '../../design-system/workspace'
+import { ErpCardSection } from '../../components/erp/card-form'
 import {
   buildCompanyAiInsight,
   buildCompanyKeyDetails,
@@ -328,7 +329,7 @@ export function Customer360Page() {
           { label: customer.customerName },
         ]
 
-  const _metrics = [
+  const metrics = [
     {
       label: 'Open Orders',
       value: String(data.openSo.length),
@@ -366,7 +367,26 @@ export function Customer360Page() {
       hint: `${crmSummary?.openOpportunities ?? 0} opportunities`,
     },
   ]
-  void _metrics
+
+  const heroStats = [
+    {
+      label: 'Open SO',
+      value: String(data.openSo.length),
+    },
+    {
+      label: 'Pipeline',
+      value: formatCrmCurrency(crmSummary?.pipelineValue ?? 0),
+    },
+    {
+      label: 'Outstanding',
+      value: formatCurrency(data.outstanding),
+      tone: data.outstanding > 0 ? ('warning' as const) : ('success' as const),
+    },
+    {
+      label: 'Contacts',
+      value: String(crmContacts.length),
+    },
+  ]
 
   const documentStrip = [
     { label: 'Code', value: customer.customerCode, highlight: true },
@@ -532,11 +552,16 @@ export function Customer360Page() {
         factBox={factBox}
         suppressFactBoxRecord
         collapsibleFactBox
-        factBoxLabel="Details"
+        factBoxLabel="Smart Context"
         stickyFooter={false}
       >
         <div className="customer-360-workspace">
-          <Customer360Hero customer={customer} status={companyStatus} />
+          <Customer360Hero
+            customer={customer}
+            status={companyStatus}
+            stats={heroStats}
+            onEdit={() => navigate(`/masters/companies/${customer.id}/edit`)}
+          />
 
           <EnterpriseFormSectionNav
             sections={sectionNavItems}
@@ -545,28 +570,126 @@ export function Customer360Page() {
             trailing={<FactBoxPaneAiToggle />}
           />
 
+          <EnterpriseFormMetrics metrics={metrics} />
+
           <div className="customer-360-tab-panel">
             <div className="customer-360-tab-body">
       {tab === 'overview' && (
-        <div className="space-y-4">
-        <div className="grid gap-4 lg:grid-cols-2">
-          <FactBox title={COMPANY_TERMINOLOGY.profile} fields={[
-            { label: 'Party Status', value: <CompanyCustomerBadge company={customer} /> },
-            { label: 'Industry', value: <TypeBadge value={customer.customerType} color="blue" /> },
-            { label: 'City', value: customer.city },
-            { label: 'Contact', value: customer.contactPerson },
-            { label: 'Credit Limit', value: formatCurrency(customer.creditLimit && customer.creditLimit > 0 ? customer.creditLimit : data.creditLimit) },
-            { label: 'Status', value: <ActiveBadge isActive={customer.isActive} /> },
-          ]} />
-          <FactBox title="Commercial Snapshot" fields={[
-            { label: 'Outstanding', value: formatCurrency(data.outstanding) },
-            { label: 'Open Orders', value: data.openSo.length },
-            { label: 'Dispatch Pending', value: data.pendingDispatch.length },
-            { label: 'Payment Pending', value: data.paymentPending.length },
-            { label: 'Next Follow-up', value: crmSummary?.nextFollowUpDate ?? '—' },
-            { label: 'Last CRM Activity', value: crmSummary?.lastActivityAt ? formatDate(crmSummary.lastActivityAt) : '—' },
-          ]} />
-        </div>
+        <div className="customer-360-overview space-y-4">
+          {(nextCrmFollowUp || companyStatus?.label) ? (
+            <div className="customer-360-insight" role="status">
+              <div className="customer-360-insight__copy">
+                <p className="customer-360-insight__eyebrow">Next best focus</p>
+                <p className="customer-360-insight__title">
+                  {nextCrmFollowUp
+                    ? `Follow-up due ${formatDate(nextCrmFollowUp.dueDate)}`
+                    : smartNextAction.title}
+                </p>
+                <p className="customer-360-insight__desc">
+                  {nextCrmFollowUp
+                    ? `${nextCrmFollowUp.followUpType.replace(/_/g, ' ')} · ${nextCrmFollowUp.assignedToName || 'Unassigned'}`
+                    : smartNextAction.description}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (nextCrmFollowUp || smartNextAction.id === 'follow_up') {
+                    setFollowUpOpen(true)
+                    return
+                  }
+                  if (smartNextAction.id === 'new_opp') {
+                    navigate(`/crm/opportunities/new?customerId=${customer.id}`)
+                    return
+                  }
+                  navigate(`/masters/companies/${customer.id}/edit`)
+                }}
+              >
+                {nextCrmFollowUp ? 'Open follow-up' : smartNextAction.ctaLabel}
+              </Button>
+            </div>
+          ) : null}
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ErpCardSection
+              title={COMPANY_TERMINOLOGY.profile}
+              subtitle="Identity, territory and credit"
+              icon={Target}
+              accent="blue"
+              columns={2}
+              collapsible
+              defaultOpen
+            >
+              <div className="customer-360-field-grid">
+                <div className="customer-360-field">
+                  <span className="customer-360-field__label">Party status</span>
+                  <span className="customer-360-field__value"><CompanyCustomerBadge company={customer} /></span>
+                </div>
+                <div className="customer-360-field">
+                  <span className="customer-360-field__label">Industry</span>
+                  <span className="customer-360-field__value"><TypeBadge value={customer.customerType} color="blue" /></span>
+                </div>
+                <div className="customer-360-field">
+                  <span className="customer-360-field__label">City</span>
+                  <span className="customer-360-field__value">{customer.city || '—'}</span>
+                </div>
+                <div className="customer-360-field">
+                  <span className="customer-360-field__label">Contact</span>
+                  <span className="customer-360-field__value">{customer.contactPerson || '—'}</span>
+                </div>
+                <div className="customer-360-field">
+                  <span className="customer-360-field__label">Credit limit</span>
+                  <span className="customer-360-field__value">
+                    {formatCurrency(customer.creditLimit && customer.creditLimit > 0 ? customer.creditLimit : data.creditLimit)}
+                  </span>
+                </div>
+                <div className="customer-360-field">
+                  <span className="customer-360-field__label">Status</span>
+                  <span className="customer-360-field__value"><ActiveBadge isActive={customer.isActive} /></span>
+                </div>
+              </div>
+            </ErpCardSection>
+
+            <ErpCardSection
+              title="Commercial snapshot"
+              subtitle="Orders, receivables and CRM pulse"
+              icon={Wallet}
+              accent="teal"
+              columns={2}
+              collapsible
+              defaultOpen
+            >
+              <div className="customer-360-field-grid">
+                <div className="customer-360-field">
+                  <span className="customer-360-field__label">Outstanding</span>
+                  <span className="customer-360-field__value">{formatCurrency(data.outstanding)}</span>
+                </div>
+                <div className="customer-360-field">
+                  <span className="customer-360-field__label">Open orders</span>
+                  <span className="customer-360-field__value">{data.openSo.length}</span>
+                </div>
+                <div className="customer-360-field">
+                  <span className="customer-360-field__label">Dispatch pending</span>
+                  <span className="customer-360-field__value">{data.pendingDispatch.length}</span>
+                </div>
+                <div className="customer-360-field">
+                  <span className="customer-360-field__label">Payment pending</span>
+                  <span className="customer-360-field__value">{data.paymentPending.length}</span>
+                </div>
+                <div className="customer-360-field">
+                  <span className="customer-360-field__label">Next follow-up</span>
+                  <span className="customer-360-field__value">{crmSummary?.nextFollowUpDate ?? '—'}</span>
+                </div>
+                <div className="customer-360-field">
+                  <span className="customer-360-field__label">Last CRM activity</span>
+                  <span className="customer-360-field__value">
+                    {crmSummary?.lastActivityAt ? formatDate(crmSummary.lastActivityAt) : '—'}
+                  </span>
+                </div>
+              </div>
+            </ErpCardSection>
+          </div>
+
         {id && (
           <Entity360Panel title="Contacts">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

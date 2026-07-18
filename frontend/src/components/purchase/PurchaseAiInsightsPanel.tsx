@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, X } from 'lucide-react'
 import { cn } from '@/utils/cn'
 
 export interface PurchaseAiOverviewRow {
@@ -24,6 +24,7 @@ export function PurchaseAiInsightsShell({
   children,
   className,
   embedded = false,
+  onClose,
 }: {
   title?: string
   subtitle?: string
@@ -31,6 +32,8 @@ export function PurchaseAiInsightsShell({
   className?: string
   /** When true, omit outer card chrome (already inside ErpFactBoxPanel). */
   embedded?: boolean
+  /** When set, shows a close control in the header. */
+  onClose?: () => void
 }) {
   return (
     <div
@@ -44,14 +47,79 @@ export function PurchaseAiInsightsShell({
         <span className="purchase-ai-panel__badge" aria-hidden>
           <Sparkles className="h-4 w-4" />
         </span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="purchase-ai-panel__title">{title}</p>
           {subtitle ? <p className="purchase-ai-panel__subtitle">{subtitle}</p> : null}
         </div>
+        {onClose ? (
+          <button
+            type="button"
+            className="purchase-ai-panel__close"
+            onClick={onClose}
+            aria-label={`Hide ${title}`}
+            title="Hide insights"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden strokeWidth={2.25} />
+          </button>
+        ) : null}
       </header>
       <div className="purchase-ai-panel__body">{children}</div>
     </div>
   )
+}
+
+export function PurchaseAiInsightsRestoreButton({
+  label = 'Purchase Insights',
+  onClick,
+  className,
+}: {
+  label?: string
+  onClick: () => void
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      className={cn('erp-factbox-pane__ai-toggle purchase-ai-panel__restore', className)}
+      onClick={onClick}
+      aria-label={`Show ${label}`}
+      title={`Show ${label}`}
+    >
+      <Sparkles className="h-4 w-4" aria-hidden />
+    </button>
+  )
+}
+
+export const PURCHASE_AI_INSIGHTS_COLLAPSED_KEY = 'purchase.ai-insights.collapsed'
+
+export function readPurchaseAiInsightsOpen(storageKey = PURCHASE_AI_INSIGHTS_COLLAPSED_KEY): boolean {
+  if (typeof window === 'undefined') return true
+  try {
+    const collapsed = localStorage.getItem(storageKey)
+    if (collapsed === '1') return false
+    if (collapsed === '0') return true
+  } catch {
+    /* ignore */
+  }
+  return true
+}
+
+export function usePurchaseAiInsightsOpen(storageKey = PURCHASE_AI_INSIGHTS_COLLAPSED_KEY) {
+  const [open, setOpenState] = useState(() => readPurchaseAiInsightsOpen(storageKey))
+
+  const setOpen = useCallback(
+    (next: boolean) => {
+      setOpenState(next)
+      try {
+        localStorage.setItem(storageKey, next ? '0' : '1')
+      } catch {
+        /* ignore */
+      }
+    },
+    [storageKey],
+  )
+
+  return [open, setOpen] as const
 }
 
 export function PurchaseAiOverviewBlock({

@@ -1,0 +1,44 @@
+﻿node.exe : npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm 
+help npmrc` for supported config options.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...config options.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+src/modules/accounting/receivables/reporting/receivable-ageing.service.ts(56,7): error TS18047: 'overdue' is possibly 'null'.
+src/modules/accounting/receivables/reporting/receivable-ageing.service.ts(57,7): error TS18047: 'overdue' is possibly 'null'.
+src/modules/accounting/receivables/reporting/receivable-ageing.service.ts(58,7): error TS18047: 'overdue' is possibly 'null'.
+src/modules/accounting/receivables/reporting/receivable-ageing.service.ts(59,7): error TS18047: 'overdue' is possibly 'null'.
+src/modules/accounting/receivables/reporting/receivable-outstanding.repository.ts(27,7): error TS6133: 'SORT_WHITELIST' is declared but its value is never read.
+src/modules/accounting/receivables/reporting/receivable-outstanding.repository.ts(242,58): error TS2345: Argument of type '{ accountingVoucher: { voucherNumber: string | null; } | null; salesInvoice: { status: SalesInvoiceStatus; customerPoNumber: string | null; postingDate: Date | null; referenceNumber: string | null; invoiceNumber: string | null; customerCodeSnapshot: string | null; invoiceDate: Date; } | null; } & { ...; }' is not assignable to parameter of type 'OpenItemWithRelations'.
+  Type '{ accountingVoucher: { voucherNumber: string | null; } | null; salesInvoice: { status: SalesInvoiceStatus; customerPoNumber: string | null; postingDate: Date | null; referenceNumber: string | null; invoiceNumber: string | null; customerCodeSnapshot: string | null; invoiceDate: Date; } | null; } & { ...; }' is not assignable to type '{ salesInvoice: { invoiceNumber: string | null; status: string; customerCodeSnapshot: string | null; referenceNumber: string | null; customerPoNumber: string | null; invoiceDate: Date; postingDate: Date | null; } | null; accountingVoucher: { ...; } | null; }'.
+    Types of property 'accountingVoucher' are incompatible.
+      Type '{ voucherNumber: string | null; } | null' is not assignable to type '{ voucherNumber: string; } | null'.
+        Type '{ voucherNumber: string | null; }' is not assignable to type '{ voucherNumber: string; }'.
+          Types of property 'voucherNumber' are incompatible.
+            Type 'string | null' is not assignable to type 'string'.
+              Type 'null' is not assignable to type 'string'.
+src/modules/accounting/receivables/reporting/receivable-outstanding.repository.ts(259,3): error TS2322: Type '({ accountingVoucher: { voucherNumber: string | null; } | null; salesInvoice: { status: SalesInvoiceStatus; customerPoNumber: string | null; postingDate: Date | null; referenceNumber: string | null; invoiceNumber: string | null; customerCodeSnapshot: string | null; invoiceDate: Date; } | null; } & { ...; })[]' is not assignable to type 'OpenItemWithRelations[]'.
+  Type '{ accountingVoucher: { voucherNumber: string | null; } | null; salesInvoice: { status: SalesInvoiceStatus; customerPoNumber: string | null; postingDate: Date | null; referenceNumber: string | null; invoiceNumber: string | null; customerCodeSnapshot: string | null; invoiceDate: Date; } | null; } & { ...; }' is not assignable to type 'OpenItemWithRelations'.
+    Type '{ accountingVoucher: { voucherNumber: string | null; } | null; salesInvoice: { status: SalesInvoiceStatus; customerPoNumber: string | null; postingDate: Date | null; referenceNumber: string | null; invoiceNumber: string | null; customerCodeSnapshot: string | null; invoiceDate: Date; } | null; } & { ...; }' is not assignable to type '{ salesInvoice: { invoiceNumber: string | null; status: string; customerCodeSnapshot: string | null; referenceNumber: string | null; customerPoNumber: string | null; invoiceDate: Date; postingDate: Date | null; } | null; accountingVoucher: { ...; } | null; }'.
+      Types of property 'accountingVoucher' are incompatible.
+        Type '{ voucherNumber: string | null; } | null' is not assignable to type '{ voucherNumber: string; } | null'.
+          Type '{ voucherNumber: string | null; }' is not assignable to type '{ voucherNumber: string; }'.
+            Types of property 'voucherNumber' are incompatible.
+              Type 'string | null' is not assignable to type 'string'.
+                Type 'null' is not assignable to type 'string'.
+src/modules/accounting/receivables/reporting/receivable-outstanding.service.ts(1,1): error TS6133: 'Request' is declared but its value is never read.
+src/modules/accounting/receivables/reporting/receivable-reporting.schemas.ts(85,16): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(refinement: (arg: { sortOrder: "asc" | "desc"; legalEntityId: string; page: number; sortBy: "customerName" | "outstandingAmount" | "openItemCount" | "oldestDueDate"; pageSize: number; includeSettled: boolean; search?: string | undefined; reportDate?: string | undefined; }, ctx: RefinementCtx) => arg is { ...; }): ZodEffects<...>', gave the following error.
+    Argument of type '(data: { amountFrom?: string | undefined; amountTo?: string | undefined; }, ctx: RefinementCtx) => void' is not assignable to parameter of type '(arg: { sortOrder: "asc" | "desc"; legalEntityId: string; page: number; sortBy: "customerName" | "outstandingAmount" | "openItemCount" | "oldestDueDate"; pageSize: number; includeSettled: boolean; search?: string | undefined; reportDate?: string | undefined; }, ctx: RefinementCtx) => arg is { ...; }'.
+      Types of parameters 'data' and 'arg' are incompatible.
+        Type '{ sortOrder: "asc" | "desc"; legalEntityId: string; page: number; sortBy: "customerName" | "outstandingAmount" | "openItemCount" | "oldestDueDate"; pageSize: number; includeSettled: boolean; search?: string | undefined; reportDate?: string | undefined; }' has no properties in common with type '{ amountFrom?: string | undefined; amountTo?: string | undefined; }'.
+  Overload 2 of 3, '(refinement: (arg: { sortOrder: "asc" | "desc"; legalEntityId: string; page: number; sortBy: "customerName" | "outstandingAmount" | "openItemCount" | "oldestDueDate"; pageSize: number; includeSettled: boolean; search?: string | undefined; reportDate?: string | undefined; }, ctx: RefinementCtx) => void): ZodEffects<...>', gave the following error.
+    Argument of type '(data: { amountFrom?: string | undefined; amountTo?: string | undefined; }, ctx: RefinementCtx) => void' is not assignable to parameter of type '(arg: { sortOrder: "asc" | "desc"; legalEntityId: string; page: number; sortBy: "customerName" | "outstandingAmount" | "openItemCount" | "oldestDueDate"; pageSize: number; includeSettled: boolean; search?: string | undefined; reportDate?: string | undefined; }, ctx: RefinementCtx) => void'.
+      Types of parameters 'data' and 'arg' are incompatible.
+        Type '{ sortOrder: "asc" | "desc"; legalEntityId: string; page: number; sortBy: "customerName" | "outstandingAmount" | "openItemCount" | "oldestDueDate"; pageSize: number; includeSettled: boolean; search?: string | undefined; reportDate?: string | undefined; }' has no properties in common with type '{ amountFrom?: string | undefined; amountTo?: string | undefined; }'.
+  Overload 3 of 3, '(refinement: (arg: { sortOrder: "asc" | "desc"; legalEntityId: string; page: number; sortBy: "customerName" | "outstandingAmount" | "openItemCount" | "oldestDueDate"; pageSize: number; includeSettled: boolean; search?: string | undefined; reportDate?: string | undefined; }, ctx: RefinementCtx) => Promise<...>): ZodEffects<...>', gave the following error.
+    Argument of type '(data: { amountFrom?: string | undefined; amountTo?: string | undefined; }, ctx: RefinementCtx) => void' is not assignable to parameter of type '(arg: { sortOrder: "asc" | "desc"; legalEntityId: string; page: number; sortBy: "customerName" | "outstandingAmount" | "openItemCount" | "oldestDueDate"; pageSize: number; includeSettled: boolean; search?: string | undefined; reportDate?: string | undefined; }, ctx: RefinementCtx) => Promise<...>'.
+      Types of parameters 'data' and 'arg' are incompatible.
+        Type '{ sortOrder: "asc" | "desc"; legalEntityId: string; page: number; sortBy: "customerName" | "outstandingAmount" | "openItemCount" | "oldestDueDate"; pageSize: number; includeSettled: boolean; search?: string | undefined; reportDate?: string | undefined; }' has no properties in common with type '{ amountFrom?: string | undefined; amountTo?: string | undefined; }'.

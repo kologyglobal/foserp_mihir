@@ -8,7 +8,7 @@ import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDateTime } from '../../utils/dates/format'
 import type { EnrichedLeadRow } from '../../utils/leadListUtils'
 import { leadDisplayStatusLabel } from '../../utils/leadListUtils'
-import { isLeadStageLocked } from '../../utils/leadUtils'
+import { resolveLeadEditPolicy, canOpenLeadEditor } from '../../utils/leadEditPolicy'
 import { cn } from '../../utils/cn'
 import {
   EnterpriseIdCell,
@@ -195,10 +195,12 @@ export function CrmLeadsTable({
         meta: { align: 'center', columnLabel: 'Actions' },
         cell: ({ row }) => {
           const lead = row.original.lead
-          const locked = isLeadStageLocked(lead.stage)
+          const editPolicy = resolveLeadEditPolicy(lead)
+          const editorOpen = canOpenLeadEditor(editPolicy)
           const quoteOppId = linkedOpportunityId?.(row.original) ?? lead.opportunityId
           const canConvertHint =
-            !locked
+            editorOpen
+            && editPolicy.mode !== 'limited'
             && lead.stage === 'qualified'
             && Boolean(lead.customerId)
             && !lead.opportunityId
@@ -213,9 +215,13 @@ export function CrmLeadsTable({
                     label: 'Edit',
                     icon: Pencil,
                     onClick: () => onEdit(row.original),
-                    disabled: !canEdit,
-                    disabledReason: !canEdit ? 'No edit permission' : undefined,
-                    title: locked ? 'Lead stage is locked — edits may be blocked' : undefined,
+                    disabled: !canEdit || !editorOpen,
+                    disabledReason: !canEdit
+                      ? 'No edit permission'
+                      : !editorOpen
+                        ? (editPolicy.reason ?? 'Lead is read-only')
+                        : undefined,
+                    title: editPolicy.mode !== 'full' && editPolicy.reason ? editPolicy.reason : undefined,
                   },
                   {
                     id: 'delete',

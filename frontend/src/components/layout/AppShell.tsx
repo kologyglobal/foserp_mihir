@@ -11,6 +11,8 @@ import { RecordDetailPanel } from '../design-system/RecordDetailPanel'
 import { RightDrawer } from '../design-system/RightDrawer'
 import { CrmQuickCreateHost } from '../crm/quick-create/CrmQuickCreateHost'
 import { AppErrorBoundary } from '../system/AppErrorBoundary'
+import { ScrollToTop } from '../routing/ScrollToTop'
+import { BackToTopButton } from './BackToTopButton'
 import { ProtectedOutlet } from '../auth/ProtectedRoute'
 import { useUIStore } from '../../store/uiStore'
 import { DensityProvider } from '../../design-system/enterprise/DensityProvider'
@@ -79,9 +81,12 @@ export function AppShell() {
 
   return (
     <div className="d365-app">
+      <ScrollToTop />
+      <BackToTopButton />
       <PageTracker />
       <KeyboardShortcuts />
       <DynamicsSuiteBar />
+
       {mobileNavOpen && (
         <button
           type="button"

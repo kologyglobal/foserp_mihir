@@ -15,6 +15,7 @@ import {
 import { DynamicsModuleDashboard, DynamicsDashboardGrid } from '../../components/dynamics'
 import { ErpButton } from '../../components/erp/ErpButton'
 import { useCrmStore } from '../../store/crmStore'
+import { resolveStoreAction } from '../../store/storeAction'
 import { useSalesStore } from '../../store/salesStore'
 import { useMasterStore } from '../../store/masterStore'
 import { buildCrmDashboardMetrics, formatCrmCurrency } from '../../utils/crmMetrics'
@@ -357,7 +358,17 @@ export function CrmDashboardPage() {
                 opportunities={opportunities}
                 onSchedule={() => setFollowUpOpen(true)}
                 onComplete={(id) => completeFollowUp(id, 'Done from dashboard')}
-                onReschedule={(id, d, t) => rescheduleFollowUp(id, d, t)}
+                onReschedule={(id, d, t, reason) => {
+                  void resolveStoreAction(rescheduleFollowUp(id, d, t)).then(() => {
+                    if (!reason) return
+                    const existing = useCrmStore.getState().followUps.find((f) => f.id === id)
+                    const noteLine = `Reschedule: ${reason}`
+                    const nextNotes = existing?.notes?.trim()
+                      ? `${existing.notes.trim()}\n${noteLine}`
+                      : noteLine
+                    void resolveStoreAction(useCrmStore.getState().updateFollowUp(id, { notes: nextNotes }))
+                  })
+                }}
               />
               <CrmNextActionsPanel actions={nextActions} />
             </DynamicsDashboardGrid>

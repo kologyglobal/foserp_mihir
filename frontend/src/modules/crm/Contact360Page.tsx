@@ -354,7 +354,7 @@ export function Contact360Page() {
         factBox={factBox}
         suppressFactBoxRecord
         collapsibleFactBox
-        factBoxLabel="Details"
+        factBoxLabel="Smart Context"
         stickyFooter={false}
       >
         <EnterpriseFormSectionNav

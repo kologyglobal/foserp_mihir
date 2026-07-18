@@ -28,12 +28,17 @@ import { useMasterStore } from './masterStore'
 import { useCrmStore } from './crmStore'
 import { formatCustomerBillingAddress, resolveCustomerShippingAddress } from '../utils/customerUtils'
 import { useProductMasterStore } from './productMasterStore'
-import { normalizeLead, mapLifecycleToStage, mapStageToLifecycle, deriveLifecycleFromStage, isLeadStageLocked } from '../utils/leadUtils'
+import { normalizeLead, mapLifecycleToStage, mapStageToLifecycle, deriveLifecycleFromStage, leadStageLabel } from '../utils/leadUtils'
+import { filterLeadPatchForPolicy, resolveLeadEditPolicy } from '../utils/leadEditPolicy'
 import { getLeadUser } from '../data/crm/leadUsers'
 import { getSessionUser } from '../utils/permissions'
 import { erpStorage } from './persistConfig'
 import { isApiMode } from '../config/apiConfig'
 import type { StoreAction, StoreActionResult } from './storeAction'
+import {
+  formatMissingStageFieldsMessage,
+  getMissingLeadStageFields,
+} from '../config/crmStageRequirements'
 
 const DEFAULT_GST_PCT = 18
 const DEFAULT_VALIDITY_DAYS = 30
@@ -321,16 +326,19 @@ export const useSalesStore = create<SalesState>()(
         if (!perm.ok) return perm
         const lead = get().getLead(id)
         if (!lead) return { ok: false, error: 'Lead not found' }
-        if (isLeadStageLocked(lead.stage)) {
-          return { ok: false, error: 'Lead is locked — cannot edit' }
+        const policy = resolveLeadEditPolicy(lead)
+        if (!policy.canSave) {
+          return { ok: false, error: policy.reason ?? 'Lead is read-only' }
         }
-        const merged = { ...patch }
-        if (patch.leadOwnerName) merged.salesOwner = patch.leadOwnerName
-        if (patch.stage) {
-          merged.lifecycleStatus = deriveLifecycleFromStage(patch.stage)
-        } else if (patch.lifecycleStatus) {
-          merged.stage = mapLifecycleToStage(patch.lifecycleStatus, lead.stage)
+        const filtered = filterLeadPatchForPolicy(patch as Record<string, unknown>, policy)
+        if (!filtered) {
+          return { ok: false, error: policy.reason ?? 'No editable fields in this lead state' }
         }
+        const merged = { ...filtered } as typeof patch
+        if (filtered.leadOwnerName) merged.salesOwner = filtered.leadOwnerName as string
+        // Stage / lifecycle only via advanceLeadStage — ignore if present
+        delete (merged as { stage?: unknown }).stage
+        delete (merged as { lifecycleStatus?: unknown }).lifecycleStatus
         set((s) => ({
           leads: s.leads.map((l) =>
             l.id === id ? normalizeLead(mergeAudit(l, { ...merged, ...stampModified(l) })) : l,
@@ -356,6 +364,20 @@ export const useSalesStore = create<SalesState>()(
         }
         const lead = get().getLead(id)
         if (!lead) return { ok: false, error: 'Lead not found' }
+        const gateLead = {
+          ...lead,
+          ...(extras?.notQualifiedReason !== undefined ? { notQualifiedReason: extras.notQualifiedReason } : {}),
+          ...(extras?.closedReason !== undefined ? { closedReason: extras.closedReason } : {}),
+        }
+        const missing = getMissingLeadStageFields(gateLead, stage)
+        if (missing.length > 0) {
+          return {
+            ok: false,
+            error: formatMissingStageFieldsMessage(missing, leadStageLabel(stage)),
+            code: 'STAGE_REQUIREMENTS_INCOMPLETE',
+            missingFields: missing,
+          }
+        }
         if (!canTransition(LEAD_STAGE_FLOW, lead.stage, stage) && lead.stage !== stage) {
           // Allow same-stage no-op; otherwise enforce flow (closed/not_qualified may be direct from form)
           const forced = stage === 'closed' || stage === 'not_qualified' || stage === 'qualified'
@@ -1039,11 +1061,21 @@ export const useSalesStore = create<SalesState>()(
     {
       name: 'vasant-erp-sales-v1',
       storage: erpStorage,
-      partialize: (s) => ({
-        leads: isApiMode() ? [] : s.leads,
-        inquiries: isApiMode() ? [] : s.inquiries,
-        quotations: isApiMode() ? [] : s.quotations,
-      }),
+      // API mode: CRM slices are owned by hydrate + bridge upserts. Never persist
+      // empty arrays — late rehydrate would wipe in-memory leads (new Lead vanishes
+      // until full page reload re-runs useCrmApiSync).
+      partialize: (s) =>
+        isApiMode()
+          ? {}
+          : {
+              leads: s.leads,
+              inquiries: s.inquiries,
+              quotations: s.quotations,
+            },
+      merge: (persisted, current) => {
+        if (isApiMode()) return current
+        return { ...current, ...(persisted as Partial<SalesState>) }
+      },
     },
   ),
 )

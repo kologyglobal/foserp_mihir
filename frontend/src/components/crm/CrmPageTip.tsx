@@ -1,12 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { CircleHelp } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
-import { CRM_PAGE_TIP_FALLBACK, resolveCrmPageGuide } from '../../config/pageGuideRegistry'
+import { PAGE_TIP_FALLBACK, resolvePageTipGuide } from '../../config/pageGuideRegistry'
 import {
   dismissCrmPageTip,
   getCrmPageTipId,
   isCrmPageTipDismissed,
-  isCrmPath,
+  shouldShowPageTip,
 } from '../../utils/crmPageTipStorage'
 import { getPageLabel } from '../../utils/pageNavigation'
 import { cn } from '../../utils/cn'
@@ -16,7 +16,8 @@ interface CrmPageTipProps {
 }
 
 /**
- * Compact CRM page tip — icon-only until opened; dismiss hides for this page (localStorage).
+ * Compact page tip — icon-only until opened; dismiss hides for this page (localStorage).
+ * Shown on every app page (except auth).
  */
 export function CrmPageTip({ className }: CrmPageTipProps) {
   const { pathname } = useLocation()
@@ -47,9 +48,9 @@ export function CrmPageTip({ className }: CrmPageTipProps) {
     }
   }, [open])
 
-  if (!isCrmPath(pathname) || dismissed) return null
+  if (!shouldShowPageTip(pathname) || dismissed) return null
 
-  const guide = resolveCrmPageGuide(pathname) ?? CRM_PAGE_TIP_FALLBACK
+  const guide = resolvePageTipGuide(pathname) ?? PAGE_TIP_FALLBACK
   const title = getPageLabel(pathname) || 'Page tip'
 
   function handleDismiss() {

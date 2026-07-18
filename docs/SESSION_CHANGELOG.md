@@ -1,3 +1,198 @@
+## 2026-07-17 ? Finance Phase 3B2: Customer Receipt Calculation & Validation Preview
+
+### Shipped (calculation + validation only ? no HTTP routes, no persistence)
+
+- **Module** `receivables/receipts/calculation/` + `validation/` ? pure `calculateCustomerReceipt`, async `validateReceiptInput`
+- **Amount formula:** Gross = Bank/Cash + Customer TDS + Bank Charges + Other Deductions; Allocatable = Gross
+- **TDS:** NONE | AMOUNT | PERCENTAGE (user-supplied base; controlled rates 0/0.1/1/2/5/10; custom with warning)
+- **Allocation preview:** combine duplicate open-item proposals; same-customer/currency; outstanding-after preview; no balance mutation
+- **Posting preview:** balanced Dr Bank/TDS/Charges/Deductions / Cr Customer Receivable (party on credit line)
+- **Account readiness:** bank/cash Account, CUSTOMER_RECEIVABLE / TDS_RECEIVABLE / BANK_CHARGES mappings, other-deduction accounts
+- **Tests:** `finance-ar-receipt-calculation.test.ts` (19), `finance-ar-receipt-validation.test.ts` (19); finance suite **194/194**
+
+### Not in scope (Phase 3B3+)
+
+- Receipt draft create/update/list APIs, mark-ready, cancel, posting, number issuance, GL, open-item mutation, frontend receipt pages
+
+### Verify
+
+- `cd backend && npx vitest run tests/finance --hookTimeout=120000` ? 194 passed
+- `cd backend && npm run typecheck` ? pass
+- `cd frontend && npm run typecheck` ? pass
+
+### Next
+
+- **Phase 3B3** ? receipt draft CRUD + validate + mark-ready + cancel + list/detail APIs + audit
+
+---
+
+## 2026-07-17 ? Finance Phase 3B1: Customer Receipt & Allocation DB Foundation
+
+### Shipped (backend DB + repos + validators ? no HTTP routes)
+
+- **Migration** `20260717270000_finance_phase3b1_receipt_foundation` ? `CustomerReceipt`, `CustomerReceiptAllocation`, `ReceivableOpenItem.side` (DEBIT|CREDIT), `FinanceDocumentType.CUSTOMER_RECEIPT`, `ReceivableDocumentType.CUSTOMER_RECEIPT`
+- **Architecture:** unified open items (no CustomerCreditOpenItem table); positive `openAmount`; bank/cash via `Account` (BANK|CASH); customer via CrmCompany UUID (no FK); reporting filters `side=DEBIT` only
+- **Module** `receivables/receipts/` ? types, schemas, errors, find-only repos, ownership validators, open-item side invariants
+- **Permissions:** `finance.ar.receipt.*`, `finance.ar.allocation.*` (Executive: view/create/edit/cancel receipts + view/create allocations; Manager: + post/reverse)
+- **Reporting safety:** outstanding/reconciliation/overview subledger queries exclude CREDIT-side open items
+- **Sales invoice posting:** explicitly sets `side: 'DEBIT'` on open item create
+- **Tests:** `finance-ar-receipt-foundation.test.ts` (15 cases); full finance suite **156/156**
+
+### Not in scope (by design ? Phase 3B2+)
+
+- Receipt calculation, draft/post APIs, GL posting, allocation post/reverse services, HTTP routes, frontend pages
+
+### Verify
+
+- `npx tsx scripts/prisma-cli.ts migrate deploy` ? applied
+- `cd backend && npx tsc --noEmit` ? pass
+- `cd backend && npx vitest run tests/finance/ --hookTimeout=120000` ? 156 passed
+- `cd frontend && npm run typecheck` ? pass
+
+### Next
+
+- **Phase 3B2** ? receipt calculation engine (gross/TDS/bank charge ? allocatable amounts)
+
+---
+
+## 2026-07-17 ? Finance Phase 3A6: Money In AR Frontend
+
+### Shipped (frontend ? dual-mode demo + API)
+
+- **Workspace** `/accounting/money-in/*` ? Overview, Invoices, Outstanding, Customers, Ageing, Reconciliation (no Receipts/Credit Notes tabs; footer ?Coming next? only)
+- **Bridge** `receivablesApiBridge.ts` + `receivablesApi.ts` + `receivablesDemoStore.ts` ? invoice CRUD/validate/mark-ready/cancel/post + reporting endpoints
+- **Permissions** `useMoneyInPermissions()` ? `finance.ar.*`; UI AND with server `allowedActions`
+- **Pages:** overview KPIs + attention panel + ageing chart; invoice list/form/detail with RHF+Zod; reporting tables
+- **Nav:** Accounting sidebar **Money In** ? `/accounting/money-in`; `/accounting/receivables` overview redirects to Money In; legacy receivables demo routes preserved
+- **Tests:** `npm run test:money-in` (`scripts/verify-money-in.ts`) ? 20/20 UI + demo store smoke
+
+### Not in scope (by design ? Phase 3B)
+
+- Receipts, allocations, credit notes, collection actions
+
+### Verify
+
+- `cd frontend && npm run typecheck` ? pass
+- `cd frontend && npm run build` ? pass
+- `cd frontend && npm run test:money-in` ? 20 passed
+- `cd backend && npx tsc --noEmit` ? pass
+
+### Next
+
+- **Phase 3B** ? customer receipts, allocation, credit notes
+
+---
+
+## 2026-07-17 ? Finance Phase 3A5: AR Reporting (Outstanding, Ageing, Reconciliation)
+
+### Shipped (backend API ? read-only, no frontend pages)
+
+- **Migration** `20260717260000_finance_phase3a5_ar_reporting_indexes` ? composite indexes on `ReceivableOpenItem` + GL `(tenantId, legalEntityId, accountId, postingDate)`
+- **Module** `receivables/reporting/` ? outstanding list, ageing buckets, customer summary, overview, AR-to-GL reconciliation
+- **HTTP (all GET, read-only):**
+  - `/receivables/overview` ? `finance.ar.view`
+  - `/receivables/outstanding`, `/ageing`, `/customers`, `/customers/:customerId`, `/customers/:customerId/open-items` ? `finance.ar.view`
+  - `/receivables/reconciliation` ? `finance.ar.reconcile.view`
+- **Rules:** default filter `openAmount > 0` + active statuses; `outstandingAmount` maps to `openAmount`; past `reportDate` allowed for ageing with `AGEING_USES_CURRENT_BALANCES`; reconciliation rejects historical `asOfDate`
+- **Tests:** `finance-ar-reporting.test.ts` (10 cases); full finance suite **141/141**
+
+### Not in scope (by design ? Phase 3A6+)
+
+- Receipts, allocations, credit notes, collection actions, full frontend AR pages
+
+### Next
+
+- **Phase 3A6** ? AR frontend pages wired to reporting + invoice APIs
+
+---
+
+## 2026-07-17 ? Finance Phase 3A4: Atomic Sales Invoice Posting
+
+### Shipped (backend API ? no frontend AR pages)
+
+- **Migration** `20260717250000_finance_phase3a4_posting_event_source_number` ? `PostingEvent.sourceNumberSeriesId`, `reservedSourceDocumentNumber`, `sourceNumberReservedAt`
+- **Posting engine extensions** ? optional `beforeTransaction` + `afterAccounting` hooks; `reserveSourceDocumentNumber()` for SALES_INVOICE series
+- **AR posting module** `receivables/posting/` ? accounting builder, validation, coordinator; reuses Phase 2 `post()` engine
+- **HTTP** `POST /accounting/receivables/invoices/:id/post` ? permission `finance.ar.invoice.post`; idempotent event key `SALES_INVOICE_POST:{invoiceId}:V1`
+- **Atomic tx:** voucher + GL + `ReceivableOpenItem` + invoice POSTED + PostingEvent POSTED in one Prisma transaction
+- **Tests:** `finance-ar-invoice-posting.test.ts` (9) ? happy path, GST shape, idempotent replay, permissions, concurrent post, partial-failure rollback
+- **Docs/Swagger:** posting lifecycle in `API_CONVENTIONS.md`; allowedActions `post` + `viewAccounting`
+
+### Not in scope (by design ? Phase 3A5+)
+
+- Receipts, allocations, credit notes, ageing APIs, full frontend AR pages
+
+### Next
+
+- **Phase 3A5** ? outstanding list, ageing, AR subledger-to-GL reconciliation
+
+---
+
+## 2026-07-17 ? Finance Phase 3A3: Sales Invoice Draft Workflow
+
+### Shipped (backend API ? no posting, no frontend)
+
+- **Migration** `20260717240000_finance_phase3a3_ar_draft_fields` ? `postingDate`, commercial refs, freight/charges, customer snapshots, `calculationContext`, line `sourceLineId` + `grossAmount`
+- **HTTP routes** `/accounting/receivables/invoices` ? create, update, validate, mark-ready, cancel, list, detail
+- **Services:** draft/read/validation, sales-order source adapter, allowed-actions, optimistic `updatedAt` concurrency
+- **Reuses:** Phase 3A2 `calculateSalesInvoice` + `validateSalesInvoiceDraft`, `requireActiveCustomerParty`
+- **Tests:** `finance-ar-invoice-drafts.test.ts` ? live MySQL; critical no-accounting assertions after each action
+- **Docs/Swagger:** AR draft lifecycle in `API_CONVENTIONS.md`; OpenAPI paths under Accounting Receivables / Sales Invoices
+
+### Not in scope (by design ? Phase 3A4)
+
+- Posting endpoint, invoice number issuance, PostingEvent/Voucher/GL/ReceivableOpenItem creation, FinanceNumberSeries consumption, frontend AR pages
+
+### Next
+
+- **Phase 3A4** ? Sales invoice posting to GL + open items + number series consumption
+
+---
+
+## 2026-07-17 ? Finance Phase 3A2: Sales Invoice Calculation Engine
+
+### Shipped (backend only ? no HTTP routes, no posting)
+
+- **Calculation engine** under `backend/src/modules/accounting/receivables/calculation/`:
+  - `calculateSalesInvoice()` ? sync pure calculation (10-step order documented in orchestrator)
+  - `validateSalesInvoiceDraft()` ? async side-effect-free preview (LE state, customer party, account/period readiness, MULTI_CURRENCY gate)
+  - Taxable freight (`freightMode=TAXABLE`) and structured `otherCharges[]` with per-charge GST
+- **Validation helpers** under `receivables/validation/` ? GSTIN, PAN, state code (01?38), HSN/SAC, account readiness, cost centre
+- **finance-decimal.ts** ? `divide`, `min`, `max`, `roundQuantity` (6dp), `roundPercentage` (4dp), `roundTax` (4dp)
+- **Schema:** optional `GST_OUTPUT_CESS` on `DefaultAccountMappingKey` ? migration `20260717230000_finance_phase3a2_gst_cess_mapping` (not mandatory for activation)
+- **Tests:** `finance-ar-calculation.test.ts` (25), `finance-ar-gst-validation.test.ts` (8)
+
+### Not in scope (by design)
+
+- HTTP routes/controllers, SalesInvoice CRUD, GL posting, open-item creation, frontend AR pages
+
+### Next
+
+- **Phase 3A3** ? Create/Edit Draft APIs (completed; see entry above)
+
+---
+
+## 2026-07-17 ? Finance Phase 3A1: AR database foundation
+
+### Shipped (backend only ? no HTTP invoice routes, no posting workflow)
+
+- **Prisma:** `SalesInvoice`, `SalesInvoiceLine`, `ReceivableOpenItem`; enums `SalesInvoiceStatus`, `SalesInvoiceSourceType`, `SalesInvoiceSupplyType`, `SalesInvoiceTaxTreatment`, `ReceivableDocumentType`, `ReceivableOpenItemStatus`; `FinanceDocumentType.SALES_INVOICE` (number series only, not `AccountingVoucherType`)
+- **Migration:** `20260717220000_finance_phase3a1_ar_foundation`
+- **Customer architecture:** operational customer = `CrmCompany` via `customer-party` adapter (`backend/src/modules/accounting/receivables/customer-party/`); `customerId` UUID without Prisma FK; sales order link via `sourceType` + `sourceDocumentId` + snapshot (no FK to `CrmSalesOrder`)
+- **Repos:** tenant-scoped find/list only under `receivables/sales-invoices` and `receivable-open-items`; Zod foundations for future APIs
+- **Permissions:** `finance.ar.*` (+ invoice CRUD/post/cancel, reconcile.view); Finance Executive gets create/edit/cancel but **not** post
+- **Tests:** `backend/tests/finance/finance-ar-foundation.test.ts`
+
+### Not in scope (by design)
+
+- Invoice HTTP routes, GST calculation, GL posting, open-item creation workflow, frontend AR pages, seeded posted invoices
+
+### Next
+
+- **Phase 3A2** ? calculation engine (completed 2026-07-17; see entry above)
+
+---
+
 ## 2026-07-17 ? Task 3.2: Country-aware mobile validation
 
 ### Why

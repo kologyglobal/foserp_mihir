@@ -56,6 +56,10 @@ import { useSalesStore } from './salesStore'
 import { ERP_STORAGE_KEYS, erpStorage } from './persistConfig'
 import { isApiMode } from '../config/apiConfig'
 import type { StoreActionResult, StoreAction } from './storeAction'
+import {
+  formatMissingStageFieldsMessage,
+  getMissingOpportunityStageFields,
+} from '../config/crmStageRequirements'
 import { cloneTemplateSections } from '../utils/quotationEngine/cloneSections'
 import { applyCommercialMastersToSections, resolveDefaultCommercialTerm } from '../utils/quotationTermUtils'
 import { mergeBuiltinQuotationTemplates } from '../utils/quotationEngine/builtinTemplateSync'
@@ -67,6 +71,7 @@ import {
   ISO_TANK_TEMPLATE_ID,
   isoTankSamplePriceLines,
 } from '../data/crm/isoTankShowcase'
+import { validateFollowUpAt } from '../utils/validation/crmDatePolicy'
 
 function genId(prefix: string) {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`
@@ -185,6 +190,7 @@ interface CrmState {
     defaultWarranty?: string
     defaultExclusions?: string
     sourceTemplateId?: string
+    printLayout?: QuotationTemplate['printLayout']
   }) => StoreAction<StoreActionResult & { templateId?: string }>
   updateQuotationTemplate: (
     id: string,
@@ -442,7 +448,7 @@ export const useCrmStore = create<CrmState>()(
           defaultWarranty: input.defaultWarranty ?? source?.defaultWarranty ?? '',
           defaultExclusions: input.defaultExclusions ?? source?.defaultExclusions ?? '',
           isActive: true,
-          printLayout: source?.printLayout,
+          printLayout: input.printLayout ?? source?.printLayout,
           ...audit,
         }
         set((s) => ({ quotationTemplates: [tpl, ...s.quotationTemplates] }))
@@ -610,6 +616,19 @@ export const useCrmStore = create<CrmState>()(
         if (stage === 'lost' && !lostReason?.trim()) {
           return { ok: false, error: 'Lost reason is required' }
         }
+        const gateOpp = {
+          ...opp,
+          ...(stage === 'lost' && lostReason !== undefined ? { lostReason } : {}),
+        }
+        const missing = getMissingOpportunityStageFields(gateOpp, stage)
+        if (missing.length > 0) {
+          return {
+            ok: false,
+            error: formatMissingStageFieldsMessage(missing, opportunityStageLabel(stage)),
+            code: 'STAGE_REQUIREMENTS_INCOMPLETE',
+            missingFields: missing,
+          }
+        }
         if (stage === 'won') {
           const hasApproved =
             manualWonApproval ||
@@ -747,6 +766,8 @@ export const useCrmStore = create<CrmState>()(
             }),
           )
         }
+        const dueError = validateFollowUpAt({ dueDate: input.dueDate, dueTime: input.dueTime })
+        if (dueError) return { ok: false, error: dueError }
         const audit = stampCreated()
         const fu: FollowUp = {
           id: genId('fu'),
@@ -796,6 +817,13 @@ export const useCrmStore = create<CrmState>()(
         if (isApiMode()) return import('../services/bridges/crmApiBridge').then((m) => m.apiUpdateFollowUp(id, patch))
         const fu = get().followUps.find((f) => f.id === id)
         if (!fu) return { ok: false, error: 'Follow-up not found' }
+        if (patch.dueDate !== undefined || patch.dueTime !== undefined) {
+          const dueError = validateFollowUpAt({
+            dueDate: patch.dueDate ?? fu.dueDate,
+            dueTime: patch.dueTime ?? fu.dueTime,
+          })
+          if (dueError) return { ok: false, error: dueError }
+        }
         set((s) => ({
           followUps: s.followUps.map((f) =>
             f.id === id ? mergeAudit(f, { ...patch, ...stampModified(f) }) : f,
@@ -833,6 +861,8 @@ export const useCrmStore = create<CrmState>()(
         if (isApiMode()) return import('../services/bridges/crmApiBridge').then((m) => m.apiSnoozeFollowUp(id, newDueDate))
         const fu = get().followUps.find((f) => f.id === id)
         if (!fu) return { ok: false, error: 'Follow-up not found' }
+        const dueError = validateFollowUpAt({ dueDate: newDueDate, dueTime: fu.dueTime ?? '23:59' })
+        if (dueError) return { ok: false, error: dueError }
         set((s) => ({
           followUps: s.followUps.map((f) =>
             f.id === id ? mergeAudit(f, { status: 'snoozed', dueDate: newDueDate, ...stampModified(f) }) : f,
@@ -845,6 +875,8 @@ export const useCrmStore = create<CrmState>()(
         if (isApiMode()) return import('../services/bridges/crmApiBridge').then((m) => m.apiRescheduleFollowUp(id, dueDate, dueTime))
         const fu = get().followUps.find((f) => f.id === id)
         if (!fu) return { ok: false, error: 'Follow-up not found' }
+        const dueError = validateFollowUpAt({ dueDate, dueTime })
+        if (dueError) return { ok: false, error: dueError }
         set((s) => ({
           followUps: s.followUps.map((f) =>
             f.id === id ? mergeAudit(f, { status: 'pending', dueDate, dueTime, ...stampModified(f) }) : f,

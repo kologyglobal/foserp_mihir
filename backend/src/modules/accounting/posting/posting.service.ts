@@ -9,7 +9,7 @@ import { beginIdempotentPosting, buildReplayResult } from './posting-idempotency
 import { reserveVoucherNumber } from './posting-number.service.js'
 import { PostingError } from './posting.errors.js'
 import { validatePostingRequest } from './posting-validation.service.js'
-import type { PostingContext, PostingRequest, PostingResult, ValidatedPostingData } from './posting.types.js'
+import type { PostingContext, PostingOptions, PostingRequest, PostingResult, ValidatedPostingData } from './posting.types.js'
 
 const MAX_TX_RETRIES = 3
 const TX_TIMEOUT_MS = 15_000
@@ -59,7 +59,11 @@ export async function buildPostedResult(
   }
 }
 
-export async function post(request: PostingRequest, context: PostingContext): Promise<PostingResult> {
+export async function post(
+  request: PostingRequest,
+  context: PostingContext,
+  options?: PostingOptions,
+): Promise<PostingResult> {
   if (!context.authorization.permissionChecked) {
     throw new PostingError('AUTHORIZATION_NOT_VERIFIED', 'Posting authorization was not verified by caller')
   }
@@ -88,9 +92,21 @@ export async function post(request: PostingRequest, context: PostingContext): Pr
     )
 
     event = await postingEventRepo.findByIdOrThrow(context.tenantId, event.id)
+
+    if (options?.beforeTransaction) {
+      const updated = await options.beforeTransaction(event)
+      event = updated ?? (await postingEventRepo.findByIdOrThrow(context.tenantId, event.id))
+    }
+
     await postingEventRepo.markProcessing(context.tenantId, event.id)
 
-    const txResult = await runPostingTransactionWithRetry(context, event.id, validated, reservation.voucherNumber)
+    const txResult = await runPostingTransactionWithRetry(
+      context,
+      event.id,
+      validated,
+      reservation.voucherNumber,
+      options,
+    )
 
     event = await postingEventRepo.findByIdOrThrow(context.tenantId, event.id)
 
@@ -135,11 +151,12 @@ async function runPostingTransactionWithRetry(
   eventId: string,
   validated: ValidatedPostingData,
   voucherNumber: string,
+  options?: PostingOptions,
 ): Promise<{ voucherId: string }> {
   let lastError: unknown
   for (let attempt = 0; attempt < MAX_TX_RETRIES; attempt += 1) {
     try {
-      return await executePostingTransaction(context, eventId, validated, voucherNumber)
+      return await executePostingTransaction(context, eventId, validated, voucherNumber, options)
     } catch (error) {
       lastError = error
       if (!isRetryableTransactionError(error) || attempt >= MAX_TX_RETRIES - 1) {
@@ -155,6 +172,7 @@ export async function executePostingTransaction(
   eventId: string,
   validated: ValidatedPostingData,
   voucherNumber: string,
+  options?: PostingOptions,
 ): Promise<{ voucherId: string }> {
   const { request } = validated
   const payloadHash = hashPayload(request)
@@ -263,6 +281,17 @@ export async function executePostingTransaction(
       }))
 
       await tx.generalLedgerEntry.createMany({ data: glRows })
+
+      if (options?.afterAccounting) {
+        await options.afterAccounting({
+          tx,
+          context,
+          eventId,
+          voucherId: voucher.id,
+          voucherNumber,
+          validated,
+        })
+      }
 
       await tx.postingEvent.update({
         where: { id: eventId, tenantId: context.tenantId },

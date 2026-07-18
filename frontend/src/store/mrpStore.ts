@@ -280,6 +280,17 @@ export const useMrpStore = create<MrpState>()(
     if (so.status !== 'open') {
       return { ok: false, error: `Cannot confirm sales order in status ${so.status}` }
     }
+    if (!so.customerPoNumber?.trim()) {
+      return { ok: false, error: 'Customer PO number is required before confirmation' }
+    }
+    if (!so.paymentTerms?.trim() || !so.deliveryTerms?.trim()) {
+      return { ok: false, error: 'Payment and delivery terms are required before confirmation' }
+    }
+    const grand = so.grandTotal != null ? Number(so.grandTotal) : 0
+    const lineValue = so.qty * (so.unitPrice ?? 0)
+    if (!(grand > 0) && !(lineValue > 0)) {
+      return { ok: false, error: 'Grand total must be greater than zero before confirmation' }
+    }
     set((s) => ({
       salesOrders: s.salesOrders.map((o) => (o.id === salesOrderId ? { ...o, status: 'confirmed' } : o)),
     }))

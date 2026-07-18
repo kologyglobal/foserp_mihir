@@ -3,7 +3,8 @@ import { paginationSchema } from '../../../utils/pagination.js'
 import { optionalUuid } from '../../../utils/zodHelpers.js'
 import { OPPORTUNITY_PRIORITIES, OPPORTUNITY_STAGES, OPPORTUNITY_STATUSES } from './opportunity.constants.js'
 
-const lineInputSchema = z.object({
+const lineInputSchema = z
+  .object({
   lineNo: z.coerce.number().int().min(1).optional(),
   productId: z.string().uuid().optional().nullable(),
   itemId: z.string().uuid().optional().nullable(),
@@ -24,6 +25,15 @@ const lineInputSchema = z.object({
   expectedDeliveryDate: z.string().datetime().optional().nullable(),
   remarks: z.string().trim().optional(),
 })
+  .superRefine((line, ctx) => {
+    const hasProduct = Boolean(line.productOrItem?.trim())
+    if (hasProduct && (line.unitPrice == null || line.unitPrice <= 0)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Unit Price is required', path: ['unitPrice'] })
+    }
+    if (hasProduct && (line.qty == null || line.qty <= 0)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Quantity must be greater than zero', path: ['qty'] })
+    }
+  })
 
 export const listOpportunitiesQuerySchema = paginationSchema.extend({
   customerId: z.string().uuid().optional(),

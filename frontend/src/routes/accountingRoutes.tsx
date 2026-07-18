@@ -18,7 +18,6 @@ import { AccountLedgerPage } from '@/modules/accounting/AccountLedgerPage'
 import { VoucherLedgerPage } from '@/modules/accounting/VoucherLedgerPage'
 import { PartyLedgerPage } from '@/modules/accounting/PartyLedgerPage'
 import { LedgerEntryDetailPage } from '@/modules/accounting/LedgerEntryDetailPage'
-import { ReceivablesDashboardPage } from '@/modules/accounting/ReceivablesDashboardPage'
 import { CustomerOutstandingPage } from '@/modules/accounting/CustomerOutstandingPage'
 import { ReceivableInvoicesPage } from '@/modules/accounting/ReceivableInvoicesPage'
 import { ReceivablesAgeingPage } from '@/modules/accounting/ReceivablesAgeingPage'
@@ -211,6 +210,18 @@ import {
   JournalListPage,
   JournalNewPage,
 } from '@/modules/accounting/journals'
+import {
+  AgeingPage as MoneyInAgeingPage,
+  CustomerDetailPage as MoneyInCustomerDetailPage,
+  CustomerListPage as MoneyInCustomerListPage,
+  InvoiceDetailPage as MoneyInInvoiceDetailPage,
+  InvoiceEditPage as MoneyInInvoiceEditPage,
+  InvoiceListPage as MoneyInInvoiceListPage,
+  InvoiceNewPage as MoneyInInvoiceNewPage,
+  MoneyInOverviewPage,
+  OutstandingPage as MoneyInOutstandingPage,
+  ReconciliationPage as MoneyInReconciliationPage,
+} from '@/modules/accounting/money-in'
 
 /**
  * Accounting module routes — demo/UI-only (no backend posting engine).
@@ -237,7 +248,19 @@ export const accountingRouteChildren: RouteObject[] = [
   { path: 'accounting/entries/journals/:id/edit', element: <JournalEditPage /> },
   { path: 'accounting/entries/approvals', element: <ApprovalInboxPage /> },
   { path: 'accounting/entries/approvals/:id', element: <ApprovalDetailPage /> },
-  { path: 'accounting/receivables', element: <ReceivablesDashboardPage /> },
+  /** Money In — Phase 3A6 AR frontend (API + demo dual-mode) */
+  { path: 'accounting/money-in', element: <MoneyInOverviewPage /> },
+  { path: 'accounting/money-in/invoices', element: <MoneyInInvoiceListPage /> },
+  { path: 'accounting/money-in/invoices/new', element: <MoneyInInvoiceNewPage /> },
+  { path: 'accounting/money-in/invoices/:id', element: <MoneyInInvoiceDetailPage /> },
+  { path: 'accounting/money-in/invoices/:id/edit', element: <MoneyInInvoiceEditPage /> },
+  { path: 'accounting/money-in/outstanding', element: <MoneyInOutstandingPage /> },
+  { path: 'accounting/money-in/customers', element: <MoneyInCustomerListPage /> },
+  { path: 'accounting/money-in/customers/:customerId', element: <MoneyInCustomerDetailPage /> },
+  { path: 'accounting/money-in/ageing', element: <MoneyInAgeingPage /> },
+  { path: 'accounting/money-in/reconciliation', element: <MoneyInReconciliationPage /> },
+
+  { path: 'accounting/receivables', element: <Navigate to="/accounting/money-in" replace /> },
   { path: 'accounting/commercial-commitments', element: <CommercialCommitmentsPage /> },
   { path: 'accounting/receivables/customers', element: <CustomerOutstandingPage /> },
   { path: 'accounting/receivables/outstanding', element: <CustomerOutstandingPage /> },

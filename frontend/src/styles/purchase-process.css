@@ -497,6 +497,46 @@ a.purchase-process-map__step:hover {
   margin-bottom: 12px;
 }
 
+.purchase-ai-panel__close {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  margin-left: auto;
+  border: 1px solid color-mix(in srgb, var(--erp-border, #d0d5dd) 80%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, #fff 88%, transparent);
+  color: #64748b;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.purchase-ai-panel__close:hover {
+  border-color: color-mix(in srgb, var(--erp-primary, #2563eb) 35%, var(--erp-border, #d0d5dd));
+  background: #fff;
+  color: var(--dyn-navy, #001b3a);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.purchase-ai-panel__close:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--erp-primary, #2563eb) 45%, transparent);
+  outline-offset: 2px;
+}
+
+.purchase-ai-panel__restore {
+  flex-shrink: 0;
+}
+
 .purchase-ai-panel--embedded .purchase-ai-panel__head {
   margin-bottom: 4px;
   padding: 10px 12px;

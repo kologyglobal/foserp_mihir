@@ -1,0 +1,41 @@
+﻿node.exe : npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm 
+help npmrc` for supported config options.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...config options.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+ RUN  v3.2.7 D:/Projects/FOS/trailer-erp 2/backend
+
+ Γ£ô tests/finance/finance-ar-receipt-calculation.test.ts (19 tests) 26ms
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Suites 1 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  tests/finance/finance-ar-receipt-validation.test.ts [ tests/finance/finance-ar-receipt-validation.test.ts ]
+Error: Cannot find module './receipt-payment-method.validator.js' imported from 'D:/Projects/FOS/trailer-erp 
+2/backend/src/modules/accounting/receivables/receipts/calculation/customer-receipt-validation-preview.service.ts'
+ Γ¥» src/modules/accounting/receivables/receipts/calculation/customer-receipt-validation-preview.service.ts:26:1
+     24| } from '../calculation/customer-receipt-calculation.errors.js'
+     25| import { buildCustomerReceiptPostingPreview } from '../calculation/recΓÇª
+     26| import { validateReceiptPaymentMethod } from './receipt-payment-methodΓÇª
+       | ^
+     27| import { checkReceiptAccountReadiness } from './receipt-account-readinΓÇª
+     28| import { resolveReceiptDateReadiness } from './receipt-date-readiness.ΓÇª
+
+Caused by: Error: Failed to load url ./receipt-payment-method.validator.js (resolved id: 
+./receipt-payment-method.validator.js) in D:/Projects/FOS/trailer-erp 
+2/backend/src/modules/accounting/receivables/receipts/calculation/customer-receipt-validation-preview.service.ts. Does 
+the file exist?
+ Γ¥» loadAndTransform 
+../../trailer-erp%202/backend/node_modules/vitest/node_modules/vite/dist/node/chunks/config.js:22739:33
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/1]ΓÄ»
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  19 passed (19)
+   Start at  23:41:23
+   Duration  1.13s (transform 257ms, setup 82ms, collect 261ms, tests 26ms, environment 0ms, prepare 386ms)
+

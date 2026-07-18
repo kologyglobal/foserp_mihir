@@ -13,6 +13,10 @@ import { Input, Select, MobileInput } from '../../forms/Inputs'
 import { Button } from '../../ui/Button'
 import { ErpButton, ErpButtonGroup } from '../../erp/ErpButton'
 import { Calendar, Eye, Route } from 'lucide-react'
+import { validateMobileForCountry } from '../../../utils/validation/mobilePhone'
+import { DEFAULT_CUSTOMER_COUNTRY } from '../../../config/countries'
+import { useMasterStore } from '../../../store/masterStore'
+import { validateEmail, normalizeEmail } from '../../../utils/validation/email'
 
 interface QuickLeadDrawerProps {
   open: boolean
@@ -64,6 +68,19 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
       setError('Provide a mobile number or email.')
       return
     }
+    const country =
+      (customerId ? useMasterStore.getState().getCustomer(customerId)?.country : null)
+      ?? DEFAULT_CUSTOMER_COUNTRY
+    const mobileError = validateMobileForCountry(mobile, country)
+    if (mobileError) {
+      setError(mobileError)
+      return
+    }
+    const emailError = validateEmail(email)
+    if (emailError) {
+      setError(emailError)
+      return
+    }
     const owner = ownerOptions.find((o) => o.value === ownerId) ?? { value: session.id, label: session.name }
     setSubmitting(true)
     setError(null)
@@ -74,7 +91,7 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
             prospectName: name,
             customerId,
             mobile: mobile.trim() || null,
-            email: email.trim() || null,
+            email: email.trim() ? normalizeEmail(email) : null,
             source,
             leadOwnerId: owner.value,
             leadOwnerName: owner.label,

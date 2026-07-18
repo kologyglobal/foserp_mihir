@@ -17,6 +17,13 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5173,
     strictPort: true,
-    open: '/masters',
+    open: '/crm',
+    // Same-origin /api in local API mode — matches production nginx proxy behaviour
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+      },
+    },
   },
 })

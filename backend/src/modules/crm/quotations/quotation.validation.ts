@@ -27,7 +27,8 @@ const sectionSchema = z.object({
   masterCode: z.string().nullable().optional(),
 })
 
-const priceLineSchema = z.object({
+const priceLineSchema = z
+  .object({
   id: z.string().optional(),
   productOrItem: z.string().trim().min(1),
   description: z.string().trim().optional(),
@@ -40,6 +41,11 @@ const priceLineSchema = z.object({
   lineTotal: z.coerce.number().min(0).optional(),
   isOptional: z.boolean().optional(),
 })
+  .superRefine((line, ctx) => {
+    if (line.unitPrice == null || line.unitPrice <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Unit Price is required', path: ['unitPrice'] })
+    }
+  })
 
 export const listQuotationsQuerySchema = paginationSchema.extend({
   customerId: z.string().uuid().optional(),

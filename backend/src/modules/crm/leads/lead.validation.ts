@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { paginationSchema } from '../../../utils/pagination.js'
 import { optionalNullablePhoneSchema } from '../../../utils/phoneValidation.js'
+import { optionalEmailSchema } from '../../../utils/emailValidation.js'
 import { optionalUuid } from '../../../utils/zodHelpers.js'
 import {
   LEAD_ACTIVITY_STATUSES,
@@ -27,7 +28,7 @@ export const createLeadSchema = z.object({
   customerId: z.string().uuid().optional().nullable(),
   contactId: z.string().uuid().optional().nullable(),
   designation: z.string().trim().max(100).optional(),
-  email: z.string().trim().email().max(255).optional().nullable().or(z.literal('')),
+  email: optionalEmailSchema.optional().nullable().or(z.literal('')),
   mobile: optionalNullablePhoneSchema,
   contactPerson: z.string().trim().max(200).optional().nullable(),
   source: z.enum(LEAD_SOURCES).default('other'),

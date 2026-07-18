@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router-dom'
 import { Navigate } from 'react-router-dom'
-import { RouteErrorPage } from '@/components/system/AppErrorBoundary'
+import { RouteErrorBoundary } from '@/components/system/RouteErrorBoundary'
+import { PageNotFoundPage } from '@/components/system/PageNotFoundPage'
 import { CrmOwnersLegacyRedirect } from '@/modules/admin/CrmOwnersLegacyRedirect'
 import {
   CrmDashboardPage,
@@ -19,6 +20,7 @@ import { Contact360Page } from '@/modules/crm/Contact360Page'
 import { CrmContactFormPage } from '@/modules/crm/CrmContactFormPage'
 import { CrmSalesOrderListPage } from '@/modules/crm/CrmSalesOrderListPage'
 import { SalesOrder360Page } from '@/modules/sales/SalesOrder360Page'
+import { SalesOrderPrintPage } from '@/components/sales/SalesOrderPrintPage'
 import { LeadListPage, LeadDetailPage } from '@/modules/sales/SalesPages'
 import { LeadFormPage } from '@/modules/crm/CrmLeadFormPage'
 import { CrmReportsIndexPage, CrmReportPage } from '@/modules/reports/CrmReportsPages'
@@ -53,6 +55,7 @@ export const crmRouteChildren: RouteObject[] = [
   { path: 'follow-ups', element: <CrmFollowUpsPage /> },
   ...quotationRouteChildren,
   { path: 'sales-orders', element: <CrmSalesOrderListPage /> },
+  { path: 'sales-orders/:id/print', element: <SalesOrderPrintPage /> },
   { path: 'sales-orders/:id', element: <SalesOrder360Page /> },
   { path: 'reports', element: <CrmReportsIndexPage /> },
   { path: 'reports/:reportId', element: <CrmReportPage /> },
@@ -79,11 +82,11 @@ export const crmRouteChildren: RouteObject[] = [
   { path: 'masters/:kind/new', element: <CrmMasterFormPage /> },
   { path: 'masters/:kind/:id/edit', element: <CrmMasterFormPage /> },
   { path: 'masters/:kind/:id', element: <CrmMasterDetailPage /> },
-  { path: '*', element: <Navigate to="/crm" replace /> },
+  { path: '*', element: <PageNotFoundPage scope="crm" /> },
 ]
 
 export const crmRouteTree = {
   path: 'crm',
-  errorElement: <RouteErrorPage />,
+  errorElement: <RouteErrorBoundary />,
   children: crmRouteChildren,
 }

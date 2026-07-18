@@ -230,11 +230,40 @@ export function SalesOrderNewPage() {
       .map((doc) => {
         const q = getQuotation(doc.quotationId)
         const cust = q ? customers.find((c) => c.id === q.customerId) : undefined
+        const quotationNo = q?.quotationNo ?? doc.quotationId
+        const companyName = cust?.customerName?.trim() || 'Unknown company'
+        const companyBits = [
+          companyName,
+          cust?.customerCode,
+          [cust?.city, cust?.state].filter(Boolean).join(', ') || null,
+          cust?.gstin ? `GSTIN ${cust.gstin}` : null,
+        ].filter(Boolean)
+        const total =
+          (doc.totalAmount > 0 ? doc.totalAmount : null)
+          ?? (q?.pricing?.grandTotal && q.pricing.grandTotal > 0 ? q.pricing.grandTotal : null)
+          ?? 0
+        const statusLabel = doc.status === 'converted' ? 'Converted' : 'Approved'
+        const owner = doc.salesOwnerName?.trim()
         return {
           value: doc.id,
-          label: q?.quotationNo ?? doc.quotationId,
-          searchText: `${q?.quotationNo ?? ''} ${cust?.customerName ?? ''} ${doc.salesOwnerName ?? ''}`.toLowerCase(),
-          meta: cust?.customerName,
+          label: `${quotationNo} · Rev ${doc.revisionNo}`,
+          subtitle: companyBits.join(' · '),
+          trailing: total > 0 ? formatCurrency(total) : '—',
+          badge: owner ? `${statusLabel} · ${owner}` : statusLabel,
+          searchText: [
+            quotationNo,
+            companyName,
+            cust?.customerCode,
+            cust?.city,
+            cust?.state,
+            cust?.gstin,
+            owner,
+            statusLabel,
+            String(total),
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase(),
         }
       })
       .sort((a, b) => a.label.localeCompare(b.label))
@@ -245,8 +274,13 @@ export function SalesOrderNewPage() {
     [customers],
   )
 
-  const productOptions = useMemo(
-    () => products.map((p) => ({ id: p.id, label: `${p.productCode} · ${p.productName}` })),
+  const productSmartOptions = useMemo(
+    () =>
+      products.map((p) => ({
+        value: p.id,
+        label: `${p.productCode} · ${p.productName}`,
+        searchText: `${p.productCode} ${p.productName}`.toLowerCase(),
+      })),
     [products],
   )
 
@@ -762,113 +796,206 @@ export function SalesOrderNewPage() {
   )
 
   const lineGrid = (
-    <div className="col-span-2 overflow-x-auto erp-line-items-grid">
-      <table className="w-full min-w-[960px] text-[12px] erp-line-items-grid__table">
-        <thead>
-          <tr className="border-b border-erp-border bg-erp-surface-alt/60 text-left text-[11px] uppercase tracking-wide text-erp-muted">
-            <th className="px-2 py-2 erp-line-items-grid__sticky-sr">#</th>
-            <th className="px-2 py-2 erp-line-items-grid__sticky-product">Product</th>
-            <th className="px-2 py-2 text-right">Qty</th>
-            <th className="px-2 py-2 text-right">Unit Price</th>
-            <th className="px-2 py-2 text-right">Disc %</th>
-            <th className="px-2 py-2">GST %</th>
-            <th className="px-2 py-2 text-right">Taxable</th>
-            <th className="px-2 py-2 text-right">GST</th>
-            <th className="px-2 py-2 text-right">Line Total</th>
-            <th className="px-2 py-2" />
-          </tr>
-        </thead>
-        <tbody>
-          {computedLines.map((line, idx) => {
-            const draft = lines[idx]
-            if (!draft) return null
-            const product = draft.productId ? getProduct(draft.productId) : undefined
-            return (
-              <tr key={line.key} className="border-b border-erp-border/60">
-                <td className="px-2 py-2 tabular-nums text-erp-muted erp-line-items-grid__sticky-sr">{idx + 1}</td>
-                <td className="px-2 py-2 erp-line-items-grid__sticky-product">
-                  <QuickCreateSelect
-                    entityType="product"
-                    value={draft.productId}
-                    onChange={(id) => updateLine(line.key, {
-                      productId: id,
-                      unitPrice: getProduct(id)?.standardPrice ?? draft.unitPrice,
-                    })}
-                    options={productOptions}
-                    placeholder="Select product…"
-                  />
-                  {product?.status === 'draft' ? (
-                    <p className="mt-1 flex items-center gap-1 text-[11px] text-amber-700">
-                      <ShieldAlert className="h-3 w-3" /> Not engineering-released
-                    </p>
-                  ) : null}
-                </td>
-                <td className="px-2 py-2">
-                  <Input
-                    type="number"
-                    min={1}
-                    className="text-right"
-                    value={draft.qty}
-                    onChange={(e) => updateLine(line.key, { qty: Math.max(1, Number(e.target.value) || 1) })}
-                  />
-                </td>
-                <td className="px-2 py-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    className="text-right"
-                    value={draft.unitPrice}
-                    onChange={(e) => updateLine(line.key, { unitPrice: Math.max(0, Number(e.target.value) || 0) })}
-                  />
-                </td>
-                <td className="px-2 py-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    className="text-right"
-                    value={draft.discountPct}
-                    onChange={(e) => updateLine(line.key, { discountPct: Math.max(0, Number(e.target.value) || 0) })}
-                  />
-                </td>
-                <td className="px-2 py-2">
-                  <select
-                    className="erp-input h-9 w-full"
-                    value={draft.taxPct}
-                    onChange={(e) => updateLine(line.key, { taxPct: Number(e.target.value) })}
-                  >
-                    {GST_RATE_OPTIONS.map((rate) => (
-                      <option key={rate} value={rate}>{rate}%</option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(line.taxableValue)}</td>
-                <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(line.gstAmount)}</td>
-                <td className="px-2 py-2 text-right font-semibold tabular-nums text-erp-primary">
-                  {formatCurrency(line.lineTotal)}
-                </td>
-                <td className="px-2 py-2">
-                  <button
-                    type="button"
-                    className="rounded p-1 text-erp-muted hover:bg-erp-danger/10 hover:text-erp-danger"
-                    onClick={() => removeLine(line.key)}
-                    aria-label="Remove line"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-      <button
-        type="button"
-        className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-erp-primary hover:underline"
-        onClick={addLine}
-      >
+    <div className="so-pricing-panel">
+      <div className="so-pricing-table-wrap">
+        <table className="so-pricing-table">
+          <colgroup>
+            <col className="so-pricing-col-idx" />
+            <col className="so-pricing-col-product" />
+            <col className="so-pricing-col-qty" />
+            <col className="so-pricing-col-price" />
+            <col className="so-pricing-col-disc" />
+            <col className="so-pricing-col-gst" />
+            <col className="so-pricing-col-money" />
+            <col className="so-pricing-col-money" />
+            <col className="so-pricing-col-money" />
+            <col className="so-pricing-col-action" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th className="so-pricing-th so-pricing-th--center">#</th>
+              <th className="so-pricing-th">Product</th>
+              <th className="so-pricing-th so-pricing-th--right">Qty</th>
+              <th className="so-pricing-th so-pricing-th--right">Unit Price</th>
+              <th className="so-pricing-th so-pricing-th--right">Disc %</th>
+              <th className="so-pricing-th so-pricing-th--right">GST %</th>
+              <th className="so-pricing-th so-pricing-th--right">Taxable</th>
+              <th className="so-pricing-th so-pricing-th--right">GST</th>
+              <th className="so-pricing-th so-pricing-th--right">Line Total</th>
+              <th className="so-pricing-th" aria-label="Actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {computedLines.map((line, idx) => {
+              const draft = lines[idx]
+              if (!draft) return null
+              const product = draft.productId ? getProduct(draft.productId) : undefined
+              return (
+                <tr key={line.key}>
+                  <td className="so-pricing-td so-pricing-td--center tabular-nums text-erp-muted">
+                    {idx + 1}
+                  </td>
+                  <td className="so-pricing-td so-pricing-td--product">
+                    <ErpSmartSelect
+                      options={productSmartOptions}
+                      value={draft.productId}
+                      onChange={(id) => {
+                        if (!id) return
+                        updateLine(line.key, {
+                          productId: id,
+                          unitPrice: getProduct(id)?.standardPrice ?? draft.unitPrice,
+                        })
+                      }}
+                      placeholder="Select product…"
+                      appearance="dropdown"
+                      dropdownMinWidth={360}
+                    />
+                    {product?.status === 'draft' ? (
+                      <p className="mt-1 flex items-center gap-1 text-[11px] text-amber-700">
+                        <ShieldAlert className="h-3 w-3" /> Not engineering-released
+                      </p>
+                    ) : null}
+                  </td>
+                  <td className="so-pricing-td">
+                    <Input
+                      type="number"
+                      min={1}
+                      className="so-pricing-input so-pricing-input--num"
+                      value={draft.qty}
+                      onChange={(e) => updateLine(line.key, { qty: Math.max(1, Number(e.target.value) || 1) })}
+                    />
+                  </td>
+                  <td className="so-pricing-td">
+                    <Input
+                      type="number"
+                      min={0}
+                      className="so-pricing-input so-pricing-input--num"
+                      value={draft.unitPrice}
+                      onChange={(e) => updateLine(line.key, { unitPrice: Math.max(0, Number(e.target.value) || 0) })}
+                    />
+                  </td>
+                  <td className="so-pricing-td">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      className="so-pricing-input so-pricing-input--num"
+                      value={draft.discountPct}
+                      onChange={(e) => updateLine(line.key, { discountPct: Math.max(0, Number(e.target.value) || 0) })}
+                    />
+                  </td>
+                  <td className="so-pricing-td">
+                    <select
+                      className="erp-input so-pricing-input so-pricing-input--select"
+                      value={draft.taxPct}
+                      onChange={(e) => updateLine(line.key, { taxPct: Number(e.target.value) })}
+                    >
+                      {GST_RATE_OPTIONS.map((rate) => (
+                        <option key={rate} value={rate}>{rate}%</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="so-pricing-td so-pricing-td--right tabular-nums">
+                    {formatCurrency(line.taxableValue)}
+                  </td>
+                  <td className="so-pricing-td so-pricing-td--right tabular-nums">
+                    {formatCurrency(line.gstAmount)}
+                  </td>
+                  <td className="so-pricing-td so-pricing-td--right so-pricing-td--total tabular-nums">
+                    {formatCurrency(line.lineTotal)}
+                  </td>
+                  <td className="so-pricing-td so-pricing-td--center">
+                    <button
+                      type="button"
+                      className="so-pricing-remove"
+                      onClick={() => removeLine(line.key)}
+                      aria-label="Remove line"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <button type="button" className="so-pricing-add" onClick={addLine}>
         <Plus className="h-3.5 w-3.5" /> Add product line
       </button>
+
+      <div className="so-pricing-footer">
+        <div className="so-pricing-charges">
+          <label className="so-pricing-charge">
+            <span className="so-pricing-charge__label">Freight (₹)</span>
+            <Input
+              type="number"
+              min={0}
+              className="so-pricing-input so-pricing-input--num"
+              value={freightAmount}
+              onChange={(e) => setFreightAmount(Math.max(0, Number(e.target.value) || 0))}
+            />
+          </label>
+          <label className="so-pricing-charge">
+            <span className="so-pricing-charge__label">Order Discount (₹)</span>
+            <Input
+              type="number"
+              min={0}
+              className="so-pricing-input so-pricing-input--num"
+              value={orderDiscountAmount}
+              onChange={(e) => setOrderDiscountAmount(Math.max(0, Number(e.target.value) || 0))}
+            />
+          </label>
+        </div>
+
+        <div className="quo-editor-price__summary so-direct-order-summary">
+          <div className="quo-editor-price__summary-row">
+            <span>Total Quantity</span>
+            <span className="tabular-nums">{orderSummary.totalQty}</span>
+          </div>
+          <div className="quo-editor-price__summary-row">
+            <span>Basic Amount</span>
+            <span className="tabular-nums">{formatCurrency(orderSummary.basicAmount)}</span>
+          </div>
+          {orderSummary.totalLineDiscount > 0 ? (
+            <div className="quo-editor-price__summary-row">
+              <span>Line Discount</span>
+              <span className="tabular-nums">−{formatCurrency(orderSummary.totalLineDiscount)}</span>
+            </div>
+          ) : null}
+          <div className="quo-editor-price__summary-row">
+            <span>Taxable Amount</span>
+            <span className="tabular-nums">{formatCurrency(orderSummary.subtotal)}</span>
+          </div>
+          {[...orderSummary.gstByRate.entries()]
+            .sort(([a], [b]) => a - b)
+            .map(([rate, amount]) => (
+              <div key={rate} className="quo-editor-price__summary-row">
+                <span>GST @ {rate}%</span>
+                <span className="tabular-nums">{formatCurrency(amount)}</span>
+              </div>
+            ))}
+          <div className="quo-editor-price__summary-row">
+            <span>Total GST</span>
+            <span className="tabular-nums">{formatCurrency(orderSummary.totalGst)}</span>
+          </div>
+          <div className="quo-editor-price__summary-row">
+            <span>Freight</span>
+            <span className="tabular-nums">{formatCurrency(freightAmount)}</span>
+          </div>
+          <div className="quo-editor-price__summary-row">
+            <span>Order Discount</span>
+            <span className="tabular-nums">
+              {orderDiscountAmount > 0 ? `−${formatCurrency(orderDiscountAmount)}` : formatCurrency(0)}
+            </span>
+          </div>
+          <div className="quo-editor-price__summary-row quo-editor-price__summary-row--total">
+            <span>Grand Total</span>
+            <span className="tabular-nums">{formatCurrency(orderSummary.grandTotal)}</span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 
@@ -911,7 +1038,8 @@ export function SalesOrderNewPage() {
               else setQuotationDocumentId('')
             }}
             allowEmpty
-            placeholder="Search quotation no, customer…"
+            placeholder="Search quotation no, customer, city, amount…"
+            dropdownMinWidth={480}
           />
         </ErpFieldRow>
       ) : (
@@ -970,60 +1098,9 @@ export function SalesOrderNewPage() {
       collapsible
       defaultOpen
       className="!max-w-none"
+      columns={1}
     >
       {lineGrid}
-      <ErpFieldRow label="Freight (₹)">
-        <Input type="number" min={0} value={freightAmount} onChange={(e) => setFreightAmount(Math.max(0, Number(e.target.value) || 0))} />
-      </ErpFieldRow>
-      <ErpFieldRow label="Order Discount (₹)">
-        <Input type="number" min={0} value={orderDiscountAmount} onChange={(e) => setOrderDiscountAmount(Math.max(0, Number(e.target.value) || 0))} />
-      </ErpFieldRow>
-      <div className="col-span-2 flex justify-end pt-2">
-        <div className="quo-editor-price__summary so-direct-order-summary">
-          <div className="quo-editor-price__summary-row">
-            <span>Total Quantity</span>
-            <span className="tabular-nums">{orderSummary.totalQty}</span>
-          </div>
-          <div className="quo-editor-price__summary-row">
-            <span>Basic Amount</span>
-            <span className="tabular-nums">{formatCurrency(orderSummary.basicAmount)}</span>
-          </div>
-          {orderSummary.totalLineDiscount > 0 ? (
-            <div className="quo-editor-price__summary-row">
-              <span>Line Discount</span>
-              <span className="tabular-nums">−{formatCurrency(orderSummary.totalLineDiscount)}</span>
-            </div>
-          ) : null}
-          <div className="quo-editor-price__summary-row">
-            <span>Taxable Amount</span>
-            <span className="tabular-nums">{formatCurrency(orderSummary.subtotal)}</span>
-          </div>
-          {[...orderSummary.gstByRate.entries()]
-            .sort(([a], [b]) => a - b)
-            .map(([rate, amount]) => (
-              <div key={rate} className="quo-editor-price__summary-row">
-                <span>GST @ {rate}%</span>
-                <span className="tabular-nums">{formatCurrency(amount)}</span>
-              </div>
-            ))}
-          <div className="quo-editor-price__summary-row">
-            <span>Total GST</span>
-            <span className="tabular-nums">{formatCurrency(orderSummary.totalGst)}</span>
-          </div>
-          <div className="quo-editor-price__summary-row">
-            <span>Freight</span>
-            <span className="tabular-nums">{formatCurrency(freightAmount)}</span>
-          </div>
-          <div className="quo-editor-price__summary-row">
-            <span>Order Discount</span>
-            <span className="tabular-nums">{orderDiscountAmount > 0 ? `−${formatCurrency(orderDiscountAmount)}` : formatCurrency(0)}</span>
-          </div>
-          <div className="quo-editor-price__summary-row quo-editor-price__summary-row--total">
-            <span>Grand Total</span>
-            <span className="tabular-nums">{formatCurrency(orderSummary.grandTotal)}</span>
-          </div>
-        </div>
-      </div>
     </ErpCardSection>
   )
 
@@ -1244,7 +1321,7 @@ export function SalesOrderNewPage() {
         badge={fromCrm ? 'CRM' : 'Sales'}
         className={`${ENTERPRISE_FORM_CLASS} enterprise-workspace--crm-smart-overview crm-so-create-page`}
         collapsibleFactBox
-        factBoxLabel="Details"
+        factBoxLabel="Smart Context"
         suppressFactBoxRecord
         stickyFooter
         recordNo="New"

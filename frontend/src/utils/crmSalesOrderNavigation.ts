@@ -24,6 +24,24 @@ export function salesOrderEditPath(salesOrderId: string): string {
   return `/sales/orders/${salesOrderId}/edit`
 }
 
+export function salesOrderPrintPath(salesOrderId: string): string {
+  return `/sales/orders/${salesOrderId}/print`
+}
+
+export function crmSalesOrderPrintPath(salesOrderId: string): string {
+  return `/crm/sales-orders/${salesOrderId}/print`
+}
+
+/** Resolve SO print URL (print-ready / PDF preview). */
+export function resolveSalesOrderPrintPath(
+  salesOrderId: string,
+  crmModeOrPathname: boolean | string = false,
+): string {
+  const crmMode =
+    typeof crmModeOrPathname === 'string' ? isCrmPath(crmModeOrPathname) : crmModeOrPathname
+  return crmMode ? crmSalesOrderPrintPath(salesOrderId) : salesOrderPrintPath(salesOrderId)
+}
+
 /**
  * Resolve SO detail URL.
  * Pass `true` / CRM pathname for `/crm/sales-orders/:id`, otherwise Sales module path.

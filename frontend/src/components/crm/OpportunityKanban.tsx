@@ -6,6 +6,10 @@ import type { Opportunity, OpportunityStage } from '../../types/crm'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
 import { CLOSED_STAGES, resolveStageTheme } from '../../utils/crmStageTheme'
 import { opportunityStageLabel } from '../../utils/opportunityUtils'
+import {
+  formatMissingStageFieldsMessage,
+  getMissingOpportunityStageFields,
+} from '../../config/crmStageRequirements'
 import { useResolvedOpportunityStages } from '../../hooks/useCrmMasters'
 import { OpportunityCard } from './OpportunityCard'
 import { QuickFollowUpDrawer } from './QuickFollowUpDrawer'
@@ -23,6 +27,7 @@ export function OpportunityKanban({ opportunities: opportunitiesProp, showClosed
   const moveOpportunityStage = useCrmStore((s) => s.moveOpportunityStage)
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<OpportunityStage | null>(null)
+  const [movingId, setMovingId] = useState<string | null>(null)
   const [followUpOpp, setFollowUpOpp] = useState<Opportunity | null>(null)
   const [moveOpp, setMoveOpp] = useState<Opportunity | null>(null)
   const [lostReason, setLostReason] = useState('')
@@ -49,11 +54,28 @@ export function OpportunityKanban({ opportunities: opportunitiesProp, showClosed
     return map
   }, [opportunities, stageOptions])
 
-  const handleDrop = (stage: OpportunityStage) => {
+  /** FE stage gate before any store/API move — card stays in source column on failure. */
+  const assertStageRequirements = (opp: Opportunity, stage: OpportunityStage, lostReasonValue?: string) => {
+    const gateOpp = {
+      ...opp,
+      ...(stage === 'lost' && lostReasonValue !== undefined ? { lostReason: lostReasonValue } : {}),
+    }
+    const missing = getMissingOpportunityStageFields(gateOpp, stage)
+    if (missing.length === 0) return true
+    notify.failed(formatMissingStageFieldsMessage(missing, opportunityStageLabel(stage)))
+    return false
+  }
+
+  const handleDrop = (e: React.DragEvent, stage: OpportunityStage) => {
+    e.preventDefault()
+    e.stopPropagation()
     setDragOverStage(null)
-    if (!dragId) return
+    if (!dragId || movingId) return
     const opp = opportunities.find((o) => o.id === dragId)
-    if (!opp) return
+    if (!opp) {
+      setDragId(null)
+      return
+    }
     if (opp.stage === stage) {
       setDragId(null)
       return
@@ -70,24 +92,38 @@ export function OpportunityKanban({ opportunities: opportunitiesProp, showClosed
       setDragId(null)
       return
     }
+
+    // Validate before move — do not optimistic-update; store only changes on success.
+    if (!assertStageRequirements(opp, stage)) {
+      setDragId(null)
+      return
+    }
+
     const opportunityId = dragId
     setDragId(null)
+    setMovingId(opportunityId)
     void (async () => {
       const r = await resolveStoreAction(moveOpportunityStage({ opportunityId, stage }))
+      setMovingId(null)
       if (r.ok) {
         notify.success(`Moved to ${opportunityStageLabel(stage)}`)
       } else {
+        // Card never left source column; surface BE/FE gate message (e.g. STAGE_REQUIREMENTS_INCOMPLETE).
         notify.failed(r.error ?? 'Could not move opportunity')
       }
     })()
   }
 
   const confirmMove = () => {
-    if (!moveOpp) return
+    if (!moveOpp || movingId) return
     const opportunityId = moveOpp.id
     const stage = targetStage
     const reason = targetStage === 'lost' ? lostReason : undefined
     const manualWonApproval = targetStage === 'won' ? manualWon : undefined
+
+    if (!assertStageRequirements(moveOpp, stage, reason)) return
+
+    setMovingId(opportunityId)
     void (async () => {
       const r = await resolveStoreAction(
         moveOpportunityStage({
@@ -97,6 +133,7 @@ export function OpportunityKanban({ opportunities: opportunitiesProp, showClosed
           manualWonApproval,
         }),
       )
+      setMovingId(null)
       if (r.ok) {
         notify.success(`Moved to ${opportunityStageLabel(stage)}`)
         setMoveOpp(null)
@@ -127,12 +164,13 @@ export function OpportunityKanban({ opportunities: opportunitiesProp, showClosed
               )}
               onDragOver={(e) => {
                 e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
                 setDragOverStage(stage.id)
               }}
               onDragLeave={(e) => {
                 if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverStage(null)
               }}
-              onDrop={() => handleDrop(stage.id)}
+              onDrop={(e) => handleDrop(e, stage.id)}
             >
               <header className={cn('crm-opp-kanban__column-head', theme.header)}>
                 <div className={cn('crm-opp-kanban__column-accent', theme.accent)} />
@@ -160,9 +198,13 @@ export function OpportunityKanban({ opportunities: opportunitiesProp, showClosed
                     <OpportunityCard
                       key={opp.id}
                       opportunity={opp}
-                      draggable
+                      draggable={!movingId}
                       variant="kanban"
                       onDragStart={(_, id) => setDragId(id)}
+                      onDragEnd={() => {
+                        setDragId(null)
+                        setDragOverStage(null)
+                      }}
                       onQuickFollowUp={setFollowUpOpp}
                       onMoveStage={(o) => {
                         setMoveOpp(o)
@@ -223,7 +265,12 @@ export function OpportunityKanban({ opportunities: opportunitiesProp, showClosed
               <button type="button" className="crm-opp-move-modal__btn" onClick={() => setMoveOpp(null)}>
                 Cancel
               </button>
-              <button type="button" className="crm-opp-move-modal__btn crm-opp-move-modal__btn--primary" onClick={confirmMove}>
+              <button
+                type="button"
+                className="crm-opp-move-modal__btn crm-opp-move-modal__btn--primary"
+                disabled={!!movingId}
+                onClick={confirmMove}
+              >
                 Confirm move
               </button>
             </div>

@@ -8,6 +8,13 @@ import { useOpportunityPriorityOptions, useFollowUpTypeOptions } from '../../hoo
 import { useActiveCustomers } from '../../hooks/useMasterLists'
 import { resolveOpportunityPriorityOptions } from '../../utils/opportunityUtils'
 import { getSessionUser } from '../../utils/permissions'
+import {
+  getDateInputMin,
+  getTimeInputMin,
+  suggestDefaultFollowUpSlot,
+  validateFollowUpAt,
+} from '../../utils/validation/crmDatePolicy'
+import { handleInvalidSubmit } from '../../utils/formValidation'
 import { CrmDrawerShell } from './CrmDrawerShell'
 import { FormField } from '../forms/FormField'
 import { Input, Select, Textarea } from '../forms/Inputs'
@@ -80,12 +87,13 @@ export function QuickFollowUpDrawer({ open, onClose, context, onCreated, followU
   const contextLocksRelated = Boolean(
     context?.customerId || context?.leadId || context?.opportunityId,
   )
+  const defaultSlot = suggestDefaultFollowUpSlot()
   const [customerId, setCustomerId] = useState(context?.customerId ?? '')
   const [leadId, setLeadId] = useState(context?.leadId ?? '')
   const [opportunityId, setOpportunityId] = useState(context?.opportunityId ?? '')
   const [followUpType, setFollowUpType] = useState<FollowUpType>('call')
-  const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10))
-  const [dueTime, setDueTime] = useState('10:00')
+  const [dueDate, setDueDate] = useState(defaultSlot.dueDate)
+  const [dueTime, setDueTime] = useState(defaultSlot.dueTime)
   const [priority, setPriority] = useState<OpportunityPriority>(defaultPriority)
   const [notes, setNotes] = useState('')
   const [outcomeMode, setOutcomeMode] = useState(false)
@@ -93,7 +101,11 @@ export function QuickFollowUpDrawer({ open, onClose, context, onCreated, followU
   const [lastFollowUpId, setLastFollowUpId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const sessionUser = getSessionUser()
+
+  const dateMin = getDateInputMin()
+  const timeMin = getTimeInputMin(dueDate)
 
   const openLeads = useMemo(
     () => leads.filter((l) => l.lifecycleStatus !== 'converted' && l.lifecycleStatus !== 'closed').slice(0, 200),
@@ -118,18 +130,20 @@ export function QuickFollowUpDrawer({ open, onClose, context, onCreated, followU
       setOutcomeMode(false)
       setLastFollowUpId(null)
     } else {
+      const slot = suggestDefaultFollowUpSlot()
       setCustomerId(context?.customerId ?? '')
       setLeadId(context?.leadId ?? '')
       setOpportunityId(context?.opportunityId ?? '')
       setFollowUpType('call')
-      setDueDate(new Date().toISOString().slice(0, 10))
-      setDueTime('10:00')
+      setDueDate(slot.dueDate)
+      setDueTime(slot.dueTime)
       setPriority(defaultPriority)
       setNotes('')
       setOutcomeMode(false)
       setLastFollowUpId(null)
     }
     setError(null)
+    setFieldErrors({})
     setSubmitting(false)
   }, [open, followUp, defaultPriority, context?.customerId, context?.leadId, context?.opportunityId])
 
@@ -143,8 +157,22 @@ export function QuickFollowUpDrawer({ open, onClose, context, onCreated, followU
       setError('Select a company, lead, or opportunity for this follow-up.')
       return
     }
+    const dueError = validateFollowUpAt({ dueDate, dueTime })
+    if (dueError) {
+      handleInvalidSubmit({
+        errors: { dueDate: dueError, dueTime: dueError },
+        fieldOrder: ['dueDate', 'dueTime'],
+        fieldLabels: { dueDate: 'Due date', dueTime: 'Time' },
+        notifyMessage: dueError,
+        root: e.currentTarget,
+        onFieldErrors: setFieldErrors,
+      })
+      setError(dueError)
+      return
+    }
     setSubmitting(true)
     setError(null)
+    setFieldErrors({})
     void (async () => {
       try {
         if (isEdit && followUp) {
@@ -255,11 +283,41 @@ export function QuickFollowUpDrawer({ open, onClose, context, onCreated, followU
           </Select>
         </FormField>
         <div className="grid grid-cols-2 gap-3">
-          <FormField label="Due date">
-            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          <FormField label="Due date" error={fieldErrors.dueDate}>
+            <Input
+              type="date"
+              data-field="dueDate"
+              value={dueDate}
+              min={dateMin}
+              error={Boolean(fieldErrors.dueDate)}
+              onChange={(e) => {
+                setDueDate(e.target.value)
+                setFieldErrors((prev) => {
+                  const next = { ...prev }
+                  delete next.dueDate
+                  delete next.dueTime
+                  return next
+                })
+              }}
+            />
           </FormField>
-          <FormField label="Time">
-            <Input type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} />
+          <FormField label="Time" error={fieldErrors.dueTime}>
+            <Input
+              type="time"
+              data-field="dueTime"
+              value={dueTime}
+              min={timeMin}
+              error={Boolean(fieldErrors.dueTime)}
+              onChange={(e) => {
+                setDueTime(e.target.value)
+                setFieldErrors((prev) => {
+                  const next = { ...prev }
+                  delete next.dueDate
+                  delete next.dueTime
+                  return next
+                })
+              }}
+            />
           </FormField>
         </div>
         <FormField label="Priority">

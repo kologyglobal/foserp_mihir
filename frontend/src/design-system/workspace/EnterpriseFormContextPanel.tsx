@@ -12,8 +12,8 @@ export interface EnterpriseQuickAction {
 }
 
 export function EnterpriseFormContextPanel({
-  summaryTitle = 'Lead Summary',
-  actionsTitle = 'Quick Actions',
+  summaryTitle = 'Overview',
+  actionsTitle = 'Suggested actions',
   summary,
   actions = [],
   className,

@@ -81,6 +81,7 @@ export const CRM_MASTERS_CATALOG: CrmMasterCatalogItem[] = [
     usedIn: [...USED_IN_COMPANY, 'sales-orders'],
     importExport: true,
     showNotes: false,
+    formPresentation: 'page',
     fields: [
       { key: 'code', label: 'Territory Code', type: 'text', required: true, section: 'basic' },
       { key: 'name', label: 'Territory Name', type: 'text', required: true, section: 'basic' },
@@ -99,6 +100,7 @@ export const CRM_MASTERS_CATALOG: CrmMasterCatalogItem[] = [
     group: 'pipeline',
     usedIn: ['leads', 'reports'],
     importExport: true,
+    formPresentation: 'page',
     fields: [
       { key: 'code', label: 'Stage Code', type: 'text', required: true },
       { key: 'name', label: 'Stage Name', type: 'text', required: true },
@@ -151,6 +153,7 @@ export const CRM_MASTERS_CATALOG: CrmMasterCatalogItem[] = [
     usedIn: USED_IN_PIPELINE,
     importExport: true,
     showNotes: false,
+    formPresentation: 'page',
     fields: [
       { key: 'code', label: 'Stage Code', type: 'text', required: true, section: 'basic' },
       { key: 'name', label: 'Stage Name', type: 'text', required: true, section: 'basic' },
@@ -198,6 +201,7 @@ export const CRM_MASTERS_CATALOG: CrmMasterCatalogItem[] = [
     group: 'communication',
     usedIn: ['leads', 'opportunities', 'quotations', 'customer360'],
     importExport: true,
+    formPresentation: 'page',
     fields: [
       { key: 'code', label: 'Type Code', type: 'text', required: true, section: 'basic' },
       { key: 'name', label: 'Type Name', type: 'text', required: true, section: 'basic' },
@@ -237,6 +241,7 @@ export const CRM_MASTERS_CATALOG: CrmMasterCatalogItem[] = [
     usedIn: USED_IN_QUOTATION,
     importExport: true,
     descriptionFormat: 'richtext',
+    formPresentation: 'page',
     fields: [
       { key: 'code', label: 'Term Code', type: 'text', required: true, section: 'basic' },
       { key: 'name', label: 'Term Name', type: 'text', required: true, section: 'basic' },
@@ -323,6 +328,7 @@ export const CRM_MASTERS_CATALOG: CrmMasterCatalogItem[] = [
     showDescription: false,
     basicSectionLabel: 'General',
     configurationSectionLabel: 'Routing Rules',
+    formPresentation: 'page',
     fields: [
       { key: 'code', label: 'Rule Code', type: 'text', required: true, section: 'basic' },
       { key: 'name', label: 'Rule Name', type: 'text', required: true, section: 'basic' },
@@ -345,6 +351,7 @@ export const CRM_MASTERS_CATALOG: CrmMasterCatalogItem[] = [
     showNotes: false,
     showDescription: false,
     basicSectionLabel: 'General',
+    formPresentation: 'page',
     fields: [
       { key: 'code', label: 'Type Code', type: 'text', required: true, section: 'basic' },
       { key: 'name', label: 'Document Type', type: 'text', required: true, section: 'basic' },

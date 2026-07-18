@@ -4,6 +4,12 @@ import { FormattedCurrencyInput } from '../forms/FormattedCurrencyInput'
 import { calcPriceSummary, syncLineTotals } from '../../utils/crmQuotationCalc'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
 import { amountInWordsINR } from '../../utils/quotationEngine/amountInWords'
+import {
+  opportunityLineUnitPriceDomId,
+  opportunityLineUnitPriceFieldKey,
+  UNIT_PRICE_REQUIRED_MESSAGE,
+} from '../../utils/opportunityLineCalc'
+import { cn } from '../../utils/cn'
 
 interface QuotationPriceTableProps {
   lines: QuotationPriceLine[]
@@ -11,6 +17,7 @@ interface QuotationPriceTableProps {
   installationAmount: number
   customCharges: number
   editable?: boolean
+  rowErrors?: Record<string, string[]>
   onChange?: (lines: QuotationPriceLine[], extras: { freightAmount: number; installationAmount: number; customCharges: number }) => void
 }
 
@@ -20,6 +27,7 @@ export function QuotationPriceTable({
   installationAmount,
   customCharges,
   editable,
+  rowErrors = {},
   onChange,
 }: QuotationPriceTableProps) {
   const synced = syncLineTotals(lines)
@@ -84,8 +92,10 @@ export function QuotationPriceTable({
           <tbody>
             {synced.map((line, idx) => {
               const { discAmt, taxable, gstAmt } = lineDetail(line)
+              const errs = rowErrors[line.id] ?? []
+              const unitPriceError = errs.find((e) => /unit price/i.test(e))
               return (
-              <tr key={line.id}>
+              <tr key={line.id} className={cn(errs.length > 0 && 'erp-line-items-grid__row--error')}>
                 <td className="tabular-nums text-erp-muted erp-line-items-grid__sticky-sr">{idx + 1}</td>
                 <td className="erp-line-items-grid__sticky-product">
                   {editable ? (
@@ -105,12 +115,29 @@ export function QuotationPriceTable({
                 <td>{line.uom}</td>
                 <td className="text-right tabular-nums">
                   {editable ? (
-                    <FormattedCurrencyInput
-                      className="quo-editor-price__input quo-editor-price__input--num"
-                      value={line.unitPrice}
-                      onValueChange={(unitPrice) => updateLine(line.id, { unitPrice: Math.max(0, unitPrice) })}
-                      aria-label="Unit price"
-                    />
+                    <div className="erp-line-items-grid__price-field">
+                      <FormattedCurrencyInput
+                        id={opportunityLineUnitPriceDomId(line.id)}
+                        data-field={opportunityLineUnitPriceFieldKey(line.id)}
+                        className={cn(
+                          'quo-editor-price__input quo-editor-price__input--num',
+                          unitPriceError && 'erp-line-items-grid__input--error',
+                        )}
+                        value={line.unitPrice}
+                        onValueChange={(unitPrice) => updateLine(line.id, { unitPrice: Math.max(0, unitPrice) })}
+                        aria-label="Unit price"
+                        aria-invalid={Boolean(unitPriceError)}
+                        aria-describedby={unitPriceError ? `${opportunityLineUnitPriceDomId(line.id)}-error` : undefined}
+                      />
+                      {unitPriceError ? (
+                        <p
+                          id={`${opportunityLineUnitPriceDomId(line.id)}-error`}
+                          className="erp-line-items-grid__row-error"
+                        >
+                          {UNIT_PRICE_REQUIRED_MESSAGE}
+                        </p>
+                      ) : null}
+                    </div>
                   ) : formatCrmCurrency(line.unitPrice)}
                 </td>
                 <td className="text-right">

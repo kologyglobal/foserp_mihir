@@ -48,6 +48,7 @@ export async function apiCreateQuotationTemplate(input: {
   defaultWarranty?: string
   defaultExclusions?: string
   sourceTemplateId?: string
+  printLayout?: QuotationTemplate['printLayout']
 }): Promise<StoreActionResult & { templateId?: string }> {
   return withSubmitLock(lockKey('quotation-template:create'), async () => {
     try {
@@ -63,7 +64,7 @@ export async function apiCreateQuotationTemplate(input: {
             defaultTerms: input.defaultTerms ?? source?.defaultTerms ?? '',
             defaultWarranty: input.defaultWarranty ?? source?.defaultWarranty ?? '',
             defaultExclusions: input.defaultExclusions ?? source?.defaultExclusions ?? '',
-            printLayout: source?.printLayout,
+            printLayout: input.printLayout ?? source?.printLayout,
             isActive: true,
             version: 1,
           },

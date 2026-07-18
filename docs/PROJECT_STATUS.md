@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified against codebase: **2026-07-17** (Accounting Phase 2C2B journal posting + Phase 2C2A approvals + Phase 2C1 journals + Phase 2B posting engine; finance tests 60/60 pass).
+Last verified against codebase: **2026-07-17** (Accounting Phase 3B2 receipt calculation/validation; finance suite 194/194 backend + `test:money-in` 20/20 frontend).
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
@@ -23,12 +23,12 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Category | Modules |
 |----------|---------|
-| **Completed (API mode)** | … **finance ledger foundation Phase 2A**; **manual journals Phase 2C1**; **journal approval Phase 2C2A**; **journal posting Phase 2C2B** (post approved journals to GL — same voucher id) |
+| **Completed (API mode)** | … **AR reporting Phase 3A5**; **Money In AR frontend Phase 3A6**; **AR receipt DB foundation Phase 3B1**; **AR receipt calculation/validation Phase 3B2** (no receipt APIs yet) |
 | **Partially completed** | Auth UI; mobile CRM (API hydrate, no offline); sales-order fulfilment beyond confirm/close; **user/role/tenant admin UI (frontend wired 2026-07-15, not test-verified)** |
 | **Not started** | Login activity module |
 | **Scaffolding (not shipped)** | — (Accounting operational screens: CoA demo, Vouchers, AR/AP, Bank, FA, Manufacturing Accounting, Tax, Reports, Budgeting, Commercial Commitments, Period Close — UI/mock only; **Finance Settings** at `/accounting/settings` is Phase 1 dual-mode, not a stub) |
 | **Blocked** | — (none currently) |
-| **Deferred by design** | Purchase / inventory / production / quality / maintenance backends; finance **GL posting / vouchers / AR-AP engines**; SO MRP / dispatch / invoice posting |
+| **Deferred by design** | Purchase / inventory / production / quality / maintenance backends; finance **Phase 3B3+ receipt draft/post APIs + credit notes**; SO MRP / dispatch |
 
 ---
 
@@ -404,7 +404,7 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | Backend | ⚠️ | Phase 1 setup + 2A ledger + 2B posting engine + **2C1 journals** + **2C2A approval** + **2C2B posting** (`postExistingApprovedVoucher`) |
 | DB | ⚠️ | Setup + ledger + approval tables + manual journals on `AccountingVoucher`; GL via existing-voucher post path |
 | API | ⚠️ | Setup + `/accounting/journals` (+ `post`, `ledger`) + `/accounting/approvals` + approve/send-back/reject; read-only voucher/GL/posting-event GET |
-| Tests | ⚠️ | finance-setup 8 + ledger 11 + posting-engine 13 + journals 11 + approvals 9 + **journal-posting 8** = **60/60** pass |
+| Tests | ⚠️ | finance-setup 8 + ledger 11 + posting-engine 13 + journals 11 + approvals 9 + journal-posting 8 + **ar-foundation 18** = **78/78** pass |
 | Demo mode | ✅ | Settings + journals + approvals + demo journal posting |
 | API mode | ⚠️ | Journals workflow + multi-level approval + post approved journal to GL (same voucher id) |
 | Remaining gap | Phase **2C3**: journal reversal; receipt/payment hooks |

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
   Building2,
@@ -218,6 +218,7 @@ const QUICK_CARDS = [
 ] as const
 
 export function MastersHomePage() {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<MasterIndexCategoryFilter>(MASTER_INDEX_CATEGORY_ALL)
   const [viewMode, setViewMode] = useState<MastersIndexViewMode>('index')
@@ -440,9 +441,9 @@ export function MastersHomePage() {
         <ErpCommandBar
           inline
           sticky={false}
-          primaryAction={{ id: 'quick-create', label: 'New Item', icon: Plus, onClick: () => { window.location.href = '/masters/items/new' } }}
+          primaryAction={{ id: 'quick-create', label: 'New Item', icon: Plus, onClick: () => navigate('/masters/items/new') }}
           secondaryActions={[
-            { id: 'code-series', label: 'Code Series', icon: Hash, onClick: () => { window.location.href = '/masters/code-series' } },
+            { id: 'code-series', label: 'Code Series', icon: Hash, onClick: () => navigate('/masters/code-series') },
             { id: 'import', label: 'Import', icon: Upload, onClick: () => notify.info('Open a master register and use Import on its list page.') },
             { id: 'export', label: 'Export', icon: Download, onClick: () => notify.info('Open a master register and use Export on its list page.') },
           ]}

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Plus, Trash2, Copy, ChevronLeft, ChevronRight,
   Columns3, Printer, Upload, Download, FileSpreadsheet,
@@ -7,6 +7,8 @@ import {
 import type { ColumnDef, RowSelectionState } from '@tanstack/react-table'
 import { OperationalPageShell } from '../../../components/design-system/OperationalPageShell'
 import { EnterpriseRegisterTableShell } from '../../../design-system/list-page/EnterpriseRegisterTableShell'
+import { BulkActionToolbar } from '../../../design-system/list-page/BulkActionToolbar'
+import { buildEnterpriseBulkActions } from '../../../design-system/list-page/buildEnterpriseBulkActions'
 import { CrmFilterDrawer } from '../../../components/crm/CrmFilterDrawer'
 import { CrmListFilterBar, CrmListSortSelect } from '../../../components/crm/CrmListFilterBar'
 import { ErpDataGrid } from '../../../components/erp/ErpDataGrid'
@@ -20,9 +22,9 @@ import {
 import { ErpFormShell } from '../../../components/erp/ErpFormShell'
 import { ErpButton, ErpButtonGroup } from '../../../components/erp/ErpButton'
 import { useCrmFilterDrawer } from '../../../hooks/useCrmFilterDrawer'
-import { ColorPickerField, ColorSwatch, normalizeHexColor } from '../../../components/forms/ColorPickerField'
+import { ColorSwatch, normalizeHexColor } from '../../../components/forms/ColorPickerField'
 import { ErpRichTextEditor, ErpRichTextRead } from '../../../components/forms/ErpRichTextEditor'
-import { formatMasterMultiSelectValue, MasterMultiSelectField } from '../../../components/forms/MasterMultiSelectField'
+import { formatMasterMultiSelectValue } from '../../../components/forms/MasterMultiSelectField'
 import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { TableLink } from '../../../components/ui/AppLink'
 import { DetailLayout, DetailSection, DetailGrid, DetailField } from '../../../components/masters/MasterLayouts'
@@ -48,18 +50,22 @@ import {
   crmMasterShowsDescription,
   crmMasterBasicSectionLabel,
   crmMasterConfigurationSectionLabel,
+  crmMasterPrefersDrawerForm,
+  crmMasterHasEffectiveDate,
 } from '../../../utils/crmMasterUtils'
 import { crmBreadcrumbs } from '../../../utils/crmNavigation'
 import { notify, notifyMasterSaved } from '../../../store/toastStore'
 import { CrmMasterContextPanel } from '@/components/crm/masters/CrmMasterContextPanel'
+import { CrmMasterEditorDrawer } from '@/components/crm/masters/CrmMasterEditorDrawer'
+import { MasterFormField, renderCatalogField } from '@/components/crm/masters/CrmMasterFormFields'
 import { CrmMasterImportDialog } from '../../../components/crm/CrmMasterImportDialog'
 import { cn } from '../../../utils/cn'
-import { downloadCrmMasterImportTemplate } from '../../../utils/crmMasterImport'
 import { EnterpriseIdCell, EnterpriseNumericCell, EnterpriseRowActionsMenu, entNumericMeta } from '../../../design-system/enterprise'
 import { buildCrmMasterRowActions } from './crmMasterRowActions'
 import { buildMasterAuditListColumns } from '../../../components/masters/MasterAuditListColumns'
 import { useMasterCodeSeries } from '../../../hooks/useMasterCodeSeries'
 import { crmKindToEntityType, MASTER_CODE_HELPER_TEXT } from '../../../config/masterCodeSeriesConfig'
+import { MQ_BELOW_LG, useMediaQuery } from '../../../hooks/useMediaQuery'
 import {
   resolveCrmMasterWrite,
   resolveCrmMasterDelete,
@@ -105,7 +111,10 @@ function masterFormBreadcrumbs(scope: MasterRegisterScope, catalogTitle: string,
 
 export function CrmLinkedMasterPage() {
   const { pathname } = useLocation()
-  const linkedSlug = ['companies', 'contacts', 'quotation-templates'].find((s) => pathname.includes(`/masters/${s}`))
+  const { id } = useParams<{ id?: string }>()
+  const linkedSlug = ['companies', 'contacts', 'quotation-templates'].find((s) =>
+    pathname.includes(`/masters/${s}`),
+  )
   const linked = linkedSlug ? getCrmLinkedMaster(linkedSlug) : undefined
   if (!linked) {
     return (
@@ -116,9 +125,32 @@ export function CrmLinkedMasterPage() {
     )
   }
 
-  // Linked masters have a real register — open it directly (list or create), skip the gateway page
+  // Preserve deep links on refresh/bookmarks — do not strip :id to the list.
   const wantsNew = /\/new\/?$/.test(pathname)
-  return <Navigate to={wantsNew ? linked.newRoute : linked.listRoute} replace />
+  const wantsEdit = /\/edit\/?$/.test(pathname)
+  if (wantsNew) return <Navigate to={linked.newRoute} replace />
+  if (id) {
+    if (linked.slug === 'quotation-templates') {
+      return <Navigate to={`/crm/quotation-templates/${id}`} replace />
+    }
+    if (linked.slug === 'companies') {
+      return (
+        <Navigate
+          to={wantsEdit ? `/masters/companies/${id}/edit` : `/masters/companies/${id}`}
+          replace
+        />
+      )
+    }
+    if (linked.slug === 'contacts') {
+      return (
+        <Navigate
+          to={wantsEdit ? `/crm/contacts/${id}/edit` : `/crm/contacts/${id}`}
+          replace
+        />
+      )
+    }
+  }
+  return <Navigate to={linked.listRoute} replace />
 }
 
 export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
@@ -130,8 +162,11 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
   const basePath = scope?.basePath ?? ''
   const entries = useCrmMasterStore((s) => (kind ? s.getByKind(kind, false) : []))
   const deactivateEntry = useCrmMasterStore((s) => s.deactivateEntry)
+  const activateEntry = useCrmMasterStore((s) => s.activateEntry)
   const duplicateEntry = useCrmMasterStore((s) => s.duplicateEntry)
   const deleteEntry = useCrmMasterStore((s) => s.deleteEntry)
+  const narrow = useMediaQuery(MQ_BELOW_LG, true)
+  const prefersDrawer = catalog ? crmMasterPrefersDrawerForm(catalog) : false
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -142,11 +177,38 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
   const [showCols, setShowCols] = useState({ code: true, name: true, status: true, usage: true, sortOrder: true, updated: true })
   const [savedView, setSavedView] = useState('All Records')
   const [importOpen, setImportOpen] = useState(false)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [editorEntry, setEditorEntry] = useState<CrmMasterEntry | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   function pushToast(msg: string, variant: 'success' | 'error' = 'success') {
     if (variant === 'success') notify.success(msg)
     else notify.error(msg)
   }
+
+  useEffect(() => {
+    if (!prefersDrawer || !kind) return
+    const editId = searchParams.get('edit')
+    const wantsNew = searchParams.get('new') === '1'
+    if (editId) {
+      const found = entries.find((e) => e.id === editId) ?? null
+      setEditorEntry(found)
+      setEditorOpen(Boolean(found))
+      return
+    }
+    if (wantsNew) {
+      setEditorEntry(null)
+      setEditorOpen(true)
+    }
+  }, [prefersDrawer, kind, searchParams, entries])
+
+  const clearEditorQuery = useCallback(() => {
+    if (!searchParams.has('edit') && !searchParams.has('new')) return
+    const next = new URLSearchParams(searchParams)
+    next.delete('edit')
+    next.delete('new')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const filtered = useMemo(() => {
     let list = entries.filter((e) => {
@@ -177,8 +239,17 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
   const clearMasterFilters = useCallback(() => {
     filterDrawer.clearAll()
     setSortKey('sortOrder')
+    setSavedView('All Records')
     setPage(1)
   }, [filterDrawer])
+
+  const applySavedView = useCallback((view: string) => {
+    setSavedView(view)
+    setPage(1)
+    if (view === 'Active Only') setStatusFilter('active')
+    else if (view === 'Inactive Only') setStatusFilter('inactive')
+    else setStatusFilter('')
+  }, [])
 
   const hasActiveMasterFilters = useMemo(
     () => Boolean(search.trim() || statusFilter),
@@ -193,6 +264,18 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
   }, [filtered, pageSafe, pageSize])
 
   const selectedIds = useMemo(() => Object.keys(rowSelection).filter((k) => rowSelection[k]), [rowSelection])
+  const selectedRows = useMemo(
+    () => filtered.filter((e) => selectedIds.includes(e.id)),
+    [filtered, selectedIds],
+  )
+
+  const mutateActivate = useCallback(
+    (entryId: string) => {
+      if (!kind) return { ok: false as const, error: 'Missing master kind' }
+      return resolveCrmMasterActivate(kind, entryId, () => activateEntry(entryId))
+    },
+    [kind, activateEntry],
+  )
 
   const mutateDeactivate = useCallback(
     (entryId: string) => {
@@ -210,17 +293,57 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
     [kind, deleteEntry],
   )
 
-  const handleBulkDeactivate = useCallback(() => {
-    void (async () => {
+  const runBulk = useCallback(
+    async (
+      ids: string[],
+      mutate: (id: string) => StoreActionResult | Promise<StoreActionResult>,
+      successLabel: string,
+    ) => {
       let n = 0
-      for (const id of selectedIds) {
-        const r = await resolveStoreAction(mutateDeactivate(id))
+      for (const id of ids) {
+        const r = await resolveStoreAction(mutate(id))
         if (r.ok) n += 1
       }
-      pushToast(`Deactivated ${n} record(s)`)
+      pushToast(`${successLabel} ${n} record(s)`)
       setRowSelection({})
-    })()
-  }, [selectedIds, mutateDeactivate])
+    },
+    [],
+  )
+
+  const downloadCsv = useCallback((rows: CrmMasterEntry[], suffix = 'masters') => {
+    if (!slug) return
+    const csv = exportMastersCsv(rows)
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${slug}-${suffix}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [slug])
+
+  const openCreate = useCallback(() => {
+    if (prefersDrawer) {
+      setEditorEntry(null)
+      setEditorOpen(true)
+      setSearchParams({ new: '1' }, { replace: true })
+      return
+    }
+    navigate(`${basePath}/new`)
+  }, [prefersDrawer, navigate, basePath, setSearchParams])
+
+  const openEdit = useCallback(
+    (entry: CrmMasterEntry) => {
+      if (prefersDrawer) {
+        setEditorEntry(entry)
+        setEditorOpen(true)
+        setSearchParams({ edit: entry.id }, { replace: true })
+        return
+      }
+      navigate(`${basePath}/${entry.id}/edit`)
+    },
+    [prefersDrawer, navigate, basePath, setSearchParams],
+  )
 
   if (!catalog || !kind || !scope) {
     const linked = slug ? getCrmLinkedMaster(slug) : undefined
@@ -232,22 +355,13 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
     )
   }
 
+  /** Import opens the dialog only — template download stays inside the dialog (Phase 12C). */
   function openMasterImport() {
-    if (!slug) return
-    downloadCrmMasterImportTemplate(slug)
     setImportOpen(true)
-    pushToast('Import template downloaded — fill it and upload in the dialog')
   }
 
   function handleExportCsv() {
-    const csv = exportMastersCsv(filtered)
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${slug}-masters.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadCsv(filtered, 'masters')
   }
 
   function handleExportExcel() {
@@ -309,12 +423,15 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
         return (
           <div onClick={(ev) => ev.stopPropagation()}>
             <EnterpriseRowActionsMenu
+              className="crm-master-row-actions"
               actions={buildCrmMasterRowActions(e, {
                 basePath,
                 navigate,
                 duplicateEntry,
+                activateEntry: mutateActivate,
                 deactivateEntry: mutateDeactivate,
                 deleteEntry: mutateDelete,
+                onEdit: prefersDrawer ? openEdit : undefined,
                 onFeedback: (msg, variant = 'success') => pushToast(msg, variant),
               })}
             />
@@ -323,7 +440,11 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
       },
     })
     return cols
-  }, [navigate, basePath, duplicateEntry, mutateDeactivate, mutateDelete])
+  }, [navigate, basePath, duplicateEntry, mutateActivate, mutateDeactivate, mutateDelete, prefersDrawer, openEdit, showCols])
+
+  const importSecondary = catalog.importExport !== false
+    ? [{ id: 'import', label: 'Import', icon: Upload, onClick: openMasterImport }]
+    : []
 
   return (
     <OperationalPageShell
@@ -334,19 +455,21 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
       breadcrumbs={masterBreadcrumbs(scope, catalog.title)}
       autoBreadcrumbs={false}
       favoritePath={basePath}
+      className="crm-master-list-page"
       commandBar={(
         <ErpCommandBar
           inline
           sticky={false}
+          collapseSecondaryOnNarrow
           primaryAction={{
             id: 'new-master',
             label: 'New',
             icon: Plus,
-            onClick: () => navigate(`${basePath}/new`),
+            onClick: openCreate,
           }}
           secondaryActions={[
-            { id: 'import', label: 'Import', icon: Upload, onClick: openMasterImport },
-            { id: 'export-csv', label: 'Export CSV', icon: Download, onClick: handleExportCsv },
+            ...importSecondary,
+            { id: 'export-csv', label: 'Export', icon: Download, onClick: handleExportCsv },
             { id: 'export-excel', label: 'Export Excel', icon: FileSpreadsheet, onClick: handleExportExcel },
             { id: 'print', label: 'Print', icon: Printer, onClick: () => printMasterTable(catalog.title, filtered) },
             { id: 'hub', label: scope.hubLabel, onClick: () => navigate(scope.hubPath) },
@@ -372,16 +495,23 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
         }}
       />
 
-      {selectedIds.length > 0 ? (
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-erp-primary/20 bg-erp-primary-soft px-3 py-2">
-          <span className="text-[12px] font-semibold text-erp-primary">{selectedIds.length} selected</span>
-          <ErpButton size="sm" variant="secondary" onClick={handleBulkDeactivate}>Deactivate</ErpButton>
-          <ErpButton size="sm" variant="ghost" onClick={() => setRowSelection({})}>Clear</ErpButton>
-        </div>
+      {prefersDrawer ? (
+        <CrmMasterEditorDrawer
+          open={editorOpen}
+          onClose={() => {
+            setEditorOpen(false)
+            setEditorEntry(null)
+            clearEditorQuery()
+          }}
+          catalog={catalog}
+          kind={kind}
+          entry={editorEntry}
+          onSaved={clearEditorQuery}
+        />
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[1fr_280px]">
-        <EnterpriseRegisterTableShell className="min-w-0">
+        <EnterpriseRegisterTableShell className="min-w-0 crm-master-register-shell">
           <ErpDataGrid
             data={paged}
             columns={columns}
@@ -400,8 +530,33 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
                 <button type="button" className="text-[13px] font-semibold text-erp-primary" onClick={clearMasterFilters}>
                   Clear Filters
                 </button>
-              ) : undefined
+              ) : (
+                <button type="button" className="erp-btn erp-btn--primary text-[13px]" onClick={openCreate}>
+                  New {catalog.title.replace(/ Master$/i, '')}
+                </button>
+              )
             }
+            bulkActions={(
+              <BulkActionToolbar
+                count={selectedRows.length}
+                entityLabel="selected"
+                onClear={() => setRowSelection({})}
+                actions={buildEnterpriseBulkActions(selectedRows, {
+                  onExport: (rows) => downloadCsv(rows, 'selected'),
+                  onDelete: (rows) => {
+                    void runBulk(rows.map((r) => r.id), mutateDelete, 'Deleted')
+                  },
+                  onInactive: (rows) => {
+                    void runBulk(rows.map((r) => r.id), mutateDeactivate, 'Deactivated')
+                  },
+                  onActive: (rows) => {
+                    void runBulk(rows.map((r) => r.id), mutateActivate, 'Activated')
+                  },
+                  canDelete: true,
+                  canSetStatus: true,
+                }).filter((a) => ['export', 'delete', 'inactive', 'active'].includes(a.id))}
+              />
+            )}
             registerBar={(
               <CrmListFilterBar
                 search={search}
@@ -413,7 +568,7 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
                 onRemoveChip={filterDrawer.removeChip}
                 onClearAll={clearMasterFilters}
                 savedView={savedView}
-                onSavedViewChange={setSavedView}
+                onSavedViewChange={applySavedView}
                 savedViews={['All Records', 'Active Only', 'Inactive Only']}
                 sort={(
                   <CrmListSortSelect
@@ -429,15 +584,17 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
                     ]}
                   />
                 )}
-                afterFilters={(
-                  <div className="flex items-center gap-1 text-[12px] text-erp-muted">
-                    <Columns3 className="h-4 w-4" />
-                    <label className="flex items-center gap-1"><input type="checkbox" checked={showCols.code} onChange={(e) => setShowCols((s) => ({ ...s, code: e.target.checked }))} /> Code</label>
-                    <label className="flex items-center gap-1"><input type="checkbox" checked={showCols.name} onChange={(e) => setShowCols((s) => ({ ...s, name: e.target.checked }))} /> Name</label>
-                    <label className="flex items-center gap-1"><input type="checkbox" checked={showCols.usage} onChange={(e) => setShowCols((s) => ({ ...s, usage: e.target.checked }))} /> In Use</label>
-                    <label className="flex items-center gap-1"><input type="checkbox" checked={showCols.updated} onChange={(e) => setShowCols((s) => ({ ...s, updated: e.target.checked }))} /> Updated</label>
-                  </div>
-                )}
+                afterFilters={
+                  narrow ? undefined : (
+                    <div className="flex items-center gap-1 text-[12px] text-erp-muted">
+                      <Columns3 className="h-4 w-4" />
+                      <label className="flex items-center gap-1"><input type="checkbox" checked={showCols.code} onChange={(e) => setShowCols((s) => ({ ...s, code: e.target.checked }))} /> Code</label>
+                      <label className="flex items-center gap-1"><input type="checkbox" checked={showCols.name} onChange={(e) => setShowCols((s) => ({ ...s, name: e.target.checked }))} /> Name</label>
+                      <label className="flex items-center gap-1"><input type="checkbox" checked={showCols.usage} onChange={(e) => setShowCols((s) => ({ ...s, usage: e.target.checked }))} /> In Use</label>
+                      <label className="flex items-center gap-1"><input type="checkbox" checked={showCols.updated} onChange={(e) => setShowCols((s) => ({ ...s, updated: e.target.checked }))} /> Updated</label>
+                    </div>
+                  )
+                }
                 className="crm-list-filter-bar--embedded"
               />
             )}
@@ -457,7 +614,9 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
             </div>
           </div>
         </EnterpriseRegisterTableShell>
-        <CrmMasterContextPanel catalog={catalog} />
+        <div className="hidden xl:block">
+          <CrmMasterContextPanel catalog={catalog} />
+        </div>
       </div>
       <CrmFilterDrawer
         open={filterDrawer.open}
@@ -490,100 +649,6 @@ function masterFieldDetailValue(field: CrmMasterFieldDef, raw: string | number |
   return text
 }
 
-function masterFieldIsWide(field: CrmMasterFieldDef) {
-  return field.type === 'textarea' || field.type === 'color' || field.type === 'multiselect' || field.type === 'richtext'
-}
-
-function renderCatalogField(
-  field: CrmMasterFieldDef,
-  value: string,
-  onChange: (v: string) => void,
-) {
-  if (field.type === 'boolean') {
-    return (
-      <div key={field.key} className="flex items-end md:col-span-2">
-        <MasterFieldInput field={field} value={value} onChange={onChange} compact />
-      </div>
-    )
-  }
-  return (
-    <MasterFormField key={field.key} label={field.label} required={field.required} wide={masterFieldIsWide(field)}>
-      <MasterFieldInput field={field} value={value} onChange={onChange} compact />
-    </MasterFormField>
-  )
-}
-function MasterFormField({
-  label,
-  required,
-  wide,
-  children,
-}: {
-  label: string
-  required?: boolean
-  wide?: boolean
-  children: ReactNode
-}) {
-  return (
-    <label className={cn('block text-sm', wide && 'md:col-span-2')}>
-      <span className="font-medium text-erp-text">
-        {label}
-        {required ? <span className="text-erp-danger"> *</span> : null}
-      </span>
-      <div className="mt-1">{children}</div>
-    </label>
-  )
-}
-
-function MasterFieldInput({
-  field,
-  value,
-  onChange,
-  compact = false,
-}: {
-  field: CrmMasterFieldDef
-  value: string
-  onChange: (v: string) => void
-  compact?: boolean
-}) {
-  if (field.type === 'boolean') {
-    return (
-      <label className="flex items-center gap-2 text-[13px]">
-        <input type="checkbox" checked={value === 'true'} onChange={(e) => onChange(e.target.checked ? 'true' : 'false')} />
-        {field.label}
-      </label>
-    )
-  }
-  if (field.type === 'textarea') {
-    return <Textarea rows={compact ? 2 : 3} value={value} onChange={(e) => onChange(e.target.value)} />
-  }
-  if (field.type === 'select' && field.options) {
-    return (
-      <Select value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">— Select —</option>
-        {field.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </Select>
-    )
-  }
-  if (field.type === 'color') {
-    return <ColorPickerField value={value} onChange={onChange} />
-  }
-  if (field.type === 'multiselect' && field.options) {
-    return <MasterMultiSelectField value={value} onChange={onChange} options={field.options} />
-  }
-  if (field.type === 'richtext') {
-    return <ErpRichTextEditor value={value} onChange={onChange} minHeight={compact ? 120 : 220} />
-  }
-  return (
-    <Input
-      type={field.type === 'number' ? 'number' : 'text'}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={field.placeholder}
-    />
-  )
-}
-
-
 export function CrmMasterFormPage({ fixedSlug }: { fixedSlug?: string } = {}) {
   const { id } = useParams()
   const scope = useMasterRegisterScope(fixedSlug)
@@ -601,11 +666,13 @@ export function CrmMasterFormPage({ fixedSlug }: { fixedSlug?: string } = {}) {
     isEdit,
     existingCode: existing?.code,
   })
+  const prefersDrawer = catalog ? crmMasterPrefersDrawerForm(catalog) : false
 
   const draftKey = `crm-master-draft-${slug}-${id ?? 'new'}`
   const [code, setCode] = useState(existing?.code ?? '')
   const [name, setName] = useState(existing?.name ?? '')
   const [status, setStatus] = useState(existing?.status ?? 'active')
+  const [sortOrder, setSortOrder] = useState(String(existing?.sortOrder ?? (entries.length + 1)))
   const [description, setDescription] = useState(existing?.description ?? '')
   const [notes, setNotes] = useState(existing?.notes ?? '')
   const [attrs, setAttrs] = useState<Record<string, string>>(() => {
@@ -635,6 +702,8 @@ export function CrmMasterFormPage({ fixedSlug }: { fixedSlug?: string } = {}) {
   const showNotesSection = catalog ? crmMasterShowsNotes(catalog) : true
   const showDescriptionSection = catalog ? crmMasterShowsDescription(catalog) : true
   const usesRichDescription = catalog?.descriptionFormat === 'richtext'
+  const showEffectiveDate = catalog ? crmMasterHasEffectiveDate(catalog) : false
+  const effectiveDateField = catalog?.fields.find((f) => f.key === 'effectiveDate')
 
   function validate() {
     const errs: string[] = []
@@ -660,11 +729,13 @@ export function CrmMasterFormPage({ fixedSlug }: { fixedSlug?: string } = {}) {
   }
 
   function persistDraft() {
-    localStorage.setItem(draftKey, JSON.stringify({ code, name, status, description, notes, attrs }))
+    localStorage.setItem(draftKey, JSON.stringify({ code, name, status, sortOrder, description, notes, attrs }))
   }
 
   function persistRecord(mode: 'save' | 'new' | 'close') {
     if (!kind || !catalog) return
+    // Adopt shared validation: handleInvalidSubmit from utils/formValidation
+    // (see CrmLeadFormPage / CrmContactFormPage) once master fields have data-field ids.
     const errs = validate()
     if (errs.length) {
       setErrors(errs)
@@ -686,6 +757,7 @@ export function CrmMasterFormPage({ fixedSlug }: { fixedSlug?: string } = {}) {
       code: code.trim(),
       name: name.trim(),
       status: status as 'active' | 'inactive',
+      sortOrder: Number(sortOrder) || 1,
       description: description.trim() || undefined,
       notes: notes.trim() || undefined,
       attributes: buildAttributes(),
@@ -719,6 +791,11 @@ export function CrmMasterFormPage({ fixedSlug }: { fixedSlug?: string } = {}) {
   }
 
   if (!catalog || !kind || !scope) return <CrmMasterListPage fixedSlug={fixedSlug} />
+
+  if (prefersDrawer) {
+    const q = isEdit && id ? `?edit=${encodeURIComponent(id)}` : '?new=1'
+    return <Navigate to={`${basePath}${q}`} replace />
+  }
 
   const pageTitle = isEdit ? `Edit ${catalog.title}` : `New ${catalog.title}`
 
@@ -781,13 +858,25 @@ export function CrmMasterFormPage({ fixedSlug }: { fixedSlug?: string } = {}) {
           <MasterFormField label="Name" required>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </MasterFormField>
-          <MasterFormField label="Status" required>
-            <Select wrapClassName="w-full" value={status} onChange={(e) => setStatus(e.target.value as 'active' | 'inactive')}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </Select>
-          </MasterFormField>
-          {basicExtraFields.map((field) => renderCatalogField(field, attrs[field.key] ?? '', (v) => setAttrs((prev) => ({ ...prev, [field.key]: v }))))}
+          <div className="grid gap-3 md:grid-cols-2 md:col-span-2">
+            <MasterFormField label="Status" required>
+              <Select wrapClassName="w-full" value={status} onChange={(e) => setStatus(e.target.value as 'active' | 'inactive')}>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </Select>
+            </MasterFormField>
+            <MasterFormField label="Sort Order">
+              <Input type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
+            </MasterFormField>
+          </div>
+          {showEffectiveDate && effectiveDateField
+            ? renderCatalogField(effectiveDateField, attrs.effectiveDate ?? '', (v) =>
+                setAttrs((prev) => ({ ...prev, effectiveDate: v })),
+              )
+            : null}
+          {basicExtraFields
+            .filter((f) => f.key !== 'effectiveDate')
+            .map((field) => renderCatalogField(field, attrs[field.key] ?? '', (v) => setAttrs((prev) => ({ ...prev, [field.key]: v }))))}
           {configFields.map((field) => renderCatalogField(field, attrs[field.key] ?? '', (v) => setAttrs((prev) => ({ ...prev, [field.key]: v }))))}
           {showDescriptionSection ? (
             <MasterFormField label="Description" wide>

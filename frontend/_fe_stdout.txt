@@ -1,0 +1,6 @@
+
+> trailer-erp@0.0.0 typecheck
+> tsc -b --noEmit
+
+src/components/crm/CrmTypedDocumentUpload.tsx(121,19): error TS5076: '??' and '||' operations cannot be mixed without parentheses.
+src/components/crm/shared/AttachmentUploadDialog.tsx(120,23): error TS5076: '??' and '||' operations cannot be mixed without parentheses.

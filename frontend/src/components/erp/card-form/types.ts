@@ -62,6 +62,8 @@ export interface ErpCardFormPageProps {
   /** BC-style collapsible right details pane */
   collapsibleFactBox?: boolean
   factBoxLabel?: string
+  /** Subtitle under Smart Context title */
+  factBoxSubtitle?: string
   factBoxStorageKey?: string
   /** Controlled open state for collapsible factbox (optional) */
   factBoxOpen?: boolean

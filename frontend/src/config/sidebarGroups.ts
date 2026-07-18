@@ -2,7 +2,6 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Box,
   Database,
-  DollarSign,
   Factory,
   Gauge,
   GitBranch,
@@ -27,11 +26,10 @@ export const SIDEBAR_ICON_MENU: {
   { categoryId: 'executive', label: 'Home', icon: LayoutGrid },
   { categoryId: 'crm', label: 'CRM', icon: User },
   { categoryId: 'sales', label: 'Sales', icon: Tag },
-  { categoryId: 'finance', label: 'Finance', icon: DollarSign },
   { categoryId: 'accounting', label: 'Accounting', icon: Landmark },
   { categoryId: 'mrp', label: 'Planning', icon: Gauge },
-  { categoryId: 'purchase', label: 'Purchase', icon: ShoppingCart },
-  { categoryId: 'production', label: 'Mfg', icon: Factory },
+  { categoryId: 'purchase', label: 'Procurement', icon: ShoppingCart },
+  { categoryId: 'production', label: 'Manufacturing', icon: Factory },
   { categoryId: 'quality', label: 'Quality', icon: ShieldCheck },
   { categoryId: 'inventory', label: 'Inventory & Warehouse', icon: Warehouse },
   { categoryId: 'dispatch', label: 'Logistics', icon: Box },
@@ -52,7 +50,7 @@ export const SIDEBAR_GROUPS = [
   {
     id: 'commercial',
     label: 'Companies & Sales',
-    categoryIds: ['crm', 'sales', 'finance', 'accounting'],
+    categoryIds: ['crm', 'sales', 'accounting'],
   },
   {
     id: 'operations',

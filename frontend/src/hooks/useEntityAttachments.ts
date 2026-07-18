@@ -29,6 +29,7 @@ export function isAllowedAttachmentFile(file: File): string | null {
   if (file.size > CRM_MAX_ATTACHMENT_BYTES) {
     return `File exceeds ${Math.round(CRM_MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB limit.`
   }
+  if (!file.type) return null
   if (!ALLOWED_MIME_PREFIXES.some((p) => file.type.startsWith(p) || file.type === p)) {
     return 'File type is not allowed.'
   }

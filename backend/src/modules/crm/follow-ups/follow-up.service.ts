@@ -1,5 +1,6 @@
 import { prisma } from '../../../config/database.js'
 import { NotFoundError } from '../../../utils/errors.js'
+import { assertFollowUpInFuture } from '../../../utils/crmDatePolicy.js'
 import { resolveUserNames } from '../../../shared/index.js'
 import * as repo from './follow-up.repository.js'
 import { deriveFollowUpStatus, mapFollowUpToDto } from './follow-up.types.js'
@@ -57,6 +58,7 @@ export async function getFollowUp(tenantId: string, id: string) {
 }
 
 export async function createFollowUp(tenantId: string, userId: string, input: CreateFollowUpInput) {
+  assertFollowUpInFuture(input.dueDate, input.dueTime)
   const followUp = await repo.createFollowUp(tenantId, userId, input)
   return mapFollowUpToDto({ ...followUp, status: deriveFollowUpStatus(followUp.dueDate, followUp.status) })
 }
@@ -64,6 +66,11 @@ export async function createFollowUp(tenantId: string, userId: string, input: Cr
 export async function updateFollowUp(tenantId: string, id: string, userId: string, input: UpdateFollowUpInput) {
   const existing = await repo.findFollowUpById(tenantId, id)
   if (!existing) throw new NotFoundError('Follow-up not found')
+  if (input.dueDate !== undefined || input.dueTime !== undefined) {
+    const dueDate = input.dueDate ?? existing.dueDate.toISOString().slice(0, 10)
+    const dueTime = input.dueTime ?? existing.dueTime ?? '10:00'
+    assertFollowUpInFuture(dueDate, dueTime)
+  }
   const followUp = await repo.updateFollowUp(tenantId, id, userId, input)
   return mapWithNames(tenantId, { ...followUp, status: deriveFollowUpStatus(followUp.dueDate, followUp.status) })
 }
@@ -78,6 +85,7 @@ export async function completeFollowUp(tenantId: string, id: string, userId: str
 export async function rescheduleFollowUp(tenantId: string, id: string, userId: string, input: RescheduleFollowUpInput) {
   const existing = await repo.findFollowUpById(tenantId, id)
   if (!existing) throw new NotFoundError('Follow-up not found')
+  assertFollowUpInFuture(input.dueDate, input.dueTime)
   const followUp = await repo.rescheduleFollowUp(tenantId, id, userId, input)
   return mapWithNames(tenantId, { ...followUp, status: deriveFollowUpStatus(followUp.dueDate, followUp.status) })
 }
@@ -85,6 +93,8 @@ export async function rescheduleFollowUp(tenantId: string, id: string, userId: s
 export async function snoozeFollowUp(tenantId: string, id: string, userId: string, input: SnoozeFollowUpInput) {
   const existing = await repo.findFollowUpById(tenantId, id)
   if (!existing) throw new NotFoundError('Follow-up not found')
+  // Date-only snooze: require a future calendar day at end-of-day UTC (keeps existing dueTime semantics elsewhere).
+  assertFollowUpInFuture(input.dueDate, existing.dueTime ?? '23:59')
   const followUp = await repo.snoozeFollowUp(tenantId, id, userId, input)
   return mapWithNames(tenantId, { ...followUp, status: 'snoozed' })
 }

@@ -18,7 +18,7 @@ export const MANDATORY_MAPPING_KEYS: DefaultAccountMappingKey[] = [
   'RETAINED_EARNINGS',
 ]
 
-/** All finance document types that need number series at activation. */
+/** All finance document types that need number series at activation. SALES_INVOICE is optional (AR numbering, not voucher posting). */
 export const REQUIRED_NUMBER_SERIES_TYPES = [
   'JOURNAL',
   'RECEIPT',
@@ -29,6 +29,9 @@ export const REQUIRED_NUMBER_SERIES_TYPES = [
   'OPENING_BALANCE',
   'REVERSAL',
 ] as const
+
+/** Optional AR number series — not required for finance activation (Phase 3A1). CUSTOMER_RECEIPT added Phase 3B1. */
+export const OPTIONAL_AR_NUMBER_SERIES_TYPES = ['SALES_INVOICE', 'CUSTOMER_RECEIPT'] as const
 
 /** Expected account types per mapping key (posting accounts only). */
 export const MAPPING_KEY_ACCOUNT_TYPES: Partial<Record<DefaultAccountMappingKey, AccountType[]>> = {
@@ -47,6 +50,7 @@ export const MAPPING_KEY_ACCOUNT_TYPES: Partial<Record<DefaultAccountMappingKey,
   GST_OUTPUT_CGST: ['GST_OUTPUT'],
   GST_OUTPUT_SGST: ['GST_OUTPUT'],
   GST_OUTPUT_IGST: ['GST_OUTPUT'],
+  GST_OUTPUT_CESS: ['GST_OUTPUT'],
   TDS_RECEIVABLE: ['TDS_RECEIVABLE'],
   TDS_PAYABLE: ['TDS_PAYABLE'],
   RETAINED_EARNINGS: ['RETAINED_EARNINGS'],

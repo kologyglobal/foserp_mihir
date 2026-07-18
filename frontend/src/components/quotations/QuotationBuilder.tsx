@@ -34,6 +34,7 @@ import { crmBreadcrumbs } from '../../utils/crmNavigation'
 import { CrmTypedDocumentUpload } from '@/components/crm/CrmTypedDocumentUpload'
 import { useQuotationAttachmentStore } from '../../store/quotationAttachmentStore'
 import { notify } from '../../store/toastStore'
+import { systemPrompt } from '../../utils/systemConfirm'
 import type { CrmTypedAttachment } from '../../types/crmDocuments'
 
 const VALIDITY_PERIOD_OPTIONS = [15, 30, 45, 60, 90] as const
@@ -175,7 +176,15 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
   }
 
   async function handleNewRevision() {
-    const reason = prompt('Revision reason?') ?? 'Customer requested changes'
+    const reason = await systemPrompt({
+      title: 'Create revision',
+      description: 'Describe why a new revision is needed.',
+      fieldLabel: 'Revision reason',
+      defaultValue: 'Customer requested changes',
+      confirmLabel: 'Create revision',
+      required: true,
+    })
+    if (!reason) return
     const r = await resolveStoreAction(createRevision(documentId, reason))
     if (r.ok && r.documentId) navigate(`/crm/quotations/${doc!.quotationId}/editor?doc=${r.documentId}`)
   }

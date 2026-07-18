@@ -24,4 +24,6 @@ export interface DemoEntityNote {
   authorName?: string
   createdAt?: string
   label?: string
+  stageCode?: string | null
+  noteType?: string | null
 }

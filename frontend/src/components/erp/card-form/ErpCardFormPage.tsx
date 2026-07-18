@@ -7,6 +7,7 @@ import { buildRouteBreadcrumbs } from '../../../utils/pageNavigation'
 import { useUIStore } from '../../../store/uiStore'
 import { ErpCardTabs } from './ErpCardTabs'
 import { ErpFactBoxPane } from './ErpFactBoxPane'
+import { FactBoxPaneAiToggle } from './FactBoxPaneAiToggle'
 import { FactBoxPaneProvider } from './FactBoxPaneContext'
 import { ErpFormStatusStrip } from './ErpFormStatusStrip'
 import { ErpFormValidationSummary } from './ErpFormValidationSummary'
@@ -47,7 +48,8 @@ export function ErpCardFormPage({
   footer,
   stickyFooter = false,
   collapsibleFactBox = false,
-  factBoxLabel = 'Details',
+  factBoxLabel = 'Smart Context',
+  factBoxSubtitle,
   factBoxStorageKey,
   factBoxOpen: controlledFactBoxOpen,
   onFactBoxOpenChange,
@@ -138,6 +140,7 @@ export function ErpCardFormPage({
     collapsibleFactBox ? (
       <ErpFactBoxPane
         label={factBoxLabel}
+        subtitle={factBoxSubtitle}
         open={factBoxOpen}
         onOpenChange={setFactBoxOpen}
       >
@@ -206,6 +209,11 @@ export function ErpCardFormPage({
                 <div className="erp-card-form-page__main">{children}</div>
                 {showSplitLayout && factBoxContent ? (
                   <div className="erp-card-form-page__factbox">{factBoxContent}</div>
+                ) : null}
+                {factBoxCollapsed ? (
+                  <div className="erp-card-form-page__factbox-restore">
+                    <FactBoxPaneAiToggle />
+                  </div>
                 ) : null}
               </div>
             </div>

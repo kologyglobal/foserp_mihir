@@ -17,6 +17,10 @@ import { enrichFollowUpStatus } from '../../utils/crmMetrics'
 import { getSessionUser, canCrmPermission } from '../../utils/permissions'
 import { resolveStoreAction } from '../../store/storeAction'
 import { CrmDeleteConfirmModal } from './CrmDeleteConfirmModal'
+import {
+  RescheduleFollowUpModal,
+  type RescheduleFollowUpTarget,
+} from './RescheduleFollowUpModal'
 import type { CrmActivity, FollowUp } from '../../types/crm'
 import { COMPANY_TERMINOLOGY } from '../../utils/companyLabels'
 
@@ -104,6 +108,7 @@ export function CrmFollowUpsPanel({ scope }: { scope: CrmEngagementScope }) {
   const canCreateFollowUp = canCrmPermission('crm.follow_up.create')
   const [view, setView] = useState<FollowUpView>('today')
   const [newFollowUpOpen, setNewFollowUpOpen] = useState(false)
+  const [rescheduleTarget, setRescheduleTarget] = useState<RescheduleFollowUpTarget | null>(null)
   const [notesDetail, setNotesDetail] = useState<{
     entityType: CrmEntityTypeApi
     entityId: string
@@ -111,6 +116,7 @@ export function CrmFollowUpsPanel({ scope }: { scope: CrmEngagementScope }) {
     subtitle?: string
     demoNotes?: DemoEntityNote[]
   } | null>(null)
+  const updateFollowUp = useCrmStore((s) => s.updateFollowUp)
   const user = getSessionUser()
   const today = todayStr()
 
@@ -211,10 +217,14 @@ export function CrmFollowUpsPanel({ scope }: { scope: CrmEngagementScope }) {
               contactName={contact?.name}
               opportunityName={opp?.opportunityName}
               onDone={() => completeFollowUp(f.id, 'Completed via follow-up panel')}
-              onReschedule={() => {
-                const d = prompt('New due date (YYYY-MM-DD)', f.dueDate)
-                if (d) rescheduleFollowUp(f.id, d, f.dueTime ?? '10:00')
-              }}
+              onReschedule={() =>
+                setRescheduleTarget({
+                  id: f.id,
+                  dueDate: f.dueDate,
+                  dueTime: f.dueTime,
+                  label: cust?.customerName ?? COMPANY_TERMINOLOGY.singular,
+                })
+              }
               onSnooze={() => snoozeFollowUp(f.id, tomorrow.toISOString().slice(0, 10))}
               onOpenCustomer={() => f.customerId && navigate(entity360CustomerPath(f.customerId))}
               onOpenOpportunity={() => f.opportunityId && navigate(`/crm/opportunities/${f.opportunityId}`)}
@@ -233,6 +243,25 @@ export function CrmFollowUpsPanel({ scope }: { scope: CrmEngagementScope }) {
         <p className="text-[13px] text-erp-muted text-center py-8">No follow-ups in this view.</p>
       ) : null}
       <QuickFollowUpDrawer open={newFollowUpOpen} onClose={() => setNewFollowUpOpen(false)} />
+      <RescheduleFollowUpModal
+        open={Boolean(rescheduleTarget)}
+        followUp={rescheduleTarget}
+        onClose={() => setRescheduleTarget(null)}
+        onReschedule={async (values) => {
+          if (!rescheduleTarget) return
+          await resolveStoreAction(
+            rescheduleFollowUp(rescheduleTarget.id, values.dueDate, values.dueTime),
+          )
+          if (values.reason) {
+            const existing = followUps.find((x) => x.id === rescheduleTarget.id)
+            const noteLine = `Reschedule: ${values.reason}`
+            const nextNotes = existing?.notes?.trim()
+              ? `${existing.notes.trim()}\n${noteLine}`
+              : noteLine
+            await resolveStoreAction(updateFollowUp(rescheduleTarget.id, { notes: nextNotes }))
+          }
+        }}
+      />
       <CrmEntityDetailDrawer
         open={!!notesDetail}
         onClose={() => setNotesDetail(null)}

@@ -51,9 +51,12 @@ export function mapLifecycleToStage(lifecycle: LeadLifecycleStatus, current: Lea
   return 'new'
 }
 
+/**
+ * @deprecated Prefer `resolveLeadEditPolicy` — converted/closed are no longer a blanket edit lock.
+ * Returns true only when the stage value itself is immutable (converted terminal).
+ */
 export function isLeadStageLocked(stage: LeadStage): boolean {
-  const s = migrateLeadStage(stage)
-  return s === 'converted_to_opportunity' || s === 'closed'
+  return migrateLeadStage(stage) === 'converted_to_opportunity'
 }
 
 export type LeadConvertToOpportunityInput = Pick<

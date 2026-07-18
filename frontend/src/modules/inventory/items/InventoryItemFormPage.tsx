@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { z } from 'zod'
 import { useForm, useWatch, type Resolver } from 'react-hook-form'
@@ -95,9 +95,12 @@ export function InventoryItemFormPage() {
   const navigate = useNavigate()
   const perms = useInventoryPermissions()
   const isEdit = Boolean(recordId)
-  const categories = useMasterStore((s) => s.categories.filter((c) => c.isActive))
-  const uoms = useMasterStore((s) => s.uoms.filter((u) => u.isActive))
-  const warehouses = useMasterStore((s) => s.warehouses.filter((w) => w.isActive))
+  const allCategories = useMasterStore((s) => s.categories)
+  const allUoms = useMasterStore((s) => s.uoms)
+  const allWarehouses = useMasterStore((s) => s.warehouses)
+  const categories = useMemo(() => allCategories.filter((c) => c.isActive), [allCategories])
+  const uoms = useMemo(() => allUoms.filter((u) => u.isActive), [allUoms])
+  const warehouses = useMemo(() => allWarehouses.filter((w) => w.isActive), [allWarehouses])
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
   const [audit, setAudit] = useState<InventoryAuditEntry[]>([])

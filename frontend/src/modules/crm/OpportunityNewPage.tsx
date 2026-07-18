@@ -34,9 +34,18 @@ import {
   calcOpportunityLinesSummary,
   calcWeightedValue,
   createEmptyOpportunityLine,
+  opportunityLineUnitPriceFieldKey,
   syncOpportunityLines,
+  UNIT_PRICE_REQUIRED_MESSAGE,
   validateOpportunityLines,
 } from '../../utils/opportunityLineCalc'
+import {
+  fieldErrorsToMessages,
+  handleInvalidSubmit,
+  toRequiredFieldLabel,
+  type FieldErrorMap,
+} from '../../utils/formValidation'
+import { opportunityRowErrorsToFieldMap } from '../../utils/opportunityLineValidationFocus'
 import { decodeLeadRequirementLines, isEncodedLeadRequirementPayload, sanitizeOpportunityScopeNotes } from '../../utils/leadRequirementLines'
 import { resolveLeadConvertToOpportunityGate } from '../../utils/leadUtils'
 import { useProductMasterOptionMap } from '../../utils/opportunityProductOptions'
@@ -75,6 +84,24 @@ function initialScopeNotesFromLead(requirement?: string): string {
   return sanitizeOpportunityScopeNotes(requirement)
 }
 
+const OPP_FIELD_ORDER = ['customerId', 'opportunityName', 'expectedCloseDate', 'ownerId', 'stage', 'probability'] as const
+const OPP_FIELD_LABELS: Record<string, string> = {
+  customerId: 'Company',
+  opportunityName: 'Opportunity Name',
+  expectedCloseDate: 'Expected Close Date',
+  ownerId: 'Owner',
+  stage: 'Stage',
+  probability: 'Probability',
+}
+const OPP_SECTION_BY_FIELD: Record<string, string> = {
+  customerId: 'opp-section-quick',
+  opportunityName: 'opp-section-quick',
+  expectedCloseDate: 'opp-section-quick',
+  ownerId: 'opp-section-quick',
+  stage: 'opp-section-quick',
+  probability: 'opp-section-commercial',
+}
+
 export function OpportunityNewPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -108,6 +135,7 @@ export function OpportunityNewPage() {
   const [activeSection, setActiveSection] = useState('quick')
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [rowErrors, setRowErrors] = useState<Record<string, string[]>>({})
+  const [forceOpenProductsKey, setForceOpenProductsKey] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [customerId, setCustomerId] = useState(initialCustomerId)
@@ -210,12 +238,38 @@ export function OpportunityNewPage() {
   }
 
   function runValidation() {
-    return validateOpportunityLines(lines, {
+    const base = validateOpportunityLines(lines, {
       customerId,
       ownerId,
       stage,
       probability,
     })
+    if (!opportunityName.trim()) {
+      const companyIdx = base.errors.findIndex((e) => /company/i.test(e))
+      base.errors.splice(companyIdx + 1, 0, 'Opportunity name is required.')
+    }
+    if (!expectedCloseDate) base.errors.push('Expected close date is required.')
+    return base
+  }
+
+  function buildOpportunityFieldErrors(
+    errors: string[],
+    lineRowErrors: Record<string, string[]>,
+  ): FieldErrorMap {
+    const map: FieldErrorMap = {}
+    for (const err of errors) {
+      if (/company/i.test(err)) map.customerId = err
+      else if (/opportunity name/i.test(err)) map.opportunityName = err
+      else if (/close date/i.test(err)) map.expectedCloseDate = err
+      else if (/owner/i.test(err)) map.ownerId = err
+      else if (/^stage/i.test(err)) map.stage = err
+      else if (/probability/i.test(err)) map.probability = err
+      else if (/unit price/i.test(err) || /fix validation|product \/ item line/i.test(err)) {
+        continue
+      } else if (!Object.values(map).includes(err)) map[`_msg_${Object.keys(map).length}`] = err
+    }
+    Object.assign(map, opportunityRowErrorsToFieldMap(lineRowErrors))
+    return map
   }
 
   function resetForm() {
@@ -246,13 +300,53 @@ export function OpportunityNewPage() {
     const leadErrors =
       prefillLeadId && !leadConvertGate.ok ? [leadConvertGate.reason] : []
     const allErrors = [...leadErrors, ...errors]
-    setValidationErrors(allErrors)
     setRowErrors(rErr)
-    if (allErrors.length) {
-      const needsMore = errors.some((e) => /line|product|item/i.test(e)) || Object.keys(rErr).length > 0
+    if (allErrors.length || Object.keys(rErr).length) {
+      const needsMore = errors.some((e) => /line|product|item|unit price/i.test(e)) || Object.keys(rErr).length > 0
       if (needsMore) setShowAdditionalDetails(true)
+      const fieldMap = buildOpportunityFieldErrors(allErrors, rErr)
+      const lineKeys = Object.keys(fieldMap).filter(
+        (k) => k.startsWith('unitPrice-') || k.startsWith('qty-') || k.startsWith('product-') || k.startsWith('taxPct-'),
+      )
+      const fieldOrder = [...OPP_FIELD_ORDER, ...lineKeys]
+      const fieldLabels: Record<string, string> = { ...OPP_FIELD_LABELS }
+      const sectionByField: Record<string, string> = {
+        ...OPP_SECTION_BY_FIELD,
+        ...Object.fromEntries(lineKeys.map((k) => [k, 'opp-section-products'])),
+      }
+      for (const key of lineKeys) {
+        if (key.startsWith('unitPrice-')) fieldLabels[key] = 'Unit Price'
+        else if (key.startsWith('qty-')) fieldLabels[key] = 'Quantity'
+        else if (key.startsWith('product-')) fieldLabels[key] = 'Product / Item'
+        else if (key.startsWith('taxPct-')) fieldLabels[key] = 'GST %'
+      }
+      if (!lineKeys.length && Object.keys(rErr).length) {
+        const firstLineId = Object.keys(rErr)[0]!
+        const key = opportunityLineUnitPriceFieldKey(firstLineId)
+        fieldMap[key] = UNIT_PRICE_REQUIRED_MESSAGE
+        fieldOrder.push(key)
+        fieldLabels[key] = 'Unit Price'
+        sectionByField[key] = 'opp-section-products'
+      }
+      handleInvalidSubmit({
+        errors: fieldMap,
+        fieldOrder,
+        fieldLabels,
+        sectionByField,
+        expandSection: (sectionId) => {
+          if (sectionId !== 'opp-section-quick') setShowAdditionalDetails(true)
+          if (sectionId === 'opp-section-products') {
+            setForceOpenProductsKey((k) => k + 1)
+            setShowAdditionalDetails(true)
+          }
+          setActiveSection(sectionId.replace(/^opp-section-/, ''))
+        },
+        onFieldErrors: (map) => setValidationErrors(fieldErrorsToMessages(map, fieldOrder)),
+        delayMs: 120,
+      })
       return
     }
+    setValidationErrors([])
     if (isSubmitting) return
 
     setIsSubmitting(true)
@@ -400,7 +494,10 @@ export function OpportunityNewPage() {
   ]
 
   const validationGuideItems = useMemo(
-    () => validationErrors.map((err, i) => ({ id: `err-${i}`, label: err, message: err })),
+    () => validationErrors.map((err, i) => ({
+      id: `err-${i}`,
+      label: toRequiredFieldLabel(err),
+    })),
     [validationErrors],
   )
 
@@ -480,7 +577,7 @@ export function OpportunityNewPage() {
       factBox={factBox}
       suppressFactBoxRecord
       collapsibleFactBox
-      factBoxLabel="Details"
+      factBoxLabel="Smart Context"
       onSubmit={handleSubmit}
       onSaveShortcut={() => createDeal('open')}
       onSaveCloseShortcut={() => createDeal('close')}
@@ -526,7 +623,13 @@ export function OpportunityNewPage() {
         title="Quick Entry"
         subtitle="Customer, opportunity name, and ownership — create the deal fast."
       >
-        <ErpFieldRow label="Customer" required>
+        <ErpFieldRow
+          label="Customer"
+          required
+          dataField="customerId"
+          fieldState={validationErrors.some((e) => /company/i.test(e)) ? 'error' : 'idle'}
+          fieldError={validationErrors.find((e) => /company/i.test(e))}
+        >
           <Select
             value={customerId}
             onChange={(e) => {
@@ -553,6 +656,9 @@ export function OpportunityNewPage() {
         <ErpFieldRow
           label="Opportunity Name"
           required
+          dataField="opportunityName"
+          fieldState={validationErrors.some((e) => /name/i.test(e)) ? 'error' : 'idle'}
+          fieldError={validationErrors.find((e) => /name/i.test(e))}
           hint={
             nameManuallyEdited
               ? 'Custom name — clear the field to resume auto-naming'
@@ -592,8 +698,14 @@ export function OpportunityNewPage() {
             ))}
           </Select>
         </ErpFieldRow>
-        <ErpFieldRow label="Expected Close Date" hint="Optional at create — set when the deal firms up">
-          <Input type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} className="erp-input" />
+        <ErpFieldRow
+          label="Expected Close Date"
+          required
+          dataField="expectedCloseDate"
+          fieldState={!expectedCloseDate && validationErrors.some((e) => /close/i.test(e)) ? 'error' : 'idle'}
+          fieldError={!expectedCloseDate ? validationErrors.find((e) => /close/i.test(e)) : undefined}
+        >
+          <Input type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} required className="erp-input" />
         </ErpFieldRow>
         {lead ? (
           <ErpFieldRow label="Source Lead" readOnly colSpan={2}>
@@ -635,6 +747,7 @@ export function OpportunityNewPage() {
         accent="teal"
         collapsible
         defaultOpen
+        forceOpenKey={forceOpenProductsKey || undefined}
       >
         <div className="col-span-3">
           <ErpLineItemsGrid

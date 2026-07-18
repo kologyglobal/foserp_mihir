@@ -1,0 +1,76 @@
+﻿node.exe : npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm 
+help npmrc` for supported config options.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...config options.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+ RUN  v3.2.7 D:/Projects/FOS/trailer-erp 2/backend
+
+stdout | tests/finance/finance-ar-receipt-validation.test.ts > Finance Phase 3B2 ΓÇö receipt validation preview
+prisma:error 
+Invalid `prisma.crmCompany.create()` invocation in
+D:\Projects\FOS\trailer-erp 2\backend\tests\finance\finance-ar-receipt-validation.test.ts:242:49
+
+  239   },
+  240 })
+  241 
+ΓåÆ 242 const otherCustomer = await prisma.crmCompany.create(
+Unique constraint failed on the constraint: `crm_companies_tenantId_companyCode_key`
+
+ Γ¥» tests/finance/finance-ar-receipt-validation.test.ts (19 tests | 15 skipped) 253ms
+   Γ£ô Payment method validator (unit) > requires cheque instrument fields 3ms
+   Γ£ô Payment method validator (unit) > accepts cheque with number and date and warns clearing not tracked 0ms
+   Γ£ô Payment method validator (unit) > warns on missing bank transfer reference 0ms
+   Γ£ô Payment method validator (unit) > warns on UPI/CARD missing transaction reference 0ms
+   Γåô Finance Phase 3B2 ΓÇö receipt validation preview > validates simple receipt with open period and balanced posting preview
+   Γåô Finance Phase 3B2 ΓÇö receipt validation preview > rejects cross-legal-entity bank account
+   Γåô Finance Phase 3B2 ΓÇö receipt validation preview > requires bank/cash account
+   Γåô Finance Phase 3B2 ΓÇö receipt validation preview > resolves TDS and bank-charge mappings when amounts > 0
+   Γåô Finance Phase 3B2 ΓÇö receipt validation preview > blocks closed posting period
+   Γåô Finance Phase 3B2 ΓÇö receipt validation preview > blocks under-review posting period
+   Γåô Finance Phase 3B2 ΓÇö receipt validation preview > validates allocation preview against invoice outstanding
+   Γåô Finance Phase 3B2 ΓÇö receipt validation preview > rejects allocation exceeding invoice outstanding
+   Γåô Finance Phase 3B2 ΓÇö receipt validation preview > rejects cross-customer allocation
+   Γåô Finance Phase 3B2 ΓÇö receipt validation preview > rejects inactive customer
+   Γåô Finance Phase 3B2 ΓÇö receipt validation preview > rejects multi-currency when feature disabled
+   Γåô Finance Phase 3B2 ΓÇö receipt validation preview > returns multiple errors together and keeps warnings separate
+   Γåô Finance Phase 3B2 ΓÇö receipt validation preview > valid with warnings only remains valid=true
+   Γåô Finance Phase 3B2 ΓÇö receipt validation preview > cash payment requires cash account
+   Γåô Finance Phase 3B2 ΓÇö receipt validation preview > does not mutate open-item balances after allocation preview
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Suites 1 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  tests/finance/finance-ar-receipt-validation.test.ts > Finance Phase 3B2 ΓÇö receipt validation preview
+PrismaClientKnownRequestError: 
+Invalid `prisma.crmCompany.create()` invocation in
+D:\Projects\FOS\trailer-erp 2\backend\tests\finance\finance-ar-receipt-validation.test.ts:242:49
+
+  239   },
+  240 })
+  241 
+ΓåÆ 242 const otherCustomer = await prisma.crmCompany.create(
+Unique constraint failed on the constraint: `crm_companies_tenantId_companyCode_key`
+ Γ¥» di.handleRequestError node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13
+ Γ¥» di.handleAndLogRequestError node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12
+ Γ¥» di.request node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12
+ Γ¥» a node_modules/@prisma/client/src/runtime/getPrismaClient.ts:833:24
+ Γ¥» seedFixture tests/finance/finance-ar-receipt-validation.test.ts:242:25
+    240|   })
+    241| 
+    242|   const otherCustomer = await prisma.crmCompany.create({
+       |                         ^
+    243|     data: {
+    244|       tenantId: tenant.id,
+ Γ¥» tests/finance/finance-ar-receipt-validation.test.ts:418:10
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/1]ΓÄ»
+
+
+ Test Files  1 failed (1)
+      Tests  4 passed | 15 skipped (19)
+   Start at  23:43:17
+   Duration  1.78s (transform 289ms, setup 41ms, collect 798ms, tests 253ms, environment 0ms, prepare 245ms)
+

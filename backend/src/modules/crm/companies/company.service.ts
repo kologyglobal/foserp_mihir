@@ -2,6 +2,7 @@ import { nextCode } from '../../../services/codeSeries.service.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import { resolveUserNames } from '../../../shared/index.js'
 import { PHONE_MAX_DIGITS } from '../../../utils/phoneValidation.js'
+import { normalizeEmail } from '../../../utils/emailValidation.js'
 import * as contactRepo from '../contacts/contact.repository.js'
 import * as contactService from '../contacts/contact.service.js'
 import * as repo from './company.repository.js'
@@ -28,7 +29,9 @@ async function syncCompanyPrimaryContact(
   if (!name) return
 
   const phone = digitsOnlyPhone(fields.contactPhone)
-  const email = fields.contactEmail?.trim() || undefined
+  const email = fields.contactEmail?.trim()
+    ? normalizeEmail(fields.contactEmail)
+    : undefined
   const existing = await contactRepo.findPrimaryOrFirstContact(tenantId, companyId)
 
   if (existing) {
@@ -36,7 +39,7 @@ async function syncCompanyPrimaryContact(
     const same =
       existingName === name
       && (existing.mobile ?? '') === (phone ?? '')
-      && (existing.email ?? '') === (email ?? '')
+      && normalizeEmail(existing.email ?? '') === (email ?? '')
       && existing.isPrimary
     if (same) return
     await contactService.updateContact(tenantId, existing.id, userId, {

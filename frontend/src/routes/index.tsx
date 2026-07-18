@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { ERPLayout } from '@/components/layout/ERPLayout'
-import { RouteErrorPage } from '@/components/system/AppErrorBoundary'
+import { RouteErrorBoundary } from '@/components/system/RouteErrorBoundary'
+import { PageNotFoundPage } from '@/components/system/PageNotFoundPage'
 import { ApiAuthGate } from '@/modules/auth/ApiAuthGate'
 import { authRoute } from './authRoutes'
 import { homeRouteChildren } from './homeRoutes'
@@ -30,7 +31,7 @@ export const router = createBrowserRouter([
         <ERPLayout />
       </ApiAuthGate>
     ),
-    errorElement: <RouteErrorPage />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       ...homeRouteChildren,
       ...masterRouteChildren,
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
       ...reportsRouteChildren,
       ...accountingRouteChildren,
       ...adminRouteChildren,
+      { path: '*', element: <PageNotFoundPage /> },
     ],
   },
 ])

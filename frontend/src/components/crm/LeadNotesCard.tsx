@@ -9,10 +9,14 @@ import { useEntityNotes } from '@/hooks/useEntityNotes'
 import { canCrmPermission } from '@/utils/permissions/crm'
 import { formatDateTime } from '@/utils/dates/format'
 import type { DemoEntityNote } from '@/types/crmEntity'
+import { crmNoteTypeLabel } from '@/types/crmNote'
+import { LEAD_STAGE_LABELS, type LeadStage } from '@/types/sales'
 import { cn } from '@/utils/cn'
 
 export interface LeadNotesCardProps {
   leadId: string
+  /** Current lead stage — stamped on new notes only (additive history). */
+  currentStage?: LeadStage | string | null
   demoNotes?: DemoEntityNote[]
   editPath?: string
   className?: string
@@ -26,10 +30,18 @@ type UnifiedNote = {
   content: string
   authorName: string
   createdAt: string
+  stageCode?: string | null
+  noteType?: string | null
 }
+
+const LEAD_STAGE_OPTIONS = (Object.keys(LEAD_STAGE_LABELS) as LeadStage[]).map((code) => ({
+  code,
+  label: LEAD_STAGE_LABELS[code],
+}))
 
 export function LeadNotesCard({
   leadId,
+  currentStage = null,
   demoNotes = [],
   editPath,
   className,
@@ -64,6 +76,8 @@ export function LeadNotesCard({
         content: n.content,
         authorName: n.authorName || 'User',
         createdAt: n.createdAt,
+        stageCode: n.stageCode,
+        noteType: n.noteType,
       }
     }
     if (demoNotes.length > 0) {
@@ -76,6 +90,8 @@ export function LeadNotesCard({
         content: n.content,
         authorName: n.authorName || 'User',
         createdAt: n.createdAt ?? '',
+        stageCode: n.stageCode,
+        noteType: n.noteType,
       }
     }
     return null
@@ -94,6 +110,19 @@ export function LeadNotesCard({
     }
     setViewAllOpen(true)
   }
+
+  const latestMeta = latest
+    ? [
+        crmNoteTypeLabel(latest.noteType),
+        latest.stageCode
+          ? `Stage: ${LEAD_STAGE_LABELS[latest.stageCode as LeadStage] ?? latest.stageCode}`
+          : '',
+        latest.authorName,
+        latest.createdAt ? formatDateTime(latest.createdAt) : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : ''
 
   return (
     <>
@@ -125,9 +154,11 @@ export function LeadNotesCard({
             <EntityNoteEditor
               pending={pending}
               submitLabel="Save note"
+              defaultStageCode={currentStage ?? null}
+              stageOptions={LEAD_STAGE_OPTIONS}
               onCancel={() => setAdding(false)}
-              onSubmit={async (content) => {
-                const r = await createNote(content)
+              onSubmit={async (input) => {
+                const r = await createNote(input)
                 if (r.ok) {
                   setAdding(false)
                   void refresh()
@@ -142,12 +173,7 @@ export function LeadNotesCard({
           <p className="lead-notes-card__empty">Loading notes…</p>
         ) : latest ? (
           <article className="lead-notes-card__latest">
-            <p className="lead-notes-card__meta">
-              <span className="lead-notes-card__author">{latest.authorName}</span>
-              {latest.createdAt ? (
-                <span className="lead-notes-card__time">{formatDateTime(latest.createdAt)}</span>
-              ) : null}
-            </p>
+            <p className="lead-notes-card__meta">{latestMeta}</p>
             <p className="lead-notes-card__body">{latest.content}</p>
           </article>
         ) : !adding ? (
@@ -167,6 +193,8 @@ export function LeadNotesCard({
           entityId={leadId}
           demoNotes={demoNotes}
           title="Notes"
+          defaultStageCode={currentStage ?? null}
+          stageOptions={LEAD_STAGE_OPTIONS}
         />
       </CrmDrawerShell>
     </>

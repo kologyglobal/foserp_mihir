@@ -3,10 +3,13 @@ import { MessageSquare, Pencil, Trash2 } from 'lucide-react'
 import { useEntityNotes } from '../../../hooks/useEntityNotes'
 import { canCrmPermission } from '../../../utils/permissions/crm'
 import type { CrmEntityTypeApi, DemoEntityNote } from '../../../types/crmEntity'
+import { crmNoteTypeLabel } from '../../../types/crmNote'
 import { EntityNoteEditor } from './EntityNoteEditor'
 import { ErpButton } from '../../erp/ErpButton'
 import { formatDateTime } from '../../../utils/dates/format'
 import { systemConfirm } from '../../../utils/systemConfirm'
+import type { CreateEntityNoteInput } from '../../../services/api/crmApi'
+
 interface EntityNotesPanelProps {
   entityType: CrmEntityTypeApi
   entityId: string
@@ -16,6 +19,28 @@ interface EntityNotesPanelProps {
   demoNotes?: DemoEntityNote[]
   /** Show legacy/demo notes even when API mode is active (no backend entity). */
   demoOnly?: boolean
+  /** Prefill stage on new notes (additive; does not mutate prior stage notes). */
+  defaultStageCode?: string | null
+  stageOptions?: Array<{ code: string; label: string }>
+}
+
+function noteMetaParts(note: {
+  authorName?: string
+  createdAt?: string
+  updatedAt?: string
+  stageCode?: string | null
+  noteType?: string | null
+  label?: string
+}) {
+  const parts: string[] = []
+  if (note.label) parts.push(note.label)
+  const typeLabel = crmNoteTypeLabel(note.noteType)
+  if (typeLabel) parts.push(typeLabel)
+  if (note.stageCode) parts.push(`Stage: ${note.stageCode}`)
+  parts.push(note.authorName || 'User')
+  if (note.createdAt) parts.push(formatDateTime(note.createdAt))
+  if (note.updatedAt && note.createdAt && note.updatedAt !== note.createdAt) parts.push('(edited)')
+  return parts.join(' · ')
 }
 
 function DemoNotesList({ notes }: { notes: DemoEntityNote[] }) {
@@ -26,11 +51,7 @@ function DemoNotesList({ notes }: { notes: DemoEntityNote[] }) {
     <ul className="ent-360-notes space-y-3">
       {notes.map((note, index) => (
         <li key={`${note.label ?? 'note'}-${index}`} className="ent-360-notes__item">
-          <p className="ent-360-notes__meta">
-            {note.label ? `${note.label} · ` : ''}
-            {note.authorName || 'User'}
-            {note.createdAt ? ` · ${formatDateTime(note.createdAt)}` : ''}
-          </p>
+          <p className="ent-360-notes__meta">{noteMetaParts(note)}</p>
           <p className="ent-360-notes__body whitespace-pre-wrap">{note.content}</p>
         </li>
       ))}
@@ -45,6 +66,8 @@ export function EntityNotesPanel({
   className,
   demoNotes = [],
   demoOnly = false,
+  defaultStageCode = null,
+  stageOptions,
 }: EntityNotesPanelProps) {
   const { notes, loading, error, pending, createNote, updateNote, deleteNote, isApiBacked } = useEntityNotes(
     entityType,
@@ -77,7 +100,13 @@ export function EntityNotesPanel({
 
       {canCreate ? (
         <div className="mb-4">
-          <EntityNoteEditor pending={pending} onSubmit={createNote} submitLabel="Add note" />
+          <EntityNoteEditor
+            pending={pending}
+            defaultStageCode={defaultStageCode}
+            stageOptions={stageOptions}
+            submitLabel="Add note"
+            onSubmit={(input: CreateEntityNoteInput) => createNote(input)}
+          />
         </div>
       ) : null}
 
@@ -92,24 +121,22 @@ export function EntityNotesPanel({
             <li key={note.id} className="ent-360-notes__item">
               {editingId === note.id ? (
                 <EntityNoteEditor
+                  editMode
                   initialContent={note.content}
                   pending={pending}
                   submitLabel="Update note"
                   onCancel={() => setEditingId(null)}
-                  onSubmit={async (content) => {
-                    const r = await updateNote(note.id, content)
+                  onSubmit={async (input) => {
+                    const r = await updateNote(note.id, input.content)
                     if (r.ok) setEditingId(null)
                     return r
                   }}
                 />
               ) : (
                 <>
-                  <p className="ent-360-notes__meta">
-                    {note.authorName || 'User'} · {formatDateTime(note.createdAt)}
-                    {note.updatedAt !== note.createdAt ? ' (edited)' : ''}
-                  </p>
+                  <p className="ent-360-notes__meta">{noteMetaParts(note)}</p>
                   <p className="ent-360-notes__body whitespace-pre-wrap">{note.content}</p>
-                  {(canUpdate || canDelete) ? (
+                  {canUpdate || canDelete ? (
                     <div className="mt-2 flex gap-2">
                       {canUpdate ? (
                         <ErpButton type="button" size="sm" variant="secondary" icon={Pencil} onClick={() => setEditingId(note.id)}>

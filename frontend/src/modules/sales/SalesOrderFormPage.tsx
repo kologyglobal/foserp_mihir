@@ -310,7 +310,7 @@ export function SalesOrderEditPage() {
         validationErrors={validationGuideItems.length ? undefined : validationErrors}
         factBox={factBox}
         collapsibleFactBox
-        factBoxLabel="Details"
+        factBoxLabel="Smart Context"
         stickyFooter
         onSubmit={handleSubmit}
         onSaveShortcut={() => void handleSave('save')}

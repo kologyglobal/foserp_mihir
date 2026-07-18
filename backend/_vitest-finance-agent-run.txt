@@ -1,0 +1,19 @@
+﻿node.exe : npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm 
+help npmrc` for supported config options.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...config options.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+ RUN  v3.2.7 D:/Projects/FOS/trailer-erp 2/backend
+
+ Γ£ô tests/finance/finance-ar-calculation.test.ts (25 tests) 43ms
+ Γ£ô tests/finance/finance-ar-gst-validation.test.ts (8 tests) 426ms
+
+ Test Files  2 passed (2)
+      Tests  33 passed (33)
+   Start at  22:13:20
+   Duration  1.72s (transform 338ms, setup 81ms, collect 934ms, tests 470ms, environment 1ms, prepare 391ms)
+

@@ -100,6 +100,25 @@ export async function saveNumberReservation(
   })
 }
 
+export async function saveSourceNumberReservation(
+  tenantId: string,
+  id: string,
+  data: { sourceNumberSeriesId: string; reservedSourceDocumentNumber: string },
+): Promise<PostingEvent> {
+  const event = await findByIdOrThrow(tenantId, id)
+  if (event.reservedSourceDocumentNumber && event.sourceNumberSeriesId) {
+    return event
+  }
+  return prisma.postingEvent.update({
+    where: { id, tenantId },
+    data: {
+      sourceNumberSeriesId: data.sourceNumberSeriesId,
+      reservedSourceDocumentNumber: data.reservedSourceDocumentNumber,
+      sourceNumberReservedAt: new Date(),
+    },
+  })
+}
+
 async function transitionStatus(
   tenantId: string,
   id: string,

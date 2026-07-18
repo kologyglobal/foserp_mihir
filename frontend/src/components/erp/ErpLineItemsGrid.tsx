@@ -9,7 +9,10 @@ import {
   calcOpportunityLinesSummary,
   calcWeightedValue,
   createEmptyOpportunityLine,
+  opportunityLineUnitPriceDomId,
+  opportunityLineUnitPriceFieldKey,
   syncOpportunityLines,
+  UNIT_PRICE_REQUIRED_MESSAGE,
 } from '../../utils/opportunityLineCalc'
 import type { ProductMasterPick } from '../../utils/opportunityProductOptions'
 import { buildOpportunityLineFromProduct } from '../../utils/opportunityLineCalc'
@@ -191,6 +194,9 @@ export function ErpLineItemsGrid({
             <tbody>
               {synced.map((line, idx) => {
                 const errs = rowErrors[line.id] ?? []
+                const unitPriceError = errs.find((e) => /unit price/i.test(e))
+                  ?? (errs.some((e) => e === UNIT_PRICE_REQUIRED_MESSAGE) ? UNIT_PRICE_REQUIRED_MESSAGE : undefined)
+                const productColumnErrors = errs.filter((e) => !/unit price/i.test(e))
                 const expanded = expandedRows[line.id]
                 const pick = line.productId ? productPickMap.get(line.productId) : undefined
                 const hsn = lineHsn(pick)
@@ -241,7 +247,9 @@ export function ErpLineItemsGrid({
                           {line.itemCode ? (
                             <p className="erp-line-items-grid__product-code">{line.itemCode}</p>
                           ) : null}
-                          {errs.length ? <p className="erp-line-items-grid__row-error">{errs.join(' · ')}</p> : null}
+                          {productColumnErrors.length ? (
+                            <p className="erp-line-items-grid__row-error">{productColumnErrors.join(' · ')}</p>
+                          ) : null}
                         </div>
                       </td>
                       {isOpportunity ? (
@@ -279,6 +287,8 @@ export function ErpLineItemsGrid({
                             value={line.qty}
                             onChange={(e) => updateLine(line.id, { qty: Number(e.target.value) })}
                             aria-label="Quantity"
+                            data-field={`qty-${line.id}`}
+                            id={`opp-line-${line.id}-qty`}
                           />
                         )}
                       </td>
@@ -291,12 +301,29 @@ export function ErpLineItemsGrid({
                       )}
                       <td className="text-right erp-line-items-grid__col-price tabular-nums">
                         {readOnly ? formatCrmCurrency(line.unitPrice) : (
-                          <FormattedCurrencyInput
-                            className="erp-line-items-grid__input-num"
-                            value={line.unitPrice}
-                            onValueChange={(unitPrice) => updateLine(line.id, { unitPrice: Math.max(0, unitPrice) })}
-                            aria-label="Unit price"
-                          />
+                          <div className="erp-line-items-grid__price-field">
+                            <FormattedCurrencyInput
+                              id={opportunityLineUnitPriceDomId(line.id)}
+                              data-field={opportunityLineUnitPriceFieldKey(line.id)}
+                              className={cn(
+                                'erp-line-items-grid__input-num',
+                                unitPriceError && 'erp-line-items-grid__input--error',
+                              )}
+                              value={line.unitPrice}
+                              onValueChange={(unitPrice) => updateLine(line.id, { unitPrice: Math.max(0, unitPrice) })}
+                              aria-label="Unit price"
+                              aria-invalid={Boolean(unitPriceError)}
+                              aria-describedby={unitPriceError ? `${opportunityLineUnitPriceDomId(line.id)}-error` : undefined}
+                            />
+                            {unitPriceError ? (
+                              <p
+                                id={`${opportunityLineUnitPriceDomId(line.id)}-error`}
+                                className="erp-line-items-grid__row-error"
+                              >
+                                {UNIT_PRICE_REQUIRED_MESSAGE}
+                              </p>
+                            ) : null}
+                          </div>
                         )}
                       </td>
                       <td className={cn(

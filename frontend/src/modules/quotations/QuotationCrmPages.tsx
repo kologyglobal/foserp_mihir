@@ -22,6 +22,11 @@ import { useSalesStore } from '../../store/salesStore'
 import { useMasterStore } from '../../store/masterStore'
 import { useUIStore } from '../../store/uiStore'
 import { notify } from '@/store/toastStore'
+import { systemPrompt } from '@/utils/systemConfirm'
+import {
+  CreateBlankQuotationTemplateModal,
+  blankTemplateDefaultTerms,
+} from '@/components/quotations/CreateBlankQuotationTemplateModal'
 import { exportRowsToCsv } from '../../utils/exportCsv'
 import { runCrmExport } from '../../utils/crmServerExport'
 import { useSavedViews } from '../../hooks/useSavedViews'
@@ -657,7 +662,13 @@ export function CrmQuotationTemplatesPage() {
 
   async function handleDuplicate(sourceId: string) {
     const source = templates.find((t) => t.id === sourceId)
-    const name = prompt('Template name', source ? `${source.templateName} (Copy)` : 'New Template')
+    const name = await systemPrompt({
+      title: 'Duplicate template',
+      fieldLabel: 'Template name',
+      defaultValue: source ? `${source.templateName} (Copy)` : 'New Template',
+      confirmLabel: 'Duplicate',
+      required: true,
+    })
     if (!name) return
     const r = await resolveStoreAction(duplicateTemplate(sourceId, name))
     if (r.ok && r.templateId) navigate(`/crm/quotation-templates/${r.templateId}/editor`)
@@ -880,19 +891,35 @@ export function CrmQuotationTemplateNewPage() {
   const navigate = useNavigate()
   const templates = useCrmStore((s) => s.quotationTemplates)
   const createTemplate = useCrmStore((s) => s.createQuotationTemplate)
+  const [blankOpen, setBlankOpen] = useState(false)
 
-  async function handleBlank() {
-    const name = prompt('Template name', 'Custom Quotation Template')
-    if (!name) return
-    const r = await resolveStoreAction(createTemplate({ templateName: name, productFamily: 'Custom', sections: [] }))
-    if (r.ok && r.templateId) navigate(`/crm/quotation-templates/${r.templateId}/editor`)
-    else if (!r.ok) notify.error(r.error ?? 'Could not create template')
+  async function handleBlankCreate(values: Parameters<typeof blankTemplateDefaultTerms>[0]) {
+    const r = await resolveStoreAction(
+      createTemplate({
+        templateName: values.templateName,
+        productFamily: values.templateType,
+        sections: [],
+        defaultTerms: blankTemplateDefaultTerms(values),
+        printLayout: values.printLayout,
+      }),
+    )
+    if (r.ok && r.templateId) {
+      navigate(`/crm/quotation-templates/${r.templateId}/editor`)
+      return
+    }
+    throw new Error(r.error ?? 'Could not create template')
   }
 
   async function handleFromBase(baseId: string) {
     const base = templates.find((t) => t.id === baseId)
     if (!base) return
-    const name = prompt('Template name', `${base.templateName} (Copy)`)
+    const name = await systemPrompt({
+      title: 'Create from template',
+      fieldLabel: 'Template name',
+      defaultValue: `${base.templateName} (Copy)`,
+      confirmLabel: 'Create',
+      required: true,
+    })
     if (!name) return
     const r = await resolveStoreAction(
       createTemplate({ templateName: name, productFamily: base.productFamily, sourceTemplateId: baseId }),
@@ -921,7 +948,7 @@ export function CrmQuotationTemplateNewPage() {
             id: 'blank',
             label: 'Blank Template',
             icon: Layers,
-            onClick: handleBlank,
+            onClick: () => setBlankOpen(true),
           }}
           secondaryActions={[
             { id: 'back', label: 'All Templates', icon: ArrowLeft, onClick: () => navigate('/crm/quotation-templates') },
@@ -943,7 +970,7 @@ export function CrmQuotationTemplateNewPage() {
       })}
     >
       <div className="crm-template-new">
-        <button type="button" className="crm-template-new__blank" onClick={handleBlank}>
+        <button type="button" className="crm-template-new__blank" onClick={() => setBlankOpen(true)}>
           <Layers className="h-6 w-6" />
           <div>
             <p className="crm-template-new__title">Blank template</p>
@@ -972,6 +999,11 @@ export function CrmQuotationTemplateNewPage() {
           ))}
         </div>
       </div>
+      <CreateBlankQuotationTemplateModal
+        open={blankOpen}
+        onClose={() => setBlankOpen(false)}
+        onCreate={handleBlankCreate}
+      />
     </OperationalPageShell>
   )
 }

@@ -39,10 +39,10 @@ import {
   primaryLinkedOpportunityIdForLead,
 } from '../../utils/leadEngagement'
 import {
-  isLeadStageLocked,
   leadStageLabel,
   resolveLeadConvertToOpportunityGate,
 } from '../../utils/leadUtils'
+import { canOpenLeadEditor, resolveLeadEditPolicy } from '../../utils/leadEditPolicy'
 import {
   DEFAULT_LEAD_LIST_FILTERS,
   type LeadListFilters,
@@ -61,6 +61,7 @@ import { LogActivityDrawer } from '../../components/crm/CrmQuickCreateDrawers'
 import { useLeadRoutes } from '../../hooks/useLeadRoutes'
 import { leadListBreadcrumbs } from '../../utils/crmLeadNavigation'
 import { getLeadUser } from '../../data/crm/leadUsers'
+import { syncLeadsFromApi } from '../../services/bridges/crmApiBridge'
 
 export function CrmLeadListPage() {
   const apiMode = useApiMode()
@@ -91,6 +92,16 @@ export function CrmLeadListPage() {
 
   const canEdit = canCrmPermission('crm.lead.update')
   const canDelete = canCrmPermission('crm.lead.delete')
+
+  // API mode: soft-refresh leads when opening the register (Zustand stand-in for
+  // invalidateQueries). Bridge upserts already update the store after create/edit;
+  // this picks up server-side changes without window.location.reload().
+  useEffect(() => {
+    if (!apiMode) return
+    void syncLeadsFromApi().catch(() => {
+      /* keep existing store slice on network failure */
+    })
+  }, [apiMode])
 
   useEffect(() => {
     const stage = searchParams.get('stage') ?? ''
@@ -466,8 +477,9 @@ export function CrmLeadListPage() {
             }
             onView={(row) => navigate(routes.view(row.lead.id))}
             onEdit={(row) => {
-              if (isLeadStageLocked(row.lead.stage)) {
-                showToast('This lead is locked (converted or closed) and cannot be edited', 'warning')
+              const policy = resolveLeadEditPolicy(row.lead)
+              if (!canOpenLeadEditor(policy)) {
+                showToast(policy.reason ?? 'This lead cannot be edited', 'warning')
                 return
               }
               navigate(routes.edit(row.lead.id))

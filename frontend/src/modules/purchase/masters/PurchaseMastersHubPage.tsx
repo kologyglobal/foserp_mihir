@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Building2,
   Package,
@@ -111,6 +111,7 @@ function MasterCard({
 }
 
 export function PurchaseMastersHubPage() {
+  const navigate = useNavigate()
   const entries = usePurchaseMasterStore((s) => s.entries)
   const crmEntries = useCrmMasterStore((s) => s.entries)
   const vendors = useMasterStore((s) => s.vendors)
@@ -170,11 +171,11 @@ export function PurchaseMastersHubPage() {
             id: 'payment-terms',
             label: 'Payment Terms',
             icon: CreditCard,
-            onClick: () => { window.location.href = '/masters/payment-terms' },
+            onClick: () => navigate('/masters/payment-terms'),
           }}
           secondaryActions={[
-            { id: 'vendors', label: 'Vendor Master', onClick: () => { window.location.href = '/masters/vendors' } },
-            { id: 'qc-rules', label: 'QC Rules', onClick: () => { window.location.href = '/purchase/masters/qc-rules' } },
+            { id: 'vendors', label: 'Vendor Master', onClick: () => navigate('/masters/vendors') },
+            { id: 'qc-rules', label: 'QC Rules', onClick: () => navigate('/purchase/masters/qc-rules') },
           ]}
         />
       )}

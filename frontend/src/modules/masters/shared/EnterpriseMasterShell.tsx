@@ -55,6 +55,7 @@ export function MasterFormCommandBar({
   isEdit?: boolean
   isSubmitting?: boolean
 }) {
+  const navigate = useNavigate()
   return (
     <ErpCardCommandBar
       inline
@@ -67,7 +68,7 @@ export function MasterFormCommandBar({
         { id: 'import', label: 'Import', icon: Upload, onClick: () => notify.info('Import wizard — connect CSV template in backend phase.') },
         { id: 'export', label: 'Export', icon: Download, onClick: () => notify.info('Export queued — download from list page.') },
         { id: 'cancel', label: 'Cancel', icon: X, onClick: onCancel },
-        { id: 'list', label: 'Back to list', onClick: () => { window.location.href = listPath } },
+        { id: 'list', label: 'Back to list', onClick: () => navigate(listPath) },
       ]}
     />
   )

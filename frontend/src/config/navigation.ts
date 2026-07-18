@@ -259,7 +259,8 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Chart of Accounts', path: '/accounting/chart-of-accounts', icon: BookOpen },
       { label: 'Journals', path: '/accounting/entries/journals', icon: FileText },
       { label: 'Vouchers (demo)', path: '/accounting/vouchers', icon: FileText, subNav: false as const },
-      { label: 'Receivables', path: '/accounting/receivables', icon: ArrowDownToLine },
+      { label: 'Money In', path: '/accounting/money-in', icon: ArrowDownToLine },
+      { label: 'Receivables (legacy)', path: '/accounting/receivables/invoices', icon: ArrowDownToLine, subNav: false as const },
       {
         label: 'Commercial Commitments',
         path: '/accounting/commercial-commitments',
@@ -369,9 +370,9 @@ export const searchablePages: SearchablePage[] = moduleCategories.flatMap((cat) 
 
 export function navItemIsActive(item: NavItem, pathname: string): boolean {
   if (item.disabled) return false
-  /** Commercial commitments live under Receivables conceptually */
+  /** Commercial commitments live under Money In / receivables conceptually */
   if (
-    item.path === '/accounting/receivables' &&
+    (item.path === '/accounting/money-in' || item.path === '/accounting/receivables/invoices') &&
     (pathname === '/accounting/commercial-commitments' ||
       pathname.startsWith('/accounting/commercial-commitments/'))
   ) {

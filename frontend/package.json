@@ -118,6 +118,7 @@
     "test:reports": "tsx scripts/test-operational-reports.ts",
     "test:product-master": "tsx scripts/test-product-master.ts",
     "test:invoice": "tsx scripts/test-invoice.ts",
+    "test:money-in": "tsx scripts/verify-money-in.ts",
     "simulate:go-live": "tsx scripts/go-live-simulation.ts",
     "calibrate:cost": "tsx scripts/go-live-simulation.ts",
     "analyze:cost-variance": "tsx scripts/go-live-simulation.ts",

@@ -28,6 +28,7 @@ import { resolveStoreAction } from '../../store/storeAction'
 import { useSalesStore } from '../../store/salesStore'
 import { useMasterStore } from '../../store/masterStore'
 import { notify } from '@/store/toastStore'
+import { systemPrompt } from '@/utils/systemConfirm'
 import {
   QuotationLineItemsEditor,
   QuotationApprovalPanel,
@@ -309,7 +310,15 @@ export function Quotation360Page() {
   }
 
   async function handleNewRevision() {
-    const reason = prompt('Revision reason?') ?? 'Customer requested changes'
+    const reason = await systemPrompt({
+      title: 'Create revision',
+      description: 'Describe why a new revision is needed.',
+      fieldLabel: 'Revision reason',
+      defaultValue: 'Customer requested changes',
+      confirmLabel: 'Create revision',
+      required: true,
+    })
+    if (!reason) return
     const r = await resolveStoreAction(createRevision(quoDoc.id, reason))
     if (r.ok && r.documentId) {
       navigate(`/crm/quotations/${quoId}/editor?doc=${r.documentId}`)
@@ -457,7 +466,7 @@ export function Quotation360Page() {
         suppressFactBoxRecord
         workspaceRecordHeader
         collapsibleFactBox
-        factBoxLabel="Details"
+        factBoxLabel="Smart Context"
         stickyFooter={false}
       >
         <div className="erp-form-body crm-lead-form-body">

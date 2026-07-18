@@ -1556,6 +1556,193 @@ export const swaggerSpec = {
       },
     },
 
+    // ─── Accounting — Receivables / Sales invoices (Phase 3A3) ───────────────
+    '/t/{tenantSlug}/accounting/receivables/invoices': {
+      get: {
+        tags: ['Accounting Receivables', 'Sales Invoices'],
+        summary: 'List sales invoice drafts',
+        description: 'Permission: `finance.ar.invoice.view`. Filter by legalEntityId (required), status, customer, dates, search.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'legalEntityId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['DRAFT', 'READY_TO_POST', 'POSTED', 'CANCELLED'] } },
+          { name: 'search', in: 'query', schema: { type: 'string' } },
+          { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 20 } },
+        ],
+        responses: { 200: { description: 'Paginated invoice list with allowedActions per row' } },
+      },
+      post: {
+        tags: ['Accounting Receivables', 'Sales Invoices'],
+        summary: 'Create sales invoice draft',
+        description:
+          'Permission: `finance.ar.invoice.create`. Server recalculates amounts via Phase 3A2 engine. Issues `draftReference` only — no invoice number or GL posting.',
+        parameters: [tenantSlugParam],
+        responses: {
+          201: { description: 'Draft created with calculated totals and allowedActions' },
+          422: { description: 'SALES_INVOICE_DRAFT_CALCULATION_FAILED / SALES_ORDER_*' },
+        },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/invoices/{id}': {
+      get: {
+        tags: ['Accounting Receivables', 'Sales Invoices'],
+        summary: 'Get sales invoice detail',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Invoice detail + lines + allowedActions + validationSummary' } },
+      },
+      put: {
+        tags: ['Accounting Receivables', 'Sales Invoices'],
+        summary: 'Update sales invoice draft',
+        description:
+          'Permission: `finance.ar.invoice.edit`. DRAFT|READY_TO_POST only. Requires `updatedAt` for optimistic concurrency. READY → DRAFT on edit.',
+        parameters: [tenantSlugParam, idParam],
+        responses: {
+          200: { description: 'Updated draft' },
+          409: { description: 'SALES_INVOICE_STALE_UPDATE' },
+          422: { description: 'SALES_INVOICE_NOT_EDITABLE' },
+        },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/invoices/{id}/validate': {
+      post: {
+        tags: ['Accounting Receivables', 'Sales Invoices'],
+        summary: 'Validate sales invoice draft (no persist)',
+        description: 'Permission: `finance.ar.invoice.view`. Runs validateSalesInvoiceDraft; audits SALES_INVOICE_VALIDATED.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Validation preview report' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/invoices/{id}/mark-ready': {
+      post: {
+        tags: ['Accounting Receivables', 'Sales Invoices'],
+        summary: 'Mark draft ready to post',
+        description:
+          'Permission: `finance.ar.invoice.edit`. Full validation + SALES_INVOICE number series preview (non-consuming). Status → READY_TO_POST. No posting in 3A3.',
+        parameters: [tenantSlugParam, idParam],
+        responses: {
+          200: { description: 'Invoice ready to post' },
+          422: { description: 'SALES_INVOICE_VALIDATION_FAILED / number series not configured' },
+        },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/invoices/{id}/cancel': {
+      post: {
+        tags: ['Accounting Receivables', 'Sales Invoices'],
+        summary: 'Cancel sales invoice draft',
+        description: 'Permission: `finance.ar.invoice.cancel`. Body: `{ cancellationReason }`. DRAFT|READY_TO_POST → CANCELLED.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Cancelled invoice' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/invoices/{id}/post': {
+      post: {
+        tags: ['Accounting Receivables', 'Sales Invoices'],
+        summary: 'Post sales invoice to GL (atomic)',
+        description:
+          'Permission: `finance.ar.invoice.post`. Empty body OK. READY_TO_POST → POSTED in one transaction: SYSTEM voucher + GL + ReceivableOpenItem + invoice number (SALES_INVOICE series) + PostingEvent. Idempotent event key `SALES_INVOICE_POST:{id}:V1`.',
+        parameters: [tenantSlugParam, idParam],
+        responses: {
+          200: { description: '{ invoice, posting, receivableOpenItemId, idempotentReplay }' },
+          403: { description: 'SALES_INVOICE_POSTING_NOT_ALLOWED' },
+          409: { description: 'SALES_INVOICE_CONCURRENT_POST' },
+          422: { description: 'SALES_INVOICE_NOT_READY / SALES_INVOICE_CHANGED_AFTER_READY / period closed' },
+        },
+      },
+    },
+
+    // ─── Accounting — Receivables reporting (Phase 3A5) ───────────────────────
+    '/t/{tenantSlug}/accounting/receivables/overview': {
+      get: {
+        tags: ['Accounting Receivables', 'AR Reporting'],
+        summary: 'Receivable overview dashboard metrics',
+        description:
+          'Permission: `finance.ar.view`. Read-only aggregates: open item totals, ready-to-post count, posted-this-month, data-quality exceptions. Default `reportDate` = today in tenant timezone.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'legalEntityId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'reportDate', in: 'query', schema: { type: 'string', format: 'date' } },
+          { name: 'includeSettled', in: 'query', schema: { type: 'boolean' } },
+        ],
+        responses: { 200: { description: 'Overview totals + currencyBreakdown' }, 422: { description: 'RECEIVABLE_REPORT_DATE_IN_FUTURE' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/outstanding': {
+      get: {
+        tags: ['Accounting Receivables', 'AR Reporting'],
+        summary: 'Outstanding receivable open items',
+        description:
+          'Permission: `finance.ar.view`. Paginated open items joined to posted sales invoices. Default filter: `openAmount > 0` and status OPEN|PARTIALLY_SETTLED|DISPUTED|ON_HOLD.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'legalEntityId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'reportDate', in: 'query', schema: { type: 'string', format: 'date' } },
+          { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
+          { name: 'pageSize', in: 'query', schema: { type: 'integer', default: 20, maximum: 100 } },
+        ],
+        responses: { 200: { description: 'Paginated outstanding rows with ageing fields + read-only allowedActions' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/ageing': {
+      get: {
+        tags: ['Accounting Receivables', 'AR Reporting'],
+        summary: 'Receivable ageing buckets',
+        description:
+          'Permission: `finance.ar.view`. `ageingBasis=due_date|invoice_age`. Past `reportDate` allowed with `limitations: [AGEING_USES_CURRENT_BALANCES]`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'legalEntityId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'ageingBasis', in: 'query', schema: { type: 'string', enum: ['due_date', 'invoice_age'], default: 'due_date' } },
+        ],
+        responses: { 200: { description: 'Bucket totals + currencyBreakdown' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/customers': {
+      get: {
+        tags: ['Accounting Receivables', 'AR Reporting'],
+        summary: 'Customer receivable summary list',
+        description: 'Permission: `finance.ar.view`. Grouped by customer with outstanding totals and currency breakdown.',
+        parameters: [tenantSlugParam, { name: 'legalEntityId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Paginated customer summaries' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/customers/{customerId}': {
+      get: {
+        tags: ['Accounting Receivables', 'AR Reporting'],
+        summary: 'Single customer receivable summary',
+        description: 'Permission: `finance.ar.view`.',
+        parameters: [tenantSlugParam, { name: 'customerId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Customer summary' }, 404: { description: 'RECEIVABLE_CUSTOMER_NOT_FOUND' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/customers/{customerId}/open-items': {
+      get: {
+        tags: ['Accounting Receivables', 'AR Reporting'],
+        summary: 'Customer open receivable items',
+        description: 'Permission: `finance.ar.view`. Same shape as `/outstanding` filtered to one customer.',
+        parameters: [tenantSlugParam, { name: 'customerId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Paginated open items for customer' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/reconciliation': {
+      get: {
+        tags: ['Accounting Receivables', 'AR Reporting'],
+        summary: 'AR subledger to GL reconciliation',
+        description:
+          'Permission: `finance.ar.reconcile.view`. Compares sum(open item baseOpenAmount) per receivable account vs GL net balance. Returns HTTP 200 with status MATCHED|MISMATCH|DATA_INCOMPLETE. Past `asOfDate` rejected with `AR_HISTORICAL_AS_OF_NOT_SUPPORTED`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'legalEntityId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'asOfDate', in: 'query', schema: { type: 'string', format: 'date' } },
+        ],
+        responses: {
+          200: { description: 'Reconciliation result with accounts[] and exceptions[]' },
+          403: { description: 'Missing finance.ar.reconcile.view' },
+          422: { description: 'AR_HISTORICAL_AS_OF_NOT_SUPPORTED' },
+        },
+      },
+    },
+
     // ─── Accounting — Approval inbox (Phase 2C2A) ───────────────────────────
     '/t/{tenantSlug}/accounting/approvals': {
       get: {

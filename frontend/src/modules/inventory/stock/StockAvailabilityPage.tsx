@@ -24,7 +24,8 @@ export function StockAvailabilityPage() {
   const navigate = useNavigate()
   const perms = useInventoryPermissions()
   const [params] = useSearchParams()
-  const warehouses = useMasterStore((s) => s.warehouses.filter((w) => w.isActive))
+  const allWarehouses = useMasterStore((s) => s.warehouses)
+  const warehouses = useMemo(() => allWarehouses.filter((w) => w.isActive), [allWarehouses])
   const [rows, setRows] = useState<StockAvailability[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState(params.get('search') ?? '')
@@ -42,16 +43,28 @@ export function StockAvailabilityPage() {
     return presets
   }, [])
 
+  const savedViewFilters = useMemo(
+    () => ({
+      search,
+      warehouseId,
+      lowStock: lowStock ? '1' : '',
+      outOfStock: outOfStock ? '1' : '',
+    }),
+    [search, warehouseId, lowStock, outOfStock],
+  )
+
+  const applySavedView = useCallback((f: Record<string, string>) => {
+    setSearch(f.search ?? '')
+    setWarehouseId(f.warehouseId ?? '')
+    setLowStock(f.lowStock === '1')
+    setOutOfStock(f.outOfStock === '1')
+  }, [])
+
   const savedViews = useSavedViews({
     pageId: '/inventory/stock',
-    filters: { search, warehouseId, lowStock: lowStock ? '1' : '', outOfStock: outOfStock ? '1' : '' },
+    filters: savedViewFilters,
     systemPresets,
-    onApply: (f) => {
-      setSearch(f.search ?? '')
-      setWarehouseId(f.warehouseId ?? '')
-      setLowStock(f.lowStock === '1')
-      setOutOfStock(f.outOfStock === '1')
-    },
+    onApply: applySavedView,
   })
 
   const [loadError, setLoadError] = useState(false)

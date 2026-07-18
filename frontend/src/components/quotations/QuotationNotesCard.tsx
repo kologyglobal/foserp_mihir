@@ -128,8 +128,8 @@ export function QuotationNotesCard({
               pending={pending}
               submitLabel="Save note"
               onCancel={() => setAdding(false)}
-              onSubmit={async (content) => {
-                const r = await createNote(content)
+              onSubmit={async (input) => {
+                const r = await createNote(input)
                 if (r.ok) {
                   setAdding(false)
                   void refresh()

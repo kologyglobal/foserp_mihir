@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { paginationSchema } from '../../../utils/pagination.js'
 import { optionalPhoneSchema } from '../../../utils/phoneValidation.js'
+import { optionalEmailSchema } from '../../../utils/emailValidation.js'
 
 export const listContactsQuerySchema = paginationSchema.extend({
   customerId: z.string().uuid().optional(),
@@ -15,7 +16,7 @@ export const createContactSchema = z.object({
   name: z.string().trim().min(1).max(200),
   designation: z.string().trim().max(100).optional(),
   department: z.string().trim().max(100).optional(),
-  email: z.string().trim().email().max(255).optional().or(z.literal('')),
+  email: optionalEmailSchema.optional().or(z.literal('')),
   phone: optionalPhoneSchema,
   alternatePhone: optionalPhoneSchema,
   linkedInUrl: z.string().trim().url().max(255).optional().or(z.literal('')),

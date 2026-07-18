@@ -3,12 +3,16 @@ import { nextCode } from '../../../services/codeSeries.service.js'
 import { InvalidStateError, NotFoundError } from '../../../utils/errors.js'
 import { resolveUserNames } from '../../../shared/index.js'
 import { assertCompanyInTenant, assertContactInTenant, assertUserInTenant } from '../crm.tenant-refs.js'
+import {
+  assertLeadStageRequirements,
+  leadEntityForStageGate,
+} from '../stage-requirements.js'
 import * as repo from './lead.repository.js'
 import {
   assertLeadAssignable,
   assertLeadConvertible,
   assertLeadDisqualifiable,
-  assertLeadMutable,
+  assertLeadWorkflowMutable,
   assertLeadQualifiable,
   sanitizeLeadUpdateInput,
 } from './lead.workflow.js'
@@ -127,6 +131,8 @@ export async function qualifyLead(tenantId: string, id: string, userId: string, 
   if (existing.lifecycleStatus === 'converted') {
     throw new InvalidStateError('Lead already converted')
   }
+  const targetStage = input.stage ?? 'qualified'
+  assertLeadStageRequirements(leadEntityForStageGate(existing), targetStage)
   const lead = await repo.qualifyLead(tenantId, id, userId, input)
   return (await mapLeadWithNames(tenantId, lead))!
 }
@@ -134,17 +140,20 @@ export async function qualifyLead(tenantId: string, id: string, userId: string, 
 export async function changeLeadStage(tenantId: string, id: string, userId: string, input: ChangeLeadStageInput) {
   const existing = await repo.findLeadById(tenantId, id)
   if (!existing) throw new NotFoundError('Lead not found')
-  assertLeadMutable(existing)
+  assertLeadWorkflowMutable(existing)
 
   if (input.stage === 'converted_to_opportunity') {
     throw new InvalidStateError('Use convert action to move a lead to opportunity')
   }
-  if (input.stage === 'not_qualified' && !input.notQualifiedReason?.trim()) {
-    throw new InvalidStateError('Not qualified reason is required')
-  }
-  if (input.stage === 'closed' && !input.closedReason?.trim()) {
-    throw new InvalidStateError('Closed reason is required')
-  }
+
+  // Validate post-merge state (entity + request body reason fields) before persist.
+  assertLeadStageRequirements(
+    leadEntityForStageGate(existing, {
+      notQualifiedReason: input.notQualifiedReason ?? existing.notQualifiedReason,
+      closedReason: input.closedReason ?? existing.closedReason,
+    }),
+    input.stage,
+  )
 
   const lifecycleStatus = lifecycleFromStage(input.stage)
   const qualificationStatus = qualificationFromStage(input.stage)
@@ -170,6 +179,10 @@ export async function disqualifyLead(tenantId: string, id: string, userId: strin
   if (existing.lifecycleStatus === 'converted') {
     throw new InvalidStateError('Lead already converted')
   }
+  assertLeadStageRequirements(
+    leadEntityForStageGate(existing, { notQualifiedReason: input.notQualifiedReason }),
+    'not_qualified',
+  )
   const lead = await repo.disqualifyLead(tenantId, id, userId, input)
   return (await mapLeadWithNames(tenantId, lead))!
 }
@@ -181,6 +194,7 @@ export async function convertLead(tenantId: string, id: string, userId: string, 
   if (existing.lifecycleStatus === 'converted' || existing.opportunityId) {
     throw new InvalidStateError('Lead already converted')
   }
+  assertLeadStageRequirements(leadEntityForStageGate(existing), 'converted_to_opportunity')
 
   let pipelineId = input.pipelineId
   let stageId = input.stageId

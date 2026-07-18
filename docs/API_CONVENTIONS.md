@@ -157,7 +157,43 @@ Master CSV export: `/masters/exports/{items|vendors|hsn-sac}`.
 
 Prefix: **`/api/v1/t/:tenantSlug/accounting`**. Auth + tenant context required. Never send `tenantId` in bodies.
 
-Live OpenAPI: `/api/docs` (tags **Accounting Journals**, **Accounting Approvals**, **Accounting Vouchers**, **Accounting Posting Events**).
+Live OpenAPI: `/api/docs` (tags **Accounting Journals**, **Accounting Receivables**, **Sales Invoices**, **Accounting Approvals**, **Accounting Vouchers**, **Accounting Posting Events**).
+
+### Sales invoices (`/receivables/invoices`) — Phase 3A3 + 3A4
+
+| Method | Path | Permission | Notes |
+|--------|------|------------|-------|
+| GET | `/receivables/invoices` | `finance.ar.invoice.view` | Requires `legalEntityId`; filters status, customer, dates, search |
+| POST | `/receivables/invoices` | `finance.ar.invoice.create` | Create DRAFT; server calculates amounts; `draftReference` only (no invoice number) |
+| GET | `/receivables/invoices/:id` | `finance.ar.invoice.view` | Detail + lines + `allowedActions` + `validationSummary`; POSTED includes `receivableOpenItemId`, `outstandingAmount` |
+| PUT | `/receivables/invoices/:id` | `finance.ar.invoice.edit` | DRAFT / READY_TO_POST; body includes `updatedAt` (optimistic lock) |
+| POST | `/receivables/invoices/:id/validate` | `finance.ar.invoice.view` | Validation preview only — no amount/status persist |
+| POST | `/receivables/invoices/:id/mark-ready` | `finance.ar.invoice.edit` | Full validation + number series preview (non-consuming) → READY_TO_POST |
+| POST | `/receivables/invoices/:id/post` | `finance.ar.invoice.post` | Atomic post READY→POSTED; empty body OK; idempotent `SALES_INVOICE_POST:{id}:V1` |
+| POST | `/receivables/invoices/:id/cancel` | `finance.ar.invoice.cancel` | Body `{ cancellationReason }` → CANCELLED |
+
+**Lifecycle:** `DRAFT` → mark-ready → `READY_TO_POST` → post → `POSTED`. Edit from READY reopens to `DRAFT`.  
+**Post response (`POST …/post`):** `{ invoice, posting, receivableOpenItemId, idempotentReplay }` where `posting` includes `voucherNumber`, `postingEventId`, `ledgerEntryCount`.  
+**Posted `allowedActions`:** all writes false; `viewAccounting: true` when user has view permission.  
+**Stale update:** `409` code `SALES_INVOICE_STALE_UPDATE` when `updatedAt` mismatch.  
+**Source types:** `DIRECT` or `SALES_ORDER` (+ `sourceDocumentId`); SO adapter read-only with duplicate-invoice warning.
+
+### AR reporting (`/receivables/*`) — Phase 3A5 (read-only GET)
+
+| Method | Path | Permission | Notes |
+|--------|------|------------|-------|
+| GET | `/receivables/overview` | `finance.ar.view` | Totals, ready-to-post count, posted-this-month, data-quality exceptions |
+| GET | `/receivables/outstanding` | `finance.ar.view` | Paginated open items + invoice join; default active outstanding filter |
+| GET | `/receivables/ageing` | `finance.ar.view` | Bucket totals; `ageingBasis=due_date\|invoice_age`; past dates → `limitations: [AGEING_USES_CURRENT_BALANCES]` |
+| GET | `/receivables/customers` | `finance.ar.view` | Customer summary list grouped by `customerId` |
+| GET | `/receivables/customers/:customerId` | `finance.ar.view` | Single customer summary |
+| GET | `/receivables/customers/:customerId/open-items` | `finance.ar.view` | Customer-scoped outstanding list |
+| GET | `/receivables/reconciliation` | `finance.ar.reconcile.view` | Subledger vs GL; HTTP 200 with `status` MATCHED\|MISMATCH\|DATA_INCOMPLETE |
+
+**Reporting field names:** API `outstandingAmount` = `ReceivableOpenItem.openAmount`; base currency uses `baseOpenAmount`.  
+**Status flags:** derive `isDisputed` / `isOnHold` from `status === DISPUTED|ON_HOLD` (no DB booleans).  
+**Errors:** `RECEIVABLE_REPORT_DATE_IN_FUTURE`, `AR_HISTORICAL_AS_OF_NOT_SUPPORTED`, `RECEIVABLE_INVALID_AMOUNT_RANGE`, etc.  
+**No writes:** reporting routes must not mutate invoices, open items, vouchers, GL, posting events, number series, or audit logs.
 
 ### Manual journals (`/journals`)
 

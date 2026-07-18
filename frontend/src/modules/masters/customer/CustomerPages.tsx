@@ -32,7 +32,9 @@ import { notify } from '../../../store/toastStore'
 import { getSessionUser } from '../../../utils/permissions'
 import { ActiveBadge, TypeBadge } from '../../../components/ui/StatusBadge'
 import { Input, Select, Checkbox, MobileInput } from '../../../components/forms/Inputs'
-import { phoneDigitsField } from '../../../utils/phoneValidationZod'
+import { phoneDigitsField, refineMobileWithCountryField } from '../../../utils/phoneValidationZod'
+import { normalizeEmail } from '../../../utils/validation/email'
+import { optionalEmailField } from '../../../utils/validation/emailZod'
 import { StateSelect, CitySelect, CountrySelect } from '../../../components/masters/GeographySelects'
 import { DEFAULT_CUSTOMER_COUNTRY } from '../../../config/countries'
 import { ErpCardCommandBar } from '../../../components/erp/card-form/ErpCardCommandBar'
@@ -62,33 +64,35 @@ import { appendAuditStripFields, resolveRecordCreatedBy, resolveRecordCreatedDat
 
 const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
 
-const schema = z.object({
-  customerCode: z.string().min(1),
-  customerName: z.string().min(1),
-  customerType: z.enum(['corporate', 'dealer', 'government']),
-  addressLine1: z.string(),
-  addressLine2: z.string().optional(),
-  shippingAddress: z.string().optional(),
-  shippingAddressLine2: z.string().optional(),
-  shippingCity: z.string().optional(),
-  shippingState: z.string().optional(),
-  shippingPincode: z.string().optional(),
-  shippingCountry: z.string().optional(),
-  shippingSameAsBilling: z.boolean().optional(),
-  city: z.string().min(1, 'City required'),
-  state: z.string().min(1, 'State required'),
-  pincode: z.string(),
-  country: z.string().min(1, 'Country required'),
-  gstin: z.string().length(15, 'GSTIN must be 15 characters').regex(GSTIN_RE, 'Invalid GSTIN format'),
-  pan: z.string().max(10).optional(),
-  contactPerson: z.string(),
-  contactPhone: phoneDigitsField,
-  contactEmail: z.string(),
-  creditDays: z.coerce.number().min(0),
-  creditLimit: z.coerce.number().min(0),
-  salesTerritory: z.enum(['West', 'North', 'South', 'East']),
-  isActive: z.boolean(),
-})
+const schema = z
+  .object({
+    customerCode: z.string().min(1),
+    customerName: z.string().min(1),
+    customerType: z.enum(['corporate', 'dealer', 'government']),
+    addressLine1: z.string(),
+    addressLine2: z.string().optional(),
+    shippingAddress: z.string().optional(),
+    shippingAddressLine2: z.string().optional(),
+    shippingCity: z.string().optional(),
+    shippingState: z.string().optional(),
+    shippingPincode: z.string().optional(),
+    shippingCountry: z.string().optional(),
+    shippingSameAsBilling: z.boolean().optional(),
+    city: z.string().min(1, 'City required'),
+    state: z.string().min(1, 'State required'),
+    pincode: z.string(),
+    country: z.string().min(1, 'Country required'),
+    gstin: z.string().length(15, 'GSTIN must be 15 characters').regex(GSTIN_RE, 'Invalid GSTIN format'),
+    pan: z.string().max(10).optional(),
+    contactPerson: z.string(),
+    contactPhone: phoneDigitsField,
+    contactEmail: optionalEmailField,
+    creditDays: z.coerce.number().min(0),
+    creditLimit: z.coerce.number().min(0),
+    salesTerritory: z.enum(['West', 'North', 'South', 'East']),
+    isActive: z.boolean(),
+  })
+  .superRefine(refineMobileWithCountryField('contactPhone', 'country'))
 
 type FormData = z.infer<typeof schema>
 
@@ -441,6 +445,7 @@ export function CustomerFormPage() {
     const { shippingSameAsBilling, ...rest } = data
     return {
       ...rest,
+      contactEmail: rest.contactEmail?.trim() ? normalizeEmail(rest.contactEmail) : '',
       gstin: rest.gstin.toUpperCase(),
       pan: rest.pan?.trim() || panFromGstin(rest.gstin) || undefined,
       addressLine2: rest.addressLine2?.trim() || undefined,
@@ -972,7 +977,12 @@ export function CustomerFormPage() {
               <ErpFieldRow label="Contact Person">
                 <Input {...register('contactPerson')} placeholder="Purchase manager name" className="erp-input" />
               </ErpFieldRow>
-              <ErpFieldRow label="Phone" fieldState={errors.contactPhone ? 'error' : 'idle'} fieldError={errors.contactPhone?.message}>
+              <ErpFieldRow
+                label="Phone"
+                dataField="contactPhone"
+                fieldState={errors.contactPhone ? 'error' : 'idle'}
+                fieldError={errors.contactPhone?.message}
+              >
                 <MobileInput {...register('contactPhone')} placeholder="10-digit mobile" className="erp-input" />
               </ErpFieldRow>
               <ErpFieldRow label="Email" fieldState={errors.contactEmail ? 'error' : 'idle'} fieldError={errors.contactEmail?.message}>

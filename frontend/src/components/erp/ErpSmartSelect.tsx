@@ -16,7 +16,14 @@ export interface ErpSmartSelectOption<T = string> {
   value: T
   label: string
   searchText: string
+  /** Legacy secondary line — prefer `subtitle` + `trailing` for richer rows */
   meta?: ReactNode
+  /** Company / context line under the primary label */
+  subtitle?: string
+  /** Right-aligned amount or status emphasis */
+  trailing?: ReactNode
+  /** Compact status / tag under the subtitle */
+  badge?: string
 }
 
 interface ErpSmartSelectProps<T = string> {
@@ -34,6 +41,8 @@ interface ErpSmartSelectProps<T = string> {
   error?: boolean
   /** dropdown = chevron-only when closed (forms); combo = always show search icon */
   appearance?: 'combo' | 'dropdown'
+  /** Minimum dropdown width in px (useful for rich option rows) */
+  dropdownMinWidth?: number
 }
 
 function matchQuery(searchText: string, query: string): boolean {
@@ -54,6 +63,7 @@ export function ErpSmartSelect<T extends string = string>({
   compact = false,
   error = false,
   appearance = 'combo',
+  dropdownMinWidth = 280,
 }: ErpSmartSelectProps<T>) {
   const anchorRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -76,12 +86,16 @@ export function ErpSmartSelect<T extends string = string>({
 
   const displayValue = open
     ? (filterQuery !== '' ? filterQuery : (selected?.label ?? orphanLabel ?? ''))
-    : (selected?.label ?? orphanLabel ?? '')
+    : (selected
+      ? (selected.subtitle
+        ? `${selected.label} · ${selected.subtitle.split(' · ')[0]}`
+        : selected.label)
+      : (orphanLabel ?? ''))
 
   const positionDropdown = useCallback(() => {
     if (!anchorRef.current) return
     const rect = anchorRef.current.getBoundingClientRect()
-    const width = Math.max(rect.width, 280)
+    const width = Math.max(rect.width, dropdownMinWidth)
     const left = Math.min(rect.left, window.innerWidth - width - 8)
     setDropdownStyle({
       position: 'fixed',
@@ -90,7 +104,7 @@ export function ErpSmartSelect<T extends string = string>({
       width,
       zIndex: 10050,
     })
-  }, [])
+  }, [dropdownMinWidth])
 
   const openList = useCallback((resetFilter = true) => {
     if (disabled) return
@@ -266,26 +280,42 @@ export function ErpSmartSelect<T extends string = string>({
                 {filterQuery.trim() ? ` matching “${filterQuery.trim()}”` : ''}
               </p>
               <ul className="erp-smart-select__list">
-                {filtered.map((opt, index) => (
-                  <li key={opt.value}>
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={value === opt.value}
-                      className={cn(
-                        'erp-smart-select__option',
-                        value === opt.value && 'erp-smart-select__option--selected',
-                        index === highlightIndex && 'erp-smart-select__option--highlight',
-                      )}
-                      onMouseEnter={() => setHighlightIndex(index)}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => selectOption(opt)}
-                    >
-                      <span className="erp-smart-select__option-label">{opt.label}</span>
-                      {opt.meta ? <span className="erp-smart-select__option-meta">{opt.meta}</span> : null}
-                    </button>
-                  </li>
-                ))}
+                {filtered.map((opt, index) => {
+                  const rich = Boolean(opt.subtitle || opt.trailing || opt.badge)
+                  return (
+                    <li key={opt.value}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={value === opt.value}
+                        className={cn(
+                          'erp-smart-select__option',
+                          rich && 'erp-smart-select__option--rich',
+                          value === opt.value && 'erp-smart-select__option--selected',
+                          index === highlightIndex && 'erp-smart-select__option--highlight',
+                        )}
+                        onMouseEnter={() => setHighlightIndex(index)}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => selectOption(opt)}
+                      >
+                        <span className="erp-smart-select__option-head">
+                          <span className="erp-smart-select__option-label">{opt.label}</span>
+                          {opt.trailing ? (
+                            <span className="erp-smart-select__option-trailing">{opt.trailing}</span>
+                          ) : null}
+                        </span>
+                        {opt.subtitle ? (
+                          <span className="erp-smart-select__option-subtitle">{opt.subtitle}</span>
+                        ) : opt.meta ? (
+                          <span className="erp-smart-select__option-meta">{opt.meta}</span>
+                        ) : null}
+                        {opt.badge ? (
+                          <span className="erp-smart-select__option-badge">{opt.badge}</span>
+                        ) : null}
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             </>
           )}

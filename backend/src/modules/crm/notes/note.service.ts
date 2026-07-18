@@ -6,7 +6,7 @@ import { resolveUserNames } from '../../../shared/index.js'
 import { assertCrmEntityInTenant } from '../crm.entity-refs.js'
 import { prisma } from '../../../config/database.js'
 import * as repo from './note.repository.js'
-import type { CreateNoteInput, UpdateNoteInput } from './note.validation.js'
+import type { CreateNoteInput, ListNotesQuery, UpdateNoteInput } from './note.validation.js'
 
 async function mapNote(row: Awaited<ReturnType<typeof repo.listNotes>>[number], tenantId: string) {
   const names = await resolveUserNames([row.createdBy, row.updatedBy], tenantId, prisma)
@@ -15,6 +15,8 @@ async function mapNote(row: Awaited<ReturnType<typeof repo.listNotes>>[number], 
     entityType: row.entityType,
     entityId: row.entityId,
     content: row.content,
+    stageCode: row.stageCode ?? null,
+    noteType: row.noteType ?? null,
     authorId: row.createdBy ?? '',
     authorName: row.createdBy ? names.get(row.createdBy) ?? '' : '',
     createdAt: row.createdAt.toISOString(),
@@ -22,9 +24,14 @@ async function mapNote(row: Awaited<ReturnType<typeof repo.listNotes>>[number], 
   }
 }
 
-export async function listNotes(tenantId: string, entityType: CrmEntityType, entityId: string) {
+export async function listNotes(
+  tenantId: string,
+  entityType: CrmEntityType,
+  entityId: string,
+  filters: ListNotesQuery = {},
+) {
   await assertCrmEntityInTenant(tenantId, entityType, entityId)
-  const rows = await repo.listNotes(tenantId, entityType, entityId)
+  const rows = await repo.listNotes(tenantId, entityType, entityId, filters)
   return Promise.all(rows.map((r) => mapNote(r, tenantId)))
 }
 
@@ -46,7 +53,13 @@ export async function createNote(
     entity: 'crmNote',
     entityId: row.id,
     action: 'CREATE',
-    newValues: { entityType, entityId, content: input.content },
+    newValues: {
+      entityType,
+      entityId,
+      content: input.content,
+      stageCode: input.stageCode ?? null,
+      noteType: input.noteType ?? null,
+    },
     ipAddress: audit.ipAddress,
     userAgent: audit.userAgent,
   })

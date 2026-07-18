@@ -124,7 +124,7 @@ export interface EnterpriseWorkspaceProps {
   documentMetaChips?: string[]
   completion?: { percent: number; items: EnterpriseCompletionItem[] }
   validationItems?: EnterpriseValidationItem[]
-  /** Overrides EnterpriseValidationGuide title (default: Complete before saving) */
+  /** Overrides EnterpriseValidationGuide title (default: Please complete the required fields) */
   validationTitle?: string
   validationErrors?: string[]
   lockedReason?: string
@@ -143,6 +143,8 @@ export interface EnterpriseWorkspaceProps {
   /** BC-style dismissible right details pane */
   collapsibleFactBox?: boolean
   factBoxLabel?: string
+  /** Line under Smart Context title */
+  factBoxSubtitle?: string
   /**
    * Persistence key for FactBox open/collapsed preference.
    * Defaults to `erp-factbox:${pathname}` (sessionStorage).

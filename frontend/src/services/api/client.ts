@@ -11,7 +11,9 @@ export interface ApiResponse<T> {
     total: number
     totalPages: number
   } | null
+  code?: string | null
   errors?: Array<{ field: string; message: string }> | null
+  missingFields?: Array<{ field: string; label: string }> | null
 }
 
 export interface AuthSession {
@@ -197,14 +199,24 @@ function looksLikeHtml(text: string): boolean {
 const HTML_INSTEAD_OF_JSON_MESSAGE =
   'API returned a web page instead of JSON. The server is not routing /api/ to the backend (check nginx/.htaccess and that Node is running).'
 
-async function parseErrorBody(res: Response): Promise<{ message: string; errors?: ApiResponse<unknown>['errors'] }> {
+async function parseErrorBody(res: Response): Promise<{
+  message: string
+  errors?: ApiResponse<unknown>['errors']
+  code?: string | null
+  missingFields?: ApiResponse<unknown>['missingFields']
+}> {
   const raw = await res.text()
   if (looksLikeHtml(raw)) {
     return { message: HTML_INSTEAD_OF_JSON_MESSAGE }
   }
   try {
     const body = JSON.parse(raw) as ApiResponse<unknown>
-    return { message: body.message || `API error ${res.status}`, errors: body.errors ?? undefined }
+    return {
+      message: body.message || `API error ${res.status}`,
+      errors: body.errors ?? undefined,
+      code: body.code,
+      missingFields: body.missingFields ?? undefined,
+    }
   } catch {
     return { message: `API error ${res.status}` }
   }
@@ -271,12 +283,20 @@ export async function apiRequest<T>(
         : err.message,
       401,
       err.errors ?? undefined,
+      err.code ?? undefined,
+      err.missingFields ?? undefined,
     )
   }
 
   const body = await parseJsonBody<T>(res)
   if (!res.ok || !body.success) {
-    throw new ApiError(body.message || `API error ${res.status}`, res.status, body.errors ?? undefined)
+    throw new ApiError(
+      body.message || `API error ${res.status}`,
+      res.status,
+      body.errors ?? undefined,
+      body.code ?? undefined,
+      body.missingFields ?? undefined,
+    )
   }
   return body
 }

@@ -31,7 +31,7 @@ const CRM_GLOBAL_MASTERS: CrmMasterCatalogItem[] = [
   PRODUCT_INTEREST_MASTER_CATALOG,
 ]
 
-/** Slugs hosted under /masters/* instead of /crm/masters/* */
+/** Slugs hosted under /masters/* or a dedicated CRM path instead of /crm/masters/* */
 const MASTER_DATA_CRM_PATHS: Record<string, string> = {
   companies: '/masters/companies',
   contacts: '/masters/contacts',
@@ -43,6 +43,7 @@ const MASTER_DATA_CRM_PATHS: Record<string, string> = {
   'product-interests': '/masters/product-interests',
   users: '/masters/users',
   owners: '/masters/users',
+  'quotation-templates': '/crm/quotation-templates',
 }
 
 export function crmMasterHubPath(slug: string): string {

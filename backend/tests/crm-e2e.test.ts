@@ -219,12 +219,16 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
   })
 
   it('creates, updates, and deletes CRM follow-up', async () => {
+    const future = new Date(Date.now() + 2 * 60 * 60 * 1000)
+    const dueDate = future.toISOString().slice(0, 10)
+    const dueTime = `${String(future.getUTCHours()).padStart(2, '0')}:${String(future.getUTCMinutes()).padStart(2, '0')}`
     const createRes = await authPost(`${BASE}/follow-ups`, {
       followUpType: 'call',
       leadId,
       customerId: companyId,
       assignedTo: userId,
-      dueDate: new Date().toISOString().slice(0, 10),
+      dueDate,
+      dueTime,
       priority: 'medium',
       notes: 'E2E follow-up',
     })
@@ -241,6 +245,21 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
 
     const delRes = await authDelete(`${BASE}/follow-ups/${followUpId}`)
     expect(delRes.status).toBe(200)
+  })
+
+  it('rejects follow-up create with past due date/time', async () => {
+    const createRes = await authPost(`${BASE}/follow-ups`, {
+      followUpType: 'call',
+      leadId,
+      customerId: companyId,
+      assignedTo: userId,
+      dueDate: '2020-01-01',
+      dueTime: '10:00',
+      priority: 'medium',
+      notes: 'Past follow-up should fail',
+    })
+    expect(createRes.status).toBe(400)
+    expect(String(createRes.body.message ?? createRes.body.error ?? '')).toMatch(/future/i)
   })
 
   it('sync ensures opportunity-stages and document-types', async () => {
@@ -490,6 +509,69 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
 
     const deleteAgain = await authDelete(`${BASE}/entities/notes/${noteId}`)
     expect(deleteAgain.status).toBe(404)
+  })
+
+  it('creates stage-specific notes additively without overwriting prior stage notes', async () => {
+    const stageA = await authPost(`${BASE}/entities/LEAD/${leadId}/notes`, {
+      content: 'Qualification context',
+      stageCode: 'qualified',
+      noteType: 'qualification',
+    })
+    expect(stageA.status).toBe(201)
+    expect(stageA.body.data.stageCode).toBe('qualified')
+    expect(stageA.body.data.noteType).toBe('qualification')
+    const noteAId = stageA.body.data.id as string
+
+    const stageB = await authPost(`${BASE}/entities/LEAD/${leadId}/notes`, {
+      content: 'Requirement details',
+      stageCode: 'requirement_collected',
+      noteType: 'requirement',
+    })
+    expect(stageB.status).toBe(201)
+    expect(stageB.body.data.stageCode).toBe('requirement_collected')
+    expect(stageB.body.data.noteType).toBe('requirement')
+    const noteBId = stageB.body.data.id as string
+    expect(noteBId).not.toBe(noteAId)
+
+    const allNotes = await authGet(`${BASE}/entities/LEAD/${leadId}/notes`)
+    expect(allNotes.status).toBe(200)
+    const rows = allNotes.body.data as Array<{
+      id: string
+      content: string
+      stageCode: string | null
+      noteType: string | null
+    }>
+    const a = rows.find((n) => n.id === noteAId)
+    const b = rows.find((n) => n.id === noteBId)
+    expect(a?.content).toBe('Qualification context')
+    expect(a?.stageCode).toBe('qualified')
+    expect(a?.noteType).toBe('qualification')
+    expect(b?.content).toBe('Requirement details')
+    expect(b?.stageCode).toBe('requirement_collected')
+    expect(b?.noteType).toBe('requirement')
+
+    const filtered = await authGet(
+      `${BASE}/entities/LEAD/${leadId}/notes?stageCode=qualified&noteType=qualification`,
+    )
+    expect(filtered.status).toBe(200)
+    const filteredRows = filtered.body.data as Array<{ id: string; stageCode: string | null }>
+    expect(filteredRows.every((n) => n.stageCode === 'qualified')).toBe(true)
+    expect(filteredRows.some((n) => n.id === noteAId)).toBe(true)
+    expect(filteredRows.some((n) => n.id === noteBId)).toBe(false)
+
+    // Content edit must not wipe stage identity (immutable stageCode / noteType)
+    const patchRes = await authPatch(`${BASE}/entities/notes/${noteAId}`, {
+      content: 'Qualification context (edited)',
+    })
+    expect(patchRes.status).toBe(200)
+    expect(patchRes.body.data.content).toBe('Qualification context (edited)')
+    expect(patchRes.body.data.stageCode).toBe('qualified')
+    expect(patchRes.body.data.noteType).toBe('qualification')
+
+    const afterEdit = await authGet(`${BASE}/entities/LEAD/${leadId}/notes`)
+    const afterRows = afterEdit.body.data as Array<{ id: string; stageCode: string | null; content: string }>
+    expect(afterRows.some((n) => n.id === noteAId && n.stageCode === 'qualified')).toBe(true)
+    expect(afterRows.some((n) => n.id === noteBId && n.stageCode === 'requirement_collected')).toBe(true)
   })
 
   it('creates, lists, gets, updates, duplicates, and soft-deletes quotation template', async () => {

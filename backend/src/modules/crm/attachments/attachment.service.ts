@@ -6,6 +6,11 @@ import { resolveUserNames, tenantActiveFilter } from '../../../shared/index.js'
 import { assertCrmEntityInTenant } from '../crm.entity-refs.js'
 import { prisma } from '../../../config/database.js'
 import * as repo from './attachment.repository.js'
+import {
+  assertAttachmentUploadAllowed,
+  parseFileTypesAttribute,
+  parseMaxSizeMbAttribute,
+} from './attachment-upload.validation.js'
 import type { CreateAttachmentInput } from '../notes/note.validation.js'
 
 async function resolveDocumentTypeLabels(
@@ -25,7 +30,13 @@ async function resolveDocumentTypeLabels(
   return new Map(rows.map((r) => [r.code, r.name]))
 }
 
-async function assertActiveDocumentType(tenantId: string, code: string) {
+type DocumentTypeRow = {
+  code: string
+  name: string
+  attributes: unknown
+}
+
+async function loadActiveDocumentType(tenantId: string, code: string): Promise<DocumentTypeRow> {
   const row = await prisma.crmMaster.findFirst({
     where: {
       ...tenantActiveFilter(tenantId),
@@ -33,7 +44,7 @@ async function assertActiveDocumentType(tenantId: string, code: string) {
       code,
       status: 'active',
     },
-    select: { code: true, name: true },
+    select: { code: true, name: true, attributes: true },
   })
   if (!row) {
     throw new ValidationError('Invalid attachment type', [
@@ -78,6 +89,29 @@ export async function listAttachments(tenantId: string, entityType: CrmEntityTyp
   return Promise.all(rows.map((r) => mapAttachment(r, tenantId, typeNames)))
 }
 
+/**
+ * Validate MIME + size against Document Type master, then persist.
+ * Rejects with ValidationError (400) when type/size is invalid.
+ */
+export function validateAttachmentAgainstDocumentType(
+  input: CreateAttachmentInput,
+  docType: DocumentTypeRow,
+  sizeBytes: number,
+) {
+  const attrs =
+    docType.attributes && typeof docType.attributes === 'object' && !Array.isArray(docType.attributes)
+      ? (docType.attributes as Record<string, unknown>)
+      : {}
+  assertAttachmentUploadAllowed({
+    originalFilename: input.originalFilename,
+    mimeType: input.mimeType,
+    sizeBytes,
+    allowedExtensions: parseFileTypesAttribute(attrs.fileTypes),
+    maxSizeMb: parseMaxSizeMbAttribute(attrs.maxSizeMb, 10),
+    documentTypeLabel: docType.name,
+  })
+}
+
 export async function createAttachment(
   req: Request,
   tenantId: string,
@@ -86,10 +120,22 @@ export async function createAttachment(
   input: CreateAttachmentInput,
 ) {
   await assertCrmEntityInTenant(tenantId, entityType, entityId)
-  await assertActiveDocumentType(tenantId, input.documentType)
+  const docType = await loadActiveDocumentType(tenantId, input.documentType)
+
+  let buffer: Buffer
+  try {
+    buffer = Buffer.from(input.contentBase64, 'base64')
+  } catch {
+    throw new ValidationError('Invalid file content', [
+      { field: 'contentBase64', message: 'Could not decode base64 content' },
+    ])
+  }
+
+  validateAttachmentAgainstDocumentType(input, docType, buffer.length)
+
   const userId = req.context?.userId ?? ''
   try {
-    const row = await repo.createAttachment(tenantId, entityType, entityId, userId, input)
+    const row = await repo.createAttachment(tenantId, entityType, entityId, userId, input, buffer)
     const audit = auditFromRequest(req)
     await createAuditLog({
       tenantId,

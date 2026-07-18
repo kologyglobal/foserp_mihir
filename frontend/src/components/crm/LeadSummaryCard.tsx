@@ -9,6 +9,7 @@ import { entity360CustomerPath } from '@/config/entity360Routes'
 import { leadPriorityLabel } from '@/utils/leadUtils'
 import { leadQualificationLabel } from '@/utils/lead360Utils'
 import { formatDate, formatDateTime } from '@/utils/dates/format'
+import { normalizeEmail } from '@/utils/validation/email'
 
 export interface LeadSummaryCardProps {
   lead: Lead
@@ -39,13 +40,13 @@ export function resolveLeadContactDesignation(
 ): string | null {
   if (!contacts.length) return null
   const phone = lead.mobile?.replace(/\D/g, '')
-  const email = lead.email?.trim().toLowerCase()
+  const email = lead.email ? normalizeEmail(lead.email) : ''
   const name = lead.contactPerson?.trim().toLowerCase()
   const pool = lead.customerId
     ? contacts.filter((c) => c.customerId === lead.customerId)
     : contacts
   const match =
-    pool.find((c) => email && c.email?.trim().toLowerCase() === email)
+    pool.find((c) => email && c.email && normalizeEmail(c.email) === email)
     ?? pool.find((c) => phone && c.phone?.replace(/\D/g, '') === phone)
     ?? pool.find((c) => name && c.name.trim().toLowerCase() === name)
   return match?.designation?.trim() || null

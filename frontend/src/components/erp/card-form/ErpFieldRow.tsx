@@ -6,6 +6,11 @@ import { cn } from '../../../utils/cn'
 interface ErpFieldRowProps {
   /** DOM id for scroll-into-view on validation reveal */
   id?: string
+  /**
+   * Stable field key for shared form validation (`data-field`).
+   * Used by `focusFirstInvalidField` / `handleInvalidSubmit`.
+   */
+  dataField?: string
   label: string
   required?: boolean
   hint?: string
@@ -27,6 +32,7 @@ interface ErpFieldRowProps {
  */
 export function ErpFieldRow({
   id,
+  dataField,
   label,
   required,
   hint,
@@ -43,6 +49,7 @@ export function ErpFieldRow({
   return (
     <div
       id={id}
+      data-field={dataField}
       className={cn(
         'erp-field-row',
         horizontal && 'erp-field-row--horizontal',

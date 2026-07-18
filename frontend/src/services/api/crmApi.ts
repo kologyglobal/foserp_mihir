@@ -553,19 +553,46 @@ export async function reopenOpportunityApi(id: string, data?: { stageId?: string
 
 // ─── Notes ───────────────────────────────────────────────────────────────────
 
-export async function fetchEntityNotesApi(entityType: string, entityId: string) {
-  return apiRequest<Array<Record<string, unknown>>>(tenantPath(`/crm/entities/${entityType}/${entityId}/notes`))
+export interface CreateEntityNoteInput {
+  content: string
+  /** Stage code at write time — new rows only; never overwrite prior stage notes. */
+  stageCode?: string | null
+  noteType?: string | null
 }
 
-export async function createEntityNoteApi(entityType: string, entityId: string, content: string) {
-  return apiRequest<Record<string, unknown>>(tenantPath(`/crm/entities/${entityType}/${entityId}/notes`), {
+export interface FetchEntityNotesParams {
+  stageCode?: string
+  noteType?: string
+}
+
+export async function fetchEntityNotesApi(
+  entityType: string,
+  entityId: string,
+  params?: FetchEntityNotesParams,
+) {
+  const qs = new URLSearchParams()
+  if (params?.stageCode) qs.set('stageCode', params.stageCode)
+  if (params?.noteType) qs.set('noteType', params.noteType)
+  const q = qs.toString()
+  return apiRequest<CrmEntityNoteDto[]>(
+    tenantPath(`/crm/entities/${entityType}/${entityId}/notes${q ? `?${q}` : ''}`),
+  )
+}
+
+export async function createEntityNoteApi(
+  entityType: string,
+  entityId: string,
+  input: string | CreateEntityNoteInput,
+) {
+  const body: CreateEntityNoteInput = typeof input === 'string' ? { content: input } : input
+  return apiRequest<CrmEntityNoteDto>(tenantPath(`/crm/entities/${entityType}/${entityId}/notes`), {
     method: 'POST',
-    body: JSON.stringify({ content }),
+    body: JSON.stringify(body),
   })
 }
 
 export async function updateEntityNoteApi(noteId: string, content: string) {
-  return apiRequest<Record<string, unknown>>(tenantPath(`/crm/entities/notes/${noteId}`), {
+  return apiRequest<CrmEntityNoteDto>(tenantPath(`/crm/entities/notes/${noteId}`), {
     method: 'PATCH',
     body: JSON.stringify({ content }),
   })
@@ -673,6 +700,8 @@ export interface CrmEntityNoteDto {
   entityType: string
   entityId: string
   content: string
+  stageCode: string | null
+  noteType: string | null
   authorId: string
   authorName: string
   createdAt: string

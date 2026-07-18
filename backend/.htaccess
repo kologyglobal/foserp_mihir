@@ -3,6 +3,9 @@
 #
 # Critical: /api/* must NOT be rewritten to public/ — otherwise Apache returns
 # index.html for API routes and the CRM UI sees HTML instead of JSON (empty leads).
+#
+# Critical: deep CRM paths (/crm/leads, /crm/opportunities/new, …) must fall back
+# to public/index.html — never 404 just because public/crm/... is not a real file.
 
 Options -Indexes
 
@@ -12,12 +15,16 @@ Options -Indexes
   # Let Node/Passenger handle the API (do not map to public/)
   RewriteRule ^api(?:/|$) - [L]
 
-  # Existing files/dirs under the app root (e.g. public/assets/* via later rules)
+  # Existing files/dirs under the app root
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # SPA: serve built frontend from public/
-  RewriteRule ^$ public/index.html [L]
+  # Serve real static files from public/ (Vite assets, favicon, etc.)
+  RewriteCond %{DOCUMENT_ROOT}/public/$1 -f [OR]
+  RewriteCond %{DOCUMENT_ROOT}/public/$1 -d
   RewriteRule ^(.*)$ public/$1 [L]
+
+  # SPA fallback — all other non-API routes get the React app
+  RewriteRule ^ public/index.html [L]
 </IfModule>

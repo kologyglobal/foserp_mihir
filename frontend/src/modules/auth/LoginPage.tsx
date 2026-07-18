@@ -52,7 +52,8 @@ export function LoginPage() {
   const { login, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as { from?: string } | null)?.from ?? '/crm'
+  const fromRaw = (location.state as { from?: string } | null)?.from ?? '/crm'
+  const from = fromRaw.startsWith('/') && !fromRaw.startsWith('//') ? fromRaw : '/crm'
 
   const remembered = loadRemembered()
   const [view, setView] = useState<LoginView>('signin')
@@ -212,7 +213,10 @@ export function LoginPage() {
               {view === 'reset' && 'Choose a new password'}
             </h2>
             <p className="mt-2 text-sm text-erp-muted">
-              {view === 'signin' && 'Sign in to your organization workspace'}
+              {view === 'signin' &&
+                (fromRaw !== '/crm'
+                  ? 'Sign in to continue to the page you requested.'
+                  : 'Sign in to your organization workspace')}
               {view === 'forgot' && 'We will send reset instructions to your email'}
               {view === 'reset' && 'Enter the token from your email and a new password'}
             </p>

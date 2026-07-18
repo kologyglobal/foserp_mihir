@@ -92,3 +92,67 @@ export async function reserveVoucherNumber(
 
   return reservation
 }
+
+export interface ReservedSourceDocumentNumber {
+  numberSeriesId: string
+  documentNumber: string
+  reused: boolean
+}
+
+export async function reserveSourceDocumentNumber(
+  tenantId: string,
+  legalEntityId: string,
+  financialYearId: string,
+  documentType: 'SALES_INVOICE',
+  event: PostingEvent,
+): Promise<ReservedSourceDocumentNumber> {
+  if (event.reservedSourceDocumentNumber && event.sourceNumberSeriesId) {
+    return {
+      numberSeriesId: event.sourceNumberSeriesId,
+      documentNumber: event.reservedSourceDocumentNumber,
+      reused: true,
+    }
+  }
+
+  const reservation = await prisma.$transaction(async (tx) => {
+    const series = await tx.financeNumberSeries.findFirst({
+      where: {
+        tenantId,
+        legalEntityId,
+        documentType,
+        isActive: true,
+        OR: [{ financialYearId }, { financialYearId: null }],
+      },
+      orderBy: [{ financialYearId: 'desc' }, { updatedAt: 'desc' }],
+    })
+
+    if (!series) {
+      throw new PostingError('NUMBER_SERIES_NOT_CONFIGURED', `Number series not configured for ${documentType}`)
+    }
+    if (!series.isActive) {
+      throw new PostingError('NUMBER_SERIES_INACTIVE', `Number series for ${documentType} is inactive`)
+    }
+
+    await tx.financeNumberSeries.update({
+      where: { id: series.id },
+      data: { currentValue: { increment: 1 } },
+    })
+
+    const updated = await tx.financeNumberSeries.findUniqueOrThrow({ where: { id: series.id } })
+    const padded = String(updated.currentValue).padStart(updated.padLength, '0')
+    const documentNumber = `${updated.prefix}${padded}`
+
+    return {
+      numberSeriesId: updated.id,
+      documentNumber,
+      reused: false,
+    }
+  })
+
+  await postingEventRepo.saveSourceNumberReservation(tenantId, event.id, {
+    sourceNumberSeriesId: reservation.numberSeriesId,
+    reservedSourceDocumentNumber: reservation.documentNumber,
+  })
+
+  return reservation
+}

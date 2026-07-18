@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/context/AuthProvider'
 import { isApiMode } from '@/config/apiConfig'
+import { PageLoadingFallback } from '@/components/system/PageLoadingFallback'
 
 export function ApiAuthGate({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth()
@@ -10,17 +11,15 @@ export function ApiAuthGate({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-erp-bg text-sm text-erp-muted">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-erp-primary border-t-transparent" />
-          Checking session…
-        </div>
+      <div className="min-h-screen bg-erp-bg">
+        <PageLoadingFallback label="Checking session…" />
       </div>
     )
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />
+    const from = `${location.pathname}${location.search}${location.hash}`
+    return <Navigate to="/login" state={{ from }} replace />
   }
 
   return <>{children}</>

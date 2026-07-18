@@ -8,6 +8,7 @@ import {
   isEncodedLeadRequirementPayload,
   opportunityRequirementDisplay,
 } from '../../utils/leadRequirementLines'
+import { opportunityPriorityLabel } from '../../utils/opportunityUtils'
 import { cn } from '../../utils/cn'
 
 function safeItemSummary(rawSummary: string, requirementLabel: string): string {
@@ -19,6 +20,7 @@ interface OpportunityCardProps {
   opportunity: Opportunity
   draggable?: boolean
   onDragStart?: (e: React.DragEvent, id: string) => void
+  onDragEnd?: (e: React.DragEvent) => void
   onQuickFollowUp?: (opp: Opportunity) => void
   onMoveStage?: (opp: Opportunity) => void
   variant?: 'kanban' | 'default'
@@ -36,10 +38,15 @@ function isFollowUpOverdue(date: string | null) {
   return date.slice(0, 10) < new Date().toISOString().slice(0, 10)
 }
 
+function formatShortDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+}
+
 export function OpportunityCard({
   opportunity: opp,
   draggable,
   onDragStart,
+  onDragEnd,
   onQuickFollowUp,
   onMoveStage,
   variant = 'kanban',
@@ -53,15 +60,28 @@ export function OpportunityCard({
   const itemSummary = safeItemSummary(getOpportunityItemSummary(opp, product), requirementLabel)
   const itemCount = opp.lines?.length || (opp.productId || opp.value ? 1 : 0)
   const overdueFu = isFollowUpOverdue(opp.nextFollowUpDate)
+  const priorityLabel = opportunityPriorityLabel(opp.priority)
+  const companyName = customer?.customerName ?? 'Unknown company'
   const openDetail = () => navigate(`/crm/opportunities/${opp.id}`)
+
+  const secondaryTooltip = [
+    opp.opportunityNo,
+    `${opp.probability}% probability`,
+    `${itemSummary} · ${itemCount} item${itemCount === 1 ? '' : 's'}`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <article
       draggable={draggable}
+      title={secondaryTooltip}
       onDragStart={(e) => {
-        onDragStart?.(e, opp.id)
+        e.dataTransfer.setData('text/plain', opp.id)
         e.dataTransfer.effectAllowed = 'move'
+        onDragStart?.(e, opp.id)
       }}
+      onDragEnd={(e) => onDragEnd?.(e)}
       className={cn(
         'crm-opp-card',
         PRIORITY_ACCENT[opp.priority] ?? 'crm-opp-card--low',
@@ -72,31 +92,21 @@ export function OpportunityCard({
         <button type="button" className="crm-opp-card__title" onClick={openDetail}>
           {opp.opportunityName}
         </button>
-        <span className="crm-opp-card__prob">
-          {opp.probability}%
+        <span className={cn('crm-opp-card__priority', `crm-opp-card__priority--${opp.priority}`)}>
+          {priorityLabel}
         </span>
       </div>
 
-      <p className="crm-opp-card__customer">{customer?.customerName ?? 'Unknown company'}</p>
-      <p className="crm-opp-card__opp-no">{opp.opportunityNo}</p>
-      <p className="crm-opp-card__items text-[12px] text-erp-muted truncate">
-        {itemSummary} · {itemCount} item{itemCount === 1 ? '' : 's'}
-      </p>
-
-      <div className="crm-opp-card__prob-bar" aria-hidden>
-        <div className="crm-opp-card__prob-fill" style={{ width: `${Math.min(100, Math.max(0, opp.probability))}%` }} />
-      </div>
+      <p className="crm-opp-card__customer">{companyName}</p>
 
       <div className="crm-opp-card__commercial">
         <div>
-          <p className="crm-opp-card__kpi-label">Deal value</p>
+          <p className="crm-opp-card__kpi-label">Value</p>
           <p className="crm-opp-card__kpi-value">{formatCrmCurrency(opp.value)}</p>
         </div>
         <div className="text-right">
           <p className="crm-opp-card__kpi-label">Expected close</p>
-          <p className="crm-opp-card__kpi-date">
-            {new Date(opp.expectedCloseDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-          </p>
+          <p className="crm-opp-card__kpi-date">{formatShortDate(opp.expectedCloseDate)}</p>
         </div>
       </div>
 
@@ -108,9 +118,14 @@ export function OpportunityCard({
         {opp.nextFollowUpDate ? (
           <span className={cn('crm-opp-card__meta-item', overdueFu && 'crm-opp-card__meta-item--overdue')}>
             {overdueFu ? <AlertCircle className="h-3.5 w-3.5" /> : <Calendar className="h-3.5 w-3.5" />}
-            F/U {new Date(opp.nextFollowUpDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+            F/U {formatShortDate(opp.nextFollowUpDate)}
           </span>
-        ) : null}
+        ) : (
+          <span className="crm-opp-card__meta-item crm-opp-card__meta-item--muted">
+            <Calendar className="h-3.5 w-3.5" />
+            No follow-up
+          </span>
+        )}
       </div>
 
       {variant === 'default' && requirementLabel ? (

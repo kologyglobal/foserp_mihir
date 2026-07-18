@@ -1,11 +1,12 @@
 import { Router } from 'express'
 import { requirePermission } from '../../../middleware/permission.middleware.js'
-import { validateBody, validateParams } from '../../../middleware/validation.middleware.js'
+import { validateBody, validateParams, validateQuery } from '../../../middleware/validation.middleware.js'
 import { attachmentIdParamSchema } from '../attachments/attachment.validation.js'
 import {
   createAttachmentSchema,
   createNoteSchema,
   entityParamsSchema,
+  listNotesQuerySchema,
   noteIdParamSchema,
   updateNoteSchema,
 } from '../notes/note.validation.js'
@@ -17,6 +18,7 @@ router.get(
   '/:entityType/:entityId/notes',
   requirePermission('crm.note.view'),
   validateParams(entityParamsSchema),
+  validateQuery(listNotesQuerySchema),
   controller.listNotes,
 )
 router.post(

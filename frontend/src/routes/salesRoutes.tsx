@@ -31,6 +31,7 @@ import {
 } from '@/modules/sales/ProformaInvoicePages'
 import { ProformaInvoiceFormPage } from '@/modules/sales/ProformaInvoiceFormPage'
 import { Customer360Page } from '@/modules/entity360'
+import { SalesOrderPrintPage } from '@/components/sales/SalesOrderPrintPage'
 
 export const salesRouteChildren: RouteObject[] = [
   { path: 'sales-pipeline', element: <SalesPipelineLegacyRedirect /> },
@@ -61,6 +62,7 @@ export const salesRouteChildren: RouteObject[] = [
   { path: 'sales/orders', element: <SalesOrderListPage /> },
   { path: 'sales/orders/new', element: <SalesOrderNewPage /> },
   { path: 'sales/orders/:id/edit', element: <SalesOrderEditPage /> },
+  { path: 'sales/orders/:id/print', element: <SalesOrderPrintPage /> },
   { path: 'sales/orders/:id', element: <SalesOrderDetailPage /> },
   { path: 'sales/proforma-invoices', element: <ProformaInvoiceListPage /> },
   { path: 'sales/proforma-invoices/new', element: <ProformaInvoiceFormPage /> },

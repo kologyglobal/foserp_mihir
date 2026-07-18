@@ -4,6 +4,7 @@ import { APPROVAL_AMOUNT_THRESHOLD, DISCOUNT_APPROVAL_THRESHOLD } from '../../ty
 import { LiveStatusBadge } from '../premium/LiveStatusBadge'
 import { quotationStatusLabel, quotationStatusTone } from './QuotationCrmCard'
 import { cn } from '../../utils/cn'
+import { systemConfirm, systemPrompt } from '../../utils/systemConfirm'
 
 interface QuotationApprovalPanelProps {
   documentId: string
@@ -59,8 +60,26 @@ export function QuotationApprovalPanel({ documentId }: QuotationApprovalPanelPro
               type="button"
               className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-erp-danger/40 bg-erp-danger-soft/20 px-4 py-2.5 text-[13px] font-semibold text-erp-danger hover:bg-erp-danger-soft/40 sm:flex-none"
               onClick={() => {
-                const remarks = prompt('Rejection remarks?') ?? 'Rejected'
-                reject(documentId, remarks)
+                void (async () => {
+                  const ok = await systemConfirm({
+                    title: 'Reject quotation?',
+                    description: 'This quotation will be marked rejected. You can create a revision afterward.',
+                    confirmLabel: 'Continue',
+                    cancelLabel: 'Cancel',
+                    variant: 'danger',
+                  })
+                  if (!ok) return
+                  const remarks = await systemPrompt({
+                    title: 'Rejection remarks',
+                    fieldLabel: 'Remarks',
+                    placeholder: 'Why is this quotation being rejected?',
+                    confirmLabel: 'Reject',
+                    variant: 'danger',
+                    required: true,
+                  })
+                  if (!remarks) return
+                  reject(documentId, remarks)
+                })()
               }}
             >
               <XCircle className="h-4 w-4" />

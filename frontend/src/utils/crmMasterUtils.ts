@@ -287,6 +287,27 @@ export function crmMasterConfigurationSectionLabel(catalog: CrmMasterCatalogItem
   return catalog.configurationSectionLabel ?? 'Configuration'
 }
 
+const DRAWER_CORE_KEYS = new Set(['code', 'name', 'status', 'description', 'notes'])
+
+/**
+ * Small masters open in a drawer; complex masters (many/extra field types) use the full page form.
+ * Catalog `formPresentation` overrides the heuristic.
+ */
+export function crmMasterPrefersDrawerForm(catalog: CrmMasterCatalogItem): boolean {
+  if (catalog.formPresentation === 'drawer') return true
+  if (catalog.formPresentation === 'page') return false
+  if (catalog.descriptionFormat === 'richtext') return false
+  const extras = catalog.fields.filter((f) => !DRAWER_CORE_KEYS.has(f.key))
+  if (extras.some((f) => f.type === 'multiselect' || f.type === 'richtext')) return false
+  if (extras.length > 3) return false
+  return true
+}
+
+/** Show Effective Date when the catalog defines that field. */
+export function crmMasterHasEffectiveDate(catalog: CrmMasterCatalogItem): boolean {
+  return catalog.fields.some((f) => f.key === 'effectiveDate')
+}
+
 export function slugToKind(slug: string): CrmMasterKind | null {
   if (slug === 'users') return 'owners'
   const valid: CrmMasterKind[] = [

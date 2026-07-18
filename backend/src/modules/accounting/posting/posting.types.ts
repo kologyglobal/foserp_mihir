@@ -1,3 +1,5 @@
+import type { PostingEvent } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 import type { PostingEventStatus, VoucherType } from '../ledger/ledger.types.js'
 
 export type PostingPurpose = 'SYSTEM_DOCUMENT' | 'MANUAL_JOURNAL' | 'OPENING_BALANCE' | 'REVERSAL'
@@ -116,6 +118,20 @@ export interface PostingResult {
   totalCredit: string
   ledgerEntryCount: number
   status: PostingEventStatus
+}
+
+export type PostingTransactionParticipant = (args: {
+  tx: Prisma.TransactionClient
+  context: PostingContext
+  eventId: string
+  voucherId: string
+  voucherNumber: string
+  validated: ValidatedPostingData
+}) => Promise<void>
+
+export interface PostingOptions {
+  beforeTransaction?: (event: PostingEvent) => Promise<PostingEvent | void>
+  afterAccounting?: PostingTransactionParticipant
 }
 
 export interface PostingEngineStatus {

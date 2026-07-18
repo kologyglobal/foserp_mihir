@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom'
-import { RouteErrorPage } from '../components/system/AppErrorBoundary'
+import { RouteErrorBoundary } from '../components/system/RouteErrorBoundary'
 import { MobileLayout } from '../components/mobile/MobileLayout'
 import {
   MobileHomePage,
@@ -59,7 +59,7 @@ import { MobileCrmPipelinePage } from '../modules/mobile/MobileCrmPipelinePage'
 export const mobileRouteTree = {
   path: '/m',
   element: <MobileLayout />,
-  errorElement: <RouteErrorPage />,
+  errorElement: <RouteErrorBoundary />,
   children: [
     { index: true, element: <Navigate to="home" replace /> },
     { path: 'home', element: <MobileHomePage /> },

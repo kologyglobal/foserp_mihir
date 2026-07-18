@@ -56,6 +56,7 @@ import {
 } from '../../utils/opportunitySmartOverview'
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { AppLink } from '../../components/ui/AppLink'
+import { toRequiredFieldLabel } from '../../utils/formValidation'
 import { useOpportunityEditor } from './hooks/useOpportunityEditor'
 
 export function OpportunityEditPage() {
@@ -80,6 +81,7 @@ export function OpportunityEditPage() {
     hasValidLine,
     validationErrors,
     rowErrors,
+    forceOpenProductsKey,
     isDirty,
     isSaving,
     isDeleting,
@@ -155,7 +157,10 @@ export function OpportunityEditPage() {
   ], [completionPercent, completionItems, dealValue, lines.length, weighted, probability, expectedCloseDate, opportunity])
 
   const validationGuideItems = useMemo(
-    () => validationErrors.map((err, i) => ({ id: `err-${i}`, label: err, message: err })),
+    () => validationErrors.map((err, i) => ({
+      id: `err-${i}`,
+      label: toRequiredFieldLabel(err),
+    })),
     [validationErrors],
   )
 
@@ -383,7 +388,7 @@ export function OpportunityEditPage() {
         factBox={factBox}
         suppressFactBoxRecord
         collapsibleFactBox
-        factBoxLabel="Details"
+        factBoxLabel="Smart Context"
         onSubmit={handleSubmit}
         onSaveShortcut={() => void executeAction('save')}
         onSaveCloseShortcut={() => void executeAction('saveAndClose')}
@@ -438,6 +443,7 @@ export function OpportunityEditPage() {
             label="Opportunity Name"
             required
             colSpan={2}
+            dataField="opportunityName"
             fieldState={validationErrors.some((e) => /name/i.test(e)) ? 'error' : 'idle'}
             fieldError={validationErrors.find((e) => /name/i.test(e))}
           >
@@ -473,6 +479,7 @@ export function OpportunityEditPage() {
           accent="teal"
           collapsible
           defaultOpen
+          forceOpenKey={forceOpenProductsKey || undefined}
         >
           <div className="col-span-3">
             <ErpLineItemsGrid
@@ -546,6 +553,7 @@ export function OpportunityEditPage() {
           <ErpFieldRow
             label="Expected Close Date"
             required
+            dataField="expectedCloseDate"
             fieldState={!expectedCloseDate && validationErrors.length ? 'error' : 'idle'}
             fieldError={!expectedCloseDate ? validationErrors.find((e) => /close/i.test(e)) : undefined}
           >

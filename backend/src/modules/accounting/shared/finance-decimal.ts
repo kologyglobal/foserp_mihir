@@ -62,6 +62,43 @@ export function multiply(a: DecimalInput, b: DecimalInput): Prisma.Decimal {
   return toDecimal(a).mul(toDecimal(b))
 }
 
+export function divide(a: DecimalInput, b: DecimalInput): Prisma.Decimal {
+  const divisor = toDecimal(b)
+  if (divisor.isZero()) {
+    throw new Error('Division by zero')
+  }
+  return toDecimal(a).div(divisor)
+}
+
+export function min(a: DecimalInput, b: DecimalInput): Prisma.Decimal {
+  const da = toDecimal(a)
+  const db = toDecimal(b)
+  return da.lte(db) ? da : db
+}
+
+export function max(a: DecimalInput, b: DecimalInput): Prisma.Decimal {
+  const da = toDecimal(a)
+  const db = toDecimal(b)
+  return da.gte(db) ? da : db
+}
+
+/** Quantities stored at 6 decimal places. */
+export function roundQuantity(value: DecimalInput): Prisma.Decimal {
+  const d = toDecimal(value)
+  return new Prisma.Decimal(d.toFixed(6, Prisma.Decimal.ROUND_HALF_UP))
+}
+
+/** Percentage/rate fields stored at 4 decimal places. */
+export function roundPercentage(value: DecimalInput): Prisma.Decimal {
+  const d = toDecimal(value)
+  return new Prisma.Decimal(d.toFixed(4, Prisma.Decimal.ROUND_HALF_UP))
+}
+
+/** Tax amounts stored at 4 decimal places (schema precision). */
+export function roundTax(value: DecimalInput): Prisma.Decimal {
+  return roundAmount(value, 4)
+}
+
 /** Parse and validate a decimal string — rejects non-numeric input. */
 export function parseDecimalString(value: string, label = 'Amount'): Prisma.Decimal {
   const trimmed = value.trim()

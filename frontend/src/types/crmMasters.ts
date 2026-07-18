@@ -97,5 +97,10 @@ export interface CrmMasterCatalogItem {
   configurationSectionLabel?: string
   /** When set to richtext, the Description section uses the rich text editor. */
   descriptionFormat?: 'plain' | 'richtext'
+  /**
+   * Create/edit presentation. When omitted, inferred from field complexity
+   * (`crmMasterPrefersDrawerForm`). Drawer = small registers; page = complex.
+   */
+  formPresentation?: 'drawer' | 'page'
   fields: CrmMasterFieldDef[]
 }

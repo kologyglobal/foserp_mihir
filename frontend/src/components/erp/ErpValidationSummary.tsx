@@ -1,5 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { notify } from '../../store/toastStore'
+import {
+  formatRequiredFieldsNotifyMessage,
+  toRequiredFieldLabel,
+} from '../../utils/formValidation'
 
 interface ErpValidationSummaryProps {
   errors?: string[]
@@ -27,12 +31,8 @@ export function ErpValidationSummary({ errors = [], lockedReason }: ErpValidatio
       notify.warning(lockedReason)
       return
     }
-    if (errors.length === 1) {
-      notify.error(errors[0])
-      return
-    }
-    if (errors.length > 1) {
-      notify.error(`Please fix ${errors.length} issues: ${errors[0]}`)
+    if (errors.length > 0) {
+      notify.error(formatRequiredFieldsNotifyMessage(errors.map(toRequiredFieldLabel)))
     }
   }, [errors, lockedReason])
 

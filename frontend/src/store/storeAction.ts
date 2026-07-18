@@ -2,6 +2,10 @@
 export interface StoreActionResult {
   ok: boolean
   error?: string
+  /** Machine code from API (e.g. STAGE_REQUIREMENTS_INCOMPLETE). */
+  code?: string
+  /** Missing mandatory stage fields when a stage gate fails. */
+  missingFields?: Array<{ field: string; label: string }>
   leadId?: string
   contactId?: string
   customerId?: string

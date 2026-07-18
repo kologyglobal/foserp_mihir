@@ -58,7 +58,8 @@ export function EnterpriseWorkspace({
   className,
   stickyFooter = false,
   collapsibleFactBox = true,
-  factBoxLabel = 'Details',
+  factBoxLabel = 'Smart Context',
+  factBoxSubtitle,
   factBoxStorageKey,
   suppressFactBoxRecord = false,
   tabs,
@@ -198,6 +199,7 @@ export function EnterpriseWorkspace({
       stickyFooter={stickyFooter}
       collapsibleFactBox={useCollapsibleFactBox}
       factBoxLabel={factBoxLabel}
+      factBoxSubtitle={factBoxSubtitle}
       factBoxOpen={useCollapsibleFactBox ? factBoxOpen : undefined}
       onFactBoxOpenChange={useCollapsibleFactBox ? setFactBoxOpen : undefined}
       factBoxStorageKey={useLocalFactBoxStore ? undefined : factBoxPaneKey}

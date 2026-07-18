@@ -6,6 +6,11 @@ import { useCrmOwnerOptions, useOpportunityPriorityOptions, useResolvedOpportuni
 import { useCrmStore } from '../../../store/crmStore'
 import { resolveStoreAction } from '../../../store/storeAction'
 import { notify } from '../../../store/toastStore'
+import {
+  fieldErrorsToMessages,
+  handleInvalidSubmit,
+  type FieldErrorMap,
+} from '../../../utils/formValidation'
 import { useMasterStore } from '../../../store/masterStore'
 import { useOpportunityAttachmentStore } from '../../../store/opportunityAttachmentStore'
 import type { CrmTypedAttachment } from '../../../types/crmDocuments'
@@ -13,10 +18,13 @@ import type { OpportunityLine, OpportunityPriority, OpportunityStage } from '../
 import {
   calcOpportunityLinesSummary,
   calcWeightedValue,
+  opportunityLineUnitPriceFieldKey,
   resolveOpportunityLines,
   syncOpportunityLines,
+  UNIT_PRICE_REQUIRED_MESSAGE,
   validateOpportunityLines,
 } from '../../../utils/opportunityLineCalc'
+import { opportunityRowErrorsToFieldMap } from '../../../utils/opportunityLineValidationFocus'
 import { sanitizeOpportunityScopeNotes } from '../../../utils/leadRequirementLines'
 import { useProductMasterOptionMap } from '../../../utils/opportunityProductOptions'
 import { resolveOpportunityPriorityOptions } from '../../../utils/opportunityUtils'
@@ -51,6 +59,26 @@ export type OpportunityEditorDialog =
 
 const SAVE_TOAST = 'Opportunity saved successfully.'
 
+const OPP_FIELD_ORDER = ['customerId', 'opportunityName', 'expectedCloseDate', 'ownerId', 'priority', 'stage', 'probability'] as const
+const OPP_FIELD_LABELS: Record<string, string> = {
+  customerId: 'Company',
+  opportunityName: 'Opportunity Name',
+  expectedCloseDate: 'Expected Close Date',
+  ownerId: 'Owner',
+  priority: 'Priority',
+  stage: 'Stage',
+  probability: 'Probability',
+}
+const OPP_SECTION_BY_FIELD: Record<string, string> = {
+  customerId: 'opp-section-general',
+  opportunityName: 'opp-section-general',
+  expectedCloseDate: 'opp-section-commercial',
+  ownerId: 'opp-section-general',
+  priority: 'opp-section-general',
+  stage: 'opp-section-general',
+  probability: 'opp-section-commercial',
+}
+
 function detailsPath(id: string) {
   return `/crm/opportunities/${id}`
 }
@@ -61,15 +89,6 @@ function editPath(id: string) {
 
 function quotationNewPath(id: string) {
   return `/crm/quotations/new?opportunityId=${encodeURIComponent(id)}`
-}
-
-function scrollToFirstError(errors: string[]) {
-  const first = errors[0] ?? ''
-  const sectionId =
-    /line|product/i.test(first) ? 'products'
-      : /close|probability|commercial|value/i.test(first) ? 'commercial'
-        : 'general'
-  document.getElementById(`opp-section-${sectionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 export function useOpportunityEditor(opportunityId: string | undefined) {
@@ -105,6 +124,7 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
 
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [rowErrors, setRowErrors] = useState<Record<string, string[]>>({})
+  const [forceOpenProductsKey, setForceOpenProductsKey] = useState(0)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [dialog, setDialog] = useState<OpportunityEditorDialog>(null)
@@ -279,6 +299,28 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
     return base
   }, [opportunity, lines, ownerId, probability, opportunityName, priority, expectedCloseDate, contactId, contacts])
 
+  function buildOpportunityFieldErrors(
+    errors: string[],
+    lineRowErrors: Record<string, string[]>,
+  ): FieldErrorMap {
+    const map: FieldErrorMap = {}
+    for (const err of errors) {
+      if (/company/i.test(err)) map.customerId = err
+      else if (/opportunity name/i.test(err)) map.opportunityName = err
+      else if (/close date/i.test(err)) map.expectedCloseDate = err
+      else if (/owner/i.test(err)) map.ownerId = err
+      else if (/priority/i.test(err)) map.priority = err
+      else if (/^stage/i.test(err)) map.stage = err
+      else if (/probability/i.test(err)) map.probability = err
+      else if (/unit price/i.test(err) || /fix validation|product \/ item line/i.test(err)) {
+        // Prefer concrete line keys from rowErrors
+        continue
+      } else if (!Object.values(map).includes(err)) map[`_msg_${Object.keys(map).length}`] = err
+    }
+    Object.assign(map, opportunityRowErrorsToFieldMap(lineRowErrors))
+    return map
+  }
+
   const persist = useCallback(async (): Promise<boolean> => {
     if (!opportunityId || !opportunity) return false
     if (!canUpdate) {
@@ -286,13 +328,47 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
       return false
     }
     const { errors, rowErrors: rErr } = runValidation()
-    setValidationErrors(errors)
     setRowErrors(rErr)
-    if (errors.length) {
-      notify.warning(errors[0] ?? 'Please fix validation errors before saving')
-      scrollToFirstError(errors)
+    if (errors.length || Object.keys(rErr).length) {
+      const fieldMap = buildOpportunityFieldErrors(errors, rErr)
+      const lineKeys = Object.keys(fieldMap).filter(
+        (k) => k.startsWith('unitPrice-') || k.startsWith('qty-') || k.startsWith('product-') || k.startsWith('taxPct-'),
+      )
+      const fieldOrder = [...OPP_FIELD_ORDER, ...lineKeys]
+      const fieldLabels: Record<string, string> = { ...OPP_FIELD_LABELS }
+      const sectionByField: Record<string, string> = { ...OPP_SECTION_BY_FIELD }
+      for (const key of lineKeys) {
+        sectionByField[key] = 'opp-section-products'
+        if (key.startsWith('unitPrice-')) fieldLabels[key] = 'Unit Price'
+        else if (key.startsWith('qty-')) fieldLabels[key] = 'Quantity'
+        else if (key.startsWith('product-')) fieldLabels[key] = 'Product / Item'
+        else if (key.startsWith('taxPct-')) fieldLabels[key] = 'GST %'
+      }
+      if (!lineKeys.length && Object.keys(rErr).length) {
+        const firstLineId = Object.keys(rErr)[0]!
+        const key = opportunityLineUnitPriceFieldKey(firstLineId)
+        fieldMap[key] = UNIT_PRICE_REQUIRED_MESSAGE
+        fieldOrder.push(key)
+        fieldLabels[key] = 'Unit Price'
+        sectionByField[key] = 'opp-section-products'
+      }
+      handleInvalidSubmit({
+        errors: fieldMap,
+        fieldOrder,
+        fieldLabels,
+        sectionByField,
+        expandSection: (sectionId) => {
+          if (sectionId === 'opp-section-products') {
+            setForceOpenProductsKey((k) => k + 1)
+          }
+          document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        },
+        onFieldErrors: (map) => setValidationErrors(fieldErrorsToMessages(map, fieldOrder)),
+        delayMs: 120,
+      })
       return false
     }
+    setValidationErrors([])
     if (isSaving) return false
 
     setIsSaving(true)
@@ -617,6 +693,7 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
     hasValidLine,
     validationErrors,
     rowErrors,
+    forceOpenProductsKey,
     setValidationErrors,
     isDirty,
     isSaving,

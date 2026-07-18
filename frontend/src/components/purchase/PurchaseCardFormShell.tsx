@@ -178,6 +178,8 @@ type PurchaseCardFormShellProps = {
 
   factBoxLabel?: string
 
+  factBoxSubtitle?: string
+
 }
 
 
@@ -274,7 +276,9 @@ export function PurchaseCardFormShell({
 
   factBoxStorageKey = factBox ? PURCHASE_FACTBOX_COLLAPSED_KEY : undefined,
 
-  factBoxLabel = 'Details',
+  factBoxLabel = 'Document Insights',
+
+  factBoxSubtitle = 'AI suggested vendor, history, and next actions for this document.',
 
 }: PurchaseCardFormShellProps) {
 
@@ -409,6 +413,8 @@ export function PurchaseCardFormShell({
     collapsibleFactBox,
 
     factBoxLabel,
+
+    factBoxSubtitle,
 
     factBoxStorageKey,
 

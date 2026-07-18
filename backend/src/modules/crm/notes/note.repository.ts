@@ -1,11 +1,23 @@
 import type { CrmEntityType } from '@prisma/client'
 import { prisma } from '../../../config/database.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
-import type { CreateNoteInput, UpdateNoteInput } from './note.validation.js'
+import type { CreateNoteInput, ListNotesQuery, UpdateNoteInput } from './note.validation.js'
 
-export async function listNotes(tenantId: string, entityType: CrmEntityType, entityId: string) {
+export async function listNotes(
+  tenantId: string,
+  entityType: CrmEntityType,
+  entityId: string,
+  filters: ListNotesQuery = {},
+) {
   return prisma.crmNote.findMany({
-    where: { tenantId, entityType, entityId, deletedAt: null },
+    where: {
+      tenantId,
+      entityType,
+      entityId,
+      deletedAt: null,
+      ...(filters.stageCode ? { stageCode: filters.stageCode } : {}),
+      ...(filters.noteType ? { noteType: filters.noteType } : {}),
+    },
     orderBy: { createdAt: 'desc' },
   })
 }
@@ -23,6 +35,8 @@ export async function createNote(
       entityType,
       entityId,
       content: input.content,
+      stageCode: input.stageCode ?? null,
+      noteType: input.noteType ?? null,
       createdBy: userId,
       updatedBy: userId,
     },
@@ -33,6 +47,7 @@ export async function findNoteById(tenantId: string, noteId: string) {
   return prisma.crmNote.findFirst({ where: { id: noteId, ...tenantActiveFilter(tenantId) } })
 }
 
+/** Updates content only — never stageCode / noteType (immutable after create). */
 export async function updateNote(tenantId: string, noteId: string, userId: string, input: UpdateNoteInput) {
   return prisma.crmNote.update({
     where: { id: noteId, tenantId },

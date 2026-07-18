@@ -1,0 +1,7 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> trailer-erp@0.0.0 typecheck
+> tsc -b --noEmit
+
+src/components/crm/CrmTypedDocumentUpload.tsx(121,19): error TS5076: '??' and '||' operations cannot be mixed without parentheses.
+src/components/crm/shared/AttachmentUploadDialog.tsx(120,23): error TS5076: '??' and '||' operations cannot be mixed without parentheses.

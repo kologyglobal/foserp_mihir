@@ -5,13 +5,19 @@ import { asyncHandler } from '../../../utils/asyncHandler.js'
 import { sendCreated, sendSuccess } from '../../../utils/response.js'
 import * as noteService from '../notes/note.service.js'
 import * as attachmentService from '../attachments/attachment.service.js'
-import type { CreateAttachmentInput, CreateNoteInput, UpdateNoteInput } from '../notes/note.validation.js'
+import type {
+  CreateAttachmentInput,
+  CreateNoteInput,
+  ListNotesQuery,
+  UpdateNoteInput,
+} from '../notes/note.validation.js'
 
 export const listNotes = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const entityType = getRouteParam(req, 'entityType') as CrmEntityType
   const entityId = getRouteParam(req, 'entityId')
-  const data = await noteService.listNotes(tenantId, entityType, entityId)
+  const filters = req.query as ListNotesQuery
+  const data = await noteService.listNotes(tenantId, entityType, entityId, filters)
   sendSuccess(res, 'Notes retrieved', data)
 })
 

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Activity,
@@ -21,6 +22,10 @@ import { DynamicsStatusChip } from '../dynamics/DynamicsStatusChip'
 import { ErpButton } from '../erp/ErpButton'
 import { GroupedActivityTimeline } from './GroupedActivityTimeline'
 import { CrmHotDealsChart } from './CrmDashboardCharts'
+import {
+  RescheduleFollowUpModal,
+  type RescheduleFollowUpTarget,
+} from './RescheduleFollowUpModal'
 import { cn } from '../../utils/cn'
 
 const FOLLOW_UP_ICONS: Record<string, typeof Phone> = {
@@ -66,11 +71,13 @@ export function CrmFollowUpsPanel({
   opportunities: Opportunity[]
   onSchedule: () => void
   onComplete: (id: string) => void
-  onReschedule: (id: string, dueDate: string, dueTime: string) => void
+  onReschedule: (id: string, dueDate: string, dueTime: string, reason?: string) => void
 }) {
   const navigate = useNavigate()
+  const [rescheduleTarget, setRescheduleTarget] = useState<RescheduleFollowUpTarget | null>(null)
 
   return (
+    <>
     <DynamicsDashboardPanel
       title="Today's follow-ups"
       actions={
@@ -125,10 +132,14 @@ export function CrmFollowUpsPanel({
                       type="button"
                       size="sm"
                       variant="secondary"
-                      onClick={() => {
-                        const d = prompt('Reschedule to (YYYY-MM-DD)', f.dueDate)
-                        if (d) onReschedule(f.id, d, f.dueTime ?? '10:00')
-                      }}
+                      onClick={() =>
+                        setRescheduleTarget({
+                          id: f.id,
+                          dueDate: f.dueDate,
+                          dueTime: f.dueTime,
+                          label: cust?.customerName ?? 'Follow-up',
+                        })
+                      }
                     >
                       Reschedule
                     </ErpButton>
@@ -145,6 +156,16 @@ export function CrmFollowUpsPanel({
         </ul>
       )}
     </DynamicsDashboardPanel>
+    <RescheduleFollowUpModal
+      open={Boolean(rescheduleTarget)}
+      followUp={rescheduleTarget}
+      onClose={() => setRescheduleTarget(null)}
+      onReschedule={(values) => {
+        if (!rescheduleTarget) return
+        onReschedule(rescheduleTarget.id, values.dueDate, values.dueTime, values.reason || undefined)
+      }}
+    />
+    </>
   )
 }
 

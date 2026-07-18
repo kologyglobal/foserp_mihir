@@ -197,6 +197,19 @@ export interface OpportunityLineValidation {
   rowErrors: Record<string, string[]>
 }
 
+/** Canonical field-level copy for missing line unit price (FE + toast). */
+export const UNIT_PRICE_REQUIRED_MESSAGE = 'Unit Price is required'
+
+/** Stable DOM / focus key for a line’s unit price control (`data-field`). */
+export function opportunityLineUnitPriceFieldKey(lineId: string): string {
+  return `unitPrice-${lineId}`
+}
+
+/** DOM id for a line unit price input. */
+export function opportunityLineUnitPriceDomId(lineId: string): string {
+  return `opp-line-${lineId}-unitPrice`
+}
+
 export function validateOpportunityLines(
   lines: OpportunityLine[],
   header: {
@@ -233,15 +246,17 @@ export function validateOpportunityLines(
     if (!line.productId && !line.productOrItem.trim()) row.push('Product / item is required.')
     if (!line.qty || line.qty <= 0) row.push('Quantity must be greater than zero.')
     if (line.unitPrice == null || Number.isNaN(line.unitPrice) || line.unitPrice <= 0) {
-      row.push('Unit price is required.')
+      row.push(UNIT_PRICE_REQUIRED_MESSAGE)
     }
     if (line.taxPct == null || Number.isNaN(line.taxPct)) row.push('GST % is required.')
     if (line.discountPct > 100) row.push('Discount cannot exceed 100%.')
     if (row.length) rowErrors[line.id] = row
   }
 
-  if (Object.keys(rowErrors).length > 0 && !errors.some((e) => e.includes('line'))) {
-    errors.push('Fix validation errors in product / item lines.')
+  if (Object.keys(rowErrors).length > 0 && !errors.some((e) => /line|unit price/i.test(e))) {
+    const allMsgs = Object.values(rowErrors).flat()
+    const onlyUnitPrice = allMsgs.length > 0 && allMsgs.every((m) => /unit price/i.test(m))
+    errors.push(onlyUnitPrice ? UNIT_PRICE_REQUIRED_MESSAGE : 'Fix validation errors in product / item lines.')
   }
 
   return { errors, rowErrors }

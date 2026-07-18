@@ -76,6 +76,12 @@ import { crmBreadcrumbs } from '../../utils/crmNavigation'
 import { sanitizeOpportunityScopeNotes } from '../../utils/leadRequirementLines'
 import { OpportunityQuotationValueMismatchBanner } from '../../components/crm/OpportunityQuotationValueMismatchBanner'
 import { notify } from '../../store/toastStore'
+import { StageCompletenessPanel } from '@/components/crm/StageCompletenessPanel'
+import {
+  formatMissingStageFieldsMessage,
+  getOpportunityStageCompleteness,
+  type StageRequirementField,
+} from '@/config/crmStageRequirements'
 
 export function Opportunity360Page() {
   const apiMode = useApiMode()
@@ -130,6 +136,8 @@ export function Opportunity360Page() {
   const [pendingActivityId, setPendingActivityId] = useState<string | null>(null)
   const [noteComposerOpen, setNoteComposerOpen] = useState(false)
   const [activeAdditionalSection, setActiveAdditionalSection] = useState<string | null>('products')
+  const [gateMissingFields, setGateMissingFields] = useState<StageRequirementField[] | null>(null)
+  const [gateStageLabel, setGateStageLabel] = useState<string | null>(null)
   const stageOptions = useResolvedOpportunityStages()
 
   const oppActivities = useMemo(
@@ -315,8 +323,33 @@ export function Opportunity360Page() {
   const favoritePath = `/crm/opportunities/${opp.id}`
   const statusTone = opp.stage === 'won' ? 'success' as const : opp.stage === 'lost' ? 'critical' as const : 'info' as const
 
+  const stageCompleteness = getOpportunityStageCompleteness(opportunity, opportunity.stage)
+  const panelMissing = gateMissingFields ?? stageCompleteness.missingFields
+  const panelCompleted = gateMissingFields
+    ? Math.max(0, stageCompleteness.requiredCount - gateMissingFields.length)
+    : stageCompleteness.completedCount
+  const panelPercent = gateMissingFields
+    ? (stageCompleteness.requiredCount === 0
+      ? 100
+      : Math.round((panelCompleted / stageCompleteness.requiredCount) * 100))
+    : stageCompleteness.percent
+  const panelStageLabel = gateStageLabel ?? opportunityStageLabel(opportunity.stage)
+
+  const moveGateEntity = {
+    ...opportunity,
+    ...(targetStage === 'lost' ? { lostReason } : {}),
+  }
+  const targetCompleteness = getOpportunityStageCompleteness(moveGateEntity, targetStage)
+
   function confirmMove() {
     void (async () => {
+      if (!targetCompleteness.isComplete) {
+        setGateMissingFields(targetCompleteness.missingFields)
+        setGateStageLabel(opportunityStageLabel(targetStage))
+        setToast(formatMissingStageFieldsMessage(targetCompleteness.missingFields, opportunityStageLabel(targetStage)))
+        notify.error(formatMissingStageFieldsMessage(targetCompleteness.missingFields, opportunityStageLabel(targetStage)))
+        return
+      }
       const r = await resolveStoreAction(
         moveOpportunityStage({
           opportunityId: opp.id,
@@ -325,7 +358,20 @@ export function Opportunity360Page() {
           manualWonApproval: targetStage === 'won' ? manualWon : undefined,
         }),
       )
-      if (r.ok) setMoveOpen(false)
+      if (r.ok) {
+        setGateMissingFields(null)
+        setGateStageLabel(null)
+        setMoveOpen(false)
+      } else {
+        if (r.missingFields?.length) {
+          setGateMissingFields(r.missingFields)
+          setGateStageLabel(opportunityStageLabel(targetStage))
+          notify.error(r.error ?? 'Could not change stage')
+        } else {
+          notify.error(r.error ?? 'Could not change stage')
+        }
+        setToast(r.error ?? 'Could not change stage')
+      }
     })()
   }
 
@@ -513,7 +559,7 @@ export function Opportunity360Page() {
         suppressFactBoxRecord
         workspaceRecordHeader
         collapsibleFactBox
-        factBoxLabel="Details"
+        factBoxLabel="Smart Context"
         stickyFooter={false}
       >
         <div className="erp-form-body crm-lead-form-body">
@@ -581,6 +627,13 @@ export function Opportunity360Page() {
                 ) : null
               }
             />
+            <StageCompletenessPanel
+              percent={panelPercent}
+              requiredCount={stageCompleteness.requiredCount}
+              completedCount={panelCompleted}
+              missingFields={panelMissing}
+              stageLabel={panelStageLabel}
+            />
           </div>
 
           <OpportunitySummaryCard
@@ -601,6 +654,7 @@ export function Opportunity360Page() {
 
           <OpportunityNotesCard
             opportunityId={opportunity.id}
+            currentStage={opportunity.stage}
             demoNotes={oppDemoNotes}
             editPath={`/crm/opportunities/${opportunity.id}/edit`}
             composerOpen={noteComposerOpen}
@@ -846,11 +900,19 @@ export function Opportunity360Page() {
                 Manual win approval
               </label>
             ) : null}
+            <StageCompletenessPanel
+              percent={targetCompleteness.percent}
+              requiredCount={targetCompleteness.requiredCount}
+              completedCount={targetCompleteness.completedCount}
+              missingFields={targetCompleteness.missingFields}
+              stageLabel={opportunityStageLabel(targetStage)}
+              className="mt-3"
+            />
             <div className="crm-opp-move-modal__actions">
               <button type="button" className="crm-opp-move-modal__btn" onClick={() => setMoveOpen(false)}>
                 Cancel
               </button>
-              <button type="button" className="crm-opp-move-modal__btn crm-opp-move-modal__btn--primary" onClick={confirmMove}>
+              <button type="button" className="crm-opp-move-modal__btn crm-opp-move-modal__btn--primary" onClick={confirmMove} disabled={!targetCompleteness.isComplete}>
                 Confirm
               </button>
             </div>

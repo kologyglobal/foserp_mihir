@@ -31,5 +31,10 @@ export {
 } from './QuotationCrmCard'
 export type { QuotationListItem } from './QuotationCrmCard'
 export { QuotationTemplateSelector } from './QuotationTemplateSelector'
+export { CreateBlankQuotationTemplateModal, blankTemplateDefaultTerms } from './CreateBlankQuotationTemplateModal'
+export type {
+  CreateBlankQuotationTemplateValues,
+  QuotationTemplateOrientation,
+} from './CreateBlankQuotationTemplateModal'
 export { CrmQuotationsTable } from './CrmQuotationsTable'
 export type { CrmQuotationsTableProps } from './CrmQuotationsTable'

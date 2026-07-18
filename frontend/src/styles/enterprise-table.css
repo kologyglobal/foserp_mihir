@@ -296,8 +296,11 @@
 
 .ent-data-grid .erp-table-actions-cell .ent-row-actions {
   display: inline-flex;
+  align-items: center;
   justify-content: center;
   width: 100%;
+  min-height: 32px;
+  vertical-align: middle;
 }
 
 /* ── Register filter bar (embedded in table shell) ── */

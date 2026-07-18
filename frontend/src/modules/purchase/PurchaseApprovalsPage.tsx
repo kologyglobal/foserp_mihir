@@ -411,7 +411,7 @@ export function PurchaseApprovalsPage() {
         kpiStrip={kpiStrip}
       >
         {tabStrip}
-        <div className="grid gap-6 xl:grid-cols-[1fr_280px]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_auto]">
           <EnterpriseRegisterTableShell className="min-w-0">
             <PurchaseApprovalsTable
               rows={filtered}
