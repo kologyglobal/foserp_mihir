@@ -183,6 +183,7 @@ export function buildSalesAtRiskOrders(
 export function buildSalesStatusChartData(salesOrders: SalesOrder[]): SalesStatusChartRow[] {
   const labels: Record<SalesOrder['status'], string> = {
     open: 'Draft',
+    pending_so: 'Pending SO',
     confirmed: 'Confirmed',
     in_production: 'In Production',
     ready_dispatch: 'Dispatch Ready',

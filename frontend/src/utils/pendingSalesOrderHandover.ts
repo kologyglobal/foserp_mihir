@@ -62,7 +62,7 @@ export function listPendingQuotationSoHandovers(input: {
   const rows: SalesOrder[] = []
   for (const doc of latestByQuotation.values()) {
     if (doc.status !== 'approved') continue
-    if (doc.salesOrderId || doc.status === 'converted') continue
+    if (doc.salesOrderId) continue
     if (soByDocumentId.has(doc.id) || soByQuotationId.has(doc.quotationId)) continue
 
     const salesQuo = quotationById.get(doc.quotationId)
@@ -105,7 +105,7 @@ export function listPendingQuotationSoHandovers(input: {
       opportunityId: doc.opportunityId,
       contactId: doc.contactId,
       grandTotal: doc.totalAmount,
-      unitPrice: primaryLine?.unitPrice ?? salesQuo?.unitPrice ?? null,
+      unitPrice: primaryLine?.unitPrice ?? null,
       salesOwnerId: doc.salesOwnerId,
       salesOwnerName: doc.salesOwnerName,
       locationId: doc.locationId ?? null,

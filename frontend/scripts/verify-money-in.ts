@@ -50,17 +50,27 @@ async function main() {
   const permSrc = read('src/utils/permissions/moneyIn.ts')
   check('Permission finance.ar.view', permSrc.includes("'finance.ar.view'"))
   check('Permission finance.ar.invoice.post', permSrc.includes("'finance.ar.invoice.post'"))
+  check('Permission finance.ar.credit_note.view', permSrc.includes("'finance.ar.credit_note.view'"))
+  check('Permission finance.ar.credit_note.post', permSrc.includes("'finance.ar.credit_note.post'"))
+  check('Permission finance.ar.allocation.create', permSrc.includes("'finance.ar.allocation.create'"))
+  check('canAllocate exposed', permSrc.includes('canAllocate'))
   check('mergeAllowedAction helper', permSrc.includes('mergeAllowedAction'))
   check('useMoneyInPermissions hook', permSrc.includes('useMoneyInPermissions'))
 
   // Workspace tabs
-  check('Six workspace tabs', MONEY_IN_WORKSPACE_TABS.length === 6)
+  check('Seven workspace tabs', MONEY_IN_WORKSPACE_TABS.length === 7)
   check('Overview tab path', MONEY_IN_WORKSPACE_TABS[0].path === '/accounting/money-in')
+  check('Credit Notes tab present', MONEY_IN_WORKSPACE_TABS.some((t) => t.path === '/accounting/money-in/credit-notes'))
 
   // Route registration smoke
   const routesSrc = read('src/routes/accountingRoutes.tsx')
   check('Money In overview route', routesSrc.includes("path: 'accounting/money-in'"))
   check('Money In invoices route', routesSrc.includes("path: 'accounting/money-in/invoices'"))
+  check('Money In credit notes route', routesSrc.includes("path: 'accounting/money-in/credit-notes'"))
+  check('Money In credit notes new route', routesSrc.includes("path: 'accounting/money-in/credit-notes/new'"))
+  check('Money In credit notes detail route', routesSrc.includes("path: 'accounting/money-in/credit-notes/:id'"))
+  check('Money In credit notes edit route', routesSrc.includes("path: 'accounting/money-in/credit-notes/:id/edit'"))
+  check('Money In credit notes allocate route', routesSrc.includes("path: 'accounting/money-in/credit-notes/:id/allocate'"))
   check('Legacy receivables redirects to Money In', routesSrc.includes('Navigate to="/accounting/money-in"'))
 
   // Demo store smoke
@@ -97,6 +107,52 @@ async function main() {
   check('Create draft invoice', created.status === 'DRAFT', created.draftReference ?? created.id)
   const marked = store.markReady(created.id)
   check('Mark ready', marked.status === 'READY_TO_POST')
+
+  // Credit notes (Phase 3C6) demo store smoke
+  store.seedCreditNotesIfEmpty(DEMO_LEGAL_ENTITY_ID)
+  const creditNotes = store.listCreditNotes({ legalEntityId: DEMO_LEGAL_ENTITY_ID })
+  check('Credit note list seeded', creditNotes.length >= 2, `count=${creditNotes.length}`)
+
+  const draftNote = creditNotes.find((n) => n.status === 'DRAFT')
+  check('Seed has DRAFT credit note', Boolean(draftNote))
+
+  const postedNote = creditNotes.find((n) => n.status === 'POSTED')
+  check('Seed has POSTED credit note with unallocated balance', Boolean(postedNote) && Number(postedNote?.unallocatedAmount) > 0)
+
+  const createdNote = store.createCreditNote({
+    legalEntityId: DEMO_LEGAL_ENTITY_ID,
+    purpose: 'SALES_RETURN',
+    sourceType: 'DIRECT',
+    customerId: 'b2000001-0001-4001-8001-000000000001',
+    creditNoteDate: new Date().toISOString().slice(0, 10),
+    postingDate: new Date().toISOString().slice(0, 10),
+    lines: [{ lineNumber: 1, adjustmentMode: 'FULL_LINE', description: 'Test credit line', quantity: '1', unitRate: '1000' }],
+  })
+  check('Create draft credit note', createdNote.status === 'DRAFT', createdNote.draftReference ?? createdNote.id)
+  const fetchedNote = store.getCreditNote(createdNote.id)
+  check('Get credit note round-trips', Boolean(fetchedNote) && fetchedNote?.allowedActions?.markReady === true)
+  const readyNote = store.markCreditNoteReady(createdNote.id)
+  check('Mark credit note ready', readyNote.status === 'READY_TO_POST')
+
+  if (postedNote) {
+    const outstanding = store.listOutstanding({ legalEntityId: DEMO_LEGAL_ENTITY_ID, customerId: postedNote.customerId })
+    const target = outstanding.items[0]
+    if (target) {
+      try {
+        const allocated = store.allocateCreditNoteDemo(postedNote.id, {
+          allocationDate: new Date().toISOString().slice(0, 10),
+          allocations: [{ invoiceId: target.salesInvoiceId ?? '', invoiceOpenItemId: target.openItemId, amount: '1' }],
+        })
+        check('Allocate credit note demo', allocated.idempotentReplay === false, `invoices=${allocated.invoices.length}`)
+        const history = store.listCreditNoteAllocationsDemo(postedNote.id)
+        check('Allocation history recorded', history.length >= 1)
+      } catch (e) {
+        check('Allocate credit note demo', false, e instanceof Error ? e.message : String(e))
+      }
+    } else {
+      check('Outstanding invoice available for allocation smoke', false)
+    }
+  }
 
   console.log(`\n${passed} passed, ${failed} failed`)
   if (failed > 0) process.exit(1)

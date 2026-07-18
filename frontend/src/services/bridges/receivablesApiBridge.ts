@@ -1,15 +1,26 @@
 import { isApiMode } from '../../config/apiConfig'
 import type {
   AgeingReportDto,
+  CreateCustomerCreditNoteInput,
   CreateSalesInvoiceInput,
+  CreditNoteAllocationHistoryRow,
+  CreditNoteAllocationPreview,
+  CreditNoteAllocationRequest,
+  CreditNoteAllocationResult,
+  CreditNoteValidationPreview,
+  CustomerCreditNoteDto,
+  CustomerCreditNoteListItemDto,
   CustomerReceivableDetailDto,
+  ListCustomerCreditNotesQuery,
   ListSalesInvoicesQuery,
   PaginatedResult,
+  PostCreditNoteResult,
   PostSalesInvoiceResult,
   ReceivableOverviewDto,
   ReceivableReconciliationDto,
   SalesInvoiceDto,
   SalesInvoiceValidationPreview,
+  UpdateCustomerCreditNoteInput,
   UpdateSalesInvoiceInput,
 } from '../../types/moneyIn'
 import * as api from '../api/receivablesApi'
@@ -223,6 +234,215 @@ export async function getReconciliation(legalEntityId?: string): Promise<Receiva
   }
   seedReceivablesDemoIfEmpty(leId)
   return getReceivablesDemoState().getReconciliation(leId)
+}
+
+// ─── Customer credit notes (Phase 3C6) ─────────────────────────────────────
+
+export async function listCustomerCreditNotes(filters?: Partial<ListCustomerCreditNotesQuery>): Promise<CustomerCreditNoteListItemDto[]> {
+  const legalEntityId = resolveLegalEntityId(filters?.legalEntityId)
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.listCustomerCreditNotes({ legalEntityId, ...filters }))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  seedReceivablesDemoIfEmpty(legalEntityId)
+  return getReceivablesDemoState().listCreditNotes({ legalEntityId, ...filters })
+}
+
+export async function getCustomerCreditNote(id: string): Promise<CustomerCreditNoteDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.getCustomerCreditNote(id))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  const note = getReceivablesDemoState().getCreditNote(id)
+  if (!note) throw new Error('Credit note not found')
+  return note
+}
+
+export async function createCustomerCreditNote(input: CreateCustomerCreditNoteInput): Promise<CustomerCreditNoteDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.createCustomerCreditNote(input))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  return getReceivablesDemoState().createCreditNote(input)
+}
+
+export async function updateCustomerCreditNote(id: string, input: UpdateCustomerCreditNoteInput): Promise<CustomerCreditNoteDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.updateCustomerCreditNote(id, input))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().updateCreditNote(id, input)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function validateCustomerCreditNote(id: string): Promise<CreditNoteValidationPreview> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.validateCustomerCreditNote(id))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().validateCreditNote(id)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function submitCustomerCreditNote(id: string, comments?: string): Promise<CustomerCreditNoteDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.submitCustomerCreditNote(id, comments))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().submitCreditNote(id)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function approveCustomerCreditNote(id: string, comments?: string): Promise<CustomerCreditNoteDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.approveCustomerCreditNote(id, comments))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().approveCreditNote(id)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function rejectCustomerCreditNote(id: string, comments?: string): Promise<CustomerCreditNoteDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.rejectCustomerCreditNote(id, comments))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().rejectCreditNote(id)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function markCustomerCreditNoteReady(id: string): Promise<CustomerCreditNoteDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.markCustomerCreditNoteReady(id))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().markCreditNoteReady(id)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function cancelCustomerCreditNote(id: string, cancellationReason: string): Promise<CustomerCreditNoteDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.cancelCustomerCreditNote(id, cancellationReason))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().cancelCreditNote(id, cancellationReason)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function postCustomerCreditNote(id: string): Promise<PostCreditNoteResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.postCustomerCreditNote(id))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().postCreditNote(id)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+// ─── Credit note allocations ───────────────────────────────────────────────
+
+export async function previewCreditNoteAllocation(
+  creditNoteId: string,
+  body: CreditNoteAllocationRequest,
+): Promise<CreditNoteAllocationPreview> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.previewCreditNoteAllocation(creditNoteId, body))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().previewCreditNoteAllocationDemo(creditNoteId, body)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function allocateCreditNote(
+  creditNoteId: string,
+  body: CreditNoteAllocationRequest,
+  idempotencyKey: string,
+): Promise<CreditNoteAllocationResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.allocateCreditNote(creditNoteId, body, idempotencyKey))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().allocateCreditNoteDemo(creditNoteId, body)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function listCreditNoteAllocations(creditNoteId: string): Promise<CreditNoteAllocationHistoryRow[]> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.listCreditNoteAllocations(creditNoteId))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  return getReceivablesDemoState().listCreditNoteAllocationsDemo(creditNoteId)
 }
 
 /** Demo customer options for invoice form */

@@ -359,3 +359,353 @@ export interface PaginatedResult<T> {
   page: number
   pageSize: number
 }
+
+// ─── Customer credit notes (Phase 3C6) ─────────────────────────────────────
+
+export type CustomerCreditNoteStatus =
+  | 'DRAFT'
+  | 'PENDING_APPROVAL'
+  | 'READY_TO_POST'
+  | 'POSTED'
+  | 'REJECTED'
+  | 'CANCELLED'
+
+export type CreditNotePurpose =
+  | 'SALES_RETURN'
+  | 'PRICE_ADJUSTMENT'
+  | 'QUANTITY_ADJUSTMENT'
+  | 'QUALITY_CLAIM'
+  | 'DISCOUNT'
+  | 'FREIGHT_ADJUSTMENT'
+  | 'TAX_CORRECTION'
+  | 'COMMERCIAL_SETTLEMENT'
+  | 'OTHER'
+
+export type CreditNoteSourceType = 'SALES_INVOICE' | 'DIRECT'
+
+export type CreditNoteAdjustmentMode = 'FULL_LINE' | 'QUANTITY' | 'VALUE' | 'RATE' | 'TAX_ONLY' | 'FULL_INVOICE'
+
+export interface CustomerCreditNoteAllowedActions {
+  edit: boolean
+  validate: boolean
+  markReady: boolean
+  submit: boolean
+  approve: boolean
+  reject: boolean
+  cancel: boolean
+  post: boolean
+  viewAccounting?: boolean
+  allocate?: boolean
+  viewAllocations?: boolean
+  reverse?: boolean
+}
+
+export interface CustomerCreditNoteLineDto {
+  id: string
+  lineNumber: number
+  originalInvoiceLineId: string | null
+  itemId: string | null
+  itemCodeSnapshot: string | null
+  itemNameSnapshot: string | null
+  hsnCodeSnapshot: string | null
+  uomSnapshot: string | null
+  description: string | null
+  adjustmentMode: CreditNoteAdjustmentMode
+  quantity: string
+  unitRate: string
+  revisedUnitRate: string | null
+  grossAmount: string
+  discountAmount: string
+  taxableAmount: string
+  cgstRate: string
+  cgstAmount: string
+  sgstRate: string
+  sgstAmount: string
+  igstRate: string
+  igstAmount: string
+  cessRate: string
+  cessAmount: string
+  lineTotal: string
+  revenueReversalAccountId: string | null
+  costCentreId: string | null
+}
+
+export interface CustomerCreditNoteOpenItemSummary {
+  id: string
+  side: 'CREDIT'
+  originalAmount: string
+  openAmount: string
+  status: ReceivableOpenItemStatus
+}
+
+export interface CustomerCreditNoteDto {
+  id: string
+  tenantId: string
+  legalEntityId: string
+  branchId: string | null
+  financialYearId: string | null
+  creditNoteNumber: string | null
+  draftReference: string | null
+  status: CustomerCreditNoteStatus
+  purpose: CreditNotePurpose
+  reasonId: string | null
+  reasonCodeSnapshot: string | null
+  reasonNameSnapshot: string | null
+  sourceType: CreditNoteSourceType
+  originalInvoiceId: string | null
+  originalInvoiceNumberSnapshot: string | null
+  customerId: string
+  customerCodeSnapshot: string | null
+  customerNameSnapshot: string
+  customerGstinSnapshot: string | null
+  customerPanSnapshot: string | null
+  customerStateCodeSnapshot: string | null
+  customerBillingAddressSnapshot: Record<string, unknown> | null
+  creditNoteDate: string
+  postingDate: string | null
+  supplyType: SalesInvoiceSupplyType
+  taxTreatment: SalesInvoiceTaxTreatment
+  currencyCode: string
+  exchangeRate: string
+  taxableAmount: string
+  cgstAmount: string
+  sgstAmount: string
+  igstAmount: string
+  cessAmount: string
+  totalTaxAmount: string
+  discountAmount: string
+  freightAmount: string
+  otherChargesAmount: string
+  roundOffAmount: string
+  grandTotal: string
+  baseTaxableAmount: string
+  baseCgstAmount: string
+  baseSgstAmount: string
+  baseIgstAmount: string
+  baseCessAmount: string
+  baseTotalTaxAmount: string
+  baseDiscountAmount: string
+  baseFreightAmount: string
+  baseOtherChargesAmount: string
+  baseRoundOffAmount: string
+  baseGrandTotal: string
+  allocatableAmount: string
+  allocatedAmount: string
+  unallocatedAmount: string
+  baseAllocatableAmount: string
+  baseAllocatedAmount: string
+  baseUnallocatedAmount: string
+  inventoryReturnRequired: boolean
+  approvalRequired: boolean
+  approvalRequestId: string | null
+  accountingVoucherId: string | null
+  postingEventId: string | null
+  creditOpenItemId: string | null
+  postedAt: string | null
+  postedBy: string | null
+  cancelledAt: string | null
+  cancelledBy: string | null
+  cancellationReason: string | null
+  createdBy: string | null
+  updatedBy: string | null
+  createdAt: string
+  updatedAt: string
+  lines?: CustomerCreditNoteLineDto[]
+  creditOpenItem?: CustomerCreditNoteOpenItemSummary | null
+  allowedActions?: CustomerCreditNoteAllowedActions
+}
+
+export type CustomerCreditNoteListItemDto = Omit<CustomerCreditNoteDto, 'lines'>
+
+export interface CreditNoteLineInput {
+  lineNumber: number
+  originalInvoiceLineId?: string | null
+  adjustmentMode: CreditNoteAdjustmentMode
+  quantity?: string
+  value?: string
+  revisedUnitRate?: string | null
+  itemId?: string | null
+  itemCode?: string | null
+  itemName?: string | null
+  hsnCode?: string | null
+  uom?: string | null
+  description?: string | null
+  unitRate?: string
+  gstRate?: string
+  cessRate?: string
+  revenueReversalAccountId?: string | null
+  costCentreId?: string | null
+}
+
+export interface CreateCustomerCreditNoteInput {
+  legalEntityId: string
+  branchId?: string | null
+  purpose: CreditNotePurpose
+  reasonId?: string | null
+  sourceType: CreditNoteSourceType
+  originalInvoiceId?: string | null
+  customerId: string
+  creditNoteDate: string
+  postingDate: string
+  supplyType?: SalesInvoiceSupplyType
+  taxTreatment?: SalesInvoiceTaxTreatment
+  currencyCode?: string
+  exchangeRate?: string
+  freightAmount?: string
+  otherChargesAmount?: string
+  roundOffAmount?: string
+  inventoryReturnRequired?: boolean
+  approvalRequired?: boolean
+  lines: CreditNoteLineInput[]
+}
+
+export interface UpdateCustomerCreditNoteInput extends Omit<CreateCustomerCreditNoteInput, 'legalEntityId'> {
+  updatedAt: string
+}
+
+export interface ListCustomerCreditNotesQuery {
+  legalEntityId: string
+  branchId?: string
+  customerId?: string
+  originalInvoiceId?: string
+  status?: CustomerCreditNoteStatus
+  purpose?: CreditNotePurpose
+  search?: string
+  page?: number
+  limit?: number
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface CreditNoteValidationPreview {
+  valid: boolean
+  errors: CalculationIssue[]
+  warnings: CalculationIssue[]
+}
+
+export interface PostCreditNoteResult {
+  creditNote: CustomerCreditNoteDto
+  posting: { voucherId: string; voucherNumber: string; postingEventId: string }
+  creditOpenItemId: string
+  idempotentReplay: boolean
+}
+
+// ─── Credit note allocations (Phase 3C5 backend / 3C6 frontend) ────────────
+
+export interface CreditNoteAllocationLineInput {
+  invoiceId: string
+  invoiceOpenItemId: string
+  amount: string
+}
+
+export interface CreditNoteAllocationRequest {
+  allocationDate: string
+  allocations: CreditNoteAllocationLineInput[]
+}
+
+export interface CreditNoteAllocationPreviewLine {
+  invoiceId: string
+  invoiceOpenItemId: string
+  invoiceNumber: string | null
+  currencyCode: string
+  invoiceOutstandingBefore: string
+  proposedAllocationAmount: string
+  invoiceOutstandingAfter: string
+  baseInvoiceOutstandingBefore: string
+  baseProposedAllocationAmount: string
+  baseInvoiceOutstandingAfter: string
+  status: 'VALID' | 'INVALID'
+  issues: CalculationIssue[]
+}
+
+export interface CreditNoteAllocationPreview {
+  creditNoteId: string
+  creditOpenItemId: string
+  currencyCode: string
+  exchangeRate: string
+  creditNoteUnallocatedBefore: string
+  totalProposedAllocation: string
+  creditNoteUnallocatedAfter: string
+  customerAdvanceAfter: string
+  valid: boolean
+  lines: CreditNoteAllocationPreviewLine[]
+  errors: CalculationIssue[]
+  warnings: CalculationIssue[]
+}
+
+export interface CreditNoteAllocationBatchDto {
+  id: string
+  status: string
+  allocationDate: string
+  currencyCode: string
+  exchangeRate: string
+  totalAllocatedAmount: string
+  baseTotalAllocatedAmount: string
+  allocationCount: number
+  createdBy: string | null
+  createdAt: string
+  completedAt: string | null
+}
+
+export interface CustomerCreditNoteAllocationDto {
+  id: string
+  batchId: string | null
+  creditNoteId: string
+  invoiceId: string | null
+  invoiceOpenItemId: string
+  allocationDate: string
+  allocatedAmount: string
+  baseAllocatedAmount: string
+  invoiceOutstandingBefore: string | null
+  invoiceOutstandingAfter: string | null
+  status: string
+  createdBy: string | null
+  createdAt: string
+}
+
+export interface CreditNoteAllocationResultInvoiceRow {
+  invoiceId: string
+  openItemId: string
+  openAmount: string
+  allocatedAmount: string
+  status: string
+  amountPaid: string
+  outstandingAmount: string
+}
+
+export interface CreditNoteAllocationResult {
+  batch: CreditNoteAllocationBatchDto
+  allocations: CustomerCreditNoteAllocationDto[]
+  creditNote: {
+    id: string
+    allocatedAmount: string
+    unallocatedAmount: string
+    baseAllocatedAmount: string
+    baseUnallocatedAmount: string
+  }
+  creditOpenItem: {
+    id: string
+    openAmount: string
+    allocatedAmount: string
+    status: string
+  }
+  invoices: CreditNoteAllocationResultInvoiceRow[]
+  customerAdvance: string
+  idempotentReplay: boolean
+}
+
+export interface CreditNoteAllocationHistoryRow {
+  batchId: string | null
+  allocationId: string
+  allocationDate: string
+  allocationSequence: number
+  invoiceId: string | null
+  invoiceNumber: string | null
+  invoiceOpenItemId: string
+  allocatedAmount: string
+  baseAllocatedAmount: string
+  invoiceOutstandingBefore: string | null
+  invoiceOutstandingAfter: string | null
+  status: string
+  createdBy: string | null
+  createdAt: string
+}

@@ -213,6 +213,11 @@ import {
 } from '@/modules/accounting/journals'
 import {
   AgeingPage as MoneyInAgeingPage,
+  CreditNoteAllocatePage as MoneyInCreditNoteAllocatePage,
+  CreditNoteDetailPage as MoneyInCreditNoteDetailPage,
+  CreditNoteEditPage as MoneyInCreditNoteEditPage,
+  CreditNoteListPage as MoneyInCreditNoteListPage,
+  CreditNoteNewPage as MoneyInCreditNoteNewPage,
   CustomerDetailPage as MoneyInCustomerDetailPage,
   CustomerListPage as MoneyInCustomerListPage,
   InvoiceDetailPage as MoneyInInvoiceDetailPage,
@@ -255,6 +260,12 @@ export const accountingRouteChildren: RouteObject[] = [
   { path: 'accounting/money-in/invoices/new', element: <MoneyInInvoiceNewPage /> },
   { path: 'accounting/money-in/invoices/:id', element: <MoneyInInvoiceDetailPage /> },
   { path: 'accounting/money-in/invoices/:id/edit', element: <MoneyInInvoiceEditPage /> },
+  /** Credit notes — Phase 3C6 AR frontend (API + demo dual-mode) */
+  { path: 'accounting/money-in/credit-notes', element: <MoneyInCreditNoteListPage /> },
+  { path: 'accounting/money-in/credit-notes/new', element: <MoneyInCreditNoteNewPage /> },
+  { path: 'accounting/money-in/credit-notes/:id', element: <MoneyInCreditNoteDetailPage /> },
+  { path: 'accounting/money-in/credit-notes/:id/edit', element: <MoneyInCreditNoteEditPage /> },
+  { path: 'accounting/money-in/credit-notes/:id/allocate', element: <MoneyInCreditNoteAllocatePage /> },
   { path: 'accounting/money-in/outstanding', element: <MoneyInOutstandingPage /> },
   { path: 'accounting/money-in/customers', element: <MoneyInCustomerListPage /> },
   { path: 'accounting/money-in/customers/:customerId', element: <MoneyInCustomerDetailPage /> },
