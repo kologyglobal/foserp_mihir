@@ -96,14 +96,38 @@ export function ErpSmartSelect<T extends string = string>({
     if (!anchorRef.current) return
     const rect = anchorRef.current.getBoundingClientRect()
     const width = Math.max(rect.width, dropdownMinWidth)
-    const left = Math.min(rect.left, window.innerWidth - width - 8)
-    setDropdownStyle({
-      position: 'fixed',
-      top: rect.bottom + 4,
-      left: Math.max(8, left),
-      width,
-      zIndex: 10050,
-    })
+    const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8)
+    const gap = 4
+    const pad = 8
+    const spaceBelow = window.innerHeight - rect.bottom - pad
+    const spaceAbove = rect.top - pad
+    const preferredMax = 280
+    // Prefer below when it fits a usable list; otherwise flip above
+    const openBelow = spaceBelow >= Math.min(preferredMax, 160) || spaceBelow >= spaceAbove
+    const available = Math.max(120, openBelow ? spaceBelow : spaceAbove)
+    const maxHeight = Math.min(preferredMax, available - gap)
+
+    if (openBelow) {
+      setDropdownStyle({
+        position: 'fixed',
+        top: rect.bottom + gap,
+        bottom: 'auto',
+        left,
+        width,
+        maxHeight,
+        zIndex: 10050,
+      })
+    } else {
+      setDropdownStyle({
+        position: 'fixed',
+        top: 'auto',
+        bottom: window.innerHeight - rect.top + gap,
+        left,
+        width,
+        maxHeight,
+        zIndex: 10050,
+      })
+    }
   }, [dropdownMinWidth])
 
   const openList = useCallback((resetFilter = true) => {
@@ -130,13 +154,16 @@ export function ErpSmartSelect<T extends string = string>({
   useEffect(() => {
     if (!open) return
     positionDropdown()
+    // Re-measure after portal paint so flip/height stay accurate on short screens
+    const raf = requestAnimationFrame(() => positionDropdown())
     window.addEventListener('scroll', positionDropdown, true)
     window.addEventListener('resize', positionDropdown)
     return () => {
+      cancelAnimationFrame(raf)
       window.removeEventListener('scroll', positionDropdown, true)
       window.removeEventListener('resize', positionDropdown)
     }
-  }, [open, positionDropdown])
+  }, [open, positionDropdown, filtered.length])
 
   useEffect(() => {
     if (!open) return

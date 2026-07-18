@@ -1,12 +1,13 @@
 import { AlertCircle } from 'lucide-react'
 import type { EnterpriseValidationItem } from './types'
+import { toRequiredFieldLabel } from '../../utils/formValidation'
 
 /**
- * Interactive “complete before saving” checklist (CRM guides).
- * Plain string errors are handled as toasts via ErpValidationSummary — not inline banners.
+ * Optional inline checklist. Primary UX for save failures is top-right toast
+ * via `handleInvalidSubmit` / `ErpValidationSummary`.
  */
 export function EnterpriseValidationGuide({
-  title = 'Please complete the required fields',
+  title = 'Please complete the required fields before saving',
   items,
 }: {
   title?: string
@@ -14,7 +15,24 @@ export function EnterpriseValidationGuide({
   /** @deprecated Errors surface as toasts via ErpValidationSummary */
   errors?: string[]
 }) {
-  const missing = items?.filter((i) => i.label || i.message) ?? []
+  const missing = (items ?? [])
+    .map((item) => {
+      const rawLabel = (item.label || item.message || '').trim()
+      const label = toRequiredFieldLabel(rawLabel) || rawLabel
+      const rawMessage = item.message?.trim() ?? ''
+      const messageLabel = rawMessage ? toRequiredFieldLabel(rawMessage) : ''
+      const hint =
+        rawMessage
+        && messageLabel.toLowerCase() !== label.toLowerCase()
+        && rawMessage.toLowerCase() !== label.toLowerCase()
+        && rawMessage.toLowerCase() !== `${label.toLowerCase()} is required`
+        && rawMessage.toLowerCase() !== `${label.toLowerCase()} is required.`
+          ? rawMessage
+          : null
+      return { ...item, label, hint }
+    })
+    .filter((i) => i.label)
+
   if (missing.length === 0) return null
 
   return (
@@ -24,26 +42,18 @@ export function EnterpriseValidationGuide({
         <p className="ent-ws-validation__title">{title}</p>
       </div>
       <ul className="ent-ws-validation__list">
-        {missing.map((item) => {
-          const label = (item.label || item.message || '').trim()
-          const hint =
-            item.message
-            && item.message.trim().toLowerCase() !== label.toLowerCase()
-              ? item.message
-              : null
-          return (
-            <li key={item.id}>
-              {item.onClick ? (
-                <button type="button" className="ent-ws-validation__link" onClick={item.onClick}>
-                  {label}
-                </button>
-              ) : (
-                <span>{label}</span>
-              )}
-              {hint ? <span className="ent-ws-validation__hint"> — {hint}</span> : null}
-            </li>
-          )
-        })}
+        {missing.map((item) => (
+          <li key={item.id}>
+            {item.onClick ? (
+              <button type="button" className="ent-ws-validation__link" onClick={item.onClick}>
+                {item.label}
+              </button>
+            ) : (
+              <span>{item.label}</span>
+            )}
+            {item.hint ? <span className="ent-ws-validation__hint"> — {item.hint}</span> : null}
+          </li>
+        ))}
       </ul>
     </div>
   )

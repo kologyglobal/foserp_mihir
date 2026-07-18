@@ -264,7 +264,7 @@ function mapLeadCreatePayload(input: Record<string, unknown>): Record<string, un
     email,
     mobile: sanitizePhoneDigits(String(input.mobile ?? '')) || '',
     contactPerson: input.contactPerson ?? '',
-    productRequirement: input.productRequirement ?? input.remarks ?? '',
+    productRequirement: input.productRequirement ?? '',
     expectedQty: input.expectedQty ?? null,
     expectedValue: input.expectedValue ?? 0,
     probability: input.probability ?? 30,

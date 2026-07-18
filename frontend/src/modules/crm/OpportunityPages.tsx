@@ -150,7 +150,16 @@ export function OpportunityPipelinePage() {
     filterDrawer.clearAll()
     setLostReasonFilter('')
     setSortBy('value')
-  }, [filterDrawer])
+    savedViews.markFiltersCustomized()
+  }, [filterDrawer, savedViews])
+
+  const removeOppFilterChip = useCallback(
+    (chipId: string) => {
+      filterDrawer.removeChip(chipId)
+      savedViews.markFiltersCustomized()
+    },
+    [filterDrawer, savedViews],
+  )
 
   const filtered = useMemo(() => {
     return opportunities.filter((o) => {
@@ -393,7 +402,7 @@ export function OpportunityPipelinePage() {
             activeFilterCount={filterDrawer.activeCount}
             onOpenFilters={filterDrawer.openDrawer}
             chips={filterDrawer.chips}
-            onRemoveChip={filterDrawer.removeChip}
+            onRemoveChip={removeOppFilterChip}
             onClearAll={filterDrawer.chips.length > 0 ? clearFilters : undefined}
             resultCount={sorted.length}
             savedView={savedViews.activeView}
@@ -438,7 +447,7 @@ export function OpportunityPipelinePage() {
                   activeFilterCount: filterDrawer.activeCount,
                   onOpenFilters: filterDrawer.openDrawer,
                   chips: filterDrawer.chips,
-                  onRemoveChip: filterDrawer.removeChip,
+                  onRemoveChip: removeOppFilterChip,
                   onClearAll: clearFilters,
                   savedView: savedViews.activeView,
                   onSavedViewChange: savedViews.selectView,

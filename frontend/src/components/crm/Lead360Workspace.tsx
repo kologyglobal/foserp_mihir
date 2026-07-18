@@ -83,7 +83,7 @@ import { canOpenLeadEditor, resolveLeadEditPolicy } from '@/utils/leadEditPolicy
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { useProductMasterOptionMap } from '@/utils/opportunityProductOptions'
-import { decodeLeadRequirementLines } from '@/utils/leadRequirementLines'
+import { decodeLeadRequirementLines, resolveLeadRequirementLinesRaw } from '@/utils/leadRequirementLines'
 
 export function Lead360Workspace() {
   const apiMode = useApiMode()
@@ -217,7 +217,8 @@ export function Lead360Workspace() {
   }, [leadActivities])
 
   const hasOptionalDetailData = Boolean(
-    lead?.productRequirement?.trim()
+    lead?.remarks?.trim()
+    || resolveLeadRequirementLinesRaw(lead?.productRequirement, lead?.remarks)
     || (lead?.expectedValue ?? 0) > 0
     || lead?.expectedCloseDate
     || lead?.nextFollowUpDate
@@ -240,8 +241,11 @@ export function Lead360Workspace() {
   })
 
   const requirementLineCount = useMemo(
-    () => decodeLeadRequirementLines(lead?.productRequirement ?? '', lead?.expectedQty).lines.filter((l) => l.productOrItem?.trim()).length,
-    [lead?.productRequirement, lead?.expectedQty],
+    () =>
+      decodeLeadRequirementLines(lead?.productRequirement ?? '', lead?.expectedQty, lead?.remarks).lines.filter(
+        (l) => l.productOrItem?.trim(),
+      ).length,
+    [lead?.productRequirement, lead?.expectedQty, lead?.remarks],
   )
 
   const additionalSectionItems = useMemo(() => {
@@ -625,7 +629,7 @@ export function Lead360Workspace() {
               requirement: (
                 <div className="space-y-4">
                   <ErpLineItemsGrid
-                    lines={decodeLeadRequirementLines(lead.productRequirement ?? '', lead.expectedQty).lines}
+                    lines={decodeLeadRequirementLines(lead.productRequirement ?? '', lead.expectedQty, lead.remarks).lines}
                     onChange={() => {}}
                     productOptions={productOptions}
                     productPickMap={pickMap}

@@ -206,7 +206,7 @@ export function normalizeLead(lead: Lead): Lead {
     closedReason: lead.closedReason ?? null,
     notQualifiedReason: lead.notQualifiedReason ?? null,
     opportunityId: lead.opportunityId ?? null,
-    productRequirement: lead.productRequirement ?? lead.remarks ?? '',
+    productRequirement: lead.productRequirement ?? '',
     expectedQty: lead.expectedQty ?? null,
     expectedCloseDate: lead.expectedCloseDate ?? null,
     contactPerson: lead.contactPerson ?? null,

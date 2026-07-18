@@ -13757,8 +13757,11 @@ a.crm-companies-table__name:hover {
 }
 
 .erp-smart-select__dropdown {
-  max-height: 280px;
-  overflow: auto;
+  max-height: min(280px, calc(100dvh - 16px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   border: 1px solid var(--erp-border);
   border-radius: var(--erp-radius-md);
   background: var(--erp-surface);

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { ColumnDef, RowSelectionState } from '@tanstack/react-table'
-import { Copy, Eye, FileText, Pencil, Printer, Send, Trash2, Calendar } from 'lucide-react'
+import { Copy, Eye, FileText, GitBranch, Pencil, Printer, Send, Trash2, Calendar } from 'lucide-react'
 import { ErpDataGrid } from '../erp/ErpDataGrid'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
 import { formatDate } from '../../utils/dates/format'
@@ -26,6 +26,7 @@ export interface CrmQuotationsTableProps {
   onView: (item: QuotationListItem) => void
   onEdit: (item: QuotationListItem) => void
   onDuplicate?: (item: QuotationListItem) => void
+  onRevise?: (item: QuotationListItem) => void
   onPreview?: (item: QuotationListItem) => void
   onScheduleActivity?: (item: QuotationListItem) => void
   onCreateSalesOrder?: (item: QuotationListItem) => void
@@ -55,6 +56,7 @@ export function CrmQuotationsTable({
   onView,
   onEdit,
   onDuplicate,
+  onRevise,
   onPreview,
   onScheduleActivity,
   onCreateSalesOrder,
@@ -166,6 +168,7 @@ export function CrmQuotationsTable({
           const soGate = resolveCreateSalesOrderGateForQuotationDocument(d.id)
           const soAlreadyExists = Boolean(soGate.salesOrderId)
           const canCreateSo = Boolean(onCreateSalesOrder) && (soAlreadyExists || soGate.enabled)
+          const canRevise = Boolean(onRevise) && d.status === 'approved' && !soAlreadyExists
           return (
             <div onClick={(e) => e.stopPropagation()}>
               <EnterpriseRowActionsMenu
@@ -175,6 +178,14 @@ export function CrmQuotationsTable({
                   { id: 'duplicate', label: 'Duplicate', icon: Copy, onClick: () => (onDuplicate ? onDuplicate(item) : onEdit(item)), disabled: !canEdit },
                   { id: 'delete', label: 'Delete', icon: Trash2, onClick: () => onBulkDelete?.([item]), danger: true, disabled: !canDelete },
                   { id: 'sep-workflow', separator: true, label: '' },
+                  ...(canRevise
+                    ? [{
+                        id: 'revise',
+                        label: 'Revised Quotation',
+                        icon: GitBranch,
+                        onClick: () => onRevise?.(item),
+                      }]
+                    : []),
                   {
                     id: 'convert',
                     label: soAlreadyExists ? 'View Sales Order' : 'Convert to Sales Order',
@@ -211,7 +222,7 @@ export function CrmQuotationsTable({
         },
       },
     ],
-    [onView, onEdit, onDuplicate, onPreview, onScheduleActivity, onCreateSalesOrder, onPrint, onSubmitApproval, onBulkDelete, canEdit, canDelete, enableColumnSorting],
+    [onView, onEdit, onDuplicate, onRevise, onPreview, onScheduleActivity, onCreateSalesOrder, onPrint, onSubmitApproval, onBulkDelete, canEdit, canDelete, enableColumnSorting],
   )
 
   const emptyMessage = hasActiveFilters ? 'No quotations match current filters.' : 'No quotations found.'

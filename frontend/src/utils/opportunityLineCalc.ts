@@ -222,7 +222,7 @@ export function validateOpportunityLines(
   const errors: string[] = []
   const rowErrors: Record<string, string[]> = {}
 
-  if (!header.customerId) errors.push('Company is required.')
+  if (!header.customerId) errors.push('Customer is required.')
   if (!header.ownerId) errors.push('Opportunity owner is required.')
   if (!header.stage) errors.push('Stage is required.')
   if (header.probability === '' || header.probability == null || Number.isNaN(Number(header.probability))) {

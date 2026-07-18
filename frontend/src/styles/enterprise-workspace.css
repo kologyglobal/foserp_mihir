@@ -2541,17 +2541,23 @@
 }
 
 .erp-view-field__link {
+  position: relative;
+  z-index: 1;
   color: var(--erp-primary, #0078d4);
   text-decoration: none;
   font-weight: 600;
   min-width: 0;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .erp-view-field__link--truncate {
-  display: block;
+  display: inline-block;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .erp-view-field__link:hover {
@@ -3128,4 +3134,64 @@
 .crm-lead-notes-card .erp-field-row--wide,
 .crm-lead-notes-card textarea.erp-input {
   min-height: 96px;
+}
+
+/*
+ * CRM Smart Context + wide product tables (Lead / Opp 360).
+ * enterprise-workspace.css loads after dynamics-components.css and was winning the
+ * 2-col template while span 8/4 from the earlier file still applied — main could
+ * stretch under the sticky factbox and hide Tax / Final Quoted.
+ */
+@media (min-width: 1024px) {
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+    align-items: start;
+    gap: 16px;
+  }
+
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__main,
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__factbox {
+    grid-column: auto;
+    min-width: 0;
+  }
+
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__main {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__factbox {
+    max-width: 320px;
+    z-index: 1;
+    overflow-x: hidden;
+  }
+}
+
+@media (max-width: 1023px) {
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: none;
+  }
+
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__factbox {
+    position: static;
+    max-width: none;
+    max-height: none;
+    z-index: auto;
+  }
+}
+
+.enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-line-items-grid,
+.enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-line-items-grid__wrap,
+.enterprise-workspace.enterprise-workspace--crm-smart-overview .quo-editor-price__table-wrap {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-additional-panel,
+.enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-additional-info-panel__inner {
+  min-width: 0;
+  max-width: 100%;
 }

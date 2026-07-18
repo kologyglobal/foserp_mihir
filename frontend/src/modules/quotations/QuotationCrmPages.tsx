@@ -344,6 +344,34 @@ export function CrmQuotationListPage() {
     navigate(`/crm/quotations/new?${params.toString()}`)
   }
 
+  async function reviseQuotation(item: QuotationListItem) {
+    const soGate = resolveCreateSalesOrderGateForQuotationDocument(item.document.id)
+    if (item.document.status !== 'approved' || soGate.salesOrderId) {
+      notify.error(
+        soGate.salesOrderId
+          ? 'Revised quotation is not available after a sales order is created.'
+          : 'Revised quotation is only available for approved quotations.',
+      )
+      return
+    }
+    const reason = await systemPrompt({
+      title: 'Revised Quotation',
+      description: 'Describe why a new revision is needed. Company details stay locked on the revision.',
+      fieldLabel: 'Revision reason',
+      defaultValue: 'Customer requested changes',
+      confirmLabel: 'Create revision',
+      required: true,
+    })
+    if (!reason) return
+    const createRevision = useCrmStore.getState().createQuotationRevision
+    const r = await resolveStoreAction(createRevision(item.document.id, reason))
+    if (r.ok && r.documentId) {
+      navigate(`/crm/quotations/${item.document.quotationId}/editor?doc=${r.documentId}`)
+    } else {
+      notify.error(r.error ?? 'Could not create revised quotation')
+    }
+  }
+
   return (
     <>
     <OperationalPageShell
@@ -427,6 +455,7 @@ export function CrmQuotationListPage() {
           onView={openQuotation}
           onEdit={editQuotation}
           onDuplicate={duplicateQuotation}
+          onRevise={(item) => void reviseQuotation(item)}
           onPreview={openQuotationPreview}
           onCreateSalesOrder={(item) => {
             const gate = resolveCreateSalesOrderGateForQuotationDocument(item.document.id)

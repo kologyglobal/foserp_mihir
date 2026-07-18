@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Building2, ChevronDown, X } from 'lucide-react'
-import { FormField } from '../forms/FormField'
+import { FormField, inputClassName } from '../forms/FormField'
 import { Input, Select, Checkbox, MobileInput } from '../forms/Inputs'
 import { StateSelect, CitySelect, CountrySelect, MasterEnumSelect } from '../masters/GeographySelects'
 import { INDUSTRY_OPTIONS } from '../../data/masters/geographySeed'
@@ -12,7 +12,7 @@ import { isApiMode } from '../../config/apiConfig'
 import { useMasterStore } from '../../store/masterStore'
 import { resolveStoreAction } from '../../store/storeAction'
 import { notify } from '../../store/toastStore'
-import { panFromGstin } from '../../utils/customerUtils'
+import { panFromGstin, validateGstin } from '../../utils/customerUtils'
 import { DEFAULT_CUSTOMER_COUNTRY } from '../../config/countries'
 import type { QuickCreateResult } from '../../types/quickCreate'
 import type { Customer, CustomerType, SalesTerritory } from '../../types/master'
@@ -124,6 +124,7 @@ export function QuickCompanyCreateModal({
   const [form, setForm] = useState<CompanyForm>(() => emptyForm(defaultName))
   const [showAdditional, setShowAdditional] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [gstinError, setGstinError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -131,6 +132,7 @@ export function QuickCompanyCreateModal({
     setForm(emptyForm(defaultName.trim()))
     setShowAdditional(false)
     setError(null)
+    setGstinError(null)
     setSubmitting(false)
   }, [open, defaultName])
 
@@ -149,13 +151,19 @@ export function QuickCompanyCreateModal({
   }
 
   function handleGstinChange(raw: string) {
-    const gst = raw.toUpperCase()
+    const gst = raw.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 15)
     setForm((prev) => ({
       ...prev,
       gstin: gst,
-      pan: panFromGstin(gst) || prev.pan,
+      pan: panFromGstin(gst) || (gst.length < 12 ? '' : prev.pan),
     }))
     setError(null)
+    // Clear stale error while typing; re-check on blur / submit
+    if (gstinError) setGstinError(gst.length === 0 || gst.length === 15 ? validateGstin(gst) : null)
+  }
+
+  function handleGstinBlur() {
+    setGstinError(validateGstin(form.gstin))
   }
 
   async function handleSubmit() {
@@ -166,6 +174,16 @@ export function QuickCompanyCreateModal({
       notify.warning(msg)
       return
     }
+
+    const gstErr = validateGstin(form.gstin)
+    if (gstErr) {
+      setGstinError(gstErr)
+      setShowAdditional(true)
+      setError(gstErr)
+      notify.warning(gstErr)
+      return
+    }
+    setGstinError(null)
 
     setSubmitting(true)
     setError(null)
@@ -360,13 +378,21 @@ export function QuickCompanyCreateModal({
                 <h3 className="text-[13px] font-semibold text-erp-text">Tax &amp; commercial terms</h3>
                 <p className="text-[11px] text-erp-muted">GST registration, PAN, credit days, and approved credit limit.</p>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <FormField label="GSTIN" hint="15-character GST identification number">
+                  <FormField
+                    label="GSTIN"
+                    hint="15-character GST identification number"
+                    error={gstinError ?? undefined}
+                  >
                     <Input
                       value={form.gstin}
                       onChange={(e) => handleGstinChange(e.target.value)}
+                      onBlur={handleGstinBlur}
                       maxLength={15}
-                      className="font-mono uppercase"
+                      className={cn('font-mono uppercase', inputClassName(Boolean(gstinError)))}
                       placeholder="27AABCU9603R1ZM"
+                      aria-invalid={Boolean(gstinError)}
+                      autoComplete="off"
+                      spellCheck={false}
                     />
                   </FormField>
                   <FormField label="PAN" hint="Auto-derived from GSTIN — edit if needed">

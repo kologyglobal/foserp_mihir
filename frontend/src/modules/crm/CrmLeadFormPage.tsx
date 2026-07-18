@@ -44,8 +44,11 @@ import { sanitizePhoneDigits } from '../../utils/phoneValidation'
 import { normalizeEmail, validateEmail } from '../../utils/validation/email'
 import { validateMobileForCountry } from '../../utils/validation/mobilePhone'
 import {
+  getCrmDateInputMax,
+  getCrmDateInputMin,
   getDateInputMin,
   suggestFollowUpDueTime,
+  validateCrmCalendarDate,
   validateFollowUpAt,
 } from '../../utils/validation/crmDatePolicy'
 import { DEFAULT_CUSTOMER_COUNTRY } from '../../config/countries'
@@ -119,7 +122,10 @@ const LEAD_FIELD_ORDER = [
   'createdDate',
   'mobile',
   'email',
+  'remarks',
   'productRequirement',
+  'expectedCloseDate',
+  'nextFollowUpDate',
   'inactiveReason',
   'notQualifiedReason',
   'closedDate',
@@ -133,7 +139,10 @@ const LEAD_SECTION_BY_FIELD: Record<string, string> = {
   createdDate: 'lead-section-quick',
   mobile: 'lead-section-quick',
   email: 'lead-section-quick',
+  remarks: 'lead-section-enquiry-notes',
   productRequirement: 'lead-section-requirement',
+  expectedCloseDate: 'lead-section-commercial',
+  nextFollowUpDate: 'lead-section-followup',
   inactiveReason: 'lead-section-status',
   notQualifiedReason: 'lead-section-status',
   closedDate: 'lead-section-status',
@@ -188,7 +197,11 @@ export function CrmLeadFormPage() {
   const [source, setSource] = useState<LeadSource>(existing?.source ?? 'other')
   const [industry, setIndustry] = useState(existing?.industry ?? '')
   const [requirementLines, setRequirementLines] = useState<OpportunityLine[]>(() =>
-    decodeLeadRequirementLines(existing?.productRequirement ?? '', existing?.expectedQty ?? null).lines,
+    decodeLeadRequirementLines(
+      existing?.productRequirement ?? '',
+      existing?.expectedQty ?? null,
+      existing?.remarks,
+    ).lines,
   )
   const [expectedValue, setExpectedValue] = useState(existing?.expectedValue ?? 0)
   const [probability, setProbability] = useState(existing?.probability ?? 30)
@@ -279,7 +292,11 @@ export function CrmLeadFormPage() {
     setSource(duplicateSource.source)
     setIndustry(duplicateSource.industry ?? '')
     setRequirementLines(
-      decodeLeadRequirementLines(duplicateSource.productRequirement ?? '', duplicateSource.expectedQty ?? null).lines,
+      decodeLeadRequirementLines(
+        duplicateSource.productRequirement ?? '',
+        duplicateSource.expectedQty ?? null,
+        duplicateSource.remarks,
+      ).lines,
     )
     setExpectedValue(duplicateSource.expectedValue ?? 0)
     setProbability(duplicateSource.probability ?? 30)
@@ -311,7 +328,11 @@ export function CrmLeadFormPage() {
     setSource(existing.source)
     setIndustry(existing.industry ?? '')
     setRequirementLines(
-      decodeLeadRequirementLines(existing.productRequirement ?? '', existing.expectedQty ?? null).lines,
+      decodeLeadRequirementLines(
+        existing.productRequirement ?? '',
+        existing.expectedQty ?? null,
+        existing.remarks,
+      ).lines,
     )
     setExpectedValue(existing.expectedValue ?? 0)
     setProbability(existing.probability ?? 30)
@@ -493,6 +514,7 @@ export function CrmLeadFormPage() {
           (draft as { expectedQty?: number | null }).expectedQty != null
             ? Number((draft as { expectedQty?: number | null }).expectedQty)
             : null,
+          draft.remarks,
         ).lines,
       )
     }
@@ -525,23 +547,38 @@ export function CrmLeadFormPage() {
       createdDate,
       mobile,
       email,
-      productRequirement: requirementText || remarks.trim() || (hasLeadRequirementLines(requirementLines) ? 'set' : ''),
+      productRequirement: requirementText || (hasLeadRequirementLines(requirementLines) ? 'set' : ''),
+      remarks,
       expectedValue,
     },
     {
       prospectName: { required: true, message: 'Company / Prospect is required' },
       leadOwnerId: { required: true, message: 'Lead Owner is required' },
       priority: { required: true, message: 'Priority is required' },
-      createdDate: { required: true, message: 'Created Date is required' },
+      createdDate: {
+        required: true,
+        message: 'Created Date is required',
+        validate: (v) =>
+          validateCrmCalendarDate(String(v ?? ''), {
+            label: 'Created Date',
+            required: true,
+            notAfter: getDateInputMin(),
+            notAfterMessage: 'Created Date cannot be in the future',
+          }),
+      },
       mobile: {
         validate: (v) => validateMobileForCountry(String(v ?? ''), resolveLeadMobileCountry()),
       },
       email: {
         validate: (v) => validateEmail(String(v ?? '')),
       },
+      remarks: {
+        required: true,
+        message: 'Notes are required',
+      },
       productRequirement: {
         validate: (v) => {
-          // Minimum-first: requirement only when the deal is serious enough.
+          // Minimum-first: product lines only when the deal is serious enough.
           const reqStages: LeadStage[] = ['requirement_collected', 'qualified']
           if (reqStages.includes(leadStage) && !String(v).trim()) {
             return 'Add at least one product / requirement line for this stage'
@@ -872,12 +909,21 @@ export function CrmLeadFormPage() {
   function validate(): FieldErrorMap {
     inlineValidation.touchAll()
     const errors: FieldErrorMap = {}
+    const today = getDateInputMin()
     // Must resolve a real prospect name — customerId alone is not enough if the master row is missing
     const prospect = resolveProspectName()
     if (!prospect) errors.prospectName = 'Company / Prospect is required'
     if (!String(leadOwnerId ?? '').trim()) errors.leadOwnerId = 'Lead Owner is required'
     if (!priority) errors.priority = 'Priority is required'
-    if (!String(createdDate ?? '').trim()) errors.createdDate = 'Created Date is required'
+
+    const createdDateError = validateCrmCalendarDate(createdDate, {
+      label: 'Created Date',
+      required: true,
+      notAfter: today,
+      notAfterMessage: 'Created Date cannot be in the future',
+    })
+    if (createdDateError) errors.createdDate = createdDateError
+
     const emailError = validateEmail(email)
     if (emailError) errors.email = emailError
     if (mobile.trim()) {
@@ -885,16 +931,41 @@ export function CrmLeadFormPage() {
       if (mobileError) errors.mobile = mobileError
     }
 
-    const requirement = requirementText || remarks.trim()
+    if (!remarks.trim()) {
+      errors.remarks = 'Notes are required'
+    }
     const reqStages: LeadStage[] = ['requirement_collected', 'qualified']
-    // Minimum-first: early stages can save without product notes; stage gates ask later.
-    if (reqStages.includes(leadStage) && !requirement) {
+    // Minimum-first: early stages can save without product lines; stage gates ask later.
+    if (reqStages.includes(leadStage) && !requirementText && !hasLeadRequirementLines(requirementLines)) {
       errors.productRequirement = 'Add at least one product / requirement line for this stage'
     }
     if (!mobile.trim() && !email.trim() && (leadStage === 'new' || leadStage === 'contacted')) {
       // Soft early capture — prefer a contact path without blocking when company is linked
       if (!company.customerId && !errors.mobile) {
         errors.mobile = 'Provide a mobile number or email (or link a company)'
+      }
+    }
+
+    const expectedCloseError = validateCrmCalendarDate(expectedCloseDate, {
+      label: 'Expected Closing Date',
+      // On create, close date must be today or later; edit may keep an overdue date
+      notBefore: isEdit ? undefined : today,
+      notBeforeMessage: 'Expected Closing Date cannot be in the past',
+    })
+    if (expectedCloseError) errors.expectedCloseDate = expectedCloseError
+
+    if (nextFollowUpDate.trim()) {
+      const followUpDateError = validateCrmCalendarDate(nextFollowUpDate, {
+        label: 'Next Follow-up Date',
+        notBefore: today,
+        notBeforeMessage: 'Next Follow-up Date cannot be in the past',
+      })
+      if (followUpDateError) {
+        errors.nextFollowUpDate = followUpDateError
+      } else {
+        const dueTime = suggestFollowUpDueTime(nextFollowUpDate)
+        const dueError = validateFollowUpAt({ dueDate: nextFollowUpDate, dueTime })
+        if (dueError) errors.nextFollowUpDate = dueError
       }
     }
 
@@ -905,7 +976,15 @@ export function CrmLeadFormPage() {
       errors.notQualifiedReason = 'Not Qualified Reason is required.'
     }
     if (leadStage === 'closed') {
-      if (!closedDate) errors.closedDate = 'Closed Date is required when lead stage is Closed.'
+      const closedDateError = validateCrmCalendarDate(closedDate, {
+        label: 'Closed Date',
+        required: true,
+        notAfter: today,
+        notAfterMessage: 'Closed Date cannot be in the future',
+        notBefore: createdDate.trim() || undefined,
+        notBeforeMessage: 'Closed Date cannot be before Created Date',
+      })
+      if (closedDateError) errors.closedDate = closedDateError
       if (!closedReason) errors.closedReason = 'Closed Reason is required when lead stage is Closed.'
     }
     return errors
@@ -957,7 +1036,7 @@ export function CrmLeadFormPage() {
       closedDate: leadStage === 'closed' ? (closedDate || todayIso()) : null,
       closedReason: leadStage === 'closed' ? closedReason : null,
       notQualifiedReason: leadStage === 'not_qualified' ? notQualifiedReason : null,
-      productRequirement: encodeLeadRequirementLines(requirementLines) || remarks.trim(),
+      productRequirement: encodeLeadRequirementLines(requirementLines),
       expectedQty: requirementLineSummary.totalQty > 0 ? requirementLineSummary.totalQty : null,
       expectedValue: Number(expectedValue) || requirementLineSummary.grandTotal || 0,
       expectedCloseDate: expectedCloseDate || null,
@@ -1127,14 +1206,22 @@ export function CrmLeadFormPage() {
         }
 
         if (!isEdit) {
-          // Save & New — stay on blank form; default Save — Lead 360 (id from API/store)
+          // Save & New — stay on blank form; default Save — lead list register
           if (mode === 'new') {
             resetBlankNewLeadForm()
             showToast('Lead saved — form cleared for next entry', 'success')
             return
           }
           resetDirty()
-          navigate(routes.view(leadId!))
+          if (isApiMode()) {
+            try {
+              const { syncLeadsFromApi } = await import('../../services/bridges/crmApiBridge')
+              await syncLeadsFromApi()
+            } catch {
+              /* upsert already applied */
+            }
+          }
+          navigate(routes.base)
           showToast('Lead created', 'success')
           return
         }
@@ -1230,7 +1317,7 @@ export function CrmLeadFormPage() {
 
   function handleCancel() {
     resetDirty()
-    navigate(isEdit && id ? routes.view(id) : routes.base)
+    navigate(routes.base)
   }
 
   const factBox = (
@@ -1554,7 +1641,15 @@ export function CrmLeadFormPage() {
               fieldState={inlineValidation.fieldState('createdDate')}
               fieldError={inlineValidation.fieldError('createdDate') ?? validationErrors.createdDate}
             >
-              <Input type="date" value={createdDate} onChange={(e) => { setCreatedDate(e.target.value); inlineValidation.touch('createdDate') }} className="erp-input" disabled={fieldLocked('createdDate')} />
+              <Input
+                type="date"
+                value={createdDate}
+                min={getCrmDateInputMin()}
+                max={getDateInputMin()}
+                onChange={(e) => { setCreatedDate(e.target.value); inlineValidation.touch('createdDate') }}
+                className="erp-input"
+                disabled={fieldLocked('createdDate')}
+              />
             </ErpFieldRow>
           </ErpFieldGroup>
         </ErpQuickEntrySection>
@@ -1576,13 +1671,13 @@ export function CrmLeadFormPage() {
             required
             colSpan={3}
             horizontal={false}
-            dataField="productRequirement"
+            dataField="remarks"
             fieldState={
-              (inlineValidation.fieldError('productRequirement') ?? validationErrors.productRequirement)
+              (inlineValidation.fieldError('remarks') ?? validationErrors.remarks)
                 ? 'error'
-                : inlineValidation.fieldState('productRequirement')
+                : inlineValidation.fieldState('remarks')
             }
-            fieldError={inlineValidation.fieldError('productRequirement') ?? validationErrors.productRequirement}
+            fieldError={inlineValidation.fieldError('remarks') ?? validationErrors.remarks}
             hint="Capture call summaries, requirements, and next steps."
           >
             <Textarea
@@ -1590,11 +1685,11 @@ export function CrmLeadFormPage() {
               value={remarks}
               onChange={(e) => {
                 setRemarks(e.target.value)
-                inlineValidation.touch('productRequirement')
+                inlineValidation.touch('remarks')
               }}
               placeholder="Context from first call or enquiry…"
               className="erp-input"
-              disabled={fieldLocked('remarks') && fieldLocked('productRequirement')}
+              disabled={fieldLocked('remarks')}
             />
           </ErpFieldRow>
         </ErpCardSection>
@@ -1696,8 +1791,20 @@ export function CrmLeadFormPage() {
                   </div>
                 </div>
               </ErpFieldRow>
-              <ErpFieldRow label="Expected Closing Date">
-                <Input type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} className="erp-input" />
+              <ErpFieldRow
+                label="Expected Closing Date"
+                dataField="expectedCloseDate"
+                fieldState={validationErrors.expectedCloseDate ? 'error' : 'idle'}
+                fieldError={validationErrors.expectedCloseDate}
+              >
+                <Input
+                  type="date"
+                  value={expectedCloseDate}
+                  min={isEdit ? getCrmDateInputMin() : getDateInputMin()}
+                  max={getCrmDateInputMax()}
+                  onChange={(e) => setExpectedCloseDate(e.target.value)}
+                  className="erp-input"
+                />
               </ErpFieldRow>
               <ErpFieldRow label="Currency" readOnly>
                 <Input value="INR (₹)" readOnly className="erp-input" />
@@ -1714,12 +1821,18 @@ export function CrmLeadFormPage() {
               accent="amber"
               columns={3}
             >
-              <ErpFieldRow label="Next Follow-up Date">
+              <ErpFieldRow
+                label="Next Follow-up Date"
+                dataField="nextFollowUpDate"
+                fieldState={validationErrors.nextFollowUpDate ? 'error' : 'idle'}
+                fieldError={validationErrors.nextFollowUpDate}
+              >
                 <Input
                   type="date"
                   data-field="nextFollowUpDate"
                   value={nextFollowUpDate}
                   min={getDateInputMin()}
+                  max={getCrmDateInputMax()}
                   onChange={(e) => setNextFollowUpDate(e.target.value)}
                   className="erp-input"
                 />
@@ -1846,7 +1959,14 @@ export function CrmLeadFormPage() {
                     fieldState={validationErrors.closedDate ? 'error' : 'idle'}
                     fieldError={validationErrors.closedDate}
                   >
-                    <Input type="date" value={closedDate} onChange={(e) => setClosedDate(e.target.value)} className="erp-input" />
+                    <Input
+                      type="date"
+                      value={closedDate}
+                      min={createdDate.trim() || getCrmDateInputMin()}
+                      max={getDateInputMin()}
+                      onChange={(e) => setClosedDate(e.target.value)}
+                      className="erp-input"
+                    />
                   </ErpFieldRow>
                   <ErpFieldRow
                     label="Closed Reason"

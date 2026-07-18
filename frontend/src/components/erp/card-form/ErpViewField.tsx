@@ -1,5 +1,7 @@
-import type { ReactNode } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import { cn } from '../../../utils/cn'
+import { normalizeEmail } from '../../../utils/validation/email'
+import { buildGmailComposeUrl, openMailto, openTel } from '../../../utils/openExternalContact'
 
 const EMPTY = 'Not provided'
 
@@ -65,6 +67,12 @@ export function ErpViewField({
   )
 }
 
+function onProtocolClick(e: MouseEvent<HTMLAnchorElement>, open: () => void) {
+  e.preventDefault()
+  e.stopPropagation()
+  open()
+}
+
 export function ErpViewPhone({
   label = 'Mobile',
   value,
@@ -90,9 +98,15 @@ export function ErpViewPhone({
       />
     )
   }
+  const href = `tel:${phone.replace(/[^\d+]/g, '') || phone}`
   return (
     <ErpViewField label={label} colSpan={colSpan} className={className}>
-      <a href={`tel:${phone}`} className="erp-view-field__link" title={phone}>
+      <a
+        href={href}
+        className="erp-view-field__link"
+        title={`Call ${phone}`}
+        onClick={(e) => onProtocolClick(e, () => openTel(phone))}
+      >
         {phone}
       </a>
     </ErpViewField>
@@ -112,8 +126,8 @@ export function ErpViewEmail({
   className?: string
   emptyLabel?: string
 }) {
-  const email = value?.trim()
-  if (!email) {
+  const display = value?.trim()
+  if (!display) {
     return (
       <ErpViewField
         label={label}
@@ -124,14 +138,19 @@ export function ErpViewEmail({
       />
     )
   }
+  const email = normalizeEmail(display)
+  const href = buildGmailComposeUrl(email) ?? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`
   return (
     <ErpViewField label={label} colSpan={colSpan} className={className}>
       <a
-        href={`mailto:${email}`}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
         className="erp-view-field__link erp-view-field__link--truncate"
-        title={email}
+        title={`Compose email to ${email} in Gmail`}
+        onClick={(e) => onProtocolClick(e, () => openMailto(email))}
       >
-        {email}
+        {display}
       </a>
     </ErpViewField>
   )

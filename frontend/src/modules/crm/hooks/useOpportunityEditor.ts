@@ -61,7 +61,7 @@ const SAVE_TOAST = 'Opportunity saved successfully.'
 
 const OPP_FIELD_ORDER = ['customerId', 'opportunityName', 'expectedCloseDate', 'ownerId', 'priority', 'stage', 'probability'] as const
 const OPP_FIELD_LABELS: Record<string, string> = {
-  customerId: 'Company',
+  customerId: 'Customer',
   opportunityName: 'Opportunity Name',
   expectedCloseDate: 'Expected Close Date',
   ownerId: 'Owner',
@@ -305,7 +305,7 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
   ): FieldErrorMap {
     const map: FieldErrorMap = {}
     for (const err of errors) {
-      if (/company/i.test(err)) map.customerId = err
+      if (/company|customer/i.test(err)) map.customerId = err
       else if (/opportunity name/i.test(err)) map.opportunityName = err
       else if (/close date/i.test(err)) map.expectedCloseDate = err
       else if (/owner/i.test(err)) map.ownerId = err

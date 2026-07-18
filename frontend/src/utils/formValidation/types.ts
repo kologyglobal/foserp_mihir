@@ -16,7 +16,7 @@ export interface HandleInvalidSubmitOptions {
   notifyMessage?: string
   /**
    * Field key → short display label for the bullet-list toast
-   * (`Please complete the required fields: • Company`).
+   * (`Please fill in Customer before saving.` / bullet list for several fields).
    * When omitted, labels are derived from error messages.
    */
   fieldLabels?: Record<string, string>

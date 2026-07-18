@@ -125,6 +125,8 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
   const contact = doc.contactId ? useCrmStore.getState().getContact(doc.contactId) : null
   const locked = doc.locked
   const canEdit = !locked && doc.status !== 'converted'
+  /** Revised quotations keep company / customer identity fixed from the approved source. */
+  const companyLocked = doc.revisionNo > 0 || Boolean(doc.revisionReason)
   const maxDiscount = doc.priceLines.reduce((m, l) => Math.max(m, l.discountPct), 0)
   const completion = sectionCompletionStatus(doc)
   const printIssues = validateQuotationForPrint(doc, customer)
@@ -325,6 +327,18 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
             <section className="quo-editor-commercial-fields" aria-label="Commercial terms">
               <p className="quo-editor-outline__title">Commercial</p>
               <ErpFormGrid columns={2} dense>
+                <ErpFieldRow
+                  label="Client / Company"
+                  readOnly
+                  colSpan={2}
+                  hint={companyLocked ? 'Company is locked on revised quotations' : 'Linked from the quotation customer'}
+                >
+                  <Input
+                    value={customer?.customerName ?? '—'}
+                    readOnly
+                    className="erp-input"
+                  />
+                </ErpFieldRow>
                 <ErpFieldRow label="Quotation date" readOnly>
                   <Input type="date" value={quotationDate} readOnly className="erp-input" />
                 </ErpFieldRow>
@@ -363,6 +377,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
                     value={quotation.paymentTerms ?? ''}
                     onChange={(v) => patchCommercial({ paymentTerms: v })}
                     placeholder="Select payment terms"
+                    disabled={!canEdit}
                   />
                 </ErpFieldRow>
                 <ErpFieldRow label="Delivery timeline" required colSpan={2}>
@@ -371,6 +386,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
                     value={quotation.deliveryTerms ?? ''}
                     onChange={(v) => patchCommercial({ deliveryTerms: v })}
                     placeholder="Select delivery terms"
+                    disabled={!canEdit}
                   />
                 </ErpFieldRow>
               </ErpFormGrid>

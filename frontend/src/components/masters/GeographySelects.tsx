@@ -106,6 +106,7 @@ interface CommercialTermSelectProps {
   error?: boolean
   placeholder?: string
   className?: string
+  disabled?: boolean
 }
 
 export function CommercialTermSelect({
@@ -116,6 +117,7 @@ export function CommercialTermSelect({
   error,
   placeholder = '— Select term —',
   className,
+  disabled,
 }: CommercialTermSelectProps) {
   const terms = useCommercialTermsByType(termType)
   const resolvedTerms = useMemo(() => {
@@ -141,6 +143,7 @@ export function CommercialTermSelect({
       onChange={(e) => onChange(e.target.value)}
       error={error}
       required={required}
+      disabled={disabled}
       className={cn(className)}
       native
     >
