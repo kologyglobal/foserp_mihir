@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified against codebase: **2026-07-17** (Accounting Phase 3B2 receipt calculation/validation; finance suite 194/194 backend + `test:money-in` 20/20 frontend).
+Last verified against codebase: **2026-07-18** (Accounting Phase 3B3 receipt draft workflow; finance suite 206/206 backend + `test:money-in` 20/20 frontend).
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
@@ -23,12 +23,12 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Category | Modules |
 |----------|---------|
-| **Completed (API mode)** | … **AR reporting Phase 3A5**; **Money In AR frontend Phase 3A6**; **AR receipt DB foundation Phase 3B1**; **AR receipt calculation/validation Phase 3B2** (no receipt APIs yet) |
+| **Completed (API mode)** | … **AR reporting Phase 3A5**; **Money In AR frontend Phase 3A6**; **AR receipt DB foundation Phase 3B1**; **AR receipt calculation/validation Phase 3B2**; **AR receipt draft workflow Phase 3B3** (create/update/validate/mark-ready/cancel/list/detail APIs — no posting/GL/number/allocation, no frontend) |
 | **Partially completed** | Auth UI; mobile CRM (API hydrate, no offline); sales-order fulfilment beyond confirm/close; **user/role/tenant admin UI (frontend wired 2026-07-15, not test-verified)** |
 | **Not started** | Login activity module |
 | **Scaffolding (not shipped)** | — (Accounting operational screens: CoA demo, Vouchers, AR/AP, Bank, FA, Manufacturing Accounting, Tax, Reports, Budgeting, Commercial Commitments, Period Close — UI/mock only; **Finance Settings** at `/accounting/settings` is Phase 1 dual-mode, not a stub) |
 | **Blocked** | — (none currently) |
-| **Deferred by design** | Purchase / inventory / production / quality / maintenance backends; finance **Phase 3B3+ receipt draft/post APIs + credit notes**; SO MRP / dispatch |
+| **Deferred by design** | Purchase / inventory / production / quality / maintenance backends; finance **Phase 3B4+ receipt posting/GL/allocation APIs + credit notes**; SO MRP / dispatch |
 
 ---
 

@@ -1,6 +1,16 @@
 # Testing Status
 
-Last run: **2026-07-15** (Purchase module frontend quality review + E2E smoke).
+Last run: **2026-07-18** (Finance Phase 3B3 customer receipt draft workflow).
+
+### 2026-07-18 — Finance Phase 3B3: Customer receipt draft workflow
+
+| Suite / check | Result |
+|---------------|--------|
+| `npx vitest run tests/finance/finance-ar-receipt-drafts.test.ts` (new) | **12/12** |
+| `npx vitest run tests/finance --hookTimeout=120000` (full finance suite) | **206/206** (16 files) |
+| `npx tsc --noEmit` (backend) | **PASS** |
+| `npm run typecheck` (frontend) | **FAIL** — pre-existing, unrelated (`PurchaseApprovalsPage.tsx` TS2304, `PurchaseSetupPage.tsx` TS17001); no frontend files touched this phase |
+| Fix applied during verification | Circular ES module import between `customer-receipt.schemas.ts` and `calculation/customer-receipt-calculation.schemas.ts` was causing an intermittent `ZodObject._parse` crash (HTTP 500) on every receipt-create call — resolved by moving `customerReceiptPaymentMethodSchema` into the calculation schema file |
 
 ### 2026-07-15 — Purchase frontend quality review
 

@@ -309,7 +309,6 @@ export function PurchaseSetupPage() {
       variant="dynamics"
       showDescription
       favoritePath="/purchase/setup"
-      variant="dynamics"
       layout="enterprise"
       breadcrumbs={[
         { label: 'Purchase', to: '/purchase' },

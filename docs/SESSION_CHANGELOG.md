@@ -1,3 +1,35 @@
+## 2026-07-18 ? Finance Phase 3B3: Customer Receipt Draft Workflow
+
+### Shipped (backend draft CRUD + validate + mark-ready + cancel APIs ? no posting/GL/allocation persistence)
+
+- **Migration** `20260718090000_finance_phase3b3_receipt_draft_fields` ? customer snapshot columns, `valueDate`, `calculationContext` JSON, TDS mode/value/base/section/certificate/account fields on `CustomerReceipt`; new `CustomerReceiptDeductionLine` table (`BANK_CHARGE`|`OTHER_DEDUCTION`) with per-line account id
+- **Errors** `customer-receipt.errors.ts` ? 16 new draft-workflow error classes mirroring `SalesInvoice*Error` (`CUSTOMER_RECEIPT_NOT_EDITABLE`, `..._STALE_UPDATE` (409), `..._SOURCE_NOT_SUPPORTED`, `..._DRAFT_CALCULATION_FAILED`, `..._VALIDATION_FAILED`, `..._CANCELLATION_REASON_REQUIRED`, etc.)
+- **Schemas** `customer-receipt.schemas.ts` ? create/update/cancel/validate/list Zod schemas; API field mapping `notes?internalRemarks`, `bankReference?customerBankReference`, `instrumentNumber?chequeNumber`, `instrumentDate?chequeDate`; **fixed a circular import** between `customer-receipt.schemas.ts` and `calculation/customer-receipt-calculation.schemas.ts` by moving `customerReceiptPaymentMethodSchema` into the calculation schema file (was causing an intermittent `ZodObject._parse` crash ? HTTP 500 on every create)
+- **Module** `receivables/receipts/` ? `customer-receipt-allowed-actions.ts` (post/allocate always `false` in 3B3), `customer-receipt-validation.service.ts` (build/parse calculation context for recalc without trusting client totals), `customer-receipt-draft.service.ts` (create/update/validate/mark-ready/cancel), `customer-receipt-read.service.ts` (detail/list serialization with `bankCharges`/`otherDeductions` split, `allowedActions`, `validationSummary` from last `CUSTOMER_RECEIPT_VALIDATED` audit), `customer-receipt.controller.ts` + `customer-receipt.routes.ts`
+- **Repository** `customer-receipt.repository.ts` ? `draftReferenceForDate`/`generateUniqueDraftReference` (`RCPT-DRAFT-YYYYMMDD-XXXXXX`), `createCustomerReceiptDraft`, `replaceEditableReceiptDeductions` (optimistic concurrency via `updatedAt`; reopens `READY_TO_POST`?`DRAFT` on edit), `persistRecalculatedAmounts`, `markCustomerReceiptReady`, `cancelCustomerReceiptDraft`, expanded `listCustomerReceiptRecords` (search across draft reference/receipt number/customer snapshot/instrument/bank+transaction refs/source doc number)
+- **Routes** `GET/POST /t/:slug/accounting/receivables/receipts`, `GET/PUT /:id`, `POST /:id/validate`, `POST /:id/mark-ready`, `POST /:id/cancel` ? **no post/allocate routes**; permissions `finance.ar.receipt.view|create|edit|cancel`
+- **Swagger** paths added for all 5 endpoints, explicitly documenting no posting/GL/number/open-item/allocation in this phase
+- **Draft-save account filter:** missing bank-charge/other-deduction/TDS/bank-cash account errors are deferred to mark-ready (not blocking on create/update), matching the spec; payment-method structural errors (e.g. cheque without instrument number/date) still block draft save
+- **Tests:** `finance-ar-receipt-drafts.test.ts` (12 cases: create direct draft, TDS+charges+deductions calc, reject `BANK_IMPORT` source, reject cheque without instrument fields, update + reopen ready?draft, stale-update 409, validate has no side effects, mark-ready without issuing number/consuming series, cancel with reason, list+detail with search/allowedActions, reject edit of POSTED/CANCELLED, permission enforcement); full finance suite **206/206** (16 files)
+
+### Not in scope (Phase 3B4+)
+
+- Receipt posting, GL, `PostingEvent`, receipt number issuance, credit-side open items, allocation persistence, frontend receipt pages
+
+### Verify
+
+- `cd backend && npx tsx scripts/prisma-cli.ts migrate deploy && npx prisma generate` ? applied
+- `cd backend && npx tsc --noEmit` ? pass
+- `cd backend && npx vitest run tests/finance --hookTimeout=120000` ? 206 passed
+- `cd frontend && npm run typecheck` ? **pre-existing failure, unrelated to this phase** (`PurchaseApprovalsPage.tsx` TS2304 `tabStrip`, `PurchaseSetupPage.tsx` TS17001 duplicate JSX attribute) ? no receipt/finance frontend code touched in 3B3
+
+### Next
+
+- **Phase 3B4** ? receipt posting (GL, `PostingEvent`, receipt number issuance) + allocation persistence against invoice open items
+- Unrelated: fix pre-existing frontend typecheck errors in `PurchaseApprovalsPage.tsx` / `PurchaseSetupPage.tsx`
+
+---
+
 ## 2026-07-17 ? Finance Phase 3B2: Customer Receipt Calculation & Validation Preview
 
 ### Shipped (calculation + validation only ? no HTTP routes, no persistence)
