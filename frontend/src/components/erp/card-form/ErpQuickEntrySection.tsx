@@ -10,7 +10,7 @@ export interface ErpQuickEntrySectionProps {
   subtitle?: string
   icon?: LucideIcon
   children: ReactNode
-  columns?: 1 | 2 | 3
+  columns?: 1 | 2 | 3 | 4
   className?: string
   collapsible?: boolean
   defaultOpen?: boolean

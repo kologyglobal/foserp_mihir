@@ -239,6 +239,7 @@ export function PurchaseOrderRevisePage() {
         status="…"
         favoritePath="/purchase/orders"
         breadcrumbs={[{ label: 'Purchase Orders', to: '/purchase/orders' }, { label: 'Loading' }]}
+        backLink={{ to: '/purchase/orders', label: 'Back to Purchase Orders' }}
         footer={null}
       >
         <LoadingState variant="form" rows={8} />
@@ -259,6 +260,7 @@ export function PurchaseOrderRevisePage() {
         { label: po.documentNumber, to: `/purchase/orders/${po.id}` },
         { label: 'Revise' },
       ]}
+      backLink={{ to: `/purchase/orders/${po.id}`, label: `Back to ${po.documentNumber}` }}
       commandBar={
         <ErpCommandBar
           inline

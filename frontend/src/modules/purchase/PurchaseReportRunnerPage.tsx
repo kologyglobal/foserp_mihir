@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import {
-  ArrowLeft,
   Download,
   FileDown,
   Filter,
@@ -243,6 +242,7 @@ export function PurchaseReportRunnerPage() {
         badge="Purchase"
         variant="dynamics"
         breadcrumbs={purchaseBreadcrumbs('Reports', { label: 'Reports', to: '/purchase/reports' })}
+        backLink={{ to: '/purchase/reports', label: 'Back to Reports' }}
       >
         <EmptyState
           icon={Filter}
@@ -269,21 +269,16 @@ export function PurchaseReportRunnerPage() {
         label: 'Reports',
         to: '/purchase/reports',
       })}
+      backLink={{ to: '/purchase/reports', label: 'Back to Reports' }}
       commandBar={
         <ErpCommandBar
           primaryAction={{
-            id: 'back',
-            label: 'All Reports',
-            icon: ArrowLeft,
-            onClick: () => navigate('/purchase/reports'),
+            id: 'apply',
+            label: 'Apply Filters',
+            icon: Filter,
+            onClick: applyFilters,
           }}
           secondaryActions={[
-            {
-              id: 'apply',
-              label: 'Apply Filters',
-              icon: Filter,
-              onClick: applyFilters,
-            },
             {
               id: 'reset',
               label: 'Reset Filters',

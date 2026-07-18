@@ -8,9 +8,14 @@ import { appConfirm } from '@/store/confirmDialogStore'
  *
  * In-app leave uses `ConfirmDialog` via `appConfirm` — never `window.confirm`.
  * Tab/window close still uses the native beforeunload prompt (browsers require it).
+ *
+ * Blocking reads `dirtyRef` (not React state) so `resetDirty()` then `navigate()`
+ * in the same tick is not treated as leaving with unsaved changes.
  */
 export function useUnsavedChangesGuard(enabled: boolean) {
   const dirtyRef = useRef(false)
+  const enabledRef = useRef(enabled)
+  enabledRef.current = enabled
   const [dirty, setDirty] = useState(false)
 
   const markDirty = useCallback(() => {
@@ -25,20 +30,17 @@ export function useUnsavedChangesGuard(enabled: boolean) {
     setDirty(false)
   }, [])
 
-  const shouldBlock = enabled && dirty
-
   useBeforeUnload(
-    useCallback(
-      (event) => {
-        if (!shouldBlock) return
-        event.preventDefault()
-        event.returnValue = ''
-      },
-      [shouldBlock],
-    ),
+    useCallback((event) => {
+      if (!enabledRef.current || !dirtyRef.current) return
+      event.preventDefault()
+      event.returnValue = ''
+    }, []),
   )
 
-  const blocker = useBlocker(shouldBlock)
+  const blocker = useBlocker(
+    useCallback(() => Boolean(enabledRef.current && dirtyRef.current), []),
+  )
 
   useEffect(() => {
     if (blocker.state !== 'blocked') return
@@ -48,7 +50,7 @@ export function useUnsavedChangesGuard(enabled: boolean) {
       description: 'You have unsaved changes. Leave this page and discard them?',
       confirmLabel: 'Leave page',
       cancelLabel: 'Keep editing',
-      tone: 'danger',
+      tone: 'default',
     }).then((leave) => {
       if (cancelled) return
       if (leave) blocker.proceed()

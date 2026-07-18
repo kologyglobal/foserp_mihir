@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { EnterpriseQuickAction } from '../../design-system/workspace/EnterpriseFormContextPanel'
 import { cn } from '../../utils/cn'
 import {
@@ -20,11 +21,19 @@ interface PurchaseRegisterContextPanelProps {
   /** Persist hide preference. Defaults to shared purchase AI insights key. */
   storageKey?: string
   className?: string
+  /**
+   * `band` — full-width above the table (default).
+   * `rail` — sticky column on the right (parent supplies flex row).
+   * `split` — wraps `children`: open = table | insights; closed = sparkle above table.
+   */
+  placement?: 'band' | 'rail' | 'split'
+  /** Required for `placement="split"` — usually the register table. */
+  children?: ReactNode
 }
 
 /**
- * List-register right rail — AI-style Overview + Suggested actions.
- * Collapsible: close hides the panel; a sparkles button restores it.
+ * Register insights panel.
+ * `split`: open → table left + insights right; closed → restore sparkle above table.
  */
 export function PurchaseRegisterContextPanel({
   overview,
@@ -34,32 +43,61 @@ export function PurchaseRegisterContextPanel({
   subtitle = 'AI suggested next actions for this register.',
   storageKey,
   className,
+  placement = 'band',
+  children,
 }: PurchaseRegisterContextPanelProps) {
   const [open, setOpen] = usePurchaseAiInsightsOpen(storageKey)
+  const isRail = placement === 'rail' || placement === 'split'
 
-  if (!open) {
-    return (
-      <aside
-        className={cn(
-          'masters-context-panel masters-context-panel--insights-collapsed sticky top-2 flex justify-end self-start',
-          className,
-        )}
-        aria-label={ariaLabel}
-      >
-        <PurchaseAiInsightsRestoreButton label={title} onClick={() => setOpen(true)} />
-      </aside>
-    )
-  }
-
-  return (
-    <aside
-      className={cn('masters-context-panel w-full min-w-0 xl:w-[280px]', className)}
+  const panel = !open ? (
+    <div
+      className={cn(
+        'purchase-register-insights purchase-register-insights--collapsed',
+        placement === 'rail' && 'purchase-register-insights--rail purchase-register-insights--rail-collapsed',
+        className,
+      )}
       aria-label={ariaLabel}
     >
-      <PurchaseAiInsightsShell title={title} subtitle={subtitle} onClose={() => setOpen(false)}>
+      <PurchaseAiInsightsRestoreButton label={title} onClick={() => setOpen(true)} />
+    </div>
+  ) : (
+    <div
+      className={cn(
+        'purchase-register-insights',
+        isRail && 'purchase-register-insights--rail',
+        className,
+      )}
+      aria-label={ariaLabel}
+    >
+      <PurchaseAiInsightsShell
+        title={title}
+        subtitle={subtitle}
+        variant="register"
+        onClose={() => setOpen(false)}
+      >
         <PurchaseAiOverviewBlock rows={overview} />
         <PurchaseAiSuggestionsBlock suggestions={suggestions} />
       </PurchaseAiInsightsShell>
-    </aside>
+    </div>
   )
+
+  if (placement === 'split' && children != null) {
+    if (!open) {
+      return (
+        <div className="purchase-register-split purchase-register-split--collapsed space-y-3">
+          {panel}
+          <div className="min-w-0">{children}</div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="purchase-register-split flex flex-col gap-3 xl:flex-row xl:items-start">
+        <div className="min-w-0 flex-1">{children}</div>
+        {panel}
+      </div>
+    )
+  }
+
+  return panel
 }

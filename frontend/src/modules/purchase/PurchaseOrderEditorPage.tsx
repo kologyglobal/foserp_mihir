@@ -37,8 +37,8 @@ import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared
 import { PurchaseOrderLinesTable } from '@/components/purchase/PurchaseOrderLinesTable'
 import { PurchaseDocumentWorkflowStrip } from '@/components/purchase/PurchaseDocumentWorkflowStrip'
 import {
-  PurchaseOrderOriginBanner,
   PurchaseOrderOriginPicker,
+  PurchaseOrderOriginSourcePanel,
 } from '@/components/purchase/PurchaseOrderOriginPicker'
 import {
   PurchaseDocumentAttachments,
@@ -59,7 +59,6 @@ import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
 import { Input, Select } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { Modal } from '@/design-system/components/Modal'
 import { EnterpriseFormMetrics } from '@/design-system/workspace'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
@@ -458,15 +457,6 @@ export function PurchaseOrderEditorPage() {
           searchParams.get('vqId') ||
           searchParams.get('blanketId'),
       ),
-  )
-  const willAutoCreateFromQuery =
-    (originModeFromParam === 'quotation_comparison' && Boolean(searchParams.get('comparisonId'))) ||
-    (originModeFromParam === 'vendor_quotation' && Boolean(searchParams.get('vqId')))
-  const [originLookupOpen, setOriginLookupOpen] = useState(
-    () =>
-      Boolean(originParam) &&
-      originModeFromParam !== 'manual' &&
-      !willAutoCreateFromQuery,
   )
   const [approvedPrs, setApprovedPrs] = useState<PurchaseRequisition[]>([])
   const [selectedPrId, setSelectedPrId] = useState(searchParams.get('prId') ?? '')
@@ -1122,6 +1112,7 @@ export function PurchaseOrderEditorPage() {
           { label: 'Orders', to: '/purchase/orders' },
           { label: 'Loading' },
         ]}
+        backLink={{ to: '/purchase/orders', label: 'Back to Purchase Orders' }}
         footer={null}
       >
         <LoadingState variant="form" rows={8} />
@@ -1137,12 +1128,10 @@ export function PurchaseOrderEditorPage() {
   const selectOrigin = (mode: PurchaseOrderOrigin) => {
     setOriginMode(mode)
     setOriginChosen(true)
-    setOriginLookupOpen(mode !== 'manual')
   }
 
   const reopenOriginSelector = () => {
     setOriginChosen(false)
-    setOriginLookupOpen(false)
   }
 
   /** Origin-gated source refs: only relevant labels; hide empty values (no wall of "—"). */
@@ -1230,8 +1219,8 @@ export function PurchaseOrderEditorPage() {
           ]}
         />
       }
-      factBox={documentFactBox}
-      collapsibleFactBox
+      factBox={awaitingOriginCreate ? undefined : documentFactBox}
+      collapsibleFactBox={!awaitingOriginCreate}
       stickyFooter
       footer={
         <ErpStickySaveBar
@@ -1243,7 +1232,7 @@ export function PurchaseOrderEditorPage() {
             <ErpButtonGroup>
               <ErpButton
                 type="button"
-                variant="ghost"
+                variant="secondary"
                 disabled={saving}
                 onClick={() => navigate('/purchase/orders')}
               >
@@ -1296,21 +1285,193 @@ export function PurchaseOrderEditorPage() {
       onSaveShortcut={() => void saveDraft(false)}
       backLink={{ to: '/purchase/orders', label: 'Back to Purchase Orders' }}
     >
-      {isNew ? (
-        !originChosen ? (
+      {isNew && !recordId ? (
+        <div className="mb-3 space-y-3">
           <PurchaseOrderOriginPicker
-            className="mb-4"
+            selected={originChosen ? originMode : null}
             onSelect={selectOrigin}
             pendingPoCount={approvedPrs.filter((p) => !p.rfqRequired && !p.convertedPoId).length}
           />
-        ) : (
-          <PurchaseOrderOriginBanner
-            originLabel={PURCHASE_ORDER_ORIGIN_LABELS[originMode]}
-            showSelectSource={originMode !== 'manual'}
-            onSelectSource={() => setOriginLookupOpen(true)}
-            onChangeSource={reopenOriginSelector}
-          />
-        )
+          {originChosen && originMode !== 'manual' ? (
+            <PurchaseOrderOriginSourcePanel
+              originLabel={PURCHASE_ORDER_ORIGIN_LABELS[originMode]}
+              description={
+                originMode === 'purchase_requisition'
+                  ? 'Select an approved requisition. Optionally override the preferred vendor.'
+                  : originMode === 'quotation_comparison'
+                    ? 'Select a completed comparison with an approved recommendation.'
+                    : originMode === 'vendor_quotation'
+                      ? 'Select a vendor quotation marked as selected / approved.'
+                      : 'Release quantities against an active blanket order.'
+              }
+              actions={
+                <>
+                  <ErpButton type="button" variant="ghost" disabled={creating} onClick={reopenOriginSelector}>
+                    Cancel
+                  </ErpButton>
+                  <ErpButton
+                    type="button"
+                    variant="primary"
+                    icon={Plus}
+                    disabled={
+                      creating ||
+                      (originMode === 'purchase_requisition' && !selectedPrId) ||
+                      (originMode === 'quotation_comparison' && !selectedComparisonId) ||
+                      (originMode === 'vendor_quotation' && !selectedVqId) ||
+                      (originMode === 'blanket_order' && !selectedBlanketId)
+                    }
+                    onClick={() => void createFromOrigin()}
+                  >
+                    {creating ? 'Creating…' : 'Create Purchase Order'}
+                  </ErpButton>
+                </>
+              }
+            >
+              {originMode === 'purchase_requisition' ? (
+                <div className="space-y-3">
+                  {approvedPrs.length === 0 ? (
+                    <p className="text-[13px] text-erp-muted">No approved requisitions available.</p>
+                  ) : (
+                    <Select value={selectedPrId} onChange={(e) => setSelectedPrId(e.target.value)}>
+                      <option value="">Select approved requisition…</option>
+                      {approvedPrs.map((pr) => (
+                        <option key={pr.id} value={pr.id}>
+                          {pr.documentNumber} · {pr.department} · {formatCurrency(pr.totalAmount)}
+                          {pr.status === 'approved' && !pr.rfqRequired
+                            ? ' · Ready for PO'
+                            : pr.status === 'converted_to_rfq'
+                              ? ' · Via RFQ'
+                              : pr.rfqRequired
+                                ? ' · RFQ required'
+                                : ''}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                  <Select value={selectedPrVendorId} onChange={(e) => setSelectedPrVendorId(e.target.value)}>
+                    <option value="">Vendor (optional — use PR preferred vendor)</option>
+                    {vendors.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.vendorCode} — {v.vendorName}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              ) : originMode === 'quotation_comparison' ? (
+                <div className="space-y-3">
+                  {eligibleComparisons.length === 0 ? (
+                    <p className="text-[13px] text-erp-muted">No completed &amp; approved comparisons available.</p>
+                  ) : (
+                    <Select
+                      value={selectedComparisonId}
+                      onChange={(e) => setSelectedComparisonId(e.target.value)}
+                    >
+                      <option value="">Select comparison…</option>
+                      {eligibleComparisons.map(({ comparison, rfq }) => (
+                        <option key={comparison.id} value={comparison.id}>
+                          {comparison.documentNumber} · RFQ {rfq.documentNumber} ·{' '}
+                          {comparison.recommendedVendorName}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </div>
+              ) : originMode === 'vendor_quotation' ? (
+                <div className="space-y-3">
+                  {approvedVqs.length === 0 ? (
+                    <p className="text-[13px] text-erp-muted">
+                      No approved (selected) vendor quotations available. Create or select a quotation
+                      under Vendors → Vendor Quotation first.
+                    </p>
+                  ) : (
+                    <Select value={selectedVqId} onChange={(e) => setSelectedVqId(e.target.value)}>
+                      <option value="">Select vendor quotation…</option>
+                      {approvedVqs.map((vq) => (
+                        <option key={vq.id} value={vq.id}>
+                          {vq.documentNumber} · {vq.vendor.name} · {formatCurrency(vq.totalAmount)}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </div>
+              ) : originMode === 'blanket_order' ? (
+                <div className="space-y-3">
+                  {activeBlankets.length === 0 ? (
+                    <p className="text-[13px] text-erp-muted">No active blanket orders available.</p>
+                  ) : (
+                    <Select
+                      value={selectedBlanketId}
+                      onChange={(e) => {
+                        setSelectedBlanketId(e.target.value)
+                        setBlanketQuantities({})
+                      }}
+                    >
+                      <option value="">Select active blanket order…</option>
+                      {activeBlankets.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.documentNumber} · {b.vendor.name}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                  {selectedBlanketId
+                    ? (() => {
+                        const blanket = activeBlankets.find((b) => b.id === selectedBlanketId)
+                        if (!blanket) return null
+                        return (
+                          <div className="overflow-x-auto rounded-md border border-erp-border">
+                            <table className="erp-table text-[12px]">
+                              <thead>
+                                <tr>
+                                  <th>Item Code</th>
+                                  <th>Item</th>
+                                  <th className="num">Max Qty</th>
+                                  <th className="num">Released</th>
+                                  <th className="num">Available</th>
+                                  <th className="num">Rate</th>
+                                  <th className="num">Release Qty</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {blanket.lines.map((l) => {
+                                  const available = Math.max(0, l.maxQuantity - l.releasedQuantity)
+                                  return (
+                                    <tr key={l.id}>
+                                      <td className="font-mono">{l.itemCode}</td>
+                                      <td>{l.itemName}</td>
+                                      <td className="num">{l.maxQuantity}</td>
+                                      <td className="num">{l.releasedQuantity}</td>
+                                      <td className="num">{available}</td>
+                                      <td className="num">{formatCurrency(l.rate)}</td>
+                                      <td className="num">
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          max={available}
+                                          className="erp-input h-8 w-24 text-right text-[12px]"
+                                          value={blanketQuantities[l.itemId] ?? 0}
+                                          onChange={(e) =>
+                                            setBlanketQuantities((prev) => ({
+                                              ...prev,
+                                              [l.itemId]: Number(e.target.value),
+                                            }))
+                                          }
+                                        />
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )
+                      })()
+                    : null}
+                </div>
+              ) : null}
+            </PurchaseOrderOriginSourcePanel>
+          ) : null}
+        </div>
       ) : null}
 
       {showPoForm ? (
@@ -1441,41 +1602,41 @@ export function PurchaseOrderEditorPage() {
                 }}
               />
             </ErpFieldRow>
-            {selectedVendor ? (
-              <ErpFormSpan span={3}>
-                <div className="mt-1 rounded-md border border-erp-border bg-erp-surface-alt/60 px-3 py-2.5 text-[12px]">
-                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
-                    Vendor summary
-                  </p>
-                  <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-4">
-                    <div>
-                      <span className="text-erp-muted">Code</span>
-                      <p className="font-mono font-medium text-erp-text">{selectedVendor.vendorCode}</p>
-                    </div>
-                    <div>
-                      <span className="text-erp-muted">GSTIN</span>
-                      <p className="font-mono font-medium text-erp-text">
-                        {selectedVendor.gstin || '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-erp-muted">Payment terms</span>
-                      <p className="font-medium text-erp-text">
-                        {header.paymentTerms || selectedVendor.paymentTerms || '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-erp-muted">Lead time</span>
-                      <p className="font-medium text-erp-text">
-                        {selectedVendor.leadTimeDays != null
-                          ? `${selectedVendor.leadTimeDays} days`
-                          : '—'}
-                      </p>
-                    </div>
+            <ErpFormSpan span={3}>
+              <div className="mt-1 min-h-[4.75rem] rounded-md border border-erp-border bg-erp-surface-alt/60 px-3 py-2.5 text-[12px]">
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
+                  Vendor summary
+                </p>
+                <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <span className="text-erp-muted">Code</span>
+                    <p className="font-mono font-medium text-erp-text">
+                      {selectedVendor?.vendorCode || '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-erp-muted">GSTIN</span>
+                    <p className="font-mono font-medium text-erp-text">
+                      {selectedVendor?.gstin || '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-erp-muted">Payment terms</span>
+                    <p className="font-medium text-erp-text">
+                      {header.paymentTerms || selectedVendor?.paymentTerms || '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-erp-muted">Lead time</span>
+                    <p className="font-medium text-erp-text">
+                      {selectedVendor?.leadTimeDays != null
+                        ? `${selectedVendor.leadTimeDays} days`
+                        : '—'}
+                    </p>
                   </div>
                 </div>
-              </ErpFormSpan>
-            ) : null}
+              </div>
+            </ErpFormSpan>
           </ErpCardSection>
 
           <ErpCardSection
@@ -1913,189 +2074,6 @@ export function PurchaseOrderEditorPage() {
         </>
       ) : null}
     </PurchaseCardFormShell>
-
-    <Modal
-      open={isNew && !recordId && originLookupOpen && originMode !== 'manual'}
-      onClose={() => setOriginLookupOpen(false)}
-      title={`Create from ${PURCHASE_ORDER_ORIGIN_LABELS[originMode]}`}
-      description={
-        originMode === 'purchase_requisition'
-          ? 'Select an approved requisition. Optionally override the preferred vendor.'
-          : originMode === 'quotation_comparison'
-            ? 'Select a completed comparison with an approved recommendation.'
-            : originMode === 'vendor_quotation'
-              ? 'Select a vendor quotation marked as selected / approved.'
-              : 'Release quantities against an active blanket order.'
-      }
-      size={originMode === 'blanket_order' ? 'lg' : 'md'}
-      closeDisabled={creating}
-      footer={
-        <div className="flex justify-end gap-2">
-          <ErpButton
-            type="button"
-            variant="ghost"
-            disabled={creating}
-            onClick={() => setOriginLookupOpen(false)}
-          >
-            Cancel
-          </ErpButton>
-          <ErpButton
-            type="button"
-            variant="primary"
-            icon={Plus}
-            disabled={
-              creating ||
-              (originMode === 'purchase_requisition' && !selectedPrId) ||
-              (originMode === 'quotation_comparison' && !selectedComparisonId) ||
-              (originMode === 'vendor_quotation' && !selectedVqId) ||
-              (originMode === 'blanket_order' && !selectedBlanketId)
-            }
-            onClick={() => void createFromOrigin()}
-          >
-            {creating ? 'Creating…' : 'Create Purchase Order'}
-          </ErpButton>
-        </div>
-      }
-    >
-      {originMode === 'purchase_requisition' ? (
-        <div className="space-y-3">
-          {approvedPrs.length === 0 ? (
-            <p className="text-[13px] text-erp-muted">No approved requisitions available.</p>
-          ) : (
-            <Select value={selectedPrId} onChange={(e) => setSelectedPrId(e.target.value)}>
-              <option value="">Select approved requisition…</option>
-              {approvedPrs.map((pr) => (
-                <option key={pr.id} value={pr.id}>
-                  {pr.documentNumber} · {pr.department} · {formatCurrency(pr.totalAmount)}
-                  {pr.status === 'approved' && !pr.rfqRequired
-                    ? ' · Ready for PO'
-                    : pr.status === 'converted_to_rfq'
-                      ? ' · Via RFQ'
-                      : pr.rfqRequired
-                        ? ' · RFQ required'
-                        : ''}
-                </option>
-              ))}
-            </Select>
-          )}
-          <Select value={selectedPrVendorId} onChange={(e) => setSelectedPrVendorId(e.target.value)}>
-            <option value="">Vendor (optional — use PR preferred vendor)</option>
-            {vendors.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.vendorCode} — {v.vendorName}
-              </option>
-            ))}
-          </Select>
-        </div>
-      ) : originMode === 'quotation_comparison' ? (
-        <div className="space-y-3">
-          {eligibleComparisons.length === 0 ? (
-            <p className="text-[13px] text-erp-muted">No completed &amp; approved comparisons available.</p>
-          ) : (
-            <Select
-              value={selectedComparisonId}
-              onChange={(e) => setSelectedComparisonId(e.target.value)}
-            >
-              <option value="">Select comparison…</option>
-              {eligibleComparisons.map(({ comparison, rfq }) => (
-                <option key={comparison.id} value={comparison.id}>
-                  {comparison.documentNumber} · RFQ {rfq.documentNumber} · {comparison.recommendedVendorName}
-                </option>
-              ))}
-            </Select>
-          )}
-        </div>
-      ) : originMode === 'vendor_quotation' ? (
-        <div className="space-y-3">
-          {approvedVqs.length === 0 ? (
-            <p className="text-[13px] text-erp-muted">No approved (selected) vendor quotations available.</p>
-          ) : (
-            <Select value={selectedVqId} onChange={(e) => setSelectedVqId(e.target.value)}>
-              <option value="">Select vendor quotation…</option>
-              {approvedVqs.map((vq) => (
-                <option key={vq.id} value={vq.id}>
-                  {vq.documentNumber} · {vq.vendor.name} · {formatCurrency(vq.totalAmount)}
-                </option>
-              ))}
-            </Select>
-          )}
-        </div>
-      ) : originMode === 'blanket_order' ? (
-        <div className="space-y-3">
-          {activeBlankets.length === 0 ? (
-            <p className="text-[13px] text-erp-muted">No active blanket orders available.</p>
-          ) : (
-            <Select
-              value={selectedBlanketId}
-              onChange={(e) => {
-                setSelectedBlanketId(e.target.value)
-                setBlanketQuantities({})
-              }}
-            >
-              <option value="">Select active blanket order…</option>
-              {activeBlankets.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.documentNumber} · {b.vendor.name}
-                </option>
-              ))}
-            </Select>
-          )}
-          {selectedBlanketId
-            ? (() => {
-                const blanket = activeBlankets.find((b) => b.id === selectedBlanketId)
-                if (!blanket) return null
-                return (
-                  <div className="overflow-x-auto rounded-md border border-erp-border">
-                    <table className="erp-table text-[12px]">
-                      <thead>
-                        <tr>
-                          <th>Item Code</th>
-                          <th>Item</th>
-                          <th className="num">Max Qty</th>
-                          <th className="num">Released</th>
-                          <th className="num">Available</th>
-                          <th className="num">Rate</th>
-                          <th className="num">Release Qty</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {blanket.lines.map((l) => {
-                          const available = Math.max(0, l.maxQuantity - l.releasedQuantity)
-                          return (
-                            <tr key={l.id}>
-                              <td className="font-mono">{l.itemCode}</td>
-                              <td>{l.itemName}</td>
-                              <td className="num">{l.maxQuantity}</td>
-                              <td className="num">{l.releasedQuantity}</td>
-                              <td className="num">{available}</td>
-                              <td className="num">{formatCurrency(l.rate)}</td>
-                              <td className="num">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={available}
-                                  className="erp-input h-8 w-24 text-right text-[12px]"
-                                  value={blanketQuantities[l.itemId] ?? 0}
-                                  onChange={(e) =>
-                                    setBlanketQuantities((prev) => ({
-                                      ...prev,
-                                      [l.itemId]: Number(e.target.value),
-                                    }))
-                                  }
-                                />
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )
-              })()
-            : null}
-        </div>
-      ) : null}
-    </Modal>
     </>
   )
 }

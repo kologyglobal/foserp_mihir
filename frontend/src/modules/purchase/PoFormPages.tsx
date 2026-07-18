@@ -304,7 +304,6 @@ export function PoCreateDocumentPage() {
         { id: 'cancel', label: 'Cancel', icon: X, onClick: () => navigate('/purchase/orders') },
       ]}
       moreActions={[
-        { id: 'back-orders', label: 'Back to Orders', icon: ArrowLeft, onClick: () => navigate('/purchase/orders') },
         { id: 'browse-pr', label: 'Browse Requisitions', icon: ClipboardList, onClick: () => navigate('/purchase/requisitions') },
       ]}
     />
@@ -386,6 +385,7 @@ export function PoCreateDocumentPage() {
           { label: 'Orders', to: '/purchase/orders' },
           { label: 'New PO' },
         ]}
+        backLink={{ to: '/purchase/orders', label: 'Back to Purchase Orders' }}
         commandBar={commandBar}
         documentStrip={documentStrip}
         className="enterprise-workspace--crm-smart-overview"

@@ -7,7 +7,6 @@ import { CrmFilterDrawer } from '@/components/crm/CrmFilterDrawer'
 import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFilterBar'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpDataGrid } from '@/components/erp/ErpDataGrid'
-import { ErpPageGuide } from '@/components/erp/ErpPageGuide'
 import { TableLink } from '@/components/ui/AppLink'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
@@ -246,10 +245,6 @@ export function QuotationComparisonIndexPage() {
             />
           ) : (
             <>
-              <ErpPageGuide
-                purpose="Compare vendor quotes for an RFQ and select a supplier."
-                nextStep="Open Compare when responses are ready."
-              />
               <EnterpriseRegisterTableShell className="min-w-0">
                 <ErpDataGrid
                   data={filtered}

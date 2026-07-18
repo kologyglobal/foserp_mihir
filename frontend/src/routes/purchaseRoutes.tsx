@@ -60,6 +60,7 @@ import {
 } from '../modules/purchase/masters/PurchaseMasterPages'
 import { PurchaseApprovalsPage } from '../modules/purchase/PurchaseApprovalsPage'
 import { PurchaseSetupPage } from '../modules/purchase/PurchaseSetupPage'
+import { PurchasePlanningSheetPage } from '../modules/purchase/PurchasePlanningSheetPage'
 
 export const purchaseRouteChildren = [
   { index: true, element: <PurchaseModuleDashboard /> },
@@ -69,6 +70,7 @@ export const purchaseRouteChildren = [
   { path: 'requisitions/new', element: <PurchaseRequisitionFormPage /> },
   { path: 'requisitions/:id/edit', element: <PurchaseRequisitionEditPage /> },
   { path: 'requisitions/:id', element: <PurchaseRequisitionDetailPage /> },
+  { path: 'planning-sheet', element: <PurchasePlanningSheetPage /> },
   { path: 'rfqs', element: <RfqListPage /> },
   { path: 'rfqs/new', element: <RfqEditorPage /> },
   { path: 'rfqs/:id/edit', element: <RfqEditorPage /> },

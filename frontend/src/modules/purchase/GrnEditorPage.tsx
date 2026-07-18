@@ -11,10 +11,7 @@ import {
   Truck,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
-import {
-  PurchaseFormSectionNav,
-  purchaseSectionId,
-} from '@/components/purchase/PurchaseEnterpriseFormKit'
+import { purchaseSectionId } from '@/components/purchase/PurchaseEnterpriseFormKit'
 import {
   PurchaseDocumentFactBox,
   buildPurchaseRelatedLinks,
@@ -26,7 +23,7 @@ import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { EnterpriseFormMetrics } from '@/design-system/workspace'
+import { EnterpriseFormMetrics, EnterpriseFormSectionNav } from '@/design-system/workspace'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
   joinFastTabSummary,
@@ -346,21 +343,19 @@ export function GrnEditorPage() {
 
   const navSections = useMemo(
     () =>
-      SECTIONS.filter((s) => s.id !== 'po-source' || showPoPicker).map((s) => ({
-        ...s,
-        done:
-          s.id === 'po-source'
-            ? Boolean(poId)
-            : s.id === 'document'
-              ? Boolean(documentDate)
-              : s.id === 'receiving'
-                ? Boolean(warehouseId)
-                : s.id === 'lines'
-                  ? lines.length > 0
-                  : Boolean(remarks.trim()),
-      })),
-    [showPoPicker, poId, documentDate, warehouseId, lines.length, remarks],
+      SECTIONS.filter((s) => s.id !== 'po-source' || showPoPicker).map((s) => {
+        if (s.id === 'po-source') return { ...s, done: Boolean(poId) }
+        if (s.id === 'document') return { ...s, done: Boolean(documentDate && poId) }
+        if (s.id === 'receiving') return { ...s, done: Boolean(warehouseId && warehouseName.trim()) }
+        if (s.id === 'lines') return { ...s, done: lines.length > 0 }
+        return { ...s, done: Boolean(remarks.trim()) }
+      }),
+    [showPoPicker, poId, documentDate, warehouseId, warehouseName, lines.length, remarks],
   )
+
+  useEffect(() => {
+    if (!showPoPicker && activeSection === 'po-source') setActiveSection('document')
+  }, [showPoPicker, activeSection])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -440,6 +435,7 @@ export function GrnEditorPage() {
     setWarehouseId(po.deliveryLocation.id)
     setWarehouseName(po.deliveryLocation.name)
     setLines(linesFromPo(po, itemControls))
+    setActiveSection('document')
   }
 
   const updateLine = (index: number, patch: Partial<LineDraft>) => {
@@ -622,6 +618,7 @@ export function GrnEditorPage() {
           { label: 'Goods Receipts', to: '/purchase/grn' },
           { label: 'Loading' },
         ]}
+        backLink={{ to: '/purchase/grn', label: 'Back to Goods Receipts' }}
         footer={null}
       >
         <LoadingState variant="form" rows={8} />
@@ -674,7 +671,7 @@ export function GrnEditorPage() {
             <ErpButtonGroup>
               <ErpButton
                 type="button"
-                variant="ghost"
+                variant="secondary"
                 disabled={saving}
                 onClick={() => navigate('/purchase/grn')}
               >
@@ -697,103 +694,115 @@ export function GrnEditorPage() {
     >
       <EnterpriseFormMetrics metrics={formMetrics} />
 
-      <PurchaseFormSectionNav
+      <EnterpriseFormSectionNav
         sections={navSections}
         activeId={activeSection}
         onSelect={setActiveSection}
       />
 
-      {showPoPicker ? (
+      {showPoPicker && activeSection === 'po-source' ? (
         <ErpCardSection
           id={purchaseSectionId('po-source')}
           title="PO Source"
           subtitle="Select a released purchase order with open quantity"
           icon={ClipboardList}
           accent="slate"
-          collapsible
+          collapsible={false}
           defaultOpen
           dense
           columns={1}
+          className="erp-card-section--tab-panel"
         >
-          <p className="mb-2 text-[12px] text-erp-muted">
-            GRN lines load from the selected PO’s open quantity. Header warehouse defaults from the PO delivery
-            location.
-          </p>
-          {receivableOrders.length === 0 ? (
-            <p className="text-[13px] text-erp-muted">
-              No receivable purchase orders.{' '}
-              <Link to="/purchase/orders" className="text-erp-primary underline">
-                Open Purchase Orders
-              </Link>
+          <ErpFormSpan span={1}>
+            <p className="mb-2 text-[12px] text-erp-muted">
+              GRN lines load from the selected PO’s open quantity. Header warehouse defaults from the PO delivery
+              location.
             </p>
-          ) : (
-            <>
-              <div
-                className="mb-3 flex flex-wrap gap-1.5"
-                role="tablist"
-                aria-label="Purchase order source"
-              >
-                {receivableOrders.map((o) => {
-                  const openQty = o.lines.reduce((s, l) => s + l.pendingQty, 0)
-                  return (
-                    <button
-                      key={o.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={poId === o.id}
-                      disabled={readOnlyHeaderPo}
-                      className={cn(
-                        'rounded border px-2.5 py-1 text-[12px] font-medium transition-colors',
-                        poId === o.id
-                          ? 'border-erp-primary bg-erp-primary text-white'
-                          : 'border-erp-border bg-erp-surface text-erp-text hover:border-erp-primary hover:bg-erp-primary-soft',
-                        readOnlyHeaderPo && 'cursor-not-allowed opacity-70',
-                      )}
-                      onClick={() => void onSelectPo(o.id)}
-                    >
-                      {o.documentNumber}
-                      <span className={cn('ml-1.5 font-normal', poId === o.id ? 'text-white/80' : 'text-erp-muted')}>
-                        {o.vendor.name} · open {formatNumber(openQty)}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-              <ErpFieldRow
-                label="Purchase Order"
-                required
-                fieldError={fieldErrors.poId}
-                fieldState={fieldErrors.poId ? 'error' : 'idle'}
-              >
-                <Select
-                  value={poId}
-                  disabled={readOnlyHeaderPo}
-                  onChange={(e) => void onSelectPo(e.target.value)}
-                  className="max-w-md"
+            {receivableOrders.length === 0 ? (
+              <p className="text-[13px] text-erp-muted">
+                No receivable purchase orders.{' '}
+                <Link to="/purchase/orders" className="text-erp-primary underline">
+                  Open Purchase Orders
+                </Link>
+              </p>
+            ) : (
+              <>
+                <div
+                  className="mb-3 flex flex-wrap gap-1.5"
+                  role="listbox"
+                  aria-label="Purchase order source"
                 >
-                  <option value="">Select released PO…</option>
-                  {receivableOrders.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.documentNumber} — {o.vendor.name} (open{' '}
-                      {formatNumber(o.lines.reduce((s, l) => s + l.pendingQty, 0))})
-                    </option>
-                  ))}
-                </Select>
-              </ErpFieldRow>
-            </>
-          )}
+                  {receivableOrders.map((o) => {
+                    const openQty = o.lines.reduce((s, l) => s + l.pendingQty, 0)
+                    const selected = poId === o.id
+                    return (
+                      <button
+                        key={o.id}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        title={`${o.documentNumber} — ${o.vendor.name} · open ${formatNumber(openQty)}`}
+                        disabled={readOnlyHeaderPo}
+                        className={cn(
+                          'rounded border px-2.5 py-1 text-[12px] font-medium transition-colors',
+                          selected
+                            ? 'border-erp-primary bg-erp-primary text-white'
+                            : 'border-erp-border bg-erp-surface text-erp-text hover:border-erp-primary hover:bg-erp-primary-soft',
+                          readOnlyHeaderPo && 'cursor-not-allowed opacity-70',
+                        )}
+                        onClick={() => void onSelectPo(o.id)}
+                      >
+                        {o.documentNumber}
+                        <span
+                          className={cn(
+                            'ml-1.5 font-normal',
+                            selected ? 'text-white/80' : 'text-erp-muted',
+                          )}
+                        >
+                          open {formatNumber(openQty)}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <ErpFieldRow
+                  label="Purchase Order"
+                  required
+                  fieldError={fieldErrors.poId}
+                  fieldState={fieldErrors.poId ? 'error' : 'idle'}
+                >
+                  <Select
+                    value={poId}
+                    disabled={readOnlyHeaderPo}
+                    onChange={(e) => void onSelectPo(e.target.value)}
+                    className="max-w-md"
+                  >
+                    <option value="">Select released PO…</option>
+                    {receivableOrders.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.documentNumber} — {o.vendor.name} (open{' '}
+                        {formatNumber(o.lines.reduce((s, l) => s + l.pendingQty, 0))})
+                      </option>
+                    ))}
+                  </Select>
+                </ErpFieldRow>
+              </>
+            )}
+          </ErpFormSpan>
         </ErpCardSection>
       ) : null}
 
+      {activeSection === 'document' ? (
       <ErpCardSection
         id={purchaseSectionId('document')}
         title="Document"
         subtitle="GRN identity, vendor, and challan references"
         icon={FileText}
         accent="blue"
-        collapsible
+        collapsible={false}
         defaultOpen
         dense
+        className="erp-card-section--tab-panel"
       >
         <ErpFormSpan span={3}>
           <p className="erp-field-group__label">Document</p>
@@ -850,7 +859,9 @@ export function GrnEditorPage() {
           />
         </ErpFieldRow>
       </ErpCardSection>
+      ) : null}
 
+      {activeSection === 'receiving' ? (
       <ErpCardSection
         id={purchaseSectionId('receiving')}
         title="Receiving"
@@ -858,9 +869,10 @@ export function GrnEditorPage() {
         collapsedSummary={receivingPeek || undefined}
         icon={Truck}
         accent="green"
-        collapsible
-        defaultOpen={false}
+        collapsible={false}
+        defaultOpen
         dense
+        className="erp-card-section--tab-panel"
       >
         <ErpFormSpan span={3}>
           <p className="erp-field-group__label">Location</p>
@@ -979,7 +991,9 @@ export function GrnEditorPage() {
           </ErpFormSpan>
         ) : null}
       </ErpCardSection>
+      ) : null}
 
+      {activeSection === 'lines' ? (
       <ErpCardSection
         id={purchaseSectionId('lines')}
         title="Lines"
@@ -987,11 +1001,13 @@ export function GrnEditorPage() {
         collapsedSummary={linesPeek || undefined}
         icon={PackageCheck}
         accent="amber"
-        collapsible
+        collapsible={false}
         defaultOpen
         dense
         columns={1}
+        className="erp-card-section--tab-panel"
       >
+        <ErpFormSpan span={1}>
         {fieldErrors.lines ? (
           <p className="mb-2 text-sm text-red-600">{fieldErrors.lines}</p>
         ) : (
@@ -999,7 +1015,7 @@ export function GrnEditorPage() {
             Adjust received quantities; short / excess recalculate from pending open qty.
           </p>
         )}
-        <div className="overflow-x-auto rounded-md border border-erp-border">
+        <div className="min-w-0 overflow-x-auto rounded-md border border-erp-border">
           <table className="erp-table min-w-full text-left text-[12px]">
             <thead>
               <tr>
@@ -1134,8 +1150,11 @@ export function GrnEditorPage() {
             </p>
           ) : null}
         </div>
+        </ErpFormSpan>
       </ErpCardSection>
+      ) : null}
 
+      {activeSection === 'notes' ? (
       <ErpCardSection
         id={purchaseSectionId('notes')}
         title="Notes"
@@ -1143,25 +1162,25 @@ export function GrnEditorPage() {
         collapsedSummary={notesPeek || undefined}
         icon={StickyNote}
         accent="violet"
-        collapsible
-        defaultOpen={false}
+        collapsible={false}
+        defaultOpen
         dense
+        columns={1}
+        className="erp-card-section--tab-panel"
       >
-        <ErpFormSpan span={3}>
-          <p className="erp-field-group__label">Remarks</p>
-        </ErpFormSpan>
-        <ErpFormSpan span={3}>
+        <ErpFieldRow label="Remarks" horizontal={false}>
           <Textarea
             value={remarks}
             onChange={(e) => {
               setRemarks(e.target.value)
               markDirty()
             }}
-            rows={3}
+            rows={4}
             placeholder="Gate notes, discrepancy context, QC instructions…"
           />
-        </ErpFormSpan>
+        </ErpFieldRow>
       </ErpCardSection>
+      ) : null}
     </PurchaseCardFormShell>
   )
 }

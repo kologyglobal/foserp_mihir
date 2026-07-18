@@ -517,6 +517,7 @@ export function RfqEditorPage() {
           { label: 'RFQs', to: '/purchase/rfqs' },
           { label: 'Loading' },
         ]}
+        backLink={{ to: '/purchase/rfqs', label: 'Back to RFQs' }}
         footer={null}
       >
         <LoadingState variant="form" rows={8} />

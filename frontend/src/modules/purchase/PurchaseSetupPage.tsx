@@ -50,6 +50,7 @@ import { usePurchasePermissions } from '@/utils/permissions'
 
 const SETUP_TABS: PurchaseSetupTabId[] = [
   'general',
+  'requisition',
   'number_series',
   'approval',
   'tax',
@@ -208,6 +209,15 @@ export function PurchaseSetupPage() {
     setSetup((prev) => (prev ? { ...prev, general: { ...prev.general, [key]: value } } : prev))
   }
 
+  const patchRequisition = <K extends keyof PurchaseSetup['requisition']>(
+    key: K,
+    value: PurchaseSetup['requisition'][K],
+  ) => {
+    setSetup((prev) =>
+      prev ? { ...prev, requisition: { ...prev.requisition, [key]: value } } : prev,
+    )
+  }
+
   const patchNumberSeries = (key: keyof PurchaseSetupNumberSeries, entry: Partial<PurchaseNumberSeriesConfig>) => {
     setSetup((prev) =>
       prev
@@ -315,6 +325,7 @@ export function PurchaseSetupPage() {
         { label: 'Masters', to: '/purchase/masters' },
         { label: 'Setup' },
       ]}
+      backLink={{ to: '/purchase/masters', label: 'Back to Purchase Masters' }}
       commandBar={
         <ErpCommandBar
           inline
@@ -489,6 +500,56 @@ export function PurchaseSetupPage() {
                   onChange={(e) => patchGeneral('allowShortClose', e.target.checked)}
                 />
               </div>
+            </SectionCard>
+          )}
+
+          {tab === 'requisition' && (
+            <SectionCard
+              title="Requisition Setup"
+              description="Defaults applied when creating a new Purchase Requisition."
+            >
+              <FieldGrid>
+                <FormField
+                  label="Default location"
+                  hint="Pre-fills Location on /purchase/requisitions/new."
+                >
+                  <Select
+                    value={setup.requisition.defaultLocationId}
+                    onChange={(e) => patchRequisition('defaultLocationId', e.target.value)}
+                  >
+                    {LOCATION_OPTIONS.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+                <FormField
+                  label="Skip RFQ"
+                  hint="No = RFQ Required. Yes = RFQ is not required (direct PO after approval)."
+                >
+                  <Select
+                    value={setup.requisition.skipRfq ? 'yes' : 'no'}
+                    onChange={(e) => patchRequisition('skipRfq', e.target.value === 'yes')}
+                  >
+                    <option value="no">No — RFQ Required</option>
+                    <option value="yes">Yes — RFQ is not required</option>
+                  </Select>
+                </FormField>
+                <FormField
+                  label="Auto-complete REF"
+                  hint="Pending — will auto-fill Reference Number from linked source docs."
+                >
+                  <Select
+                    value={setup.requisition.autoCompleteRef ? 'yes' : 'no'}
+                    disabled
+                    onChange={(e) => patchRequisition('autoCompleteRef', e.target.value === 'yes')}
+                  >
+                    <option value="no">No (pending)</option>
+                    <option value="yes">Yes (pending)</option>
+                  </Select>
+                </FormField>
+              </FieldGrid>
             </SectionCard>
           )}
 

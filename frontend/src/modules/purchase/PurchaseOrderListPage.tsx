@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Download, FileText, Plus, RefreshCw, Save } from 'lucide-react'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
-import { ErpPageGuide } from '../../components/erp/ErpPageGuide'
 import { SaveViewDialog } from '../../components/design-system/SaveViewDialog'
 import { EnterpriseRegisterTableShell } from '../../design-system/list-page/EnterpriseRegisterTableShell'
 import { ErpCommandBar } from '../../components/erp/ErpCommandBar'
@@ -467,12 +466,16 @@ export function PurchaseOrderListPage() {
           />
         }
       >
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
+        <div className="space-y-3">
+          <PurchaseRegisterContextPanel
+            ariaLabel="Purchase order overview and suggestions"
+            title="Order Insights"
+            subtitle="AI suggested bottlenecks and next actions for this register."
+            storageKey="purchase.ai-insights.orders"
+            overview={registerOverview}
+            suggestions={registerSuggestions}
+          />
           <div className="min-w-0 space-y-3">
-            <ErpPageGuide
-              purpose="Purchase orders — create, approve and release, then track delivery."
-              nextStep="Approve and release PO, await vendor confirmation, then record gate entry & GRN."
-            />
             <EnterpriseRegisterTableShell className="min-w-0">
               <PurchaseOrdersTable
                 rows={filtered}
@@ -531,13 +534,6 @@ export function PurchaseOrderListPage() {
               />
             </EnterpriseRegisterTableShell>
           </div>
-          <PurchaseRegisterContextPanel
-            ariaLabel="Purchase order overview and suggestions"
-            title="Order Insights"
-            subtitle="AI suggested bottlenecks and next actions for this register."
-            overview={registerOverview}
-            suggestions={registerSuggestions}
-          />
         </div>
       </OperationalPageShell>
 

@@ -8,7 +8,6 @@ import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFil
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpDataGrid } from '@/components/erp/ErpDataGrid'
-import { ErpPageGuide } from '@/components/erp/ErpPageGuide'
 import { TableLink } from '@/components/ui/AppLink'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
@@ -314,10 +313,6 @@ export function RfqListPage() {
             />
           ) : (
             <>
-              <ErpPageGuide
-                purpose="RFQs collect vendor quotes from approved PRs or manual entry."
-                nextStep="Send RFQ, capture vendor quotations, then compare."
-              />
               <EnterpriseRegisterTableShell className="min-w-0">
                 <ErpDataGrid
                   data={filtered}

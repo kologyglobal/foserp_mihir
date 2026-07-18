@@ -114,6 +114,11 @@ export const DEFAULT_PURCHASE_SETUP: PurchaseSetup = {
     allowRejectedStockInQuarantine: true,
     defaultQuarantineWarehouseId: PURCHASE_DEMO_LOCATION_FG.id,
   },
+  requisition: {
+    defaultLocationId: PURCHASE_DEMO_LOCATION.id,
+    skipRfq: false,
+    autoCompleteRef: false,
+  },
   print: {
     companyName: 'Vasant Trailers Pvt Ltd',
     logoPlaceholderUrl: '/brand/vasant-logo-placeholder.svg',

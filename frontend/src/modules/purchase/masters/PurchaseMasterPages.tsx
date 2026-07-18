@@ -227,6 +227,7 @@ export function PurchaseMasterListPage() {
       description={catalog.purpose ?? catalog.description}
       breadcrumbs={masterBreadcrumbs(catalog.title)}
       favoritePath={`/purchase/masters/${slug}`}
+      backLink={{ to: '/purchase/masters', label: 'Back to Purchase Masters' }}
       commandBar={(
         <ErpCommandBar
           sticky={false}
@@ -236,7 +237,6 @@ export function PurchaseMasterListPage() {
             { id: 'export-csv', label: 'Export CSV', icon: Download, onClick: handleExportCsv },
             { id: 'export-excel', label: 'Export Excel', icon: FileSpreadsheet, onClick: () => printMasterTable(catalog.title, filtered) },
             { id: 'print', label: 'Print', icon: Printer, onClick: () => printMasterTable(catalog.title, filtered) },
-            { id: 'hub', label: 'Purchase Masters', onClick: () => navigate('/purchase/masters') },
           ]}
         />
       )}
@@ -512,6 +512,7 @@ export function PurchaseMasterFormPage() {
         { label: catalog.title, to: listPath },
         { label: isEdit ? 'Edit' : 'New' },
       ]}
+      backLink={{ to: listPath, label: `Back to ${catalog.title}` }}
       commandBar={commandBar}
       documentStrip={documentStrip}
       validationErrors={errors}
@@ -639,7 +640,11 @@ export function PurchaseMasterDetailPage() {
 
   if (!catalog || !entry) {
     return (
-      <OperationalPageShell title="Record not found" breadcrumbs={masterBreadcrumbs('Not Found')}>
+      <OperationalPageShell
+        title="Record not found"
+        breadcrumbs={masterBreadcrumbs('Not Found')}
+        backLink={{ to: `/purchase/masters/${slug ?? ''}`, label: 'Back to list' }}
+      >
         <Link to={`/purchase/masters/${slug ?? ''}`} className="text-sm font-semibold text-erp-primary">Back to list</Link>
       </OperationalPageShell>
     )
@@ -655,6 +660,7 @@ export function PurchaseMasterDetailPage() {
       variant="dynamics"
       breadcrumbs={masterBreadcrumbs(entry.name)}
       favoritePath={`/purchase/masters/${slug}/${entry.id}`}
+      backLink={{ to: `/purchase/masters/${slug}`, label: `Back to ${catalog.title}` }}
     >
       <div className="grid gap-6 xl:grid-cols-[1fr_280px]">
         <DetailLayout

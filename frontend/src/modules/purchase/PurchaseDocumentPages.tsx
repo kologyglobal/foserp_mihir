@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft,
   BarChart3,
   CheckCircle,
   ClipboardList,
@@ -153,7 +152,6 @@ export function RfqDocumentPage() {
       hint="F4 Lookup · Esc Back"
       actions={(
         <ErpButtonGroup>
-          <ErpButton type="button" variant="ghost" icon={ArrowLeft} onClick={() => navigate('/purchase/rfqs')}>Back</ErpButton>
           {rfq.status === 'draft' ? (
             <ErpButton type="button" variant="primary" icon={Send} onClick={() => { const r = sendRfq(rfq.id); if (r.ok) show('RFQ sent to vendors'); else show(r.error ?? 'Failed') }}>
               Send to Vendors
@@ -192,7 +190,6 @@ export function RfqDocumentPage() {
       actions={[
         { id: 'send', label: 'Send RFQ', icon: Send, primary: true, onClick: () => { const r = sendRfq(rfq.id); if (r.ok) show('RFQ sent to approved vendors'); else show(r.error ?? 'Failed') }, disabled: rfq.status !== 'draft' },
         { id: 'compare', label: 'Compare', icon: BarChart3, onClick: () => navigate(`/purchase/comparison/${rfq.id}`), disabled: quotesCount < 2 },
-        { id: 'back', label: 'Back', icon: ArrowLeft, onClick: () => navigate('/purchase/rfqs') },
       ]}
     />
   )
@@ -575,6 +572,7 @@ export function RfqDocumentPage() {
           { label: 'RFQs', to: '/purchase/rfqs' },
           { label: rfq.rfqNo },
         ]}
+        backLink={{ to: '/purchase/rfqs', label: 'Back to RFQs' }}
         commandBar={commandBar}
         documentStrip={purchaseStatusStripToDocumentStrip(statusStrip)}
         detailMode
@@ -705,7 +703,6 @@ export function PurchaseOrderDocumentPage() {
       hint="Alt+S Save · Esc Back"
       actions={(
         <ErpButtonGroup>
-          <ErpButton type="button" variant="ghost" icon={ArrowLeft} onClick={() => navigate('/purchase/orders')}>Back</ErpButton>
           <ErpButton type="button" variant="secondary" icon={FileEdit} disabled={!poIsAmendable(po)} onClick={() => navigate(`/purchase/orders/${po.id}/amend`)}>Amend PO</ErpButton>
           <ErpButton type="button" variant="secondary" icon={Package} disabled={!['sent', 'partial', 'released'].includes(po.status)} onClick={receiveAll}>Gate Entry &amp; GRN</ErpButton>
           <ErpButton type="button" variant="secondary" icon={Printer} onClick={() => navigate(`/purchase/orders/${po.id}/print`)}>Print</ErpButton>
@@ -736,7 +733,6 @@ export function PurchaseOrderDocumentPage() {
       actions={[
         { id: 'grn', label: 'Gate Entry & GRN', icon: Package, primary: true, onClick: receiveAll, disabled: !['sent', 'partial', 'released'].includes(po.status) },
         { id: 'amend', label: 'Amend', icon: FileEdit, onClick: () => navigate(`/purchase/orders/${po.id}/amend`), disabled: !poIsAmendable(po) },
-        { id: 'back', label: 'Back', icon: ArrowLeft, onClick: () => navigate('/purchase/orders') },
       ]}
     />
   )
@@ -967,6 +963,7 @@ export function PurchaseOrderDocumentPage() {
           { label: 'Purchase Orders', to: '/purchase/orders' },
           { label: po.poNo },
         ]}
+        backLink={{ to: '/purchase/orders', label: 'Back to Purchase Orders' }}
         commandBar={commandBar}
         documentStrip={purchaseStatusStripToDocumentStrip(statusStrip)}
         detailMode
@@ -1073,7 +1070,6 @@ export function GrnDocumentPage() {
       hint="Esc Back"
       actions={(
         <ErpButtonGroup>
-          <ErpButton type="button" variant="ghost" icon={ArrowLeft} onClick={() => navigate('/purchase/grn')}>Back</ErpButton>
           <ErpButton type="button" variant="secondary" icon={Truck} onClick={() => navigate(`/purchase/orders/${grn.poId}`)}>View PO</ErpButton>
           <ErpButton type="button" variant="primary" icon={Printer} onClick={() => window.print()}>Print</ErpButton>
         </ErpButtonGroup>
@@ -1102,7 +1098,6 @@ export function GrnDocumentPage() {
       actions={[
         { id: 'po', label: 'View PO', icon: Truck, primary: true, onClick: () => navigate(`/purchase/orders/${grn.poId}`) },
         { id: 'print', label: 'Print', icon: Printer, onClick: () => window.print() },
-        { id: 'back', label: 'Back', icon: ArrowLeft, onClick: () => navigate('/purchase/grn') },
       ]}
     />
   )
@@ -1265,6 +1260,7 @@ export function GrnDocumentPage() {
         { label: 'Gate Entry & GRN', to: '/purchase/grn' },
         { label: grn.grnNo },
       ]}
+      backLink={{ to: '/purchase/grn', label: 'Back to Goods Receipts' }}
       commandBar={commandBar}
       documentStrip={purchaseStatusStripToDocumentStrip(statusStrip)}
       detailMode

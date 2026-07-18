@@ -253,7 +253,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Description | PR/PO/GRN API |
 | Reason | **Accepted deferral** — demo FE only (CRM-parity polish included). Not a CRM verification defect (report G3). Do not invent purchase/AP APIs until a dedicated purchase backend phase is scheduled. |
 | Dependencies | Items, vendors (done) |
-| Next step | See `docs/purchase-workflow-map.md` for UX coverage; backend: `backend/docs/api-requirement-matrix.md`. Demo FE may surface Planned steps (stock check, gate-pass, AP invoice/match/payment). |
+| Next step | See `docs/purchase-workflow-map.md` for UX coverage; backend: `backend/docs/api-requirement-matrix.md`. Demo FE may surface Planned steps (stock check, gate-pass, AP invoice/match/payment). **PR lines:** each line must store its own `locationId` (header location is not enough). Also plan `binCode`; `purchaseOrderNumber` / `purchaseQuoteNumber` / line `requiredDate` are future read-only when PO/quote exists. **Purchase Planning Sheet** (`/purchase/planning-sheet`): demo FE for approved PRs with `rfqRequired=false` — one planning row per PR line; RFQ-required PRs never appear. |
 | Test required | `test:purchase:production` equivalent for API when backend starts |
 | Status | open (accepted deferral) |
 

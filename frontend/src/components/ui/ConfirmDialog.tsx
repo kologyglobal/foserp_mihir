@@ -1,37 +1,14 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Info, MessageSquareText, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { ErpButton, ErpButtonGroup } from '../erp/ErpButton'
 import { cn } from '../../utils/cn'
 import type { ConfirmDialogRequest, ConfirmDialogTone } from '../../store/confirmDialogStore'
 
-const TONE_META: Record<
-  ConfirmDialogTone,
-  {
-    icon: typeof Info
-    iconWrap: string
-    confirmVariant: 'primary' | 'danger' | 'success' | 'warning'
-  }
-> = {
-  default: {
-    icon: Info,
-    iconWrap: 'bg-erp-primary-soft text-erp-primary',
-    confirmVariant: 'primary',
-  },
-  danger: {
-    icon: AlertTriangle,
-    iconWrap: 'bg-red-50 text-red-600',
-    confirmVariant: 'danger',
-  },
-  warning: {
-    icon: AlertTriangle,
-    iconWrap: 'bg-amber-50 text-amber-700',
-    confirmVariant: 'warning',
-  },
-  success: {
-    icon: CheckCircle2,
-    iconWrap: 'bg-emerald-50 text-emerald-700',
-    confirmVariant: 'success',
-  },
+const TONE_CONFIRM_VARIANT: Record<ConfirmDialogTone, 'primary' | 'danger' | 'success' | 'warning'> = {
+  default: 'primary',
+  danger: 'danger',
+  warning: 'warning',
+  success: 'success',
 }
 
 export type ConfirmDialogProps = {
@@ -41,6 +18,10 @@ export type ConfirmDialogProps = {
   onConfirm: (note: string) => void
 }
 
+/**
+ * App confirm / notes dialog — Dynamics-style panel (flat border, header/footer rules).
+ * Used by `appConfirm` / `appPromptNote` (e.g. unsaved leave).
+ */
 export function ConfirmDialog({ open, request, onCancel, onConfirm }: ConfirmDialogProps) {
   const titleId = useId()
   const descId = useId()
@@ -50,8 +31,7 @@ export function ConfirmDialog({ open, request, onCancel, onConfirm }: ConfirmDia
   const [touched, setTouched] = useState(false)
 
   const tone = request?.tone ?? 'default'
-  const meta = TONE_META[tone]
-  const Icon = request?.note?.enabled ? MessageSquareText : meta.icon
+  const confirmVariant = TONE_CONFIRM_VARIANT[tone]
   const noteEnabled = Boolean(request?.note?.enabled)
   const noteRequired = Boolean(request?.note?.required)
   const noteLabel = request?.note?.label ?? 'Comments'
@@ -99,11 +79,8 @@ export function ConfirmDialog({ open, request, onCancel, onConfirm }: ConfirmDia
     >
       <button type="button" className="erp-confirm-backdrop__scrim" aria-label="Dismiss" onClick={onCancel} />
 
-      <div className="erp-confirm-panel">
-        <div className="erp-confirm-panel__top">
-          <div className={cn('erp-confirm-panel__icon', meta.iconWrap)}>
-            <Icon className="h-5 w-5" strokeWidth={2} aria-hidden />
-          </div>
+      <div className={cn('erp-confirm-panel', tone !== 'default' && `erp-confirm-panel--${tone}`)}>
+        <header className="erp-confirm-panel__header">
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="erp-confirm-panel__title">
               {request.title}
@@ -113,62 +90,69 @@ export function ConfirmDialog({ open, request, onCancel, onConfirm }: ConfirmDia
                 {request.description}
               </p>
             ) : null}
-            {request.detail ? <p className="erp-confirm-panel__detail">{request.detail}</p> : null}
           </div>
           <button type="button" className="erp-confirm-panel__close" onClick={onCancel} aria-label="Close">
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4" aria-hidden />
           </button>
-        </div>
+        </header>
 
-        {noteEnabled ? (
-          <div className="erp-confirm-panel__note">
-            <label htmlFor={noteId} className="erp-confirm-panel__note-label">
-              {noteLabel}
-              {noteRequired ? <span className="erp-confirm-panel__req">Required</span> : null}
-            </label>
-            <textarea
-              ref={textareaRef}
-              id={noteId}
-              value={note}
-              rows={request.note?.rows ?? 4}
-              maxLength={request.note?.maxLength}
-              placeholder={request.note?.placeholder ?? 'Add a clear reason for the audit trail…'}
-              className={cn('erp-confirm-panel__textarea', noteError && 'erp-confirm-panel__textarea--error')}
-              onChange={(e) => setNote(e.target.value)}
-              onBlur={() => setTouched(true)}
-            />
-            <div className="erp-confirm-panel__note-meta">
-              {noteError ? (
-                <span className="erp-confirm-panel__error">Please enter comments to continue.</span>
-              ) : (
-                <span className="erp-confirm-panel__hint">Ctrl/⌘ + Enter to confirm</span>
-              )}
-              {request.note?.maxLength ? (
-                <span className="erp-confirm-panel__count">
-                  {note.length}/{request.note.maxLength}
-                </span>
-              ) : null}
-            </div>
+        {(request.detail || noteEnabled) && (
+          <div className="erp-confirm-panel__body">
+            {request.detail ? <p className="erp-confirm-panel__detail">{request.detail}</p> : null}
+
+            {noteEnabled ? (
+              <div className="erp-confirm-panel__note">
+                <label htmlFor={noteId} className="erp-confirm-panel__note-label">
+                  {noteLabel}
+                  {noteRequired ? <span className="erp-confirm-panel__req">Required</span> : null}
+                </label>
+                <textarea
+                  ref={textareaRef}
+                  id={noteId}
+                  value={note}
+                  rows={request.note?.rows ?? 4}
+                  maxLength={request.note?.maxLength}
+                  placeholder={request.note?.placeholder ?? 'Add a clear reason for the audit trail…'}
+                  className={cn('erp-confirm-panel__textarea', noteError && 'erp-confirm-panel__textarea--error')}
+                  onChange={(e) => setNote(e.target.value)}
+                  onBlur={() => setTouched(true)}
+                />
+                <div className="erp-confirm-panel__note-meta">
+                  {noteError ? (
+                    <span className="erp-confirm-panel__error">Please enter comments to continue.</span>
+                  ) : (
+                    <span className="erp-confirm-panel__hint">Ctrl/⌘ + Enter to confirm</span>
+                  )}
+                  {request.note?.maxLength ? (
+                    <span className="erp-confirm-panel__count">
+                      {note.length}/{request.note.maxLength}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        )}
 
-        <ErpButtonGroup className="erp-confirm-panel__actions">
-          <ErpButton type="button" variant="secondary" onClick={onCancel}>
-            {cancelLabel}
-          </ErpButton>
-          <ErpButton
-            type="button"
-            variant={meta.confirmVariant}
-            disabled={!canConfirm}
-            onClick={() => {
-              setTouched(true)
-              if (!canConfirm) return
-              onConfirm(note.trim())
-            }}
-          >
-            {confirmLabel}
-          </ErpButton>
-        </ErpButtonGroup>
+        <footer className="erp-confirm-panel__footer">
+          <ErpButtonGroup className="erp-confirm-panel__actions">
+            <ErpButton type="button" variant="secondary" onClick={onCancel} autoFocus={!noteEnabled}>
+              {cancelLabel}
+            </ErpButton>
+            <ErpButton
+              type="button"
+              variant={confirmVariant}
+              disabled={!canConfirm}
+              onClick={() => {
+                setTouched(true)
+                if (!canConfirm) return
+                onConfirm(note.trim())
+              }}
+            >
+              {confirmLabel}
+            </ErpButton>
+          </ErpButtonGroup>
+        </footer>
       </div>
     </div>
   )

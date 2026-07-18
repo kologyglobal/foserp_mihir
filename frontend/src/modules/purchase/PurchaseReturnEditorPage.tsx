@@ -618,7 +618,7 @@ export function PurchaseReturnEditorPage() {
             <ErpButtonGroup>
               <ErpButton
                 type="button"
-                variant="ghost"
+                variant="secondary"
                 disabled={saving}
                 onClick={() => navigate('/purchase/returns')}
               >
@@ -970,7 +970,7 @@ export function PurchaseReturnEditorPage() {
               Add Line
             </ErpButton>
           ) : null}
-          <span className="text-[12px] tabular-nums text-erp-muted">
+          <span className="ml-auto text-[12px] tabular-nums text-erp-muted">
             Qty {summary.returnQty} · {formatCurrency(summary.total)}
           </span>
         </PurchaseTableToolbar>

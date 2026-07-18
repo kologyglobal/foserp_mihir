@@ -2,7 +2,7 @@ import { Sparkles } from 'lucide-react'
 import { cn } from '../../../utils/cn'
 import { useFactBoxPane } from './FactBoxPaneContext'
 
-/** Reopen collapsed details pane — matches smart-context chrome */
+/** Reopen collapsed Smart Context — always rendered above form sections (see smart-context-restore rule). */
 export function FactBoxPaneAiToggle({ className }: { className?: string }) {
   const ctx = useFactBoxPane()
   if (!ctx?.collapsible || ctx.open) return null

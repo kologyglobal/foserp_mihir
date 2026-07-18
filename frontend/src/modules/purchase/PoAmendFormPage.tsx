@@ -131,9 +131,6 @@ export function PoAmendFormPage() {
         { id: 'save', label: `Save Rev ${nextRev}`, icon: Save, onClick: persist, primary: true, disabled: submitting },
         { id: 'cancel', label: 'Cancel', icon: X, onClick: () => navigate(`/purchase/orders/${po.id}`) },
       ]}
-      moreActions={[
-        { id: 'back', label: 'Back to PO', icon: ArrowLeft, onClick: () => navigate(`/purchase/orders/${po.id}`) },
-      ]}
     />
   )
 
@@ -173,7 +170,6 @@ export function PoAmendFormPage() {
       ]}
       actions={[
         { id: 'save', label: `Save Rev ${nextRev}`, icon: Save, primary: true, onClick: persist, disabled: submitting },
-        { id: 'back', label: 'Back to PO', icon: ArrowLeft, onClick: () => navigate(`/purchase/orders/${po.id}`) },
       ]}
     >
       <p className="text-xs text-erp-muted leading-relaxed px-1 pt-2">
@@ -328,6 +324,7 @@ export function PoAmendFormPage() {
           { label: po.poNo, to: `/purchase/orders/${po.id}` },
           { label: 'Amend' },
         ]}
+        backLink={{ to: `/purchase/orders/${po.id}`, label: `Back to ${po.poNo}` }}
         commandBar={commandBar}
         documentStrip={purchaseStatusStripToDocumentStrip(statusStrip)}
         onSubmit={(e) => { e.preventDefault(); persist() }}

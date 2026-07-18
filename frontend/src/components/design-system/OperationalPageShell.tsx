@@ -16,7 +16,10 @@ import type { LiveAlert } from '../live-erp/types'
 import { cn } from '../../utils/cn'
 import { resolvePageGuide } from '../../config/pageGuideRegistry'
 import { CrmPageTip } from '../crm/CrmPageTip'
+import { PurchasePageTip } from '../purchase/PurchasePageTip'
 import { ErpPageGuide } from '../erp/ErpPageGuide'
+import { shouldShowPageTip } from '../../utils/crmPageTipStorage'
+import { isPurchasePath } from '../../utils/purchasePageTip'
 
 interface OperationalPageShellProps {
   title: string
@@ -27,7 +30,7 @@ interface OperationalPageShellProps {
   actions?: ReactNode
   commandBar?: ReactNode
   insights?: PageInsight[]
-  /** Enterprise KPI cards â€” preferred for CRM/Sales list pages */
+  /** Enterprise KPI cards — preferred for CRM/Sales list pages */
   kpiStrip?: EnterpriseKpiItem[]
   filterBar?: ReactNode
   favoritePath?: string
@@ -37,7 +40,7 @@ interface OperationalPageShellProps {
   className?: string
   variant?: 'default' | 'dynamics'
   /**
-   * enterprise â€” compact BC/D365 header: title + actions same row, filters below.
+   * enterprise — compact BC/D365 header: title + actions same row, filters below.
    * Default for dynamics variant.
    */
   layout?: 'default' | 'enterprise'
@@ -45,7 +48,7 @@ interface OperationalPageShellProps {
   showDescription?: boolean
   /** Merge breadcrumbs + title + actions into workspace tab header (Dynamics) */
   mergeHeaderWithWorkspace?: boolean
-  /** Hide chrome title/fav â€” page commandBar supplies sticky record header */
+  /** Hide chrome title/fav — page commandBar supplies sticky record header */
   workspaceRecordHeader?: boolean
   /** In-page back link above content (preferred on view/detail pages). */
   backLink?: { to: string; label: string }
@@ -53,7 +56,7 @@ interface OperationalPageShellProps {
 
 /**
  * Standard ERP list page layout.
- * Enterprise: Breadcrumb â†’ Title + Actions â†’ Search/Filters â†’ Content
+ * Enterprise: Breadcrumb → Title + Actions → Search/Filters → Content
  */
 export function OperationalPageShell({
   title,
@@ -98,7 +101,8 @@ export function OperationalPageShell({
    */
   const mergeHeader = mergeHeaderWithWorkspace ?? (variant === 'dynamics' || Boolean(workspaceRecordHeader))
   /** Tip lives in WorkspaceUnifiedHeader when header is merged; local hero otherwise. */
-  const showLocalPageTip = !mergeHeader && !workspaceHeaderSetters
+  const showLocalPurchaseTip = !mergeHeader && (badge === 'Purchase' || isPurchasePath(pathname))
+  const showLocalPageTip = !mergeHeader && !showLocalPurchaseTip && shouldShowPageTip(pathname)
 
   const headerMeta = useMemo(
     () => ({
@@ -131,6 +135,13 @@ export function OperationalPageShell({
   }, [mergeHeader, setHeader])
 
   const showLocalHero = !mergeHeader
+  const showHeroChrome =
+    showLocalHero ||
+    Boolean(liveAlerts?.length) ||
+    Boolean(filterBar) ||
+    Boolean(kpiStrip?.length) ||
+    Boolean(!kpiStrip?.length && insights?.length) ||
+    Boolean(!isEnterprise && commandBar)
 
   return (
     <div
@@ -141,6 +152,7 @@ export function OperationalPageShell({
         className,
       )}
     >
+      {showHeroChrome ? (
       <header className={cn('erp-page-hero', !showLocalHero && 'erp-page-hero--workspace-merged')}>
         {showLocalHero && (
         <div className="erp-page-hero-band">
@@ -167,7 +179,7 @@ export function OperationalPageShell({
                 >
                   <Star className={cn('h-3.5 w-3.5', fav && 'fill-current')} />
                 </button>
-                {showLocalPageTip ? <CrmPageTip /> : null}
+                {showLocalPurchaseTip ? <PurchasePageTip /> : showLocalPageTip ? <CrmPageTip /> : null}
               </div>
               {description && (!isEnterprise || showDescription) ? (
                 <p className="erp-page-subtitle mt-0.5 max-w-2xl">{description}</p>
@@ -201,15 +213,13 @@ export function OperationalPageShell({
           </div>
         )}
       </header>
+      ) : null}
 
-      {/* Back always above Purpose / guide — never after or inside the guide. */}
-      {backLink ? <PageBackLink to={backLink.to} label={backLink.label} /> : null}
-
-      {guide ? <ErpPageGuide purpose={guide.purpose} nextStep={guide.nextStep} className="mb-2" /> : null}
-
-      {children}
+      <div className="erp-page-content">
+        {backLink ? <PageBackLink to={backLink.to} label={backLink.label} /> : null}
+        {guide ? <ErpPageGuide purpose={guide.purpose} nextStep={guide.nextStep} className="mb-2" /> : null}
+        {children}
+      </div>
     </div>
   )
 }
-
-

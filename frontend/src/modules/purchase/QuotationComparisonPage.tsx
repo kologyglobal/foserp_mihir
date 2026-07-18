@@ -367,6 +367,7 @@ export function QuotationComparisonPage() {
         title="Quotation Comparison"
         variant="dynamics"
         breadcrumbs={purchaseBreadcrumbs('Comparison')}
+        backLink={{ to: '/purchase/comparison', label: 'Back to Comparison' }}
       >
         <LoadingState variant="table" rows={8} cols={8} />
       </OperationalPageShell>
@@ -379,6 +380,7 @@ export function QuotationComparisonPage() {
         title="Quotation Comparison"
         variant="dynamics"
         breadcrumbs={purchaseBreadcrumbs('Not Found')}
+        backLink={{ to: '/purchase/comparison', label: 'Back to Comparison' }}
       >
         <EmptyState icon={GitCompare} title="RFQ not found" />
       </OperationalPageShell>
@@ -396,6 +398,7 @@ export function QuotationComparisonPage() {
         to: '/purchase/comparison',
       })}
       favoritePath={`/purchase/comparison/${rfq.id}`}
+      backLink={{ to: '/purchase/comparison', label: 'Back to Comparison' }}
       commandBar={
         <ErpCommandBar
           inline

@@ -323,7 +323,15 @@ export function PurchaseApprovalsPage() {
           />
         }
       >
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="space-y-3">
+          <PurchaseRegisterContextPanel
+            ariaLabel="Approval queue overview and suggestions"
+            title="Approval Insights"
+            subtitle="AI suggested bottlenecks and next actions for this queue."
+            storageKey="purchase.ai-insights.approvals"
+            overview={registerOverview}
+            suggestions={registerSuggestions}
+          />
           <EnterpriseRegisterTableShell className="min-w-0">
             <PurchaseApprovalsTable
               rows={filtered}
@@ -384,13 +392,6 @@ export function PurchaseApprovalsPage() {
               }
             />
           </EnterpriseRegisterTableShell>
-          <PurchaseRegisterContextPanel
-            ariaLabel="Approval queue overview and suggestions"
-            title="Approval Insights"
-            subtitle="AI suggested bottlenecks and next actions for this queue."
-            overview={registerOverview}
-            suggestions={registerSuggestions}
-          />
         </div>
       </OperationalPageShell>
 

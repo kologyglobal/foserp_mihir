@@ -989,6 +989,7 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
           { label: 'Requisitions', to: '/purchase/requisitions' },
           { label: isCreate ? 'New' : docNo },
         ]}
+        backLink={{ to: '/purchase/requisitions', label: 'Back to Requisitions' }}
         commandBar={isCreate ? createCommandBar : commandBar}
         documentStrip={purchaseStatusStripToDocumentStrip(statusStrip)}
         detailMode={isView}

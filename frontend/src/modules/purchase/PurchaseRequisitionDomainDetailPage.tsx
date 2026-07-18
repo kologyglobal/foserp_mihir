@@ -8,19 +8,21 @@ import { Badge } from '../../components/ui/Badge'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingState } from '../../design-system/components/LoadingState'
 import { TableLink } from '../../components/ui/AppLink'
+import { PurchaseRequisitionLinesTable } from '../../components/purchase/PurchaseRequisitionLinesTable'
 import {
   convertPurchaseRequisitionToPo,
   convertPurchaseRequisitionToRfq,
   getPurchaseRequisitionById,
   getRFQById,
   getPurchaseOrderById,
+  getVendors,
   updatePurchaseRequisition,
   PURCHASE_REQUISITION_PRIORITY_LABELS,
   PURCHASE_REQUISITION_SOURCE_LABELS,
   PURCHASE_REQUISITION_STATUS_LABELS,
   PurchaseServiceError,
 } from '../../services/purchase'
-import type { PurchaseRequisition } from '../../types/purchaseDomain'
+import type { PurchaseRequisition, Vendor } from '../../types/purchaseDomain'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { notify } from '../../store/toastStore'
@@ -51,11 +53,22 @@ export function PurchaseRequisitionDomainDetailPage({
   const [department, setDepartment] = useState('')
   const [saving, setSaving] = useState(false)
   const [converting, setConverting] = useState(false)
+  const [vendors, setVendors] = useState<Vendor[]>([])
 
   const readOnly = mode === 'view' || pr?.status === 'cancelled' || pr?.status === 'pending_approval'
   const canEdit = pr && (pr.status === 'draft' || pr.status === 'rejected')
   const showCreatePo = pr ? canConvertPrToPo(pr) && perms.canCreateOrder : false
   const showCreateRfq = pr ? canConvertPrToRfq(pr) && perms.canCreateRfq : false
+
+  const worksheetLines = useMemo(
+    () =>
+      (pr?.lines ?? []).map((l) => ({
+        ...l,
+        key: l.id || crypto.randomUUID(),
+        actionMessage: false,
+      })),
+    [pr?.lines],
+  )
 
   const createPurchaseOrder = async () => {
     if (!pr) return
@@ -84,6 +97,10 @@ export function PurchaseRequisitionDomainDetailPage({
       setConverting(false)
     }
   }
+
+  useEffect(() => {
+    void getVendors().then(setVendors)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -146,7 +163,12 @@ export function PurchaseRequisitionDomainDetailPage({
 
   if (loading) {
     return (
-      <OperationalPageShell title="Purchase Requisition" badge="Purchase" variant="dynamics">
+      <OperationalPageShell
+        title="Purchase Requisition"
+        badge="Purchase"
+        variant="dynamics"
+        backLink={{ to: '/purchase/requisitions', label: 'Back to Requisitions' }}
+      >
         <LoadingState variant="form" rows={6} />
       </OperationalPageShell>
     )
@@ -158,7 +180,12 @@ export function PurchaseRequisitionDomainDetailPage({
 
   if (!pr) {
     return (
-      <OperationalPageShell title="Purchase Requisition" badge="Purchase" variant="dynamics">
+      <OperationalPageShell
+        title="Purchase Requisition"
+        badge="Purchase"
+        variant="dynamics"
+        backLink={{ to: '/purchase/requisitions', label: 'Back to Requisitions' }}
+      >
         <EmptyState
           icon={ArrowLeft}
           title="Requisition not found"
@@ -291,38 +318,20 @@ export function PurchaseRequisitionDomainDetailPage({
         </div>
 
         <div className="erp-page-panel p-4">
-          <h3 className="mb-3 text-[13px] font-semibold text-erp-text">Lines</h3>
-          <div className="overflow-x-auto">
-            <table className="erp-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Item</th>
-                  <th className="num">Qty</th>
-                  <th>UOM</th>
-                  <th className="num">Rate</th>
-                  <th className="num">Amount</th>
-                  <th>Required</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pr.lines.map((line) => (
-                  <tr key={line.id}>
-                    <td>{line.lineNo}</td>
-                    <td>
-                      <div className="font-mono text-[12px]">{line.itemCode}</div>
-                      <div className="text-[12px] text-erp-muted">{line.itemName}</div>
-                    </td>
-                    <td className="num">{line.quantity}</td>
-                    <td>{line.uom}</td>
-                    <td className="num">{formatCurrency(line.estimatedRate)}</td>
-                    <td className="num">{formatCurrency(line.amount)}</td>
-                    <td>{formatDate(line.requiredDate)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <h3 className="mb-1 text-[13px] font-semibold text-erp-text">Line Items</h3>
+          <p className="mb-3 text-[12px] text-erp-muted">
+            Product type, item, qty, rate — BIN, PO number, quote number, required date.
+          </p>
+          <PurchaseRequisitionLinesTable
+            lines={worksheetLines}
+            catalogItems={[]}
+            vendors={vendors}
+            editable={false}
+            readOnly
+            reqNo={pr.documentNumber}
+            formatCurrency={formatCurrency}
+            estimatedTotal={pr.totalAmount}
+          />
         </div>
 
         <div className="erp-page-panel space-y-2 p-4">

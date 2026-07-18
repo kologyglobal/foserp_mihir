@@ -1,4 +1,5 @@
 import { Select } from '../forms/Inputs'
+import { SELECT_PLACEHOLDER } from '../forms/selectStandards'
 import { withCurrentTermOption } from '../../data/purchase/purchaseCommercialTerms'
 
 interface PurchaseTermSelectProps {
@@ -17,7 +18,7 @@ export function PurchaseTermSelect({
   options,
   onChange,
   disabled,
-  emptyLabel = 'Select…',
+  emptyLabel = SELECT_PLACEHOLDER,
   id,
 }: PurchaseTermSelectProps) {
   const opts = withCurrentTermOption(options, value)

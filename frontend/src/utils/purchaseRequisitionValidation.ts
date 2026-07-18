@@ -1,4 +1,5 @@
 import type {
+  PurchaseItemCategory,
   PurchaseRequisition,
   PurchaseRequisitionLine,
   PurchaseRequisitionPriority,
@@ -31,7 +32,13 @@ export type PrEditorHeader = {
   rfqRequired: boolean
 }
 
-export type PrEditorLine = PurchaseRequisitionLine & { key: string }
+export type PrEditorLine = Omit<PurchaseRequisitionLine, 'category'> & {
+  key: string
+  /** Empty until chosen on the row — gates the item catalog for that line. */
+  category: PurchaseItemCategory | ''
+  /** Action Message accept checkbox (planning-sheet style). */
+  actionMessage: boolean
+}
 
 export type PrValidationResult = {
   errors: string[]
@@ -67,7 +74,7 @@ export function validatePurchaseRequisitionForm(
   }
 
   const usableLines = lines.filter(
-    (l) => l.itemName.trim() || l.itemCode.trim() || l.itemId || Number(l.quantity) > 0,
+    (l) => l.itemName.trim() || l.itemCode.trim() || l.itemId,
   )
   if (usableLines.length === 0) {
     errors.push('At least one line is mandatory.')
@@ -75,6 +82,10 @@ export function validatePurchaseRequisitionForm(
 
   for (const line of usableLines) {
     const prefix = `Line ${line.lineNo}`
+    if (!line.category) {
+      errors.push(`${prefix}: Product type is mandatory.`)
+      lineErrors[`${line.key}:category`] = 'Required'
+    }
     if (!line.itemName.trim() && !line.itemCode.trim()) {
       errors.push(`${prefix}: Item or service description is mandatory.`)
       lineErrors[`${line.key}:itemName`] = 'Description required'
@@ -97,14 +108,15 @@ export function validatePurchaseRequisitionForm(
     errors.push('Purpose is mandatory for urgent requisitions.')
     fieldErrors.purpose = 'Required for Urgent'
   }
-  if (header.source === 'work_order' && !header.productionOrderNo.trim()) {
-    errors.push('Production Order is mandatory when source is Production Order.')
-    fieldErrors.productionOrderNo = 'Required'
-  }
-  if (header.source === 'maintenance' && !header.maintenanceOrderNo.trim()) {
-    errors.push('Maintenance Order is mandatory when source is Maintenance.')
-    fieldErrors.maintenanceOrderNo = 'Required'
-  }
+  // Production / Maintenance order fields are hidden in the UI for now.
+  // if (header.source === 'work_order' && !header.productionOrderNo.trim()) {
+  //   errors.push('Production Order is mandatory when source is Production Order.')
+  //   fieldErrors.productionOrderNo = 'Required'
+  // }
+  // if (header.source === 'maintenance' && !header.maintenanceOrderNo.trim()) {
+  //   errors.push('Maintenance Order is mandatory when source is Maintenance.')
+  //   fieldErrors.maintenanceOrderNo = 'Required'
+  // }
 
   const seen = new Map<string, number>()
   for (const line of usableLines) {
@@ -121,7 +133,7 @@ export function validatePurchaseRequisitionForm(
 }
 
 export function summarizePrLines(lines: PrEditorLine[]) {
-  const usable = lines.filter((l) => l.itemName.trim() || l.itemCode.trim() || Number(l.quantity) > 0)
+  const usable = lines.filter((l) => l.itemName.trim() || l.itemCode.trim() || l.itemId)
   const totalQty = usable.reduce((s, l) => s + (Number(l.quantity) || 0), 0)
   const subtotal = usable.reduce((s, l) => s + (Number(l.amount) || 0), 0)
   const taxPct = 18

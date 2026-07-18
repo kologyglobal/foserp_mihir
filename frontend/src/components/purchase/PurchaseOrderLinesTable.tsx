@@ -190,7 +190,7 @@ export function PurchaseOrderLinesTable({
           })
         )}
         {toolbarExtra}
-        <span className="text-[12px] tabular-nums text-erp-muted">
+        <span className="ml-auto text-[12px] tabular-nums text-erp-muted">
           {lines.length} line(s) · Total {formatCurrency(totals.lineTotal)}
           {dirty ? ' · Unsaved' : ''}
         </span>

@@ -163,6 +163,7 @@ export function PurchaseMastersHubPage() {
       description="Procurement setup — linked global and CRM registers plus purchase-specific rules for receiving and returns."
       breadcrumbs={purchaseBreadcrumbs('Masters')}
       favoritePath="/purchase/masters"
+      backLink={{ to: '/purchase', label: 'Back to Purchase' }}
       commandBar={(
         <ErpCommandBar
           sticky={false}

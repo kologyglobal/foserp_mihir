@@ -55,7 +55,7 @@ export function ErpSmartSelect<T extends string = string>({
   options,
   value,
   onChange,
-  placeholder = 'Type to search…',
+  placeholder = '— Select —',
   disabled,
   className,
   emptyMessage = 'No matches found',

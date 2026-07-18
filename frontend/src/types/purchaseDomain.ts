@@ -790,6 +790,22 @@ export interface PurchaseSetupQuality {
   defaultQuarantineWarehouseId: string
 }
 
+/** Defaults applied when creating a new Purchase Requisition. */
+export interface PurchaseSetupRequisition {
+  /** Default location on PR create (Quick Entry). */
+  defaultLocationId: string
+  /**
+   * When true, new PRs default to Skip RFQ (`rfqRequired: false` → direct PO after approval).
+   * When false, RFQ is required after approval.
+   */
+  skipRfq: boolean
+  /**
+   * Auto-complete Reference Number from linked source docs.
+   * Reserved — not wired yet.
+   */
+  autoCompleteRef: boolean
+}
+
 export type PurchasePrintPaperSize = 'A4' | 'Letter'
 export type PurchasePrintOrientation = 'portrait' | 'landscape'
 
@@ -837,6 +853,8 @@ export interface PurchaseSetup {
   allowDirectInvoice: boolean
   receiving: PurchaseSetupReceiving
   quality: PurchaseSetupQuality
+  /** Defaults for Purchase Requisition create (`/purchase/requisitions/new`). */
+  requisition: PurchaseSetupRequisition
   print: PurchaseSetupPrint
   notifications: PurchaseSetupNotifications
   updatedAt: IsoDateTime
@@ -845,6 +863,7 @@ export interface PurchaseSetup {
 
 export type PurchaseSetupTabId =
   | 'general'
+  | 'requisition'
   | 'number_series'
   | 'approval'
   | 'tax'
@@ -856,6 +875,7 @@ export type PurchaseSetupTabId =
 
 export const PURCHASE_SETUP_TAB_LABELS: Record<PurchaseSetupTabId, string> = {
   general: 'General Setup',
+  requisition: 'Requisition Setup',
   number_series: 'Number Series',
   approval: 'Approval Setup',
   tax: 'Tax Setup',
@@ -1132,9 +1152,30 @@ export interface PurchaseRequisitionLine {
   openPoQty: number
   preferredVendorId: string | null
   preferredVendorName: string | null
+  /** Vendor code / number shown on the Complete worksheet. */
+  vendorNumber: string
+  /** Line need-by date on the Complete worksheet. */
   requiredDate: IsoDate
+  /** Planned / actual order date for this line (worksheet). */
+  orderDate: IsoDate
+  /** Requesting customer / project customer (worksheet). */
+  customerName: string
+  /**
+   * Delivery / receiving location for this line.
+   * Backend must persist `locationId` on every PR line (not header-only). Not shown on the grid.
+   */
   locationId: string
   locationName: string
+  /** Warehouse bin / storage location code. */
+  binCode: string
+  /**
+   * Filled when a PO is created from this PR line (future — view-only on PR form).
+   */
+  purchaseOrderNumber: string
+  /**
+   * Linked vendor quotation / RFQ quote number after sourcing (future — view-only).
+   */
+  purchaseQuoteNumber: string
   purpose: string
   remarks: string
   attachmentNote: string
@@ -1176,6 +1217,137 @@ export interface PurchaseRequisition extends PurchaseMoneyTotals, PurchaseAuditF
   estimatedTaxPct: number
   estimatedTaxAmount: number
 }
+
+/* -------------------------------------------------------------------------- */
+/* Purchase Planning Sheet (direct PO path — RFQ not required)                */
+/* -------------------------------------------------------------------------- */
+
+export const PURCHASE_PLANNING_PURCHASE_TYPES = [
+  'direct_purchase',
+  'repeat_purchase',
+  'rate_contract',
+  'emergency_purchase',
+  'local_purchase',
+  'import_purchase',
+] as const
+export type PurchasePlanningPurchaseType = (typeof PURCHASE_PLANNING_PURCHASE_TYPES)[number]
+
+export const PURCHASE_PLANNING_PURCHASE_TYPE_LABELS: Record<PurchasePlanningPurchaseType, string> = {
+  direct_purchase: 'Direct Purchase',
+  repeat_purchase: 'Repeat Purchase',
+  rate_contract: 'Rate Contract',
+  emergency_purchase: 'Emergency Purchase',
+  local_purchase: 'Local Purchase',
+  import_purchase: 'Import Purchase',
+}
+
+export const PURCHASE_PLANNING_PRIORITIES = ['low', 'medium', 'high', 'critical'] as const
+export type PurchasePlanningPriority = (typeof PURCHASE_PLANNING_PRIORITIES)[number]
+
+export const PURCHASE_PLANNING_PRIORITY_LABELS: Record<PurchasePlanningPriority, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  critical: 'Critical',
+}
+
+export const PURCHASE_PLANNING_STATUSES = [
+  'draft',
+  'pending_review',
+  'approved',
+  'vendor_selected',
+  'po_pending',
+  'po_created',
+  'partially_ordered',
+  'completed',
+  'cancelled',
+] as const
+export type PurchasePlanningStatus = (typeof PURCHASE_PLANNING_STATUSES)[number]
+
+export const PURCHASE_PLANNING_STATUS_LABELS: Record<PurchasePlanningStatus, string> = {
+  draft: 'Draft',
+  pending_review: 'Pending Review',
+  approved: 'Approved',
+  vendor_selected: 'Vendor Selected',
+  po_pending: 'PO Pending',
+  po_created: 'PO Created',
+  partially_ordered: 'Partially Ordered',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+}
+
+/**
+ * One row per PR line when `rfqRequired = false`.
+ * RFQ-required PR lines must never appear here.
+ */
+export interface PurchasePlanningSheetRow {
+  id: string
+  planningNumber: string
+  planningDate: IsoDate
+  purchaseRequisitionId: string
+  purchaseRequisitionNumber: string
+  purchaseRequisitionLineId: string
+  department: string
+  requestedById: string
+  requestedByName: string
+  itemId: string
+  itemCode: string
+  itemName: string
+  specification: string
+  /** Product / item type shown as Type column. */
+  itemCategory: PurchaseItemCategory
+  requiredQuantity: number
+  uom: string
+  requiredByDate: IsoDate
+  currentStock: number
+  openPoQuantity: number
+  /** Required Qty − Current Stock − Open PO Qty (floored at 0). */
+  netPurchaseQuantity: number
+  preferredVendorId: string | null
+  preferredVendorName: string | null
+  preferredVendorCode: string | null
+  lastPurchaseVendorId: string | null
+  lastPurchaseVendorName: string | null
+  lastPurchaseRate: number | null
+  expectedRate: number
+  estimatedAmount: number
+  purchaseType: PurchasePlanningPurchaseType
+  priority: PurchasePlanningPriority
+  buyerId: string
+  buyerName: string
+  status: PurchasePlanningStatus
+  purchaseOrderId: string | null
+  purchaseOrderNumber: string | null
+  /** Planned order date (worksheet). */
+  orderDate: IsoDate
+  /** Action Message accept checkbox. */
+  actionMessage: boolean
+  remarks: string
+  createdBy: string
+  createdAt: IsoDateTime
+  updatedBy: string | null
+  updatedAt: IsoDateTime | null
+}
+
+export type PurchasePlanningSheetInput = Partial<
+  Pick<
+    PurchasePlanningSheetRow,
+    | 'specification'
+    | 'requiredQuantity'
+    | 'requiredByDate'
+    | 'preferredVendorId'
+    | 'expectedRate'
+    | 'purchaseType'
+    | 'priority'
+    | 'buyerId'
+    | 'buyerName'
+    | 'remarks'
+    | 'status'
+    | 'orderDate'
+    | 'actionMessage'
+    | 'itemCategory'
+  >
+>
 
 /** Enriched list row for the PR register (includes linked doc numbers). */
 export interface PurchaseRequisitionListRow extends PurchaseRequisition {
@@ -2209,6 +2381,8 @@ export type PurchaseOrderInput = Partial<
   >
 > & {
   vendorId: string
+  /** Optional explicit document number (e.g. from series selection). */
+  documentNumber?: string
   freight?: number
   otherCharges?: number
   discount?: number

@@ -32,7 +32,7 @@ export interface ErpCardSectionProps {
   forceOpenKey?: number
   dense?: boolean
   /** Field grid columns. Dense defaults to 3 (tablet 2 / mobile 1 via CSS). */
-  columns?: 1 | 2 | 3
+  columns?: 1 | 2 | 3 | 4
   accent?: 'blue' | 'teal' | 'green' | 'amber' | 'violet' | 'slate'
 }
 
@@ -145,6 +145,7 @@ export function ErpCardSection({
               gridColumns === 1 && 'erp-card-section__grid--cols-1',
               gridColumns === 2 && 'erp-card-section__grid--cols-2',
               gridColumns === 3 && 'erp-card-section__grid--cols-3',
+              gridColumns === 4 && 'erp-card-section__grid--cols-4',
             )}
           >
             {children}

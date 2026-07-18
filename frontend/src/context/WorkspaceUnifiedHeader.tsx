@@ -2,9 +2,11 @@
 import { Star } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { CrmPageTip } from '../components/crm/CrmPageTip'
+import { PurchasePageTip } from '../components/purchase/PurchasePageTip'
 import { Breadcrumbs } from '../components/ui/Breadcrumbs'
 import { PageBackLink } from '../components/ui/PageBackLink'
 import { getPageLabel } from '../utils/pageNavigation'
+import { isPurchasePath } from '../utils/purchasePageTip'
 import { useUIStore } from '../store/uiStore'
 import { cn } from '../utils/cn'
 import type { WorkspacePageHeaderMeta } from './WorkspacePageHeaderContext'
@@ -38,7 +40,8 @@ export function WorkspaceUnifiedHeader({
   const path = meta.favoritePath ?? pathname
   const fav = path ? isFavorite(path) : false
   const badge = (meta.badge?.trim() || moduleName?.trim() || '').trim()
-  const tip = <CrmPageTip />
+  const showPurchaseTip = isPurchasePath(pathname) || meta.badge === 'Purchase'
+  const tip = showPurchaseTip ? <PurchasePageTip /> : <CrmPageTip />
 
   const hasActions = Boolean(commandBar || actions)
   const recordHeader = Boolean(meta.recordHeader)

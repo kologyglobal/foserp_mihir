@@ -15,6 +15,7 @@ export function PurchaseReportsHubPage() {
       variant="dynamics"
       favoritePath="/purchase/reports"
       breadcrumbs={purchaseBreadcrumbs('Reports')}
+      backLink={{ to: '/purchase', label: 'Back to Purchase' }}
     >
       <div className="space-y-6">
         {catalog.map((group) => (

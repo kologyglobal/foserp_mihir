@@ -8,7 +8,6 @@ import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFil
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpDataGrid } from '@/components/erp/ErpDataGrid'
-import { ErpPageGuide } from '@/components/erp/ErpPageGuide'
 import { TableLink } from '@/components/ui/AppLink'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
@@ -275,10 +274,6 @@ export function VendorQuotationListPage() {
             />
           ) : (
             <>
-              <ErpPageGuide
-                purpose="Vendor quotations are responses to RFQs."
-                nextStep="Submit quotes, then open Comparison to award."
-              />
               <EnterpriseRegisterTableShell className="min-w-0">
                 <ErpDataGrid
                   data={filtered}

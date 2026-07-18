@@ -43,7 +43,11 @@ export function PurchaseDataTable({ children, className }: { children: ReactNode
 }
 
 export function PurchaseTableToolbar({ children }: { children: ReactNode }) {
-  return <div className="mb-3 flex items-center justify-between gap-3 text-sm text-erp-muted">{children}</div>
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-start gap-2 text-sm text-erp-muted">
+      {children}
+    </div>
+  )
 }
 
 export function PurchaseDocTimeline({

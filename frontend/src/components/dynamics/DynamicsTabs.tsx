@@ -121,12 +121,12 @@ function GroupDropdown({
         aria-selected={active}
         aria-expanded={open}
         aria-haspopup="menu"
+        aria-label={activeChild ? `${label}: ${activeChild.label}` : label}
+        title={activeChild ? `${label} — ${activeChild.label}` : label}
         className={cn('dyn-tab dyn-tab-group-trigger', active && 'dyn-tab-active')}
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="min-w-0 truncate">
-          {activeChild ? `${label} · ${activeChild.label}` : label}
-        </span>
+        <span className="min-w-0 truncate">{label}</span>
         <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 opacity-70 transition', open && 'rotate-180')} />
       </button>
       {open

@@ -536,6 +536,7 @@ export function PurchaseInvoiceEditorPage() {
           { label: 'Invoices', to: '/purchase/invoices' },
           { label: 'Loading' },
         ]}
+        backLink={{ to: '/purchase/invoices', label: 'Back to Invoices' }}
         footer={null}
       >
         <LoadingState variant="form" rows={10} />
@@ -605,7 +606,7 @@ export function PurchaseInvoiceEditorPage() {
             <ErpButtonGroup>
               <ErpButton
                 type="button"
-                variant="ghost"
+                variant="secondary"
                 disabled={saving}
                 onClick={() => navigate('/purchase/invoices')}
               >
