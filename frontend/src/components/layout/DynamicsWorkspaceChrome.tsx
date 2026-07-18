@@ -54,6 +54,7 @@ function DynamicsWorkspaceChromeInner({ children }: { children: ReactNode }) {
         visitedAt: '',
       }))
     }
+    // Prefer clean module nav over visit-history tabs (avoids UUID / Edit noise).
     const tabs = recentPages
       .filter((t) => isUsableWorkspaceTab(t.label, t.path))
       .slice(0, 6)
@@ -96,6 +97,16 @@ function DynamicsWorkspaceChromeInner({ children }: { children: ReactNode }) {
     />
   ) : null
 
+  /** Module pages: spaced tab strip under the unified header (not flush under suite bar). */
+  const headerTabs =
+    useModuleTabs && tabsNode ? (
+      <div className="d365-module-nav-band d365-module-nav-band--embedded">
+        <div className="d365-module-nav-band__tabs">{tabsNode}</div>
+      </div>
+    ) : (
+      tabsNode
+    )
+
   return (
     <div className="d365-workspace">
       <div className="d365-workspace-sticky">
@@ -103,7 +114,7 @@ function DynamicsWorkspaceChromeInner({ children }: { children: ReactNode }) {
           meta={headerMeta}
           commandBar={commandBar}
           actions={actions}
-          tabs={tabsNode}
+          tabs={headerTabs}
           pageTitle={pageTitle || activeTabLabel}
           moduleName={module}
         />

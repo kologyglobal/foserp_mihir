@@ -3,11 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { ClipboardCheck, Eye, RefreshCw } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
-import { SmartFilterBar } from '@/components/design-system/SmartFilterBar'
+import { PurchaseSimpleListFilterBar } from '@/components/purchase/PurchaseSimpleListFilterBar'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { Select } from '@/components/forms/Inputs'
-import { SearchInput } from '@/components/ui/SearchInput'
 import { TableLink } from '@/components/ui/AppLink'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { DataTable } from '@/components/tables/DataTable'
@@ -172,31 +170,21 @@ export function QualityInspectionListPage() {
         />
       }
     >
-      <SmartFilterBar
-        className="mb-4"
-        onClearAll={() => {
-          setSearch('')
-          setStatus('')
-        }}
-        resultCount={filtered.length}
-      >
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search QI / GRN / item / batch"
-        />
-        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">All statuses</option>
-          {QUALITY_INSPECTION_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {QUALITY_INSPECTION_STATUS_LABELS[s as QualityInspectionStatus]}
-            </option>
-          ))}
-        </Select>
-      </SmartFilterBar>
+      <PurchaseSimpleListFilterBar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search QI / GRN / item / batch"
+        status={status}
+        onStatusChange={setStatus}
+        statusAriaLabel="Filter quality inspections by status"
+        statusOptions={QUALITY_INSPECTION_STATUSES.map((s) => ({
+          value: s,
+          label: QUALITY_INSPECTION_STATUS_LABELS[s as QualityInspectionStatus],
+        }))}
+      />
 
-      {loading ? (
-        <LoadingState variant="table" rows={6} />
+      {loading && rows.length === 0 ? (
+        <LoadingState variant="table" rows={8} cols={7} />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={ClipboardCheck}

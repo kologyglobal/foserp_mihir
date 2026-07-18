@@ -58,8 +58,8 @@ function buildRowActions(
 ): RowActionItem[] {
   const actions: RowActionItem[] = [
     {
-      id: 'review',
-      label: 'Review',
+      id: 'view',
+      label: 'View',
       icon: Eye,
       onClick: () => handlers.onReview(row),
     },
@@ -77,9 +77,7 @@ function buildRowActions(
         ? canPurchasePermission('purchase.order.approve')
         : canPurchasePermission('purchase.requisition.approve')
     if (canApprove) {
-      actions.splice(
-        1,
-        0,
+      actions.push(
         {
           id: 'approve',
           label: 'Approve',
@@ -137,7 +135,7 @@ export function PurchaseApprovalsTable({
       {
         accessorKey: 'documentNumber',
         header: 'Document',
-        meta: { columnLabel: 'Document Number' },
+        meta: { columnLabel: 'Document' },
         cell: ({ row }) => {
           const r = row.original
           return (
@@ -157,7 +155,7 @@ export function PurchaseApprovalsTable({
       {
         accessorKey: 'requestedBy',
         header: 'Requester',
-        meta: { columnLabel: 'Requested By' },
+        meta: { columnLabel: 'Requester' },
         cell: ({ row }) => (
           <div className="min-w-[8.5rem]">
             <span className="whitespace-nowrap">{row.original.requestedBy}</span>
@@ -199,7 +197,7 @@ export function PurchaseApprovalsTable({
       {
         accessorKey: 'submittedDate',
         header: 'Submitted',
-        meta: { columnLabel: 'Submitted Date' },
+        meta: { columnLabel: 'Submitted' },
         cell: ({ row }) => (
           <span className="whitespace-nowrap tabular-nums text-erp-text">
             {formatDate(row.original.submittedDate.slice(0, 10))}
@@ -209,7 +207,7 @@ export function PurchaseApprovalsTable({
       {
         accessorKey: 'pendingSinceDays',
         header: 'Age',
-        meta: { align: 'right', columnLabel: 'Pending Since' },
+        meta: { align: 'right', columnLabel: 'Age' },
         cell: ({ row }) => {
           const r = row.original
           if (r.status !== 'pending') {
@@ -231,7 +229,7 @@ export function PurchaseApprovalsTable({
       {
         accessorKey: 'approvalLevelLabel',
         header: 'Level',
-        meta: { columnLabel: 'Approval Level' },
+        meta: { columnLabel: 'Level' },
         cell: ({ row }) => (
           <div className="min-w-[7.5rem]">
             <span className="text-[12px] leading-snug text-erp-text">
@@ -281,7 +279,7 @@ export function PurchaseApprovalsTable({
       className={cn('erp-approvals-table', densityClass)}
       data={rows}
       columns={columns}
-      recordLabel="Approvals"
+      recordLabel={undefined}
       emptyMessage={emptyMessage}
       emptyAction={
         emptyAction ??
@@ -302,7 +300,11 @@ export function PurchaseApprovalsTable({
       onRowQuickView={(r) => handlers.onReview(r)}
       registerBar={
         registerFilter ? (
-          <CrmListFilterBar {...registerFilter} className="crm-list-filter-bar--embedded" />
+          <CrmListFilterBar
+            {...registerFilter}
+            showCommandPaletteHint={false}
+            className="crm-list-filter-bar--embedded"
+          />
         ) : undefined
       }
     />

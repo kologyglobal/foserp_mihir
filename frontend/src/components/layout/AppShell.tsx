@@ -80,7 +80,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="d365-app">
+    <div className={cn('d365-app', sidebarCollapsed && 'erp-sidebar-is-collapsed')}>
       <ScrollToTop />
       <BackToTopButton />
       <PageTracker />

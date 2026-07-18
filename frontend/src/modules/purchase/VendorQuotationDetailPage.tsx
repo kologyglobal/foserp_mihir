@@ -254,6 +254,7 @@ export function VendorQuotationDetailPage() {
           { label: 'Vendor Quotations', to: '/purchase/vendor-quotations' },
           { label: 'Loading' },
         ]}
+        backLink={{ to: '/purchase/vendor-quotations', label: 'Back to Vendor Quotations' }}
         footer={null}
         detailMode
       >
@@ -306,6 +307,7 @@ export function VendorQuotationDetailPage() {
         { label: 'Vendor Quotations', to: '/purchase/vendor-quotations' },
         { label: quote.documentNumber },
       ]}
+      backLink={{ to: '/purchase/vendor-quotations', label: 'Back to Vendor Quotations' }}
       createdBy={quote.createdBy}
       createdDate={formatDate(quote.createdAt.slice(0, 10))}
       modifiedBy={quote.updatedBy || undefined}

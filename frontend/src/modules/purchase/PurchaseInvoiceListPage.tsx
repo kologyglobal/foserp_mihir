@@ -27,7 +27,6 @@ import {
   type InvoiceSortKey,
 } from '@/config/invoiceFilterConfig'
 import {
-  buildInvoiceRegisterKpiItems,
   isInvoiceMismatchOrHold,
   isInvoiceNeedsAttention,
   isInvoiceReadyToPost,
@@ -168,14 +167,6 @@ export function PurchaseInvoiceListPage() {
     chipLabelResolver: (key, value) => invoiceFilterChipLabelResolver(key, value),
   })
 
-  const summary = useMemo(() => {
-    const draft = rows.filter((r) => r.status === 'draft').length
-    const pendingApproval = rows.filter((r) => r.status === 'pending_approval').length
-    const mismatchOrHold = rows.filter(isInvoiceMismatchOrHold).length
-    const totalValue = rows.reduce((s, r) => s + r.totalAmount, 0)
-    return { draft, pendingApproval, mismatchOrHold, totalValue }
-  }, [rows])
-
   const filtered = useMemo(() => {
     let list = [...rows]
     const q = filters.search.trim().toLowerCase()
@@ -222,14 +213,6 @@ export function PurchaseInvoiceListPage() {
     }
     return sortInvoiceRows(list, sortBy)
   }, [rows, filters, sortBy])
-
-  const invoiceKpiStrip = useMemo(
-    () =>
-      buildInvoiceRegisterKpiItems(rows, summary, filters.status, (status) =>
-        setFilters((f) => ({ ...f, status })),
-      ),
-    [rows, summary, filters.status],
-  )
 
   const applyStatusFilter = useCallback((status: string) => {
     setFilters((f) => ({ ...f, status }))
@@ -312,7 +295,7 @@ export function PurchaseInvoiceListPage() {
         breadcrumbs={shellBreadcrumbs}
         favoritePath="/purchase/invoices"
       >
-        <LoadingState variant="table" rows={8} />
+        <LoadingState variant="table" rows={8} cols={8} />
       </OperationalPageShell>
     )
   }
@@ -404,9 +387,8 @@ export function PurchaseInvoiceListPage() {
             ]}
           />
         }
-        kpiStrip={invoiceKpiStrip}
       >
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,minmax(0,1fr))_auto] xl:items-start">
           <EnterpriseRegisterTableShell className="min-w-0">
             <PurchaseInvoicesTable
               rows={filtered}
@@ -427,6 +409,7 @@ export function PurchaseInvoiceListPage() {
                 onSavedViewChange: savedViews.selectView,
                 savedViews: savedViews.viewNames,
                 onSaveView: savedViews.openSaveDialog,
+                showCommandPaletteHint: false,
                 sort: (
                   <CrmListSortSelect
                     value={sortBy}

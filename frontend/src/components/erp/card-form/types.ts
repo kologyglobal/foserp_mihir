@@ -75,6 +75,8 @@ export interface ErpCardFormPageProps {
   onSaveAndNewShortcut?: () => void
   /** Hide chrome title — commandBar is a sticky record header */
   workspaceRecordHeader?: boolean
+  /** View/detail back — surfaces at top of workspace header when merged */
+  backLink?: { to: string; label: string }
 }
 
 export interface ErpSubpageColumn<T> {

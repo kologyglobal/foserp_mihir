@@ -6,7 +6,6 @@ import { purchaseBreadcrumbs } from '@/utils/purchaseNavigation'
 
 export function PurchaseReportsHubPage() {
   const catalog = getPurchaseReportCatalog()
-  const totalReports = catalog.reduce((sum, g) => sum + g.reports.length, 0)
 
   return (
     <OperationalPageShell
@@ -16,15 +15,6 @@ export function PurchaseReportsHubPage() {
       variant="dynamics"
       favoritePath="/purchase/reports"
       breadcrumbs={purchaseBreadcrumbs('Reports')}
-      insights={[
-        { label: 'Categories', value: catalog.length, accent: 'blue' },
-        { label: 'Reports', value: totalReports, accent: 'slate' },
-        {
-          label: 'Placeholders',
-          value: catalog.flatMap((g) => g.reports).filter((r) => r.isPlaceholder).length,
-          accent: 'amber',
-        },
-      ]}
     >
       <div className="space-y-6">
         {catalog.map((group) => (

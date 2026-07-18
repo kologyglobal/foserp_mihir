@@ -955,11 +955,17 @@
 
 .enterprise-workspace--dynamics-form .erp-card-form-page__body {
   background: var(--d365-workspace-bg, #f3f2f1);
+  /* Page scrolls in workspace — do not flex-grow an empty dead zone under content */
+  flex: none;
+  min-height: 0;
   overflow: visible;
   overflow-y: visible;
 }
 
 .enterprise-workspace--dynamics-form .erp-card-form-page__form {
+  flex: none;
+  min-height: 0;
+  height: auto;
   overflow: visible;
 }
 
@@ -1968,12 +1974,6 @@
   box-shadow: none;
 }
 
-.enterprise-workspace--dynamics-form .erp-card-form-page__footer-sticky {
-  border-top: none;
-  background: transparent;
-  box-shadow: none;
-}
-
 .enterprise-workspace--dynamics-form .enterprise-workspace__main {
   gap: 10px;
 }
@@ -2355,7 +2355,17 @@
 .enterprise-workspace--dynamics-detail .erp-card-form-page__layout {
   align-items: flex-start;
   gap: 16px;
-  padding: 0 4px 24px;
+  padding: 0 4px 8px;
+}
+
+/* View pages have no sticky save bar — don't stretch the form into empty bottom space */
+.enterprise-workspace--dynamics-detail .erp-card-form-page__form.erp-form-shell-body {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.enterprise-workspace--dynamics-detail .erp-card-form-page__body {
+  padding-bottom: 0;
 }
 
 .enterprise-workspace--dynamics-detail .erp-card-form-page__main {

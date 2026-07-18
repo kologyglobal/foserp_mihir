@@ -368,7 +368,7 @@ export function QuotationComparisonPage() {
         variant="dynamics"
         breadcrumbs={purchaseBreadcrumbs('Comparison')}
       >
-        <LoadingState variant="table" rows={8} />
+        <LoadingState variant="table" rows={8} cols={8} />
       </OperationalPageShell>
     )
   }

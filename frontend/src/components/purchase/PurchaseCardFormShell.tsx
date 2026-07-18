@@ -82,6 +82,9 @@ type PurchaseCardFormShellProps = {
 
   breadcrumbs: { label: string; to?: string }[]
 
+  /** In-page back link (preferred over command-bar Back on view pages). */
+  backLink?: { to: string; label: string }
+
   insights?: PageInsight[]
 
   commandBar?: ReactNode
@@ -217,6 +220,8 @@ export function PurchaseCardFormShell({
   favoritePath,
 
   breadcrumbs,
+
+  backLink,
 
   insights,
 
@@ -422,9 +427,13 @@ export function PurchaseCardFormShell({
 
     showAi: useStickyRecordHeader ? false : undefined,
 
+    backLink,
+
     className: cn(
 
       themeClass,
+
+      'enterprise-workspace--purchase',
 
       factBox && 'enterprise-workspace--purchase-doc-factbox',
 
@@ -434,7 +443,7 @@ export function PurchaseCardFormShell({
 
     ),
 
-    stickyFooter,
+    stickyFooter: Boolean(footer) && stickyFooter,
 
     suppressFactBoxRecord: useStickyRecordHeader ? true : suppressFactBoxRecord,
 

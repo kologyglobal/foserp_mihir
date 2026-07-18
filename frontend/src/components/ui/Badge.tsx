@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { cn } from '../../utils/cn'
+import { statusToneFromLabel } from '../../utils/statusTone'
 
 const colorMap = {
   gray: 'erp-badge-soft-neutral',
@@ -58,79 +59,29 @@ export function Badge({ children, color = 'gray', className, dot, variant = 'sof
   )
 }
 
-export function statusColor(
-  status: string,
-): keyof typeof colorMap {
-  const map: Record<string, keyof typeof colorMap> = {
-    draft: 'gray',
-    open: 'blue',
-    pending: 'yellow',
-    released: 'purple',
-    in_progress: 'blue',
-    'in-progress': 'blue',
-    'in_production': 'blue',
-    'in-production': 'blue',
-    qc_hold: 'orange',
-    'qc-hold': 'orange',
-    rejected: 'red',
-    failed: 'red',
-    completed: 'green',
-    closed: 'green',
-    confirmed: 'blue',
-    engineering: 'purple',
-    'ready-dispatch': 'green',
-    ready_dispatch: 'green',
-    dispatched: 'green',
-    delivered: 'green',
-    planned: 'gray',
-    submitted: 'yellow',
-    approved: 'purple',
-    material_reserved: 'blue',
-    partially_issued: 'yellow',
-    fully_issued: 'green',
-    fg_received: 'green',
-    partially_reserved: 'yellow',
-    issued: 'green',
-    sent: 'blue',
-    partial_received: 'yellow',
-    partial: 'orange',
-    quoted: 'purple',
-    converted: 'green',
-    received: 'green',
-    posted: 'green',
-    invoiced: 'purple',
-    unpaid: 'yellow',
-    paid: 'green',
-    overdue: 'red',
-    cancelled: 'red',
-    obsolete: 'gray',
-    investigating: 'orange',
-    resolved: 'green',
-    critical: 'red',
-    major: 'orange',
-    minor: 'yellow',
-    high: 'orange',
-    medium: 'yellow',
-    low: 'gray',
-    available: 'green',
-    'low stock': 'red',
-    'low-stock': 'red',
-    reserved: 'blue',
-    quarantine: 'orange',
-    'out of stock': 'red',
-    'out-of-stock': 'red',
-    passed: 'green',
-    rework: 'orange',
-    ready: 'green',
-    loading: 'yellow',
-    in_transit: 'blue',
-    'qc-pending': 'yellow',
-    'on-hold': 'red',
-    'under-review': 'purple',
-    implemented: 'green',
+/** Maps status strings to Badge colors via the shared statusTone rules. */
+export function statusColor(status: string): keyof typeof colorMap {
+  const s = status.toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim()
+
+  // Priority / severity (not document workflow)
+  if (['high', 'major', 'quarantine', 'rework', 'qc hold'].some((k) => s === k || s.includes(k))) {
+    return 'orange'
   }
-  return map[status.toLowerCase()] ?? 'gray'
+  if (s === 'medium' || s === 'minor') return 'yellow'
+  if (s === 'low') return 'gray'
+
+  const tone = statusToneFromLabel(status)
+  const toneToColor: Record<StatusToneColor, keyof typeof colorMap> = {
+    success: 'green',
+    warning: 'yellow',
+    danger: 'red',
+    info: 'blue',
+    neutral: 'gray',
+  }
+  return toneToColor[tone] ?? 'gray'
 }
+
+type StatusToneColor = 'success' | 'warning' | 'danger' | 'info' | 'neutral'
 
 export function formatStatus(status: string): string {
   return status

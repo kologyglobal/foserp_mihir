@@ -1,26 +1,40 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Eye, FilePlus2, Plus, Printer, RefreshCw, Send, XCircle } from 'lucide-react'
+import { Eye, Pencil, Plus, Printer, RefreshCw, Send, Trash2 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
-import { SmartFilterBar } from '@/components/design-system/SmartFilterBar'
+import { CrmFilterDrawer } from '@/components/crm/CrmFilterDrawer'
+import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFilterBar'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { Select } from '@/components/forms/Inputs'
-import { SearchInput } from '@/components/ui/SearchInput'
+import { ErpDataGrid } from '@/components/erp/ErpDataGrid'
+import { ErpPageGuide } from '@/components/erp/ErpPageGuide'
 import { TableLink } from '@/components/ui/AppLink'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { DataTable } from '@/components/tables/DataTable'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
 import {
   EnterpriseRowActionsMenu,
   type RowActionItem,
 } from '@/design-system/enterprise/EnterpriseTablePrimitives'
 import {
+  buildRfqFilterFields,
+  crmValuesToRfqFilters,
+  DEFAULT_RFQ_LIST_FILTERS,
+  filterRfqRows,
+  hasActiveRfqFilters,
+  RFQ_SORT_OPTIONS,
+  rfqFilterChipLabelResolver,
+  rfqFiltersToCrmValues,
+  sortRfqRows,
+  type RfqListFilters,
+  type RfqSortKey,
+} from '@/config/rfqFilterConfig'
+import { useCrmFilterDrawer } from '@/hooks/useCrmFilterDrawer'
+import {
   cancelRFQ,
   getRfqList,
   PurchaseServiceError,
-  RFQ_DOMAIN_STATUS_LABELS,
 } from '@/services/purchase'
 import type { RfqListRow } from '@/types/purchaseDomain'
 import { formatCurrency } from '@/utils/formatters/currency'
@@ -34,8 +48,8 @@ export function RfqListPage() {
   const [rows, setRows] = useState<RfqListRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
+  const [filters, setFilters] = useState<RfqListFilters>(DEFAULT_RFQ_LIST_FILTERS)
+  const [sortBy, setSortBy] = useState<RfqSortKey>('documentDate')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -54,27 +68,41 @@ export function RfqListPage() {
     void load()
   }, [load])
 
-  const filtered = useMemo(() => {
-    let list = [...rows]
-    if (status) list = list.filter((r) => r.status === status)
-    if (search.trim()) {
-      const q = search.trim().toLowerCase()
-      list = list.filter(
-        (r) =>
-          r.documentNumber.toLowerCase().includes(q) ||
-          r.buyerName.toLowerCase().includes(q) ||
-          r.locationName.toLowerCase().includes(q) ||
-          r.purchaseRequisitionNumbers.some((n) => n.toLowerCase().includes(q)),
-      )
-    }
-    return list
-  }, [rows, search, status])
+  const buyerOptions = useMemo(
+    () => [...new Set(rows.map((r) => r.buyerName).filter(Boolean))].sort(),
+    [rows],
+  )
+  const locationOptions = useMemo(
+    () => [...new Set(rows.map((r) => r.locationName).filter(Boolean))].sort(),
+    [rows],
+  )
+  const filterFields = useMemo(
+    () => buildRfqFilterFields({ buyerOptions, locationOptions }),
+    [buyerOptions, locationOptions],
+  )
+
+  const filterDrawer = useCrmFilterDrawer({
+    values: rfqFiltersToCrmValues(filters),
+    onChange: (next) => setFilters(crmValuesToRfqFilters(next)),
+    fields: filterFields,
+    defaults: rfqFiltersToCrmValues(DEFAULT_RFQ_LIST_FILTERS),
+    chipLabelResolver: rfqFilterChipLabelResolver,
+  })
+
+  const filtered = useMemo(
+    () => sortRfqRows(filterRfqRows(rows, filters), sortBy),
+    [rows, filters, sortBy],
+  )
+
+  const clearFilters = () => filterDrawer.clearAll()
+  const activeFilters = hasActiveRfqFilters(filters)
 
   const columns = useMemo<ColumnDef<RfqListRow>[]>(
     () => [
       {
         accessorKey: 'documentNumber',
         header: 'RFQ Number',
+        meta: { columnLabel: 'RFQ Number' },
         cell: ({ row }) => (
           <TableLink to={`/purchase/rfqs/${row.original.id}`} className="font-mono">
             {row.original.documentNumber}
@@ -84,28 +112,41 @@ export function RfqListPage() {
       {
         accessorKey: 'documentDate',
         header: 'RFQ Date',
+        meta: { columnLabel: 'RFQ Date' },
         cell: ({ row }) => formatDate(row.original.documentDate),
       },
       {
         accessorKey: 'bidDueDate',
         header: 'Enquiry Due Date',
+        meta: { columnLabel: 'Enquiry Due Date' },
         cell: ({ row }) => formatDate(row.original.bidDueDate),
       },
-      { accessorKey: 'buyerName', header: 'Buyer' },
-      { accessorKey: 'locationName', header: 'Location' },
+      {
+        accessorKey: 'buyerName',
+        header: 'Buyer',
+        meta: { columnLabel: 'Buyer' },
+      },
+      {
+        accessorKey: 'locationName',
+        header: 'Location',
+        meta: { columnLabel: 'Location' },
+      },
       {
         accessorKey: 'vendorCount',
         header: 'Vendor Count',
+        meta: { columnLabel: 'Vendor Count' },
         cell: ({ row }) => row.original.vendorCount,
       },
       {
         accessorKey: 'itemCount',
         header: 'Item Count',
+        meta: { columnLabel: 'Item Count' },
         cell: ({ row }) => row.original.itemCount,
       },
       {
         accessorKey: 'estimatedValue',
         header: 'Estimated Value',
+        meta: { columnLabel: 'Estimated Value' },
         cell: ({ row }) => (
           <span className="tabular-nums">{formatCurrency(row.original.estimatedValue)}</span>
         ),
@@ -113,12 +154,14 @@ export function RfqListPage() {
       {
         accessorKey: 'responsesReceived',
         header: 'Responses Received',
+        meta: { columnLabel: 'Responses Received' },
         cell: ({ row }) =>
           `${row.original.responsesReceived}/${row.original.vendorCount || 0}`,
       },
       {
         accessorKey: 'statusLabel',
         header: 'Status',
+        meta: { columnLabel: 'Status' },
         cell: ({ row }) => (
           <StatusDot
             label={row.original.statusLabel}
@@ -128,9 +171,13 @@ export function RfqListPage() {
       },
       {
         id: 'actions',
-        header: 'Actions',
+        header: '',
+        enableHiding: false,
+        enableSorting: false,
         cell: ({ row }) => {
           const r = row.original
+          const isDraft = r.status === 'draft'
+          const statusLabel = r.statusLabel || r.status
           const actions: RowActionItem[] = [
             {
               id: 'view',
@@ -138,41 +185,43 @@ export function RfqListPage() {
               icon: Eye,
               onClick: () => navigate(`/purchase/rfqs/${r.id}`),
             },
+            {
+              id: 'edit',
+              label: 'Edit',
+              icon: Pencil,
+              onClick: () => navigate(`/purchase/rfqs/${r.id}/edit`),
+              disabled: !isDraft,
+              disabledReason: `${statusLabel} RFQs cannot be edited`,
+            },
+            {
+              id: 'delete',
+              label: 'Delete',
+              icon: Trash2,
+              danger: true,
+              disabled: !isDraft,
+              disabledReason: `${statusLabel} RFQs cannot be deleted`,
+              onClick: () => {
+                void (async () => {
+                  try {
+                    await cancelRFQ(r.id)
+                    notify.success(`${r.documentNumber} cancelled`)
+                    await load()
+                  } catch (err) {
+                    notify.error(
+                      err instanceof PurchaseServiceError ? err.message : 'Cancel failed',
+                    )
+                  }
+                })()
+              },
+            },
           ]
-          if (r.status === 'draft') {
-            actions.push(
-              {
-                id: 'edit',
-                label: 'Edit',
-                icon: FilePlus2,
-                onClick: () => navigate(`/purchase/rfqs/${r.id}/edit`),
-              },
-              {
-                id: 'send',
-                label: 'Send RFQ',
-                icon: Send,
-                onClick: () => navigate(`/purchase/rfqs/${r.id}?send=1`),
-              },
-              {
-                id: 'cancel',
-                label: 'Cancel',
-                icon: XCircle,
-                danger: true,
-                onClick: () => {
-                  void (async () => {
-                    try {
-                      await cancelRFQ(r.id)
-                      notify.success(`${r.documentNumber} cancelled`)
-                      await load()
-                    } catch (err) {
-                      notify.error(
-                        err instanceof PurchaseServiceError ? err.message : 'Cancel failed',
-                      )
-                    }
-                  })()
-                },
-              },
-            )
+          if (isDraft) {
+            actions.push({
+              id: 'send',
+              label: 'Send RFQ',
+              icon: Send,
+              onClick: () => navigate(`/purchase/rfqs/${r.id}?send=1`),
+            })
           }
           actions.push({
             id: 'print',
@@ -187,92 +236,141 @@ export function RfqListPage() {
     [load, navigate],
   )
 
-  return (
-    <OperationalPageShell
-      title="Requests for Quotation"
-      description="Vendor enquiry documents — from approved PRs, manual entry, or combined requisitions"
-      badge="Purchase"
-      variant="dynamics"
-      favoritePath="/purchase/rfqs"
-      commandBar={
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={
-            perms.canCreateRfq
-              ? {
-                  id: 'create',
-                  label: 'Create RFQ',
-                  icon: Plus,
-                  onClick: () => navigate('/purchase/rfqs/new'),
-                }
-              : undefined
-          }
-          secondaryActions={[
-            {
-              id: 'refresh',
-              label: 'Refresh',
-              icon: RefreshCw,
-              onClick: () => void load(),
-            },
-          ]}
-        />
-      }
-    >
-      <SmartFilterBar
-        className="mb-4"
-        onClearAll={() => {
-          setSearch('')
-          setStatus('')
-        }}
-        resultCount={filtered.length}
-      >
-        <SearchInput value={search} onChange={setSearch} placeholder="Search RFQ / buyer / PR" />
-        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">All statuses</option>
-          {Object.entries(RFQ_DOMAIN_STATUS_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </Select>
-      </SmartFilterBar>
+  const shellProps = {
+    title: 'Requests for Quotation',
+    description: 'Vendor enquiry documents — from approved PRs, manual entry, or combined requisitions',
+    badge: 'Purchase' as const,
+    variant: 'dynamics' as const,
+    favoritePath: '/purchase/rfqs',
+    pageGuide: null,
+  }
 
-      {loading ? (
-        <LoadingState variant="table" rows={8} />
-      ) : error ? (
-        <EmptyState
-          icon={Send}
-          title="Could not load RFQs"
-          description={error}
-          action={
-            <button
-              type="button"
-              className="rounded-md bg-erp-primary px-3 py-2 text-[13px] font-semibold text-white"
-              onClick={() => void load()}
-            >
-              Retry
-            </button>
-          }
-        />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={Send}
-          title="No RFQs found"
-          description="Create from an approved PR, manually, or combine multiple requisitions."
-          action={
-            <button
-              type="button"
-              className="rounded-md bg-erp-primary px-3 py-2 text-[13px] font-semibold text-white"
-              onClick={() => navigate('/purchase/rfqs/new')}
-            >
-              Create RFQ
-            </button>
-          }
-        />
+  const commandBar = (
+    <ErpCommandBar
+      inline
+      sticky={false}
+      primaryAction={
+        perms.canCreateRfq
+          ? {
+              id: 'create',
+              label: 'Create RFQ',
+              icon: Plus,
+              onClick: () => navigate('/purchase/rfqs/new'),
+            }
+          : undefined
+      }
+      secondaryActions={[
+        {
+          id: 'refresh',
+          label: 'Refresh',
+          icon: RefreshCw,
+          onClick: () => void load(),
+        },
+      ]}
+    />
+  )
+
+  const emptyAction = (
+    <div className="flex flex-wrap justify-center gap-2">
+      {rows.length === 0 && perms.canCreateRfq ? (
+        <button
+          type="button"
+          className="erp-btn erp-btn--primary text-[13px]"
+          onClick={() => navigate('/purchase/rfqs/new')}
+        >
+          Create RFQ
+        </button>
+      ) : null}
+      {activeFilters ? (
+        <button type="button" className="erp-btn erp-btn--secondary text-[13px]" onClick={clearFilters}>
+          Clear Filters
+        </button>
+      ) : null}
+    </div>
+  )
+
+  return (
+    <>
+      {loading && rows.length === 0 ? (
+        <OperationalPageShell {...shellProps}>
+          <LoadingState variant="table" rows={8} cols={8} />
+        </OperationalPageShell>
       ) : (
-        <DataTable data={filtered} columns={columns} />
+        <OperationalPageShell {...shellProps} commandBar={commandBar}>
+          {error ? (
+            <EmptyState
+              icon={Send}
+              title="Could not load RFQs"
+              description={error}
+              action={
+                <button
+                  type="button"
+                  className="erp-btn erp-btn--primary text-[13px]"
+                  onClick={() => void load()}
+                >
+                  Retry
+                </button>
+              }
+            />
+          ) : (
+            <>
+              <ErpPageGuide
+                purpose="RFQs collect vendor quotes from approved PRs or manual entry."
+                nextStep="Send RFQ, capture vendor quotations, then compare."
+              />
+              <EnterpriseRegisterTableShell className="min-w-0">
+                <ErpDataGrid
+                  data={filtered}
+                  columns={columns}
+                  showCompactSearch={false}
+                  enableColumnSorting={false}
+                  stickyFirstColumn
+                  emptyMessage={
+                    activeFilters
+                      ? 'No RFQs match current filters.'
+                      : 'No RFQs found. Create from an approved PR, manually, or combine multiple requisitions.'
+                  }
+                  emptyAction={emptyAction}
+                  getRowId={(r) => r.id}
+                  registerBar={
+                    <CrmListFilterBar
+                      search={filters.search}
+                      onSearchChange={(search) => setFilters((f) => ({ ...f, search }))}
+                      searchPlaceholder="Search RFQ / buyer / PR"
+                      activeFilterCount={filterDrawer.activeCount}
+                      onOpenFilters={filterDrawer.openDrawer}
+                      chips={filterDrawer.chips}
+                      onRemoveChip={filterDrawer.removeChip}
+                      onClearAll={clearFilters}
+                      className="crm-list-filter-bar--embedded"
+                      showCommandPaletteHint={false}
+                      sort={
+                        <CrmListSortSelect
+                          value={sortBy}
+                          onChange={(v) => setSortBy(v as RfqSortKey)}
+                          aria-label="Sort RFQs"
+                          options={RFQ_SORT_OPTIONS}
+                        />
+                      }
+                    />
+                  }
+                />
+              </EnterpriseRegisterTableShell>
+            </>
+          )}
+        </OperationalPageShell>
       )}
-    </OperationalPageShell>
+
+      <CrmFilterDrawer
+        open={filterDrawer.open}
+        onClose={filterDrawer.closeDrawer}
+        title="Filter RFQs"
+        fields={filterFields}
+        values={filterDrawer.draft}
+        onChange={(next) => filterDrawer.setDraft({ ...filterDrawer.draft, ...next })}
+        onApply={filterDrawer.applyFilters}
+        onReset={filterDrawer.resetDraft}
+      />
+    </>
   )
 }

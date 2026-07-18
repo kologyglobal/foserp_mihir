@@ -76,6 +76,7 @@ export function buildPoFilterFields(input: {
   buyerOptions: string[]
 }): CrmFilterField[] {
   return [
+    { type: 'section', label: 'Status & workflow' },
     {
       type: 'select',
       key: 'status',
@@ -87,27 +88,6 @@ export function buildPoFilterFields(input: {
         })),
         ...PO_COMPOSITE_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
       ],
-    },
-    {
-      type: 'search-select',
-      key: 'vendorName',
-      label: 'Vendor',
-      options: input.vendorOptions.map((v) => ({ value: v, label: v })),
-      placeholder: 'Search vendor…',
-    },
-    {
-      type: 'search-select',
-      key: 'locationName',
-      label: 'Location',
-      options: input.locationOptions.map((l) => ({ value: l, label: l })),
-      placeholder: 'Search location…',
-    },
-    {
-      type: 'search-select',
-      key: 'buyerName',
-      label: 'Buyer',
-      options: input.buyerOptions.map((b) => ({ value: b, label: b })),
-      placeholder: 'Search buyer…',
     },
     {
       type: 'select',
@@ -136,6 +116,29 @@ export function buildPoFilterFields(input: {
         label,
       })),
     },
+    { type: 'section', label: 'Parties & location' },
+    {
+      type: 'search-select',
+      key: 'vendorName',
+      label: 'Vendor',
+      options: input.vendorOptions.map((v) => ({ value: v, label: v })),
+      placeholder: 'Search vendor…',
+    },
+    {
+      type: 'search-select',
+      key: 'locationName',
+      label: 'Location',
+      options: input.locationOptions.map((l) => ({ value: l, label: l })),
+      placeholder: 'Search location…',
+    },
+    {
+      type: 'search-select',
+      key: 'buyerName',
+      label: 'Buyer',
+      options: input.buyerOptions.map((b) => ({ value: b, label: b })),
+      placeholder: 'Search buyer…',
+    },
+    { type: 'section', label: 'Dates' },
     {
       type: 'date-range',
       label: 'PO Date',

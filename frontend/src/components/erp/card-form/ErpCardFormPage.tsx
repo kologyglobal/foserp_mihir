@@ -59,6 +59,7 @@ export function ErpCardFormPage({
   onSaveCloseShortcut,
   onSaveAndNewShortcut,
   workspaceRecordHeader = false,
+  backLink,
 }: ErpCardFormPageProps) {
   const { pathname } = useLocation()
   const toggleFavorite = useUIStore((s) => s.toggleFavorite)
@@ -169,6 +170,7 @@ export function ErpCardFormPage({
       commandBar={commandBar}
       actions={headerActions}
       workspaceRecordHeader={workspaceRecordHeader}
+      backLink={backLink}
     >
       {actionRow ? <div className="erp-card-form-page__action-row">{actionRow}</div> : null}
 
@@ -186,8 +188,10 @@ export function ErpCardFormPage({
         <ErpFormValidationSummary errors={validationErrors} lockedReason={lockedReason} className="mb-3" />
 
         <div className={cn(
-          'erp-card-form-page__body erp-form-shell-content erp-form-shell-content--padded min-h-0 flex-1 overflow-y-auto',
-          stickyFooter ? 'pb-28' : 'pb-4',
+          'erp-card-form-page__body erp-form-shell-content erp-form-shell-content--padded min-h-0',
+          stickyFooter
+            ? 'erp-card-form-page__body--sticky-footer flex-1 overflow-y-auto'
+            : 'pb-4',
         )}>
           <FactBoxPaneProvider
             open={factBoxOpen}

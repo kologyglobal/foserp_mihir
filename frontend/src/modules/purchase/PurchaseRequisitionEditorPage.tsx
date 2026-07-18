@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft,
   ArrowRight,
   Banknote,
   Eye,
@@ -47,7 +46,7 @@ import {
 } from '@/components/erp/card-form'
 import { EnterpriseFormMetrics } from '@/design-system/workspace'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { ErpButton } from '@/components/erp/ErpButton'
+import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
 import { Input, Textarea, Select } from '@/components/forms/Inputs'
 import {
   approvalActivitySummary,
@@ -268,7 +267,7 @@ export function PurchaseRequisitionEditorPage() {
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [attemptedSubmit, setAttemptedSubmit] = useState(false)
   const [workspace, setWorkspace] = useState<PrEditorWorkspace>('requisition')
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+  const [, setLastSavedAt] = useState<Date | null>(null)
   const [forceOpenAdditionalKey, setForceOpenAdditionalKey] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -414,9 +413,11 @@ export function PurchaseRequisitionEditorPage() {
 
   const recordHeaderFacts = useMemo(
     () => [
-      ...(isNew
-        ? [{ label: 'PR No', value: documentNumber ?? 'Auto-generated' }]
-        : []),
+      ...(documentNumber
+        ? [{ label: 'PR No', value: documentNumber }]
+        : isNew
+          ? [{ label: 'PR No', value: 'Auto-generated on save' }]
+          : []),
       { label: 'Department', value: departmentFact },
       { label: 'Requester', value: header.requesterName },
       {
@@ -786,6 +787,7 @@ export function PurchaseRequisitionEditorPage() {
       statusKey={status}
       recordHeaderFacts={recordHeaderFacts}
       favoritePath={recordId ? `/purchase/requisitions/${recordId}/edit` : '/purchase/requisitions/new'}
+      backLink={{ to: '/purchase/requisitions', label: 'Back to Requisitions' }}
       breadcrumbs={[
         { label: 'Requisitions', to: '/purchase/requisitions' },
         { label: isNew ? 'New' : documentNumber ?? 'Edit' },
@@ -820,25 +822,37 @@ export function PurchaseRequisitionEditorPage() {
         })),
       ]}
       commandBar={
-        <div className="relative flex flex-wrap items-center gap-2">
+        <>
           <ErpCommandBar
             inline
             sticky={false}
+            collapseSecondaryOnNarrow={false}
+            primaryAction={
+              perms.canSubmitRequisition
+                ? {
+                    id: 'submit',
+                    label: 'Submit for Approval',
+                    icon: Send,
+                    onClick: () => void submitForApproval(),
+                    disabled: !editable || saving || (attemptedSubmit && validation.errors.length > 0),
+                    disabledReason:
+                      attemptedSubmit && validation.errors.length
+                        ? 'Fix validation errors first'
+                        : !editable
+                          ? 'Document is read-only'
+                          : undefined,
+                  }
+                : undefined
+            }
             secondaryActions={[
-              {
-                id: 'back',
-                label: 'Back',
-                icon: ArrowLeft,
-                onClick: () => navigate('/purchase/requisitions'),
-              },
               {
                 id: 'draft',
                 label: saving ? 'Saving…' : 'Save Draft',
                 icon: Save,
+                pin: true,
                 onClick: () => void saveDraft(true),
                 disabled: !editable || saving,
                 disabledReason: editable ? undefined : 'Document is read-only',
-                pin: true,
               },
               {
                 id: 'print',
@@ -882,23 +896,6 @@ export function PurchaseRequisitionEditorPage() {
                 disabled: !editable || saving,
               },
             ]}
-            primaryAction={
-              perms.canSubmitRequisition
-                ? {
-                    id: 'submit',
-                    label: 'Submit for Approval',
-                    icon: Send,
-                    onClick: () => void submitForApproval(),
-                    disabled: !editable || saving || (attemptedSubmit && validation.errors.length > 0),
-                    disabledReason:
-                      attemptedSubmit && validation.errors.length
-                        ? 'Fix validation errors first'
-                        : !editable
-                          ? 'Document is read-only'
-                          : undefined,
-                  }
-                : undefined
-            }
           />
           <input
             ref={fileInputRef}
@@ -912,14 +909,14 @@ export function PurchaseRequisitionEditorPage() {
               e.target.value = ''
             }}
           />
-        </div>
+        </>
       }
       factBox={
         <PurchaseEnterpriseFactBox
           title="PR insight"
           metrics={formMetrics}
           summary={[
-            { label: 'PR No.', value: documentNumber ?? 'Auto on save' },
+            { label: 'PR No.', value: documentNumber ?? 'Auto-generated on save' },
             { label: 'Status', value: PURCHASE_REQUISITION_STATUS_LABELS[status] },
             {
               label: 'Department',
@@ -983,36 +980,58 @@ export function PurchaseRequisitionEditorPage() {
       footer={
         <ErpStickySaveBar
           sticky
-          hint={
-            <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
-              {dirty ? (
-                <span className="font-medium text-erp-warning-fg">Unsaved changes</span>
-              ) : (
-                <span className="text-erp-muted">All changes saved</span>
-              )}
-              {lastSavedAt ? (
-                <span className="text-erp-muted">
-                  Last saved{' '}
-                  {lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              ) : null}
-            </span>
-          }
-          onSaveDraft={() => void saveDraft(true)}
-          saveDraftLabel={saving ? 'Saving…' : 'Save Draft'}
-          onSave={() => void submitForApproval()}
-          submitLabel="Submit for Approval"
           isSubmitting={saving}
-          submitDisabled={!editable || saving || (attemptedSubmit && validation.errors.length > 0)}
-          submitDisabledReason={
-            !editable
-              ? 'Document is read-only'
-              : attemptedSubmit && validation.errors.length
-                ? 'Fix validation errors first'
-                : undefined
-          }
-          cancelLabel="Back"
+          cancelLabel="Cancel"
           onCancel={() => navigate('/purchase/requisitions')}
+          actions={
+            <ErpButtonGroup>
+              <ErpButton
+                type="button"
+                variant="ghost"
+                disabled={saving}
+                onClick={() => navigate('/purchase/requisitions')}
+              >
+                Cancel
+              </ErpButton>
+              <ErpButton
+                type="button"
+                variant="secondary"
+                icon={Save}
+                disabled={!editable || saving}
+                onClick={() => void saveDraft(true)}
+              >
+                {saving ? 'Saving…' : 'Save Draft'}
+              </ErpButton>
+              {workspace === 'requisition' ? (
+                <ErpButton
+                  type="button"
+                  variant="primary"
+                  icon={ArrowRight}
+                  disabled={!editable || saving}
+                  onClick={() => setWorkspace('line_items')}
+                >
+                  Continue to Line Items
+                </ErpButton>
+              ) : (
+                <ErpButton
+                  type="button"
+                  variant="primary"
+                  icon={Send}
+                  disabled={!editable || saving || (attemptedSubmit && validation.errors.length > 0)}
+                  disabledReason={
+                    !editable
+                      ? 'Document is read-only'
+                      : attemptedSubmit && validation.errors.length
+                        ? 'Fix validation errors first'
+                        : undefined
+                  }
+                  onClick={() => void submitForApproval()}
+                >
+                  Submit for Approval
+                </ErpButton>
+              )}
+            </ErpButtonGroup>
+          }
         />
       }
       onSaveShortcut={() => void saveDraft(true)}
@@ -1045,7 +1064,12 @@ export function PurchaseRequisitionEditorPage() {
               <p className="erp-field-group__label">Document</p>
             </ErpFormSpan>
             <ErpFieldRow label="PR Number" readOnly>
-              <Input value={documentNumber ?? 'Auto-generated'} readOnly className="bg-erp-surface-alt" />
+              <Input
+                value={documentNumber ?? ''}
+                placeholder="Auto-generated on save"
+                readOnly
+                className="bg-erp-surface-alt"
+              />
             </ErpFieldRow>
             <ErpFieldRow label="PR Date" required>
               <Input
@@ -1338,26 +1362,6 @@ export function PurchaseRequisitionEditorPage() {
               )}
             </div>
           </ErpCardSection>
-
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-erp-border pt-3">
-            <ErpButton
-              type="button"
-              variant="secondary"
-              icon={Save}
-              disabled={!editable || saving}
-              onClick={() => void saveDraft(true)}
-            >
-              {saving ? 'Saving…' : 'Save Draft'}
-            </ErpButton>
-            <ErpButton
-              type="button"
-              variant="primary"
-              icon={ArrowRight}
-              onClick={() => setWorkspace('line_items')}
-            >
-              Continue to Line Items
-            </ErpButton>
-          </div>
         </div>
       ) : (
         <div

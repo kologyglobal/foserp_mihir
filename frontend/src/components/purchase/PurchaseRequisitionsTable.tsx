@@ -8,6 +8,7 @@ import {
   Printer,
   Send,
   ShoppingCart,
+  Trash2,
   Truck,
 } from 'lucide-react'
 import { ErpDataGrid } from '../erp/ErpDataGrid'
@@ -100,7 +101,7 @@ function buildRowActions(
             ? 'Cancelled documents are read-only'
             : isConverted
               ? 'Converted documents are read-only'
-              : 'Edit is only available for Draft or Rejected',
+              : `${row.statusLabel || status} purchase requisitions cannot be edited`,
     },
     {
       id: 'duplicate',
@@ -146,19 +147,36 @@ function buildRowActions(
     },
     { id: 'print', label: 'Print', icon: Printer, onClick: () => handlers.onPrint(row) },
     {
+      id: 'delete',
+      label: 'Delete',
+      icon: Trash2,
+      onClick: () => handlers.onCancel(row),
+      danger: true,
+      disabled: !canEditPerm || !canCancel || status !== 'draft',
+      disabledReason: !canEditPerm
+        ? getPurchasePermissionDenialReason('purchase.requisition.edit')
+        : status !== 'draft'
+          ? `${row.statusLabel || status} purchase requisitions cannot be deleted`
+          : isCancelled
+            ? 'Already cancelled'
+            : 'Cannot delete this status',
+    },
+    {
       id: 'cancel',
       label: 'Cancel',
       icon: Ban,
       onClick: () => handlers.onCancel(row),
       danger: true,
-      disabled: !canEditPerm || !canCancel,
+      disabled: !canEditPerm || !canCancel || status === 'draft',
       disabledReason: !canEditPerm
         ? getPurchasePermissionDenialReason('purchase.requisition.edit')
-        : isCancelled
-          ? 'Already cancelled'
-          : isConverted
-            ? 'Converted documents cannot be cancelled'
-            : 'Cannot cancel this status',
+        : status === 'draft'
+          ? 'Use Delete for draft requisitions'
+          : isCancelled
+            ? 'Already cancelled'
+            : isConverted
+              ? 'Converted documents cannot be cancelled'
+              : `${row.statusLabel || status} purchase requisitions cannot be cancelled`,
     },
   ]
 }
@@ -380,7 +398,7 @@ export function PurchaseRequisitionsTable({
       className={cn('erp-pr-table', densityClass)}
       data={rows}
       columns={columns}
-      recordLabel="Purchase Requisitions"
+      recordLabel={undefined}
       emptyMessage={emptyMessage}
       emptyAction={
         emptyAction ?? (
@@ -404,7 +422,11 @@ export function PurchaseRequisitionsTable({
       onRowQuickView={handlers.onView}
       registerBar={
         registerFilter ? (
-          <CrmListFilterBar {...registerFilter} className="crm-list-filter-bar--embedded" />
+          <CrmListFilterBar
+            {...registerFilter}
+            showCommandPaletteHint={false}
+            className="crm-list-filter-bar--embedded"
+          />
         ) : undefined
       }
     />

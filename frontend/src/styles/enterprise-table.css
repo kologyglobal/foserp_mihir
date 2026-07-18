@@ -167,8 +167,8 @@
 
 /* ── Row actions ── */
 .ent-data-grid .ent-row-actions__trigger {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
 }
 
 /* ── Sticky header (per-cell — avoids thead/body bleed-through) ── */
@@ -259,11 +259,11 @@
   background-color: #ecfdf5;
 }
 
-/* Sticky compact actions column (⋯ menu) */
+/* Sticky actions column — stays on the right while other columns scroll */
 .ent-data-grid .erp-table-has-actions-col .erp-table-actions-cell {
   position: sticky;
   right: 0;
-  z-index: 4;
+  z-index: 5;
   width: 52px;
   min-width: 52px;
   max-width: 52px;
@@ -273,12 +273,16 @@
   vertical-align: middle;
   cursor: default;
   background-color: #fff;
-  box-shadow: -4px 0 8px rgb(15 23 42 / 0.06);
+  box-shadow: -6px 0 10px rgb(15 23 42 / 0.07);
 }
 
 .ent-data-grid .erp-table-has-actions-col thead .erp-table-actions-cell {
-  z-index: 30;
+  z-index: 31;
   background: var(--ent-th-bg, #f8fafc);
+}
+
+.ent-data-grid--register .erp-table-has-actions-col thead .erp-table-actions-cell {
+  background: #ffffff;
 }
 
 .ent-data-grid .erp-table-has-actions-col.erp-table-zebra tbody tr:nth-child(even) .erp-table-actions-cell {
@@ -297,7 +301,7 @@
 .ent-data-grid .erp-table-actions-cell .ent-row-actions {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   width: 100%;
   min-height: 32px;
   vertical-align: middle;
@@ -305,9 +309,37 @@
 
 /* ── Register filter bar (embedded in table shell) ── */
 .ent-data-grid__register-bar {
+  position: relative;
+  z-index: 40;
   padding: 10px 16px;
   border-bottom: 1px solid #e4e7ec;
   background: #ffffff;
+}
+
+/* Columns panel must sit above sticky thead (z-20 inside .erp-table-wrap). */
+.ent-data-grid__column-chooser {
+  z-index: 80;
+}
+
+.ent-data-grid--register .ent-data-grid__register-bar,
+.ent-data-grid--register .crm-list-filter-bar--embedded,
+.ent-data-grid--register .crm-list-filter-bar {
+  background: #ffffff;
+}
+
+/* Purchase / register grids: white column headers (match toolbar) */
+.ent-data-grid--register {
+  --ent-th-bg: #ffffff;
+}
+
+.ent-data-grid--register .erp-table th,
+.ent-data-grid--register thead th {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
+
+.ent-data-grid--register .crm-list-filter-bar__filters-btn {
+  min-width: 7.25rem;
 }
 
 .ent-data-grid__register-bar--merged .ent-data-grid__register-bar-row {
@@ -339,72 +371,141 @@
 
 .ent-data-grid__register-bar--merged .ent-data-grid__columns-btn {
   height: 36px;
+  min-height: 36px;
   flex-shrink: 0;
-  border-radius: 8px;
+  border-radius: 8px !important;
   font-size: 13px;
+  box-sizing: border-box;
 }
 
 .ent-data-grid--register .crm-list-filter-bar--embedded {
   width: 100%;
 }
 
-.ent-data-grid--register .crm-list-filter-bar--embedded > .erp-smart-filter > .flex.items-center {
+/* Toolbar: one line when space allows; else Search+Sort / tools */
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+  width: 100%;
 }
 
-.ent-data-grid--register .crm-list-filter-bar--embedded .erp-smart-filter-fields {
-  flex: 1;
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__primary,
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__secondary {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
-  gap: 8px;
 }
 
-.ent-data-grid--register .crm-list-filter-bar--embedded .ent-search-wrap {
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__primary {
   flex: 1 1 320px;
   min-width: min(100%, 280px);
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__secondary {
+  flex: 0 1 auto;
+  margin-left: auto;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__search {
+  flex: 1 1 auto;
+  min-width: 12rem;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__select-wrap {
+  flex-shrink: 0;
+  width: auto !important;
   max-width: none;
 }
 
-.ent-data-grid--register .crm-list-filter-bar--embedded .ent-search-wrap input {
-  height: 36px;
-  font-size: 13px;
-  border-radius: 8px;
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__sort-wrap {
+  width: 11rem !important;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__view-wrap {
+  width: 9rem !important;
+}
+
+/* Shared control chrome — same height + same 8px radius */
+.ent-data-grid--register .crm-list-filter-bar--embedded .erp-search-field,
+.ent-data-grid--register .crm-list-filter-bar--embedded .erp-search-field__input.erp-input,
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__select-wrap .erp-input,
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__select-wrap .erp-select,
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__select-wrap .erp-smart-select,
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__btn,
+.ent-data-grid--register .crm-list-filter-bar--embedded .ent-data-grid__columns-btn,
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__save-view {
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  box-sizing: border-box;
+  font-size: 13px !important;
+  border-radius: 8px !important;
+}
+
+.ent-data-grid__column-chooser-row--dragging {
+  opacity: 0.55;
+  background: var(--erp-primary-soft, #deecf9);
+}
+
+.ent-data-grid__column-drag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .erp-search-field__input.erp-input {
+  width: 100%;
 }
 
 .ent-data-grid--register .crm-list-filter-bar--embedded .ent-search-kbd {
-  right: 10px;
+  display: none !important;
 }
 
 .ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__btn {
-  height: 36px;
   padding-inline: 12px;
-  font-size: 13px;
 }
 
-.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__sort-select {
-  height: 36px;
-  min-width: 10.5rem;
-  max-width: 12rem;
-  font-size: 13px;
-  border-radius: 8px;
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__save-view {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 12px;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--erp-primary, #0078d4);
+  border: 1px solid color-mix(in srgb, var(--erp-primary, #0078d4) 25%, transparent);
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 8%, white);
+  cursor: pointer;
 }
 
-.ent-data-grid--register .crm-list-filter-bar--embedded .erp-smart-filter-meta {
-  gap: 8px;
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__save-view:hover {
+  background: color-mix(in srgb, var(--erp-primary, #0078d4) 14%, white);
 }
 
-.ent-data-grid--register .crm-list-filter-bar--embedded .erp-smart-filter-meta .erp-select-wrap select {
-  height: 36px;
-  font-size: 13px;
-  border-radius: 8px;
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e4e7ec;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__chips-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #667085;
 }
 
 .ent-data-grid--register .crm-list-filter-bar--embedded .erp-filter-chip {
   margin-top: 0;
-}
-
-.ent-data-grid--register .crm-list-filter-bar--embedded .erp-smart-filter > .mt-2 {
-  margin-top: 8px;
-  padding-top: 8px;
 }
 
 .erp-register-table-shell .ent-data-grid {
@@ -413,6 +514,12 @@
   border-right: none;
   border-bottom: none;
   box-shadow: none;
+  /* Let Columns / Filters panels paint above sticky thead */
+  overflow: visible;
+}
+
+.erp-register-table-shell {
+  overflow: visible;
 }
 
 /* ── Toolbar in grid ── */

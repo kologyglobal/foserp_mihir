@@ -57,7 +57,6 @@ import {
   PURCHASE_ORDER_APPROVAL_STATUS_LABELS,
   PURCHASE_ORDER_DOMAIN_STATUS_LABELS,
   PURCHASE_ORDER_LINE_STATUS_LABELS,
-  PURCHASE_ORDER_ORIGIN_LABELS,
   PURCHASE_ORDER_TYPE_LABELS,
 } from '@/services/purchase'
 import type {
@@ -246,6 +245,16 @@ export function PurchaseOrderDetailPage() {
     )
   }, [po, linked, vendorMaster])
 
+  const headerFacts = useMemo(() => {
+    if (!po) return []
+    return [
+      { label: 'Vendor', value: po.vendor.name },
+      { label: 'Buyer', value: po.buyer.name },
+      { label: 'PO Date', value: formatDate(po.documentDate) },
+      { label: 'Expected', value: formatDate(po.expectedDeliveryDate) },
+    ]
+  }, [po])
+
   if (loading || !po) {
     return (
       <PurchaseCardFormShell
@@ -253,12 +262,14 @@ export function PurchaseOrderDetailPage() {
         description="Loading…"
         status="…"
         favoritePath="/purchase/orders"
+        backLink={{ to: '/purchase/orders', label: 'Back to Purchase Orders' }}
         breadcrumbs={[
           { label: 'Purchase', to: '/purchase' },
           { label: 'Purchase Orders', to: '/purchase/orders' },
           { label: 'Loading' },
         ]}
         footer={null}
+        stickyFooter={false}
         detailMode
       >
         <LoadingState variant="form" rows={8} />
@@ -339,6 +350,7 @@ export function PurchaseOrderDetailPage() {
         statusTone={purchaseStatusTone(po.status)}
         company={po.vendor.name}
         favoritePath={`/purchase/orders/${po.id}`}
+        backLink={{ to: '/purchase/orders', label: 'Back to Purchase Orders' }}
         breadcrumbs={[
           { label: 'Purchase', to: '/purchase' },
           { label: 'Purchase Orders', to: '/purchase/orders' },
@@ -348,34 +360,13 @@ export function PurchaseOrderDetailPage() {
         createdDate={formatDate(po.createdAt.slice(0, 10))}
         modifiedBy={po.updatedBy ?? undefined}
         modifiedDate={po.updatedAt ? formatDate(po.updatedAt.slice(0, 10)) : undefined}
-        documentIdentity={{
-          moduleLabel: 'PURCHASE ORDER',
-          title: po.documentNumber,
-          status: statusLabel,
-          statusTone: purchaseStatusTone(po.status),
-        }}
-        documentFacts={[
-          { label: 'PO No', value: po.documentNumber, emphasize: true },
-          { label: 'Vendor', value: po.vendor.name, emphasize: true },
-          { label: 'Buyer', value: po.buyer.name },
-          { label: 'PO Date', value: formatDate(po.documentDate) },
-          { label: 'Expected Delivery', value: formatDate(po.expectedDeliveryDate) },
-        ]}
-        documentMetaChips={[
-          PURCHASE_ORDER_ORIGIN_LABELS[po.origin],
-          orderTypeLabel,
-          po.department
-            ? po.department.toLowerCase().includes('department')
-              ? po.department
-              : `${po.department} Department`
-            : 'Department',
-          po.currency || 'INR',
-          approvalLabel,
-        ]}
+        recordHeaderFacts={headerFacts}
+        recordHeaderId={`Rev ${po.revisionNo}`}
         commandBar={
           <ErpCommandBar
             inline
             sticky={false}
+            collapseSecondaryOnNarrow={false}
             primaryAction={
               canApprove && !approveGate.hidden
                 ? {
@@ -413,6 +404,7 @@ export function PurchaseOrderDetailPage() {
                 id: 'edit',
                 label: 'Edit / Save Draft',
                 icon: Pencil,
+                pin: true,
                 onClick: () => navigate(`/purchase/orders/${po.id}/edit`),
                 hidden: editGate.hidden || !isEditable,
               },
@@ -447,7 +439,13 @@ export function PurchaseOrderDetailPage() {
                 onClick: () => navigate(`/purchase/orders/${po.id}/revise`),
                 hidden: !perms.canEditOrder || !canRevise,
               },
-              { id: 'print', label: 'Print', icon: Printer, onClick: () => navigate(`/purchase/orders/${po.id}/print`) },
+              {
+                id: 'print',
+                label: 'Print',
+                icon: Printer,
+                pin: true,
+                onClick: () => navigate(`/purchase/orders/${po.id}/print`),
+              },
               { id: 'download', label: 'Download PDF', icon: Download, onClick: downloadStub },
             ]}
             destructiveActions={[
@@ -474,10 +472,12 @@ export function PurchaseOrderDetailPage() {
         factBox={documentFactBox}
         collapsibleFactBox
         footer={null}
+        stickyFooter={false}
         detailMode
       >
         <PurchaseDocumentWorkflowStrip
           status={po.status}
+          purpose="Purchase orders — create, approve and release, then track delivery."
           nextActionContext={{
             canSubmit: !submitGate.hidden && !submitGate.disabled,
             canApprove: !approveGate.hidden && !approveGate.disabled,

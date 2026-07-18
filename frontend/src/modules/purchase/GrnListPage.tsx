@@ -8,28 +8,40 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Trash2,
 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
-import { SmartFilterBar } from '@/components/design-system/SmartFilterBar'
+import { CrmFilterDrawer } from '@/components/crm/CrmFilterDrawer'
+import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFilterBar'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { Select } from '@/components/forms/Inputs'
-import { SearchInput } from '@/components/ui/SearchInput'
+import { ErpDataGrid } from '@/components/erp/ErpDataGrid'
+import { ErpPageGuide } from '@/components/erp/ErpPageGuide'
 import { TableLink } from '@/components/ui/AppLink'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { DataTable } from '@/components/tables/DataTable'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
 import {
   EnterpriseRowActionsMenu,
   type RowActionItem,
 } from '@/design-system/enterprise/EnterpriseTablePrimitives'
 import {
-  getGrnList,
-  GRN_DOMAIN_STATUS_LABELS,
-  GRN_DOMAIN_STATUSES,
-} from '@/services/purchase'
+  buildGrnFilterFields,
+  crmValuesToGrnFilters,
+  DEFAULT_GRN_LIST_FILTERS,
+  filterGrnRows,
+  GRN_SORT_OPTIONS,
+  grnFilterChipLabelResolver,
+  grnFiltersToCrmValues,
+  hasActiveGrnFilters,
+  sortGrnRows,
+  type GrnListFilters,
+  type GrnSortKey,
+} from '@/config/grnFilterConfig'
+import { useCrmFilterDrawer } from '@/hooks/useCrmFilterDrawer'
+import { getGrnList } from '@/services/purchase'
 import { usePurchasePermissions } from '@/utils/permissions'
-import type { GrnDomainStatus, GrnListRow } from '@/types/purchaseDomain'
+import type { GrnListRow } from '@/types/purchaseDomain'
 import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { grnListBreadcrumbs } from '@/utils/purchaseNavigation'
@@ -41,8 +53,11 @@ export function GrnListPage() {
   const [rows, setRows] = useState<GrnListRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState(searchParams.get('status') ?? '')
+  const [filters, setFilters] = useState<GrnListFilters>(() => ({
+    ...DEFAULT_GRN_LIST_FILTERS,
+    status: searchParams.get('status') ?? '',
+  }))
+  const [sortBy, setSortBy] = useState<GrnSortKey>('documentDate')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -61,29 +76,43 @@ export function GrnListPage() {
     void load()
   }, [load])
 
-  const filtered = useMemo(() => {
-    let list = [...rows]
-    if (status) list = list.filter((r) => r.status === status)
-    if (search.trim()) {
-      const q = search.trim().toLowerCase()
-      list = list.filter(
-        (r) =>
-          r.documentNumber.toLowerCase().includes(q) ||
-          r.purchaseOrderNumber.toLowerCase().includes(q) ||
-          r.vendorName.toLowerCase().includes(q) ||
-          r.vendorCode.toLowerCase().includes(q) ||
-          (r.gateEntryNo ?? '').toLowerCase().includes(q) ||
-          (r.vehicleNo ?? '').toLowerCase().includes(q),
-      )
-    }
-    return list
-  }, [rows, search, status])
+  useEffect(() => {
+    const status = searchParams.get('status')
+    if (!status) return
+    setFilters((f) => ({ ...f, status }))
+  }, [searchParams])
+
+  const vendorOptions = useMemo(
+    () => [...new Set(rows.map((r) => r.vendorName).filter(Boolean))].sort(),
+    [rows],
+  )
+  const filterFields = useMemo(
+    () => buildGrnFilterFields({ vendorOptions }),
+    [vendorOptions],
+  )
+
+  const filterDrawer = useCrmFilterDrawer({
+    values: grnFiltersToCrmValues(filters),
+    onChange: (next) => setFilters(crmValuesToGrnFilters(next)),
+    fields: filterFields,
+    defaults: grnFiltersToCrmValues(DEFAULT_GRN_LIST_FILTERS),
+    chipLabelResolver: grnFilterChipLabelResolver,
+  })
+
+  const filtered = useMemo(
+    () => sortGrnRows(filterGrnRows(rows, filters), sortBy),
+    [rows, filters, sortBy],
+  )
+
+  const clearFilters = () => filterDrawer.clearAll()
+  const activeFilters = hasActiveGrnFilters(filters)
 
   const columns = useMemo<ColumnDef<GrnListRow>[]>(
     () => [
       {
         accessorKey: 'documentNumber',
         header: 'GRN Number',
+        meta: { columnLabel: 'GRN Number' },
         cell: ({ row }) => (
           <TableLink to={`/purchase/grn/${row.original.id}`} className="font-mono">
             {row.original.documentNumber}
@@ -93,32 +122,45 @@ export function GrnListPage() {
       {
         accessorKey: 'documentDate',
         header: 'Date',
+        meta: { columnLabel: 'Date' },
         cell: ({ row }) => formatDate(row.original.documentDate),
       },
       {
         accessorKey: 'purchaseOrderNumber',
         header: 'PO Number',
+        meta: { columnLabel: 'PO Number' },
         cell: ({ row }) => (
           <TableLink to={`/purchase/orders/${row.original.purchaseOrderId}`} className="font-mono">
             {row.original.purchaseOrderNumber}
           </TableLink>
         ),
       },
-      { accessorKey: 'vendorName', header: 'Vendor' },
-      { accessorKey: 'warehouseName', header: 'Warehouse' },
+      {
+        accessorKey: 'vendorName',
+        header: 'Vendor',
+        meta: { columnLabel: 'Vendor' },
+      },
+      {
+        accessorKey: 'warehouseName',
+        header: 'Warehouse',
+        meta: { columnLabel: 'Warehouse' },
+      },
       {
         accessorKey: 'totalReceivedQty',
         header: 'Received Qty',
+        meta: { columnLabel: 'Received Qty' },
         cell: ({ row }) => formatNumber(row.original.totalReceivedQty),
       },
       {
         accessorKey: 'totalAmount',
         header: 'Value',
+        meta: { columnLabel: 'Value' },
         cell: ({ row }) => formatCurrency(row.original.totalAmount),
       },
       {
         accessorKey: 'status',
         header: 'Status',
+        meta: { columnLabel: 'Status' },
         cell: ({ row }) => (
           <StatusDot
             tone={statusToneFromLabel(row.original.statusLabel)}
@@ -129,8 +171,12 @@ export function GrnListPage() {
       {
         id: 'actions',
         header: '',
+        enableHiding: false,
+        enableSorting: false,
         cell: ({ row }) => {
           const r = row.original
+          const canEdit = r.status === 'draft' || r.status === 'pending_inspection'
+          const statusLabel = r.statusLabel || r.status
           const actions: RowActionItem[] = [
             {
               id: 'view',
@@ -138,15 +184,23 @@ export function GrnListPage() {
               icon: Eye,
               onClick: () => navigate(`/purchase/grn/${r.id}`),
             },
-          ]
-          if (r.status === 'draft' || r.status === 'pending_inspection') {
-            actions.push({
+            {
               id: 'edit',
               label: 'Edit',
               icon: Pencil,
               onClick: () => navigate(`/purchase/grn/${r.id}/edit`),
-            })
-          }
+              disabled: !canEdit,
+              disabledReason: `${statusLabel} GRNs cannot be edited`,
+            },
+            {
+              id: 'delete',
+              label: 'Delete',
+              icon: Trash2,
+              danger: true,
+              disabled: r.status !== 'draft',
+              disabledReason: `${statusLabel} GRNs cannot be deleted`,
+            },
+          ]
           if (r.inspectionRequired) {
             actions.push({
               id: 'qi',
@@ -167,82 +221,136 @@ export function GrnListPage() {
     [navigate],
   )
 
-  return (
-    <OperationalPageShell
-      title="Goods Receipt Notes"
-      description="Receive against released purchase orders · inspection · post (inventory deferred)"
-      badge="Purchase"
-      variant="dynamics"
-      breadcrumbs={grnListBreadcrumbs()}
-      favoritePath="/purchase/grn"
-      commandBar={
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={
-            perms.canCreateGrn
-              ? {
-                  id: 'new',
-                  label: 'New GRN',
-                  icon: Plus,
-                  onClick: () => navigate('/purchase/grn/new'),
-                }
-              : undefined
-          }
-          secondaryActions={[
-            {
-              id: 'qi',
-              label: 'Quality Inspections',
-              icon: ClipboardCheck,
-              onClick: () => navigate('/purchase/quality-inspections'),
-              hidden: !perms.canViewQuality,
-            },
-            {
-              id: 'refresh',
-              label: 'Refresh',
-              icon: RefreshCw,
-              onClick: () => void load(),
-            },
-          ]}
-        />
-      }
-    >
-      <SmartFilterBar
-        className="mb-4"
-        onClearAll={() => {
-          setSearch('')
-          setStatus('')
-        }}
-        resultCount={filtered.length}
-      >
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search GRN / PO / vendor / gate entry"
-        />
-        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">All statuses</option>
-          {GRN_DOMAIN_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {GRN_DOMAIN_STATUS_LABELS[s as GrnDomainStatus]}
-            </option>
-          ))}
-        </Select>
-      </SmartFilterBar>
+  const shellProps = {
+    title: 'Goods Receipt Notes',
+    description: 'Receive against released purchase orders · inspection · post (inventory deferred)',
+    badge: 'Purchase' as const,
+    variant: 'dynamics' as const,
+    breadcrumbs: grnListBreadcrumbs(),
+    favoritePath: '/purchase/grn',
+    pageGuide: null,
+  }
 
-      {loading ? (
-        <LoadingState variant="table" rows={8} />
-      ) : error ? (
-        <EmptyState icon={Package} title="Could not load GRNs" description={error} />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={Package}
-          title="No goods receipts"
-          description="Create a GRN from a released purchase order with open quantity."
-        />
+  const commandBar = (
+    <ErpCommandBar
+      inline
+      sticky={false}
+      primaryAction={
+        perms.canCreateGrn
+          ? {
+              id: 'new',
+              label: 'New GRN',
+              icon: Plus,
+              onClick: () => navigate('/purchase/grn/new'),
+            }
+          : undefined
+      }
+      secondaryActions={[
+        {
+          id: 'qi',
+          label: 'Quality Inspections',
+          icon: ClipboardCheck,
+          onClick: () => navigate('/purchase/quality-inspections'),
+          hidden: !perms.canViewQuality,
+        },
+        {
+          id: 'refresh',
+          label: 'Refresh',
+          icon: RefreshCw,
+          onClick: () => void load(),
+        },
+      ]}
+    />
+  )
+
+  const emptyAction = (
+    <div className="flex flex-wrap justify-center gap-2">
+      {rows.length === 0 && perms.canCreateGrn ? (
+        <button
+          type="button"
+          className="erp-btn erp-btn--primary text-[13px]"
+          onClick={() => navigate('/purchase/grn/new')}
+        >
+          New GRN
+        </button>
+      ) : null}
+      {activeFilters ? (
+        <button type="button" className="erp-btn erp-btn--secondary text-[13px]" onClick={clearFilters}>
+          Clear Filters
+        </button>
+      ) : null}
+    </div>
+  )
+
+  return (
+    <>
+      {loading && rows.length === 0 ? (
+        <OperationalPageShell {...shellProps}>
+          <LoadingState variant="table" rows={8} cols={7} />
+        </OperationalPageShell>
       ) : (
-        <DataTable columns={columns} data={filtered} />
+        <OperationalPageShell {...shellProps} commandBar={commandBar}>
+          {error ? (
+            <EmptyState icon={Package} title="Could not load GRNs" description={error} />
+          ) : (
+            <>
+              <ErpPageGuide
+                purpose="Goods receipt notes against purchase orders."
+                nextStep="Inspect if required, then post the GRN."
+              />
+              <EnterpriseRegisterTableShell className="min-w-0">
+                <ErpDataGrid
+                  data={filtered}
+                  columns={columns}
+                  showCompactSearch={false}
+                  enableColumnSorting={false}
+                  stickyFirstColumn
+                  emptyMessage={
+                    activeFilters
+                      ? 'No GRNs match current filters.'
+                      : 'No goods receipts. Create a GRN from a released purchase order with open quantity.'
+                  }
+                  emptyAction={emptyAction}
+                  getRowId={(r) => r.id}
+                  registerBar={
+                    <CrmListFilterBar
+                      search={filters.search}
+                      onSearchChange={(search) => setFilters((f) => ({ ...f, search }))}
+                      searchPlaceholder="Search GRN / PO / vendor / gate entry"
+                      activeFilterCount={filterDrawer.activeCount}
+                      onOpenFilters={filterDrawer.openDrawer}
+                      chips={filterDrawer.chips}
+                      onRemoveChip={filterDrawer.removeChip}
+                      onClearAll={clearFilters}
+                      className="crm-list-filter-bar--embedded"
+                      showCommandPaletteHint={false}
+                      sort={
+                        <CrmListSortSelect
+                          value={sortBy}
+                          onChange={(v) => setSortBy(v as GrnSortKey)}
+                          aria-label="Sort GRNs"
+                          options={GRN_SORT_OPTIONS}
+                        />
+                      }
+                    />
+                  }
+                />
+              </EnterpriseRegisterTableShell>
+            </>
+          )}
+        </OperationalPageShell>
       )}
-    </OperationalPageShell>
+
+      <CrmFilterDrawer
+        open={filterDrawer.open}
+        onClose={filterDrawer.closeDrawer}
+        title="Filter GRNs"
+        fields={filterFields}
+        values={filterDrawer.draft}
+        onChange={(next) => filterDrawer.setDraft({ ...filterDrawer.draft, ...next })}
+        onApply={filterDrawer.applyFilters}
+        onReset={filterDrawer.resetDraft}
+      />
+    </>
   )
 }

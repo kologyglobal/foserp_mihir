@@ -1,14 +1,36 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { GitCompare, RefreshCw } from 'lucide-react'
+import { Eye, GitCompare, RefreshCw } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { CrmFilterDrawer } from '@/components/crm/CrmFilterDrawer'
+import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFilterBar'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { ErpDataGrid } from '@/components/erp/ErpDataGrid'
+import { ErpPageGuide } from '@/components/erp/ErpPageGuide'
 import { TableLink } from '@/components/ui/AppLink'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { DataTable } from '@/components/tables/DataTable'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
+import {
+  EnterpriseRowActionsMenu,
+  type RowActionItem,
+} from '@/design-system/enterprise/EnterpriseTablePrimitives'
+import {
+  buildRfqFilterFields,
+  crmValuesToRfqFilters,
+  DEFAULT_RFQ_LIST_FILTERS,
+  filterRfqRows,
+  hasActiveRfqFilters,
+  RFQ_SORT_OPTIONS,
+  rfqFilterChipLabelResolver,
+  rfqFiltersToCrmValues,
+  sortRfqRows,
+  type RfqListFilters,
+  type RfqSortKey,
+} from '@/config/rfqFilterConfig'
+import { useCrmFilterDrawer } from '@/hooks/useCrmFilterDrawer'
 import { getRfqList, getVendorQuotations } from '@/services/purchase'
 import type { RfqListRow } from '@/types/purchaseDomain'
 import { formatCurrency } from '@/utils/formatters/currency'
@@ -22,6 +44,8 @@ export function QuotationComparisonIndexPage() {
   const [rows, setRows] = useState<ComparisonIndexRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState<RfqListFilters>(DEFAULT_RFQ_LIST_FILTERS)
+  const [sortBy, setSortBy] = useState<RfqSortKey>('documentDate')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -49,11 +73,41 @@ export function QuotationComparisonIndexPage() {
     void load()
   }, [load])
 
+  const buyerOptions = useMemo(
+    () => [...new Set(rows.map((r) => r.buyerName).filter(Boolean))].sort(),
+    [rows],
+  )
+  const locationOptions = useMemo(
+    () => [...new Set(rows.map((r) => r.locationName).filter(Boolean))].sort(),
+    [rows],
+  )
+  const filterFields = useMemo(
+    () => buildRfqFilterFields({ buyerOptions, locationOptions }),
+    [buyerOptions, locationOptions],
+  )
+
+  const filterDrawer = useCrmFilterDrawer({
+    values: rfqFiltersToCrmValues(filters),
+    onChange: (next) => setFilters(crmValuesToRfqFilters(next)),
+    fields: filterFields,
+    defaults: rfqFiltersToCrmValues(DEFAULT_RFQ_LIST_FILTERS),
+    chipLabelResolver: rfqFilterChipLabelResolver,
+  })
+
+  const filtered = useMemo(() => {
+    const list = filterRfqRows(rows, filters) as ComparisonIndexRow[]
+    return sortRfqRows(list, sortBy) as ComparisonIndexRow[]
+  }, [rows, filters, sortBy])
+
+  const clearFilters = () => filterDrawer.clearAll()
+  const activeFilters = hasActiveRfqFilters(filters)
+
   const columns = useMemo<ColumnDef<ComparisonIndexRow>[]>(
     () => [
       {
         accessorKey: 'documentNumber',
         header: 'RFQ Number',
+        meta: { columnLabel: 'RFQ Number' },
         cell: ({ row }) => (
           <TableLink to={`/purchase/rfqs/${row.original.id}`} className="font-mono">
             {row.original.documentNumber}
@@ -63,13 +117,23 @@ export function QuotationComparisonIndexPage() {
       {
         accessorKey: 'documentDate',
         header: 'RFQ Date',
+        meta: { columnLabel: 'RFQ Date' },
         cell: ({ row }) => formatDate(row.original.documentDate),
       },
-      { accessorKey: 'buyerName', header: 'Buyer' },
-      { accessorKey: 'locationName', header: 'Location' },
+      {
+        accessorKey: 'buyerName',
+        header: 'Buyer',
+        meta: { columnLabel: 'Buyer' },
+      },
+      {
+        accessorKey: 'locationName',
+        header: 'Location',
+        meta: { columnLabel: 'Location' },
+      },
       {
         accessorKey: 'quoteCount',
         header: 'Quotations',
+        meta: { columnLabel: 'Quotations' },
         cell: ({ row }) => (
           <span className="font-semibold tabular-nums">{row.original.quoteCount}</span>
         ),
@@ -77,17 +141,20 @@ export function QuotationComparisonIndexPage() {
       {
         accessorKey: 'responsesReceived',
         header: 'Responses',
+        meta: { columnLabel: 'Responses' },
         cell: ({ row }) =>
           `${row.original.responsesReceived}/${row.original.vendorCount || 0}`,
       },
       {
         accessorKey: 'estimatedValue',
         header: 'Estimated Value',
+        meta: { columnLabel: 'Estimated Value' },
         cell: ({ row }) => formatCurrency(row.original.estimatedValue),
       },
       {
         accessorKey: 'statusLabel',
         header: 'Status',
+        meta: { columnLabel: 'Status' },
         cell: ({ row }) => (
           <StatusDot
             label={row.original.statusLabel}
@@ -96,63 +163,146 @@ export function QuotationComparisonIndexPage() {
         ),
       },
       {
-        id: 'compare',
+        id: 'actions',
         header: '',
-        cell: ({ row }) => (
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded-md border border-erp-border px-2 py-1 text-[12px] font-medium text-erp-primary hover:bg-erp-surface-alt"
-            onClick={() => navigate(`/purchase/comparison/${row.original.id}`)}
-          >
-            <GitCompare className="h-3.5 w-3.5" />
-            Compare
-          </button>
-        ),
+        enableHiding: false,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const r = row.original
+          const actions: RowActionItem[] = [
+            {
+              id: 'view',
+              label: 'View RFQ',
+              icon: Eye,
+              onClick: () => navigate(`/purchase/rfqs/${r.id}`),
+            },
+            {
+              id: 'compare',
+              label: 'Compare',
+              icon: GitCompare,
+              onClick: () => navigate(`/purchase/comparison/${r.id}`),
+            },
+          ]
+          return <EnterpriseRowActionsMenu actions={actions} />
+        },
       },
     ],
     [navigate],
   )
 
+  const shellProps = {
+    title: 'Quotation Comparison',
+    description: 'Compare vendor responses side-by-side and select a recommendation',
+    badge: 'Purchase' as const,
+    variant: 'dynamics' as const,
+    breadcrumbs: purchaseBreadcrumbs('Comparison'),
+    favoritePath: '/purchase/comparison',
+    pageGuide: null,
+  }
+
+  const commandBar = (
+    <ErpCommandBar
+      inline
+      sticky={false}
+      secondaryActions={[
+        {
+          id: 'refresh',
+          label: 'Refresh',
+          icon: RefreshCw,
+          onClick: () => void load(),
+        },
+      ]}
+    />
+  )
+
+  const emptyAction = activeFilters ? (
+    <button type="button" className="erp-btn erp-btn--secondary text-[13px]" onClick={clearFilters}>
+      Clear Filters
+    </button>
+  ) : undefined
+
   return (
-    <OperationalPageShell
-      title="Quotation Comparison"
-      description="Compare vendor responses side-by-side and select a recommendation"
-      badge="Purchase"
-      variant="dynamics"
-      breadcrumbs={purchaseBreadcrumbs('Comparison')}
-      favoritePath="/purchase/comparison"
-      commandBar={
-        <ErpCommandBar
-          inline
-          sticky={false}
-          secondaryActions={[
-            {
-              id: 'refresh',
-              label: 'Refresh',
-              icon: RefreshCw,
-              onClick: () => void load(),
-            },
-          ]}
-        />
-      }
-    >
-      {loading ? (
-        <LoadingState variant="table" rows={6} />
-      ) : error ? (
-        <EmptyState
-          icon={GitCompare}
-          title="Could not load comparison index"
-          description={error}
-        />
-      ) : rows.length === 0 ? (
-        <EmptyState
-          icon={GitCompare}
-          title="No RFQs with quotations"
-          description="Record vendor quotations against sent RFQs to enable comparison."
-        />
+    <>
+      {loading && rows.length === 0 ? (
+        <OperationalPageShell {...shellProps}>
+          <LoadingState variant="table" rows={8} cols={7} />
+        </OperationalPageShell>
       ) : (
-        <DataTable data={rows} columns={columns} />
+        <OperationalPageShell {...shellProps} commandBar={commandBar}>
+          {error ? (
+            <EmptyState
+              icon={GitCompare}
+              title="Could not load comparison index"
+              description={error}
+              action={
+                <button
+                  type="button"
+                  className="erp-btn erp-btn--primary text-[13px]"
+                  onClick={() => void load()}
+                >
+                  Retry
+                </button>
+              }
+            />
+          ) : (
+            <>
+              <ErpPageGuide
+                purpose="Compare vendor quotes for an RFQ and select a supplier."
+                nextStep="Open Compare when responses are ready."
+              />
+              <EnterpriseRegisterTableShell className="min-w-0">
+                <ErpDataGrid
+                  data={filtered}
+                  columns={columns}
+                  showCompactSearch={false}
+                  enableColumnSorting={false}
+                  stickyFirstColumn
+                  emptyMessage={
+                    activeFilters
+                      ? 'No RFQs match filters.'
+                      : 'No RFQs with quotations. Record vendor quotations against sent RFQs to enable comparison.'
+                  }
+                  emptyAction={emptyAction}
+                  getRowId={(r) => r.id}
+                  registerBar={
+                    <CrmListFilterBar
+                      search={filters.search}
+                      onSearchChange={(search) => setFilters((f) => ({ ...f, search }))}
+                      searchPlaceholder="Search RFQ / buyer / location"
+                      activeFilterCount={filterDrawer.activeCount}
+                      onOpenFilters={filterDrawer.openDrawer}
+                      chips={filterDrawer.chips}
+                      onRemoveChip={filterDrawer.removeChip}
+                      onClearAll={clearFilters}
+                      className="crm-list-filter-bar--embedded"
+                      showCommandPaletteHint={false}
+                      sort={
+                        <CrmListSortSelect
+                          value={sortBy}
+                          onChange={(v) => setSortBy(v as RfqSortKey)}
+                          aria-label="Sort comparison RFQs"
+                          options={RFQ_SORT_OPTIONS}
+                        />
+                      }
+                    />
+                  }
+                />
+              </EnterpriseRegisterTableShell>
+            </>
+          )}
+        </OperationalPageShell>
       )}
-    </OperationalPageShell>
+
+      <CrmFilterDrawer
+        open={filterDrawer.open}
+        onClose={filterDrawer.closeDrawer}
+        title="Filter comparison RFQs"
+        fields={filterFields}
+        values={filterDrawer.draft}
+        onChange={(next) => filterDrawer.setDraft({ ...filterDrawer.draft, ...next })}
+        onApply={filterDrawer.applyFilters}
+        onReset={filterDrawer.resetDraft}
+      />
+    </>
   )
 }

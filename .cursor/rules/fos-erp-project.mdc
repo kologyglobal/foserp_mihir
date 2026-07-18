@@ -33,9 +33,13 @@ alwaysApply: true
 15. **Quotation backend:** CRUD + lifecycle + convert-to-SO + entity notes/attachments + quotation templates shipped.
 16. **Transactional ERP** (purchase, inventory, production, quality, finance, sales orders beyond CRM conversion) is **deferred by design** — demo frontend only.
 
+## Purchase UI
+
+17. **Purchase frontend consistency:** follow `docs/PURCHASE_UI_CONSISTENCY.md`, `docs/UI_VIEW_PAGE_STANDARD.md`, and `docs/PURCHASE_LIST_PAGE_STANDARD.md`. Reuse purchase shells; no one-off “AI demo” chrome (gradients/glow/purple); view pages use in-page `PageBackLink` / `backLink` (not command-bar Back); list pages use register filter bar + drawer + saved views + column show/reorder (gold path: `/purchase/orders`); use `appConfirm`/`appPromptNote` instead of browser dialogs.
+
 ## Quality & maintenance
 
-17. **Run tests after CRM/backend changes:** `typecheck`, `npm test`, `npm run test:crm-live` (when MySQL available).
-18. **Update project memory** when shipping significant work: `SESSION_CHANGELOG.md`, `PROJECT_STATUS.md`, `REMAINING_WORK.md`, `TESTING_STATUS.md`.
-19. **Minimize diff scope** — match existing patterns; no drive-by refactors.
-20. **Preserve demo mode** — shared store changes must keep `VITE_USE_API=false` working unless explicitly migrating that module.
+18. **Run tests after CRM/backend changes:** `typecheck`, `npm test`, `npm run test:crm-live` (when MySQL available).
+19. **Update project memory** when shipping significant work: `SESSION_CHANGELOG.md`, `PROJECT_STATUS.md`, `REMAINING_WORK.md`, `TESTING_STATUS.md`.
+20. **Minimize diff scope** — match existing patterns; no drive-by refactors.
+21. **Preserve demo mode** — shared store changes must keep `VITE_USE_API=false` working unless explicitly migrating that module.

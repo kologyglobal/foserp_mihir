@@ -34,6 +34,7 @@ interface ErpCommandBarProps {
   /** Inline in page title row (enterprise layout) */
   inline?: boolean
   className?: string
+  /** Optional group label left of buttons. Omitted by default (no “Actions” chrome). */
   groupLabel?: string
   /**
    * Below `lg`, move unpinned secondary actions into “More actions”.
@@ -84,7 +85,7 @@ export function ErpCommandBar({
   sticky = true,
   inline = false,
   className,
-  groupLabel = 'Actions',
+  groupLabel,
   collapseSecondaryOnNarrow = inline,
   moreActionsLabel = 'More actions',
 }: ErpCommandBarProps) {

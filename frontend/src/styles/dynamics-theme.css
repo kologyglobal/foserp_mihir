@@ -37,6 +37,11 @@
   --d365-fw-regular: 400;
   --d365-fw-semibold: 600;
 
+  /* Soft scrollbars — replaces thick OS chrome */
+  --d365-scrollbar-size: 6px;
+  --d365-scrollbar-thumb: rgb(50 49 48 / 0.22);
+  --d365-scrollbar-thumb-hover: rgb(0 120 212 / 0.42);
+
   /* Bridge to existing ERP tokens */
   --erp-primary: var(--d365-brand);
   --erp-primary-hover: var(--d365-brand-hover);
@@ -69,6 +74,113 @@
   --saas-border: var(--d365-border);
 }
 
+/* ── Theme scrollbars (global) ──
+   Thin Fluent-style bars; hide Windows arrow buttons. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--d365-scrollbar-thumb) transparent;
+}
+
+.d365-app,
+.d365-app * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--d365-scrollbar-thumb) transparent;
+}
+
+.d365-app *::-webkit-scrollbar {
+  width: var(--d365-scrollbar-size);
+  height: var(--d365-scrollbar-size);
+}
+
+.d365-app *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.d365-app *::-webkit-scrollbar-thumb {
+  background-color: var(--d365-scrollbar-thumb);
+  border-radius: 99px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.d365-app *::-webkit-scrollbar-thumb:hover {
+  background-color: var(--d365-scrollbar-thumb-hover);
+}
+
+.d365-app *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.d365-app *::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Sidebar — no scrollbar chrome (wheel/trackpad still scrolls) */
+.d365-app .erp-sidebar-scroll,
+.d365-app .erp-sidebar .erp-sidebar-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.d365-app .erp-sidebar-scroll::-webkit-scrollbar,
+.d365-app .erp-sidebar .erp-sidebar-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Module tab strips / metric rows — quieter until hover */
+.d365-app .dyn-tabs,
+.d365-app .d365-tab-strip-scroll,
+.d365-app .d365-subnav,
+.d365-app .d365-metric-strip,
+.d365-app .po-workflow-strip__track {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.d365-app .dyn-tabs:hover,
+.d365-app .dyn-tabs:focus-within,
+.d365-app .d365-tab-strip-scroll:hover,
+.d365-app .d365-tab-strip-scroll:focus-within,
+.d365-app .d365-subnav:hover,
+.d365-app .d365-subnav:focus-within,
+.d365-app .d365-metric-strip:hover,
+.d365-app .d365-metric-strip:focus-within,
+.d365-app .po-workflow-strip__track:hover,
+.d365-app .po-workflow-strip__track:focus-within {
+  scrollbar-color: var(--d365-scrollbar-thumb) transparent;
+}
+
+.d365-app .dyn-tabs::-webkit-scrollbar,
+.d365-app .d365-tab-strip-scroll::-webkit-scrollbar,
+.d365-app .d365-subnav::-webkit-scrollbar,
+.d365-app .d365-metric-strip::-webkit-scrollbar,
+.d365-app .po-workflow-strip__track::-webkit-scrollbar {
+  height: 3px;
+  width: 0;
+}
+
+.d365-app .dyn-tabs::-webkit-scrollbar-thumb,
+.d365-app .d365-tab-strip-scroll::-webkit-scrollbar-thumb,
+.d365-app .d365-subnav::-webkit-scrollbar-thumb,
+.d365-app .d365-metric-strip::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+
+.d365-app .dyn-tabs:hover::-webkit-scrollbar-thumb,
+.d365-app .dyn-tabs:focus-within::-webkit-scrollbar-thumb,
+.d365-app .d365-tab-strip-scroll:hover::-webkit-scrollbar-thumb,
+.d365-app .d365-tab-strip-scroll:focus-within::-webkit-scrollbar-thumb,
+.d365-app .d365-subnav:hover::-webkit-scrollbar-thumb,
+.d365-app .d365-subnav:focus-within::-webkit-scrollbar-thumb,
+.d365-app .d365-metric-strip:hover::-webkit-scrollbar-thumb,
+.d365-app .d365-metric-strip:focus-within::-webkit-scrollbar-thumb {
+  background-color: var(--d365-scrollbar-thumb);
+}
+
 @layer components {
   /* ── Global Dynamics shell typography ── */
   .d365-app,
@@ -93,9 +205,12 @@
 
   .d365-body {
     display: flex;
-    height: calc(100vh - var(--d365-suite-height) - var(--dyn-live-strip-height));
+    /* border-box: height must be 100vh so padding-top (suite bar) does not
+       shrink the shell and leave a dead strip above the Windows taskbar */
+    height: 100vh;
     min-height: 0;
     padding-top: calc(var(--d365-suite-height) + var(--dyn-live-strip-height));
+    box-sizing: border-box;
     overflow: hidden;
   }
 
@@ -643,8 +758,92 @@
     top: 0;
     z-index: 20;
     flex-shrink: 0;
-    background: var(--d365-surface);
+    background: var(--d365-workspace-bg);
     box-shadow: 0 1px 0 var(--d365-border), 0 4px 12px rgb(0 0 0 / 0.04);
+  }
+
+  /* Module page links (Purchase / CRM / …) — spaced under suite bar */
+  .d365-module-nav-band {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 0 0;
+    background: linear-gradient(180deg, #ebe9e7 0%, #faf9f8 10px, #ffffff 28px);
+    border-bottom: 1px solid var(--d365-border);
+  }
+
+  .d365-module-nav-band--embedded {
+    padding: 4px 0 0;
+    background: #ffffff;
+    border-bottom: none;
+  }
+
+  .d365-module-nav-band__head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 0 16px 2px;
+  }
+
+  .d365-module-nav-band__eyebrow {
+    font-family: var(--d365-font-family);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--d365-muted);
+    line-height: 1;
+  }
+
+  .d365-module-nav-band__title {
+    font-family: var(--d365-font-family);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--d365-text);
+    line-height: 1.2;
+  }
+
+  .d365-module-nav-band__tabs {
+    min-width: 0;
+  }
+
+  .d365-module-nav-band__tabs .dyn-tabs {
+    height: 42px;
+    min-height: 42px;
+    max-height: 42px;
+    padding: 0 12px 0 16px;
+    background: transparent;
+    border-bottom: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .d365-module-nav-band__tabs .dyn-tabs::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .d365-module-nav-band__tabs .dyn-tab {
+    height: 42px;
+    max-height: 42px;
+    padding: 0 12px;
+    font-size: 13px;
+    color: var(--d365-text-secondary);
+    border-bottom-width: 2px;
+  }
+
+  .d365-module-nav-band__tabs .dyn-tab:hover {
+    color: var(--d365-text);
+    background: rgb(0 0 0 / 0.03);
+  }
+
+  .d365-module-nav-band__tabs .dyn-tab-active {
+    color: var(--d365-brand);
+    font-weight: 600;
+    border-bottom-color: var(--d365-brand);
   }
 
   .d365-workspace-context {
@@ -690,6 +889,14 @@
   .d365-workspace-unified-header {
     background: var(--d365-surface);
     border-bottom: 1px solid var(--d365-border);
+  }
+
+  .d365-workspace-unified-back {
+    padding: 8px 16px 0;
+  }
+
+  .d365-workspace-unified-back .erp-page-back {
+    margin: 0;
   }
 
   .d365-workspace-unified-head {
@@ -804,16 +1011,32 @@
   }
 
   .d365-workspace-unified-tabs-row {
-    padding: 0 16px;
+    padding: 0;
     border-top: 1px solid var(--d365-border);
     background: var(--d365-surface);
   }
 
+  .d365-workspace-unified-tabs-row .d365-module-nav-band--embedded {
+    border-top: none;
+  }
+
   .d365-workspace-unified-tabs-row .dyn-tabs {
+    height: 40px;
     min-height: 40px;
-    padding: 0;
+    max-height: 40px;
+    padding: 0 16px;
     background: transparent;
     border-bottom: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .d365-workspace-unified-tabs-row .dyn-tabs::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
 
   .d365-workspace-unified-tabs-row .dyn-tab {
@@ -830,6 +1053,7 @@
     align-items: center;
     justify-content: flex-end;
     gap: 6px;
+    margin-left: auto;
     padding-top: 18px;
   }
 
@@ -889,21 +1113,16 @@
     background: var(--d365-surface);
     border-bottom: 1px solid var(--d365-border);
     padding: 0 8px;
+    height: 44px;
     min-height: 44px;
+    max-height: 44px;
+    overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .d365-tab-strip-scroll {
     overflow-x: auto;
-    scrollbar-width: thin;
-  }
-
-  .d365-tab-strip-scroll::-webkit-scrollbar {
-    height: 4px;
-  }
-
-  .d365-tab-strip-scroll::-webkit-scrollbar-thumb {
-    background: var(--d365-border-strong);
-    border-radius: 2px;
+    overflow-y: hidden;
   }
 
   .d365-tab {
@@ -967,6 +1186,11 @@
     background: var(--d365-surface);
     border-bottom: 1px solid var(--d365-border);
     padding: 0 1rem;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .d365-subnav-link {
@@ -989,9 +1213,10 @@
   }
 
   .dyn-subnav-secondary {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     row-gap: 0;
     overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .d365-filter-bar {
@@ -1030,7 +1255,7 @@
     font-family: var(--d365-font-family);
     font-size: var(--d365-font-base);
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
+    scrollbar-width: none;
     scrollbar-color: color-mix(in srgb, var(--d365-brand) 28%, var(--d365-border-strong)) transparent;
   }
 
@@ -1112,6 +1337,16 @@
     }
   }
 
+  /* View/detail pages — no sticky save bar, keep bottom tight */
+  .d365-workspace-content:has(.enterprise-workspace--dynamics-detail) {
+    padding-bottom: 12px;
+  }
+
+  /* View/detail pages — no sticky save bar, keep bottom tight */
+  .d365-workspace-content:has(.enterprise-workspace--dynamics-detail) {
+    padding-bottom: 12px;
+  }
+
   /* ── Dynamics KPI metric strip ── */
   .d365-metric-strip {
     display: flex;
@@ -1121,6 +1356,7 @@
     border: 1px solid var(--d365-border);
     border-radius: var(--d365-radius);
     overflow-x: auto;
+    overflow-y: hidden;
     margin-bottom: 16px;
   }
 

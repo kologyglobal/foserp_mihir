@@ -5,6 +5,7 @@ import { bootstrapErpStartup, type IntegrityReport } from './bootstrap/erpStartu
 import { IntegrityBanner } from './components/system/IntegrityBanner'
 import { SystemConfirmDialogHost } from './components/system/SystemConfirmDialogHost'
 import { ToastHost } from './components/ui/ToastHost'
+import { ConfirmDialogHost } from './components/ui/ConfirmDialogHost'
 import { clearErpLocalStorage } from './demo/demoStorage'
 
 function App() {
@@ -71,6 +72,7 @@ function App() {
       {integrity && !integrity.ok && <IntegrityBanner report={integrity} />}
       <RouterProvider router={router} />
       <ToastHost />
+      <ConfirmDialogHost />
       <SystemConfirmDialogHost />
     </>
   )

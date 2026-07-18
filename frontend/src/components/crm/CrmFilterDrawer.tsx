@@ -18,6 +18,8 @@ export interface CrmFilterDrawerProps {
   onChange: (values: CrmFilterValues) => void
   onApply: () => void
   onReset: () => void
+  /** Drawer heading — default "Filters" */
+  title?: string
   /** Future-ready saved views slot */
   savedViewsSlot?: React.ReactNode
 }
@@ -141,6 +143,7 @@ export function CrmFilterDrawer({
   onChange,
   onApply,
   onReset,
+  title = 'Filters',
   savedViewsSlot,
 }: CrmFilterDrawerProps) {
   function patch(patch: CrmFilterValues) {
@@ -151,16 +154,16 @@ export function CrmFilterDrawer({
     <CrmDrawerShell
       open={open}
       onClose={onClose}
-      title="Filters"
+      title={title}
       width="filter"
       variant="filter"
       footer={(
         <div className="crm-filter-drawer__footer">
           <ErpButton type="button" variant="ghost" onClick={onReset}>
-            Reset Filters
+            Reset
           </ErpButton>
           <ErpButton type="button" variant="primary" onClick={onApply}>
-            Apply Filters
+            Apply
           </ErpButton>
         </div>
       )}

@@ -458,7 +458,7 @@
   .erp-form-footer-sticky {
     position: static;
     z-index: auto;
-    margin-top: 16px;
+    margin: 0;
     flex-shrink: 0;
   }
 
@@ -2002,9 +2002,15 @@
   }
 
   .erp-skeleton {
-    background: linear-gradient(90deg, var(--erp-surface-alt) 0%, #eef2f7 50%, var(--erp-surface-alt) 100%);
+    background: linear-gradient(
+      90deg,
+      #f3f4f6 0%,
+      #e8edf5 40%,
+      #f8fafc 60%,
+      #f3f4f6 100%
+    );
     background-size: 200% 100%;
-    animation: erp-shimmer 1.2s ease-in-out infinite;
+    animation: erp-shimmer 1.35s ease-in-out infinite;
   }
 
   @keyframes erp-shimmer {
@@ -2176,21 +2182,16 @@
   }
 
   .erp-sidebar-scroll {
-    scrollbar-width: thin;
-    scrollbar-color: rgb(10 77 140 / 0.18) transparent;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* legacy Edge */
   }
 
   .erp-sidebar-scroll::-webkit-scrollbar {
-    width: 5px;
-  }
-
-  .erp-sidebar-scroll::-webkit-scrollbar-thumb {
-    background: rgb(10 77 140 / 0.18);
-    border-radius: 99px;
-  }
-
-  .erp-sidebar-scroll::-webkit-scrollbar-thumb:hover {
-    background: rgb(10 77 140 / 0.28);
+    display: none; /* Chrome / Safari / Edge */
+    width: 0;
+    height: 0;
   }
 
   .erp-sidebar-footer {
