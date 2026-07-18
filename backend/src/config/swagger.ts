@@ -1651,6 +1651,91 @@ export const swaggerSpec = {
       },
     },
 
+    // ─── Accounting — Receivables / Customer receipts (Phase 3B3) ─────────────
+    // Draft workflow only — no posting, no GL, no receiptNumber issuance, no open-item
+    // creation, and no allocation persistence. Those ship in Phase 3B4.
+    '/t/{tenantSlug}/accounting/receivables/receipts': {
+      get: {
+        tags: ['Accounting Receivables', 'Customer Receipts'],
+        summary: 'List customer receipt drafts',
+        description:
+          'Permission: `finance.ar.receipt.view`. Filter by legalEntityId (required), status, paymentMethod, customer, dates, search. No posting fields exposed beyond null placeholders.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'legalEntityId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['DRAFT', 'READY_TO_POST', 'POSTED', 'CANCELLED'] } },
+          { name: 'paymentMethod', in: 'query', schema: { type: 'string', enum: ['BANK_TRANSFER', 'CASH', 'CHEQUE', 'UPI', 'CARD', 'OTHER'] } },
+          { name: 'search', in: 'query', schema: { type: 'string' } },
+          { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 20 } },
+        ],
+        responses: { 200: { description: 'Paginated receipt list with allowedActions per row (post/allocate always false)' } },
+      },
+      post: {
+        tags: ['Accounting Receivables', 'Customer Receipts'],
+        summary: 'Create customer receipt draft',
+        description:
+          'Permission: `finance.ar.receipt.create`. Server recalculates amounts via Phase 3B2 engine (bank/cash + TDS + bank charges + other deductions). Issues `draftReference` only — no receiptNumber, GL posting, or open-item/allocation persistence. `sourceType=BANK_IMPORT` is rejected with `CUSTOMER_RECEIPT_SOURCE_NOT_SUPPORTED`.',
+        parameters: [tenantSlugParam],
+        responses: {
+          201: { description: 'Draft created with calculated totals and allowedActions' },
+          422: { description: 'CUSTOMER_RECEIPT_DRAFT_CALCULATION_FAILED / CUSTOMER_RECEIPT_SOURCE_NOT_SUPPORTED' },
+        },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/receipts/{id}': {
+      get: {
+        tags: ['Accounting Receivables', 'Customer Receipts'],
+        summary: 'Get customer receipt detail',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Receipt detail + bankCharges/otherDeductions deduction lines + TDS details + allowedActions + validationSummary' } },
+      },
+      put: {
+        tags: ['Accounting Receivables', 'Customer Receipts'],
+        summary: 'Update customer receipt draft',
+        description:
+          'Permission: `finance.ar.receipt.edit`. DRAFT|READY_TO_POST only. Requires `updatedAt` for optimistic concurrency. READY → DRAFT on edit. Deduction lines fully replaced.',
+        parameters: [tenantSlugParam, idParam],
+        responses: {
+          200: { description: 'Updated draft' },
+          409: { description: 'CUSTOMER_RECEIPT_STALE_UPDATE' },
+          422: { description: 'CUSTOMER_RECEIPT_NOT_EDITABLE' },
+        },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/receipts/{id}/validate': {
+      post: {
+        tags: ['Accounting Receivables', 'Customer Receipts'],
+        summary: 'Validate customer receipt draft (no persist)',
+        description:
+          'Permission: `finance.ar.receipt.view`. Body: `{ proposedAllocations? }` (amount-only preview — no allocation is persisted). Runs the full Phase 3B2 validateReceiptInput preview; audits CUSTOMER_RECEIPT_VALIDATED. Never changes status or amounts.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Validation preview report (customer/account/payment-method/currency/period/allocation readiness)' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/receipts/{id}/mark-ready': {
+      post: {
+        tags: ['Accounting Receivables', 'Customer Receipts'],
+        summary: 'Mark draft ready to post',
+        description:
+          'Permission: `finance.ar.receipt.edit`. DRAFT only. Full validation + CUSTOMER_RECEIPT number series preview (non-consuming). Status → READY_TO_POST. No receiptNumber issued and no posting in 3B3.',
+        parameters: [tenantSlugParam, idParam],
+        responses: {
+          200: { description: 'Receipt ready to post (receiptNumber still null)' },
+          422: { description: 'CUSTOMER_RECEIPT_VALIDATION_FAILED / number series not configured' },
+        },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/receipts/{id}/cancel': {
+      post: {
+        tags: ['Accounting Receivables', 'Customer Receipts'],
+        summary: 'Cancel customer receipt draft',
+        description: 'Permission: `finance.ar.receipt.cancel`. Body: `{ cancellationReason }`. DRAFT|READY_TO_POST → CANCELLED.',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Cancelled receipt' } },
+      },
+    },
+
     // ─── Accounting — Receivables reporting (Phase 3A5) ───────────────────────
     '/t/{tenantSlug}/accounting/receivables/overview': {
       get: {

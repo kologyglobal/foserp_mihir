@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { decimalAmountSchema } from '../shared/receivables.schemas.js'
 import {
+  customerReceiptPaymentMethodSchema,
   customerTdsInputSchema,
   isoDateSchema,
   nonNegativeDecimalStringSchema,
@@ -15,7 +16,7 @@ export const customerReceiptIdSchema = z.string().uuid('receiptId must be a vali
 export const customerReceiptAllocationIdSchema = z.string().uuid('allocationId must be a valid UUID')
 
 export const customerReceiptStatusSchema = z.enum(['DRAFT', 'READY_TO_POST', 'POSTED', 'CANCELLED'])
-export const customerReceiptPaymentMethodSchema = z.enum(['BANK_TRANSFER', 'CASH', 'CHEQUE', 'UPI', 'CARD', 'OTHER'])
+export { customerReceiptPaymentMethodSchema }
 export const customerReceiptSourceTypeSchema = z.enum(['DIRECT', 'BANK_IMPORT'])
 export const customerReceiptAllocationStatusSchema = z.enum(['DRAFT', 'POSTED', 'REVERSED'])
 

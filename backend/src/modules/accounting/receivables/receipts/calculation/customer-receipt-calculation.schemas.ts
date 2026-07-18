@@ -1,5 +1,7 @@
 import { z } from 'zod'
-import { customerReceiptPaymentMethodSchema } from '../customer-receipt.schemas.js'
+
+/** Defined here (not in customer-receipt.schemas.ts) to avoid a circular module import between the two schema files. */
+export const customerReceiptPaymentMethodSchema = z.enum(['BANK_TRANSFER', 'CASH', 'CHEQUE', 'UPI', 'CARD', 'OTHER'])
 
 /** Reject exponent notation and blank strings; allow optional leading minus for later reject. */
 const strictDecimalString = z
