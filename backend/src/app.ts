@@ -10,6 +10,7 @@ import { prisma } from './config/database.js'
 import { errorMiddleware } from './middleware/error.middleware.js'
 import authRoutes from './modules/auth/auth.routes.js'
 import crmRoutes from './modules/crm/crm.routes.js'
+import purchaseRoutes from './modules/purchase/purchase.routes.js'
 import mastersRoutes from './modules/masters/masters.routes.js'
 import masterImportRoutes from './modules/masters/imports/import.routes.js'
 import masterExportRoutes from './modules/masters/exports/export.routes.js'
@@ -98,6 +99,7 @@ export function createApp() {
   app.use('/api/v1/tenants/:tenantId/lookups/vendors', vendorLookupRouter)
   app.use('/api/v1/tenants/:tenantId/lookups', lookupRoutes)
   app.use('/api/v1/tenants/:tenantId/accounting', accountingRoutes)
+  app.use('/api/v1/tenants/:tenantId/purchase', purchaseRoutes)
 
   // Tenant slug aliases
   app.use('/api/v1/t/:tenantSlug/users', userRoutes)
@@ -112,6 +114,7 @@ export function createApp() {
   app.use('/api/v1/t/:tenantSlug/lookups/vendors', vendorLookupRouter)
   app.use('/api/v1/t/:tenantSlug/lookups', lookupRoutes)
   app.use('/api/v1/t/:tenantSlug/accounting', accountingRoutes)
+  app.use('/api/v1/t/:tenantSlug/purchase', purchaseRoutes)
 
   // Single-host production: serve Vite build from public/ (same origin as /api).
   // Docker Compose leaves this unused (frontend nginx container serves the SPA).
