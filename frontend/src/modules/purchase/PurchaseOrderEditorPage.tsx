@@ -1071,6 +1071,15 @@ export function PurchaseOrderEditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const apiOriginDisabled = useMemo((): Partial<Record<PurchaseOrderOrigin, string>> | undefined => {
+    if (!isApiMode()) return undefined
+    return {
+      manual: 'Manual PO create is not available in API mode yet. Use Planning or Comparison.',
+      vendor_quotation: 'Use Quotation Comparison → Create PO (VQ→PO direct is not API-backed yet).',
+      blanket_order: 'Blanket call-off is not available in API mode yet.',
+    }
+  }, [])
+
   if (loading) {
     return (
       <PurchaseCardFormShell
@@ -1094,15 +1103,6 @@ export function PurchaseOrderEditorPage() {
   const awaitingOriginCreate =
     isNew && !recordId && (!originChosen || originMode !== 'manual')
   const showPoForm = !awaitingOriginCreate
-
-  const apiOriginDisabled = useMemo(() => {
-    if (!isApiMode()) return undefined
-    return {
-      manual: 'Manual PO create is not available in API mode yet. Use Planning or Comparison.',
-      vendor_quotation: 'Use Quotation Comparison → Create PO (VQ→PO direct is not API-backed yet).',
-      blanket_order: 'Blanket call-off is not available in API mode yet.',
-    } satisfies Partial<Record<PurchaseOrderOrigin, string>>
-  }, [])
 
   const selectOrigin = (mode: PurchaseOrderOrigin) => {
     if (apiOriginDisabled?.[mode]) {

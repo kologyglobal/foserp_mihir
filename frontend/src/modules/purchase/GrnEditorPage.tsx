@@ -35,6 +35,7 @@ import {
   getPurchaseOrderById,
   getPurchaseOrders,
   PurchaseServiceError,
+  submitGRN,
   updateGRN,
   GRN_DOMAIN_STATUS_LABELS,
 } from '@/services/purchase'
@@ -511,6 +512,63 @@ export function GrnEditorPage() {
         }
       } else {
         notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const submit = async () => {
+    if (isApiMode()) {
+      notify.info(
+        'GRN submit is not available in API mode yet. Purchase receipt (GRN) backend is the next phase after PO lifecycle.',
+      )
+      return
+    }
+    const firstError = validateClient()
+    if (firstError) {
+      notify.error(firstError)
+      return
+    }
+    setSaving(true)
+    try {
+      const input = buildInput()
+      let id = recordId
+      if (id) {
+        const updated = await updateGRN(id, input)
+        setDocumentNumber(updated.documentNumber)
+        setStatus(updated.status)
+        setLines(linesFromGrn(updated))
+      } else {
+        const created = await createGRNFromPo(input)
+        id = created.id
+        setRecordId(created.id)
+        setDocumentNumber(created.documentNumber)
+        setStatus(created.status)
+        setLines(linesFromGrn(created))
+      }
+      const submitted = await submitGRN(id)
+      setStatus(submitted.status)
+      setLines(linesFromGrn(submitted))
+      resetDirty()
+      notify.success(`Submitted · ${submitted.documentNumber}`)
+      navigate(`/purchase/grn/${submitted.id}`, { replace: true })
+    } catch (err) {
+      if (err instanceof PurchaseServiceError && err.code === 'EXCESS_QTY_REQUIRES_PERMISSION') {
+        const ok = await systemConfirm({
+          title: 'Allow excess receipt?',
+          description: `${err.message}\n\nAllow excess receipt for this GRN?`,
+          confirmLabel: 'Allow excess',
+          cancelLabel: 'Cancel',
+          variant: 'danger',
+        })
+        if (ok) {
+          setAllowExcess(true)
+          setLines((prev) => prev.map((l) => ({ ...l, allowExcess: true })))
+          notify.info('Allow Excess enabled — submit again to confirm')
+        }
+      } else {
+        notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
       }
     } finally {
       setSaving(false)
