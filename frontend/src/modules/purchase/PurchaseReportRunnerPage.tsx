@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import {
   Download,
@@ -94,7 +94,6 @@ function exportPdfDemo(result: PurchaseReportResult) {
 
 export function PurchaseReportRunnerPage() {
   const { reportId: reportIdParam } = useParams<{ reportId: string }>()
-  const navigate = useNavigate()
   const reportId = reportIdParam && isPurchaseReportId(reportIdParam) ? reportIdParam : null
   const catalogEntry = reportId ? getPurchaseReportEntry(reportId) : null
 

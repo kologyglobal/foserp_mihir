@@ -7,7 +7,7 @@ import { EnterpriseRegisterTableShell } from '../../design-system/list-page/Ente
 import { ErpCommandBar } from '../../components/erp/ErpCommandBar'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingState } from '../../design-system/components/LoadingState'
-import { CrmInlineFilterPanel } from '../../components/crm/CrmInlineFilterPanel'
+import { CrmFilterDrawer } from '../../components/crm/CrmFilterDrawer'
 import { CrmListSortSelect } from '../../components/crm/CrmListFilterBar'
 import { PurchaseRequisitionsTable } from '../../components/purchase/PurchaseRequisitionsTable'
 import {
@@ -310,16 +310,25 @@ export function PurchaseRequisitionListPage() {
           () => submitPurchaseRequisition(pr.id),
           `${pr.documentNumber} submitted for approval`,
         ),
-      onConvertRfq: (pr: PurchaseRequisitionListRow) =>
+      onConvertRfq: (pr: PurchaseRequisitionListRow) => {
+        if (pr.convertedRfqId) {
+          navigate(`/purchase/rfqs/${pr.convertedRfqId}`)
+          return
+        }
         void runAction(pr.id, async () => {
           const rfq = await convertPurchaseRequisitionToRfq(pr.id)
           navigate(`/purchase/rfqs/${rfq.id}`)
-        }, `${pr.documentNumber} converted to RFQ`),
+        }, `${pr.documentNumber} converted to RFQ`)
+      },
       onConvertPo: (pr: PurchaseRequisitionListRow) =>
         void runAction(pr.id, async () => {
           const po = await convertPurchaseRequisitionToPo(pr.id)
           navigate(`/purchase/orders/${po.id}`)
         }, `${pr.documentNumber} converted to PO`),
+      onViewPlanning: (pr: PurchaseRequisitionListRow) => {
+        const q = encodeURIComponent(pr.documentNumber)
+        navigate(`/purchase/planning-sheet?search=${q}`)
+      },
       onPrint: (pr: PurchaseRequisitionListRow) => {
         navigate(`/purchase/requisitions/${pr.id}?print=1`)
         notify.info('Open print dialog from the requisition detail (Ctrl+P)')
@@ -501,24 +510,7 @@ export function PurchaseRequisitionListPage() {
                 onSearchChange: (search) => setFilters((f) => ({ ...f, search })),
                 searchPlaceholder: 'Search PR number, item, requester, department…',
                 activeFilterCount: filterDrawer.activeCount,
-                filtersExpanded: filterDrawer.open,
-                filtersButtonLabel: filterDrawer.open ? 'Apply filters' : undefined,
-                onOpenFilters: () => {
-                  if (filterDrawer.open) {
-                    filterDrawer.applyFilters()
-                  } else {
-                    filterDrawer.openDrawer()
-                  }
-                },
-                filterPanel: (
-                  <CrmInlineFilterPanel
-                    fields={prFilterFields}
-                    values={filterDrawer.draft}
-                    onChange={(next) => filterDrawer.setDraft({ ...filterDrawer.draft, ...next })}
-                    onReset={filterDrawer.resetDraft}
-                    onClose={filterDrawer.closeDrawer}
-                  />
-                ),
+                onOpenFilters: filterDrawer.openDrawer,
                 chips: filterDrawer.chips,
                 onRemoveChip: filterDrawer.removeChip,
                 onClearAll: clearFilters,
@@ -587,6 +579,23 @@ export function PurchaseRequisitionListPage() {
           ) : null}
         </div>
       </OperationalPageShell>
+
+      <CrmFilterDrawer
+        open={filterDrawer.open}
+        onClose={filterDrawer.closeDrawer}
+        title="Filter purchase requisitions"
+        fields={prFilterFields}
+        values={filterDrawer.draft}
+        onChange={(next) => filterDrawer.setDraft({ ...filterDrawer.draft, ...next })}
+        onApply={filterDrawer.applyFilters}
+        onReset={filterDrawer.resetDraft}
+        savedViewsSlot={
+          <p className="text-[12px] leading-snug text-erp-muted">
+            Apply filters, then use <span className="font-semibold text-erp-text">Save view</span> on
+            the register bar to reuse this setup later.
+          </p>
+        }
+      />
 
       <SaveViewDialog
         open={savedViews.saveDialogOpen}

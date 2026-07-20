@@ -388,15 +388,15 @@ export function PurchaseInvoiceListPage() {
           />
         }
       >
-        <div className="space-y-3">
-          <PurchaseRegisterContextPanel
-            ariaLabel="Purchase invoice overview and suggestions"
-            title="Invoice Insights"
-            subtitle="AI suggested bottlenecks and next actions for this register."
-            storageKey="purchase.ai-insights.invoices"
-            overview={registerOverview}
-            suggestions={registerSuggestions}
-          />
+        <PurchaseRegisterContextPanel
+          ariaLabel="Purchase invoice overview and suggestions"
+          title="Invoice Insights"
+          subtitle="Bottlenecks and next actions for this register."
+          storageKey="purchase.ai-insights.invoices"
+          overview={registerOverview}
+          suggestions={registerSuggestions}
+          placement="split"
+        >
           <EnterpriseRegisterTableShell className="min-w-0">
             <PurchaseInvoicesTable
               rows={filtered}
@@ -453,7 +453,7 @@ export function PurchaseInvoiceListPage() {
               }
             />
           </EnterpriseRegisterTableShell>
-        </div>
+        </PurchaseRegisterContextPanel>
       </OperationalPageShell>
 
       <CrmFilterDrawer

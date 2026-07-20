@@ -67,10 +67,10 @@ function buildRowActions(
   const canDelete = status === 'draft'
   const statusLabel = row.statusLabel || status
 
-  const canEditPerm = canPurchasePermission('purchase.order.edit')
-  const canApprovePerm = canPurchasePermission('purchase.order.approve')
-  const canReleasePerm = canPurchasePermission('purchase.order.release')
-  const canCancelPerm = canPurchasePermission('purchase.order.cancel')
+  const canEditPerm = canPurchasePermission('purchase.po.edit')
+  const canApprovePerm = canPurchasePermission('purchase.po.approve')
+  const canReleasePerm = canPurchasePermission('purchase.po.send')
+  const canCancelPerm = canPurchasePermission('purchase.po.cancel')
 
   return [
     { id: 'view', label: 'View', icon: Eye, onClick: () => handlers.onView(row) },
@@ -81,7 +81,7 @@ function buildRowActions(
       onClick: () => handlers.onEdit(row),
       disabled: !canEditPerm || !canEdit,
       disabledReason: !canEditPerm
-        ? getPurchasePermissionDenialReason('purchase.order.edit')
+        ? getPurchasePermissionDenialReason('purchase.po.edit')
         : `${statusLabel} purchase orders cannot be edited`,
     },
     {
@@ -92,7 +92,7 @@ function buildRowActions(
       onClick: () => handlers.onCancel(row),
       disabled: !canCancelPerm || !canDelete,
       disabledReason: !canCancelPerm
-        ? getPurchasePermissionDenialReason('purchase.order.cancel')
+        ? getPurchasePermissionDenialReason('purchase.po.cancel')
         : `${statusLabel} purchase orders cannot be deleted`,
     },
     {
@@ -102,7 +102,7 @@ function buildRowActions(
       onClick: () => handlers.onRevise(row),
       disabled: !canEditPerm || !canRevise,
       disabledReason: !canEditPerm
-        ? getPurchasePermissionDenialReason('purchase.order.edit')
+        ? getPurchasePermissionDenialReason('purchase.po.edit')
         : canRevise
           ? undefined
           : 'Revise is only available once released',
@@ -115,7 +115,7 @@ function buildRowActions(
       onClick: () => handlers.onSubmit(row),
       disabled: !canEditPerm || !canSubmit,
       disabledReason: !canEditPerm
-        ? getPurchasePermissionDenialReason('purchase.order.edit')
+        ? getPurchasePermissionDenialReason('purchase.po.edit')
         : canSubmit
           ? undefined
           : 'Only Draft orders can be submitted',
@@ -127,7 +127,7 @@ function buildRowActions(
       onClick: () => handlers.onApprove(row),
       disabled: !canApprovePerm || !canApprove,
       disabledReason: !canApprovePerm
-        ? getPurchasePermissionDenialReason('purchase.order.approve')
+        ? getPurchasePermissionDenialReason('purchase.po.approve')
         : canApprove
           ? undefined
           : 'Only Pending Approval orders can be approved',
@@ -139,7 +139,7 @@ function buildRowActions(
       onClick: () => handlers.onRelease(row),
       disabled: !canReleasePerm || !canRelease,
       disabledReason: !canReleasePerm
-        ? getPurchasePermissionDenialReason('purchase.order.release')
+        ? getPurchasePermissionDenialReason('purchase.po.send')
         : canRelease
           ? undefined
           : 'Only Approved orders can be released',
@@ -152,7 +152,7 @@ function buildRowActions(
       danger: true,
       disabled: !canCancelPerm || !canCancel || canDelete,
       disabledReason: !canCancelPerm
-        ? getPurchasePermissionDenialReason('purchase.order.cancel')
+        ? getPurchasePermissionDenialReason('purchase.po.cancel')
         : canDelete
           ? 'Use Delete for draft orders'
           : isCancelled

@@ -583,7 +583,7 @@ a.purchase-process-map__step:hover {
   min-height: 34px;
 }
 
-/* Split: open = table | rail; closed = sparkle above full-width table */
+/* Split: open = table left | insights right; closed = sparkle above full-width table */
 .purchase-register-split--collapsed .purchase-register-insights--collapsed {
   justify-content: flex-end;
 }
@@ -599,14 +599,22 @@ a.purchase-process-map__step:hover {
   color: var(--erp-muted, #605e5c);
 }
 
-/* Right rail beside register table */
+/* Right rail beside register table — always beside table in split (never stacked below) */
+.purchase-register-split > .purchase-register-insights--rail {
+  position: sticky;
+  top: 0.75rem;
+  width: 17.5rem;
+  max-width: 17.5rem;
+  flex-shrink: 0;
+}
+
 .purchase-register-insights--rail {
   width: 100%;
   max-width: 100%;
 }
 
 @media (min-width: 1280px) {
-  .purchase-register-insights--rail {
+  .purchase-register-insights--rail:not(.purchase-register-split > .purchase-register-insights--rail) {
     position: sticky;
     top: 0.75rem;
     width: 17.5rem;

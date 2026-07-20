@@ -9,7 +9,8 @@ import {
   ShoppingCart,
   ThumbsUp,
 } from 'lucide-react'
-import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
+import { ErpCardSection, ErpFormSpan } from '@/components/erp/card-form'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { Checkbox, Select, Textarea } from '@/components/forms/Inputs'
@@ -57,7 +58,7 @@ function cellHighlightClass(q: QuotationComparisonQuoteCell | undefined): string
   if (q.isLowestLanded) parts.push('bg-blue-50')
   if (q.isBestDelivery) parts.push('bg-amber-50')
   if (q.isNonCompliant) parts.push('bg-rose-50')
-  if (q.isPreferred) parts.push('ring-2 ring-inset ring-violet-400')
+  if (q.isPreferred) parts.push('ring-2 ring-inset ring-erp-primary')
   return parts.join(' ') || ''
 }
 
@@ -332,7 +333,14 @@ export function QuotationComparisonPage() {
     }
     setBusy(true)
     try {
-      const updated = await approveQuotationRecommendation(comparison.id)
+      const vendorId =
+        selectionMode === 'all_lines'
+          ? allLinesVendorId || comparison.recommendedVendorId || undefined
+          : comparison.recommendedVendorId || Object.values(lineSelections)[0] || undefined
+      const updated = await approveQuotationRecommendation(comparison.id, {
+        vendorId,
+        selectionReason: selectionReason.trim() || comparison.selectionReason,
+      })
       setComparison(updated)
       notify.success('Recommendation approved')
     } catch (err) {
@@ -363,42 +371,52 @@ export function QuotationComparisonPage() {
 
   if (loading) {
     return (
-      <OperationalPageShell
+      <PurchaseCardFormShell
         title="Quotation Comparison"
-        variant="dynamics"
+        description="Loading…"
+        status="—"
+        favoritePath="/purchase/comparison"
         breadcrumbs={purchaseBreadcrumbs('Comparison')}
         backLink={{ to: '/purchase/comparison', label: 'Back to Comparison' }}
+        footer={null}
+        detailMode
       >
         <LoadingState variant="table" rows={8} cols={8} />
-      </OperationalPageShell>
+      </PurchaseCardFormShell>
     )
   }
 
   if (!rfq) {
     return (
-      <OperationalPageShell
+      <PurchaseCardFormShell
         title="Quotation Comparison"
-        variant="dynamics"
+        description="RFQ not found"
+        status="—"
+        favoritePath="/purchase/comparison"
         breadcrumbs={purchaseBreadcrumbs('Not Found')}
         backLink={{ to: '/purchase/comparison', label: 'Back to Comparison' }}
+        footer={null}
+        detailMode
       >
         <EmptyState icon={GitCompare} title="RFQ not found" />
-      </OperationalPageShell>
+      </PurchaseCardFormShell>
     )
   }
 
   return (
-    <OperationalPageShell
+    <PurchaseCardFormShell
       title={`Compare · ${rfq.documentNumber}`}
       description="Side-by-side vendor quotation matrix"
-      badge="Purchase"
-      variant="dynamics"
+      recordNo={rfq.documentNumber}
+      status="Compare"
+      favoritePath={`/purchase/comparison/${rfq.id}`}
       breadcrumbs={purchaseBreadcrumbs(rfq.documentNumber, {
         label: 'Comparison',
         to: '/purchase/comparison',
       })}
-      favoritePath={`/purchase/comparison/${rfq.id}`}
       backLink={{ to: '/purchase/comparison', label: 'Back to Comparison' }}
+      detailMode
+      footer={null}
       commandBar={
         <ErpCommandBar
           inline
@@ -424,7 +442,7 @@ export function QuotationComparisonPage() {
               label: 'Approve Recommendation',
               icon: CheckCircle2,
               onClick: () => void onApprove(),
-              hidden: !perms.canCompareQuotation,
+              hidden: !perms.canAwardRfq,
               disabled: !comparison || busy || reasonMissing,
             },
             {
@@ -432,7 +450,7 @@ export function QuotationComparisonPage() {
               label: 'Create Purchase Order',
               icon: ShoppingCart,
               onClick: () => void onCreatePo(),
-              hidden: !perms.canCreateOrder,
+              hidden: !(perms.canConvertRfqToPo || perms.canCreateOrder),
               disabled: !comparison || busy || reasonMissing,
             },
             {
@@ -455,114 +473,140 @@ export function QuotationComparisonPage() {
         />
       }
     >
-      <div className="mb-4 rounded-md border border-erp-border bg-white p-4 print:hidden">
-        <div className="mb-3 flex flex-wrap items-center gap-2 text-[13px]">
-          <span className="text-erp-muted">RFQ:</span>
-          <Link to={`/purchase/rfqs/${rfq.id}`} className="font-mono font-medium text-erp-primary">
-            {rfq.documentNumber}
-          </Link>
-          <span className="text-erp-muted">· {quotations.length} quotation(s) on file</span>
-        </div>
+      <div className="space-y-3">
+        <ErpCardSection
+          title="Comparison Setup"
+          subtitle="Vendors, method, and criteria"
+          icon={GitCompare}
+          accent="blue"
+          collapsible
+          defaultOpen
+          dense
+          columns={1}
+        >
+          <ErpFormSpan span={3}>
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
+              <span className="text-erp-muted">RFQ:</span>
+              <Link to={`/purchase/rfqs/${rfq.id}`} className="font-mono font-medium text-erp-primary">
+                {rfq.documentNumber}
+              </Link>
+              <span className="text-erp-muted">· {quotations.length} quotation(s) on file</span>
+            </div>
+          </ErpFormSpan>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div>
-            <p className="mb-2 text-[12px] font-semibold uppercase text-erp-muted">Responding vendors</p>
+          <ErpFormSpan span={3}>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div>
+                <p className="mb-2 text-[12px] font-semibold uppercase text-erp-muted">
+                  Responding vendors
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {quotations.map((q) => (
+                    <label
+                      key={q.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-md border border-erp-border px-2 py-1 text-[12px]"
+                    >
+                      <Checkbox
+                        checked={selectedVendorIds.includes(q.vendor.id)}
+                        onChange={() => toggleVendor(q.vendor.id)}
+                      />
+                      <span>{q.vendor.name}</span>
+                      <span className="font-mono text-erp-muted">{q.documentNumber}</span>
+                    </label>
+                  ))}
+                  {quotations.length === 0 ? (
+                    <p className="text-[13px] text-erp-muted">No vendor quotations recorded yet.</p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-[12px] font-semibold uppercase text-erp-muted">
+                    Comparison method
+                  </label>
+                  <Select
+                    value={method}
+                    onChange={(e) => setMethod(e.target.value as QuotationComparisonMethod)}
+                  >
+                    {Object.entries(QUOTATION_COMPARISON_METHOD_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>
+                        {v}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[12px] font-semibold uppercase text-erp-muted">
+                    Selection mode
+                  </label>
+                  <Select
+                    value={selectionMode}
+                    onChange={(e) => setSelectionMode(e.target.value as QuotationSelectionMode)}
+                  >
+                    <option value="all_lines">One vendor for all lines</option>
+                    <option value="per_line">Per-line vendor</option>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </ErpFormSpan>
+
+          <ErpFormSpan span={3}>
+            <p className="mb-2 text-[12px] font-semibold uppercase text-erp-muted">Criteria</p>
             <div className="flex flex-wrap gap-2">
-              {quotations.map((q) => (
+              {ALL_CRITERIA.map((c) => (
                 <label
-                  key={q.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-md border border-erp-border px-2 py-1 text-[12px]"
+                  key={c}
+                  className={cn(
+                    'cursor-pointer rounded-md border px-2 py-0.5 text-[11px]',
+                    criteria.includes(c)
+                      ? 'border-erp-primary bg-erp-primary/10 text-erp-primary'
+                      : 'border-erp-border text-erp-muted',
+                  )}
                 >
-                  <Checkbox
-                    checked={selectedVendorIds.includes(q.vendor.id)}
-                    onChange={() => toggleVendor(q.vendor.id)}
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={criteria.includes(c)}
+                    onChange={() => toggleCriterion(c)}
                   />
-                  <span>{q.vendor.name}</span>
-                  <span className="font-mono text-erp-muted">{q.documentNumber}</span>
+                  {QUOTATION_COMPARISON_CRITERION_LABELS[c]}
                 </label>
               ))}
-              {quotations.length === 0 ? (
-                <p className="text-[13px] text-erp-muted">No vendor quotations recorded yet.</p>
-              ) : null}
             </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-[12px] font-semibold uppercase text-erp-muted">
-                Comparison method
-              </label>
-              <Select
-                value={method}
-                onChange={(e) => setMethod(e.target.value as QuotationComparisonMethod)}
-              >
-                {Object.entries(QUOTATION_COMPARISON_METHOD_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1 block text-[12px] font-semibold uppercase text-erp-muted">
-                Selection mode
-              </label>
-              <Select
-                value={selectionMode}
-                onChange={(e) => setSelectionMode(e.target.value as QuotationSelectionMode)}
-              >
-                <option value="all_lines">One vendor for all lines</option>
-                <option value="per_line">Per-line vendor</option>
-              </Select>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-3">
-          <p className="mb-2 text-[12px] font-semibold uppercase text-erp-muted">Criteria toggles</p>
-          <div className="flex flex-wrap gap-2">
-            {ALL_CRITERIA.map((c) => (
-              <label
-                key={c}
-                className={cn(
-                  'cursor-pointer rounded-full border px-2 py-0.5 text-[11px]',
-                  criteria.includes(c)
-                    ? 'border-erp-primary bg-erp-primary/10 text-erp-primary'
-                    : 'border-erp-border text-erp-muted',
-                )}
-              >
-                <input
-                  type="checkbox"
-                  className="sr-only"
-                  checked={criteria.includes(c)}
-                  onChange={() => toggleCriterion(c)}
-                />
-                {QUOTATION_COMPARISON_CRITERION_LABELS[c]}
-              </label>
-            ))}
-          </div>
-        </div>
-      </div>
+          </ErpFormSpan>
+        </ErpCardSection>
 
       {comparison ? (
         <>
+          <ErpCardSection
+            title="Comparison Matrix"
+            subtitle="Vendor quotes by item line"
+            icon={GitCompare}
+            accent="teal"
+            collapsible
+            defaultOpen
+            dense
+            columns={1}
+          >
           <div className="mb-3 flex flex-wrap gap-3 text-[11px] print:hidden">
-            <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-1">
+            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1">
               <span className="h-2 w-2 rounded bg-emerald-400" /> Lowest basic
             </span>
-            <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-1">
+            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1">
               <span className="h-2 w-2 rounded bg-blue-400" /> Lowest landed
             </span>
-            <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-1">
+            <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1">
               <span className="h-2 w-2 rounded bg-amber-400" /> Best delivery
             </span>
-            <span className="inline-flex items-center gap-1 rounded bg-rose-50 px-2 py-1">
+            <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-1">
               <span className="h-2 w-2 rounded bg-rose-400" /> Non-compliant
             </span>
-            <span className="inline-flex items-center gap-1 rounded px-2 py-1 ring-2 ring-violet-400">
+            <span className="inline-flex items-center gap-1 rounded-md border border-erp-primary px-2 py-1 text-erp-primary">
               Preferred vendor
             </span>
-            <span className="inline-flex items-center gap-1 rounded bg-erp-surface-alt px-2 py-1 bg-stripes-missing">
+            <span className="inline-flex items-center gap-1 rounded-md bg-erp-surface-alt px-2 py-1">
               Missing values
             </span>
           </div>
@@ -659,8 +703,19 @@ export function QuotationComparisonPage() {
               </tbody>
             </table>
           </div>
+          </ErpCardSection>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-2 print:hidden">
+          <ErpCardSection
+            title="Award Selection"
+            subtitle="Vendor choice and audit reason"
+            icon={ThumbsUp}
+            accent="amber"
+            collapsible
+            defaultOpen
+            dense
+            columns={1}
+          >
+          <div className="grid gap-4 lg:grid-cols-2 print:hidden">
             {selectionMode === 'all_lines' ? (
               <div>
                 <label className="mb-1 block text-[12px] font-semibold uppercase text-erp-muted">
@@ -718,6 +773,7 @@ export function QuotationComparisonPage() {
               {comparison.approvedBy ? ` · Approved by ${comparison.approvedBy}` : ''}
             </div>
           ) : null}
+          </ErpCardSection>
         </>
       ) : (
         <EmptyState
@@ -731,18 +787,13 @@ export function QuotationComparisonPage() {
           }
         />
       )}
+      </div>
 
       <style>{`
         .bg-stripes-missing {
-          background-image: repeating-linear-gradient(
-            -45deg,
-            transparent,
-            transparent 4px,
-            rgba(148, 163, 184, 0.15) 4px,
-            rgba(148, 163, 184, 0.15) 8px
-          );
+          background-color: var(--erp-surface-alt, #f8fafc);
         }
       `}</style>
-    </OperationalPageShell>
+    </PurchaseCardFormShell>
   )
 }

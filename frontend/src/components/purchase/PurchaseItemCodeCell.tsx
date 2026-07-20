@@ -8,8 +8,9 @@ import {
   type CSSProperties,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronsUpDown, Search } from 'lucide-react'
+import { ChevronDown, Search } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { PURCHASE_ITEM_CATEGORY_LABELS, type PurchaseItem } from '@/types/purchaseDomain'
 import { formatCurrency } from '@/utils/formatters/currency'
 
@@ -164,8 +165,9 @@ export function PurchaseItemCodeCell({
 
   const triggerLabel =
     labelMode === 'name'
-      ? selected?.itemName || itemName?.trim() || (isManual && itemCode ? itemCode : 'Select item…')
-      : selected?.itemCode || (isManual && itemCode ? itemCode : 'Select item…')
+      ? selected?.itemName || itemName?.trim() || (isManual && itemCode ? itemCode : SELECT_PLACEHOLDER)
+      : selected?.itemCode || (isManual && itemCode ? itemCode : SELECT_PLACEHOLDER)
+  const isEmpty = !selected && !(isManual && itemCode.trim()) && !itemName?.trim()
 
   return (
     <div
@@ -175,25 +177,27 @@ export function PurchaseItemCodeCell({
         labelMode === 'name' ? 'min-w-[14rem] max-w-[22rem]' : 'min-w-[9.5rem] max-w-[14rem]',
       )}
     >
-      <button
-        ref={triggerRef}
-        type="button"
-        disabled={disabled}
-        className={cn(
-          'erp-input flex h-8 w-full min-w-0 items-center justify-between gap-1 px-2',
-          labelMode === 'code' && 'font-mono',
-          textClassName,
-          !selected && !itemCode && !itemName && 'text-erp-muted',
-          open && 'ring-2 ring-erp-primary/30',
-        )}
-        onClick={() => !disabled && setOpen((v) => !v)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        title={selected ? `${selected.itemCode} — ${selected.itemName}` : 'Pick catalog item'}
-      >
-        <span className="truncate">{triggerLabel}</span>
-        <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-erp-muted" aria-hidden />
-      </button>
+      <div className="erp-select-wrap w-full">
+        <button
+          ref={triggerRef}
+          type="button"
+          disabled={disabled}
+          className={cn(
+            'erp-input erp-select flex h-8 w-full min-w-0 items-center text-left',
+            labelMode === 'code' && 'font-mono',
+            textClassName,
+            isEmpty && 'text-erp-muted',
+            open && 'ring-2 ring-erp-primary/30',
+          )}
+          onClick={() => !disabled && setOpen((v) => !v)}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          title={selected ? `${selected.itemCode} — ${selected.itemName}` : 'Pick catalog item'}
+        >
+          <span className="truncate">{triggerLabel}</span>
+        </button>
+        <ChevronDown className="erp-select-chevron pointer-events-none h-4 w-4" aria-hidden />
+      </div>
       {isManual ? (
         <input
           className={cn('erp-input h-8 w-full font-mono', textClassName)}

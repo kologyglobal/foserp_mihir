@@ -1,16 +1,19 @@
 /**
- * Purchase Reports mock service — catalog + run against domain seed via public getters.
- * Additive module; does not mutate purchaseService state.
+ * Purchase Reports — catalog + run against dual-mode getters.
+ * PR / RFQ / items / vendors use the API facade when `VITE_USE_API=true`.
+ * PO / GRN / invoice use empty in-memory store in API mode (backends not mounted).
  */
 import {
-  getGRNs,
-  getPurchaseInvoices,
   getPurchaseItems,
   getPurchaseOrders,
   getPurchaseRequisitions,
   getRFQs,
   getVendorQuotations,
   getVendors,
+} from './purchaseApiFacade'
+import {
+  getGRNs,
+  getPurchaseInvoices,
 } from './purchaseService'
 import type {
   GoodsReceiptNote,

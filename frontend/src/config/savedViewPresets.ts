@@ -287,3 +287,58 @@ export const INVOICE_REGISTER_PRESETS: Record<string, Record<string, string>> = 
     sortBy: 'documentDate',
   },
 }
+
+export const RFQ_REGISTER_PRESETS: Record<string, Record<string, string>> = {
+  'My View': {
+    search: '',
+    status: '',
+    buyerName: '',
+    locationName: '',
+    sortBy: 'documentDate',
+  },
+  Drafts: {
+    search: '',
+    status: 'draft',
+    buyerName: '',
+    locationName: '',
+    sortBy: 'documentDate',
+  },
+  Sent: {
+    search: '',
+    status: 'sent',
+    buyerName: '',
+    locationName: '',
+    sortBy: 'bidDueDate',
+  },
+  'Quotation Received': {
+    search: '',
+    status: 'quotation_received',
+    buyerName: '',
+    locationName: '',
+    sortBy: 'documentDate',
+  },
+}
+
+export const COMPARISON_REGISTER_PRESETS: Record<string, Record<string, string>> = {
+  'My View': {
+    search: '',
+    status: '',
+    buyerName: '',
+    locationName: '',
+    sortBy: 'documentDate',
+  },
+  'Ready to Compare': {
+    search: '',
+    status: 'quotation_received',
+    buyerName: '',
+    locationName: '',
+    sortBy: 'documentDate',
+  },
+  'Under Evaluation': {
+    search: '',
+    status: 'under_evaluation',
+    buyerName: '',
+    locationName: '',
+    sortBy: 'documentDate',
+  },
+}

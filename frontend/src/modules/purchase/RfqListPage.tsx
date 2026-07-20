@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Eye, Pencil, Plus, Printer, RefreshCw, Send, Trash2 } from 'lucide-react'
+import { Eye, Pencil, Plus, Printer, RefreshCw, Save, Send, Trash2 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { SaveViewDialog } from '@/components/design-system/SaveViewDialog'
 import { CrmFilterDrawer } from '@/components/crm/CrmFilterDrawer'
 import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFilterBar'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpDataGrid } from '@/components/erp/ErpDataGrid'
+import { PurchaseRegisterContextPanel } from '@/components/purchase/PurchaseRegisterContextPanel'
 import { TableLink } from '@/components/ui/AppLink'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
@@ -29,7 +31,9 @@ import {
   type RfqListFilters,
   type RfqSortKey,
 } from '@/config/rfqFilterConfig'
+import { RFQ_REGISTER_PRESETS } from '@/config/savedViewPresets'
 import { useCrmFilterDrawer } from '@/hooks/useCrmFilterDrawer'
+import { useSavedViews } from '@/hooks/useSavedViews'
 import {
   cancelRFQ,
   getRfqList,
@@ -38,6 +42,10 @@ import {
 import type { RfqListRow } from '@/types/purchaseDomain'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
+import {
+  buildRfqRegisterOverview,
+  buildRfqRegisterSuggestions,
+} from '@/utils/rfqRegisterInsights'
 import { notify } from '@/store/toastStore'
 import { usePurchasePermissions } from '@/utils/permissions'
 
@@ -67,6 +75,26 @@ export function RfqListPage() {
     void load()
   }, [load])
 
+  const applySavedFilters = useCallback((saved: Record<string, string>) => {
+    setFilters({
+      search: saved.search ?? '',
+      status: saved.status ?? '',
+      buyerName: saved.buyerName ?? '',
+      locationName: saved.locationName ?? '',
+    })
+    const sb = saved.sortBy as RfqSortKey | undefined
+    if (sb && RFQ_SORT_OPTIONS.some((o) => o.value === sb)) {
+      setSortBy(sb)
+    }
+  }, [])
+
+  const savedViews = useSavedViews({
+    pageId: '/purchase/rfqs',
+    filters: { ...filters, sortBy },
+    onApply: applySavedFilters,
+    systemPresets: RFQ_REGISTER_PRESETS,
+  })
+
   const buyerOptions = useMemo(
     () => [...new Set(rows.map((r) => r.buyerName).filter(Boolean))].sort(),
     [rows],
@@ -95,6 +123,20 @@ export function RfqListPage() {
 
   const clearFilters = () => filterDrawer.clearAll()
   const activeFilters = hasActiveRfqFilters(filters)
+
+  const registerOverview = useMemo(() => buildRfqRegisterOverview(filtered), [filtered])
+  const registerSuggestions = useMemo(
+    () =>
+      buildRfqRegisterSuggestions({
+        rows: filtered,
+        activeStatus: filters.status,
+        canCreate: perms.canCreateRfq,
+        onApplyStatus: (status) => setFilters((f) => ({ ...f, status })),
+        onCreate: () => navigate('/purchase/rfqs/new'),
+        onOpenSetup: () => navigate('/purchase/setup'),
+      }),
+    [filtered, filters.status, navigate, perms.canCreateRfq],
+  )
 
   const columns = useMemo<ColumnDef<RfqListRow>[]>(
     () => [
@@ -266,6 +308,9 @@ export function RfqListPage() {
           onClick: () => void load(),
         },
       ]}
+      moreActions={[
+        { id: 'save-view', label: 'Save View', icon: Save, onClick: savedViews.openSaveDialog },
+      ]}
     />
   )
 
@@ -312,7 +357,15 @@ export function RfqListPage() {
               }
             />
           ) : (
-            <>
+            <PurchaseRegisterContextPanel
+              ariaLabel="RFQ overview and suggestions"
+              title="RFQ Insights"
+              subtitle="Bottlenecks and next actions for this register."
+              storageKey="purchase.ai-insights.rfqs"
+              overview={registerOverview}
+              suggestions={registerSuggestions}
+              placement="split"
+            >
               <EnterpriseRegisterTableShell className="min-w-0">
                 <ErpDataGrid
                   data={filtered}
@@ -337,6 +390,10 @@ export function RfqListPage() {
                       chips={filterDrawer.chips}
                       onRemoveChip={filterDrawer.removeChip}
                       onClearAll={clearFilters}
+                      savedView={savedViews.activeView}
+                      onSavedViewChange={savedViews.selectView}
+                      savedViews={savedViews.viewNames}
+                      onSaveView={savedViews.openSaveDialog}
                       className="crm-list-filter-bar--embedded"
                       showCommandPaletteHint={false}
                       sort={
@@ -351,7 +408,7 @@ export function RfqListPage() {
                   }
                 />
               </EnterpriseRegisterTableShell>
-            </>
+            </PurchaseRegisterContextPanel>
           )}
         </OperationalPageShell>
       )}
@@ -365,6 +422,18 @@ export function RfqListPage() {
         onChange={(next) => filterDrawer.setDraft({ ...filterDrawer.draft, ...next })}
         onApply={filterDrawer.applyFilters}
         onReset={filterDrawer.resetDraft}
+        savedViewsSlot={
+          <p className="text-[12px] leading-snug text-erp-muted">
+            Apply filters, then use <span className="font-semibold text-erp-text">Save view</span> on
+            the register bar to reuse this setup later.
+          </p>
+        }
+      />
+      <SaveViewDialog
+        open={savedViews.saveDialogOpen}
+        defaultName={savedViews.activeView === 'My View' ? '' : savedViews.activeView}
+        onClose={savedViews.closeSaveDialog}
+        onSave={savedViews.saveCurrentView}
       />
     </>
   )

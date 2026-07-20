@@ -10,6 +10,7 @@ import { TabStrip } from '@/components/ui/TabStrip'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import {
   getPurchaseSetup,
+  getPurchaseWarehouses,
   PURCHASE_APPROVAL_DOCUMENT_TYPE_LABELS,
   PURCHASE_APPROVAL_ROLE_LABELS,
   PURCHASE_APPROVAL_ROLES,
@@ -35,11 +36,6 @@ import type {
   PurchaseSetupTabId,
 } from '@/types/purchaseDomain'
 import {
-  PURCHASE_DEMO_LOCATION,
-  PURCHASE_DEMO_LOCATION_FG,
-  PURCHASE_DOMAIN_ACTORS,
-} from '@/data/purchase/purchaseDomainSeed'
-import {
   PURCHASE_DELIVERY_TERMS,
   PURCHASE_PAYMENT_TERMS,
   withCurrentTermOption,
@@ -47,6 +43,7 @@ import {
 import { formatCurrency } from '@/utils/formatters/currency'
 import { notify } from '@/store/toastStore'
 import { usePurchasePermissions } from '@/utils/permissions'
+import { isApiMode } from '@/config/apiConfig'
 
 const SETUP_TABS: PurchaseSetupTabId[] = [
   'general',
@@ -59,16 +56,6 @@ const SETUP_TABS: PurchaseSetupTabId[] = [
   'quality',
   'print',
   'notifications',
-]
-
-const LOCATION_OPTIONS = [
-  { id: PURCHASE_DEMO_LOCATION.id, label: `${PURCHASE_DEMO_LOCATION.name} (${PURCHASE_DEMO_LOCATION.code})` },
-  { id: PURCHASE_DEMO_LOCATION_FG.id, label: `${PURCHASE_DEMO_LOCATION_FG.name} (${PURCHASE_DEMO_LOCATION_FG.code})` },
-]
-
-const BUYER_OPTIONS = [
-  { id: PURCHASE_DOMAIN_ACTORS.buyer.id, label: PURCHASE_DOMAIN_ACTORS.buyer.name },
-  { id: PURCHASE_DOMAIN_ACTORS.purchaseHead.id, label: PURCHASE_DOMAIN_ACTORS.purchaseHead.name },
 ]
 
 const INDIAN_STATES: { name: string; code: string }[] = [
@@ -160,6 +147,8 @@ export function PurchaseSetupPage() {
   const location = useLocation()
   const perms = usePurchasePermissions()
   const [setup, setSetup] = useState<PurchaseSetup | null>(null)
+  const [locationOptions, setLocationOptions] = useState<Array<{ id: string; label: string }>>([])
+  const [buyerOptions, setBuyerOptions] = useState<Array<{ id: string; label: string }>>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [tab, setTab] = useState<PurchaseSetupTabId>(() => tabFromHash(location.hash))
@@ -171,7 +160,23 @@ export function PurchaseSetupPage() {
   const load = async () => {
     setLoading(true)
     try {
-      setSetup(await getPurchaseSetup())
+      const [nextSetup, warehouses] = await Promise.all([
+        getPurchaseSetup(),
+        getPurchaseWarehouses(),
+      ])
+      setSetup(nextSetup)
+      setLocationOptions(
+        warehouses.map((w) => ({
+          id: w.id,
+          label: w.code ? `${w.name} (${w.code})` : w.name,
+        })),
+      )
+      const buyerId = nextSetup.general.defaultBuyerId
+      setBuyerOptions(
+        buyerId
+          ? [{ id: buyerId, label: buyerId }]
+          : [],
+      )
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Failed to load setup')
     } finally {
@@ -344,9 +349,11 @@ export function PurchaseSetupPage() {
         />
       }
     >
+      {!isApiMode() ? (
       <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
         Demo mode — Purchase Setup is saved in browser memory only until the purchase API is wired.
       </p>
+      ) : null}
 
       <TabStrip tabs={tabItems} active={tab} onChange={setTab} className="mb-4" />
 
@@ -365,7 +372,8 @@ export function PurchaseSetupPage() {
                     value={setup.general.defaultPurchaseLocationId}
                     onChange={(e) => patchGeneral('defaultPurchaseLocationId', e.target.value)}
                   >
-                    {LOCATION_OPTIONS.map((o) => (
+                    <option value="">Select location</option>
+                    {locationOptions.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.label}
                       </option>
@@ -377,7 +385,8 @@ export function PurchaseSetupPage() {
                     value={setup.general.defaultWarehouseId}
                     onChange={(e) => patchGeneral('defaultWarehouseId', e.target.value)}
                   >
-                    {LOCATION_OPTIONS.map((o) => (
+                    <option value="">Select warehouse</option>
+                    {locationOptions.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.label}
                       </option>
@@ -389,7 +398,8 @@ export function PurchaseSetupPage() {
                     value={setup.general.defaultBuyerId}
                     onChange={(e) => patchGeneral('defaultBuyerId', e.target.value)}
                   >
-                    {BUYER_OPTIONS.map((o) => (
+                    <option value="">Not set</option>
+                    {buyerOptions.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.label}
                       </option>
@@ -517,7 +527,8 @@ export function PurchaseSetupPage() {
                     value={setup.requisition.defaultLocationId}
                     onChange={(e) => patchRequisition('defaultLocationId', e.target.value)}
                   >
-                    {LOCATION_OPTIONS.map((o) => (
+                    <option value="">Select location</option>
+                    {locationOptions.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.label}
                       </option>
@@ -525,15 +536,15 @@ export function PurchaseSetupPage() {
                   </Select>
                 </FormField>
                 <FormField
-                  label="Skip RFQ"
-                  hint="No = RFQ Required. Yes = RFQ is not required (direct PO after approval)."
+                  label="RFQ Required? (default for new PRs)"
+                  hint="Yes = RFQ path. No = Direct purchase planning (Planning Sheet after approval)."
                 >
                   <Select
-                    value={setup.requisition.skipRfq ? 'yes' : 'no'}
-                    onChange={(e) => patchRequisition('skipRfq', e.target.value === 'yes')}
+                    value={setup.requisition.skipRfq ? 'no' : 'yes'}
+                    onChange={(e) => patchRequisition('skipRfq', e.target.value === 'no')}
                   >
-                    <option value="no">No — RFQ Required</option>
-                    <option value="yes">Yes — RFQ is not required</option>
+                    <option value="yes">Yes, Vendor quotations required</option>
+                    <option value="no">No, Direct purchase planning</option>
                   </Select>
                 </FormField>
                 <FormField
@@ -986,7 +997,7 @@ export function PurchaseSetupPage() {
                     value={setup.receiving.defaultReceivingWarehouseId}
                     onChange={(e) => patchReceiving('defaultReceivingWarehouseId', e.target.value)}
                   >
-                    {LOCATION_OPTIONS.map((o) => (
+                    {locationOptions.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.label}
                       </option>
@@ -1075,7 +1086,7 @@ export function PurchaseSetupPage() {
                     value={setup.quality.defaultQuarantineWarehouseId}
                     onChange={(e) => patchQuality('defaultQuarantineWarehouseId', e.target.value)}
                   >
-                    {LOCATION_OPTIONS.map((o) => (
+                    {locationOptions.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.label}
                       </option>

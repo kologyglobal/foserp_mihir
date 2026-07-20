@@ -247,6 +247,13 @@ export const usePurchaseMasterStore = create<PurchaseMasterState>()(
       name: ERP_STORAGE_KEYS.purchaseMasters,
       storage: erpStorage,
       partialize: (s) => ({ entries: s.entries, settings: s.settings }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return
+        const existingIds = new Set(state.entries.map((e) => e.id))
+        const missing = PURCHASE_MASTERS_SEED.filter((e) => !existingIds.has(e.id))
+        if (missing.length === 0) return
+        state.entries = [...state.entries, ...missing.map((e) => ({ ...e }))]
+      },
     },
   ),
 )

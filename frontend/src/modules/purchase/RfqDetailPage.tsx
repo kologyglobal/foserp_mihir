@@ -13,6 +13,10 @@ import {
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
 import {
+  PurchaseAuditTimeline,
+  buildDemoPurchaseTimeline,
+} from '@/components/purchase/PurchaseAuditTimeline'
+import {
   PurchaseDocumentFactBox,
   buildPurchaseRelatedLinks,
   purchaseDocumentApprovalFact,
@@ -214,7 +218,7 @@ export function RfqDetailPage() {
     statusAllowed: isDraft,
   })
   const compareGate = purchaseActionGate({
-    permission: 'purchase.quotation.compare',
+    permission: 'purchase.rfq.compare',
     statusAllowed: canCompare,
     statusBlockedReason: 'Send the RFQ and collect quotations before comparing',
   })
@@ -354,39 +358,7 @@ export function RfqDetailPage() {
         footer={null}
         detailMode
       >
-        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 print:hidden">
-          <div className="rounded-md border border-erp-border bg-white px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Vendors</p>
-            <p className="mt-1 text-xl font-semibold tabular-nums text-erp-text">
-              {responseStats.selected}
-            </p>
-            <p className="text-[12px] text-erp-muted">Selected for invite</p>
-          </div>
-          <div className="rounded-md border border-erp-border bg-white px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Quoted</p>
-            <p className="mt-1 text-xl font-semibold tabular-nums text-emerald-700">
-              {responseStats.quoted}
-            </p>
-            <p className="text-[12px] text-erp-muted">Responses received</p>
-          </div>
-          <div className="rounded-md border border-erp-border bg-white px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Awaiting</p>
-            <p className="mt-1 text-xl font-semibold tabular-nums text-sky-700">
-              {responseStats.sent}
-            </p>
-            <p className="text-[12px] text-erp-muted">Sent / viewed</p>
-          </div>
-          <div className="rounded-md border border-erp-border bg-white px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
-              Estimated Value
-            </p>
-            <p className="mt-1 text-xl font-semibold tabular-nums text-erp-text">
-              {formatCurrency(rfq.estimatedValue)}
-            </p>
-            <p className="text-[12px] text-erp-muted">{rfq.lines.length} item line(s)</p>
-          </div>
-        </div>
-
+        <div className="space-y-3">
         <ErpCardSection title="General" subtitle="Identity, buyer, and locations" defaultOpen>
           <ErpViewField label="RFQ Number" value={rfq.documentNumber} />
           <ErpViewField label="RFQ Date" value={formatDate(rfq.documentDate)} />
@@ -579,6 +551,27 @@ export function RfqDetailPage() {
             </div>
           )}
         </ErpCardSection>
+
+        <ErpCardSection title="Audit Timeline" subtitle="Lifecycle and vendor activity" columns={1} defaultOpen>
+          <PurchaseAuditTimeline
+            entityType="rfq"
+            entityId={rfq.id}
+            className="border-0 p-0 shadow-none"
+            demoEvents={buildDemoPurchaseTimeline({
+              entityId: rfq.id,
+              entityType: 'RequestForQuotation',
+              createdAt: rfq.createdAt,
+              createdBy: rfq.createdBy,
+              updatedAt: rfq.updatedAt,
+              updatedBy: rfq.updatedBy,
+              statusLabel: RFQ_DOMAIN_STATUS_LABELS[rfq.status],
+              extra: rfq.sentAt
+                ? [{ action: 'RFQ_SENT', actionLabel: 'Sent', timestamp: rfq.sentAt }]
+                : [],
+            })}
+          />
+        </ErpCardSection>
+        </div>
       </PurchaseCardFormShell>
 
       <Modal

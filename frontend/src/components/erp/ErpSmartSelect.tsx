@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -72,7 +73,7 @@ export function ErpSmartSelect<T extends string = string>({
   /** Filter text only — empty on open so the full list is visible without clearing the field */
   const [filterQuery, setFilterQuery] = useState('')
   const [highlightIndex, setHighlightIndex] = useState(0)
-  const [dropdownStyle, setDropdownStyle] = useState<CSSProperties>({})
+  const [dropdownStyle, setDropdownStyle] = useState<CSSProperties | null>(null)
 
   const selected = options.find((o) => o.value === value)
   const orphanLabel =
@@ -95,6 +96,7 @@ export function ErpSmartSelect<T extends string = string>({
   const positionDropdown = useCallback(() => {
     if (!anchorRef.current) return
     const rect = anchorRef.current.getBoundingClientRect()
+    if (rect.width === 0 && rect.height === 0) return
     const width = Math.max(rect.width, dropdownMinWidth)
     const left = Math.min(rect.left, window.innerWidth - width - 8)
     setDropdownStyle({
@@ -111,6 +113,7 @@ export function ErpSmartSelect<T extends string = string>({
     const selectedIndex = options.findIndex((o) => o.value === value)
     if (resetFilter) setFilterQuery('')
     setHighlightIndex(selectedIndex >= 0 ? selectedIndex : 0)
+    setDropdownStyle(null)
     setOpen(true)
     requestAnimationFrame(() => {
       inputRef.current?.focus()
@@ -124,10 +127,11 @@ export function ErpSmartSelect<T extends string = string>({
     if (!open) {
       setFilterQuery('')
       setHighlightIndex(0)
+      setDropdownStyle(null)
     }
   }, [open])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return
     positionDropdown()
     window.addEventListener('scroll', positionDropdown, true)
@@ -269,7 +273,8 @@ export function ErpSmartSelect<T extends string = string>({
         <ChevronDown className={cn('erp-smart-select__chevron h-4 w-4', open && 'erp-smart-select__chevron--open')} aria-hidden />
       </div>
 
-      {open && createPortal(
+      {open && dropdownStyle
+        ? createPortal(
         <div ref={dropdownRef} className="erp-smart-select__dropdown" style={dropdownStyle} role="listbox">
           {filtered.length === 0 ? (
             <p className="erp-smart-select__empty">{emptyMessage}</p>
@@ -321,7 +326,8 @@ export function ErpSmartSelect<T extends string = string>({
           )}
         </div>,
         document.body,
-      )}
+      )
+        : null}
     </div>
   )
 }

@@ -23,8 +23,8 @@ interface PurchaseRegisterContextPanelProps {
   className?: string
   /**
    * `band` — full-width above the table (default).
-   * `rail` — sticky column on the right (parent supplies flex row).
-   * `split` — wraps `children`: open = table | insights; closed = sparkle above table.
+   * `rail` — sticky column (parent supplies flex row).
+   * `split` — wraps `children`: open = table left | insights right; closed = sparkle above table.
    */
   placement?: 'band' | 'rail' | 'split'
   /** Required for `placement="split"` — usually the register table. */
@@ -92,8 +92,8 @@ export function PurchaseRegisterContextPanel({
     }
 
     return (
-      <div className="purchase-register-split flex flex-col gap-3 xl:flex-row xl:items-start">
-        <div className="min-w-0 flex-1">{children}</div>
+      <div className="purchase-register-split flex flex-row items-start gap-3">
+        <div className="min-w-0 flex-1 overflow-x-auto">{children}</div>
         {panel}
       </div>
     )

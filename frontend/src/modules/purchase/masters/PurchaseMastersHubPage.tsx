@@ -65,6 +65,7 @@ const ICONS: Record<string, typeof Building2> = {
   'qc-rules': FlaskConical,
   'grn-tolerance': Scale,
   'return-reasons': RotateCcw,
+  'bin-codes': MapPin,
 }
 
 function MasterCard({

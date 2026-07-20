@@ -19,11 +19,9 @@ import {
 } from '@/components/purchase/PurchaseDocumentFactBox'
 import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
 import { ErpCardSection, ErpFieldRow, ErpFormSpan, ErpStickySaveBar } from '@/components/erp/card-form'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { EnterpriseFormMetrics, EnterpriseFormSectionNav } from '@/design-system/workspace'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
   joinFastTabSummary,
@@ -37,7 +35,6 @@ import {
   getPurchaseOrderById,
   getPurchaseOrders,
   PurchaseServiceError,
-  submitGRN,
   updateGRN,
   GRN_DOMAIN_STATUS_LABELS,
 } from '@/services/purchase'
@@ -47,6 +44,7 @@ import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { systemConfirm } from '@/utils/systemConfirm'
 import { cn } from '@/utils/cn'
+import { isApiMode } from '@/config/apiConfig'
 
 type LineDraft = {
   purchaseOrderLineId: string
@@ -77,14 +75,6 @@ type LineDraft = {
   expiryControlled: boolean
   remarks: string
 }
-
-const SECTIONS = [
-  { id: 'po-source', label: 'PO Source', icon: ClipboardList },
-  { id: 'document', label: 'Document', icon: FileText },
-  { id: 'receiving', label: 'Receiving', icon: Truck },
-  { id: 'lines', label: 'Lines', icon: PackageCheck },
-  { id: 'notes', label: 'Notes', icon: StickyNote },
-]
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -194,8 +184,6 @@ export function GrnEditorPage() {
   const [remarks, setRemarks] = useState('')
   const [lines, setLines] = useState<LineDraft[]>([])
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const [activeSection, setActiveSection] = useState('po-source')
-
   const { markDirty, resetDirty } = useUnsavedChangesGuard(true)
 
   const receivableOrders = useMemo(
@@ -223,42 +211,6 @@ export function GrnEditorPage() {
       excessQty,
     }
   }, [lines])
-
-  const formMetrics = useMemo(
-    () => [
-      {
-        label: 'Lines',
-        value: String(lineTotals.lineCount),
-        accent: 'blue' as const,
-        highlight: lineTotals.lineCount > 0,
-      },
-      {
-        label: 'Received Qty',
-        value: formatNumber(lineTotals.receivedQty),
-        accent: 'green' as const,
-        highlight: lineTotals.receivedQty > 0,
-      },
-      {
-        label: 'Pending Qty',
-        value: formatNumber(lineTotals.pendingQty),
-        accent: 'amber' as const,
-        highlight: lineTotals.pendingQty > 0,
-      },
-      {
-        label: 'Short',
-        value: formatNumber(lineTotals.shortQty),
-        accent: 'violet' as const,
-        highlight: lineTotals.shortQty > 0,
-      },
-      {
-        label: 'Excess',
-        value: formatNumber(lineTotals.excessQty),
-        accent: 'slate' as const,
-        highlight: lineTotals.excessQty > 0,
-      },
-    ],
-    [lineTotals],
-  )
 
   const receivingPeek = useMemo(
     () =>
@@ -341,22 +293,6 @@ export function GrnEditorPage() {
   const readOnlyHeaderPo = !isNew && Boolean(recordId)
   const showPoPicker = isNew || !readOnlyHeaderPo
 
-  const navSections = useMemo(
-    () =>
-      SECTIONS.filter((s) => s.id !== 'po-source' || showPoPicker).map((s) => {
-        if (s.id === 'po-source') return { ...s, done: Boolean(poId) }
-        if (s.id === 'document') return { ...s, done: Boolean(documentDate && poId) }
-        if (s.id === 'receiving') return { ...s, done: Boolean(warehouseId && warehouseName.trim()) }
-        if (s.id === 'lines') return { ...s, done: lines.length > 0 }
-        return { ...s, done: Boolean(remarks.trim()) }
-      }),
-    [showPoPicker, poId, documentDate, warehouseId, warehouseName, lines.length, remarks],
-  )
-
-  useEffect(() => {
-    if (!showPoPicker && activeSection === 'po-source') setActiveSection('document')
-  }, [showPoPicker, activeSection])
-
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -397,7 +333,6 @@ export function GrnEditorPage() {
         setAllowExcess(grn.allowExcess)
         setRemarks(grn.remarks)
         setLines(linesFromGrn(grn))
-        setActiveSection('document')
         resetDirty()
       } else {
         const initialPoId = searchParams.get('poId') ?? ''
@@ -409,7 +344,6 @@ export function GrnEditorPage() {
             setWarehouseName(po.deliveryLocation.name)
             setLines(linesFromPo(po, controls))
             setInspectionRequired(true)
-            setActiveSection('document')
           }
         }
         resetDirty()
@@ -435,7 +369,6 @@ export function GrnEditorPage() {
     setWarehouseId(po.deliveryLocation.id)
     setWarehouseName(po.deliveryLocation.name)
     setLines(linesFromPo(po, itemControls))
-    setActiveSection('document')
   }
 
   const updateLine = (index: number, patch: Partial<LineDraft>) => {
@@ -489,27 +422,56 @@ export function GrnEditorPage() {
     })),
   })
 
-  const validateClient = (): boolean => {
+  /** Returns the first clear, user-facing message (or null when valid). */
+  const validateClient = (): string | null => {
     const errs: Record<string, string> = {}
-    if (!poId) errs.poId = 'Select a purchase order'
-    if (!warehouseId.trim()) errs.warehouseId = 'Warehouse is mandatory'
-    if (!lines.length) errs.lines = 'Add at least one line with open quantity'
+    const messages: string[] = []
+
+    const push = (key: string, message: string) => {
+      errs[key] = message
+      messages.push(message)
+    }
+
+    if (!poId) push('poId', 'Please select a purchase order.')
+    if (!warehouseId.trim()) push('warehouseId', 'Please select a warehouse.')
+    if (!lines.length) push('lines', 'Add at least one line with open quantity to receive.')
+
     lines.forEach((l, i) => {
-      if ((Number(l.receivedQty) || 0) <= 0) errs[`line-${i}-qty`] = 'Received qty required'
-      if (l.batchControlled && !l.batchNumber.trim()) errs[`line-${i}-batch`] = 'Batch required'
-      if (l.serialControlled && !l.serialNumber.trim()) errs[`line-${i}-serial`] = 'Serial required'
-      if (l.expiryControlled && !l.expiryDate) errs[`line-${i}-expiry`] = 'Expiry required'
+      const itemLabel = (l.itemCode || l.itemName || `Line ${i + 1}`).trim()
+      if ((Number(l.receivedQty) || 0) <= 0) {
+        push(`line-${i}-qty`, `Enter received quantity for ${itemLabel}.`)
+      }
+      if (l.batchControlled && !l.batchNumber.trim()) {
+        push(`line-${i}-batch`, `Batch number is required for ${itemLabel}.`)
+      }
+      if (l.serialControlled && !l.serialNumber.trim()) {
+        push(`line-${i}-serial`, `Serial number is required for ${itemLabel}.`)
+      }
+      if (l.expiryControlled && !l.expiryDate) {
+        push(`line-${i}-expiry`, `Expiry date is required for ${itemLabel}.`)
+      }
       if ((Number(l.receivedQty) || 0) > l.pendingQty && !l.allowExcess && !allowExcess) {
-        errs[`line-${i}-excess`] = 'Exceeds pending — enable Allow Excess'
+        push(
+          `line-${i}-excess`,
+          `Received quantity for ${itemLabel} exceeds pending quantity. Turn on Allow Excess to continue.`,
+        )
       }
     })
+
     setFieldErrors(errs)
-    return Object.keys(errs).length === 0
+    return messages[0] ?? null
   }
 
   const saveDraft = async () => {
-    if (!validateClient()) {
-      notify.error('Fix validation errors before saving')
+    if (isApiMode()) {
+      notify.info(
+        'GRN create/save is not available in API mode yet. Purchase receipt (GRN) backend is the next phase after PO lifecycle.',
+      )
+      return
+    }
+    const firstError = validateClient()
+    if (firstError) {
+      notify.error(firstError)
       return
     }
     setSaving(true)
@@ -520,14 +482,14 @@ export function GrnEditorPage() {
         setDocumentNumber(updated.documentNumber)
         setStatus(updated.status)
         setLines(linesFromGrn(updated))
-        notify.success(`Draft ${updated.documentNumber} saved`)
+        notify.success(`Saved · ${updated.documentNumber}`)
       } else {
         const created = await createGRNFromPo(input)
         setRecordId(created.id)
         setDocumentNumber(created.documentNumber)
         setStatus(created.status)
         setLines(linesFromGrn(created))
-        notify.success(`Created ${created.documentNumber}`)
+        notify.success(`Saved · ${created.documentNumber}`)
         resetDirty()
         navigate(`/purchase/grn/${created.id}/edit`, { replace: true })
         return
@@ -555,53 +517,6 @@ export function GrnEditorPage() {
     }
   }
 
-  const submit = async () => {
-    if (!validateClient()) {
-      notify.error('Fix validation errors before submit')
-      return
-    }
-    setSaving(true)
-    try {
-      let grnId = recordId
-      const input = buildInput()
-      if (!grnId) {
-        const created = await createGRNFromPo(input)
-        grnId = created.id
-        setRecordId(created.id)
-        setDocumentNumber(created.documentNumber)
-      } else {
-        await updateGRN(grnId, input)
-      }
-      const submitted = await submitGRN(grnId)
-      setStatus(submitted.status)
-      resetDirty()
-      notify.success(
-        submitted.inspectionRequired
-          ? `${submitted.documentNumber} submitted — pending inspection`
-          : `${submitted.documentNumber} submitted`,
-      )
-      navigate(`/purchase/grn/${submitted.id}`)
-    } catch (err) {
-      if (err instanceof PurchaseServiceError && err.code === 'EXCESS_QTY_REQUIRES_PERMISSION') {
-        const ok = await systemConfirm({
-          title: 'Allow excess receipt?',
-          description: `${err.message}\n\nAllow excess receipt?`,
-          confirmLabel: 'Allow excess',
-          cancelLabel: 'Cancel',
-          variant: 'danger',
-        })
-        if (ok) {
-          setAllowExcess(true)
-          notify.info('Allow Excess enabled — submit again')
-        }
-      } else {
-        notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
-      }
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const breadcrumbs = [
     { label: 'Goods Receipts', to: '/purchase/grn' },
     { label: isNew ? 'New' : documentNumber ?? 'Edit' },
@@ -618,7 +533,6 @@ export function GrnEditorPage() {
           { label: 'Goods Receipts', to: '/purchase/grn' },
           { label: 'Loading' },
         ]}
-        backLink={{ to: '/purchase/grn', label: 'Back to Goods Receipts' }}
         footer={null}
       >
         <LoadingState variant="form" rows={8} />
@@ -638,30 +552,8 @@ export function GrnEditorPage() {
       recordHeaderFacts={recordHeaderFacts}
       favoritePath={recordId ? `/purchase/grn/${recordId}/edit` : '/purchase/grn/new'}
       breadcrumbs={breadcrumbs}
-      backLink={{ to: '/purchase/grn', label: 'Back to Goods Receipts' }}
       factBox={documentFactBox}
-      commandBar={
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={{
-            id: 'submit',
-            label: 'Submit',
-            icon: Send,
-            onClick: () => void submit(),
-            disabled: saving || (status !== 'draft' && Boolean(recordId)),
-          }}
-          secondaryActions={[
-            {
-              id: 'save',
-              label: saving ? 'Saving…' : 'Save Draft',
-              icon: Save,
-              onClick: () => void saveDraft(),
-              disabled: saving,
-            },
-          ]}
-        />
-      }
+      commandBar={null}
       stickyFooter
       footer={
         <ErpStickySaveBar
@@ -686,32 +578,32 @@ export function GrnEditorPage() {
               >
                 {saving ? 'Saving…' : 'Save Draft'}
               </ErpButton>
+              <ErpButton
+                type="button"
+                variant="primary"
+                icon={Send}
+                disabled={saving || (status !== 'draft' && Boolean(recordId))}
+                onClick={() => void submit()}
+              >
+                Submit
+              </ErpButton>
             </ErpButtonGroup>
           }
         />
       }
       onSaveShortcut={() => void saveDraft()}
     >
-      <EnterpriseFormMetrics metrics={formMetrics} />
-
-      <EnterpriseFormSectionNav
-        sections={navSections}
-        activeId={activeSection}
-        onSelect={setActiveSection}
-      />
-
-      {showPoPicker && activeSection === 'po-source' ? (
+      {showPoPicker ? (
         <ErpCardSection
           id={purchaseSectionId('po-source')}
           title="PO Source"
           subtitle="Select a released purchase order with open quantity"
           icon={ClipboardList}
           accent="slate"
-          collapsible={false}
+          collapsible
           defaultOpen
           dense
           columns={1}
-          className="erp-card-section--tab-panel"
         >
           <ErpFormSpan span={1}>
             <p className="mb-2 text-[12px] text-erp-muted">
@@ -792,17 +684,15 @@ export function GrnEditorPage() {
         </ErpCardSection>
       ) : null}
 
-      {activeSection === 'document' ? (
       <ErpCardSection
         id={purchaseSectionId('document')}
         title="Document"
         subtitle="GRN identity, vendor, and challan references"
         icon={FileText}
         accent="blue"
-        collapsible={false}
+        collapsible
         defaultOpen
         dense
-        className="erp-card-section--tab-panel"
       >
         <ErpFormSpan span={3}>
           <p className="erp-field-group__label">Document</p>
@@ -859,9 +749,7 @@ export function GrnEditorPage() {
           />
         </ErpFieldRow>
       </ErpCardSection>
-      ) : null}
 
-      {activeSection === 'receiving' ? (
       <ErpCardSection
         id={purchaseSectionId('receiving')}
         title="Receiving"
@@ -869,10 +757,9 @@ export function GrnEditorPage() {
         collapsedSummary={receivingPeek || undefined}
         icon={Truck}
         accent="green"
-        collapsible={false}
+        collapsible
         defaultOpen
         dense
-        className="erp-card-section--tab-panel"
       >
         <ErpFormSpan span={3}>
           <p className="erp-field-group__label">Location</p>
@@ -991,9 +878,7 @@ export function GrnEditorPage() {
           </ErpFormSpan>
         ) : null}
       </ErpCardSection>
-      ) : null}
 
-      {activeSection === 'lines' ? (
       <ErpCardSection
         id={purchaseSectionId('lines')}
         title="Lines"
@@ -1001,11 +886,10 @@ export function GrnEditorPage() {
         collapsedSummary={linesPeek || undefined}
         icon={PackageCheck}
         accent="amber"
-        collapsible={false}
+        collapsible
         defaultOpen
         dense
         columns={1}
-        className="erp-card-section--tab-panel"
       >
         <ErpFormSpan span={1}>
         {fieldErrors.lines ? (
@@ -1152,9 +1036,7 @@ export function GrnEditorPage() {
         </div>
         </ErpFormSpan>
       </ErpCardSection>
-      ) : null}
 
-      {activeSection === 'notes' ? (
       <ErpCardSection
         id={purchaseSectionId('notes')}
         title="Notes"
@@ -1162,11 +1044,10 @@ export function GrnEditorPage() {
         collapsedSummary={notesPeek || undefined}
         icon={StickyNote}
         accent="violet"
-        collapsible={false}
+        collapsible
         defaultOpen
         dense
         columns={1}
-        className="erp-card-section--tab-panel"
       >
         <ErpFieldRow label="Remarks" horizontal={false}>
           <Textarea
@@ -1180,7 +1061,6 @@ export function GrnEditorPage() {
           />
         </ErpFieldRow>
       </ErpCardSection>
-      ) : null}
     </PurchaseCardFormShell>
   )
 }

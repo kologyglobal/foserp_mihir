@@ -850,7 +850,7 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
         </ErpCardSection>
       ) : null}
       {isView && ['approved', 'submitted'].includes(status) && !linkedPo ? (
-        <ErpCardSection title="Create Purchase Order" subtitle="Skip RFQ when vendor is known (canonical step 9)" accent="teal" collapsible defaultOpen>
+        <ErpCardSection title="Create Purchase Order" subtitle="Direct purchase planning when RFQ is not required (canonical step 9)" accent="teal" collapsible defaultOpen>
           <ErpFieldRow label="Vendor">
             <VendorLookupSelect
               compact

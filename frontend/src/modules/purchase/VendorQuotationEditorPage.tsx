@@ -27,11 +27,9 @@ import {
   ErpFormSpan,
   ErpStickySaveBar,
 } from '@/components/erp/card-form'
-import { ErpButton } from '@/components/erp/ErpButton'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { Badge } from '@/components/ui/Badge'
-import { EnterpriseFormMetrics } from '@/design-system/workspace'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
@@ -715,29 +713,6 @@ export function VendorQuotationEditorPage() {
     [isNew, documentNumber, vendorFact, selectedRfq?.documentNumber, documentDate, validTill],
   )
 
-  const formMetrics = useMemo(
-    () => [
-      {
-        label: 'Lines',
-        value: String(filledLineCount || computedLines.length),
-        accent: 'green' as const,
-        highlight: filledLineCount > 0,
-      },
-      {
-        label: 'Taxable',
-        value: formatCurrency(totals.taxableAmount),
-        accent: 'blue' as const,
-      },
-      {
-        label: 'Total',
-        value: formatCurrency(totals.totalAmount),
-        accent: 'amber' as const,
-        highlight: totals.totalAmount > 0,
-      },
-    ],
-    [filledLineCount, computedLines.length, totals.taxableAmount, totals.totalAmount],
-  )
-
   const quotationPeek = joinFastTabSummary([
     selectedRfq?.documentNumber ? `RFQ ${selectedRfq.documentNumber}` : false,
     formatFastTabDate(documentDate) ? `Date ${formatFastTabDate(documentDate)}` : false,
@@ -831,7 +806,6 @@ export function VendorQuotationEditorPage() {
           { label: 'Vendor Quotations', to: '/purchase/vendor-quotations' },
           { label: 'Loading' },
         ]}
-        backLink={{ to: '/purchase/vendor-quotations', label: 'Back to Vendor Quotations' }}
         footer={null}
       >
         <LoadingState variant="form" rows={8} />
@@ -857,49 +831,48 @@ export function VendorQuotationEditorPage() {
         { label: 'Vendor Quotations', to: '/purchase/vendor-quotations' },
         { label: isNew ? 'New' : documentNumber ?? 'Edit' },
       ]}
-      backLink={{ to: '/purchase/vendor-quotations', label: 'Back to Vendor Quotations' }}
       factBox={documentFactBox}
       collapsibleFactBox
-      commandBar={
-        <ErpCommandBar
-          inline
-          sticky={false}
-          collapseSecondaryOnNarrow
-          secondaryActions={[
-            {
-              id: 'draft',
-              label: saving ? 'Saving…' : 'Save Draft',
-              icon: Save,
-              onClick: () => void saveDraft(),
-              disabled: saving || status !== 'draft',
-              pin: true,
-            },
-          ]}
-          primaryAction={{
-            id: 'submit',
-            label: 'Save & Submit',
-            icon: Send,
-            onClick: () => void saveAndSubmit(),
-            disabled: saving || status !== 'draft',
-          }}
-        />
-      }
+      commandBar={null}
       stickyFooter
       footer={
         <ErpStickySaveBar
           sticky
-          onSave={() => void saveDraft()}
-          submitLabel={saving ? 'Saving…' : 'Save Draft'}
           isSubmitting={saving}
-          submitDisabled={saving || status !== 'draft'}
-          cancelLabel="Cancel"
-          onCancel={() => navigate('/purchase/vendor-quotations')}
+          actions={
+            <ErpButtonGroup>
+              <ErpButton
+                type="button"
+                variant="secondary"
+                disabled={saving}
+                onClick={() => navigate('/purchase/vendor-quotations')}
+              >
+                Cancel
+              </ErpButton>
+              <ErpButton
+                type="button"
+                variant="secondary"
+                icon={Save}
+                disabled={saving || status !== 'draft'}
+                onClick={() => void saveDraft()}
+              >
+                {saving ? 'Saving…' : 'Save Draft'}
+              </ErpButton>
+              <ErpButton
+                type="button"
+                variant="primary"
+                icon={Send}
+                disabled={saving || status !== 'draft'}
+                onClick={() => void saveAndSubmit()}
+              >
+                Save & Submit
+              </ErpButton>
+            </ErpButtonGroup>
+          }
         />
       }
       onSaveShortcut={() => void saveDraft()}
     >
-      <EnterpriseFormMetrics metrics={formMetrics} />
-
       <ErpCardSection
         title="Quotation"
         subtitle="RFQ link, dates, and document identity"

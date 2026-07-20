@@ -53,6 +53,8 @@ export type PurchaseOrderOriginPickerProps = {
   selected?: PurchaseOrderOrigin | null
   /** Optional count badge on Approved PR (e.g. pending direct PO). */
   pendingPoCount?: number
+  /** Origins that cannot be used (e.g. not API-backed yet). */
+  disabledOrigins?: Partial<Record<PurchaseOrderOrigin, string>>
   className?: string
 }
 
@@ -64,6 +66,7 @@ export function PurchaseOrderOriginPicker({
   onSelect,
   selected = null,
   pendingPoCount,
+  disabledOrigins,
   className,
 }: PurchaseOrderOriginPickerProps) {
   return (
@@ -73,7 +76,7 @@ export function PurchaseOrderOriginPicker({
       <div className="mb-3 max-w-2xl">
         <h2 className="text-[15px] font-semibold text-erp-text">How do you want to create this PO?</h2>
         <p className="mt-0.5 text-[12px] leading-snug text-erp-muted">
-          Choose a source to prefill vendor and lines, or start with manual entry.
+          Prefer Planning (direct PR) or Quotation Comparison (RFQ path). Other origins require APIs not enabled yet.
         </p>
       </div>
 
@@ -86,22 +89,29 @@ export function PurchaseOrderOriginPicker({
           const meta = ORIGIN_META[mode]
           const Icon = meta.icon
           const isSelected = selected === mode
-          const recommended = mode === 'purchase_requisition'
+          const recommended = mode === 'purchase_requisition' || mode === 'quotation_comparison'
+          const disabledReason = disabledOrigins?.[mode]
+          const disabled = Boolean(disabledReason)
           return (
             <button
               key={mode}
               type="button"
               role="option"
               aria-selected={isSelected}
-              title={meta.description}
+              aria-disabled={disabled}
+              disabled={disabled}
+              title={disabledReason ?? meta.description}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-[12px] font-medium transition-colors',
                 isSelected
                   ? 'border-erp-primary bg-erp-primary text-white'
                   : 'border-erp-border bg-erp-surface text-erp-text hover:border-erp-primary hover:bg-erp-primary-soft',
-                recommended && !isSelected && 'border-erp-primary/50',
+                recommended && !isSelected && !disabled && 'border-erp-primary/50',
+                disabled && 'cursor-not-allowed opacity-45 hover:border-erp-border hover:bg-erp-surface',
               )}
-              onClick={() => onSelect(mode)}
+              onClick={() => {
+                if (!disabled) onSelect(mode)
+              }}
             >
               <Icon className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
               <span>{PURCHASE_ORDER_ORIGIN_LABELS[mode]}</span>

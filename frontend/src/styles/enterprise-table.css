@@ -179,6 +179,12 @@
   background-color: var(--ent-th-bg, #f8fafc);
 }
 
+/* Separate borders so left/top sticky cells stay reliable while scrolling */
+.ent-data-grid .erp-table.erp-table-sticky-first {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
 /* ── Sticky columns ── */
 .ent-data-grid .erp-table-sticky-first th:first-child,
 .ent-data-grid .erp-table-sticky-first td:first-child {
@@ -194,7 +200,7 @@
   background-color: var(--ent-th-bg, #f8fafc);
 }
 
-/* Selectable rows: checkbox stays narrow; first data column is sticky */
+/* Selectable rows: checkbox + first data column both sticky (header + body) */
 .ent-data-grid .erp-table-sticky-first--with-select .erp-table-select-cell {
   position: sticky;
   left: 0;
@@ -208,8 +214,11 @@
   box-shadow: 2px 0 6px rgb(15 23 42 / 0.08);
 }
 
-.ent-data-grid .erp-table-sticky-first--with-select thead .erp-table-select-cell {
-  z-index: 32;
+.ent-data-grid .erp-table-wrap .erp-table.erp-table-sticky-first--with-select thead .erp-table-select-cell {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 33;
   background-color: var(--ent-th-bg, #f8fafc);
 }
 
@@ -225,13 +234,20 @@
   left: 40px;
 }
 
-.ent-data-grid .erp-table-sticky-first thead .erp-table-sticky-data-cell {
-  z-index: 31;
+.ent-data-grid .erp-table-wrap .erp-table.erp-table-sticky-first thead .erp-table-sticky-data-cell {
+  position: sticky;
+  top: 0;
+  z-index: 32;
   background-color: var(--ent-th-bg, #f8fafc);
 }
 
-.ent-data-grid .erp-table-sticky-first--with-select th:first-child,
-.ent-data-grid .erp-table-sticky-first--with-select td:first-child {
+.ent-data-grid .erp-table-wrap .erp-table.erp-table-sticky-first--with-select thead .erp-table-sticky-data-cell {
+  left: 40px;
+}
+
+/* Undo generic first-child sticky when checkbox column owns left:0 */
+.ent-data-grid .erp-table-sticky-first--with-select > thead > tr > th:first-child:not(.erp-table-select-cell),
+.ent-data-grid .erp-table-sticky-first--with-select > tbody > tr > td:first-child:not(.erp-table-select-cell) {
   position: static;
   box-shadow: none;
   min-width: unset;

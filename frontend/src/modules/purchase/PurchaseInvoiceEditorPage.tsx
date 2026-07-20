@@ -32,7 +32,6 @@ import {
   ErpFormSpan,
   ErpStickySaveBar,
 } from '@/components/erp/card-form'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { Badge } from '@/components/ui/Badge'
@@ -43,7 +42,6 @@ import {
   taxTotalsSummary,
 } from '@/modules/purchase/purchaseFastTabSummaries'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { EnterpriseFormMetrics } from '@/design-system/workspace'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
   createDirectPurchaseInvoice,
@@ -422,33 +420,6 @@ export function PurchaseInvoiceEditorPage() {
     [isNew, invoice?.documentNumber, vendorFact, poNumber, grnNumber, documentDate],
   )
 
-  const formMetrics = useMemo(
-    () => [
-      {
-        label: 'Lines',
-        value: String(totals.filledLines || totals.lineCount),
-        accent: 'green' as const,
-      },
-      {
-        label: 'Taxable',
-        value: formatCurrency(totals.taxableAmount),
-        accent: 'blue' as const,
-      },
-      {
-        label: 'Tax',
-        value: formatCurrency(totals.tax),
-        accent: 'violet' as const,
-      },
-      {
-        label: 'Total',
-        value: formatCurrency(totals.totalAmount),
-        accent: 'amber' as const,
-        highlight: totals.totalAmount > 0,
-      },
-    ],
-    [totals],
-  )
-
   const taxTotalsDefaultOpen = hasMeaningfulTaxTotals(
     totals.taxableAmount,
     totals.tax,
@@ -536,7 +507,6 @@ export function PurchaseInvoiceEditorPage() {
           { label: 'Invoices', to: '/purchase/invoices' },
           { label: 'Loading' },
         ]}
-        backLink={{ to: '/purchase/invoices', label: 'Back to Invoices' }}
         footer={null}
       >
         <LoadingState variant="form" rows={10} />
@@ -560,41 +530,7 @@ export function PurchaseInvoiceEditorPage() {
         { label: 'Invoices', to: '/purchase/invoices' },
         { label: isNew ? 'New' : invoice?.documentNumber ?? 'Edit' },
       ]}
-      backLink={{ to: '/purchase/invoices', label: 'Back to Invoices' }}
-      commandBar={
-        <ErpCommandBar
-          inline
-          sticky={false}
-          secondaryActions={[
-            {
-              id: 'verify',
-              label: 'Verify Invoice',
-              icon: CheckCircle,
-              onClick: () => void saveAndVerify(),
-              disabled: saving,
-            },
-            {
-              id: 'submit',
-              label: 'Send for Approval',
-              icon: Send,
-              onClick: async () => {
-                await saveDraft()
-                const targetId = invoice?.id ?? id
-                if (!targetId || targetId === 'new') return
-                try {
-                  const row = await submitPurchaseInvoiceForApproval(targetId)
-                  applyInvoice(row)
-                  notify.success('Sent for approval')
-                  navigate(`/purchase/invoices/${row.id}`)
-                } catch (err) {
-                  notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
-                }
-              },
-              disabled: saving,
-            },
-          ]}
-        />
-      }
+      commandBar={null}
       factBox={documentFactBox}
       collapsibleFactBox
       stickyFooter
@@ -614,12 +550,42 @@ export function PurchaseInvoiceEditorPage() {
               </ErpButton>
               <ErpButton
                 type="button"
-                variant="secondary"
+                variant={isNew ? 'primary' : 'secondary'}
                 icon={Save}
                 disabled={saving}
                 onClick={() => void saveDraft()}
               >
-                {saving ? 'Saving…' : 'Save Draft'}
+                {saving ? 'Saving…' : 'Save'}
+              </ErpButton>
+              <ErpButton
+                type="button"
+                variant="secondary"
+                icon={CheckCircle}
+                disabled={saving}
+                onClick={() => void saveAndVerify()}
+              >
+                Verify
+              </ErpButton>
+              <ErpButton
+                type="button"
+                variant="primary"
+                icon={Send}
+                disabled={saving}
+                onClick={async () => {
+                  await saveDraft()
+                  const targetId = invoice?.id ?? id
+                  if (!targetId || targetId === 'new') return
+                  try {
+                    const row = await submitPurchaseInvoiceForApproval(targetId)
+                    applyInvoice(row)
+                    notify.success('Sent for approval')
+                    navigate(`/purchase/invoices/${row.id}`)
+                  } catch (err) {
+                    notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
+                  }
+                }}
+              >
+                Send for Approval
               </ErpButton>
             </ErpButtonGroup>
           }
@@ -773,8 +739,6 @@ export function PurchaseInvoiceEditorPage() {
           ) : null}
         </ErpCardSection>
       ) : null}
-
-      <EnterpriseFormMetrics metrics={formMetrics} />
 
       <ErpCardSection
         title="Document & Vendor"

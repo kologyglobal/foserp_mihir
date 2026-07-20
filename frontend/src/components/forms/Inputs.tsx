@@ -172,6 +172,14 @@ export function Select({
     return [{ value: '', label: SELECT_PLACEHOLDER }, ...parsedRaw]
   }, [injectEmpty, parsedRaw])
 
+  const realOptionCount = useMemo(
+    () => parsedRaw.filter((o) => o.value !== '').length,
+    [parsedRaw],
+  )
+  /** Short lists (Yes/No, priority, type) use native — no search chrome or portal flicker. */
+  const preferNative =
+    Boolean(native) || multiple || parsedRaw.length === 0 || realOptionCount <= 8
+
   const hasWrapWidth = Boolean(wrapClassName ?? partitioned.wrap)
   const resolvedWrap = cn(
     wrapClassName ?? partitioned.wrap,
@@ -189,7 +197,7 @@ export function Select({
   const smartClassName = partitioned.select.replace(/\berp-input\b/g, '').trim()
   const placeholder = resolveSelectPlaceholder(emptyOption?.label, { inFilterBar })
 
-  if (native || multiple || parsedRaw.length === 0) {
+  if (preferNative) {
     return (
       <NativeSelect
         className={className}

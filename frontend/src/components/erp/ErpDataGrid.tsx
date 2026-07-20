@@ -28,6 +28,7 @@ export interface ErpDataGridProps<T> {
   initialSortColumnId?: string
   initialSortDesc?: boolean
   selectable?: boolean
+  getRowCanSelect?: (row: T) => boolean
   rowSelection?: RowSelectionState
   onRowSelectionChange?: OnChangeFn<RowSelectionState>
   getRowId?: (row: T) => string

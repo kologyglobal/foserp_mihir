@@ -15,6 +15,10 @@ import {
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
 import {
+  PurchaseAuditTimeline,
+  buildDemoPurchaseTimeline,
+} from '@/components/purchase/PurchaseAuditTimeline'
+import {
   PurchaseDocumentFactBox,
   buildPurchaseRelatedLinks,
   purchaseDocumentApprovalFact,
@@ -72,6 +76,7 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { ReservationsPanel } from '@/components/inventory/ReservationsPanel'
+import { isApiMode } from '@/config/apiConfig'
 
 const REVISABLE_STATUSES: PurchaseOrder['status'][] = [
   'released',
@@ -151,6 +156,12 @@ export function PurchaseOrderDetailPage() {
   }, [po, searchParams, setSearchParams])
 
   const runAction = async (work: () => Promise<PurchaseOrder>, success: string) => {
+    if (isApiMode()) {
+      notify.info(
+        'PO approval / release / submit APIs are not enabled yet. Draft POs from Planning or Comparison are listed from the server; lifecycle actions come next.',
+      )
+      return
+    }
     setBusy(true)
     try {
       const updated = await work()
@@ -293,24 +304,24 @@ export function PurchaseOrderDetailPage() {
   const canCancel = !['closed', 'cancelled'].includes(po.status)
 
   const approveGate = purchaseActionGate({
-    permission: 'purchase.order.approve',
+    permission: 'purchase.po.approve',
     statusAllowed: canApprove,
   })
   const releaseGate = purchaseActionGate({
-    permission: 'purchase.order.release',
+    permission: 'purchase.po.send',
     statusAllowed: canRelease,
   })
   const submitGate = purchaseActionGate({
-    permission: 'purchase.order.edit',
+    permission: 'purchase.po.edit',
     statusAllowed: canSubmit,
     statusBlockedReason: 'Only Draft orders can be submitted',
   })
   const editGate = purchaseActionGate({
-    permission: 'purchase.order.edit',
+    permission: 'purchase.po.edit',
     statusAllowed: isEditable,
   })
   const cancelGate = purchaseActionGate({
-    permission: 'purchase.order.cancel',
+    permission: 'purchase.po.cancel',
     statusAllowed: canCancel,
   })
   const grnGate = purchaseActionGate({
@@ -695,6 +706,35 @@ export function PurchaseOrderDetailPage() {
             disabled
             onChange={() => {}}
             hint="PO specifications, drawings, quotations, and supporting documents"
+          />
+        </ErpCardSection>
+
+        <ErpCardSection
+          title="Audit Timeline"
+          subtitle="Purchase order lifecycle events"
+          columns={1}
+          collapsible
+          defaultOpen
+        >
+          <PurchaseAuditTimeline
+            entityType="purchase-order"
+            entityId={po.id}
+            className="border-0 p-0 shadow-none"
+            demoEvents={buildDemoPurchaseTimeline({
+              entityId: po.id,
+              entityType: 'PurchaseOrder',
+              createdAt: po.createdAt,
+              createdBy: po.createdBy,
+              updatedAt: po.updatedAt,
+              updatedBy: po.updatedBy,
+              statusLabel: po.status,
+              extra: history.map((h) => ({
+                action: h.action,
+                actionLabel: h.action.replace(/_/g, ' '),
+                timestamp: h.actedAt,
+                actor: h.actorName,
+              })),
+            })}
           />
         </ErpCardSection>
 

@@ -435,6 +435,7 @@ function normalizeSeedPrLine(
     locationId: String(line.locationId ?? PURCHASE_DEMO_LOCATION.id),
     locationName: String(line.locationName ?? PURCHASE_DEMO_LOCATION.name),
     binCode: String(line.binCode ?? ''),
+    purchaseOrderId: (line.purchaseOrderId as string | null | undefined) ?? null,
     purchaseOrderNumber: String(line.purchaseOrderNumber ?? ''),
     purchaseQuoteNumber: String(line.purchaseQuoteNumber ?? ''),
     purpose: String(line.purpose ?? ''),

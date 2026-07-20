@@ -231,6 +231,22 @@ export const PURCHASE_MASTERS_CATALOG: PurchaseMasterCatalogItem[] = [
       STATUS_FIELD,
     ],
   },
+  {
+    kind: 'bin-codes',
+    slug: 'bin-codes',
+    title: 'BIN Code Master',
+    description: 'Storage BIN codes selectable on purchase requisition lines.',
+    group: 'item',
+    usedIn: ['requisitions', 'purchase-orders', 'grn'],
+    importExport: true,
+    fields: [
+      { key: 'code', label: 'BIN Code', type: 'text', required: true, placeholder: 'e.g. A1-01' },
+      { key: 'name', label: 'BIN Name', type: 'text', required: true, placeholder: 'e.g. Rack A / Bin 01' },
+      { key: 'warehouseCode', label: 'Warehouse Code', type: 'text', placeholder: 'Optional warehouse' },
+      { key: 'locationCode', label: 'Location Code', type: 'text', placeholder: 'Optional location' },
+      STATUS_FIELD,
+    ],
+  },
 ]
 
 export function getPurchaseMasterCatalog(slug: string): PurchaseMasterCatalogItem | undefined {
