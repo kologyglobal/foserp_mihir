@@ -20,7 +20,7 @@ Related: [`PURCHASE_UI_CONSISTENCY.md`](PURCHASE_UI_CONSISTENCY.md) · [`UI_VIEW
 | Advanced filters | `CrmFilterDrawer` (right drawer) — **not** a second inline filter strip |
 | KPI strip | Optional but preferred when the register has actionable queues |
 | Purpose guide | `pageGuide={null}` on shell; `ErpPageGuide` inside the **left** column (same width as table) |
-| Context rail | `PurchaseRegisterContextPanel` on `xl` when the register already has it |
+| Context rail | `PurchaseRegisterContextPanel` `placement="split"` → **insights on the right**, table on the left |
 | Confirms | `appConfirm` / `appPromptNote` / `ConfirmDialog` — **never** `window.confirm` / `alert` / `prompt` |
 
 ---

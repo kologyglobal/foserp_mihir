@@ -1,6 +1,94 @@
 # Testing Status
 
-Last run: **2026-07-18** (Finance Phase 3B3 customer receipt draft workflow).
+Last run: **2026-07-20** (Purchase typecheck fix + coverage gap tests; prior Phase 16 QA).
+
+### 2026-07-20 — Purchase typecheck + coverage gaps
+
+| Check | Result |
+|-------|--------|
+| Frontend `npm run typecheck` | **PASS** |
+| Frontend `npm run test:purchase-phase15-all` | **PASS** |
+| Backend `tsc --noEmit` | **PASS** |
+| Backend `npm run test:purchase-phase15` | **29/29** |
+| Backend `purchase-phase15-integration.test.ts` | **9/9** |
+| Backend `purchase-module-coverage.test.ts` | **4/4** (cross-tenant, double-approve, RFQ→PO, concurrent conflict) |
+| Local migrate deploy `20260720160000_rfq_flow_award_fields` | **Applied** |
+
+### 2026-07-20 — Purchase Phase 16 final QA
+
+| Check | Result |
+|-------|--------|
+| Report | [`docs/purchase/PHASE_16_FINAL_QA_REPORT.md`](purchase/PHASE_16_FINAL_QA_REPORT.md) |
+| Prisma validate | **PASS** |
+| Backend `tsc --noEmit` | **PASS** |
+| Backend `npm run test:purchase-phase15` | **29/29** |
+| Backend live `purchase-phase15-integration.test.ts` | **9/9** |
+| Frontend `npm run test:purchase-phase15-all` | **PASS** (20 + E2E A/B) |
+| Frontend `npm run typecheck` | Was **FAIL** — **fixed** same day (see entry above) |
+| Full CRM/Sales/Inventory suite | **Not re-run** (modules present) |
+
+### 2026-07-20 — Purchase Phase 15 automated tests
+
+| Check | Result |
+|-------|--------|
+| Backend `npm run test:purchase-phase15` | **29/29** |
+| Backend `npx vitest run tests/purchase-phase15-integration.test.ts` | **9/9** (live MySQL) |
+| Backend `tsc --noEmit` | **PASS** |
+| Prisma validate | **PASS** |
+| Frontend `npm run test:purchase-phase15-all` | **PASS** (20 FE checks + E2E A + E2E B) |
+| Create PO from Planning | `POST /purchase/planning-sheet/create-po` |
+
+### 2026-07-20 — Purchase Phase 14 validation and error messages
+
+| Check | Result |
+|-------|--------|
+| `npx vitest run tests/purchase-requisition-workflow.test.ts tests/purchase-planning-workflow.test.ts tests/purchase-error-catalog.test.ts` | **Pass** (8+6+2) |
+| Backend `tsc --noEmit` | **PASS** |
+| Stable codes | `PR_*` / `PPS_*` / `PO_*` catalog + FE `purchaseErrorMessages` |
+| Error middleware | Prisma/FK/SQL sanitized; technical detail logged only |
+| Live MySQL lifecycle | Expectations updated (`PR_NOT_EDITABLE`, `PR_NO_LINES`, …); re-run when DB available |
+
+### 2026-07-20 — Purchase Phase 13 audit logs and timeline
+
+| Check | Result |
+|-------|--------|
+| `npx vitest run tests/purchase-audit-timeline.test.ts` | **2/2** |
+| Backend `tsc --noEmit` | Pass (after audit helper + service wiring) |
+| Timeline API | `GET /purchase/timeline/:entityType/:entityId` |
+| FE views | PR / Planning drawer / RFQ / PO show `PurchaseAuditTimeline` |
+
+### 2026-07-20 — Purchase RBAC
+
+| Check | Result |
+|-------|--------|
+| `npx vitest run tests/purchase-rbac-permissions.test.ts` | **4/4** |
+| Canonical keys on purchase routes | Wired (`purchase.pr.*` / `planning.*` / `rfq.*` / `po.*`) |
+| Permission-denied audit | `requirePermission` → `PERMISSION_DENIED` audit log |
+
+### 2026-07-20 — Purchase RFQ workflow + FE dual-mode bridge
+
+| Check | Result |
+|-------|--------|
+| `npx vitest run tests/purchase-rfq-workflow.test.ts` | **2/2** |
+| FE RFQ/VQ/comparison facade + mappers | Wired (`VITE_USE_API=true`); demo path unchanged |
+| Live RFQ/VQ/comparison MySQL suite | **Pending** |
+
+### 2026-07-20 — Purchase Planning Sheet backend
+
+| Suite / check | Result |
+|---------------|--------|
+| `npx vitest run tests/purchase-planning-workflow.test.ts` | **5/5** |
+| `npx vitest run tests/purchase-planning-sheet.test.ts --hookTimeout=120000` | **4/4** (live MySQL) |
+| `npx tsc --noEmit` (backend) | **PASS** |
+
+### 2026-07-20 — Purchase Requisition backend
+
+| Suite / check | Result |
+|---------------|--------|
+| `npx vitest run tests/purchase-requisition-workflow.test.ts` | **8/8** |
+| `npx vitest run tests/purchase-requisition-lifecycle.test.ts --hookTimeout=120000` | **5/5** (live MySQL) |
+| `npx tsc --noEmit` (backend) | **PASS** |
+| `npx tsx scripts/prisma-cli.ts migrate deploy` | **PASS** (`20260720130000_add_purchase_code_series_entities`) |
 
 ### 2026-07-18 — Finance Phase 3B3: Customer receipt draft workflow
 

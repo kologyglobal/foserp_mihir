@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified against codebase: **2026-07-18** (Accounting Phase 3B3 receipt draft workflow; finance suite 206/206 backend + `test:money-in` 20/20 frontend).
+Last verified against codebase: **2026-07-20** (Purchase typecheck + coverage tests; Phase 16 QA report).
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
@@ -28,7 +28,7 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | **Not started** | Login activity module |
 | **Scaffolding (not shipped)** | — (Accounting operational screens: CoA demo, Vouchers, AR/AP, Bank, FA, Manufacturing Accounting, Tax, Reports, Budgeting, Commercial Commitments, Period Close — UI/mock only; **Finance Settings** at `/accounting/settings` is Phase 1 dual-mode, not a stub) |
 | **Blocked** | — (none currently) |
-| **Deferred by design** | Purchase / inventory / production / quality / maintenance backends; finance **Phase 3B4+ receipt posting/GL/allocation APIs + credit notes**; SO MRP / dispatch |
+| **Deferred by design** | Purchase backends beyond RFQ award→draft PO (full PO lifecycle, GRN); inventory / production / quality / maintenance; finance **Phase 3B4+ receipt posting/GL/allocation APIs + credit notes**; SO MRP / dispatch |
 
 ---
 
@@ -370,18 +370,18 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | API mode | ✅ | Commercial path only |
 | Remaining gap | **Accepted deferral:** MRP / dispatch / invoice posting (verification report G2) |
 
-### Purchase (demo only)
+### Purchase (PR backend started; rest demo)
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ✅ | Domain service + UI for Dashboard, PR, Approvals/**Setup (9-tab config)**, RFQ, Vendor Quotation, Comparison, **Purchase Order** (list/create/detail/revise/print), **GRN + Quality Inspection**, **Purchase Invoice** (list/create/detail/print, three-way matching, exception-gated post, debit-note stub), **Purchase Return**, **Reports & Analytics** (hub + 36 mock runners). Legacy Zustand GRN/invoice paths left unused at purchase invoice routes. |
-| Backend | 🔒 | Deferred by design |
-| DB | 🔒 | — |
-| API | 🔒 | — |
-| Tests | ✅ | Demo/smoke scripts including **`smoke-purchase-e2e-flow`** (umbrella PR→invoice→return→report), plus RFQ/VQ/PO/GRN/invoice/return smokes; `test:purchase:production` 39/39 |
-| Demo mode | ✅ | Nav + routes under `/purchase/*` |
-| API mode | ❌ | |
-| Remaining gap | Backend phase (see `purchase-workflow-map.md`). Inventory stock write on GRN post and AP/GL on invoice post deferred by design |
+| Frontend | ⚠️ | Domain UI rich; PR/Planning/RFQ dual-mode API-backed; PR line grid shows read-only PO No. PO/GRN/invoice/returns/reports still demo. **FE typecheck PASS** (2026-07-20). |
+| Backend | ⚠️ | PR + Planning + RFQ/VQ/comparison/award→draft PO + Create PO from Planning; PR lines stamp `purchaseOrderId`/`purchaseOrderNumberSnapshot` + `CONVERTED` on PO create. Full PO approval/release and **GRN** remain deferred (next). |
+| DB | ⚠️ | Purchase schema + `20260720170000_pr_line_purchase_order_track` (deploy on all envs) |
+| API | ⚠️ | `/purchase/requisitions`, `/planning-sheet` (+ `create-po`), `/rfqs`, `/vendor-quotations`, `/comparisons`, timeline |
+| Tests | ⚠️ | Phase 15 unit **29** + integration **9** + coverage **4** + FE phase15 + E2E A/B |
+| Demo mode | ✅ | Full RFQ→VQ→comparison→award→PO + Planning→PO paths |
+| API mode | ⚠️ | Dual-mode for PR + Planning + RFQ flow + create-PO; not full Purchase surface |
+| Remaining gap | GRN backend (planned); PO approval/release; see Phase 16 report |
 
 ### Inventory / Production / Quality / Maintenance / Finance (invoices)
 

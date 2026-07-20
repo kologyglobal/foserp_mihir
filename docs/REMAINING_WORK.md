@@ -251,11 +251,11 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 |-------|-------|
 | Module | Purchase |
 | Description | PR/PO/GRN API |
-| Reason | **Accepted deferral** — demo FE only (CRM-parity polish included). Not a CRM verification defect (report G3). Do not invent purchase/AP APIs until a dedicated purchase backend phase is scheduled. |
-| Dependencies | Items, vendors (done) |
-| Next step | See `docs/purchase-workflow-map.md` for UX coverage; backend: `backend/docs/api-requirement-matrix.md`. Demo FE may surface Planned steps (stock check, gate-pass, AP invoice/match/payment). **PR lines:** each line must store its own `locationId` (header location is not enough). Also plan `binCode`; `purchaseOrderNumber` / `purchaseQuoteNumber` / line `requiredDate` are future read-only when PO/quote exists. **Purchase Planning Sheet** (`/purchase/planning-sheet`): demo FE for approved PRs with `rfqRequired=false` — one planning row per PR line; RFQ-required PRs never appear. |
-| Test required | `test:purchase:production` equivalent for API when backend starts |
-| Status | open (accepted deferral) |
+| Reason | **Partial** — Phase 16 QA + typecheck/coverage remediation done. Core PR + Planning/RFQ → draft PO verified. **Next: proper GRN backend.** |
+| Dependencies | Items, vendors (done); PR schema Phase 03 (done) |
+| Next step | GRN foundation (API + DB + RBAC + tests); then PO approval/release. Ensure `20260720170000_pr_line_purchase_order_track` on all envs. |
+| Test required | `npm run test:purchase-phase15` + `test:purchase-phase15-live` (includes coverage); `frontend` `typecheck` + `test:purchase-phase15-all` |
+| Status | partial (ready for GRN phase; PO lifecycle still open) |
 
 ### P3-3: Inventory / production / quality / finance backends
 

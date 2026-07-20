@@ -1,3 +1,276 @@
+## 2026-07-20 — PR line PO track (read-only)
+
+### Shipped
+
+- **Schema** — `purchase_requisition_lines.purchaseOrderId` + `purchaseOrderNumberSnapshot` (`20260720170000_pr_line_purchase_order_track`)
+- **Write-back** — Planning→PO and RFQ award→PO stamp lines via `linkPurchaseRequisitionLinesToOrder` (status `CONVERTED`, id + number snapshot)
+- **API** — PR line DTO exposes `purchaseOrderId` / `purchaseOrderNumber` (not accepted on create/update input)
+- **UI** — PR lines grid **PO No.** column (link); converted lines locked (`rowEditable` when no PO)
+- **Tests** — live coverage asserts stamp after RFQ→PO / Planning create-PO
+
+### Run
+
+```bash
+cd frontend && npm run typecheck
+cd backend && npm run test:purchase-phase15
+```
+
+---
+
+## 2026-07-20 — Purchase UAT flow seed (interconnected docs)
+
+### Shipped
+
+- **Script** — `backend/scripts/seed-purchase-flow-uat.ts` (idempotent `UAT-*` docs)
+- **Data** — 13 PR + 8 planning + 5 RFQ + 6 VQ + 2 comparisons + 6 PO; warehouses/items/vendors reused; mixed statuses for UI testing
+- **GRN** — still no DB table (demo FE only)
+
+### Run
+
+```bash
+cd backend
+npx tsx scripts/seed-purchase-demo-data.ts
+npx tsx scripts/seed-purchase-flow-uat.ts
+```
+
+---
+
+## 2026-07-20 — PR line → PO track record
+
+### Shipped
+
+- **Schema** — `purchase_requisition_lines.purchaseOrderId` + `purchaseOrderNumberSnapshot` (migration `20260720170000_pr_line_purchase_order_track`); line status set to `CONVERTED` on PO create
+- **Backend** — Planning→PO and RFQ award→PO stamp PR lines automatically; RFQ→PO also sets `purchaseRequisitionLineId` on PO lines; API PR line DTO exposes `purchaseOrderId` / `purchaseOrderNumber`
+- **Frontend** — PR line grid shows read-only **PO No.** (link when id present); demo create-PO paths stamp the same fields; mapper hydrates from API
+- **Tests** — Phase 15 integration + coverage assert PR lines carry PO id/number after create-PO
+
+### Run
+
+```bash
+cd backend && npx tsx scripts/prisma-cli.ts migrate deploy && npx prisma generate
+cd backend && npm run test:purchase-phase15-live
+cd frontend && npm run typecheck
+```
+
+---
+
+## 2026-07-20 — Purchase typecheck fix + coverage gap tests
+
+### Shipped
+
+- **FE typecheck** — Planning Sheet `chipLabelResolver` + `defaults`; `LoadingState` props; unused imports; removed orphan Vitest file; `binCode` master usage guard
+- **Create-PO conflicts** — map Prisma `P2034`/`P2028` to purchase `PO_ALREADY_CONVERTED` / global 409; concurrent loser no longer raw 500
+- **Document numbers** — `nextPurchaseDocumentNumber` fallback for RFQ/VQ/comparison/PO when code-series enum not yet migrated
+- **Comparison duplicate PO** — check existing PO before award-status gate (stable **409**)
+- **Live coverage** — `tests/purchase-module-coverage.test.ts` (cross-tenant GET, double-approve idempotency, RFQ→award→PO, concurrent create-PO)
+- **DB** — deployed `20260720160000_rfq_flow_award_fields` on local MySQL (additive)
+
+### Run
+
+```bash
+cd frontend && npm run typecheck && npm run test:purchase-phase15-all
+cd backend && npm run test:purchase-phase15 && npm run test:purchase-phase15-live
+```
+
+---
+
+## 2026-07-20 — Purchase Phase 16 final QA
+
+### Shipped
+
+- **QA report only** — [`docs/purchase/PHASE_16_FINAL_QA_REPORT.md`](purchase/PHASE_16_FINAL_QA_REPORT.md) (no product features)
+- **Verified** — RFQ vs Planning split, idempotent sync, vendor-grouped create-PO, tenant/RBAC, additive migrations, Phase 15 suites
+- **Failed** — frontend `npm run typecheck`; claim that all Purchase pages are API-backed / free of FE memory
+- **Go-live** — not full-module go-live; blockers listed in Phase 16 report
+
+### Run
+
+```bash
+cd backend && npx tsx scripts/prisma-cli.ts validate && npx tsc --noEmit && npm run test:purchase-phase15
+cd backend && npx vitest run tests/purchase-phase15-integration.test.ts --hookTimeout=120000
+cd frontend && npm run test:purchase-phase15-all && npm run typecheck
+```
+
+---
+
+## 2026-07-20 — Purchase Phase 15 automated tests
+
+### Shipped
+
+- **Create PO from Planning API** — `POST /purchase/planning-sheet/create-po` (vendor grouping, PR conversion status, concurrent guard, RFQ-required blocked)
+- **Backend unit** — `purchase-phase15-unit.test.ts` + existing workflow/catalog/RBAC/RFQ/audit suites (`npm run test:purchase-phase15` → **29** tests)
+- **Backend integration** — `purchase-phase15-integration.test.ts` covers Phase 15 items 1–17 (skip without MySQL)
+- **Frontend** — `scripts/test-purchase-phase15.ts` (PR validation, helpers, Planning UI gates, error map)
+- **E2E A/B (demo)** — `smoke-purchase-phase15-e2e-a.ts` (direct → Planning → POs), `smoke-purchase-phase15-e2e-b.ts` (RFQ → award → PO)
+
+### Run
+
+```bash
+cd backend && npm run test:purchase-phase15 && npm run test:purchase-phase15-live
+cd frontend && npm run test:purchase-phase15-all
+```
+
+---
+
+## 2026-07-20 — Purchase Phase 14 validation and error messages
+
+
+### Shipped
+
+- **Stable codes + catalog** — `purchase/shared/purchase-error-catalog.ts` (`PR_*` / `PPS_*` / `PO_*`) with business copy; Phase 02 §12 expanded
+- **PR workflow** — submit enforces department, requested by, dates, RFQ selection, ≥1 item, item/qty/UOM, date order; submitted → `PR_NOT_EDITABLE`; approved → `PR_MUST_REOPEN` (reopen allowed from approved)
+- **Planning PO guards** — `assertPlanningRowReadyForPo` (vendor, net qty, rate, required date, eligible status, cancelled/converted/RFQ/tenant/active masters)
+- **Error middleware** — Prisma/FK/SQL/stack never returned to clients; technical detail logged server-side
+- **Frontend** — `utils/purchase/purchaseErrorMessages.ts` + `formatPurchaseApiError` / `PurchaseServiceError` map codes to friendly toasts; PR form validation copy aligned
+- **Tests** — workflow + catalog unit tests updated; lifecycle expectations use new codes
+
+### Remaining
+
+- Wire Create-PO-from-Planning HTTP API to `assertPlanningRowReadyForPo` when that endpoint ships
+- Live MySQL lifecycle re-run after UOM seed helper (when DB available)
+
+---
+
+## 2026-07-20 — Purchase Phase 13 audit logs and timeline
+
+
+### Shipped
+
+- **Canonical audit helper** — `purchase/shared/purchase-audit.ts` with `PR_*` / `PPS_*` / `RFQ_*` / `PO_*` actions, `writePurchaseAudit`, timeline entity map
+- **Write-side** — PR (incl. line add/update/remove + RFQ decision), Planning (generate/buyer/vendor/rate/qty/status/hold/cancel), RFQ/VQ/comparison dual-write, PO create from award
+- **Read API** — `GET /purchase/timeline/:entityType/:entityId` merges `AuditLog` + `PurchaseStatusHistory` (RFQ also includes linked VQ/comparison audits)
+- **UI** — `PurchaseAuditTimeline` (CRM-style vertical feed) on PR View, Planning Row View, RFQ View, PO View
+- **Tests** — `purchase-audit-timeline.test.ts` (labels + entity map)
+
+### Remaining
+
+- Live MySQL integration asserting timeline rows after PR submit/approve
+- Full PO lifecycle audits when PO module APIs ship (submit/approve/send/receive/close)
+
+---
+
+### Shipped
+
+- **Catalog** — renamed to `purchase.pr.*`, expanded `purchase.planning.*` (`assign_buyer`, `select_vendor`, `cancel`), RFQ (`enter_quote`, `compare`, `award`, `convert_to_po`), PO (`purchase.po.*` with `send` / `close`)
+- **Role packs** — Requester, Department Manager (+ Department Head alias), Purchase Executive, Purchase Manager, Administrator; seed creates these roles
+- **Backend routes** — all purchase routes use canonical keys; legacy JWT/DB names still authorize via `permissionSetIncludes` aliases
+- **Audit** — `requirePermission` / `requireAnyPermission` / `requireSuperAdmin` write `PERMISSION_DENIED` audit logs (module `rbac`)
+- **Frontend** — `utils/permissions/purchase.ts` + demo admin seed + UI call sites aligned; button hide remains supplementary
+
+### Verify
+
+- `npx vitest run tests/purchase-rbac-permissions.test.ts` — alias checks
+- Re-seed or upsert permissions so new catalog rows exist in MySQL
+
+### Remaining
+
+- Live integration test asserting 403 + audit row for missing purchase permission
+- Optional: migrate/remove orphaned legacy permission rows in DB
+
+---
+
+### Shipped
+
+- **Frontend bridge** — `purchaseApiFacade` dual-mode for RFQ list/create/update/send/cancel, PR→RFQ convert, vendor quotations CRUD/submit, comparison build/selection/award, and award→draft PO
+- **Mappers** — `mapApiRfqToDomain`, VQ + comparison matrix mappers in `purchaseMappers.ts`; `comparisonApi.ts` client
+- **UI** — Quotation Comparison award passes vendor + selection reason into API award endpoint
+- **Tests** — `purchase-rfq-workflow.test.ts` (2/2) for PR eligibility + draft send guards
+- **Rule preserved** — `rfqRequired=true` never syncs to Planning Sheet (backend + demo)
+
+### Remaining
+
+- Live MySQL integration tests for RFQ→VQ→award→PO
+- Enrich vendor/item display names from masters in API mode
+- Create PO from planning selection; full PO lifecycle / GRN
+
+---
+
+## 2026-07-20 — Purchase RFQ vendor quotation and comparison/award APIs
+
+### Shipped
+
+- **Vendor quotations** — list/create/get/draft update/submit under `/purchase/vendor-quotations`; validates RFQ vendor membership and active RFQ state, calculates landed cost on submit, advances a SENT RFQ to `QUOTATION_RECEIVED`, and writes status history/audit records.
+- **Comparisons** — list/get/build from submitted quotations, vendor-wise comparison matrix, award workflow, and comparison-to-draft-PO conversion under `/purchase/comparisons`.
+- **PR handoff** — `POST /purchase/requisitions/:id/convert-to-rfq` now invokes the RFQ service with the RFQ create permission.
+- **Verification** — regenerated Prisma client and `npx tsc --noEmit -p tsconfig.json` passes.
+
+### Remaining
+
+- Add focused Vendor Quotation / Comparison integration tests with a live MySQL test database and wire the frontend API bridge to these completed endpoints.
+
+---
+
+## 2026-07-20 — Purchase FE dual-mode API integration (PR + Planning)
+
+### Shipped
+
+- **API clients** — `purchaseRequisitionApi.ts`, `purchasePlanningApi.ts`, `rfqApi.ts`, `vendorQuotationApi.ts`, `purchaseOrderApi.ts` + `purchaseApiTypes.ts`
+- **Mappers / facade** — `purchaseMappers.ts`, `purchaseApiFacade.ts`; barrel `services/purchase/index.ts` routes PR + Planning through dual-mode when `VITE_USE_API=true`
+- **Backend source of truth (API mode)** — PR CRUD/submit/approve/reject/cancel; planning list/edit/buyer/vendor/status/recalculate; approval waits for server (planning sync); no optimistic PO/approval
+- **Permissions** — FE catalog + route/nav gates for `purchase.planning.view|edit|approve|create_po`
+- **Planning UI** — recalculate action, Create PO permission gate, refetch after mutations
+- **RFQ / VQ / PO clients** — ready against expected paths; API mode surfaces `PURCHASE_API_NOT_IMPLEMENTED` until backends ship (demo mode unchanged)
+
+### Verify
+
+- Dual-mode facade + mappers compile (no errors in those files under `tsc -b`)
+- Demo mode (`VITE_USE_API=false`) still uses in-memory `purchaseService`
+
+### Next
+
+- Ship Create-PO-from-planning + RFQ/VQ/PO backends; complete domain mappers for those DTOs
+- Optional: page-level hydrate hook / summary KPI strip on Planning Sheet
+
+---
+
+## 2026-07-20 — Purchase Planning Sheet backend APIs
+
+### Shipped
+
+- **Permissions** — `purchase.planning.view|edit|approve|create_po`
+- **APIs** under `/api/v1/t/:tenantSlug/purchase/planning-sheet` (+ tenantId alias):
+  - `GET /` (filters: search, planningNumber, PR number, status, dept, item, vendor, buyer, priority, purchaseType, date ranges, overdue, poPending, page/pageSize, sort)
+  - `GET /summary` (pending, critical, overdue, vendor pending, po pending/created, estimated value)
+  - `GET|PATCH /:id` (editable vendor/rates/dates/type/buyer/priority/actionMessage/remarks/status; PR/item/qty/stock/PO refs read-only)
+  - `POST /bulk-assign-buyer`, `/bulk-select-vendor`, `/bulk-status`, `/recalculate`
+- **Rules** — tenant filter, RBAC, status transition matrix, audit + status history; recalculate batches open-PO qty (stock stub = 0 until inventory)
+- **Tests** — workflow 5/5; API integration 4/4
+
+### Next
+
+- Create PO from planning selection (`purchase.planning.create_po`)
+- FE dual-mode bridge for planning sheet
+
+---
+
+## 2026-07-20 — Purchase Requisition backend (PR lifecycle + planning sync)
+
+### Shipped
+
+- **Code series** — `CodeSeriesEntity` + `PURCHASE_REQUISITION` / `PURCHASE_PLANNING` (migration `20260720130000_add_purchase_code_series_entities`); prefixes `PR` / `PPS`
+- **Module** `backend/src/modules/purchase/` — routes under `/api/v1/t/:tenantSlug/purchase` and `/api/v1/tenants/:tenantId/purchase`
+- **PR APIs** — list/create/get/patch + submit / approve / reject / cancel / reopen
+- **Rules** — draft-only edit; ≥1 valid line + qty>0 to submit; requiredDate ≥ requisitionDate; reject requires reason; approve permission-gated; tenantId on every query; audit + status history on lifecycle
+- **Approve path** — `rfqRequired=true` → no PPS rows (RFQ-ready); `rfqRequired=false` → `syncPurchasePlanningRowsFromApprovedPr` in same TX
+- **Error codes** — `PURCHASE_REQUISITION_NOT_FOUND|NOT_EDITABLE|NOT_SUBMITTABLE|NOT_APPROVABLE`, `REJECTION_REASON_REQUIRED`, `INVALID_PURCHASE_QUANTITY`; global `PERMISSION_DENIED` / `TENANT_ACCESS_DENIED`
+- **Tests** — workflow unit 8/8; lifecycle integration 5/5
+
+### Not in scope
+
+- Planning Sheet CRUD APIs, RFQ/VQ/PO backends, FE API bridge for purchase
+
+### Verify
+
+- `migrate deploy` + `prisma generate` + `tsc --noEmit` — pass
+- `vitest run tests/purchase-requisition-*.test.ts` — **13/13**
+
+### Next
+
+- Purchase Planning Sheet list/update + Create PO from planning
+- Optional: dual-mode FE bridge for PR when `VITE_USE_API=true`
+
+---
+
 ## 2026-07-18 ? Finance Phase 3B3: Customer Receipt Draft Workflow
 
 ### Shipped (backend draft CRUD + validate + mark-ready + cancel APIs ? no posting/GL/allocation persistence)
