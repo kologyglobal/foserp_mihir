@@ -36,6 +36,12 @@ enum CodeSeriesEntity {
   OPPORTUNITY
   QUOTATION
   SALES_ORDER
+  PURCHASE_REQUISITION
+  PURCHASE_PLANNING
+  REQUEST_FOR_QUOTATION
+  VENDOR_QUOTATION
+  VENDOR_COMPARISON
+  PURCHASE_ORDER
 }
 
 enum ActivityType {
@@ -95,62 +101,77 @@ model Tenant {
   updatedAt          DateTime     @updatedAt
   deletedAt          DateTime?
 
-  users              User[]
-  roles              Role[]
-  codeSeries         CodeSeries[]
-  auditLogs          AuditLog[]
-  crmCompanies       CrmCompany[]
-  crmContacts        CrmContact[]
-  crmLeads           CrmLead[]
-  crmActivities      CrmActivity[]
-  crmPipelines       CrmPipeline[]
-  crmPipelineStages  CrmPipelineStage[]
-  crmOpportunities   CrmOpportunity[]
-  crmFollowUps       CrmFollowUp[]
-  crmMasters         CrmMaster[]
-  crmNotes              CrmNote[]
-  crmAttachments        CrmAttachment[]
-  crmQuotations         CrmQuotation[]
-  crmQuotationDocuments CrmQuotationDocument[]
-  crmQuotationTemplates CrmQuotationTemplate[]
-  crmSalesOrders        CrmSalesOrder[]
-  masterCountries      MasterCountry[]
-  masterStates         MasterState[]
-  masterCities         MasterCity[]
-  masterProducts       MasterProduct[]
-  masterUoms           MasterUom[]
-  masterWarehouses     MasterWarehouse[]
-  masterLocations      MasterLocation[]
-  masterItemCategories MasterItemCategory[]
-  masterHsnCodes       MasterHsnCode[]
-  masterGstGroups      MasterGstGroup[]
-  masterGstRates       MasterGstRate[]
-  masterItems          MasterItem[]
-  masterVendors        MasterVendor[]
-  legalEntities        LegalEntity[]
-  branches             Branch[]
-  financialYears       FinancialYear[]
-  accountingPeriods    AccountingPeriod[]
-  accounts             Account[]
-  defaultAccountMappings DefaultAccountMapping[]
-  financeSettings      FinanceSettings[]
-  costCentres          CostCentre[]
-  financeFeatureControls FinanceFeatureControl[]
-  financeApprovalRules FinanceApprovalRule[]
-  financeNumberSeries  FinanceNumberSeries[]
-  accountingVouchers     AccountingVoucher[]
-  accountingVoucherLines AccountingVoucherLine[]
-  generalLedgerEntries GeneralLedgerEntry[]
-  postingEvents        PostingEvent[]
-  postingRules         PostingRule[]
-  financeApprovalRequests FinanceApprovalRequest[]
-  financeApprovalSteps    FinanceApprovalStep[]
-  salesInvoices           SalesInvoice[]
-  salesInvoiceLines       SalesInvoiceLine[]
-  receivableOpenItems     ReceivableOpenItem[]
-  customerReceipts        CustomerReceipt[]
-  customerReceiptAllocations CustomerReceiptAllocation[]
+  users                         User[]
+  roles                         Role[]
+  codeSeries                    CodeSeries[]
+  auditLogs                     AuditLog[]
+  crmCompanies                  CrmCompany[]
+  crmContacts                   CrmContact[]
+  crmLeads                      CrmLead[]
+  crmActivities                 CrmActivity[]
+  crmPipelines                  CrmPipeline[]
+  crmPipelineStages             CrmPipelineStage[]
+  crmOpportunities              CrmOpportunity[]
+  crmFollowUps                  CrmFollowUp[]
+  crmMasters                    CrmMaster[]
+  crmNotes                      CrmNote[]
+  crmAttachments                CrmAttachment[]
+  crmQuotations                 CrmQuotation[]
+  crmQuotationDocuments         CrmQuotationDocument[]
+  crmQuotationTemplates         CrmQuotationTemplate[]
+  crmSalesOrders                CrmSalesOrder[]
+  masterCountries               MasterCountry[]
+  masterStates                  MasterState[]
+  masterCities                  MasterCity[]
+  masterProducts                MasterProduct[]
+  masterUoms                    MasterUom[]
+  masterWarehouses              MasterWarehouse[]
+  masterLocations               MasterLocation[]
+  masterItemCategories          MasterItemCategory[]
+  masterHsnCodes                MasterHsnCode[]
+  masterGstGroups               MasterGstGroup[]
+  masterGstRates                MasterGstRate[]
+  masterItems                   MasterItem[]
+  masterVendors                 MasterVendor[]
+  legalEntities                 LegalEntity[]
+  branches                      Branch[]
+  financialYears                FinancialYear[]
+  accountingPeriods             AccountingPeriod[]
+  accounts                      Account[]
+  defaultAccountMappings        DefaultAccountMapping[]
+  financeSettings               FinanceSettings[]
+  costCentres                   CostCentre[]
+  financeFeatureControls        FinanceFeatureControl[]
+  financeApprovalRules          FinanceApprovalRule[]
+  financeNumberSeries           FinanceNumberSeries[]
+  accountingVouchers            AccountingVoucher[]
+  accountingVoucherLines        AccountingVoucherLine[]
+  generalLedgerEntries          GeneralLedgerEntry[]
+  postingEvents                 PostingEvent[]
+  postingRules                  PostingRule[]
+  financeApprovalRequests       FinanceApprovalRequest[]
+  financeApprovalSteps          FinanceApprovalStep[]
+  salesInvoices                 SalesInvoice[]
+  salesInvoiceLines             SalesInvoiceLine[]
+  receivableOpenItems           ReceivableOpenItem[]
+  customerReceipts              CustomerReceipt[]
+  customerReceiptAllocations    CustomerReceiptAllocation[]
   customerReceiptDeductionLines CustomerReceiptDeductionLine[]
+
+  purchaseRequisitions     PurchaseRequisition[]
+  purchaseRequisitionLines PurchaseRequisitionLine[]
+  purchasePlanningRows     PurchasePlanningRow[]
+  requestForQuotations     RequestForQuotation[]
+  requestForQuotationLines RequestForQuotationLine[]
+  rfqVendors               RfqVendor[]
+  vendorQuotations         VendorQuotation[]
+  vendorQuotationLines     VendorQuotationLine[]
+  vendorComparisons        VendorComparison[]
+  vendorComparisonLines    VendorComparisonLine[]
+  purchaseOrders           PurchaseOrder[]
+  purchaseOrderLines       PurchaseOrderLine[]
+  purchaseApprovals        PurchaseApproval[]
+  purchaseStatusHistories  PurchaseStatusHistory[]
 
   @@index([status])
   @@index([deletedAt])
@@ -178,9 +199,9 @@ model User {
   updatedAt     DateTime   @updatedAt
   deletedAt     DateTime?
 
-  tenant        Tenant     @relation(fields: [tenantId], references: [id])
-  userRoles     UserRole[]
-  refreshTokens RefreshToken[]
+  tenant              Tenant               @relation(fields: [tenantId], references: [id])
+  userRoles           UserRole[]
+  refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
 
   @@unique([tenantId, email])
@@ -191,20 +212,20 @@ model User {
 }
 
 model Role {
-  id          String   @id @default(uuid())
-  tenantId    String?  // null = global system role (Super Admin)
-  name        String   @db.VarChar(100)
-  description String?  @db.Text
-  isSystem    Boolean  @default(false)
+  id          String    @id @default(uuid())
+  tenantId    String? // null = global system role (Super Admin)
+  name        String    @db.VarChar(100)
+  description String?   @db.Text
+  isSystem    Boolean   @default(false)
   createdBy   String?
   updatedBy   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  tenant           Tenant?          @relation(fields: [tenantId], references: [id])
-  userRoles        UserRole[]
-  rolePermissions  RolePermission[]
+  tenant          Tenant?          @relation(fields: [tenantId], references: [id])
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -253,15 +274,15 @@ model RolePermission {
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
   tenantId  String
-  tokenHash String   @db.VarChar(255)
+  tokenHash String    @db.VarChar(255)
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
-  userAgent String?  @db.VarChar(512)
-  ipAddress String?  @db.VarChar(64)
+  createdAt DateTime  @default(now())
+  userAgent String?   @db.VarChar(512)
+  ipAddress String?   @db.VarChar(64)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -272,12 +293,12 @@ model RefreshToken {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  tokenHash String   @db.VarChar(255)
+  tokenHash String    @db.VarChar(255)
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -329,43 +350,43 @@ model CodeSeries {
 // ─── CRM ─────────────────────────────────────────────────────────────────────
 
 model CrmCompany {
-  id            String   @id @default(uuid())
-  tenantId      String
-  companyCode   String   @db.VarChar(32)
-  name          String   @db.VarChar(300)
-  customerType  String   @default("corporate") @db.VarChar(32)
-  website       String?  @db.VarChar(255)
-  industry      String?  @db.VarChar(100)
-  turnoverRange String?  @db.VarChar(64)
-  employeeRange String?  @db.VarChar(64)
-  email         String?  @db.VarChar(255)
-  phone         String?  @db.VarChar(30)
-  addressLine1  String?  @db.VarChar(500)
-  addressLine2  String?  @db.VarChar(500)
-  city          String?  @db.VarChar(100)
-  state         String?  @db.VarChar(100)
-  pincode       String?  @db.VarChar(20)
-  country       String?  @default("India") @db.VarChar(100)
-  gstin         String?  @db.VarChar(20)
-  pan           String?  @db.VarChar(20)
-  contactPerson String?  @db.VarChar(200)
-  contactPhone  String?  @db.VarChar(30)
-  contactEmail  String?  @db.VarChar(255)
-  creditDays    Int      @default(0)
-  creditLimit   Decimal? @db.Decimal(18, 2)
-  salesTerritory String? @db.VarChar(32)
-  source        String?  @db.VarChar(64)
-  ownerId       String?
-  status        String   @default("active") @db.VarChar(32)
-  isActive      Boolean  @default(true)
-  notes         String?  @db.Text
-  createdBy     String?
-  updatedBy     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  deletedAt     DateTime?
+  id             String    @id @default(uuid())
+  tenantId       String
+  companyCode    String    @db.VarChar(32)
+  name           String    @db.VarChar(300)
+  customerType   String    @default("corporate") @db.VarChar(32)
+  website        String?   @db.VarChar(255)
+  industry       String?   @db.VarChar(100)
+  turnoverRange  String?   @db.VarChar(64)
+  employeeRange  String?   @db.VarChar(64)
+  email          String?   @db.VarChar(255)
+  phone          String?   @db.VarChar(30)
+  addressLine1   String?   @db.VarChar(500)
+  addressLine2   String?   @db.VarChar(500)
+  city           String?   @db.VarChar(100)
+  state          String?   @db.VarChar(100)
+  pincode        String?   @db.VarChar(20)
+  country        String?   @default("India") @db.VarChar(100)
+  gstin          String?   @db.VarChar(20)
+  pan            String?   @db.VarChar(20)
+  contactPerson  String?   @db.VarChar(200)
+  contactPhone   String?   @db.VarChar(30)
+  contactEmail   String?   @db.VarChar(255)
+  creditDays     Int       @default(0)
+  creditLimit    Decimal?  @db.Decimal(18, 2)
+  salesTerritory String?   @db.VarChar(32)
+  source         String?   @db.VarChar(64)
+  ownerId        String?
+  status         String    @default("active") @db.VarChar(32)
+  isActive       Boolean   @default(true)
+  notes          String?   @db.Text
+  createdBy      String?
+  updatedBy      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
 
-  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  tenant        Tenant           @relation(fields: [tenantId], references: [id])
   contacts      CrmContact[]
   leads         CrmLead[]
   activities    CrmActivity[]
@@ -382,32 +403,32 @@ model CrmCompany {
 }
 
 model CrmContact {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   tenantId        String
-  contactCode     String   @db.VarChar(32)
+  contactCode     String    @db.VarChar(32)
   companyId       String
-  firstName       String   @db.VarChar(100)
-  lastName        String   @default("") @db.VarChar(100)
-  designation     String?  @db.VarChar(100)
-  department      String?  @db.VarChar(100)
-  email           String?  @db.VarChar(255)
-  mobile          String?  @db.VarChar(20)
-  alternateMobile String?  @db.VarChar(20)
-  linkedInUrl     String?  @db.VarChar(255)
+  firstName       String    @db.VarChar(100)
+  lastName        String    @default("") @db.VarChar(100)
+  designation     String?   @db.VarChar(100)
+  department      String?   @db.VarChar(100)
+  email           String?   @db.VarChar(255)
+  mobile          String?   @db.VarChar(20)
+  alternateMobile String?   @db.VarChar(20)
+  linkedInUrl     String?   @db.VarChar(255)
   ownerId         String?
-  isPrimary       Boolean  @default(false)
-  status          String   @default("active") @db.VarChar(32)
-  isActive        Boolean  @default(true)
+  isPrimary       Boolean   @default(false)
+  status          String    @default("active") @db.VarChar(32)
+  isActive        Boolean   @default(true)
   masterContactId String?
-  notes           String?  @db.Text
+  notes           String?   @db.Text
   createdBy       String?
   updatedBy       String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
 
-  tenant        Tenant         @relation(fields: [tenantId], references: [id])
-  company       CrmCompany     @relation(fields: [companyId], references: [id])
+  tenant        Tenant           @relation(fields: [tenantId], references: [id])
+  company       CrmCompany       @relation(fields: [companyId], references: [id])
   leads         CrmLead[]
   activities    CrmActivity[]
   opportunities CrmOpportunity[]
@@ -468,12 +489,12 @@ model CrmLead {
   updatedAt           DateTime  @updatedAt
   deletedAt           DateTime?
 
-  tenant       Tenant              @relation(fields: [tenantId], references: [id])
-  company      CrmCompany?         @relation(fields: [companyId], references: [id])
-  contact      CrmContact?         @relation(fields: [contactId], references: [id])
-  activities   CrmActivity[]
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id])
+  company       CrmCompany?            @relation(fields: [companyId], references: [id])
+  contact       CrmContact?            @relation(fields: [contactId], references: [id])
+  activities    CrmActivity[]
   statusHistory CrmLeadStatusHistory[]
-  assignments  CrmLeadAssignment[]
+  assignments   CrmLeadAssignment[]
 
   @@unique([tenantId, leadCode])
   @@index([tenantId])
@@ -578,23 +599,23 @@ model CrmPipeline {
 }
 
 model CrmPipelineStage {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   tenantId     String
   pipelineId   String
-  name         String   @db.VarChar(100)
-  slug         String   @db.VarChar(64)
-  sequence     Int      @default(0)
-  probability  Int      @default(0)
-  isClosedWon  Boolean  @default(false)
-  isClosedLost Boolean  @default(false)
+  name         String    @db.VarChar(100)
+  slug         String    @db.VarChar(64)
+  sequence     Int       @default(0)
+  probability  Int       @default(0)
+  isClosedWon  Boolean   @default(false)
+  isClosedLost Boolean   @default(false)
   createdBy    String?
   updatedBy    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  tenant        Tenant             @relation(fields: [tenantId], references: [id])
-  pipeline      CrmPipeline        @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  tenant        Tenant           @relation(fields: [tenantId], references: [id])
+  pipeline      CrmPipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   opportunities CrmOpportunity[]
 
   @@unique([tenantId, pipelineId, slug])
@@ -632,14 +653,14 @@ model CrmOpportunity {
   updatedAt         DateTime          @updatedAt
   deletedAt         DateTime?
 
-  tenant     Tenant           @relation(fields: [tenantId], references: [id])
-  company    CrmCompany       @relation(fields: [companyId], references: [id])
-  contact    CrmContact?      @relation(fields: [contactId], references: [id])
-  pipeline   CrmPipeline      @relation(fields: [pipelineId], references: [id])
-  stage      CrmPipelineStage @relation(fields: [stageId], references: [id])
-  lines       CrmOpportunityLine[]
-  activities  CrmActivity[]
-  quotations  CrmQuotation[]
+  tenant     Tenant               @relation(fields: [tenantId], references: [id])
+  company    CrmCompany           @relation(fields: [companyId], references: [id])
+  contact    CrmContact?          @relation(fields: [contactId], references: [id])
+  pipeline   CrmPipeline          @relation(fields: [pipelineId], references: [id])
+  stage      CrmPipelineStage     @relation(fields: [stageId], references: [id])
+  lines      CrmOpportunityLine[]
+  activities CrmActivity[]
+  quotations CrmQuotation[]
 
   @@unique([tenantId, opportunityCode])
   @@index([tenantId])
@@ -651,30 +672,30 @@ model CrmOpportunity {
 }
 
 model CrmOpportunityLine {
-  id                  String   @id @default(uuid())
-  tenantId            String
-  opportunityId       String
-  lineNo              Int
-  productId           String?
-  itemId              String?
-  itemCode            String   @default("") @db.VarChar(64)
-  productOrItem       String   @db.VarChar(300)
-  description         String?  @db.Text
-  productFamily       String?  @db.VarChar(100)
-  itemType            String?  @db.VarChar(64)
-  qty                 Decimal  @default(1) @db.Decimal(18, 4)
-  uom                 String   @default("NOS") @db.VarChar(16)
-  unitPrice           Decimal  @default(0) @db.Decimal(18, 2)
-  discountPct         Decimal  @default(0) @db.Decimal(5, 2)
-  discountAmount      Decimal  @default(0) @db.Decimal(18, 2)
-  taxableValue        Decimal  @default(0) @db.Decimal(18, 2)
-  taxPct              Decimal  @default(0) @db.Decimal(5, 2)
-  gstAmount           Decimal  @default(0) @db.Decimal(18, 2)
-  lineTotal           Decimal  @default(0) @db.Decimal(18, 2)
+  id                   String    @id @default(uuid())
+  tenantId             String
+  opportunityId        String
+  lineNo               Int
+  productId            String?
+  itemId               String?
+  itemCode             String    @default("") @db.VarChar(64)
+  productOrItem        String    @db.VarChar(300)
+  description          String?   @db.Text
+  productFamily        String?   @db.VarChar(100)
+  itemType             String?   @db.VarChar(64)
+  qty                  Decimal   @default(1) @db.Decimal(18, 4)
+  uom                  String    @default("NOS") @db.VarChar(16)
+  unitPrice            Decimal   @default(0) @db.Decimal(18, 2)
+  discountPct          Decimal   @default(0) @db.Decimal(5, 2)
+  discountAmount       Decimal   @default(0) @db.Decimal(18, 2)
+  taxableValue         Decimal   @default(0) @db.Decimal(18, 2)
+  taxPct               Decimal   @default(0) @db.Decimal(5, 2)
+  gstAmount            Decimal   @default(0) @db.Decimal(18, 2)
+  lineTotal            Decimal   @default(0) @db.Decimal(18, 2)
   expectedDeliveryDate DateTime?
-  remarks             String?  @db.Text
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  remarks              String?   @db.Text
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   opportunity CrmOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
 
@@ -727,20 +748,20 @@ enum CrmEntityType {
 }
 
 model CrmMaster {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   tenantId    String
-  kind        String   @db.VarChar(64)
-  code        String   @db.VarChar(64)
-  name        String   @db.VarChar(200)
-  description String?  @db.Text
-  status      String   @default("active") @db.VarChar(32)
-  sortOrder   Int      @default(0)
-  attributes  Json     @default("{}")
-  isSystem    Boolean  @default(false)
+  kind        String    @db.VarChar(64)
+  code        String    @db.VarChar(64)
+  name        String    @db.VarChar(200)
+  description String?   @db.Text
+  status      String    @default("active") @db.VarChar(32)
+  sortOrder   Int       @default(0)
+  attributes  Json      @default("{}")
+  isSystem    Boolean   @default(false)
   createdBy   String?
   updatedBy   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
@@ -758,9 +779,13 @@ model CrmNote {
   entityType CrmEntityType
   entityId   String
   content    String        @db.Text
-  /** CRM/lead/opportunity stage code at write time (additive; never overwritten on stage change). */
+  /**
+   * CRM/lead/opportunity stage code at write time (additive; never overwritten on stage change).
+   */
   stageCode  String?       @db.VarChar(64)
-  /** Stable note-type code e.g. general, qualification, requirement, … */
+  /**
+   * Stable note-type code e.g. general, qualification, requirement, …
+   */
   noteType   String?       @db.VarChar(64)
   createdBy  String?
   updatedBy  String?
@@ -903,23 +928,23 @@ model CrmQuotation {
 }
 
 model CrmQuotationTemplate {
-  id                 String    @id @default(uuid())
-  tenantId           String
-  code               String    @db.VarChar(64)
-  templateName       String    @db.VarChar(200)
-  productFamily      String    @db.VarChar(100)
-  version            Int       @default(1)
-  sections           Json      @default("[]")
-  defaultTerms       String    @default("") @db.Text
-  defaultWarranty    String    @default("") @db.Text
-  defaultExclusions  String    @default("") @db.Text
-  printLayout        Json?
-  isActive           Boolean   @default(true)
-  createdBy          String?
-  updatedBy          String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  deletedAt          DateTime?
+  id                String    @id @default(uuid())
+  tenantId          String
+  code              String    @db.VarChar(64)
+  templateName      String    @db.VarChar(200)
+  productFamily     String    @db.VarChar(100)
+  version           Int       @default(1)
+  sections          Json      @default("[]")
+  defaultTerms      String    @default("") @db.Text
+  defaultWarranty   String    @default("") @db.Text
+  defaultExclusions String    @default("") @db.Text
+  printLayout       Json?
+  isActive          Boolean   @default(true)
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -932,35 +957,35 @@ model CrmQuotationTemplate {
 }
 
 model CrmQuotationDocument {
-  id                 String   @id @default(uuid())
+  id                 String    @id @default(uuid())
   tenantId           String
   quotationId        String
-  revisionNo         Int      @default(1)
+  revisionNo         Int       @default(1)
   templateId         String?
   opportunityId      String?
-  status             String   @default("draft") @db.VarChar(32)
-  totalAmount        Decimal  @default(0) @db.Decimal(18, 2)
-  freightAmount      Decimal  @default(0) @db.Decimal(18, 2)
-  installationAmount Decimal  @default(0) @db.Decimal(18, 2)
-  customCharges      Decimal  @default(0) @db.Decimal(18, 2)
-  revisionReason     String?  @db.Text
-  locked             Boolean  @default(false)
-  approvalHistory    Json     @default("[]")
-  sections           Json     @default("[]")
-  priceLines         Json     @default("[]")
-  commercialNotes    String?  @db.Text
-  technicalNotes     String?  @db.Text
+  status             String    @default("draft") @db.VarChar(32)
+  totalAmount        Decimal   @default(0) @db.Decimal(18, 2)
+  freightAmount      Decimal   @default(0) @db.Decimal(18, 2)
+  installationAmount Decimal   @default(0) @db.Decimal(18, 2)
+  customCharges      Decimal   @default(0) @db.Decimal(18, 2)
+  revisionReason     String?   @db.Text
+  locked             Boolean   @default(false)
+  approvalHistory    Json      @default("[]")
+  sections           Json      @default("[]")
+  priceLines         Json      @default("[]")
+  commercialNotes    String?   @db.Text
+  technicalNotes     String?   @db.Text
   locationId         String?
   salesOrderId       String?
-  salesOrderNo       String?  @db.VarChar(64)
+  salesOrderNo       String?   @db.VarChar(64)
   contactId          String?
   salesOwnerId       String?
-  salesOwnerName     String?  @db.VarChar(200)
+  salesOwnerName     String?   @db.VarChar(200)
   createdBy          String?
-  createdByName      String?  @db.VarChar(200)
+  createdByName      String?   @db.VarChar(200)
   updatedBy          String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
   deletedAt          DateTime?
 
   tenant    Tenant       @relation(fields: [tenantId], references: [id])
@@ -1007,7 +1032,7 @@ model CrmSalesOrder {
   technicalNotes              String?   @db.Text
   customerCode                String?   @db.VarChar(64)
   customerPoNumber            String?   @db.VarChar(100)
-  customerPoDate                DateTime? @db.Date
+  customerPoDate              DateTime? @db.Date
   deliveryLocation            String?   @db.VarChar(500)
   billingAddress              String?   @db.Text
   shippingAddress             String?   @db.Text
@@ -1162,9 +1187,14 @@ model MasterUom {
   updatedAt     DateTime           @updatedAt
   deletedAt     DateTime?
 
-  tenant           Tenant       @relation(fields: [tenantId], references: [id])
-  itemsBaseUom     MasterItem[] @relation("ItemBaseUom")
-  itemsPurchaseUom MasterItem[] @relation("ItemPurchaseUom")
+  tenant                   Tenant                    @relation(fields: [tenantId], references: [id])
+  itemsBaseUom             MasterItem[]              @relation("ItemBaseUom")
+  itemsPurchaseUom         MasterItem[]              @relation("ItemPurchaseUom")
+  purchaseRequisitionLines PurchaseRequisitionLine[]
+  purchasePlanningRows     PurchasePlanningRow[]
+  requestForQuotationLines RequestForQuotationLine[]
+  vendorQuotationLines     VendorQuotationLine[]
+  purchaseOrderLines       PurchaseOrderLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1188,9 +1218,11 @@ model MasterWarehouse {
   updatedAt     DateTime           @updatedAt
   deletedAt     DateTime?
 
-  tenant    Tenant          @relation(fields: [tenantId], references: [id])
-  locations MasterLocation[]
-  categories MasterItemCategory[]
+  tenant                   Tenant                    @relation(fields: [tenantId], references: [id])
+  locations                MasterLocation[]
+  categories               MasterItemCategory[]
+  purchaseRequisitions     PurchaseRequisition[]
+  purchaseRequisitionLines PurchaseRequisitionLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1200,29 +1232,29 @@ model MasterWarehouse {
 }
 
 model MasterLocation {
-  id                  String             @id @default(uuid())
-  tenantId            String
-  warehouseId         String
-  code                String             @db.VarChar(32)
-  name                String             @db.VarChar(200)
-  addressLine1        String?            @db.VarChar(300)
-  addressLine2        String?            @db.VarChar(300)
-  city                String?            @db.VarChar(100)
-  state               String?            @db.VarChar(100)
-  pincode             String?            @db.VarChar(16)
-  country             String?            @db.VarChar(100)
-  gstin               String?            @db.VarChar(15)
-  registeredType      String?            @db.VarChar(64)
-  allowSales          Boolean            @default(true)
-  allowPurchase       Boolean            @default(true)
-  allowProduction     Boolean            @default(true)
-  allowInventory      Boolean            @default(true)
-  status              MasterRecordStatus @default(ACTIVE)
-  createdBy           String?
-  updatedBy           String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  deletedAt           DateTime?
+  id              String             @id @default(uuid())
+  tenantId        String
+  warehouseId     String
+  code            String             @db.VarChar(32)
+  name            String             @db.VarChar(200)
+  addressLine1    String?            @db.VarChar(300)
+  addressLine2    String?            @db.VarChar(300)
+  city            String?            @db.VarChar(100)
+  state           String?            @db.VarChar(100)
+  pincode         String?            @db.VarChar(16)
+  country         String?            @db.VarChar(100)
+  gstin           String?            @db.VarChar(15)
+  registeredType  String?            @db.VarChar(64)
+  allowSales      Boolean            @default(true)
+  allowPurchase   Boolean            @default(true)
+  allowProduction Boolean            @default(true)
+  allowInventory  Boolean            @default(true)
+  status          MasterRecordStatus @default(ACTIVE)
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  deletedAt       DateTime?
 
   tenant    Tenant          @relation(fields: [tenantId], references: [id])
   warehouse MasterWarehouse @relation(fields: [warehouseId], references: [id])
@@ -1315,23 +1347,23 @@ model MasterHsnCode {
 }
 
 model MasterGstRate {
-  id                  String             @id @default(uuid())
-  tenantId            String
-  code                String             @db.VarChar(32)
-  gstGroupId          String
-  fromState           String             @db.VarChar(100)
-  locationStateCode   String             @db.VarChar(100)
-  dateFrom            DateTime           @db.Date
-  dateTo              DateTime?          @db.Date
-  sgst                Decimal            @default(0) @db.Decimal(5, 2)
-  cgst                Decimal            @default(0) @db.Decimal(5, 2)
-  igst                Decimal            @default(0) @db.Decimal(5, 2)
-  status              MasterRecordStatus @default(ACTIVE)
-  createdBy           String?
-  updatedBy           String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  deletedAt           DateTime?
+  id                String             @id @default(uuid())
+  tenantId          String
+  code              String             @db.VarChar(32)
+  gstGroupId        String
+  fromState         String             @db.VarChar(100)
+  locationStateCode String             @db.VarChar(100)
+  dateFrom          DateTime           @db.Date
+  dateTo            DateTime?          @db.Date
+  sgst              Decimal            @default(0) @db.Decimal(5, 2)
+  cgst              Decimal            @default(0) @db.Decimal(5, 2)
+  igst              Decimal            @default(0) @db.Decimal(5, 2)
+  status            MasterRecordStatus @default(ACTIVE)
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
 
   tenant   Tenant         @relation(fields: [tenantId], references: [id])
   gstGroup MasterGstGroup @relation(fields: [gstGroupId], references: [id])
@@ -1383,12 +1415,17 @@ model MasterItem {
   updatedAt            DateTime           @updatedAt
   deletedAt            DateTime?
 
-  tenant      Tenant             @relation(fields: [tenantId], references: [id])
-  category    MasterItemCategory @relation(fields: [categoryId], references: [id])
-  baseUom     MasterUom          @relation("ItemBaseUom", fields: [baseUomId], references: [id])
-  purchaseUom MasterUom?         @relation("ItemPurchaseUom", fields: [purchaseUomId], references: [id])
-  hsn         MasterHsnCode?     @relation(fields: [hsnId], references: [id])
-  gstGroup    MasterGstGroup?    @relation(fields: [gstGroupId], references: [id])
+  tenant                   Tenant                    @relation(fields: [tenantId], references: [id])
+  category                 MasterItemCategory        @relation(fields: [categoryId], references: [id])
+  baseUom                  MasterUom                 @relation("ItemBaseUom", fields: [baseUomId], references: [id])
+  purchaseUom              MasterUom?                @relation("ItemPurchaseUom", fields: [purchaseUomId], references: [id])
+  hsn                      MasterHsnCode?            @relation(fields: [hsnId], references: [id])
+  gstGroup                 MasterGstGroup?           @relation(fields: [gstGroupId], references: [id])
+  purchaseRequisitionLines PurchaseRequisitionLine[]
+  purchasePlanningRows     PurchasePlanningRow[]
+  requestForQuotationLines RequestForQuotationLine[]
+  vendorQuotationLines     VendorQuotationLine[]
+  purchaseOrderLines       PurchaseOrderLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1436,10 +1473,18 @@ model MasterVendor {
   updatedAt           DateTime           @updatedAt
   deletedAt           DateTime?
 
-  tenant      Tenant         @relation(fields: [tenantId], references: [id])
-  countryRef  MasterCountry? @relation(fields: [countryId], references: [id])
-  stateRef    MasterState?   @relation(fields: [stateId], references: [id])
-  cityRef     MasterCity?    @relation(fields: [cityId], references: [id])
+  tenant                            Tenant                    @relation(fields: [tenantId], references: [id])
+  countryRef                        MasterCountry?            @relation(fields: [countryId], references: [id])
+  stateRef                          MasterState?              @relation(fields: [stateId], references: [id])
+  cityRef                           MasterCity?               @relation(fields: [cityId], references: [id])
+  purchaseRequisitionLinesPreferred PurchaseRequisitionLine[] @relation("PrLinePreferredVendor")
+  purchasePlanningPreferred         PurchasePlanningRow[]     @relation("PlanningPreferredVendor")
+  purchasePlanningSelected          PurchasePlanningRow[]     @relation("PlanningSelectedVendor")
+  purchasePlanningLastPurchase      PurchasePlanningRow[]     @relation("PlanningLastPurchaseVendor")
+  rfqVendors                        RfqVendor[]
+  vendorQuotations                  VendorQuotation[]
+  vendorComparisonsAwarded          VendorComparison[]        @relation("ComparisonAwardedVendor")
+  purchaseOrders                    PurchaseOrder[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1620,29 +1665,29 @@ model LegalEntity {
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
-  tenant                 Tenant                  @relation(fields: [tenantId], references: [id])
-  branches               Branch[]
-  financialYears         FinancialYear[]
-  accountingPeriods      AccountingPeriod[]
-  accounts               Account[]
-  defaultAccountMappings DefaultAccountMapping[]
-  financeSettings        FinanceSettings?
-  costCentres            CostCentre[]
-  financeFeatureControls FinanceFeatureControl[]
-  financeApprovalRules   FinanceApprovalRule[]
-  financeNumberSeries    FinanceNumberSeries[]
-  accountingVouchers     AccountingVoucher[]
-  accountingVoucherLines AccountingVoucherLine[]
-  generalLedgerEntries   GeneralLedgerEntry[]
-  postingEvents          PostingEvent[]
-  postingRules           PostingRule[]
-  financeApprovalRequests FinanceApprovalRequest[]
-  financeApprovalSteps    FinanceApprovalStep[]
-  salesInvoices           SalesInvoice[]
-  salesInvoiceLines       SalesInvoiceLine[]
-  receivableOpenItems     ReceivableOpenItem[]
-  customerReceipts        CustomerReceipt[]
-  customerReceiptAllocations CustomerReceiptAllocation[]
+  tenant                        Tenant                         @relation(fields: [tenantId], references: [id])
+  branches                      Branch[]
+  financialYears                FinancialYear[]
+  accountingPeriods             AccountingPeriod[]
+  accounts                      Account[]
+  defaultAccountMappings        DefaultAccountMapping[]
+  financeSettings               FinanceSettings?
+  costCentres                   CostCentre[]
+  financeFeatureControls        FinanceFeatureControl[]
+  financeApprovalRules          FinanceApprovalRule[]
+  financeNumberSeries           FinanceNumberSeries[]
+  accountingVouchers            AccountingVoucher[]
+  accountingVoucherLines        AccountingVoucherLine[]
+  generalLedgerEntries          GeneralLedgerEntry[]
+  postingEvents                 PostingEvent[]
+  postingRules                  PostingRule[]
+  financeApprovalRequests       FinanceApprovalRequest[]
+  financeApprovalSteps          FinanceApprovalStep[]
+  salesInvoices                 SalesInvoice[]
+  salesInvoiceLines             SalesInvoiceLine[]
+  receivableOpenItems           ReceivableOpenItem[]
+  customerReceipts              CustomerReceipt[]
+  customerReceiptAllocations    CustomerReceiptAllocation[]
   customerReceiptDeductionLines CustomerReceiptDeductionLine[]
 
   @@unique([tenantId, code])
@@ -1672,13 +1717,13 @@ model Branch {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-  tenant      Tenant      @relation(fields: [tenantId], references: [id])
-  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
-  accountingVouchers AccountingVoucher[]
+  tenant               Tenant               @relation(fields: [tenantId], references: [id])
+  legalEntity          LegalEntity          @relation(fields: [legalEntityId], references: [id])
+  accountingVouchers   AccountingVoucher[]
   generalLedgerEntries GeneralLedgerEntry[]
-  salesInvoices SalesInvoice[]
-  receivableOpenItems ReceivableOpenItem[]
-  customerReceipts CustomerReceipt[]
+  salesInvoices        SalesInvoice[]
+  receivableOpenItems  ReceivableOpenItem[]
+  customerReceipts     CustomerReceipt[]
 
   @@unique([legalEntityId, code])
   @@index([tenantId])
@@ -1702,14 +1747,14 @@ model FinancialYear {
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 
-  tenant            Tenant             @relation(fields: [tenantId], references: [id])
-  legalEntity       LegalEntity        @relation(fields: [legalEntityId], references: [id])
-  periods           AccountingPeriod[]
-  financeNumberSeries FinanceNumberSeries[]
-  accountingVouchers AccountingVoucher[]
+  tenant               Tenant                @relation(fields: [tenantId], references: [id])
+  legalEntity          LegalEntity           @relation(fields: [legalEntityId], references: [id])
+  periods              AccountingPeriod[]
+  financeNumberSeries  FinanceNumberSeries[]
+  accountingVouchers   AccountingVoucher[]
   generalLedgerEntries GeneralLedgerEntry[]
-  salesInvoices SalesInvoice[]
-  customerReceipts CustomerReceipt[]
+  salesInvoices        SalesInvoice[]
+  customerReceipts     CustomerReceipt[]
 
   @@index([tenantId])
   @@index([legalEntityId])
@@ -1736,10 +1781,10 @@ model AccountingPeriod {
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
 
-  tenant        Tenant        @relation(fields: [tenantId], references: [id])
-  legalEntity   LegalEntity   @relation(fields: [legalEntityId], references: [id])
-  financialYear FinancialYear @relation(fields: [financialYearId], references: [id])
-  accountingVouchers AccountingVoucher[]
+  tenant               Tenant               @relation(fields: [tenantId], references: [id])
+  legalEntity          LegalEntity          @relation(fields: [legalEntityId], references: [id])
+  financialYear        FinancialYear        @relation(fields: [financialYearId], references: [id])
+  accountingVouchers   AccountingVoucher[]
   generalLedgerEntries GeneralLedgerEntry[]
 
   @@unique([financialYearId, periodNumber])
@@ -1751,44 +1796,44 @@ model AccountingPeriod {
 }
 
 model Account {
-  id                   String          @id @default(uuid())
-  tenantId             String
-  legalEntityId        String
-  accountCode          String          @db.VarChar(32)
-  accountName          String          @db.VarChar(200)
-  parentAccountId      String?
-  category             AccountCategory
-  accountType          AccountType     @default(GENERAL)
-  level                Int             @default(1)
-  isGroup              Boolean         @default(false)
-  isControlAccount     Boolean         @default(false)
-  allowManualPosting   Boolean         @default(true)
-  normalBalance        NormalBalance   @default(DEBIT)
-  currencyCode         String?         @db.VarChar(8)
-  requiresParty        Boolean         @default(false)
-  requiresReconciliation Boolean       @default(false)
-  isActive             Boolean         @default(true)
-  description          String?         @db.Text
-  createdBy            String?
-  updatedBy            String?
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
+  id                     String          @id @default(uuid())
+  tenantId               String
+  legalEntityId          String
+  accountCode            String          @db.VarChar(32)
+  accountName            String          @db.VarChar(200)
+  parentAccountId        String?
+  category               AccountCategory
+  accountType            AccountType     @default(GENERAL)
+  level                  Int             @default(1)
+  isGroup                Boolean         @default(false)
+  isControlAccount       Boolean         @default(false)
+  allowManualPosting     Boolean         @default(true)
+  normalBalance          NormalBalance   @default(DEBIT)
+  currencyCode           String?         @db.VarChar(8)
+  requiresParty          Boolean         @default(false)
+  requiresReconciliation Boolean         @default(false)
+  isActive               Boolean         @default(true)
+  description            String?         @db.Text
+  createdBy              String?
+  updatedBy              String?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
 
-  tenant      Tenant                   @relation(fields: [tenantId], references: [id])
-  legalEntity LegalEntity              @relation(fields: [legalEntityId], references: [id])
-  parent      Account?                 @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
-  children    Account[]                @relation("AccountHierarchy")
-  mappings    DefaultAccountMapping[]
-  voucherLines AccountingVoucherLine[]
-  generalLedgerEntries GeneralLedgerEntry[]
-  salesInvoiceLines SalesInvoiceLine[]
-  receivableOpenItems ReceivableOpenItem[]
-  customerReceiptsBankCash CustomerReceipt[] @relation("ReceiptBankCashAccount")
-  customerReceiptsReceivable CustomerReceipt[] @relation("ReceiptCustomerReceivableAccount")
-  customerReceiptsBankCharge CustomerReceipt[] @relation("ReceiptBankChargeAccount")
-  customerReceiptsTdsReceivable CustomerReceipt[] @relation("ReceiptTdsReceivableAccount")
-  customerReceiptsOtherDeduction CustomerReceipt[] @relation("ReceiptOtherDeductionAccount")
-  customerReceiptDeductionLines CustomerReceiptDeductionLine[] @relation("ReceiptDeductionLineAccount")
+  tenant                         Tenant                         @relation(fields: [tenantId], references: [id])
+  legalEntity                    LegalEntity                    @relation(fields: [legalEntityId], references: [id])
+  parent                         Account?                       @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
+  children                       Account[]                      @relation("AccountHierarchy")
+  mappings                       DefaultAccountMapping[]
+  voucherLines                   AccountingVoucherLine[]
+  generalLedgerEntries           GeneralLedgerEntry[]
+  salesInvoiceLines              SalesInvoiceLine[]
+  receivableOpenItems            ReceivableOpenItem[]
+  customerReceiptsBankCash       CustomerReceipt[]              @relation("ReceiptBankCashAccount")
+  customerReceiptsReceivable     CustomerReceipt[]              @relation("ReceiptCustomerReceivableAccount")
+  customerReceiptsBankCharge     CustomerReceipt[]              @relation("ReceiptBankChargeAccount")
+  customerReceiptsTdsReceivable  CustomerReceipt[]              @relation("ReceiptTdsReceivableAccount")
+  customerReceiptsOtherDeduction CustomerReceipt[]              @relation("ReceiptOtherDeductionAccount")
+  customerReceiptDeductionLines  CustomerReceiptDeductionLine[] @relation("ReceiptDeductionLineAccount")
 
   @@unique([legalEntityId, accountCode])
   @@index([tenantId])
@@ -1824,29 +1869,29 @@ model DefaultAccountMapping {
 }
 
 model FinanceSettings {
-  id                             String         @id @default(uuid())
-  tenantId                       String
-  legalEntityId                  String         @unique
-  baseCurrency                   String         @default("INR") @db.VarChar(8)
-  dateFormat                     String         @default("DD/MM/YYYY") @db.VarChar(32)
-  amountPrecision                Int            @default(2)
-  quantityPrecision              Int            @default(3)
-  roundingMethod                 RoundingMethod @default(ROUND_HALF_UP)
-  roundingTolerance              Decimal        @default(1) @db.Decimal(18, 4)
-  allowBackdatedPosting          Boolean        @default(false)
-  backdatedDaysLimit             Int            @default(0)
-  requireAttachmentAbove         Decimal?       @db.Decimal(18, 4)
-  receiptApprovalLimit           Decimal?       @db.Decimal(18, 4)
-  paymentApprovalLimit           Decimal?       @db.Decimal(18, 4)
-  journalApprovalLimit           Decimal?       @db.Decimal(18, 4)
-  writeOffTolerance              Decimal?       @db.Decimal(18, 4)
-  bankChargeTolerance            Decimal?       @db.Decimal(18, 4)
-  allowManualControlAccountPosting Boolean      @default(false)
-  financeActivated               Boolean        @default(false)
-  activatedAt                    DateTime?
-  activatedBy                    String?
-  createdAt                      DateTime       @default(now())
-  updatedAt                      DateTime       @updatedAt
+  id                               String         @id @default(uuid())
+  tenantId                         String
+  legalEntityId                    String         @unique
+  baseCurrency                     String         @default("INR") @db.VarChar(8)
+  dateFormat                       String         @default("DD/MM/YYYY") @db.VarChar(32)
+  amountPrecision                  Int            @default(2)
+  quantityPrecision                Int            @default(3)
+  roundingMethod                   RoundingMethod @default(ROUND_HALF_UP)
+  roundingTolerance                Decimal        @default(1) @db.Decimal(18, 4)
+  allowBackdatedPosting            Boolean        @default(false)
+  backdatedDaysLimit               Int            @default(0)
+  requireAttachmentAbove           Decimal?       @db.Decimal(18, 4)
+  receiptApprovalLimit             Decimal?       @db.Decimal(18, 4)
+  paymentApprovalLimit             Decimal?       @db.Decimal(18, 4)
+  journalApprovalLimit             Decimal?       @db.Decimal(18, 4)
+  writeOffTolerance                Decimal?       @db.Decimal(18, 4)
+  bankChargeTolerance              Decimal?       @db.Decimal(18, 4)
+  allowManualControlAccountPosting Boolean        @default(false)
+  financeActivated                 Boolean        @default(false)
+  activatedAt                      DateTime?
+  activatedBy                      String?
+  createdAt                        DateTime       @default(now())
+  updatedAt                        DateTime       @updatedAt
 
   tenant      Tenant      @relation(fields: [tenantId], references: [id])
   legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
@@ -1869,13 +1914,13 @@ model CostCentre {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  tenant      Tenant       @relation(fields: [tenantId], references: [id])
-  legalEntity LegalEntity  @relation(fields: [legalEntityId], references: [id])
-  parent      CostCentre?  @relation("CostCentreHierarchy", fields: [parentId], references: [id])
-  children    CostCentre[] @relation("CostCentreHierarchy")
-  voucherLines AccountingVoucherLine[]
+  tenant               Tenant                  @relation(fields: [tenantId], references: [id])
+  legalEntity          LegalEntity             @relation(fields: [legalEntityId], references: [id])
+  parent               CostCentre?             @relation("CostCentreHierarchy", fields: [parentId], references: [id])
+  children             CostCentre[]            @relation("CostCentreHierarchy")
+  voucherLines         AccountingVoucherLine[]
   generalLedgerEntries GeneralLedgerEntry[]
-  salesInvoiceLines SalesInvoiceLine[]
+  salesInvoiceLines    SalesInvoiceLine[]
 
   @@unique([legalEntityId, code])
   @@index([tenantId])
@@ -1998,76 +2043,76 @@ enum PostingEventStatus {
 }
 
 model AccountingVoucher {
-  id                   String                   @id @default(uuid())
-  tenantId             String
-  legalEntityId        String
-  branchId             String?
-  financialYearId      String
-  accountingPeriodId   String
+  id                 String  @id @default(uuid())
+  tenantId           String
+  legalEntityId      String
+  branchId           String?
+  financialYearId    String
+  accountingPeriodId String
 
-  voucherType          AccountingVoucherType
-  voucherNumber        String?                  @db.VarChar(64)
-  status               AccountingVoucherStatus  @default(DRAFT)
+  voucherType   AccountingVoucherType
+  voucherNumber String?                 @db.VarChar(64)
+  status        AccountingVoucherStatus @default(DRAFT)
 
-  documentDate         DateTime                 @db.Date
-  postingDate          DateTime                 @db.Date
-  referenceNumber      String?                  @db.VarChar(100)
-  externalReference    String?                  @db.VarChar(100)
-  narration            String?                  @db.Text
+  documentDate      DateTime @db.Date
+  postingDate       DateTime @db.Date
+  referenceNumber   String?  @db.VarChar(100)
+  externalReference String?  @db.VarChar(100)
+  narration         String?  @db.Text
 
-  currencyCode         String                   @default("INR") @db.VarChar(8)
-  exchangeRate         Decimal                  @default(1) @db.Decimal(18, 8)
+  currencyCode String  @default("INR") @db.VarChar(8)
+  exchangeRate Decimal @default(1) @db.Decimal(18, 8)
 
-  totalDebit           Decimal                  @default(0) @db.Decimal(18, 4)
-  totalCredit          Decimal                  @default(0) @db.Decimal(18, 4)
-  baseTotalDebit       Decimal                  @default(0) @db.Decimal(18, 4)
-  baseTotalCredit      Decimal                  @default(0) @db.Decimal(18, 4)
+  totalDebit      Decimal @default(0) @db.Decimal(18, 4)
+  totalCredit     Decimal @default(0) @db.Decimal(18, 4)
+  baseTotalDebit  Decimal @default(0) @db.Decimal(18, 4)
+  baseTotalCredit Decimal @default(0) @db.Decimal(18, 4)
 
-  sourceModule         String?                  @db.VarChar(64)
-  sourceDocumentType   String?                  @db.VarChar(64)
+  sourceModule         String? @db.VarChar(64)
+  sourceDocumentType   String? @db.VarChar(64)
   sourceDocumentId     String?
   sourceDocumentLineId String?
 
-  reversalOfVoucherId  String?
-  reversedByVoucherId  String?
-  reversalReason       String?                  @db.VarChar(500)
+  reversalOfVoucherId String?
+  reversedByVoucherId String?
+  reversalReason      String? @db.VarChar(500)
 
-  approvalRequired     Boolean                  @default(false)
-  currentApprovalLevel Int                      @default(0)
+  approvalRequired     Boolean @default(false)
+  currentApprovalLevel Int     @default(0)
 
-  postedAt             DateTime?
-  postedBy             String?
-  reversedAt           DateTime?
-  reversedBy           String?
-  cancelledAt          DateTime?
-  cancelledBy          String?
-  cancellationReason   String?                  @db.VarChar(500)
+  postedAt           DateTime?
+  postedBy           String?
+  reversedAt         DateTime?
+  reversedBy         String?
+  cancelledAt        DateTime?
+  cancelledBy        String?
+  cancellationReason String?   @db.VarChar(500)
 
-  createdBy            String?
-  updatedBy            String?
-  createdAt            DateTime                 @default(now())
-  updatedAt            DateTime                 @updatedAt
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant             Tenant             @relation(fields: [tenantId], references: [id])
-  legalEntity        LegalEntity        @relation(fields: [legalEntityId], references: [id])
-  branch             Branch?            @relation(fields: [branchId], references: [id])
-  financialYear      FinancialYear      @relation(fields: [financialYearId], references: [id])
-  accountingPeriod   AccountingPeriod   @relation(fields: [accountingPeriodId], references: [id])
+  tenant           Tenant           @relation(fields: [tenantId], references: [id])
+  legalEntity      LegalEntity      @relation(fields: [legalEntityId], references: [id])
+  branch           Branch?          @relation(fields: [branchId], references: [id])
+  financialYear    FinancialYear    @relation(fields: [financialYearId], references: [id])
+  accountingPeriod AccountingPeriod @relation(fields: [accountingPeriodId], references: [id])
 
   /// This voucher reverses the target voucher (reversalOfVoucherId → original).
-  reversalOf         AccountingVoucher? @relation("VoucherReversalOf", fields: [reversalOfVoucherId], references: [id])
+  reversalOf         AccountingVoucher?  @relation("VoucherReversalOf", fields: [reversalOfVoucherId], references: [id])
   reversedByOriginal AccountingVoucher[] @relation("VoucherReversalOf")
 
   /// Original voucher points at its effective reversing voucher.
-  reversedByVoucher  AccountingVoucher? @relation("VoucherReversedBy", fields: [reversedByVoucherId], references: [id])
-  reversesTarget     AccountingVoucher[] @relation("VoucherReversedBy")
+  reversedByVoucher AccountingVoucher?  @relation("VoucherReversedBy", fields: [reversedByVoucherId], references: [id])
+  reversesTarget    AccountingVoucher[] @relation("VoucherReversedBy")
 
-  lines              AccountingVoucherLine[]
+  lines                AccountingVoucherLine[]
   generalLedgerEntries GeneralLedgerEntry[]
-  postingEvents      PostingEvent[]
-  salesInvoice       SalesInvoice?
-  receivableOpenItems ReceivableOpenItem[]
-  customerReceipt    CustomerReceipt?
+  postingEvents        PostingEvent[]
+  salesInvoice         SalesInvoice?
+  receivableOpenItems  ReceivableOpenItem[]
+  customerReceipt      CustomerReceipt?
 
   @@unique([tenantId, legalEntityId, financialYearId, voucherType, voucherNumber], map: "acc_vch_tenant_le_fy_type_num_key")
   @@index([tenantId])
@@ -2084,47 +2129,47 @@ model AccountingVoucher {
 }
 
 model AccountingVoucherLine {
-  id                     String               @id @default(uuid())
-  tenantId               String
-  legalEntityId          String
-  voucherId              String
-  lineNumber             Int
+  id            String @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+  voucherId     String
+  lineNumber    Int
 
-  accountId              String
+  accountId String
 
-  partyType              AccountingPartyType?
-  partyId                String?
-  partyNameSnapshot      String?              @db.VarChar(300)
+  partyType         AccountingPartyType?
+  partyId           String?
+  partyNameSnapshot String?              @db.VarChar(300)
 
-  debitAmount            Decimal              @default(0) @db.Decimal(18, 4)
-  creditAmount           Decimal              @default(0) @db.Decimal(18, 4)
-  baseDebitAmount        Decimal              @default(0) @db.Decimal(18, 4)
-  baseCreditAmount       Decimal              @default(0) @db.Decimal(18, 4)
+  debitAmount      Decimal @default(0) @db.Decimal(18, 4)
+  creditAmount     Decimal @default(0) @db.Decimal(18, 4)
+  baseDebitAmount  Decimal @default(0) @db.Decimal(18, 4)
+  baseCreditAmount Decimal @default(0) @db.Decimal(18, 4)
 
-  currencyCode           String               @default("INR") @db.VarChar(8)
-  exchangeRate           Decimal              @default(1) @db.Decimal(18, 8)
+  currencyCode String  @default("INR") @db.VarChar(8)
+  exchangeRate Decimal @default(1) @db.Decimal(18, 8)
 
-  costCentreId           String?
+  costCentreId        String?
   /// Soft reference until a shared Project model exists — not a foreign key.
-  projectReference       String?              @db.VarChar(64)
-  departmentReference    String?              @db.VarChar(64)
+  projectReference    String? @db.VarChar(64)
+  departmentReference String? @db.VarChar(64)
 
-  referenceDocumentType  String?              @db.VarChar(64)
-  referenceDocumentId    String?
+  referenceDocumentType   String? @db.VarChar(64)
+  referenceDocumentId     String?
   referenceDocumentLineId String?
 
-  dueDate                DateTime?            @db.Date
-  lineNarration          String?              @db.VarChar(500)
-  metadataJson           Json?
+  dueDate       DateTime? @db.Date
+  lineNarration String?   @db.VarChar(500)
+  metadataJson  Json?
 
-  createdAt              DateTime             @default(now())
-  updatedAt              DateTime             @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant       Tenant            @relation(fields: [tenantId], references: [id])
-  legalEntity  LegalEntity       @relation(fields: [legalEntityId], references: [id])
-  voucher      AccountingVoucher @relation(fields: [voucherId], references: [id])
-  account      Account           @relation(fields: [accountId], references: [id])
-  costCentre   CostCentre?       @relation(fields: [costCentreId], references: [id])
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  legalEntity        LegalEntity         @relation(fields: [legalEntityId], references: [id])
+  voucher            AccountingVoucher   @relation(fields: [voucherId], references: [id])
+  account            Account             @relation(fields: [accountId], references: [id])
+  costCentre         CostCentre?         @relation(fields: [costCentreId], references: [id])
   generalLedgerEntry GeneralLedgerEntry?
 
   @@unique([voucherId, lineNumber])
@@ -2139,66 +2184,66 @@ model AccountingVoucherLine {
 
 /// Immutable posted ledger rows. Application repositories must not update or delete.
 model GeneralLedgerEntry {
-  id                   String                 @id @default(uuid())
-  tenantId             String
-  legalEntityId        String
-  branchId             String?
-  financialYearId      String
-  accountingPeriodId   String
+  id                 String  @id @default(uuid())
+  tenantId           String
+  legalEntityId      String
+  branchId           String?
+  financialYearId    String
+  accountingPeriodId String
 
-  voucherId            String
-  voucherLineId        String                 @unique
-  voucherType          AccountingVoucherType
-  voucherNumber        String                 @db.VarChar(64)
-  lineNumber           Int
+  voucherId     String
+  voucherLineId String                @unique
+  voucherType   AccountingVoucherType
+  voucherNumber String                @db.VarChar(64)
+  lineNumber    Int
 
-  postingDate          DateTime               @db.Date
-  documentDate         DateTime               @db.Date
+  postingDate  DateTime @db.Date
+  documentDate DateTime @db.Date
 
-  accountId            String
-  partyType            AccountingPartyType?
-  partyId              String?
-  partyNameSnapshot    String?                @db.VarChar(300)
+  accountId         String
+  partyType         AccountingPartyType?
+  partyId           String?
+  partyNameSnapshot String?              @db.VarChar(300)
 
-  debitAmount          Decimal                @default(0) @db.Decimal(18, 4)
-  creditAmount         Decimal                @default(0) @db.Decimal(18, 4)
-  baseDebitAmount      Decimal                @default(0) @db.Decimal(18, 4)
-  baseCreditAmount     Decimal                @default(0) @db.Decimal(18, 4)
+  debitAmount      Decimal @default(0) @db.Decimal(18, 4)
+  creditAmount     Decimal @default(0) @db.Decimal(18, 4)
+  baseDebitAmount  Decimal @default(0) @db.Decimal(18, 4)
+  baseCreditAmount Decimal @default(0) @db.Decimal(18, 4)
 
-  currencyCode         String                 @default("INR") @db.VarChar(8)
-  exchangeRate         Decimal                @default(1) @db.Decimal(18, 8)
+  currencyCode String  @default("INR") @db.VarChar(8)
+  exchangeRate Decimal @default(1) @db.Decimal(18, 8)
 
-  costCentreId         String?
-  projectReference     String?                @db.VarChar(64)
-  departmentReference  String?                @db.VarChar(64)
+  costCentreId        String?
+  projectReference    String? @db.VarChar(64)
+  departmentReference String? @db.VarChar(64)
 
-  sourceModule         String?                @db.VarChar(64)
-  sourceDocumentType   String?                @db.VarChar(64)
+  sourceModule         String? @db.VarChar(64)
+  sourceDocumentType   String? @db.VarChar(64)
   sourceDocumentId     String?
   sourceDocumentLineId String?
 
-  isReversal           Boolean                @default(false)
-  reversalOfEntryId    String?
-  reversedByEntryId    String?
+  isReversal        Boolean @default(false)
+  reversalOfEntryId String?
+  reversedByEntryId String?
 
-  postedBy             String?
-  postedAt             DateTime               @default(now())
-  createdAt            DateTime               @default(now())
+  postedBy  String?
+  postedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  tenant           Tenant              @relation(fields: [tenantId], references: [id])
-  legalEntity      LegalEntity         @relation(fields: [legalEntityId], references: [id])
-  branch           Branch?             @relation(fields: [branchId], references: [id])
-  financialYear    FinancialYear       @relation(fields: [financialYearId], references: [id])
-  accountingPeriod AccountingPeriod    @relation(fields: [accountingPeriodId], references: [id])
-  voucher          AccountingVoucher   @relation(fields: [voucherId], references: [id])
+  tenant           Tenant                @relation(fields: [tenantId], references: [id])
+  legalEntity      LegalEntity           @relation(fields: [legalEntityId], references: [id])
+  branch           Branch?               @relation(fields: [branchId], references: [id])
+  financialYear    FinancialYear         @relation(fields: [financialYearId], references: [id])
+  accountingPeriod AccountingPeriod      @relation(fields: [accountingPeriodId], references: [id])
+  voucher          AccountingVoucher     @relation(fields: [voucherId], references: [id])
   voucherLine      AccountingVoucherLine @relation(fields: [voucherLineId], references: [id])
-  account          Account             @relation(fields: [accountId], references: [id])
-  costCentre       CostCentre?         @relation(fields: [costCentreId], references: [id])
+  account          Account               @relation(fields: [accountId], references: [id])
+  costCentre       CostCentre?           @relation(fields: [costCentreId], references: [id])
 
-  reversalOf       GeneralLedgerEntry? @relation("GlEntryReversalOf", fields: [reversalOfEntryId], references: [id])
-  reversedEntries  GeneralLedgerEntry[] @relation("GlEntryReversalOf")
-  reversedByEntry  GeneralLedgerEntry? @relation("GlEntryReversedBy", fields: [reversedByEntryId], references: [id])
-  reversesEntries  GeneralLedgerEntry[] @relation("GlEntryReversedBy")
+  reversalOf      GeneralLedgerEntry?  @relation("GlEntryReversalOf", fields: [reversalOfEntryId], references: [id])
+  reversedEntries GeneralLedgerEntry[] @relation("GlEntryReversalOf")
+  reversedByEntry GeneralLedgerEntry?  @relation("GlEntryReversedBy", fields: [reversedByEntryId], references: [id])
+  reversesEntries GeneralLedgerEntry[] @relation("GlEntryReversedBy")
 
   @@index([tenantId, legalEntityId, postingDate])
   @@index([tenantId, legalEntityId, accountId, postingDate])
@@ -2213,48 +2258,48 @@ model GeneralLedgerEntry {
 }
 
 model PostingEvent {
-  id                   String             @id @default(uuid())
-  tenantId             String
-  legalEntityId        String
+  id            String @id @default(uuid())
+  tenantId      String
+  legalEntityId String
 
-  eventKey             String             @db.VarChar(200)
-  eventType            String             @db.VarChar(100)
-  eventVersion         Int                @default(1)
-  status               PostingEventStatus @default(RECEIVED)
+  eventKey     String             @db.VarChar(200)
+  eventType    String             @db.VarChar(100)
+  eventVersion Int                @default(1)
+  status       PostingEventStatus @default(RECEIVED)
 
-  sourceModule         String?            @db.VarChar(64)
-  sourceDocumentType   String?            @db.VarChar(64)
+  sourceModule         String? @db.VarChar(64)
+  sourceDocumentType   String? @db.VarChar(64)
   sourceDocumentId     String?
   sourceDocumentLineId String?
 
-  payloadHash          String             @db.VarChar(64)
-  payloadJson          Json?
+  payloadHash String @db.VarChar(64)
+  payloadJson Json?
 
-  voucherId            String?
+  voucherId String?
 
-  numberSeriesId       String?
-  reservedVoucherNumber String?           @db.VarChar(64)
-  numberReservedAt     DateTime?
+  numberSeriesId        String?
+  reservedVoucherNumber String?   @db.VarChar(64)
+  numberReservedAt      DateTime?
 
-  sourceNumberSeriesId            String?
-  reservedSourceDocumentNumber    String?   @db.VarChar(64)
-  sourceNumberReservedAt          DateTime?
+  sourceNumberSeriesId         String?
+  reservedSourceDocumentNumber String?   @db.VarChar(64)
+  sourceNumberReservedAt       DateTime?
 
-  attemptCount         Int                @default(0)
-  lastAttemptAt        DateTime?
-  processedAt          DateTime?
+  attemptCount  Int       @default(0)
+  lastAttemptAt DateTime?
+  processedAt   DateTime?
 
-  errorCode            String?            @db.VarChar(64)
-  errorMessage         String?            @db.VarChar(500)
+  errorCode    String? @db.VarChar(64)
+  errorMessage String? @db.VarChar(500)
 
-  createdBy            String?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant      Tenant             @relation(fields: [tenantId], references: [id])
-  legalEntity LegalEntity        @relation(fields: [legalEntityId], references: [id])
-  voucher     AccountingVoucher? @relation(fields: [voucherId], references: [id])
-  salesInvoice SalesInvoice?
+  tenant          Tenant             @relation(fields: [tenantId], references: [id])
+  legalEntity     LegalEntity        @relation(fields: [legalEntityId], references: [id])
+  voucher         AccountingVoucher? @relation(fields: [voucherId], references: [id])
+  salesInvoice    SalesInvoice?
   customerReceipt CustomerReceipt?
 
   @@unique([tenantId, legalEntityId, eventKey])
@@ -2269,29 +2314,29 @@ model PostingEvent {
 }
 
 model PostingRule {
-  id                   String    @id @default(uuid())
-  tenantId             String
-  legalEntityId        String
+  id            String @id @default(uuid())
+  tenantId      String
+  legalEntityId String
 
-  ruleCode             String    @db.VarChar(64)
-  ruleName             String    @db.VarChar(200)
-  eventType            String    @db.VarChar(100)
-  version              Int       @default(1)
-  priority             Int       @default(100)
+  ruleCode  String @db.VarChar(64)
+  ruleName  String @db.VarChar(200)
+  eventType String @db.VarChar(100)
+  version   Int    @default(1)
+  priority  Int    @default(100)
 
-  effectiveFrom        DateTime  @db.Date
-  effectiveTo          DateTime? @db.Date
+  effectiveFrom DateTime  @db.Date
+  effectiveTo   DateTime? @db.Date
 
-  conditionsJson       Json?
-  lineDefinitionsJson  Json
+  conditionsJson      Json?
+  lineDefinitionsJson Json
 
-  isSystemRule         Boolean   @default(false)
-  isActive             Boolean   @default(true)
+  isSystemRule Boolean @default(false)
+  isActive     Boolean @default(true)
 
-  createdBy            String?
-  updatedBy            String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenant      Tenant      @relation(fields: [tenantId], references: [id])
   legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
@@ -2334,38 +2379,38 @@ enum FinanceApprovalStepStatus {
 
 /// Runtime approval transaction — distinct from FinanceApprovalRule (configuration).
 model FinanceApprovalRequest {
-  id                      String                        @id @default(uuid())
-  tenantId                String
-  legalEntityId           String
+  id            String @id @default(uuid())
+  tenantId      String
+  legalEntityId String
 
-  documentType            FinanceApprovalDocumentType
-  documentId              String
-  documentNumberSnapshot  String?                       @db.VarChar(64)
-  documentStatusSnapshot  String?                       @db.VarChar(32)
+  documentType           FinanceApprovalDocumentType
+  documentId             String
+  documentNumberSnapshot String?                     @db.VarChar(64)
+  documentStatusSnapshot String?                     @db.VarChar(32)
 
-  cycleNumber             Int                           @default(1)
-  status                  FinanceApprovalRequestStatus  @default(PENDING)
+  cycleNumber Int                          @default(1)
+  status      FinanceApprovalRequestStatus @default(PENDING)
 
-  amountBasis             Decimal                       @db.Decimal(18, 4)
-  currencyCode            String                        @default("INR") @db.VarChar(8)
+  amountBasis  Decimal @db.Decimal(18, 4)
+  currencyCode String  @default("INR") @db.VarChar(8)
 
-  currentLevel            Int                           @default(1)
-  totalLevels             Int                           @default(1)
+  currentLevel Int @default(1)
+  totalLevels  Int @default(1)
 
-  requestedBy             String?
-  requestedAt             DateTime                      @default(now())
+  requestedBy String?
+  requestedAt DateTime @default(now())
 
-  completedAt             DateTime?
-  completedBy             String?
+  completedAt DateTime?
+  completedBy String?
 
-  ruleSnapshotJson        Json?
-  workflowSnapshotJson    Json?
+  ruleSnapshotJson     Json?
+  workflowSnapshotJson Json?
 
-  createdAt               DateTime                      @default(now())
-  updatedAt               DateTime                      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant      Tenant                 @relation(fields: [tenantId], references: [id])
-  legalEntity LegalEntity            @relation(fields: [legalEntityId], references: [id])
+  tenant      Tenant                @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity           @relation(fields: [legalEntityId], references: [id])
   steps       FinanceApprovalStep[]
 
   @@unique([tenantId, legalEntityId, documentType, documentId, cycleNumber], map: "fin_appr_req_doc_cycle_key")
@@ -2377,28 +2422,28 @@ model FinanceApprovalRequest {
 }
 
 model FinanceApprovalStep {
-  id                  String                     @id @default(uuid())
-  tenantId            String
-  legalEntityId       String
-  approvalRequestId   String
+  id                String @id @default(uuid())
+  tenantId          String
+  legalEntityId     String
+  approvalRequestId String
 
-  level               Int
-  sequence            Int                        @default(1)
+  level    Int
+  sequence Int @default(1)
 
-  approverRoleId      String?
-  approverUserId      String?
+  approverRoleId String?
+  approverUserId String?
 
-  status              FinanceApprovalStepStatus  @default(WAITING)
+  status FinanceApprovalStepStatus @default(WAITING)
 
-  actedBy             String?
-  actedAt             DateTime?
-  comments            String?                    @db.VarChar(1000)
+  actedBy  String?
+  actedAt  DateTime?
+  comments String?   @db.VarChar(1000)
 
   delegatedFromUserId String?
   metadataJson        Json?
 
-  createdAt           DateTime                   @default(now())
-  updatedAt           DateTime                   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenant          Tenant                 @relation(fields: [tenantId], references: [id])
   legalEntity     LegalEntity            @relation(fields: [legalEntityId], references: [id])
@@ -2474,96 +2519,96 @@ enum ReceivableOpenItemStatus {
 /// invoiceNumber null while DRAFT; MySQL unique (legalEntityId, invoiceNumber) allows multiple NULLs.
 /// draftReference unique per LE when set; multiple NULLs allowed.
 model SalesInvoice {
-  id                   String                   @id @default(uuid())
-  tenantId             String
-  legalEntityId        String
-  branchId             String?
-  financialYearId      String?
+  id              String  @id @default(uuid())
+  tenantId        String
+  legalEntityId   String
+  branchId        String?
+  financialYearId String?
 
-  invoiceNumber        String?                  @db.VarChar(64)
-  draftReference       String?                  @db.VarChar(64)
-  status               SalesInvoiceStatus       @default(DRAFT)
+  invoiceNumber  String?            @db.VarChar(64)
+  draftReference String?            @db.VarChar(64)
+  status         SalesInvoiceStatus @default(DRAFT)
 
   /// CrmCompany.id — validated by customer-party service, not a DB FK.
-  customerId           String
-  customerCodeSnapshot String?                  @db.VarChar(32)
-  customerNameSnapshot String                   @db.VarChar(300)
-  customerGstinSnapshot String?                 @db.VarChar(20)
-  customerPanSnapshot  String?                  @db.VarChar(20)
-  customerBillingAddressSnapshot Json?
-  customerStateCodeSnapshot      String?                  @db.VarChar(8)
+  customerId                      String
+  customerCodeSnapshot            String? @db.VarChar(32)
+  customerNameSnapshot            String  @db.VarChar(300)
+  customerGstinSnapshot           String? @db.VarChar(20)
+  customerPanSnapshot             String? @db.VarChar(20)
+  customerBillingAddressSnapshot  Json?
+  customerStateCodeSnapshot       String? @db.VarChar(8)
   customerShippingAddressSnapshot Json?
 
   /// Commercial inputs needed to recalculate without trusting client totals
-  calculationContext   Json?
+  calculationContext Json?
 
-  sourceType           SalesInvoiceSourceType   @default(DIRECT)
-  sourceDocumentId     String?
+  sourceType             SalesInvoiceSourceType @default(DIRECT)
+  sourceDocumentId       String?
   sourceDocumentSnapshot Json?
 
-  invoiceDate          DateTime                 @db.Date
-  postingDate          DateTime?                @db.Date
-  referenceNumber      String?                  @db.VarChar(64)
-  customerPoNumber     String?                  @db.VarChar(64)
-  paymentTermsDays     Int?
-  freightAmount        Decimal                  @default(0) @db.Decimal(18, 4)
-  otherChargesAmount   Decimal                  @default(0) @db.Decimal(18, 4)
-  dueDate              DateTime?                @db.Date
-  placeOfSupply        String?                  @db.VarChar(8)
+  invoiceDate        DateTime  @db.Date
+  postingDate        DateTime? @db.Date
+  referenceNumber    String?   @db.VarChar(64)
+  customerPoNumber   String?   @db.VarChar(64)
+  paymentTermsDays   Int?
+  freightAmount      Decimal   @default(0) @db.Decimal(18, 4)
+  otherChargesAmount Decimal   @default(0) @db.Decimal(18, 4)
+  dueDate            DateTime? @db.Date
+  placeOfSupply      String?   @db.VarChar(8)
 
-  supplyType           SalesInvoiceSupplyType   @default(INTRA_STATE)
-  taxTreatment         SalesInvoiceTaxTreatment @default(REGISTERED)
+  supplyType   SalesInvoiceSupplyType   @default(INTRA_STATE)
+  taxTreatment SalesInvoiceTaxTreatment @default(REGISTERED)
 
-  currencyCode         String                   @default("INR") @db.VarChar(8)
-  exchangeRate         Decimal                  @default(1) @db.Decimal(18, 8)
+  currencyCode String  @default("INR") @db.VarChar(8)
+  exchangeRate Decimal @default(1) @db.Decimal(18, 8)
 
-  subtotalAmount       Decimal                  @default(0) @db.Decimal(18, 4)
-  discountAmount       Decimal                  @default(0) @db.Decimal(18, 4)
-  taxableAmount        Decimal                  @default(0) @db.Decimal(18, 4)
-  cgstAmount           Decimal                  @default(0) @db.Decimal(18, 4)
-  sgstAmount           Decimal                  @default(0) @db.Decimal(18, 4)
-  igstAmount           Decimal                  @default(0) @db.Decimal(18, 4)
-  cessAmount           Decimal                  @default(0) @db.Decimal(18, 4)
-  totalTaxAmount       Decimal                  @default(0) @db.Decimal(18, 4)
-  roundOffAmount       Decimal                  @default(0) @db.Decimal(18, 4)
-  totalAmount          Decimal                  @default(0) @db.Decimal(18, 4)
+  subtotalAmount Decimal @default(0) @db.Decimal(18, 4)
+  discountAmount Decimal @default(0) @db.Decimal(18, 4)
+  taxableAmount  Decimal @default(0) @db.Decimal(18, 4)
+  cgstAmount     Decimal @default(0) @db.Decimal(18, 4)
+  sgstAmount     Decimal @default(0) @db.Decimal(18, 4)
+  igstAmount     Decimal @default(0) @db.Decimal(18, 4)
+  cessAmount     Decimal @default(0) @db.Decimal(18, 4)
+  totalTaxAmount Decimal @default(0) @db.Decimal(18, 4)
+  roundOffAmount Decimal @default(0) @db.Decimal(18, 4)
+  totalAmount    Decimal @default(0) @db.Decimal(18, 4)
 
-  baseSubtotalAmount   Decimal                  @default(0) @db.Decimal(18, 4)
-  baseDiscountAmount   Decimal                  @default(0) @db.Decimal(18, 4)
-  baseTaxableAmount    Decimal                  @default(0) @db.Decimal(18, 4)
-  baseCgstAmount       Decimal                  @default(0) @db.Decimal(18, 4)
-  baseSgstAmount       Decimal                  @default(0) @db.Decimal(18, 4)
-  baseIgstAmount       Decimal                  @default(0) @db.Decimal(18, 4)
-  baseCessAmount       Decimal                  @default(0) @db.Decimal(18, 4)
-  baseTotalTaxAmount   Decimal                  @default(0) @db.Decimal(18, 4)
-  baseRoundOffAmount   Decimal                  @default(0) @db.Decimal(18, 4)
-  baseTotalAmount      Decimal                  @default(0) @db.Decimal(18, 4)
+  baseSubtotalAmount Decimal @default(0) @db.Decimal(18, 4)
+  baseDiscountAmount Decimal @default(0) @db.Decimal(18, 4)
+  baseTaxableAmount  Decimal @default(0) @db.Decimal(18, 4)
+  baseCgstAmount     Decimal @default(0) @db.Decimal(18, 4)
+  baseSgstAmount     Decimal @default(0) @db.Decimal(18, 4)
+  baseIgstAmount     Decimal @default(0) @db.Decimal(18, 4)
+  baseCessAmount     Decimal @default(0) @db.Decimal(18, 4)
+  baseTotalTaxAmount Decimal @default(0) @db.Decimal(18, 4)
+  baseRoundOffAmount Decimal @default(0) @db.Decimal(18, 4)
+  baseTotalAmount    Decimal @default(0) @db.Decimal(18, 4)
 
-  narration            String?                  @db.Text
+  narration String? @db.Text
 
-  accountingVoucherId  String?                  @unique
-  postingEventId       String?                  @unique
+  accountingVoucherId String? @unique
+  postingEventId      String? @unique
 
-  postedAt             DateTime?
-  postedBy             String?
-  cancelledAt          DateTime?
-  cancelledBy          String?
-  cancellationReason   String?                  @db.VarChar(500)
+  postedAt           DateTime?
+  postedBy           String?
+  cancelledAt        DateTime?
+  cancelledBy        String?
+  cancellationReason String?   @db.VarChar(500)
 
-  createdBy            String?
-  updatedBy            String?
-  createdAt            DateTime                 @default(now())
-  updatedAt            DateTime                 @updatedAt
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant             Tenant             @relation(fields: [tenantId], references: [id])
-  legalEntity        LegalEntity        @relation(fields: [legalEntityId], references: [id])
-  branch             Branch?            @relation(fields: [branchId], references: [id])
-  financialYear      FinancialYear?     @relation(fields: [financialYearId], references: [id])
-  accountingVoucher  AccountingVoucher? @relation(fields: [accountingVoucherId], references: [id])
-  postingEvent       PostingEvent?      @relation(fields: [postingEventId], references: [id])
-  lines              SalesInvoiceLine[]
+  tenant              Tenant                      @relation(fields: [tenantId], references: [id])
+  legalEntity         LegalEntity                 @relation(fields: [legalEntityId], references: [id])
+  branch              Branch?                     @relation(fields: [branchId], references: [id])
+  financialYear       FinancialYear?              @relation(fields: [financialYearId], references: [id])
+  accountingVoucher   AccountingVoucher?          @relation(fields: [accountingVoucherId], references: [id])
+  postingEvent        PostingEvent?               @relation(fields: [postingEventId], references: [id])
+  lines               SalesInvoiceLine[]
   receivableOpenItems ReceivableOpenItem[]
-  receiptAllocations CustomerReceiptAllocation[]
+  receiptAllocations  CustomerReceiptAllocation[]
 
   @@unique([legalEntityId, invoiceNumber], map: "sales_inv_le_number_key")
   @@unique([legalEntityId, draftReference], map: "sales_inv_le_draft_ref_key")
@@ -2580,48 +2625,48 @@ model SalesInvoice {
 }
 
 model SalesInvoiceLine {
-  id               String   @id @default(uuid())
-  tenantId         String
-  legalEntityId    String
-  salesInvoiceId   String
-  lineNumber       Int
-  sourceLineId     String?  @db.VarChar(64)
+  id             String  @id @default(uuid())
+  tenantId       String
+  legalEntityId  String
+  salesInvoiceId String
+  lineNumber     Int
+  sourceLineId   String? @db.VarChar(64)
 
   /// MasterItem.id when known — soft reference only (no FK; item master lifecycle independent).
   itemId           String?
-  itemCodeSnapshot String?  @db.VarChar(64)
-  itemNameSnapshot String?  @db.VarChar(300)
-  hsnCodeSnapshot  String?  @db.VarChar(16)
-  uomSnapshot      String?  @db.VarChar(32)
-  description      String?  @db.VarChar(500)
+  itemCodeSnapshot String? @db.VarChar(64)
+  itemNameSnapshot String? @db.VarChar(300)
+  hsnCodeSnapshot  String? @db.VarChar(16)
+  uomSnapshot      String? @db.VarChar(32)
+  description      String? @db.VarChar(500)
 
-  quantity         Decimal  @db.Decimal(18, 6)
-  unitRate         Decimal  @db.Decimal(18, 4)
-  grossAmount      Decimal  @default(0) @db.Decimal(18, 4)
-  discountPercent  Decimal  @default(0) @db.Decimal(9, 4)
-  discountAmount   Decimal  @default(0) @db.Decimal(18, 4)
-  taxableAmount    Decimal  @default(0) @db.Decimal(18, 4)
-  cgstRate         Decimal  @default(0) @db.Decimal(9, 4)
-  cgstAmount       Decimal  @default(0) @db.Decimal(18, 4)
-  sgstRate         Decimal  @default(0) @db.Decimal(9, 4)
-  sgstAmount       Decimal  @default(0) @db.Decimal(18, 4)
-  igstRate         Decimal  @default(0) @db.Decimal(9, 4)
-  igstAmount       Decimal  @default(0) @db.Decimal(18, 4)
-  cessRate         Decimal  @default(0) @db.Decimal(9, 4)
-  cessAmount       Decimal  @default(0) @db.Decimal(18, 4)
-  lineTotal        Decimal  @default(0) @db.Decimal(18, 4)
+  quantity        Decimal @db.Decimal(18, 6)
+  unitRate        Decimal @db.Decimal(18, 4)
+  grossAmount     Decimal @default(0) @db.Decimal(18, 4)
+  discountPercent Decimal @default(0) @db.Decimal(9, 4)
+  discountAmount  Decimal @default(0) @db.Decimal(18, 4)
+  taxableAmount   Decimal @default(0) @db.Decimal(18, 4)
+  cgstRate        Decimal @default(0) @db.Decimal(9, 4)
+  cgstAmount      Decimal @default(0) @db.Decimal(18, 4)
+  sgstRate        Decimal @default(0) @db.Decimal(9, 4)
+  sgstAmount      Decimal @default(0) @db.Decimal(18, 4)
+  igstRate        Decimal @default(0) @db.Decimal(9, 4)
+  igstAmount      Decimal @default(0) @db.Decimal(18, 4)
+  cessRate        Decimal @default(0) @db.Decimal(9, 4)
+  cessAmount      Decimal @default(0) @db.Decimal(18, 4)
+  lineTotal       Decimal @default(0) @db.Decimal(18, 4)
 
   revenueAccountId String?
   costCentreId     String?
 
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant        Tenant        @relation(fields: [tenantId], references: [id])
-  legalEntity   LegalEntity   @relation(fields: [legalEntityId], references: [id])
-  salesInvoice  SalesInvoice  @relation(fields: [salesInvoiceId], references: [id])
+  tenant         Tenant       @relation(fields: [tenantId], references: [id])
+  legalEntity    LegalEntity  @relation(fields: [legalEntityId], references: [id])
+  salesInvoice   SalesInvoice @relation(fields: [salesInvoiceId], references: [id])
   revenueAccount Account?     @relation(fields: [revenueAccountId], references: [id])
-  costCentre    CostCentre?   @relation(fields: [costCentreId], references: [id])
+  costCentre     CostCentre?  @relation(fields: [costCentreId], references: [id])
 
   @@unique([salesInvoiceId, lineNumber])
   @@index([tenantId])
@@ -2637,62 +2682,62 @@ model SalesInvoiceLine {
 /// documentId holds source document UUID; salesInvoiceId optional join helper for SALES_INVOICE rows.
 /// customerReceiptId links credit-side rows to CustomerReceipt.
 model ReceivableOpenItem {
-  id                     String                   @id @default(uuid())
-  tenantId               String
-  legalEntityId          String
-  branchId               String?
+  id            String  @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+  branchId      String?
 
   /// DEBIT = invoice outstanding; CREDIT = receipt/credit unallocated balance.
-  side                   ReceivableOpenItemSide   @default(DEBIT)
+  side                   ReceivableOpenItemSide @default(DEBIT)
   documentType           ReceivableDocumentType
   documentId             String
-  documentNumberSnapshot String?                  @db.VarChar(64)
-  salesInvoiceId         String?                  @unique
+  documentNumberSnapshot String?                @db.VarChar(64)
+  salesInvoiceId         String?                @unique
   /// FK to CustomerReceipt when side=CREDIT.
-  customerReceiptId      String?                  @unique
+  customerReceiptId      String?                @unique
 
   /// CrmCompany.id — application-validated, no DB FK.
-  customerId             String
-  customerNameSnapshot   String?                  @db.VarChar(300)
+  customerId           String
+  customerNameSnapshot String? @db.VarChar(300)
 
-  receivableAccountId    String?
+  receivableAccountId String?
 
-  currencyCode           String                   @default("INR") @db.VarChar(8)
-  exchangeRate           Decimal                  @default(1) @db.Decimal(18, 8)
+  currencyCode String  @default("INR") @db.VarChar(8)
+  exchangeRate Decimal @default(1) @db.Decimal(18, 8)
 
-  originalAmount         Decimal                  @db.Decimal(18, 4)
-  openAmount             Decimal                  @db.Decimal(18, 4)
-  allocatedAmount        Decimal                  @default(0) @db.Decimal(18, 4)
-  adjustedAmount         Decimal                  @default(0) @db.Decimal(18, 4)
-  writtenOffAmount       Decimal                  @default(0) @db.Decimal(18, 4)
+  originalAmount   Decimal @db.Decimal(18, 4)
+  openAmount       Decimal @db.Decimal(18, 4)
+  allocatedAmount  Decimal @default(0) @db.Decimal(18, 4)
+  adjustedAmount   Decimal @default(0) @db.Decimal(18, 4)
+  writtenOffAmount Decimal @default(0) @db.Decimal(18, 4)
 
-  baseOriginalAmount     Decimal                  @db.Decimal(18, 4)
-  baseOpenAmount         Decimal                  @db.Decimal(18, 4)
-  baseAllocatedAmount    Decimal                  @default(0) @db.Decimal(18, 4)
-  baseAdjustedAmount     Decimal                  @default(0) @db.Decimal(18, 4)
-  baseWrittenOffAmount   Decimal                  @default(0) @db.Decimal(18, 4)
+  baseOriginalAmount   Decimal @db.Decimal(18, 4)
+  baseOpenAmount       Decimal @db.Decimal(18, 4)
+  baseAllocatedAmount  Decimal @default(0) @db.Decimal(18, 4)
+  baseAdjustedAmount   Decimal @default(0) @db.Decimal(18, 4)
+  baseWrittenOffAmount Decimal @default(0) @db.Decimal(18, 4)
 
-  documentDate           DateTime?                @db.Date
-  dueDate                DateTime?                @db.Date
-  status                 ReceivableOpenItemStatus @default(OPEN)
+  documentDate DateTime?                @db.Date
+  dueDate      DateTime?                @db.Date
+  status       ReceivableOpenItemStatus @default(OPEN)
 
-  accountingVoucherId    String?
+  accountingVoucherId String?
 
-  createdBy              String?
-  updatedBy              String?
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @updatedAt
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant             Tenant              @relation(fields: [tenantId], references: [id])
-  legalEntity        LegalEntity         @relation(fields: [legalEntityId], references: [id])
-  branch             Branch?             @relation(fields: [branchId], references: [id])
-  salesInvoice       SalesInvoice?       @relation(fields: [salesInvoiceId], references: [id])
-  customerReceipt    CustomerReceipt?    @relation("ReceiptOpenItemSide", fields: [customerReceiptId], references: [id])
-  receivableAccount  Account?            @relation(fields: [receivableAccountId], references: [id])
-  accountingVoucher  AccountingVoucher?  @relation(fields: [accountingVoucherId], references: [id])
-  linkedReceipt      CustomerReceipt?    @relation("ReceiptCreditOpenItemLink")
-  creditAllocations  CustomerReceiptAllocation[] @relation("ReceiptCreditOpenItem")
-  debitAllocations   CustomerReceiptAllocation[] @relation("InvoiceDebitOpenItem")
+  tenant            Tenant                      @relation(fields: [tenantId], references: [id])
+  legalEntity       LegalEntity                 @relation(fields: [legalEntityId], references: [id])
+  branch            Branch?                     @relation(fields: [branchId], references: [id])
+  salesInvoice      SalesInvoice?               @relation(fields: [salesInvoiceId], references: [id])
+  customerReceipt   CustomerReceipt?            @relation("ReceiptOpenItemSide", fields: [customerReceiptId], references: [id])
+  receivableAccount Account?                    @relation(fields: [receivableAccountId], references: [id])
+  accountingVoucher AccountingVoucher?          @relation(fields: [accountingVoucherId], references: [id])
+  linkedReceipt     CustomerReceipt?            @relation("ReceiptCreditOpenItemLink")
+  creditAllocations CustomerReceiptAllocation[] @relation("ReceiptCreditOpenItem")
+  debitAllocations  CustomerReceiptAllocation[] @relation("InvoiceDebitOpenItem")
 
   @@unique([tenantId, legalEntityId, documentType, documentId], map: "recv_open_doc_key")
   @@index([tenantId])
@@ -2746,73 +2791,73 @@ enum CustomerReceiptDeductionType {
 /// Amounts stay positive; openAmount naming matches ReceivableOpenItem (API aliases to outstandingAmount).
 /// Phase 3B3: drafts persist TDS metadata + calculationContext + deduction lines; receiptNumber stays null until 3B4.
 model CustomerReceipt {
-  id                   String                       @id @default(uuid())
-  tenantId             String
-  legalEntityId        String
-  branchId             String?
-  financialYearId      String?
+  id              String  @id @default(uuid())
+  tenantId        String
+  legalEntityId   String
+  branchId        String?
+  financialYearId String?
 
-  receiptNumber        String?                      @db.VarChar(64)
-  draftReference       String?                      @db.VarChar(64)
-  status               CustomerReceiptStatus        @default(DRAFT)
+  receiptNumber  String?               @db.VarChar(64)
+  draftReference String?               @db.VarChar(64)
+  status         CustomerReceiptStatus @default(DRAFT)
 
   /// CrmCompany.id — validated by customer-party service, not a DB FK.
-  customerId           String
-  customerCodeSnapshot String?                      @db.VarChar(32)
-  customerNameSnapshot String                       @db.VarChar(300)
-  customerGstinSnapshot String?                     @db.VarChar(20)
-  customerPanSnapshot  String?                      @db.VarChar(20)
-  customerStateCodeSnapshot String?                 @db.VarChar(8)
-  customerCountryCodeSnapshot String?               @db.VarChar(8)
+  customerId                     String
+  customerCodeSnapshot           String? @db.VarChar(32)
+  customerNameSnapshot           String  @db.VarChar(300)
+  customerGstinSnapshot          String? @db.VarChar(20)
+  customerPanSnapshot            String? @db.VarChar(20)
+  customerStateCodeSnapshot      String? @db.VarChar(8)
+  customerCountryCodeSnapshot    String? @db.VarChar(8)
   customerBillingAddressSnapshot Json?
 
-  sourceType           CustomerReceiptSourceType    @default(DIRECT)
-  sourceDocumentId     String?
-  sourceDocumentNumberSnapshot String?              @db.VarChar(64)
-  paymentMethod        CustomerReceiptPaymentMethod @default(BANK_TRANSFER)
+  sourceType                   CustomerReceiptSourceType    @default(DIRECT)
+  sourceDocumentId             String?
+  sourceDocumentNumberSnapshot String?                      @db.VarChar(64)
+  paymentMethod                CustomerReceiptPaymentMethod @default(BANK_TRANSFER)
 
   /// Commercial + TDS inputs needed to recalculate without trusting client totals (Phase 3B3).
-  calculationContext   Json?
+  calculationContext Json?
 
-  receiptDate          DateTime                     @db.Date
-  postingDate          DateTime?                    @db.Date
-  valueDate            DateTime?                    @db.Date
-  referenceNumber      String?                      @db.VarChar(64)
-  transactionReference String?                      @db.VarChar(100)
-  customerBankReference String?                     @db.VarChar(100)
+  receiptDate           DateTime  @db.Date
+  postingDate           DateTime? @db.Date
+  valueDate             DateTime? @db.Date
+  referenceNumber       String?   @db.VarChar(64)
+  transactionReference  String?   @db.VarChar(100)
+  customerBankReference String?   @db.VarChar(100)
   /// Instrument number (cheque / instrument) — API field instrumentNumber.
-  chequeNumber         String?                      @db.VarChar(64)
+  chequeNumber          String?   @db.VarChar(64)
   /// Instrument date — API field instrumentDate.
-  chequeDate           DateTime?                    @db.Date
-  bankName             String?                      @db.VarChar(200)
+  chequeDate            DateTime? @db.Date
+  bankName              String?   @db.VarChar(200)
 
-  currencyCode         String                       @default("INR") @db.VarChar(8)
-  exchangeRate         Decimal                      @default(1) @db.Decimal(18, 8)
+  currencyCode String  @default("INR") @db.VarChar(8)
+  exchangeRate Decimal @default(1) @db.Decimal(18, 8)
 
   /// TDS metadata (server-resolved from Phase 3B2 calculation).
-  tdsMode              String?                      @db.VarChar(16)
-  tdsValue             Decimal?                     @db.Decimal(18, 4)
-  tdsCalculationBase   Decimal?                     @db.Decimal(18, 4)
-  tdsSectionCode       String?                      @db.VarChar(32)
-  tdsCertificateReference String?                   @db.VarChar(64)
+  tdsMode                 String?  @db.VarChar(16)
+  tdsValue                Decimal? @db.Decimal(18, 4)
+  tdsCalculationBase      Decimal? @db.Decimal(18, 4)
+  tdsSectionCode          String?  @db.VarChar(32)
+  tdsCertificateReference String?  @db.VarChar(64)
 
-  grossReceiptAmount       Decimal                  @default(0) @db.Decimal(18, 4)
-  customerTdsAmount        Decimal                  @default(0) @db.Decimal(18, 4)
-  bankChargeAmount         Decimal                  @default(0) @db.Decimal(18, 4)
-  otherDeductionAmount     Decimal                  @default(0) @db.Decimal(18, 4)
-  bankCashAmount           Decimal                  @default(0) @db.Decimal(18, 4)
-  allocatableAmount        Decimal                  @default(0) @db.Decimal(18, 4)
-  allocatedAmount          Decimal                  @default(0) @db.Decimal(18, 4)
-  unallocatedAmount        Decimal                  @default(0) @db.Decimal(18, 4)
+  grossReceiptAmount   Decimal @default(0) @db.Decimal(18, 4)
+  customerTdsAmount    Decimal @default(0) @db.Decimal(18, 4)
+  bankChargeAmount     Decimal @default(0) @db.Decimal(18, 4)
+  otherDeductionAmount Decimal @default(0) @db.Decimal(18, 4)
+  bankCashAmount       Decimal @default(0) @db.Decimal(18, 4)
+  allocatableAmount    Decimal @default(0) @db.Decimal(18, 4)
+  allocatedAmount      Decimal @default(0) @db.Decimal(18, 4)
+  unallocatedAmount    Decimal @default(0) @db.Decimal(18, 4)
 
-  baseGrossReceiptAmount   Decimal                  @default(0) @db.Decimal(18, 4)
-  baseCustomerTdsAmount    Decimal                  @default(0) @db.Decimal(18, 4)
-  baseBankChargeAmount     Decimal                  @default(0) @db.Decimal(18, 4)
-  baseOtherDeductionAmount Decimal                  @default(0) @db.Decimal(18, 4)
-  baseBankCashAmount       Decimal                  @default(0) @db.Decimal(18, 4)
-  baseAllocatableAmount    Decimal                  @default(0) @db.Decimal(18, 4)
-  baseAllocatedAmount      Decimal                  @default(0) @db.Decimal(18, 4)
-  baseUnallocatedAmount    Decimal                  @default(0) @db.Decimal(18, 4)
+  baseGrossReceiptAmount   Decimal @default(0) @db.Decimal(18, 4)
+  baseCustomerTdsAmount    Decimal @default(0) @db.Decimal(18, 4)
+  baseBankChargeAmount     Decimal @default(0) @db.Decimal(18, 4)
+  baseOtherDeductionAmount Decimal @default(0) @db.Decimal(18, 4)
+  baseBankCashAmount       Decimal @default(0) @db.Decimal(18, 4)
+  baseAllocatableAmount    Decimal @default(0) @db.Decimal(18, 4)
+  baseAllocatedAmount      Decimal @default(0) @db.Decimal(18, 4)
+  baseUnallocatedAmount    Decimal @default(0) @db.Decimal(18, 4)
 
   bankCashAccountId              String?
   customerReceivableAccountId    String?
@@ -2820,40 +2865,40 @@ model CustomerReceipt {
   customerTdsReceivableAccountId String?
   otherDeductionAccountId        String?
 
-  accountingVoucherId  String?                      @unique
-  postingEventId       String?                      @unique
+  accountingVoucherId String? @unique
+  postingEventId      String? @unique
   /// Optional link to credit-side ReceivableOpenItem created on post (Phase 3B4).
-  creditOpenItemId     String?                      @unique
+  creditOpenItemId    String? @unique
 
-  narration            String?                      @db.Text
-  internalRemarks      String?                      @db.Text
+  narration       String? @db.Text
+  internalRemarks String? @db.Text
 
-  postedAt             DateTime?
-  postedBy             String?
-  cancelledAt          DateTime?
-  cancelledBy          String?
-  cancellationReason   String?                      @db.VarChar(500)
+  postedAt           DateTime?
+  postedBy           String?
+  cancelledAt        DateTime?
+  cancelledBy        String?
+  cancellationReason String?   @db.VarChar(500)
 
-  createdBy            String?
-  updatedBy            String?
-  createdAt            DateTime                     @default(now())
-  updatedAt            DateTime                     @updatedAt
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant                      Tenant              @relation(fields: [tenantId], references: [id])
-  legalEntity                 LegalEntity         @relation(fields: [legalEntityId], references: [id])
-  branch                      Branch?             @relation(fields: [branchId], references: [id])
-  financialYear               FinancialYear?      @relation(fields: [financialYearId], references: [id])
-  bankCashAccount             Account?            @relation("ReceiptBankCashAccount", fields: [bankCashAccountId], references: [id])
-  customerReceivableAccount   Account?            @relation("ReceiptCustomerReceivableAccount", fields: [customerReceivableAccountId], references: [id])
-  bankChargeAccount           Account?            @relation("ReceiptBankChargeAccount", fields: [bankChargeAccountId], references: [id])
-  customerTdsReceivableAccount Account?           @relation("ReceiptTdsReceivableAccount", fields: [customerTdsReceivableAccountId], references: [id])
-  otherDeductionAccount       Account?            @relation("ReceiptOtherDeductionAccount", fields: [otherDeductionAccountId], references: [id])
-  accountingVoucher           AccountingVoucher?  @relation(fields: [accountingVoucherId], references: [id])
-  postingEvent                PostingEvent?       @relation(fields: [postingEventId], references: [id])
-  creditOpenItem              ReceivableOpenItem? @relation("ReceiptCreditOpenItemLink", fields: [creditOpenItemId], references: [id])
-  openItemFromSide            ReceivableOpenItem? @relation("ReceiptOpenItemSide")
-  allocations                 CustomerReceiptAllocation[]
-  deductionLines              CustomerReceiptDeductionLine[]
+  tenant                       Tenant                         @relation(fields: [tenantId], references: [id])
+  legalEntity                  LegalEntity                    @relation(fields: [legalEntityId], references: [id])
+  branch                       Branch?                        @relation(fields: [branchId], references: [id])
+  financialYear                FinancialYear?                 @relation(fields: [financialYearId], references: [id])
+  bankCashAccount              Account?                       @relation("ReceiptBankCashAccount", fields: [bankCashAccountId], references: [id])
+  customerReceivableAccount    Account?                       @relation("ReceiptCustomerReceivableAccount", fields: [customerReceivableAccountId], references: [id])
+  bankChargeAccount            Account?                       @relation("ReceiptBankChargeAccount", fields: [bankChargeAccountId], references: [id])
+  customerTdsReceivableAccount Account?                       @relation("ReceiptTdsReceivableAccount", fields: [customerTdsReceivableAccountId], references: [id])
+  otherDeductionAccount        Account?                       @relation("ReceiptOtherDeductionAccount", fields: [otherDeductionAccountId], references: [id])
+  accountingVoucher            AccountingVoucher?             @relation(fields: [accountingVoucherId], references: [id])
+  postingEvent                 PostingEvent?                  @relation(fields: [postingEventId], references: [id])
+  creditOpenItem               ReceivableOpenItem?            @relation("ReceiptCreditOpenItemLink", fields: [creditOpenItemId], references: [id])
+  openItemFromSide             ReceivableOpenItem?            @relation("ReceiptOpenItemSide")
+  allocations                  CustomerReceiptAllocation[]
+  deductionLines               CustomerReceiptDeductionLine[]
 
   @@unique([legalEntityId, receiptNumber], map: "cust_rcpt_le_number_key")
   @@unique([legalEntityId, draftReference], map: "cust_rcpt_le_draft_ref_key")
@@ -2870,24 +2915,24 @@ model CustomerReceipt {
 
 /// Bank-charge and other-deduction rows for a customer receipt (Phase 3B3).
 model CustomerReceiptDeductionLine {
-  id            String                       @id @default(uuid())
+  id            String @id @default(uuid())
   tenantId      String
   legalEntityId String
   receiptId     String
 
-  lineNumber    Int
-  type          CustomerReceiptDeductionType
+  lineNumber Int
+  type       CustomerReceiptDeductionType
 
-  code          String?                      @db.VarChar(32)
-  description   String                       @db.VarChar(200)
+  code        String? @db.VarChar(32)
+  description String  @db.VarChar(200)
 
-  amount        Decimal                      @db.Decimal(18, 4)
-  baseAmount    Decimal                      @db.Decimal(18, 4)
+  amount     Decimal @db.Decimal(18, 4)
+  baseAmount Decimal @db.Decimal(18, 4)
 
-  accountId     String?
+  accountId String?
 
-  createdAt     DateTime                     @default(now())
-  updatedAt     DateTime                     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenant      Tenant          @relation(fields: [tenantId], references: [id])
   legalEntity LegalEntity     @relation(fields: [legalEntityId], references: [id])
@@ -2904,40 +2949,40 @@ model CustomerReceiptDeductionLine {
 
 /// Allocation of receipt credit to invoice debit open items.
 model CustomerReceiptAllocation {
-  id                   String                          @id @default(uuid())
-  tenantId             String
-  legalEntityId        String
-  customerId           String
+  id            String @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+  customerId    String
 
-  receiptId            String
-  receiptOpenItemId    String
-  invoiceId            String?
-  invoiceOpenItemId    String
+  receiptId         String
+  receiptOpenItemId String
+  invoiceId         String?
+  invoiceOpenItemId String
 
-  allocationDate       DateTime                        @db.Date
-  postingDate          DateTime?                       @db.Date
-  currencyCode         String                          @default("INR") @db.VarChar(8)
-  exchangeRate         Decimal                         @default(1) @db.Decimal(18, 8)
+  allocationDate DateTime  @db.Date
+  postingDate    DateTime? @db.Date
+  currencyCode   String    @default("INR") @db.VarChar(8)
+  exchangeRate   Decimal   @default(1) @db.Decimal(18, 8)
 
-  allocatedAmount      Decimal                         @db.Decimal(18, 4)
-  baseAllocatedAmount  Decimal                         @db.Decimal(18, 4)
+  allocatedAmount     Decimal @db.Decimal(18, 4)
+  baseAllocatedAmount Decimal @db.Decimal(18, 4)
 
-  status               CustomerReceiptAllocationStatus @default(DRAFT)
-  allocationSequence   Int
+  status             CustomerReceiptAllocationStatus @default(DRAFT)
+  allocationSequence Int
 
-  createdBy            String?
-  createdAt            DateTime                        @default(now())
+  createdBy String?
+  createdAt DateTime @default(now())
 
-  reversedAt           DateTime?
-  reversedBy           String?
-  reversalReason       String?                         @db.VarChar(500)
+  reversedAt     DateTime?
+  reversedBy     String?
+  reversalReason String?   @db.VarChar(500)
 
-  tenant            Tenant             @relation(fields: [tenantId], references: [id])
-  legalEntity       LegalEntity        @relation(fields: [legalEntityId], references: [id])
-  receipt           CustomerReceipt    @relation(fields: [receiptId], references: [id])
-  receiptOpenItem   ReceivableOpenItem @relation("ReceiptCreditOpenItem", fields: [receiptOpenItemId], references: [id])
-  invoice           SalesInvoice?      @relation(fields: [invoiceId], references: [id])
-  invoiceOpenItem   ReceivableOpenItem @relation("InvoiceDebitOpenItem", fields: [invoiceOpenItemId], references: [id])
+  tenant          Tenant             @relation(fields: [tenantId], references: [id])
+  legalEntity     LegalEntity        @relation(fields: [legalEntityId], references: [id])
+  receipt         CustomerReceipt    @relation(fields: [receiptId], references: [id])
+  receiptOpenItem ReceivableOpenItem @relation("ReceiptCreditOpenItem", fields: [receiptOpenItemId], references: [id])
+  invoice         SalesInvoice?      @relation(fields: [invoiceId], references: [id])
+  invoiceOpenItem ReceivableOpenItem @relation("InvoiceDebitOpenItem", fields: [invoiceOpenItemId], references: [id])
 
   @@unique([tenantId, legalEntityId, receiptId, allocationSequence], map: "cust_rcpt_alloc_seq_key")
   @@index([receiptId])
@@ -2951,3 +2996,682 @@ model CustomerReceiptAllocation {
   @@map("customer_receipt_allocations")
 }
 
+// ─── Purchase (Phase 03 — PR / Planning / RFQ / PO foundation) ─────────────────
+// Soft-delete on headers; no ON DELETE CASCADE between purchase documents.
+// Money/qty: Decimal only. Actor fields store user UUID strings (no User FK).
+
+enum PurchaseRequisitionStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PARTIALLY_CONVERTED
+  CONVERTED_TO_PO
+  CANCELLED
+  CLOSED
+}
+
+enum PurchaseRequisitionLineStatus {
+  OPEN
+  CANCELLED
+  CONVERTED
+  CLOSED
+}
+
+enum PurchasePlanningStatus {
+  PENDING_PLANNING
+  UNDER_REVIEW
+  VENDOR_SELECTED
+  APPROVED
+  PO_PENDING
+  PO_CREATED
+  PARTIALLY_ORDERED
+  ON_HOLD
+  CANCELLED
+  COMPLETED
+}
+
+enum PurchasePlanningPurchaseType {
+  DIRECT_PURCHASE
+  RFQ_BASED
+  RATE_CONTRACT
+  OTHER
+}
+
+enum PurchasePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+  CRITICAL
+}
+
+enum RequestForQuotationStatus {
+  DRAFT
+  SENT
+  QUOTATION_RECEIVED
+  UNDER_COMPARISON
+  VENDOR_SELECTED
+  CONVERTED_TO_PO
+  CANCELLED
+  CLOSED
+}
+
+enum RfqVendorInviteStatus {
+  INVITED
+  SENT
+  RESPONDED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+enum VendorQuotationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  SELECTED
+  REJECTED
+  CANCELLED
+  CLOSED
+}
+
+enum VendorComparisonStatus {
+  DRAFT
+  UNDER_COMPARISON
+  VENDOR_SELECTED
+  CONVERTED_TO_PO
+  CANCELLED
+  CLOSED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SENT_TO_VENDOR
+  PARTIALLY_RECEIVED
+  FULLY_RECEIVED
+  CANCELLED
+  CLOSED
+}
+
+enum PurchaseOrderOrigin {
+  MANUAL
+  PURCHASE_REQUISITION
+  PLANNING_SHEET
+  RFQ_COMPARISON
+  OTHER
+}
+
+enum PurchaseApprovalDocumentType {
+  PURCHASE_REQUISITION
+  PURCHASE_ORDER
+  REQUEST_FOR_QUOTATION
+  PURCHASE_PLANNING
+}
+
+enum PurchaseApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RETURNED
+  CANCELLED
+  SKIPPED
+}
+
+enum PurchaseStatusHistoryDocumentType {
+  PURCHASE_REQUISITION
+  PURCHASE_REQUISITION_LINE
+  PURCHASE_PLANNING_ROW
+  REQUEST_FOR_QUOTATION
+  VENDOR_QUOTATION
+  VENDOR_COMPARISON
+  PURCHASE_ORDER
+  PURCHASE_APPROVAL
+}
+
+model PurchaseRequisition {
+  id                String                    @id @default(uuid())
+  tenantId          String
+  requisitionNumber String                    @db.VarChar(64)
+  requisitionDate   DateTime                  @db.Date
+  departmentId      String?                   @db.VarChar(36)
+  requestedById     String?                   @db.VarChar(36)
+  warehouseId       String?
+  requiredDate      DateTime?                 @db.Date
+  priority          PurchasePriority          @default(NORMAL)
+  purchasePurpose   String?                   @db.Text
+  rfqRequired       Boolean                   @default(true)
+  status            PurchaseRequisitionStatus @default(DRAFT)
+  submittedAt       DateTime?
+  approvedAt        DateTime?
+  rejectedAt        DateTime?
+  rejectionReason   String?                   @db.Text
+  remarks           String?                   @db.Text
+  createdById       String?                   @db.VarChar(36)
+  updatedById       String?                   @db.VarChar(36)
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  deletedAt         DateTime?
+
+  tenant         Tenant                    @relation(fields: [tenantId], references: [id])
+  warehouse      MasterWarehouse?          @relation(fields: [warehouseId], references: [id])
+  lines          PurchaseRequisitionLine[]
+  planningRows   PurchasePlanningRow[]
+  rfqs           RequestForQuotation[]
+  purchaseOrders PurchaseOrder[]
+  approvals      PurchaseApproval[]        @relation("PurchaseApprovalPr")
+
+  @@unique([tenantId, requisitionNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, warehouseId])
+  @@index([tenantId, requestedById])
+  @@index([tenantId, requisitionDate])
+  @@index([tenantId, rfqRequired])
+  @@map("purchase_requisitions")
+}
+
+model PurchaseRequisitionLine {
+  id                    String                        @id @default(uuid())
+  tenantId              String
+  purchaseRequisitionId String
+  lineNumber            Int
+  itemId                String?
+  itemCodeSnapshot      String                        @default("") @db.VarChar(64)
+  itemNameSnapshot      String                        @default("") @db.VarChar(300)
+  description           String?                       @db.Text
+  requiredQuantity      Decimal                       @default(0) @db.Decimal(18, 4)
+  uomId                 String?
+  estimatedRate         Decimal                       @default(0) @db.Decimal(18, 2)
+  estimatedAmount       Decimal                       @default(0) @db.Decimal(18, 2)
+  warehouseId           String?
+  binId                 String?                       @db.VarChar(36)
+  preferredVendorId     String?
+  requiredDate          DateTime?                     @db.Date
+  remarks                       String?                       @db.Text
+  status                        PurchaseRequisitionLineStatus @default(OPEN)
+  /// Set when Planning→PO or RFQ→PO creates an order for this line (track record; not user-editable).
+  purchaseOrderId               String?
+  purchaseOrderNumberSnapshot   String?                       @db.VarChar(64)
+  createdAt                     DateTime                      @default(now())
+  updatedAt                     DateTime                      @updatedAt
+
+  tenant              Tenant                    @relation(fields: [tenantId], references: [id])
+  purchaseRequisition PurchaseRequisition       @relation(fields: [purchaseRequisitionId], references: [id])
+  item                MasterItem?               @relation(fields: [itemId], references: [id])
+  uom                 MasterUom?                @relation(fields: [uomId], references: [id])
+  warehouse           MasterWarehouse?          @relation(fields: [warehouseId], references: [id])
+  preferredVendor     MasterVendor?             @relation("PrLinePreferredVendor", fields: [preferredVendorId], references: [id])
+  purchaseOrder       PurchaseOrder?            @relation(fields: [purchaseOrderId], references: [id])
+  planningRow         PurchasePlanningRow?
+  rfqLines            RequestForQuotationLine[]
+  purchaseOrderLines  PurchaseOrderLine[]
+
+  @@unique([tenantId, purchaseRequisitionId, lineNumber])
+  @@index([tenantId])
+  @@index([tenantId, purchaseRequisitionId])
+  @@index([tenantId, itemId])
+  @@index([tenantId, status])
+  @@index([tenantId, preferredVendorId])
+  @@index([tenantId, purchaseOrderId])
+  @@map("purchase_requisition_lines")
+}
+
+model PurchasePlanningRow {
+  id                                String                       @id @default(uuid())
+  tenantId                          String
+  planningNumber                    String                       @db.VarChar(64)
+  planningDate                      DateTime                     @db.Date
+  purchaseRequisitionId             String
+  purchaseRequisitionLineId         String                       @unique
+  purchaseRequisitionNumberSnapshot String                       @db.VarChar(64)
+  departmentId                      String?                      @db.VarChar(36)
+  requestedById                     String?                      @db.VarChar(36)
+  itemId                            String?
+  itemCodeSnapshot                  String                       @default("") @db.VarChar(64)
+  itemNameSnapshot                  String                       @default("") @db.VarChar(300)
+  itemDescriptionSnapshot           String?                      @db.Text
+  requiredQuantity                  Decimal                      @default(0) @db.Decimal(18, 4)
+  uomId                             String?
+  currentStockQuantity              Decimal                      @default(0) @db.Decimal(18, 4)
+  openPurchaseOrderQuantity         Decimal                      @default(0) @db.Decimal(18, 4)
+  netPurchaseQuantity               Decimal                      @default(0) @db.Decimal(18, 4)
+  preferredVendorId                 String?
+  selectedVendorId                  String?
+  lastPurchaseVendorId              String?
+  lastPurchaseRate                  Decimal?                     @db.Decimal(18, 2)
+  expectedRate                      Decimal                      @default(0) @db.Decimal(18, 2)
+  negotiatedRate                    Decimal?                     @db.Decimal(18, 2)
+  estimatedAmount                   Decimal                      @default(0) @db.Decimal(18, 2)
+  requiredDate                      DateTime?                    @db.Date
+  purchaseType                      PurchasePlanningPurchaseType @default(DIRECT_PURCHASE)
+  priority                          PurchasePriority             @default(NORMAL)
+  buyerId                           String?                      @db.VarChar(36)
+  status                            PurchasePlanningStatus       @default(PENDING_PLANNING)
+  actionMessage                     Boolean                      @default(false)
+  purchaseOrderId                   String?
+  purchaseOrderNumberSnapshot       String?                      @db.VarChar(64)
+  convertedAt                       DateTime?
+  remarks                           String?                      @db.Text
+  createdById                       String?                      @db.VarChar(36)
+  updatedById                       String?                      @db.VarChar(36)
+  createdAt                         DateTime                     @default(now())
+  updatedAt                         DateTime                     @updatedAt
+  deletedAt                         DateTime?
+
+  tenant                  Tenant                  @relation(fields: [tenantId], references: [id])
+  purchaseRequisition     PurchaseRequisition     @relation(fields: [purchaseRequisitionId], references: [id])
+  purchaseRequisitionLine PurchaseRequisitionLine @relation(fields: [purchaseRequisitionLineId], references: [id])
+  item                    MasterItem?             @relation(fields: [itemId], references: [id])
+  uom                     MasterUom?              @relation(fields: [uomId], references: [id])
+  preferredVendor         MasterVendor?           @relation("PlanningPreferredVendor", fields: [preferredVendorId], references: [id])
+  selectedVendor          MasterVendor?           @relation("PlanningSelectedVendor", fields: [selectedVendorId], references: [id])
+  lastPurchaseVendor      MasterVendor?           @relation("PlanningLastPurchaseVendor", fields: [lastPurchaseVendorId], references: [id])
+  purchaseOrder           PurchaseOrder?          @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrderLines      PurchaseOrderLine[]
+
+  @@unique([tenantId, purchaseRequisitionLineId])
+  @@unique([tenantId, planningNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, purchaseRequisitionId])
+  @@index([tenantId, purchaseRequisitionLineId])
+  @@index([tenantId, selectedVendorId])
+  @@index([tenantId, buyerId])
+  @@index([tenantId, requiredDate])
+  @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, actionMessage])
+  @@map("purchase_planning_rows")
+}
+
+model RequestForQuotation {
+  id                    String                    @id @default(uuid())
+  tenantId              String
+  rfqNumber             String                    @db.VarChar(64)
+  rfqDate               DateTime                  @db.Date
+  purchaseRequisitionId String?
+  title                 String?                   @db.VarChar(300)
+  responseDueDate       DateTime?                 @db.Date
+  status                RequestForQuotationStatus @default(DRAFT)
+  remarks               String?                   @db.Text
+  sentAt                DateTime?
+  closedAt              DateTime?
+  createdById           String?                   @db.VarChar(36)
+  updatedById           String?                   @db.VarChar(36)
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  deletedAt             DateTime?
+
+  tenant              Tenant                    @relation(fields: [tenantId], references: [id])
+  purchaseRequisition PurchaseRequisition?      @relation(fields: [purchaseRequisitionId], references: [id])
+  lines               RequestForQuotationLine[]
+  vendors             RfqVendor[]
+  vendorQuotations    VendorQuotation[]
+  comparisons         VendorComparison[]
+  purchaseOrders      PurchaseOrder[]
+
+  @@unique([tenantId, rfqNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, purchaseRequisitionId])
+  @@index([tenantId, rfqDate])
+  @@map("request_for_quotations")
+}
+
+model RequestForQuotationLine {
+  id                        String    @id @default(uuid())
+  tenantId                  String
+  requestForQuotationId     String
+  lineNumber                Int
+  purchaseRequisitionLineId String?
+  itemId                    String?
+  itemCodeSnapshot          String    @default("") @db.VarChar(64)
+  itemNameSnapshot          String    @default("") @db.VarChar(300)
+  description               String?   @db.Text
+  requiredQuantity          Decimal   @default(0) @db.Decimal(18, 4)
+  uomId                     String?
+  targetRate                Decimal?  @db.Decimal(18, 2)
+  requiredDate              DateTime? @db.Date
+  remarks                   String?   @db.Text
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id])
+  requestForQuotation     RequestForQuotation      @relation(fields: [requestForQuotationId], references: [id])
+  purchaseRequisitionLine PurchaseRequisitionLine? @relation(fields: [purchaseRequisitionLineId], references: [id])
+  item                    MasterItem?              @relation(fields: [itemId], references: [id])
+  uom                     MasterUom?               @relation(fields: [uomId], references: [id])
+  vendorQuotationLines    VendorQuotationLine[]
+  comparisonLines         VendorComparisonLine[]
+
+  @@unique([tenantId, requestForQuotationId, lineNumber])
+  @@index([tenantId])
+  @@index([tenantId, requestForQuotationId])
+  @@index([tenantId, purchaseRequisitionLineId])
+  @@index([tenantId, itemId])
+  @@map("request_for_quotation_lines")
+}
+
+/// Vendor invite / participation on an RFQ (Prisma model name RfqVendor; table rfq_vendors).
+model RfqVendor {
+  id                    String                @id @default(uuid())
+  tenantId              String
+  requestForQuotationId String
+  vendorId              String
+  inviteStatus          RfqVendorInviteStatus @default(INVITED)
+  invitedAt             DateTime              @default(now())
+  respondedAt           DateTime?
+  remarks               String?               @db.Text
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id])
+  requestForQuotation RequestForQuotation @relation(fields: [requestForQuotationId], references: [id])
+  vendor              MasterVendor        @relation(fields: [vendorId], references: [id])
+
+  @@unique([tenantId, requestForQuotationId, vendorId])
+  @@index([tenantId])
+  @@index([tenantId, requestForQuotationId])
+  @@index([tenantId, vendorId])
+  @@index([tenantId, inviteStatus])
+  @@map("rfq_vendors")
+}
+
+model VendorQuotation {
+  id                    String                @id @default(uuid())
+  tenantId              String
+  quotationNumber       String                @db.VarChar(64)
+  quotationDate         DateTime              @db.Date
+  requestForQuotationId String?
+  vendorId              String
+  status                VendorQuotationStatus @default(DRAFT)
+  currencyCode          String                @default("INR") @db.VarChar(8)
+  validUntil            DateTime?             @db.Date
+  paymentTerms          String?               @db.VarChar(200)
+  deliveryTerms         String?               @db.VarChar(200)
+  freightAmount         Decimal               @default(0) @db.Decimal(18, 2)
+  discountAmount        Decimal               @default(0) @db.Decimal(18, 2)
+  otherCharges          Decimal               @default(0) @db.Decimal(18, 2)
+  taxAmount             Decimal               @default(0) @db.Decimal(18, 2)
+  landedCost            Decimal               @default(0) @db.Decimal(18, 2)
+  totalAmount           Decimal               @default(0) @db.Decimal(18, 2)
+  warranty              String?               @db.VarChar(300)
+  remarks               String?               @db.Text
+  submittedAt           DateTime?
+  createdById           String?               @db.VarChar(36)
+  updatedById           String?               @db.VarChar(36)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  deletedAt             DateTime?
+
+  tenant              Tenant                 @relation(fields: [tenantId], references: [id])
+  requestForQuotation RequestForQuotation?   @relation(fields: [requestForQuotationId], references: [id])
+  vendor              MasterVendor           @relation(fields: [vendorId], references: [id])
+  lines               VendorQuotationLine[]
+  comparisonLines     VendorComparisonLine[]
+  purchaseOrders      PurchaseOrder[]
+
+  @@unique([tenantId, quotationNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, requestForQuotationId])
+  @@index([tenantId, vendorId])
+  @@map("vendor_quotations")
+}
+
+model VendorQuotationLine {
+  id                        String   @id @default(uuid())
+  tenantId                  String
+  vendorQuotationId         String
+  lineNumber                Int
+  requestForQuotationLineId String?
+  itemId                    String?
+  itemCodeSnapshot          String   @default("") @db.VarChar(64)
+  itemNameSnapshot          String   @default("") @db.VarChar(300)
+  description               String?  @db.Text
+  quantity                  Decimal  @default(0) @db.Decimal(18, 4)
+  uomId                     String?
+  rate                      Decimal  @default(0) @db.Decimal(18, 2)
+  amount                    Decimal  @default(0) @db.Decimal(18, 2)
+  leadTimeDays              Int?
+  remarks                   String?  @db.Text
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id])
+  vendorQuotation         VendorQuotation          @relation(fields: [vendorQuotationId], references: [id])
+  requestForQuotationLine RequestForQuotationLine? @relation(fields: [requestForQuotationLineId], references: [id])
+  item                    MasterItem?              @relation(fields: [itemId], references: [id])
+  uom                     MasterUom?               @relation(fields: [uomId], references: [id])
+  comparisonLines         VendorComparisonLine[]
+
+  @@unique([tenantId, vendorQuotationId, lineNumber])
+  @@index([tenantId])
+  @@index([tenantId, vendorQuotationId])
+  @@index([tenantId, requestForQuotationLineId])
+  @@index([tenantId, itemId])
+  @@map("vendor_quotation_lines")
+}
+
+model VendorComparison {
+  id                       String                 @id @default(uuid())
+  tenantId                 String
+  comparisonNumber         String                 @db.VarChar(64)
+  comparisonDate           DateTime               @db.Date
+  requestForQuotationId    String
+  status                   VendorComparisonStatus @default(DRAFT)
+  awardedVendorId          String?
+  awardedVendorQuotationId String?
+  selectionReason          String?                @db.Text
+  awardedById              String?                @db.VarChar(36)
+  remarks                  String?                @db.Text
+  selectedAt               DateTime?
+  createdById              String?                @db.VarChar(36)
+  updatedById              String?                @db.VarChar(36)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  deletedAt                DateTime?
+
+  tenant              Tenant                 @relation(fields: [tenantId], references: [id])
+  requestForQuotation RequestForQuotation    @relation(fields: [requestForQuotationId], references: [id])
+  awardedVendor       MasterVendor?          @relation("ComparisonAwardedVendor", fields: [awardedVendorId], references: [id])
+  lines               VendorComparisonLine[]
+  purchaseOrders      PurchaseOrder[]
+
+  @@unique([tenantId, comparisonNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, requestForQuotationId])
+  @@index([tenantId, awardedVendorId])
+  @@map("vendor_comparisons")
+}
+
+model VendorComparisonLine {
+  id                        String   @id @default(uuid())
+  tenantId                  String
+  vendorComparisonId        String
+  lineNumber                Int
+  requestForQuotationLineId String?
+  vendorQuotationId         String?
+  vendorQuotationLineId     String?
+  itemId                    String?  @db.VarChar(36)
+  quantity                  Decimal  @default(0) @db.Decimal(18, 4)
+  rate                      Decimal  @default(0) @db.Decimal(18, 2)
+  amount                    Decimal  @default(0) @db.Decimal(18, 2)
+  rank                      Int?
+  isSelected                Boolean  @default(false)
+  remarks                   String?  @db.Text
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id])
+  vendorComparison        VendorComparison         @relation(fields: [vendorComparisonId], references: [id])
+  requestForQuotationLine RequestForQuotationLine? @relation(fields: [requestForQuotationLineId], references: [id])
+  vendorQuotation         VendorQuotation?         @relation(fields: [vendorQuotationId], references: [id])
+  vendorQuotationLine     VendorQuotationLine?     @relation(fields: [vendorQuotationLineId], references: [id])
+
+  @@unique([tenantId, vendorComparisonId, lineNumber])
+  @@index([tenantId])
+  @@index([tenantId, vendorComparisonId])
+  @@index([tenantId, requestForQuotationLineId])
+  @@index([tenantId, vendorQuotationId])
+  @@index([tenantId, isSelected])
+  @@map("vendor_comparison_lines")
+}
+
+model PurchaseOrder {
+  id                    String              @id @default(uuid())
+  tenantId              String
+  orderNumber           String              @db.VarChar(64)
+  orderDate             DateTime            @db.Date
+  vendorId              String
+  origin                PurchaseOrderOrigin @default(MANUAL)
+  status                PurchaseOrderStatus @default(DRAFT)
+  purchaseRequisitionId String?
+  requestForQuotationId String?
+  vendorQuotationId     String?
+  vendorComparisonId    String?
+  currencyCode          String              @default("INR") @db.VarChar(8)
+  expectedDeliveryDate  DateTime?           @db.Date
+  paymentTerms          String?             @db.VarChar(200)
+  deliveryTerms         String?             @db.VarChar(200)
+  subtotalAmount        Decimal             @default(0) @db.Decimal(18, 2)
+  taxAmount             Decimal             @default(0) @db.Decimal(18, 2)
+  freightAmount         Decimal             @default(0) @db.Decimal(18, 2)
+  totalAmount           Decimal             @default(0) @db.Decimal(18, 2)
+  remarks               String?             @db.Text
+  submittedAt           DateTime?
+  approvedAt            DateTime?
+  sentAt                DateTime?
+  closedAt              DateTime?
+  cancelledAt           DateTime?
+  createdById           String?             @db.VarChar(36)
+  updatedById           String?             @db.VarChar(36)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  deletedAt             DateTime?
+
+  tenant              Tenant                @relation(fields: [tenantId], references: [id])
+  vendor              MasterVendor          @relation(fields: [vendorId], references: [id])
+  purchaseRequisition PurchaseRequisition?  @relation(fields: [purchaseRequisitionId], references: [id])
+  requestForQuotation RequestForQuotation?  @relation(fields: [requestForQuotationId], references: [id])
+  vendorQuotation     VendorQuotation?      @relation(fields: [vendorQuotationId], references: [id])
+  vendorComparison    VendorComparison?     @relation(fields: [vendorComparisonId], references: [id])
+  lines                         PurchaseOrderLine[]
+  planningRows                  PurchasePlanningRow[]
+  convertedRequisitionLines     PurchaseRequisitionLine[]
+  approvals                     PurchaseApproval[]    @relation("PurchaseApprovalPo")
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, vendorId])
+  @@index([tenantId, purchaseRequisitionId])
+  @@index([tenantId, requestForQuotationId])
+  @@index([tenantId, orderDate])
+  @@index([tenantId, origin])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id                        String    @id @default(uuid())
+  tenantId                  String
+  purchaseOrderId           String
+  lineNumber                Int
+  purchaseRequisitionLineId String?
+  purchasePlanningRowId     String?
+  itemId                    String?
+  itemCodeSnapshot          String    @default("") @db.VarChar(64)
+  itemNameSnapshot          String    @default("") @db.VarChar(300)
+  description               String?   @db.Text
+  quantity                  Decimal   @default(0) @db.Decimal(18, 4)
+  uomId                     String?
+  rate                      Decimal   @default(0) @db.Decimal(18, 2)
+  amount                    Decimal   @default(0) @db.Decimal(18, 2)
+  receivedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
+  requiredDate              DateTime? @db.Date
+  remarks                   String?   @db.Text
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id])
+  purchaseOrder           PurchaseOrder            @relation(fields: [purchaseOrderId], references: [id])
+  purchaseRequisitionLine PurchaseRequisitionLine? @relation(fields: [purchaseRequisitionLineId], references: [id])
+  purchasePlanningRow     PurchasePlanningRow?     @relation(fields: [purchasePlanningRowId], references: [id])
+  item                    MasterItem?              @relation(fields: [itemId], references: [id])
+  uom                     MasterUom?               @relation(fields: [uomId], references: [id])
+
+  @@unique([tenantId, purchaseOrderId, lineNumber])
+  @@index([tenantId])
+  @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, purchaseRequisitionLineId])
+  @@index([tenantId, purchasePlanningRowId])
+  @@index([tenantId, itemId])
+  @@map("purchase_order_lines")
+}
+
+model PurchaseApproval {
+  id                    String                       @id @default(uuid())
+  tenantId              String
+  documentType          PurchaseApprovalDocumentType
+  documentId            String                       @db.VarChar(36)
+  documentNumber        String?                      @db.VarChar(64)
+  purchaseRequisitionId String?
+  purchaseOrderId       String?
+  level                 Int                          @default(1)
+  status                PurchaseApprovalStatus       @default(PENDING)
+  approverRole          String?                      @db.VarChar(64)
+  approverId            String?                      @db.VarChar(36)
+  requesterId           String?                      @db.VarChar(36)
+  amount                Decimal?                     @db.Decimal(18, 2)
+  remarks               String?                      @db.Text
+  requestedAt           DateTime                     @default(now())
+  respondedAt           DateTime?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+
+  tenant              Tenant               @relation(fields: [tenantId], references: [id])
+  purchaseRequisition PurchaseRequisition? @relation("PurchaseApprovalPr", fields: [purchaseRequisitionId], references: [id])
+  purchaseOrder       PurchaseOrder?       @relation("PurchaseApprovalPo", fields: [purchaseOrderId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, documentType, documentId])
+  @@index([tenantId, status])
+  @@index([tenantId, purchaseRequisitionId])
+  @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, approverId])
+  @@map("purchase_approvals")
+}
+
+model PurchaseStatusHistory {
+  id             String                            @id @default(uuid())
+  tenantId       String
+  documentType   PurchaseStatusHistoryDocumentType
+  documentId     String                            @db.VarChar(36)
+  documentNumber String?                           @db.VarChar(64)
+  action         String                            @db.VarChar(64)
+  fromStatus     String?                           @db.VarChar(64)
+  toStatus       String?                           @db.VarChar(64)
+  actorId        String?                           @db.VarChar(36)
+  actorName      String?                           @db.VarChar(200)
+  remarks        String?                           @db.Text
+  actedAt        DateTime                          @default(now())
+  createdAt      DateTime                          @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, documentType, documentId])
+  @@index([tenantId, actedAt])
+  @@index([tenantId, action])
+  @@map("purchase_status_histories")
+}
