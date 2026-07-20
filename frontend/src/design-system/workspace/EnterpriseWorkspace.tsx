@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ErpCardFormPage } from '../../components/erp/card-form/ErpCardFormPage'
-import { ErpFormValidationSummary } from '../../components/erp/card-form/ErpFormValidationSummary'
 import { CrmFormSaveCommandBar } from '../../components/crm/CrmFormSaveCommandBar'
 import { cn } from '../../utils/cn'
 import { EnterpriseDocumentHeader } from './EnterpriseDocumentHeader'
@@ -220,11 +219,6 @@ export function EnterpriseWorkspace({
       {documentInfo}
       {validationGuide}
       <div className="enterprise-workspace__main">{children}</div>
-      {showLegacyValidation ? null : (
-        validationErrors?.length ? (
-          <ErpFormValidationSummary errors={validationErrors} lockedReason={lockedReason} className="mt-3" />
-        ) : null
-      )}
     </ErpCardFormPage>
   )
 }

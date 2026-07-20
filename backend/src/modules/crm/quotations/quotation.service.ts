@@ -24,6 +24,7 @@ import {
   assertDocumentEditable,
   assertDocumentRejectable,
   assertDocumentSubmittable,
+  assertQuotationDeletable,
 } from './quotation.workflow.js'
 
 async function mapQuotationWithNames(
@@ -217,6 +218,7 @@ export async function markDocumentSent(tenantId: string, quotationId: string, do
 export async function deleteQuotation(tenantId: string, id: string, userId: string) {
   const existing = await repo.findQuotationById(tenantId, id)
   if (!existing) throw new NotFoundError('Quotation not found')
+  assertQuotationDeletable(existing)
   await repo.softDeleteQuotation(tenantId, id, userId)
 }
 

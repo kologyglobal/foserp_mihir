@@ -30,7 +30,6 @@ import type {
 
 import { cn } from '../../utils/cn'
 
-import { FactBoxPaneAiToggle } from '../erp/card-form/FactBoxPaneAiToggle'
 
 import { PURCHASE_FACTBOX_COLLAPSED_KEY } from '../erp/card-form/factBoxOpenDefaults'
 
@@ -468,16 +467,6 @@ export function PurchaseCardFormShell({
   return (
 
     <EnterpriseWorkspace {...shellProps}>
-
-      {factBox && collapsibleFactBox ? (
-
-        <div className="erp-form-body__toolbar">
-
-          <FactBoxPaneAiToggle />
-
-        </div>
-
-      ) : null}
 
       {children}
 

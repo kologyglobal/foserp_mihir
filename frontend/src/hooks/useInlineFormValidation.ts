@@ -26,6 +26,10 @@ export function useInlineFormValidation<T extends Record<string, unknown>>(
     setTouched(all)
   }, [rules])
 
+  const resetTouched = useCallback(() => {
+    setTouched({})
+  }, [])
+
   const fieldErrors = useMemo(() => {
     const errors: Partial<Record<keyof T, string>> = {}
     for (const key of Object.keys(rules) as (keyof T)[]) {
@@ -67,6 +71,7 @@ export function useInlineFormValidation<T extends Record<string, unknown>>(
     fieldError,
     touch,
     touchAll,
+    resetTouched,
     errorList,
     isValid: errorList.length === 0,
   }

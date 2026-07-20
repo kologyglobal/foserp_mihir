@@ -188,6 +188,9 @@ export type QuotationPageSize = 'A4' | 'Letter'
 
 export type QuotationHeaderStyle = 'standard' | 'minimal' | 'cover'
 
+/** Visual print theme — `vf_word` mimics Vasant Fabricators Word quotation layout. */
+export type QuotationPrintSkin = 'default' | 'vf_word'
+
 export interface QuotationPrintLayout {
   pageSize: QuotationPageSize
   marginMm: number
@@ -200,6 +203,8 @@ export interface QuotationPrintLayout {
   showSignatureBlock: boolean
   /** Section types that begin on a new printed page */
   pageBreakBefore: QuotationSectionType[]
+  /** Optional print/PDF visual skin (CSS modifier) */
+  printSkin?: QuotationPrintSkin
 }
 
 export type QuotationTemplateSection = Omit<QuotationSection, 'id' | 'specRows'> & {

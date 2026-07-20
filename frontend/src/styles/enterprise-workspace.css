@@ -33,18 +33,45 @@
 
 @media (min-width: 1024px) {
   .enterprise-workspace .erp-card-form-page__layout--with-factbox {
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .enterprise-workspace .erp-card-form-page__layout--with-factbox {
+    grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr);
+  }
+
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
   }
 
   .enterprise-workspace .erp-card-form-page__factbox {
     position: sticky;
     top: 12px;
     align-self: start;
+    max-height: none;
+    overflow: visible;
+    z-index: 4;
+  }
+
+  .enterprise-workspace:not(.enterprise-workspace--crm-smart-overview) .erp-card-form-page__factbox {
+    align-self: stretch;
     max-height: calc(100dvh - 96px);
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
-    z-index: 4;
+  }
+}
+
+@media (min-width: 1440px) {
+  .enterprise-workspace .erp-card-form-page__layout--with-factbox {
+    grid-template-columns: minmax(0, 68fr) minmax(340px, 32fr);
+  }
+
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
+    grid-template-columns: minmax(0, 1fr) 340px;
   }
 }
 
@@ -515,9 +542,20 @@
   font-size: 14px;
 }
 
-@media (max-width: 1099px) {
+@media (max-width: 1279px) {
   .enterprise-workspace .erp-card-section__grid--cols-3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .enterprise-workspace--dynamics-form .erp-field-row--horizontal {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .enterprise-workspace--dynamics-form .erp-field-row__dots {
+    display: none;
   }
 }
 
@@ -1642,7 +1680,7 @@
 }
 
 .enterprise-workspace--dynamics-form .erp-input:focus,
-.enterprise-workspace--dynamics-form input:focus,
+.enterprise-workspace--dynamics-form input:not([type='range']):focus,
 .enterprise-workspace--dynamics-form select:focus,
 .enterprise-workspace--dynamics-form textarea:focus {
   border-color: #0078d4;
@@ -1650,7 +1688,7 @@
   outline: none;
 }
 
-/* Probability slider */
+/* Probability slider — single native range (no duplicate fill bar) */
 .dyn-probability-field {
   display: flex;
   flex-direction: column;
@@ -1667,8 +1705,20 @@
 .dyn-probability-field__range {
   flex: 1;
   height: 4px;
+  margin: 0;
   accent-color: #0078d4;
   cursor: pointer;
+  outline: none;
+  box-shadow: none;
+  border: none;
+  background: transparent;
+}
+
+.dyn-probability-field__range:focus,
+.dyn-probability-field__range:focus-visible,
+.dyn-probability-field__range:active {
+  outline: none;
+  box-shadow: none;
 }
 
 .dyn-probability-field__value {
@@ -1680,18 +1730,9 @@
   text-align: right;
 }
 
+/* Legacy markup may still include a decorative bar — never show it under the range */
 .dyn-probability-field__bar {
-  height: 4px;
-  border-radius: 2px;
-  background: #edebe9;
-  overflow: hidden;
-}
-
-.dyn-probability-field__fill {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #0078d4, #00bcf2);
-  transition: width 0.15s ease;
+  display: none;
 }
 
 /* Typed document upload — document type master + preview */
@@ -1976,14 +2017,35 @@
   border-radius: 4px;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox .erp-card-form-page__layout--with-factbox {
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+    grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr);
+  }
+
+  .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
   }
 
   .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox .erp-card-form-page__factbox {
     top: 8px;
     max-height: calc(100dvh - 88px);
+  }
+
+  .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox.enterprise-workspace--crm-smart-overview .erp-card-form-page__factbox {
+    max-height: none;
+    height: fit-content;
+    align-self: start;
+  }
+}
+
+@media (min-width: 1440px) {
+  .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox .erp-card-form-page__layout--with-factbox {
+    grid-template-columns: minmax(0, 68fr) minmax(340px, 32fr);
+  }
+
+  .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
+    grid-template-columns: minmax(0, 1fr) 340px;
   }
 }
 
@@ -3137,42 +3199,60 @@
 }
 
 /*
- * CRM Smart Context + wide product tables (Lead / Opp 360).
- * enterprise-workspace.css loads after dynamics-components.css and was winning the
- * 2-col template while span 8/4 from the earlier file still applied — main could
- * stretch under the sticky factbox and hide Tax / Final Quoted.
+ * CRM Smart Context — fixed narrow rail beside flexible main content.
+ * Stack below 1280; 320px rail at ≥1280; 340px at ≥1440. Content-sized card height.
  */
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+    grid-template-columns: minmax(0, 1fr) 320px;
     align-items: start;
-    gap: 16px;
+    gap: 20px;
   }
 
   .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__main,
   .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__factbox {
     grid-column: auto;
     min-width: 0;
+    max-width: none;
   }
 
   .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__main {
-    max-width: 100%;
     overflow-x: auto;
   }
 
   .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__factbox {
-    max-width: 320px;
-    z-index: 1;
-    overflow-x: hidden;
+    display: block;
+    width: 100%;
+    height: fit-content;
+    min-height: 0;
+    max-height: none;
+    align-self: start;
+    position: sticky;
+    top: 12px;
+    overflow: visible;
+  }
+
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-factbox-pane {
+    width: 100%;
+    max-width: none;
+    height: auto;
+    max-height: none;
+    flex: 0 0 auto;
   }
 }
 
-@media (max-width: 1023px) {
+@media (min-width: 1440px) {
   .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
-    display: flex;
-    flex-direction: column;
-    grid-template-columns: none;
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
+@media (max-width: 1279px) {
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    flex-direction: unset;
   }
 
   .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__factbox {

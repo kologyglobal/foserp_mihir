@@ -2,7 +2,11 @@ import { Sparkles } from 'lucide-react'
 import { cn } from '../../../utils/cn'
 import { useFactBoxPane } from './FactBoxPaneContext'
 
-/** Reopen collapsed details pane — matches smart-context chrome */
+/**
+ * Reopen collapsed Smart Context pane.
+ * Canonical mount: `ErpCardFormPage` factbox-restore slot only.
+ * Do not also mount this in page toolbars / section-nav trailing — that duplicates the FAB.
+ */
 export function FactBoxPaneAiToggle({ className }: { className?: string }) {
   const ctx = useFactBoxPane()
   if (!ctx?.collapsible || ctx.open) return null

@@ -185,16 +185,16 @@ export function buildQuotationSmartSignals(input: QuotationSmartOverviewInput): 
   const missing: CrmSmartSignal[] = []
   const ok: CrmSmartSignal[] = []
 
-  if (!input.customerId) missing.push({ id: 'company', label: 'Customer not linked', tone: 'warn' })
+  if (!input.customerId) missing.push({ id: 'company', label: 'Link a customer', tone: 'warn' })
   else ok.push({ id: 'company', label: 'Customer linked', tone: 'ok' })
 
-  if (!input.hasValidLine) missing.push({ id: 'lines', label: 'Line items incomplete', tone: 'warn' })
+  if (!input.hasValidLine) missing.push({ id: 'lines', label: 'Add line items', tone: 'warn' })
   else ok.push({ id: 'lines', label: `${input.lineCount} line(s)`, tone: 'ok' })
 
-  if (input.grandTotal <= 0) missing.push({ id: 'total', label: 'Total not calculated', tone: 'warn' })
+  if (input.grandTotal <= 0) missing.push({ id: 'total', label: 'Review totals', tone: 'warn' })
   else ok.push({ id: 'total', label: 'Totals ready', tone: 'ok' })
 
-  if (!input.validUntil) missing.push({ id: 'validity', label: 'Validity date missing', tone: 'warn' })
+  if (!input.validUntil) missing.push({ id: 'validity', label: 'Set validity date', tone: 'warn' })
   else ok.push({ id: 'validity', label: 'Validity set', tone: 'ok' })
 
   return [...missing, ...ok].slice(0, 3)

@@ -16,7 +16,6 @@ import {
 } from 'lucide-react'
 import { Entity360Panel } from '../../components/design-system/Entity360Shell'
 import { ErpCardCommandBar } from '../../components/erp/card-form/ErpCardCommandBar'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import {
   ENTERPRISE_FORM_DETAIL_CLASS,
   EnterpriseBusinessFactBox,
@@ -498,7 +497,6 @@ export function SalesOrder360Page() {
           sections={sectionNavItems}
           activeId={activeSection}
           onSelect={(id) => selectSection(id as SoTab)}
-          trailing={<FactBoxPaneAiToggle />}
         />
 
         <EnterpriseFormMetrics metrics={formMetrics} />

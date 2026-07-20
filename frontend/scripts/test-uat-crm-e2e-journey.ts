@@ -155,7 +155,7 @@ const cust = useMasterStore.getState().customers[0]
 // Journey C: Opportunity → quotation → approval → revision
 {
   const oppRes = makeOpp(cust.id, 'E2E Journey C Opportunity')
-  const quo = useCrmStore.getState().createQuotationFromOpportunity(oppRes.opportunityId!, 'qtpl-standard-trailer', 1200000)
+  const quo = useCrmStore.getState().createQuotationFromOpportunity(oppRes.opportunityId!, 'qtpl-iso-tank', 1200000)
   const docId = quo.documentId
   const submit = docId ? useCrmStore.getState().submitQuotationDocumentForApproval(docId) : { ok: false }
   const approve = docId ? useCrmStore.getState().approveQuotationDocument(docId) : { ok: false }
@@ -170,7 +170,7 @@ const cust = useMasterStore.getState().customers[0]
 // Journey D: Approved quotation → SO conversion → persistence
 {
   const oppRes = makeOpp(cust.id, 'E2E Journey D Opportunity')
-  const quo = useCrmStore.getState().createQuotationFromOpportunity(oppRes.opportunityId!, 'qtpl-standard-trailer', 1200000)
+  const quo = useCrmStore.getState().createQuotationFromOpportunity(oppRes.opportunityId!, 'qtpl-iso-tank', 1200000)
   const docId = quo.documentId!
   useCrmStore.getState().submitQuotationDocumentForApproval(docId)
   useCrmStore.getState().approveQuotationDocument(docId)

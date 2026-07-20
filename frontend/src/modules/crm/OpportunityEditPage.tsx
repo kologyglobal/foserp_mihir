@@ -22,7 +22,6 @@ import {
 } from 'lucide-react'
 import { ErpCardSection, ErpFieldRow, ErpStickySaveBar, ErpViewField } from '../../components/erp/card-form'
 import { ErpCardCommandBar } from '../../components/erp/card-form/ErpCardCommandBar'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import { ErpLineItemsGrid } from '../../components/erp/ErpLineItemsGrid'
 import { CrmTypedDocumentUpload } from '../../components/crm/CrmTypedDocumentUpload'
 import { EntityAttachmentsPanel } from '../../components/crm/shared/EntityAttachmentsPanel'
@@ -56,7 +55,6 @@ import {
 } from '../../utils/opportunitySmartOverview'
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { AppLink } from '../../components/ui/AppLink'
-import { toRequiredFieldLabel } from '../../utils/formValidation'
 import { useOpportunityEditor } from './hooks/useOpportunityEditor'
 
 export function OpportunityEditPage() {
@@ -155,14 +153,6 @@ export function OpportunityEditPage() {
     { label: 'Weighted Forecast', value: formatCrmCurrency(weighted), accent: 'violet' as const, hint: `${probability}% × Final Quoted` },
     { label: 'Expected Close', value: expectedCloseDate ? formatDate(expectedCloseDate) : '—', accent: 'amber' as const, hint: opportunity ? opportunityStageLabel(opportunity.stage) : '—' },
   ], [completionPercent, completionItems, dealValue, lines.length, weighted, probability, expectedCloseDate, opportunity])
-
-  const validationGuideItems = useMemo(
-    () => validationErrors.map((err, i) => ({
-      id: `err-${i}`,
-      label: toRequiredFieldLabel(err),
-    })),
-    [validationErrors],
-  )
 
   if (!id || !opportunity) {
     return (
@@ -387,8 +377,6 @@ export function OpportunityEditPage() {
         )}
         commandBar={commandBar}
         documentStrip={documentStrip}
-        validationItems={validationGuideItems.length ? validationGuideItems : undefined}
-        validationErrors={validationGuideItems.length ? undefined : validationErrors}
         factBox={factBox}
         suppressFactBoxRecord
         collapsibleFactBox
@@ -419,7 +407,6 @@ export function OpportunityEditPage() {
           sections={sectionNavItems}
           activeId={activeSection}
           onSelect={scrollToSection}
-          trailing={<FactBoxPaneAiToggle />}
         />
 
         <EnterpriseFormMetrics metrics={formMetrics} />
@@ -541,9 +528,6 @@ export function OpportunityEditPage() {
                   aria-label="Win probability"
                 />
                 <span className="dyn-probability-field__value">{probability}%</span>
-              </div>
-              <div className="dyn-probability-field__bar" aria-hidden>
-                <div className="dyn-probability-field__fill" style={{ width: `${Number(probability) || 0}%` }} />
               </div>
             </div>
           </ErpFieldRow>

@@ -9,7 +9,6 @@ import {
   GitBranch,
   Paperclip,
 } from 'lucide-react'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import {
   ErpAdditionalInfoToggle,
   ErpAdditionalInfoPanel,
@@ -53,6 +52,7 @@ import { resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation
 import { OpportunityQuotationValueMismatchBanner } from '../../components/crm/OpportunityQuotationValueMismatchBanner'
 import { buildUnifiedFeed } from '../../utils/crmUnifiedFeed'
 import { canCrmPermission } from '../../utils/permissions/crm'
+import { isQuotationDeletableStatus } from '../../utils/quotationDeletePolicy'
 import { useQuotationConversion } from '../crm/hooks/useQuotationConversion'
 import { QuotationConversionDialog } from '@/components/quotations/QuotationConversionDialog'
 
@@ -81,6 +81,7 @@ export function Quotation360Page() {
   const markSent = useCrmStore((s) => s.markQuotationDocumentSent)
   const approveDocument = useCrmStore((s) => s.approveQuotationDocument)
   const createRevision = useCrmStore((s) => s.createQuotationRevision)
+  const deleteQuotation = useCrmStore((s) => s.deleteQuotation)
   const updateOpportunity = useCrmStore((s) => s.updateOpportunity)
   const getQuotation = useSalesStore((s) => s.getQuotation)
   const customers = useMasterStore((s) => s.customers)
@@ -95,6 +96,8 @@ export function Quotation360Page() {
   const [editingFollowUp, setEditingFollowUp] = useState<FollowUp | null>(null)
   const [deleteActivityTarget, setDeleteActivityTarget] = useState<CrmActivity | null>(null)
   const [deleteFollowUpTarget, setDeleteFollowUpTarget] = useState<FollowUp | null>(null)
+  const [deleteQuotationOpen, setDeleteQuotationOpen] = useState(false)
+  const [deletingQuotation, setDeletingQuotation] = useState(false)
   const [pendingActivityId, setPendingActivityId] = useState<string | null>(null)
   const [pendingFollowUpId, setPendingFollowUpId] = useState<string | null>(null)
   const canAddActivity = canCrmPermission('crm.activity.create')
@@ -103,6 +106,7 @@ export function Quotation360Page() {
   const canDeleteActivity = canCrmPermission('crm.activity.delete')
   const canEditFollowUp = canCrmPermission('crm.follow_up.update')
   const canDeleteFollowUp = canCrmPermission('crm.follow_up.delete')
+  const canDeleteQuotationPerm = canCrmPermission('crm.quotation.delete')
   const conversion = useQuotationConversion()
 
   const doc = id ? getLatest(id) : undefined
@@ -292,11 +296,20 @@ export function Quotation360Page() {
   const canMarkSent = quoDoc.status === 'draft' && !quoDoc.locked
   const canApprove = quoDoc.status === 'pending_approval'
   const canRevise = quoDoc.locked || quoDoc.status === 'approved' || quoDoc.status === 'rejected'
+  const canDeleteQuotation =
+    canDeleteQuotationPerm
+    && isQuotationDeletableStatus(quoDoc.status)
+    && isQuotationDeletableStatus(quotation?.status ?? quoDoc.status)
   const soGate = resolveCreateSalesOrderGateForQuotationDocument(quoDoc.id)
 
   async function handleSubmitApproval() {
     const r = await resolveStoreAction(submitForApproval(quoDoc.id))
-    if (!r.ok) notify.error(r.error ?? 'Could not submit')
+    if (!r.ok) {
+      notify.error(r.error ?? 'Could not submit')
+      return
+    }
+    notify.success('Quotation submitted for approval')
+    navigate('/crm/quotations')
   }
 
   async function handleMarkSent() {
@@ -321,6 +334,7 @@ export function Quotation360Page() {
     if (!reason) return
     const r = await resolveStoreAction(createRevision(quoDoc.id, reason))
     if (r.ok && r.documentId) {
+      notify.success('Quotation revised successfully')
       navigate(`/crm/quotations/${quoId}/editor?doc=${r.documentId}`)
     } else {
       notify.error(r.error ?? 'Could not create revision')
@@ -400,6 +414,7 @@ export function Quotation360Page() {
       canSubmitApproval={canSubmit}
       canApprove={canApprove}
       canRevise={canRevise}
+      canDelete={canDeleteQuotation}
       showCreateSalesOrder={soGate.showCreate || Boolean(soGate.salesOrderId)}
       canCreateSalesOrder={soGate.enabled}
       createSalesOrderDisabledReason={soGate.disabledReason}
@@ -412,6 +427,7 @@ export function Quotation360Page() {
       onApprove={() => void handleApprove()}
       onNewRevision={() => void handleNewRevision()}
       onCreateSalesOrder={openConvertToSalesOrder}
+      onDelete={canDeleteQuotation ? () => setDeleteQuotationOpen(true) : undefined}
       onViewSalesOrder={
         (soGate.salesOrderId ?? quo.salesOrderId ?? quoDoc.salesOrderId)
           ? () =>
@@ -470,9 +486,6 @@ export function Quotation360Page() {
         stickyFooter={false}
       >
         <div className="erp-form-body crm-lead-form-body">
-          <div className="erp-form-body__toolbar">
-            <FactBoxPaneAiToggle />
-          </div>
 
           {quoDoc.status === 'converted' && (quoDoc.salesOrderNo || quo.salesOrderId) ? (
             <div className="dyn-detail-banner dyn-detail-banner--success">
@@ -694,6 +707,31 @@ export function Quotation360Page() {
           opportunityId: doc.opportunityId,
         }}
         activity={editingActivity}
+      />
+      <CrmDeleteConfirmModal
+        open={deleteQuotationOpen}
+        title="Delete quotation?"
+        description={`"${quo.quotationNo}" will be permanently removed. Only draft quotations can be deleted.`}
+        confirmLabel="Delete quotation"
+        onCancel={() => setDeleteQuotationOpen(false)}
+        onConfirm={() => {
+          void (async () => {
+            setDeletingQuotation(true)
+            try {
+              const r = await resolveStoreAction(deleteQuotation(quoId))
+              if (r.ok) {
+                notify.success('Quotation deleted')
+                setDeleteQuotationOpen(false)
+                navigate('/crm/quotations')
+              } else {
+                notify.error(r.error ?? 'Could not delete quotation')
+              }
+            } finally {
+              setDeletingQuotation(false)
+            }
+          })()
+        }}
+        isDeleting={deletingQuotation}
       />
       <CrmDeleteConfirmModal
         open={Boolean(deleteActivityTarget)}

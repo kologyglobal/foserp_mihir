@@ -1,7 +1,6 @@
 import { useMemo, useState, useRef, type FormEvent } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { z } from 'zod'
 import { useForm, useWatch, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Building2, MapPin, User, Truck, Receipt, Save, Paperclip, History, Plus, X } from 'lucide-react'
@@ -32,12 +31,11 @@ import { notify } from '../../../store/toastStore'
 import { getSessionUser } from '../../../utils/permissions'
 import { ActiveBadge, TypeBadge } from '../../../components/ui/StatusBadge'
 import { Input, Select, Checkbox, MobileInput } from '../../../components/forms/Inputs'
-import { phoneDigitsField, refineMobileWithCountryField } from '../../../utils/phoneValidationZod'
 import { normalizeEmail } from '../../../utils/validation/email'
-import { optionalEmailField } from '../../../utils/validation/emailZod'
+import { companyFormSchema, type CompanyFormData } from '../../../utils/validation/crmSchemas/companySchema'
 import { StateSelect, CitySelect, CountrySelect } from '../../../components/masters/GeographySelects'
 import { DEFAULT_CUSTOMER_COUNTRY } from '../../../config/countries'
-import { focusAndHighlightField } from '../../../utils/formValidation'
+import { focusAndHighlightField, handleInvalidSubmit, rhfErrorsToFieldMap, crmShowCompletenessHints } from '../../../utils/formValidation'
 import { ErpCardCommandBar } from '../../../components/erp/card-form/ErpCardCommandBar'
 import {
   ErpCardSection,
@@ -63,39 +61,9 @@ import type { Customer } from '../../../types/master'
 import { formatDate, formatDateTime } from '../../../utils/dates/format'
 import { appendAuditStripFields, resolveRecordCreatedBy, resolveRecordCreatedDate } from '../../../utils/masterAudit'
 
-const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
+const schema = companyFormSchema
 
-const schema = z
-  .object({
-    customerCode: z.string().min(1),
-    customerName: z.string().min(1),
-    customerType: z.enum(['corporate', 'dealer', 'government']),
-    addressLine1: z.string(),
-    addressLine2: z.string().optional(),
-    shippingAddress: z.string().optional(),
-    shippingAddressLine2: z.string().optional(),
-    shippingCity: z.string().optional(),
-    shippingState: z.string().optional(),
-    shippingPincode: z.string().optional(),
-    shippingCountry: z.string().optional(),
-    shippingSameAsBilling: z.boolean().optional(),
-    city: z.string().min(1, 'City required'),
-    state: z.string().min(1, 'State required'),
-    pincode: z.string(),
-    country: z.string().min(1, 'Country required'),
-    gstin: z.string().length(15, 'GSTIN must be 15 characters').regex(GSTIN_RE, 'Invalid GSTIN format'),
-    pan: z.string().max(10).optional(),
-    contactPerson: z.string(),
-    contactPhone: phoneDigitsField,
-    contactEmail: optionalEmailField,
-    creditDays: z.coerce.number().min(0),
-    creditLimit: z.coerce.number().min(0),
-    salesTerritory: z.enum(['West', 'North', 'South', 'East']),
-    isActive: z.boolean(),
-  })
-  .superRefine(refineMobileWithCountryField('contactPhone', 'country'))
-
-type FormData = z.infer<typeof schema>
+type FormData = CompanyFormData
 
 export function CustomerListPage() {
   const customers = useMasterStore((s) => s.customers)
@@ -187,8 +155,10 @@ export function CustomerFormPage() {
     [crmActivities, effectiveCustomerId],
   )
 
-  const { register, handleSubmit, control, setValue, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, control, setValue, reset, formState: { errors, isSubmitting, isDirty, isSubmitted } } = useForm<FormData>({
     resolver: zodResolver(schema) as Resolver<FormData>,
+    mode: 'onTouched',
+    reValidateMode: 'onChange',
     defaultValues: existing
       ? {
           ...existing,
@@ -364,15 +334,6 @@ export function CustomerFormPage() {
 
   const recordAudit = existing ?? {}
   const composedDocumentStrip = appendAuditStripFields(documentStrip, recordAudit, { pendingUserName: session.name })
-
-  const validationGuideItems = useMemo(
-    () => Object.entries(errors).map(([key, err]) => ({
-      id: key,
-      label: err?.message?.toString() ?? key,
-      message: err?.message?.toString(),
-    })),
-    [errors],
-  )
 
   function focusFormField(fieldName?: string) {
     if (!fieldName) return
@@ -566,6 +527,10 @@ export function CustomerFormPage() {
       }
     }, (errs) => {
       openSectionForErrors(errs)
+      handleInvalidSubmit({
+        errors: rhfErrorsToFieldMap(errs),
+        root: formRootRef.current,
+      })
     })()
   }
 
@@ -636,6 +601,11 @@ export function CustomerFormPage() {
     <CompanySmartOverviewPanel
       input={smartOverviewInput}
       onGoToSection={scrollToSection}
+      showGapSignals={crmShowCompletenessHints({
+        isEdit,
+        dirty: isDirty,
+        saveAttempted: isSubmitted,
+      })}
     />
   )
 
@@ -663,7 +633,6 @@ export function CustomerFormPage() {
       )}
       commandBar={commandBar}
       documentStrip={composedDocumentStrip}
-      validationItems={validationGuideItems.length ? validationGuideItems : undefined}
       factBox={factBox}
       suppressFactBoxRecord
       collapsibleFactBox

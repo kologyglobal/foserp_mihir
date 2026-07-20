@@ -95,6 +95,14 @@ export async function syncLeadsFromApi(): Promise<void> {
   useSalesStore.setState({ leads: leads.map((l) => normalizeLead(l)) })
 }
 
+/** Refetch opportunities slice only (pipeline / register soft-refresh). */
+export async function syncOpportunitiesFromApi(): Promise<void> {
+  const opportunities = await api.fetchAllCrmPages<Opportunity>('/crm/opportunities')
+  useCrmStore.setState({
+    opportunities: Array.isArray(opportunities) ? opportunities : [],
+  })
+}
+
 function removeLead(id: string): void {
   useSalesStore.setState((s) => ({ leads: s.leads.filter((l) => l.id !== id) }))
 }

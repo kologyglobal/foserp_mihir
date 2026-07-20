@@ -22,6 +22,8 @@ import { useSalesStore } from '../../store/salesStore'
 import { useMasterStore } from '../../store/masterStore'
 import { useUIStore } from '../../store/uiStore'
 import { notify } from '@/store/toastStore'
+import { isApiMode } from '../../config/apiConfig'
+import { syncQuotationsFromApi } from '../../services/bridges/quotationApiBridge'
 import { systemPrompt } from '@/utils/systemConfirm'
 import {
   CreateBlankQuotationTemplateModal,
@@ -45,11 +47,13 @@ import { buildCrmQuotationRegisterKpis, buildQuotationTemplateKpis } from '../..
 import type { QuotationDocumentStatus } from '../../types/crm'
 import type { QuotationListItem } from '@/components/quotations/QuotationCrmCard'
 import { Quotation360Page } from './Quotation360Page'
-import { Toast } from '../../components/ui/Toast'
 import { resolveCreateSalesOrderGateForQuotationDocument } from '../../utils/opportunitySalesOrderDraft'
 import { resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
 import { useQuotationConversion } from '../crm/hooks/useQuotationConversion'
 import { QuotationConversionDialog } from '@/components/quotations/QuotationConversionDialog'
+import { CrmDeleteConfirmModal } from '@/components/crm/CrmDeleteConfirmModal'
+import { canCrmPermission } from '@/utils/permissions/crm'
+import { isQuotationDeletableStatus } from '@/utils/quotationDeletePolicy'
 
 const QUOTATION_FILTER_FIELDS: CrmFilterField[] = [
   {
@@ -79,7 +83,7 @@ const QUOTATION_FILTER_FIELDS: CrmFilterField[] = [
 
 export function CrmQuotationListPage() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const openDetailPanel = useUIStore((s) => s.openDetailPanel)
   const quotationDocuments = useCrmStore((s) => s.quotationDocuments)
   const conversion = useQuotationConversion()
@@ -93,20 +97,47 @@ export function CrmQuotationListPage() {
   const [segment, setSegment] = useState<'all' | 'pending' | 'draft' | 'approved'>('all')
   const [ownerFilter, setOwnerFilter] = useState('')
   const [followUpQuotation, setFollowUpQuotation] = useState<QuotationListItem | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
+  const [deleteTargets, setDeleteTargets] = useState<QuotationListItem[]>([])
+  const [deleting, setDeleting] = useState(false)
+  const [urlSeeded, setUrlSeeded] = useState(false)
+  const canDelete = canCrmPermission('crm.quotation.delete')
+  const deleteQuotation = useCrmStore((s) => s.deleteQuotation)
 
   useEffect(() => {
+    if (!isApiMode()) return
+    void syncQuotationsFromApi().catch(() => {
+      notify.error('Could not refresh quotations from server')
+    })
+  }, [])
+
+  useEffect(() => {
+    if (urlSeeded) return
     const status = searchParams.get('status')
-    const segment = searchParams.get('segment')
+    const segmentParam = searchParams.get('segment')
     const owner = searchParams.get('owner')
     if (status) setStatusFilter(status as QuotationDocumentStatus)
-    if (segment === 'pending' || segment === 'draft' || segment === 'approved') {
-      setSegment(segment)
-    } else if (segment === 'all') {
+    if (segmentParam === 'pending' || segmentParam === 'draft' || segmentParam === 'approved') {
+      setSegment(segmentParam)
+    } else if (segmentParam === 'all') {
       setSegment('all')
     }
     if (owner) setOwnerFilter(owner)
-  }, [searchParams])
+    setUrlSeeded(true)
+  }, [searchParams, urlSeeded])
+
+  useEffect(() => {
+    if (!urlSeeded) return
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (statusFilter) next.set('status', statusFilter)
+      else next.delete('status')
+      if (segment && segment !== 'all') next.set('segment', segment)
+      else next.delete('segment')
+      if (ownerFilter) next.set('owner', ownerFilter)
+      else next.delete('owner')
+      return next
+    }, { replace: true })
+  }, [statusFilter, segment, ownerFilter, urlSeeded, setSearchParams])
 
   const applyQuotationFilters = useCallback((saved: Record<string, string>) => {
     setSearch(saved.search ?? '')
@@ -315,7 +346,7 @@ export function CrmQuotationListPage() {
       },
       'crm-quotations.csv',
     ).then((r) => {
-      if (!r.ok) setToast(r.error ?? 'Export failed')
+      if (!r.ok) notify.error(r.error ?? 'Export failed')
     })
   }
 
@@ -366,9 +397,41 @@ export function CrmQuotationListPage() {
     const createRevision = useCrmStore.getState().createQuotationRevision
     const r = await resolveStoreAction(createRevision(item.document.id, reason))
     if (r.ok && r.documentId) {
+      notify.success('Quotation revised successfully')
       navigate(`/crm/quotations/${item.document.quotationId}/editor?doc=${r.documentId}`)
     } else {
       notify.error(r.error ?? 'Could not create revised quotation')
+    }
+  }
+
+  function requestDeleteQuotations(rows: QuotationListItem[]) {
+    const draftRows = rows.filter((r) => isQuotationDeletableStatus(r.document.status))
+    if (draftRows.length === 0) {
+      notify.warning('Only draft quotations can be deleted')
+      return
+    }
+    if (draftRows.length !== rows.length) {
+      notify.warning('Non-draft quotations cannot be deleted and were excluded')
+    }
+    setDeleteTargets(draftRows)
+  }
+
+  async function confirmDeleteQuotations() {
+    if (deleteTargets.length === 0) return
+    setDeleting(true)
+    try {
+      let okCount = 0
+      for (const row of deleteTargets) {
+        const r = await resolveStoreAction(deleteQuotation(row.document.quotationId))
+        if (r.ok) okCount += 1
+        else notify.error(r.error ?? `Could not delete ${row.quotationNo}`)
+      }
+      if (okCount > 0) {
+        notify.success(okCount === 1 ? 'Quotation deleted' : `${okCount} quotations deleted`)
+        setDeleteTargets([])
+      }
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -470,10 +533,27 @@ export function CrmQuotationListPage() {
             conversion.openConversionModal(item.document.id)
           }}
           onPrint={(item) => navigate(`/crm/quotations/${item.document.quotationId}/preview?doc=${item.document.id}`)}
-          onSubmitApproval={(item) => navigate(`/crm/quotations/${item.document.quotationId}/editor?doc=${item.document.id}`)}
+          onSubmitApproval={(item) => {
+            void (async () => {
+              if (item.document.status !== 'draft') {
+                notify.warning('Only draft quotations can be submitted for approval')
+                return
+              }
+              const submit = useCrmStore.getState().submitQuotationDocumentForApproval
+              const r = await resolveStoreAction(submit(item.document.id))
+              if (!r.ok) {
+                notify.error(r.error ?? 'Could not submit for approval')
+                return
+              }
+              notify.success('Quotation submitted for approval')
+              navigate('/crm/quotations')
+            })()
+          }}
           onScheduleActivity={(item) => setFollowUpQuotation(item)}
           onBulkExport={exportSelectedQuotations}
+          onBulkDelete={canDelete ? requestDeleteQuotations : undefined}
           canEdit
+          canDelete={canDelete}
         />
       </EnterpriseRegisterTableShell>
       <QuotationConversionDialog
@@ -481,6 +561,19 @@ export function CrmQuotationListPage() {
         onViewSalesOrder={(salesOrderId) => navigate(resolveSalesOrderDetailPath(salesOrderId, true))}
       />
     </OperationalPageShell>
+    <CrmDeleteConfirmModal
+      open={deleteTargets.length > 0}
+      title={deleteTargets.length > 1 ? `Delete ${deleteTargets.length} quotations?` : 'Delete quotation?'}
+      description={
+        deleteTargets.length === 1
+          ? `"${deleteTargets[0]!.quotationNo}" will be permanently removed. Only draft quotations can be deleted.`
+          : 'Selected draft quotations will be permanently removed. Non-draft quotations cannot be deleted.'
+      }
+      confirmLabel={deleteTargets.length > 1 ? 'Delete quotations' : 'Delete quotation'}
+      onCancel={() => setDeleteTargets([])}
+      onConfirm={() => void confirmDeleteQuotations()}
+      isDeleting={deleting}
+    />
     <CrmFilterDrawer
       open={filterDrawer.open}
       onClose={filterDrawer.closeDrawer}
@@ -504,7 +597,6 @@ export function CrmQuotationListPage() {
         customerId: followUpQuotation ? getQuotation(followUpQuotation.document.quotationId)?.customerId : undefined,
       }}
     />
-    {toast ? <Toast message={toast} variant="error" /> : null}
     </>
   )
 }

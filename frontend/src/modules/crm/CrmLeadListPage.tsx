@@ -29,7 +29,6 @@ import { buildLeadRegisterKpiItems } from '../../utils/leadKpiItems'
 import { exportRowsToCsv } from '../../utils/exportCsv'
 import { runCrmExport } from '../../utils/crmServerExport'
 import { useApiMode } from '@/hooks/useApiMode'
-import { downloadLeadImportTemplate } from '../../utils/leadImport'
 import { canCrmPermission } from '../../utils/permissions'
 import {
   filterActivitiesForLead,
@@ -66,7 +65,7 @@ import { syncLeadsFromApi } from '../../services/bridges/crmApiBridge'
 export function CrmLeadListPage() {
   const apiMode = useApiMode()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const routes = useLeadRoutes()
   const leads = useSalesStore((s) => s.leads)
   const quotations = useSalesStore((s) => s.quotations)
@@ -89,6 +88,7 @@ export function CrmLeadListPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [assignTargets, setAssignTargets] = useState<ReturnType<typeof enrichLeadRow>[] | null>(null)
+  const [urlSeeded, setUrlSeeded] = useState(false)
 
   const canEdit = canCrmPermission('crm.lead.update')
   const canDelete = canCrmPermission('crm.lead.delete')
@@ -99,11 +99,13 @@ export function CrmLeadListPage() {
   useEffect(() => {
     if (!apiMode) return
     void syncLeadsFromApi().catch(() => {
-      /* keep existing store slice on network failure */
+      notify.error('Could not refresh leads from server')
     })
   }, [apiMode])
 
+  // One-time seed from deep-link query params
   useEffect(() => {
+    if (urlSeeded) return
     const stage = searchParams.get('stage') ?? ''
     const priority = searchParams.get('priority') ?? ''
     const ownerCode = searchParams.get('owner') ?? ''
@@ -116,7 +118,28 @@ export function CrmLeadListPage() {
         ...(owner ? { owner } : {}),
       }))
     }
-  }, [searchParams])
+    setUrlSeeded(true)
+  }, [searchParams, urlSeeded])
+
+  // Keep shareable URL in sync with primary filters (no full reload)
+  useEffect(() => {
+    if (!urlSeeded) return
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        const sync = (key: string, value: string) => {
+          if (value) next.set(key, value)
+          else next.delete(key)
+        }
+        sync('stage', filters.stage)
+        sync('priority', filters.priority)
+        // Prefer owner code in URL when we can resolve from display name
+        sync('owner', filters.owner)
+        return next
+      },
+      { replace: true },
+    )
+  }, [filters.stage, filters.priority, filters.owner, urlSeeded, setSearchParams])
 
   const applyLeadFilters = useCallback((saved: Record<string, string>) => {
     setFilters({
@@ -286,9 +309,7 @@ export function CrmLeadListPage() {
   }
 
   function openLeadImport() {
-    downloadLeadImportTemplate()
     setImportOpen(true)
-    showToast('Lead import template downloaded — fill it and upload in the dialog', 'success')
   }
 
   function exportSelectedLeads(selected: ReturnType<typeof enrichLeadRow>[]) {

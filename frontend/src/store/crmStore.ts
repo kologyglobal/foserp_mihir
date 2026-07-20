@@ -242,6 +242,7 @@ interface CrmState {
   updateQuotationDocumentSections: (documentId: string, sections: QuotationSection[]) => StoreAction<StoreActionResult>
   updateQuotationDocumentPriceTable: (documentId: string, priceLines: QuotationPriceLine[], extras?: { freightAmount?: number; installationAmount?: number; customCharges?: number }) => StoreAction<StoreActionResult>
   createQuotationRevision: (documentId: string, reason: string) => StoreAction<StoreActionResult & { documentId?: string }>
+  deleteQuotation: (quotationId: string) => StoreAction<StoreActionResult>
   markQuotationDocumentSent: (documentId: string) => StoreAction<StoreActionResult>
   submitQuotationDocumentForApproval: (documentId: string) => StoreAction<StoreActionResult>
   approveQuotationDocument: (documentId: string, remarks?: string) => StoreAction<StoreActionResult>
@@ -1082,6 +1083,26 @@ export const useCrmStore = create<CrmState>()(
           ownerName: audit.createdByName,
         })
         return { ok: true, documentId: newDocId }
+      },
+
+      deleteQuotation: (quotationId) => {
+        const header = useSalesStore.getState().getQuotation(quotationId)
+        const docs = get().quotationDocuments.filter((d) => d.quotationId === quotationId)
+        if (!header && docs.length === 0) return { ok: false, error: 'Quotation not found' }
+        const status = header?.status ?? docs.sort((a, b) => b.revisionNo - a.revisionNo)[0]?.status
+        if (status !== 'draft') {
+          return { ok: false, error: `Only draft quotations can be deleted — current status is ${status}` }
+        }
+        if (isApiMode()) {
+          return import('../services/bridges/crmApiBridge').then((m) => m.apiDeleteQuotation(quotationId))
+        }
+        useSalesStore.setState((s) => ({
+          quotations: s.quotations.filter((q) => q.id !== quotationId),
+        }))
+        set((s) => ({
+          quotationDocuments: s.quotationDocuments.filter((d) => d.quotationId !== quotationId),
+        }))
+        return { ok: true }
       },
 
       markQuotationDocumentSent: (documentId) => {

@@ -103,10 +103,11 @@ export async function syncQuotationsFromApi(): Promise<{
   quotationDocuments: QuotationDocument[]
 }> {
   const quotations = await crmApi.fetchAllCrmPages<quotationApi.QuotationApiDto>('/crm/quotations')
-  return {
-    quotationHeaders: quotations.map(quotationHeaderFromApi),
-    quotationDocuments: quotations.flatMap((q) => q.documents ?? []),
-  }
+  const quotationHeaders = quotations.map(quotationHeaderFromApi)
+  const quotationDocuments = quotations.flatMap((q) => q.documents ?? [])
+  useSalesStore.setState({ quotations: quotationHeaders })
+  useCrmStore.setState({ quotationDocuments })
+  return { quotationHeaders, quotationDocuments }
 }
 
 export async function apiCreateQuotation(input: Record<string, unknown>): Promise<StoreActionResult & { quotationId?: string; documentId?: string }> {

@@ -20,6 +20,7 @@ import { CrmListFilterBar, type CrmListFilterBarProps } from '@/components/crm/C
 import { cn } from '../../utils/cn'
 import { StatusBadge } from '../../design-system/list-page'
 import { resolveCreateSalesOrderGateForQuotationDocument } from '../../utils/opportunitySalesOrderDraft'
+import { isQuotationDeletableStatus } from '../../utils/quotationDeletePolicy'
 
 export interface CrmQuotationsTableProps {
   rows: QuotationListItem[]
@@ -87,6 +88,14 @@ export function CrmQuotationsTable({
     const ids = Object.keys(rowSelection).filter((k) => rowSelection[k])
     return rows.filter((r) => ids.includes(r.document.id))
   }, [rowSelection, rows])
+
+  const selectedDraftRows = useMemo(
+    () => selectedRows.filter((r) => isQuotationDeletableStatus(r.document.status)),
+    [selectedRows],
+  )
+  const canBulkDeleteDrafts = Boolean(
+    canDelete && onBulkDelete && selectedRows.length > 0 && selectedDraftRows.length === selectedRows.length,
+  )
 
   const columns: ColumnDef<QuotationListItem>[] = useMemo(
     () => [
@@ -176,7 +185,15 @@ export function CrmQuotationsTable({
                   { id: 'view', label: 'View', icon: Eye, onClick: () => onView(item) },
                   { id: 'edit', label: 'Edit', icon: Pencil, onClick: () => onEdit(item), disabled: !canEdit },
                   { id: 'duplicate', label: 'Duplicate', icon: Copy, onClick: () => (onDuplicate ? onDuplicate(item) : onEdit(item)), disabled: !canEdit },
-                  { id: 'delete', label: 'Delete', icon: Trash2, onClick: () => onBulkDelete?.([item]), danger: true, disabled: !canDelete },
+                  ...(canDelete && onBulkDelete && isQuotationDeletableStatus(d.status)
+                    ? [{
+                        id: 'delete',
+                        label: 'Delete',
+                        icon: Trash2,
+                        onClick: () => onBulkDelete([item]),
+                        danger: true as const,
+                      }]
+                    : []),
                   { id: 'sep-workflow', separator: true, label: '' },
                   ...(canRevise
                     ? [{
@@ -270,13 +287,13 @@ export function CrmQuotationsTable({
           actions={buildEnterpriseBulkActions(selectedRows, {
             onAssign: onBulkAssign,
             onExport: onBulkExport,
-            onDelete: onBulkDelete,
+            onDelete: canBulkDeleteDrafts ? (rows) => onBulkDelete?.(rows) : undefined,
             onInactive: onBulkInactive,
             onActive: onBulkActive,
             canAssign: canEdit,
-            canDelete,
+            canDelete: canBulkDeleteDrafts,
             canSetStatus: canEdit,
-          })}
+          }).filter((action) => action.id !== 'delete' || canBulkDeleteDrafts)}
         />
       }
     />

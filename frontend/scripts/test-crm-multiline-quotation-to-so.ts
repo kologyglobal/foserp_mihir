@@ -117,7 +117,7 @@ if (p2) {
 
   let soLineProductIds: string[] = []
   if (opp.ok && opp.opportunityId) {
-    const q = crm.createQuotationFromOpportunity(opp.opportunityId, 'qtpl-standard-trailer', 2000000)
+    const q = crm.createQuotationFromOpportunity(opp.opportunityId, 'qtpl-iso-tank', 2000000)
     const doc = q.documentId ? crm.getQuotationDocument(q.documentId) : undefined
     check(3, 'Quotation document carries multiple price lines', (doc?.priceLines.length ?? 0) >= 2, `${doc?.priceLines.length ?? 0} lines`)
     check(
@@ -194,7 +194,7 @@ if (p2) {
   })
 
   if (openOpp.ok && openOpp.opportunityId) {
-    const q2 = crm.createQuotationFromOpportunity(openOpp.opportunityId, 'qtpl-standard-trailer', 1500000)
+    const q2 = crm.createQuotationFromOpportunity(openOpp.opportunityId, 'qtpl-iso-tank', 1500000)
     if (q2.documentId) {
       const manualLines = syncLineTotals([
         {

@@ -4,6 +4,7 @@ import { Eye, FileText } from 'lucide-react'
 import { useCrmStore } from '../../../store/crmStore'
 import { resolveStoreAction } from '../../../store/storeAction'
 import { formatApiError } from '../../../services/api/apiErrors'
+import { notify } from '../../../store/toastStore'
 import { useActiveCustomers, useActiveProducts } from '../../../hooks/useMasterLists'
 import { buildOpportunityLineFromProduct } from '../../../utils/opportunityLineCalc'
 import { useMasterStore } from '../../../store/masterStore'
@@ -72,25 +73,30 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
     if (submitting) return
     if (!customerId) {
       setError('Select a customer.')
+      notify.warning('Select a customer.')
       return
     }
     if (!productId) {
       setError('Select a product.')
+      notify.warning('Select a product.')
       return
     }
     const price = Number(unitPrice)
     const quantity = Math.max(1, Number(qty) || 1)
     if (!price || price <= 0) {
       setError('Unit price must be greater than zero.')
+      notify.warning('Unit price must be greater than zero.')
       return
     }
     if (!templateId) {
       setError('No quotation template available — open the full quotation form.')
+      notify.warning('No quotation template available — open the full quotation form.')
       return
     }
     const product = getProduct(productId)
     if (!product) {
       setError('Product not found.')
+      notify.warning('Product not found.')
       return
     }
     const item = items.find((i) => i.id === product.fgItemId) ?? items.find((i) => i.id === productId)
@@ -108,9 +114,12 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
           }),
         )
         if (!r.ok || !r.documentId) {
-          setError(r.error ?? formatApiError('Failed to create quotation'))
+          const msg = r.error ?? formatApiError('Failed to create quotation')
+          setError(msg)
+          notify.error(msg)
           return
         }
+        notify.success('Draft quotation created')
         setSavedDocId(r.documentId)
       } finally {
         setSubmitting(false)

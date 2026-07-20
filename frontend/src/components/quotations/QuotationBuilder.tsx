@@ -188,7 +188,12 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
     })
     if (!reason) return
     const r = await resolveStoreAction(createRevision(documentId, reason))
-    if (r.ok && r.documentId) navigate(`/crm/quotations/${doc!.quotationId}/editor?doc=${r.documentId}`)
+    if (r.ok && r.documentId) {
+      notify.success('Quotation revised successfully')
+      navigate(`/crm/quotations/${doc!.quotationId}/editor?doc=${r.documentId}`)
+    } else {
+      notify.error(r.error ?? 'Could not create revision')
+    }
   }
 
   function handleSaveAndClose() {
@@ -202,7 +207,12 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
 
   async function handleSubmitApprovalClick() {
     const r = await resolveStoreAction(submitApproval(documentId))
-    if (!r.ok) notify.error(r.error ?? 'Could not submit for approval')
+    if (!r.ok) {
+      notify.error(r.error ?? 'Could not submit for approval')
+      return
+    }
+    notify.success('Quotation submitted for approval')
+    navigate('/crm/quotations')
   }
 
   function handleSavePdfToDms() {
@@ -256,7 +266,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
           sticky={false}
           primaryAction={
             !locked && doc.status === 'draft'
-              ? { id: 'submit-approval', label: 'Submit Approval', icon: CheckCircle, onClick: () => submitApproval(documentId) }
+              ? { id: 'submit-approval', label: 'Submit Approval', icon: CheckCircle, onClick: () => void handleSubmitApprovalClick() }
               : { id: 'preview', label: 'Preview Document', icon: Eye, onClick: () => navigate(`/crm/quotations/${doc.quotationId}/preview?doc=${documentId}`) }
           }
           secondaryActions={secondaryActions}

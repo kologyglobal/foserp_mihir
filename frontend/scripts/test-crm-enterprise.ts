@@ -77,7 +77,7 @@ const pendingCrmDoc = crm.quotationDocuments.find((d) => d.status === 'pending_a
 if (!pendingCrmDoc) {
   const openOpp = crm.opportunities.find((o) => o.status === 'open' && !o.quotationId)
   if (openOpp) {
-    const q = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-standard-trailer', 2200000)
+    const q = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-iso-tank', 2200000)
     if (q.documentId) crm.submitQuotationDocumentForApproval(q.documentId)
   }
 }
@@ -150,7 +150,7 @@ const multiOpp = crm.createOpportunity({
 
 let multiLineOk = false
 if (multiOpp.ok && multiOpp.opportunityId) {
-  const q = crm.createQuotationFromOpportunity(multiOpp.opportunityId, 'qtpl-standard-trailer', 2400000)
+  const q = crm.createQuotationFromOpportunity(multiOpp.opportunityId, 'qtpl-iso-tank', 2400000)
   if (q.documentId) {
     crm.approveQuotationDocument(q.documentId, 'Enterprise multi-line test')
     const conv = crm.convertQuotationDocumentToSalesOrder(q.documentId, {

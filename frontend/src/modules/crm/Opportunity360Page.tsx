@@ -10,7 +10,6 @@ import {
   Target,
 } from 'lucide-react'
 import { Select } from '../../components/forms/Inputs'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import { CrmCardFormShell, ENTERPRISE_FORM_CLASS } from '@/components/crm/CrmCardFormShell'
 import {
   ErpAdditionalInfoToggle,
@@ -21,7 +20,6 @@ import {
 import { ErpButton } from '../../components/erp/ErpButton'
 import { ErpLineItemsGrid } from '../../components/erp/ErpLineItemsGrid'
 import { Button } from '../../components/ui/Button'
-import { Toast } from '../../components/ui/Toast'
 import { DynamicsStatusChip } from '../../components/dynamics/DynamicsStatusChip'
 import {
   QuickFollowUpDrawer,
@@ -104,7 +102,6 @@ export function Opportunity360Page() {
   const attachmentItems = useOpportunityAttachmentStore((s) => s.items)
   const { options: productOptions, pickMap } = useProductMasterOptionMap(products, items, uoms)
 
-  const [toast, setToast] = useState<string | null>(null)
   const [followUpOpen, setFollowUpOpen] = useState(false)
   const [logActivityOpen, setLogActivityOpen] = useState(false)
   const [editingActivity, setEditingActivity] = useState<CrmActivity | null>(null)
@@ -328,7 +325,6 @@ export function Opportunity360Page() {
   function confirmMove() {
     void (async () => {
       if (!targetCompleteness.isComplete) {
-        setToast(formatMissingStageFieldsMessage(targetCompleteness.missingFields, opportunityStageLabel(targetStage)))
         notify.error(formatMissingStageFieldsMessage(targetCompleteness.missingFields, opportunityStageLabel(targetStage)))
         return
       }
@@ -344,7 +340,6 @@ export function Opportunity360Page() {
         setMoveOpen(false)
       } else {
         notify.error(r.error ?? 'Could not change stage')
-        setToast(r.error ?? 'Could not change stage')
       }
     })()
   }
@@ -380,7 +375,7 @@ export function Opportunity360Page() {
         if (r.ok) {
           navigate('/crm/opportunities')
         } else {
-          setToast(r.error ?? 'Delete failed')
+          notify.error(r.error ?? 'Delete failed')
         }
       } finally {
         setIsDeleting(false)
@@ -394,7 +389,7 @@ export function Opportunity360Page() {
     void (async () => {
       try {
         const r = await resolveStoreAction(completeActivity(activity.id, activity.outcome ?? 'Completed'))
-        if (!r.ok) setToast(r.error ?? 'Could not complete activity')
+        if (!r.ok) notify.error(r.error ?? 'Could not complete activity')
       } finally {
         setPendingActivityId(null)
       }
@@ -537,9 +532,6 @@ export function Opportunity360Page() {
         stickyFooter={false}
       >
         <div className="erp-form-body crm-lead-form-body">
-          <div className="erp-form-body__toolbar">
-            <FactBoxPaneAiToggle />
-          </div>
 
           {overdueFu ? (
             <div className="dyn-detail-banner">
@@ -807,9 +799,9 @@ export function Opportunity360Page() {
               const r = await resolveStoreAction(deleteActivity(deleteActivityTarget.id))
               if (r.ok) {
                 setDeleteActivityTarget(null)
-                setToast('Activity deleted')
+                notify.success('Activity deleted')
               } else {
-                setToast(r.error ?? 'Failed to delete activity')
+                notify.error(r.error ?? 'Failed to delete activity')
               }
             } finally {
               setPendingActivityId(null)
@@ -834,9 +826,9 @@ export function Opportunity360Page() {
               const r = await resolveStoreAction(deleteFollowUp(deleteFollowUpTarget.id))
               if (r.ok) {
                 setDeleteFollowUpTarget(null)
-                setToast('Follow-up deleted')
+                notify.success('Follow-up deleted')
               } else {
-                setToast(r.error ?? 'Failed to delete follow-up')
+                notify.error(r.error ?? 'Failed to delete follow-up')
               }
             } finally {
               setPendingFollowUpId(null)
@@ -925,7 +917,6 @@ export function Opportunity360Page() {
         onConfirm={confirmDeleteOpportunity}
         isDeleting={isDeleting}
       />
-      {toast ? <Toast message={toast} /> : null}
     </>
   )
 }

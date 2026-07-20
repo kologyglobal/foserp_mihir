@@ -11,6 +11,7 @@ import {
   Send,
   ShoppingCart,
   Star,
+  Trash2,
 } from 'lucide-react'
 import { StatusBadge } from '@/design-system/list-page'
 import {
@@ -36,6 +37,7 @@ export interface Quotation360RecordHeaderProps {
   canSubmitApproval: boolean
   canApprove: boolean
   canRevise: boolean
+  canDelete?: boolean
   showCreateSalesOrder: boolean
   canCreateSalesOrder: boolean
   createSalesOrderDisabledReason?: string | null
@@ -49,6 +51,7 @@ export interface Quotation360RecordHeaderProps {
   onNewRevision: () => void
   onCreateSalesOrder: () => void
   onViewSalesOrder?: () => void
+  onDelete?: () => void
 }
 
 function useNarrowViewport() {
@@ -78,6 +81,7 @@ export function Quotation360RecordHeader({
   canSubmitApproval,
   canApprove,
   canRevise,
+  canDelete = false,
   showCreateSalesOrder,
   canCreateSalesOrder,
   createSalesOrderDisabledReason,
@@ -91,6 +95,7 @@ export function Quotation360RecordHeader({
   onNewRevision,
   onCreateSalesOrder,
   onViewSalesOrder,
+  onDelete,
 }: Quotation360RecordHeaderProps) {
   const narrow = useNarrowViewport()
   const toggleFavorite = useUIStore((s) => s.toggleFavorite)
@@ -145,6 +150,9 @@ export function Quotation360RecordHeader({
       : []),
     ...(canRevise
       ? [{ id: 'revise', label: 'New Revision', icon: GitBranch, onClick: onNewRevision }]
+      : []),
+    ...(canDelete && onDelete
+      ? [{ id: 'delete', label: 'Delete', icon: Trash2, onClick: onDelete, danger: true as const }]
       : []),
     { id: 'export', label: 'Export PDF', icon: FileDown, onClick: () => window.print() },
     { id: 'print', label: 'Print', icon: Printer, onClick: () => window.print() },

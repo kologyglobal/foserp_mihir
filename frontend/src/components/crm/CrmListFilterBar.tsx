@@ -59,8 +59,9 @@ export function CrmListSortSelect({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       wrapClassName="crm-list-filter-bar__select-wrap crm-list-filter-bar__sort-wrap shrink-0"
-      className={cn('crm-list-filter-bar__control crm-list-filter-bar__sort-select', className)}
+      className={cn('erp-select crm-list-filter-bar__control crm-list-filter-bar__sort-select', className)}
       aria-label={ariaLabel}
+      title={options.find((o) => o.value === value)?.label ?? ariaLabel}
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>

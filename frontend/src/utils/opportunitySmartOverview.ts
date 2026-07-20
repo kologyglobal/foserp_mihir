@@ -209,21 +209,21 @@ export function buildOpportunitySmartSignals(input: OpportunitySmartOverviewInpu
   const missing: CrmSmartSignal[] = []
   const ok: CrmSmartSignal[] = []
 
-  if (!input.customerId) missing.push({ id: 'company', label: 'Company not linked', tone: 'warn' })
+  if (!input.customerId) missing.push({ id: 'company', label: 'Link a company', tone: 'warn' })
   else ok.push({ id: 'company', label: 'Company linked', tone: 'ok' })
 
-  if (!input.hasValidLine) missing.push({ id: 'lines', label: 'Product lines incomplete', tone: 'warn' })
+  if (!input.hasValidLine) missing.push({ id: 'lines', label: 'Add product lines', tone: 'warn' })
   else ok.push({ id: 'lines', label: `${input.lineCount} line item(s)`, tone: 'ok' })
 
-  if (input.dealValue <= 0) missing.push({ id: 'value', label: 'Deal value not set', tone: 'warn' })
+  if (input.dealValue <= 0) missing.push({ id: 'value', label: 'Set deal value', tone: 'warn' })
   else ok.push({ id: 'value', label: 'Deal value set', tone: 'ok' })
 
-  if (input.overdueFollowUp) missing.push({ id: 'followup', label: 'Follow-up overdue', tone: 'warn' })
-  else if (!input.nextFollowUpDate) missing.push({ id: 'followup', label: 'Follow-up not scheduled', tone: 'warn' })
+  if (input.overdueFollowUp) missing.push({ id: 'followup', label: 'Follow-up is overdue', tone: 'warn' })
+  else if (!input.nextFollowUpDate) missing.push({ id: 'followup', label: 'Plan a follow-up', tone: 'warn' })
   else ok.push({ id: 'followup', label: 'Follow-up scheduled', tone: 'ok' })
 
   if (!input.quotationId && input.isOpen !== false) {
-    missing.push({ id: 'quote', label: 'No quotation yet', tone: 'warn' })
+    missing.push({ id: 'quote', label: 'Create a quotation when ready', tone: 'warn' })
   } else if (input.quotationId) {
     ok.push({ id: 'quote', label: 'Quotation linked', tone: 'ok' })
   }

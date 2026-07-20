@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Building2, ChevronDown, X } from 'lucide-react'
 import { FormField, inputClassName } from '../forms/FormField'
@@ -14,9 +14,17 @@ import { resolveStoreAction } from '../../store/storeAction'
 import { notify } from '../../store/toastStore'
 import { panFromGstin, validateGstin } from '../../utils/customerUtils'
 import { DEFAULT_CUSTOMER_COUNTRY } from '../../config/countries'
+import { useInlineFormValidation } from '../../hooks/useInlineFormValidation'
+import { validateEmail, normalizeEmail } from '../../utils/validation/email'
+import { validateMobileForCountry } from '../../utils/validation/mobilePhone'
 import type { QuickCreateResult } from '../../types/quickCreate'
 import type { Customer, CustomerType, SalesTerritory } from '../../types/master'
 import { cn } from '../../utils/cn'
+
+/** Contact person names: letters and spaces only (no digits / symbols). */
+function sanitizeAlphabeticName(raw: string): string {
+  return raw.replace(/[^A-Za-z\s]/g, '')
+}
 
 export interface QuickCompanyCreateModalProps {
   open: boolean
@@ -107,7 +115,7 @@ function buildCustomerPayload(form: CompanyForm, name: string): Omit<Customer, '
     pan: form.pan.trim().toUpperCase() || panFromGstin(gstin) || undefined,
     contactPerson: form.contactPerson.trim(),
     contactPhone: form.mobile.trim(),
-    contactEmail: form.email.trim(),
+    contactEmail: form.email.trim() ? normalizeEmail(form.email) : '',
     creditDays: Number(form.creditDays) || 30,
     creditLimit: Number(form.creditLimit) || 0,
     salesTerritory: (form.salesTerritory || 'West') as SalesTerritory,
@@ -127,6 +135,38 @@ export function QuickCompanyCreateModal({
   const [gstinError, setGstinError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  const validationValues = useMemo(
+    () => ({
+      customerName: form.customerName,
+      contactPerson: form.contactPerson,
+      mobile: form.mobile,
+      email: form.email,
+      country: form.country,
+    }),
+    [form.customerName, form.contactPerson, form.mobile, form.email, form.country],
+  )
+
+  const inline = useInlineFormValidation(validationValues, {
+    customerName: {
+      required: true,
+      message: `${COMPANY_TERMINOLOGY.name} is required`,
+    },
+    contactPerson: {
+      validate: (v) => {
+        const value = String(v ?? '')
+        if (!value.trim()) return null
+        if (/[^A-Za-z\s]/.test(value)) return 'Contact Person allows letters only'
+        return null
+      },
+    },
+    mobile: {
+      validate: (v) => validateMobileForCountry(String(v ?? ''), form.country || DEFAULT_CUSTOMER_COUNTRY),
+    },
+    email: {
+      validate: (v) => validateEmail(String(v ?? '')),
+    },
+  })
+
   useEffect(() => {
     if (!open) return
     setForm(emptyForm(defaultName.trim()))
@@ -134,6 +174,9 @@ export function QuickCompanyCreateModal({
     setError(null)
     setGstinError(null)
     setSubmitting(false)
+    inline.resetTouched()
+    // Only reset when the modal opens / default name changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultName])
 
   useEffect(() => {
@@ -158,7 +201,6 @@ export function QuickCompanyCreateModal({
       pan: panFromGstin(gst) || (gst.length < 12 ? '' : prev.pan),
     }))
     setError(null)
-    // Clear stale error while typing; re-check on blur / submit
     if (gstinError) setGstinError(gst.length === 0 || gst.length === 15 ? validateGstin(gst) : null)
   }
 
@@ -167,20 +209,24 @@ export function QuickCompanyCreateModal({
   }
 
   async function handleSubmit() {
-    const name = form.customerName.trim()
-    if (!name) {
-      const msg = `${COMPANY_TERMINOLOGY.name} is required`
-      setError(msg)
-      notify.warning(msg)
-      return
-    }
-
+    inline.touchAll()
     const gstErr = validateGstin(form.gstin)
     if (gstErr) {
       setGstinError(gstErr)
       setShowAdditional(true)
-      setError(gstErr)
-      notify.warning(gstErr)
+    }
+
+    const name = form.customerName.trim()
+    const mobileErr = validateMobileForCountry(form.mobile, form.country || DEFAULT_CUSTOMER_COUNTRY)
+    const emailErr = validateEmail(form.email)
+
+    if (!name || mobileErr || emailErr || gstErr) {
+      const msg =
+        !name
+          ? `${COMPANY_TERMINOLOGY.name} is required`
+          : mobileErr || emailErr || gstErr || 'Please fix the highlighted fields'
+      setError(msg)
+      notify.warning(msg)
       return
     }
     setGstinError(null)
@@ -192,7 +238,7 @@ export function QuickCompanyCreateModal({
     const demoPayload = {
       ...customerData,
       mobile: form.mobile.trim(),
-      email: form.email.trim(),
+      email: form.email.trim() ? normalizeEmail(form.email) : '',
       billingAddress: form.addressLine1.trim(),
     }
 
@@ -253,7 +299,7 @@ export function QuickCompanyCreateModal({
   // Portal outside the lead page <form> — nested forms break Create Company submit.
   return createPortal(
     <div
-      className="erp-modal-backdrop"
+      className="erp-modal-backdrop crm-form-surface"
       role="dialog"
       aria-modal="true"
       aria-labelledby="quick-company-modal-title"
@@ -291,10 +337,16 @@ export function QuickCompanyCreateModal({
           <section className="space-y-3">
             <h3 className="text-[13px] font-semibold text-erp-text">Quick entry</h3>
             <div className="grid gap-3 sm:grid-cols-3">
-              <FormField label={`${COMPANY_TERMINOLOGY.name} *`} className="sm:col-span-3">
+              <FormField
+                label={COMPANY_TERMINOLOGY.name}
+                required
+                className="sm:col-span-3"
+                error={inline.fieldError('customerName')}
+              >
                 <Input
                   value={form.customerName}
                   onChange={(e) => setField('customerName', e.target.value)}
+                  onBlur={() => inline.touch('customerName')}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
@@ -302,29 +354,42 @@ export function QuickCompanyCreateModal({
                     }
                   }}
                   placeholder="e.g. Acme Logistics Pvt Ltd"
+                  error={Boolean(inline.fieldError('customerName'))}
+                  aria-invalid={Boolean(inline.fieldError('customerName'))}
                   autoFocus
                 />
               </FormField>
-              <FormField label="Contact Person">
+              <FormField label="Contact Person" error={inline.fieldError('contactPerson')}>
                 <Input
                   value={form.contactPerson}
-                  onChange={(e) => setField('contactPerson', e.target.value)}
+                  onChange={(e) => setField('contactPerson', sanitizeAlphabeticName(e.target.value))}
+                  onBlur={() => inline.touch('contactPerson')}
                   placeholder="Primary contact"
+                  autoComplete="name"
+                  inputMode="text"
+                  error={Boolean(inline.fieldError('contactPerson'))}
+                  aria-invalid={Boolean(inline.fieldError('contactPerson'))}
                 />
               </FormField>
-              <FormField label="Mobile">
+              <FormField label="Mobile" error={inline.fieldError('mobile')}>
                 <MobileInput
                   value={form.mobile}
                   onChange={(e) => setField('mobile', e.target.value)}
+                  onBlur={() => inline.touch('mobile')}
                   placeholder="10-digit mobile"
+                  error={Boolean(inline.fieldError('mobile'))}
+                  aria-invalid={Boolean(inline.fieldError('mobile'))}
                 />
               </FormField>
-              <FormField label="Email">
+              <FormField label="Email" error={inline.fieldError('email')}>
                 <Input
                   type="email"
                   value={form.email}
                   onChange={(e) => setField('email', e.target.value)}
+                  onBlur={() => inline.touch('email')}
                   placeholder="name@company.com"
+                  error={Boolean(inline.fieldError('email'))}
+                  aria-invalid={Boolean(inline.fieldError('email'))}
                 />
               </FormField>
             </div>

@@ -24,7 +24,10 @@ interface CompanyProspectSelectProps {
   value: CompanyProspectValue
   onChange: (value: CompanyProspectValue) => void
   onCompanyLinked?: (match: CompanyProspectMatch) => void
-  error?: string
+  /** Called when focus leaves the control (Tab / click away). Use for required-field validation. */
+  onBlur?: () => void
+  /** Border / aria invalid. Prefer parent `ErpFieldRow.fieldError` for the message text. */
+  error?: string | boolean
   disabled?: boolean
   autoFocus?: boolean
 }
@@ -33,6 +36,7 @@ export function CompanyProspectSelect({
   value,
   onChange,
   onCompanyLinked,
+  onBlur,
   error,
   disabled,
   autoFocus,
@@ -270,6 +274,7 @@ export function CompanyProspectSelect({
                 if (wrapRef.current?.contains(document.activeElement)) return
                 setOpen(false)
                 commitExactMatchIfNeeded()
+                onBlur?.()
               }, 0)
             }}
             onKeyDown={onInputKeyDown}
@@ -363,7 +368,6 @@ export function CompanyProspectSelect({
           Prospect name only — pick a company from the list or Add New Company to link before converting to an opportunity.
         </p>
       ) : null}
-      {error ? <p className="text-[12px] font-medium text-erp-danger-fg">{error}</p> : null}
 
       <QuickCompanyCreateModal
         open={companyModalOpen}

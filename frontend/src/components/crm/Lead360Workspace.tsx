@@ -7,7 +7,6 @@ import {
   ClipboardList,
   Paperclip,
 } from 'lucide-react'
-import { FactBoxPaneAiToggle } from '@/components/erp/card-form/FactBoxPaneAiToggle'
 import { QuickFollowUpDrawer } from '@/components/crm/QuickFollowUpDrawer'
 import { LogActivityDrawer } from '@/components/crm/CrmQuickCreateDrawers'
 import { LeadHistoryDrawer } from '@/components/crm/LeadHistoryDrawer'
@@ -547,9 +546,6 @@ export function Lead360Workspace() {
         stickyFooter={false}
       >
         <div className="erp-form-body crm-lead-form-body">
-        <div className="erp-form-body__toolbar">
-          <FactBoxPaneAiToggle />
-        </div>
 
         {isConverted ? (
           <div className="dyn-detail-banner dyn-detail-banner--success">

@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Lightbulb, Sparkles } from 'lucide-react'
+import { ArrowRight, CircleAlert, Lightbulb, Sparkles } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import { focusAndHighlightField } from '../../utils/formValidation'
 
@@ -66,7 +66,7 @@ export interface CrmSmartOverviewPanelProps {
   chips?: CrmSmartChip[]
   meta?: string[]
   savedLabel?: string
-  /** Progress section label, default Completeness */
+  /** Progress section label, default Record Health */
   progressLabel?: string
   progressPercent: number
   /** Tooltip for the primary progress metric */
@@ -85,14 +85,19 @@ export interface CrmSmartOverviewPanelProps {
   /** Extra block under key details (e.g. convert card) */
   footer?: React.ReactNode
   /**
-   * `lean` = Health → Missing → Next Action (+ optional context line).
-   * Hides header status, key details, and secondary actions unless explicitly needed.
+   * `lean` = Record Health → Priority Insight → Recommended Next Step (+ secondary actions).
+   * Hides dense header chips / key details unless explicitly needed.
    */
   variant?: 'full' | 'lean'
   /** Compact footer line in lean mode, e.g. "Qualified · Rajesh Patel" */
   contextLine?: string
   /** Optional value line under progress in lean mode, e.g. deal value */
   valueLine?: string
+  /**
+   * When false, hide gap warn chips (pristine create forms).
+   * Next best action still shows. Default true.
+   */
+  showGapSignals?: boolean
 }
 
 function readinessTone(percent: number): 'high' | 'mid' | 'low' {
@@ -101,14 +106,18 @@ function readinessTone(percent: number): 'high' | 'mid' | 'low' {
   return 'low'
 }
 
-/** Shared AI-style right rail: overview, next action, key details, quick actions. */
+function normalizeCompare(value: string): string {
+  return value.trim().toLowerCase().replace(/[.!]+$/g, '')
+}
+
+/** Shared AI-style right rail: health, insight, next step, secondary actions. */
 export function CrmSmartOverviewPanel({
   ariaLabel = 'Smart overview',
   title,
   chips = [],
   meta = [],
   savedLabel,
-  progressLabel = 'Completeness',
+  progressLabel = 'Record Health',
   progressPercent,
   progressTooltip,
   scoreCards,
@@ -122,6 +131,7 @@ export function CrmSmartOverviewPanel({
   variant = 'full',
   contextLine,
   valueLine,
+  showGapSignals = true,
 }: CrmSmartOverviewPanelProps) {
   const clamped = Math.max(0, Math.min(100, Math.round(progressPercent)))
   const lean = variant === 'lean'
@@ -133,19 +143,56 @@ export function CrmSmartOverviewPanel({
       focusAndHighlightField(nextAction.focusField, { delayMs: 140 })
     }
   }
-  const visibleSignals = lean
-    ? signals.filter((s) => s.tone === 'warn').slice(0, 2)
-    : signals.filter((s) => s.tone === 'warn').slice(0, 3)
-  const showActionDescription = Boolean(nextAction.description?.trim())
-  const showAi = !lean && Boolean(aiInsight?.trim())
+
+  const gatedSignals = showGapSignals ? signals : []
+  const warnSignals = gatedSignals.filter((s) => s.tone === 'warn')
+  const visibleSignals = lean ? warnSignals.slice(0, 2) : warnSignals.slice(0, 3)
+  const attentionCount = warnSignals.length
+
+  const actionDescription = nextAction.description?.trim() ?? ''
+  const actionTitle = nextAction.title?.trim() ?? ''
+  const ctaLabel = nextAction.ctaLabel?.trim() || 'Continue'
+
+  /** Prefer a gap signal for Priority Insight so NBA copy is not repeated. */
+  const priorityInsight = (() => {
+    const topSignal = visibleSignals[0]?.label?.trim()
+    if (topSignal) return topSignal
+    if (!showGapSignals) return null
+    if (actionTitle && normalizeCompare(actionTitle) !== normalizeCompare(ctaLabel)) {
+      return actionTitle
+    }
+    return null
+  })()
+
+  const recommendationCopy = (() => {
+    if (actionDescription) return actionDescription
+    if (actionTitle && normalizeCompare(actionTitle) !== normalizeCompare(ctaLabel)) {
+      return actionTitle
+    }
+    return `Use “${ctaLabel}” to move this record forward.`
+  })()
+
+  const attentionLabel = (() => {
+    if (clamped >= 100 && attentionCount === 0) return 'Ready — no critical gaps'
+    if (!showGapSignals && attentionCount === 0) {
+      return clamped < 40 ? 'Getting started' : 'Keep filling required fields'
+    }
+    if (attentionCount === 0) return 'No items need attention'
+    if (attentionCount === 1) return '1 item needs attention'
+    return `${attentionCount} items need attention`
+  })()
+
+  const secondaryActions = quickActions
+    .filter((action) => normalizeCompare(action.label) !== normalizeCompare(ctaLabel))
+    .slice(0, lean ? 3 : 4)
+
   const showKeys = !lean && keyDetails.length > 0
-  const showQuick = !lean && quickActions.length > 0
-  const leanContext = contextLine
-    ?? (lean && meta.length > 0
-      ? meta.map((m) => m.replace(/^(Stage|Owner):\s*/i, '')).join(' · ')
-      : undefined)
-  const titleMatchesCta = nextAction.title.trim().toLowerCase() === nextAction.ctaLabel.trim().toLowerCase()
+  const showAi = !lean && Boolean(aiInsight?.trim())
   const factorGroups = (scoreCards ?? []).filter((card) => (card.factors?.length ?? 0) > 0)
+  const footerLine = savedLabel
+    ?? (lean
+      ? (contextLine ? contextLine : 'Guidance updates as you fill the form')
+      : null)
 
   return (
     <aside className={cn('crm-smart-overview', lean && 'crm-smart-overview--lean')} aria-label={ariaLabel}>
@@ -174,37 +221,34 @@ export function CrmSmartOverviewPanel({
               ))}
             </p>
           ) : null}
-          {savedLabel ? <p className="crm-smart-overview__saved">{savedLabel}</p> : null}
         </header>
       ) : (
         <span className="sr-only">{title}</span>
       )}
 
       <section
-        className={cn(
-          'crm-smart-overview__section crm-smart-overview__section--health',
-          !lean && 'crm-smart-overview__section--card',
-        )}
+        className="crm-smart-overview__section crm-smart-overview__section--health"
         aria-labelledby="crm-smart-overview-progress"
       >
-        <div className="crm-smart-overview__qual-row">
-          <h3
-            id="crm-smart-overview-progress"
-            className="crm-smart-overview__section-title crm-smart-overview__section-title--inline"
-            title={progressTooltip}
-          >
-            {progressLabel}
-          </h3>
-          <strong
-            className={cn('crm-smart-overview__pct', `crm-smart-overview__pct--${tone}`)}
-            aria-label={`${progressLabel} ${clamped}%`}
-          >
-            {clamped}%
-          </strong>
+        <h3 id="crm-smart-overview-progress" className="crm-smart-overview__section-title" title={progressTooltip}>
+          {progressLabel}
+        </h3>
+
+        <div className="crm-smart-overview__health-head">
+          <div className="crm-smart-overview__health-metric">
+            <strong
+              className={cn('crm-smart-overview__pct', `crm-smart-overview__pct--${tone}`)}
+              aria-label={`${progressLabel} ${clamped}% complete`}
+            >
+              {clamped}%
+            </strong>
+            <span className="crm-smart-overview__health-complete">Complete</span>
+          </div>
+          {lean && valueLine ? (
+            <p className="crm-smart-overview__value-line">{valueLine}</p>
+          ) : null}
         </div>
-        {progressTooltip && (!lean || factorGroups.length === 0) ? (
-          <p className="crm-smart-overview__score-tooltip">{progressTooltip}</p>
-        ) : null}
+
         <div
           className={cn('crm-smart-overview__bar', `crm-smart-overview__bar--${tone}`)}
           role="progressbar"
@@ -215,6 +259,15 @@ export function CrmSmartOverviewPanel({
         >
           <div className="crm-smart-overview__bar-fill" style={{ width: `${clamped}%` }} />
         </div>
+
+        <p className={cn(
+          'crm-smart-overview__attention',
+          attentionCount > 0 ? 'crm-smart-overview__attention--warn' : 'crm-smart-overview__attention--ok',
+        )}
+        >
+          {attentionLabel}
+        </p>
+
         {factorGroups.length > 0 ? (
           <details className="crm-smart-overview__why">
             <summary className="crm-smart-overview__why-summary">Why this score</summary>
@@ -258,72 +311,78 @@ export function CrmSmartOverviewPanel({
             </div>
           </details>
         ) : null}
-        {lean && valueLine ? (
-          <p className="crm-smart-overview__value-line">{valueLine}</p>
-        ) : null}
-        {visibleSignals.length > 0 ? (
-          <ul className="crm-smart-overview__signals">
-            {visibleSignals.map((signal) => (
-              <li
-                key={signal.id}
-                className={cn(
-                  'crm-smart-overview__signal',
-                  signal.tone === 'ok' ? 'crm-smart-overview__signal--ok' : 'crm-smart-overview__signal--warn',
-                )}
-              >
-                <span aria-hidden>{signal.tone === 'ok' ? '✓' : '⚠'}</span>
-                {signal.label}
-              </li>
-            ))}
-          </ul>
-        ) : lean ? (
-          <p className="crm-smart-overview__all-clear">No critical gaps</p>
-        ) : clamped >= 100 ? (
-          <p className="crm-smart-overview__all-clear">Profile complete</p>
-        ) : null}
       </section>
 
+      {priorityInsight ? (
+        <section
+          className="crm-smart-overview__section crm-smart-overview__section--insight"
+          aria-labelledby="crm-smart-priority"
+        >
+          <h3 id="crm-smart-priority" className="crm-smart-overview__section-title">
+            Priority Insight
+          </h3>
+          <div className="crm-smart-overview__insight">
+            <span className="crm-smart-overview__insight-icon" aria-hidden>
+              <CircleAlert className="h-3.5 w-3.5" strokeWidth={2.25} />
+            </span>
+            <p className="crm-smart-overview__insight-text">{priorityInsight}</p>
+          </div>
+          {!lean && visibleSignals.length > 1 ? (
+            <ul className="crm-smart-overview__signals">
+              {visibleSignals.slice(1).map((signal) => (
+                <li key={signal.id} className="crm-smart-overview__signal crm-smart-overview__signal--warn">
+                  <span aria-hidden>⚠</span>
+                  {signal.label}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
+
       <section
-        className={cn(
-          'crm-smart-overview__section crm-smart-overview__section--action',
-          !lean && 'crm-smart-overview__section--nba-card',
-        )}
+        className="crm-smart-overview__section crm-smart-overview__section--action"
         aria-labelledby="crm-smart-nba"
       >
         <h3 id="crm-smart-nba" className="crm-smart-overview__section-title">
           <Sparkles className="crm-smart-overview__spark-icon" aria-hidden />
-          Next best action
+          Recommended Next Step
         </h3>
-        {!lean || !titleMatchesCta ? (
-          <p className="crm-smart-overview__action-title">{nextAction.title}</p>
-        ) : null}
-        {showActionDescription ? (
-          <p className="crm-smart-overview__action-desc">{nextAction.description}</p>
-        ) : null}
+        <p className="crm-smart-overview__action-desc">{recommendationCopy}</p>
         <button type="button" className="crm-smart-overview__cta" onClick={handleNextActionClick}>
-          {nextAction.ctaLabel}
+          <span>{ctaLabel}</span>
+          <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden strokeWidth={2.25} />
         </button>
+      </section>
 
-        {showQuick ? (
-          <div className="crm-smart-overview__quick-actions" role="group" aria-label="Quick actions">
-            {quickActions.slice(0, 4).map((action) => {
+      {secondaryActions.length > 0 ? (
+        <section
+          className="crm-smart-overview__section crm-smart-overview__section--secondary"
+          aria-labelledby="crm-smart-secondary"
+        >
+          <h3 id="crm-smart-secondary" className="crm-smart-overview__section-title">
+            Secondary actions
+          </h3>
+          <ul className="crm-smart-overview__secondary-list">
+            {secondaryActions.map((action) => {
               const Icon = action.icon
               return (
-                <button
-                  key={action.id}
-                  type="button"
-                  className="crm-smart-overview__cta-secondary"
-                  onClick={action.onClick}
-                  disabled={action.disabled}
-                >
-                  {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden /> : null}
-                  <span>{action.label}</span>
-                </button>
+                <li key={action.id}>
+                  <button
+                    type="button"
+                    className="crm-smart-overview__secondary-link"
+                    onClick={action.onClick}
+                    disabled={action.disabled}
+                  >
+                    {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden /> : null}
+                    <span>{action.label}</span>
+                  </button>
+                </li>
               )
             })}
-          </div>
-        ) : null}
-      </section>
+          </ul>
+        </section>
+      ) : null}
 
       {showKeys ? (
         <section className="crm-smart-overview__section crm-smart-overview__section--keys" aria-labelledby="crm-smart-keys">
@@ -349,8 +408,8 @@ export function CrmSmartOverviewPanel({
         </section>
       ) : null}
 
-      {leanContext ? (
-        <p className="crm-smart-overview__context">{leanContext}</p>
+      {footerLine ? (
+        <p className="crm-smart-overview__status">{footerLine}</p>
       ) : null}
 
       {footer ? <div className="crm-smart-overview__footer">{footer}</div> : null}

@@ -31,5 +31,8 @@ export const MQ_MOBILE = '(max-width: 767px)'
 /** Below Tailwind `lg` (1024px) — collapse secondary command / toolbar actions. */
 export const MQ_BELOW_LG = '(max-width: 1023px)'
 
-/** Tailwind `xl` and up — FactBox open by default; register right-rail breakpoint. */
+/** Tailwind `xl` and up — register right-rail / FactBox side-by-side breakpoint. */
 export const MQ_XL_UP = '(min-width: 1280px)'
+
+/** Wide desktop — denser 72/28 factbox split. */
+export const MQ_2XL_UP = '(min-width: 1440px)'

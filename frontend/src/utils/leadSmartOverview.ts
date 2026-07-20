@@ -91,25 +91,25 @@ export function buildLeadSmartSignals(input: LeadSmartOverviewInput): LeadSmartS
   const missing: LeadSmartSignal[] = []
 
   if (!hasCompany(input)) {
-    missing.push({ id: 'company', label: 'Company / prospect missing', tone: 'warn' })
+    missing.push({ id: 'company', label: 'Add a company or prospect', tone: 'warn' })
   } else if (!input.customerId) {
-    missing.push({ id: 'company-link', label: 'Not linked to Company Master', tone: 'warn' })
+    missing.push({ id: 'company-link', label: 'Link to Company Master when ready', tone: 'warn' })
   }
 
   if (!hasContact(input)) {
-    missing.push({ id: 'contact', label: 'Contact details incomplete', tone: 'warn' })
+    missing.push({ id: 'contact', label: 'Add contact details', tone: 'warn' })
   }
 
   if (!hasRequirement(input)) {
-    missing.push({ id: 'requirement', label: 'Requirement not captured', tone: 'warn' })
+    missing.push({ id: 'requirement', label: 'Capture the requirement', tone: 'warn' })
   }
 
   if (!hasCommercial(input)) {
-    missing.push({ id: 'commercial', label: 'Expected value missing', tone: 'warn' })
+    missing.push({ id: 'commercial', label: 'Add expected value', tone: 'warn' })
   }
 
   if (!hasFollowUp(input)) {
-    missing.push({ id: 'followup', label: 'Follow-up not scheduled', tone: 'warn' })
+    missing.push({ id: 'followup', label: 'Plan a follow-up', tone: 'warn' })
   }
 
   return missing.slice(0, 3)

@@ -89,7 +89,7 @@ let quotationId: string | undefined
 let opportunityId = openOpp?.id
 
 if (openOpp) {
-  const r = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-standard-trailer', 2100000)
+  const r = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-iso-tank', 2100000)
   check(1, 'Opportunity creates quotation', r.ok)
   check(2, 'Quotation copies customer/contact/product from opportunity', r.ok && !!openOpp.customerId && !!openOpp.productId)
   quotationId = r.quotationId

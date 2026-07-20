@@ -3,8 +3,9 @@ import type { EnterpriseValidationItem } from './types'
 import { toRequiredFieldLabel } from '../../utils/formValidation'
 
 /**
- * Optional inline checklist. Primary UX for save failures is top-right toast
- * via `handleInvalidSubmit` / `ErpValidationSummary`.
+ * Optional inline checklist for rare non-field multi-errors.
+ * CRM create/edit forms should prefer toast + inline field errors — see
+ * `crmValidationDisplay.ts`. Do not pass field-keyed save failures here.
  */
 export function EnterpriseValidationGuide({
   title = 'Please complete the required fields before saving',
@@ -12,7 +13,7 @@ export function EnterpriseValidationGuide({
 }: {
   title?: string
   items?: EnterpriseValidationItem[]
-  /** @deprecated Errors surface as toasts via ErpValidationSummary */
+  /** @deprecated Errors surface as toasts via ErpValidationSummary / handleInvalidSubmit */
   errors?: string[]
 }) {
   const missing = (items ?? [])

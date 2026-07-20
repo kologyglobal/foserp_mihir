@@ -193,7 +193,7 @@ const openOpp = crm.opportunities.find((o) => !o.quotationId && o.productId && o
   })()
 
 if (openOpp) {
-  const q = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-standard-trailer', 2100000)
+  const q = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-iso-tank', 2100000)
   quotationId = q.quotationId
   documentId = q.documentId
 

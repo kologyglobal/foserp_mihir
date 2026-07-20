@@ -932,13 +932,62 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
     await authPost(`${BASE}/quotations/${approvalQuotationId}/documents/${approvalDocId}/approve`, {
       remarks: 'E2E cleanup approve',
     })
-    await authDelete(`${BASE}/quotations/${approvalQuotationId}`)
+    // Approved quotations cannot be deleted via API — soft-delete for cleanup only
+    await prisma.crmQuotationDocument.updateMany({
+      where: { quotationId: approvalQuotationId },
+      data: { deletedAt: new Date() },
+    })
+    await prisma.crmQuotation.update({
+      where: { id: approvalQuotationId },
+      data: { deletedAt: new Date(), status: 'cancelled' },
+    })
     await authDelete(`${BASE}/opportunities/${approvalOppId}`)
   })
 
-  it('deletes CRM quotation', async () => {
+  it('rejects delete for non-draft CRM quotation', async () => {
     const res = await authDelete(`${BASE}/quotations/${quotationId}`)
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(422)
+    expect(String(res.body?.message ?? res.body?.error ?? '')).toMatch(/draft/i)
+  })
+
+  it('deletes draft CRM quotation only', async () => {
+    const createRes = await authPost(`${BASE}/quotations`, {
+      customerId: companyId,
+      opportunityId: quotationOppId,
+      qty: 1,
+      unitPrice: 100000,
+      validityDate: new Date(Date.now() + 30 * 86400000).toISOString(),
+      priceLines: [
+        {
+          productOrItem: 'Draft Delete Target',
+          description: 'Supply',
+          qty: 1,
+          uom: 'NOS',
+          unitPrice: 100000,
+          discountPct: 0,
+          taxPct: 18,
+        },
+      ],
+    })
+    expect(createRes.status).toBe(201)
+    const draftId = createRes.body.data.id as string
+    expect(createRes.body.data.status).toBe('draft')
+
+    const del = await authDelete(`${BASE}/quotations/${draftId}`)
+    expect(del.status).toBe(200)
+
+    const getGone = await authGet(`${BASE}/quotations/${draftId}`)
+    expect(getGone.status).toBe(404)
+
+    // Converted main quotation — cleanup without DELETE API
+    await prisma.crmQuotationDocument.updateMany({
+      where: { quotationId },
+      data: { deletedAt: new Date() },
+    })
+    await prisma.crmQuotation.update({
+      where: { id: quotationId },
+      data: { deletedAt: new Date(), status: 'cancelled' },
+    })
     await authDelete(`${BASE}/opportunities/${quotationOppId}`)
     if (salesOrderId) {
       await prisma.crmSalesOrder.update({

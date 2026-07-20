@@ -29,6 +29,15 @@ export function assertDocumentRejectable(doc: CrmQuotationDocument): void {
   }
 }
 
+/** Soft-delete is allowed only while the quotation header is still Draft. */
+export function assertQuotationDeletable(quotation: { status: string }): void {
+  if (quotation.status !== 'draft') {
+    throw new InvalidStateError(
+      `Only draft quotations can be deleted — current status is ${quotation.status}`,
+    )
+  }
+}
+
 export function appendApprovalHistory(
   doc: CrmQuotationDocument,
   action: QuotationApprovalEntryDto['action'],

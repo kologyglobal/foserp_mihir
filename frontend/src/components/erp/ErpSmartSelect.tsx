@@ -43,6 +43,8 @@ interface ErpSmartSelectProps<T = string> {
   appearance?: 'combo' | 'dropdown'
   /** Minimum dropdown width in px (useful for rich option rows) */
   dropdownMinWidth?: number
+  /** Fired when focus leaves the control (Tab / click away). */
+  onBlur?: () => void
 }
 
 function matchQuery(searchText: string, query: string): boolean {
@@ -64,6 +66,7 @@ export function ErpSmartSelect<T extends string = string>({
   error = false,
   appearance = 'combo',
   dropdownMinWidth = 280,
+  onBlur,
 }: ErpSmartSelectProps<T>) {
   const anchorRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -280,6 +283,15 @@ export function ErpSmartSelect<T extends string = string>({
           onFocus={() => {
             if (disabled) return
             if (!open) openList(true)
+          }}
+          onBlur={() => {
+            window.setTimeout(() => {
+              const active = document.activeElement
+              if (anchorRef.current?.contains(active)) return
+              if (dropdownRef.current?.contains(active)) return
+              setOpen(false)
+              onBlur?.()
+            }, 0)
           }}
           onKeyDown={onInputKeyDown}
         />

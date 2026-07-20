@@ -12,7 +12,6 @@ import {
   Trash2,
 } from 'lucide-react'
 import { ErpCardSection, ErpFieldRow, ErpStickySaveBar } from '../../components/erp/card-form'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import { ErpSegmentedControl } from '../../components/erp/ErpSegmentedControl'
 import { ErpSmartSelect } from '../../components/erp/ErpSmartSelect'
 import { Input, Textarea } from '../../components/forms/Inputs'
@@ -544,7 +543,6 @@ export function ProformaInvoiceFormPage() {
           sections={sectionNavItems}
           activeId={activeSection}
           onSelect={scrollToSection}
-          trailing={<FactBoxPaneAiToggle />}
         />
 
         <ErpCardSection

@@ -12,7 +12,7 @@ interface ErpFactBoxPaneProps {
   onOpenChange: (open: boolean) => void
 }
 
-const DEFAULT_SUBTITLE = 'AI suggested context and next actions for this record.'
+const DEFAULT_SUBTITLE = 'AI-assisted record guidance'
 
 /** Smart Context details pane — Approval Insights card chrome across modules */
 export function ErpFactBoxPane({
@@ -30,7 +30,6 @@ export function ErpFactBoxPane({
   return (
     <div className={cn('erp-factbox-pane', className)}>
       <header className="erp-factbox-pane__chrome">
-        <div className="erp-factbox-pane__chrome-glow" aria-hidden />
         <span className="erp-factbox-pane__glyph" aria-hidden>
           <Sparkles className="h-4 w-4" strokeWidth={2.25} />
         </span>

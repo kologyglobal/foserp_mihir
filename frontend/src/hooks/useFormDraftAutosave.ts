@@ -20,6 +20,8 @@ export function useFormDraftAutosave<T>({
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initial = useRef(true)
+  /** Bumped on clear so any in-flight debounce write is ignored. */
+  const writeGen = useRef(0)
 
   const loadDraft = useCallback((): T | null => {
     try {
@@ -31,6 +33,11 @@ export function useFormDraftAutosave<T>({
   }, [key])
 
   const clearDraft = useCallback(() => {
+    if (timer.current) {
+      clearTimeout(timer.current)
+      timer.current = null
+    }
+    writeGen.current += 1
     localStorage.removeItem(key)
     setStatus('idle')
     setLastSavedAt(null)
@@ -46,7 +53,9 @@ export function useFormDraftAutosave<T>({
     if (timer.current) clearTimeout(timer.current)
     setStatus('saving')
 
+    const gen = writeGen.current
     timer.current = setTimeout(() => {
+      if (gen !== writeGen.current) return
       try {
         localStorage.setItem(key, JSON.stringify(data))
         setLastSavedAt(new Date())
