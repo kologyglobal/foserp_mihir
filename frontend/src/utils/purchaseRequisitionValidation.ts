@@ -8,6 +8,7 @@ import type {
 
 export type PrEditorHeader = {
   documentDate: string
+  /** Stored as backend `departmentId` (max 36 chars). */
   department: string
   locationId: string
   locationCode: string
@@ -28,8 +29,39 @@ export type PrEditorHeader = {
   referenceNumber: string
   purpose: string
   remarks: string
-  /** true = create RFQ after approval; false = ready for direct PO */
+  /** true = RFQ path after approval; false = Planning Sheet after approval */
   rfqRequired: boolean
+}
+
+/** Department options — `value` is persisted as `departmentId` (≤36 chars). */
+export const PR_DEPARTMENT_OPTIONS = [
+  { value: 'PROD_PLAN', label: 'Production Planning' },
+  { value: 'STORES', label: 'Stores' },
+  { value: 'MAINT', label: 'Maintenance' },
+  { value: 'DISPATCH', label: 'Dispatch' },
+  { value: 'PURCHASE', label: 'Purchase' },
+  { value: 'QUALITY', label: 'Quality' },
+] as const
+
+export function prDepartmentLabel(code: string): string {
+  const hit = PR_DEPARTMENT_OPTIONS.find((d) => d.value === code)
+  if (hit) return hit.label
+  // Legacy free-text departments stored before codes were introduced
+  const byLabel = PR_DEPARTMENT_OPTIONS.find(
+    (d) => d.label.toLowerCase() === code.trim().toLowerCase(),
+  )
+  return byLabel?.label ?? code
+}
+
+export function normalizePrDepartmentCode(value: string): string {
+  const v = value.trim()
+  if (!v) return ''
+  const byValue = PR_DEPARTMENT_OPTIONS.find((d) => d.value === v)
+  if (byValue) return byValue.value
+  const byLabel = PR_DEPARTMENT_OPTIONS.find(
+    (d) => d.label.toLowerCase() === v.toLowerCase(),
+  )
+  return byLabel?.value ?? v.slice(0, 36)
 }
 
 export type PrEditorLine = Omit<PurchaseRequisitionLine, 'category'> & {
@@ -57,27 +89,45 @@ export function validatePurchaseRequisitionForm(
   const lineErrors: Record<string, string> = {}
 
   if (!header.department.trim()) {
-    errors.push('Department is mandatory.')
-    fieldErrors.department = 'Required'
+    errors.push('Department is required.')
+    fieldErrors.department = 'Department is required.'
+  }
+  if (!header.requesterId.trim()) {
+    errors.push('Requested By is required.')
+    fieldErrors.requesterId = 'Requested By is required.'
+  }
+  if (!header.documentDate.trim()) {
+    errors.push('Requisition date is required.')
+    fieldErrors.documentDate = 'Requisition date is required.'
+  }
+  if (!header.expectedDeliveryDate.trim()) {
+    errors.push('Required date is required.')
+    fieldErrors.expectedDeliveryDate = 'Required date is required.'
   }
   if (!header.locationId.trim()) {
     errors.push('Location is mandatory.')
     fieldErrors.locationId = 'Required'
+  }
+  // RFQ Required is a boolean on the form; always present once rendered.
+  // Keep an explicit check for defensive completeness.
+  if (typeof header.rfqRequired !== 'boolean') {
+    errors.push('RFQ Required selection is mandatory.')
+    fieldErrors.rfqRequired = 'RFQ Required selection is mandatory.'
   }
   if (
     header.expectedDeliveryDate &&
     header.documentDate &&
     header.expectedDeliveryDate < header.documentDate
   ) {
-    errors.push('Required-by date cannot be before PR date.')
-    fieldErrors.expectedDeliveryDate = 'Cannot be before PR date'
+    errors.push('Required date cannot be before requisition date.')
+    fieldErrors.expectedDeliveryDate = 'Required date cannot be before requisition date.'
   }
 
   const usableLines = lines.filter(
     (l) => l.itemName.trim() || l.itemCode.trim() || l.itemId,
   )
   if (usableLines.length === 0) {
-    errors.push('At least one line is mandatory.')
+    errors.push('Add at least one item.')
   }
 
   for (const line of usableLines) {
@@ -86,17 +136,17 @@ export function validatePurchaseRequisitionForm(
       errors.push(`${prefix}: Product type is mandatory.`)
       lineErrors[`${line.key}:category`] = 'Required'
     }
-    if (!line.itemName.trim() && !line.itemCode.trim()) {
-      errors.push(`${prefix}: Item or service description is mandatory.`)
-      lineErrors[`${line.key}:itemName`] = 'Description required'
+    if (!line.itemName.trim() && !line.itemCode.trim() && !line.itemId) {
+      errors.push(`${prefix}: Item is required.`)
+      lineErrors[`${line.key}:itemName`] = 'Item is required.'
     }
     if (!(Number(line.quantity) > 0)) {
       errors.push(`${prefix}: Quantity must be greater than zero.`)
-      lineErrors[`${line.key}:quantity`] = 'Must be > 0'
+      lineErrors[`${line.key}:quantity`] = 'Quantity must be greater than zero.'
     }
-    if (!line.uom.trim()) {
-      errors.push(`${prefix}: Unit of measure is mandatory.`)
-      lineErrors[`${line.key}:uom`] = 'Required'
+    if (!line.uom.trim() && !(line.uomId ?? '').trim()) {
+      errors.push(`${prefix}: UOM is required.`)
+      lineErrors[`${line.key}:uom`] = 'UOM is required.'
     }
     if (Number(line.estimatedRate) < 0) {
       errors.push(`${prefix}: Estimated unit price cannot be negative.`)

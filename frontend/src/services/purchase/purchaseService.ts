@@ -1,10 +1,15 @@
 /**
  * Purchase Module mock service — Promise API ready for future Node/MySQL swap.
  *
+ * When `VITE_USE_API=true`, this store stays **empty** (no seed documents) so
+ * dual-mode pages never mix demo and API data. Demo seed is used only when
+ * `VITE_USE_API=false`.
+ *
  * Pages should depend on these functions (not Zustand) when migrating to the
  * domain models in `types/purchaseDomain`. Existing store-backed screens are
  * unchanged until explicitly wired.
  */
+import { isApiMode } from '../../config/apiConfig'
 import type {
   GoodsReceiptLine,
   GoodsReceiptNote,
@@ -49,7 +54,6 @@ import type {
   PurchaseOrderReviseInput,
   PurchaseOrderType,
   PurchasePlanningPriority,
-  PurchasePlanningPurchaseType,
   PurchasePlanningSheetInput,
   PurchasePlanningSheetRow,
   PurchasePlanningStatus,
@@ -98,8 +102,6 @@ import {
   PURCHASE_INVOICE_ORIGIN_LABELS,
   PURCHASE_INVOICE_STATUS_LABELS,
   INVOICE_MATCHING_RESULT_STATUS_LABELS,
-  PURCHASE_PLANNING_PRIORITY_LABELS,
-  PURCHASE_PLANNING_STATUS_LABELS,
   PURCHASE_REQUISITION_APPROVAL_STATUS_LABELS,
   PURCHASE_REQUISITION_PRIORITY_LABELS,
   PURCHASE_REQUISITION_SOURCE_LABELS,
@@ -139,6 +141,7 @@ import {
   sessionCanActAsApprover,
 } from '../../utils/purchaseApprovalMatrix'
 import { getSessionUser } from '../../utils/permissions'
+import { mapPurchaseErrorMessage } from '../../utils/purchase/purchaseErrorMessages'
 
 const LATENCY_MS = 35
 
@@ -146,7 +149,7 @@ export class PurchaseServiceError extends Error {
   readonly code: string
 
   constructor(code: string, message: string) {
-    super(message)
+    super(mapPurchaseErrorMessage(code, message))
     this.name = 'PurchaseServiceError'
     this.code = code
   }
@@ -186,7 +189,54 @@ interface PurchaseMockState {
   }
 }
 
+function emptyApiModeState(): PurchaseMockState {
+  const setup = structuredClone(DEFAULT_PURCHASE_SETUP)
+  // Strip demo location / buyer IDs so Setup and editors never default to seed entities.
+  setup.general.defaultPurchaseLocationId = ''
+  setup.general.defaultWarehouseId = ''
+  setup.general.defaultBuyerId = ''
+  setup.requisition.defaultLocationId = ''
+  for (const key of Object.keys(setup.numberSeries) as (keyof typeof setup.numberSeries)[]) {
+    setup.numberSeries[key] = { ...setup.numberSeries[key], nextNumber: 1 }
+  }
+  return {
+    vendors: [],
+    items: [],
+    requisitions: [],
+    planningSheet: [],
+    approvals: [],
+    approvalHistory: [],
+    attachments: [],
+    rfqs: [],
+    vendorQuotations: [],
+    comparisons: [],
+    blanketOrders: [],
+    orders: [],
+    grns: [],
+    qualityInspections: [],
+    invoices: [],
+    returns: [],
+    setup,
+    seq: {
+      pr: 1,
+      rfq: 1,
+      vq: 1,
+      cmp: 1,
+      po: 1,
+      grn: 1,
+      qi: 1,
+      inv: 1,
+      ret: 1,
+      appr: 1,
+      dn: 1,
+      pps: 1,
+    },
+  }
+}
+
 function cloneSeed(): PurchaseMockState {
+  // Never hydrate demo documents when the app is talking to the real API.
+  if (isApiMode()) return emptyApiModeState()
   return {
     vendors: structuredClone(PURCHASE_DOMAIN_VENDORS),
     items: structuredClone(PURCHASE_DOMAIN_ITEMS),
@@ -223,7 +273,9 @@ function cloneSeed(): PurchaseMockState {
 }
 
 let state = cloneSeed()
-seedPlanningSheetFromApprovedDirectPrs()
+if (!isApiMode()) {
+  seedPlanningSheetFromApprovedDirectPrs()
+}
 
 function delay(ms = LATENCY_MS): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -297,6 +349,7 @@ function buildPlanningRowFromPrLine(
     lastPurchaseVendorName: lastVendor?.vendorName ?? null,
     lastPurchaseRate: expectedRate || null,
     expectedRate,
+    negotiatedRate: null,
     estimatedAmount: Number((net * expectedRate).toFixed(2)),
     purchaseType: 'direct_purchase',
     priority: mapPrPriorityToPlanning(pr.priority),
@@ -350,6 +403,11 @@ function genId(prefix: string): string {
 
 function docNo(kind: string, n: number): string {
   return `${kind}-2526-${n}`
+}
+
+/** Peek next PR number without consuming the sequence (demo mode). */
+export function previewNextPurchaseRequisitionNumber(): string {
+  return docNo('PR', state.seq.pr)
 }
 
 function requireVendor(vendorId: string): Vendor {
@@ -632,6 +690,7 @@ function buildRequisitionLines(
       locationId: row.locationId ?? PURCHASE_DEMO_LOCATION.id,
       locationName: row.locationName ?? PURCHASE_DEMO_LOCATION.name,
       binCode: row.binCode ?? '',
+      purchaseOrderId: row.purchaseOrderId ?? null,
       purchaseOrderNumber: row.purchaseOrderNumber ?? '',
       purchaseQuoteNumber: row.purchaseQuoteNumber ?? '',
       purpose: row.purpose ?? '',
@@ -859,7 +918,9 @@ function assertPoRevisable(po: PurchaseOrder) {
 export async function resetPurchaseMockData(): Promise<void> {
   await delay(0)
   state = cloneSeed()
-  seedPlanningSheetFromApprovedDirectPrs()
+  if (!isApiMode()) {
+    seedPlanningSheetFromApprovedDirectPrs()
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -868,14 +929,21 @@ export async function resetPurchaseMockData(): Promise<void> {
 
 export async function getPurchasePlanningSheet(): Promise<PurchasePlanningSheetRow[]> {
   await delay()
-  // Keep in sync with any newly approved direct-PO PRs
+  // Keep in sync with any newly approved direct-PO PRs (RFQ Required = No only)
   for (const pr of state.requisitions) syncPlanningSheetFromPr(pr)
-  state.planningSheet = state.planningSheet.map((row) => ({
-    ...row,
-    itemCategory: row.itemCategory ?? 'consumable',
-    orderDate: row.orderDate ?? '',
-    actionMessage: row.actionMessage ?? false,
-  }))
+  // Defensive: never surface rows whose source PR requires RFQ
+  const rfqPrIds = new Set(
+    state.requisitions.filter((pr) => pr.rfqRequired).map((pr) => pr.id),
+  )
+  state.planningSheet = state.planningSheet
+    .filter((row) => !rfqPrIds.has(row.purchaseRequisitionId))
+    .map((row) => ({
+      ...row,
+      itemCategory: row.itemCategory ?? 'consumable',
+      orderDate: row.orderDate ?? '',
+      actionMessage: row.actionMessage ?? false,
+      negotiatedRate: row.negotiatedRate ?? null,
+    }))
   return structuredClone(
     [...state.planningSheet].sort((a, b) => b.planningDate.localeCompare(a.planningDate)),
   )
@@ -1073,13 +1141,32 @@ export async function getPurchaseOrderSeriesOptions(): Promise<PurchaseOrderSeri
  * Create one PO per vendor from Action Message–selected planning rows.
  * Uses Purchase Setup PO number series (master) for document numbers.
  */
+function stampPrLinesWithPurchaseOrder(
+  purchaseRequisitionId: string | null | undefined,
+  purchaseRequisitionLineIds: Array<string | null | undefined>,
+  order: { id: string; documentNumber: string },
+) {
+  if (!purchaseRequisitionId) return
+  const pr = state.requisitions.find((r) => r.id === purchaseRequisitionId)
+  if (!pr) return
+  const idSet = new Set(
+    purchaseRequisitionLineIds.filter((id): id is string => Boolean(id && String(id).trim())),
+  )
+  if (idSet.size === 0) return
+  for (const line of pr.lines) {
+    if (!idSet.has(line.id)) continue
+    line.purchaseOrderId = order.id
+    line.purchaseOrderNumber = order.documentNumber
+  }
+}
+
 export async function createPurchaseOrdersFromPlanningSelection(
   planningRowIds: string[],
   options?: { seriesPrefix?: string },
 ): Promise<PurchaseOrder[]> {
   await delay()
   if (!planningRowIds.length) {
-    throw new PurchaseServiceError('PPS_NO_SELECTION', 'Select at least one planning row (Action Message)')
+    throw new PurchaseServiceError('PPS_NO_SELECTION', 'Select at least one eligible Planning row.')
   }
   const prefix =
     options?.seriesPrefix?.trim() || state.setup.numberSeries.purchaseOrder.prefix || 'PO'
@@ -1090,11 +1177,33 @@ export async function createPurchaseOrdersFromPlanningSelection(
   })
 
   for (const row of selected) {
+    if (row.status === 'cancelled') {
+      throw new PurchaseServiceError('PPS_CANCELLED', 'Cancelled rows cannot be converted.')
+    }
+    if (row.status === 'po_created' || row.status === 'completed') {
+      throw new PurchaseServiceError(
+        'PO_ALREADY_CONVERTED',
+        'Converted rows must not be selected again.',
+      )
+    }
     if (!row.actionMessage) {
       throw new PurchaseServiceError(
         'PPS_NOT_SELECTED',
         `${row.planningNumber}: tick Action Message before creating PO`,
       )
+    }
+    if (!row.preferredVendorId) {
+      throw new PurchaseServiceError('PPS_VENDOR_REQUIRED', 'Selected vendor is required before PO creation.')
+    }
+    const qty = row.netPurchaseQuantity > 0 ? row.netPurchaseQuantity : row.requiredQuantity
+    if (!(qty > 0)) {
+      throw new PurchaseServiceError(
+        'PPS_NET_QTY_INVALID',
+        'Net Purchase Quantity must be greater than zero.',
+      )
+    }
+    if (!(row.expectedRate > 0)) {
+      throw new PurchaseServiceError('PPS_RATE_REQUIRED', 'Rate is required before PO creation.')
     }
     if (!canSelectPlanningRowForPo(row)) {
       throw new PurchaseServiceError(
@@ -1171,7 +1280,27 @@ export async function createPurchaseOrdersFromPlanningSelection(
         updatedAt: nowIso(),
       }
     }
+    stampPrLinesWithPurchaseOrder(
+      pr.id,
+      vendorRows.map((r) => r.purchaseRequisitionLineId),
+      order,
+    )
     createdOrders.push(structuredClone(order))
+  }
+
+  // Update PR conversion when all linked planning rows are PO-created
+  const prIds = [...new Set(selected.map((r) => r.purchaseRequisitionId))]
+  for (const prId of prIds) {
+    const pr = state.requisitions.find((r) => r.id === prId)
+    if (!pr) continue
+    const linked = state.planningSheet.filter((r) => r.purchaseRequisitionId === prId)
+    const converted = linked.filter((r) => r.status === 'po_created' || r.status === 'completed')
+    if (converted.length === 0) continue
+    if (converted.length === linked.length) {
+      pr.status = 'converted_to_po'
+      pr.convertedPoId = createdOrders[createdOrders.length - 1]?.id ?? pr.convertedPoId
+      pr.updatedAt = nowIso()
+    }
   }
 
   return createdOrders
@@ -1185,7 +1314,7 @@ export async function createPurchaseOrderFromPlanningRow(id: string): Promise<Pu
   if (!canCreatePoFromPlanningRow(row)) {
     throw new PurchaseServiceError(
       'PPS_PO_NOT_READY',
-      'Create PO requires Approved status, vendor, net qty > 0, expected rate, and required-by date',
+      'Selected vendor, rate, net quantity, and required date are needed before PO creation.',
     )
   }
   const pr = state.requisitions.find((r) => r.id === row.purchaseRequisitionId)
@@ -1193,7 +1322,7 @@ export async function createPurchaseOrderFromPlanningRow(id: string): Promise<Pu
   if (pr.rfqRequired) {
     throw new PurchaseServiceError(
       'PPS_RFQ_REQUIRED',
-      'RFQ-required requisitions must not create planning POs',
+      'RFQ-required PR items cannot be processed from Planning.',
     )
   }
 
@@ -1233,6 +1362,7 @@ export async function createPurchaseOrderFromPlanningRow(id: string): Promise<Pu
     updatedBy: PURCHASE_DOMAIN_ACTORS.buyer.name,
     updatedAt: nowIso(),
   }
+  stampPrLinesWithPurchaseOrder(pr.id, [row.purchaseRequisitionLineId], order)
   return structuredClone(order)
 }
 
@@ -1716,7 +1846,13 @@ export async function updatePurchaseRequisition(
   if (idx < 0) throw new PurchaseServiceError('PR_NOT_FOUND', `Purchase requisition not found: ${id}`)
   const current = state.requisitions[idx]
   if (!['draft', 'rejected'].includes(current.status)) {
-    throw new PurchaseServiceError('PR_NOT_EDITABLE', `Cannot update PR in status ${current.status}`)
+    if (current.status === 'approved') {
+      throw new PurchaseServiceError(
+        'PR_MUST_REOPEN',
+        'Approved PR must be reopened before amendment.',
+      )
+    }
+    throw new PurchaseServiceError('PR_NOT_EDITABLE', 'Submitted PR cannot be edited.')
   }
   const lines = input.lines ? buildRequisitionLines(input.lines) : current.lines
   const taxPct = input.estimatedTaxPct ?? current.estimatedTaxPct ?? 18
@@ -1763,7 +1899,7 @@ export async function submitPurchaseRequisition(id: string): Promise<PurchaseReq
     throw new PurchaseServiceError('PR_INVALID_STATUS', `Cannot submit from ${pr.status}`)
   }
   if (pr.lines.length === 0) {
-    throw new PurchaseServiceError('PR_NO_LINES', 'Add at least one line before submit')
+    throw new PurchaseServiceError('PR_NO_LINES', 'Add at least one item.')
   }
   const from = pr.status
   pr.status = 'pending_approval'
@@ -1798,7 +1934,7 @@ export async function rejectPurchaseRequisition(
 ): Promise<PurchaseRequisition> {
   await delay()
   if (!remarks.trim()) {
-    throw new PurchaseServiceError('REMARKS_REQUIRED', 'Rejection comments are mandatory')
+    throw new PurchaseServiceError('PR_REJECTION_REASON_REQUIRED', 'Rejection reason is required.')
   }
   return advanceDocumentApproval('purchase_requisition', id, 'reject', remarks) as Promise<PurchaseRequisition>
 }
@@ -3094,7 +3230,7 @@ export async function createPurchaseOrderFromComparison(
   }
 
   const rfq = state.rfqs.find((r) => r.id === cmp.rfqId)
-  return createPurchaseOrder({
+  const order = await createPurchaseOrder({
     vendorId,
     origin: 'quotation_comparison',
     lines: lineInputs,
@@ -3117,6 +3253,12 @@ export async function createPurchaseOrderFromComparison(
     discount: vq.discount,
     remarks: `Created from ${cmp.documentNumber}`,
   })
+  stampPrLinesWithPurchaseOrder(
+    rfq?.purchaseRequisitionId,
+    (rfq?.lines ?? []).map((l) => l.prLineId),
+    order,
+  )
+  return order
 }
 
 export async function getPurchaseOrders(): Promise<PurchaseOrder[]> {

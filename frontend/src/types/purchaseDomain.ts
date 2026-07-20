@@ -608,6 +608,8 @@ export interface PurchaseItem {
   itemName: string
   category: PurchaseItemCategory
   description: string
+  /** Master UOM UUID — required by purchase APIs. */
+  uomId?: string | null
   uom: string
   hsnCode: string
   /** Service Accounting Code — used for job work / services. */
@@ -795,7 +797,7 @@ export interface PurchaseSetupRequisition {
   /** Default location on PR create (Quick Entry). */
   defaultLocationId: string
   /**
-   * When true, new PRs default to Skip RFQ (`rfqRequired: false` → direct PO after approval).
+   * When true, new PRs default to Direct Purchase Planning (`rfqRequired: false`).
    * When false, RFQ is required after approval.
    */
   skipRfq: boolean
@@ -1142,6 +1144,8 @@ export interface PurchaseRequisitionLine {
   itemName: string
   specification: string
   category: PurchaseItemCategory
+  /** Master UOM UUID — required by purchase APIs when line has an item/qty. */
+  uomId?: string | null
   uom: string
   hsnCode: string
   sacCode: string | null
@@ -1169,7 +1173,11 @@ export interface PurchaseRequisitionLine {
   /** Warehouse bin / storage location code. */
   binCode: string
   /**
-   * Filled when a PO is created from this PR line (future — view-only on PR form).
+   * Linked PO after Planning→PO or RFQ→PO (read-only track record on the PR line).
+   */
+  purchaseOrderId: string | null
+  /**
+   * PO document number snapshot — filled when a PO is created from this PR line (view-only).
    */
   purchaseOrderNumber: string
   /**
@@ -1310,6 +1318,8 @@ export interface PurchasePlanningSheetRow {
   lastPurchaseVendorName: string | null
   lastPurchaseRate: number | null
   expectedRate: number
+  /** Optional negotiated rate after vendor discussion (edit drawer). */
+  negotiatedRate: number | null
   estimatedAmount: number
   purchaseType: PurchasePlanningPurchaseType
   priority: PurchasePlanningPriority
@@ -1337,6 +1347,7 @@ export type PurchasePlanningSheetInput = Partial<
     | 'requiredByDate'
     | 'preferredVendorId'
     | 'expectedRate'
+    | 'negotiatedRate'
     | 'purchaseType'
     | 'priority'
     | 'buyerId'

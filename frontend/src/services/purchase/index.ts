@@ -1,9 +1,14 @@
 /**
- * Purchase domain service layer (mock → future API).
+ * Purchase domain service layer.
+ * Dual-mode: PR + Planning Sheet use backend when `VITE_USE_API=true`.
  * Domain models: `@/types/purchaseDomain`
  * Operational Zustand docs remain in `@/types/purchase` until migration.
  */
 export type * from '../../types/purchaseDomain'
+export type * from './purchaseApiTypes'
+export type { PlanningSheetSummary } from './purchaseApiFacade'
+export type { PurchaseOrderSeriesOption } from './purchaseService'
+
 export {
   PURCHASE_REQUISITION_STATUSES,
   PURCHASE_REQUISITION_STATUS_LABELS,
@@ -59,13 +64,12 @@ export {
   QUOTATION_COMPLIANCE_STATUS_LABELS,
 } from '../../types/purchaseDomain'
 
+/** Dual-mode (API when `VITE_USE_API=true`) — PR + Planning + RFQ flow */
 export {
-  PurchaseServiceError,
-  resetPurchaseMockData,
-  getPurchaseDashboard,
   getPurchaseRequisitions,
   getPurchaseRequisitionListSummary,
   getPurchaseRequisitionById,
+  previewNextPurchaseRequisitionNumber,
   createPurchaseRequisition,
   updatePurchaseRequisition,
   submitPurchaseRequisition,
@@ -78,17 +82,22 @@ export {
   convertPurchaseRequisitionToPo,
   getPurchasePlanningSheet,
   getPurchasePlanningSheetById,
+  getPurchasePlanningSheetSummary,
   updatePurchasePlanningSheetRow,
   assignPurchasePlanningBuyer,
   selectPurchasePlanningVendor,
   approvePurchasePlanningRow,
   holdPurchasePlanningRow,
   cancelPurchasePlanningRow,
+  bulkAssignPurchasePlanningBuyer,
+  bulkSelectPurchasePlanningVendor,
+  bulkUpdatePurchasePlanningStatus,
+  recalculatePurchasePlanningRows,
   canCreatePoFromPlanningRow,
+  canSelectPlanningRowForPo,
+  getPurchaseOrderSeriesOptions,
   createPurchaseOrderFromPlanningRow,
   createPurchaseOrdersFromPlanningSelection,
-  getPurchaseOrderSeriesOptions,
-  canSelectPlanningRowForPo,
   getRFQs,
   getRFQById,
   getRfqList,
@@ -96,7 +105,6 @@ export {
   updateRFQ,
   sendRFQ,
   cancelRFQ,
-  getRecommendedVendorsForItems,
   getVendorQuotationList,
   getVendorQuotations,
   getVendorQuotationById,
@@ -109,16 +117,24 @@ export {
   recommendQuotationVendor,
   approveQuotationRecommendation,
   createPurchaseOrderFromComparison,
-  createPurchaseOrder,
   createPurchaseOrderFromPr,
-  createPurchaseOrderFromVendorQuotation,
-  createPurchaseOrderFromBlanket,
+  getPurchaseItems,
+  getVendors,
+  getPurchaseWarehouses,
+  getPurchaseDashboard,
+  getRecommendedVendorsForItems,
   getPurchaseOrders,
   getPurchaseOrderById,
   getPurchaseOrderList,
   getPurchaseOrderLinkedDocuments,
+} from './purchaseApiFacade'
+
+export {
+  PurchaseServiceError,
+  resetPurchaseMockData,
   getBlanketOrders,
   getBlanketOrderById,
+  createPurchaseOrder,
   updatePurchaseOrder,
   submitPurchaseOrder,
   approvePurchaseOrder,
@@ -128,6 +144,8 @@ export {
   closePurchaseOrder,
   cancelPurchaseOrder,
   revisePurchaseOrder,
+  createPurchaseOrderFromVendorQuotation,
+  createPurchaseOrderFromBlanket,
   createGRN,
   createGRNFromPo,
   getGRNs,
@@ -177,21 +195,22 @@ export {
   cancelPurchaseReturn,
   createDebitNoteFromReturn,
   createReplacementPoFromReturn,
-  getVendors,
-  getPurchaseItems,
   getApprovals,
   getApprovalHistory,
   getAttachments,
   getPurchaseSetup,
   updatePurchaseSetup,
+  emptyMoney,
+} from './purchaseService'
+
+export {
   getPurchaseApprovalQueue,
   getPurchaseApprovalReview,
   approvePurchaseDocument,
   rejectPurchaseDocument,
   sendBackPurchaseDocument,
   delegatePurchaseApproval,
-  emptyMoney,
-} from './purchaseService'
+} from './purchaseApiFacade'
 
 export {
   getPurchaseReportCatalog,
@@ -200,5 +219,3 @@ export {
   isPurchaseReportId,
   runPurchaseReport,
 } from './purchaseReportsService'
-
-export type { PurchaseOrderSeriesOption } from './purchaseService'

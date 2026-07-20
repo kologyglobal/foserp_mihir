@@ -1,9 +1,7 @@
 /**
  * Purchase module fine-grained permissions.
  *
- * SECURITY: UI gating alone is not security. When the purchase API ships, every
- * mutation and sensitive read must be re-enforced server-side (tenant + permission).
- * Demo / Zustand paths remain client-only until then.
+ * SECURITY: UI gating is supplementary. Backend `requirePermission` is authoritative.
  */
 
 import { useMemo } from 'react'
@@ -14,7 +12,6 @@ import { getSessionUser, type ErpRole } from './index'
 /**
  * Soft-guard only: Tenant Admin / Admin / Administrator / Super Admin open purchase UI
  * even if RolePermissions lag a catalog expansion. Does not disable gates for other roles.
- * Purchase API must still authorize when it ships.
  */
 const PURCHASE_ADMIN_ROLE_FALLBACK = new Set([
   'super admin',
@@ -30,26 +27,37 @@ function hasPurchaseAdminRoleFallback(session: AuthSession | null | undefined): 
 
 /** Canonical purchase permission strings — keep in sync with backend `PERMISSIONS`. */
 export const PURCHASE_PERMISSIONS = [
-  /** Module shell / nav (also used by legacy route matrix `purchase.view`). */
   'purchase.view',
   'purchase.dashboard.view',
-  'purchase.requisition.view',
-  'purchase.requisition.create',
-  'purchase.requisition.edit',
-  'purchase.requisition.submit',
-  'purchase.requisition.approve',
+  'purchase.pr.view',
+  'purchase.pr.create',
+  'purchase.pr.edit',
+  'purchase.pr.submit',
+  'purchase.pr.approve',
+  'purchase.pr.reject',
+  'purchase.pr.cancel',
+  'purchase.pr.reopen',
+  'purchase.planning.view',
+  'purchase.planning.edit',
+  'purchase.planning.assign_buyer',
+  'purchase.planning.select_vendor',
+  'purchase.planning.approve',
+  'purchase.planning.create_po',
+  'purchase.planning.cancel',
   'purchase.rfq.view',
   'purchase.rfq.create',
   'purchase.rfq.send',
-  'purchase.quotation.view',
-  'purchase.quotation.create',
-  'purchase.quotation.compare',
-  'purchase.order.view',
-  'purchase.order.create',
-  'purchase.order.edit',
-  'purchase.order.approve',
-  'purchase.order.release',
-  'purchase.order.cancel',
+  'purchase.rfq.enter_quote',
+  'purchase.rfq.compare',
+  'purchase.rfq.award',
+  'purchase.rfq.convert_to_po',
+  'purchase.po.view',
+  'purchase.po.create',
+  'purchase.po.edit',
+  'purchase.po.approve',
+  'purchase.po.send',
+  'purchase.po.cancel',
+  'purchase.po.close',
   'purchase.grn.view',
   'purchase.grn.create',
   'purchase.grn.post',
@@ -69,40 +77,63 @@ export const PURCHASE_PERMISSIONS = [
 
 export type PurchasePermission = (typeof PURCHASE_PERMISSIONS)[number]
 
+/** Legacy JWT/DB keys → canonical (bidirectional checks in canPurchasePermission). */
+const PURCHASE_PERMISSION_ALIASES: Record<string, PurchasePermission> = {
+  'purchase.requisition.view': 'purchase.pr.view',
+  'purchase.requisition.create': 'purchase.pr.create',
+  'purchase.requisition.edit': 'purchase.pr.edit',
+  'purchase.requisition.submit': 'purchase.pr.submit',
+  'purchase.requisition.approve': 'purchase.pr.approve',
+  'purchase.quotation.view': 'purchase.rfq.view',
+  'purchase.quotation.create': 'purchase.rfq.enter_quote',
+  'purchase.quotation.compare': 'purchase.rfq.compare',
+  'purchase.order.view': 'purchase.po.view',
+  'purchase.order.create': 'purchase.po.create',
+  'purchase.order.edit': 'purchase.po.edit',
+  'purchase.order.approve': 'purchase.po.approve',
+  'purchase.order.release': 'purchase.po.send',
+  'purchase.order.cancel': 'purchase.po.cancel',
+}
+
 const ALL = [...PURCHASE_PERMISSIONS]
 
 /** Persona permission packs used by demo RBAC (mapped onto ErpRole below). */
 const REQUESTER: PurchasePermission[] = [
   'purchase.view',
   'purchase.dashboard.view',
-  'purchase.requisition.view',
-  'purchase.requisition.create',
-  'purchase.requisition.edit',
-  'purchase.requisition.submit',
+  'purchase.pr.view',
+  'purchase.pr.create',
+  'purchase.pr.edit',
+  'purchase.pr.submit',
 ]
 
-const DEPARTMENT_HEAD: PurchasePermission[] = [
+const DEPARTMENT_MANAGER: PurchasePermission[] = [
   ...REQUESTER,
-  'purchase.requisition.approve',
+  'purchase.pr.approve',
+  'purchase.pr.reject',
   'purchase.reports.view',
 ]
 
 const PURCHASE_EXECUTIVE: PurchasePermission[] = [
   'purchase.view',
   'purchase.dashboard.view',
-  'purchase.requisition.view',
-  'purchase.requisition.create',
-  'purchase.requisition.edit',
-  'purchase.requisition.submit',
+  'purchase.pr.view',
+  'purchase.pr.create',
+  'purchase.pr.edit',
+  'purchase.pr.submit',
+  'purchase.planning.view',
+  'purchase.planning.edit',
+  'purchase.planning.assign_buyer',
+  'purchase.planning.select_vendor',
+  'purchase.planning.create_po',
   'purchase.rfq.view',
   'purchase.rfq.create',
   'purchase.rfq.send',
-  'purchase.quotation.view',
-  'purchase.quotation.create',
-  'purchase.quotation.compare',
-  'purchase.order.view',
-  'purchase.order.create',
-  'purchase.order.edit',
+  'purchase.rfq.enter_quote',
+  'purchase.rfq.compare',
+  'purchase.po.view',
+  'purchase.po.create',
+  'purchase.po.edit',
   'purchase.grn.view',
   'purchase.quality.view',
   'purchase.invoice.view',
@@ -116,7 +147,7 @@ const PURCHASE_MANAGER: PurchasePermission[] = ALL.filter((p) => p !== 'purchase
 const STORE_EXECUTIVE: PurchasePermission[] = [
   'purchase.view',
   'purchase.dashboard.view',
-  'purchase.order.view',
+  'purchase.po.view',
   'purchase.grn.view',
   'purchase.grn.create',
   'purchase.grn.post',
@@ -139,7 +170,7 @@ const QUALITY_INSPECTOR: PurchasePermission[] = [
 const FINANCE_EXECUTIVE: PurchasePermission[] = [
   'purchase.view',
   'purchase.dashboard.view',
-  'purchase.order.view',
+  'purchase.po.view',
   'purchase.grn.view',
   'purchase.invoice.view',
   'purchase.invoice.create',
@@ -157,15 +188,18 @@ const FINANCE_MANAGER: PurchasePermission[] = [
 const MANAGEMENT: PurchasePermission[] = [
   'purchase.view',
   'purchase.dashboard.view',
-  'purchase.requisition.view',
-  'purchase.requisition.approve',
+  'purchase.pr.view',
+  'purchase.pr.approve',
+  'purchase.pr.reject',
+  'purchase.planning.view',
+  'purchase.planning.approve',
   'purchase.rfq.view',
-  'purchase.quotation.view',
-  'purchase.quotation.compare',
-  'purchase.order.view',
-  'purchase.order.approve',
-  'purchase.order.release',
-  'purchase.order.cancel',
+  'purchase.rfq.compare',
+  'purchase.rfq.award',
+  'purchase.po.view',
+  'purchase.po.approve',
+  'purchase.po.send',
+  'purchase.po.cancel',
   'purchase.grn.view',
   'purchase.quality.view',
   'purchase.invoice.view',
@@ -183,10 +217,10 @@ export const DEMO_PURCHASE_ROLE_PERMISSIONS: Record<ErpRole, PurchasePermission[
   ceo: MANAGEMENT,
   director: MANAGEMENT,
   management: MANAGEMENT,
-  engineering_head: DEPARTMENT_HEAD,
-  planning_manager: DEPARTMENT_HEAD,
-  planning: DEPARTMENT_HEAD,
-  engineering: DEPARTMENT_HEAD,
+  engineering_head: DEPARTMENT_MANAGER,
+  planning_manager: DEPARTMENT_MANAGER,
+  planning: DEPARTMENT_MANAGER,
+  engineering: DEPARTMENT_MANAGER,
   sales_manager: REQUESTER,
   sales: REQUESTER,
   purchase_head: PURCHASE_MANAGER,
@@ -197,14 +231,14 @@ export const DEMO_PURCHASE_ROLE_PERMISSIONS: Record<ErpRole, PurchasePermission[
   stores: STORE_EXECUTIVE,
   production_head: REQUESTER,
   production_supervisor: REQUESTER,
-  shop_floor: ['purchase.requisition.view'],
+  shop_floor: ['purchase.pr.view'],
   production: REQUESTER,
   quality_head: QUALITY_INSPECTOR,
   quality_inspector: QUALITY_INSPECTOR,
   quality: QUALITY_INSPECTOR,
-  dispatch_manager: ['purchase.view', 'purchase.dashboard.view', 'purchase.order.view'],
-  dispatch_user: ['purchase.view', 'purchase.order.view'],
-  dispatch: ['purchase.view', 'purchase.dashboard.view', 'purchase.order.view'],
+  dispatch_manager: ['purchase.view', 'purchase.dashboard.view', 'purchase.po.view'],
+  dispatch_user: ['purchase.view', 'purchase.po.view'],
+  dispatch: ['purchase.view', 'purchase.dashboard.view', 'purchase.po.view'],
   accounts_head: FINANCE_MANAGER,
   accounts_user: FINANCE_EXECUTIVE,
   accounts: FINANCE_MANAGER,
@@ -218,12 +252,13 @@ export const PURCHASE_ROUTE_VIEW_PERMISSIONS: Array<{
 }> = [
   { prefix: '/purchase/setup', permission: 'purchase.setup.manage', pageName: 'Purchase Setup' },
   { prefix: '/purchase/masters', permission: 'purchase.setup.manage', pageName: 'Purchase Masters' },
-  { prefix: '/purchase/approvals', permission: 'purchase.requisition.approve', pageName: 'Purchase Approvals' },
-  { prefix: '/purchase/requisitions', permission: 'purchase.requisition.view', pageName: 'Purchase Requisitions' },
+  { prefix: '/purchase/approvals', permission: 'purchase.pr.approve', pageName: 'Purchase Approvals' },
+  { prefix: '/purchase/requisitions', permission: 'purchase.pr.view', pageName: 'Purchase Requisitions' },
+  { prefix: '/purchase/planning-sheet', permission: 'purchase.planning.view', pageName: 'Purchase Planning Sheet' },
   { prefix: '/purchase/rfqs', permission: 'purchase.rfq.view', pageName: 'RFQs' },
-  { prefix: '/purchase/vendor-quotations', permission: 'purchase.quotation.view', pageName: 'Vendor Quotations' },
-  { prefix: '/purchase/comparison', permission: 'purchase.quotation.compare', pageName: 'Quote Comparison' },
-  { prefix: '/purchase/orders', permission: 'purchase.order.view', pageName: 'Purchase Orders' },
+  { prefix: '/purchase/vendor-quotations', permission: 'purchase.rfq.view', pageName: 'Vendor Quotations' },
+  { prefix: '/purchase/comparison', permission: 'purchase.rfq.compare', pageName: 'Quote Comparison' },
+  { prefix: '/purchase/orders', permission: 'purchase.po.view', pageName: 'Purchase Orders' },
   { prefix: '/purchase/invoices', permission: 'purchase.invoice.view', pageName: 'Purchase Invoices' },
   { prefix: '/purchase/grn', permission: 'purchase.grn.view', pageName: 'Gate Entry & GRN' },
   { prefix: '/purchase/grns', permission: 'purchase.grn.view', pageName: 'Gate Entry & GRN' },
@@ -231,19 +266,20 @@ export const PURCHASE_ROUTE_VIEW_PERMISSIONS: Array<{
   { prefix: '/purchase/returns', permission: 'purchase.return.view', pageName: 'Purchase Returns' },
   { prefix: '/purchase/vendor-performance', permission: 'purchase.reports.view', pageName: 'Vendor Performance' },
   { prefix: '/purchase/reports', permission: 'purchase.reports.view', pageName: 'Purchase Reports' },
-  { prefix: '/purchase/manual-pr', permission: 'purchase.requisition.create', pageName: 'Manual PR' },
+  { prefix: '/purchase/manual-pr', permission: 'purchase.pr.create', pageName: 'Manual PR' },
   { prefix: '/purchase', permission: 'purchase.view', pageName: 'Purchase' },
 ]
 
 /** Nav path → required view (or manage) permission. */
 export const PURCHASE_NAV_ITEM_PERMISSIONS: Record<string, PurchasePermission> = {
   '/purchase': 'purchase.view',
-  '/purchase/approvals': 'purchase.requisition.approve',
-  '/purchase/requisitions': 'purchase.requisition.view',
+  '/purchase/approvals': 'purchase.pr.approve',
+  '/purchase/requisitions': 'purchase.pr.view',
+  '/purchase/planning-sheet': 'purchase.planning.view',
   '/purchase/rfqs': 'purchase.rfq.view',
-  '/purchase/vendor-quotations': 'purchase.quotation.view',
-  '/purchase/comparison': 'purchase.quotation.compare',
-  '/purchase/orders': 'purchase.order.view',
+  '/purchase/vendor-quotations': 'purchase.rfq.view',
+  '/purchase/comparison': 'purchase.rfq.compare',
+  '/purchase/orders': 'purchase.po.view',
   '/purchase/invoices': 'purchase.invoice.view',
   '/purchase/grn': 'purchase.grn.view',
   '/purchase/quality-inspections': 'purchase.quality.view',
@@ -260,21 +296,34 @@ function demoPermissionsForRole(role: ErpRole): Set<string> | '*' {
   return new Set(pack)
 }
 
+function permissionSetIncludes(granted: readonly string[], required: string): boolean {
+  if (granted.includes(required)) return true
+  for (const g of granted) {
+    const canonical = PURCHASE_PERMISSION_ALIASES[g]
+    if (canonical === required) return true
+  }
+  const asCanonical = PURCHASE_PERMISSION_ALIASES[required]
+  if (asCanonical && granted.includes(asCanonical)) return true
+  return false
+}
+
 /**
  * Check a fine-grained purchase permission.
- * SECURITY: Enforced in the UI for demo/API hydration only — backend must validate the same keys.
+ * SECURITY: Enforced in the UI as a soft gate — backend must validate the same keys.
  */
 export function canPurchasePermission(permission: PurchasePermission | string): boolean {
   if (isApiMode()) {
     const session = getStoredSession()
     const perms = session?.user.permissions ?? []
-    if (perms.includes(permission)) return true
-    // Tenant / workspace admins: allow purchase soft-guards without waiting on every RolePermission row.
+    if (permissionSetIncludes(perms, permission)) return true
     return hasPurchaseAdminRoleFallback(session)
   }
   const pack = demoPermissionsForRole(getSessionUser().role)
   if (pack === '*') return true
-  return pack.has(permission)
+  if (pack instanceof Set) {
+    return permissionSetIncludes([...pack], permission)
+  }
+  return false
 }
 
 /** Any purchase view access — controls Purchase shell / sidebar category. */
@@ -282,10 +331,10 @@ export function canAccessPurchaseShell(): boolean {
   return (
     canPurchasePermission('purchase.view')
     || canPurchasePermission('purchase.dashboard.view')
-    || canPurchasePermission('purchase.requisition.view')
+    || canPurchasePermission('purchase.pr.view')
     || canPurchasePermission('purchase.rfq.view')
-    || canPurchasePermission('purchase.quotation.view')
-    || canPurchasePermission('purchase.order.view')
+    || canPurchasePermission('purchase.po.view')
+    || canPurchasePermission('purchase.planning.view')
     || canPurchasePermission('purchase.grn.view')
     || canPurchasePermission('purchase.quality.view')
     || canPurchasePermission('purchase.invoice.view')
@@ -312,10 +361,6 @@ export function resolvePurchaseRoutePermission(pathname: string): {
   return null
 }
 
-/**
- * Module shell keys — either grants entry to `/purchase`.
- * `purchase.dashboard.view` kept for tenants seeded before `purchase.view` existed.
- */
 function canEnterPurchaseModule(): boolean {
   return (
     canPurchasePermission('purchase.view')
@@ -328,8 +373,8 @@ export function canPurchaseRoute(pathname: string): boolean {
   if (!isPurchasePath(pathname)) return true
   if (pathname === '/purchase/approvals' || pathname.startsWith('/purchase/approvals/')) {
     return (
-      canPurchasePermission('purchase.requisition.approve')
-      || canPurchasePermission('purchase.order.approve')
+      canPurchasePermission('purchase.pr.approve')
+      || canPurchasePermission('purchase.po.approve')
     )
   }
   const resolved = resolvePurchaseRoutePermission(pathname)
@@ -341,8 +386,8 @@ export function canPurchaseRoute(pathname: string): boolean {
 export function canViewPurchaseNavItem(path: string): boolean {
   if (path === '/purchase/approvals') {
     return (
-      canPurchasePermission('purchase.requisition.approve')
-      || canPurchasePermission('purchase.order.approve')
+      canPurchasePermission('purchase.pr.approve')
+      || canPurchasePermission('purchase.po.approve')
     )
   }
   const required = PURCHASE_NAV_ITEM_PERMISSIONS[path]
@@ -352,7 +397,7 @@ export function canViewPurchaseNavItem(path: string): boolean {
 }
 
 export function getPurchasePermissionDenialReason(permission: PurchasePermission | string): string {
-  return `Requires ${permission} — your role does not have this permission (UI gate only until purchase API enforces it)`
+  return `Requires ${permission} — your role does not have this permission`
 }
 
 /**
@@ -383,7 +428,6 @@ export function withPurchaseActionGate<T extends { disabled?: boolean; disabledR
     permission: PurchasePermission
     statusAllowed: boolean
     statusBlockedReason?: string
-    /** When true, hide on status block instead of disable (matches cascaded primary actions). */
     hideWhenStatusBlocked?: boolean
   },
 ): T & { hidden: boolean; disabled: boolean; disabledReason?: string } {
@@ -411,23 +455,38 @@ export function usePurchasePermissions() {
       can,
       canViewModule: can('purchase.view') || can('purchase.dashboard.view'),
       canViewDashboard: can('purchase.dashboard.view') || can('purchase.view'),
-      canViewRequisition: can('purchase.requisition.view'),
-      canCreateRequisition: can('purchase.requisition.create'),
-      canEditRequisition: can('purchase.requisition.edit'),
-      canSubmitRequisition: can('purchase.requisition.submit'),
-      canApproveRequisition: can('purchase.requisition.approve'),
+      canViewRequisition: can('purchase.pr.view'),
+      canCreateRequisition: can('purchase.pr.create'),
+      canEditRequisition: can('purchase.pr.edit'),
+      canSubmitRequisition: can('purchase.pr.submit'),
+      canApproveRequisition: can('purchase.pr.approve'),
+      canRejectRequisition: can('purchase.pr.reject'),
+      canCancelRequisition: can('purchase.pr.cancel'),
+      canReopenRequisition: can('purchase.pr.reopen'),
+      canViewPlanning: can('purchase.planning.view'),
+      canEditPlanning: can('purchase.planning.edit'),
+      canAssignPlanningBuyer: can('purchase.planning.assign_buyer'),
+      canSelectPlanningVendor: can('purchase.planning.select_vendor'),
+      canApprovePlanning: can('purchase.planning.approve'),
+      canCreatePoFromPlanning: can('purchase.planning.create_po'),
+      canCancelPlanning: can('purchase.planning.cancel'),
       canViewRfq: can('purchase.rfq.view'),
       canCreateRfq: can('purchase.rfq.create'),
       canSendRfq: can('purchase.rfq.send'),
-      canViewQuotation: can('purchase.quotation.view'),
-      canCreateQuotation: can('purchase.quotation.create'),
-      canCompareQuotation: can('purchase.quotation.compare'),
-      canViewOrder: can('purchase.order.view'),
-      canCreateOrder: can('purchase.order.create'),
-      canEditOrder: can('purchase.order.edit'),
-      canApproveOrder: can('purchase.order.approve'),
-      canReleaseOrder: can('purchase.order.release'),
-      canCancelOrder: can('purchase.order.cancel'),
+      canEnterQuote: can('purchase.rfq.enter_quote'),
+      canViewQuotation: can('purchase.rfq.view') || can('purchase.rfq.enter_quote'),
+      canCreateQuotation: can('purchase.rfq.enter_quote'),
+      canCompareQuotation: can('purchase.rfq.compare'),
+      canAwardRfq: can('purchase.rfq.award'),
+      canConvertRfqToPo: can('purchase.rfq.convert_to_po'),
+      canViewOrder: can('purchase.po.view'),
+      canCreateOrder: can('purchase.po.create'),
+      canEditOrder: can('purchase.po.edit'),
+      canApproveOrder: can('purchase.po.approve'),
+      canSendOrder: can('purchase.po.send'),
+      canReleaseOrder: can('purchase.po.send'),
+      canCancelOrder: can('purchase.po.cancel'),
+      canCloseOrder: can('purchase.po.close'),
       canViewGrn: can('purchase.grn.view'),
       canCreateGrn: can('purchase.grn.create'),
       canPostGrn: can('purchase.grn.post'),
@@ -448,7 +507,7 @@ export function usePurchasePermissions() {
   }, [role])
 }
 
-/** Alias matching the brief — `canPurchase('purchase.order.approve')`. */
+/** Alias matching the brief — `canPurchase('purchase.po.approve')`. */
 export function canPurchase(permission: PurchasePermission | string): boolean {
   return canPurchasePermission(permission)
 }
