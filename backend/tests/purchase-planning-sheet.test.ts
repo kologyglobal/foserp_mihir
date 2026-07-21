@@ -12,7 +12,11 @@ const dbAvailable = await prisma
   .catch(() => false)
 
 const NEEDED_PERMS = PERMISSIONS.filter(
-  (p) => p.startsWith('purchase.pr.') || p.startsWith('purchase.planning.'),
+  (p) =>
+    p.startsWith('purchase.pr.') ||
+    p.startsWith('purchase.planning.') ||
+    p === 'purchase.po.create' ||
+    p === 'purchase.po.view',
 )
 
 async function ensurePermissions(): Promise<void> {
@@ -37,18 +41,6 @@ async function createTenant(slugPrefix: string) {
     data: { name: 'Planning Test', slug, email: `${slug}@test.com`, status: 'ACTIVE' },
   })
 
-  const user = await prisma.user.create({
-    data: {
-      tenantId: tenant.id,
-      firstName: 'Plan',
-      lastName: 'Tester',
-      email: `user-${slug}@test.com`,
-      passwordHash: pw,
-      status: 'ACTIVE',
-      emailVerified: true,
-    },
-  })
-
   const perms = await prisma.permission.findMany({
     where: { name: { in: [...NEEDED_PERMS] as PermissionName[] } },
   })
@@ -59,23 +51,48 @@ async function createTenant(slugPrefix: string) {
       rolePermissions: { create: perms.map((p) => ({ permissionId: p.id })) },
     },
   })
-  await prisma.userRole.create({ data: { userId: user.id, roleId: role.id, tenantId: tenant.id } })
 
-  const loginRes = await request(app).post('/api/v1/auth/login').send({
-    email: user.email,
-    password: 'Test@123',
-    tenantSlug: slug,
-  })
+  async function createUser(label: string) {
+    const user = await prisma.user.create({
+      data: {
+        tenantId: tenant.id,
+        firstName: label,
+        lastName: 'Tester',
+        email: `${label.toLowerCase()}-${slug}@test.com`,
+        passwordHash: pw,
+        status: 'ACTIVE',
+        emailVerified: true,
+      },
+    })
+    await prisma.userRole.create({
+      data: { userId: user.id, roleId: role.id, tenantId: tenant.id },
+    })
+    const loginRes = await request(app).post('/api/v1/auth/login').send({
+      email: user.email,
+      password: 'Test@123',
+      tenantSlug: slug,
+    })
+    return {
+      userId: user.id,
+      token: loginRes.body.data?.accessToken as string,
+    }
+  }
+
+  const requester = await createUser('Requester')
+  const approver = await createUser('Approver')
 
   return {
     tenantId: tenant.id,
-    userId: user.id,
+    userId: requester.userId,
     slug,
-    token: loginRes.body.data?.accessToken as string,
+    token: requester.token,
+    approverToken: approver.token,
   }
 }
 
 async function cleanupTenant(tenantId: string) {
+  await prisma.purchaseOrderLine.deleteMany({ where: { tenantId } })
+  await prisma.purchaseOrder.deleteMany({ where: { tenantId } })
   await prisma.purchasePlanningRow.deleteMany({ where: { tenantId } })
   await prisma.purchaseApproval.deleteMany({ where: { tenantId } })
   await prisma.purchaseStatusHistory.deleteMany({ where: { tenantId } })
@@ -92,11 +109,18 @@ async function cleanupTenant(tenantId: string) {
   await prisma.tenant.delete({ where: { id: tenantId } }).catch(() => {})
 }
 
-async function createApprovedDirectPr(token: string, slug: string, purpose: string, uomId: string) {
+async function createApprovedDirectPr(
+  requesterToken: string,
+  approverToken: string,
+  slug: string,
+  purpose: string,
+  uomId: string,
+  preferredVendorId?: string,
+) {
   const base = `/api/v1/t/${slug}/purchase/requisitions`
   const createRes = await request(app)
     .post(base)
-    .set({ Authorization: `Bearer ${token}` })
+    .set({ Authorization: `Bearer ${requesterToken}` })
     .send({
       requisitionDate: '2026-07-01',
       requiredDate: '2026-07-05',
@@ -112,14 +136,21 @@ async function createApprovedDirectPr(token: string, slug: string, purpose: stri
           estimatedRate: 25,
           requiredDate: '2026-07-05',
           uomId,
+          preferredVendorId,
         },
       ],
     })
   expect(createRes.status).toBe(201)
   const id = createRes.body.data.id as string
-  const submit = await request(app).post(`${base}/${id}/submit`).set({ Authorization: `Bearer ${token}` }).send({})
+  const submit = await request(app)
+    .post(`${base}/${id}/submit`)
+    .set({ Authorization: `Bearer ${requesterToken}` })
+    .send({})
   expect(submit.status).toBe(200)
-  const approve = await request(app).post(`${base}/${id}/approve`).set({ Authorization: `Bearer ${token}` }).send({})
+  const approve = await request(app)
+    .post(`${base}/${id}/approve`)
+    .set({ Authorization: `Bearer ${approverToken}` })
+    .send({})
   expect(approve.status).toBe(200)
   return id
 }
@@ -128,6 +159,7 @@ describe.skipIf(!dbAvailable)('Purchase planning sheet APIs (integration)', () =
   let tenantId = ''
   let slug = ''
   let token = ''
+  let approverToken = ''
   let uomId = ''
   const base = () => `/api/v1/t/${slug}/purchase/planning-sheet`
 
@@ -137,7 +169,9 @@ describe.skipIf(!dbAvailable)('Purchase planning sheet APIs (integration)', () =
     tenantId = ctx.tenantId
     slug = ctx.slug
     token = ctx.token
+    approverToken = ctx.approverToken
     expect(token).toBeTruthy()
+    expect(approverToken).toBeTruthy()
     const uom = await prisma.masterUom.create({
       data: {
         tenantId,
@@ -153,12 +187,12 @@ describe.skipIf(!dbAvailable)('Purchase planning sheet APIs (integration)', () =
     if (tenantId) await cleanupTenant(tenantId)
   })
 
-  function auth() {
-    return { Authorization: `Bearer ${token}` }
+  function auth(value = token) {
+    return { Authorization: `Bearer ${value}` }
   }
 
   it('lists rows after PR approve, supports summary and get-by-id', async () => {
-    await createApprovedDirectPr(token, slug, 'PPS seed A', uomId)
+    await createApprovedDirectPr(token, approverToken, slug, 'PPS seed A', uomId)
 
     const listRes = await request(app).get(base()).set(auth()).query({ page: 1, pageSize: 20 })
     expect(listRes.status).toBe(200)
@@ -220,7 +254,7 @@ describe.skipIf(!dbAvailable)('Purchase planning sheet APIs (integration)', () =
   }, 60_000)
 
   it('bulk assign buyer, select vendor, status, and recalculate', async () => {
-    await createApprovedDirectPr(token, slug, 'PPS seed B', uomId)
+    await createApprovedDirectPr(token, approverToken, slug, 'PPS seed B', uomId)
     const listRes = await request(app).get(base()).set(auth()).query({ pageSize: 50 })
     const rowIds = (listRes.body.data as Array<{ id: string }>).map((r) => r.id)
     expect(rowIds.length).toBeGreaterThanOrEqual(1)
@@ -270,6 +304,92 @@ describe.skipIf(!dbAvailable)('Purchase planning sheet APIs (integration)', () =
     expect(recalc.body.data[0]).toHaveProperty('netPurchaseQuantity')
     expect(recalc.body.data[0]).toHaveProperty('estimatedAmount')
   }, 90_000)
+
+  it('creates draft PO from ready Action Message rows and blocks RFQ-required demand', async () => {
+    const vendor = await prisma.masterVendor.create({
+      data: {
+        tenantId,
+        code: `POV-${Date.now()}`,
+        name: 'Create PO Vendor',
+        status: 'ACTIVE',
+      },
+    })
+    await createApprovedDirectPr(token, approverToken, slug, 'PPS create PO', uomId, vendor.id)
+
+    const listRes = await request(app).get(base()).set(auth()).query({ pageSize: 100 })
+    const row = (
+      listRes.body.data as Array<{
+        id: string
+        purchaseRequisitionNumber: string
+        status: string
+        selectedVendorId: string | null
+        actionMessage: boolean
+      }>
+    ).find((r) => r.selectedVendorId === vendor.id)
+    expect(row).toBeTruthy()
+    expect(row!.status).toBe('vendor_selected')
+
+    const blockedWithoutAction = await request(app)
+      .post(`${base()}/create-po`)
+      .set(auth())
+      .send({ rowIds: [row!.id] })
+    expect(blockedWithoutAction.status).toBe(400)
+    expect(blockedWithoutAction.body.code).toBe('PPS_NOT_SELECTED')
+
+    await request(app)
+      .patch(`${base()}/${row!.id}`)
+      .set(auth())
+      .send({ actionMessage: true })
+
+    const created = await request(app)
+      .post(`${base()}/create-po`)
+      .set(auth())
+      .send({ rowIds: [row!.id] })
+    expect(created.status).toBe(201)
+    expect(created.body.data.orderCount).toBe(1)
+    expect(created.body.data.orders[0].status).toBe('DRAFT')
+    expect(created.body.data.orders[0].origin).toBe('PLANNING_SHEET')
+
+    const after = await request(app).get(`${base()}/${row!.id}`).set(auth())
+    expect(after.body.data.status).toBe('po_created')
+    expect(after.body.data.purchaseOrderId).toBe(created.body.data.orders[0].id)
+
+    // RFQ-required PR must never land on Planning Sheet
+    const rfqCreate = await request(app)
+      .post(`/api/v1/t/${slug}/purchase/requisitions`)
+      .set(auth())
+      .send({
+        requisitionDate: '2026-07-01',
+        requiredDate: '2026-07-05',
+        departmentId: 'dept-ops',
+        rfqRequired: true,
+        priority: 'NORMAL',
+        purchasePurpose: 'Must stay off planning',
+        lines: [
+          {
+            itemCode: 'RFQ-001',
+            itemName: 'RFQ Item',
+            requiredQuantity: 3,
+            estimatedRate: 10,
+            requiredDate: '2026-07-05',
+            uomId,
+          },
+        ],
+      })
+    expect(rfqCreate.status).toBe(201)
+    await request(app)
+      .post(`/api/v1/t/${slug}/purchase/requisitions/${rfqCreate.body.data.id}/submit`)
+      .set(auth())
+      .send({})
+    await request(app)
+      .post(`/api/v1/t/${slug}/purchase/requisitions/${rfqCreate.body.data.id}/approve`)
+      .set(auth(approverToken))
+      .send({})
+    const planningCount = await prisma.purchasePlanningRow.count({
+      where: { tenantId, purchaseRequisitionId: rfqCreate.body.data.id, deletedAt: null },
+    })
+    expect(planningCount).toBe(0)
+  }, 120_000)
 
   it('filters by overdue and poPending', async () => {
     const overdue = await request(app).get(base()).set(auth()).query({ overdue: true })

@@ -59,8 +59,28 @@ async function createPurchaseTenant(slugPrefix: string) {
   })
   await prisma.userRole.create({ data: { userId: user.id, roleId: role.id, tenantId: tenant.id } })
 
+  const approver = await prisma.user.create({
+    data: {
+      tenantId: tenant.id,
+      firstName: 'PR',
+      lastName: 'Approver',
+      email: `approver-${slug}@test.com`,
+      passwordHash: pw,
+      status: 'ACTIVE',
+      emailVerified: true,
+    },
+  })
+  await prisma.userRole.create({
+    data: { userId: approver.id, roleId: role.id, tenantId: tenant.id },
+  })
+
   const loginRes = await request(app).post('/api/v1/auth/login').send({
     email: user.email,
+    password: 'Test@123',
+    tenantSlug: slug,
+  })
+  const approverLoginRes = await request(app).post('/api/v1/auth/login').send({
+    email: approver.email,
     password: 'Test@123',
     tenantSlug: slug,
   })
@@ -70,6 +90,7 @@ async function createPurchaseTenant(slugPrefix: string) {
     userId: user.id,
     slug,
     token: loginRes.body.data?.accessToken as string,
+    approverToken: approverLoginRes.body.data?.accessToken as string,
   }
 }
 
@@ -95,6 +116,7 @@ describe.skipIf(!dbAvailable)('Purchase requisition lifecycle (integration)', ()
   let tenantId = ''
   let slug = ''
   let token = ''
+  let approverToken = ''
   let uomId = ''
   const base = () => `/api/v1/t/${slug}/purchase/requisitions`
 
@@ -104,6 +126,7 @@ describe.skipIf(!dbAvailable)('Purchase requisition lifecycle (integration)', ()
     tenantId = ctx.tenantId
     slug = ctx.slug
     token = ctx.token
+    approverToken = ctx.approverToken
     expect(token).toBeTruthy()
 
     const uom = await prisma.masterUom.create({
@@ -121,8 +144,8 @@ describe.skipIf(!dbAvailable)('Purchase requisition lifecycle (integration)', ()
     if (tenantId) await cleanupTenant(tenantId)
   })
 
-  function auth() {
-    return { Authorization: `Bearer ${token}` }
+  function auth(value = token) {
+    return { Authorization: `Bearer ${value}` }
   }
 
   function validPrBody(overrides: Record<string, unknown> = {}) {
@@ -176,7 +199,10 @@ describe.skipIf(!dbAvailable)('Purchase requisition lifecycle (integration)', ()
     expect(editBlocked.status).toBe(422)
     expect(editBlocked.body.code).toBe('PR_NOT_EDITABLE')
 
-    const approveRes = await request(app).post(`${base()}/${id}/approve`).set(auth()).send({})
+    const approveRes = await request(app)
+      .post(`${base()}/${id}/approve`)
+      .set(auth(approverToken))
+      .send({})
     expect(approveRes.status).toBe(200)
     expect(approveRes.body.data.status).toBe('approved')
 
@@ -211,7 +237,10 @@ describe.skipIf(!dbAvailable)('Purchase requisition lifecycle (integration)', ()
     const id = createRes.body.data.id as string
 
     await request(app).post(`${base()}/${id}/submit`).set(auth()).send({})
-    const approveRes = await request(app).post(`${base()}/${id}/approve`).set(auth()).send({})
+    const approveRes = await request(app)
+      .post(`${base()}/${id}/approve`)
+      .set(auth(approverToken))
+      .send({})
     expect(approveRes.status).toBe(200)
 
     const planning = await prisma.purchasePlanningRow.count({

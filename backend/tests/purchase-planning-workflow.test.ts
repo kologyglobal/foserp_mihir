@@ -26,6 +26,7 @@ function readyRow(partial: Record<string, unknown> = {}) {
     status: 'APPROVED' as const,
     deletedAt: null,
     selectedVendorId: 'v-1',
+    actionMessage: true,
     netPurchaseQuantity: 5 as never,
     expectedRate: 10 as never,
     negotiatedRate: null,
@@ -74,6 +75,14 @@ describe('purchase planning workflow', () => {
 
   it('enforces PO-ready validations with stable codes', () => {
     expect(() => assertPlanningRowReadyForPo(readyRow())).not.toThrow()
+
+    try {
+      assertPlanningRowReadyForPo(readyRow({ actionMessage: false }))
+      expect.fail('expected throw')
+    } catch (e) {
+      expect(e).toBeInstanceOf(PlanningPoNotReadyError)
+      expect((e as PlanningPoNotReadyError).code).toBe(PURCHASE_ERROR_CODE.PPS_NOT_SELECTED)
+    }
 
     try {
       assertPlanningRowReadyForPo(readyRow({ selectedVendorId: null }))
