@@ -14,7 +14,7 @@ import { stampCreated } from '../../utils/audit'
 import { syncLineTotals } from '../../utils/crmQuotationCalc'
 import { cloneTemplateSections } from '../../utils/quotationEngine/cloneSections'
 import { injectIsoTankShowcase } from './isoTankShowcase'
-import { demoPipelineLink, isConvertedDemoQuotation, ANCHOR_SO_PIPELINE_INDEX } from '../demo/crmSalesOrderLinkage'
+import { demoPipelineLink, isConvertedDemoQuotation, ANCHOR_SO_PIPELINE_INDEX, DEMO_QUOTATION_STATUS_CYCLE } from '../demo/crmSalesOrderLinkage'
 
 const now = () => new Date().toISOString()
 
@@ -38,8 +38,9 @@ const OWNERS = [
 ]
 
 const PRODUCTS = [
-  'prod-45m3', 'prod-iso', 'prod-sidewall', 'prod-tipping', 'prod-cement-bulker',
-  'prod-flyash', 'prod-lowbed', 'prod-flatbed', 'prod-ss-tank', 'prod-bulk-50m3',
+  'prod-45m3', 'prod-iso', 'prod-tipping', 'prod-cement-bulker',
+  'prod-flyash', 'prod-flatbed', 'prod-bulk-50m3', 'prod-tanker-30kl',
+  'prod-pneumatic', 'prod-container-40ft',
 ]
 
 const REQUIREMENTS = [
@@ -387,21 +388,17 @@ export function buildCrmSampleData(customerIds: string[]): CrmSampleBundle {
     const total = lines.reduce((s, l) => s + l.lineTotal, 0)
     const converted = isConvertedDemoQuotation(i)
     const isAnchorDoc = i === ANCHOR_SO_PIPELINE_INDEX
-    const status = isAnchorDoc
+    const cycleStatus = DEMO_QUOTATION_STATUS_CYCLE[i % DEMO_QUOTATION_STATUS_CYCLE.length]
+    const status = isAnchorDoc || converted
       ? 'converted'
-      : converted
-        ? 'converted'
-        : i % 10 === 0
-          ? 'approved'
-          : i % 7 === 0
-            ? 'pending_approval'
-            : i % 5 === 0
-              ? 'sent'
-              : 'draft'
+      : cycleStatus === 'pending_approval' || cycleStatus === 'approved' || cycleStatus === 'sent' || cycleStatus === 'draft'
+        ? cycleStatus
+        : 'draft'
+    const hasInternalApproval = status === 'approved' || status === 'sent' || status === 'converted'
     quotationDocuments.push({
       id: link.quotationDocumentId,
       quotationId: link.quotationId,
-      revisionNo: 0,
+      revisionNo: 1,
       templateId: tplId,
       opportunityId: link.opportunityId,
       sections: sectionsFromTemplate(tplId),
@@ -412,8 +409,16 @@ export function buildCrmSampleData(customerIds: string[]): CrmSampleBundle {
       status,
       totalAmount: total,
       revisionReason: null,
-      locked: status === 'approved' || status === 'sent' || converted,
-      approvalHistory: status === 'approved' || converted ? [{ id: `appr-${n}`, action: 'approved' as const, byId: 'user-rajesh', byName: 'Rajesh Kumar', at: audit.createdAt, remarks: 'Demo approved' }] : [],
+      locked: status === 'approved' || status === 'sent' || status === 'converted',
+      approvalHistory: hasInternalApproval
+        ? [
+            { id: `appr-sub-${n}`, action: 'submitted' as const, byId: 'user-rajesh', byName: 'Rajesh Kumar', at: audit.createdAt, remarks: 'Submitted for approval' },
+            { id: `appr-${n}`, action: 'approved' as const, byId: 'user-rajesh', byName: 'Rajesh Kumar', at: audit.createdAt, remarks: 'Demo approved' },
+            ...(status === 'sent' || status === 'converted'
+              ? [{ id: `appr-sent-${n}`, action: 'sent' as const, byId: 'user-rajesh', byName: 'Rajesh Kumar', at: audit.createdAt, remarks: 'Sent to customer' }]
+              : []),
+          ]
+        : [],
       contactId: contacts.find((c) => c.customerId === allCustomerIds[i % allCustomerIds.length] && c.isPrimary)?.id ?? null,
       salesOwnerId: OWNERS[i % OWNERS.length].id,
       salesOwnerName: OWNERS[i % OWNERS.length].name,

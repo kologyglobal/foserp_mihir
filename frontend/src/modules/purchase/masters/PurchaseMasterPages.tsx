@@ -1,9 +1,9 @@
-import { useCallback, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Eye, Pencil, Plus, Trash2, Copy, ChevronLeft, ChevronRight,
   Columns3, Printer, Upload, Download, FileSpreadsheet,
-  ArrowLeft, ClipboardList, FileText, Save, Settings2, X,
+  ClipboardList, FileText, Settings2,
 } from 'lucide-react'
 import type { ColumnDef, RowSelectionState } from '@tanstack/react-table'
 import { OperationalPageShell } from '../../../components/design-system/OperationalPageShell'
@@ -17,11 +17,10 @@ import {
   ErpCardSection,
   ErpFieldRow,
   ErpQuickEntrySection,
-  ErpStickySaveBar,
   ErpViewField,
   useErpAdditionalInfo,
 } from '../../../components/erp/card-form'
-import { ErpCardCommandBar } from '../../../components/erp/card-form/ErpCardCommandBar'
+import { FormActionBar } from '../../../components/erp/FormActionBar'
 import { Input, Select, Textarea } from '../../../components/forms/Inputs'
 import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { TableLink } from '../../../components/ui/AppLink'
@@ -45,6 +44,7 @@ import { getSessionUser } from '../../../utils/permissions'
 import { notify, notifyMasterSaved } from '../../../store/toastStore'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
 import { PurchaseMasterContextPanel } from '@/components/purchase/masters/PurchaseMasterContextPanel'
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
   PurchaseFormSectionNav,
   purchaseSectionId,
@@ -236,7 +236,6 @@ export function PurchaseMasterListPage() {
             { id: 'export-csv', label: 'Export CSV', icon: Download, onClick: handleExportCsv },
             { id: 'export-excel', label: 'Export Excel', icon: FileSpreadsheet, onClick: () => printMasterTable(catalog.title, filtered) },
             { id: 'print', label: 'Print', icon: Printer, onClick: () => printMasterTable(catalog.title, filtered) },
-            { id: 'hub', label: 'Purchase Masters', onClick: () => navigate('/purchase/masters') },
           ]}
         />
       )}
@@ -390,6 +389,28 @@ export function PurchaseMasterFormPage() {
   const [errors, setErrors] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeSection, setActiveSection] = useState('quick')
+  const initialAttrs = useMemo(() => {
+    const base: Record<string, string> = {}
+    if (existing) {
+      Object.entries(existing.attributes).forEach(([key, value]) => {
+        base[key] = String(value ?? '')
+      })
+    }
+    return base
+  }, [existing])
+  const dirty =
+    code !== (existing?.code ?? '') ||
+    name !== (existing?.name ?? '') ||
+    status !== (existing?.status ?? 'active') ||
+    description !== (existing?.description ?? '') ||
+    notes !== (existing?.notes ?? '') ||
+    JSON.stringify(attrs) !== JSON.stringify(initialAttrs)
+  const { markDirty, resetDirty } = useUnsavedChangesGuard(true)
+
+  useEffect(() => {
+    if (dirty && !isSubmitting) markDirty()
+    else resetDirty()
+  }, [dirty, isSubmitting, markDirty, resetDirty])
   const {
     open: showAdditionalDetails,
     toggle: toggleAdditionalDetails,
@@ -415,6 +436,7 @@ export function PurchaseMasterFormPage() {
   }
 
   function persist() {
+    if (isSubmitting) return
     const errs: string[] = []
     if (!code.trim()) errs.push('Code is required.')
     if (!name.trim()) errs.push('Name is required.')
@@ -434,6 +456,7 @@ export function PurchaseMasterFormPage() {
     setIsSubmitting(false)
     if (!r.ok) { setErrors([r.error ?? 'Save failed']); return }
     notifyMasterSaved(catalog!.title.replace(/ Master$/i, '') || 'Record', !isEdit)
+    resetDirty()
     navigate(listPath)
   }
 
@@ -449,46 +472,23 @@ export function PurchaseMasterFormPage() {
     { label: 'Created by', value: existing?.createdBy ?? session.name },
   ]
 
-  const commandBar = (
-    <ErpCardCommandBar
-      inline
-      homeActions={[
-        {
-          id: 'save',
-          label: isEdit ? 'Save Changes' : 'Save',
-          icon: Save,
-          onClick: persist,
-          primary: true,
-          disabled: isSubmitting || !quickDone,
-        },
-        { id: 'cancel', label: 'Cancel', icon: X, onClick: () => navigate(listPath) },
-      ]}
-    />
-  )
-
   const footer = (
-    <ErpStickySaveBar
-      sticky={false}
-      isSubmitting={isSubmitting}
-      submitLabel={isEdit ? 'Save Changes' : 'Save'}
-      submitDisabled={!quickDone}
-      cancelTo={listPath}
+    <FormActionBar
+      cancelFirst
+      busy={isSubmitting}
+      dirty={dirty}
+      disabled={!quickDone}
+      disabledReason={!quickDone ? 'Code and name are required' : undefined}
+      onCancel={() => {
+        resetDirty()
+        navigate(listPath)
+      }}
       onSave={persist}
       hint={(
         <span className="text-[12px] text-erp-muted">
           {quickDone ? 'Ready to save' : 'Code and name required'}
           {configFields.length > 0 ? ' · Configuration in Additional Information' : ''}
         </span>
-      )}
-      actions={(
-        <ErpButtonGroup>
-          <ErpButton type="button" variant="ghost" icon={ArrowLeft} onClick={() => navigate(listPath)}>
-            Cancel
-          </ErpButton>
-          <ErpButton type="submit" variant="primary" icon={Save} disabled={isSubmitting || !quickDone}>
-            {isSubmitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Save'}
-          </ErpButton>
-        </ErpButtonGroup>
       )}
     />
   )
@@ -512,7 +512,7 @@ export function PurchaseMasterFormPage() {
         { label: catalog.title, to: listPath },
         { label: isEdit ? 'Edit' : 'New' },
       ]}
-      commandBar={commandBar}
+      commandBar={null}
       documentStrip={documentStrip}
       validationErrors={errors}
       className="enterprise-workspace--crm-smart-overview"
@@ -639,7 +639,10 @@ export function PurchaseMasterDetailPage() {
 
   if (!catalog || !entry) {
     return (
-      <OperationalPageShell title="Record not found" breadcrumbs={masterBreadcrumbs('Not Found')}>
+      <OperationalPageShell
+        title="Record not found"
+        breadcrumbs={masterBreadcrumbs('Not Found')}
+      >
         <Link to={`/purchase/masters/${slug ?? ''}`} className="text-sm font-semibold text-erp-primary">Back to list</Link>
       </OperationalPageShell>
     )

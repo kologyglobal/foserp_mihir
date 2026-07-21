@@ -113,7 +113,7 @@ export function QuotationApprovalSummary({
   validityExpired?: boolean
 }) {
   const fullyAccepted =
-    headerStatus === 'approved' && documentStatus === 'approved' && customerApproval === 'approved'
+    headerStatus === 'sent' && documentStatus === 'sent' && customerApproval === 'approved'
   return (
     <div className="flex flex-wrap gap-1 text-[11px]">
       <span className="rounded border border-erp-border px-1.5 py-0.5">Header: {headerStatus ?? '—'}</span>

@@ -304,7 +304,6 @@ export function PoCreateDocumentPage() {
         { id: 'cancel', label: 'Cancel', icon: X, onClick: () => navigate('/purchase/orders') },
       ]}
       moreActions={[
-        { id: 'back-orders', label: 'Back to Orders', icon: ArrowLeft, onClick: () => navigate('/purchase/orders') },
         { id: 'browse-pr', label: 'Browse Requisitions', icon: ClipboardList, onClick: () => navigate('/purchase/requisitions') },
       ]}
     />

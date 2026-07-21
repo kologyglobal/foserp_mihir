@@ -3,7 +3,6 @@ import {
   Box,
   Database,
   Factory,
-  Gauge,
   GitBranch,
   Landmark,
   LayoutGrid,
@@ -27,7 +26,6 @@ export const SIDEBAR_ICON_MENU: {
   { categoryId: 'crm', label: 'CRM', icon: User },
   { categoryId: 'sales', label: 'Sales', icon: Tag },
   { categoryId: 'accounting', label: 'Accounting', icon: Landmark },
-  { categoryId: 'mrp', label: 'Planning', icon: Gauge },
   { categoryId: 'purchase', label: 'Procurement', icon: ShoppingCart },
   { categoryId: 'production', label: 'Manufacturing', icon: Factory },
   { categoryId: 'quality', label: 'Quality', icon: ShieldCheck },
@@ -55,7 +53,7 @@ export const SIDEBAR_GROUPS = [
   {
     id: 'operations',
     label: 'Operations',
-    categoryIds: ['mrp', 'purchase', 'production', 'quality', 'dispatch', 'inventory'],
+    categoryIds: ['purchase', 'production', 'quality', 'dispatch', 'inventory'],
   },
   {
     id: 'engineering',

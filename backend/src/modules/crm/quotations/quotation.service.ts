@@ -21,9 +21,13 @@ import type {
 import {
   appendApprovalHistory,
   assertDocumentApprovable,
-  assertDocumentEditable,
+  assertDocumentCustomerApprovable,
   assertDocumentRejectable,
+  assertDocumentSendable,
   assertDocumentSubmittable,
+  assertQuotationDeletable,
+  sanitizeQuotationDocumentUpdateInput,
+  sanitizeQuotationUpdateInput,
 } from './quotation.workflow.js'
 
 async function mapQuotationWithNames(
@@ -98,11 +102,13 @@ export async function updateQuotation(tenantId: string, id: string, userId: stri
   if (!existing) throw new NotFoundError('Quotation not found')
   if (existing.locked) throw new InvalidStateError('Quotation is locked')
 
-  if (input.customerId) await assertCompanyInTenant(tenantId, input.customerId)
-  if (input.contactId) await assertContactInTenant(tenantId, input.contactId)
-  if (input.salesOwnerId) await assertUserInTenant(tenantId, input.salesOwnerId)
+  const safeInput = sanitizeQuotationUpdateInput(existing, input)
 
-  const quotation = await repo.updateQuotation(tenantId, id, userId, input)
+  if (safeInput.customerId) await assertCompanyInTenant(tenantId, safeInput.customerId)
+  if (safeInput.contactId) await assertContactInTenant(tenantId, safeInput.contactId)
+  if (safeInput.salesOwnerId) await assertUserInTenant(tenantId, safeInput.salesOwnerId)
+
+  const quotation = await repo.updateQuotation(tenantId, id, userId, safeInput)
   return mapQuotationWithNames(tenantId, quotation)
 }
 
@@ -115,9 +121,10 @@ export async function updateQuotationDocument(
 ) {
   const doc = await repo.findQuotationDocumentById(tenantId, quotationId, docId)
   if (!doc) throw new NotFoundError('Quotation document not found')
-  assertDocumentEditable(doc)
 
-  const quotation = await repo.updateQuotationDocument(tenantId, quotationId, docId, userId, input)
+  const safeInput = sanitizeQuotationDocumentUpdateInput(doc, input)
+
+  const quotation = await repo.updateQuotationDocument(tenantId, quotationId, docId, userId, safeInput)
   return mapQuotationWithNames(tenantId, quotation)
 }
 
@@ -210,13 +217,57 @@ export async function rejectDocument(
 export async function markDocumentSent(tenantId: string, quotationId: string, docId: string, userId: string) {
   const doc = await repo.findQuotationDocumentById(tenantId, quotationId, docId)
   if (!doc) throw new NotFoundError('Quotation document not found')
-  const quotation = await repo.markDocumentSent(tenantId, quotationId, docId, userId)
+  assertDocumentSendable(doc)
+  const userName = await getUserName(tenantId, userId)
+  const history = appendApprovalHistory(doc, 'sent', userId, userName, 'Sent to customer')
+  const quotation = await repo.markDocumentSent(
+    tenantId,
+    quotationId,
+    docId,
+    userId,
+    history as unknown as import('@prisma/client').Prisma.InputJsonValue,
+  )
+  return mapQuotationWithNames(tenantId, quotation)
+}
+
+export async function recordCustomerApproval(
+  tenantId: string,
+  quotationId: string,
+  docId: string,
+  userId: string,
+  input: ApprovalRemarksInput & { decision?: 'approved' | 'rejected' },
+) {
+  const doc = await repo.findQuotationDocumentById(tenantId, quotationId, docId)
+  if (!doc) throw new NotFoundError('Quotation document not found')
+  const header = await repo.findQuotationById(tenantId, quotationId)
+  if (!header) throw new NotFoundError('Quotation not found')
+  assertDocumentCustomerApprovable(doc, header)
+
+  const decision = input.decision ?? 'approved'
+  const userName = await getUserName(tenantId, userId)
+  const history = appendApprovalHistory(
+    doc,
+    decision === 'approved' ? 'customer_approved' : 'customer_rejected',
+    userId,
+    userName,
+    input.remarks ?? (decision === 'approved' ? 'Customer approved' : 'Customer rejected'),
+  )
+  const quotation = await repo.recordCustomerApproval(
+    tenantId,
+    quotationId,
+    docId,
+    userId,
+    decision,
+    input.remarks,
+    history as unknown as import('@prisma/client').Prisma.InputJsonValue,
+  )
   return mapQuotationWithNames(tenantId, quotation)
 }
 
 export async function deleteQuotation(tenantId: string, id: string, userId: string) {
   const existing = await repo.findQuotationById(tenantId, id)
   if (!existing) throw new NotFoundError('Quotation not found')
+  assertQuotationDeletable(existing)
   await repo.softDeleteQuotation(tenantId, id, userId)
 }
 

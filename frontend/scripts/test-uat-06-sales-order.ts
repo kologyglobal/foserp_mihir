@@ -193,7 +193,7 @@ const openOpp = crm.opportunities.find((o) => !o.quotationId && o.productId && o
   })()
 
 if (openOpp) {
-  const q = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-standard-trailer', 2100000)
+  const q = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-iso-tank', 2100000)
   quotationId = q.quotationId
   documentId = q.documentId
 
@@ -507,6 +507,12 @@ async function tryLiveSoConversion() {
     }
 
     await fetch(`${crmBase}/quotations/${quoId}/documents/${docId}/submit-approval`, { method: 'POST', headers, body: '{}' })
+    await fetch(`${crmBase}/quotations/${quoId}/documents/${docId}/mark-sent`, { method: 'POST', headers, body: '{}' })
+    await fetch(`${crmBase}/quotations/${quoId}/documents/${docId}/customer-approve`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ remarks: 'UAT-06 customer accepted' }),
+    })
     const convRes = await fetch(`${crmBase}/quotations/${quoId}/convert-to-sales-order`, {
       method: 'POST',
       headers,
@@ -521,7 +527,7 @@ async function tryLiveSoConversion() {
       headers,
       body: JSON.stringify({ documentId: docId, customerPoNumber: 'PO-DUP' }),
     })
-    check('UAT-06.39', 'Live API', 'Duplicate SO conversion blocked', dupRes.status === 422, `HTTP ${dupRes.status}`, true)
+    check('UAT-06.39', 'Live API', 'Duplicate SO conversion blocked', dupRes.status === 409, `HTTP ${dupRes.status}`, true)
 
     if (soId) {
       const soGet = await fetch(`${crmBase}/sales-orders/${soId}`, { headers })

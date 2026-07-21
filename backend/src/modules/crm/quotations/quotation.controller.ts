@@ -109,6 +109,32 @@ export const markDocumentSent = asyncHandler(async (req: Request, res: Response)
   sendSuccess(res, 'Quotation marked as sent', data)
 })
 
+export const customerApproveDocument = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const { userId } = getContext(req)
+  const data = await service.recordCustomerApproval(
+    tenantId,
+    getRouteParam(req, 'id'),
+    getRouteParam(req, 'docId'),
+    userId,
+    { ...req.body, decision: 'approved' },
+  )
+  sendSuccess(res, 'Customer approved quotation', data)
+})
+
+export const customerRejectDocument = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const { userId } = getContext(req)
+  const data = await service.recordCustomerApproval(
+    tenantId,
+    getRouteParam(req, 'id'),
+    getRouteParam(req, 'docId'),
+    userId,
+    { ...req.body, decision: 'rejected' },
+  )
+  sendSuccess(res, 'Customer rejected quotation', data)
+})
+
 export const convertQuotationToSalesOrder = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const { userId } = getContext(req)

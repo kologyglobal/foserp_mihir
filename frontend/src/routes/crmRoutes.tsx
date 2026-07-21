@@ -21,8 +21,9 @@ import { CrmContactFormPage } from '@/modules/crm/CrmContactFormPage'
 import { CrmSalesOrderListPage } from '@/modules/crm/CrmSalesOrderListPage'
 import { SalesOrder360Page } from '@/modules/sales/SalesOrder360Page'
 import { SalesOrderPrintPage } from '@/components/sales/SalesOrderPrintPage'
-import { LeadListPage, LeadDetailPage } from '@/modules/sales/SalesPages'
+import { LeadListPage } from '@/modules/crm/CrmLeadListPage'
 import { LeadFormPage } from '@/modules/crm/CrmLeadFormPage'
+import { Lead360Workspace } from '@/components/crm/Lead360Workspace'
 import { CrmReportsIndexPage, CrmReportPage } from '@/modules/reports/CrmReportsPages'
 import { CrmMastersHubPage } from '@/modules/crm/masters/CrmMastersHubPage'
 import {
@@ -40,8 +41,10 @@ export const crmRouteChildren: RouteObject[] = [
   { path: 'leads', element: <LeadListPage /> },
   { path: 'leads/new', element: <LeadFormPage /> },
   { path: 'leads/:id/edit', element: <LeadFormPage /> },
-  { path: 'leads/:id', element: <LeadDetailPage /> },
-  { path: 'customers', element: <CrmCustomersPage /> },
+  { path: 'leads/:id', element: <Lead360Workspace /> },
+  /** Canonical CRM companies register (nav: Companies). */
+  { path: 'companies', element: <CrmCustomersPage hubPath="/crm/companies" /> },
+  { path: 'customers', element: <Navigate to="/crm/companies" replace /> },
   { path: 'contacts', element: <CrmContactsPage /> },
   { path: 'contacts/new', element: <CrmContactFormPage /> },
   { path: 'contacts/:id/edit', element: <CrmContactFormPage /> },

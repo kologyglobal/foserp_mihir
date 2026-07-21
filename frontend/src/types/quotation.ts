@@ -6,6 +6,7 @@ export type QuotationStatus =
   | 'submitted'
   | 'pending_approval'
   | 'approved'
+  | 'sent'
   | 'rejected'
   | 'superseded'
   | 'converted'
@@ -14,10 +15,11 @@ export type QuotationStatus =
 export type CustomerApprovalStatus = 'pending' | 'approved' | 'rejected'
 
 export const QUOTATION_STATUS_FLOW: Record<QuotationStatus, QuotationStatus[]> = {
-  draft: ['submitted', 'cancelled'],
+  draft: ['submitted', 'pending_approval', 'cancelled'],
   submitted: ['pending_approval', 'cancelled'],
   pending_approval: ['approved', 'rejected'],
-  approved: ['converted'],
+  approved: ['sent'],
+  sent: ['converted'],
   rejected: ['draft'],
   superseded: [],
   converted: [],
@@ -107,7 +109,7 @@ export type QuotationDocumentStatus = 'draft' | 'sent' | 'pending_approval' | 'a
 
 export interface QuotationApprovalEntry {
   id: string
-  action: 'submitted' | 'approved' | 'rejected'
+  action: 'submitted' | 'approved' | 'rejected' | 'sent' | 'customer_approved' | 'customer_rejected'
   byId: string
   byName: string
   at: string
@@ -188,6 +190,9 @@ export type QuotationPageSize = 'A4' | 'Letter'
 
 export type QuotationHeaderStyle = 'standard' | 'minimal' | 'cover'
 
+/** Visual print theme — `vf_word` mimics Vasant Fabricators Word quotation layout. */
+export type QuotationPrintSkin = 'default' | 'vf_word'
+
 export interface QuotationPrintLayout {
   pageSize: QuotationPageSize
   marginMm: number
@@ -200,6 +205,8 @@ export interface QuotationPrintLayout {
   showSignatureBlock: boolean
   /** Section types that begin on a new printed page */
   pageBreakBefore: QuotationSectionType[]
+  /** Optional print/PDF visual skin (CSS modifier) */
+  printSkin?: QuotationPrintSkin
 }
 
 export type QuotationTemplateSection = Omit<QuotationSection, 'id' | 'specRows'> & {

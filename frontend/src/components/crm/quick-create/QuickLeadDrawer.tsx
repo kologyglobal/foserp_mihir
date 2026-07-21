@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import type { LeadSource } from '../../../types/sales'
 import { useSalesStore } from '../../../store/salesStore'
 import { resolveStoreAction } from '../../../store/storeAction'
+import { notify } from '../../../store/toastStore'
 import { formatApiError } from '../../../services/api/apiErrors'
 import { useCrmOwnerOptions, useLeadSourceOptions } from '../../../hooks/useCrmMasters'
 import { getSessionUser } from '../../../utils/permissions'
@@ -17,6 +18,7 @@ import { validateMobileForCountry } from '../../../utils/validation/mobilePhone'
 import { DEFAULT_CUSTOMER_COUNTRY } from '../../../config/countries'
 import { useMasterStore } from '../../../store/masterStore'
 import { validateEmail, normalizeEmail } from '../../../utils/validation/email'
+import { useInlineFormValidation } from '../../../hooks/useInlineFormValidation'
 
 interface QuickLeadDrawerProps {
   open: boolean
@@ -42,6 +44,33 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
   const [savedLeadId, setSavedLeadId] = useState<string | null>(null)
   const [savedLeadNo, setSavedLeadNo] = useState<string | null>(null)
 
+  const phoneCountry =
+    (customerId ? useMasterStore.getState().getCustomer(customerId)?.country : null)
+    ?? DEFAULT_CUSTOMER_COUNTRY
+
+  const inline = useInlineFormValidation(
+    { prospectName, mobile, email },
+    {
+      prospectName: { required: true, message: 'Enter a company or prospect name.' },
+      mobile: {
+        validate: (v) => {
+          const digits = String(v ?? '').trim()
+          const mail = email.trim()
+          if (!digits && !mail) return 'Provide a mobile number or email.'
+          return validateMobileForCountry(digits, phoneCountry)
+        },
+      },
+      email: {
+        validate: (v) => {
+          const mail = String(v ?? '').trim()
+          const digits = mobile.trim()
+          if (!mail && !digits) return 'Provide a mobile number or email.'
+          return validateEmail(mail)
+        },
+      },
+    },
+  )
+
   useEffect(() => {
     if (!open) return
     setCustomerId(null)
@@ -54,31 +83,37 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
     setError(null)
     setSavedLeadId(null)
     setSavedLeadNo(null)
+    inline.resetTouched()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, ownerOptions, session.id, sourceOptions])
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (submitting) return
+    inline.touchAll()
     const name = prospectName.trim()
     if (!name) {
-      setError('Enter a company or prospect name.')
+      const msg = 'Enter a company or prospect name.'
+      setError(msg)
+      notify.warning(msg)
       return
     }
     if (!mobile.trim() && !email.trim()) {
-      setError('Provide a mobile number or email.')
+      const msg = 'Provide a mobile number or email.'
+      setError(msg)
+      notify.warning(msg)
       return
     }
-    const country =
-      (customerId ? useMasterStore.getState().getCustomer(customerId)?.country : null)
-      ?? DEFAULT_CUSTOMER_COUNTRY
-    const mobileError = validateMobileForCountry(mobile, country)
+    const mobileError = validateMobileForCountry(mobile, phoneCountry)
     if (mobileError) {
       setError(mobileError)
+      notify.warning(mobileError)
       return
     }
     const emailError = validateEmail(email)
     if (emailError) {
       setError(emailError)
+      notify.warning(emailError)
       return
     }
     const owner = ownerOptions.find((o) => o.value === ownerId) ?? { value: session.id, label: session.name }
@@ -90,6 +125,7 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
           createLead({
             prospectName: name,
             customerId,
+            contactPerson: name,
             mobile: mobile.trim() || null,
             email: email.trim() ? normalizeEmail(email) : null,
             source,
@@ -100,18 +136,22 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
             probability: 20,
             stage: 'new',
             productRequirement: '',
+            remarks: 'Quick lead capture',
             createdDate: new Date().toISOString().slice(0, 10),
             activityStatus: 'active',
             lifecycleStatus: 'open',
           }),
         )
         if (!r.ok || !r.leadId) {
-          setError(r.error ?? formatApiError('Failed to create lead'))
+          const msg = r.error ?? formatApiError('Failed to create lead')
+          setError(msg)
+          notify.error(msg)
           return
         }
         const lead = useSalesStore.getState().getLead(r.leadId)
         setSavedLeadId(r.leadId)
         setSavedLeadNo(lead?.leadNo ?? null)
+        notify.success('Lead created')
         onCreated?.(r.leadId)
       } finally {
         setSubmitting(false)
@@ -163,23 +203,36 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
           </ErpButtonGroup>
         </div>
       ) : (
-        <form id="crm-quick-lead-form" onSubmit={handleSubmit} className="crm-drawer-form">
+        <form id="crm-quick-lead-form" onSubmit={handleSubmit} className="crm-drawer-form crm-form-surface">
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          <FormField label="Company / prospect" required hint="Search master or type a new prospect name">
+          <FormField label="Company / prospect" required error={inline.fieldError('prospectName')}>
             <CompanyProspectSelect
               value={{ customerId, prospectName }}
               onChange={(v) => {
                 setCustomerId(v.customerId)
                 setProspectName(v.prospectName)
+                inline.touch('prospectName')
               }}
+              error={Boolean(inline.fieldError('prospectName'))}
             />
           </FormField>
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="Mobile">
-              <MobileInput value={mobile} onChange={(e) => setMobile(e.target.value)} />
+            <FormField label="Mobile" error={inline.fieldError('mobile')}>
+              <MobileInput
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value)}
+                onBlur={() => inline.touch('mobile')}
+                error={Boolean(inline.fieldError('mobile'))}
+              />
             </FormField>
-            <FormField label="Email">
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <FormField label="Email" error={inline.fieldError('email')}>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => inline.touch('email')}
+                error={Boolean(inline.fieldError('email'))}
+              />
             </FormField>
           </div>
           <FormField label="Source" required>

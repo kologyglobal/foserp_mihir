@@ -4,7 +4,7 @@ import { ShoppingCart, ExternalLink } from 'lucide-react'
 import { useCrmStore } from '../../store/crmStore'
 import { ErpButton } from '../erp/ErpButton'
 import { resolveCreateSalesOrderGateForQuotationDocument } from '../../utils/opportunitySalesOrderDraft'
-import { isCrmPath, resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
+import { buildSalesOrderNewUrl, isCrmPath, resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
 
 interface ConvertQuotationToSOActionProps {
   documentId: string
@@ -67,8 +67,8 @@ export function ConvertQuotationToSOAction({
       {showHandoverNote ? (
         <p className={gate.enabled ? 'mb-2 text-[12px] text-emerald-700' : 'mb-2 text-[12px] text-erp-muted'}>
           {gate.enabled
-            ? 'Approved quotation ready — convert to an Open sales order.'
-            : (gate.disabledReason ?? 'Available after quotation approval.')}
+            ? 'Customer-approved quotation ready — convert to an Open sales order.'
+            : (gate.disabledReason ?? 'Complete Send → Customer Approve before converting.')}
         </p>
       ) : null}
       <ErpButton
@@ -83,6 +83,10 @@ export function ConvertQuotationToSOAction({
           if (onConvert) {
             onConvert(documentId)
             return
+          }
+          // Fallback when list/card has no conversion dialog host — open SO create with prefill.
+          if (doc.opportunityId) {
+            navigate(buildSalesOrderNewUrl(doc.opportunityId, documentId, { fromCrm }))
           }
         }}
       >

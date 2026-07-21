@@ -24,6 +24,7 @@ export function PurchaseAiInsightsShell({
   children,
   className,
   embedded = false,
+  variant = 'card',
   onClose,
 }: {
   title?: string
@@ -32,14 +33,18 @@ export function PurchaseAiInsightsShell({
   className?: string
   /** When true, omit outer card chrome (already inside ErpFactBoxPanel). */
   embedded?: boolean
-  /** When set, shows a close control in the header. */
+  /** `register` = list-page band above the table (collapsible header like CRM cards). */
+  variant?: 'card' | 'register'
+  /** When set, shows a close/collapse control in the header. */
   onClose?: () => void
 }) {
+  const isRegister = variant === 'register' && !embedded
+
   return (
     <div
       className={cn(
         'purchase-ai-panel',
-        embedded ? 'purchase-ai-panel--embedded' : 'purchase-ai-panel--card',
+        embedded ? 'purchase-ai-panel--embedded' : isRegister ? 'purchase-ai-panel--register' : 'purchase-ai-panel--card',
         className,
       )}
     >
@@ -54,10 +59,13 @@ export function PurchaseAiInsightsShell({
         {onClose ? (
           <button
             type="button"
-            className="purchase-ai-panel__close"
+            className={cn(
+              'purchase-ai-panel__close',
+              isRegister && 'purchase-ai-panel__close--collapse',
+            )}
             onClick={onClose}
-            aria-label={`Hide ${title}`}
-            title="Hide insights"
+            aria-label={isRegister ? `Collapse ${title}` : `Hide ${title}`}
+            title={isRegister ? 'Collapse insights' : 'Hide insights'}
           >
             <X className="h-3.5 w-3.5" aria-hidden strokeWidth={2.25} />
           </button>
@@ -72,18 +80,26 @@ export function PurchaseAiInsightsRestoreButton({
   label = 'Purchase Insights',
   onClick,
   className,
+  pressed,
 }: {
   label?: string
   onClick: () => void
   className?: string
+  /** When true, button acts as a toggle that can hide insights. */
+  pressed?: boolean
 }) {
   return (
     <button
       type="button"
-      className={cn('erp-factbox-pane__ai-toggle purchase-ai-panel__restore', className)}
+      className={cn(
+        'erp-factbox-pane__ai-toggle purchase-ai-panel__restore',
+        pressed && 'purchase-ai-panel__restore--on',
+        className,
+      )}
       onClick={onClick}
-      aria-label={`Show ${label}`}
-      title={`Show ${label}`}
+      aria-pressed={pressed}
+      aria-label={pressed ? `Hide ${label}` : `Show ${label}`}
+      title={pressed ? `Hide ${label}` : `Show ${label}`}
     >
       <Sparkles className="h-4 w-4" aria-hidden />
     </button>

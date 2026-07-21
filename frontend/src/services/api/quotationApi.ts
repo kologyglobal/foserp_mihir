@@ -79,3 +79,31 @@ export async function markQuotationDocumentSentApi(quotationId: string, docId: s
     body: JSON.stringify({}),
   })
 }
+
+export async function customerApproveQuotationDocumentApi(
+  quotationId: string,
+  docId: string,
+  data?: { remarks?: string },
+) {
+  return apiRequest<QuotationApiDto>(
+    tenantPath(`/crm/quotations/${quotationId}/documents/${docId}/customer-approve`),
+    {
+      method: 'POST',
+      body: JSON.stringify(data ?? {}),
+    },
+  )
+}
+
+export async function customerRejectQuotationDocumentApi(
+  quotationId: string,
+  docId: string,
+  data?: { remarks?: string },
+) {
+  return apiRequest<QuotationApiDto>(
+    tenantPath(`/crm/quotations/${quotationId}/documents/${docId}/customer-reject`),
+    {
+      method: 'POST',
+      body: JSON.stringify(data ?? {}),
+    },
+  )
+}

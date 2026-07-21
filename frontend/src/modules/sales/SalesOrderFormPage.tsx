@@ -9,8 +9,7 @@ import {
   Save,
 } from 'lucide-react'
 import { ErpCardSection, ErpFieldRow, ErpStickySaveBar } from '../../components/erp/card-form'
-import { CrmFormSaveCommandBar } from '../../components/crm/CrmFormSaveCommandBar'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
+import { ErpCardCommandBar } from '../../components/erp/card-form/ErpCardCommandBar'
 import {
   ENTERPRISE_FORM_CLASS,
   EnterpriseBusinessFactBox,
@@ -30,7 +29,9 @@ import {
 import { CommercialTermSelect } from '../../components/masters/GeographySelects'
 import { Input, Textarea } from '../../components/forms/Inputs'
 import { AppLink } from '../../components/ui/AppLink'
-import { Toast } from '../../components/ui/Toast'
+import { notify } from '../../store/toastStore'
+import { validateSalesOrderDraft } from '../../utils/validation/crmSchemas/salesOrderSchema'
+import { handleInvalidSubmit, type FieldErrorMap } from '../../utils/formValidation'
 import { useMrpStore } from '../../store/mrpStore'
 import { useMasterStore } from '../../store/masterStore'
 import { isApiMode } from '../../config/apiConfig'
@@ -58,8 +59,7 @@ export function SalesOrderEditPage() {
   const customers = useMasterStore((s) => s.customers)
   const products = useMasterStore((s) => s.products)
   const locations = useMasterStore((s) => s.locations)
-  const [toast, setToast] = useState<string | null>(null)
-  const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [validationErrors, setValidationErrors] = useState<FieldErrorMap>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeSection, setActiveSection] = useState('context')
 
@@ -120,11 +120,6 @@ export function SalesOrderEditPage() {
     { label: 'Delivery', value: expectedDeliveryDate ? formatDate(expectedDeliveryDate) : '—', accent: 'amber' as const, hint: so ? formatStatus(so.status === 'open' ? 'draft' : so.status) : 'Draft' },
   ], [completionPercent, completionItems, customer, displayValue, so, product, expectedDeliveryDate])
 
-  const validationGuideItems = useMemo(
-    () => validationErrors.map((err, i) => ({ id: `err-${i}`, label: err, message: err })),
-    [validationErrors],
-  )
-
   function scrollToSection(sectionId: string) {
     setActiveSection(sectionId)
     document.getElementById(`so-edit-section-${sectionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -157,23 +152,26 @@ export function SalesOrderEditPage() {
 
   const draftSo = so
 
-  function validateDraft(): string[] {
-    const errors: string[] = []
-    if (!paymentTerms.trim()) errors.push('Payment terms are required.')
-    if (!deliveryTerms.trim()) errors.push('Delivery terms are required.')
-    if (expectedDeliveryDate && Number.isNaN(Date.parse(expectedDeliveryDate))) {
-      errors.push('Expected delivery date is invalid.')
-    }
-    if (customerPoDate && Number.isNaN(Date.parse(customerPoDate))) {
-      errors.push('Customer PO date is invalid.')
-    }
-    return errors
+  function validateDraft(): FieldErrorMap {
+    return validateSalesOrderDraft({
+      paymentTerms,
+      deliveryTerms,
+      expectedDeliveryDate,
+      customerPoDate,
+    }).fieldErrors
   }
 
   async function handleSave(mode: 'save' | 'close' = 'save') {
     const errors = validateDraft()
-    setValidationErrors(errors)
-    if (errors.length) return
+    if (Object.keys(errors).length) {
+      handleInvalidSubmit({
+        errors,
+        fieldOrder: ['paymentTerms', 'deliveryTerms', 'expectedDeliveryDate', 'customerPoDate'],
+        onFieldErrors: setValidationErrors,
+      })
+      return
+    }
+    setValidationErrors({})
 
     setIsSubmitting(true)
     const locLabel = locations.find((l) => l.id === locationId)
@@ -194,10 +192,11 @@ export function SalesOrderEditPage() {
     setIsSubmitting(false)
 
     if (r.ok) {
+      notify.success('Sales order saved')
       navigate(mode === 'close' ? listPath : detailPath)
       return
     }
-    setToast(r.error ?? 'Save failed')
+    notify.error(r.error ?? 'Save failed')
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -216,12 +215,10 @@ export function SalesOrderEditPage() {
     { label: 'Quotation', value: so.quotationNo ? `${so.quotationNo} Rev ${so.quotationRevisionNo ?? 1}` : '—' },
   ]
 
+  /** Secondary nav only — Save / Cancel live in the sticky footer (same as New Lead). */
   const commandBar = (
-    <CrmFormSaveCommandBar
-      isSubmitting={isSubmitting}
-      onSave={() => void handleSave('save')}
-      onSaveAndClose={() => void handleSave('close')}
-      onCancel={() => navigate(detailPath)}
+    <ErpCardCommandBar
+      inline
       moreActions={[
         { id: '360', label: 'View 360', icon: Building2, onClick: () => navigate(detailPath) },
         {
@@ -306,8 +303,6 @@ export function SalesOrderEditPage() {
         breadcrumbs={breadcrumbs}
         commandBar={commandBar}
         documentStrip={documentStrip}
-        validationItems={validationGuideItems.length ? validationGuideItems : undefined}
-        validationErrors={validationGuideItems.length ? undefined : validationErrors}
         factBox={factBox}
         collapsibleFactBox
         factBoxLabel="Smart Context"
@@ -335,7 +330,6 @@ export function SalesOrderEditPage() {
           sections={sectionNavItems}
           activeId={activeSection}
           onSelect={scrollToSection}
-          trailing={<FactBoxPaneAiToggle />}
         />
 
         <EnterpriseFormMetrics metrics={formMetrics} />
@@ -412,10 +406,10 @@ export function SalesOrderEditPage() {
           collapsible
           defaultOpen
         >
-          <ErpFieldRow label="Payment Terms" required>
+          <ErpFieldRow label="Payment Terms" required dataField="paymentTerms" fieldError={validationErrors.paymentTerms}>
             <CommercialTermSelect termType="payment" value={paymentTerms} onChange={setPaymentTerms} />
           </ErpFieldRow>
-          <ErpFieldRow label="Delivery Terms" required>
+          <ErpFieldRow label="Delivery Terms" required dataField="deliveryTerms" fieldError={validationErrors.deliveryTerms}>
             <CommercialTermSelect termType="delivery" value={deliveryTerms} onChange={setDeliveryTerms} />
           </ErpFieldRow>
           <ErpFieldRow label="Internal Remarks" colSpan={2} horizontal={false}>
@@ -423,8 +417,6 @@ export function SalesOrderEditPage() {
           </ErpFieldRow>
         </ErpCardSection>
       </SalesCardFormShell>
-
-      {toast ? <Toast message={toast} variant="error" /> : null}
     </>
   )
 }

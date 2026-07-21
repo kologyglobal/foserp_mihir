@@ -113,7 +113,7 @@ check(
 )
 const openOpp = crm.opportunities.find((o) => !o.quotationId && o.productId)
 if (openOpp) {
-  const q = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-standard-trailer', 2000000)
+  const q = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-iso-tank', 2000000)
   check(9, 'Quotation can be created from opportunity', q.ok, q.quotationId)
   if (q.documentId) {
     const doc = useCrmStore.getState().getQuotationDocument(q.documentId!)

@@ -12,6 +12,25 @@ export const DEFAULT_QUOTATION_PRINT_LAYOUT: QuotationPrintLayout = {
   showPageFooter: true,
   showSignatureBlock: true,
   pageBreakBefore: ['price_table', 'terms', 'bank', 'signature'],
+  printSkin: 'default',
+}
+
+/**
+ * Word-like print layout for VF ISO tank / dry-bulk quotations.
+ * Customer & cover text come from template sections (not the ERP chrome blocks).
+ */
+export const VF_WORD_PRINT_LAYOUT: QuotationPrintLayout = {
+  pageSize: 'A4',
+  marginMm: 18,
+  fontScale: 1,
+  headerStyle: 'minimal',
+  showLogo: false,
+  showCompanyHeader: false,
+  showCustomerBlock: false,
+  showPageFooter: true,
+  showSignatureBlock: true,
+  pageBreakBefore: ['price_table'],
+  printSkin: 'vf_word',
 }
 
 export const PRINT_LAYOUT_SECTION_OPTIONS: { id: QuotationSectionType; label: string }[] = [
@@ -41,6 +60,7 @@ export function resolveQuotationPrintLayout(template?: Pick<QuotationTemplate, '
     ...DEFAULT_QUOTATION_PRINT_LAYOUT,
     ...template.printLayout,
     pageBreakBefore: template.printLayout.pageBreakBefore ?? DEFAULT_QUOTATION_PRINT_LAYOUT.pageBreakBefore,
+    printSkin: template.printLayout.printSkin ?? DEFAULT_QUOTATION_PRINT_LAYOUT.printSkin,
   }
 }
 
@@ -53,9 +73,13 @@ export function printLayoutStyleVars(layout: QuotationPrintLayout): CSSPropertie
 }
 
 export function printLayoutClassNames(layout: QuotationPrintLayout): string {
+  const skin = layout.printSkin && layout.printSkin !== 'default'
+    ? `quo-print-doc--skin-${layout.printSkin.replace(/_/g, '-')}`
+    : ''
   return [
     `quo-print-doc--${layout.pageSize.toLowerCase()}`,
     `quo-print-doc--header-${layout.headerStyle}`,
+    skin,
     layout.showLogo ? '' : 'quo-print-doc--no-logo',
     layout.showCompanyHeader ? '' : 'quo-print-doc--no-company-header',
     layout.showCustomerBlock ? '' : 'quo-print-doc--no-customer',

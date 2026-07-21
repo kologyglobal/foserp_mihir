@@ -58,6 +58,20 @@ router.post(
   controller.markDocumentSent,
 )
 router.post(
+  '/:id/documents/:docId/customer-approve',
+  requirePermission('crm.quotation.update'),
+  validateParams(quotationDocumentParamsSchema),
+  validateBody(approvalRemarksSchema),
+  controller.customerApproveDocument,
+)
+router.post(
+  '/:id/documents/:docId/customer-reject',
+  requirePermission('crm.quotation.update'),
+  validateParams(quotationDocumentParamsSchema),
+  validateBody(approvalRemarksSchema),
+  controller.customerRejectDocument,
+)
+router.post(
   '/:id/convert-to-sales-order',
   requirePermission('crm.quotation.convert', 'crm.sales_order.create'),
   validateParams(uuidParamSchema),

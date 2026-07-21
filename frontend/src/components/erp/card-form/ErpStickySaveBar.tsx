@@ -74,11 +74,11 @@ export function ErpStickySaveBar({
         </ErpButton>
       ) : null}
       {cancelTo ? (
-        <ErpButton type="button" variant="ghost" icon={X} onClick={() => navigate(cancelTo)}>
+        <ErpButton type="button" variant="secondary" icon={X} onClick={() => navigate(cancelTo)}>
           {cancelLabel}
         </ErpButton>
       ) : onCancel ? (
-        <ErpButton type="button" variant="ghost" icon={X} onClick={onCancel}>
+        <ErpButton type="button" variant="secondary" icon={X} onClick={onCancel}>
           {cancelLabel}
         </ErpButton>
       ) : null}

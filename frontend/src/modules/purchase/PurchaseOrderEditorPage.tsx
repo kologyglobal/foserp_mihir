@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ArrowRight,
   Banknote,
   Building2,
   CheckCircle,
@@ -12,22 +11,12 @@ import {
   MapPin,
   Package,
   Plus,
-  Printer,
-  Save,
-  Send,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
 import {
   purchaseSectionId,
   scrollToPurchaseValidationTarget,
 } from '@/components/purchase/PurchaseEnterpriseFormKit'
-import {
-  PurchaseOrderWorkspaceTabs,
-  derivePoWorkspaceTabs,
-  poSectionToWorkspace,
-  poWorkspaceHasValidationErrors,
-  type PoEditorWorkspace,
-} from '@/components/purchase/PurchaseOrderWorkspaceTabs'
 import {
   PurchaseDocumentFactBox,
   buildPurchaseRelatedLinks,
@@ -37,8 +26,8 @@ import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared
 import { PurchaseOrderLinesTable } from '@/components/purchase/PurchaseOrderLinesTable'
 import { PurchaseDocumentWorkflowStrip } from '@/components/purchase/PurchaseDocumentWorkflowStrip'
 import {
-  PurchaseOrderOriginBanner,
   PurchaseOrderOriginPicker,
+  PurchaseOrderOriginSourcePanel,
 } from '@/components/purchase/PurchaseOrderOriginPicker'
 import {
   PurchaseDocumentAttachments,
@@ -53,14 +42,11 @@ import {
   ErpCardSection,
   ErpFieldRow,
   ErpFormSpan,
-  ErpStickySaveBar,
 } from '@/components/erp/card-form'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
+import { ErpButton } from '@/components/erp/ErpButton'
+import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Input, Select } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { Modal } from '@/design-system/components/Modal'
-import { EnterpriseFormMetrics } from '@/design-system/workspace'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
   attachmentsSummary,
@@ -84,8 +70,9 @@ import {
   getRFQs,
   getVendorQuotations,
   getVendors,
+  getPurchaseWarehouses,
+  previewNextPurchaseOrderNumber,
   PurchaseServiceError,
-  submitPurchaseOrder,
   updatePurchaseOrder,
   PURCHASE_ORDER_DOMAIN_STATUS_LABELS,
   PURCHASE_ORDER_ORIGIN_LABELS,
@@ -107,7 +94,6 @@ import type {
   Vendor,
   VendorQuotation,
 } from '@/types/purchaseDomain'
-import { PURCHASE_DEMO_LOCATION, PURCHASE_DEMO_LOCATION_FG } from '@/data/purchase/purchaseDomainSeed'
 import {
   isPurchaseInsuranceTermsApplicable,
   PURCHASE_DELIVERY_TERMS,
@@ -124,11 +110,16 @@ import {
   validatePurchaseOrderForm,
 } from '@/utils/purchaseOrderValidation'
 import { notify } from '@/store/toastStore'
+import { purchaseUserMessage } from '@/utils/purchase/purchaseErrorMessages'
+import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
+import { useOptionalAuth } from '@/context/AuthProvider'
+import { isApiMode } from '@/config/apiConfig'
 
-const ACTOR = { id: 'user-buyer-01', code: 'BUY01', name: 'Rahul Patil' }
-const LOCATION_OPTIONS = [PURCHASE_DEMO_LOCATION, PURCHASE_DEMO_LOCATION_FG]
+type LocationOption = { id: string; code: string; name: string; state: string; city: string }
+const EMPTY_LOCATION: LocationOption = { id: '', code: '', name: '', state: '', city: '' }
 
-const EDITABLE_STATUSES: PurchaseOrder['status'][] = ['draft', 'pending_approval']
+// Backend rule: only draft and sent-back POs are editable (submitted POs are locked).
+const EDITABLE_STATUSES: PurchaseOrder['status'][] = ['draft', 'sent_back']
 const REVISABLE_STATUSES: PurchaseOrder['status'][] = [
   'released',
   'partially_received',
@@ -186,8 +177,8 @@ function emptyLine(partial?: Partial<PurchaseOrderLine>): PoEditorLine {
     lineTotal: 0,
     requiredDate: today(),
     deliverySchedule: '',
-    warehouseId: PURCHASE_DEMO_LOCATION.id,
-    warehouseName: PURCHASE_DEMO_LOCATION.name,
+    warehouseId: '',
+    warehouseName: '',
     costCentre: '',
     project: '',
     productionOrder: '',
@@ -195,8 +186,8 @@ function emptyLine(partial?: Partial<PurchaseOrderLine>): PoEditorLine {
     pendingQty: 0,
     invoicedQty: 0,
     lineStatus: 'open',
-    locationId: PURCHASE_DEMO_LOCATION.id,
-    locationName: PURCHASE_DEMO_LOCATION.name,
+    locationId: '',
+    locationName: '',
     expectedDeliveryDate: today(),
     prLineId: null,
     rfqLineId: null,
@@ -328,13 +319,13 @@ function defaultHeader(): PoEditorHeader {
     vendorAddress: '',
     isInterstate: false,
     placeOfSupply: '',
-    purchaseLocationId: PURCHASE_DEMO_LOCATION.id,
-    deliveryLocationId: PURCHASE_DEMO_LOCATION.id,
+    purchaseLocationId: '',
+    deliveryLocationId: '',
     department: 'Purchase',
     expectedDeliveryDate: today(),
     validityDate: '',
     paymentTerms: 'Net 30',
-    deliveryTerms: 'FOR Chakan',
+    deliveryTerms: 'Ex-Works',
     freightTerms: 'Buyer freight',
     packingTerms: '',
     insuranceTerms: '',
@@ -407,6 +398,20 @@ export function PurchaseOrderEditorPage() {
   const isNew = !id
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const auth = useOptionalAuth()
+  const sessionUser = auth?.session?.user
+  const ACTOR = useMemo(() => {
+    const name = sessionUser
+      ? `${sessionUser.firstName ?? ''} ${sessionUser.lastName ?? ''}`.trim() ||
+        sessionUser.email ||
+        sessionUser.id
+      : ''
+    return {
+      id: sessionUser?.id ?? '',
+      code: sessionUser?.email?.split('@')[0] ?? '',
+      name,
+    }
+  }, [sessionUser])
 
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
@@ -415,13 +420,12 @@ export function PurchaseOrderEditorPage() {
   const [documentNumber, setDocumentNumber] = useState<string | null>(null)
   const [status, setStatus] = useState<PurchaseOrder['status']>('draft')
   const [revisionNo, setRevisionNo] = useState(0)
-  const [createdMeta, setCreatedMeta] = useState({ by: ACTOR.name, at: '' })
+  const [createdMeta, setCreatedMeta] = useState({ by: '', at: '' })
   const [updatedMeta, setUpdatedMeta] = useState({ by: '', at: '' })
 
   const [header, setHeader] = useState<PoEditorHeader>(defaultHeader)
   const [lines, setLines] = useState<PoEditorLine[]>([])
   const [attachments, setAttachments] = useState<PurchaseDocumentAttachmentRow[]>([])
-  const [workspace, setWorkspace] = useState<PoEditorWorkspace>('vendor_order')
   const [, setActiveSection] = useState('general')
   const [attemptedMode, setAttemptedMode] = useState<'draft' | 'submit' | null>(null)
   const [forceOpenKey, setForceOpenKey] = useState(0)
@@ -434,6 +438,7 @@ export function PurchaseOrderEditorPage() {
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [catalogItems, setCatalogItems] = useState<PurchaseItem[]>([])
   const [purchaseSetup, setPurchaseSetup] = useState<PurchaseSetup | null>(null)
+  const [locationOptions, setLocationOptions] = useState<LocationOption[]>([])
 
   const originParam = (searchParams.get('origin') ?? '') as string
   const originModeFromParam: PurchaseOrderOrigin =
@@ -458,15 +463,6 @@ export function PurchaseOrderEditorPage() {
           searchParams.get('vqId') ||
           searchParams.get('blanketId'),
       ),
-  )
-  const willAutoCreateFromQuery =
-    (originModeFromParam === 'quotation_comparison' && Boolean(searchParams.get('comparisonId'))) ||
-    (originModeFromParam === 'vendor_quotation' && Boolean(searchParams.get('vqId')))
-  const [originLookupOpen, setOriginLookupOpen] = useState(
-    () =>
-      Boolean(originParam) &&
-      originModeFromParam !== 'manual' &&
-      !willAutoCreateFromQuery,
   )
   const [approvedPrs, setApprovedPrs] = useState<PurchaseRequisition[]>([])
   const [selectedPrId, setSelectedPrId] = useState(searchParams.get('prId') ?? '')
@@ -578,15 +574,6 @@ export function PurchaseOrderEditorPage() {
   )
   const showErrors = attemptedMode !== null
   const activeValidation = attemptedMode === 'draft' ? draftValidation : validation
-  const workspaceTabs = useMemo(
-    () =>
-      derivePoWorkspaceTabs({
-        submitValidation: validation,
-        attemptedValidation: showErrors ? activeValidation : null,
-        dirty,
-      }),
-    [validation, showErrors, activeValidation, dirty],
-  )
   const totals = useMemo(
     () =>
       aggregateTotals(
@@ -696,6 +683,7 @@ export function PurchaseOrderEditorPage() {
     createdMeta.by,
     updatedMeta.by,
     updatedMeta.at,
+    ACTOR.name,
   ])
 
   const notesPeek = useMemo(
@@ -708,40 +696,13 @@ export function PurchaseOrderEditorPage() {
     [attachments.length],
   )
 
-  const formMetrics = useMemo(
-    () => [
-      {
-        label: 'Lines',
-        value: String(computedLines.length),
-        accent: 'green' as const,
-      },
-      {
-        label: 'Subtotal',
-        value: formatCurrency(totals.subtotal),
-        accent: 'blue' as const,
-      },
-      {
-        label: 'Tax',
-        value: formatCurrency(gstTotal),
-        accent: 'violet' as const,
-      },
-      {
-        label: 'Grand Total',
-        value: formatCurrency(totals.totalAmount),
-        accent: 'amber' as const,
-        highlight: totals.totalAmount > 0,
-      },
-    ],
-    [computedLines.length, totals.subtotal, gstTotal, totals.totalAmount],
-  )
-
   const documentTitle = isNew ? 'New Purchase Order' : (documentNumber ?? 'Purchase Order')
   const vendorFact = selectedVendor?.vendorName || 'Not selected'
 
   const recordHeaderFacts = useMemo(
     () => [
       ...(isNew
-        ? [{ label: 'PO No', value: documentNumber ?? 'Auto-generated' }]
+        ? [{ label: 'PO No', value: documentNumber ?? 'Loading…' }]
         : []),
       { label: 'Vendor', value: vendorFact },
       { label: 'Buyer', value: ACTOR.name },
@@ -813,10 +774,39 @@ export function PurchaseOrderEditorPage() {
       getRFQs(),
       getBlanketOrders(),
       getPurchaseSetup(),
-    ]).then(async ([vendorRows, items, prs, vqs, rfqs, blankets, setup]) => {
+      getPurchaseWarehouses(),
+    ]).then(async ([vendorRows, items, prs, vqs, rfqs, blankets, setup, warehouses]) => {
       setVendors(vendorRows.filter((v) => v.isActive))
       setCatalogItems(items)
       setPurchaseSetup(setup)
+      const locs = warehouses.map((w) => ({
+        id: w.id,
+        code: w.code,
+        name: w.name,
+        state: w.state,
+        city: w.city,
+      }))
+      setLocationOptions(locs)
+      if (isNew) {
+        const preferred =
+          (setup.general.defaultWarehouseId &&
+            locs.find((l) => l.id === setup.general.defaultWarehouseId)?.id) ||
+          ''
+        setHeader((prev) => ({
+          ...prev,
+          purchaseLocationId: prev.purchaseLocationId || preferred,
+          deliveryLocationId: prev.deliveryLocationId || preferred,
+          paymentTerms: prev.paymentTerms || setup.general.defaultPaymentTerms || prev.paymentTerms,
+          deliveryTerms: prev.deliveryTerms || setup.general.defaultDeliveryTerms || prev.deliveryTerms,
+        }))
+        void previewNextPurchaseOrderNumber()
+          .then((next) => {
+            if (next) setDocumentNumber(next)
+          })
+          .catch(() => {
+            /* preview is optional — save still allocates server-side */
+          })
+      }
       setApprovedPrs(
         prs
           .filter((p) => p.status === 'approved' || p.status === 'converted_to_rfq')
@@ -839,7 +829,7 @@ export function PurchaseOrderEditorPage() {
         ),
       )
     })
-  }, [])
+  }, [isNew])
 
   useEffect(() => {
     if (isNew || !id) return
@@ -891,8 +881,10 @@ export function PurchaseOrderEditorPage() {
   }, [id, isNew, navigate, resetDirty])
 
   const toInput = useCallback(() => {
-    const purchaseLocation = LOCATION_OPTIONS.find((l) => l.id === header.purchaseLocationId) ?? PURCHASE_DEMO_LOCATION
-    const deliveryLocation = LOCATION_OPTIONS.find((l) => l.id === header.deliveryLocationId) ?? PURCHASE_DEMO_LOCATION
+    const purchaseLocation =
+      locationOptions.find((l) => l.id === header.purchaseLocationId) ?? EMPTY_LOCATION
+    const deliveryLocation =
+      locationOptions.find((l) => l.id === header.deliveryLocationId) ?? EMPTY_LOCATION
     return {
       vendorId: header.vendorId,
       documentDate: header.documentDate,
@@ -929,7 +921,7 @@ export function PurchaseOrderEditorPage() {
         .filter((l) => l.itemId || l.itemCode.trim() || l.itemName.trim())
         .map(({ key: _key, ...rest }) => rest),
     }
-  }, [attachmentIds, computedLines, header, totals.lineDiscount])
+  }, [attachmentIds, computedLines, header, totals.lineDiscount, locationOptions, ACTOR])
 
   const revealValidation = useCallback(
     (result: typeof validation, mode: 'draft' | 'submit') => {
@@ -942,9 +934,6 @@ export function PurchaseOrderEditorPage() {
         opened[section] = nextKey
       }
       setForceOpenSections(opened)
-      const targetWorkspace = poSectionToWorkspace(result.firstSection)
-      setWorkspace(targetWorkspace)
-      // Defer scroll until the target workspace panel is mounted.
       window.requestAnimationFrame(() => {
         scrollToPurchaseValidationTarget({
           fieldId: result.firstFieldId,
@@ -956,37 +945,18 @@ export function PurchaseOrderEditorPage() {
     [forceOpenKey],
   )
 
-  const focusValidationItem = useCallback(
-    (message: string) => {
-      const inVendor = poWorkspaceHasValidationErrors('vendor_order', activeValidation)
-      const inItems = poWorkspaceHasValidationErrors('items_financials', activeValidation)
-      const looksLikeLine =
-        /line/i.test(message) ||
-        /item/i.test(message) ||
-        /quantity/i.test(message) ||
-        /rate/i.test(message)
-      const target: PoEditorWorkspace =
-        looksLikeLine && inItems
-          ? 'items_financials'
-          : inVendor
-            ? 'vendor_order'
-            : inItems
-              ? 'items_financials'
-              : poSectionToWorkspace(activeValidation.firstSection)
-      setWorkspace(target)
-      window.requestAnimationFrame(() => {
-        scrollToPurchaseValidationTarget({
-          fieldId: activeValidation.firstFieldId,
-          sectionId: activeValidation.firstSection,
-          onActive: setActiveSection,
-        })
+  const focusValidationItem = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      scrollToPurchaseValidationTarget({
+        fieldId: activeValidation.firstFieldId,
+        sectionId: activeValidation.firstSection,
+        onActive: setActiveSection,
       })
-    },
-    [activeValidation],
-  )
+    })
+  }, [activeValidation])
 
-  const saveDraft = async (andView = false) => {
-    if (!editable) return
+  const saveDraft = async () => {
+    if (!editable || saving) return
     if (draftValidation.errors.length) {
       revealValidation(draftValidation, 'draft')
       return
@@ -999,53 +969,22 @@ export function PurchaseOrderEditorPage() {
         setDocumentNumber(updated.documentNumber)
         setStatus(updated.status)
         setUpdatedMeta({ by: updated.updatedBy ?? '', at: updated.updatedAt ?? '' })
-        notify.success(`Draft saved · ${updated.documentNumber}`)
+        notify.success(`Saved · ${updated.documentNumber}`)
         setLastSavedAt(new Date())
         resetDirty()
-        if (andView) navigate(`/purchase/orders/${recordId}`)
       } else {
         const created = await createPurchaseOrder(input)
         setRecordId(created.id)
         setDocumentNumber(created.documentNumber)
         setStatus(created.status)
         setCreatedMeta({ by: created.createdBy, at: created.createdAt })
-        notify.success(`Draft created · ${created.documentNumber}`)
+        notify.success(`Saved · ${created.documentNumber}`)
         setLastSavedAt(new Date())
         resetDirty()
-        navigate(`/purchase/orders/${created.id}/edit`, { replace: true })
       }
+      navigate(PURCHASE_FORM_ROUTES.purchaseOrder.list, { replace: true })
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const submitForApproval = async () => {
-    if (validation.errors.length) {
-      revealValidation(validation, 'submit')
-      return
-    }
-    setSaving(true)
-    try {
-      let poId = recordId
-      const input = toInput()
-      if (!poId) {
-        const created = await createPurchaseOrder(input)
-        poId = created.id
-        setRecordId(created.id)
-        setDocumentNumber(created.documentNumber)
-      } else {
-        await updatePurchaseOrder(poId, input)
-      }
-      const submitted = await submitPurchaseOrder(poId)
-      setStatus(submitted.status)
-      setLastSavedAt(new Date())
-      resetDirty()
-      notify.success(`${submitted.documentNumber} submitted for approval`)
-      navigate(`/purchase/orders/${poId}`)
-    } catch (err) {
-      notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
     } finally {
       setSaving(false)
     }
@@ -1093,7 +1032,7 @@ export function PurchaseOrderEditorPage() {
       notify.success(`${created.documentNumber} created`)
       navigate(`/purchase/orders/${created.id}/edit`, { replace: true })
     } catch (err) {
-      notify.error(err instanceof PurchaseServiceError ? err.message : 'Could not create purchase order')
+      notify.error(purchaseUserMessage(err, 'Could not create purchase order'))
     } finally {
       setCreating(false)
     }
@@ -1108,6 +1047,14 @@ export function PurchaseOrderEditorPage() {
       void createFromOrigin()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const apiOriginDisabled = useMemo((): Partial<Record<PurchaseOrderOrigin, string>> | undefined => {
+    if (!isApiMode()) return undefined
+    return {
+      vendor_quotation: 'Use Quotation Comparison → Create PO (VQ→PO direct is not API-backed yet).',
+      blanket_order: 'Blanket call-off is not available in API mode yet.',
+    }
   }, [])
 
   if (loading) {
@@ -1135,14 +1082,16 @@ export function PurchaseOrderEditorPage() {
   const showPoForm = !awaitingOriginCreate
 
   const selectOrigin = (mode: PurchaseOrderOrigin) => {
+    if (apiOriginDisabled?.[mode]) {
+      notify.info(apiOriginDisabled[mode])
+      return
+    }
     setOriginMode(mode)
     setOriginChosen(true)
-    setOriginLookupOpen(mode !== 'manual')
   }
 
   const reopenOriginSelector = () => {
     setOriginChosen(false)
-    setOriginLookupOpen(false)
   }
 
   /** Origin-gated source refs: only relevant labels; hide empty values (no wall of "—"). */
@@ -1199,118 +1148,240 @@ export function PurchaseOrderEditorPage() {
       validationErrors={showErrors ? activeValidation.errors : []}
       validationItems={
         showErrors
-          ? activeValidation.errors.map((message, i) => {
-              const workspaceLabel =
-                /vendor/i.test(message) ||
-                /po date/i.test(message) ||
-                /expected delivery/i.test(message)
-                  ? 'Vendor & Order Details'
-                  : 'Items & Financials'
-              return {
-                id: `po-err-${i}`,
-                label: `${workspaceLabel} · ${message}`,
-                message: 'Required',
-                onClick: () => focusValidationItem(message),
-              }
-            })
+          ? activeValidation.errors.map((message, i) => ({
+              id: `po-err-${i}`,
+              label: message,
+              message: 'Required',
+              onClick: () => focusValidationItem(),
+            }))
           : undefined
       }
-      commandBar={
-        <ErpCommandBar
-          inline
-          sticky={false}
-          collapseSecondaryOnNarrow
-          moreActions={[
-            {
-              id: 'print',
-              label: 'Print',
-              icon: Printer,
-              onClick: () => window.print(),
-            },
-          ]}
-        />
-      }
-      factBox={documentFactBox}
-      collapsibleFactBox
+      commandBar={null}
+      factBox={awaitingOriginCreate ? undefined : documentFactBox}
+      collapsibleFactBox={!awaitingOriginCreate}
       stickyFooter
       footer={
-        <ErpStickySaveBar
+        <FormActionBar
           sticky
-          isSubmitting={saving}
-          cancelLabel="Cancel"
-          onCancel={() => navigate('/purchase/orders')}
-          actions={
-            <ErpButtonGroup>
-              <ErpButton
-                type="button"
-                variant="ghost"
-                disabled={saving}
-                onClick={() => navigate('/purchase/orders')}
-              >
-                Cancel
-              </ErpButton>
-              <ErpButton
-                type="button"
-                variant="secondary"
-                icon={Save}
-                disabled={awaitingOriginCreate || !editable || saving}
-                onClick={() => void saveDraft(false)}
-              >
-                {saving ? 'Saving…' : 'Save Draft'}
-              </ErpButton>
-              {workspace === 'vendor_order' ? (
-                <ErpButton
-                  type="button"
-                  variant="primary"
-                  icon={ArrowRight}
-                  disabled={awaitingOriginCreate || !editable || saving}
-                  onClick={() => setWorkspace('items_financials')}
-                >
-                  Continue to Items &amp; Financials
-                </ErpButton>
-              ) : (
-                <ErpButton
-                  type="button"
-                  variant="primary"
-                  icon={Send}
-                  disabled={
-                    awaitingOriginCreate ||
-                    !editable ||
-                    saving ||
-                    (showErrors && validation.errors.length > 0)
-                  }
-                  disabledReason={
-                    showErrors && validation.errors.length > 0
-                      ? 'Fix validation errors first'
-                      : undefined
-                  }
-                  onClick={() => void submitForApproval()}
-                >
-                  Submit for Approval
-                </ErpButton>
-              )}
-            </ErpButtonGroup>
+          cancelFirst
+          busy={saving}
+          dirty={dirty}
+          disabled={awaitingOriginCreate || !editable}
+          disabledReason={
+            awaitingOriginCreate
+              ? 'Choose a purchase order origin first'
+              : !editable
+                ? 'Document is read-only'
+                : undefined
           }
+          onCancel={() => {
+            resetDirty()
+            navigate(PURCHASE_FORM_ROUTES.purchaseOrder.list)
+          }}
+          onSave={saveDraft}
         />
       }
-      onSaveShortcut={() => void saveDraft(false)}
-      backLink={{ to: '/purchase/orders', label: 'Back to Purchase Orders' }}
+      onSaveShortcut={() => void saveDraft()}
     >
-      {isNew ? (
-        !originChosen ? (
+      {isNew && !recordId ? (
+        <div className="mb-3 space-y-3">
           <PurchaseOrderOriginPicker
-            className="mb-4"
+            selected={originChosen ? originMode : null}
             onSelect={selectOrigin}
             pendingPoCount={approvedPrs.filter((p) => !p.rfqRequired && !p.convertedPoId).length}
+            disabledOrigins={apiOriginDisabled}
           />
-        ) : (
-          <PurchaseOrderOriginBanner
-            originLabel={PURCHASE_ORDER_ORIGIN_LABELS[originMode]}
-            showSelectSource={originMode !== 'manual'}
-            onSelectSource={() => setOriginLookupOpen(true)}
-            onChangeSource={reopenOriginSelector}
-          />
-        )
+          {originChosen && originMode !== 'manual' ? (
+            <PurchaseOrderOriginSourcePanel
+              originLabel={PURCHASE_ORDER_ORIGIN_LABELS[originMode]}
+              description={
+                originMode === 'purchase_requisition'
+                  ? 'Direct PRs (RFQ not required) create PO via Planning. RFQ-required PRs must go through RFQ → comparison.'
+                  : originMode === 'quotation_comparison'
+                    ? 'Select a completed comparison with an approved recommendation.'
+                    : originMode === 'vendor_quotation'
+                      ? 'Select a vendor quotation marked as selected / approved.'
+                      : 'Release quantities against an active blanket order.'
+              }
+              actions={
+                <>
+                  <ErpButton type="button" variant="ghost" disabled={creating} onClick={reopenOriginSelector}>
+                    Cancel
+                  </ErpButton>
+                  <ErpButton
+                    type="button"
+                    variant="primary"
+                    icon={Plus}
+                    disabled={
+                      creating ||
+                      (originMode === 'purchase_requisition' &&
+                        (!selectedPrId ||
+                          Boolean(approvedPrs.find((p) => p.id === selectedPrId)?.rfqRequired))) ||
+                      (originMode === 'quotation_comparison' && !selectedComparisonId) ||
+                      (originMode === 'vendor_quotation' && !selectedVqId) ||
+                      (originMode === 'blanket_order' && !selectedBlanketId)
+                    }
+                    onClick={() => void createFromOrigin()}
+                  >
+                    {creating ? 'Creating…' : 'Create Purchase Order'}
+                  </ErpButton>
+                </>
+              }
+            >
+              {originMode === 'purchase_requisition' ? (
+                <div className="space-y-3">
+                  {approvedPrs.length === 0 ? (
+                    <p className="text-[13px] text-erp-muted">No approved requisitions available.</p>
+                  ) : (
+                    <Select value={selectedPrId} onChange={(e) => setSelectedPrId(e.target.value)}>
+                      <option value="">Select approved requisition…</option>
+                      {approvedPrs.map((pr) => (
+                        <option key={pr.id} value={pr.id}>
+                          {pr.documentNumber} · {pr.department} · {formatCurrency(pr.totalAmount)}
+                          {pr.status === 'approved' && !pr.rfqRequired
+                            ? ' · Ready for PO'
+                            : pr.status === 'converted_to_rfq'
+                              ? ' · Via RFQ'
+                              : pr.rfqRequired
+                                ? ' · RFQ required'
+                                : ''}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                  {selectedPrId && approvedPrs.find((p) => p.id === selectedPrId)?.rfqRequired ? (
+                    <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+                      This PR requires RFQ. Open{' '}
+                      <a className="underline" href={`/purchase/rfqs/new?prId=${selectedPrId}`}>
+                        New RFQ
+                      </a>{' '}
+                      (or Comparison → Create PO). Direct PO from PR is not allowed.
+                    </p>
+                  ) : null}
+                  <Select value={selectedPrVendorId} onChange={(e) => setSelectedPrVendorId(e.target.value)}>
+                    <option value="">Vendor (optional — use Planning preferred vendor)</option>
+                    {vendors.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.vendorCode} — {v.vendorName}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              ) : originMode === 'quotation_comparison' ? (
+                <div className="space-y-3">
+                  {eligibleComparisons.length === 0 ? (
+                    <p className="text-[13px] text-erp-muted">No completed &amp; approved comparisons available.</p>
+                  ) : (
+                    <Select
+                      value={selectedComparisonId}
+                      onChange={(e) => setSelectedComparisonId(e.target.value)}
+                    >
+                      <option value="">Select comparison…</option>
+                      {eligibleComparisons.map(({ comparison, rfq }) => (
+                        <option key={comparison.id} value={comparison.id}>
+                          {comparison.documentNumber} · RFQ {rfq.documentNumber} ·{' '}
+                          {comparison.recommendedVendorName}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </div>
+              ) : originMode === 'vendor_quotation' ? (
+                <div className="space-y-3">
+                  {approvedVqs.length === 0 ? (
+                    <p className="text-[13px] text-erp-muted">
+                      No approved (selected) vendor quotations available. Create or select a quotation
+                      under Vendors → Vendor Quotation first.
+                    </p>
+                  ) : (
+                    <Select value={selectedVqId} onChange={(e) => setSelectedVqId(e.target.value)}>
+                      <option value="">Select vendor quotation…</option>
+                      {approvedVqs.map((vq) => (
+                        <option key={vq.id} value={vq.id}>
+                          {vq.documentNumber} · {vq.vendor.name} · {formatCurrency(vq.totalAmount)}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </div>
+              ) : originMode === 'blanket_order' ? (
+                <div className="space-y-3">
+                  {activeBlankets.length === 0 ? (
+                    <p className="text-[13px] text-erp-muted">No active blanket orders available.</p>
+                  ) : (
+                    <Select
+                      value={selectedBlanketId}
+                      onChange={(e) => {
+                        setSelectedBlanketId(e.target.value)
+                        setBlanketQuantities({})
+                      }}
+                    >
+                      <option value="">Select active blanket order…</option>
+                      {activeBlankets.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.documentNumber} · {b.vendor.name}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                  {selectedBlanketId
+                    ? (() => {
+                        const blanket = activeBlankets.find((b) => b.id === selectedBlanketId)
+                        if (!blanket) return null
+                        return (
+                          <div className="overflow-x-auto rounded-md border border-erp-border">
+                            <table className="erp-table text-[12px]">
+                              <thead>
+                                <tr>
+                                  <th>Item Code</th>
+                                  <th>Item</th>
+                                  <th className="num">Max Qty</th>
+                                  <th className="num">Released</th>
+                                  <th className="num">Available</th>
+                                  <th className="num">Rate</th>
+                                  <th className="num">Release Qty</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {blanket.lines.map((l) => {
+                                  const available = Math.max(0, l.maxQuantity - l.releasedQuantity)
+                                  return (
+                                    <tr key={l.id}>
+                                      <td className="font-mono">{l.itemCode}</td>
+                                      <td>{l.itemName}</td>
+                                      <td className="num">{l.maxQuantity}</td>
+                                      <td className="num">{l.releasedQuantity}</td>
+                                      <td className="num">{available}</td>
+                                      <td className="num">{formatCurrency(l.rate)}</td>
+                                      <td className="num">
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          max={available}
+                                          className="erp-input h-8 w-24 text-right text-[12px]"
+                                          value={blanketQuantities[l.itemId] ?? 0}
+                                          onChange={(e) =>
+                                            setBlanketQuantities((prev) => ({
+                                              ...prev,
+                                              [l.itemId]: Number(e.target.value),
+                                            }))
+                                          }
+                                        />
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )
+                      })()
+                    : null}
+                </div>
+              ) : null}
+            </PurchaseOrderOriginSourcePanel>
+          ) : null}
+        </div>
       ) : null}
 
       {showPoForm ? (
@@ -1321,21 +1392,7 @@ export function PurchaseOrderEditorPage() {
             nextActionContext={{ canSubmit: editable }}
           />
 
-          <EnterpriseFormMetrics metrics={formMetrics} />
-
-          <PurchaseOrderWorkspaceTabs
-            active={workspace}
-            onChange={setWorkspace}
-            tabs={workspaceTabs}
-          />
-
-          {workspace === 'vendor_order' ? (
-            <div
-              id="po-workspace-panel-vendor_order"
-              role="tabpanel"
-              aria-labelledby="po-workspace-tab-vendor_order"
-              className="space-y-3"
-            >
+          <div className="space-y-3">
           <ErpCardSection
             id={purchaseSectionId('general')}
             title="Order Information"
@@ -1347,8 +1404,13 @@ export function PurchaseOrderEditorPage() {
             forceOpenKey={forceOpenSections.general}
             dense
           >
-            <ErpFieldRow label="PO Number" readOnly>
-              <Input value={documentNumber ?? 'Auto-generated'} readOnly className="bg-erp-surface-alt" />
+            <ErpFieldRow label="PO Number" readOnly hint={isNew ? 'Preview from number series — assigned when you save' : undefined}>
+              <Input
+                value={documentNumber ?? ''}
+                placeholder="Loading number…"
+                readOnly
+                className="bg-erp-surface-alt"
+              />
             </ErpFieldRow>
             <ErpFieldRow
               id={purchaseFieldId('documentDate')}
@@ -1441,41 +1503,41 @@ export function PurchaseOrderEditorPage() {
                 }}
               />
             </ErpFieldRow>
-            {selectedVendor ? (
-              <ErpFormSpan span={3}>
-                <div className="mt-1 rounded-md border border-erp-border bg-erp-surface-alt/60 px-3 py-2.5 text-[12px]">
-                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
-                    Vendor summary
-                  </p>
-                  <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-4">
-                    <div>
-                      <span className="text-erp-muted">Code</span>
-                      <p className="font-mono font-medium text-erp-text">{selectedVendor.vendorCode}</p>
-                    </div>
-                    <div>
-                      <span className="text-erp-muted">GSTIN</span>
-                      <p className="font-mono font-medium text-erp-text">
-                        {selectedVendor.gstin || '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-erp-muted">Payment terms</span>
-                      <p className="font-medium text-erp-text">
-                        {header.paymentTerms || selectedVendor.paymentTerms || '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-erp-muted">Lead time</span>
-                      <p className="font-medium text-erp-text">
-                        {selectedVendor.leadTimeDays != null
-                          ? `${selectedVendor.leadTimeDays} days`
-                          : '—'}
-                      </p>
-                    </div>
+            <ErpFormSpan span={3}>
+              <div className="mt-1 min-h-[4.75rem] rounded-md border border-erp-border bg-erp-surface-alt/60 px-3 py-2.5 text-[12px]">
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
+                  Vendor summary
+                </p>
+                <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <span className="text-erp-muted">Code</span>
+                    <p className="font-mono font-medium text-erp-text">
+                      {selectedVendor?.vendorCode || '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-erp-muted">GSTIN</span>
+                    <p className="font-mono font-medium text-erp-text">
+                      {selectedVendor?.gstin || '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-erp-muted">Payment terms</span>
+                    <p className="font-medium text-erp-text">
+                      {header.paymentTerms || selectedVendor?.paymentTerms || '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-erp-muted">Lead time</span>
+                    <p className="font-medium text-erp-text">
+                      {selectedVendor?.leadTimeDays != null
+                        ? `${selectedVendor.leadTimeDays} days`
+                        : '—'}
+                    </p>
                   </div>
                 </div>
-              </ErpFormSpan>
-            ) : null}
+              </div>
+            </ErpFormSpan>
           </ErpCardSection>
 
           <ErpCardSection
@@ -1493,7 +1555,7 @@ export function PurchaseOrderEditorPage() {
                 disabled={!editable}
                 onChange={(e) => patchHeader({ purchaseLocationId: e.target.value })}
               >
-                {LOCATION_OPTIONS.map((l) => (
+                {locationOptions.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.name}
                   </option>
@@ -1506,7 +1568,7 @@ export function PurchaseOrderEditorPage() {
                 disabled={!editable}
                 onChange={(e) => patchHeader({ deliveryLocationId: e.target.value })}
               >
-                {LOCATION_OPTIONS.map((l) => (
+                {locationOptions.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.name}
                   </option>
@@ -1670,14 +1732,7 @@ export function PurchaseOrderEditorPage() {
               </ErpFieldRow>
             ) : null}
           </ErpCardSection>
-            </div>
-          ) : (
-            <div
-              id="po-workspace-panel-items_financials"
-              role="tabpanel"
-              aria-labelledby="po-workspace-tab-items_financials"
-              className="space-y-3"
-            >
+
           <ErpCardSection
             id={purchaseSectionId('lines')}
             title="Item Lines"
@@ -1700,7 +1755,7 @@ export function PurchaseOrderEditorPage() {
               <PurchaseOrderLinesTable
                 lines={computedLines}
                 catalogItems={catalogItemsForPicker}
-                warehouseOptions={LOCATION_OPTIONS}
+                warehouseOptions={locationOptions}
                 editable={editable}
                 isInterstate={isInterstate}
                 dirty={dirty}
@@ -1908,194 +1963,10 @@ export function PurchaseOrderEditorPage() {
               <p className="mt-2 text-[12px] text-erp-muted">Revision {revisionNo}</p>
             ) : null}
           </ErpCardSection>
-            </div>
-          )}
+          </div>
         </>
       ) : null}
     </PurchaseCardFormShell>
-
-    <Modal
-      open={isNew && !recordId && originLookupOpen && originMode !== 'manual'}
-      onClose={() => setOriginLookupOpen(false)}
-      title={`Create from ${PURCHASE_ORDER_ORIGIN_LABELS[originMode]}`}
-      description={
-        originMode === 'purchase_requisition'
-          ? 'Select an approved requisition. Optionally override the preferred vendor.'
-          : originMode === 'quotation_comparison'
-            ? 'Select a completed comparison with an approved recommendation.'
-            : originMode === 'vendor_quotation'
-              ? 'Select a vendor quotation marked as selected / approved.'
-              : 'Release quantities against an active blanket order.'
-      }
-      size={originMode === 'blanket_order' ? 'lg' : 'md'}
-      closeDisabled={creating}
-      footer={
-        <div className="flex justify-end gap-2">
-          <ErpButton
-            type="button"
-            variant="ghost"
-            disabled={creating}
-            onClick={() => setOriginLookupOpen(false)}
-          >
-            Cancel
-          </ErpButton>
-          <ErpButton
-            type="button"
-            variant="primary"
-            icon={Plus}
-            disabled={
-              creating ||
-              (originMode === 'purchase_requisition' && !selectedPrId) ||
-              (originMode === 'quotation_comparison' && !selectedComparisonId) ||
-              (originMode === 'vendor_quotation' && !selectedVqId) ||
-              (originMode === 'blanket_order' && !selectedBlanketId)
-            }
-            onClick={() => void createFromOrigin()}
-          >
-            {creating ? 'Creating…' : 'Create Purchase Order'}
-          </ErpButton>
-        </div>
-      }
-    >
-      {originMode === 'purchase_requisition' ? (
-        <div className="space-y-3">
-          {approvedPrs.length === 0 ? (
-            <p className="text-[13px] text-erp-muted">No approved requisitions available.</p>
-          ) : (
-            <Select value={selectedPrId} onChange={(e) => setSelectedPrId(e.target.value)}>
-              <option value="">Select approved requisition…</option>
-              {approvedPrs.map((pr) => (
-                <option key={pr.id} value={pr.id}>
-                  {pr.documentNumber} · {pr.department} · {formatCurrency(pr.totalAmount)}
-                  {pr.status === 'approved' && !pr.rfqRequired
-                    ? ' · Ready for PO'
-                    : pr.status === 'converted_to_rfq'
-                      ? ' · Via RFQ'
-                      : pr.rfqRequired
-                        ? ' · RFQ required'
-                        : ''}
-                </option>
-              ))}
-            </Select>
-          )}
-          <Select value={selectedPrVendorId} onChange={(e) => setSelectedPrVendorId(e.target.value)}>
-            <option value="">Vendor (optional — use PR preferred vendor)</option>
-            {vendors.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.vendorCode} — {v.vendorName}
-              </option>
-            ))}
-          </Select>
-        </div>
-      ) : originMode === 'quotation_comparison' ? (
-        <div className="space-y-3">
-          {eligibleComparisons.length === 0 ? (
-            <p className="text-[13px] text-erp-muted">No completed &amp; approved comparisons available.</p>
-          ) : (
-            <Select
-              value={selectedComparisonId}
-              onChange={(e) => setSelectedComparisonId(e.target.value)}
-            >
-              <option value="">Select comparison…</option>
-              {eligibleComparisons.map(({ comparison, rfq }) => (
-                <option key={comparison.id} value={comparison.id}>
-                  {comparison.documentNumber} · RFQ {rfq.documentNumber} · {comparison.recommendedVendorName}
-                </option>
-              ))}
-            </Select>
-          )}
-        </div>
-      ) : originMode === 'vendor_quotation' ? (
-        <div className="space-y-3">
-          {approvedVqs.length === 0 ? (
-            <p className="text-[13px] text-erp-muted">No approved (selected) vendor quotations available.</p>
-          ) : (
-            <Select value={selectedVqId} onChange={(e) => setSelectedVqId(e.target.value)}>
-              <option value="">Select vendor quotation…</option>
-              {approvedVqs.map((vq) => (
-                <option key={vq.id} value={vq.id}>
-                  {vq.documentNumber} · {vq.vendor.name} · {formatCurrency(vq.totalAmount)}
-                </option>
-              ))}
-            </Select>
-          )}
-        </div>
-      ) : originMode === 'blanket_order' ? (
-        <div className="space-y-3">
-          {activeBlankets.length === 0 ? (
-            <p className="text-[13px] text-erp-muted">No active blanket orders available.</p>
-          ) : (
-            <Select
-              value={selectedBlanketId}
-              onChange={(e) => {
-                setSelectedBlanketId(e.target.value)
-                setBlanketQuantities({})
-              }}
-            >
-              <option value="">Select active blanket order…</option>
-              {activeBlankets.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.documentNumber} · {b.vendor.name}
-                </option>
-              ))}
-            </Select>
-          )}
-          {selectedBlanketId
-            ? (() => {
-                const blanket = activeBlankets.find((b) => b.id === selectedBlanketId)
-                if (!blanket) return null
-                return (
-                  <div className="overflow-x-auto rounded-md border border-erp-border">
-                    <table className="erp-table text-[12px]">
-                      <thead>
-                        <tr>
-                          <th>Item Code</th>
-                          <th>Item</th>
-                          <th className="num">Max Qty</th>
-                          <th className="num">Released</th>
-                          <th className="num">Available</th>
-                          <th className="num">Rate</th>
-                          <th className="num">Release Qty</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {blanket.lines.map((l) => {
-                          const available = Math.max(0, l.maxQuantity - l.releasedQuantity)
-                          return (
-                            <tr key={l.id}>
-                              <td className="font-mono">{l.itemCode}</td>
-                              <td>{l.itemName}</td>
-                              <td className="num">{l.maxQuantity}</td>
-                              <td className="num">{l.releasedQuantity}</td>
-                              <td className="num">{available}</td>
-                              <td className="num">{formatCurrency(l.rate)}</td>
-                              <td className="num">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={available}
-                                  className="erp-input h-8 w-24 text-right text-[12px]"
-                                  value={blanketQuantities[l.itemId] ?? 0}
-                                  onChange={(e) =>
-                                    setBlanketQuantities((prev) => ({
-                                      ...prev,
-                                      [l.itemId]: Number(e.target.value),
-                                    }))
-                                  }
-                                />
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )
-              })()
-            : null}
-        </div>
-      ) : null}
-    </Modal>
     </>
   )
 }

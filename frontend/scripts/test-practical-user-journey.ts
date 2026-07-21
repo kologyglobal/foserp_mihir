@@ -177,6 +177,9 @@ const leadR = sales.createLead({
   lifecycleStatus: 'open',
   stage: 'new',
   productRequirement: 'Journey test requirement',
+  remarks: 'Test notes',
+  contactPerson: 'Test Contact',
+  mobile: '9876543210',
   source: 'referral',
   industry: 'Cement',
   probability: 55,
@@ -227,7 +230,7 @@ if (leadR.ok) {
     if (fu.ok && fu.followUpId) useCrmStore.getState().completeFollowUp(fu.followUpId, 'Called customer')
     check(1, 'Follow-up and activity recorded', useCrmStore.getState().activities.length > actsBefore)
 
-    const quoR = crm.createQuotationFromOpportunity(oppR.opportunityId, 'qtpl-standard-trailer', 2150000)
+    const quoR = crm.createQuotationFromOpportunity(oppR.opportunityId, 'qtpl-iso-tank', 2150000)
     check(2, 'Opportunity to quotation works', quoR.ok, quoR.documentId)
 
     if (quoR.ok && quoR.documentId) {

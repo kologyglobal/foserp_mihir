@@ -11,7 +11,7 @@ export function purchaseBreadcrumbs(...trail: { label: string; to?: string }[]) 
 
 export function purchaseStatusTone(status: string): 'success' | 'warning' | 'critical' | 'info' | 'neutral' {
   if (status === 'draft') return 'neutral'
-  if (status === 'submitted' || status === 'sent' || status === 'pending_qc') return 'warning'
+  if (status === 'submitted' || status === 'sent' || status === 'pending_qc' || status === 'sent_back') return 'warning'
   if (status === 'approved' || status === 'quoted' || status === 'posted' || status === 'released') return 'success'
   if (status === 'cancelled' || status === 'rejected') return 'critical'
   if (status === 'converted' || status === 'closed' || status === 'received' || status === 'partial') return 'info'
@@ -43,7 +43,11 @@ export function PurchaseDataTable({ children, className }: { children: ReactNode
 }
 
 export function PurchaseTableToolbar({ children }: { children: ReactNode }) {
-  return <div className="mb-3 flex items-center justify-between gap-3 text-sm text-erp-muted">{children}</div>
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-start gap-2 text-sm text-erp-muted">
+      {children}
+    </div>
+  )
 }
 
 export function PurchaseDocTimeline({

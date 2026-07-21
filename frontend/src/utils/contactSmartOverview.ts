@@ -33,20 +33,20 @@ export function buildContactSmartSignals(input: ContactSmartOverviewInput): CrmS
   const missing: CrmSmartSignal[] = []
   const ok: CrmSmartSignal[] = []
 
-  if (!input.name.trim()) missing.push({ id: 'name', label: 'Contact name missing', tone: 'warn' })
+  if (!input.name.trim()) missing.push({ id: 'name', label: 'Add contact name', tone: 'warn' })
   else ok.push({ id: 'name', label: 'Name captured', tone: 'ok' })
 
-  if (!input.customerId) missing.push({ id: 'company', label: 'Company not linked', tone: 'warn' })
+  if (!input.customerId) missing.push({ id: 'company', label: 'Link a company', tone: 'warn' })
   else ok.push({ id: 'company', label: 'Company linked', tone: 'ok' })
 
   if (!input.phone.trim() && !input.email.trim()) {
-    missing.push({ id: 'reach', label: 'No phone or email', tone: 'warn' })
+    missing.push({ id: 'reach', label: 'Add phone or email', tone: 'warn' })
   } else {
     ok.push({ id: 'reach', label: 'Reachable contact', tone: 'ok' })
   }
 
   if (!input.designation.trim() && !input.department.trim()) {
-    missing.push({ id: 'role', label: 'Role / department blank', tone: 'warn' })
+    missing.push({ id: 'role', label: 'Add role or department', tone: 'warn' })
   } else {
     ok.push({ id: 'role', label: 'Role captured', tone: 'ok' })
   }

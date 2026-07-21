@@ -13,6 +13,10 @@ import { CrmDrawerShell } from './CrmDrawerShell'
 import { FormField } from '../forms/FormField'
 import { Input, Select, Textarea, MobileInput } from '../forms/Inputs'
 import { Button } from '../ui/Button'
+import { notify } from '../../store/toastStore'
+import { buildContactSchema } from '../../utils/validation/crmSchemas/contactSchema'
+import { DEFAULT_CUSTOMER_COUNTRY } from '../../config/countries'
+import { handleInvalidSubmit } from '../../utils/formValidation'
 
 const FALLBACK_ACTIVITY_TYPES: { id: CrmActivityType; label: string }[] = [
   { id: 'call', label: 'Call' },
@@ -62,6 +66,40 @@ export function NewContactDrawer({
   function submit(e: React.FormEvent) {
     e.preventDefault()
     if (submitting) return
+    const country =
+      customers.find((c) => c.id === customerId)?.country
+      ?? DEFAULT_CUSTOMER_COUNTRY
+    const parsed = buildContactSchema(() => country).safeParse({
+      contactCode: 'TEMP',
+      customerId,
+      name,
+      designation,
+      department,
+      email,
+      phone,
+      isPrimary,
+    })
+    if (!parsed.success) {
+      const fieldErrors: Record<string, string> = {}
+      for (const issue of parsed.error.issues) {
+        const key = String(issue.path[0] ?? '')
+        if (key && !fieldErrors[key]) fieldErrors[key] = issue.message
+      }
+      handleInvalidSubmit({
+        errors: fieldErrors,
+        fieldOrder: ['customerId', 'name', 'email', 'phone'],
+        fieldLabels: {
+          customerId: 'Customer',
+          name: 'Name',
+          email: 'Email',
+          phone: 'Phone',
+        },
+        notifyMessage: 'Fix the highlighted contact fields',
+        root: e.currentTarget,
+      })
+      setError(Object.values(fieldErrors)[0] ?? 'Invalid contact details')
+      return
+    }
     let contactCode = ''
     try {
       contactCode = reserveCode('contact')
@@ -74,19 +112,22 @@ export function NewContactDrawer({
       try {
         const r = await resolveStoreAction(createContact({
           contactCode,
-          customerId,
-          name,
-          designation,
-          department,
-          email,
-          phone,
-          isPrimary,
+          customerId: parsed.data.customerId,
+          name: parsed.data.name,
+          designation: parsed.data.designation ?? '',
+          department: parsed.data.department ?? '',
+          email: parsed.data.email ?? '',
+          phone: parsed.data.phone ?? '',
+          isPrimary: Boolean(parsed.data.isPrimary),
         }))
         if (!r.ok) {
-          setError(r.error ?? 'Failed to create contact')
+          const msg = r.error ?? formatApiError('Failed to create contact')
+          setError(msg)
+          notify.error(msg)
           return
         }
         confirmCode('contact', contactCode)
+        notify.success('Contact created')
         if (r.contactId) onCreated?.(r.contactId)
         onClose()
         setName('')

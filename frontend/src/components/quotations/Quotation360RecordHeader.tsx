@@ -8,9 +8,13 @@ import {
   MoreHorizontal,
   Pencil,
   Printer,
+  RotateCcw,
   Send,
   ShoppingCart,
   Star,
+  Trash2,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react'
 import { StatusBadge } from '@/design-system/list-page'
 import {
@@ -22,6 +26,7 @@ import { useUIStore } from '@/store/uiStore'
 import { cn } from '@/utils/cn'
 import { quotationStatusLabel } from './QuotationCrmCard'
 import type { QuotationDocumentStatus } from '@/types/crm'
+import { quotationRevisionLabel } from './Quotation360Sections'
 
 export interface Quotation360RecordHeaderProps {
   quotationNo: string
@@ -35,7 +40,11 @@ export interface Quotation360RecordHeaderProps {
   canMarkSent: boolean
   canSubmitApproval: boolean
   canApprove: boolean
+  canRecall?: boolean
+  canCustomerApprove: boolean
+  canCustomerReject?: boolean
   canRevise: boolean
+  canDelete?: boolean
   showCreateSalesOrder: boolean
   canCreateSalesOrder: boolean
   createSalesOrderDisabledReason?: string | null
@@ -46,9 +55,13 @@ export interface Quotation360RecordHeaderProps {
   onMarkSent: () => void
   onSubmitApproval: () => void
   onApprove: () => void
+  onRecall?: () => void
+  onCustomerApprove: () => void
+  onCustomerReject?: () => void
   onNewRevision: () => void
   onCreateSalesOrder: () => void
   onViewSalesOrder?: () => void
+  onDelete?: () => void
 }
 
 function useNarrowViewport() {
@@ -77,7 +90,11 @@ export function Quotation360RecordHeader({
   canMarkSent,
   canSubmitApproval,
   canApprove,
+  canRecall = false,
+  canCustomerApprove,
+  canCustomerReject = false,
   canRevise,
+  canDelete = false,
   showCreateSalesOrder,
   canCreateSalesOrder,
   createSalesOrderDisabledReason,
@@ -88,9 +105,13 @@ export function Quotation360RecordHeader({
   onMarkSent,
   onSubmitApproval,
   onApprove,
+  onRecall,
+  onCustomerApprove,
+  onCustomerReject,
   onNewRevision,
   onCreateSalesOrder,
   onViewSalesOrder,
+  onDelete,
 }: Quotation360RecordHeaderProps) {
   const narrow = useNarrowViewport()
   const toggleFavorite = useUIStore((s) => s.toggleFavorite)
@@ -116,14 +137,23 @@ export function Quotation360RecordHeader({
             icon: Eye,
             onClick: onPreview,
           },
-          ...(canMarkSent
-            ? [{ id: 'send', label: 'Mark Sent', icon: Send, onClick: onMarkSent }]
-            : []),
           ...(canSubmitApproval
             ? [{ id: 'submit', label: 'Submit Approval', icon: CheckCircle2, onClick: onSubmitApproval }]
             : []),
           ...(canApprove
             ? [{ id: 'approve', label: 'Approve', icon: CheckCircle2, onClick: onApprove }]
+            : []),
+          ...(canRecall && onRecall
+            ? [{ id: 'recall', label: 'Recall to Draft', icon: RotateCcw, onClick: onRecall }]
+            : []),
+          ...(canMarkSent
+            ? [{ id: 'send', label: 'Send', icon: Send, onClick: onMarkSent }]
+            : []),
+          ...(canCustomerApprove
+            ? [{ id: 'customer-approve', label: 'Customer Approve', icon: ThumbsUp, onClick: onCustomerApprove }]
+            : []),
+          ...(canCustomerReject && onCustomerReject
+            ? [{ id: 'customer-reject', label: 'Customer Reject', icon: ThumbsDown, onClick: onCustomerReject }]
             : []),
           ...(showCreateSalesOrder
             ? [{
@@ -143,18 +173,28 @@ export function Quotation360RecordHeader({
           { id: 'preview', label: 'Preview', icon: Eye, onClick: onPreview },
         ]
       : []),
+    ...(canRecall && onRecall
+      ? [{ id: 'recall', label: 'Recall to Draft', icon: RotateCcw, onClick: onRecall }]
+      : []),
+    ...(canCustomerReject && onCustomerReject
+      ? [{ id: 'customer-reject', label: 'Customer Reject', icon: ThumbsDown, onClick: onCustomerReject, danger: true as const }]
+      : []),
     ...(canRevise
       ? [{ id: 'revise', label: 'New Revision', icon: GitBranch, onClick: onNewRevision }]
+      : []),
+    ...(canDelete && onDelete
+      ? [{ id: 'delete', label: 'Delete', icon: Trash2, onClick: onDelete, danger: true as const }]
       : []),
     { id: 'export', label: 'Export PDF', icon: FileDown, onClick: () => window.print() },
     { id: 'print', label: 'Print', icon: Printer, onClick: () => window.print() },
   ]
 
   const lifecyclePrimary =
-    canMarkSent ? { label: 'Send', icon: Send, onClick: onMarkSent }
+    canSubmitApproval ? { label: 'Submit Approval', icon: CheckCircle2, onClick: onSubmitApproval }
       : canApprove ? { label: 'Approve', icon: CheckCircle2, onClick: onApprove }
-        : canSubmitApproval ? { label: 'Submit Approval', icon: CheckCircle2, onClick: onSubmitApproval }
-          : null
+        : canMarkSent ? { label: 'Send', icon: Send, onClick: onMarkSent }
+          : canCustomerApprove ? { label: 'Customer Approve', icon: ThumbsUp, onClick: onCustomerApprove }
+            : null
 
   return (
     <header className="crm-sticky-record-header" aria-label="Quotation record header">
@@ -175,7 +215,7 @@ export function Quotation360RecordHeader({
           </button>
         </div>
         <div className="crm-sticky-record-header__meta">
-          <span className="crm-sticky-record-header__id">R{revisionNo}</span>
+          <span className="crm-sticky-record-header__id">{quotationRevisionLabel(revisionNo)}</span>
           <StatusBadge label={statusLabel} status={documentStatus} />
           {customerName ? (
             <span className="crm-sticky-record-header__owner">
@@ -195,7 +235,7 @@ export function Quotation360RecordHeader({
           </span>
         </div>
         <span className="sr-only">
-          Status {statusLabel}. Revision {revisionNo}.
+          Status {statusLabel}. {quotationRevisionLabel(revisionNo)}.
         </span>
       </div>
 
@@ -214,12 +254,6 @@ export function Quotation360RecordHeader({
             onClick={lifecyclePrimary.onClick}
           >
             {lifecyclePrimary.label}
-          </ErpButton>
-        ) : null}
-
-        {!narrow && canSubmitApproval && lifecyclePrimary?.label !== 'Submit Approval' ? (
-          <ErpButton size="sm" variant="secondary" icon={CheckCircle2} onClick={onSubmitApproval}>
-            Submit Approval
           </ErpButton>
         ) : null}
 

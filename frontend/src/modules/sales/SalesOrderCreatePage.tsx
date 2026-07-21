@@ -24,7 +24,6 @@ import {
   ErpQuickEntrySection,
   ErpStickySaveBar,
 } from '../../components/erp/card-form'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
 import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
 import { DynamicsStatusChip } from '../../components/dynamics/DynamicsStatusChip'
@@ -41,13 +40,17 @@ import { QuickCreateSelect } from '../../components/quick-create/QuickCreateSele
 import { Input, Textarea } from '../../components/forms/Inputs'
 import { AppLink } from '../../components/ui/AppLink'
 import { resolveCompany360Path } from '../../config/entity360Routes'
-import { Toast } from '../../components/ui/Toast'
+import { notify } from '../../store/toastStore'
+import { validateSalesOrderCreate } from '../../utils/validation/crmSchemas/salesOrderSchema'
+import { handleInvalidSubmit, type FieldErrorMap } from '../../utils/formValidation'
+import { assertProductSellableForSales, isProductSellable, productNotSellableForSalesMessage } from '../../utils/productMaster'
+import { PRODUCT_STATUS_LABELS } from '../../types/productMaster'
 import { useSalesStore } from '../../store/salesStore'
 import { useCrmStore } from '../../store/crmStore'
 import { useMasterStore } from '../../store/masterStore'
 import { isApiMode } from '../../config/apiConfig'
 import { apiCreateSalesOrder } from '../../services/bridges/salesOrderApiBridge'
-import { useActiveCustomers, useActiveProducts } from '../../hooks/useMasterLists'
+import { useActiveCustomers, useSellableProducts } from '../../hooks/useMasterLists'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import {
@@ -177,7 +180,8 @@ export function SalesOrderNewPage() {
   const getOpportunity = useCrmStore((s) => s.getOpportunity)
   const getQuotation = useSalesStore((s) => s.getQuotation)
   const customers = useActiveCustomers()
-  const products = useActiveProducts()
+  const sellableProducts = useSellableProducts()
+  const allProducts = useMasterStore((s) => s.products)
   const getCustomer = useMasterStore((s) => s.getCustomer)
   const getProduct = useMasterStore((s) => s.getProduct)
   const locations = useMasterStore((s) => s.locations)
@@ -185,8 +189,7 @@ export function SalesOrderNewPage() {
   const [activeSection, setActiveSection] = useState('quick')
   const [createMode, setCreateMode] = useState<SoCreateMode>(initialCreateMode)
   const [modeChosen, setModeChosen] = useState(skipModeChooser)
-  const [toast, setToast] = useState<string | null>(null)
-  const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [validationErrors, setValidationErrors] = useState<FieldErrorMap>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [customerId, setCustomerId] = useState(
@@ -278,15 +281,26 @@ export function SalesOrderNewPage() {
     [customers],
   )
 
-  const productSmartOptions = useMemo(
-    () =>
-      products.map((p) => ({
+  const productSmartOptions = useMemo(() => {
+    const retainIds = new Set(lines.map((l) => l.productId).filter(Boolean))
+    const sellableOpts = sellableProducts.map((p) => ({
+      value: p.id,
+      label: `${p.productCode} · ${p.productName}`,
+      searchText: `${p.productCode} ${p.productName}`.toLowerCase(),
+    }))
+    const retained = allProducts
+      .filter((p) => retainIds.has(p.id) && !isProductSellable(p))
+      .map((p) => ({
         value: p.id,
         label: `${p.productCode} · ${p.productName}`,
-        searchText: `${p.productCode} ${p.productName}`.toLowerCase(),
-      })),
-    [products],
-  )
+        searchText: `${p.productCode} ${p.productName} not released`.toLowerCase(),
+        badge: `Not released · ${PRODUCT_STATUS_LABELS[p.status] ?? p.status}`,
+        subtitle: productNotSellableForSalesMessage(p),
+      }))
+    return [...sellableOpts, ...retained]
+  }, [sellableProducts, allProducts, lines])
+
+  const products = sellableProducts
 
   const computedLines = useMemo(
     () => lines.map((line) => {
@@ -363,7 +377,7 @@ export function SalesOrderNewPage() {
   function handleCreateModeChange(mode: SoCreateMode) {
     if (mode === createMode) return
     setCreateMode(mode)
-    setValidationErrors([])
+    setValidationErrors({})
     if (mode === 'direct') {
       setQuotationDocumentId('')
       if (directSoReason.startsWith('Approved quotation handover')) setDirectSoReason('')
@@ -384,7 +398,7 @@ export function SalesOrderNewPage() {
 
   function reopenModeChooser() {
     setModeChosen(false)
-    setValidationErrors([])
+    setValidationErrors({})
   }
 
   function updateLine(key: string, patch: Partial<SoLineDraft>) {
@@ -414,32 +428,50 @@ export function SalesOrderNewPage() {
     e.target.value = ''
   }
 
-  function validate(): string[] {
-    const errors: string[] = []
-    const effectiveQuoteId = quotationDocumentId || opportunityPrefill?.quotationDocumentId || null
+  function validate(): FieldErrorMap {
+    const fieldErrors = validateSalesOrderCreate({
+      createMode,
+      fromOpportunity: Boolean(fromOpportunity),
+      opportunitySoGateEnabled: opportunitySoGate?.enabled,
+      opportunitySoGateReason: opportunitySoGate?.disabledReason,
+      quotationDocumentId: quotationDocumentId || null,
+      opportunityPrefillQuotationDocumentId: opportunityPrefill?.quotationDocumentId ?? null,
+      customerId,
+      lines,
+      customerPoNumber,
+      paymentTerms,
+      deliveryTerms,
+    }).fieldErrors
 
-    if (fromOpportunity && createMode === 'quotation' && opportunitySoGate && !opportunitySoGate.enabled) {
-      errors.push(opportunitySoGate.disabledReason ?? 'Available after quotation approval.')
+    for (const line of lines) {
+      if (!line.productId) continue
+      const sellable = assertProductSellableForSales(getProduct(line.productId))
+      if (!sellable.ok) {
+        fieldErrors.lines = sellable.error
+        break
+      }
     }
-
-    if (createMode === 'quotation' && !effectiveQuoteId) {
-      errors.push('Select an approved quotation.')
-    }
-    if (!customerId) errors.push('Select a customer.')
-    if (!lines.length) errors.push('Add at least one product line.')
-    if (lines.some((l) => !l.productId)) errors.push('Every line needs a product.')
-    if (lines.some((l) => !l.qty || l.qty < 1)) errors.push('Line quantities must be at least 1.')
-    if (lines.some((l) => l.unitPrice <= 0)) errors.push('Line unit prices must be greater than zero.')
-    if (!customerPoNumber.trim()) errors.push('Customer PO number is required.')
-    if (!paymentTerms.trim()) errors.push('Payment terms are required.')
-    if (!deliveryTerms.trim()) errors.push('Delivery terms are required.')
-    return errors
+    return fieldErrors
   }
 
   async function persist(saveMode: 'save' | 'save_new' | 'save_close') {
     const errors = validate()
-    setValidationErrors(errors)
-    if (errors.length) return
+    if (Object.keys(errors).length) {
+      handleInvalidSubmit({
+        errors,
+        fieldOrder: [
+          'quotationDocumentId',
+          'customerId',
+          'lines',
+          'customerPoNumber',
+          'paymentTerms',
+          'deliveryTerms',
+        ],
+        onFieldErrors: setValidationErrors,
+      })
+      return
+    }
+    setValidationErrors({})
 
     setIsSubmitting(true)
     const attachmentNote = attachments.length
@@ -558,7 +590,7 @@ export function SalesOrderNewPage() {
     setIsSubmitting(false)
     if (r.ok && r.salesOrderId) {
       if (saveMode === 'save_new') {
-        setToast('Sales order saved — ready for next entry')
+        notify.success('Sales order saved — ready for next entry')
         setCustomerPoNumber('')
         setCustomerPoDate('')
         setAttachments([])
@@ -572,7 +604,7 @@ export function SalesOrderNewPage() {
       navigate(resolveSalesOrderDetailPath(r.salesOrderId, fromCrm))
       return
     }
-    setToast(r.error ?? 'Could not create sales order')
+    notify.error(r.error ?? 'Could not create sales order')
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -668,11 +700,6 @@ export function SalesOrderNewPage() {
     { label: 'Lines', value: String(lines.length), highlight: lines.length > 0 },
     { label: 'Grand Total', value: orderSummary.grandTotal > 0 ? formatCurrency(orderSummary.grandTotal) : '—', highlight: orderSummary.grandTotal > 0 },
   ]
-
-  const validationGuideItems = useMemo(
-    () => validationErrors.map((err, i) => ({ id: `err-${i}`, label: err, message: err })),
-    [validationErrors],
-  )
 
   const recordTitle = fromOpportunity && opportunityPrefill
     ? opportunityPrefill.opportunityName
@@ -887,18 +914,25 @@ export function SalesOrderNewPage() {
                       value={draft.productId}
                       onChange={(id) => {
                         if (!id) return
+                        const nextProduct = getProduct(id)
+                        const sellable = assertProductSellableForSales(nextProduct)
+                        if (!sellable.ok) {
+                          notify.warning(sellable.error)
+                          return
+                        }
                         updateLine(line.key, {
                           productId: id,
-                          unitPrice: getProduct(id)?.standardPrice ?? draft.unitPrice,
+                          unitPrice: nextProduct?.standardPrice ?? draft.unitPrice,
                         })
                       }}
-                      placeholder="Select product…"
+                      placeholder="Select released product…"
                       appearance="dropdown"
                       dropdownMinWidth={360}
+                      emptyMessage="No released products match. Only products released for sale can be selected."
                     />
-                    {product?.status === 'draft' ? (
+                    {product && !isProductSellable(product) ? (
                       <p className="so-pricing-warn">
-                        <ShieldAlert className="h-3 w-3" /> Not engineering-released
+                        <ShieldAlert className="h-3 w-3" /> {productNotSellableForSalesMessage(product)}
                       </p>
                     ) : null}
                   </td>
@@ -1138,6 +1172,7 @@ export function SalesOrderNewPage() {
           required
           colSpan={3}
           dataField="quotationDocumentId"
+          fieldError={validationErrors.quotationDocumentId}
           hint="Approved quotations only — selecting one fills customer, lines, and terms"
         >
           <ErpSmartSelect
@@ -1155,7 +1190,7 @@ export function SalesOrderNewPage() {
       ) : null}
 
       <ErpFieldGroup label="Bill-to customer" className="so-qe-customer-group">
-        <ErpFieldRow label="Customer" required colSpan={3} dataField="customerId">
+        <ErpFieldRow label="Customer" required colSpan={3} dataField="customerId" fieldError={validationErrors.customerId}>
           <QuickCreateSelect
             entityType="customer"
             value={customerId}
@@ -1242,7 +1277,7 @@ export function SalesOrderNewPage() {
       </ErpFieldGroup>
 
       <ErpFieldGroup label="Customer purchase order" className="so-qe-po-group">
-        <ErpFieldRow label="Customer PO Number" required dataField="customerPoNumber">
+        <ErpFieldRow label="Customer PO Number" required dataField="customerPoNumber" fieldError={validationErrors.customerPoNumber}>
           <Input
             value={customerPoNumber}
             onChange={(e) => setCustomerPoNumber(e.target.value)}
@@ -1294,7 +1329,7 @@ export function SalesOrderNewPage() {
     >
       <div className="so-commercial-body">
         <ErpFieldGroup label="Commercial terms" className="so-commercial-group" columns={2}>
-          <ErpFieldRow label="Payment Terms" required dataField="paymentTerms">
+          <ErpFieldRow label="Payment Terms" required dataField="paymentTerms" fieldError={validationErrors.paymentTerms}>
             <CommercialTermSelect
               termType="payment"
               value={paymentTerms}
@@ -1302,7 +1337,7 @@ export function SalesOrderNewPage() {
               placeholder="Select payment terms"
             />
           </ErpFieldRow>
-          <ErpFieldRow label="Delivery Terms" required dataField="deliveryTerms">
+          <ErpFieldRow label="Delivery Terms" required dataField="deliveryTerms" fieldError={validationErrors.deliveryTerms}>
             <CommercialTermSelect
               termType="delivery"
               value={deliveryTerms}
@@ -1544,21 +1579,11 @@ export function SalesOrderNewPage() {
             : salesChildBreadcrumbs('Sales Orders', '/sales/orders', createTitle)
         }
         documentStrip={documentStrip}
-        validationItems={validationGuideItems.length ? validationGuideItems : undefined}
-        validationErrors={validationGuideItems.length ? undefined : validationErrors}
         factBox={factBox}
         onSubmit={handleSubmit}
         onSaveShortcut={() => persist('save')}
         onSaveCloseShortcut={() => persist('save_close')}
         onSaveAndNewShortcut={() => persist('save_new')}
-        formSaveActions={{
-          isSubmitting,
-          saveLabel: 'Save',
-          onSave: () => void persist('save'),
-          onSaveAndNew: () => void persist('save_new'),
-          onSaveAndClose: () => void persist('save_close'),
-          onCancel: () => navigate(listPath),
-        }}
         footer={(
           <ErpStickySaveBar
             sticky
@@ -1582,14 +1607,12 @@ export function SalesOrderNewPage() {
           sections={sectionNavItems}
           activeId={activeSection}
           onSelect={scrollToSection}
-          trailing={<FactBoxPaneAiToggle />}
         />
 
         <EnterpriseFormMetrics metrics={formMetrics} />
 
         {formBody}
       </CrmCardFormShell>
-      {toast ? <Toast message={toast} variant={toast.includes('saved') ? 'success' : 'error'} /> : null}
     </>
   )
 }

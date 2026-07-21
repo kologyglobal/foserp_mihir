@@ -22,9 +22,8 @@ import {
   resolveOpportunityLines,
   syncOpportunityLines,
   UNIT_PRICE_REQUIRED_MESSAGE,
-  validateOpportunityLines,
 } from '../../../utils/opportunityLineCalc'
-import { opportunityRowErrorsToFieldMap } from '../../../utils/opportunityLineValidationFocus'
+import { validateOpportunityForm } from '../../../utils/validation/crmSchemas/opportunitySchema'
 import { sanitizeOpportunityScopeNotes } from '../../../utils/leadRequirementLines'
 import { useProductMasterOptionMap } from '../../../utils/opportunityProductOptions'
 import { resolveOpportunityPriorityOptions } from '../../../utils/opportunityUtils'
@@ -61,7 +60,7 @@ const SAVE_TOAST = 'Opportunity saved successfully.'
 
 const OPP_FIELD_ORDER = ['customerId', 'opportunityName', 'expectedCloseDate', 'ownerId', 'priority', 'stage', 'probability'] as const
 const OPP_FIELD_LABELS: Record<string, string> = {
-  customerId: 'Company',
+  customerId: 'Customer',
   opportunityName: 'Opportunity Name',
   expectedCloseDate: 'Expected Close Date',
   ownerId: 'Owner',
@@ -106,7 +105,6 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
   const ownerOptions = useCrmOwnerOptions()
   const priorityOptions = useOpportunityPriorityOptions()
   const stageOptions = useResolvedOpportunityStages()
-  const { options: productOptions, pickMap } = useProductMasterOptionMap(products, items, uoms)
 
   const canUpdate = canCrmPermission('crm.opportunity.update')
   const canClose = canCrmPermission('crm.opportunity.close')
@@ -135,6 +133,17 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
   const [opportunityName, setOpportunityName] = useState(opportunity?.opportunityName ?? '')
   const [contactId, setContactId] = useState(opportunity?.contactId ?? '')
   const [lines, setLines] = useState<OpportunityLine[]>(initialLines)
+  const retainProductIds = useMemo(
+    () => [...lines.map((l) => l.productId), opportunity?.productId],
+    [lines, opportunity?.productId],
+  )
+  const { options: productOptions, pickMap } = useProductMasterOptionMap(
+    products,
+    items,
+    uoms,
+    undefined,
+    retainProductIds,
+  )
   const [probability, setProbability] = useState(String(opportunity?.probability ?? 0))
   const [expectedCloseDate, setExpectedCloseDate] = useState(opportunity?.expectedCloseDate?.slice(0, 10) ?? '')
   const [priority, setPriority] = useState<OpportunityPriority>(opportunity?.priority ?? 'medium')
@@ -279,47 +288,30 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
 
   const runValidation = useCallback(() => {
     if (!opportunity) {
-      return { errors: ['Opportunity not found.'], rowErrors: {} as Record<string, string[]> }
+      return {
+        fieldErrors: { _msg_0: 'Opportunity not found.' } as FieldErrorMap,
+        rowErrors: {} as Record<string, string[]>,
+      }
     }
-    const base = validateOpportunityLines(lines, {
+    const { fieldErrors, rowErrors } = validateOpportunityForm({
       customerId: opportunity.customerId,
+      opportunityName,
       ownerId,
       stage: opportunity.stage,
       probability,
+      expectedCloseDate,
+      lines,
     })
-    if (!opportunityName.trim()) base.errors.unshift('Opportunity name is required.')
-    if (!priority) base.errors.push('Priority is required.')
-    if (!expectedCloseDate) base.errors.push('Expected close date is required.')
+    // Editor-only rules (not part of shared create schema)
+    if (!priority) fieldErrors.priority = 'Priority is required.'
     if (contactId) {
       const contact = contacts.find((c) => c.id === contactId)
       if (!contact || contact.customerId !== opportunity.customerId) {
-        base.errors.push('Selected contact must belong to the customer.')
+        fieldErrors[`_msg_${Object.keys(fieldErrors).length}`] = 'Selected contact must belong to the customer.'
       }
     }
-    return base
+    return { fieldErrors, rowErrors }
   }, [opportunity, lines, ownerId, probability, opportunityName, priority, expectedCloseDate, contactId, contacts])
-
-  function buildOpportunityFieldErrors(
-    errors: string[],
-    lineRowErrors: Record<string, string[]>,
-  ): FieldErrorMap {
-    const map: FieldErrorMap = {}
-    for (const err of errors) {
-      if (/company/i.test(err)) map.customerId = err
-      else if (/opportunity name/i.test(err)) map.opportunityName = err
-      else if (/close date/i.test(err)) map.expectedCloseDate = err
-      else if (/owner/i.test(err)) map.ownerId = err
-      else if (/priority/i.test(err)) map.priority = err
-      else if (/^stage/i.test(err)) map.stage = err
-      else if (/probability/i.test(err)) map.probability = err
-      else if (/unit price/i.test(err) || /fix validation|product \/ item line/i.test(err)) {
-        // Prefer concrete line keys from rowErrors
-        continue
-      } else if (!Object.values(map).includes(err)) map[`_msg_${Object.keys(map).length}`] = err
-    }
-    Object.assign(map, opportunityRowErrorsToFieldMap(lineRowErrors))
-    return map
-  }
 
   const persist = useCallback(async (): Promise<boolean> => {
     if (!opportunityId || !opportunity) return false
@@ -327,10 +319,10 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
       notify.error('You do not have permission to update opportunities.')
       return false
     }
-    const { errors, rowErrors: rErr } = runValidation()
+    const { fieldErrors, rowErrors: rErr } = runValidation()
     setRowErrors(rErr)
-    if (errors.length || Object.keys(rErr).length) {
-      const fieldMap = buildOpportunityFieldErrors(errors, rErr)
+    if (Object.keys(fieldErrors).length || Object.keys(rErr).length) {
+      const fieldMap = fieldErrors
       const lineKeys = Object.keys(fieldMap).filter(
         (k) => k.startsWith('unitPrice-') || k.startsWith('qty-') || k.startsWith('product-') || k.startsWith('taxPct-'),
       )
@@ -429,9 +421,13 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
   ])
 
   const save = useCallback(async () => {
-    if (!isDirty) return
-    await persist()
-  }, [isDirty, persist])
+    if (!opportunityId) return
+    if (isDirty) {
+      const ok = await persist()
+      if (!ok) return
+    }
+    navigate(detailsPath(opportunityId))
+  }, [isDirty, persist, opportunityId, navigate])
 
   const saveAndClose = useCallback(async () => {
     if (!opportunityId) return

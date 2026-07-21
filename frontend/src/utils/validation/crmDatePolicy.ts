@@ -14,8 +14,12 @@
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const TIME_RE = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/
 
+/** How far CRM date years may stray from the current calendar year (blocks 0001 / 9999). */
+export const CRM_DATE_YEAR_PAD = 10
+
 export const FOLLOW_UP_PAST_MESSAGE = 'Follow-up date/time must be in the future'
 export const FOLLOW_UP_INVALID_MESSAGE = 'Enter a valid follow-up date and time'
+export const CRM_DATE_INVALID_MESSAGE = 'Enter a valid date'
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0')
@@ -29,11 +33,75 @@ export function normalizeDueTime(time?: string | null): string {
   return `${pad2(Number(m[1]))}:${m[2]}`
 }
 
-function isValidCalendarDate(dueDate: string): boolean {
+/** True when `YYYY-MM-DD` is a real calendar day (rejects 2026-02-31, etc.). */
+export function isValidCalendarDate(dueDate: string): boolean {
   if (!DATE_RE.test(dueDate)) return false
   const [y, mo, d] = dueDate.split('-').map(Number)
   const dt = new Date(y, mo - 1, d)
   return dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d
+}
+
+export function getCrmYearBounds(now: Date = new Date()): { minYear: number; maxYear: number } {
+  const y = now.getFullYear()
+  return { minYear: y - CRM_DATE_YEAR_PAD, maxYear: y + CRM_DATE_YEAR_PAD }
+}
+
+/** Earliest selectable CRM date (`minYear-01-01`). */
+export function getCrmDateInputMin(now: Date = new Date()): string {
+  const { minYear } = getCrmYearBounds(now)
+  return `${minYear}-01-01`
+}
+
+/** Latest selectable CRM date (`maxYear-12-31`). */
+export function getCrmDateInputMax(now: Date = new Date()): string {
+  const { maxYear } = getCrmYearBounds(now)
+  return `${maxYear}-12-31`
+}
+
+export interface ValidateCrmCalendarDateOptions {
+  label?: string
+  required?: boolean
+  /** Default true — rejects years outside ±CRM_DATE_YEAR_PAD. */
+  checkYearRange?: boolean
+  /** Inclusive upper bound (`YYYY-MM-DD`). */
+  notAfter?: string
+  /** Inclusive lower bound (`YYYY-MM-DD`). */
+  notBefore?: string
+  notAfterMessage?: string
+  notBeforeMessage?: string
+  now?: Date
+}
+
+/**
+ * Validate a CRM `type="date"` value: format, real calendar day, year band, optional bounds.
+ * @returns error message, or null when valid / empty (and not required).
+ */
+export function validateCrmCalendarDate(
+  value: string | null | undefined,
+  opts: ValidateCrmCalendarDateOptions = {},
+): string | null {
+  const label = opts.label ?? 'Date'
+  const trimmed = String(value ?? '').trim()
+  if (!trimmed) {
+    return opts.required ? `${label} is required` : null
+  }
+  if (!DATE_RE.test(trimmed) || !isValidCalendarDate(trimmed)) {
+    return `Enter a valid ${label.toLowerCase()}`
+  }
+  if (opts.checkYearRange !== false) {
+    const { minYear, maxYear } = getCrmYearBounds(opts.now)
+    const year = Number(trimmed.slice(0, 4))
+    if (year < minYear || year > maxYear) {
+      return `${label} year must be between ${minYear} and ${maxYear}`
+    }
+  }
+  if (opts.notAfter && trimmed > opts.notAfter) {
+    return opts.notAfterMessage ?? `${label} cannot be after ${opts.notAfter}`
+  }
+  if (opts.notBefore && trimmed < opts.notBefore) {
+    return opts.notBeforeMessage ?? `${label} cannot be before ${opts.notBefore}`
+  }
+  return null
 }
 
 /**

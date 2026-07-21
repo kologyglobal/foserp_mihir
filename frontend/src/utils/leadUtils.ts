@@ -100,6 +100,22 @@ export function resolveLeadConvertToOpportunityGate(
   return { ok: true }
 }
 
+/**
+ * Data gate + `crm.lead.convert` permission.
+ * Call from UI affordances so Sales Executive without convert cannot open convert.
+ */
+export function resolveLeadConvertActionGate(
+  lead: LeadConvertToOpportunityInput | null | undefined,
+  canConvertPermission: boolean,
+): { ok: true } | { ok: false; reason: string } {
+  const dataGate = resolveLeadConvertToOpportunityGate(lead)
+  if (!dataGate.ok) return dataGate
+  if (!canConvertPermission) {
+    return { ok: false, reason: 'Requires crm.lead.convert permission' }
+  }
+  return { ok: true }
+}
+
 export function canConvertLeadToOpportunity(
   lead: LeadConvertToOpportunityInput | null | undefined,
 ): boolean {
@@ -206,7 +222,7 @@ export function normalizeLead(lead: Lead): Lead {
     closedReason: lead.closedReason ?? null,
     notQualifiedReason: lead.notQualifiedReason ?? null,
     opportunityId: lead.opportunityId ?? null,
-    productRequirement: lead.productRequirement ?? lead.remarks ?? '',
+    productRequirement: lead.productRequirement ?? '',
     expectedQty: lead.expectedQty ?? null,
     expectedCloseDate: lead.expectedCloseDate ?? null,
     contactPerson: lead.contactPerson ?? null,

@@ -1,0 +1,26 @@
+---
+description: System-wide dropdown standard — closed “— Select —”, options only on open
+alwaysApply: true
+---
+
+# Form Select / Dropdown Standard
+
+Applies to **every** `<Select>`, `ErpSmartSelect`, and native `<select>` used as a form or filter control.
+
+## Rules
+
+1. **Closed state** — When nothing is chosen, show placeholder **`— Select —`** (constant `SELECT_PLACEHOLDER` from `frontend/src/components/forms/selectStandards.ts`). Field-specific copy like `Select vendor…` is OK; bare `Select…` / `Choose…` must normalize to `— Select —`.
+2. **Options only on open** — Do not render choice lists as always-visible chips/radios unless the UX is explicitly multi-select toggles. Use `Select` / `ErpSmartSelect` so data appears **after click or focus**.
+3. **Empty option** — First option is `<option value="">…</option>` (or smart-select `allowEmpty`). Never rely on the first real row as the “unselected” state.
+4. **Open list** — Exclude the empty placeholder from the dropdown list; show only real options (plus clear via X when allowed).
+5. **Filter bars** — Prefer `All` / `Any …` for “no filter”, not `— Select —`. Keep those labels.
+6. **Implementation** — Prefer shared `Select` from `components/forms/Inputs.tsx` (auto-injects placeholder + smart open-on-click). Do not invent one-off dropdown chrome.
+
+```tsx
+<Select value={vendorId} onChange={…}>
+  <option value="">— Select —</option>
+  {vendors.map((v) => (
+    <option key={v.id} value={v.id}>{v.vendorName}</option>
+  ))}
+</Select>
+```

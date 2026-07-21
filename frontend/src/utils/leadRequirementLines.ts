@@ -21,11 +21,33 @@ export function hasLeadRequirementLines(lines: OpportunityLine[]): boolean {
   )
 }
 
+/** True when productRequirement holds the structured lead-lines payload (not human notes). */
+export function isEncodedLeadRequirementPayload(raw: string | null | undefined): boolean {
+  return String(raw ?? '').trimStart().startsWith(LEAD_REQUIREMENT_LINES_PREFIX)
+}
+
+/**
+ * Raw productRequirement for the product grid.
+ * Plain text that duplicates remarks was incorrectly persisted as product lines — ignore those.
+ */
+export function resolveLeadRequirementLinesRaw(
+  productRequirement: string | null | undefined,
+  remarks?: string | null,
+): string {
+  const raw = String(productRequirement ?? '')
+  if (!raw.trim()) return ''
+  if (isEncodedLeadRequirementPayload(raw)) return raw
+  const notes = String(remarks ?? '').trim()
+  if (notes && raw.trim() === notes) return ''
+  return raw
+}
+
 export function decodeLeadRequirementLines(
   raw: string,
   expectedQty?: number | null,
+  remarks?: string | null,
 ): { lines: OpportunityLine[]; plainText: string } {
-  const text = String(raw ?? '')
+  const text = resolveLeadRequirementLinesRaw(raw, remarks)
   if (text.startsWith(LEAD_REQUIREMENT_LINES_PREFIX)) {
     try {
       const parsed = JSON.parse(text.slice(LEAD_REQUIREMENT_LINES_PREFIX.length)) as OpportunityLine[]
@@ -64,13 +86,12 @@ export function leadRequirementQtyTotal(lines: OpportunityLine[]): number {
   return calcOpportunityLinesSummary(lines).totalQty
 }
 
-export function leadRequirementDisplayText(raw: string, expectedQty?: number | null): string {
-  return decodeLeadRequirementLines(raw, expectedQty).plainText
-}
-
-/** True when productRequirement holds the structured lead-lines payload (not human notes). */
-export function isEncodedLeadRequirementPayload(raw: string | null | undefined): boolean {
-  return String(raw ?? '').trimStart().startsWith(LEAD_REQUIREMENT_LINES_PREFIX)
+export function leadRequirementDisplayText(
+  raw: string,
+  expectedQty?: number | null,
+  remarks?: string | null,
+): string {
+  return decodeLeadRequirementLines(raw, expectedQty, remarks).plainText
 }
 
 /**

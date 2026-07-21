@@ -58,6 +58,7 @@ export type {
   QuotationTemplate,
   QuotationPageSize,
   QuotationHeaderStyle,
+  QuotationPrintSkin,
   QuotationPrintLayout,
   QuotationTemplateSection,
 } from './quotation'

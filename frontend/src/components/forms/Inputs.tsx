@@ -5,6 +5,7 @@ import { inputClassName } from '../forms/FormField'
 import { useFilterBarField } from '../design-system/filterBarContext'
 import { ErpSmartSelect } from '../erp/ErpSmartSelect'
 import { parseSelectOptions, toSmartSelectOptions } from '../../utils/parseSelectOptions'
+import { resolveSelectPlaceholder, SELECT_PLACEHOLDER } from './selectStandards'
 
 /** Layout/width utilities belong on the wrapper so filters sit inline beside search boxes. */
 const SELECT_WRAP_CLASS = /^(w-|min-w-|max-w-|shrink-|grow-|basis-|flex-|mt-|mb-|ml-|mr-|m-|self-)/
@@ -123,8 +124,10 @@ function NativeSelect({
   wrapClassName,
   error,
   children,
+  ensurePlaceholder,
+  placeholderLabel = SELECT_PLACEHOLDER,
   ...props
-}: SelectProps) {
+}: SelectProps & { ensurePlaceholder?: boolean; placeholderLabel?: string }) {
   const inFilterBar = useFilterBarField()
   const partitioned = partitionSelectClasses(className)
   const hasWrapWidth = Boolean(wrapClassName ?? partitioned.wrap)
@@ -137,6 +140,7 @@ function NativeSelect({
   return (
     <div className={cn('erp-select-wrap', resolvedWrap)}>
       <select className={cn('erp-input erp-select w-full', inputClassName(error), partitioned.select)} {...props}>
+        {ensurePlaceholder ? <option value="">{placeholderLabel}</option> : null}
         {children}
       </select>
       <ChevronDown className="erp-select-chevron pointer-events-none h-4 w-4" aria-hidden />
@@ -159,7 +163,23 @@ export function Select({
 }: SelectProps) {
   const inFilterBar = useFilterBarField()
   const partitioned = partitionSelectClasses(className)
-  const parsed = useMemo(() => parseSelectOptions(children), [children])
+  const parsedRaw = useMemo(() => parseSelectOptions(children), [children])
+  const hasEmpty = parsedRaw.some((o) => o.value === '')
+  /** Forms without an empty option still get a closed “— Select —” state. */
+  const injectEmpty = !hasEmpty && !inFilterBar && !multiple && parsedRaw.length > 0
+  const parsed = useMemo(() => {
+    if (!injectEmpty) return parsedRaw
+    return [{ value: '', label: SELECT_PLACEHOLDER }, ...parsedRaw]
+  }, [injectEmpty, parsedRaw])
+
+  const realOptionCount = useMemo(
+    () => parsedRaw.filter((o) => o.value !== '').length,
+    [parsedRaw],
+  )
+  /** Short lists (Yes/No, priority, type) use native — no search chrome or portal flicker. */
+  const preferNative =
+    Boolean(native) || multiple || parsedRaw.length === 0 || realOptionCount <= 8
+
   const hasWrapWidth = Boolean(wrapClassName ?? partitioned.wrap)
   const resolvedWrap = cn(
     wrapClassName ?? partitioned.wrap,
@@ -168,11 +188,16 @@ export function Select({
   )
 
   const emptyOption = parsed.find((o) => o.value === '')
-  const smartOptions = useMemo(() => toSmartSelectOptions(parsed), [parsed])
+  /** Open list = real options only; placeholder stays on the closed control. */
+  const smartOptions = useMemo(
+    () => toSmartSelectOptions(parsed).filter((o) => o.value !== ''),
+    [parsed],
+  )
   const stringValue = value === undefined || value === null ? '' : String(value)
   const smartClassName = partitioned.select.replace(/\berp-input\b/g, '').trim()
+  const placeholder = resolveSelectPlaceholder(emptyOption?.label, { inFilterBar })
 
-  if (native || multiple || parsed.length === 0) {
+  if (preferNative) {
     return (
       <NativeSelect
         className={className}
@@ -183,6 +208,8 @@ export function Select({
         disabled={disabled}
         name={name}
         multiple={multiple}
+        ensurePlaceholder={injectEmpty}
+        placeholderLabel={placeholder}
         {...rest}
       >
         {children}
@@ -200,7 +227,7 @@ export function Select({
             target: { value: next, name: name ?? '' },
           } as ChangeEvent<HTMLSelectElement>)
         }}
-        placeholder={emptyOption?.label ?? 'Click to browse or type to search…'}
+        placeholder={placeholder}
         allowEmpty={Boolean(emptyOption)}
         disabled={disabled}
         compact={inFilterBar}

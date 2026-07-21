@@ -251,11 +251,11 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 |-------|-------|
 | Module | Purchase |
 | Description | PR/PO/GRN API |
-| Reason | **Accepted deferral** — demo FE only (CRM-parity polish included). Not a CRM verification defect (report G3). Do not invent purchase/AP APIs until a dedicated purchase backend phase is scheduled. |
-| Dependencies | Items, vendors (done) |
-| Next step | See `docs/purchase-workflow-map.md` for UX coverage; backend: `backend/docs/api-requirement-matrix.md`. Demo FE may surface Planned steps (stock check, gate-pass, AP invoice/match/payment). |
-| Test required | `test:purchase:production` equivalent for API when backend starts |
-| Status | open (accepted deferral) |
+| Reason | **Partial** — PO lifecycle + inventory masters + GRN + Approvals + **Purchase Setup full persistence** (all editable tabs + enforcement) + Invoice/QI/Return APIs shipped 2026-07-21. Remaining gaps: richer inventory posting, reports, and fuller FE wiring for invoice/QI/return beyond Setup enforcement. |
+| Dependencies | Items, vendors (done); PR schema Phase 03 (done); PO lifecycle (done); Approvals queue (done); Setup 1A (done) |
+| Next step | Quality inspections / invoice / returns backends when prioritized. **Approvals next iteration:** backend Approval Matrix enforcement (amount bands → role chain, currently demo-only frontend config) + per-user Approval Limits, layered on the existing RBAC + self-approval policy. |
+| Test required | Setup **13/13**; PO lifecycle (warehouse resolution); GRN **15/15** (Setup policies); approvals 11/11 + flow 4/4. Continue quality/invoice suites next. |
+| Status | partial (Setup 1A done; quality/invoice/returns next) |
 
 ### P3-3: Inventory / production / quality / finance backends
 

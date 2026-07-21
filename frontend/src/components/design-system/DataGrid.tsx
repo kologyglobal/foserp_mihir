@@ -84,6 +84,8 @@ export interface DataGridProps<T> {
   emptyAction?: React.ReactNode
   /** Multi-select with green checkboxes (DataTable spec) */
   selectable?: boolean
+  /** When selectable, return false to disable the row checkbox (e.g. terminal statuses). */
+  getRowCanSelect?: (row: T) => boolean
   getRowId?: (row: T) => string
   rowSelection?: RowSelectionState
   onRowSelectionChange?: OnChangeFn<RowSelectionState>
@@ -136,6 +138,7 @@ export function DataGrid<T>({
   onRowSelect,
   emptyAction,
   selectable = false,
+  getRowCanSelect,
   getRowId,
   rowSelection: controlledSelection,
   onRowSelectionChange,
@@ -207,7 +210,11 @@ export function DataGrid<T>({
     onColumnVisibilityChange: setColumnVisibility,
     onColumnOrderChange: setColumnOrder,
     onRowSelectionChange: selectable ? setRowSelection : undefined,
-    enableRowSelection: selectable,
+    enableRowSelection: selectable
+      ? getRowCanSelect
+        ? (row) => getRowCanSelect(row.original)
+        : true
+      : false,
     enableSorting: enableColumnSorting,
     getRowId: getRowId ?? ((_, index) => String(index)),
     getCoreRowModel: getCoreRowModel(),
@@ -546,74 +553,83 @@ export function DataGrid<T>({
           hasCustomActionsColumn && 'erp-table-has-actions-col',
         )}>
           <thead>
-            {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id}>
-                {selectable && (
-                  <th className="erp-table-select-cell w-10">
-                    <Checkbox
-                      checked={table.getIsAllPageRowsSelected()}
-                      indeterminate={table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()}
-                      onChange={table.getToggleAllPageRowsSelectedHandler()}
-                      aria-label="Select all rows"
-                    />
-                  </th>
-                )}
-                {hg.headers.map((header, headerIndex) =>
-                  header.column.getIsVisible() ? (
-                    <th
-                      key={header.id}
-                      className={cn(
-                        entMetaToClasses(header.column.columnDef.meta as EnterpriseColumnMeta | undefined),
-                        header.column.columnDef.meta?.align === 'right' && 'ent-align-right',
-                        header.column.columnDef.meta?.align === 'center' && 'ent-align-center',
-                        header.column.id === 'actions' && 'erp-table-actions-cell',
-                        stickyFirstColumn && headerIndex === 0 && 'erp-table-sticky-data-cell',
-                      )}
-                    >
-                      {header.isPlaceholder ? null : (
-                        <button
-                          type="button"
-                          className={cn(
-                            'inline-flex items-center gap-1',
-                            header.column.getCanSort() && 'cursor-pointer hover:text-erp-text',
-                            header.column.columnDef.meta?.align === 'right' && 'ml-auto',
-                          )}
-                          onClick={header.column.getToggleSortingHandler()}
-                          aria-label={
-                            header.column.getCanSort()
-                              ? `Sort by ${typeof header.column.columnDef.header === 'string' ? header.column.columnDef.header : header.id}`
-                              : undefined
-                          }
-                          aria-sort={
-                            header.column.getIsSorted() === 'asc'
-                              ? 'ascending'
-                              : header.column.getIsSorted() === 'desc'
-                                ? 'descending'
-                                : header.column.getCanSort()
-                                  ? 'none'
-                                  : undefined
-                          }
-                        >
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                          {header.column.getCanSort() && (
-                            <span className="text-erp-muted">
-                              {header.column.getIsSorted() === 'asc' ? (
-                                <ArrowUp className="h-3.5 w-3.5" />
-                              ) : header.column.getIsSorted() === 'desc' ? (
-                                <ArrowDown className="h-3.5 w-3.5" />
-                              ) : (
-                                <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
-                              )}
-                            </span>
-                          )}
-                        </button>
-                      )}
+            {table.getHeaderGroups().map((hg) => {
+              const firstVisibleColumnId = hg.headers.find((h) => h.column.getIsVisible())?.column.id
+              return (
+                <tr key={hg.id}>
+                  {selectable && (
+                    <th className="erp-table-select-cell w-10">
+                      <Checkbox
+                        checked={table.getIsAllPageRowsSelected()}
+                        indeterminate={
+                          table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()
+                        }
+                        onChange={table.getToggleAllPageRowsSelectedHandler()}
+                        aria-label="Select all rows"
+                      />
                     </th>
-                  ) : null,
-                )}
-                {hasRowActions && <th className="w-12 ent-align-center">Actions</th>}
-              </tr>
-            ))}
+                  )}
+                  {hg.headers.map((header) =>
+                    header.column.getIsVisible() ? (
+                      <th
+                        key={header.id}
+                        className={cn(
+                          entMetaToClasses(
+                            header.column.columnDef.meta as EnterpriseColumnMeta | undefined,
+                          ),
+                          header.column.columnDef.meta?.align === 'right' && 'ent-align-right',
+                          header.column.columnDef.meta?.align === 'center' && 'ent-align-center',
+                          header.column.id === 'actions' && 'erp-table-actions-cell',
+                          stickyFirstColumn &&
+                            header.column.id === firstVisibleColumnId &&
+                            'erp-table-sticky-data-cell',
+                        )}
+                      >
+                        {header.isPlaceholder ? null : (
+                          <button
+                            type="button"
+                            className={cn(
+                              'inline-flex items-center gap-1',
+                              header.column.getCanSort() && 'cursor-pointer hover:text-erp-text',
+                              header.column.columnDef.meta?.align === 'right' && 'ml-auto',
+                            )}
+                            onClick={header.column.getToggleSortingHandler()}
+                            aria-label={
+                              header.column.getCanSort()
+                                ? `Sort by ${typeof header.column.columnDef.header === 'string' ? header.column.columnDef.header : header.id}`
+                                : undefined
+                            }
+                            aria-sort={
+                              header.column.getIsSorted() === 'asc'
+                                ? 'ascending'
+                                : header.column.getIsSorted() === 'desc'
+                                  ? 'descending'
+                                  : header.column.getCanSort()
+                                    ? 'none'
+                                    : undefined
+                            }
+                          >
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            {header.column.getCanSort() && (
+                              <span className="text-erp-muted">
+                                {header.column.getIsSorted() === 'asc' ? (
+                                  <ArrowUp className="h-3.5 w-3.5" />
+                                ) : header.column.getIsSorted() === 'desc' ? (
+                                  <ArrowDown className="h-3.5 w-3.5" />
+                                ) : (
+                                  <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+                                )}
+                              </span>
+                            )}
+                          </button>
+                        )}
+                      </th>
+                    ) : null,
+                  )}
+                  {hasRowActions && <th className="w-12 ent-align-center">Actions</th>}
+                </tr>
+              )
+            })}
           </thead>
           <tbody>
             {table.getRowModel().rows.length === 0 ? (
@@ -637,8 +653,14 @@ export function DataGrid<T>({
                     <td className="erp-table-select-cell w-10" onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={row.getIsSelected()}
+                        disabled={!row.getCanSelect()}
                         onChange={row.getToggleSelectedHandler()}
-                        aria-label="Select row"
+                        aria-label={row.getCanSelect() ? 'Select row' : 'Row cannot be selected'}
+                        title={
+                          row.getCanSelect()
+                            ? undefined
+                            : 'Converted / cancelled rows cannot be selected'
+                        }
                       />
                     </td>
                   )}

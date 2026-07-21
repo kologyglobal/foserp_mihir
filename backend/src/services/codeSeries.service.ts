@@ -16,8 +16,16 @@ const DEFAULT_PREFIX: Record<CodeSeriesEntity, string> = {
   STOCK_MOVEMENT: 'STM',
   STOCK_RESERVATION: 'RES',
   PURCHASE_REQUISITION: 'PR',
+  PURCHASE_PLANNING: 'PPS',
+  REQUEST_FOR_QUOTATION: 'RFQ',
+  VENDOR_QUOTATION: 'VQ',
+  VENDOR_COMPARISON: 'CMP',
+  PURCHASE_ORDER: 'PO',
+  GOODS_RECEIPT: 'GRN',
   QUALITY_INSPECTION: 'QI',
   QUALITY_NCR: 'NCR',
+  PURCHASE_INVOICE: 'PI',
+  PURCHASE_RETURN: 'PRT',
   JOB_WORK_ORDER: 'JW',
   PRODUCTION_RUNTIME_CHANGE: 'RC',
   PRODUCTION_WIP_MOVEMENT: 'WM',
@@ -66,6 +74,23 @@ async function generateNextCode(
   return `${series.prefix}-${num}`
 }
 
+/** Non-consuming peek at the next document number (does not increment). */
+export async function previewNextCode(
+  tenantId: string,
+  entityType: CodeSeriesEntity,
+): Promise<string> {
+  await ensureCodeSeries(tenantId, entityType)
+  const series = await prisma.codeSeries.findUnique({
+    where: { tenantId_entityType: { tenantId, entityType } },
+  })
+  if (!series) {
+    const prefix = DEFAULT_PREFIX[entityType]
+    return `${prefix}-${String(1).padStart(6, '0')}`
+  }
+  const next = series.currentValue + 1
+  return `${series.prefix}-${String(next).padStart(series.padLength, '0')}`
+}
+
 export async function nextCode(
   tenantId: string,
   entityType: CodeSeriesEntity,
@@ -86,6 +111,16 @@ export async function initTenantCodeSeries(tenantId: string, tx?: Prisma.Transac
     'OPPORTUNITY',
     'QUOTATION',
     'SALES_ORDER',
+    'PURCHASE_REQUISITION',
+    'PURCHASE_PLANNING',
+    'REQUEST_FOR_QUOTATION',
+    'VENDOR_QUOTATION',
+    'VENDOR_COMPARISON',
+    'PURCHASE_ORDER',
+    'GOODS_RECEIPT',
+    'QUALITY_INSPECTION',
+    'PURCHASE_INVOICE',
+    'PURCHASE_RETURN',
   ]
   for (const entityType of types) {
     await ensureCodeSeries(tenantId, entityType, tx)

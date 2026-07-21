@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { cn } from '@/utils/cn'
 
 export type DocumentWorkspaceTabStatus =
@@ -13,33 +14,33 @@ export type DocumentWorkspaceTabModel<TId extends string = string> = {
   label: string
   icon: LucideIcon
   status: DocumentWorkspaceTabStatus
-  /** Short status text shown after an em dash, e.g. "2 fields pending" */
+  /** Short status text, e.g. "2 fields pending" */
   statusDetail: string
 }
 
-const STATUS_CHIP: Record<
+const STATUS_TONE: Record<
   DocumentWorkspaceTabStatus,
-  { label: string; className: string }
+  { dot: string; text: string }
 > = {
   complete: {
-    label: 'Complete',
-    className: 'bg-emerald-50 text-emerald-800 ring-emerald-200/80',
+    dot: 'bg-emerald-500',
+    text: 'text-emerald-700',
   },
   fields_pending: {
-    label: 'Fields Pending',
-    className: 'bg-amber-50 text-amber-900 ring-amber-200/80',
+    dot: 'bg-amber-500',
+    text: 'text-amber-800',
   },
   incomplete_lines: {
-    label: 'Incomplete Lines',
-    className: 'bg-amber-50 text-amber-900 ring-amber-200/80',
+    dot: 'bg-amber-500',
+    text: 'text-amber-800',
   },
   validation_error: {
-    label: 'Validation Error',
-    className: 'bg-red-50 text-red-800 ring-red-200/80',
+    dot: 'bg-red-500',
+    text: 'text-red-700',
   },
   unsaved: {
-    label: 'Unsaved',
-    className: 'bg-sky-50 text-sky-900 ring-sky-200/80',
+    dot: 'bg-sky-500',
+    text: 'text-sky-800',
   },
 }
 
@@ -54,7 +55,11 @@ export type PurchaseDocumentWorkspaceTabsProps<TId extends string = string> = {
   className?: string
 }
 
-/** Two-workspace document tab strip with progress / validation status chips. */
+/**
+ * Compact two-step document workspace strip (PR / PO / similar).
+ * Selected = primary underline + soft fill (no “Active” badge).
+ * Status = one muted line + tone dot (no duplicate uppercase chips).
+ */
 export function PurchaseDocumentWorkspaceTabs<TId extends string = string>({
   active,
   onChange,
@@ -66,17 +71,21 @@ export function PurchaseDocumentWorkspaceTabs<TId extends string = string>({
   return (
     <div
       className={cn(
-        'mb-3 overflow-hidden rounded-md border border-erp-border bg-erp-surface-alt/40 shadow-[var(--erp-shadow-card)]',
+        'purchase-doc-workspace-tabs mb-3 overflow-hidden rounded-md border border-erp-border bg-white',
         className,
       )}
       role="tablist"
       aria-label={ariaLabel}
     >
-      <div className="flex flex-wrap gap-0">
-        {tabs.map((tab) => {
+      <div
+        className="grid"
+        style={{ gridTemplateColumns: `repeat(${Math.max(tabs.length, 1)}, minmax(0, 1fr))` }}
+      >
+        {tabs.map((tab, index) => {
           const Icon = tab.icon
-          const chip = STATUS_CHIP[tab.status]
+          const tone = STATUS_TONE[tab.status]
           const selected = active === tab.id
+          const ready = tab.status === 'complete'
           return (
             <button
               key={tab.id}
@@ -88,25 +97,41 @@ export function PurchaseDocumentWorkspaceTabs<TId extends string = string>({
               aria-controls={`${idPrefix}-workspace-panel-${tab.id}`}
               onClick={() => onChange(tab.id)}
               className={cn(
-                'relative flex min-w-0 flex-1 items-center gap-2.5 border-b-[3px] px-3 py-3 text-left transition-all sm:px-4',
+                'relative flex min-h-[3.5rem] min-w-0 items-center gap-3 border-b-[3px] px-3 py-2.5 text-left transition-colors sm:px-4',
+                index > 0 && 'border-l border-l-erp-border',
                 selected
-                  ? 'z-[1] border-erp-primary bg-erp-surface shadow-[inset_3px_0_0_0_var(--erp-primary)]'
-                  : 'border-transparent bg-transparent text-erp-muted opacity-80 hover:bg-erp-surface/80 hover:opacity-100',
+                  ? 'border-b-erp-primary bg-erp-primary-soft/35'
+                  : 'border-b-transparent hover:bg-erp-surface-alt/70',
               )}
             >
               <span
                 className={cn(
-                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-md',
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-bold tabular-nums',
                   selected
                     ? 'bg-erp-primary text-white'
-                    : 'bg-erp-surface-alt text-erp-muted ring-1 ring-erp-border',
+                    : ready
+                      ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                      : 'bg-erp-surface-alt text-erp-muted ring-1 ring-erp-border',
                 )}
                 aria-hidden
               >
-                <Icon className="h-4 w-4" strokeWidth={selected ? 2.25 : 1.75} />
+                {ready && !selected ? (
+                  <Check className="h-4 w-4" strokeWidth={2.5} />
+                ) : (
+                  index + 1
+                )}
               </span>
+
               <span className="min-w-0 flex-1">
-                <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <Icon
+                    className={cn(
+                      'h-3.5 w-3.5 shrink-0',
+                      selected ? 'text-erp-primary' : 'text-erp-muted',
+                    )}
+                    aria-hidden
+                    strokeWidth={selected ? 2.25 : 1.75}
+                  />
                   <span
                     className={cn(
                       'truncate text-[13px] font-semibold tracking-tight',
@@ -115,27 +140,18 @@ export function PurchaseDocumentWorkspaceTabs<TId extends string = string>({
                   >
                     {tab.label}
                   </span>
-                  {selected ? (
-                    <span className="rounded bg-erp-primary px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
-                      Active
-                    </span>
-                  ) : null}
+                  <span
+                    className={cn('ml-0.5 h-1.5 w-1.5 shrink-0 rounded-full', tone.dot)}
+                    aria-hidden
+                  />
                 </span>
                 <span
                   className={cn(
-                    'mt-0.5 block truncate text-[11px]',
-                    selected ? 'font-medium text-erp-text' : 'text-erp-muted',
+                    'mt-0.5 block min-h-[1rem] truncate pl-[1.125rem] text-[11px] leading-tight',
+                    selected ? cn('font-medium', tone.text) : 'text-erp-muted',
                   )}
                 >
                   {tab.statusDetail}
-                </span>
-                <span
-                  className={cn(
-                    'mt-1 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset',
-                    chip.className,
-                  )}
-                >
-                  {chip.label}
                 </span>
               </span>
             </button>

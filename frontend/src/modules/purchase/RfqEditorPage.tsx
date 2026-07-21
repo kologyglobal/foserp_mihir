@@ -5,8 +5,6 @@ import {
   FileText,
   Package,
   Plus,
-  Save,
-  Send,
   Star,
   Trash2,
   Truck,
@@ -16,29 +14,28 @@ import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShe
 import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
 import { PurchaseTermSelect } from '@/components/purchase/PurchaseTermSelect'
 import {
-  PurchaseDocumentFactBox,
-  buildPurchaseRelatedLinks,
-  purchaseDocumentApprovalFact,
-} from '@/components/purchase/PurchaseDocumentFactBox'
+  PurchaseEnterpriseFactBox,
+  purchaseSectionId,
+} from '@/components/purchase/PurchaseEnterpriseFormKit'
 import {
   ErpCardSection,
   ErpFieldRow,
-  ErpFormSpan,
-  ErpStickySaveBar,
 } from '@/components/erp/card-form'
 import { ErpButton } from '@/components/erp/ErpButton'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Checkbox, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { EnterpriseFormMetrics } from '@/design-system/workspace'
+import { Badge } from '@/components/ui/Badge'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
   createRFQ,
   getPurchaseItems,
   getPurchaseRequisitions,
+  getPurchaseWarehouses,
   getRecommendedVendorsForItems,
   getRFQById,
   getVendors,
+  previewNextRfqNumber,
   PurchaseServiceError,
   updateRFQ,
 } from '@/services/purchase'
@@ -48,7 +45,6 @@ import type {
   RfqLine,
   Vendor,
 } from '@/types/purchaseDomain'
-import { PURCHASE_DEMO_LOCATION, PURCHASE_DEMO_LOCATION_FG } from '@/data/purchase/purchaseDomainSeed'
 import {
   PURCHASE_DELIVERY_TERMS,
   PURCHASE_FREIGHT_TERMS,
@@ -64,8 +60,12 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
+import { useOptionalAuth } from '@/context/AuthProvider'
+import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 
-const ACTOR = { id: 'user-buyer-01', code: 'BUY01', name: 'Rahul Patil' }
+type LocationOption = { id: string; code: string; name: string; state: string; city: string }
+
+const EMPTY_LOCATION: LocationOption = { id: '', code: '', name: '', state: '', city: '' }
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -114,6 +114,20 @@ export function RfqEditorPage() {
   const [searchParams] = useSearchParams()
   const isNew = !id
   const navigate = useNavigate()
+  const auth = useOptionalAuth()
+  const sessionUser = auth?.session?.user
+  const ACTOR = useMemo(() => {
+    const name = sessionUser
+      ? `${sessionUser.firstName ?? ''} ${sessionUser.lastName ?? ''}`.trim() ||
+        sessionUser.email ||
+        sessionUser.id
+      : ''
+    return {
+      id: sessionUser?.id ?? '',
+      code: sessionUser?.email?.split('@')[0] ?? '',
+      name,
+    }
+  }, [sessionUser])
 
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
@@ -129,15 +143,15 @@ export function RfqEditorPage() {
   const [documentDate, setDocumentDate] = useState(today())
   const [bidDueDate, setBidDueDate] = useState(today())
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState(today())
-  const [purchaseLocationId, setPurchaseLocationId] = useState<string>(PURCHASE_DEMO_LOCATION.id)
-  const [deliveryLocationId, setDeliveryLocationId] = useState<string>(PURCHASE_DEMO_LOCATION.id)
+  const [purchaseLocationId, setPurchaseLocationId] = useState('')
+  const [deliveryLocationId, setDeliveryLocationId] = useState('')
   const [currency] = useState('INR')
   const [paymentTerms, setPaymentTerms] = useState('Net 30')
-  const [deliveryTerms, setDeliveryTerms] = useState('FOR Chakan')
+  const [deliveryTerms, setDeliveryTerms] = useState('Ex-Works')
   const [freightTerms, setFreightTerms] = useState('Vendor')
   const [inspectionRequirement, setInspectionRequirement] = useState('')
-  const [technicalContact, setTechnicalContact] = useState('Amit Deshmukh · Stores')
-  const [commercialContact, setCommercialContact] = useState(ACTOR.name)
+  const [technicalContact, setTechnicalContact] = useState('')
+  const [commercialContact, setCommercialContact] = useState('')
   const [remarks, setRemarks] = useState('')
   const [lines, setLines] = useState<RfqLine[]>([emptyLine()])
   const [vendorPicks, setVendorPicks] = useState<VendorPick[]>([])
@@ -145,10 +159,9 @@ export function RfqEditorPage() {
   const [approvedPrs, setApprovedPrs] = useState<PurchaseRequisition[]>([])
   const [catalogItems, setCatalogItems] = useState<PurchaseItem[]>([])
   const [allVendors, setAllVendors] = useState<Vendor[]>([])
+  const [locations, setLocations] = useState<LocationOption[]>([])
 
-  const { markDirty, resetDirty } = useUnsavedChangesGuard(true)
-
-  const locations = [PURCHASE_DEMO_LOCATION, PURCHASE_DEMO_LOCATION_FG]
+  const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(true)
 
   const estimatedValue = useMemo(
     () => lines.reduce((s, l) => s + Number(l.amount || 0), 0),
@@ -211,13 +224,47 @@ export function RfqEditorPage() {
   )
 
   useEffect(() => {
-    void Promise.all([getPurchaseRequisitions(), getPurchaseItems(), getVendors()]).then(
-      ([prs, items, vendors]) => {
-        setApprovedPrs(prs.filter((p) => p.status === 'approved' || p.status === 'converted_to_rfq'))
-        setCatalogItems(items)
-        setAllVendors(vendors.filter((v) => v.isActive))
-      },
-    )
+    if (ACTOR.name) setCommercialContact((prev) => prev || ACTOR.name)
+  }, [ACTOR.name])
+
+  useEffect(() => {
+    if (!isNew) return
+    let cancelled = false
+    void previewNextRfqNumber()
+      .then((next) => {
+        if (!cancelled && next) setDocumentNumber(next)
+      })
+      .catch(() => {
+        /* preview is optional — save still allocates server-side */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isNew])
+
+  useEffect(() => {
+    void Promise.all([
+      getPurchaseRequisitions(),
+      getPurchaseItems(),
+      getVendors(),
+      getPurchaseWarehouses(),
+    ]).then(([prs, items, vendors, warehouses]) => {
+      setApprovedPrs(prs.filter((p) => p.status === 'approved' || p.status === 'converted_to_rfq'))
+      setCatalogItems(items)
+      setAllVendors(vendors.filter((v) => v.isActive))
+      const locs = warehouses.map((w) => ({
+        id: w.id,
+        code: w.code,
+        name: w.name,
+        state: w.state,
+        city: w.city,
+      }))
+      setLocations(locs)
+      if (locs[0]) {
+        setPurchaseLocationId((prev) => prev || locs[0].id)
+        setDeliveryLocationId((prev) => prev || locs[0].id)
+      }
+    })
   }, [])
 
   useEffect(() => {
@@ -330,9 +377,9 @@ export function RfqEditorPage() {
 
   const toInput = () => {
     const purchaseLocation =
-      locations.find((l) => l.id === purchaseLocationId) ?? PURCHASE_DEMO_LOCATION
+      locations.find((l) => l.id === purchaseLocationId) ?? locations[0] ?? EMPTY_LOCATION
     const deliveryLocation =
-      locations.find((l) => l.id === deliveryLocationId) ?? PURCHASE_DEMO_LOCATION
+      locations.find((l) => l.id === deliveryLocationId) ?? locations[0] ?? EMPTY_LOCATION
     const vendorIds = vendorPicks.filter((v) => v.selected).map((v) => v.vendorId)
     return {
       documentDate,
@@ -361,6 +408,7 @@ export function RfqEditorPage() {
   }
 
   const saveDraft = async (): Promise<string | null> => {
+    if (saving) return null
     setSaving(true)
     try {
       const input = toInput()
@@ -375,16 +423,17 @@ export function RfqEditorPage() {
       if (recordId) {
         const updated = await updateRFQ(recordId, input)
         setDocumentNumber(updated.documentNumber)
-        notify.success(`Draft saved · ${updated.documentNumber}`)
+        notify.success(`Saved · ${updated.documentNumber}`)
         resetDirty()
+        navigate(PURCHASE_FORM_ROUTES.rfq.list, { replace: true })
         return updated.id
       }
       const created = await createRFQ(input)
       setRecordId(created.id)
       setDocumentNumber(created.documentNumber)
-      notify.success(`Draft created · ${created.documentNumber}`)
+      notify.success(`Saved · ${created.documentNumber}`)
       resetDirty()
-      navigate(`/purchase/rfqs/${created.id}/edit`, { replace: true })
+      navigate(PURCHASE_FORM_ROUTES.rfq.list, { replace: true })
       return created.id
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
@@ -394,37 +443,14 @@ export function RfqEditorPage() {
     }
   }
 
-  const saveAndSend = async () => {
-    const savedId = await saveDraft()
-    if (savedId) navigate(`/purchase/rfqs/${savedId}?send=1`)
-  }
-
   const selectedVendorCount = vendorPicks.filter((p) => p.selected).length
-
-  const formMetrics = useMemo(
-    () => [
-      {
-        label: 'Lines',
-        value: String(lines.length),
-        accent: 'blue' as const,
-        highlight: lines.length > 0,
-      },
-      {
-        label: 'Est. Value',
-        value: formatCurrency(estimatedValue),
-        accent: 'amber' as const,
-        highlight: estimatedValue > 0,
-      },
-    ],
-    [lines.length, estimatedValue],
-  )
 
   const documentTitle = isNew ? 'New Request for Quotation' : (documentNumber ?? 'RFQ')
 
   const recordHeaderFacts = useMemo(
     () => [
       ...(isNew
-        ? [{ label: 'RFQ No', value: documentNumber ?? 'Auto-generated' }]
+        ? [{ label: 'RFQ No', value: documentNumber ?? 'Loading…' }]
         : []),
       {
         label: 'Source',
@@ -435,7 +461,7 @@ export function RfqEditorPage() {
               ? `${selectedPrIds.length} PR${selectedPrIds.length === 1 ? '' : 's'}`
               : SOURCE_MODE_LABELS[sourceMode],
       },
-      { label: 'Buyer', value: ACTOR.name },
+      { label: 'Buyer', value: ACTOR.name || '—' },
       {
         label: 'Date',
         value: formatFastTabDate(documentDate) ?? formatDate(documentDate),
@@ -445,7 +471,7 @@ export function RfqEditorPage() {
         value: formatFastTabDate(bidDueDate) ?? bidDueDate,
       },
     ],
-    [isNew, documentNumber, sourceMode, selectedPrIds.length, documentDate, bidDueDate],
+    [isNew, documentNumber, sourceMode, selectedPrIds.length, documentDate, bidDueDate, ACTOR.name],
   )
 
   const commercialPeek = commercialTermsSummary({
@@ -457,47 +483,6 @@ export function RfqEditorPage() {
   })
 
   const notesPeek = notesSummary(remarks, inspectionRequirement)
-
-  const primaryVendor = vendorPicks.find((p) => p.selected)?.vendor ?? vendorPicks[0]?.vendor
-  const documentFactBox = useMemo(() => {
-    const approval = purchaseDocumentApprovalFact('draft')
-    const relatedPrs = approvedPrs.filter((p) => selectedPrIds.includes(p.id))
-    const firstPr = relatedPrs[0]
-    const firstLine = lines.find((l) => l.itemId || l.itemCode.trim())
-    return (
-      <PurchaseDocumentFactBox
-        vendor={
-          primaryVendor
-            ? {
-                id: primaryVendor.id,
-                code: primaryVendor.vendorCode,
-                name: primaryVendor.vendorName,
-                rating: primaryVendor.rating,
-                paymentTerms: paymentTerms || primaryVendor.paymentTerms,
-                leadTimeDays: primaryVendor.leadTimeDays,
-              }
-            : null
-        }
-        purchaseHistory={{
-          lastPurchasePrice:
-            firstLine && Number(firstLine.targetPrice) > 0 ? Number(firstLine.targetPrice) : null,
-          lastVendorName: primaryVendor?.vendorName ?? null,
-          averageLeadTimeDays: primaryVendor?.leadTimeDays ?? null,
-        }}
-        documentStatus={{
-          statusLabel: 'Draft',
-          ...approval,
-          createdBy: ACTOR.name,
-          modifiedBy: null,
-          modifiedDate: null,
-        }}
-        related={buildPurchaseRelatedLinks({
-          purchaseRequisitionId: firstPr?.id ?? null,
-          purchaseRequisitionNumber: firstPr?.documentNumber ?? null,
-        })}
-      />
-    )
-  }, [primaryVendor, approvedPrs, selectedPrIds, lines, paymentTerms])
 
   const sourcePeek = joinFastTabSummary([
     SOURCE_MODE_LABELS[sourceMode],
@@ -539,56 +524,58 @@ export function RfqEditorPage() {
         { label: 'RFQs', to: '/purchase/rfqs' },
         { label: isNew ? 'New' : documentNumber ?? 'Edit' },
       ]}
-      backLink={{ to: '/purchase/rfqs', label: 'Back to RFQs' }}
-      factBox={documentFactBox}
-      commandBar={
-        <ErpCommandBar
-          inline
-          sticky={false}
-          collapseSecondaryOnNarrow
-          secondaryActions={[
+      commandBar={null}
+      factBox={
+        <PurchaseEnterpriseFactBox
+          title="RFQ insight"
+          summary={[
+            { label: 'RFQ No.', value: documentNumber ?? (isNew ? 'Loading…' : '—') },
+            { label: 'Status', value: 'Draft' },
+            { label: 'Source', value: SOURCE_MODE_LABELS[sourceMode] },
             {
-              id: 'draft',
-              label: saving ? 'Saving…' : 'Save Draft',
-              icon: Save,
-              onClick: () => void saveDraft(),
-              disabled: saving,
-              pin: true,
+              label: 'Vendors',
+              value: `${selectedVendorCount} selected`,
+              highlight: selectedVendorCount > 0,
             },
             {
-              id: 'recommended',
-              label: 'Add Recommended Vendors',
-              icon: Users,
-              onClick: () => void addRecommendedVendors(),
+              label: 'Bid due',
+              value: formatFastTabDate(bidDueDate) ?? bidDueDate,
             },
+            ...(dirty
+              ? [{ label: 'Changes', value: 'Unsaved', highlight: true as const }]
+              : []),
           ]}
-          primaryAction={{
-            id: 'send',
-            label: 'Save & Send RFQ',
-            icon: Send,
-            onClick: () => void saveAndSend(),
-            disabled: saving,
-          }}
-        />
+        >
+          <ul className="mt-3 list-disc space-y-1 pl-4 text-[11px] text-erp-muted">
+            <li>RFQ Number is reserved from the series and confirmed on save.</li>
+            <li>Select vendors in Vendor Selection before sending the RFQ.</li>
+          </ul>
+          {dirty ? (
+            <div className="mt-2">
+              <Badge color="orange">Unsaved changes</Badge>
+            </div>
+          ) : null}
+        </PurchaseEnterpriseFactBox>
       }
       stickyFooter
       footer={
-        <ErpStickySaveBar
+        <FormActionBar
           sticky
-          onSaveDraft={() => void saveDraft()}
-          saveDraftLabel={saving ? 'Saving…' : 'Save Draft'}
-          onSave={() => void saveAndSend()}
-          submitLabel="Save & Send RFQ"
-          isSubmitting={saving}
-          cancelLabel="Cancel"
-          onCancel={() => navigate('/purchase/rfqs')}
+          cancelFirst
+          busy={saving}
+          dirty={dirty}
+          onCancel={() => {
+            resetDirty()
+            navigate(PURCHASE_FORM_ROUTES.rfq.list)
+          }}
+          onSave={saveDraft}
         />
       }
       onSaveShortcut={() => void saveDraft()}
     >
-      <EnterpriseFormMetrics metrics={formMetrics} />
-
+      <div className="space-y-3">
       <ErpCardSection
+        id={purchaseSectionId('source')}
         title="Source"
         subtitle="Manual demand or copy from approved requisition(s)"
         icon={ClipboardList}
@@ -670,21 +657,35 @@ export function RfqEditorPage() {
       </ErpCardSection>
 
       <ErpCardSection
-        title="General Information"
-        subtitle="Dates, buyer, and locations"
+        id={purchaseSectionId('general')}
+        title="RFQ Header"
+        subtitle="RFQ identity, buyer, dates, and locations"
         icon={FileText}
         accent="blue"
         collapsible
         defaultOpen
         dense
+        columns={3}
+        collapsedSummary={joinFastTabSummary([
+          documentNumber ?? 'New RFQ',
+          formatFastTabDate(documentDate),
+          formatFastTabDate(bidDueDate),
+        ])}
       >
-        <ErpFormSpan span={3}>
-          <p className="erp-field-group__label">Document</p>
-        </ErpFormSpan>
-        <ErpFieldRow label="RFQ Number" readOnly>
-          <Input value={documentNumber ?? 'Auto-generated'} readOnly className="bg-erp-surface-alt" />
+        <ErpFieldRow
+          label="RFQ Number"
+          readOnly
+          horizontal={false}
+          hint={isNew ? 'Preview from number series — assigned when you save' : undefined}
+        >
+          <Input
+            value={documentNumber ?? ''}
+            placeholder="Loading number…"
+            readOnly
+            className="bg-erp-surface-alt"
+          />
         </ErpFieldRow>
-        <ErpFieldRow label="RFQ Date" required>
+        <ErpFieldRow label="RFQ Date" required horizontal={false}>
           <Input
             type="date"
             value={documentDate}
@@ -694,7 +695,7 @@ export function RfqEditorPage() {
             }}
           />
         </ErpFieldRow>
-        <ErpFieldRow label="Enquiry Due Date" required>
+        <ErpFieldRow label="Enquiry Due Date" required horizontal={false}>
           <Input
             type="date"
             value={bidDueDate}
@@ -704,65 +705,13 @@ export function RfqEditorPage() {
             }}
           />
         </ErpFieldRow>
-        <ErpFieldRow label="Buyer" readOnly>
+        <ErpFieldRow label="Buyer" readOnly horizontal={false}>
           <Input value={ACTOR.name} readOnly className="bg-erp-surface-alt" />
         </ErpFieldRow>
-        <ErpFieldRow label="Currency" readOnly>
+        <ErpFieldRow label="Currency" readOnly horizontal={false}>
           <Input value={currency} readOnly className="bg-erp-surface-alt" />
         </ErpFieldRow>
-        <ErpFieldRow label="Technical Contact">
-          <Input
-            value={technicalContact}
-            onChange={(e) => {
-              setTechnicalContact(e.target.value)
-              markDirty()
-            }}
-          />
-        </ErpFieldRow>
-        <ErpFieldRow label="Commercial Contact">
-          <Input
-            value={commercialContact}
-            onChange={(e) => {
-              setCommercialContact(e.target.value)
-              markDirty()
-            }}
-          />
-        </ErpFieldRow>
-
-        <ErpFormSpan span={3}>
-          <p className="erp-field-group__label">Locations</p>
-        </ErpFormSpan>
-        <ErpFieldRow label="Purchase Location" required>
-          <Select
-            value={purchaseLocationId}
-            onChange={(e) => {
-              setPurchaseLocationId(e.target.value)
-              markDirty()
-            }}
-          >
-            {locations.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </Select>
-        </ErpFieldRow>
-        <ErpFieldRow label="Delivery Location">
-          <Select
-            value={deliveryLocationId}
-            onChange={(e) => {
-              setDeliveryLocationId(e.target.value)
-              markDirty()
-            }}
-          >
-            {locations.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </Select>
-        </ErpFieldRow>
-        <ErpFieldRow label="Expected Delivery Date">
+        <ErpFieldRow label="Expected Delivery Date" horizontal={false}>
           <Input
             type="date"
             value={expectedDeliveryDate}
@@ -772,9 +721,60 @@ export function RfqEditorPage() {
             }}
           />
         </ErpFieldRow>
+        <ErpFieldRow label="Purchase Location" required horizontal={false}>
+          <Select
+            value={purchaseLocationId}
+            onChange={(e) => {
+              setPurchaseLocationId(e.target.value)
+              markDirty()
+            }}
+          >
+            <option value="">Select location</option>
+            {locations.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </Select>
+        </ErpFieldRow>
+        <ErpFieldRow label="Delivery Location" horizontal={false}>
+          <Select
+            value={deliveryLocationId}
+            onChange={(e) => {
+              setDeliveryLocationId(e.target.value)
+              markDirty()
+            }}
+          >
+            <option value="">Select location</option>
+            {locations.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </Select>
+        </ErpFieldRow>
+        <ErpFieldRow label="Technical Contact" horizontal={false}>
+          <Input
+            value={technicalContact}
+            onChange={(e) => {
+              setTechnicalContact(e.target.value)
+              markDirty()
+            }}
+          />
+        </ErpFieldRow>
+        <ErpFieldRow label="Commercial Contact" horizontal={false} className="sm:col-span-2">
+          <Input
+            value={commercialContact}
+            onChange={(e) => {
+              setCommercialContact(e.target.value)
+              markDirty()
+            }}
+          />
+        </ErpFieldRow>
       </ErpCardSection>
 
       <ErpCardSection
+        id={purchaseSectionId('commercial')}
         title="Commercial Terms"
         subtitle="Payment, delivery, and freight"
         icon={Truck}
@@ -782,12 +782,10 @@ export function RfqEditorPage() {
         collapsible
         defaultOpen={false}
         dense
+        columns={3}
         collapsedSummary={commercialPeek || undefined}
       >
-        <ErpFormSpan span={3}>
-          <p className="erp-field-group__label">Commercial</p>
-        </ErpFormSpan>
-        <ErpFieldRow label="Payment Terms">
+        <ErpFieldRow label="Payment Terms" horizontal={false}>
           <PurchaseTermSelect
             value={paymentTerms}
             onChange={(v) => {
@@ -797,7 +795,7 @@ export function RfqEditorPage() {
             options={PURCHASE_PAYMENT_TERMS}
           />
         </ErpFieldRow>
-        <ErpFieldRow label="Delivery Terms">
+        <ErpFieldRow label="Delivery Terms" horizontal={false}>
           <PurchaseTermSelect
             value={deliveryTerms}
             onChange={(v) => {
@@ -807,7 +805,7 @@ export function RfqEditorPage() {
             options={PURCHASE_DELIVERY_TERMS}
           />
         </ErpFieldRow>
-        <ErpFieldRow label="Freight Terms">
+        <ErpFieldRow label="Freight Terms" horizontal={false}>
           <PurchaseTermSelect
             value={freightTerms}
             onChange={(v) => {
@@ -817,7 +815,11 @@ export function RfqEditorPage() {
             options={PURCHASE_FREIGHT_TERMS}
           />
         </ErpFieldRow>
-        <ErpFieldRow label="Inspection Requirement" className="sm:col-span-2 lg:col-span-3">
+        <ErpFieldRow
+          label="Inspection Requirement"
+          horizontal={false}
+          className="sm:col-span-2 lg:col-span-3"
+        >
           <Input
             value={inspectionRequirement}
             onChange={(e) => {
@@ -829,7 +831,8 @@ export function RfqEditorPage() {
       </ErpCardSection>
 
       <ErpCardSection
-        title="Item Lines"
+        id={purchaseSectionId('lines')}
+        title="Item Details"
         subtitle="Demand lines for vendor quotation"
         icon={Package}
         accent="teal"
@@ -837,7 +840,12 @@ export function RfqEditorPage() {
         defaultOpen
         dense
         columns={1}
-        badge={`${lines.length} line${lines.length === 1 ? '' : 's'} · ${formatCurrency(estimatedValue)}`}
+        badge={`${lines.length} line${lines.length === 1 ? '' : 's'}`}
+        collapsedSummary={
+          lines.length
+            ? `${lines.length} line${lines.length === 1 ? '' : 's'} · ${formatCurrency(estimatedValue)}`
+            : 'No lines'
+        }
       >
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <ErpButton
@@ -988,6 +996,7 @@ export function RfqEditorPage() {
       </ErpCardSection>
 
       <ErpCardSection
+        id={purchaseSectionId('vendors')}
         title="Vendor Selection"
         subtitle="Invitees for this RFQ"
         icon={Users}
@@ -1093,6 +1102,7 @@ export function RfqEditorPage() {
       </ErpCardSection>
 
       <ErpCardSection
+        id={purchaseSectionId('remarks')}
         title="Remarks"
         subtitle="Internal notes for this RFQ"
         icon={FileText}
@@ -1103,7 +1113,7 @@ export function RfqEditorPage() {
         columns={1}
         collapsedSummary={notesPeek || undefined}
       >
-        <ErpFieldRow label="Remarks">
+        <ErpFieldRow label="Remarks" horizontal={false}>
           <Textarea
             rows={3}
             className="min-h-[4.5rem] max-h-40"
@@ -1115,6 +1125,7 @@ export function RfqEditorPage() {
           />
         </ErpFieldRow>
       </ErpCardSection>
+      </div>
     </PurchaseCardFormShell>
   )
 }

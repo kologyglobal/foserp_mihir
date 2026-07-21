@@ -36,6 +36,7 @@ function normalizeInput(config: MasterResourceConfig, input: Record<string, unkn
     if (data.parentId === '') data.parentId = null
     if (data.defaultWarehouseId === '') data.defaultWarehouseId = null
   }
+  if (config.slug === 'warehouses' && data.plantId === '') data.plantId = null
   if (config.slug === 'products') {
     if (data.fgItemId === '') data.fgItemId = null
     if (data.baseUomId === '') data.baseUomId = null
@@ -69,11 +70,14 @@ function validateGstRatePayload(input: Record<string, unknown>): void {
 }
 
 function buildWhere(config: MasterResourceConfig, tenantId: string, query: ListMastersQuery): Record<string, unknown> {
+  const isLocationLike = config.slug === 'locations' || config.slug === 'storage-locations'
   const where: Record<string, unknown> = {
     ...tenantActiveFilter(tenantId),
     ...(query.status ? { status: query.status } : {}),
     ...(query.stateId && config.slug === 'cities' ? { stateId: query.stateId } : {}),
-    ...(query.warehouseId && config.slug === 'locations' ? { warehouseId: query.warehouseId } : {}),
+    ...(query.warehouseId && (isLocationLike || config.slug === 'bins') ? { warehouseId: query.warehouseId } : {}),
+    ...(query.plantId && config.slug === 'warehouses' ? { plantId: query.plantId } : {}),
+    ...(query.storageLocationId && config.slug === 'bins' ? { storageLocationId: query.storageLocationId } : {}),
     ...(query.gstGroupId && (config.slug === 'hsn-sac' || config.slug === 'gst-rates')
       ? { gstGroupId: query.gstGroupId }
       : {}),
@@ -121,7 +125,7 @@ async function assertTenantFk(
       'State not found in tenant',
     )
   }
-  if (config.slug === 'locations' && input.warehouseId) {
+  if ((config.slug === 'locations' || config.slug === 'storage-locations') && input.warehouseId) {
     await assertTenantRecord(
       () =>
         prisma.masterWarehouse.findFirst({
@@ -129,6 +133,35 @@ async function assertTenantFk(
         }),
       'Warehouse not found in tenant',
     )
+  }
+  if (config.slug === 'warehouses' && input.plantId) {
+    await assertTenantRecord(
+      () =>
+        prisma.masterPlant.findFirst({
+          where: { id: String(input.plantId), ...tenantActiveFilter(tenantId), status: 'ACTIVE' },
+        }),
+      'Plant not found in tenant',
+    )
+  }
+  if (config.slug === 'bins') {
+    if (input.warehouseId) {
+      await assertTenantRecord(
+        () =>
+          prisma.masterWarehouse.findFirst({
+            where: { id: String(input.warehouseId), ...tenantActiveFilter(tenantId), status: 'ACTIVE' },
+          }),
+        'Warehouse not found in tenant',
+      )
+    }
+    if (input.storageLocationId) {
+      const location = await prisma.masterLocation.findFirst({
+        where: { id: String(input.storageLocationId), ...tenantActiveFilter(tenantId), status: 'ACTIVE' },
+      })
+      if (!location) throw new ValidationError('Storage location not found in tenant')
+      if (input.warehouseId && location.warehouseId !== String(input.warehouseId)) {
+        throw new ValidationError('Storage location does not belong to the selected warehouse')
+      }
+    }
   }
   if (config.slug === 'item-categories') {
     if (input.parentId) {
@@ -189,15 +222,31 @@ async function assertNotReferenced(
     if (vendorCount > 0) throw new ConflictError('City is referenced by vendors')
   }
   // gst-rates: no inbound FK references from other master entities
+  if (config.slug === 'plants') {
+    const whCount = await prisma.masterWarehouse.count({
+      where: { tenantId, plantId: id, deletedAt: null },
+    })
+    if (whCount > 0) throw new ConflictError('Plant is referenced by warehouses')
+  }
   if (config.slug === 'warehouses') {
     const locCount = await prisma.masterLocation.count({
       where: { tenantId, warehouseId: id, deletedAt: null },
     })
     if (locCount > 0) throw new ConflictError('Warehouse is referenced by locations')
+    const binCount = await prisma.masterBin.count({
+      where: { tenantId, warehouseId: id, deletedAt: null },
+    })
+    if (binCount > 0) throw new ConflictError('Warehouse is referenced by bins')
     const catCount = await prisma.masterItemCategory.count({
       where: { tenantId, defaultWarehouseId: id, deletedAt: null },
     })
     if (catCount > 0) throw new ConflictError('Warehouse is referenced by item categories')
+  }
+  if (config.slug === 'locations' || config.slug === 'storage-locations') {
+    const binCount = await prisma.masterBin.count({
+      where: { tenantId, storageLocationId: id, deletedAt: null },
+    })
+    if (binCount > 0) throw new ConflictError('Storage location is referenced by bins')
   }
   if (config.slug === 'uom') {
     const itemCount = await prisma.masterItem.count({
@@ -367,17 +416,21 @@ export async function listMasterLookups(
   const select =
     config.slug === 'cities'
       ? { id: true, name: true, stateId: true }
-      : config.slug === 'locations'
+      : config.slug === 'locations' || config.slug === 'storage-locations'
         ? { id: true, code: true, name: true, warehouseId: true }
-        : config.slug === 'item-categories'
-          ? { id: true, code: true, name: true, parentId: true, level: true }
-          : config.slug === 'hsn-sac'
-            ? { id: true, code: true, description: true, gstGroupId: true }
-            : config.slug === 'gst-groups'
-              ? { id: true, code: true, description: true, goodsType: true }
-              : config.slug === 'gst-rates'
-                ? { id: true, code: true, gstGroupId: true, fromState: true, locationStateCode: true }
-                : { id: true, code: true, name: true }
+        : config.slug === 'warehouses'
+          ? { id: true, code: true, name: true, plantId: true, warehouseType: true }
+          : config.slug === 'bins'
+            ? { id: true, code: true, name: true, warehouseId: true, storageLocationId: true }
+            : config.slug === 'item-categories'
+              ? { id: true, code: true, name: true, parentId: true, level: true }
+              : config.slug === 'hsn-sac'
+                ? { id: true, code: true, description: true, gstGroupId: true }
+                : config.slug === 'gst-groups'
+                  ? { id: true, code: true, description: true, goodsType: true }
+                  : config.slug === 'gst-rates'
+                    ? { id: true, code: true, gstGroupId: true, fromState: true, locationStateCode: true }
+                    : { id: true, code: true, name: true }
 
   const items = await model.findMany({
     where: {

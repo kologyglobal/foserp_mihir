@@ -14,6 +14,7 @@ import { CrmTypedDocumentUpload } from '../../components/crm/CrmTypedDocumentUpl
 import { Input, Select, Textarea } from '../../components/forms/Inputs'
 import { useCrmStore } from '../../store/crmStore'
 import { resolveStoreAction } from '../../store/storeAction'
+import { notify } from '../../store/toastStore'
 import { useMasterStore } from '../../store/masterStore'
 import { useSalesStore } from '../../store/salesStore'
 import { useOpportunityAttachmentStore } from '../../store/opportunityAttachmentStore'
@@ -37,23 +38,27 @@ import {
   opportunityLineUnitPriceFieldKey,
   syncOpportunityLines,
   UNIT_PRICE_REQUIRED_MESSAGE,
-  validateOpportunityLines,
 } from '../../utils/opportunityLineCalc'
+import {
+  getCrmDateInputMax,
+  getDateInputMin,
+} from '../../utils/validation/crmDatePolicy'
 import {
   fieldErrorsToMessages,
   handleInvalidSubmit,
-  toRequiredFieldLabel,
+  crmShowCompletenessHints,
   type FieldErrorMap,
 } from '../../utils/formValidation'
-import { opportunityRowErrorsToFieldMap } from '../../utils/opportunityLineValidationFocus'
+import { useInlineFormValidation } from '../../hooks/useInlineFormValidation'
+import { validateOpportunityForm } from '../../utils/validation/crmSchemas/opportunitySchema'
 import { decodeLeadRequirementLines, isEncodedLeadRequirementPayload, sanitizeOpportunityScopeNotes } from '../../utils/leadRequirementLines'
-import { resolveLeadConvertToOpportunityGate } from '../../utils/leadUtils'
+import { resolveLeadConvertActionGate } from '../../utils/leadUtils'
+import { canCrmPermission } from '../../utils/permissions/crm'
 import { useProductMasterOptionMap } from '../../utils/opportunityProductOptions'
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { useDocumentLocation } from '../../hooks/useDocumentLocation'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
 import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import { crmChildBreadcrumbs } from '../../utils/crmNavigation'
 import {
   ENTERPRISE_FORM_CLASS,
@@ -76,17 +81,22 @@ function defaultCloseDate() {
   return d.toISOString().slice(0, 10)
 }
 
-function initialLinesFromLead(requirement?: string): OpportunityLine[] {
-  return decodeLeadRequirementLines(requirement ?? '', null).lines
+function initialLinesFromLead(requirement?: string, remarks?: string | null): OpportunityLine[] {
+  return decodeLeadRequirementLines(requirement ?? '', null, remarks).lines
 }
 
-function initialScopeNotesFromLead(requirement?: string): string {
+function initialScopeNotesFromLead(requirement?: string, remarks?: string | null): string {
+  // Encoded product lines or notes duplicated into productRequirement must not fill Scope Notes.
+  if (isEncodedLeadRequirementPayload(requirement)) return ''
+  const raw = String(requirement ?? '').trim()
+  const notes = String(remarks ?? '').trim()
+  if (notes && raw === notes) return ''
   return sanitizeOpportunityScopeNotes(requirement)
 }
 
 const OPP_FIELD_ORDER = ['customerId', 'opportunityName', 'expectedCloseDate', 'ownerId', 'stage', 'probability'] as const
 const OPP_FIELD_LABELS: Record<string, string> = {
-  customerId: 'Company',
+  customerId: 'Customer',
   opportunityName: 'Opportunity Name',
   expectedCloseDate: 'Expected Close Date',
   ownerId: 'Owner',
@@ -124,7 +134,6 @@ export function OpportunityNewPage() {
     () => (priorityOptions.length > 0 ? priorityOptions : resolveOpportunityPriorityOptions().map((p) => ({ value: p.value, label: p.label }))),
     [priorityOptions],
   )
-  const { options: productOptions, pickMap } = useProductMasterOptionMap(products, items, uoms)
 
   const initialCustomerId = prefillCustomerId || lead?.customerId || ''
   const initialOwnerId = lead?.leadOwnerId ?? ownerOptions[0]?.value ?? user.id
@@ -137,13 +146,26 @@ export function OpportunityNewPage() {
   const [rowErrors, setRowErrors] = useState<Record<string, string[]>>({})
   const [forceOpenProductsKey, setForceOpenProductsKey] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [saveAttempted, setSaveAttempted] = useState(false)
 
   const [customerId, setCustomerId] = useState(initialCustomerId)
-  const [contactId, setContactId] = useState('')
+  const [contactId, setContactId] = useState(() => lead?.contactId ?? '')
   const [opportunityName, setOpportunityName] = useState('')
   const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
-  const [productRequirement, setProductRequirement] = useState(() => initialScopeNotesFromLead(lead?.productRequirement))
-  const [lines, setLines] = useState<OpportunityLine[]>(() => initialLinesFromLead(lead?.productRequirement))
+  const [productRequirement, setProductRequirement] = useState(() =>
+    initialScopeNotesFromLead(lead?.productRequirement, lead?.remarks),
+  )
+  const [lines, setLines] = useState<OpportunityLine[]>(() =>
+    initialLinesFromLead(lead?.productRequirement, lead?.remarks),
+  )
+  const retainProductIds = useMemo(() => lines.map((l) => l.productId), [lines])
+  const { options: productOptions, pickMap } = useProductMasterOptionMap(
+    products,
+    items,
+    uoms,
+    undefined,
+    retainProductIds,
+  )
   const [probability, setProbability] = useState(initialProbability)
   const [expectedCloseDate, setExpectedCloseDate] = useState(lead?.expectedCloseDate?.slice(0, 10) || defaultCloseDate())
   const [stage, setStage] = useState<OpportunityStage>(initialStage)
@@ -156,6 +178,21 @@ export function OpportunityNewPage() {
   const bindDraftAttachments = useOpportunityAttachmentStore((s) => s.bindDraftToOpportunity)
   const [attachments, setAttachmentsState] = useState<CrmTypedAttachment[]>(() =>
     useOpportunityAttachmentStore.getState().getForOpportunity(attachmentScopeId),
+  )
+
+  const inline = useInlineFormValidation(
+    {
+      customerId,
+      opportunityName,
+      expectedCloseDate,
+      ownerId,
+    },
+    {
+      customerId: { required: true, message: 'Customer is required' },
+      opportunityName: { required: true, message: 'Opportunity Name is required' },
+      expectedCloseDate: { required: true, message: 'Expected Close Date is required' },
+      ownerId: { required: true, message: 'Owner is required' },
+    },
   )
 
   const customer = customers.find((c) => c.id === customerId)
@@ -187,7 +224,7 @@ export function OpportunityNewPage() {
 
   useEffect(() => {
     if (!prefillLeadId || !lead) return
-    const gate = resolveLeadConvertToOpportunityGate(lead)
+    const gate = resolveLeadConvertActionGate(lead, canCrmPermission('crm.lead.convert'))
     if (!gate.ok) {
       setValidationErrors((prev) => (prev.includes(gate.reason) ? prev : [gate.reason, ...prev]))
     }
@@ -203,15 +240,19 @@ export function OpportunityNewPage() {
     if (!valid) setOwnerId(ownerOptions[0]!.value)
   }, [ownerOptions, ownerId, user.id])
 
-  // Prefill contact from lead contact person / primary company contact
+  // Prefill contact: lead.contactId → name match → company primary → first contact
   useEffect(() => {
     if (!prefillLeadId || !customerId || contactId) return
+    if (lead?.contactId && customerContacts.some((c) => c.id === lead.contactId)) {
+      setContactId(lead.contactId)
+      return
+    }
     const byName = lead?.contactPerson
       ? customerContacts.find((c) => c.name.trim().toLowerCase() === lead.contactPerson!.trim().toLowerCase())
       : undefined
     const next = byName ?? customerContacts.find((c) => c.isPrimary) ?? customerContacts[0]
     if (next) setContactId(next.id)
-  }, [prefillLeadId, lead?.contactPerson, customerId, customerContacts, contactId])
+  }, [prefillLeadId, lead?.contactId, lead?.contactPerson, customerId, customerContacts, contactId])
 
   useEffect(() => {
     setAttachmentsState(useOpportunityAttachmentStore.getState().getForOpportunity(attachmentScopeId))
@@ -238,42 +279,20 @@ export function OpportunityNewPage() {
   }
 
   function runValidation() {
-    const base = validateOpportunityLines(lines, {
+    return validateOpportunityForm({
       customerId,
+      opportunityName,
       ownerId,
       stage,
       probability,
+      expectedCloseDate,
+      lines,
     })
-    if (!opportunityName.trim()) {
-      const companyIdx = base.errors.findIndex((e) => /company/i.test(e))
-      base.errors.splice(companyIdx + 1, 0, 'Opportunity name is required.')
-    }
-    if (!expectedCloseDate) base.errors.push('Expected close date is required.')
-    return base
   }
 
-  function buildOpportunityFieldErrors(
-    errors: string[],
-    lineRowErrors: Record<string, string[]>,
-  ): FieldErrorMap {
-    const map: FieldErrorMap = {}
-    for (const err of errors) {
-      if (/company/i.test(err)) map.customerId = err
-      else if (/opportunity name/i.test(err)) map.opportunityName = err
-      else if (/close date/i.test(err)) map.expectedCloseDate = err
-      else if (/owner/i.test(err)) map.ownerId = err
-      else if (/^stage/i.test(err)) map.stage = err
-      else if (/probability/i.test(err)) map.probability = err
-      else if (/unit price/i.test(err) || /fix validation|product \/ item line/i.test(err)) {
-        continue
-      } else if (!Object.values(map).includes(err)) map[`_msg_${Object.keys(map).length}`] = err
-    }
-    Object.assign(map, opportunityRowErrorsToFieldMap(lineRowErrors))
-    return map
-  }
-
+  /** Blank create form — no lead/customer prefill left over after Save & New. */
   function resetForm() {
-    setCustomerId(prefillCustomerId || '')
+    setCustomerId('')
     setContactId('')
     setOpportunityName('')
     setNameManuallyEdited(false)
@@ -285,26 +304,34 @@ export function OpportunityNewPage() {
     setOwnerId(ownerOptions[0]?.value ?? user.id)
     setPriority((resolvedPriorities[0]?.value ?? 'medium') as OpportunityPriority)
     setAttachments([])
+    setOpportunityAttachments(attachmentScopeId, [])
     setValidationErrors([])
     setRowErrors({})
+    setSaveAttempted(false)
+  }
+
+  function handleCancel() {
+    setOpportunityAttachments(attachmentScopeId, [])
+    navigate('/crm/opportunities')
   }
 
   const leadConvertGate = !prefillLeadId
     ? ({ ok: true } as const)
     : !lead
       ? ({ ok: false, reason: 'Lead not found' } as const)
-      : resolveLeadConvertToOpportunityGate(lead)
+      : resolveLeadConvertActionGate(lead, canCrmPermission('crm.lead.convert'))
 
   function createDeal(mode: 'open' | 'close' | 'new' | 'quotation') {
-    const { errors, rowErrors: rErr } = runValidation()
-    const leadErrors =
-      prefillLeadId && !leadConvertGate.ok ? [leadConvertGate.reason] : []
-    const allErrors = [...leadErrors, ...errors]
+    inline.touchAll()
+    const { fieldErrors, rowErrors: rErr } = runValidation()
+    const leadErrors = prefillLeadId && !leadConvertGate.ok ? [leadConvertGate.reason] : []
+    const merged: FieldErrorMap = { ...fieldErrors }
+    leadErrors.forEach((msg, i) => { merged[`_lead_${i}`] = msg })
     setRowErrors(rErr)
-    if (allErrors.length || Object.keys(rErr).length) {
-      const needsMore = errors.some((e) => /line|product|item|unit price/i.test(e)) || Object.keys(rErr).length > 0
+    if (Object.keys(merged).length || Object.keys(rErr).length) {
+      const needsMore = Object.keys(rErr).length > 0 || Object.keys(merged).some((k) => k.startsWith('unitPrice-') || k.startsWith('qty-') || k.startsWith('product-'))
       if (needsMore) setShowAdditionalDetails(true)
-      const fieldMap = buildOpportunityFieldErrors(allErrors, rErr)
+      const fieldMap = merged
       const lineKeys = Object.keys(fieldMap).filter(
         (k) => k.startsWith('unitPrice-') || k.startsWith('qty-') || k.startsWith('product-') || k.startsWith('taxPct-'),
       )
@@ -328,6 +355,7 @@ export function OpportunityNewPage() {
         fieldLabels[key] = 'Unit Price'
         sectionByField[key] = 'opp-section-products'
       }
+      setSaveAttempted(true)
       handleInvalidSubmit({
         errors: fieldMap,
         fieldOrder,
@@ -384,11 +412,13 @@ export function OpportunityNewPage() {
 
         if (!r.ok || !r.opportunityId) {
           setValidationErrors([r.error ?? 'Could not create opportunity'])
+          notify.error(r.error ?? 'Could not create opportunity')
           return
         }
 
         bindDraftAttachments(attachmentScopeId, r.opportunityId)
         setOpportunityAttachments(r.opportunityId, attachments.map((a) => ({ ...a, opportunityId: r.opportunityId })))
+        notify.success('Opportunity created successfully')
 
         if (mode === 'quotation') {
           navigate(`/crm/quotations/new?opportunityId=${r.opportunityId}`)
@@ -398,13 +428,15 @@ export function OpportunityNewPage() {
           resetForm()
           setActiveSection('quick')
           setShowAdditionalDetails(false)
+          // Drop lead/customer query so the next entry stays blank
+          if (searchParams.toString()) {
+            navigate('/crm/opportunities/new', { replace: true })
+          }
           return
         }
-        if (mode === 'close') {
-          navigate('/crm/opportunities')
-          return
-        }
-        navigate(`/crm/opportunities/${r.opportunityId}`)
+        // Save / Save & Close → opportunities register
+        setOpportunityAttachments(attachmentScopeId, [])
+        navigate('/crm/opportunities')
       } finally {
         setIsSubmitting(false)
       }
@@ -493,14 +525,6 @@ export function OpportunityNewPage() {
     { label: 'Source Lead', value: lead?.leadNo ?? '—', highlight: Boolean(lead) },
   ]
 
-  const validationGuideItems = useMemo(
-    () => validationErrors.map((err, i) => ({
-      id: `err-${i}`,
-      label: toRequiredFieldLabel(err),
-    })),
-    [validationErrors],
-  )
-
   const smartOverviewInput = useMemo(() => ({
     opportunityName,
     customerName: customer?.customerName ?? '',
@@ -527,6 +551,10 @@ export function OpportunityNewPage() {
       progressLabel="Deal readiness"
       progressPercent={computeOpportunityCompleteness(smartOverviewInput)}
       signals={buildOpportunitySmartSignals(smartOverviewInput)}
+      showGapSignals={crmShowCompletenessHints({
+        dirty: Boolean(customerId || opportunityName.trim() || lines.some((l) => l.productOrItem?.trim())),
+        saveAttempted,
+      })}
       nextAction={nextAction}
       onNextAction={() => {
         if (nextAction.id === 'create_quotation') {
@@ -572,8 +600,6 @@ export function OpportunityNewPage() {
       favoritePath="/crm/opportunities/new"
       breadcrumbs={crmChildBreadcrumbs('Opportunities', '/crm/opportunities', 'New Opportunity')}
       documentStrip={documentStrip}
-      validationItems={validationGuideItems}
-      validationErrors={validationGuideItems.length ? undefined : validationErrors}
       factBox={factBox}
       suppressFactBoxRecord
       collapsibleFactBox
@@ -583,20 +609,12 @@ export function OpportunityNewPage() {
       onSaveCloseShortcut={() => createDeal('close')}
       onSaveAndNewShortcut={() => createDeal('new')}
       stickyFooter
-      formSaveActions={{
-        isSubmitting,
-        saveLabel: 'Save',
-        onSave: () => createDeal('open'),
-        onSaveAndNew: () => createDeal('new'),
-        onSaveAndClose: () => createDeal('close'),
-        onCancel: () => navigate('/crm/opportunities'),
-      }}
       footer={(
         <ErpStickySaveBar
           sticky
           isSubmitting={isSubmitting}
           submitLabel="Save"
-          cancelTo="/crm/opportunities"
+          onCancel={handleCancel}
           onSave={() => createDeal('open')}
           onSaveAndNew={() => createDeal('new')}
           onSaveAndClose={() => createDeal('close')}
@@ -612,7 +630,6 @@ export function OpportunityNewPage() {
         sections={sectionNavItems}
         activeId={activeSection}
         onSelect={scrollToSection}
-        trailing={<FactBoxPaneAiToggle />}
       />
 
       <EnterpriseFormMetrics metrics={formMetrics} />
@@ -627,15 +644,24 @@ export function OpportunityNewPage() {
           label="Customer"
           required
           dataField="customerId"
-          fieldState={validationErrors.some((e) => /company/i.test(e)) ? 'error' : 'idle'}
-          fieldError={validationErrors.find((e) => /company/i.test(e))}
+          fieldState={
+            inline.fieldError('customerId') || validationErrors.some((e) => /company|customer/i.test(e))
+              ? 'error'
+              : inline.fieldState('customerId')
+          }
+          fieldError={
+            inline.fieldError('customerId')
+            ?? validationErrors.find((e) => /company|customer/i.test(e))
+          }
         >
           <Select
             value={customerId}
             onChange={(e) => {
               setCustomerId(e.target.value)
               setContactId('')
+              inline.touch('customerId')
             }}
+            onBlur={() => inline.touch('customerId')}
             required
             className="erp-input"
           >
@@ -657,8 +683,15 @@ export function OpportunityNewPage() {
           label="Opportunity Name"
           required
           dataField="opportunityName"
-          fieldState={validationErrors.some((e) => /name/i.test(e)) ? 'error' : 'idle'}
-          fieldError={validationErrors.find((e) => /name/i.test(e))}
+          fieldState={
+            inline.fieldError('opportunityName') || validationErrors.some((e) => /name/i.test(e))
+              ? 'error'
+              : inline.fieldState('opportunityName')
+          }
+          fieldError={
+            inline.fieldError('opportunityName')
+            ?? validationErrors.find((e) => /name/i.test(e))
+          }
           hint={
             nameManuallyEdited
               ? 'Custom name — clear the field to resume auto-naming'
@@ -668,8 +701,10 @@ export function OpportunityNewPage() {
           <Input
             value={opportunityName}
             onChange={(e) => handleOpportunityNameChange(e.target.value)}
+            onBlur={() => inline.touch('opportunityName')}
             placeholder="Select a company to auto-name, or type your own"
             required
+            error={Boolean(inline.fieldError('opportunityName'))}
             className="erp-input"
           />
         </ErpFieldRow>
@@ -680,8 +715,24 @@ export function OpportunityNewPage() {
             ))}
           </Select>
         </ErpFieldRow>
-        <ErpFieldRow label="Owner" required>
-          <Select native value={ownerId} onChange={(e) => setOwnerId(e.target.value)} required className="erp-input">
+        <ErpFieldRow
+          label="Owner"
+          required
+          dataField="ownerId"
+          fieldState={inline.fieldError('ownerId') ? 'error' : inline.fieldState('ownerId')}
+          fieldError={inline.fieldError('ownerId')}
+        >
+          <Select
+            native
+            value={ownerId}
+            onChange={(e) => {
+              setOwnerId(e.target.value)
+              inline.touch('ownerId')
+            }}
+            onBlur={() => inline.touch('ownerId')}
+            required
+            className="erp-input"
+          >
             {ownerOptions.length === 0 ? (
               <option value={user.id}>{user.name}</option>
             ) : (
@@ -702,10 +753,30 @@ export function OpportunityNewPage() {
           label="Expected Close Date"
           required
           dataField="expectedCloseDate"
-          fieldState={!expectedCloseDate && validationErrors.some((e) => /close/i.test(e)) ? 'error' : 'idle'}
-          fieldError={!expectedCloseDate ? validationErrors.find((e) => /close/i.test(e)) : undefined}
+          fieldState={
+            inline.fieldError('expectedCloseDate') || validationErrors.some((e) => /close date/i.test(e))
+              ? 'error'
+              : inline.fieldState('expectedCloseDate')
+          }
+          fieldError={
+            inline.fieldError('expectedCloseDate')
+            ?? validationErrors.find((e) => /close date/i.test(e))
+          }
         >
-          <Input type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} required className="erp-input" />
+          <Input
+            type="date"
+            value={expectedCloseDate}
+            min={getDateInputMin()}
+            max={getCrmDateInputMax()}
+            onChange={(e) => {
+              setExpectedCloseDate(e.target.value)
+              inline.touch('expectedCloseDate')
+            }}
+            onBlur={() => inline.touch('expectedCloseDate')}
+            required
+            error={Boolean(inline.fieldError('expectedCloseDate'))}
+            className="erp-input"
+          />
         </ErpFieldRow>
         {lead ? (
           <ErpFieldRow label="Source Lead" readOnly colSpan={2}>
@@ -805,9 +876,6 @@ export function OpportunityNewPage() {
                 aria-label="Win probability"
               />
               <span className="dyn-probability-field__value">{probability}%</span>
-            </div>
-            <div className="dyn-probability-field__bar" aria-hidden>
-              <div className="dyn-probability-field__fill" style={{ width: `${Number(probability) || 0}%` }} />
             </div>
           </div>
         </ErpFieldRow>

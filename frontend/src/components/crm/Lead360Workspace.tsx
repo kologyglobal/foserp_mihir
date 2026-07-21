@@ -7,16 +7,18 @@ import {
   ClipboardList,
   Paperclip,
 } from 'lucide-react'
-import { FactBoxPaneAiToggle } from '@/components/erp/card-form/FactBoxPaneAiToggle'
 import { QuickFollowUpDrawer } from '@/components/crm/QuickFollowUpDrawer'
 import { LogActivityDrawer } from '@/components/crm/CrmQuickCreateDrawers'
 import { LeadHistoryDrawer } from '@/components/crm/LeadHistoryDrawer'
 import { CrmUnifiedActivityFeed } from '@/components/crm/CrmUnifiedActivityFeed'
 import { CrmDeleteConfirmModal } from '@/components/crm/CrmDeleteConfirmModal'
+import { useCrmRecordLoadState } from '@/components/crm/CrmRecordLoadGate'
+import { PageLoadingFallback } from '@/components/system/PageLoadingFallback'
 import { canCrmPermission } from '@/utils/permissions/crm'
 import { AppLink } from '@/components/ui/AppLink'
 import { Button } from '@/components/ui/Button'
 import { Toast } from '@/components/ui/Toast'
+import { notify } from '@/store/toastStore'
 import { formatStatus } from '@/components/ui/Badge'
 import {
   ErpAdditionalInfoToggle,
@@ -31,13 +33,16 @@ import { Enterprise360Documents,
   useEnterprise360Keyboard,
 } from '@/design-system/workspace360'
 import { EntityAttachmentsPanel } from '@/components/crm/shared/EntityAttachmentsPanel'
-import { demoNotesFromTexts } from '@/utils/crmEntityNotes'
+import { demoNotesFromTexts, entityNotesToFeedNotes } from '@/utils/crmEntityNotes'
+import type { CrmEntityNoteDto } from '@/services/api/crmApi'
+import type { LeadStage } from '@/types/sales'
 import { useApiMode } from '@/hooks/useApiMode'
 import type { CrmActivity, FollowUp } from '@/types/crm'
 import { Lead360RecordHeader } from '@/components/crm/Lead360RecordHeader'
 import { LeadChangeStageControl } from '@/components/crm/LeadChangeStageControl'
 import { LeadSummaryCard, resolveLeadContactDesignation } from '@/components/crm/LeadSummaryCard'
-import { LeadNotesCard } from '@/components/crm/LeadNotesCard'
+import { CrmStageNotes } from '@/components/crm/shared/CrmStageNotes'
+import { LEAD_NOTE_STAGE_OPTIONS } from '@/utils/crmNoteStageOptions'
 import { LeadSmartOverviewPanel } from '@/components/crm/LeadSmartOverviewPanel'
 import { ErpLineItemsGrid } from '@/components/erp/ErpLineItemsGrid'
 import { CrmCardFormShell, ENTERPRISE_FORM_CLASS } from '@/components/crm/CrmCardFormShell'
@@ -73,7 +78,7 @@ import {
 import {
   leadPriorityLabel,
   leadStageLabel,
-  resolveLeadConvertToOpportunityGate,
+  resolveLeadConvertActionGate,
 } from '@/utils/leadUtils'
 import {
   formatMissingStageFieldsMessage,
@@ -83,7 +88,7 @@ import { canOpenLeadEditor, resolveLeadEditPolicy } from '@/utils/leadEditPolicy
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { useProductMasterOptionMap } from '@/utils/opportunityProductOptions'
-import { decodeLeadRequirementLines } from '@/utils/leadRequirementLines'
+import { decodeLeadRequirementLines, resolveLeadRequirementLinesRaw } from '@/utils/leadRequirementLines'
 
 export function Lead360Workspace() {
   const apiMode = useApiMode()
@@ -120,6 +125,7 @@ export function Lead360Workspace() {
   const [notesComposerOpen, setNotesComposerOpen] = useState(false)
   const deleteActivity = useCrmStore((s) => s.deleteActivity)
   const deleteFollowUp = useCrmStore((s) => s.deleteFollowUp)
+  const completeActivity = useCrmStore((s) => s.completeActivity)
 
   const attachmentItems = useLeadAttachmentStore((s) => s.items)
   const leadAttachments = useMemo(
@@ -138,6 +144,15 @@ export function Lead360Workspace() {
       { label: 'Follow-up notes', text: lead?.followUpNotes, authorName: lead?.leadOwnerName },
     ]),
     [lead],
+  )
+  /** API entity notes reported by the Notes card — merged into the unified feed. */
+  const [entityNotes, setEntityNotes] = useState<CrmEntityNoteDto[]>([])
+  const feedNotes = useMemo(
+    () => [
+      ...leadDemoNotes,
+      ...entityNotesToFeedNotes(entityNotes, (code) => leadStageLabel(code as LeadStage)),
+    ],
+    [leadDemoNotes, entityNotes],
   )
 
   const customerName = useCallback(
@@ -188,9 +203,9 @@ export function Lead360Workspace() {
         : undefined,
       onCreateOpportunity: lead
         ? () => {
-            const gate = resolveLeadConvertToOpportunityGate(lead)
+            const gate = resolveLeadConvertActionGate(lead, canCrmPermission('crm.lead.convert'))
             if (!gate.ok) {
-              setToast(gate.reason)
+              notify.warning(gate.reason)
               return
             }
             navigate(`/crm/opportunities/new?customerId=${encodeURIComponent(lead.customerId!)}&leadId=${encodeURIComponent(lead.id)}`)
@@ -217,7 +232,8 @@ export function Lead360Workspace() {
   }, [leadActivities])
 
   const hasOptionalDetailData = Boolean(
-    lead?.productRequirement?.trim()
+    lead?.remarks?.trim()
+    || resolveLeadRequirementLinesRaw(lead?.productRequirement, lead?.remarks)
     || (lead?.expectedValue ?? 0) > 0
     || lead?.expectedCloseDate
     || lead?.nextFollowUpDate
@@ -240,8 +256,11 @@ export function Lead360Workspace() {
   })
 
   const requirementLineCount = useMemo(
-    () => decodeLeadRequirementLines(lead?.productRequirement ?? '', lead?.expectedQty).lines.filter((l) => l.productOrItem?.trim()).length,
-    [lead?.productRequirement, lead?.expectedQty],
+    () =>
+      decodeLeadRequirementLines(lead?.productRequirement ?? '', lead?.expectedQty, lead?.remarks).lines.filter(
+        (l) => l.productOrItem?.trim(),
+      ).length,
+    [lead?.productRequirement, lead?.expectedQty, lead?.remarks],
   )
 
   const additionalSectionItems = useMemo(() => {
@@ -295,7 +314,14 @@ export function Lead360Workspace() {
     lead, requirementLineCount, leadAttachments.length, leadActivities.length,
   ])
 
-  if (!lead) {
+  const recordReady = Boolean(lead)
+  const { showLoader, showNotFound } = useCrmRecordLoadState(recordReady)
+
+  if (showLoader) {
+    return <PageLoadingFallback label="Loading lead…" />
+  }
+
+  if (showNotFound || !lead) {
     return (
       <div className="erp-page flex flex-col items-center justify-center gap-3 p-12">
         <p className="text-erp-muted">Lead not found.</p>
@@ -312,7 +338,13 @@ export function Lead360Workspace() {
   const engagementCtx = leadEngagementContext(lead)
   const editPolicy = resolveLeadEditPolicy(lead)
   const canEdit = canOpenLeadEditor(editPolicy)
-  const canConvertOpp = canEdit && editPolicy.mode !== 'limited' && lead.stage === 'qualified' && Boolean(lead.customerId) && !isConverted
+  const canConvertLeadPerm = canCrmPermission('crm.lead.convert')
+  const canConvertOpp =
+    canConvertLeadPerm
+    && editPolicy.mode !== 'limited'
+    && lead.stage === 'qualified'
+    && Boolean(lead.customerId)
+    && !isConverted
   const canClose = canEdit && editPolicy.canChangeStage && lead.stage !== 'closed' && !isConverted
 
   const {
@@ -322,7 +354,10 @@ export function Lead360Workspace() {
     statusNote: pipelineStatusNote,
     tone: pipelineTone,
   } = buildLeadCrmPipeline(lead, leadActivities)
-  const canChangeStage = editPolicy.canChangeStage && canCrmPermission('crm.lead.update')
+  /** Stage picker stays visible when user can update OR qualify (qualify covers Qualified/Not Qualified). */
+  const canChangeStage =
+    editPolicy.canChangeStage
+    && (canCrmPermission('crm.lead.update') || canCrmPermission('crm.lead.qualify'))
   const systemEvents = buildLeadSystemEvents(
     lead,
     customerQuotations.length > 0,
@@ -332,7 +367,7 @@ export function Lead360Workspace() {
   const unifiedFeedItems = buildLeadUnifiedFeed({
     activities: leadActivities,
     followUps: leadFollowUps,
-    notes: leadDemoNotes,
+    notes: feedNotes,
     systemEvents,
   })
   const relAge = formatRelationshipAge(relationshipAgeDays(lead.createdDate))
@@ -369,8 +404,21 @@ export function Lead360Workspace() {
   const canAddFollowUp = canCrmPermission('crm.follow_up.create')
   const canEditActivity = canCrmPermission('crm.activity.update')
   const canDeleteActivity = canCrmPermission('crm.activity.delete')
+  const canCompleteActivity = canCrmPermission('crm.activity.complete')
   const canEditFollowUp = canCrmPermission('crm.follow_up.update')
   const canDeleteFollowUp = canCrmPermission('crm.follow_up.delete')
+
+  function handleCompleteActivity(activity: CrmActivity) {
+    setPendingActivityId(activity.id)
+    void (async () => {
+      try {
+        const r = await resolveStoreAction(completeActivity(activity.id, activity.outcome ?? 'Completed'))
+        if (!r.ok) notify.error(r.error ?? 'Could not complete activity')
+      } finally {
+        setPendingActivityId(null)
+      }
+    })()
+  }
 
   function selectAdditionalSection(sectionId: string) {
     const normalized =
@@ -486,7 +534,14 @@ export function Lead360Workspace() {
         if (!quoteOpportunityId) return
         navigate(`/crm/quotations/new?opportunityId=${quoteOpportunityId}`)
       }}
-      onConvert={() => navigate(`/crm/opportunities/new?customerId=${lead.customerId ?? ''}&leadId=${lead.id}`)}
+      onConvert={() => {
+        const gate = resolveLeadConvertActionGate(lead, canCrmPermission('crm.lead.convert'))
+        if (!gate.ok) {
+          notify.warning(gate.reason)
+          return
+        }
+        navigate(`/crm/opportunities/new?customerId=${encodeURIComponent(lead.customerId ?? '')}&leadId=${encodeURIComponent(lead.id)}`)
+      }}
       onLogActivity={() => setLogActivityOpen(true)}
       onViewHistory={() => setHistoryOpen(true)}
       onDuplicate={() => navigate(`${routes.new}?duplicateFrom=${lead.id}`)}
@@ -500,9 +555,9 @@ export function Lead360Workspace() {
       input={smartOverviewInput}
       onGoToSection={handleSmartOverviewAction}
       onCreateOpportunity={() => {
-        const gate = resolveLeadConvertToOpportunityGate(lead)
+        const gate = resolveLeadConvertActionGate(lead, canCrmPermission('crm.lead.convert'))
         if (!gate.ok) {
-          setToast(gate.reason)
+          notify.warning(gate.reason)
           return
         }
         navigate(`/crm/opportunities/new?customerId=${encodeURIComponent(lead.customerId!)}&leadId=${encodeURIComponent(lead.id)}`)
@@ -543,9 +598,6 @@ export function Lead360Workspace() {
         stickyFooter={false}
       >
         <div className="erp-form-body crm-lead-form-body">
-        <div className="erp-form-body__toolbar">
-          <FactBoxPaneAiToggle />
-        </div>
 
         {isConverted ? (
           <div className="dyn-detail-banner dyn-detail-banner--success">
@@ -595,13 +647,18 @@ export function Lead360Workspace() {
           lastActivityLabel={lastActivity?.subject ?? null}
         />
 
-        <LeadNotesCard
-          leadId={currentLead.id}
+        <CrmStageNotes
+          entityType="LEAD"
+          entityId={currentLead.id}
+          sectionId="lead-section-notes"
+          stageOptions={LEAD_NOTE_STAGE_OPTIONS}
+          historyLabel="Lead notes history"
           currentStage={currentLead.stage}
           demoNotes={leadDemoNotes}
           editPath={routes.edit(currentLead.id)}
           composerOpen={notesComposerOpen}
           onComposerOpenChange={setNotesComposerOpen}
+          onNotesChange={setEntityNotes}
         />
 
         <ErpAdditionalInfoToggle
@@ -625,7 +682,7 @@ export function Lead360Workspace() {
               requirement: (
                 <div className="space-y-4">
                   <ErpLineItemsGrid
-                    lines={decodeLeadRequirementLines(lead.productRequirement ?? '', lead.expectedQty).lines}
+                    lines={decodeLeadRequirementLines(lead.productRequirement ?? '', lead.expectedQty, lead.remarks).lines}
                     onChange={() => {}}
                     productOptions={productOptions}
                     productPickMap={pickMap}
@@ -670,6 +727,7 @@ export function Lead360Workspace() {
                     setFollowUpOpen(true)
                   } : undefined}
                   onDeleteFollowUp={canDeleteFollowUp ? (followUp) => setDeleteFollowUpTarget(followUp) : undefined}
+                  onCompleteActivity={canCompleteActivity ? handleCompleteActivity : undefined}
                   pendingActivityId={pendingActivityId}
                   pendingFollowUpId={pendingFollowUpId}
                 />

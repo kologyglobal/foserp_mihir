@@ -17,6 +17,9 @@ type MasterRowActionHandlers = {
   /** When set, Edit opens drawer/custom UI instead of navigating to the form page. */
   onEdit?: (entry: CrmMasterEntry) => void
   onFeedback: (message: string, variant?: 'success' | 'error') => void
+  canCreate?: boolean
+  canUpdate?: boolean
+  canDelete?: boolean
 }
 
 /** Standard CRM master list row ⋯ menu — no extras, no duplicates. */
@@ -33,6 +36,9 @@ export function buildCrmMasterRowActions(
     deleteEntry,
     onEdit,
     onFeedback,
+    canCreate = true,
+    canUpdate = true,
+    canDelete = true,
   } = handlers
   const deleteCheck = canDeleteMasterEntry(entry)
   const detailPath = `${basePath}/${entry.id}`
@@ -44,9 +50,10 @@ export function buildCrmMasterRowActions(
       id: 'edit',
       label: 'Edit',
       icon: Pencil,
-      to: entry.systemControlled || onEdit ? undefined : editPath,
-      disabled: entry.systemControlled,
-      onClick: entry.systemControlled
+      to: entry.systemControlled || onEdit || !canUpdate ? undefined : editPath,
+      disabled: entry.systemControlled || !canUpdate,
+      disabledReason: !canUpdate ? 'Requires crm.master.update' : undefined,
+      onClick: entry.systemControlled || !canUpdate
         ? undefined
         : onEdit
           ? () => onEdit(entry)
@@ -56,11 +63,15 @@ export function buildCrmMasterRowActions(
       id: 'duplicate',
       label: 'Duplicate',
       icon: Copy,
-      onClick: () => {
-        const result = duplicateEntry(entry.id)
-        if (result.ok && result.id) navigate(`${basePath}/${result.id}/edit`)
-        else onFeedback(result.error ?? 'Duplicate failed', 'error')
-      },
+      disabled: !canCreate,
+      disabledReason: !canCreate ? 'Requires crm.master.create' : undefined,
+      onClick: !canCreate
+        ? undefined
+        : () => {
+            const result = duplicateEntry(entry.id)
+            if (result.ok && result.id) navigate(`${basePath}/${result.id}/edit`)
+            else onFeedback(result.error ?? 'Duplicate failed', 'error')
+          },
     },
     {
       id: 'history',
@@ -72,9 +83,10 @@ export function buildCrmMasterRowActions(
       id: 'activate',
       label: 'Activate',
       icon: CircleCheck,
-      disabled: entry.status !== 'inactive' || !activateEntry,
+      disabled: entry.status !== 'inactive' || !activateEntry || !canUpdate,
+      disabledReason: !canUpdate ? 'Requires crm.master.update' : undefined,
       onClick: () => {
-        if (!activateEntry) return
+        if (!activateEntry || !canUpdate) return
         void (async () => {
           const result = await Promise.resolve(activateEntry(entry.id))
           onFeedback(result.ok ? 'Activated' : (result.error ?? 'Activate failed'), result.ok ? 'success' : 'error')
@@ -85,8 +97,10 @@ export function buildCrmMasterRowActions(
       id: 'deactivate',
       label: 'Deactivate',
       icon: CircleOff,
-      disabled: entry.status !== 'active' || entry.systemControlled,
+      disabled: entry.status !== 'active' || entry.systemControlled || !canUpdate,
+      disabledReason: !canUpdate ? 'Requires crm.master.update' : undefined,
       onClick: () => {
+        if (!canUpdate) return
         void (async () => {
           const result = await Promise.resolve(deactivateEntry(entry.id))
           onFeedback(result.ok ? 'Deactivated' : (result.error ?? 'Deactivate failed'), result.ok ? 'success' : 'error')
@@ -98,12 +112,15 @@ export function buildCrmMasterRowActions(
       label: 'Delete',
       icon: Trash2,
       danger: true,
-      disabled: !deleteCheck.ok,
+      disabled: !deleteCheck.ok || !canDelete,
+      disabledReason: !canDelete
+        ? 'Requires crm.master.delete'
+        : (!deleteCheck.ok ? deleteCheck.reason : undefined),
       onClick: () => {
+        if (!canDelete || !deleteCheck.ok) return
         void (async () => {
           const result = await Promise.resolve(deleteEntry(entry.id))
-          if (result.ok) onFeedback('Record deleted', 'success')
-          else onFeedback(result.error ?? 'Delete blocked', 'error')
+          onFeedback(result.ok ? 'Deleted' : (result.error ?? 'Delete failed'), result.ok ? 'success' : 'error')
         })()
       },
     },

@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import {
   Ban,
+  ClipboardList,
   Copy,
   Eye,
   Pencil,
@@ -63,6 +64,7 @@ export interface PurchaseRequisitionRowHandlers {
   onSubmit: (row: PurchaseRequisitionListRow) => void
   onConvertRfq: (row: PurchaseRequisitionListRow) => void
   onConvertPo: (row: PurchaseRequisitionListRow) => void
+  onViewPlanning: (row: PurchaseRequisitionListRow) => void
   onPrint: (row: PurchaseRequisitionListRow) => void
   onCancel: (row: PurchaseRequisitionListRow) => void
 }
@@ -79,11 +81,12 @@ function buildRowActions(
   const canRfq = canConvertPrToRfq(row)
   const canPo = canConvertPrToPo(row)
   const canCancel = !isCancelled && !isConverted && status !== 'closed'
+  const hasRfq = Boolean(row.convertedRfqId)
 
-  const canEditPerm = canPurchasePermission('purchase.requisition.edit')
-  const canSubmitPerm = canPurchasePermission('purchase.requisition.submit')
+  const canEditPerm = canPurchasePermission('purchase.pr.edit')
+  const canSubmitPerm = canPurchasePermission('purchase.pr.submit')
   const canCreateRfq = canPurchasePermission('purchase.rfq.create')
-  const canCreatePo = canPurchasePermission('purchase.order.create')
+  const canCreatePo = canPurchasePermission('purchase.po.create')
 
   return [
     { id: 'view', label: 'View', icon: Eye, onClick: () => handlers.onView(row) },
@@ -94,7 +97,7 @@ function buildRowActions(
       onClick: () => handlers.onEdit(row),
       disabled: !canEditPerm || !canEdit,
       disabledReason: !canEditPerm
-        ? getPurchasePermissionDenialReason('purchase.requisition.edit')
+        ? getPurchasePermissionDenialReason('purchase.pr.edit')
         : status === 'pending_approval'
           ? 'Pending approval — requester cannot edit'
           : isCancelled
@@ -108,8 +111,8 @@ function buildRowActions(
       label: 'Duplicate',
       icon: Copy,
       onClick: () => handlers.onDuplicate(row),
-      disabled: !canPurchasePermission('purchase.requisition.create'),
-      disabledReason: getPurchasePermissionDenialReason('purchase.requisition.create'),
+      disabled: !canPurchasePermission('purchase.pr.create'),
+      disabledReason: getPurchasePermissionDenialReason('purchase.pr.create'),
     },
     {
       id: 'submit',
@@ -118,33 +121,46 @@ function buildRowActions(
       onClick: () => handlers.onSubmit(row),
       disabled: !canSubmitPerm || !canSubmit,
       disabledReason: !canSubmitPerm
-        ? getPurchasePermissionDenialReason('purchase.requisition.submit')
+        ? getPurchasePermissionDenialReason('purchase.pr.submit')
         : 'Only Draft or Rejected requisitions can be submitted',
     },
     {
       id: 'to-rfq',
-      label: 'Convert to RFQ',
+      label: hasRfq ? 'View RFQ' : 'Create RFQ',
       icon: ShoppingCart,
       onClick: () => handlers.onConvertRfq(row),
-      disabled: !canCreateRfq || !canRfq,
-      disabledReason: !canCreateRfq
-        ? getPurchasePermissionDenialReason('purchase.rfq.create')
-        : row.status === 'approved' && !row.rfqRequired
-          ? 'This PR is marked for direct Purchase Order'
-          : 'Only approved PRs that require RFQ can convert',
+      disabled: hasRfq ? false : !canCreateRfq || !canRfq,
+      disabledReason: hasRfq
+        ? undefined
+        : !canCreateRfq
+          ? getPurchasePermissionDenialReason('purchase.rfq.create')
+          : row.status === 'approved' && !row.rfqRequired
+            ? 'This PR uses Direct Purchase Planning Path'
+            : 'Only approved PRs that require RFQ can convert',
     },
-    {
-      id: 'to-po',
-      label: isPrPendingPo(row) ? 'Create Purchase Order' : 'Convert to Purchase Order',
-      icon: Truck,
-      onClick: () => handlers.onConvertPo(row),
-      disabled: !canCreatePo || !canPo,
-      disabledReason: !canCreatePo
-        ? getPurchasePermissionDenialReason('purchase.order.create')
-        : row.status === 'approved' && row.rfqRequired
-          ? 'RFQ is required first for this requisition'
-          : 'Only approved (direct PO) or RFQ-converted PRs can create a PO',
-    },
+    ...(isPrPendingPo(row)
+      ? [
+          {
+            id: 'view-planning',
+            label: 'View Planning Items',
+            icon: ClipboardList,
+            onClick: () => handlers.onViewPlanning(row),
+          },
+        ]
+      : [
+          {
+            id: 'to-po',
+            label: 'Convert to Purchase Order',
+            icon: Truck,
+            onClick: () => handlers.onConvertPo(row),
+            disabled: !canCreatePo || !canPo,
+            disabledReason: !canCreatePo
+              ? getPurchasePermissionDenialReason('purchase.po.create')
+              : row.status === 'approved' && row.rfqRequired
+                ? 'RFQ is required first for this requisition'
+                : 'Only RFQ-converted PRs can create a PO here',
+          },
+        ]),
     { id: 'print', label: 'Print', icon: Printer, onClick: () => handlers.onPrint(row) },
     {
       id: 'delete',
@@ -154,7 +170,7 @@ function buildRowActions(
       danger: true,
       disabled: !canEditPerm || !canCancel || status !== 'draft',
       disabledReason: !canEditPerm
-        ? getPurchasePermissionDenialReason('purchase.requisition.edit')
+        ? getPurchasePermissionDenialReason('purchase.pr.edit')
         : status !== 'draft'
           ? `${row.statusLabel || status} purchase requisitions cannot be deleted`
           : isCancelled
@@ -169,7 +185,7 @@ function buildRowActions(
       danger: true,
       disabled: !canEditPerm || !canCancel || status === 'draft',
       disabledReason: !canEditPerm
-        ? getPurchasePermissionDenialReason('purchase.requisition.edit')
+        ? getPurchasePermissionDenialReason('purchase.pr.edit')
         : status === 'draft'
           ? 'Use Delete for draft requisitions'
           : isCancelled

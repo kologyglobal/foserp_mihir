@@ -47,12 +47,11 @@ import {
   quotationPriceLinesToOpportunityLines,
   resolveOpportunityLines,
   syncOpportunityLines,
-  validateOpportunityLines,
   opportunityLineUnitPriceFieldKey,
   UNIT_PRICE_REQUIRED_MESSAGE,
 } from '../../utils/opportunityLineCalc'
-import { opportunityRowErrorsToFieldMap } from '../../utils/opportunityLineValidationFocus'
-import { handleInvalidSubmit } from '../../utils/formValidation'
+import { handleInvalidSubmit, crmShowCompletenessHints } from '../../utils/formValidation'
+import { validateQuotationCreate } from '../../utils/validation/crmSchemas/quotationSchema'
 import {
   decodeLeadRequirementLines,
   hasLeadRequirementLines,
@@ -65,7 +64,6 @@ import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { CommercialTermSelect } from '../../components/masters/GeographySelects'
 import { useDocumentLocation } from '../../hooks/useDocumentLocation'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import { crmChildBreadcrumbs } from '../../utils/crmNavigation'
 import { CrmTypedDocumentUpload } from '../../components/crm/CrmTypedDocumentUpload'
 import { useQuotationAttachmentStore } from '../../store/quotationAttachmentStore'
@@ -197,6 +195,7 @@ export function CrmQuotationNewPage() {
   const [rowErrors, setRowErrors] = useState<Record<string, string[]>>({})
   const [forceOpenProductsKey, setForceOpenProductsKey] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [saveAttempted, setSaveAttempted] = useState(false)
 
   function handleQuotationDateChange(value: string) {
     setQuotationDate(value)
@@ -330,63 +329,70 @@ export function CrmQuotationNewPage() {
     }
   }
 
-  function validate(): string[] {
-    const errors: string[] = []
-    if (createMode === 'opportunity') {
-      if (!opportunityId) errors.push('Select an opportunity to link this quotation.')
-    } else if (!customerId) {
-      errors.push('Select a client / company for this quotation.')
-    }
-    if (!templateId) errors.push('Select a quotation template.')
-    if (!validUntil) errors.push('Set a valid-until date for this quotation.')
-    if (!paymentTerms.trim()) errors.push('Select payment terms.')
-    if (!deliveryTerms.trim()) errors.push('Select delivery terms / timeline.')
-    const lineValidation = validateOpportunityLines(syncedLines, {
-      customerId: effectiveCustomerId,
+  function validate() {
+    return validateQuotationCreate({
+      createMode,
+      opportunityId,
+      customerId: effectiveCustomerId || customerId,
+      templateId,
+      validUntil,
+      paymentTerms,
+      deliveryTerms,
+      lines: syncedLines,
       ownerId: selectedOpp?.ownerId ?? '',
       stage: selectedOpp?.stage ?? 'new_lead',
       probability: String(probability),
     })
-    if (!syncedLines.some((l) => l.productOrItem?.trim() && l.qty > 0 && l.unitPrice > 0)) {
-      errors.push('Add at least one product line with quantity and unit price.')
-    }
-    errors.push(...lineValidation.errors.filter((e) => !e.includes('customer') && !e.includes('owner')))
-    return errors
   }
 
   async function createQuotation(mode: 'editor' | 'close' | 'new') {
-    const errors = validate()
-    const { rowErrors: rErr } = validateOpportunityLines(syncedLines, {
-      customerId: effectiveCustomerId,
-      ownerId: selectedOpp?.ownerId ?? '',
-      stage: selectedOpp?.stage ?? 'new_lead',
-      probability: String(probability),
-    })
-    setValidationErrors(errors)
+    const { fieldErrors, rowErrors: rErr, messages } = validate()
+    setValidationErrors(messages)
     setRowErrors(rErr)
-    if (errors.length || Object.keys(rErr).length) {
-      const fieldMap = opportunityRowErrorsToFieldMap(rErr)
-      const lineKeys = Object.keys(fieldMap)
+    if (messages.length || Object.keys(rErr).length) {
+      const fieldMap = { ...fieldErrors }
+      const lineKeys = Object.keys(fieldMap).filter(
+        (k) => k.startsWith('unitPrice-') || k.startsWith('qty-') || k.startsWith('product-') || k.startsWith('taxPct-'),
+      )
       if (!lineKeys.length && Object.keys(rErr).length) {
         const firstLineId = Object.keys(rErr)[0]!
         fieldMap[opportunityLineUnitPriceFieldKey(firstLineId)] = UNIT_PRICE_REQUIRED_MESSAGE
       }
       const keys = Object.keys(fieldMap)
-      const fieldLabels: Record<string, string> = {}
-      const sectionByField: Record<string, string> = {}
-      for (const key of keys) {
-        sectionByField[key] = 'quote-section-products'
-        if (key.startsWith('unitPrice-')) fieldLabels[key] = 'Unit Price'
-        else if (key.startsWith('qty-')) fieldLabels[key] = 'Quantity'
-        else if (key.startsWith('product-')) fieldLabels[key] = 'Product / Item'
-        else fieldLabels[key] = 'Line item'
+      const fieldLabels: Record<string, string> = {
+        opportunityId: 'Opportunity',
+        customerId: 'Client / Company',
+        templateId: 'Template',
+        validUntil: 'Valid until',
+        paymentTerms: 'Payment terms',
+        deliveryTerms: 'Delivery terms',
+        lines: 'Line items',
       }
-      const headerOnly = errors.filter((e) => !/line|product|unit price/i.test(e))
-      const merged: Record<string, string> = { ...fieldMap }
-      headerOnly.forEach((e, i) => { if (!Object.values(merged).includes(e)) merged[`_msg_${i}`] = e })
+      const sectionByField: Record<string, string> = {
+        opportunityId: 'quote-section-quick',
+        customerId: 'quote-section-quick',
+        templateId: 'quote-section-quick',
+        validUntil: 'quote-section-commercial',
+        paymentTerms: 'quote-section-commercial',
+        deliveryTerms: 'quote-section-commercial',
+        lines: 'quote-section-products',
+      }
+      for (const key of keys) {
+        if (key.startsWith('unitPrice-') || key.startsWith('qty-') || key.startsWith('product-') || key.startsWith('taxPct-')) {
+          sectionByField[key] = 'quote-section-products'
+          if (key.startsWith('unitPrice-')) fieldLabels[key] = 'Unit Price'
+          else if (key.startsWith('qty-')) fieldLabels[key] = 'Quantity'
+          else if (key.startsWith('product-')) fieldLabels[key] = 'Product / Item'
+          else if (key.startsWith('taxPct-')) fieldLabels[key] = 'GST %'
+          else fieldLabels[key] = 'Line item'
+        } else if (key.startsWith('_msg_')) {
+          fieldLabels[key] = 'Form'
+        }
+      }
+      setSaveAttempted(true)
       handleInvalidSubmit({
-        errors: Object.keys(merged).length ? merged : errors,
-        fieldOrder: [...keys, ...Object.keys(merged).filter((k) => k.startsWith('_msg_'))],
+        errors: Object.keys(fieldMap).length ? fieldMap : messages,
+        fieldOrder: keys,
         fieldLabels,
         sectionByField,
         expandSection: (sectionId) => {
@@ -429,12 +435,15 @@ export function CrmQuotationNewPage() {
     setIsSubmitting(false)
 
     if (!r.ok || !r.quotationId) {
-      setValidationErrors([r.error ?? 'Could not create quotation'])
+      const msg = r.error ?? 'Could not create quotation'
+      setValidationErrors([msg])
+      notify.error(msg)
       return
     }
 
     bindDraftAttachments(attachmentScopeId, r.quotationId)
     setQuotationAttachments(r.quotationId, attachments.map((a) => ({ ...a, quotationId: r.quotationId })))
+    notify.success('Quotation created successfully')
 
     if (mode === 'new') {
       setAttachments([])
@@ -595,11 +604,6 @@ export function CrmQuotationNewPage() {
     { label: 'Owner', value: selectedOpp?.ownerName ?? '—' },
   ]
 
-  const validationGuideItems = useMemo(
-    () => validationErrors.map((err, i) => ({ id: `err-${i}`, label: err })),
-    [validationErrors],
-  )
-
   const smartOverviewInput = useMemo(() => ({
     quotationNo: '',
     customerName: selectedCustomer?.customerName ?? '',
@@ -640,6 +644,10 @@ export function CrmQuotationNewPage() {
       progressLabel="Quotation readiness"
       progressPercent={computeQuotationCompleteness(smartOverviewInput)}
       signals={buildQuotationSmartSignals(smartOverviewInput)}
+      showGapSignals={crmShowCompletenessHints({
+        dirty: Boolean(customerId || opportunityId || syncedLines.some((l) => l.productOrItem?.trim())),
+        saveAttempted,
+      })}
       nextAction={nextAction}
       onNextAction={() => {
         scrollToSection(nextAction.sectionId ?? 'source')
@@ -705,8 +713,6 @@ export function CrmQuotationNewPage() {
       favoritePath="/crm/quotations/new"
       breadcrumbs={crmChildBreadcrumbs('Quotations', '/crm/quotations', 'New Quotation')}
       documentStrip={documentStrip}
-      validationItems={validationGuideItems}
-      validationErrors={validationGuideItems.length ? undefined : validationErrors}
       factBox={factBox}
       suppressFactBoxRecord
       collapsibleFactBox
@@ -716,14 +722,6 @@ export function CrmQuotationNewPage() {
       onSaveCloseShortcut={() => createQuotation('close')}
       onSaveAndNewShortcut={() => createQuotation('new')}
       stickyFooter
-      formSaveActions={{
-        isSubmitting,
-        saveLabel: 'Save',
-        onSave: () => void createQuotation('editor'),
-        onSaveAndNew: () => void createQuotation('new'),
-        onSaveAndClose: () => void createQuotation('close'),
-        onCancel: () => navigate('/crm/quotations'),
-      }}
       footer={(
         <ErpStickySaveBar
           sticky
@@ -747,7 +745,6 @@ export function CrmQuotationNewPage() {
         sections={sectionNavItems}
         activeId={activeSection}
         onSelect={scrollToSection}
-        trailing={<FactBoxPaneAiToggle />}
       />
 
       <EnterpriseFormMetrics metrics={formMetrics} />
@@ -803,7 +800,7 @@ export function CrmQuotationNewPage() {
         </div>
 
         <ErpFieldGroup
-          label={createMode === 'opportunity' ? 'Opportunity' : 'Client'}
+          label={createMode === 'direct' ? 'Client' : undefined}
           className="so-qe-customer-group"
         >
           {createMode === 'opportunity' ? (

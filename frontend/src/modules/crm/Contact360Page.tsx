@@ -13,7 +13,6 @@ import {
   User,
 } from 'lucide-react'
 import { ErpCardCommandBar } from '../../components/erp/card-form/ErpCardCommandBar'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
 import { ContactSummaryCard } from '@/components/crm/ContactSummaryCard'
 import { ENTERPRISE_FORM_DETAIL_CLASS } from '../../design-system/workspace'
@@ -363,7 +362,6 @@ export function Contact360Page() {
           sections={sectionNavItems}
           activeId={activeSection}
           onSelect={scrollToSection}
-          trailing={<FactBoxPaneAiToggle />}
         />
 
         <EnterpriseFormMetrics metrics={metrics} />

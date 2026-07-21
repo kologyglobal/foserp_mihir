@@ -96,7 +96,6 @@ export function PurchaseReturnDetailPage() {
         status="…"
         favoritePath="/purchase/returns"
         breadcrumbs={[{ label: 'Returns', to: '/purchase/returns' }, { label: 'Loading' }]}
-        backLink={{ to: '/purchase/returns', label: 'Back to Returns' }}
         footer={null}
         detailMode
       >
@@ -152,7 +151,6 @@ export function PurchaseReturnDetailPage() {
           { label: 'Returns', to: '/purchase/returns' },
           { label: doc.documentNumber },
         ]}
-        backLink={{ to: '/purchase/returns', label: 'Back to Returns' }}
         createdBy={doc.createdBy}
         createdDate={formatDate(doc.createdAt.slice(0, 10))}
         modifiedBy={doc.updatedBy ?? undefined}

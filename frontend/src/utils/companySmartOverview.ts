@@ -35,12 +35,12 @@ export function computeCompanyCompleteness(input: CompanySmartOverviewInput): nu
 export function buildCompanySmartSignals(input: CompanySmartOverviewInput): CrmSmartSignal[] {
   const missing: CrmSmartSignal[] = []
 
-  if (!input.customerName.trim()) missing.push({ id: 'name', label: 'Company name missing', tone: 'warn' })
+  if (!input.customerName.trim()) missing.push({ id: 'name', label: 'Add company name', tone: 'warn' })
   if (!input.hasBillingAddress || !input.city.trim() || !input.state.trim()) {
-    missing.push({ id: 'address', label: 'Billing address incomplete', tone: 'warn' })
+    missing.push({ id: 'address', label: 'Complete billing address', tone: 'warn' })
   }
-  if (!input.gstin.trim()) missing.push({ id: 'gstin', label: 'GSTIN pending', tone: 'warn' })
-  if (!input.salesTerritory.trim()) missing.push({ id: 'territory', label: 'Territory not set', tone: 'warn' })
+  if (!input.gstin.trim()) missing.push({ id: 'gstin', label: 'Add GSTIN when available', tone: 'warn' })
+  if (!input.salesTerritory.trim()) missing.push({ id: 'territory', label: 'Set sales territory', tone: 'warn' })
 
   return missing.slice(0, 3)
 }

@@ -26,6 +26,7 @@ import {
 } from '../utils/customerUtils'
 import { applyPrimaryContactFlags, syncCrmContactToMaster, syncPrimaryToCustomer } from '../utils/contactSync'
 import { getStageProbability, opportunityStageLabel } from '../utils/opportunityUtils'
+import { opportunityRequirementDisplay } from '../utils/leadRequirementLines'
 import { resolveLeadConvertToOpportunityGate } from '../utils/leadUtils'
 import { DEFAULT_QUOTATION_TEMPLATES } from '../data/quotations/quotationTemplates'
 import { buildCrmSampleData, emptyCrmState } from '../data/crm/crmSampleSeed'
@@ -50,6 +51,8 @@ import {
   sectionContent,
 } from '../utils/crmIntegration'
 import { useMasterStore } from './masterStore'
+import { assertProductSellableForSales } from '../utils/productMaster'
+import { resolveQuotationRevisionPolicy } from '../utils/quotationRevisionPolicy'
 import { nextDocumentNo } from '../utils/documentNumbers'
 import { assertPermission } from '../utils/permissions'
 import { useSalesStore } from './salesStore'
@@ -61,7 +64,11 @@ import {
   getMissingOpportunityStageFields,
 } from '../config/crmStageRequirements'
 import { cloneTemplateSections } from '../utils/quotationEngine/cloneSections'
-import { applyCommercialMastersToSections, resolveDefaultCommercialTerm } from '../utils/quotationTermUtils'
+import {
+  applyCommercialMastersToSections,
+  resolveDefaultCommercialTerm,
+  resolveCommercialTermSelectValue,
+} from '../utils/quotationTermUtils'
 import { mergeBuiltinQuotationTemplates } from '../utils/quotationEngine/builtinTemplateSync'
 import {
   buildIsoTankShowcaseBundle,
@@ -75,6 +82,19 @@ import { validateFollowUpAt } from '../utils/validation/crmDatePolicy'
 
 function genId(prefix: string) {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`
+}
+
+/** Block unreleased / inactive products at the first CRM write — not only at SO convert. */
+function assertSellableProductIds(
+  productIds: Array<string | null | undefined>,
+): { ok: true } | { ok: false; error: string } {
+  const master = useMasterStore.getState()
+  for (const id of productIds) {
+    if (!id) continue
+    const check = assertProductSellableForSales(master.getProduct(id))
+    if (!check.ok) return check
+  }
+  return { ok: true }
 }
 
 function appendApproval(
@@ -242,10 +262,15 @@ interface CrmState {
   updateQuotationDocumentSections: (documentId: string, sections: QuotationSection[]) => StoreAction<StoreActionResult>
   updateQuotationDocumentPriceTable: (documentId: string, priceLines: QuotationPriceLine[], extras?: { freightAmount?: number; installationAmount?: number; customCharges?: number }) => StoreAction<StoreActionResult>
   createQuotationRevision: (documentId: string, reason: string) => StoreAction<StoreActionResult & { documentId?: string }>
+  deleteQuotation: (quotationId: string) => StoreAction<StoreActionResult>
   markQuotationDocumentSent: (documentId: string) => StoreAction<StoreActionResult>
   submitQuotationDocumentForApproval: (documentId: string) => StoreAction<StoreActionResult>
   approveQuotationDocument: (documentId: string, remarks?: string) => StoreAction<StoreActionResult>
   rejectQuotationDocument: (documentId: string, remarks: string) => StoreAction<StoreActionResult>
+  /** Pending approval → draft (edit again without creating a revision). */
+  recallQuotationDocumentFromApproval: (documentId: string, remarks?: string) => StoreAction<StoreActionResult>
+  customerApproveQuotationDocument: (documentId: string, remarks?: string) => StoreAction<StoreActionResult>
+  customerRejectQuotationDocument: (documentId: string, remarks: string) => StoreAction<StoreActionResult>
 
   createQuotationFromOpportunity: (
     opportunityId: string,
@@ -482,6 +507,11 @@ export const useCrmStore = create<CrmState>()(
         const syncedLines = syncOpportunityLines(input.lines ?? [])
         const summary = calcOpportunityLinesSummary(syncedLines)
         const primaryProductId = syncedLines[0]?.productId ?? input.productId ?? null
+        const sellable = assertSellableProductIds([
+          primaryProductId,
+          ...syncedLines.map((l) => l.productId),
+        ])
+        if (!sellable.ok) return sellable
         const computedValue = summary.grandTotal > 0 ? summary.grandTotal : input.value
         const opp: Opportunity = {
           id: genId('opp'),
@@ -712,6 +742,11 @@ export const useCrmStore = create<CrmState>()(
             value: calcOpportunityLinesSummary(syncedLines).grandTotal,
           }
         }
+        const sellable = assertSellableProductIds([
+          nextPatch.productId ?? (patch.productId !== undefined ? patch.productId : null),
+          ...((nextPatch.lines ?? patch.lines ?? []) as { productId?: string | null }[]).map((l) => l.productId),
+        ])
+        if (!sellable.ok) return sellable
         set((s) => ({
           opportunities: s.opportunities.map((o) => (o.id === id ? mergeAudit(o, { ...nextPatch, ...stampModified(o) }) : o)),
         }))
@@ -947,7 +982,7 @@ export const useCrmStore = create<CrmState>()(
         const doc: QuotationDocument = {
           id: genId('qdoc'),
           quotationId,
-          revisionNo: 0,
+          revisionNo: 1,
           templateId,
           opportunityId: opportunityId ?? null,
           sections,
@@ -995,6 +1030,8 @@ export const useCrmStore = create<CrmState>()(
       updateQuotationDocumentPriceTable: (documentId, priceLines, extras) => {
         const doc = get().getQuotationDocument(documentId)
         if (!doc) return { ok: false, error: 'Document not found' }
+        const sellable = assertSellableProductIds(priceLines.map((l) => l.productId))
+        if (!sellable.ok) return sellable
         if (isApiMode()) {
           const lines = syncLineTotals(priceLines)
           const freight = extras?.freightAmount ?? doc.freightAmount
@@ -1038,6 +1075,16 @@ export const useCrmStore = create<CrmState>()(
       createQuotationRevision: (documentId, reason) => {
         const doc = get().getQuotationDocument(documentId)
         if (!doc) return { ok: false, error: 'Document not found' }
+        const salesQuo = useSalesStore.getState().getQuotation(doc.quotationId)
+        const latest = get().getLatestQuotationDocument(doc.quotationId)
+        const policy = resolveQuotationRevisionPolicy({
+          status: doc.status,
+          customerApproval: salesQuo?.customerApproval ?? 'pending',
+          isLatest: latest?.id === doc.id,
+        })
+        if (!policy.canCreateRevision) {
+          return { ok: false, error: policy.disabledReason ?? 'Revision is not available in the current status.' }
+        }
         if (isApiMode()) {
           return import('../services/bridges/crmApiBridge').then((m) => m.apiCreateQuotationRevision(doc.quotationId, reason))
         }
@@ -1057,7 +1104,7 @@ export const useCrmStore = create<CrmState>()(
           quotationDocuments: [
             ...s.quotationDocuments.map((d) =>
               d.quotationId === doc.quotationId && d.revisionNo === doc.revisionNo
-                ? mergeAudit(d, { locked: true, ...stampModified(d) })
+                ? mergeAudit(d, { locked: true, status: 'superseded' as QuotationDocumentStatus, ...stampModified(d) })
                 : d,
             ),
             {
@@ -1084,6 +1131,26 @@ export const useCrmStore = create<CrmState>()(
         return { ok: true, documentId: newDocId }
       },
 
+      deleteQuotation: (quotationId) => {
+        const header = useSalesStore.getState().getQuotation(quotationId)
+        const docs = get().quotationDocuments.filter((d) => d.quotationId === quotationId)
+        if (!header && docs.length === 0) return { ok: false, error: 'Quotation not found' }
+        const status = header?.status ?? docs.sort((a, b) => b.revisionNo - a.revisionNo)[0]?.status
+        if (status !== 'draft') {
+          return { ok: false, error: `Only draft quotations can be deleted — current status is ${status}` }
+        }
+        if (isApiMode()) {
+          return import('../services/bridges/crmApiBridge').then((m) => m.apiDeleteQuotation(quotationId))
+        }
+        useSalesStore.setState((s) => ({
+          quotations: s.quotations.filter((q) => q.id !== quotationId),
+        }))
+        set((s) => ({
+          quotationDocuments: s.quotationDocuments.filter((d) => d.quotationId !== quotationId),
+        }))
+        return { ok: true }
+      },
+
       markQuotationDocumentSent: (documentId) => {
         const doc = get().getQuotationDocument(documentId)
         if (!doc) return { ok: false, error: 'Document not found' }
@@ -1092,13 +1159,18 @@ export const useCrmStore = create<CrmState>()(
             m.apiMarkQuotationDocumentSent(doc.quotationId, documentId),
           )
         }
+        if (doc.status !== 'approved') {
+          return { ok: false, error: 'Only approved quotations can be sent to the customer' }
+        }
+        const history = appendApproval(doc, 'sent', 'Sent to customer')
         set((s) => ({
           quotationDocuments: s.quotationDocuments.map((d) =>
             d.id === documentId
-              ? mergeAudit(d, { status: 'sent', locked: true, ...stampModified(d) })
+              ? mergeAudit(d, { status: 'sent', locked: true, approvalHistory: history, ...stampModified(d) })
               : d,
           ),
         }))
+        useSalesStore.getState().markQuotationSent(doc.quotationId)
         logActivity(get, set, {
           type: 'quotation_sent',
           subject: 'Quotation sent to customer',
@@ -1119,7 +1191,12 @@ export const useCrmStore = create<CrmState>()(
             m.apiSubmitQuotationDocumentForApproval(doc.quotationId, documentId),
           )
         }
-        if (doc.locked && doc.status !== 'draft') return { ok: false, error: 'Document is locked' }
+        if (doc.locked && doc.status !== 'draft' && doc.status !== 'rejected') {
+          return { ok: false, error: 'Document is locked' }
+        }
+        if (doc.status !== 'draft' && doc.status !== 'rejected') {
+          return { ok: false, error: 'Only draft or rejected quotations can be submitted' }
+        }
         const maxDiscount = doc.priceLines.reduce((m, l) => Math.max(m, l.discountPct), 0)
         const audit = stampCreated()
         const history = appendApproval(doc, 'submitted', 'Submitted for approval')
@@ -1158,6 +1235,9 @@ export const useCrmStore = create<CrmState>()(
             m.apiApproveQuotationDocument(doc.quotationId, documentId, remarks),
           )
         }
+        if (doc.status !== 'pending_approval' && doc.status !== 'draft') {
+          return { ok: false, error: 'Only pending quotations can be approved' }
+        }
         const history = appendApproval(doc, 'approved', remarks ?? 'Approved')
         set((s) => ({
           quotationDocuments: s.quotationDocuments.map((d) =>
@@ -1171,7 +1251,7 @@ export const useCrmStore = create<CrmState>()(
         if (salesQuo && (salesQuo.status === 'draft' || salesQuo.status === 'rejected')) {
           salesState.submitQuotationForApproval(doc.quotationId)
         }
-        salesState.recordCustomerApproval(doc.quotationId, 'approved')
+        salesState.approveQuotationInternally(doc.quotationId)
         logActivity(get, set, {
           type: 'quotation_approved',
           subject: 'Quotation approved',
@@ -1194,6 +1274,9 @@ export const useCrmStore = create<CrmState>()(
             m.apiRejectQuotationDocument(doc.quotationId, documentId, remarks),
           )
         }
+        if (doc.status !== 'pending_approval') {
+          return { ok: false, error: 'Only pending quotations can be rejected' }
+        }
         const history = appendApproval(doc, 'rejected', remarks)
         set((s) => ({
           quotationDocuments: s.quotationDocuments.map((d) =>
@@ -1202,10 +1285,125 @@ export const useCrmStore = create<CrmState>()(
               : d,
           ),
         }))
-        useSalesStore.getState().recordCustomerApproval(doc.quotationId, 'rejected', remarks)
+        useSalesStore.getState().rejectQuotationInternally(doc.quotationId)
         logActivity(get, set, {
           type: 'quotation_rejected',
           subject: 'Quotation rejected',
+          description: remarks,
+          quotationId: doc.quotationId,
+          opportunityId: doc.opportunityId ?? undefined,
+          ownerId: doc.createdById,
+          ownerName: doc.createdByName,
+        })
+        return { ok: true }
+      },
+
+      recallQuotationDocumentFromApproval: (documentId, remarks) => {
+        const doc = get().getQuotationDocument(documentId)
+        if (!doc) return { ok: false, error: 'Document not found' }
+        if (doc.status !== 'pending_approval') {
+          return { ok: false, error: 'Only quotations pending internal approval can be recalled to Draft.' }
+        }
+        if (isApiMode()) {
+          return { ok: false, error: 'Recall to Draft is available in demo mode. In API mode, reject the quotation or ask an approver to reject it first.' }
+        }
+        const history = appendApproval(doc, 'rejected', remarks?.trim() || 'Recalled to Draft for edits')
+        set((s) => ({
+          quotationDocuments: s.quotationDocuments.map((d) =>
+            d.id === documentId
+              ? mergeAudit(d, {
+                  status: 'draft' as QuotationDocumentStatus,
+                  locked: false,
+                  approvalHistory: history,
+                  ...stampModified(d),
+                })
+              : d,
+          ),
+        }))
+        useSalesStore.setState((s) => ({
+          quotations: s.quotations.map((q) =>
+            q.id === doc.quotationId
+              ? { ...q, status: 'draft' as const, locked: false, modifiedAt: new Date().toISOString() }
+              : q,
+          ),
+        }))
+        logActivity(get, set, {
+          type: 'note',
+          subject: 'Quotation recalled to Draft',
+          description: remarks?.trim() || 'Recalled from pending internal approval',
+          quotationId: doc.quotationId,
+          opportunityId: doc.opportunityId ?? undefined,
+          ownerId: doc.createdById,
+          ownerName: doc.createdByName,
+        })
+        return { ok: true }
+      },
+
+      customerApproveQuotationDocument: (documentId, remarks) => {
+        const perm = assertPermission('sales', 'approve')
+        if (!perm.ok) return perm
+        const doc = get().getQuotationDocument(documentId)
+        if (!doc) return { ok: false, error: 'Document not found' }
+        if (isApiMode()) {
+          return import('../services/bridges/crmApiBridge').then((m) =>
+            m.apiCustomerApproveQuotationDocument(doc.quotationId, documentId, remarks),
+          )
+        }
+        if (doc.status !== 'sent') {
+          return { ok: false, error: 'Quotation must be sent before customer approval' }
+        }
+        const salesQuo = useSalesStore.getState().getQuotation(doc.quotationId)
+        if (salesQuo && salesQuo.customerApproval !== 'pending') {
+          return { ok: false, error: 'Customer approval already recorded' }
+        }
+        const history = appendApproval(doc, 'customer_approved', remarks ?? 'Customer approved')
+        set((s) => ({
+          quotationDocuments: s.quotationDocuments.map((d) =>
+            d.id === documentId
+              ? mergeAudit(d, { approvalHistory: history, ...stampModified(d) })
+              : d,
+          ),
+        }))
+        const r = useSalesStore.getState().recordCustomerApproval(doc.quotationId, 'approved')
+        if (!r.ok) return r
+        logActivity(get, set, {
+          type: 'note',
+          subject: 'Customer approved quotation',
+          description: remarks ?? 'Customer approved',
+          quotationId: doc.quotationId,
+          opportunityId: doc.opportunityId ?? undefined,
+          ownerId: doc.createdById,
+          ownerName: doc.createdByName,
+        })
+        return { ok: true }
+      },
+
+      customerRejectQuotationDocument: (documentId, remarks) => {
+        const perm = assertPermission('sales', 'approve')
+        if (!perm.ok) return perm
+        const doc = get().getQuotationDocument(documentId)
+        if (!doc) return { ok: false, error: 'Document not found' }
+        if (isApiMode()) {
+          return import('../services/bridges/crmApiBridge').then((m) =>
+            m.apiCustomerRejectQuotationDocument(doc.quotationId, documentId, remarks),
+          )
+        }
+        if (doc.status !== 'sent') {
+          return { ok: false, error: 'Quotation must be sent before customer rejection' }
+        }
+        const history = appendApproval(doc, 'customer_rejected', remarks)
+        set((s) => ({
+          quotationDocuments: s.quotationDocuments.map((d) =>
+            d.id === documentId
+              ? mergeAudit(d, { approvalHistory: history, ...stampModified(d) })
+              : d,
+          ),
+        }))
+        const r = useSalesStore.getState().recordCustomerApproval(doc.quotationId, 'rejected', remarks)
+        if (!r.ok) return r
+        logActivity(get, set, {
+          type: 'quotation_rejected',
+          subject: 'Customer rejected quotation',
           description: remarks,
           quotationId: doc.quotationId,
           opportunityId: doc.opportunityId ?? undefined,
@@ -1231,16 +1429,27 @@ export const useCrmStore = create<CrmState>()(
         if (!effectiveUnitPrice || effectiveUnitPrice <= 0) {
           return { ok: false, error: 'Unit price must be greater than zero' }
         }
+        const sellable = assertSellableProductIds([
+          primaryProductId,
+          ...resolvedLines.map((l) => l.productId),
+        ])
+        if (!sellable.ok) return sellable
 
         const customer = master.getCustomer(opp.customerId)
         const contact = opp.contactId ? get().getContact(opp.contactId) : null
         const tpl = get().getTemplate(templateId)
         const paymentDefault = resolveDefaultCommercialTerm('payment-terms')
         const deliveryDefault = resolveDefaultCommercialTerm('delivery-terms')
-        const paymentTerms = extras?.paymentTerms?.trim() || paymentDefault.text
-        const deliveryTerms = extras?.deliveryTerms?.trim() || deliveryDefault.text
+        const paymentTerms = extras?.paymentTerms?.trim()
+          || resolveCommercialTermSelectValue('payment-terms', paymentDefault.text)
+          || paymentDefault.text
+        const deliveryTerms = extras?.deliveryTerms?.trim()
+          || resolveCommercialTermSelectValue('delivery-terms', deliveryDefault.text)
+          || deliveryDefault.text
         const validityDate = extras?.validityDate?.trim() || undefined
-        const commercialNotes = opp.productRequirement
+        // Human-readable requirement — never the encoded <!--fos-lead-lines--> payload.
+        const requirementText = opportunityRequirementDisplay(opp.productRequirement)
+        const commercialNotes = requirementText
         const qty = resolvedLines[0]?.qty ?? 1
 
         if (isApiMode()) {
@@ -1250,8 +1459,8 @@ export const useCrmStore = create<CrmState>()(
           const sections = populateDocumentFromOpportunity(tplSections, {
             customerName: customer?.customerName ?? opp.customerId,
             contactName: contact?.name ?? customer?.contactPerson ?? '—',
-            productRequirement: opp.productRequirement,
-            technicalNotes: opp.productRequirement,
+            productRequirement: requirementText,
+            technicalNotes: requirementText,
             commercialNotes,
             deliveryDate: opp.expectedCloseDate,
             ownerName: opp.ownerName,
@@ -1261,7 +1470,7 @@ export const useCrmStore = create<CrmState>()(
             : syncLineTotals([
               {
                 id: genId('pl'),
-                productOrItem: opp.productRequirement,
+                productOrItem: requirementText,
                 description: tpl?.productFamily ?? 'Supply',
                 qty,
                 uom: 'Nos',
@@ -1292,7 +1501,7 @@ export const useCrmStore = create<CrmState>()(
               sections,
               priceLines,
               commercialNotes,
-              technicalNotes: opp.productRequirement,
+              technicalNotes: requirementText,
             }),
           )
         }
@@ -1321,8 +1530,8 @@ export const useCrmStore = create<CrmState>()(
         const sections = populateDocumentFromOpportunity(createdDoc.sections, {
           customerName: customer?.customerName ?? opp.customerId,
           contactName: contact?.name ?? customer?.contactPerson ?? '—',
-          productRequirement: opp.productRequirement,
-          technicalNotes: opp.productRequirement,
+          productRequirement: requirementText,
+          technicalNotes: requirementText,
           commercialNotes,
           deliveryDate: opp.expectedCloseDate,
           ownerName: opp.ownerName,
@@ -1334,8 +1543,9 @@ export const useCrmStore = create<CrmState>()(
           : syncLineTotals([
             {
               id: genId('pl'),
-              productOrItem: opp.productRequirement,
+              productOrItem: product?.productName ?? requirementText,
               description: tpl?.productFamily ?? 'Supply',
+              productId: primaryProductId,
               qty,
               uom: 'Nos',
               unitPrice: effectiveUnitPrice,
@@ -1356,7 +1566,7 @@ export const useCrmStore = create<CrmState>()(
                   salesOwnerId: opp.ownerId,
                   salesOwnerName: opp.ownerName,
                   commercialNotes,
-                  technicalNotes: opp.productRequirement,
+                  technicalNotes: requirementText,
                   ...stampModified(d),
                 })
               : d,
@@ -1402,12 +1612,21 @@ export const useCrmStore = create<CrmState>()(
         if (!effectiveUnitPrice || effectiveUnitPrice <= 0) {
           return { ok: false, error: 'Unit price must be greater than zero' }
         }
+        const sellable = assertSellableProductIds([
+          primaryProductId,
+          ...resolvedLines.map((l) => l.productId),
+        ])
+        if (!sellable.ok) return sellable
 
         const tpl = get().getTemplate(templateId)
         const paymentDefault = resolveDefaultCommercialTerm('payment-terms')
         const deliveryDefault = resolveDefaultCommercialTerm('delivery-terms')
-        const paymentTerms = extras?.paymentTerms?.trim() || paymentDefault.text
-        const deliveryTerms = extras?.deliveryTerms?.trim() || deliveryDefault.text
+        const paymentTerms = extras?.paymentTerms?.trim()
+          || resolveCommercialTermSelectValue('payment-terms', paymentDefault.text)
+          || paymentDefault.text
+        const deliveryTerms = extras?.deliveryTerms?.trim()
+          || resolveCommercialTermSelectValue('delivery-terms', deliveryDefault.text)
+          || deliveryDefault.text
         const validityDate = extras?.validityDate?.trim() || undefined
         const commercialNotes = extras?.scopeNotes?.trim() || undefined
         const qty = resolvedLines[0]?.qty ?? 1

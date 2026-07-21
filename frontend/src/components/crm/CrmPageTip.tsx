@@ -60,7 +60,7 @@ export function CrmPageTip({ className }: CrmPageTipProps) {
   }
 
   return (
-    <div ref={rootRef} className={cn('crm-page-tip relative inline-flex', className)}>
+    <div ref={rootRef} className={cn('crm-page-tip relative inline-flex', open && 'z-[100]', className)}>
       <button
         type="button"
         className={cn(
@@ -83,7 +83,7 @@ export function CrmPageTip({ className }: CrmPageTipProps) {
           role="dialog"
           aria-label={`Tip: ${title}`}
           className={cn(
-            'crm-page-tip__panel absolute left-0 top-[calc(100%+6px)] z-50 w-[min(22rem,calc(100vw-2rem))]',
+            'crm-page-tip__panel absolute left-0 top-[calc(100%+6px)] z-[100] w-[min(22rem,calc(100vw-2rem))]',
             'rounded border border-[var(--d365-border-strong,#c8c6c4)] bg-[var(--d365-surface,#fff)]',
             'shadow-[0_4px_16px_rgb(0_0_0_/_0.12)]',
           )}

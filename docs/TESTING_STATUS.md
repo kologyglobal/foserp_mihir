@@ -1,3 +1,35 @@
+# Purchase backend lifecycle verification (2026-07-21)
+
+- `cd backend && npm run typecheck` — **PASS**.
+- `cd backend && npx vitest run tests/purchase-invoice-lifecycle.test.ts` — **4/4 PASS** (create/code series, direct-invoice policy, PO/GRN requirements, tolerance override).
+- Purchase RBAC regression — **4/4 PASS**.
+- Broader combined purchase run — **11/12 PASS**; one existing planning create-PO concurrency test returned `[400, 400]` instead of one `201` and is outside the new invoice/QI/return modules.
+
+## Purchase create/edit footer verification (2026-07-21)
+
+- `npm run test:purchase-form-footers` — **80/80 PASS** (registered editor footer, API wiring, redirect, duplicate-save, unsaved-confirmation, mobile layout, and detail lifecycle contracts).
+- `npm run typecheck` — **PASS**.
+- `npm run build` — **PASS** (existing Tailwind/chunk warnings only).
+- Targeted changed-file `oxlint` — **PASS** with four pre-existing hook dependency warnings.
+- Full `npm run lint` — **BLOCKED** by the existing syntax error in `scripts/generate-uat-deliverables.ts`.
+- `npm run test:purchase:production` — **39/39 PASS** (runner uses `tsconfig.app.json` for path aliases).
+
+See [`PURCHASE_FORM_FOOTER_AUDIT.md`](PURCHASE_FORM_FOOTER_AUDIT.md).
+
+---
+
+## Purchase create/edit footer standard — 2026-07-21
+
+- `cd frontend && npm run test:purchase-form-footers` — **80/80 PASS**
+  - Registered PR/RFQ/VQ/PO/GRN/Return/Invoice editors use shared Cancel | Save actions.
+  - Stable route-map redirects, unsaved confirmation, backend API wiring, lifecycle action placement, mobile widths, and duplicate-click single-flight behavior covered.
+- `cd frontend && npm run build` — **PASS**
+- `cd frontend && npm run test:purchase:production` — **39/39 PASS** (script now uses `tsconfig.app.json` for path aliases).
+- Targeted `oxlint` on changed files — **PASS** with four pre-existing hook dependency warnings.
+- Full `npm run lint` — non-zero on the existing repository-wide warning baseline; no changed-file lint errors.
+
+---
+
 # 2026-07-18 — Finance Phase 3C5 credit-note allocation
 
 - Added focused test: `finance-ar-credit-note-allocation.test.ts` — **11/11 pass** (full/partial settlement, multi-invoice from one CN, multiple CNs against one invoice, multiple batches on one CN, unallocated CN stays a customer advance, over-allocation/empty/zero rejection, cross-customer rejection, idempotent replay, permission boundary, invoice outstanding unchanged until allocation + reconciliation MATCHED).
@@ -15,7 +47,157 @@
 
 # Testing Status
 
-Last run: **2026-07-18** (Finance Phase 3B4 atomic customer receipt posting).
+### 2026-07-21 — Self-approval policy (maker-checker override)
+
+| Check | Result |
+|-------|--------|
+| `purchase-approval-flow.test.ts` | **7/7 PASS** — new: PERMISSION_ONLY default allows holder of `purchase.approvals.self_approve` (queue `canAct` + approve + `selfApproved` audit flag); NEVER blocks everyone; EVERYONE allows without permission; legacy maker-checker/delegation/send-back still pass |
+| `purchase-approvals.test.ts` | **11/11 PASS** — requester provisioned without the bypass permission; self-approval block re-verified |
+| Migration `20260721110000_self_approval_policy` | **Applied** |
+| `sync-permissions.ts` | **PASS** (238 perms incl. `purchase.approvals.self_approve`) |
+| Backend `tsc --noEmit` | **PASS** |
+| Frontend `npm run typecheck` | **PASS** |
+
+---
+
+### 2026-07-21 — Purchase Setup full persistence
+
+| Check | Result |
+|-------|--------|
+| `purchase-setup.test.ts` | **15/15 PASS** — nested DTO round-trip, approval bands, number series prefix/pad, notifications ON_HOLD, version 409, FK/RBAC/tenant isolation, audit |
+| `purchase-invoice-lifecycle.test.ts` | **4/4 PASS** — matching / direct-invoice setup enforcement |
+| Backend `tsc --noEmit` | **PASS** |
+| Frontend `tsc -p tsconfig.app.json` | **PASS** |
+| Migrations `20260721120000_purchase_setup_full_persistence` + `20260721130000_purchase_status_history_docs` | **Applied** |
+
+### 2026-07-21 — Purchase Setup Phase 1A
+
+| Check | Result |
+|-------|--------|
+| `purchase-setup.test.ts` | Superseded by full persistence suite (was 13/13 on Phase 1A flat DTO) |
+| `purchase-order-lifecycle.test.ts` | **PASS** — includes deliveryWarehouseId resolution, `requirePoWarehouse`, retain warehouse after setup change |
+| `goods-receipt-lifecycle.test.ts` | **15/15 PASS** — Setup over-receipt tolerance (client `allowExcess` ignored), challan/vehicle/gate requirements |
+| Backend `tsc --noEmit` | **PASS** |
+| Frontend `npm run typecheck` | **PASS** |
+| `prisma validate` + migrate `20260721090000_purchase_setup_phase1` | **Applied** |
+| `sync-permissions.ts` | **PASS** (237 perms incl. `purchase.setup.view`) |
+
+---
+
+### 2026-07-21 — Purchase Planning Sheet E2E audit
+
+| Check | Result |
+|-------|--------|
+| `purchase-planning-workflow.test.ts` | **6/6 PASS** — net qty, transitions, Action Message + PO-ready codes |
+| `purchase-planning-sheet.test.ts` | **5/5 PASS** — approve→PPS sync, edit/bulk, create-po grouping, RFQ-required never syncs |
+| FE Create PO eligibility | Aligns with backend: Action Message + vendor_selected/approved/po_pending + vendor/qty/rate/date |
+| Who can Create PO | `purchase.planning.create_po` (Purchase Manager / Purchase Executive); Requester & Dept Manager cannot |
+| Frontend `/purchase/planning-sheet` HTTP | **200** |
+
+---
+
+Last run: **2026-07-21** (Purchase Planning Sheet E2E + approvals).
+
+### 2026-07-21 — Purchase approvals
+
+| Check | Result |
+|-------|--------|
+| `purchase-approvals.test.ts` | **11/11 PASS** — PR+PO queue/review/actions/RBAC/tenant/empty state |
+| `purchase-approval-flow.test.ts` | **4/4 PASS** — maker-checker, actor inbox, real-user delegation/assignment, PR send-back |
+| PR + PO + approval combined regression | **26/26 PASS** |
+| Frontend `test:purchase-approvals-api` | **PASS — 9 assertions** |
+| Backend typecheck | **PASS** |
+| Frontend app typecheck (`tsconfig.app.json`) | **PASS** |
+| Running API smoke | **PASS** — pending + history queue |
+| `/purchase/approvals` HTTP smoke | **200** |
+
+### 2026-07-20 — Purchase typecheck + coverage gaps
+
+| Check | Result |
+|-------|--------|
+| Frontend `npm run typecheck` | **PASS** |
+| Frontend `npm run test:purchase-phase15-all` | **PASS** |
+| Backend `tsc --noEmit` | **PASS** |
+| Backend `npm run test:purchase-phase15` | **29/29** |
+| Backend `purchase-phase15-integration.test.ts` | **9/9** |
+| Backend `purchase-module-coverage.test.ts` | **4/4** (cross-tenant, double-approve, RFQ→PO, concurrent conflict) |
+| Local migrate deploy `20260720160000_rfq_flow_award_fields` | **Applied** |
+
+### 2026-07-20 — Purchase Phase 16 final QA
+
+| Check | Result |
+|-------|--------|
+| Report | [`docs/purchase/PHASE_16_FINAL_QA_REPORT.md`](purchase/PHASE_16_FINAL_QA_REPORT.md) |
+| Prisma validate | **PASS** |
+| Backend `tsc --noEmit` | **PASS** |
+| Backend `npm run test:purchase-phase15` | **29/29** |
+| Backend live `purchase-phase15-integration.test.ts` | **9/9** |
+| Frontend `npm run test:purchase-phase15-all` | **PASS** (20 + E2E A/B) |
+| Frontend `npm run typecheck` | Was **FAIL** — **fixed** same day (see entry above) |
+| Full CRM/Sales/Inventory suite | **Not re-run** (modules present) |
+
+### 2026-07-20 — Purchase Phase 15 automated tests
+
+| Check | Result |
+|-------|--------|
+| Backend `npm run test:purchase-phase15` | **29/29** |
+| Backend `npx vitest run tests/purchase-phase15-integration.test.ts` | **9/9** (live MySQL) |
+| Backend `tsc --noEmit` | **PASS** |
+| Prisma validate | **PASS** |
+| Frontend `npm run test:purchase-phase15-all` | **PASS** (20 FE checks + E2E A + E2E B) |
+| Create PO from Planning | `POST /purchase/planning-sheet/create-po` |
+
+### 2026-07-20 — Purchase Phase 14 validation and error messages
+
+| Check | Result |
+|-------|--------|
+| `npx vitest run tests/purchase-requisition-workflow.test.ts tests/purchase-planning-workflow.test.ts tests/purchase-error-catalog.test.ts` | **Pass** (8+6+2) |
+| Backend `tsc --noEmit` | **PASS** |
+| Stable codes | `PR_*` / `PPS_*` / `PO_*` catalog + FE `purchaseErrorMessages` |
+| Error middleware | Prisma/FK/SQL sanitized; technical detail logged only |
+| Live MySQL lifecycle | Expectations updated (`PR_NOT_EDITABLE`, `PR_NO_LINES`, …); re-run when DB available |
+
+### 2026-07-20 — Purchase Phase 13 audit logs and timeline
+
+| Check | Result |
+|-------|--------|
+| `npx vitest run tests/purchase-audit-timeline.test.ts` | **2/2** |
+| Backend `tsc --noEmit` | Pass (after audit helper + service wiring) |
+| Timeline API | `GET /purchase/timeline/:entityType/:entityId` |
+| FE views | PR / Planning drawer / RFQ / PO show `PurchaseAuditTimeline` |
+
+### 2026-07-20 — Purchase RBAC
+
+| Check | Result |
+|-------|--------|
+| `npx vitest run tests/purchase-rbac-permissions.test.ts` | **4/4** |
+| Canonical keys on purchase routes | Wired (`purchase.pr.*` / `planning.*` / `rfq.*` / `po.*`) |
+| Permission-denied audit | `requirePermission` → `PERMISSION_DENIED` audit log |
+
+### 2026-07-20 — Purchase RFQ workflow + FE dual-mode bridge
+
+| Check | Result |
+|-------|--------|
+| `npx vitest run tests/purchase-rfq-workflow.test.ts` | **2/2** |
+| FE RFQ/VQ/comparison facade + mappers | Wired (`VITE_USE_API=true`); demo path unchanged |
+| Live RFQ/VQ/comparison MySQL suite | **Pending** |
+
+### 2026-07-20 — Purchase Planning Sheet backend
+
+| Suite / check | Result |
+|---------------|--------|
+| `npx vitest run tests/purchase-planning-workflow.test.ts` | **5/5** |
+| `npx vitest run tests/purchase-planning-sheet.test.ts --hookTimeout=120000` | **4/4** (live MySQL) |
+| `npx tsc --noEmit` (backend) | **PASS** |
+
+### 2026-07-20 — Purchase Requisition backend
+
+| Suite / check | Result |
+|---------------|--------|
+| `npx vitest run tests/purchase-requisition-workflow.test.ts` | **8/8** |
+| `npx vitest run tests/purchase-requisition-lifecycle.test.ts --hookTimeout=120000` | **5/5** (live MySQL) |
+| `npx tsc --noEmit` (backend) | **PASS** |
+| `npx tsx scripts/prisma-cli.ts migrate deploy` | **PASS** (`20260720130000_add_purchase_code_series_entities`) |
 
 ### 2026-07-18 — Finance Phase 3B4: Atomic customer receipt posting
 

@@ -1,6 +1,6 @@
 /**
  * Data cleanup: remove all opportunities + quotations; keep sales orders;
- * keep exactly one quotation template (STANDARD-TRAILER, or most complete fallback).
+ * keep exactly one quotation template (ISO-TANK-26KL, or most complete fallback).
  *
  * Does NOT delete companies, contacts, leads, products, users, or sales orders.
  * Soft-deletes notes/attachments on OPPORTUNITY/QUOTATION entities.
@@ -12,13 +12,13 @@
  * Optional:
  *   TENANT_SLUG=vasant-trailers          (default)
  *   DRY_RUN=1                            (counts only, no writes)
- *   KEEP_TEMPLATE_CODE=STANDARD-TRAILER  (preferred keep code)
+ *   KEEP_TEMPLATE_CODE=ISO-TANK-26KL  (preferred keep code)
  */
 import { CrmEntityType } from '@prisma/client'
 import { prisma } from '../src/config/database.js'
 const slug = process.env.TENANT_SLUG ?? 'vasant-trailers'
 const dryRun = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true'
-const preferredTemplateCode = process.env.KEEP_TEMPLATE_CODE ?? 'STANDARD-TRAILER'
+const preferredTemplateCode = process.env.KEEP_TEMPLATE_CODE ?? 'ISO-TANK-26KL'
 
 type Counts = {
   opportunities: number

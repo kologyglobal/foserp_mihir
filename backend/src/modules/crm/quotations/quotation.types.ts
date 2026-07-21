@@ -42,7 +42,7 @@ export interface QuotationSectionDto {
 
 export interface QuotationApprovalEntryDto {
   id: string
-  action: 'submitted' | 'approved' | 'rejected'
+  action: 'submitted' | 'approved' | 'rejected' | 'sent' | 'customer_approved' | 'customer_rejected'
   byId: string
   byName: string
   at: string

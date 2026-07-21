@@ -29,7 +29,6 @@ import { buildLeadRegisterKpiItems } from '../../utils/leadKpiItems'
 import { exportRowsToCsv } from '../../utils/exportCsv'
 import { runCrmExport } from '../../utils/crmServerExport'
 import { useApiMode } from '@/hooks/useApiMode'
-import { downloadLeadImportTemplate } from '../../utils/leadImport'
 import { canCrmPermission } from '../../utils/permissions'
 import {
   filterActivitiesForLead,
@@ -40,7 +39,7 @@ import {
 } from '../../utils/leadEngagement'
 import {
   leadStageLabel,
-  resolveLeadConvertToOpportunityGate,
+  resolveLeadConvertActionGate,
 } from '../../utils/leadUtils'
 import { canOpenLeadEditor, resolveLeadEditPolicy } from '../../utils/leadEditPolicy'
 import {
@@ -66,7 +65,7 @@ import { syncLeadsFromApi } from '../../services/bridges/crmApiBridge'
 export function CrmLeadListPage() {
   const apiMode = useApiMode()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const routes = useLeadRoutes()
   const leads = useSalesStore((s) => s.leads)
   const quotations = useSalesStore((s) => s.quotations)
@@ -89,9 +88,14 @@ export function CrmLeadListPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [assignTargets, setAssignTargets] = useState<ReturnType<typeof enrichLeadRow>[] | null>(null)
+  const [urlSeeded, setUrlSeeded] = useState(false)
 
   const canEdit = canCrmPermission('crm.lead.update')
   const canDelete = canCrmPermission('crm.lead.delete')
+  const canAssign = canCrmPermission('crm.lead.assign')
+  const canConvert = canCrmPermission('crm.lead.convert')
+  const canCreateLead = canCrmPermission('crm.lead.create')
+  const canScheduleActivity = canCrmPermission('crm.activity.create')
 
   // API mode: soft-refresh leads when opening the register (Zustand stand-in for
   // invalidateQueries). Bridge upserts already update the store after create/edit;
@@ -99,11 +103,13 @@ export function CrmLeadListPage() {
   useEffect(() => {
     if (!apiMode) return
     void syncLeadsFromApi().catch(() => {
-      /* keep existing store slice on network failure */
+      notify.error('Could not refresh leads from server')
     })
   }, [apiMode])
 
+  // One-time seed from deep-link query params
   useEffect(() => {
+    if (urlSeeded) return
     const stage = searchParams.get('stage') ?? ''
     const priority = searchParams.get('priority') ?? ''
     const ownerCode = searchParams.get('owner') ?? ''
@@ -116,7 +122,28 @@ export function CrmLeadListPage() {
         ...(owner ? { owner } : {}),
       }))
     }
-  }, [searchParams])
+    setUrlSeeded(true)
+  }, [searchParams, urlSeeded])
+
+  // Keep shareable URL in sync with primary filters (no full reload)
+  useEffect(() => {
+    if (!urlSeeded) return
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        const sync = (key: string, value: string) => {
+          if (value) next.set(key, value)
+          else next.delete(key)
+        }
+        sync('stage', filters.stage)
+        sync('priority', filters.priority)
+        // Prefer owner code in URL when we can resolve from display name
+        sync('owner', filters.owner)
+        return next
+      },
+      { replace: true },
+    )
+  }, [filters.stage, filters.priority, filters.owner, urlSeeded, setSearchParams])
 
   const applyLeadFilters = useCallback((saved: Record<string, string>) => {
     setFilters({
@@ -286,9 +313,7 @@ export function CrmLeadListPage() {
   }
 
   function openLeadImport() {
-    downloadLeadImportTemplate()
     setImportOpen(true)
-    showToast('Lead import template downloaded — fill it and upload in the dialog', 'success')
   }
 
   function exportSelectedLeads(selected: ReturnType<typeof enrichLeadRow>[]) {
@@ -405,12 +430,16 @@ export function CrmLeadListPage() {
           <ErpCommandBar
             inline
             sticky={false}
-            primaryAction={{
-              id: 'new-lead',
-              label: 'New Lead',
-              icon: Plus,
-              onClick: () => navigate(routes.new),
-            }}
+            primaryAction={
+              canCreateLead
+                ? {
+                    id: 'new-lead',
+                    label: 'New Lead',
+                    icon: Plus,
+                    onClick: () => navigate(routes.new),
+                  }
+                : undefined
+            }
             secondaryActions={[
               { id: 'import', label: 'Import', icon: Upload, onClick: openLeadImport },
               { id: 'export', label: 'Export', icon: Download, onClick: exportLeads },
@@ -428,6 +457,9 @@ export function CrmLeadListPage() {
             routes={routes}
             canEdit={canEdit}
             canDelete={canDelete}
+            canAssign={canAssign}
+            canConvert={canConvert}
+            canScheduleActivity={canScheduleActivity}
             search={filters.search}
             onSearchChange={(search) => setFilters((f) => ({ ...f, search }))}
             showCompactSearch={false}
@@ -466,9 +498,11 @@ export function CrmLeadListPage() {
             emptyAction={
               enrichedRows.length === 0 ? (
                 <div className="flex flex-wrap justify-center gap-2">
-                  <button type="button" className="erp-btn erp-btn--primary text-[13px]" onClick={() => navigate(routes.new)}>
-                    New Lead
-                  </button>
+                  {canCreateLead ? (
+                    <button type="button" className="erp-btn erp-btn--primary text-[13px]" onClick={() => navigate(routes.new)}>
+                      New Lead
+                    </button>
+                  ) : null}
                   <button type="button" className="erp-btn erp-btn--secondary text-[13px]" onClick={openLeadImport}>
                     Import Leads
                   </button>
@@ -486,7 +520,7 @@ export function CrmLeadListPage() {
             }}
             onDelete={openDeleteModal}
             onCreateOpportunity={(row) => {
-              const gate = resolveLeadConvertToOpportunityGate(row.lead)
+              const gate = resolveLeadConvertActionGate(row.lead, canConvert)
               if (!gate.ok) {
                 showToast(gate.reason, 'warning')
                 return

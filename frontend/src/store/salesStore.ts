@@ -35,6 +35,7 @@ import { getSessionUser } from '../utils/permissions'
 import { erpStorage } from './persistConfig'
 import { isApiMode } from '../config/apiConfig'
 import type { StoreAction, StoreActionResult } from './storeAction'
+import { getLeadCreateValidationError } from '../utils/validation/crmSchemas/leadSchema'
 import {
   formatMissingStageFieldsMessage,
   getMissingLeadStageFields,
@@ -202,6 +203,12 @@ interface SalesState {
   createQuotationRevision: (quotationId: string, changes: { unitPrice?: number; discountPct?: number; summary: string }) => { ok: boolean; error?: string; quotationId?: string }
   updateQuotationDraft: (id: string, patch: Partial<Pick<Quotation, 'terms' | 'paymentTerms' | 'deliveryTerms' | 'validityDate'>> & { unitPrice?: number; discountPct?: number }) => StoreAction<StoreActionResult>
   submitQuotationForApproval: (id: string) => { ok: boolean; error?: string }
+  /** Internal approval — header → approved; customerApproval stays pending until after send. */
+  approveQuotationInternally: (id: string) => { ok: boolean; error?: string }
+  rejectQuotationInternally: (id: string) => { ok: boolean; error?: string }
+  /** After internal approve — header → sent. */
+  markQuotationSent: (id: string) => { ok: boolean; error?: string }
+  /** Customer decision after document is sent. */
   recordCustomerApproval: (id: string, decision: CustomerApprovalStatus, rejectionReason?: string) => { ok: boolean; error?: string }
 
   createSalesOrderFromQuotation: (quotationId: string, crm?: CrmSalesOrderContext) => { ok: boolean; error?: string; salesOrderId?: string; salesOrderNo?: string }
@@ -267,53 +274,59 @@ export const useSalesStore = create<SalesState>()(
 
       getPendingCustomerApprovals: () =>
         get().quotations.filter(
-          (q) => q.isLatestRevision && q.status === 'pending_approval' && q.customerApproval === 'pending',
+          (q) => q.isLatestRevision && q.status === 'sent' && q.customerApproval === 'pending',
         ),
 
       createLead: (input) => {
-        if (isApiMode()) return import('../services/bridges/crmApiBridge').then((m) => m.apiCreateLead(input as unknown as Record<string, unknown>))
+        const session = getSessionUser()
+        const normalizedInput = {
+          ...input,
+          leadOwnerId: input.leadOwnerId || session.id,
+        }
+        const createError = getLeadCreateValidationError(normalizedInput as unknown as Record<string, unknown>)
+        if (createError) return { ok: false, error: createError }
+        if (isApiMode()) return import('../services/bridges/crmApiBridge').then((m) => m.apiCreateLead(normalizedInput as unknown as Record<string, unknown>))
         const perm = assertPermission('sales', 'create')
         if (!perm.ok) return perm
 
-        const session = getSessionUser()
-        const ownerName = input.leadOwnerName || session.name
-        const stage = input.stage ?? mapLifecycleToStage(input.lifecycleStatus, 'new')
-        const lifecycleStatus = input.lifecycleStatus ?? deriveLifecycleFromStage(stage)
+        const ownerName = normalizedInput.leadOwnerName || session.name
+        const stage = normalizedInput.stage ?? mapLifecycleToStage(normalizedInput.lifecycleStatus, 'new')
+        const lifecycleStatus = normalizedInput.lifecycleStatus ?? deriveLifecycleFromStage(stage)
         const leadNo = nextDocumentNo('LEAD-', get().leads.map((l) => l.leadNo))
         const lead: Lead = normalizeLead({
           id: genId('lead'),
           leadNo,
-          source: input.source ?? 'other',
-          industry: input.industry ?? '',
-          customerId: input.customerId ?? null,
-          prospectName: input.prospectName,
+          source: normalizedInput.source ?? 'other',
+          industry: normalizedInput.industry ?? '',
+          customerId: normalizedInput.customerId ?? null,
+          prospectName: normalizedInput.prospectName,
           salesOwner: ownerName,
-          leadOwnerId: input.leadOwnerId || session.id,
+          leadOwnerId: normalizedInput.leadOwnerId || session.id,
           leadOwnerName: ownerName,
-          expectedValue: input.expectedValue,
-          probability: input.probability ?? 30,
+          expectedValue: normalizedInput.expectedValue,
+          probability: normalizedInput.probability ?? 30,
           stage,
-          remarks: input.remarks ?? input.productRequirement ?? '',
-          priority: input.priority,
-          createdDate: input.createdDate,
-          activityStatus: input.activityStatus,
-          inactiveReason: input.inactiveReason ?? null,
+          remarks: normalizedInput.remarks ?? normalizedInput.productRequirement ?? '',
+          priority: normalizedInput.priority,
+          createdDate: normalizedInput.createdDate,
+          activityStatus: normalizedInput.activityStatus,
+          inactiveReason: normalizedInput.inactiveReason ?? null,
           lifecycleStatus,
-          closedDate: input.closedDate ?? null,
-          closedReason: input.closedReason ?? null,
-          notQualifiedReason: input.notQualifiedReason ?? null,
-          opportunityId: input.opportunityId ?? null,
-          productRequirement: input.productRequirement,
-          expectedQty: input.expectedQty ?? null,
-          expectedCloseDate: input.expectedCloseDate ?? null,
-          contactPerson: input.contactPerson ?? null,
-          contactId: input.contactId ?? null,
-          mobile: input.mobile ?? null,
-          email: input.email ?? null,
-          nextFollowUpDate: input.nextFollowUpDate ?? null,
-          followUpType: input.followUpType ?? null,
-          followUpNotes: input.followUpNotes ?? null,
-          locationId: input.locationId ?? null,
+          closedDate: normalizedInput.closedDate ?? null,
+          closedReason: normalizedInput.closedReason ?? null,
+          notQualifiedReason: normalizedInput.notQualifiedReason ?? null,
+          opportunityId: normalizedInput.opportunityId ?? null,
+          productRequirement: normalizedInput.productRequirement,
+          expectedQty: normalizedInput.expectedQty ?? null,
+          expectedCloseDate: normalizedInput.expectedCloseDate ?? null,
+          contactPerson: normalizedInput.contactPerson ?? null,
+          contactId: normalizedInput.contactId ?? null,
+          mobile: normalizedInput.mobile ?? null,
+          email: normalizedInput.email ?? null,
+          nextFollowUpDate: normalizedInput.nextFollowUpDate ?? null,
+          followUpType: normalizedInput.followUpType ?? null,
+          followUpNotes: normalizedInput.followUpNotes ?? null,
+          locationId: normalizedInput.locationId ?? null,
           ...stampCreated(),
         })
         set((s) => ({ leads: [lead, ...s.leads] }))
@@ -690,8 +703,8 @@ export const useSalesStore = create<SalesState>()(
         if (!current) return { ok: false, error: 'Quotation not found' }
         if (!current.isLatestRevision) return { ok: false, error: 'Only the latest revision can be revised' }
         if (current.status === 'converted') return { ok: false, error: 'Quotation already converted to sales order' }
-        if (current.customerApproval === 'approved' && current.status === 'approved') {
-          return { ok: false, error: 'Approved quotation cannot be revised — create a new opportunity if terms changed' }
+        if (current.customerApproval === 'approved' && (current.status === 'sent' || current.status === 'approved')) {
+          return { ok: false, error: 'Customer-approved quotation cannot be revised — create a new opportunity if terms changed' }
         }
 
         const unitPrice = changes.unitPrice ?? current.pricing.unitPrice
@@ -810,16 +823,80 @@ export const useSalesStore = create<SalesState>()(
         return { ok: true }
       },
 
+      approveQuotationInternally: (id) => {
+        const perm = assertPermission('sales', 'approve')
+        if (!perm.ok) return perm
+        const quo = get().getQuotation(id)
+        if (!quo) return { ok: false, error: 'Quotation not found' }
+        if (quo.status !== 'pending_approval' && quo.status !== 'draft' && quo.status !== 'rejected') {
+          return { ok: false, error: `Cannot approve quotation in status ${quo.status}` }
+        }
+        set((s) => ({
+          quotations: s.quotations.map((q) =>
+            q.id === id
+              ? mergeAudit(q, {
+                  status: 'approved',
+                  locked: true,
+                  customerApproval: 'pending',
+                  ...stampModified(q),
+                })
+              : q,
+          ),
+        }))
+        return { ok: true }
+      },
+
+      rejectQuotationInternally: (id) => {
+        const perm = assertPermission('sales', 'approve')
+        if (!perm.ok) return perm
+        const quo = get().getQuotation(id)
+        if (!quo) return { ok: false, error: 'Quotation not found' }
+        if (quo.status !== 'pending_approval') {
+          return { ok: false, error: 'Only pending quotations can be rejected' }
+        }
+        set((s) => ({
+          quotations: s.quotations.map((q) =>
+            q.id === id
+              ? mergeAudit(q, {
+                  status: 'rejected',
+                  locked: false,
+                  customerApproval: 'pending',
+                  ...stampModified(q),
+                })
+              : q,
+          ),
+        }))
+        return { ok: true }
+      },
+
+      markQuotationSent: (id) => {
+        const quo = get().getQuotation(id)
+        if (!quo) return { ok: false, error: 'Quotation not found' }
+        if (quo.status !== 'approved') {
+          return { ok: false, error: 'Only internally approved quotations can be sent' }
+        }
+        set((s) => ({
+          quotations: s.quotations.map((q) =>
+            q.id === id
+              ? mergeAudit(q, { status: 'sent', locked: true, ...stampModified(q) })
+              : q,
+          ),
+        }))
+        return { ok: true }
+      },
+
       recordCustomerApproval: (id, decision, rejectionReason) => {
         const perm = assertPermission('sales', 'approve')
         if (!perm.ok) return perm
 
         const quo = get().getQuotation(id)
         if (!quo) return { ok: false, error: 'Quotation not found' }
-        if (quo.locked) return { ok: false, error: 'Quotation is locked' }
         if (!quo.isLatestRevision) return { ok: false, error: 'Customer approval applies to latest revision only' }
-        if (quo.status !== 'pending_approval') {
-          return { ok: false, error: 'Quotation must be pending approval' }
+        if (quo.status !== 'sent') {
+          return { ok: false, error: 'Quotation must be sent to the customer before customer approval' }
+        }
+        if (quo.customerApproval !== 'pending') {
+          return { ok: false, error: 'Customer approval already recorded' }
         }
 
         if (decision === 'approved') {
@@ -827,7 +904,6 @@ export const useSalesStore = create<SalesState>()(
             quotations: s.quotations.map((q) =>
               q.id === id
                 ? mergeAudit(q, {
-                    status: 'approved',
                     customerApproval: 'approved',
                     customerApprovalAt: new Date().toISOString(),
                     customerApprovalBy: stampCreated().createdByName,
@@ -845,7 +921,6 @@ export const useSalesStore = create<SalesState>()(
             quotations: s.quotations.map((q) =>
               q.id === id
                 ? mergeAudit(q, {
-                    status: 'rejected',
                     customerApproval: 'rejected',
                     customerApprovalAt: new Date().toISOString(),
                     customerApprovalBy: stampCreated().createdByName,
@@ -867,8 +942,8 @@ export const useSalesStore = create<SalesState>()(
 
         const quo = get().getQuotation(quotationId)
         if (!quo) return { ok: false, error: 'Quotation not found' }
-        if (quo.customerApproval !== 'approved' || quo.status !== 'approved') {
-          return { ok: false, error: 'Sales order requires customer-approved quotation' }
+        if (quo.customerApproval !== 'approved' || quo.status !== 'sent') {
+          return { ok: false, error: 'Sales order requires a sent, customer-approved quotation' }
         }
         if (!quo.isLatestRevision) {
           return { ok: false, error: 'Convert from the latest approved revision only' }

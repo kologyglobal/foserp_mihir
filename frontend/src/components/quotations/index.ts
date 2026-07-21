@@ -17,13 +17,13 @@ export { ConvertQuotationToSOAction } from './ConvertQuotationToSOAction'
 export { QuotationConversionDialog } from './QuotationConversionDialog'
 export { Quotation360RecordHeader } from './Quotation360RecordHeader'
 export { QuotationSummaryCard } from './QuotationSummaryCard'
-export { QuotationNotesCard } from './QuotationNotesCard'
 export { QuotationSmartOverviewPanel } from './QuotationSmartOverviewPanel'
 export {
   QuotationHeroCard,
   QuotationWorkflowStepper,
   QuotationCommercialSummary,
   QuotationSectionList,
+  quotationRevisionLabel,
 } from './Quotation360Sections'
 export {
   QuotationCrmCard, QuotationCrmList, QuotationCrmEmptyState, QuotationPortfolioToolbar,

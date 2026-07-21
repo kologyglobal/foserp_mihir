@@ -226,7 +226,7 @@ export function buildCrmQuotationRegisterKpis(
       value: kpis.approved,
       icon: KPI_ICON_PRESETS.qualified,
       accent: 'green',
-      context: 'Ready for conversion',
+      context: 'Ready to send / convert',
       active: segment === 'approved',
       onClick: () => onSegment(segment === 'approved' ? 'all' : 'approved'),
       updatedAt: now,

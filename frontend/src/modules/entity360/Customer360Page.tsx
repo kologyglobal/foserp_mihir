@@ -25,7 +25,6 @@ import { ActivityFeed } from '../../components/design-system/Timeline'
 import { Customer360Hero } from '../../components/entity360/Customer360Hero'
 import { DynamicsKpiRow, DynamicsKpiTile } from '../../components/dynamics/DynamicsKpiTile'
 import { ErpCardCommandBar } from '../../components/erp/card-form/ErpCardCommandBar'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import { ErpButton } from '../../components/erp/ErpButton'
 import { ActiveBadge, StatusBadge, TypeBadge } from '../../components/ui/StatusBadge'
 import { TableLink } from '../../components/ui/AppLink'
@@ -567,7 +566,6 @@ export function Customer360Page() {
             sections={sectionNavItems}
             activeId={tab}
             onSelect={(t) => setTab(t as Tab)}
-            trailing={<FactBoxPaneAiToggle />}
           />
 
           <EnterpriseFormMetrics metrics={metrics} />

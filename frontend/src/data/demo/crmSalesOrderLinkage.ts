@@ -3,12 +3,12 @@ import type { SalesOrder } from '../../types/mrp'
 /** Pipeline quotation status cycle — index % 10 */
 export const DEMO_QUOTATION_STATUS_CYCLE = [
   'draft',
-  'submitted',
   'pending_approval',
   'approved',
+  'sent',
   'converted',
-  'submitted',
-  'approved',
+  'pending_approval',
+  'sent',
   'converted',
   'approved',
   'converted',

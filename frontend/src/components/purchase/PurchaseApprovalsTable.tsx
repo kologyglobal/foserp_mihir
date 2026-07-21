@@ -74,8 +74,8 @@ function buildRowActions(
   if (row.status === 'pending' && row.canAct) {
     const canApprove =
       row.documentType === 'purchase_order'
-        ? canPurchasePermission('purchase.order.approve')
-        : canPurchasePermission('purchase.requisition.approve')
+        ? canPurchasePermission('purchase.po.approve')
+        : canPurchasePermission('purchase.pr.approve')
     if (canApprove) {
       actions.push(
         {

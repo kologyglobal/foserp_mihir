@@ -26,6 +26,10 @@ const SUITES = [
   'test:crm-masters',
   'test:crm-companies-ui',
   'test:crm-dashboard-design-polish',
+  'test:crm-stage-requirements',
+  'test:lead-validation-and-convert-contact',
+  'test:crm-a11y',
+  'test:crm-form-alignment',
   'test:advanced-crm',
   'test:erp-card-form-system',
 ] as const

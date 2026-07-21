@@ -36,11 +36,16 @@ export interface Opportunity360RecordHeaderProps {
   favoritePath: string
   isOpen: boolean
   canDelete: boolean
+  /** Require crm.opportunity.close for Mark Won / Mark Lost. */
+  canClose?: boolean
   /** Show Create SO control (hide when SO already linked). */
   showCreateSalesOrder: boolean
   /** Enable Create SO — quotation accepted + Won/Order Confirmed. */
   canCreateSalesOrder: boolean
   createSalesOrderDisabledReason?: string | null
+  /** Create Quotation gate — stage + mandatory fields. */
+  canCreateQuotation?: boolean
+  createQuotationDisabledReason?: string | null
   contactPhone?: string
   contactEmail?: string
   onEdit: () => void
@@ -82,9 +87,12 @@ export function Opportunity360RecordHeader({
   favoritePath,
   isOpen,
   canDelete,
+  canClose = true,
   showCreateSalesOrder,
   canCreateSalesOrder,
   createSalesOrderDisabledReason,
+  canCreateQuotation = true,
+  createQuotationDisabledReason,
   contactPhone,
   contactEmail,
   onEdit,
@@ -123,7 +131,8 @@ export function Opportunity360RecordHeader({
             label: 'Create Quotation',
             icon: FileText,
             onClick: onCreateQuotation,
-            disabled: !isOpen,
+            disabled: !isOpen || !canCreateQuotation,
+            disabledReason: createQuotationDisabledReason ?? undefined,
           },
           ...(showCreateSalesOrder
             ? [{
@@ -152,7 +161,7 @@ export function Opportunity360RecordHeader({
     },
     { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, onClick: onLogActivity },
     { id: 'meeting', label: 'Meeting', icon: Video, onClick: onLogActivity },
-    ...(isOpen
+    ...(isOpen && canClose
       ? [
           { id: 'won', label: 'Mark as Won', icon: CheckCircle2, onClick: onMarkWon },
           { id: 'lost', label: 'Mark as Lost', icon: XCircle, onClick: onMarkLost, danger: true },
@@ -227,7 +236,8 @@ export function Opportunity360RecordHeader({
               variant="secondary"
               icon={FileText}
               onClick={onCreateQuotation}
-              disabled={!isOpen}
+              disabled={!isOpen || !canCreateQuotation}
+              disabledReason={createQuotationDisabledReason ?? undefined}
             >
               Create Quotation
             </ErpButton>

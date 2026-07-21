@@ -21,6 +21,7 @@ import {
   getMissingLeadStageFields,
   getMissingOpportunityStageFields,
 } from '../../config/crmStageRequirements'
+import { getLeadCreateValidationError } from '../../utils/validation/crmSchemas/leadSchema'
 
 const submitLocks = new Set<string>()
 let defaultPipelineCache: PipelineDto | null = null
@@ -93,6 +94,14 @@ function upsertLead(lead: Lead): void {
 export async function syncLeadsFromApi(): Promise<void> {
   const leads = await api.fetchAllCrmPages<Lead>('/crm/leads')
   useSalesStore.setState({ leads: leads.map((l) => normalizeLead(l)) })
+}
+
+/** Refetch opportunities slice only (pipeline / register soft-refresh). */
+export async function syncOpportunitiesFromApi(): Promise<void> {
+  const opportunities = await api.fetchAllCrmPages<Opportunity>('/crm/opportunities')
+  useCrmStore.setState({
+    opportunities: Array.isArray(opportunities) ? opportunities : [],
+  })
 }
 
 function removeLead(id: string): void {
@@ -264,7 +273,7 @@ function mapLeadCreatePayload(input: Record<string, unknown>): Record<string, un
     email,
     mobile: sanitizePhoneDigits(String(input.mobile ?? '')) || '',
     contactPerson: input.contactPerson ?? '',
-    productRequirement: input.productRequirement ?? input.remarks ?? '',
+    productRequirement: input.productRequirement ?? '',
     expectedQty: input.expectedQty ?? null,
     expectedValue: input.expectedValue ?? 0,
     probability: input.probability ?? 30,
@@ -414,6 +423,8 @@ export async function apiDeleteContact(id: string): Promise<StoreActionResult> {
 }
 
 export async function apiCreateLead(input: Record<string, unknown>): Promise<StoreActionResult & { leadId?: string }> {
+  const createError = getLeadCreateValidationError(input)
+  if (createError) return { ok: false, error: createError }
   return withSubmitLock(lockKey('lead:create'), async () => {
     try {
       const res = await api.createLeadApi(mapLeadCreatePayload(input))
@@ -649,6 +660,7 @@ export async function apiCreateOpportunity(
           value: input.value,
           expectedCloseDate: toApiDateTime(input.expectedCloseDate),
           lines: mapOpportunityLinesForApi(input.lines),
+          contactId: isUuid(input.contactId ?? undefined) ? input.contactId : null,
         })
         upsertLead(res.data.lead)
         if (res.data.opportunity) upsertOpportunity(res.data.opportunity)

@@ -1,6 +1,6 @@
 import type { PurchaseRequisition, PurchaseRequisitionListRow } from '@/types/purchaseDomain'
 
-/** Approved and marked for direct PO (skip RFQ). */
+/** Approved for Direct Purchase Planning (Planning Sheet rows; no RFQ). */
 export function isPrPendingPo(
   pr: Pick<PurchaseRequisition, 'status' | 'rfqRequired' | 'convertedPoId'>,
 ): boolean {
@@ -34,13 +34,19 @@ export function prProcurementPathLabel(
 ): string {
   if (pr.convertedPoId) return 'PO created'
   if (pr.status === 'converted_to_rfq' || pr.convertedRfqId) return 'Via RFQ'
-  if (pr.status === 'approved' && !pr.rfqRequired) return 'Direct to PO'
-  if (pr.rfqRequired) return 'RFQ required'
-  return 'Direct to PO'
+  if (pr.status === 'approved' && !pr.rfqRequired) return 'Direct Purchase Planning Path'
+  if (pr.rfqRequired) return 'RFQ Purchase Path'
+  return 'Direct Purchase Planning Path'
 }
 
 export function prNextActionHint(pr: PurchaseRequisitionListRow | PurchaseRequisition): string | null {
-  if (isPrPendingPo(pr)) return 'Ready for Purchase Order'
+  if (isPrPendingPo(pr)) return 'Ready for Purchase Planning Sheet'
   if (isPrPendingRfq(pr)) return 'Ready for RFQ'
   return null
+}
+
+/** Deep-link to planning sheet filtered by PR document number. */
+export function purchasePlanningSheetHrefForPr(documentNumber: string): string {
+  const q = encodeURIComponent(documentNumber.trim())
+  return q ? `/purchase/planning-sheet?search=${q}` : '/purchase/planning-sheet'
 }

@@ -57,7 +57,24 @@ export const VENDOR_PAYMENT_METHODS = [
 ] as const
 
 export type VendorPaymentMethod = (typeof VENDOR_PAYMENT_METHODS)[number]
-export type WarehouseType = 'main' | 'sub' | 'wip' | 'fg' | 'quarantine'
+export type WarehouseType =
+  | 'main'
+  | 'sub'
+  | 'wip'
+  | 'fg'
+  | 'quarantine'
+  | 'raw_material'
+  | 'finished_goods'
+  | 'work_in_progress'
+  | 'receiving'
+  | 'quality_hold'
+  | 'rejected'
+  | 'vendor_return'
+  | 'maintenance'
+  | 'consumables'
+  | 'scrap'
+  | 'transit'
+  | 'dispatch'
 export type ProductType =
   | 'bulker'
   | 'iso_tank'
@@ -373,6 +390,8 @@ export interface Warehouse extends MasterRecordAudit {
   warehouseCode: string
   warehouseName: string
   warehouseType: WarehouseType
+  /** FK to plants master (API mode); null when not linked yet. */
+  plantId?: string | null
   plantCode: string
   address: string
   isActive: boolean

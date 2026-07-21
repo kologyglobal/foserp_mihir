@@ -6,7 +6,7 @@ export const PURCHASE_FACTBOX_COLLAPSED_KEY = 'purchase.factbox.collapsed'
 /**
  * Resolve initial FactBox open state.
  * - Explicit storage preference wins.
- * - When unset, default open only at xl+ (match register right-rail).
+ * - When unset, default open at 1280px+ (side-by-side form + Smart Context).
  *
  * Supports:
  * - sessionStorage `erp-factbox:*` → `'1'` open / `'0'` closed

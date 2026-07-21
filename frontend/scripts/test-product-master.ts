@@ -38,7 +38,8 @@ check('Seed has quality plan', !!prod.quality.finalInspectionPlanName)
 check('Can use released product in sales', useProductMasterStore.getState().canUseProductInSales('prod-45m3').ok)
 
 check('Cannot skip status draft→released', !PRODUCT_STATUS_FLOW.draft.includes('released'))
-check('Advance engineering_review→approved', useProductMasterStore.getState().advanceProductStatus('prod-iso', 'approved', 'Test approval').ok)
+check('Advance engineering_review→approved', useProductMasterStore.getState().advanceProductStatus('prod-ss-tank', 'approved', 'Test approval').ok)
+check('Unreleased product blocked from sales', !useProductMasterStore.getState().canUseProductInSales('prod-ss-tank').ok)
 
 const rev = useProductMasterStore.getState().createProductRevision('prod-iso', {
   revisionNo: 'Rev-2',
@@ -47,6 +48,7 @@ const rev = useProductMasterStore.getState().createProductRevision('prod-iso', {
 check('Create revision', rev.ok)
 const iso = useMasterStore.getState().getProduct('prod-iso')!
 check('Revision locks history', iso.revisions.some((r) => r.locked))
+check('Released ISO product sellable', useProductMasterStore.getState().canUseProductInSales('prod-iso').ok)
 
 check('Product revision report', getProductRevisionReport().length >= 3)
 check('Product cost report', getProductCostReport().length >= 3)

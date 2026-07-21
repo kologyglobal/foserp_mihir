@@ -32,7 +32,6 @@ import {
 } from '@/utils/approvalRegisterInsights'
 import {
   approvePurchaseDocument,
-  delegatePurchaseApproval,
   getPurchaseApprovalQueue,
   PurchaseServiceError,
   rejectPurchaseDocument,
@@ -150,7 +149,7 @@ export function PurchaseApprovalsPage() {
   const runQuickAction = useCallback(
     async (
       row: PurchaseApprovalQueueRow,
-      kind: 'approve' | 'reject' | 'send_back' | 'delegate',
+      kind: 'approve' | 'reject' | 'send_back',
     ) => {
       try {
         if (kind === 'approve') {
@@ -199,10 +198,6 @@ export function PurchaseApprovalsPage() {
           setBusyId(row.approvalId)
           await sendBackPurchaseDocument(row.documentType, row.documentId, remarks)
           notify.success(`${row.documentNumber} sent back`)
-        } else {
-          setBusyId(row.approvalId)
-          await delegatePurchaseApproval(row.approvalId, 'finance_head', 'Delegated to Finance Head')
-          notify.success(`${row.documentNumber} delegated`)
         }
         setRefreshToken((n) => n + 1)
       } catch (err) {
@@ -221,7 +216,7 @@ export function PurchaseApprovalsPage() {
       onApprove: (row: PurchaseApprovalQueueRow) => void runQuickAction(row, 'approve'),
       onReject: (row: PurchaseApprovalQueueRow) => void runQuickAction(row, 'reject'),
       onSendBack: (row: PurchaseApprovalQueueRow) => void runQuickAction(row, 'send_back'),
-      onDelegate: (row: PurchaseApprovalQueueRow) => void runQuickAction(row, 'delegate'),
+      onDelegate: (row: PurchaseApprovalQueueRow) => openReview(row.approvalId, 'review'),
     }),
     [runQuickAction],
   )
@@ -237,7 +232,7 @@ export function PurchaseApprovalsPage() {
     return (
       <OperationalPageShell
         title="Purchase Approvals"
-        description="Requisitions and purchase orders awaiting approval — matrix driven by Purchase Setup"
+        description="Live requisition and purchase-order approval inbox"
         badge="Purchase"
         variant="dynamics"
         breadcrumbs={shellBreadcrumbs}
@@ -252,7 +247,7 @@ export function PurchaseApprovalsPage() {
     return (
       <OperationalPageShell
         title="Purchase Approvals"
-        description="Requisitions and purchase orders awaiting approval — matrix driven by Purchase Setup"
+        description="Live requisition and purchase-order approval inbox"
         badge="Purchase"
         variant="dynamics"
         breadcrumbs={shellBreadcrumbs}
@@ -294,7 +289,7 @@ export function PurchaseApprovalsPage() {
     <>
       <OperationalPageShell
         title="Purchase Approvals"
-        description="Requisitions and purchase orders awaiting approval — matrix driven by Purchase Setup"
+        description="Live requisition and purchase-order approval inbox"
         badge="Purchase"
         variant="dynamics"
         breadcrumbs={shellBreadcrumbs}
@@ -323,7 +318,15 @@ export function PurchaseApprovalsPage() {
           />
         }
       >
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="space-y-3">
+          <PurchaseRegisterContextPanel
+            ariaLabel="Approval queue overview and suggestions"
+            title="Approval Insights"
+            subtitle="AI suggested bottlenecks and next actions for this queue."
+            storageKey="purchase.ai-insights.approvals"
+            overview={registerOverview}
+            suggestions={registerSuggestions}
+          />
           <EnterpriseRegisterTableShell className="min-w-0">
             <PurchaseApprovalsTable
               rows={filtered}
@@ -384,13 +387,6 @@ export function PurchaseApprovalsPage() {
               }
             />
           </EnterpriseRegisterTableShell>
-          <PurchaseRegisterContextPanel
-            ariaLabel="Approval queue overview and suggestions"
-            title="Approval Insights"
-            subtitle="AI suggested bottlenecks and next actions for this queue."
-            overview={registerOverview}
-            suggestions={registerSuggestions}
-          />
         </div>
       </OperationalPageShell>
 

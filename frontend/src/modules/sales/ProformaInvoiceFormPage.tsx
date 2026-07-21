@@ -12,7 +12,6 @@ import {
   Trash2,
 } from 'lucide-react'
 import { ErpCardSection, ErpFieldRow, ErpStickySaveBar } from '../../components/erp/card-form'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import { ErpSegmentedControl } from '../../components/erp/ErpSegmentedControl'
 import { ErpSmartSelect } from '../../components/erp/ErpSmartSelect'
 import { Input, Textarea } from '../../components/forms/Inputs'
@@ -27,13 +26,14 @@ import {
 import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
 import { useMrpStore } from '../../store/mrpStore'
 import { useMasterStore } from '../../store/masterStore'
-import { useActiveCustomers, useActiveProducts } from '../../hooks/useMasterLists'
+import { useActiveCustomers, useSellableProducts } from '../../hooks/useMasterLists'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { computeProformaLineTotals } from '../../utils/proformaInvoiceLines'
 import { resolveSalesOrderProformaPrefill } from '../../utils/proformaInvoicePrefill'
 import type { ProformaInvoiceLine } from '../../types/proformaInvoice'
 import { computeGst, gstSchemeLabel } from '../../utils/gstEngine'
+import { isProductSellable, productNotSellableForSalesMessage } from '../../utils/productMaster'
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { useDocumentLocation } from '../../hooks/useDocumentLocation'
 import { SalesCardFormShell } from './SalesCardFormShell'
@@ -103,7 +103,7 @@ export function ProformaInvoiceFormPage() {
   const createDirect = useProformaInvoiceStore((s) => s.createDirect)
   const createFromSalesOrder = useProformaInvoiceStore((s) => s.createFromSalesOrder)
   const customers = useActiveCustomers()
-  const products = useActiveProducts()
+  const products = useSellableProducts()
   const getCustomer = useMasterStore((s) => s.getCustomer)
   const getProduct = useMasterStore((s) => s.getProduct)
 
@@ -444,10 +444,15 @@ export function ProformaInvoiceFormPage() {
                     onChange={(v) => {
                       if (!v) return
                       const p = getProduct(v)
+                      if (p && !isProductSellable(p)) {
+                        setErrors([productNotSellableForSalesMessage(p)])
+                        return
+                      }
                       patchLine(row.key, { productId: v, unitPrice: String(p?.standardPrice ?? row.unitPrice) })
                     }}
-                    placeholder="Select product…"
+                    placeholder="Select released product…"
                     appearance="dropdown"
+                    emptyMessage="Only products released for sale can be selected."
                   />
                 </td>
                 <td className="px-2 py-2">
@@ -544,7 +549,6 @@ export function ProformaInvoiceFormPage() {
           sections={sectionNavItems}
           activeId={activeSection}
           onSelect={scrollToSection}
-          trailing={<FactBoxPaneAiToggle />}
         />
 
         <ErpCardSection

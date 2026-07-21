@@ -9,6 +9,7 @@ import {
   Package,
   Pencil,
   Printer,
+  Send,
   Truck,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
@@ -23,7 +24,11 @@ import { ErpCardSection, ErpViewField } from '@/components/erp/card-form'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { Badge } from '@/components/ui/Badge'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { getVendorQuotationById } from '@/services/purchase'
+import {
+  getVendorQuotationById,
+  PurchaseServiceError,
+  submitVendorQuotation,
+} from '@/services/purchase'
 import {
   QUOTATION_COMPLIANCE_STATUS_LABELS,
   VENDOR_QUOTATION_DOMAIN_STATUS_LABELS,
@@ -184,6 +189,7 @@ export function VendorQuotationDetailPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [quote, setQuote] = useState<VendorQuotation | null>(null)
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -232,6 +238,20 @@ export function VendorQuotationDetailPage() {
       })
     : ''
 
+  const submit = async () => {
+    if (!quote || submitting) return
+    setSubmitting(true)
+    try {
+      const submitted = await submitVendorQuotation(quote.id)
+      setQuote(submitted)
+      notify.success(`${submitted.documentNumber} submitted`)
+    } catch (err) {
+      notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const headerFacts = useMemo(() => {
     if (!quote) return []
     return [
@@ -254,7 +274,6 @@ export function VendorQuotationDetailPage() {
           { label: 'Vendor Quotations', to: '/purchase/vendor-quotations' },
           { label: 'Loading' },
         ]}
-        backLink={{ to: '/purchase/vendor-quotations', label: 'Back to Vendor Quotations' }}
         footer={null}
         detailMode
       >
@@ -307,7 +326,6 @@ export function VendorQuotationDetailPage() {
         { label: 'Vendor Quotations', to: '/purchase/vendor-quotations' },
         { label: quote.documentNumber },
       ]}
-      backLink={{ to: '/purchase/vendor-quotations', label: 'Back to Vendor Quotations' }}
       createdBy={quote.createdBy}
       createdDate={formatDate(quote.createdAt.slice(0, 10))}
       modifiedBy={quote.updatedBy || undefined}
@@ -318,6 +336,17 @@ export function VendorQuotationDetailPage() {
         <ErpCommandBar
           inline
           sticky={false}
+          primaryAction={
+            isDraft
+              ? {
+                  id: 'submit',
+                  label: submitting ? 'Submitting…' : 'Submit',
+                  icon: Send,
+                  onClick: () => void submit(),
+                  disabled: submitting,
+                }
+              : undefined
+          }
           secondaryActions={[
             {
               id: 'compare',

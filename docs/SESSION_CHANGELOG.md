@@ -1,3 +1,744 @@
+<<<<<<< Updated upstream
+## 2026-07-21 — Purchase Setup full persistence
+
+### Shipped
+
+- Nested Purchase Setup API contract for General, Requisition, Number Series, Approval matrix, Tax, Invoice Matching, Receiving, Quality, and Print.
+- Prisma migration `20260721120000_purchase_setup_full_persistence` (+ status-history docs enum) — extended `purchase_settings`, approval tiers/roles, inspection categories, QI/Invoice/Return tables, CodeSeries entities `QUALITY_INSPECTION` / `PURCHASE_INVOICE` / `PURCHASE_RETURN`.
+- Atomic save with optimistic `version`, FK validation, non-overlapping approval bands, editable series prefix/pad (next number read-only).
+- Notifications tab remains visible, read-only, `ON_HOLD` — excluded from save payloads.
+- Frontend `/purchase/setup` is API-only in API mode (no Phase 1 “not persisted” notices; no silent demo merge).
+- Workflow enforcement: direct-PO / PR-before-PO, RFQ vendor count, GRN batch/serial/expiry + receiving flags, short-close, multi-level approval chain from persisted matrix, invoice matching/tax defaults via invoice module.
+
+### Verification
+
+- `npx tsc --noEmit` (backend) — **PASS**
+- `tests/purchase-setup.test.ts` — **15/15 PASS**
+- `tests/purchase-invoice-lifecycle.test.ts` — **4/4 PASS**
+- Frontend `tsc -p tsconfig.app.json` — **PASS**
+- Migrations applied to local `fos_erp` (including recovery after MySQL identifier-length fix)
+
+---
+
+## 2026-07-21 — Purchase Invoice, QI, and Return backend
+
+### Shipped
+
+- Added complete controller/service/repository/mapper/validation/workflow/routes stacks for Purchase Invoice, Quality Inspection, and Purchase Return.
+- Added explicit lifecycle endpoints and tenant-scoped, soft-delete-aware persistence.
+- Enforced Purchase Setup direct-invoice/matching/tolerance/tax defaults/authorized override, QI category/deviation/quarantine settings, and default vendor-return location.
+- Added canonical invoice/QI/return permissions and mounted `/purchase/invoices`, `/purchase/quality-inspections`, and `/purchase/returns`.
+- Document numbers use tenant code series entities only (`PURCHASE_INVOICE`, `QUALITY_INSPECTION`, `PURCHASE_RETURN`).
+
+### Verification
+
+- Backend typecheck — PASS.
+- `purchase-invoice-lifecycle.test.ts` — 4/4 PASS.
+- Purchase RBAC test — 4/4 PASS.
+- Combined purchase regression — 11/12; pre-existing planning create-PO concurrency case failed with both requests returning 400.
+
+## 2026-07-21 — Purchase create/edit footer standard
+
+### Shipped
+
+- Standardized all registered Purchase document editors (PR, RFQ, Vendor Quotation, PO, GRN, Return, Invoice), PO revision, Purchase master forms, and the Planning edit drawer on the shared responsive `FormActionBar`: **Cancel | Save** only.
+- Save now performs create/update only, uses single-flight duplicate-click protection, reports backend errors, and redirects to the explicit module list route after backend success.
+- Cancel uses stable list routes and the shared unsaved-changes confirmation; no browser confirm or history-back navigation.
+- Removed lifecycle Submit / Verify actions from editor footers. PR and Vendor Quotation Submit were added to their detail pages; PO, GRN, Return, and Invoice lifecycle actions remain on existing detail pages.
+- Added an explicit Purchase form route map and standardized the Planning Sheet edit drawer on the same shared action component.
+- Added `test:purchase-form-footers` (route/footer/API wiring, unsaved confirmation, mobile layout, duplicate click, and detail lifecycle contracts).
+
+### Verification
+
+- `npm run test:purchase-form-footers` — **80/80 PASS**
+- `npm run typecheck` — **PASS**
+- `npm run test:purchase:production` — **39/39 PASS** (runner uses `tsconfig.app.json` for path aliases)
+- `npm run build` — **PASS**
+- Targeted `oxlint` — **PASS** (4 pre-existing hook warnings in PO/VQ editors)
+- Full `npm run lint` remains non-zero because of the existing syntax error in `scripts/generate-uat-deliverables.ts` and the repository-wide warning baseline.
+- Full route/action audit: [`PURCHASE_FORM_FOOTER_AUDIT.md`](PURCHASE_FORM_FOOTER_AUDIT.md).
+
+---
+
+## 2026-07-21 — Purchase form number previews
+
+### Shipped
+
+- **Backend** — Non-consuming `GET …/next-number` for RFQ, Vendor Quotation, PO, and GRN (PR already had it)
+- **Frontend** — Create forms show the actual next sequence instead of “Auto-generated”; demo peeks for invoice/return
+- **Tests** — `purchase-number-previews.test.ts` **4/4**
+
+### Run
+
+```bash
+cd backend && npx vitest run tests/purchase-number-previews.test.ts
+cd frontend && npm run typecheck
+```
+
+---
+
+## 2026-07-21 — Self-approval policy (maker-checker override)
+
+### Shipped
+
+- **Schema** — `SelfApprovalPolicy` enum (`NEVER` / `PERMISSION_ONLY` / `EVERYONE`) + `PurchaseSettings.selfApprovalPolicy` (default `PERMISSION_ONLY`) — `20260721110000_self_approval_policy`, additive, applied
+- **Permission** — `purchase.approvals.self_approve` (238 perms synced); excluded from `PURCHASE_OPS` (Purchase Manager does NOT get it); Tenant Admin / Admin / Administrator / CEO get it via full grant sets
+- **Backend enforcement** — PR + PO `assertApprovable` accept `allowSelfApproval`; approve services resolve `isSelfApprovalAllowed(tenantId, actorPermissions)` (policy `EVERYONE` → yes; `PERMISSION_ONLY` → requires the permission; `NEVER` → maker-checker for all); controllers pass `req.context.permissions`; self-approvals audit `selfApproved: true` in `PR_APPROVED` / `PO_APPROVED` newValue
+- **Approvals queue** — `pending_mine` keeps the actor's own requests (and `canAct: true`) when self-approval is allowed; assigned-to-another-user check still applies
+- **Setup API + UI** — `selfApprovalPolicy` in setup GET/PUT/PATCH + defaults; Purchase Setup → Approval tab "Self-approval policy" select (Never / Permission-only (default) / Everyone)
+- **Tests** — `purchase-approval-flow.test.ts` 7/7 (new: permission-based self-approve + audit flag, NEVER blocks, EVERYONE allows); `purchase-approvals.test.ts` 11/11 (requester now provisioned without the bypass permission); backend + frontend typecheck PASS
+
+### Deferred (next iteration per product direction)
+
+Approval Matrix enforcement (amount bands → role chain) and per-user Approval Limits — currently demo-only frontend config; backend approvals remain single-level.
+
+### Run
+
+```bash
+cd backend && npx tsx scripts/prisma-cli.ts migrate deploy
+cd backend && npx tsx scripts/sync-permissions.ts
+cd backend && npx vitest run tests/purchase-approval-flow.test.ts tests/purchase-approvals.test.ts
+```
+
+---
+
+## 2026-07-21 — Purchase form number previews
+
+### Shipped
+
+- **Backend** — Non-consuming `GET …/next-number` for RFQ, Vendor Quotation, PO, and GRN (PR already had it); uses `previewNextCode` / `previewPurchaseDocumentNumber`
+- **Frontend** — New create forms show the actual next sequence (e.g. `GRN-000001`) instead of “Auto-generated”; demo peeks for invoice/return (no API series yet)
+- **Tests** — `backend/tests/purchase-number-previews.test.ts` **4/4** (non-consume, RBAC, tenant isolation)
+
+### Run
+
+```bash
+cd backend && npx vitest run tests/purchase-number-previews.test.ts
+cd frontend && npm run typecheck
+```
+
+---
+
+## 2026-07-21 — Purchase Setup Phase 1A (semantics 2A)
+
+### Shipped
+
+- **Schema** — `PurchaseSettings` + `PurchasePlantSettings`; `DuplicateChallanPolicy` enum; `PurchaseOrder.deliveryWarehouseId` FK (`20260721090000_purchase_setup_phase1`, additive, applied)
+- **Backend** — `GET/PUT/PATCH /purchase/setup` + plant overrides; defaults-on-empty GET (no persist-on-read); optimistic `version` concurrency; FK validation (plant/warehouse/location + CRM payment terms); audit `SETUP_*`; shared `purchase-defaults` resolution
+- **PO/GRN enforcement** — PO resolves/stores `deliveryWarehouseId` (explicit → PR → setup); `requirePoWarehouse` / expected delivery / payment terms on submit; GRN ignores client `allowExcess` and uses Setup over-receipt + tolerance; challan/vehicle/gate + duplicate challan policy; inspection default from Setup
+- **Permissions** — `purchase.setup.view` (+ existing manage); `sync-permissions.ts` (237 perms)
+- **Frontend** — `purchaseSetupApi` + facade (no API-mode memory fallback); Setup page 2A warehouse → dependent locations, CRM payment terms, unsaved guard, Phase-1 non-persisted tab notices; PR/PO/GRN drop first-warehouse fallback and prefill from Setup; `getPurchaseWarehouses` lazy-hydrates masters
+- **Tests** — `purchase-setup.test.ts` **13/13**; PO lifecycle warehouse/setup cases **3** added (suite pass); GRN setup policy cases **3** added (suite **15/15**); backend `tsc` + frontend `typecheck` **PASS**
+
+### Explicitly deferred (not Phase 1)
+
+Multi-level approval matrix, QI/Returns/Invoice Setup enforcement, currency master, number-series/print/notification/tax persistence (number series stays on `CodeSeries`).
+
+### Run
+
+```bash
+cd backend && npx tsx scripts/prisma-cli.ts migrate deploy
+cd backend && npx tsx scripts/sync-permissions.ts
+cd backend && npx vitest run tests/purchase-setup.test.ts tests/purchase-order-lifecycle.test.ts tests/goods-receipt-lifecycle.test.ts
+cd frontend && npm run typecheck
+```
+
+---
+
+## 2026-07-21 — Purchase Approvals queue (PR + PO, production API)
+
+### Shipped
+
+- **Backend** — `GET /purchase/approvals` (+ `GET /:id` review) from `PurchaseApproval` rows for PR + PO; orphan `PENDING_APPROVAL` docs healed into queue; RBAC via `purchase.pr/po.approve|view`
+- **PR send-back** — `POST /requisitions/:id/send-back` (pending → draft + reason); approval resolved as `RETURNED`; no longer uses reopen from Approvals
+- **Maker-checker + assignment** — PR/PO creators cannot approve their own documents; delegated approvals are actionable only by the assigned user; `pending_mine`, `approved_by_me`, and `rejected_by_me` are actor-scoped
+- **Delegation** — `POST /purchase/approvals/:id/delegate` validates a real active user with the required PR/PO approval permission and records delegation in status history
+- **Frontend** — Approvals page uses the live queue API (PR + PO); send-back uses the real PR endpoint; review shows named status-history actors and eligible live approvers; no hardcoded Finance Head or fake budget/matrix chrome
+- **Tests** — approval queue **11/11**, maker-checker/delegation flow **4/4**, full PR+PO+approval regression **26/26**, frontend API contract **9 assertions**, backend/app typechecks pass
+
+### Run
+
+```bash
+cd backend && npx vitest run tests/purchase-approvals.test.ts tests/purchase-approval-flow.test.ts --hookTimeout=120000
+cd frontend && npm run test:purchase-approvals-api
+```
+
+---
+
+## 2026-07-21 — GRN Phase 3 (production backend + FE wiring)
+
+### Shipped
+
+- **Schema** — `GoodsReceipt` + `GoodsReceiptLine`; `GoodsReceiptStatus` enum; `CodeSeriesEntity.GOODS_RECEIPT`; status-history doc type (`20260721080000_grn_phase3`, additive, applied)
+- **Backend** — GRN CRUD + `POST /:id/{submit,cancel,reverse}` + `GET /orders/:id/receivable-lines`; submit updates PO `receivedQuantity` + header `PARTIALLY_RECEIVED`/`FULLY_RECEIVED` in one transaction; reverse restores qty; warehouse master required; over-receipt blocked without `allowExcess`; duplicate challan blocked; RBAC (`purchase.grn.*`); audit + status history
+- **Frontend** — GRN list/editor/detail use real APIs in API mode; API-mode “not available” save/submit blocks removed; warehouse/location/bin dropdowns from Phase 2 masters
+- **Tests** — `backend/tests/goods-receipt-lifecycle.test.ts` (12 live) — all pass
+
+### Run
+
+```bash
+cd backend && npx vitest run tests/goods-receipt-lifecycle.test.ts
+cd frontend && npm run typecheck
+```
+
+---
+
+## 2026-07-21 — Inventory masters Phase 2 (Plant/Warehouse/Location/Bin)
+
+### Shipped
+
+- **Schema** — `MasterPlant` + `MasterBin` models; `MasterWarehouse.plantId` FK (`20260721070000_inventory_masters_phase2`, additive, applied)
+- **Backend** — registry-driven CRUD for `plants` / `bins` / `storage-locations` (alias of locations) via existing masters engine; hierarchy FK guards (warehouse→plant, bin→warehouse+location, location-must-match-warehouse, inactive parents blocked); reference guards block hard delete (plant←warehouses, warehouse←bins, location←bins); dependent list/lookup filters `plantId` / `warehouseId` / `storageLocationId`
+- **Routes** — `/api/v1/t/:slug/inventory/{plants|warehouses|storage-locations|bins}` alias (restricted) + existing `/masters/:resource`
+- **RBAC** — new `master.plant.*` + `master.bin.*` permissions; `scripts/sync-permissions.ts` (idempotent DB sync — 236 perms, roles re-granted)
+- **Seed** — `scripts/seed-inventory-setup.ts` (controlled): plants from warehouse plantCodes, links warehouses, default bin per location (vasant-trailers: 2 plants, 8 WH, 8 loc, 8 bins)
+- **Frontend** — GRN editor: warehouse free-text → API-backed `Select`; receiving location → dependent Select; line BIN → Select from bins lookup (API mode); warehouse master form supports production warehouse types (receiving/quality_hold/rejected/vendor_return/…)
+- **Tests** — `backend/tests/inventory-masters.test.ts` (17 live tests: hierarchy, unique codes, inactive blocks, delete guards, dependent filters, tenant isolation, RBAC, audit, persistence) — all pass
+
+### Run
+
+```bash
+cd backend && npx vitest run tests/inventory-masters.test.ts
+cd backend && npx tsx scripts/sync-permissions.ts
+cd backend && npx tsx scripts/seed-inventory-setup.ts [tenantSlug]
+```
+
+---
+
+## 2026-07-21 — PO lifecycle Phase 1 (production backend + FE wiring)
+
+### Shipped
+
+- **Schema** — `PurchaseOrderStatus` += `REJECTED`, `SENT_BACK`, `PARTIALLY_INVOICED`, `FULLY_INVOICED`; PO header `rejectedAt/rejectionReason/sentBackAt/sendBackReason`; PO line `acceptedQuantity/rejectedQuantity/returnedQuantity/invoicedQuantity` (`20260721060000_po_lifecycle_phase1`, additive, applied)
+- **Backend** — full PO CRUD + lifecycle: `POST /purchase/orders`, `PATCH /:id`, `POST /:id/{submit,approve,reject,send-back,send-to-vendor,cancel,close,reopen}` — RBAC per action, tenant-scoped, Zod-validated, transactional, status history + `PurchaseApproval` rows + audit logs; DTO includes `allowedActions` + line `openQuantity`
+- **Rules** — draft/sent-back editable only; reject/send-back require reason; only approved → send-to-vendor; receipts block cancel (close instead); reopen: rejected/cancelled→draft, closed→receipt-derived status; numbering via code-series only
+- **Frontend** — PO editor save/submit, detail lifecycle buttons (incl. new Reject / Send Back with `appPromptNote`), list row actions and approvals queue all hit real APIs in API mode; refetch after mutation; eligibility from backend `allowedActions`; manual PO create unblocked in API mode; API-mode block notice removed; `revisePurchaseOrder` explicitly NOT_SUPPORTED in API mode (no silent demo fallback)
+- **Domain** — FE `PurchaseOrderDomainStatus` += `rejected`, `sent_back`
+- **Tests** — `backend/tests/purchase-order-lifecycle.test.ts` (17 live tests: CRUD, all transitions, invalid transitions, tenant isolation, RBAC denial, audit logs, persistence) — all pass
+
+### Run
+
+```bash
+cd backend && npx vitest run tests/purchase-order-lifecycle.test.ts
+cd backend && npm run typecheck
+cd frontend && npm run typecheck
+```
+
+---
+
+## 2026-07-20 — PR line PO track (read-only)
+
+### Shipped
+
+- **Schema** — `purchase_requisition_lines.purchaseOrderId` + `purchaseOrderNumberSnapshot` (`20260720170000_pr_line_purchase_order_track`)
+- **Write-back** — Planning→PO and RFQ award→PO stamp lines via `linkPurchaseRequisitionLinesToOrder` (status `CONVERTED`, id + number snapshot)
+- **API** — PR line DTO exposes `purchaseOrderId` / `purchaseOrderNumber` (not accepted on create/update input)
+- **UI** — PR lines grid **PO No.** column (link); converted lines locked (`rowEditable` when no PO)
+- **Tests** — live coverage asserts stamp after RFQ→PO / Planning create-PO
+
+### Run
+
+```bash
+cd frontend && npm run typecheck
+cd backend && npm run test:purchase-phase15
+```
+
+---
+
+## 2026-07-20 — Purchase UAT flow seed (interconnected docs)
+
+### Shipped
+
+- **Script** — `backend/scripts/seed-purchase-flow-uat.ts` (idempotent `UAT-*` docs)
+- **Data** — 13 PR + 8 planning + 5 RFQ + 6 VQ + 2 comparisons + 6 PO; warehouses/items/vendors reused; mixed statuses for UI testing
+- **GRN** — still no DB table (demo FE only)
+
+### Run
+
+```bash
+cd backend
+npx tsx scripts/seed-purchase-demo-data.ts
+npx tsx scripts/seed-purchase-flow-uat.ts
+```
+
+---
+
+## 2026-07-20 — PR line → PO track record
+
+### Shipped
+
+- **Schema** — `purchase_requisition_lines.purchaseOrderId` + `purchaseOrderNumberSnapshot` (migration `20260720170000_pr_line_purchase_order_track`); line status set to `CONVERTED` on PO create
+- **Backend** — Planning→PO and RFQ award→PO stamp PR lines automatically; RFQ→PO also sets `purchaseRequisitionLineId` on PO lines; API PR line DTO exposes `purchaseOrderId` / `purchaseOrderNumber`
+- **Frontend** — PR line grid shows read-only **PO No.** (link when id present); demo create-PO paths stamp the same fields; mapper hydrates from API
+- **Tests** — Phase 15 integration + coverage assert PR lines carry PO id/number after create-PO
+
+### Run
+
+```bash
+cd backend && npx tsx scripts/prisma-cli.ts migrate deploy && npx prisma generate
+cd backend && npm run test:purchase-phase15-live
+cd frontend && npm run typecheck
+```
+
+---
+
+## 2026-07-20 — Purchase typecheck fix + coverage gap tests
+
+### Shipped
+
+- **FE typecheck** — Planning Sheet `chipLabelResolver` + `defaults`; `LoadingState` props; unused imports; removed orphan Vitest file; `binCode` master usage guard
+- **Create-PO conflicts** — map Prisma `P2034`/`P2028` to purchase `PO_ALREADY_CONVERTED` / global 409; concurrent loser no longer raw 500
+- **Document numbers** — `nextPurchaseDocumentNumber` fallback for RFQ/VQ/comparison/PO when code-series enum not yet migrated
+- **Comparison duplicate PO** — check existing PO before award-status gate (stable **409**)
+- **Live coverage** — `tests/purchase-module-coverage.test.ts` (cross-tenant GET, double-approve idempotency, RFQ→award→PO, concurrent create-PO)
+- **DB** — deployed `20260720160000_rfq_flow_award_fields` on local MySQL (additive)
+
+### Run
+
+```bash
+cd frontend && npm run typecheck && npm run test:purchase-phase15-all
+cd backend && npm run test:purchase-phase15 && npm run test:purchase-phase15-live
+```
+
+---
+
+## 2026-07-20 — Purchase Phase 16 final QA
+
+### Shipped
+
+- **QA report only** — [`docs/purchase/PHASE_16_FINAL_QA_REPORT.md`](purchase/PHASE_16_FINAL_QA_REPORT.md) (no product features)
+- **Verified** — RFQ vs Planning split, idempotent sync, vendor-grouped create-PO, tenant/RBAC, additive migrations, Phase 15 suites
+- **Failed** — frontend `npm run typecheck`; claim that all Purchase pages are API-backed / free of FE memory
+- **Go-live** — not full-module go-live; blockers listed in Phase 16 report
+
+### Run
+
+```bash
+cd backend && npx tsx scripts/prisma-cli.ts validate && npx tsc --noEmit && npm run test:purchase-phase15
+cd backend && npx vitest run tests/purchase-phase15-integration.test.ts --hookTimeout=120000
+cd frontend && npm run test:purchase-phase15-all && npm run typecheck
+```
+
+---
+
+## 2026-07-20 — Purchase Phase 15 automated tests
+
+### Shipped
+
+- **Create PO from Planning API** — `POST /purchase/planning-sheet/create-po` (vendor grouping, PR conversion status, concurrent guard, RFQ-required blocked)
+- **Backend unit** — `purchase-phase15-unit.test.ts` + existing workflow/catalog/RBAC/RFQ/audit suites (`npm run test:purchase-phase15` → **29** tests)
+- **Backend integration** — `purchase-phase15-integration.test.ts` covers Phase 15 items 1–17 (skip without MySQL)
+- **Frontend** — `scripts/test-purchase-phase15.ts` (PR validation, helpers, Planning UI gates, error map)
+- **E2E A/B (demo)** — `smoke-purchase-phase15-e2e-a.ts` (direct → Planning → POs), `smoke-purchase-phase15-e2e-b.ts` (RFQ → award → PO)
+
+### Run
+
+```bash
+cd backend && npm run test:purchase-phase15 && npm run test:purchase-phase15-live
+cd frontend && npm run test:purchase-phase15-all
+```
+
+---
+
+## 2026-07-20 — Purchase Phase 14 validation and error messages
+
+
+### Shipped
+
+- **Stable codes + catalog** — `purchase/shared/purchase-error-catalog.ts` (`PR_*` / `PPS_*` / `PO_*`) with business copy; Phase 02 §12 expanded
+- **PR workflow** — submit enforces department, requested by, dates, RFQ selection, ≥1 item, item/qty/UOM, date order; submitted → `PR_NOT_EDITABLE`; approved → `PR_MUST_REOPEN` (reopen allowed from approved)
+- **Planning PO guards** — `assertPlanningRowReadyForPo` (vendor, net qty, rate, required date, eligible status, cancelled/converted/RFQ/tenant/active masters)
+- **Error middleware** — Prisma/FK/SQL/stack never returned to clients; technical detail logged server-side
+- **Frontend** — `utils/purchase/purchaseErrorMessages.ts` + `formatPurchaseApiError` / `PurchaseServiceError` map codes to friendly toasts; PR form validation copy aligned
+- **Tests** — workflow + catalog unit tests updated; lifecycle expectations use new codes
+
+### Remaining
+
+- Wire Create-PO-from-Planning HTTP API to `assertPlanningRowReadyForPo` when that endpoint ships
+- Live MySQL lifecycle re-run after UOM seed helper (when DB available)
+
+---
+
+## 2026-07-20 — Purchase Phase 13 audit logs and timeline
+
+
+### Shipped
+
+- **Canonical audit helper** — `purchase/shared/purchase-audit.ts` with `PR_*` / `PPS_*` / `RFQ_*` / `PO_*` actions, `writePurchaseAudit`, timeline entity map
+- **Write-side** — PR (incl. line add/update/remove + RFQ decision), Planning (generate/buyer/vendor/rate/qty/status/hold/cancel), RFQ/VQ/comparison dual-write, PO create from award
+- **Read API** — `GET /purchase/timeline/:entityType/:entityId` merges `AuditLog` + `PurchaseStatusHistory` (RFQ also includes linked VQ/comparison audits)
+- **UI** — `PurchaseAuditTimeline` (CRM-style vertical feed) on PR View, Planning Row View, RFQ View, PO View
+- **Tests** — `purchase-audit-timeline.test.ts` (labels + entity map)
+
+### Remaining
+
+- Live MySQL integration asserting timeline rows after PR submit/approve
+- Full PO lifecycle audits when PO module APIs ship (submit/approve/send/receive/close)
+
+---
+
+### Shipped
+
+- **Catalog** — renamed to `purchase.pr.*`, expanded `purchase.planning.*` (`assign_buyer`, `select_vendor`, `cancel`), RFQ (`enter_quote`, `compare`, `award`, `convert_to_po`), PO (`purchase.po.*` with `send` / `close`)
+- **Role packs** — Requester, Department Manager (+ Department Head alias), Purchase Executive, Purchase Manager, Administrator; seed creates these roles
+- **Backend routes** — all purchase routes use canonical keys; legacy JWT/DB names still authorize via `permissionSetIncludes` aliases
+- **Audit** — `requirePermission` / `requireAnyPermission` / `requireSuperAdmin` write `PERMISSION_DENIED` audit logs (module `rbac`)
+- **Frontend** — `utils/permissions/purchase.ts` + demo admin seed + UI call sites aligned; button hide remains supplementary
+
+### Verify
+
+- `npx vitest run tests/purchase-rbac-permissions.test.ts` — alias checks
+- Re-seed or upsert permissions so new catalog rows exist in MySQL
+
+### Remaining
+
+- Live integration test asserting 403 + audit row for missing purchase permission
+- Optional: migrate/remove orphaned legacy permission rows in DB
+
+---
+
+### Shipped
+
+- **Frontend bridge** — `purchaseApiFacade` dual-mode for RFQ list/create/update/send/cancel, PR→RFQ convert, vendor quotations CRUD/submit, comparison build/selection/award, and award→draft PO
+- **Mappers** — `mapApiRfqToDomain`, VQ + comparison matrix mappers in `purchaseMappers.ts`; `comparisonApi.ts` client
+- **UI** — Quotation Comparison award passes vendor + selection reason into API award endpoint
+- **Tests** — `purchase-rfq-workflow.test.ts` (2/2) for PR eligibility + draft send guards
+- **Rule preserved** — `rfqRequired=true` never syncs to Planning Sheet (backend + demo)
+
+### Remaining
+
+- Live MySQL integration tests for RFQ→VQ→award→PO
+- Enrich vendor/item display names from masters in API mode
+- Create PO from planning selection; full PO lifecycle / GRN
+
+---
+
+## 2026-07-20 — Purchase RFQ vendor quotation and comparison/award APIs
+
+### Shipped
+
+- **Vendor quotations** — list/create/get/draft update/submit under `/purchase/vendor-quotations`; validates RFQ vendor membership and active RFQ state, calculates landed cost on submit, advances a SENT RFQ to `QUOTATION_RECEIVED`, and writes status history/audit records.
+- **Comparisons** — list/get/build from submitted quotations, vendor-wise comparison matrix, award workflow, and comparison-to-draft-PO conversion under `/purchase/comparisons`.
+- **PR handoff** — `POST /purchase/requisitions/:id/convert-to-rfq` now invokes the RFQ service with the RFQ create permission.
+- **Verification** — regenerated Prisma client and `npx tsc --noEmit -p tsconfig.json` passes.
+
+### Remaining
+
+- Add focused Vendor Quotation / Comparison integration tests with a live MySQL test database and wire the frontend API bridge to these completed endpoints.
+
+---
+
+## 2026-07-20 — Purchase FE dual-mode API integration (PR + Planning)
+
+### Shipped
+
+- **API clients** — `purchaseRequisitionApi.ts`, `purchasePlanningApi.ts`, `rfqApi.ts`, `vendorQuotationApi.ts`, `purchaseOrderApi.ts` + `purchaseApiTypes.ts`
+- **Mappers / facade** — `purchaseMappers.ts`, `purchaseApiFacade.ts`; barrel `services/purchase/index.ts` routes PR + Planning through dual-mode when `VITE_USE_API=true`
+- **Backend source of truth (API mode)** — PR CRUD/submit/approve/reject/cancel; planning list/edit/buyer/vendor/status/recalculate; approval waits for server (planning sync); no optimistic PO/approval
+- **Permissions** — FE catalog + route/nav gates for `purchase.planning.view|edit|approve|create_po`
+- **Planning UI** — recalculate action, Create PO permission gate, refetch after mutations
+- **RFQ / VQ / PO clients** — ready against expected paths; API mode surfaces `PURCHASE_API_NOT_IMPLEMENTED` until backends ship (demo mode unchanged)
+
+### Verify
+
+- Dual-mode facade + mappers compile (no errors in those files under `tsc -b`)
+- Demo mode (`VITE_USE_API=false`) still uses in-memory `purchaseService`
+
+### Next
+
+- Ship Create-PO-from-planning + RFQ/VQ/PO backends; complete domain mappers for those DTOs
+- Optional: page-level hydrate hook / summary KPI strip on Planning Sheet
+
+---
+
+## 2026-07-20 — Purchase Planning Sheet backend APIs
+
+### Shipped
+
+- **Permissions** — `purchase.planning.view|edit|approve|create_po`
+- **APIs** under `/api/v1/t/:tenantSlug/purchase/planning-sheet` (+ tenantId alias):
+  - `GET /` (filters: search, planningNumber, PR number, status, dept, item, vendor, buyer, priority, purchaseType, date ranges, overdue, poPending, page/pageSize, sort)
+  - `GET /summary` (pending, critical, overdue, vendor pending, po pending/created, estimated value)
+  - `GET|PATCH /:id` (editable vendor/rates/dates/type/buyer/priority/actionMessage/remarks/status; PR/item/qty/stock/PO refs read-only)
+  - `POST /bulk-assign-buyer`, `/bulk-select-vendor`, `/bulk-status`, `/recalculate`
+- **Rules** — tenant filter, RBAC, status transition matrix, audit + status history; recalculate batches open-PO qty (stock stub = 0 until inventory)
+- **Tests** — workflow 5/5; API integration 4/4
+
+### Next
+
+- Create PO from planning selection (`purchase.planning.create_po`)
+- FE dual-mode bridge for planning sheet
+
+---
+
+## 2026-07-20 — Purchase Requisition backend (PR lifecycle + planning sync)
+
+### Shipped
+
+- **Code series** — `CodeSeriesEntity` + `PURCHASE_REQUISITION` / `PURCHASE_PLANNING` (migration `20260720130000_add_purchase_code_series_entities`); prefixes `PR` / `PPS`
+- **Module** `backend/src/modules/purchase/` — routes under `/api/v1/t/:tenantSlug/purchase` and `/api/v1/tenants/:tenantId/purchase`
+- **PR APIs** — list/create/get/patch + submit / approve / reject / cancel / reopen
+- **Rules** — draft-only edit; ≥1 valid line + qty>0 to submit; requiredDate ≥ requisitionDate; reject requires reason; approve permission-gated; tenantId on every query; audit + status history on lifecycle
+- **Approve path** — `rfqRequired=true` → no PPS rows (RFQ-ready); `rfqRequired=false` → `syncPurchasePlanningRowsFromApprovedPr` in same TX
+- **Error codes** — `PURCHASE_REQUISITION_NOT_FOUND|NOT_EDITABLE|NOT_SUBMITTABLE|NOT_APPROVABLE`, `REJECTION_REASON_REQUIRED`, `INVALID_PURCHASE_QUANTITY`; global `PERMISSION_DENIED` / `TENANT_ACCESS_DENIED`
+- **Tests** — workflow unit 8/8; lifecycle integration 5/5
+
+### Not in scope
+
+- Planning Sheet CRUD APIs, RFQ/VQ/PO backends, FE API bridge for purchase
+
+### Verify
+
+- `migrate deploy` + `prisma generate` + `tsc --noEmit` — pass
+- `vitest run tests/purchase-requisition-*.test.ts` — **13/13**
+
+### Next
+
+- Purchase Planning Sheet list/update + Create PO from planning
+- Optional: dual-mode FE bridge for PR when `VITE_USE_API=true`
+=======
+## 2026-07-21 - CRM route source audit (old UI string trace)
+
+### Verdict
+
+Production `/crm/leads` already rendered the **canonical** CRM stack. Visible
+strings map to current enterprise components — not a stale duplicate page:
+
+| String | Source file | Component | On `/crm/leads`? |
+|--------|-------------|-----------|------------------|
+| Quick Entry | `ErpQuickEntrySection.tsx` / `CrmLeadFormPage.tsx` | form FastTab | No (form/360 only) |
+| Smart Context | `ErpCardFormPage` / 360 pages | fact box | No (form/360 only) |
+| Create Lead | **not in source** | — | — |
+| Lead Information | **not in source** | — | — |
+| Change Stage | `LeadChangeStageControl.tsx` | Lead 360 | No (detail only) |
+| Notes | `CrmStageNotes` / form sections | 360 + form | No (detail/form) |
+
+List route chain: `crmRoutes` → `LeadListPage` → `CrmLeadListPage` →
+`CrmLeadsTable`. Detail: `Lead360Workspace`. Form: `CrmLeadFormPage`.
+
+### Fixes (indirection / alias only)
+
+- `crmRoutes` imports Lead list/form/360 from CRM modules (no `SalesPages`
+  lead wrappers).
+- Removed `LeadDetailPage` / `LeadListPage` re-exports from `SalesPages`.
+- `/crm/companies` mounts `CrmCustomersPage`; `/crm/customers` redirects.
+- CRM barrel exports `LeadListPage` / `LeadFormPage`.
+
+No business-rule, permission, or API contract changes.
+
+---
+
+### Follow-up from audits
+
+- Overlay hardening: `erp-modal` z-index 320 above drawers (200); confirm 420;
+  `CrmDeleteConfirmModal` + `SaveViewDialog` Escape / body lock / backdrop /
+  labelled dialog; `CrmDrawerShell` `closeDisabled` + unique title id.
+- Contact Save chrome: footer-only (`ErpStickySaveBar`); removed duplicate
+  header `formSaveActions`.
+- Lifecycle RBAC AND’d with status: quotation update/approve perms; Opp Won/Lost
+  + move-to-won/lost → `crm.opportunity.close`; SO Confirm →
+  `crm.sales_order.confirm`; Complete Activity on Lead360 + Quotation360 feeds.
+- QA: wired orphan scripts + `test:crm-a11y` / `test:crm-form-alignment` into
+  package.json and CRM freeze ([Audit CRM QA coverage](aa63249d-73d7-4b2e-a7cf-e2913677596c)).
+
+### Still deferred
+
+- Full Opp Edit → Quick Entry mirror; native Select → ErpSmartSelect sweep;
+  DocumentTypeSelect extract; full focus-trap / arrow-key menus.
+
+---
+
+## 2026-07-21 - CRM form / overlay / workflow alignment pass
+
+### Audit (keep working)
+
+- Shared form stack already correct for responsive grids: `ErpFormGrid`
+  desktop 3 → tablet 2 → mobile 1; CRM page forms use `CrmCardFormShell` +
+  `erp-input` heights. No redesign of working Lead/Opp/Quote/SO shells.
+- Masters catalog is centralized via `useCrmMasters` / `CrmMasterPages`
+  ([Audit CRM masters reuse](4a1d7172-0830-49e6-b54f-ff95cf696a0e)).
+
+### Minimum safe fixes shipped
+
+- **Lead RBAC:** qualify stages need `crm.lead.qualify`; convert needs
+  `crm.lead.convert` (`resolveLeadConvertActionGate`, Lead360, list row
+  actions, OpportunityNew lead-path, `LeadChangeStageControl`).
+- **Companies / Contacts registers:** pass `canEdit` permissions; contacts
+  New/Duplicate → `/crm/contacts/new`; company Edit → masters edit; remove
+  miswired Assign/Duplicate row actions.
+- **CRM masters:** New / Import / Edit / Duplicate / Delete / bulk gated on
+  `crm.master.*`.
+- **Quick create parity:** `NewContactDrawer` uses `buildContactSchema`;
+  `QuickCompanyCreateModal` industry/territory from CRM masters.
+- **Quotation lifecycle UX:** ApprovalPanel await + toasts + approve perm;
+  Customer Reject on Quote 360; hide Recall in API mode; Convert card
+  fallback navigates to SO create when no dialog host.
+- **Overlay a11y:** drawer initial focus; Modal `aria-modal` + labelled title.
+
+### Verification
+
+- Frontend `npm run typecheck` — pass after alignment edits.
+
+---
+
+## 2026-07-21 - CRM Lead→SO funnel hardening
+
+### Shipped
+
+- Quotation generic PATCH can no longer set lifecycle fields (`status`,
+  `customerApproval` on header; `status` on document). Sanitizers in
+  `quotation.workflow.ts` throw `ValidationError` (400); wired from
+  `updateQuotation` / `updateQuotationDocument`.
+- Live E2E: PATCH lifecycle rejection; confirm after convert-created SO;
+  continuous Lead→Opp→Quote→mark-sent→customer-approve→convert→confirm +
+  duplicate convert **409**. Draft-delete case no longer reuses an opportunity
+  that already has a quotation.
+- UAT-06 live path: mark-sent + customer-approve before convert; duplicate
+  convert expectation **422 → 409**.
+- Funnel toasts: Lead 360 convert gates use `notify.warning`; SO 360 confirm
+  success/errors use `notify.success` / `notify.error`.
+
+### Verification
+
+- Backend `npm run typecheck` — pass.
+- Frontend `npm run typecheck` — pass.
+- `npm run test:crm-live` — **55 passed / 3 failed**. New funnel cases all
+  passed (`rejects lifecycle fields on quotation PATCH`,
+  `confirms convert-created sales order…`, continuous Lead→…→confirm funnel,
+  duplicate 409, draft delete). Remaining failures are **local DB env**, not
+  this change: missing `crm_notes.stageCode` column (migration not applied),
+  empty locations seed.
+- `npm run test:uat-06-sales-order` — demo path hits pre-existing `@/utils`
+  resolution under `tsx`; live 409/sent/customer-approve code path updated in
+  script. Static UAT-06.3 string check also pre-existing vs current convert
+  action copy.
+>>>>>>> Stashed changes
+
+---
+
+## 2026-07-21 - Hostinger Git deployment now builds and publishes the SPA
+
+### Root cause
+
+- Hostinger pulled `main`, but repository-root `npm run build` called a missing
+  `build.ps1`. `frontend/dist` is intentionally ignored, so Git could not update
+  nginx/Express static files by pull alone.
+- The only GitHub workflow was under `frontend/.github/workflows`, which GitHub
+  does not discover. Live therefore kept the July 17 Vite hash while API/DB
+  changes could update independently.
+
+### Shipped
+
+- Root `npm run build` now runs cross-platform
+  `scripts/build-hostinger.mjs`: deterministic frontend/backend installs, API-mode
+  Vite build, Prisma generation/backend compile, then publish to
+  ignored `backend/public` only after both builds succeed.
+- `backend/hostinger-start.mjs` makes `backend/` a self-contained Hostinger
+  output directory, starts the compiled backend from the correct working
+  directory, and refuses startup when backend or SPA output is missing.
+- `scripts/verify-hostinger-build.mjs` verifies copied asset hashes and
+  `build-meta.json` revision parity.
+- CI moved to repository-root `.github/workflows/ci.yml` and executes the same
+  Hostinger build/verification path.
+- Added `docs/HOSTINGER_GIT_DEPLOYMENT.md` with exact hPanel configuration.
+
+### Verification
+
+- Root `npm run build` passed: Vite production build + Prisma generate + backend
+  TypeScript compile; published 16 referenced assets.
+- `npm run verify:deployment` passed for revision
+  `38f8d4ae4478e6571848dd66c280a04454156fa6`.
+- Production-entry smoke test passed on port 5051:
+  `/api/v1/health` returned JSON 200 and `/build-meta.json` returned the same
+  revision. Generated `frontend/dist` and `backend/public` remain ignored.
+- Live hPanel build settings/redeploy are still required before declaring
+  production updated.
+
+---
+
+## 2026-07-21 - Quotation template catalog trimmed to the two VF ISO products
+
+### Context
+
+- User supplied the two real VF quotation docs (VF/QUO/26-27/76 → 26 KL ISO Tank Container; VF/QUO/26-27/109 → 20' ISO Dry Bulk Tanker 25 CBM). Frontend `DEFAULT_QUOTATION_TEMPLATES` and `prisma/quotationTemplateSeedData.ts` already contain exactly these two — but the DB still carried 9 legacy trailer templates (Standard/45M3 Bulker/Sidewall/Flatbed/Lowbed/Tipper/Job Work/Spare Parts/Custom) from the old seed.
+
+### Shipped
+
+- **New** `backend/scripts/cleanup-quotation-templates.ts` — per-tenant, idempotent: soft-deletes (deletedAt + isActive=0) every template whose code is not `ISO-TANK-26KL` / `ISO-DRY-BULK-25CBM`, then upserts/restores the two keep rows from `quotationTemplateSeedData`. `--dry-run` reports only; `--emit-sql` writes `scripts/quotation-template-cleanup.sql` (phpMyAdmin-ready, backslash + quote escaped JSON) for the live DB without SSH.
+- **Applied on local DB:** 9 legacy templates soft-deleted; ISO-DRY-BULK-25CBM created (was missing). Verified list repo filters `tenantActiveFilter` → only the two ISO templates are served. Quotations referencing old templates are untouched (soft delete, catalog-only).
+- Frontend demo mode already correct: `RETIRED_BUILTIN_QUOTATION_TEMPLATE_IDS` drops the same 9 on merge.
+
+### Live fix (no terminal): run `backend/scripts/quotation-template-cleanup.sql` in phpMyAdmin, then hard-refresh the templates page.
+
+---
+
+## 2026-07-21 - Canonical CrmStageNotes component (replaces 3 duplicated notes cards)
+
+### Shipped
+
+- **New** `frontend/src/components/crm/shared/CrmStageNotes.tsx` — single canonical stage-stamped Notes card for CRM 360 pages. Props: `entityType`/`entityId` (useEntityNotes), `sectionId` (preserves `lead-section-notes` / `opp-section-notes` / `quo-section-notes` jump anchors), `stageOptions`, `currentStage`, `historyLabel`, plus the shared demo/composer/onNotesChange contract. Reuses existing `lead-notes-card` CSS — zero visual change vs the correct local design.
+- **New** `frontend/src/utils/crmNoteStageOptions.ts` — `LEAD_NOTE_STAGE_OPTIONS`, `OPPORTUNITY_NOTE_STAGE_OPTIONS`, `QUOTATION_NOTE_STAGE_OPTIONS`, `quotationNoteStageLabel` (moved out of the deleted QuotationNotesCard; Quotation360Page unified-feed import updated).
+- **Deleted** `LeadNotesCard.tsx`, `OpportunityNotesCard.tsx`, `QuotationNotesCard.tsx`; removed the `QuotationNotesCard` barrel export. Rewired `Lead360Workspace`, `Opportunity360Page`, `Quotation360Page` to render `CrmStageNotes`. No other consumers existed (verified by search). Contact/Customer 360 keep `EntityNotesPanel` (no stage workflow).
+- Demo mode preserved: demoNotes list + editPath fallback behave exactly as before.
+
+### Verification
+
+- `typecheck` clean; `npm run build` clean; oxlint clean on changed files.
+- Bundle proof of consolidation: `dist/assets/index-j7v20-mn.js` contains exactly **one** copy of the Notes-card strings ("No notes yet. Add the first note…", `lead-notes-card__composer`) — previously three duplicated components.
+- `npm run test:crm` fails at startup with a **pre-existing** tsx alias error (`Cannot find package '@/utils'` from `permissions/manufacturing.ts`) — verified identical failure with all changes stashed; unrelated to this refactor.
+
+### Live deploy
+
+- Live still serves old `assets/index-DeT-0V6R.js`. Upload the new `frontend/dist/` (index.html + assets) to Hostinger public_html, hard-refresh, and confirm index.html now references `index-j7v20-mn.js`.
+
+---
+
+## 2026-07-21 - Live Convert Quotation → SO blocked: stale permission catalog on live DB
+
+### Diagnosis
+
+- `POST /:id/convert-to-sales-order` (backend `quotation.routes.ts`) requires **both** `crm.quotation.convert` and `crm.sales_order.create` (`requirePermission` is all-of). Frontend gate `canConvertQuotationToSalesOrderPermission()` requires the same pair, so the Convert button/action reports "You do not have permission".
+- Live DB catalog only has the pre-convert-era CRM keys (`crm.quotation.view/create/update/delete/approve`, `crm.sales_order.view`, `crm.lead.convert`) — neither `crm.quotation.convert` nor `crm.sales_order.create/update/delete/confirm` exists there. Same RBAC seed-drift class as the Notes issue below: the live DB was seeded from the old catalog (old deploy bundle gated convert on `crm.quotation.update` only), then the new backend shipped with the expanded catalog but no permission sync was run.
+- Code side is already complete: both keys are in `backend/src/constants/permissions.ts` PERMISSIONS and mapped in ROLE_PERMISSIONS (Tenant Admin/Admin/Administrator, Sales Manager, Sales Executive, CRM Admin). No code changes needed; no RBAC bypass.
+
+### Live fix (idempotent, no code deploy needed if backend is current)
+
+**Option A — server terminal available:** from `backend/`: `npx tsx scripts/sync-permissions.ts --dry-run`, review, then re-run without `--dry-run` (upsert-only; never removes grants or touches users/tenants).
+
+**Option B — no SSH/terminal (phpMyAdmin only):** new generator `backend/scripts/generate-permission-sync-sql.ts` emits `backend/scripts/permission-sync.sql` — a self-contained idempotent script (INSERT IGNORE against `permissions.name` and `role_permissions.roleId+permissionId` unique keys) mirroring the same PERMISSIONS/ROLE_PERMISSIONS source of truth. Import/paste it into phpMyAdmin on the live DB. Validated locally: all 244 statements execute cleanly and re-running is a 0-row no-op. Regenerate after any catalog/role-map change.
+
+Then in both cases:
+1. Users log out / log in (frontend session permissions are issued at login; backend checks read the DB per request and take effect immediately).
+2. Verify: `fos-erp-auth` → `user.permissions` includes both keys; Convert to Sales Order on a Sent + Customer Approved quotation creates an Open SO and marks the opportunity Won.
+3. SQL spot-check: `SELECT name FROM permissions WHERE name IN ('crm.quotation.convert','crm.sales_order.create');` and per-role link counts via `role_permissions` join.
+
+Local DB verified in sync (224/224 catalog; applied 3 pending `crm.note.*` links for Sales Executive from the entry below).
+
+---
+
+## 2026-07-21 - Live Notes still looks old after Hostinger SPA redeploy
+
+### Diagnosis
+
+- Live already serves a SPA that includes the new Notes card (`lead-notes-card` + `crm.note.create` present in `https://erp.dhurandharcrm.com/assets/index-DeT-0V6R.js`). Rebuild succeeded — this is not a “missing frontend upload” problem anymore.
+- In API mode, Add Note only opens the new inline composer when the session has `crm.note.create`. Without it, the UI used to navigate to the record **edit** page (legacy remarks) — which looks like the previous Notes design.
+- `Sales Executive` had no `crm.note.*` grants in `ROLE_PERMISSIONS` (same RBAC seed-drift class as Convert → SO).
+
+### Shipped
+
+- Grant `crm.note.view` / `create` / `update` to Sales Executive.
+- Lead / Opportunity / Quotation Notes cards: missing `crm.note.create` now shows a clear permission toast instead of silently opening the edit form.
+
+### Live fix
+
+1. Deploy these code changes (or at least run permissions sync with updated role map).
+2. On Hostinger app: `npm run db:sync-permissions`
+3. Log out / log in; hard refresh.
+4. Confirm `fos-erp-auth` → `user.permissions` includes `crm.note.create`.
+5. Add Note should open Note type + Stage composer on the 360 page.
+
+---
+
 ## 2026-07-18 - Finance Phase 3C5: Atomic Credit Note Allocation
 
 ### Shipped (subledger allocation only — no GL / voucher / PostingEvent / number series)

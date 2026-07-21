@@ -26,7 +26,7 @@ export class AuthenticationError extends AppError {
 
 export class AuthorizationError extends AppError {
   constructor(message = 'Insufficient permissions') {
-    super(403, message, 'AUTHORIZATION_ERROR')
+    super(403, message, 'PERMISSION_DENIED')
   }
 }
 
@@ -44,7 +44,7 @@ export class ConflictError extends AppError {
 
 export class TenantMismatchError extends AppError {
   constructor(message = 'Tenant access denied') {
-    super(403, message, 'TENANT_MISMATCH')
+    super(403, message, 'TENANT_ACCESS_DENIED')
   }
 }
 

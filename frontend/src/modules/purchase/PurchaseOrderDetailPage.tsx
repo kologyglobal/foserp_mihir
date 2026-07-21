@@ -15,6 +15,10 @@ import {
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
 import {
+  PurchaseAuditTimeline,
+  buildDemoPurchaseTimeline,
+} from '@/components/purchase/PurchaseAuditTimeline'
+import {
   PurchaseDocumentFactBox,
   buildPurchaseRelatedLinks,
   purchaseDocumentApprovalFact,
@@ -49,8 +53,10 @@ import {
   getPurchaseOrderById,
   getPurchaseOrderLinkedDocuments,
   getVendors,
+  rejectPurchaseOrder,
   releasePurchaseOrder,
   reopenPurchaseOrder,
+  sendBackPurchaseOrder,
   sendPurchaseOrderToVendor,
   submitPurchaseOrder,
   PurchaseServiceError,
@@ -71,7 +77,9 @@ import { PurchaseDocumentWorkflowStrip } from '@/components/purchase/PurchaseDoc
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
+import { appPromptNote } from '@/store/confirmDialogStore'
 import { ReservationsPanel } from '@/components/inventory/ReservationsPanel'
+import { isApiMode } from '@/config/apiConfig'
 
 const REVISABLE_STATUSES: PurchaseOrder['status'][] = [
   'released',
@@ -153,8 +161,9 @@ export function PurchaseOrderDetailPage() {
   const runAction = async (work: () => Promise<PurchaseOrder>, success: string) => {
     setBusy(true)
     try {
-      const updated = await work()
-      setPo(updated)
+      await work()
+      // Backend is the source of truth — refetch instead of trusting the local result.
+      await load()
       notify.success(success)
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Action failed')
@@ -262,7 +271,6 @@ export function PurchaseOrderDetailPage() {
         description="Loading…"
         status="…"
         favoritePath="/purchase/orders"
-        backLink={{ to: '/purchase/orders', label: 'Back to Purchase Orders' }}
         breadcrumbs={[
           { label: 'Purchase', to: '/purchase' },
           { label: 'Purchase Orders', to: '/purchase/orders' },
@@ -281,36 +289,40 @@ export function PurchaseOrderDetailPage() {
   const orderTypeLabel = PURCHASE_ORDER_TYPE_LABELS[po.orderType]
   const approvalLabel = PURCHASE_ORDER_APPROVAL_STATUS_LABELS[po.approvalStatus]
 
-  const isEditable = po.status === 'draft' || po.status === 'pending_approval'
-  const canSubmit = po.status === 'draft'
-  const canApprove = po.status === 'pending_approval'
-  const canRelease = po.status === 'approved'
-  const canReopen = po.status === 'closed'
-  const canSendToVendor = (po.status === 'approved' || po.status === 'released') && !po.sentToVendorAt
-  const canCreateGrn = RECEIVABLE_STATUSES.includes(po.status)
-  const canRevise = REVISABLE_STATUSES.includes(po.status)
-  const canClose = !['draft', 'closed', 'cancelled'].includes(po.status)
-  const canCancel = !['closed', 'cancelled'].includes(po.status)
+  // Prefer backend-provided eligibility (API mode); fall back to local status rules (demo).
+  const aa = po.allowedActions
+  const isEditable = aa ? aa.canEdit : po.status === 'draft' || po.status === 'pending_approval'
+  const canSubmit = aa ? aa.canSubmit : po.status === 'draft'
+  const canApprove = aa ? aa.canApprove : po.status === 'pending_approval'
+  const canRelease = aa ? aa.canSendToVendor : po.status === 'approved'
+  const canReopen = aa ? aa.canReopen : po.status === 'closed'
+  const canSendToVendor = aa
+    ? aa.canSendToVendor
+    : (po.status === 'approved' || po.status === 'released') && !po.sentToVendorAt
+  const canCreateGrn = aa ? aa.canReceive : RECEIVABLE_STATUSES.includes(po.status)
+  const canRevise = isApiMode() ? false : REVISABLE_STATUSES.includes(po.status)
+  const canClose = aa ? aa.canClose : !['draft', 'closed', 'cancelled'].includes(po.status)
+  const canCancel = aa ? aa.canCancel : !['closed', 'cancelled'].includes(po.status)
 
   const approveGate = purchaseActionGate({
-    permission: 'purchase.order.approve',
+    permission: 'purchase.po.approve',
     statusAllowed: canApprove,
   })
   const releaseGate = purchaseActionGate({
-    permission: 'purchase.order.release',
+    permission: 'purchase.po.send',
     statusAllowed: canRelease,
   })
   const submitGate = purchaseActionGate({
-    permission: 'purchase.order.edit',
+    permission: 'purchase.po.edit',
     statusAllowed: canSubmit,
     statusBlockedReason: 'Only Draft orders can be submitted',
   })
   const editGate = purchaseActionGate({
-    permission: 'purchase.order.edit',
+    permission: 'purchase.po.edit',
     statusAllowed: isEditable,
   })
   const cancelGate = purchaseActionGate({
-    permission: 'purchase.order.cancel',
+    permission: 'purchase.po.cancel',
     statusAllowed: canCancel,
   })
   const grnGate = purchaseActionGate({
@@ -350,7 +362,6 @@ export function PurchaseOrderDetailPage() {
         statusTone={purchaseStatusTone(po.status)}
         company={po.vendor.name}
         favoritePath={`/purchase/orders/${po.id}`}
-        backLink={{ to: '/purchase/orders', label: 'Back to Purchase Orders' }}
         breadcrumbs={[
           { label: 'Purchase', to: '/purchase' },
           { label: 'Purchase Orders', to: '/purchase/orders' },
@@ -407,6 +418,50 @@ export function PurchaseOrderDetailPage() {
                 pin: true,
                 onClick: () => navigate(`/purchase/orders/${po.id}/edit`),
                 hidden: editGate.hidden || !isEditable,
+              },
+              {
+                id: 'reject',
+                label: 'Reject',
+                icon: Ban,
+                onClick: () =>
+                  void (async () => {
+                    const reason = await appPromptNote({
+                      title: `Reject ${po.documentNumber}?`,
+                      description: 'Rejection reason is required for the audit trail.',
+                      tone: 'danger',
+                      confirmLabel: 'Reject',
+                      note: { required: true, label: 'Rejection reason' },
+                    })
+                    if (reason == null) return
+                    await runAction(
+                      () => rejectPurchaseOrder(po.id, reason),
+                      `${po.documentNumber} rejected`,
+                    )
+                  })(),
+                hidden: approveGate.hidden || !(aa ? aa.canReject : canApprove),
+                disabled: busy || approveGate.disabled,
+              },
+              {
+                id: 'send-back',
+                label: 'Send Back',
+                icon: Undo2,
+                onClick: () =>
+                  void (async () => {
+                    const reason = await appPromptNote({
+                      title: `Send back ${po.documentNumber}?`,
+                      description: 'The buyer can edit and resubmit. Reason is required.',
+                      tone: 'warning',
+                      confirmLabel: 'Send back',
+                      note: { required: true, label: 'Send-back reason' },
+                    })
+                    if (reason == null) return
+                    await runAction(
+                      () => sendBackPurchaseOrder(po.id, reason),
+                      `${po.documentNumber} sent back`,
+                    )
+                  })(),
+                hidden: approveGate.hidden || !(aa ? aa.canSendBack : canApprove),
+                disabled: busy || approveGate.disabled,
               },
               {
                 id: 'reopen',
@@ -695,6 +750,35 @@ export function PurchaseOrderDetailPage() {
             disabled
             onChange={() => {}}
             hint="PO specifications, drawings, quotations, and supporting documents"
+          />
+        </ErpCardSection>
+
+        <ErpCardSection
+          title="Audit Timeline"
+          subtitle="Purchase order lifecycle events"
+          columns={1}
+          collapsible
+          defaultOpen
+        >
+          <PurchaseAuditTimeline
+            entityType="purchase-order"
+            entityId={po.id}
+            className="border-0 p-0 shadow-none"
+            demoEvents={buildDemoPurchaseTimeline({
+              entityId: po.id,
+              entityType: 'PurchaseOrder',
+              createdAt: po.createdAt,
+              createdBy: po.createdBy,
+              updatedAt: po.updatedAt,
+              updatedBy: po.updatedBy,
+              statusLabel: po.status,
+              extra: history.map((h) => ({
+                action: h.action,
+                actionLabel: h.action.replace(/_/g, ' '),
+                timestamp: h.actedAt,
+                actor: h.actorName,
+              })),
+            })}
           />
         </ErpCardSection>
 

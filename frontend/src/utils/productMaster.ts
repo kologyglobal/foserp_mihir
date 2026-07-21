@@ -10,7 +10,7 @@ import type {
   ProductStandardCost,
   ProductStatus,
 } from '../types/productMaster'
-import { LEGACY_LIFECYCLE_TO_STATUS, PRODUCT_STATUS_FLOW } from '../types/productMaster'
+import { LEGACY_LIFECYCLE_TO_STATUS, PRODUCT_STATUS_FLOW, PRODUCT_STATUS_LABELS } from '../types/productMaster'
 import type { Product } from '../types/master'
 import { getSessionUser } from './permissions'
 
@@ -246,6 +246,38 @@ export function isProductSellable(product: Product): boolean {
 
 export function isProductObsolete(product: Product): boolean {
   return product.status === 'obsolete'
+}
+
+/** Clear user-facing reason when a product cannot enter the sales funnel. */
+export function productNotSellableForSalesMessage(product: Product): string {
+  const statusLabel = PRODUCT_STATUS_LABELS[product.status] ?? product.status
+  if (!product.isActive) {
+    return `Product ${product.productCode} (${product.productName}) is inactive and cannot be used in sales.`
+  }
+  return (
+    `Product ${product.productCode} (${product.productName}) is not released for sale (${statusLabel}). `
+    + 'Only released products can be selected in leads, opportunities, quotations, and sales orders. '
+    + 'Release the product in Product Master, or choose a released product.'
+  )
+}
+
+/**
+ * First-entry gate for sales product selection / save / convert.
+ * Prefer filtering pickers with `isProductSellable`; use this when a productId is already set.
+ */
+export function assertProductSellableForSales(
+  product: Product | null | undefined,
+): { ok: true } | { ok: false; error: string } {
+  if (!product) return { ok: false, error: 'Product not found' }
+  if (!isProductSellable(product)) {
+    return { ok: false, error: productNotSellableForSalesMessage(product) }
+  }
+  return { ok: true }
+}
+
+/** Filter helpers for product pickers — only released + active. */
+export function filterSellableProducts<T extends Product>(products: T[]): T[] {
+  return products.filter(isProductSellable)
 }
 
 export function createInitialRevision(product: Product): ProductRevisionRecord {

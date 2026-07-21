@@ -57,7 +57,7 @@ export function resolveCompany360Path(customerId: string, pathname?: string | nu
 
 export function customer360HubPath(pathname: string): string {
   const ctx = resolveCompany360Context(pathname)
-  if (ctx === 'crm') return '/crm/customers'
+  if (ctx === 'crm') return '/crm/companies'
   if (ctx === 'sales') return SALES_CUSTOMER_360_HUB
   return '/masters/companies'
 }

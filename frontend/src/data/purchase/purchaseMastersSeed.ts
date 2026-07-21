@@ -81,6 +81,12 @@ export const PURCHASE_MASTERS_SEED: PurchaseMasterEntry[] = [
   entry('return-reasons', 'damage_transit', 'Damage in Transit', 3, { requiresApproval: true }),
   entry('return-reasons', 'wrong_item', 'Wrong Item Supplied', 4, { requiresApproval: true }),
   entry('return-reasons', 'rate_dispute', 'Rate Dispute', 5, { requiresApproval: true }),
+
+  entry('bin-codes', 'A1-01', 'Rack A / Bin 01', 1, { warehouseCode: 'WH-MAIN', locationCode: 'MAIN' }),
+  entry('bin-codes', 'A1-02', 'Rack A / Bin 02', 2, { warehouseCode: 'WH-MAIN', locationCode: 'MAIN' }),
+  entry('bin-codes', 'B2-01', 'Rack B / Bin 01', 3, { warehouseCode: 'WH-MAIN', locationCode: 'MAIN' }),
+  entry('bin-codes', 'C3-01', 'Rack C / Quarantine', 4, { warehouseCode: 'WH-QC', locationCode: 'QC' }),
+  entry('bin-codes', 'FG-01', 'Finished Goods Bin 01', 5, { warehouseCode: 'WH-FG', locationCode: 'FG' }),
 ]
 
 export const PURCHASE_MASTER_SETTINGS_SEED = {

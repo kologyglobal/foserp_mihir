@@ -14,6 +14,12 @@ export interface CrmListFilterBarProps {
   /** Omit when the bar has no filter drawer (status lives in `sort`). */
   activeFilterCount?: number
   onOpenFilters?: () => void
+  /** When true, show `filterPanel` on the row below the toolbar. */
+  filtersExpanded?: boolean
+  /** Inline filter fields (e.g. CrmInlineFilterPanel). */
+  filterPanel?: ReactNode
+  /** Overrides default “Filters” label (e.g. “Apply filters” when expanded). */
+  filtersButtonLabel?: string
   chips?: FilterChip[]
   onRemoveChip?: (id: string) => void
   onClearAll?: () => void
@@ -59,8 +65,9 @@ export function CrmListSortSelect({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       wrapClassName="crm-list-filter-bar__select-wrap crm-list-filter-bar__sort-wrap shrink-0"
-      className={cn('crm-list-filter-bar__control crm-list-filter-bar__sort-select', className)}
+      className={cn('erp-select crm-list-filter-bar__control crm-list-filter-bar__sort-select', className)}
       aria-label={ariaLabel}
+      title={options.find((o) => o.value === value)?.label ?? ariaLabel}
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>
@@ -82,6 +89,9 @@ export function CrmListFilterBar({
   searchPlaceholder = 'Search…',
   activeFilterCount = 0,
   onOpenFilters,
+  filtersExpanded = false,
+  filterPanel,
+  filtersButtonLabel,
   chips = [],
   onRemoveChip,
   onClearAll,
@@ -99,6 +109,8 @@ export function CrmListFilterBar({
 }: CrmListFilterBarProps) {
   const showChips = chips.length > 0
   const showFilters = typeof onOpenFilters === 'function'
+  const showPanel = Boolean(filtersExpanded && filterPanel)
+  const filtersLabel = filtersButtonLabel ?? (filtersExpanded ? 'Apply filters' : 'Filters')
   const showSecondary =
     Boolean(onSavedViewChange && savedViews) ||
     Boolean(onSaveView) ||
@@ -110,7 +122,7 @@ export function CrmListFilterBar({
 
   return (
     <FilterBarFieldContext.Provider value>
-      <div className={cn('crm-list-filter-bar', className)}>
+      <div className={cn('crm-list-filter-bar', showPanel && 'crm-list-filter-bar--filters-open', className)}>
         <div className="crm-list-filter-bar__toolbar">
           <div className="crm-list-filter-bar__primary">
             <div
@@ -167,26 +179,33 @@ export function CrmListFilterBar({
             {showFilters ? (
               <ErpButton
                 type="button"
-                variant="secondary"
+                variant={filtersExpanded ? 'primary' : 'secondary'}
                 size="sm"
-                icon={SlidersHorizontal}
+                icon={filtersExpanded ? undefined : SlidersHorizontal}
                 onClick={onOpenFilters}
                 className="crm-list-filter-bar__btn crm-list-filter-bar__filters-btn shrink-0"
+                aria-expanded={filtersExpanded}
                 aria-label={
-                  activeFilterCount > 0 ? `Filters (${activeFilterCount} active)` : 'Open filters'
+                  filtersExpanded
+                    ? 'Apply filters'
+                    : activeFilterCount > 0
+                      ? `Filters (${activeFilterCount} active)`
+                      : 'Open filters'
                 }
               >
                 <span className="crm-list-filter-bar__filters-label">
-                  Filters
-                  <span
-                    className={cn(
-                      'crm-list-filter-bar__filters-count',
-                      activeFilterCount > 0 && 'crm-list-filter-bar__filters-count--on',
-                    )}
-                    aria-hidden={activeFilterCount === 0}
-                  >
-                    {activeFilterCount > 0 ? `(${activeFilterCount})` : '\u00a0'}
-                  </span>
+                  {filtersLabel}
+                  {!filtersExpanded ? (
+                    <span
+                      className={cn(
+                        'crm-list-filter-bar__filters-count',
+                        activeFilterCount > 0 && 'crm-list-filter-bar__filters-count--on',
+                      )}
+                      aria-hidden={activeFilterCount === 0}
+                    >
+                      {activeFilterCount > 0 ? `(${activeFilterCount})` : '\u00a0'}
+                    </span>
+                  ) : null}
                 </span>
               </ErpButton>
             ) : null}
@@ -200,6 +219,10 @@ export function CrmListFilterBar({
           </div>
           ) : null}
         </div>
+
+        {showPanel ? (
+          <div className="crm-list-filter-bar__panel">{filterPanel}</div>
+        ) : null}
 
         {showChips ? (
           <div className="crm-list-filter-bar__chips">

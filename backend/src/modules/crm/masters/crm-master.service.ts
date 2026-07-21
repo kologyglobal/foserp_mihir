@@ -161,6 +161,8 @@ export async function listAllMastersForSync(tenantId: string) {
   // Keep sync-ensure in lockstep with seed + UI masters (incl. opportunity pipeline stages + attachment types)
   const ensureKinds = [
     'payment-terms',
+    'delivery-terms',
+    'warranty-terms',
     'industries',
     'opportunity-stages',
     'opportunity-priorities',

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, FileSpreadsheet, Printer } from 'lucide-react'
+import { Download, FileSpreadsheet, Printer } from 'lucide-react'
 import { ErpButton, ErpButtonGroup } from '../../components/erp/ErpButton'
 import { usePurchaseStore } from '../../store/purchaseStore'
 import { useMasterStore } from '../../store/masterStore'
@@ -61,11 +61,6 @@ export function PoPrintPage() {
     <div className="erp-page space-y-4 p-4 print:p-0">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <ErpButtonGroup>
-          <Link to={`/purchase/orders/${id}`}>
-            <ErpButton type="button" variant="secondary" icon={ArrowLeft}>
-              Back
-            </ErpButton>
-          </Link>
           <ErpButton
             type="button"
             variant="secondary"

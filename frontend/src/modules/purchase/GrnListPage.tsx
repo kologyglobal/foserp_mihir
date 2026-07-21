@@ -16,7 +16,6 @@ import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFil
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpDataGrid } from '@/components/erp/ErpDataGrid'
-import { ErpPageGuide } from '@/components/erp/ErpPageGuide'
 import { TableLink } from '@/components/ui/AppLink'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
@@ -294,10 +293,6 @@ export function GrnListPage() {
             <EmptyState icon={Package} title="Could not load GRNs" description={error} />
           ) : (
             <>
-              <ErpPageGuide
-                purpose="Goods receipt notes against purchase orders."
-                nextStep="Inspect if required, then post the GRN."
-              />
               <EnterpriseRegisterTableShell className="min-w-0">
                 <ErpDataGrid
                   data={filtered}

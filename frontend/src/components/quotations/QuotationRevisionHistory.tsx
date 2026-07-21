@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Eye } from 'lucide-react'
+import { Eye, Lock } from 'lucide-react'
 import type { QuotationDocument } from '../../types/crm'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
 import { LiveStatusBadge } from '../premium/LiveStatusBadge'
 import { quotationStatusLabel, quotationStatusTone } from './QuotationCrmCard'
+import { quotationRevisionLabel } from './Quotation360Sections'
 import { cn } from '../../utils/cn'
 
 interface QuotationRevisionHistoryProps {
@@ -13,31 +14,43 @@ interface QuotationRevisionHistoryProps {
 
 export function QuotationRevisionHistory({ documents, quotationId }: QuotationRevisionHistoryProps) {
   const navigate = useNavigate()
-  const latestRev = documents[0]?.revisionNo ?? 0
+  const sorted = [...documents].sort((a, b) => b.revisionNo - a.revisionNo)
+  const latestRev = sorted[0]?.revisionNo ?? 0
 
   return (
     <div className="space-y-3">
-      {documents.map((d) => {
+      {sorted.map((d) => {
         const isLatest = d.revisionNo === latestRev
+        const qLabel = quotationRevisionLabel(d.revisionNo)
+        const readOnly = !isLatest || d.locked || d.status === 'superseded' || d.status === 'converted'
         return (
           <div
             key={d.id}
             className={cn(
               'rounded-xl border bg-erp-surface p-4 transition-colors',
-              isLatest ? 'border-erp-primary/30 ring-1 ring-erp-primary/10' : 'border-erp-border',
+              isLatest ? 'border-erp-primary/30 ring-1 ring-erp-primary/10' : 'border-erp-border opacity-95',
+              readOnly && !isLatest && 'bg-erp-surface-alt/40',
             )}
           >
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-mono text-[14px] font-bold text-erp-text">Revision {d.revisionNo}</p>
+                  <p className="font-mono text-[14px] font-bold text-erp-text">{qLabel}</p>
                   {isLatest ? (
-                    <span className="rounded bg-erp-primary-soft px-1.5 py-0.5 text-[10px] font-bold uppercase text-erp-primary">Latest</span>
-                  ) : null}
+                    <span className="rounded bg-erp-primary-soft px-1.5 py-0.5 text-[10px] font-bold uppercase text-erp-primary">
+                      Latest
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded bg-erp-surface-alt px-1.5 py-0.5 text-[10px] font-bold uppercase text-erp-muted">
+                      <Lock className="h-2.5 w-2.5" aria-hidden />
+                      Locked
+                    </span>
+                  )}
                   <LiveStatusBadge label={quotationStatusLabel(d.status)} tone={quotationStatusTone(d.status)} pulse={false} />
                 </div>
                 <p className="mt-1 text-[12px] text-erp-muted">
                   {d.createdByName} · {new Date(d.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {!isLatest ? ' · Prior revision — view only' : null}
                 </p>
               </div>
               <p className="text-[16px] font-bold tabular-nums text-erp-primary">{formatCrmCurrency(d.totalAmount)}</p>
@@ -51,10 +64,14 @@ export function QuotationRevisionHistory({ documents, quotationId }: QuotationRe
               <button
                 type="button"
                 className="crm-inline-action crm-inline-action--primary"
-                onClick={() => navigate(`/crm/quotations/${quotationId}/editor?doc=${d.id}`)}
+                onClick={() => navigate(
+                  readOnly
+                    ? `/crm/quotations/${quotationId}/preview?doc=${d.id}`
+                    : `/crm/quotations/${quotationId}/editor?doc=${d.id}`,
+                )}
               >
-                {d.locked ? <Eye className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
-                {d.locked ? 'View' : 'Edit'}
+                <Eye className="h-3 w-3" />
+                {readOnly ? 'View' : 'Edit'}
               </button>
               <button
                 type="button"

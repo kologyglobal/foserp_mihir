@@ -21,6 +21,7 @@ const GUIDES: { prefix: string; guide: PageGuideEntry }[] = [
   { prefix: '/crm/quotations', guide: { purpose: 'Prepare editable customer quotations with revisions.', nextStep: 'Create or open a quotation, edit sections, then submit for approval.' } },
   { prefix: '/crm/sales-orders', guide: { purpose: 'CRM sales orders — create from quotation or directly when customer and items exist. Fulfilment, MRP, and dispatch live under Sales → Sales Orders.', nextStep: 'Use New Sales Order for a direct draft, or Create from Quotation for pipeline handover.' } },
   { prefix: '/crm/contacts', guide: { purpose: 'Maintain customer contact directory.', nextStep: 'Create contacts directly, or open Company 360 to manage related records.' } },
+  { prefix: '/crm/companies', guide: { purpose: 'CRM companies — account relationships, pipeline, quotations, and activity. Operational receivables and order fulfilment use Sales → Companies.', nextStep: 'Create Company, Opportunity, Quotation, Follow-up, or Sales Order directly — funnel links are optional.' } },
   { prefix: '/crm/customers', guide: { purpose: 'CRM companies — account relationships, pipeline, quotations, and activity. Operational receivables and order fulfilment use Sales → Companies.', nextStep: 'Create Company, Opportunity, Quotation, Follow-up, or Sales Order directly — funnel links are optional.' } },
   { prefix: '/crm/forecast', guide: { purpose: 'Sales forecast by territory and period.', nextStep: 'Review pipeline coverage, then adjust opportunity stages or owners.' } },
   { prefix: '/crm/reports', guide: { purpose: 'CRM operational reports — pipeline, conversion, and activity.', nextStep: 'Pick a report, set filters, then export if needed.' } },
@@ -42,19 +43,20 @@ const GUIDES: { prefix: string; guide: PageGuideEntry }[] = [
   { prefix: '/mrp', guide: { purpose: 'Planning hub — shortages, purchase needs, and order readiness.', nextStep: 'Run planning on an open sales order.' } },
 
   // —— Purchase ——
-  { prefix: '/purchase/requisitions', guide: { purpose: 'Purchase requisition created from demand (MRP / manual).', nextStep: 'Submit for requisition approval, then send RFQ to vendors or create PO.' } },
+  { prefix: '/purchase/planning-sheet', guide: { purpose: 'Purchase Planning Sheet for approved PRs where RFQ is not required — one row per item for vendor selection and direct PO.', nextStep: 'Assign buyer, select vendor, approve, then Create Purchase Order when net qty and rate are ready.' } },
+  { prefix: '/purchase/requisitions', guide: { purpose: 'Purchase requisition demand capture with Complete worksheet (item, qty, required date, rate, vendor, order date, customer).', nextStep: 'Submit for requisition approval, then send RFQ to vendors or create PO.' } },
   { prefix: '/purchase/rfqs', guide: { purpose: 'RFQ sent to approved vendors and quote capture — create manually or from approved PR(s).', nextStep: 'Send RFQ, record vendor quotations, then run technical and commercial comparison.' } },
   { prefix: '/purchase/vendor-quotations', guide: { purpose: 'Vendor quotations received against RFQs.', nextStep: 'Open a quote, then compare and select vendor.' } },
   { prefix: '/purchase/comparison', guide: { purpose: 'Technical and commercial comparison to select a vendor.', nextStep: 'Rank quotes, select vendor, then create the purchase order.' } },
   { prefix: '/purchase/orders', guide: { purpose: 'Purchase orders — create, approve and release, then track delivery.', nextStep: 'Approve and release PO, await vendor confirmation, then record gate entry & GRN.' } },
   { prefix: '/purchase/grn', guide: { purpose: 'Gate entry and GRN — material delivered, QC, then accepted stock posted (demo).', nextStep: 'Post GRN, complete quality inspection if required. Invoice match and payment are Planned.' } },
-  { prefix: '/purchase/returns', guide: { purpose: 'Purchase returns and debit notes to vendors.', nextStep: 'Create a return from GRN/PO, then submit for approval if required.' } },
-  { prefix: '/purchase/invoices', guide: { purpose: 'Purchase invoices for matching and accounts payable.', nextStep: 'Match to PO/GRN, then submit for posting.' } },
-  { prefix: '/purchase/approvals', guide: { purpose: 'Purchase document approvals (PR, PO, amendments).', nextStep: 'Open the next pending request and Approve or Reject.' } },
+  { prefix: '/purchase/returns', guide: { purpose: 'Vendor material returns — draft, approve, and post return challans (demo).', nextStep: 'Create a return from GRN/QC, submit for approval, then post.' } },
+  { prefix: '/purchase/invoices', guide: { purpose: 'Purchase invoices — match to PO/GRN, verify, and send for approval (demo).', nextStep: 'Save draft, verify match, then submit for approval.' } },
+  { prefix: '/purchase/approvals', guide: { purpose: 'Approval queue for purchase documents awaiting your decision.', nextStep: 'Open a row to review, then Approve, Reject, Send Back, or Delegate.' } },
   { prefix: '/purchase/vendor-performance', guide: { purpose: 'Vendor scorecards — delivery, quality, and commercial performance.', nextStep: 'Filter by vendor and review trends before the next RFQ.' } },
-  { prefix: '/purchase/reports', guide: { purpose: 'Purchase operational reports.', nextStep: 'Pick a report and export when ready.' } },
-  { prefix: '/purchase/masters', guide: { purpose: 'Purchase masters hub — linked global registers open the canonical Master Data pages.', nextStep: 'Open a purchase-owned master or follow a linked register shortcut.' } },
-  { prefix: '/purchase/setup', guide: { purpose: 'Purchase module setup and defaults.', nextStep: 'Review numbering, tolerances, and approval links.' } },
+  { prefix: '/purchase/reports', guide: { purpose: 'Purchase reports and analytics — operational and vendor performance (demo).', nextStep: 'Open a report category and run the register you need.' } },
+  { prefix: '/purchase/masters', guide: { purpose: 'Purchase masters — vendors, items, terms, QC rules, and receiving setup.', nextStep: 'Open a register to maintain values used across procurement.' } },
+  { prefix: '/purchase/setup', guide: { purpose: 'Purchase setup — approval matrix and process defaults (demo).', nextStep: 'Review approval roles and thresholds, then return to the queue.' } },
   { prefix: '/purchase', guide: { purpose: 'Procurement lifecycle: Demand → PR → RFQ → Compare → PO → GRN → QC → stock. Invoice/payment Planned.', nextStep: 'Use the process map, or open awaiting PR approval / open POs.' } },
 
   // —— Inventory ——
@@ -192,6 +194,13 @@ export function resolveCrmPageGuide(pathname: string): PageGuideEntry | null {
   return resolvePageTipGuide(pathname)
 }
 
+/** Purchase tip content from the same registry. */
+export function resolvePurchasePageGuide(pathname: string): PageGuideEntry | null {
+  const path = pathname.split('?')[0].replace(/\/$/, '') || '/'
+  if (path !== '/purchase' && !path.startsWith('/purchase/')) return null
+  return matchGuide(pathname)
+}
+
 export const PAGE_GUIDE_COUNT = GUIDES.length
 
 export const PAGE_TIP_FALLBACK: PageGuideEntry = {
@@ -201,3 +210,8 @@ export const PAGE_TIP_FALLBACK: PageGuideEntry = {
 
 /** @deprecated Prefer PAGE_TIP_FALLBACK */
 export const CRM_PAGE_TIP_FALLBACK = PAGE_TIP_FALLBACK
+
+export const PURCHASE_PAGE_TIP_FALLBACK: PageGuideEntry = {
+  purpose: 'Procurement lifecycle: Demand → PR → RFQ → Compare → PO → GRN → QC → stock. Invoice/payment Planned.',
+  nextStep: 'Use the process map, or open awaiting PR approval / open POs.',
+}

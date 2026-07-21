@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Building2, ChevronDown, X } from 'lucide-react'
-import { FormField } from '../forms/FormField'
+import { FormField, inputClassName } from '../forms/FormField'
 import { Input, Select, Checkbox, MobileInput } from '../forms/Inputs'
 import { StateSelect, CitySelect, CountrySelect, MasterEnumSelect } from '../masters/GeographySelects'
-import { INDUSTRY_OPTIONS } from '../../data/masters/geographySeed'
 import { ErpButton, ErpButtonGroup } from '../erp/ErpButton'
 import { COMPANY_TERMINOLOGY } from '../../utils/companyLabels'
 import { saveQuickCreateEntity } from '../../utils/quickCreateService'
@@ -12,11 +11,20 @@ import { isApiMode } from '../../config/apiConfig'
 import { useMasterStore } from '../../store/masterStore'
 import { resolveStoreAction } from '../../store/storeAction'
 import { notify } from '../../store/toastStore'
-import { panFromGstin } from '../../utils/customerUtils'
+import { panFromGstin, validateGstin } from '../../utils/customerUtils'
 import { DEFAULT_CUSTOMER_COUNTRY } from '../../config/countries'
+import { useInlineFormValidation } from '../../hooks/useInlineFormValidation'
+import { validateEmail, normalizeEmail } from '../../utils/validation/email'
+import { validateMobileForCountry } from '../../utils/validation/mobilePhone'
+import { useIndustryOptions, useTerritoryOptions } from '../../hooks/useCrmMasters'
 import type { QuickCreateResult } from '../../types/quickCreate'
 import type { Customer, CustomerType, SalesTerritory } from '../../types/master'
 import { cn } from '../../utils/cn'
+
+/** Contact person names: letters and spaces only (no digits / symbols). */
+function sanitizeAlphabeticName(raw: string): string {
+  return raw.replace(/[^A-Za-z\s]/g, '')
+}
 
 export interface QuickCompanyCreateModalProps {
   open: boolean
@@ -61,7 +69,7 @@ function emptyForm(defaultName = ''): CompanyForm {
     email: '',
     industry: '',
     customerType: 'corporate',
-    salesTerritory: 'West',
+    salesTerritory: '',
     gstin: '',
     pan: '',
     creditDays: 30,
@@ -107,7 +115,7 @@ function buildCustomerPayload(form: CompanyForm, name: string): Omit<Customer, '
     pan: form.pan.trim().toUpperCase() || panFromGstin(gstin) || undefined,
     contactPerson: form.contactPerson.trim(),
     contactPhone: form.mobile.trim(),
-    contactEmail: form.email.trim(),
+    contactEmail: form.email.trim() ? normalizeEmail(form.email) : '',
     creditDays: Number(form.creditDays) || 30,
     creditLimit: Number(form.creditLimit) || 0,
     salesTerritory: (form.salesTerritory || 'West') as SalesTerritory,
@@ -121,17 +129,65 @@ export function QuickCompanyCreateModal({
   onClose,
   onCreated,
 }: QuickCompanyCreateModalProps) {
+  const industryOptions = useIndustryOptions()
+  const territoryOptions = useTerritoryOptions()
   const [form, setForm] = useState<CompanyForm>(() => emptyForm(defaultName))
   const [showAdditional, setShowAdditional] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [gstinError, setGstinError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setForm((prev) => {
+      if (prev.salesTerritory) return prev
+      const firstTerritory = territoryOptions[0]?.value
+      return firstTerritory ? { ...prev, salesTerritory: firstTerritory } : prev
+    })
+  }, [open, territoryOptions])
+
+  const validationValues = useMemo(
+    () => ({
+      customerName: form.customerName,
+      contactPerson: form.contactPerson,
+      mobile: form.mobile,
+      email: form.email,
+      country: form.country,
+    }),
+    [form.customerName, form.contactPerson, form.mobile, form.email, form.country],
+  )
+
+  const inline = useInlineFormValidation(validationValues, {
+    customerName: {
+      required: true,
+      message: `${COMPANY_TERMINOLOGY.name} is required`,
+    },
+    contactPerson: {
+      validate: (v) => {
+        const value = String(v ?? '')
+        if (!value.trim()) return null
+        if (/[^A-Za-z\s]/.test(value)) return 'Contact Person allows letters only'
+        return null
+      },
+    },
+    mobile: {
+      validate: (v) => validateMobileForCountry(String(v ?? ''), form.country || DEFAULT_CUSTOMER_COUNTRY),
+    },
+    email: {
+      validate: (v) => validateEmail(String(v ?? '')),
+    },
+  })
 
   useEffect(() => {
     if (!open) return
     setForm(emptyForm(defaultName.trim()))
     setShowAdditional(false)
     setError(null)
+    setGstinError(null)
     setSubmitting(false)
+    inline.resetTouched()
+    // Only reset when the modal opens / default name changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultName])
 
   useEffect(() => {
@@ -149,24 +205,67 @@ export function QuickCompanyCreateModal({
   }
 
   function handleGstinChange(raw: string) {
-    const gst = raw.toUpperCase()
+    const gst = raw.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 15)
     setForm((prev) => ({
       ...prev,
       gstin: gst,
-      pan: panFromGstin(gst) || prev.pan,
+      pan: panFromGstin(gst) || (gst.length < 12 ? '' : prev.pan),
     }))
     setError(null)
+    if (gstinError) setGstinError(gst.length === 0 || gst.length === 15 ? validateGstin(gst) : null)
+  }
+
+  function handleGstinBlur() {
+    setGstinError(validateGstin(form.gstin))
   }
 
   async function handleSubmit() {
+    inline.touchAll()
+
     const name = form.customerName.trim()
-    if (!name) {
-      const msg = `${COMPANY_TERMINOLOGY.name} is required`
+    const mobileErr = validateMobileForCountry(form.mobile, form.country || DEFAULT_CUSTOMER_COUNTRY)
+    const emailErr = validateEmail(form.email)
+    const contactValue = form.contactPerson
+    const contactErr =
+      contactValue.trim() && /[^A-Za-z\s]/.test(contactValue)
+        ? 'Contact Person allows letters only'
+        : null
+
+    // Account-detail fields (GSTIN etc.) only gate submit when the accordion is open
+    // or the user has already entered a partial/full GSTIN.
+    const gstinRaw = form.gstin.trim()
+    const shouldValidateAccountDetails = showAdditional || gstinRaw.length > 0
+    const gstErr = shouldValidateAccountDetails
+      ? validateGstin(form.gstin, { required: false })
+      : null
+
+    if (gstErr) {
+      setGstinError(gstErr)
+      setShowAdditional(true)
+    } else {
+      setGstinError(null)
+    }
+
+    if (!name || mobileErr || emailErr || contactErr || gstErr) {
+      const msg =
+        !name
+          ? `${COMPANY_TERMINOLOGY.name} is required`
+          : contactErr || mobileErr || emailErr || gstErr || 'Please fix the highlighted fields'
       setError(msg)
       notify.warning(msg)
+      // Defer focus until touched errors paint
+      window.requestAnimationFrame(() => {
+        const root = document.getElementById('quick-company-modal-title')?.closest('.erp-modal-panel')
+        const invalid = root?.querySelector<HTMLElement>(
+          '[aria-invalid="true"], .erp-field-row--error input, input.erp-input--error, textarea.erp-input--error',
+        )
+        invalid?.focus({ preventScroll: true })
+        invalid?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
       return
     }
 
+    setGstinError(null)
     setSubmitting(true)
     setError(null)
 
@@ -174,7 +273,7 @@ export function QuickCompanyCreateModal({
     const demoPayload = {
       ...customerData,
       mobile: form.mobile.trim(),
-      email: form.email.trim(),
+      email: form.email.trim() ? normalizeEmail(form.email) : '',
       billingAddress: form.addressLine1.trim(),
     }
 
@@ -235,7 +334,7 @@ export function QuickCompanyCreateModal({
   // Portal outside the lead page <form> — nested forms break Create Company submit.
   return createPortal(
     <div
-      className="erp-modal-backdrop"
+      className="erp-modal-backdrop crm-form-surface"
       role="dialog"
       aria-modal="true"
       aria-labelledby="quick-company-modal-title"
@@ -270,13 +369,28 @@ export function QuickCompanyCreateModal({
         </header>
 
         <div className="px-5 py-4">
+          {error ? (
+            <p
+              role="alert"
+              className="mb-3 rounded-md border border-erp-danger-solid/30 bg-red-50 px-3 py-2 text-[12px] font-medium text-erp-danger-fg"
+            >
+              {error}
+            </p>
+          ) : null}
+
           <section className="space-y-3">
             <h3 className="text-[13px] font-semibold text-erp-text">Quick entry</h3>
             <div className="grid gap-3 sm:grid-cols-3">
-              <FormField label={`${COMPANY_TERMINOLOGY.name} *`} className="sm:col-span-3">
+              <FormField
+                label={COMPANY_TERMINOLOGY.name}
+                required
+                className="sm:col-span-3"
+                error={inline.fieldError('customerName')}
+              >
                 <Input
                   value={form.customerName}
                   onChange={(e) => setField('customerName', e.target.value)}
+                  onBlur={() => inline.touch('customerName')}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
@@ -284,29 +398,42 @@ export function QuickCompanyCreateModal({
                     }
                   }}
                   placeholder="e.g. Acme Logistics Pvt Ltd"
+                  error={Boolean(inline.fieldError('customerName'))}
+                  aria-invalid={Boolean(inline.fieldError('customerName'))}
                   autoFocus
                 />
               </FormField>
-              <FormField label="Contact Person">
+              <FormField label="Contact Person" error={inline.fieldError('contactPerson')}>
                 <Input
                   value={form.contactPerson}
-                  onChange={(e) => setField('contactPerson', e.target.value)}
+                  onChange={(e) => setField('contactPerson', sanitizeAlphabeticName(e.target.value))}
+                  onBlur={() => inline.touch('contactPerson')}
                   placeholder="Primary contact"
+                  autoComplete="name"
+                  inputMode="text"
+                  error={Boolean(inline.fieldError('contactPerson'))}
+                  aria-invalid={Boolean(inline.fieldError('contactPerson'))}
                 />
               </FormField>
-              <FormField label="Mobile">
+              <FormField label="Mobile" error={inline.fieldError('mobile')}>
                 <MobileInput
                   value={form.mobile}
                   onChange={(e) => setField('mobile', e.target.value)}
+                  onBlur={() => inline.touch('mobile')}
                   placeholder="10-digit mobile"
+                  error={Boolean(inline.fieldError('mobile'))}
+                  aria-invalid={Boolean(inline.fieldError('mobile'))}
                 />
               </FormField>
-              <FormField label="Email">
+              <FormField label="Email" error={inline.fieldError('email')}>
                 <Input
                   type="email"
                   value={form.email}
                   onChange={(e) => setField('email', e.target.value)}
+                  onBlur={() => inline.touch('email')}
                   placeholder="name@company.com"
+                  error={Boolean(inline.fieldError('email'))}
+                  aria-invalid={Boolean(inline.fieldError('email'))}
                 />
               </FormField>
             </div>
@@ -316,7 +443,14 @@ export function QuickCompanyCreateModal({
             <button
               type="button"
               className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-erp-border bg-erp-surface px-4 py-3 text-left text-[13px] font-semibold text-erp-primary hover:bg-erp-primary-soft/40"
-              onClick={() => setShowAdditional((v) => !v)}
+              onClick={() => {
+                setShowAdditional((v) => {
+                  const next = !v
+                  // Closing unused account details clears GSTIN gate errors
+                  if (!next && !form.gstin.trim()) setGstinError(null)
+                  return next
+                })
+              }}
               aria-expanded={showAdditional}
             >
               <span>{showAdditional ? 'Hide account details' : 'Add account details'}</span>
@@ -334,7 +468,11 @@ export function QuickCompanyCreateModal({
                     <MasterEnumSelect
                       value={form.industry}
                       onChange={(v) => setField('industry', v)}
-                      options={INDUSTRY_OPTIONS}
+                      options={
+                        industryOptions.length > 0
+                          ? industryOptions.map((o) => o.label || o.value)
+                          : []
+                      }
                       placeholder="— Select industry —"
                     />
                   </FormField>
@@ -347,10 +485,10 @@ export function QuickCompanyCreateModal({
                   </FormField>
                   <FormField label="Sales Territory">
                     <Select native value={form.salesTerritory} onChange={(e) => setField('salesTerritory', e.target.value)}>
-                      <option value="West">West</option>
-                      <option value="North">North</option>
-                      <option value="South">South</option>
-                      <option value="East">East</option>
+                      <option value="">— Select territory —</option>
+                      {territoryOptions.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
                     </Select>
                   </FormField>
                 </div>
@@ -360,13 +498,21 @@ export function QuickCompanyCreateModal({
                 <h3 className="text-[13px] font-semibold text-erp-text">Tax &amp; commercial terms</h3>
                 <p className="text-[11px] text-erp-muted">GST registration, PAN, credit days, and approved credit limit.</p>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <FormField label="GSTIN" hint="15-character GST identification number">
+                  <FormField
+                    label="GSTIN"
+                    hint="15-character GST identification number"
+                    error={gstinError ?? undefined}
+                  >
                     <Input
                       value={form.gstin}
                       onChange={(e) => handleGstinChange(e.target.value)}
+                      onBlur={handleGstinBlur}
                       maxLength={15}
-                      className="font-mono uppercase"
+                      className={cn('font-mono uppercase', inputClassName(Boolean(gstinError)))}
                       placeholder="27AABCU9603R1ZM"
+                      aria-invalid={Boolean(gstinError)}
+                      autoComplete="off"
+                      spellCheck={false}
                     />
                   </FormField>
                   <FormField label="PAN" hint="Auto-derived from GSTIN — edit if needed">
@@ -535,12 +681,6 @@ export function QuickCompanyCreateModal({
                 />
               </section>
             </div>
-          ) : null}
-
-          {error ? (
-            <p className="mb-3 rounded-md border border-erp-danger-solid/30 bg-red-50 px-3 py-2 text-[12px] font-medium text-erp-danger-fg">
-              {error}
-            </p>
           ) : null}
 
           <ErpButtonGroup className="sticky bottom-0 justify-end border-t border-erp-border bg-white py-4">
