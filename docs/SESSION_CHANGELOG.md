@@ -1,3 +1,42 @@
+## 2026-07-21 - Hostinger Git deployment now builds and publishes the SPA
+
+### Root cause
+
+- Hostinger pulled `main`, but repository-root `npm run build` called a missing
+  `build.ps1`. `frontend/dist` is intentionally ignored, so Git could not update
+  nginx/Express static files by pull alone.
+- The only GitHub workflow was under `frontend/.github/workflows`, which GitHub
+  does not discover. Live therefore kept the July 17 Vite hash while API/DB
+  changes could update independently.
+
+### Shipped
+
+- Root `npm run build` now runs cross-platform
+  `scripts/build-hostinger.mjs`: deterministic frontend/backend installs, API-mode
+  Vite build, Prisma generation/backend compile, then publish to
+  ignored `backend/public` only after both builds succeed.
+- Root `hostinger-start.mjs` starts the compiled backend from the correct working
+  directory and refuses startup when backend or SPA build output is missing.
+- `scripts/verify-hostinger-build.mjs` verifies copied asset hashes and
+  `build-meta.json` revision parity.
+- CI moved to repository-root `.github/workflows/ci.yml` and executes the same
+  Hostinger build/verification path.
+- Added `docs/HOSTINGER_GIT_DEPLOYMENT.md` with exact hPanel configuration.
+
+### Verification
+
+- Root `npm run build` passed: Vite production build + Prisma generate + backend
+  TypeScript compile; published 16 referenced assets.
+- `npm run verify:deployment` passed for revision
+  `38f8d4ae4478e6571848dd66c280a04454156fa6`.
+- Production-entry smoke test passed on port 5051:
+  `/api/v1/health` returned JSON 200 and `/build-meta.json` returned the same
+  revision. Generated `frontend/dist` and `backend/public` remain ignored.
+- Live hPanel build settings/redeploy are still required before declaring
+  production updated.
+
+---
+
 ## 2026-07-21 - Quotation template catalog trimmed to the two VF ISO products
 
 ### Context

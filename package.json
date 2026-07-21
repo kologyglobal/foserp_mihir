@@ -3,11 +3,16 @@
   "private": true,
   "version": "1.0.0",
   "description": "FOS ERP monorepo — frontend (Vite) + backend (Express/Prisma)",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File ./build.ps1 -SkipInstall",
-    "build:all": "powershell -NoProfile -ExecutionPolicy Bypass -File ./build.ps1",
-    "build:frontend": "powershell -NoProfile -ExecutionPolicy Bypass -File ./build.ps1 -FrontendOnly -SkipInstall",
-    "build:backend": "powershell -NoProfile -ExecutionPolicy Bypass -File ./build.ps1 -BackendOnly -SkipInstall",
+    "build": "node scripts/build-hostinger.mjs",
+    "build:all": "node scripts/build-hostinger.mjs",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend run build",
+    "start": "node hostinger-start.mjs",
+    "verify:deployment": "node scripts/verify-hostinger-build.mjs",
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:backend": "npm --prefix backend run dev"
   },

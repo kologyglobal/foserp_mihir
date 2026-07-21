@@ -49,6 +49,9 @@ dist/
 dist-ssr/
 build/
 coverage/
+# Hostinger deployment output (generated from frontend/dist)
+backend/public/
+backend/.public-next/
 
 # Nested-repo backups (never commit)
 frontend/.git.bak-nested-*/

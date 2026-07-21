@@ -36,7 +36,7 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Risk | Status |
 |------|--------|
-| Production API served as HTML (`erp.dhurandharcrm.com`) | **Redeploy pending** — fixed `backend/.htaccess` (+ deploy copy) skips `^api`; until `/api/v1/health` returns JSON, live CRM hydrate stays broken |
+| Production deployment parity | **hPanel redeploy pending (2026-07-21)** — API health is JSON/connected, but live SPA still serves a July 17 Vite hash. Root Hostinger build/start/verification architecture is now fixed in code; configure hPanel per `HOSTINGER_GIT_DEPLOYMENT.md` and verify `/build-meta.json` before closing. |
 | Local API-mode empty data | Backend must listen on `:5000`; not a demo/API mix bug |
 | DB cleanup scripts | `cleanup-leads.ts`, `cleanup-opp-quotations.ts`, `cleanup-sales-orders.ts` — local one-offs; do not run on prod without intent |
 | Accounting orphan UI | **Resolved 2026-07-15** — all `/accounting/*` deep links from the dashboard now resolve (dashboard live; other screens are placeholders, not 404s) |
