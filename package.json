@@ -11,7 +11,7 @@
     "build:all": "node scripts/build-hostinger.mjs",
     "build:frontend": "npm --prefix frontend run build",
     "build:backend": "npm --prefix backend run build",
-    "start": "node hostinger-start.mjs",
+    "start": "node backend/hostinger-start.mjs",
     "verify:deployment": "node scripts/verify-hostinger-build.mjs",
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:backend": "npm --prefix backend run dev"

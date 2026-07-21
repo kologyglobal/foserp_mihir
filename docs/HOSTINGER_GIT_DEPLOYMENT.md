@@ -5,10 +5,10 @@ This repository deploys as one Hostinger Node.js application:
 - Express API from `backend/dist`
 - Vite SPA generated from `frontend/src`
 - Published SPA copied to `backend/public`
-- Root startup entry: `hostinger-start.mjs`
+- Runtime entry: `backend/hostinger-start.mjs`
 
-`frontend/dist` and `backend/public` are generated during deployment and remain
-gitignored. A Git pull alone is not a deployment.
+`frontend/dist`, `backend/dist`, and `backend/public` are generated during
+deployment and remain gitignored. A Git pull alone is not a deployment.
 
 ## Hostinger hPanel settings
 
@@ -23,7 +23,7 @@ In **Websites → Node.js Web App → Settings & Redeploy**:
 | Node.js | 22.x (20.x minimum) |
 | Install command | `npm ci` |
 | Build command | `npm run build` |
-| Output directory | `backend/public` |
+| Output directory | `backend` |
 | Entry file | `hostinger-start.mjs` |
 
 Required frontend build variables:
@@ -49,7 +49,8 @@ Variables. Never place their values in Git.
 6. Writes `backend/public/build-meta.json` with the deployed Git revision
 
 The publish step occurs only after both builds pass. `npm start` launches
-`hostinger-start.mjs`, which refuses to start if either build output is missing.
+`backend/hostinger-start.mjs`, which refuses to start if either build output is
+missing.
 
 ## Verification after every deployment
 

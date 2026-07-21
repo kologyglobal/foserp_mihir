@@ -15,8 +15,9 @@
   `scripts/build-hostinger.mjs`: deterministic frontend/backend installs, API-mode
   Vite build, Prisma generation/backend compile, then publish to
   ignored `backend/public` only after both builds succeed.
-- Root `hostinger-start.mjs` starts the compiled backend from the correct working
-  directory and refuses startup when backend or SPA build output is missing.
+- `backend/hostinger-start.mjs` makes `backend/` a self-contained Hostinger
+  output directory, starts the compiled backend from the correct working
+  directory, and refuses startup when backend or SPA output is missing.
 - `scripts/verify-hostinger-build.mjs` verifies copied asset hashes and
   `build-meta.json` revision parity.
 - CI moved to repository-root `.github/workflows/ci.yml` and executes the same

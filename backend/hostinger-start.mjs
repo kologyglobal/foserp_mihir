@@ -2,8 +2,7 @@ import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-const root = dirname(fileURLToPath(import.meta.url))
-const backend = join(root, 'backend')
+const backend = dirname(fileURLToPath(import.meta.url))
 const server = join(backend, 'dist', 'server.js')
 const frontend = join(backend, 'public')
 
@@ -14,8 +13,8 @@ if (!existsSync(join(frontend, 'index.html'))) {
   throw new Error(`Frontend build is missing: ${frontend}. Hostinger must run npm run build before start.`)
 }
 
-// Keep backend dotenv and relative paths stable even though Hostinger launches
-// the repository-root entry file.
+// Hostinger launches this file from the selected backend output directory.
+// Keep dotenv and all relative backend paths stable.
 process.chdir(backend)
 process.env.FRONTEND_DIST = process.env.FRONTEND_DIST ?? resolve(frontend)
 
