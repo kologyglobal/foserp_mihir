@@ -22,6 +22,7 @@ import { cn } from '../../utils/cn'
 import type { CustomerApprovalStatus } from '../../types/quotation'
 import { resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
 import { resolveQuotationRevisionPolicy } from '../../utils/quotationRevisionPolicy'
+import { opportunityRequirementDisplay } from '../../utils/leadRequirementLines'
 
 type WorkflowStepId =
   | 'draft'
@@ -378,7 +379,10 @@ export function QuotationCommercialSummary({ document: doc }: { document: Quotat
 }
 
 export function QuotationSectionList({ document: doc }: { document: QuotationDocument }) {
-  const sorted = [...doc.sections].sort((a, b) => a.sequenceNo - b.sequenceNo)
+  const sorted = [...doc.sections]
+    .sort((a, b) => a.sequenceNo - b.sequenceNo)
+    // Legacy docs stored the encoded <!--fos-lead-lines--> payload in scope/technical sections.
+    .map((sec) => ({ ...sec, content: opportunityRequirementDisplay(sec.content) }))
 
   return (
     <div className="space-y-2">

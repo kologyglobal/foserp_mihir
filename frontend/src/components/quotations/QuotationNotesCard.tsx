@@ -88,7 +88,9 @@ export function QuotationNotesCard({
   }, [composerOpen, isApiBacked, canCreate, editPath, navigate, onComposerOpenChange])
 
   const latest = useMemo((): UnifiedNote | null => {
-    if (isApiBacked && notes.length > 0) {
+    // API mode shows real entity notes only — document scalar fields are not notes.
+    if (isApiBacked) {
+      if (notes.length === 0) return null
       const sorted = [...notes].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
       const n = sorted[0]!
       return {

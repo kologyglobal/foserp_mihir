@@ -30,6 +30,7 @@ import { DocumentFooterActions } from '../../design-system'
 import { sectionCompletionStatus, validateQuotationForPrint } from '../../utils/quotationEngine/validation'
 import { saveQuotationPdfToDms } from '../../utils/quotationEngine/pdfExport'
 import { commercialTermsNeedApproval, extractCommercialTermsFromSections, resolveCommercialTermSelectValue, syncCommercialTermsIntoSections } from '../../utils/quotationTermUtils'
+import { opportunityRequirementDisplay } from '../../utils/leadRequirementLines'
 import { useCrmRecordLoadState } from '../crm/CrmRecordLoadGate'
 import { PageLoadingFallback } from '../system/PageLoadingFallback'
 import type { QuotationPriceLine, QuotationSection } from '../../types/crm'
@@ -503,7 +504,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
                   probability={opportunity?.probability ?? 0}
                   readOnly={!canEdit}
                   showFreightExtras
-                  scopeNotes={doc.commercialNotes ?? ''}
+                  scopeNotes={opportunityRequirementDisplay(doc.commercialNotes)}
                   onChange={canEdit ? handlePrice : undefined}
                 />
               )}

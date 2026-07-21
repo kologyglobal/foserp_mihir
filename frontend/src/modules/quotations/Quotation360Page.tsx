@@ -43,6 +43,7 @@ import { CrmUnifiedActivityFeed } from '@/components/crm/CrmUnifiedActivityFeed'
 import { CrmDeleteConfirmModal } from '@/components/crm/CrmDeleteConfirmModal'
 import { EntityAttachmentsPanel } from '../../components/crm/shared/EntityAttachmentsPanel'
 import { demoNotesFromTexts, entityNotesToFeedNotes } from '../../utils/crmEntityNotes'
+import { opportunityRequirementDisplay } from '../../utils/leadRequirementLines'
 import { quotationNoteStageLabel } from '@/components/quotations/QuotationNotesCard'
 import type { CrmEntityNoteDto } from '../../services/api/crmApi'
 import type { CrmActivity, FollowUp, QuotationDocumentStatus } from '../../types/crm'
@@ -155,9 +156,10 @@ export function Quotation360Page() {
   }, [quoActivities])
 
   const quoDemoNotes = useMemo(
+    // opportunityRequirementDisplay: legacy docs stored the encoded <!--fos-lead-lines--> payload here.
     () => demoNotesFromTexts([
-      { label: 'Commercial notes', text: doc?.commercialNotes },
-      { label: 'Technical notes', text: doc?.technicalNotes },
+      { label: 'Commercial notes', text: opportunityRequirementDisplay(doc?.commercialNotes) },
+      { label: 'Technical notes', text: opportunityRequirementDisplay(doc?.technicalNotes) },
     ]),
     [doc?.commercialNotes, doc?.technicalNotes],
   )
@@ -715,7 +717,7 @@ export function Quotation360Page() {
                     probability={opportunity?.probability ?? 0}
                     readOnly
                     showFreightExtras
-                    scopeNotes={quoDoc.commercialNotes ?? ''}
+                    scopeNotes={opportunityRequirementDisplay(quoDoc.commercialNotes)}
                   />
                 ),
                 commercial: (

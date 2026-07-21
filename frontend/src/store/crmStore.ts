@@ -26,6 +26,7 @@ import {
 } from '../utils/customerUtils'
 import { applyPrimaryContactFlags, syncCrmContactToMaster, syncPrimaryToCustomer } from '../utils/contactSync'
 import { getStageProbability, opportunityStageLabel } from '../utils/opportunityUtils'
+import { opportunityRequirementDisplay } from '../utils/leadRequirementLines'
 import { resolveLeadConvertToOpportunityGate } from '../utils/leadUtils'
 import { DEFAULT_QUOTATION_TEMPLATES } from '../data/quotations/quotationTemplates'
 import { buildCrmSampleData, emptyCrmState } from '../data/crm/crmSampleSeed'
@@ -1446,7 +1447,9 @@ export const useCrmStore = create<CrmState>()(
           || resolveCommercialTermSelectValue('delivery-terms', deliveryDefault.text)
           || deliveryDefault.text
         const validityDate = extras?.validityDate?.trim() || undefined
-        const commercialNotes = opp.productRequirement
+        // Human-readable requirement — never the encoded <!--fos-lead-lines--> payload.
+        const requirementText = opportunityRequirementDisplay(opp.productRequirement)
+        const commercialNotes = requirementText
         const qty = resolvedLines[0]?.qty ?? 1
 
         if (isApiMode()) {
@@ -1456,8 +1459,8 @@ export const useCrmStore = create<CrmState>()(
           const sections = populateDocumentFromOpportunity(tplSections, {
             customerName: customer?.customerName ?? opp.customerId,
             contactName: contact?.name ?? customer?.contactPerson ?? '—',
-            productRequirement: opp.productRequirement,
-            technicalNotes: opp.productRequirement,
+            productRequirement: requirementText,
+            technicalNotes: requirementText,
             commercialNotes,
             deliveryDate: opp.expectedCloseDate,
             ownerName: opp.ownerName,
@@ -1467,7 +1470,7 @@ export const useCrmStore = create<CrmState>()(
             : syncLineTotals([
               {
                 id: genId('pl'),
-                productOrItem: opp.productRequirement,
+                productOrItem: requirementText,
                 description: tpl?.productFamily ?? 'Supply',
                 qty,
                 uom: 'Nos',
@@ -1498,7 +1501,7 @@ export const useCrmStore = create<CrmState>()(
               sections,
               priceLines,
               commercialNotes,
-              technicalNotes: opp.productRequirement,
+              technicalNotes: requirementText,
             }),
           )
         }
@@ -1527,8 +1530,8 @@ export const useCrmStore = create<CrmState>()(
         const sections = populateDocumentFromOpportunity(createdDoc.sections, {
           customerName: customer?.customerName ?? opp.customerId,
           contactName: contact?.name ?? customer?.contactPerson ?? '—',
-          productRequirement: opp.productRequirement,
-          technicalNotes: opp.productRequirement,
+          productRequirement: requirementText,
+          technicalNotes: requirementText,
           commercialNotes,
           deliveryDate: opp.expectedCloseDate,
           ownerName: opp.ownerName,
@@ -1540,7 +1543,7 @@ export const useCrmStore = create<CrmState>()(
           : syncLineTotals([
             {
               id: genId('pl'),
-              productOrItem: product?.productName ?? opp.productRequirement,
+              productOrItem: product?.productName ?? requirementText,
               description: tpl?.productFamily ?? 'Supply',
               productId: primaryProductId,
               qty,
@@ -1563,7 +1566,7 @@ export const useCrmStore = create<CrmState>()(
                   salesOwnerId: opp.ownerId,
                   salesOwnerName: opp.ownerName,
                   commercialNotes,
-                  technicalNotes: opp.productRequirement,
+                  technicalNotes: requirementText,
                   ...stampModified(d),
                 })
               : d,
