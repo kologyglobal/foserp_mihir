@@ -32,7 +32,9 @@ import { Enterprise360Documents,
   useEnterprise360Keyboard,
 } from '@/design-system/workspace360'
 import { EntityAttachmentsPanel } from '@/components/crm/shared/EntityAttachmentsPanel'
-import { demoNotesFromTexts } from '@/utils/crmEntityNotes'
+import { demoNotesFromTexts, entityNotesToFeedNotes } from '@/utils/crmEntityNotes'
+import type { CrmEntityNoteDto } from '@/services/api/crmApi'
+import type { LeadStage } from '@/types/sales'
 import { useApiMode } from '@/hooks/useApiMode'
 import type { CrmActivity, FollowUp } from '@/types/crm'
 import { Lead360RecordHeader } from '@/components/crm/Lead360RecordHeader'
@@ -139,6 +141,15 @@ export function Lead360Workspace() {
       { label: 'Follow-up notes', text: lead?.followUpNotes, authorName: lead?.leadOwnerName },
     ]),
     [lead],
+  )
+  /** API entity notes reported by the Notes card — merged into the unified feed. */
+  const [entityNotes, setEntityNotes] = useState<CrmEntityNoteDto[]>([])
+  const feedNotes = useMemo(
+    () => [
+      ...leadDemoNotes,
+      ...entityNotesToFeedNotes(entityNotes, (code) => leadStageLabel(code as LeadStage)),
+    ],
+    [leadDemoNotes, entityNotes],
   )
 
   const customerName = useCallback(
@@ -344,7 +355,7 @@ export function Lead360Workspace() {
   const unifiedFeedItems = buildLeadUnifiedFeed({
     activities: leadActivities,
     followUps: leadFollowUps,
-    notes: leadDemoNotes,
+    notes: feedNotes,
     systemEvents,
   })
   const relAge = formatRelationshipAge(relationshipAgeDays(lead.createdDate))
@@ -611,6 +622,7 @@ export function Lead360Workspace() {
           editPath={routes.edit(currentLead.id)}
           composerOpen={notesComposerOpen}
           onComposerOpenChange={setNotesComposerOpen}
+          onNotesChange={setEntityNotes}
         />
 
         <ErpAdditionalInfoToggle

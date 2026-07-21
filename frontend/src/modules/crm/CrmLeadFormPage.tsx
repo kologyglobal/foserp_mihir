@@ -436,24 +436,13 @@ export function CrmLeadFormPage() {
   const customer = company.customerId ? useMasterStore.getState().getCustomer(company.customerId) : undefined
   const territory = customer?.salesTerritory ?? companyInfo?.salesTerritory ?? '—'
 
+  // New Lead policy: the form always opens blank — drafts are never persisted or restored.
+  // clearDraft stays wired so any legacy stale draft key is purged on mount / cancel / save.
   const draftKey = `erp-lead-draft-${id ?? 'new'}`
-  const draftPayload = useMemo(
-    () => ({
-      company, contactId, contactPerson, mobile, email, leadOwnerId, priority, createdDate, source, industry,
-      requirementLines, expectedValue, probability, expectedCloseDate, remarks,
-      leadStage, nextFollowUpDate, followUpType, followUpNotes, internalNotes, reference,
-    }),
-    [
-      company, contactId, contactPerson, mobile, email, leadOwnerId, priority, createdDate, source, industry,
-      requirementLines, expectedValue, probability, expectedCloseDate, remarks,
-      leadStage, nextFollowUpDate, followUpType, followUpNotes, internalNotes, reference,
-    ],
-  )
-
-  const { statusLabel: autosaveLabel, clearDraft, loadDraft } = useFormDraftAutosave({
+  const { statusLabel: autosaveLabel, clearDraft } = useFormDraftAutosave({
     key: draftKey,
-    data: draftPayload,
-    enabled: !isEdit,
+    data: null,
+    enabled: false,
   })
 
   /** After a successful create, clear every field for the next entry. */
@@ -500,43 +489,13 @@ export function CrmLeadFormPage() {
     captureDirtyBaseline()
   }
 
+  // Create mode must start completely blank: purge any stale draft (from older builds or
+  // abandoned sessions) and any leftover draft:new attachments from a previous lead entry.
   useEffect(() => {
-    if (isEdit) return
-    const draft = loadDraft()
-    if (!draft) return
-    setCompany(draft.company ?? company)
-    setContactId(draft.contactId ?? '')
-    setContactPerson(draft.contactPerson ?? '')
-    setMobile(sanitizePhoneDigits(draft.mobile ?? ''))
-    setEmail(draft.email ?? '')
-    setLeadOwnerId(draft.leadOwnerId ?? session.id)
-    setPriority(draft.priority ?? 'medium')
-    setCreatedDate(draft.createdDate ?? todayIso())
-    setSource(draft.source ?? 'other')
-    setIndustry(draft.industry ?? '')
-    if (Array.isArray(draft.requirementLines) && draft.requirementLines.length > 0) {
-      setRequirementLines(syncOpportunityLines(draft.requirementLines as OpportunityLine[]))
-    } else {
-      setRequirementLines(
-        decodeLeadRequirementLines(
-          String((draft as { productRequirement?: string }).productRequirement ?? ''),
-          (draft as { expectedQty?: number | null }).expectedQty != null
-            ? Number((draft as { expectedQty?: number | null }).expectedQty)
-            : null,
-          draft.remarks,
-        ).lines,
-      )
-    }
-    setExpectedValue(draft.expectedValue ?? 0)
-    setProbability(draft.probability ?? 30)
-    setExpectedCloseDate(draft.expectedCloseDate ?? '')
-    setRemarks(draft.remarks ?? '')
-    setLeadStage(draft.leadStage ?? 'new')
-    setNextFollowUpDate(draft.nextFollowUpDate ?? '')
-    setFollowUpType(draft.followUpType ?? 'call')
-    setFollowUpNotes(draft.followUpNotes ?? '')
-    setInternalNotes(draft.internalNotes ?? '')
-    setReference(draft.reference ?? '')
+    if (id) return
+    clearDraft()
+    setLeadAttachments('draft:new', [])
+    setAttachmentsState([])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

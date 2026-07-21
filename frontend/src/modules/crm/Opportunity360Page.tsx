@@ -58,7 +58,8 @@ import {
 } from '../../design-system/workspace360'
 import { EntityAttachmentsPanel } from '../../components/crm/shared/EntityAttachmentsPanel'
 import { OpportunityHistoryPanel } from '../../components/crm/shared/OpportunityHistoryPanel'
-import { demoNotesFromTexts } from '../../utils/crmEntityNotes'
+import { demoNotesFromTexts, entityNotesToFeedNotes } from '../../utils/crmEntityNotes'
+import type { CrmEntityNoteDto } from '../../services/api/crmApi'
 import {
   buildOpportunitySystemEvents,
   buildUnifiedFeed,
@@ -170,15 +171,17 @@ export function Opportunity360Page() {
     ]),
     [opportunity?.productRequirement, opportunity?.lostReason, opportunity?.modifiedAt, opportunity?.createdAt],
   )
+  /** API entity notes reported by the Notes card — merged into the unified feed. */
+  const [entityNotes, setEntityNotes] = useState<CrmEntityNoteDto[]>([])
   const unifiedFeedItems = useMemo(() => {
     if (!opportunity) return []
     return buildUnifiedFeed({
       activities: oppActivities,
       followUps: oppFollowUps,
-      notes: oppDemoNotes,
+      notes: [...oppDemoNotes, ...entityNotesToFeedNotes(entityNotes, opportunityStageLabel)],
       systemEvents: buildOpportunitySystemEvents(opportunity),
     })
-  }, [opportunity, oppActivities, oppFollowUps, oppDemoNotes])
+  }, [opportunity, oppActivities, oppFollowUps, oppDemoNotes, entityNotes])
 
   const oppDocs = useMemo(() => {
     if (!opportunity?.quotationId) return []
@@ -678,6 +681,8 @@ export function Opportunity360Page() {
             editPath={`/crm/opportunities/${opportunity.id}/edit`}
             composerOpen={noteComposerOpen}
             onComposerOpenChange={setNoteComposerOpen}
+            stageOptions={stageOptions.map((s) => ({ code: s.id, label: s.label }))}
+            onNotesChange={setEntityNotes}
           />
 
           <ErpAdditionalInfoToggle

@@ -42,7 +42,9 @@ import { QuickFollowUpDrawer, LogActivityDrawer } from '@/components/crm'
 import { CrmUnifiedActivityFeed } from '@/components/crm/CrmUnifiedActivityFeed'
 import { CrmDeleteConfirmModal } from '@/components/crm/CrmDeleteConfirmModal'
 import { EntityAttachmentsPanel } from '../../components/crm/shared/EntityAttachmentsPanel'
-import { demoNotesFromTexts } from '../../utils/crmEntityNotes'
+import { demoNotesFromTexts, entityNotesToFeedNotes } from '../../utils/crmEntityNotes'
+import { quotationNoteStageLabel } from '@/components/quotations/QuotationNotesCard'
+import type { CrmEntityNoteDto } from '../../services/api/crmApi'
 import type { CrmActivity, FollowUp, QuotationDocumentStatus } from '../../types/crm'
 import { ErpButton } from '../../components/erp/ErpButton'
 import { Enterprise360Documents } from '../../design-system/workspace360'
@@ -159,6 +161,8 @@ export function Quotation360Page() {
     ]),
     [doc?.commercialNotes, doc?.technicalNotes],
   )
+  /** API entity notes reported by the Notes card — merged into the unified feed. */
+  const [entityNotes, setEntityNotes] = useState<CrmEntityNoteDto[]>([])
 
   const nextQuoFollowUp = useMemo(
     () => quoFollowUps.find((f) => f.status === 'pending' || f.status === 'overdue') ?? null,
@@ -169,12 +173,12 @@ export function Quotation360Page() {
     () => buildUnifiedFeed({
       activities: quoActivities,
       followUps: quoFollowUps,
-      notes: quoDemoNotes,
+      notes: [...quoDemoNotes, ...entityNotesToFeedNotes(entityNotes, quotationNoteStageLabel)],
       systemEvents: doc
         ? [{ id: 'created', label: 'Quotation Document', date: doc.createdAt?.slice(0, 10) || doc.modifiedAt?.slice(0, 10) || new Date().toISOString().slice(0, 10) }]
         : [],
     }),
-    [quoActivities, quoFollowUps, quoDemoNotes, doc],
+    [quoActivities, quoFollowUps, quoDemoNotes, entityNotes, doc],
   )
 
   const quotationAttachments = useMemo(
@@ -678,10 +682,12 @@ export function Quotation360Page() {
 
           <QuotationNotesCard
             quotationId={quoId}
+            currentStage={quoDoc.status}
             demoNotes={quoDemoNotes}
             editPath={canEdit ? `/crm/quotations/${quoId}/editor?doc=${quoDoc.id}` : undefined}
             composerOpen={noteComposerOpen}
             onComposerOpenChange={setNoteComposerOpen}
+            onNotesChange={setEntityNotes}
           />
 
           <ErpAdditionalInfoToggle
