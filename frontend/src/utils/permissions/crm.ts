@@ -26,7 +26,8 @@ export function canAccessCrmShell(): boolean {
 export function canCrmPermission(permission: string): boolean {
   if (isApiMode()) {
     const perms = getStoredSession()?.user.permissions ?? []
-    return perms.includes(permission)
+    // Backend requirePermission treats tenant.manage as a wildcard — mirror it here.
+    return perms.includes(permission) || perms.includes('tenant.manage')
   }
   // Demo RBAC matrix still uses legacy sales.* keys — only this helper may map to them.
   if (permission.endsWith('.view') || permission.includes('dashboard') || permission.includes('report') || permission.includes('search')) {
