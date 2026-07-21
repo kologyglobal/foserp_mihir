@@ -497,6 +497,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'crm.opportunity.view', 'crm.opportunity.create', 'crm.opportunity.update',
     'crm.quotation.view', 'crm.quotation.create', 'crm.quotation.update', 'crm.quotation.convert',
     'crm.sales_order.view', 'crm.sales_order.create', 'crm.sales_order.update',
+    'crm.note.view', 'crm.note.create', 'crm.note.update',
     'crm.dashboard.view', 'crm.report.view', 'crm.search.view',
     'master.lookup.view',
     'master.item.view',

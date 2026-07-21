@@ -1,3 +1,26 @@
+## 2026-07-21 - Live Notes still looks old after Hostinger SPA redeploy
+
+### Diagnosis
+
+- Live already serves a SPA that includes the new Notes card (`lead-notes-card` + `crm.note.create` present in `https://erp.dhurandharcrm.com/assets/index-DeT-0V6R.js`). Rebuild succeeded — this is not a “missing frontend upload” problem anymore.
+- In API mode, Add Note only opens the new inline composer when the session has `crm.note.create`. Without it, the UI used to navigate to the record **edit** page (legacy remarks) — which looks like the previous Notes design.
+- `Sales Executive` had no `crm.note.*` grants in `ROLE_PERMISSIONS` (same RBAC seed-drift class as Convert → SO).
+
+### Shipped
+
+- Grant `crm.note.view` / `create` / `update` to Sales Executive.
+- Lead / Opportunity / Quotation Notes cards: missing `crm.note.create` now shows a clear permission toast instead of silently opening the edit form.
+
+### Live fix
+
+1. Deploy these code changes (or at least run permissions sync with updated role map).
+2. On Hostinger app: `npm run db:sync-permissions`
+3. Log out / log in; hard refresh.
+4. Confirm `fos-erp-auth` → `user.permissions` includes `crm.note.create`.
+5. Add Note should open Note type + Stage composer on the 360 page.
+
+---
+
 ## 2026-07-18 - Finance Phase 3C5: Atomic Credit Note Allocation
 
 ### Shipped (subledger allocation only — no GL / voucher / PostingEvent / number series)

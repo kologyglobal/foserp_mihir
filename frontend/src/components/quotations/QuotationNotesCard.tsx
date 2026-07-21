@@ -7,6 +7,7 @@ import { EntityNotesPanel } from '@/components/crm/shared/EntityNotesPanel'
 import { CrmDrawerShell } from '@/components/crm/CrmDrawerShell'
 import { useEntityNotes } from '@/hooks/useEntityNotes'
 import { canCrmPermission } from '@/utils/permissions/crm'
+import { notify } from '@/store/toastStore'
 import { formatDateTime } from '@/utils/dates/format'
 import type { DemoEntityNote } from '@/types/crmEntity'
 import type { CrmEntityNoteDto } from '@/services/api/crmApi'
@@ -84,6 +85,10 @@ export function QuotationNotesCard({
     if (!composerOpen) return
     if (isApiBacked && canCreate) return
     onComposerOpenChange?.(false)
+    if (isApiBacked && !canCreate) {
+      notify.error('You do not have permission to add notes (crm.note.create).')
+      return
+    }
     if (editPath) navigate(editPath)
   }, [composerOpen, isApiBacked, canCreate, editPath, navigate, onComposerOpenChange])
 
@@ -124,6 +129,10 @@ export function QuotationNotesCard({
   function handleAddNote() {
     if (isApiBacked && canCreate) {
       setAdding(true)
+      return
+    }
+    if (isApiBacked && !canCreate) {
+      notify.error('You do not have permission to add notes (crm.note.create).')
       return
     }
     if (editPath) {
