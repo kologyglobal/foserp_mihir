@@ -355,6 +355,7 @@ model Tenant {
   purchaseInspectionCategories   PurchaseInspectionCategory[]
   qualityInspections             QualityInspection[]
   qualityInspectionLines         QualityInspectionLine[]
+  manufacturingQualityInspections ManufacturingQualityInspection[]
   purchaseInvoices               PurchaseInvoice[]
   purchaseInvoiceLines           PurchaseInvoiceLine[]
   purchaseReturns                PurchaseReturn[]
@@ -1240,7 +1241,6 @@ model CrmSalesOrder {
 
   productionDemands    ProductionDemand[]
   productionOrders     ProductionOrder[]
-  purchaseRequisitions PurchaseRequisition[]
   lineFulfilments      SalesOrderLineFulfilment[]
   outboundDispatches   OutboundDispatch[]
   dispatchRequirements DispatchRequirement[]
@@ -1480,7 +1480,7 @@ model MasterWarehouse {
   manufacturingProfilesFinishedGoods ManufacturingProfile[] @relation("ProfileFinishedGoodsWarehouse")
   manufacturingProfilesScrap         ManufacturingProfile[] @relation("ProfileScrapWarehouse")
   manufacturingProfilesQualityHold   ManufacturingProfile[] @relation("ProfileQualityHoldWarehouse")
-  qualityHoldInspections             QualityInspection[]    @relation("InspectionQualityHoldWarehouse")
+  qualityHoldInspections             ManufacturingQualityInspection[] @relation("InspectionQualityHoldWarehouse")
 
   mfgWhMapRawMaterial     ManufacturingWarehouseMapping[] @relation("MfgWhMapRawMaterial")
   mfgWhMapProductionIssue ManufacturingWarehouseMapping[] @relation("MfgWhMapProductionIssue")
@@ -1495,8 +1495,6 @@ model MasterWarehouse {
   inventoryStockBalances          InventoryStockBalance[]
   inventoryStockMovements         InventoryStockMovement[]
   inventoryStockReservations      InventoryStockReservation[]
-  purchaseRequisitions            PurchaseRequisition[]
-  purchaseRequisitionLines        PurchaseRequisitionLine[]
   productionOrderMaterials        ProductionOrderMaterial[]
   jobWorkMaterialWarehouses       JobWorkOrder[]                   @relation("JobWorkMaterialWarehouse")
   jobWorkReceiptWarehouses        JobWorkOrder[]                   @relation("JobWorkReceiptWarehouse")
@@ -1774,13 +1772,12 @@ model MasterItem {
   inventoryStockBalances          InventoryStockBalance[]
   inventoryStockMovements         InventoryStockMovement[]
   inventoryStockReservations      InventoryStockReservation[]
-  purchaseRequisitionLines        PurchaseRequisitionLine[]
   productionOrderMaterials        ProductionOrderMaterial[]
   productionWipMovements          ProductionWipMovement[]
   productionFinishedGoodsReceipts ProductionFinishedGoodsReceipt[]
   jobWorkOutputOrders             JobWorkOrder[]                   @relation("JobWorkOutputItem")
   jobWorkMaterialLines            JobWorkMaterialLine[]            @relation("JobWorkMaterialItem")
-  qualityInspections              QualityInspection[]
+  manufacturingQualityInspections ManufacturingQualityInspection[]
   qualityNcrs                     QualityNcr[]
   qualityInspectionPlans          QualityInspectionPlan[]
   outboundDispatchLines           OutboundDispatchLine[]
@@ -4126,6 +4123,7 @@ model PurchaseRequisition {
   rfqs           RequestForQuotation[]
   purchaseOrders PurchaseOrder[]
   approvals      PurchaseApproval[]        @relation("PurchaseApprovalPr")
+  productionMaterials ProductionOrderMaterial[]
 
   @@unique([tenantId, requisitionNumber])
   @@index([tenantId])
@@ -8675,7 +8673,7 @@ enum QualityInspectionCategory {
   AD_HOC
 }
 
-enum QualityInspectionStatus {
+enum ManufacturingQualityInspectionStatus {
   PENDING
   READY
   IN_PROGRESS
@@ -9075,10 +9073,8 @@ model ProductionOrder {
   dailyLines               DailyProductionLine[]
   issues                   ProductionIssue[]
   downtimes                ProductionDowntime[]
-  purchaseRequisitions     PurchaseRequisition[]
-  purchaseRequisitionLines PurchaseRequisitionLine[]
   materials                ProductionOrderMaterial[]
-  qualityInspections       QualityInspection[]
+  manufacturingQualityInspections ManufacturingQualityInspection[]
   qualityNcrs              QualityNcr[]
   jobWorkOrders            JobWorkOrder[]
   runtimeChanges           ProductionRuntimeChange[]
@@ -9267,7 +9263,7 @@ model ProductionOrderStage {
   dailyLines         DailyProductionLine[]
   issues             ProductionIssue[]
   downtimes          ProductionDowntime[]
-  qualityInspections QualityInspection[]
+  manufacturingQualityInspections ManufacturingQualityInspection[]
   runtimeChanges     ProductionRuntimeChange[]
   wipMovements       ProductionWipMovement[]
 
@@ -9323,7 +9319,7 @@ model ProductionOrderOperation {
   dailyLines         DailyProductionLine[]
   issues             ProductionIssue[]
   downtimes          ProductionDowntime[]
-  qualityInspections QualityInspection[]
+  manufacturingQualityInspections ManufacturingQualityInspection[]
   runtimeChanges     ProductionRuntimeChange[]
   wipMovements       ProductionWipMovement[]
 
@@ -10640,117 +10636,6 @@ model DeliveryChallanTrackingAllocation {
   @@map("delivery_challan_tracking_allocations")
 }
 
-// ─── Purchase Phase 3B — Purchase Requisition foundation ─────────────────────
-// PR header + lines only. No RFQ / PO / GRN / conversion in this phase.
-// Production creates PR (not PO) for shortages — ADR-030.
-
-enum PurchaseRequisitionStatus {
-  DRAFT
-  SUBMITTED
-  APPROVED
-  REJECTED
-  CANCELLED
-}
-
-enum PurchaseRequisitionSource {
-  MANUAL
-  PRODUCTION_SHORTAGE
-  MRP
-  SALES_ORDER
-}
-
-enum PurchaseRequisitionPriority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
-}
-
-model PurchaseRequisition {
-  id                 String                      @id @default(uuid())
-  tenantId           String
-  prNumber           String                      @db.VarChar(64)
-  source             PurchaseRequisitionSource   @default(MANUAL)
-  status             PurchaseRequisitionStatus   @default(DRAFT)
-  priority           PurchaseRequisitionPriority @default(MEDIUM)
-  purpose            String?                     @db.VarChar(500)
-  requestedByUserId  String?
-  requiredByDate     DateTime?                   @db.Date
-  warehouseId        String?
-  /// Primary production order this PR supports (optional; lines may refine).
-  productionOrderId  String?
-  salesOrderId       String?
-  projectRef         String?                     @db.VarChar(100)
-  notes              String?                     @db.Text
-  submittedAt        DateTime?
-  submittedBy        String?
-  approvedAt         DateTime?
-  approvedBy         String?
-  rejectedAt         DateTime?
-  rejectedBy         String?
-  rejectionReason    String?                     @db.Text
-  cancelledAt        DateTime?
-  cancelledBy        String?
-  cancellationReason String?                     @db.Text
-  idempotencyKey     String?                     @db.VarChar(150)
-  createdBy          String?
-  updatedBy          String?
-  createdAt          DateTime                    @default(now())
-  updatedAt          DateTime                    @updatedAt
-  deletedAt          DateTime?
-
-  tenant              Tenant                    @relation(fields: [tenantId], references: [id])
-  warehouse           MasterWarehouse?          @relation(fields: [warehouseId], references: [id])
-  productionOrder     ProductionOrder?          @relation(fields: [productionOrderId], references: [id])
-  salesOrder          CrmSalesOrder?            @relation(fields: [salesOrderId], references: [id])
-  lines               PurchaseRequisitionLine[]
-  productionMaterials ProductionOrderMaterial[]
-
-  @@unique([tenantId, prNumber])
-  @@unique([tenantId, idempotencyKey])
-  @@index([tenantId])
-  @@index([tenantId, status])
-  @@index([tenantId, productionOrderId])
-  @@index([tenantId, salesOrderId])
-  @@index([tenantId, deletedAt])
-  @@map("purchase_requisitions")
-}
-
-model PurchaseRequisitionLine {
-  id                String    @id @default(uuid())
-  tenantId          String
-  requisitionId     String
-  lineNo            Int
-  itemId            String
-  warehouseId       String?
-  uomId             String?
-  quantity          Decimal   @db.Decimal(18, 4)
-  requiredDate      DateTime? @db.Date
-  productionOrderId String?
-  /// Soft refs — validated when present; no mandatory FK to avoid Phase 2A coupling churn.
-  stageId           String?
-  operationId       String?
-  bomLineId         String?
-  salesOrderId      String?
-  salesOrderLineKey String?   @db.VarChar(150)
-  preferredVendorId String?
-  remarks           String?   @db.Text
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  tenant          Tenant              @relation(fields: [tenantId], references: [id])
-  requisition     PurchaseRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
-  item            MasterItem          @relation(fields: [itemId], references: [id])
-  warehouse       MasterWarehouse?    @relation(fields: [warehouseId], references: [id])
-  productionOrder ProductionOrder?    @relation(fields: [productionOrderId], references: [id])
-
-  @@index([tenantId])
-  @@index([requisitionId, lineNo])
-  @@index([tenantId, productionOrderId])
-  @@index([tenantId, itemId])
-  @@map("purchase_requisition_lines")
-}
-
 // ─── Quality Phase 4A — Inspection foundation (no Job Work / subcontracting) ─
 
 model QualityParameter {
@@ -10815,7 +10700,7 @@ model QualityInspectionPlan {
   item        MasterItem?                     @relation(fields: [itemId], references: [id])
   lines       QualityInspectionPlanLine[]
   revisions   QualityInspectionPlanRevision[]
-  inspections QualityInspection[]
+  inspections ManufacturingQualityInspection[]
 
   @@unique([tenantId, planCode])
   @@index([tenantId])
@@ -10846,7 +10731,7 @@ model QualityInspectionPlanRevision {
 
   tenant         Tenant                @relation(fields: [tenantId], references: [id])
   inspectionPlan QualityInspectionPlan @relation(fields: [inspectionPlanId], references: [id], onDelete: Cascade)
-  inspections    QualityInspection[]
+  inspections    ManufacturingQualityInspection[]
 
   @@unique([inspectionPlanId, revisionNumber])
   @@index([tenantId])
@@ -10881,12 +10766,12 @@ model QualityInspectionPlanLine {
   @@map("quality_inspection_plan_lines")
 }
 
-model QualityInspection {
+model ManufacturingQualityInspection {
   id                       String                     @id @default(uuid())
   tenantId                 String
   inspectionNumber         String                     @db.VarChar(64)
   category                 QualityInspectionCategory
-  status                   QualityInspectionStatus    @default(PENDING)
+  status                   ManufacturingQualityInspectionStatus @default(PENDING)
   decision                 QualityInspectionDecision?
   productionOrderId        String?
   jobWorkOrderId           String?
@@ -10956,7 +10841,7 @@ model QualityInspection {
   @@index([tenantId, inspectionPlanId])
   @@index([tenantId, inspectionPlanRevisionId])
   @@index([tenantId, releaseIdempotencyKey])
-  @@map("quality_inspections")
+  @@map("mfg_quality_inspections")
 }
 
 model QualityInspectionParameterResult {
@@ -10983,7 +10868,7 @@ model QualityInspectionParameterResult {
   updatedAt       DateTime                 @updatedAt
 
   tenant     Tenant            @relation(fields: [tenantId], references: [id])
-  inspection QualityInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  inspection ManufacturingQualityInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
 
   @@unique([inspectionId, parameterId])
   @@index([tenantId])
@@ -11025,7 +10910,7 @@ model QualityNcr {
 
   tenant          Tenant             @relation(fields: [tenantId], references: [id])
   productionOrder ProductionOrder?   @relation(fields: [productionOrderId], references: [id])
-  inspection      QualityInspection? @relation(fields: [inspectionId], references: [id])
+  inspection      ManufacturingQualityInspection? @relation(fields: [inspectionId], references: [id])
   item            MasterItem?        @relation(fields: [itemId], references: [id])
 
   @@unique([tenantId, ncrNumber])
@@ -11060,7 +10945,7 @@ model QualityCertificate {
   updatedBy         String?
 
   tenant     Tenant             @relation(fields: [tenantId], references: [id])
-  inspection QualityInspection? @relation(fields: [inspectionId], references: [id])
+  inspection ManufacturingQualityInspection? @relation(fields: [inspectionId], references: [id])
 
   @@unique([tenantId, certificateNumber])
   @@index([tenantId])
@@ -11158,7 +11043,7 @@ model JobWorkOrder {
   materialLines      JobWorkMaterialLine[]
   dispatches         JobWorkDispatch[]
   receipts           JobWorkReceipt[]
-  qualityInspections QualityInspection[]
+  manufacturingQualityInspections ManufacturingQualityInspection[]
   runtimeChanges     ProductionRuntimeChange[]
 
   @@unique([tenantId, jwNumber])
