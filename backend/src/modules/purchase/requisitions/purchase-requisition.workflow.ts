@@ -6,6 +6,7 @@ import {
   PurchaseRequisitionNotSubmittableError,
   PurchaseRequisitionValidationError,
   RejectionReasonRequiredError,
+  SendBackReasonRequiredError,
 } from './purchase-requisition.errors.js'
 import { PURCHASE_ERROR_CODE, purchaseMessage } from '../shared/purchase-error-catalog.js'
 import type { PurchaseRequisitionLineInput } from './purchase-requisition.validation.js'
@@ -206,12 +207,30 @@ export function assertSubmittable(pr: PrWithLines): void {
   assertRequiredDateNotBeforeRequisition(pr.requisitionDate, pr.requiredDate)
 }
 
-export function assertApprovable(pr: Pick<PurchaseRequisition, 'status' | 'deletedAt'>): void {
+/** True when the actor is the maker (requester or creator) of the PR. */
+export function isSelfApproval(
+  pr: Pick<PurchaseRequisition, 'requestedById' | 'createdById'>,
+  actorId?: string,
+): boolean {
+  return Boolean(actorId && (actorId === pr.requestedById || actorId === pr.createdById))
+}
+
+export function assertApprovable(
+  pr: Pick<PurchaseRequisition, 'status' | 'deletedAt' | 'requestedById' | 'createdById'>,
+  actorId?: string,
+  opts: { allowSelfApproval?: boolean } = {},
+): void {
   if (pr.deletedAt) {
     throw new PurchaseRequisitionNotApprovableError(purchaseMessage(PURCHASE_ERROR_CODE.PR_NOT_FOUND))
   }
   if (pr.status !== 'PENDING_APPROVAL' && pr.status !== 'SUBMITTED') {
     throw new PurchaseRequisitionNotApprovableError(purchaseMessage(PURCHASE_ERROR_CODE.PR_INVALID_STATUS))
+  }
+  if (!opts.allowSelfApproval && isSelfApproval(pr, actorId)) {
+    throw new PurchaseRequisitionNotApprovableError(
+      purchaseMessage(PURCHASE_ERROR_CODE.APPROVAL_SELF_ACTION_NOT_ALLOWED),
+      PURCHASE_ERROR_CODE.APPROVAL_SELF_ACTION_NOT_ALLOWED,
+    )
   }
 }
 
@@ -224,9 +243,24 @@ export function assertRejectable(pr: Pick<PurchaseRequisition, 'status' | 'delet
   }
 }
 
+export function assertSendBackable(pr: Pick<PurchaseRequisition, 'status' | 'deletedAt'>): void {
+  if (pr.deletedAt) {
+    throw new PurchaseRequisitionNotApprovableError(purchaseMessage(PURCHASE_ERROR_CODE.PR_NOT_FOUND))
+  }
+  if (pr.status !== 'PENDING_APPROVAL' && pr.status !== 'SUBMITTED') {
+    throw new PurchaseRequisitionNotApprovableError(purchaseMessage(PURCHASE_ERROR_CODE.PR_INVALID_STATUS))
+  }
+}
+
 export function assertRejectionReason(reason: string | null | undefined): string {
   const trimmed = reason?.trim() ?? ''
   if (!trimmed) throw new RejectionReasonRequiredError()
+  return trimmed
+}
+
+export function assertSendBackReason(reason: string | null | undefined): string {
+  const trimmed = reason?.trim() ?? ''
+  if (!trimmed) throw new SendBackReasonRequiredError()
   return trimmed
 }
 

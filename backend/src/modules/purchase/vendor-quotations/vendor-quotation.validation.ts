@@ -41,6 +41,7 @@ export const createVendorQuotationSchema = z.object({
   quotationDate: dateInput,
   requestForQuotationId: z.string().uuid(),
   vendorId: z.string().uuid(),
+  vendorReferenceNumber: z.string().trim().max(100).optional().nullable(),
   currencyCode: z.string().max(8).optional().default('INR'),
   validUntil: dateInput,
   paymentTerms: z.string().max(200).optional().nullable(),

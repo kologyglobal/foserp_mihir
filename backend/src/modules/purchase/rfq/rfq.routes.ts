@@ -28,6 +28,12 @@ router.post(
 )
 
 router.get(
+  '/next-number',
+  requirePermission('purchase.rfq.create'),
+  controller.previewNextRfqNumber,
+)
+
+router.get(
   '/:id',
   requirePermission('purchase.rfq.view'),
   validateParams(uuidParamSchema),

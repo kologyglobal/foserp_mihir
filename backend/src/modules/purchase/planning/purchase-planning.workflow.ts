@@ -135,6 +135,7 @@ export type PlanningRowForPo = Pick<
   | 'status'
   | 'deletedAt'
   | 'selectedVendorId'
+  | 'actionMessage'
   | 'netPurchaseQuantity'
   | 'expectedRate'
   | 'negotiatedRate'
@@ -189,6 +190,14 @@ export function assertPlanningRowReadyForPo(
 
   if (!PO_ELIGIBLE_PLANNING_STATUSES.includes(row.status)) {
     throw new PlanningNotEligibleError()
+  }
+
+  if (!row.actionMessage) {
+    throw new PlanningPoNotReadyError(
+      purchaseMessage(PURCHASE_ERROR_CODE.PPS_NOT_SELECTED),
+      PURCHASE_ERROR_CODE.PPS_NOT_SELECTED,
+      'actionMessage',
+    )
   }
 
   if (!(row.selectedVendorId ?? '').trim()) {

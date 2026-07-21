@@ -1,6 +1,9 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../../config/database.js'
-import { nextPurchaseDocumentNumber } from '../shared/purchase-document-number.js'
+import {
+  nextPurchaseDocumentNumber,
+  previewPurchaseDocumentNumber,
+} from '../shared/purchase-document-number.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import {
   PURCHASE_AUDIT_ACTION,
@@ -36,6 +39,15 @@ async function loadOrThrow(tenantId: string, id: string) {
   return rfq
 }
 
+export async function previewNextRfqNumber(tenantId: string) {
+  const rfqNumber = await previewPurchaseDocumentNumber(
+    tenantId,
+    'REQUEST_FOR_QUOTATION',
+    'RFQ',
+  )
+  return { rfqNumber }
+}
+
 function normalizeLines(lines: CreateRfqInput['lines']) {
   return lines.map((line, index) => ({
     lineNumber: index + 1,
@@ -54,8 +66,12 @@ function normalizeLines(lines: CreateRfqInput['lines']) {
 
 export async function listRfqs(tenantId: string, query: ListRfqsQuery) {
   const result = await repo.findRfqs(tenantId, query)
+  const userNames = await repo.resolveUserNames(
+    tenantId,
+    result.items.map((r) => r.createdById),
+  )
   return {
-    items: result.items.map(mapRfqToDto),
+    items: result.items.map((r) => mapRfqToDto(r, userNames)),
     total: result.total,
     page: result.page,
     limit: result.limit,
@@ -63,11 +79,18 @@ export async function listRfqs(tenantId: string, query: ListRfqsQuery) {
 }
 
 export async function getRfq(tenantId: string, id: string) {
-  return mapRfqToDto(await loadOrThrow(tenantId, id))
+  const rfq = await loadOrThrow(tenantId, id)
+  const userNames = await repo.resolveUserNames(tenantId, [rfq.createdById])
+  return mapRfqToDto(rfq, userNames)
 }
 
 export async function createRfq(tenantId: string, actorId: string, input: CreateRfqInput) {
   if (!input.vendorIds?.length) throw new RfqVendorsRequiredError()
+  const { resolveEffectivePurchaseDefaults } = await import('../shared/purchase-defaults.js')
+  const { assertRfqVendorCount } = await import('../shared/purchase-setup-enforcement.js')
+  const defaults = await resolveEffectivePurchaseDefaults(tenantId)
+  const vendorCountError = assertRfqVendorCount(defaults, input.vendorIds.length)
+  if (vendorCountError) throw new RfqVendorsRequiredError(vendorCountError)
   const lines = normalizeLines(input.lines)
   const rfqNumber = await nextPurchaseDocumentNumber(tenantId, 'REQUEST_FOR_QUOTATION', 'RFQ')
 

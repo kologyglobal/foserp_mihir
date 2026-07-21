@@ -15,6 +15,7 @@ import mastersRoutes from './modules/masters/masters.routes.js'
 import masterImportRoutes from './modules/masters/imports/import.routes.js'
 import masterExportRoutes from './modules/masters/exports/export.routes.js'
 import lookupRoutes from './modules/masters/lookups.routes.js'
+import inventoryMastersRoutes from './modules/masters/inventory-masters.routes.js'
 import itemRoutes, { itemLookupRouter } from './modules/items/item.routes.js'
 import vendorRoutes, { vendorLookupRouter } from './modules/vendors/vendor.routes.js'
 import accountingRoutes from './modules/accounting/accounting.routes.js'
@@ -95,6 +96,7 @@ export function createApp() {
   app.use('/api/v1/tenants/:tenantId/masters/imports', masterImportRoutes)
   app.use('/api/v1/tenants/:tenantId/masters/exports', masterExportRoutes)
   app.use('/api/v1/tenants/:tenantId/masters', mastersRoutes)
+  app.use('/api/v1/tenants/:tenantId/inventory', inventoryMastersRoutes)
   app.use('/api/v1/tenants/:tenantId/lookups/items', itemLookupRouter)
   app.use('/api/v1/tenants/:tenantId/lookups/vendors', vendorLookupRouter)
   app.use('/api/v1/tenants/:tenantId/lookups', lookupRoutes)
@@ -110,6 +112,7 @@ export function createApp() {
   app.use('/api/v1/t/:tenantSlug/masters/imports', masterImportRoutes)
   app.use('/api/v1/t/:tenantSlug/masters/exports', masterExportRoutes)
   app.use('/api/v1/t/:tenantSlug/masters', mastersRoutes)
+  app.use('/api/v1/t/:tenantSlug/inventory', inventoryMastersRoutes)
   app.use('/api/v1/t/:tenantSlug/lookups/items', itemLookupRouter)
   app.use('/api/v1/t/:tenantSlug/lookups/vendors', vendorLookupRouter)
   app.use('/api/v1/t/:tenantSlug/lookups', lookupRoutes)

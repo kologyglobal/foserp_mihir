@@ -14,6 +14,14 @@ export const getVendorQuotation = asyncHandler(async (req: Request, res: Respons
   sendSuccess(res, 'Vendor quotation retrieved', await service.getVendorQuotation(getTenantId(req), getRouteParam(req, 'id')))
 })
 
+export const previewNextVendorQuotationNumber = asyncHandler(async (req: Request, res: Response) => {
+  sendSuccess(
+    res,
+    'Next vendor quotation number previewed',
+    await service.previewNextVendorQuotationNumber(getTenantId(req)),
+  )
+})
+
 export const createVendorQuotation = asyncHandler(async (req: Request, res: Response) => {
   const { userId } = getContext(req)
   sendCreated(res, 'Vendor quotation created', await service.createVendorQuotation(getTenantId(req), userId, req.body))

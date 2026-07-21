@@ -6,7 +6,10 @@ import {
   PURCHASE_AUDIT_ENTITY,
   writePurchaseAudit,
 } from '../shared/purchase-audit.js'
-import { nextPurchaseDocumentNumber } from '../shared/purchase-document-number.js'
+import {
+  nextPurchaseDocumentNumber,
+  previewPurchaseDocumentNumber,
+} from '../shared/purchase-document-number.js'
 import {
   VendorQuotationNotEditableError,
   VendorQuotationNotFoundError,
@@ -65,6 +68,10 @@ function quotationData(input: Partial<CreateVendorQuotationInput>, actorId: stri
     validUntil: input.validUntil === undefined ? undefined : (asDate(input.validUntil) as never),
     paymentTerms: input.paymentTerms === undefined ? undefined : input.paymentTerms?.trim() || null,
     deliveryTerms: input.deliveryTerms === undefined ? undefined : input.deliveryTerms?.trim() || null,
+    vendorReferenceNumber:
+      input.vendorReferenceNumber === undefined
+        ? undefined
+        : input.vendorReferenceNumber?.trim() || null,
     freightAmount: input.freightAmount,
     discountAmount: input.discountAmount,
     otherCharges: input.otherCharges,
@@ -84,6 +91,15 @@ export async function getVendorQuotation(tenantId: string, id: string) {
   return mapVendorQuotationToDto(await loadOrThrow(tenantId, id))
 }
 
+export async function previewNextVendorQuotationNumber(tenantId: string) {
+  const quotationNumber = await previewPurchaseDocumentNumber(
+    tenantId,
+    'VENDOR_QUOTATION',
+    'VQ',
+  )
+  return { quotationNumber }
+}
+
 export async function createVendorQuotation(tenantId: string, actorId: string, input: CreateVendorQuotationInput) {
   await assertVendorCanQuote(tenantId, input.requestForQuotationId, input.vendorId)
   const quotationNumber = await nextPurchaseDocumentNumber(tenantId, 'VENDOR_QUOTATION', 'VQ')
@@ -96,6 +112,7 @@ export async function createVendorQuotation(tenantId: string, actorId: string, i
       quotationDate: asDate(input.quotationDate) ?? new Date(),
       requestForQuotationId: input.requestForQuotationId,
       vendorId: input.vendorId,
+      vendorReferenceNumber: input.vendorReferenceNumber?.trim() || null,
       status: 'DRAFT',
       currencyCode: input.currencyCode,
       validUntil: asDate(input.validUntil),

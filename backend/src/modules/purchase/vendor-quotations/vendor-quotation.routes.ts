@@ -27,6 +27,12 @@ router.post(
 )
 
 router.get(
+  '/next-number',
+  requirePermission('purchase.rfq.enter_quote'),
+  controller.previewNextVendorQuotationNumber,
+)
+
+router.get(
   '/:id',
   requirePermission('purchase.rfq.view'),
   validateParams(uuidParamSchema),

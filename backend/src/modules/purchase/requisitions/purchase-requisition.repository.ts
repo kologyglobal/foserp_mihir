@@ -156,6 +156,8 @@ export async function createApprovalRequest(
     purchaseRequisitionId: string
     requesterId: string
     amount?: number | null
+    level?: number
+    approverRole?: string | null
   },
   tx: Prisma.TransactionClient = prisma,
 ) {
@@ -166,8 +168,9 @@ export async function createApprovalRequest(
       documentId: input.documentId,
       documentNumber: input.documentNumber,
       purchaseRequisitionId: input.purchaseRequisitionId,
-      level: 1,
+      level: input.level ?? 1,
       status: 'PENDING',
+      approverRole: input.approverRole ?? null,
       requesterId: input.requesterId,
       amount: input.amount ?? null,
     },
@@ -177,7 +180,7 @@ export async function createApprovalRequest(
 export async function resolvePendingApprovals(
   tenantId: string,
   purchaseRequisitionId: string,
-  status: 'APPROVED' | 'REJECTED' | 'CANCELLED',
+  status: 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'RETURNED',
   actorId: string,
   remarks?: string | null,
   tx: Prisma.TransactionClient = prisma,

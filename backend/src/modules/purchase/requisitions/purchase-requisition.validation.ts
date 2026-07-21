@@ -77,6 +77,11 @@ export const rejectPurchaseRequisitionSchema = z.object({
   remarks: z.string().trim().optional().nullable(),
 })
 
+export const sendBackPurchaseRequisitionSchema = z.object({
+  reason: z.string().optional().nullable(),
+  remarks: z.string().trim().optional().nullable(),
+})
+
 export const lifecycleRemarksSchema = z
   .object({
     remarks: z.string().trim().optional().nullable(),
@@ -88,4 +93,5 @@ export type CreatePurchaseRequisitionInput = z.infer<typeof createPurchaseRequis
 export type UpdatePurchaseRequisitionInput = z.infer<typeof updatePurchaseRequisitionSchema>
 export type PurchaseRequisitionLineInput = z.infer<typeof purchaseRequisitionLineInputSchema>
 export type RejectPurchaseRequisitionInput = z.infer<typeof rejectPurchaseRequisitionSchema>
+export type SendBackPurchaseRequisitionInput = z.infer<typeof sendBackPurchaseRequisitionSchema>
 export type LifecycleRemarksInput = z.infer<typeof lifecycleRemarksSchema>

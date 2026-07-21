@@ -9,6 +9,7 @@ import {
   lifecycleRemarksSchema,
   listPurchaseRequisitionsQuerySchema,
   rejectPurchaseRequisitionSchema,
+  sendBackPurchaseRequisitionSchema,
   updatePurchaseRequisitionSchema,
 } from './purchase-requisition.validation.js'
 
@@ -71,6 +72,14 @@ router.post(
   validateParams(uuidParamSchema),
   validateBody(rejectPurchaseRequisitionSchema),
   controller.rejectPurchaseRequisition,
+)
+
+router.post(
+  '/:id/send-back',
+  requirePermission('purchase.pr.approve'),
+  validateParams(uuidParamSchema),
+  validateBody(sendBackPurchaseRequisitionSchema),
+  controller.sendBackPurchaseRequisition,
 )
 
 router.post(

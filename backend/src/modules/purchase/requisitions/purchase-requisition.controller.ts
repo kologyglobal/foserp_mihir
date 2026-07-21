@@ -62,12 +62,13 @@ export const submitPurchaseRequisition = asyncHandler(async (req: Request, res: 
 
 export const approvePurchaseRequisition = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
-  const { userId } = getContext(req)
+  const { userId, permissions } = getContext(req)
   const data = await service.approvePurchaseRequisition(
     tenantId,
     getRouteParam(req, 'id'),
     userId,
     req.body ?? {},
+    permissions,
   )
   sendSuccess(res, 'Purchase requisition approved', data)
 })
@@ -82,6 +83,18 @@ export const rejectPurchaseRequisition = asyncHandler(async (req: Request, res: 
     req.body,
   )
   sendSuccess(res, 'Purchase requisition rejected', data)
+})
+
+export const sendBackPurchaseRequisition = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const { userId } = getContext(req)
+  const data = await service.sendBackPurchaseRequisition(
+    tenantId,
+    getRouteParam(req, 'id'),
+    userId,
+    req.body ?? {},
+  )
+  sendSuccess(res, 'Purchase requisition sent back', data)
 })
 
 export const cancelPurchaseRequisition = asyncHandler(async (req: Request, res: Response) => {

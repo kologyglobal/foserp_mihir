@@ -16,6 +16,11 @@ export const getRfq = asyncHandler(async (req: Request, res: Response) => {
   sendSuccess(res, 'RFQ retrieved', data)
 })
 
+export const previewNextRfqNumber = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.previewNextRfqNumber(getTenantId(req))
+  sendSuccess(res, 'Next RFQ number previewed', data)
+})
+
 export const createRfq = asyncHandler(async (req: Request, res: Response) => {
   const { userId } = getContext(req)
   const data = await service.createRfq(getTenantId(req), userId, req.body)

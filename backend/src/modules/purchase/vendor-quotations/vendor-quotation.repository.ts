@@ -3,7 +3,27 @@ import { prisma } from '../../../config/database.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import type { ListVendorQuotationsQuery } from './vendor-quotation.validation.js'
 
-const includeQuotation = { lines: { orderBy: { lineNumber: 'asc' as const } } }
+const includeQuotation = {
+  lines: { orderBy: { lineNumber: 'asc' as const } },
+  vendor: {
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      gstin: true,
+      state: true,
+      email: true,
+      contactPerson: true,
+      contactPhone: true,
+    },
+  },
+  requestForQuotation: {
+    select: {
+      id: true,
+      rfqNumber: true,
+    },
+  },
+}
 
 export async function findVendorQuotations(tenantId: string, query: ListVendorQuotationsQuery) {
   const { getPagination } = await import('../../../utils/pagination.js')

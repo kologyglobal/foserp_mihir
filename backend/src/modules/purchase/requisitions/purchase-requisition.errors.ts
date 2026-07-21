@@ -35,9 +35,12 @@ export class PurchaseRequisitionNotSubmittableError extends InvalidStateError {
 }
 
 export class PurchaseRequisitionNotApprovableError extends InvalidStateError {
-  constructor(message = purchaseMessage(PURCHASE_ERROR_CODE.PR_NOT_APPROVABLE)) {
+  constructor(
+    message = purchaseMessage(PURCHASE_ERROR_CODE.PR_NOT_APPROVABLE),
+    code: string = PURCHASE_ERROR_CODE.PR_NOT_APPROVABLE,
+  ) {
     super(message)
-    Object.defineProperty(this, 'code', { value: PURCHASE_ERROR_CODE.PR_NOT_APPROVABLE })
+    Object.defineProperty(this, 'code', { value: code })
     this.name = 'PurchaseRequisitionNotApprovableError'
   }
 }
@@ -47,6 +50,14 @@ export class RejectionReasonRequiredError extends ValidationError {
     super(message, [{ field: 'reason', message }])
     Object.defineProperty(this, 'code', { value: PURCHASE_ERROR_CODE.PR_REJECTION_REASON_REQUIRED })
     this.name = 'RejectionReasonRequiredError'
+  }
+}
+
+export class SendBackReasonRequiredError extends ValidationError {
+  constructor(message = purchaseMessage(PURCHASE_ERROR_CODE.PR_SEND_BACK_REASON_REQUIRED)) {
+    super(message, [{ field: 'reason', message }])
+    Object.defineProperty(this, 'code', { value: PURCHASE_ERROR_CODE.PR_SEND_BACK_REASON_REQUIRED })
+    this.name = 'SendBackReasonRequiredError'
   }
 }
 

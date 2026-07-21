@@ -1,11 +1,20 @@
-import type { VendorQuotation, VendorQuotationLine } from '@prisma/client'
+import type {
+  MasterVendor,
+  RequestForQuotation,
+  VendorQuotation,
+  VendorQuotationLine,
+} from '@prisma/client'
 
-type VendorQuotationWithLines = VendorQuotation & { lines: VendorQuotationLine[] }
+type VendorQuotationWithRelations = VendorQuotation & {
+  lines: VendorQuotationLine[]
+  vendor?: Pick<MasterVendor, 'id' | 'code' | 'name' | 'gstin' | 'state' | 'email' | 'contactPerson' | 'contactPhone'> | null
+  requestForQuotation?: Pick<RequestForQuotation, 'id' | 'rfqNumber'> | null
+}
 
 const num = (value: unknown) => Number(value ?? 0)
 const date = (value: Date | null | undefined) => value?.toISOString().slice(0, 10) ?? null
 
-export function mapVendorQuotationToDto(quotation: VendorQuotationWithLines) {
+export function mapVendorQuotationToDto(quotation: VendorQuotationWithRelations) {
   const lines = quotation.lines.map((line) => ({
     id: line.id,
     lineNumber: line.lineNumber,
@@ -31,7 +40,13 @@ export function mapVendorQuotationToDto(quotation: VendorQuotationWithLines) {
     quotationNumber: quotation.quotationNumber,
     quotationDate: date(quotation.quotationDate),
     requestForQuotationId: quotation.requestForQuotationId,
+    requestForQuotationNumber: quotation.requestForQuotation?.rfqNumber ?? null,
     vendorId: quotation.vendorId,
+    vendorCode: quotation.vendor?.code ?? '',
+    vendorName: quotation.vendor?.name ?? '',
+    vendorGstin: quotation.vendor?.gstin ?? '',
+    vendorState: quotation.vendor?.state ?? '',
+    vendorReferenceNumber: quotation.vendorReferenceNumber ?? null,
     status: quotation.status,
     currencyCode: quotation.currencyCode,
     validUntil: date(quotation.validUntil),

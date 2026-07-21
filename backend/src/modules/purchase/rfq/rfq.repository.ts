@@ -5,7 +5,31 @@ import type { ListRfqsQuery } from './rfq.validation.js'
 
 const includeRfq = {
   lines: { orderBy: { lineNumber: 'asc' as const } },
-  vendors: { orderBy: { invitedAt: 'asc' as const } },
+  vendors: {
+    orderBy: { invitedAt: 'asc' as const },
+    include: {
+      vendor: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          email: true,
+          contactPerson: true,
+          contactPhone: true,
+          gstin: true,
+          state: true,
+          rating: true,
+        },
+      },
+    },
+  },
+  purchaseRequisition: {
+    select: {
+      id: true,
+      requisitionNumber: true,
+      warehouse: { select: { id: true, code: true, name: true } },
+    },
+  },
 }
 
 export async function findRfqs(tenantId: string, query: ListRfqsQuery) {
@@ -123,6 +147,16 @@ export async function replaceRfqVendors(
       inviteStatus: 'INVITED',
     })),
   })
+}
+
+export async function resolveUserNames(tenantId: string, userIds: Array<string | null>) {
+  const ids = [...new Set(userIds.filter((id): id is string => Boolean(id)))]
+  if (ids.length === 0) return new Map<string, string>()
+  const users = await prisma.user.findMany({
+    where: { tenantId, id: { in: ids }, deletedAt: null },
+    select: { id: true, firstName: true, lastName: true },
+  })
+  return new Map(users.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim()]))
 }
 
 export async function createStatusHistory(
