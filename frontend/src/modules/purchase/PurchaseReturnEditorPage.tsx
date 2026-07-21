@@ -6,8 +6,6 @@ import {
   Link2,
   Package,
   Plus,
-  Save,
-  Send,
   Trash2,
   Truck,
 } from 'lucide-react'
@@ -19,13 +17,12 @@ import {
   buildPurchaseRelatedLinks,
   purchaseDocumentApprovalFact,
 } from '@/components/purchase/PurchaseDocumentFactBox'
-import { ErpCardSection, ErpFieldRow, ErpFormSpan, ErpStickySaveBar } from '@/components/erp/card-form'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
+import { ErpCardSection, ErpFieldRow, ErpFormSpan } from '@/components/erp/card-form'
+import { ErpButton } from '@/components/erp/ErpButton'
+import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Checkbox, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { EnterpriseFormMetrics } from '@/design-system/workspace'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
   hasMeaningfulTaxTotals,
@@ -42,11 +39,12 @@ import {
   getPurchaseReturnById,
   getQualityInspections,
   getVendors,
+  getPurchaseWarehouses,
+  previewNextPurchaseReturnNumber,
   PurchaseServiceError,
   PURCHASE_RETURN_DOMAIN_STATUS_LABELS,
   PURCHASE_RETURN_ORIGIN_LABELS,
   PURCHASE_RETURN_REASON_LABELS,
-  submitPurchaseReturn,
   updatePurchaseReturn,
 } from '@/services/purchase'
 import type {
@@ -60,11 +58,11 @@ import type {
   QualityInspection,
   Vendor,
 } from '@/types/purchaseDomain'
-import { PURCHASE_DEMO_LOCATION, PURCHASE_DEMO_LOCATION_FG } from '@/data/purchase/purchaseDomainSeed'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
+import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -142,7 +140,7 @@ export function PurchaseReturnEditorPage() {
   const [purchaseInvoiceId, setPurchaseInvoiceId] = useState('')
   const [qualityInspectionId, setQualityInspectionId] = useState(searchParams.get('qiId') ?? '')
   const [returnReason, setReturnReason] = useState<PurchaseReturnReason>('quality_rejection')
-  const [warehouseId, setWarehouseId] = useState<string>(PURCHASE_DEMO_LOCATION.id)
+  const [warehouseId, setWarehouseId] = useState('')
   const [transportDetails, setTransportDetails] = useState('')
   const [debitNoteRequired, setDebitNoteRequired] = useState(true)
   const [replacementRequired, setReplacementRequired] = useState(false)
@@ -155,9 +153,9 @@ export function PurchaseReturnEditorPage() {
   const [grns, setGrns] = useState<GoodsReceiptNote[]>([])
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([])
   const [inspections, setInspections] = useState<QualityInspection[]>([])
+  const [locations, setLocations] = useState<Array<{ id: string; code: string; name: string }>>([])
 
-  const { markDirty, resetDirty } = useUnsavedChangesGuard(true)
-  const locations = [PURCHASE_DEMO_LOCATION, PURCHASE_DEMO_LOCATION_FG]
+  const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(true)
 
   const selectedVendor = useMemo(() => vendors.find((v) => v.id === vendorId), [vendors, vendorId])
 
@@ -174,38 +172,6 @@ export function PurchaseReturnEditorPage() {
       total: Number(total.toFixed(2)),
     }
   }, [lines])
-
-  const formMetrics = useMemo(
-    () => [
-      {
-        label: 'Lines',
-        value: String(summary.lineCount),
-        accent: 'green' as const,
-      },
-      {
-        label: 'Return Qty',
-        value: String(summary.returnQty),
-        accent: 'slate' as const,
-      },
-      {
-        label: 'Taxable',
-        value: formatCurrency(summary.taxable),
-        accent: 'blue' as const,
-      },
-      {
-        label: 'GST',
-        value: formatCurrency(summary.tax),
-        accent: 'violet' as const,
-      },
-      {
-        label: 'Est. Total',
-        value: formatCurrency(summary.total),
-        accent: 'amber' as const,
-        highlight: summary.total > 0,
-      },
-    ],
-    [summary],
-  )
 
   const financeDefaultOpen = hasMeaningfulTaxTotals(summary.taxable, summary.tax, summary.total)
   const financePeek = useMemo(
@@ -226,7 +192,7 @@ export function PurchaseReturnEditorPage() {
   const recordHeaderFacts = useMemo(
     () => [
       ...(isNew
-        ? [{ label: 'Return No', value: documentNumber ?? 'Auto-generated' }]
+        ? [{ label: 'Return No', value: documentNumber ?? 'Loading…' }]
         : []),
       { label: 'Vendor', value: vendorFact },
       {
@@ -343,7 +309,7 @@ export function PurchaseReturnEditorPage() {
     qualityInspectionId: qualityInspectionId || null,
     returnReason,
     warehouseId,
-    warehouseName: locations.find((l) => l.id === warehouseId)?.name ?? PURCHASE_DEMO_LOCATION.name,
+    warehouseName: locations.find((l) => l.id === warehouseId)?.name ?? '',
     transportDetails,
     debitNoteRequired,
     replacementRequired,
@@ -414,13 +380,14 @@ export function PurchaseReturnEditorPage() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const [v, i, o, g, inv, qi] = await Promise.all([
+      const [v, i, o, g, inv, qi, wh] = await Promise.all([
         getVendors(),
         getPurchaseItems(),
         getPurchaseOrders(),
         getGRNs(),
         getPurchaseInvoices(),
         getQualityInspections(),
+        getPurchaseWarehouses(),
       ])
       if (cancelled) return
       setVendors(v)
@@ -429,6 +396,8 @@ export function PurchaseReturnEditorPage() {
       setGrns(g)
       setInvoices(inv)
       setInspections(qi)
+      setLocations(wh.map((w) => ({ id: w.id, code: w.code, name: w.name })))
+      if (wh[0]) setWarehouseId((prev) => prev || wh[0].id)
 
       if (!isNew && id) {
         setLoading(true)
@@ -475,6 +444,9 @@ export function PurchaseReturnEditorPage() {
           } finally {
             if (!cancelled) setLoading(false)
           }
+        } else {
+          const nextNumber = await previewNextPurchaseReturnNumber().catch(() => null)
+          if (!cancelled && nextNumber) setDocumentNumber(nextNumber)
         }
       }
     })()
@@ -507,7 +479,8 @@ export function PurchaseReturnEditorPage() {
     }
   }
 
-  const saveDraft = async (andSubmit: boolean) => {
+  const saveDraft = async () => {
+    if (saving) return
     if (!vendorId) {
       notify.error('Select a vendor')
       return
@@ -527,16 +500,10 @@ export function PurchaseReturnEditorPage() {
         setRecordId(doc.id)
         setDocumentNumber(doc.documentNumber)
       }
-      if (andSubmit) {
-        doc = await submitPurchaseReturn(doc.id)
-        notify.success('Return submitted for approval')
-        resetDirty()
-        navigate(`/purchase/returns/${doc.id}`)
-        return
-      }
       hydrate(doc)
-      notify.success('Draft saved')
-      if (isNew) navigate(`/purchase/returns/${doc.id}/edit`, { replace: true })
+      resetDirty()
+      notify.success(`Saved · ${doc.documentNumber}`)
+      navigate(PURCHASE_FORM_ROUTES.purchaseReturn.list, { replace: true })
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
     } finally {
@@ -557,7 +524,6 @@ export function PurchaseReturnEditorPage() {
           { label: 'Loading' },
         ]}
         footer={null}
-        backLink={{ to: '/purchase/returns', label: 'Back to Returns' }}
       >
         <LoadingState variant="form" rows={8} />
       </PurchaseCardFormShell>
@@ -581,63 +547,29 @@ export function PurchaseReturnEditorPage() {
       statusKey={status}
       recordHeaderFacts={recordHeaderFacts}
       favoritePath={recordId ? `/purchase/returns/${recordId}/edit` : '/purchase/returns/new'}
-      backLink={{ to: '/purchase/returns', label: 'Back to Returns' }}
       breadcrumbs={[
         { label: 'Returns', to: '/purchase/returns' },
         { label: isNew ? 'New' : documentNumber ?? 'Edit' },
       ]}
       factBox={documentFactBox}
-      commandBar={
-        <ErpCommandBar
-          inline
-          sticky={false}
-          secondaryActions={[
-            {
-              id: 'save',
-              label: saving ? 'Saving…' : 'Save Draft',
-              icon: Save,
-              onClick: () => void saveDraft(false),
-              disabled: !editable || saving,
-            },
-          ]}
-          primaryAction={{
-            id: 'submit',
-            label: 'Submit for Approval',
-            icon: Send,
-            onClick: () => void saveDraft(true),
-            disabled: !editable || saving,
-          }}
-        />
-      }
+      commandBar={null}
       stickyFooter
       footer={
-        <ErpStickySaveBar
+        <FormActionBar
           sticky
-          isSubmitting={saving}
-          actions={
-            <ErpButtonGroup>
-              <ErpButton
-                type="button"
-                variant="ghost"
-                disabled={saving}
-                onClick={() => navigate('/purchase/returns')}
-              >
-                Cancel
-              </ErpButton>
-              <ErpButton
-                type="button"
-                variant="secondary"
-                icon={Save}
-                disabled={!editable || saving}
-                onClick={() => void saveDraft(false)}
-              >
-                {saving ? 'Saving…' : 'Save Draft'}
-              </ErpButton>
-            </ErpButtonGroup>
-          }
+          cancelFirst
+          busy={saving}
+          dirty={dirty}
+          disabled={!editable}
+          disabledReason={!editable ? 'Document is read-only' : undefined}
+          onCancel={() => {
+            resetDirty()
+            navigate(PURCHASE_FORM_ROUTES.purchaseReturn.list)
+          }}
+          onSave={saveDraft}
         />
       }
-      onSaveShortcut={() => void saveDraft(false)}
+      onSaveShortcut={() => void saveDraft()}
     >
       {showOriginPicker ? (
         <ErpCardSection
@@ -733,8 +665,6 @@ export function PurchaseReturnEditorPage() {
         </ErpCardSection>
       ) : null}
 
-      <EnterpriseFormMetrics metrics={formMetrics} />
-
       <ErpCardSection
         title="Header"
         subtitle="Vendor, reason, linked documents, warehouse, and return flags"
@@ -747,9 +677,14 @@ export function PurchaseReturnEditorPage() {
         <ErpFormSpan span={3}>
           <p className="erp-field-group__label">Document</p>
         </ErpFormSpan>
-        <ErpFieldRow label="Return Number" readOnly>
+        <ErpFieldRow
+          label="Return Number"
+          readOnly
+          hint={isNew && !recordId ? 'Preview from number series — assigned when you save' : undefined}
+        >
           <Input
-            value={documentNumber ?? 'Auto on save'}
+            value={documentNumber ?? ''}
+            placeholder="Loading number…"
             readOnly
             className="bg-erp-surface-alt"
           />
@@ -970,7 +905,7 @@ export function PurchaseReturnEditorPage() {
               Add Line
             </ErpButton>
           ) : null}
-          <span className="text-[12px] tabular-nums text-erp-muted">
+          <span className="ml-auto text-[12px] tabular-nums text-erp-muted">
             Qty {summary.returnQty} · {formatCurrency(summary.total)}
           </span>
         </PurchaseTableToolbar>

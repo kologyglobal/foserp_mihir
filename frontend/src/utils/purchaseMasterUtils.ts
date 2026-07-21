@@ -68,6 +68,10 @@ export function countPurchaseMasterUsage(entry: PurchaseMasterEntry): number {
   if (kind === 'return-reasons') {
     return purchase.purchaseReturns.filter((r) => r.lines.some((l) => l.reason === code)).length
   }
+  if (kind === 'bin-codes') {
+    // Legacy Zustand PR lines do not track bin codes; domain PR usage is outside this store.
+    return 0
+  }
   return 0
 }
 

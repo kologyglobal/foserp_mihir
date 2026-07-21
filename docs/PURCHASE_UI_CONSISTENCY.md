@@ -48,6 +48,7 @@ Every purchase **list**:
 4. Filters in drawer / smart filter bar — not a second custom filter UI
 5. Primary CTA top-right (`+ Create …`)
 6. **Purpose guide width:** set `pageGuide={null}` on the shell and render `ErpPageGuide` inside the **left register column** (same width as the table), not full-bleed above the side rail
+7. **Register insights:** `PurchaseRegisterContextPanel` with `placement="split"` → **insights right**, table left (Comparison, RFQ, PO, Invoice)
 
 Every purchase **view**:
 
@@ -122,7 +123,7 @@ When polishing a list, mirror that standard:
 - Saved view + Save view on operational registers
 - Columns show/hide **and** reorder
 - KPI chips that drive filters
-- Right overview / suggestions rail where those pages have it
+- Right overview / suggestions rail where those pages have it (`placement="split"`)
 - Same empty state tone (icon + one sentence + one CTA)
 
 RFQ / GRN / Invoice / Return / VQ lists should converge to this — not stay on older flat `DataTable` + inline `SmartFilterBar` shells when touched.

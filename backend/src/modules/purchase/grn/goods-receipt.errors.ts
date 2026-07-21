@@ -1,0 +1,30 @@
+import { InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
+import { PURCHASE_ERROR_CODE, purchaseMessage } from '../shared/purchase-error-catalog.js'
+
+export class GoodsReceiptNotFoundError extends NotFoundError {
+  constructor(message = purchaseMessage(PURCHASE_ERROR_CODE.GRN_NOT_FOUND)) {
+    super(message)
+    Object.defineProperty(this, 'code', { value: PURCHASE_ERROR_CODE.GRN_NOT_FOUND })
+    this.name = 'GoodsReceiptNotFoundError'
+  }
+}
+
+export class GoodsReceiptWorkflowError extends InvalidStateError {
+  constructor(message: string, code: string = PURCHASE_ERROR_CODE.GRN_VALIDATION_FAILED) {
+    super(message)
+    Object.defineProperty(this, 'code', { value: code })
+    this.name = 'GoodsReceiptWorkflowError'
+  }
+}
+
+export class GoodsReceiptValidationError extends ValidationError {
+  constructor(
+    message: string,
+    code: string = PURCHASE_ERROR_CODE.GRN_VALIDATION_FAILED,
+    errors?: Array<{ field: string; message: string }>,
+  ) {
+    super(message, errors ?? [{ field: 'body', message }])
+    Object.defineProperty(this, 'code', { value: code })
+    this.name = 'GoodsReceiptValidationError'
+  }
+}

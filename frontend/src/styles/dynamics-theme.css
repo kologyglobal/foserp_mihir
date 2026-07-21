@@ -887,8 +887,11 @@ html {
     background: var(--d365-surface);
   }
 
-  /* Unified workspace header — page title + module tabs + actions in one band */
+  /* Unified workspace header — page title + module tabs + actions in one band.
+     z-index keeps page-tip popovers above register filter bars (z-40). */
   .d365-workspace-unified-header {
+    position: relative;
+    z-index: 50;
     background: var(--d365-surface);
     border-bottom: 1px solid var(--d365-border);
   }

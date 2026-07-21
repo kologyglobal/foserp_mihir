@@ -7,7 +7,6 @@ import {
   getVendors,
   PurchaseServiceError,
 } from '../../../services/purchase'
-import { PURCHASE_DEMO_LOCATION } from '../../../data/purchase/purchaseDomainSeed'
 import { CrmDrawerShell } from '../CrmDrawerShell'
 import { FormField } from '../../forms/FormField'
 import { Input, Textarea } from '../../forms/Inputs'
@@ -41,7 +40,7 @@ export function QuickRfqDrawer({ open, onClose }: QuickRfqDrawerProps) {
     if (!open) return
     setTitle('')
     setBidDueDate(defaultBidDue())
-    setLocationId(locations[0]?.id ?? PURCHASE_DEMO_LOCATION.id)
+    setLocationId(locations[0]?.id ?? '')
     setSubmitting(false)
     setError(null)
     setSavedId(null)
@@ -71,16 +70,18 @@ export function QuickRfqDrawer({ open, onClose }: QuickRfqDrawerProps) {
           setError('No purchase items available — open the full RFQ form to add lines.')
           return
         }
-        const masterLoc = locations.find((l) => l.id === locationId)
-        const location = masterLoc
-          ? {
-              id: masterLoc.id,
-              code: masterLoc.locationCode ?? masterLoc.id,
-              name: masterLoc.locationName,
-              state: masterLoc.state || PURCHASE_DEMO_LOCATION.state,
-              city: masterLoc.city || PURCHASE_DEMO_LOCATION.city,
-            }
-          : { ...PURCHASE_DEMO_LOCATION }
+        const masterLoc = locations.find((l) => l.id === locationId) ?? locations[0]
+        if (!masterLoc) {
+          setError('No location available — set up a warehouse/location first.')
+          return
+        }
+        const location = {
+          id: masterLoc.id,
+          code: masterLoc.locationCode ?? masterLoc.id,
+          name: masterLoc.locationName,
+          state: masterLoc.state || '',
+          city: masterLoc.city || '',
+        }
         const created = await createRFQ({
           documentDate: new Date().toISOString().slice(0, 10),
           bidDueDate,

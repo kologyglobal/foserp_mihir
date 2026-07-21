@@ -289,7 +289,6 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    max-width: 14rem;
   }
 
   /* Portaled to document.body — position via inline fixed coords */
@@ -10525,11 +10524,28 @@ a.crm-companies-table__name:hover {
   .erp-form-grid--cols-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  /* 4-col quick entry: prefer four narrow stacked fields once the form has room */
+  .erp-form-grid--cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 @media (min-width: 768px) and (max-width: 1279px) {
   .erp-form-grid--cols-3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 899px) {
+  .erp-form-grid--cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 599px) {
+  .erp-form-grid--cols-4 {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -13855,19 +13871,40 @@ a.crm-companies-table__name:hover {
 }
 
 @media (min-width: 768px) {
-  .erp-card-section__grid--dense,
+  /* Dense defaults to 2 cols — never override an explicit cols-1 */
+  .erp-card-section__grid--dense:not(.erp-card-section__grid--cols-1):not(
+      .erp-card-section__grid--cols-3
+    ):not(.erp-card-section__grid--cols-4),
   .erp-card-section__grid--cols-2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .erp-card-section__grid--cols-1 {
+    grid-template-columns: 1fr;
+  }
+
   .erp-card-section__grid--cols-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .erp-card-section__grid--cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 768px) and (max-width: 1279px) {
   .erp-card-section__grid--cols-3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-card-section__grid--cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .erp-card-section__grid--cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -16098,7 +16135,7 @@ a.crm-companies-table__name:hover {
   text-align: left;
 }
 
-/* -- App confirm / notes dialog (replaces window.prompt / confirm) -- */
+/* -- App confirm / notes dialog (Dynamics-style; replaces window.prompt / confirm) -- */
 .erp-confirm-backdrop {
   position: fixed;
   inset: 0;
@@ -16115,81 +16152,75 @@ a.crm-companies-table__name:hover {
   border: none;
   padding: 0;
   cursor: pointer;
-  background: rgb(15 23 42 / 0.48);
-  backdrop-filter: blur(2px);
+  background: rgb(0 0 0 / 0.4);
 }
 
 .erp-confirm-panel {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  max-width: 440px;
-  border-radius: 14px;
-  background: #ffffff;
-  border: 1px solid var(--dyn-border, #e1e4e8);
-  box-shadow:
-    0 24px 48px rgb(15 23 42 / 0.18),
-    0 0 0 1px rgb(255 255 255 / 0.6) inset;
-  padding: 18px 18px 16px;
-  animation: erp-confirm-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  max-width: 420px;
+  border-radius: 2px;
+  background: var(--d365-surface, #fff);
+  border: 1px solid var(--d365-border-strong, var(--dyn-border, #c8c6c4));
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
 }
 
-@keyframes erp-confirm-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.erp-confirm-panel__top {
+.erp-confirm-panel__header {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--d365-border, var(--dyn-border, #edebe9));
+  background: var(--d365-nav-bg, #faf9f8);
 }
 
-.erp-confirm-panel__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  border-radius: 10px;
+.erp-confirm-panel--danger .erp-confirm-panel__header {
+  border-left: 3px solid var(--erp-danger-solid, #a4262c);
+}
+
+.erp-confirm-panel--warning .erp-confirm-panel__header {
+  border-left: 3px solid var(--erp-warning-solid, #c27d0e);
+}
+
+.erp-confirm-panel--success .erp-confirm-panel__header {
+  border-left: 3px solid var(--erp-success-solid, #0e7a3e);
 }
 
 .erp-confirm-panel__title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 650;
+  font-size: 14px;
+  font-weight: 600;
   line-height: 1.3;
-  color: var(--erp-text, #1f2933);
-  letter-spacing: -0.01em;
+  color: var(--d365-text, var(--erp-text, #201f1e));
 }
 
 .erp-confirm-panel__desc {
   margin: 4px 0 0;
   font-size: 13px;
-  line-height: 1.45;
-  color: var(--erp-muted, #5f6b7a);
+  line-height: 1.4;
+  color: var(--d365-text-secondary, var(--erp-muted, #605e5c));
+}
+
+.erp-confirm-panel__body {
+  padding: 12px 14px;
 }
 
 .erp-confirm-panel__detail {
-  margin: 8px 0 0;
+  margin: 0;
   display: inline-flex;
   align-items: center;
   max-width: 100%;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: var(--erp-surface-alt, #f3f4f6);
-  border: 1px solid var(--erp-border, #e1e4e8);
+  padding: 2px 8px;
+  border-radius: 2px;
+  background: var(--erp-surface-alt, #f3f2f1);
+  border: 1px solid var(--erp-border, #edebe9);
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--erp-text, #1f2933);
+  color: var(--erp-text, #201f1e);
 }
 
 .erp-confirm-panel__close {
@@ -16199,76 +16230,71 @@ a.crm-companies-table__name:hover {
   width: 28px;
   height: 28px;
   flex-shrink: 0;
-  margin: -4px -4px 0 0;
+  margin: -2px -4px 0 0;
   border: none;
-  border-radius: 8px;
+  border-radius: 2px;
   background: transparent;
-  color: var(--erp-muted, #8a94a6);
+  color: var(--d365-muted, #8a8886);
   cursor: pointer;
 }
 
 .erp-confirm-panel__close:hover {
-  background: var(--erp-surface-alt, #f3f4f6);
-  color: var(--erp-text, #1f2933);
+  background: rgb(0 0 0 / 0.04);
+  color: var(--d365-text, #201f1e);
 }
 
 .erp-confirm-panel__note {
-  margin-top: 14px;
+  margin: 0;
+}
+
+.erp-confirm-panel__detail + .erp-confirm-panel__note {
+  margin-top: 12px;
 }
 
 .erp-confirm-panel__note-label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--erp-text, #1f2933);
+  color: var(--erp-text, #201f1e);
 }
 
 .erp-confirm-panel__req {
-  display: inline-flex;
-  align-items: center;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 99px;
-  background: #fef3c7;
-  color: #92400e;
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--erp-danger-solid, #a4262c);
 }
 
 .erp-confirm-panel__textarea {
   width: 100%;
+  min-height: 88px;
   resize: vertical;
-  min-height: 96px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--erp-border, #d0d5dd);
-  background: #fafbfc;
-  font-family: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--d365-border-strong, #c8c6c4);
+  border-radius: 2px;
+  background: #fff;
   font-size: 13px;
-  line-height: 1.45;
-  color: var(--erp-text, #1f2933);
-  outline: none;
-  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+  line-height: 1.4;
+  color: var(--erp-text, #201f1e);
 }
 
 .erp-confirm-panel__textarea:focus {
-  background: #fff;
-  border-color: var(--erp-primary, #0078d4);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--erp-primary, #0078d4) 22%, transparent);
+  outline: none;
+  border-color: var(--d365-brand, #0078d4);
+  box-shadow: 0 0 0 1px var(--d365-brand, #0078d4);
 }
 
 .erp-confirm-panel__textarea--error {
-  border-color: #d13438;
-  background: #fff8f8;
+  border-color: var(--erp-danger-solid, #a4262c);
 }
 
 .erp-confirm-panel__textarea--error:focus {
-  box-shadow: 0 0 0 3px rgb(209 52 56 / 0.18);
+  border-color: var(--erp-danger-solid, #a4262c);
+  box-shadow: 0 0 0 1px var(--erp-danger-solid, #a4262c);
 }
 
 .erp-confirm-panel__note-meta {
@@ -16277,34 +16303,99 @@ a.crm-companies-table__name:hover {
   justify-content: space-between;
   gap: 8px;
   margin-top: 6px;
-  min-height: 16px;
 }
 
 .erp-confirm-panel__hint,
 .erp-confirm-panel__count {
   font-size: 11px;
-  color: var(--erp-muted, #8a94a6);
+  color: var(--erp-muted, #605e5c);
 }
 
 .erp-confirm-panel__error {
-  font-size: 11px;
-  font-weight: 600;
-  color: #d13438;
+  font-size: 12px;
+  color: var(--erp-danger-solid, #a4262c);
+}
+
+.erp-confirm-panel__footer {
+  padding: 10px 14px;
+  border-top: 1px solid var(--d365-border, #edebe9);
+  background: #fff;
 }
 
 .erp-confirm-panel__actions {
-  margin-top: 16px;
+  margin: 0;
   justify-content: flex-end;
+}
+
+/* Flat confirm actions — no lift / glow inside dialogs */
+.erp-confirm-panel__footer .erp-btn--danger,
+.erp-confirm-panel__footer .erp-btn--primary,
+.erp-confirm-panel__footer .erp-btn--warning,
+.erp-confirm-panel__footer .erp-btn--success {
+  box-shadow: none;
+  transform: none;
+  background: var(--erp-danger-solid, #a4262c);
+  filter: none;
+}
+
+.erp-confirm-panel__footer .erp-btn--primary {
+  background: var(--d365-brand, #0078d4);
+}
+
+.erp-confirm-panel__footer .erp-btn--warning {
+  background: var(--erp-warning-solid, #c27d0e);
+}
+
+.erp-confirm-panel__footer .erp-btn--success {
+  background: var(--erp-success-solid, #0e7a3e);
+}
+
+.erp-confirm-panel__footer .erp-btn--danger:hover:not(:disabled),
+.erp-confirm-panel__footer .erp-btn--primary:hover:not(:disabled),
+.erp-confirm-panel__footer .erp-btn--warning:hover:not(:disabled),
+.erp-confirm-panel__footer .erp-btn--success:hover:not(:disabled) {
+  transform: none;
+  filter: brightness(0.95);
+  box-shadow: none;
 }
 
 /* -- In-page back link (view/detail) -- */
 .erp-page-back {
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+}
+
+/* Content stack: Back + guide + body share one tight column */
+.erp-page-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-page-content > .erp-page-back {
   margin: 0;
 }
 
 /* Empty merged hero still occupies a flex slot + gap above Back — hide it */
 .erp-page-hero--workspace-merged:not(:has(*)) {
   display: none;
+}
+
+.d365-workspace-content:has(.erp-card-form-page__footer-sticky) .erp-page-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.d365-workspace-content:has(.erp-card-form-page__footer-sticky) .erp-page-content > .enterprise-workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .d365-workspace-content:has(.erp-card-form-page__footer-sticky) .erp-page-back {

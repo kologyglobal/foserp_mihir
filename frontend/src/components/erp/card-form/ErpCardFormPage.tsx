@@ -187,17 +187,25 @@ export function ErpCardFormPage({
       >
         <ErpFormValidationSummary errors={validationErrors} lockedReason={lockedReason} className="mb-3" />
 
-        <div className={cn(
-          'erp-card-form-page__body erp-form-shell-content erp-form-shell-content--padded min-h-0',
-          stickyFooter
-            ? 'erp-card-form-page__body--sticky-footer flex-1 overflow-y-auto'
-            : 'pb-4',
-        )}>
-          <FactBoxPaneProvider
-            open={factBoxOpen}
-            collapsible={Boolean(collapsibleFactBox && factBox)}
-            label={factBoxLabel}
-            setOpen={setFactBoxOpen}
+        <FactBoxPaneProvider
+          open={factBoxOpen}
+          collapsible={Boolean(collapsibleFactBox && factBox)}
+          label={factBoxLabel}
+          setOpen={setFactBoxOpen}
+        >
+          {factBoxCollapsed ? (
+            <div className="erp-card-form-page__context-restore" role="toolbar" aria-label="Smart context">
+              <FactBoxPaneAiToggle />
+            </div>
+          ) : null}
+
+          <div
+            className={cn(
+              'erp-card-form-page__body erp-form-shell-content erp-form-shell-content--padded min-h-0',
+              stickyFooter
+                ? 'erp-card-form-page__body--sticky-footer flex-1 overflow-y-auto'
+                : 'pb-4',
+            )}
           >
             <div
               className="erp-card-form-page__layout-wrap"
@@ -214,16 +222,11 @@ export function ErpCardFormPage({
                 {showSplitLayout && factBoxContent ? (
                   <div className="erp-card-form-page__factbox min-w-0">{factBoxContent}</div>
                 ) : null}
-                {factBoxCollapsed ? (
-                  <div className="erp-card-form-page__factbox-restore">
-                    <FactBoxPaneAiToggle />
-                  </div>
-                ) : null}
               </div>
             </div>
-          </FactBoxPaneProvider>
-          {subpage ? <div className="erp-card-form-page__subpage mt-4">{subpage}</div> : null}
-        </div>
+            {subpage ? <div className="erp-card-form-page__subpage mt-4">{subpage}</div> : null}
+          </div>
+        </FactBoxPaneProvider>
 
         {footer ? (
           <div className={cn(stickyFooter && 'erp-card-form-page__footer-sticky', !stickyFooter && 'erp-card-form-page__footer-inline')}>

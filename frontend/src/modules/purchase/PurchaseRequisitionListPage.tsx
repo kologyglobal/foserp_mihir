@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Download, FileText, Plus, RefreshCw, Save } from 'lucide-react'
+import { Download, FileText, Plus, RefreshCw } from 'lucide-react'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
 import { SaveViewDialog } from '../../components/design-system/SaveViewDialog'
 import { EnterpriseRegisterTableShell } from '../../design-system/list-page/EnterpriseRegisterTableShell'
@@ -10,7 +10,13 @@ import { LoadingState } from '../../design-system/components/LoadingState'
 import { CrmFilterDrawer } from '../../components/crm/CrmFilterDrawer'
 import { CrmListSortSelect } from '../../components/crm/CrmListFilterBar'
 import { PurchaseRequisitionsTable } from '../../components/purchase/PurchaseRequisitionsTable'
-import { PurchaseRegisterContextPanel } from '../../components/purchase/PurchaseRegisterContextPanel'
+import {
+  PurchaseAiInsightsRestoreButton,
+  PurchaseAiInsightsShell,
+  PurchaseAiOverviewBlock,
+  PurchaseAiSuggestionsBlock,
+  usePurchaseAiInsightsOpen,
+} from '../../components/purchase/PurchaseAiInsightsPanel'
 import { useSavedViews } from '../../hooks/useSavedViews'
 import { useCrmFilterDrawer } from '../../hooks/useCrmFilterDrawer'
 import { PR_REGISTER_PRESETS } from '../../config/savedViewPresets'
@@ -265,6 +271,9 @@ export function PurchaseRequisitionListPage() {
       }),
     [filtered, filters.status, perms.canCreateRequisition, applyStatusFilter, navigate],
   )
+  const [insightsOpen, setInsightsOpen] = usePurchaseAiInsightsOpen(
+    'purchase.ai-insights.requisitions',
+  )
 
   const runAction = async (id: string, work: () => Promise<unknown>, success: string) => {
     setBusyId(id)
@@ -301,16 +310,25 @@ export function PurchaseRequisitionListPage() {
           () => submitPurchaseRequisition(pr.id),
           `${pr.documentNumber} submitted for approval`,
         ),
-      onConvertRfq: (pr: PurchaseRequisitionListRow) =>
+      onConvertRfq: (pr: PurchaseRequisitionListRow) => {
+        if (pr.convertedRfqId) {
+          navigate(`/purchase/rfqs/${pr.convertedRfqId}`)
+          return
+        }
         void runAction(pr.id, async () => {
           const rfq = await convertPurchaseRequisitionToRfq(pr.id)
           navigate(`/purchase/rfqs/${rfq.id}`)
-        }, `${pr.documentNumber} converted to RFQ`),
+        }, `${pr.documentNumber} converted to RFQ`)
+      },
       onConvertPo: (pr: PurchaseRequisitionListRow) =>
         void runAction(pr.id, async () => {
           const po = await convertPurchaseRequisitionToPo(pr.id)
           navigate(`/purchase/orders/${po.id}`)
         }, `${pr.documentNumber} converted to PO`),
+      onViewPlanning: (pr: PurchaseRequisitionListRow) => {
+        const q = encodeURIComponent(pr.documentNumber)
+        navigate(`/purchase/planning-sheet?search=${q}`)
+      },
       onPrint: (pr: PurchaseRequisitionListRow) => {
         navigate(`/purchase/requisitions/${pr.id}?print=1`)
         notify.info('Open print dialog from the requisition detail (Ctrl+P)')
@@ -469,91 +487,116 @@ export function PurchaseRequisitionListPage() {
                 },
               },
             ]}
-            moreActions={[
-              { id: 'save-view', label: 'Save View', icon: Save, onClick: savedViews.openSaveDialog },
-            ]}
           />
         }
       >
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
-          <div className="min-w-0 space-y-3">
-            <EnterpriseRegisterTableShell className="min-w-0">
-              <PurchaseRequisitionsTable
-                rows={filtered}
-                busyId={busyId}
-                handlers={rowHandlers}
-                hasActiveFilters={activeFilters}
-                onClearFilters={clearFilters}
-                onExport={exportList}
-                registerFilter={{
-                  search: filters.search,
-                  onSearchChange: (search) => setFilters((f) => ({ ...f, search })),
-                  searchPlaceholder: 'Search PR number, item, requester, department…',
-                  activeFilterCount: filterDrawer.activeCount,
-                  onOpenFilters: filterDrawer.openDrawer,
-                  chips: filterDrawer.chips,
-                  onRemoveChip: filterDrawer.removeChip,
-                  onClearAll: clearFilters,
-                  savedView: savedViews.activeView,
-                  onSavedViewChange: savedViews.selectView,
-                  savedViews: savedViews.viewNames,
-                  onSaveView: savedViews.openSaveDialog,
-                  showCommandPaletteHint: false,
-                  sort: (
-                    <CrmListSortSelect
-                      value={sortBy}
-                      onChange={(v) => setSortBy(v as PrSortKey)}
-                      aria-label="Sort purchase requisitions"
-                      options={PR_SORT_OPTIONS}
-                    />
-                  ),
-                }}
-                emptyAction={
-                  filtered.length === 0 ? (
-                    <div className="flex flex-wrap justify-center gap-2">
-                      {rows.length === 0 && perms.canCreateRequisition ? (
-                        <button
-                          type="button"
-                          className="erp-btn erp-btn--primary text-[13px]"
-                          onClick={() => navigate('/purchase/requisitions/new')}
-                        >
-                          Create Requisition
-                        </button>
-                      ) : null}
-                      {activeFilters ? (
-                        <button
-                          type="button"
-                          className="erp-btn erp-btn--secondary text-[13px]"
-                          onClick={clearFilters}
-                        >
-                          Clear Filters
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : undefined
-                }
-              />
-            </EnterpriseRegisterTableShell>
-          </div>
-          <PurchaseRegisterContextPanel
-            ariaLabel="Purchase requisition overview and suggestions"
-            title="Requisition Insights"
-            subtitle="AI suggested bottlenecks and next actions for this register."
-            overview={registerOverview}
-            suggestions={registerSuggestions}
-          />
+        <div
+          className={
+            insightsOpen
+              ? 'purchase-register-split flex flex-col gap-3 xl:flex-row xl:items-start'
+              : 'space-y-3'
+          }
+        >
+          <EnterpriseRegisterTableShell className="min-w-0 flex-1">
+            <PurchaseRequisitionsTable
+              rows={filtered}
+              busyId={busyId}
+              handlers={rowHandlers}
+              hasActiveFilters={activeFilters}
+              onClearFilters={clearFilters}
+              onExport={exportList}
+              registerFilter={{
+                search: filters.search,
+                onSearchChange: (search) => setFilters((f) => ({ ...f, search })),
+                searchPlaceholder: 'Search PR number, item, requester, department…',
+                activeFilterCount: filterDrawer.activeCount,
+                onOpenFilters: filterDrawer.openDrawer,
+                chips: filterDrawer.chips,
+                onRemoveChip: filterDrawer.removeChip,
+                onClearAll: clearFilters,
+                savedView: savedViews.activeView,
+                onSavedViewChange: savedViews.selectView,
+                savedViews: savedViews.viewNames,
+                onSaveView: savedViews.openSaveDialog,
+                showCommandPaletteHint: false,
+                afterFilters: (
+                  <PurchaseAiInsightsRestoreButton
+                    label="Requisition Insights"
+                    pressed={insightsOpen}
+                    onClick={() => setInsightsOpen(!insightsOpen)}
+                  />
+                ),
+                sort: (
+                  <CrmListSortSelect
+                    value={sortBy}
+                    onChange={(v) => setSortBy(v as PrSortKey)}
+                    aria-label="Sort purchase requisitions"
+                    options={PR_SORT_OPTIONS}
+                  />
+                ),
+              }}
+              emptyAction={
+                filtered.length === 0 ? (
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {rows.length === 0 && perms.canCreateRequisition ? (
+                      <button
+                        type="button"
+                        className="erp-btn erp-btn--primary text-[13px]"
+                        onClick={() => navigate('/purchase/requisitions/new')}
+                      >
+                        Create Requisition
+                      </button>
+                    ) : null}
+                    {activeFilters ? (
+                      <button
+                        type="button"
+                        className="erp-btn erp-btn--secondary text-[13px]"
+                        onClick={clearFilters}
+                      >
+                        Clear Filters
+                      </button>
+                    ) : null}
+                  </div>
+                ) : undefined
+              }
+            />
+          </EnterpriseRegisterTableShell>
+          {insightsOpen ? (
+            <div
+              className="purchase-register-insights purchase-register-insights--rail"
+              aria-label="Purchase requisition overview and suggestions"
+            >
+              <PurchaseAiInsightsShell
+                title="Requisition Insights"
+                subtitle="AI suggested bottlenecks and next actions for this register."
+                variant="register"
+                onClose={() => setInsightsOpen(false)}
+              >
+                <PurchaseAiOverviewBlock rows={registerOverview} />
+                <PurchaseAiSuggestionsBlock suggestions={registerSuggestions} />
+              </PurchaseAiInsightsShell>
+            </div>
+          ) : null}
         </div>
       </OperationalPageShell>
 
       <CrmFilterDrawer
         open={filterDrawer.open}
         onClose={filterDrawer.closeDrawer}
+        title="Filter purchase requisitions"
         fields={prFilterFields}
         values={filterDrawer.draft}
         onChange={(next) => filterDrawer.setDraft({ ...filterDrawer.draft, ...next })}
         onApply={filterDrawer.applyFilters}
         onReset={filterDrawer.resetDraft}
+        savedViewsSlot={
+          <p className="text-[12px] leading-snug text-erp-muted">
+            Apply filters, then use <span className="font-semibold text-erp-text">Save view</span> on
+            the register bar to reuse this setup later.
+          </p>
+        }
       />
+
       <SaveViewDialog
         open={savedViews.saveDialogOpen}
         defaultName={savedViews.activeView === 'My View' ? '' : savedViews.activeView}

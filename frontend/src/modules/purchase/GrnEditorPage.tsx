@@ -5,28 +5,21 @@ import {
   FileText,
   MapPin,
   PackageCheck,
-  Save,
-  Send,
   StickyNote,
   Truck,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
-import {
-  PurchaseFormSectionNav,
-  purchaseSectionId,
-} from '@/components/purchase/PurchaseEnterpriseFormKit'
+import { purchaseSectionId } from '@/components/purchase/PurchaseEnterpriseFormKit'
 import {
   PurchaseDocumentFactBox,
   buildPurchaseRelatedLinks,
   purchaseDocumentApprovalFact,
 } from '@/components/purchase/PurchaseDocumentFactBox'
 import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
-import { ErpCardSection, ErpFieldRow, ErpFormSpan, ErpStickySaveBar } from '@/components/erp/card-form'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
+import { ErpCardSection, ErpFieldRow, ErpFormSpan } from '@/components/erp/card-form'
+import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { EnterpriseFormMetrics } from '@/design-system/workspace'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
   joinFastTabSummary,
@@ -39,8 +32,9 @@ import {
   getPurchaseItems,
   getPurchaseOrderById,
   getPurchaseOrders,
+  getPurchaseSetup,
+  previewNextGoodsReceiptNumber,
   PurchaseServiceError,
-  submitGRN,
   updateGRN,
   GRN_DOMAIN_STATUS_LABELS,
 } from '@/services/purchase'
@@ -50,6 +44,39 @@ import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { systemConfirm } from '@/utils/systemConfirm'
 import { cn } from '@/utils/cn'
+import { isApiMode } from '@/config/apiConfig'
+import { useActiveWarehouses, useActiveLocations } from '@/hooks/useMasterLists'
+import { useMasterStore } from '@/store/masterStore'
+import { fetchLookup, type MasterLookupRow } from '@/services/api/masterApi'
+import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
+
+/**
+ * Resolve GRN warehouse: PO delivery warehouse → Purchase Setup default → blank.
+ * Never picks the first warehouse from the master list.
+ */
+function warehouseFromPoDelivery(
+  po: PurchaseOrder,
+  setupDefaultWarehouseId?: string,
+): { id: string; name: string } {
+  const { locations, warehouses } = useMasterStore.getState()
+  if (po.deliveryLocation?.id) {
+    const loc = locations.find((l) => l.id === po.deliveryLocation.id)
+    const byLocation = loc?.warehouseId
+      ? warehouses.find((w) => w.id === loc.warehouseId)
+      : undefined
+    if (byLocation) return { id: byLocation.id, name: byLocation.warehouseName }
+    const direct = warehouses.find(
+      (w) => w.id === po.deliveryLocation.id || w.warehouseName === po.deliveryLocation.name,
+    )
+    if (direct) return { id: direct.id, name: direct.warehouseName }
+  }
+  if (setupDefaultWarehouseId) {
+    const fromSetup = warehouses.find((w) => w.id === setupDefaultWarehouseId)
+    if (fromSetup) return { id: fromSetup.id, name: fromSetup.warehouseName }
+    return { id: setupDefaultWarehouseId, name: '' }
+  }
+  return { id: '', name: '' }
+}
 
 type LineDraft = {
   purchaseOrderLineId: string
@@ -80,14 +107,6 @@ type LineDraft = {
   expiryControlled: boolean
   remarks: string
 }
-
-const SECTIONS = [
-  { id: 'po-source', label: 'PO Source', icon: ClipboardList },
-  { id: 'document', label: 'Document', icon: FileText },
-  { id: 'receiving', label: 'Receiving', icon: Truck },
-  { id: 'lines', label: 'Lines', icon: PackageCheck },
-  { id: 'notes', label: 'Notes', icon: StickyNote },
-]
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -197,16 +216,43 @@ export function GrnEditorPage() {
   const [remarks, setRemarks] = useState('')
   const [lines, setLines] = useState<LineDraft[]>([])
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const [activeSection, setActiveSection] = useState('po-source')
+  const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(true)
 
-  const { markDirty, resetDirty } = useUnsavedChangesGuard(true)
+  const warehouses = useActiveWarehouses()
+  const storageLocations = useActiveLocations()
+  const [bins, setBins] = useState<MasterLookupRow[]>([])
+
+  useEffect(() => {
+    if (!isApiMode()) return
+    let cancelled = false
+    fetchLookup('bins')
+      .then((res) => {
+        if (!cancelled) setBins(res.data)
+      })
+      .catch(() => {
+        // Bin lookup is optional context; failures surface when the user opens the dropdown empty.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const warehouseLocations = useMemo(
+    () => storageLocations.filter((l) => !warehouseId || l.warehouseId === warehouseId),
+    [storageLocations, warehouseId],
+  )
+  const warehouseBins = useMemo(
+    () => bins.filter((b) => !warehouseId || b.warehouseId === warehouseId),
+    [bins, warehouseId],
+  )
 
   const receivableOrders = useMemo(
     () =>
       orders.filter(
         (o) =>
-          ['released', 'partially_received', 'fully_received', 'invoiced'].includes(o.status) &&
-          o.lines.some((l) => l.pendingQty > 0),
+          ['released', 'sent_to_vendor', 'partially_received', 'fully_received', 'invoiced'].includes(
+            o.status,
+          ) && o.lines.some((l) => l.pendingQty > 0),
       ),
     [orders],
   )
@@ -226,42 +272,6 @@ export function GrnEditorPage() {
       excessQty,
     }
   }, [lines])
-
-  const formMetrics = useMemo(
-    () => [
-      {
-        label: 'Lines',
-        value: String(lineTotals.lineCount),
-        accent: 'blue' as const,
-        highlight: lineTotals.lineCount > 0,
-      },
-      {
-        label: 'Received Qty',
-        value: formatNumber(lineTotals.receivedQty),
-        accent: 'green' as const,
-        highlight: lineTotals.receivedQty > 0,
-      },
-      {
-        label: 'Pending Qty',
-        value: formatNumber(lineTotals.pendingQty),
-        accent: 'amber' as const,
-        highlight: lineTotals.pendingQty > 0,
-      },
-      {
-        label: 'Short',
-        value: formatNumber(lineTotals.shortQty),
-        accent: 'violet' as const,
-        highlight: lineTotals.shortQty > 0,
-      },
-      {
-        label: 'Excess',
-        value: formatNumber(lineTotals.excessQty),
-        accent: 'slate' as const,
-        highlight: lineTotals.excessQty > 0,
-      },
-    ],
-    [lineTotals],
-  )
 
   const receivingPeek = useMemo(
     () =>
@@ -295,7 +305,7 @@ export function GrnEditorPage() {
   const recordHeaderFacts = useMemo(
     () => [
       ...(isNew
-        ? [{ label: 'GRN No', value: documentNumber ?? 'Auto-generated' }]
+        ? [{ label: 'GRN No', value: documentNumber ?? 'Loading…' }]
         : []),
       { label: 'Vendor', value: vendorFact },
       { label: 'PO', value: poFact },
@@ -344,24 +354,6 @@ export function GrnEditorPage() {
   const readOnlyHeaderPo = !isNew && Boolean(recordId)
   const showPoPicker = isNew || !readOnlyHeaderPo
 
-  const navSections = useMemo(
-    () =>
-      SECTIONS.filter((s) => s.id !== 'po-source' || showPoPicker).map((s) => ({
-        ...s,
-        done:
-          s.id === 'po-source'
-            ? Boolean(poId)
-            : s.id === 'document'
-              ? Boolean(documentDate)
-              : s.id === 'receiving'
-                ? Boolean(warehouseId)
-                : s.id === 'lines'
-                  ? lines.length > 0
-                  : Boolean(remarks.trim()),
-      })),
-    [showPoPicker, poId, documentDate, warehouseId, lines.length, remarks],
-  )
-
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -402,21 +394,28 @@ export function GrnEditorPage() {
         setAllowExcess(grn.allowExcess)
         setRemarks(grn.remarks)
         setLines(linesFromGrn(grn))
-        setActiveSection('document')
         resetDirty()
       } else {
         const initialPoId = searchParams.get('poId') ?? ''
         if (initialPoId) {
-          const po = await getPurchaseOrderById(initialPoId)
+          const [po, setup] = await Promise.all([
+            getPurchaseOrderById(initialPoId),
+            getPurchaseSetup().catch(() => null),
+          ])
           if (po) {
             setPoId(po.id)
-            setWarehouseId(po.deliveryLocation.id)
-            setWarehouseName(po.deliveryLocation.name)
+            const wh = warehouseFromPoDelivery(po, setup?.general.defaultWarehouseId)
+            setWarehouseId(wh.id)
+            setWarehouseName(wh.name)
+            if (setup?.receiving.defaultReceivingLocationId) {
+              setReceivingLocation(setup.receiving.defaultReceivingLocationId)
+            }
             setLines(linesFromPo(po, controls))
-            setInspectionRequired(true)
-            setActiveSection('document')
+            setInspectionRequired(setup?.receiving.autoCreateInspection ?? true)
           }
         }
+        const nextNumber = await previewNextGoodsReceiptNumber().catch(() => null)
+        if (nextNumber) setDocumentNumber(nextNumber)
         resetDirty()
       }
     } finally {
@@ -435,10 +434,17 @@ export function GrnEditorPage() {
       setLines([])
       return
     }
-    const po = await getPurchaseOrderById(nextPoId)
+    const [po, setup] = await Promise.all([
+      getPurchaseOrderById(nextPoId),
+      getPurchaseSetup().catch(() => null),
+    ])
     if (!po) return
-    setWarehouseId(po.deliveryLocation.id)
-    setWarehouseName(po.deliveryLocation.name)
+    const wh = warehouseFromPoDelivery(po, setup?.general.defaultWarehouseId)
+    setWarehouseId(wh.id)
+    setWarehouseName(wh.name)
+    if (!receivingLocation && setup?.receiving.defaultReceivingLocationId) {
+      setReceivingLocation(setup.receiving.defaultReceivingLocationId)
+    }
     setLines(linesFromPo(po, itemControls))
   }
 
@@ -446,10 +452,13 @@ export function GrnEditorPage() {
     setLines((prev) => {
       const next = [...prev]
       const row = { ...next[index], ...patch }
-      const pending = row.pendingQty
-      const received = Number(row.receivedQty) || 0
-      row.excessQty = Math.max(0, received - pending)
-      row.shortQty = Math.max(0, pending - received)
+      // Auto-derive short/excess only when received qty changes; manual edits stay put.
+      if ('receivedQty' in patch) {
+        const pending = row.pendingQty
+        const received = Number(row.receivedQty) || 0
+        row.excessQty = Math.max(0, received - pending)
+        row.shortQty = Math.max(0, pending - received)
+      }
       next[index] = row
       return next
     })
@@ -493,27 +502,51 @@ export function GrnEditorPage() {
     })),
   })
 
-  const validateClient = (): boolean => {
+  /** Returns the first clear, user-facing message (or null when valid). */
+  const validateClient = (): string | null => {
     const errs: Record<string, string> = {}
-    if (!poId) errs.poId = 'Select a purchase order'
-    if (!warehouseId.trim()) errs.warehouseId = 'Warehouse is mandatory'
-    if (!lines.length) errs.lines = 'Add at least one line with open quantity'
+    const messages: string[] = []
+
+    const push = (key: string, message: string) => {
+      errs[key] = message
+      messages.push(message)
+    }
+
+    if (!poId) push('poId', 'Please select a purchase order.')
+    if (!warehouseId.trim()) push('warehouseId', 'Please select a warehouse.')
+    if (!lines.length) push('lines', 'Add at least one line with open quantity to receive.')
+
     lines.forEach((l, i) => {
-      if ((Number(l.receivedQty) || 0) <= 0) errs[`line-${i}-qty`] = 'Received qty required'
-      if (l.batchControlled && !l.batchNumber.trim()) errs[`line-${i}-batch`] = 'Batch required'
-      if (l.serialControlled && !l.serialNumber.trim()) errs[`line-${i}-serial`] = 'Serial required'
-      if (l.expiryControlled && !l.expiryDate) errs[`line-${i}-expiry`] = 'Expiry required'
+      const itemLabel = (l.itemCode || l.itemName || `Line ${i + 1}`).trim()
+      if ((Number(l.receivedQty) || 0) <= 0) {
+        push(`line-${i}-qty`, `Enter received quantity for ${itemLabel}.`)
+      }
+      if (l.batchControlled && !l.batchNumber.trim()) {
+        push(`line-${i}-batch`, `Batch number is required for ${itemLabel}.`)
+      }
+      if (l.serialControlled && !l.serialNumber.trim()) {
+        push(`line-${i}-serial`, `Serial number is required for ${itemLabel}.`)
+      }
+      if (l.expiryControlled && !l.expiryDate) {
+        push(`line-${i}-expiry`, `Expiry date is required for ${itemLabel}.`)
+      }
       if ((Number(l.receivedQty) || 0) > l.pendingQty && !l.allowExcess && !allowExcess) {
-        errs[`line-${i}-excess`] = 'Exceeds pending — enable Allow Excess'
+        push(
+          `line-${i}-excess`,
+          `Received quantity for ${itemLabel} exceeds pending quantity. Turn on Allow Excess to continue.`,
+        )
       }
     })
+
     setFieldErrors(errs)
-    return Object.keys(errs).length === 0
+    return messages[0] ?? null
   }
 
   const saveDraft = async () => {
-    if (!validateClient()) {
-      notify.error('Fix validation errors before saving')
+    if (saving) return
+    const firstError = validateClient()
+    if (firstError) {
+      notify.error(firstError)
       return
     }
     setSaving(true)
@@ -524,19 +557,17 @@ export function GrnEditorPage() {
         setDocumentNumber(updated.documentNumber)
         setStatus(updated.status)
         setLines(linesFromGrn(updated))
-        notify.success(`Draft ${updated.documentNumber} saved`)
+        notify.success(`Saved · ${updated.documentNumber}`)
       } else {
         const created = await createGRNFromPo(input)
         setRecordId(created.id)
         setDocumentNumber(created.documentNumber)
         setStatus(created.status)
         setLines(linesFromGrn(created))
-        notify.success(`Created ${created.documentNumber}`)
-        resetDirty()
-        navigate(`/purchase/grn/${created.id}/edit`, { replace: true })
-        return
+        notify.success(`Saved · ${created.documentNumber}`)
       }
       resetDirty()
+      navigate(PURCHASE_FORM_ROUTES.grn.list, { replace: true })
     } catch (err) {
       if (err instanceof PurchaseServiceError && err.code === 'EXCESS_QTY_REQUIRES_PERMISSION') {
         const ok = await systemConfirm({
@@ -551,55 +582,10 @@ export function GrnEditorPage() {
           setLines((prev) => prev.map((l) => ({ ...l, allowExcess: true })))
           notify.info('Allow Excess enabled — save again to confirm')
         }
+      } else if (err instanceof PurchaseServiceError && err.code === 'GRN_QTY_EXCEEDS') {
+        notify.error(err.message)
       } else {
         notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
-      }
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const submit = async () => {
-    if (!validateClient()) {
-      notify.error('Fix validation errors before submit')
-      return
-    }
-    setSaving(true)
-    try {
-      let grnId = recordId
-      const input = buildInput()
-      if (!grnId) {
-        const created = await createGRNFromPo(input)
-        grnId = created.id
-        setRecordId(created.id)
-        setDocumentNumber(created.documentNumber)
-      } else {
-        await updateGRN(grnId, input)
-      }
-      const submitted = await submitGRN(grnId)
-      setStatus(submitted.status)
-      resetDirty()
-      notify.success(
-        submitted.inspectionRequired
-          ? `${submitted.documentNumber} submitted — pending inspection`
-          : `${submitted.documentNumber} submitted`,
-      )
-      navigate(`/purchase/grn/${submitted.id}`)
-    } catch (err) {
-      if (err instanceof PurchaseServiceError && err.code === 'EXCESS_QTY_REQUIRES_PERMISSION') {
-        const ok = await systemConfirm({
-          title: 'Allow excess receipt?',
-          description: `${err.message}\n\nAllow excess receipt?`,
-          confirmLabel: 'Allow excess',
-          cancelLabel: 'Cancel',
-          variant: 'danger',
-        })
-        if (ok) {
-          setAllowExcess(true)
-          notify.info('Allow Excess enabled — submit again')
-        }
-      } else {
-        notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
       }
     } finally {
       setSaving(false)
@@ -641,68 +627,24 @@ export function GrnEditorPage() {
       recordHeaderFacts={recordHeaderFacts}
       favoritePath={recordId ? `/purchase/grn/${recordId}/edit` : '/purchase/grn/new'}
       breadcrumbs={breadcrumbs}
-      backLink={{ to: '/purchase/grn', label: 'Back to Goods Receipts' }}
       factBox={documentFactBox}
-      commandBar={
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={{
-            id: 'submit',
-            label: 'Submit',
-            icon: Send,
-            onClick: () => void submit(),
-            disabled: saving || (status !== 'draft' && Boolean(recordId)),
-          }}
-          secondaryActions={[
-            {
-              id: 'save',
-              label: saving ? 'Saving…' : 'Save Draft',
-              icon: Save,
-              onClick: () => void saveDraft(),
-              disabled: saving,
-            },
-          ]}
-        />
-      }
+      commandBar={null}
       stickyFooter
       footer={
-        <ErpStickySaveBar
+        <FormActionBar
           sticky
-          isSubmitting={saving}
-          actions={
-            <ErpButtonGroup>
-              <ErpButton
-                type="button"
-                variant="ghost"
-                disabled={saving}
-                onClick={() => navigate('/purchase/grn')}
-              >
-                Cancel
-              </ErpButton>
-              <ErpButton
-                type="button"
-                variant="secondary"
-                icon={Save}
-                disabled={saving}
-                onClick={() => void saveDraft()}
-              >
-                {saving ? 'Saving…' : 'Save Draft'}
-              </ErpButton>
-            </ErpButtonGroup>
-          }
+          cancelFirst
+          busy={saving}
+          dirty={dirty}
+          onCancel={() => {
+            resetDirty()
+            navigate(PURCHASE_FORM_ROUTES.grn.list)
+          }}
+          onSave={saveDraft}
         />
       }
       onSaveShortcut={() => void saveDraft()}
     >
-      <EnterpriseFormMetrics metrics={formMetrics} />
-
-      <PurchaseFormSectionNav
-        sections={navSections}
-        activeId={activeSection}
-        onSelect={setActiveSection}
-      />
-
       {showPoPicker ? (
         <ErpCardSection
           id={purchaseSectionId('po-source')}
@@ -715,73 +657,82 @@ export function GrnEditorPage() {
           dense
           columns={1}
         >
-          <p className="mb-2 text-[12px] text-erp-muted">
-            GRN lines load from the selected PO’s open quantity. Header warehouse defaults from the PO delivery
-            location.
-          </p>
-          {receivableOrders.length === 0 ? (
-            <p className="text-[13px] text-erp-muted">
-              No receivable purchase orders.{' '}
-              <Link to="/purchase/orders" className="text-erp-primary underline">
-                Open Purchase Orders
-              </Link>
+          <ErpFormSpan span={1}>
+            <p className="mb-2 text-[12px] text-erp-muted">
+              GRN lines load from the selected PO’s open quantity. Header warehouse defaults from the PO delivery
+              location.
             </p>
-          ) : (
-            <>
-              <div
-                className="mb-3 flex flex-wrap gap-1.5"
-                role="tablist"
-                aria-label="Purchase order source"
-              >
-                {receivableOrders.map((o) => {
-                  const openQty = o.lines.reduce((s, l) => s + l.pendingQty, 0)
-                  return (
-                    <button
-                      key={o.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={poId === o.id}
-                      disabled={readOnlyHeaderPo}
-                      className={cn(
-                        'rounded border px-2.5 py-1 text-[12px] font-medium transition-colors',
-                        poId === o.id
-                          ? 'border-erp-primary bg-erp-primary text-white'
-                          : 'border-erp-border bg-erp-surface text-erp-text hover:border-erp-primary hover:bg-erp-primary-soft',
-                        readOnlyHeaderPo && 'cursor-not-allowed opacity-70',
-                      )}
-                      onClick={() => void onSelectPo(o.id)}
-                    >
-                      {o.documentNumber}
-                      <span className={cn('ml-1.5 font-normal', poId === o.id ? 'text-white/80' : 'text-erp-muted')}>
-                        {o.vendor.name} · open {formatNumber(openQty)}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-              <ErpFieldRow
-                label="Purchase Order"
-                required
-                fieldError={fieldErrors.poId}
-                fieldState={fieldErrors.poId ? 'error' : 'idle'}
-              >
-                <Select
-                  value={poId}
-                  disabled={readOnlyHeaderPo}
-                  onChange={(e) => void onSelectPo(e.target.value)}
-                  className="max-w-md"
+            {receivableOrders.length === 0 ? (
+              <p className="text-[13px] text-erp-muted">
+                No receivable purchase orders.{' '}
+                <Link to="/purchase/orders" className="text-erp-primary underline">
+                  Open Purchase Orders
+                </Link>
+              </p>
+            ) : (
+              <>
+                <div
+                  className="mb-3 flex flex-wrap gap-1.5"
+                  role="listbox"
+                  aria-label="Purchase order source"
                 >
-                  <option value="">Select released PO…</option>
-                  {receivableOrders.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.documentNumber} — {o.vendor.name} (open{' '}
-                      {formatNumber(o.lines.reduce((s, l) => s + l.pendingQty, 0))})
-                    </option>
-                  ))}
-                </Select>
-              </ErpFieldRow>
-            </>
-          )}
+                  {receivableOrders.map((o) => {
+                    const openQty = o.lines.reduce((s, l) => s + l.pendingQty, 0)
+                    const selected = poId === o.id
+                    return (
+                      <button
+                        key={o.id}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        title={`${o.documentNumber} — ${o.vendor.name} · open ${formatNumber(openQty)}`}
+                        disabled={readOnlyHeaderPo}
+                        className={cn(
+                          'rounded border px-2.5 py-1 text-[12px] font-medium transition-colors',
+                          selected
+                            ? 'border-erp-primary bg-erp-primary text-white'
+                            : 'border-erp-border bg-erp-surface text-erp-text hover:border-erp-primary hover:bg-erp-primary-soft',
+                          readOnlyHeaderPo && 'cursor-not-allowed opacity-70',
+                        )}
+                        onClick={() => void onSelectPo(o.id)}
+                      >
+                        {o.documentNumber}
+                        <span
+                          className={cn(
+                            'ml-1.5 font-normal',
+                            selected ? 'text-white/80' : 'text-erp-muted',
+                          )}
+                        >
+                          open {formatNumber(openQty)}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <ErpFieldRow
+                  label="Purchase Order"
+                  required
+                  fieldError={fieldErrors.poId}
+                  fieldState={fieldErrors.poId ? 'error' : 'idle'}
+                >
+                  <Select
+                    value={poId}
+                    disabled={readOnlyHeaderPo}
+                    onChange={(e) => void onSelectPo(e.target.value)}
+                    className="max-w-md"
+                  >
+                    <option value="">Select released PO…</option>
+                    {receivableOrders.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.documentNumber} — {o.vendor.name} (open{' '}
+                        {formatNumber(o.lines.reduce((s, l) => s + l.pendingQty, 0))})
+                      </option>
+                    ))}
+                  </Select>
+                </ErpFieldRow>
+              </>
+            )}
+          </ErpFormSpan>
         </ErpCardSection>
       ) : null}
 
@@ -798,8 +749,17 @@ export function GrnEditorPage() {
         <ErpFormSpan span={3}>
           <p className="erp-field-group__label">Document</p>
         </ErpFormSpan>
-        <ErpFieldRow label="GRN Number" readOnly>
-          <Input value={documentNumber ?? 'Auto-generated'} readOnly className="bg-erp-surface-alt" />
+        <ErpFieldRow
+          label="GRN Number"
+          readOnly
+          hint={isNew ? 'Preview from number series — assigned when you save' : undefined}
+        >
+          <Input
+            value={documentNumber ?? ''}
+            placeholder="Loading number…"
+            readOnly
+            className="bg-erp-surface-alt"
+          />
         </ErpFieldRow>
         <ErpFieldRow label="GRN Date" required>
           <Input
@@ -859,7 +819,7 @@ export function GrnEditorPage() {
         icon={Truck}
         accent="green"
         collapsible
-        defaultOpen={false}
+        defaultOpen
         dense
       >
         <ErpFormSpan span={3}>
@@ -871,24 +831,40 @@ export function GrnEditorPage() {
           fieldError={fieldErrors.warehouseId}
           fieldState={fieldErrors.warehouseId ? 'error' : 'idle'}
         >
-          <Input
-            value={warehouseName}
+          <Select
+            value={warehouseId}
             onChange={(e) => {
-              setWarehouseName(e.target.value)
-              if (!warehouseId) setWarehouseId('loc-custom')
+              const wh = warehouses.find((w) => w.id === e.target.value)
+              setWarehouseId(wh?.id ?? '')
+              setWarehouseName(wh?.warehouseName ?? '')
+              setReceivingLocation('')
               markDirty()
             }}
-          />
+          >
+            <option value="">— Select —</option>
+            {warehouses.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.warehouseCode} — {w.warehouseName}
+              </option>
+            ))}
+          </Select>
         </ErpFieldRow>
         <ErpFieldRow label="Receiving Location">
-          <Input
+          <Select
             value={receivingLocation}
             onChange={(e) => {
               setReceivingLocation(e.target.value)
               markDirty()
             }}
-            placeholder="Dock / bay"
-          />
+            disabled={!warehouseId}
+          >
+            <option value="">— Select —</option>
+            {warehouseLocations.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.locationCode} — {l.locationName}
+              </option>
+            ))}
+          </Select>
         </ErpFieldRow>
         <ErpFieldRow label="Received By">
           <Input
@@ -992,6 +968,7 @@ export function GrnEditorPage() {
         dense
         columns={1}
       >
+        <ErpFormSpan span={1}>
         {fieldErrors.lines ? (
           <p className="mb-2 text-sm text-red-600">{fieldErrors.lines}</p>
         ) : (
@@ -999,7 +976,7 @@ export function GrnEditorPage() {
             Adjust received quantities; short / excess recalculate from pending open qty.
           </p>
         )}
-        <div className="overflow-x-auto rounded-md border border-erp-border">
+        <div className="min-w-0 overflow-x-auto rounded-md border border-erp-border">
           <table className="erp-table min-w-full text-left text-[12px]">
             <thead>
               <tr>
@@ -1107,11 +1084,27 @@ export function GrnEditorPage() {
                     ) : null}
                   </td>
                   <td>
-                    <Input
-                      className="w-20"
-                      value={l.bin}
-                      onChange={(e) => updateLine(i, { bin: e.target.value })}
-                    />
+                    {isApiMode() ? (
+                      <Select
+                        className="w-32"
+                        value={l.bin}
+                        onChange={(e) => updateLine(i, { bin: e.target.value })}
+                        disabled={!warehouseBins.length}
+                      >
+                        <option value="">— Select —</option>
+                        {warehouseBins.map((b) => (
+                          <option key={b.id} value={b.code ?? b.name}>
+                            {b.code ?? b.name}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : (
+                      <Input
+                        className="w-20"
+                        value={l.bin}
+                        onChange={(e) => updateLine(i, { bin: e.target.value })}
+                      />
+                    )}
                   </td>
                   <td>
                     <Input
@@ -1134,6 +1127,7 @@ export function GrnEditorPage() {
             </p>
           ) : null}
         </div>
+        </ErpFormSpan>
       </ErpCardSection>
 
       <ErpCardSection
@@ -1144,23 +1138,21 @@ export function GrnEditorPage() {
         icon={StickyNote}
         accent="violet"
         collapsible
-        defaultOpen={false}
+        defaultOpen
         dense
+        columns={1}
       >
-        <ErpFormSpan span={3}>
-          <p className="erp-field-group__label">Remarks</p>
-        </ErpFormSpan>
-        <ErpFormSpan span={3}>
+        <ErpFieldRow label="Remarks" horizontal={false}>
           <Textarea
             value={remarks}
             onChange={(e) => {
               setRemarks(e.target.value)
               markDirty()
             }}
-            rows={3}
+            rows={4}
             placeholder="Gate notes, discrepancy context, QC instructions…"
           />
-        </ErpFormSpan>
+        </ErpFieldRow>
       </ErpCardSection>
     </PurchaseCardFormShell>
   )

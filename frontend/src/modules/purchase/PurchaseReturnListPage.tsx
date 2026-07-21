@@ -8,7 +8,6 @@ import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFil
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpDataGrid } from '@/components/erp/ErpDataGrid'
-import { ErpPageGuide } from '@/components/erp/ErpPageGuide'
 import { TableLink } from '@/components/ui/AppLink'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
@@ -278,10 +277,6 @@ export function PurchaseReturnListPage() {
             />
           ) : (
             <>
-              <ErpPageGuide
-                purpose="Purchase returns against GRN or PO."
-                nextStep="Create return, approve, then ship back."
-              />
               <EnterpriseRegisterTableShell className="min-w-0">
                 <ErpDataGrid
                   data={filtered}

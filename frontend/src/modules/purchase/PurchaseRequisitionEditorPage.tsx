@@ -1,21 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowRight,
   Banknote,
-  Eye,
-  FileSpreadsheet,
+  ClipboardList,
+  FileText,
   Layers,
   Package,
   Paperclip,
-  Plus,
-  Printer,
-  Save,
-  Send,
-  Trash2,
-  Zap,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
+import { useOptionalAuth } from '@/context/AuthProvider'
+import { isApiMode } from '@/config/apiConfig'
 import {
   PurchaseEnterpriseFactBox,
   purchaseSectionId,
@@ -24,14 +19,8 @@ import {
 import {
   purchaseStatusTone,
 } from '@/components/purchase/purchaseCardFormShared'
-import {
-  PurchaseRequisitionWorkspaceTabs,
-  derivePrWorkspaceTabs,
-  prSectionToWorkspace,
-  prWorkspaceHasValidationErrors,
-  type PrEditorWorkspace,
-} from '@/components/purchase/PurchaseRequisitionWorkspaceTabs'
 import { PurchaseRequisitionLinesTable } from '@/components/purchase/PurchaseRequisitionLinesTable'
+import { PurchaseRequisitionPathBanner } from '@/components/purchase/PurchaseRequisitionPathBanner'
 import {
   PurchaseDocumentAttachments,
   type PurchaseDocumentAttachmentRow,
@@ -40,13 +29,9 @@ import {
   ErpCardSection,
   ErpFieldRow,
   ErpFormSpan,
-  ErpQuickEntrySection,
-  ErpStickySaveBar,
   ErpViewField,
 } from '@/components/erp/card-form'
-import { EnterpriseFormMetrics } from '@/design-system/workspace'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
+import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Input, Textarea, Select } from '@/components/forms/Inputs'
 import {
   approvalActivitySummary,
@@ -61,13 +46,14 @@ import { LoadingState } from '@/design-system/components/LoadingState'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
   createPurchaseRequisition,
-  deletePurchaseRequisition,
   getApprovalHistory,
   getPurchaseItems,
   getPurchaseRequisitionById,
+  getPurchaseSetup,
+  getPurchaseWarehouses,
   getVendors,
+  previewNextPurchaseRequisitionNumber,
   PurchaseServiceError,
-  submitPurchaseRequisition,
   updatePurchaseRequisition,
   PURCHASE_REQUISITION_ATTACHMENT_KIND_LABELS,
   PURCHASE_REQUISITION_PRIORITY_LABELS,
@@ -75,18 +61,21 @@ import {
   PURCHASE_REQUISITION_STATUS_LABELS,
   PURCHASE_REQUISITION_TYPE_LABELS,
 } from '@/services/purchase'
-import type {
-  ApprovalHistory,
-  PurchaseItem,
-  PurchaseRequisition,
-  PurchaseRequisitionAttachmentKind,
-  PurchaseRequisitionAttachmentPlaceholder,
-  Vendor,
+import {
+  type ApprovalHistory,
+  type PurchaseItem,
+  type PurchaseItemCategory,
+  type PurchaseRequisition,
+  type PurchaseRequisitionAttachmentKind,
+  type PurchaseRequisitionAttachmentPlaceholder,
+  type Vendor,
 } from '@/types/purchaseDomain'
-import { PURCHASE_DEMO_LOCATION } from '@/data/purchase/purchaseDomainSeed'
 import {
   summarizePrLines,
   validatePurchaseRequisitionForm,
+  PR_DEPARTMENT_OPTIONS,
+  prDepartmentLabel,
+  normalizePrDepartmentCode,
   type PrEditorHeader,
   type PrEditorLine,
 } from '@/utils/purchaseRequisitionValidation'
@@ -94,18 +83,36 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { systemConfirm } from '@/utils/systemConfirm'
-import { usePurchasePermissions } from '@/utils/permissions'
+import { getSessionUser } from '@/utils/permissions'
+import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 
-const ACTOR = { id: 'user-buyer-01', code: 'BUY01', name: 'Rahul Patil' }
+const ACTOR = { id: '', code: '', name: '' }
+
+type LocationOption = {
+  id: string
+  code: string
+  name: string
+  state: string
+  city: string
+}
+
+const EMPTY_LOCATION: LocationOption = {
+  id: '',
+  code: '',
+  name: '',
+  state: '',
+  city: '',
+}
 
 function prPlaceholdersToRows(
   list: PurchaseRequisitionAttachmentPlaceholder[],
+  uploadedBy: string,
 ): PurchaseDocumentAttachmentRow[] {
   return list.map((a) => ({
     id: a.id,
     fileName: a.fileName.trim() || a.id,
     type: PURCHASE_REQUISITION_ATTACHMENT_KIND_LABELS[a.kind],
-    uploadedBy: ACTOR.name,
+    uploadedBy,
     uploadedAt: '',
     sizeBytes: null,
   }))
@@ -157,39 +164,64 @@ function emptyLine(partial?: Partial<PrEditorLine>): PrEditorLine {
     itemCode: '',
     itemName: '',
     specification: '',
-    category: 'consumable',
+    category: '',
+    uomId: null,
     uom: 'NOS',
     hsnCode: '',
     sacCode: null,
-    quantity: 1,
+    quantity: 0,
     estimatedRate: 0,
     amount: 0,
     currentStock: 0,
     openPoQty: 0,
     preferredVendorId: null,
     preferredVendorName: null,
+    vendorNumber: '',
     requiredDate: today(),
-    locationId: PURCHASE_DEMO_LOCATION.id,
-    locationName: PURCHASE_DEMO_LOCATION.name,
+    orderDate: '',
+    customerName: '',
+    locationId: '',
+    locationName: '',
+    binCode: '',
+    purchaseOrderId: null,
+    purchaseOrderNumber: '',
+    purchaseQuoteNumber: '',
     purpose: '',
     remarks: '',
     attachmentNote: '',
+    actionMessage: false,
     ...partial,
   }
 }
 
-function defaultHeader(): PrEditorHeader {
+function resolveLocation(
+  locationId: string,
+  options: LocationOption[],
+): LocationOption {
+  if (!locationId) return EMPTY_LOCATION
+  return options.find((l) => l.id === locationId) ?? EMPTY_LOCATION
+}
+
+function defaultHeader(opts?: {
+  locationId?: string
+  skipRfq?: boolean
+  locations?: LocationOption[]
+  requester?: { id: string; code: string; name: string }
+}): PrEditorHeader {
+  const locations = opts?.locations?.length ? opts.locations : []
+  const loc = resolveLocation(opts?.locationId ?? locations[0]?.id ?? '', locations)
+  const requester = opts?.requester ?? ACTOR
   return {
     documentDate: today(),
     department: '',
-    locationId: PURCHASE_DEMO_LOCATION.id,
-    locationCode: PURCHASE_DEMO_LOCATION.code,
-    locationName: PURCHASE_DEMO_LOCATION.name,
-    locationState: PURCHASE_DEMO_LOCATION.state,
-    locationCity: PURCHASE_DEMO_LOCATION.city,
-    requesterId: ACTOR.id,
-    requesterCode: ACTOR.code,
-    requesterName: ACTOR.name,
+    locationId: loc.id,
+    locationCode: loc.code,
+    locationName: loc.name,
+    locationState: loc.state,
+    locationCity: loc.city,
+    requesterId: requester.id,
+    requesterCode: requester.code,
+    requesterName: requester.name,
     expectedDeliveryDate: today(),
     priority: 'normal',
     requisitionType: 'material',
@@ -201,14 +233,14 @@ function defaultHeader(): PrEditorHeader {
     referenceNumber: '',
     purpose: '',
     remarks: '',
-    rfqRequired: true,
+    rfqRequired: !(opts?.skipRfq ?? false),
   }
 }
 
 function headerFromPr(pr: PurchaseRequisition): PrEditorHeader {
   return {
     documentDate: pr.documentDate,
-    department: pr.department,
+    department: normalizePrDepartmentCode(pr.department),
     locationId: pr.location.id,
     locationCode: pr.location.code,
     locationName: pr.location.name,
@@ -233,26 +265,20 @@ function headerFromPr(pr: PurchaseRequisition): PrEditorHeader {
 }
 
 function linesFromPr(pr: PurchaseRequisition): PrEditorLine[] {
-  return pr.lines.map((l) => ({ ...l, key: l.id || crypto.randomUUID() }))
+  return pr.lines.map((l) => ({
+    ...l,
+    key: l.id || crypto.randomUUID(),
+    actionMessage: false,
+  }))
 }
 
-const LOCATION_OPTIONS = [
-  { ...PURCHASE_DEMO_LOCATION },
-  {
-    id: 'loc-chakan-fg',
-    code: 'CHAKAN-FG',
-    name: 'Chakan FG Yard',
-    state: 'Maharashtra',
-    city: 'Pune',
-  },
-]
-
 export function PurchaseRequisitionEditorPage() {
-  const perms = usePurchasePermissions()
+  const auth = useOptionalAuth()
+  const session = auth?.session ?? null
   const { id } = useParams()
   const isNew = !id
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(!isNew)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [recordId, setRecordId] = useState<string | null>(id ?? null)
   const [documentNumber, setDocumentNumber] = useState<string | null>(null)
@@ -265,8 +291,8 @@ export function PurchaseRequisitionEditorPage() {
   const [updatedMeta, setUpdatedMeta] = useState({ by: '', at: '' })
   const [catalogItems, setCatalogItems] = useState<PurchaseItem[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
+  const [locationOptions, setLocationOptions] = useState<LocationOption[]>([])
   const [attemptedSubmit, setAttemptedSubmit] = useState(false)
-  const [workspace, setWorkspace] = useState<PrEditorWorkspace>('requisition')
   const [, setLastSavedAt] = useState<Date | null>(null)
   const [forceOpenAdditionalKey, setForceOpenAdditionalKey] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -274,20 +300,23 @@ export function PurchaseRequisitionEditorPage() {
   const editable = status === 'draft' || status === 'rejected'
   const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(editable)
 
+  useEffect(() => {
+    if (!isNew || !isApiMode() || !session?.user) return
+    const name = `${session.user.firstName ?? ''} ${session.user.lastName ?? ''}`.trim()
+    setHeader((prev) => ({
+      ...prev,
+      requesterId: session.user.id,
+      requesterCode: session.user.email?.split('@')[0] ?? '',
+      requesterName: name || session.user.email || session.user.id,
+    }))
+    setCreatedMeta((prev) => ({ ...prev, by: name || session.user.email || prev.by }))
+  }, [isNew, session])
+
   const validation = useMemo(
     () => validatePurchaseRequisitionForm(header, lines),
     [header, lines],
   )
   const showErrors = attemptedSubmit
-  const workspaceTabs = useMemo(
-    () =>
-      derivePrWorkspaceTabs({
-        submitValidation: validation,
-        attemptedValidation: showErrors ? validation : null,
-        dirty,
-      }),
-    [validation, showErrors, dirty],
-  )
   const summary = useMemo(() => summarizePrLines(lines), [lines])
   const financeDefaultOpen = hasMeaningfulTaxTotals(
     summary.estimatedSubtotal,
@@ -316,40 +345,14 @@ export function PurchaseRequisitionEditorPage() {
     [status, history.length],
   )
   const additionalDefaultOpen =
-    header.source === 'work_order' ||
-    header.source === 'maintenance' ||
-    Boolean(header.costCentre.trim()) ||
-    Boolean(header.project.trim()) ||
-    Boolean(header.productionOrderNo.trim()) ||
-    Boolean(header.maintenanceOrderNo.trim()) ||
-    Boolean(header.referenceNumber.trim()) ||
-    Boolean(header.remarks.trim())
+    status === 'pending_approval' || status === 'approved' || history.length > 0
   const additionalSummaryText = useMemo(
     () =>
       joinFastTabSummary([
-        PURCHASE_REQUISITION_SOURCE_LABELS[header.source],
-        header.costCentre.trim() || false,
-        header.project.trim() || false,
-        header.productionOrderNo.trim()
-          ? `Prod ${header.productionOrderNo.trim()}`
-          : false,
-        header.maintenanceOrderNo.trim()
-          ? `Maint ${header.maintenanceOrderNo.trim()}`
-          : false,
-        header.referenceNumber.trim() ? `Ref ${header.referenceNumber.trim()}` : false,
-        header.remarks.trim() ? 'Remarks set' : false,
+        PURCHASE_REQUISITION_STATUS_LABELS[status],
         approvalSummaryText || false,
       ]),
-    [
-      header.source,
-      header.costCentre,
-      header.project,
-      header.productionOrderNo,
-      header.maintenanceOrderNo,
-      header.referenceNumber,
-      header.remarks,
-      approvalSummaryText,
-    ],
+    [status, approvalSummaryText],
   )
   const quickEntrySummaryText = useMemo(
     () =>
@@ -357,8 +360,12 @@ export function PurchaseRequisitionEditorPage() {
         header.department.trim() || false,
         PURCHASE_REQUISITION_PRIORITY_LABELS[header.priority],
         PURCHASE_REQUISITION_TYPE_LABELS[header.requisitionType],
-        header.rfqRequired ? 'RFQ after approval' : 'PO after approval',
+        header.rfqRequired ? 'RFQ Purchase Path' : 'Direct Purchase Planning Path',
         header.locationName || false,
+        PURCHASE_REQUISITION_SOURCE_LABELS[header.source],
+        header.project.trim() || false,
+        header.referenceNumber.trim() ? `Ref ${header.referenceNumber.trim()}` : false,
+        header.remarks.trim() ? 'Remarks set' : false,
         formatFastTabDate(header.expectedDeliveryDate)
           ? `Need-by ${formatFastTabDate(header.expectedDeliveryDate)}`
           : false,
@@ -369,6 +376,10 @@ export function PurchaseRequisitionEditorPage() {
       header.requisitionType,
       header.rfqRequired,
       header.locationName,
+      header.source,
+      header.project,
+      header.referenceNumber,
+      header.remarks,
       header.expectedDeliveryDate,
     ],
   )
@@ -409,14 +420,16 @@ export function PurchaseRequisitionEditorPage() {
   const documentTitle = isNew
     ? 'New Purchase Requisition'
     : (documentNumber ?? 'Purchase Requisition')
-  const departmentFact = header.department || 'Not selected'
+  const departmentFact = header.department
+    ? prDepartmentLabel(header.department)
+    : 'Not selected'
 
   const recordHeaderFacts = useMemo(
     () => [
       ...(documentNumber
         ? [{ label: 'PR No', value: documentNumber }]
         : isNew
-          ? [{ label: 'PR No', value: 'Auto-generated on save' }]
+          ? [{ label: 'PR No', value: 'Loading…' }]
           : []),
       { label: 'Department', value: departmentFact },
       { label: 'Requester', value: header.requesterName },
@@ -469,11 +482,86 @@ export function PurchaseRequisitionEditorPage() {
   }
 
   useEffect(() => {
-    void Promise.all([getPurchaseItems(), getVendors()]).then(([items, v]) => {
-      setCatalogItems(items)
-      setVendors(v)
-    })
+    void Promise.all([getPurchaseItems(), getVendors(), getPurchaseWarehouses()]).then(
+      ([items, v, warehouses]) => {
+        setCatalogItems(items)
+        setVendors(v)
+        if (warehouses.length) {
+          setLocationOptions(
+            warehouses.map((w) => ({
+              id: w.id,
+              code: w.code,
+              name: w.name,
+              state: w.state,
+              city: w.city,
+            })),
+          )
+        }
+      },
+    )
   }, [])
+
+  const threeEmptyLines = (loc?: { locationId: string; locationName: string }) =>
+    [emptyLine(loc), emptyLine(loc), emptyLine(loc)].map((l, i) => ({
+      ...l,
+      lineNo: i + 1,
+    }))
+
+  useEffect(() => {
+    if (!isNew) return
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      const [setup, nextNumber, warehouses] = await Promise.all([
+        getPurchaseSetup(),
+        previewNextPurchaseRequisitionNumber().catch(() => null),
+        getPurchaseWarehouses(),
+      ])
+      if (cancelled) return
+      if (nextNumber) setDocumentNumber(nextNumber)
+      const locs =
+        warehouses.length > 0
+          ? warehouses.map((w) => ({
+              id: w.id,
+              code: w.code,
+              name: w.name,
+              state: w.state,
+              city: w.city,
+            }))
+          : []
+      setLocationOptions(locs)
+      // Requisition Setup default wins; fall back to the General Setup warehouse.
+      const candidateIds = [
+        setup.requisition.defaultWarehouseId,
+        setup.general.defaultWarehouseId,
+      ]
+      const preferredId =
+        candidateIds.find((id) => id && locs.some((l) => l.id === id)) ?? ''
+      const loc = resolveLocation(preferredId ?? '', locs)
+      setHeader((prev) => {
+        // Preserve the session-derived requester — this effect resolves after the
+        // session effect and must not reset it back to the empty ACTOR default.
+        const fallback = getSessionUser()
+        return defaultHeader({
+          locationId: loc.id,
+          skipRfq: setup.requisition.skipRfq,
+          locations: locs,
+          requester: prev.requesterId
+            ? { id: prev.requesterId, code: prev.requesterCode, name: prev.requesterName }
+            : { id: fallback.id, code: '', name: fallback.name },
+        })
+      })
+      const lineLoc = loc.id
+        ? { locationId: loc.id, locationName: loc.name }
+        : undefined
+      setLines(threeEmptyLines(lineLoc))
+      resetDirty()
+      setLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isNew, resetDirty])
 
   const catalogItemsForPicker = useMemo(
     () =>
@@ -528,14 +616,22 @@ export function PurchaseRequisitionEditorPage() {
       state: header.locationState,
       city: header.locationCity,
     }
+    const sessionUser = session?.user
+    const requesterId = header.requesterId || sessionUser?.id || ''
+    const requesterName =
+      header.requesterName ||
+      (sessionUser
+        ? `${sessionUser.firstName ?? ''} ${sessionUser.lastName ?? ''}`.trim() ||
+          sessionUser.email
+        : '')
     return {
       documentDate: header.documentDate,
       department: header.department,
       location,
       requester: {
-        id: header.requesterId,
-        code: header.requesterCode,
-        name: header.requesterName,
+        id: requesterId,
+        code: header.requesterCode || sessionUser?.email?.split('@')[0] || '',
+        name: requesterName,
       },
       expectedDeliveryDate: header.expectedDeliveryDate || null,
       priority: header.priority,
@@ -552,13 +648,36 @@ export function PurchaseRequisitionEditorPage() {
       attachmentPlaceholders: attachments,
       estimatedTaxPct: summary.estimatedTaxPct,
       lines: lines
-        .filter((l) => l.itemName.trim() || l.itemCode.trim() || l.itemId)
-        .map(({ key: _key, ...rest }) => rest),
+        .filter(
+          (l) =>
+            (l.itemName.trim() || l.itemCode.trim() || l.itemId) &&
+            l.category &&
+            Number(l.quantity) > 0,
+        )
+        .map(({ key: _key, category, actionMessage: _actionMessage, ...rest }) => ({
+          ...rest,
+          category: category as PurchaseItemCategory,
+        })),
     }
-  }, [attachments, header, lines, summary.estimatedTaxPct])
+  }, [attachments, header, lines, session, summary.estimatedTaxPct])
 
-  const saveDraft = async (andStay = true) => {
-    if (!editable) return
+  const saveDraft = async () => {
+    if (!editable || saving) return
+    setAttemptedSubmit(true)
+    if (validation.errors.length) {
+      const section =
+        validation.fieldErrors.department ||
+        validation.fieldErrors.locationId ||
+        validation.fieldErrors.requesterId ||
+        validation.fieldErrors.expectedDeliveryDate
+          ? 'general'
+          : validation.errors.some((e) => /line|quantity|item|uom/i.test(e))
+            ? 'lines'
+            : 'general'
+      focusValidationSection(section)
+      notify.error(validation.errors[0] ?? 'Fix validation errors before saving')
+      return
+    }
     setSaving(true)
     try {
       if (recordId) {
@@ -566,7 +685,7 @@ export function PurchaseRequisitionEditorPage() {
         setDocumentNumber(updated.documentNumber)
         setStatus(updated.status)
         setUpdatedMeta({ by: updated.updatedBy ?? '', at: updated.updatedAt ?? '' })
-        notify.success(`Draft saved · ${updated.documentNumber}`)
+        notify.success(`Saved · ${updated.documentNumber}`)
         setLastSavedAt(new Date())
       } else {
         const created = await createPurchaseRequisition(toInput())
@@ -574,14 +693,11 @@ export function PurchaseRequisitionEditorPage() {
         setDocumentNumber(created.documentNumber)
         setStatus(created.status)
         setCreatedMeta({ by: created.createdBy, at: created.createdAt })
-        notify.success(`Draft created · ${created.documentNumber}`)
+        notify.success(`Saved · ${created.documentNumber}`)
         setLastSavedAt(new Date())
-        resetDirty()
-        navigate(`/purchase/requisitions/${created.id}/edit`, { replace: true })
-        return
       }
       resetDirty()
-      if (!andStay && recordId) navigate(`/purchase/requisitions/${recordId}`)
+      navigate(PURCHASE_FORM_ROUTES.requisition.list, { replace: true })
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
     } finally {
@@ -591,8 +707,6 @@ export function PurchaseRequisitionEditorPage() {
 
   const focusValidationSection = useCallback(
     (section: 'general' | 'lines') => {
-      const target = prSectionToWorkspace(section)
-      setWorkspace(target)
       const needsAdditional =
         section === 'general' &&
         (Boolean(validation.fieldErrors.productionOrderNo) ||
@@ -609,24 +723,14 @@ export function PurchaseRequisitionEditorPage() {
 
   const focusValidationItem = useCallback(
     (message: string) => {
-      const inRequisition = prWorkspaceHasValidationErrors('requisition', validation)
-      const inLineItems = prWorkspaceHasValidationErrors('line_items', validation)
       const looksLikeLine =
         /line/i.test(message) ||
         /quantity/i.test(message) ||
         /description/i.test(message) ||
-        /unit/i.test(message)
-      const target: PrEditorWorkspace =
-        looksLikeLine && inLineItems
-          ? 'line_items'
-          : inRequisition
-            ? 'requisition'
-            : inLineItems
-              ? 'line_items'
-              : 'requisition'
-      setWorkspace(target)
+        /unit/i.test(message) ||
+        /At least one line/i.test(message)
       const needsAdditional =
-        target === 'requisition' &&
+        !looksLikeLine &&
         (Boolean(validation.fieldErrors.productionOrderNo) ||
           Boolean(validation.fieldErrors.maintenanceOrderNo))
       if (needsAdditional) {
@@ -634,78 +738,18 @@ export function PurchaseRequisitionEditorPage() {
       }
       window.requestAnimationFrame(() => {
         scrollToPurchaseSection(
-          target === 'line_items' ? 'lines' : needsAdditional ? 'costing' : 'general',
+          looksLikeLine ? 'lines' : needsAdditional ? 'costing' : 'general',
         )
       })
     },
-    [validation],
+    [validation.fieldErrors.productionOrderNo, validation.fieldErrors.maintenanceOrderNo],
   )
 
-  const submitForApproval = async () => {
-    setAttemptedSubmit(true)
-    if (validation.errors.length) {
-      const section =
-        validation.fieldErrors.department ||
-        validation.fieldErrors.locationId ||
-        validation.fieldErrors.purpose ||
-        validation.fieldErrors.productionOrderNo ||
-        validation.fieldErrors.maintenanceOrderNo ||
-        validation.fieldErrors.expectedDeliveryDate
-          ? 'general'
-          : validation.errors.some((e) => /line|quantity|description|unit/i.test(e))
-            ? 'lines'
-            : 'general'
-      focusValidationSection(section)
-      return
-    }
-    setSaving(true)
-    try {
-      let prId = recordId
-      if (!prId) {
-        const created = await createPurchaseRequisition(toInput())
-        prId = created.id
-        setRecordId(created.id)
-        setDocumentNumber(created.documentNumber)
-      } else {
-        await updatePurchaseRequisition(prId, toInput())
-      }
-      const submitted = await submitPurchaseRequisition(prId)
-      setStatus(submitted.status)
-      resetDirty()
-      notify.success(`${submitted.documentNumber} submitted for approval`)
-      navigate(`/purchase/requisitions/${prId}`)
-    } catch (err) {
-      notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const onDelete = async () => {
-    if (!recordId) {
-      navigate('/purchase/requisitions')
-      return
-    }
-    if (!(await systemConfirm({
-      title: 'Delete draft requisition?',
-      description: 'This draft will be permanently removed.',
-      confirmLabel: 'Delete',
-      cancelLabel: 'Cancel',
-      variant: 'danger',
-    }))) return
-    try {
-      await deletePurchaseRequisition(recordId)
-      resetDirty()
-      notify.success('Requisition deleted')
-      navigate('/purchase/requisitions')
-    } catch (err) {
-      notify.error(err instanceof PurchaseServiceError ? err.message : 'Delete failed')
-    }
-  }
-
   const applyItemCatalog = (key: string, itemId: string) => {
+    const line = lines.find((l) => l.key === key)
     const item = catalogItems.find((i) => i.id === itemId)
-    if (!item) return
+    if (!item || !line) return
+    if (line.category && item.category !== line.category) return
     const vendor = item.preferredVendorId
       ? vendors.find((v) => v.id === item.preferredVendorId)
       : undefined
@@ -714,13 +758,16 @@ export function PurchaseRequisitionEditorPage() {
       itemCode: item.itemCode,
       itemName: item.itemName,
       category: item.category,
+      uomId: item.uomId,
       uom: item.uom,
       hsnCode: item.hsnCode,
       sacCode: item.sacCode,
       estimatedRate: item.standardRate,
+      quantity: Number(line.quantity) > 0 ? line.quantity : 1,
       itemType: item.category === 'job_work' ? 'service' : 'inventory',
       preferredVendorId: vendor?.id ?? null,
       preferredVendorName: vendor?.vendorName ?? null,
+      vendorNumber: vendor?.vendorCode ?? '',
       currentStock: Math.max(0, Math.round(item.reorderLevel * 1.4)),
       openPoQty: Math.max(0, Math.round(item.reorderLevel * 0.3)),
     })
@@ -746,14 +793,17 @@ export function PurchaseRequisitionEditorPage() {
         itemId: matched?.id ?? '',
         itemCode: code || matched?.itemCode || '',
         itemName: name || matched?.itemName || code || 'Imported item',
+        uomId: matched?.uomId ?? null,
         uom: uom || matched?.uom || 'NOS',
         quantity,
         estimatedRate: estimatedRate || matched?.standardRate || 0,
         hsnCode: matched?.hsnCode ?? '',
-        category: matched?.category ?? 'consumable',
+        category: matched?.category ?? '',
+        locationId: header.locationId,
+        locationName: header.locationName,
       })
     })
-    setLinesDirty([...(lines.filter((l) => l.itemName || l.itemCode) ), ...imported])
+    setLinesDirty([...(lines.filter((l) => l.itemName || l.itemCode)), ...imported])
     notify.success(`Imported ${imported.length} line(s)`)
   }
 
@@ -787,7 +837,6 @@ export function PurchaseRequisitionEditorPage() {
       statusKey={status}
       recordHeaderFacts={recordHeaderFacts}
       favoritePath={recordId ? `/purchase/requisitions/${recordId}/edit` : '/purchase/requisitions/new'}
-      backLink={{ to: '/purchase/requisitions', label: 'Back to Requisitions' }}
       breadcrumbs={[
         { label: 'Requisitions', to: '/purchase/requisitions' },
         { label: isNew ? 'New' : documentNumber ?? 'Edit' },
@@ -806,10 +855,10 @@ export function PurchaseRequisitionEditorPage() {
                 /description/i.test(message) ||
                 /unit/i.test(message) ||
                 /At least one line/i.test(message)
-              const workspaceLabel = looksLikeLine ? 'Line Items' : 'Requisition'
+              const sectionLabel = looksLikeLine ? 'Item Details' : 'Requisition Header'
               return {
                 id: `pr-err-${i}`,
-                label: `${workspaceLabel} · ${message}`,
+                label: `${sectionLabel} · ${message}`,
                 message: 'Required',
                 onClick: () => focusValidationItem(message),
               }
@@ -821,82 +870,71 @@ export function PurchaseRequisitionEditorPage() {
           message: 'Warning',
         })),
       ]}
-      commandBar={
-        <>
-          <ErpCommandBar
-            inline
-            sticky={false}
-            collapseSecondaryOnNarrow={false}
-            primaryAction={
-              perms.canSubmitRequisition
-                ? {
-                    id: 'submit',
-                    label: 'Submit for Approval',
-                    icon: Send,
-                    onClick: () => void submitForApproval(),
-                    disabled: !editable || saving || (attemptedSubmit && validation.errors.length > 0),
-                    disabledReason:
-                      attemptedSubmit && validation.errors.length
-                        ? 'Fix validation errors first'
-                        : !editable
-                          ? 'Document is read-only'
-                          : undefined,
-                  }
-                : undefined
-            }
-            secondaryActions={[
-              {
-                id: 'draft',
-                label: saving ? 'Saving…' : 'Save Draft',
-                icon: Save,
-                pin: true,
-                onClick: () => void saveDraft(true),
-                disabled: !editable || saving,
-                disabledReason: editable ? undefined : 'Document is read-only',
-              },
-              {
-                id: 'print',
-                label: 'Print',
-                icon: Printer,
-                onClick: () => window.print(),
-              },
-            ]}
-            moreActions={[
-              {
-                id: 'add-line',
-                label: 'Add blank line',
-                icon: Plus,
-                onClick: () => setLinesDirty([...lines, emptyLine()]),
-                disabled: !editable,
-              },
-              {
-                id: 'import',
-                label: 'Import from Excel / CSV',
-                icon: FileSpreadsheet,
-                onClick: () => fileInputRef.current?.click(),
-                disabled: !editable,
-              },
-              {
-                id: 'view-doc',
-                label: 'View document',
-                icon: Eye,
-                onClick: () => {
-                  if (recordId) navigate(`/purchase/requisitions/${recordId}`)
-                },
-                disabled: !recordId,
-                disabledReason: 'Save the requisition first',
-              },
-            ]}
-            destructiveActions={[
-              {
-                id: 'delete',
-                label: 'Delete',
-                icon: Trash2,
-                onClick: () => void onDelete(),
-                disabled: !editable || saving,
-              },
-            ]}
-          />
+      commandBar={null}
+      factBox={
+        <PurchaseEnterpriseFactBox
+          title="PR insight"
+          metrics={formMetrics}
+          summary={[
+            { label: 'PR No.', value: documentNumber ?? (isNew ? 'Loading…' : '—') },
+            { label: 'Status', value: PURCHASE_REQUISITION_STATUS_LABELS[status] },
+            {
+              label: 'Department',
+              value: header.department ? prDepartmentLabel(header.department) : '—',
+              highlight: Boolean(header.department),
+            },
+            {
+              label: 'Priority',
+              value: PURCHASE_REQUISITION_PRIORITY_LABELS[header.priority],
+              highlight: header.priority === 'urgent',
+            },
+            {
+              label: 'Process path',
+              value: header.rfqRequired ? 'RFQ Purchase Path' : 'Direct Purchase Planning Path',
+              highlight: !header.rfqRequired,
+            },
+            {
+              label: 'Est. Total',
+              value: formatCurrency(summary.estimatedTotal),
+              highlight: true,
+            },
+            ...(dirty
+              ? [{ label: 'Changes', value: 'Unsaved', highlight: true as const }]
+              : []),
+          ]}
+        >
+          <ul className="mt-3 list-disc space-y-1 pl-4 text-[11px] text-erp-muted">
+            <li>PR Number is reserved from the series and confirmed on save.</li>
+            <li>Urgent PRs require Purpose before submit.</li>
+          </ul>
+          {dirty ? (
+            <div className="mt-2">
+              <Badge color="orange">Unsaved changes</Badge>
+            </div>
+          ) : null}
+        </PurchaseEnterpriseFactBox>
+      }
+      stickyFooter
+      footer={
+        <FormActionBar
+          sticky
+          cancelFirst
+          busy={saving}
+          dirty={dirty}
+          disabled={!editable}
+          disabledReason={!editable ? 'Document is read-only' : undefined}
+          onCancel={() => {
+            resetDirty()
+            navigate(PURCHASE_FORM_ROUTES.requisition.list)
+          }}
+          onSave={saveDraft}
+        />
+      }
+      onSaveShortcut={() => void saveDraft()}
+    >
+      <div className="space-y-3">
+          <PurchaseRequisitionPathBanner rfqRequired={header.rfqRequired} />
+
           <input
             ref={fileInputRef}
             type="file"
@@ -909,169 +947,33 @@ export function PurchaseRequisitionEditorPage() {
               e.target.value = ''
             }}
           />
-        </>
-      }
-      factBox={
-        <PurchaseEnterpriseFactBox
-          title="PR insight"
-          metrics={formMetrics}
-          summary={[
-            { label: 'PR No.', value: documentNumber ?? 'Auto-generated on save' },
-            { label: 'Status', value: PURCHASE_REQUISITION_STATUS_LABELS[status] },
-            {
-              label: 'Department',
-              value: header.department || '—',
-              highlight: Boolean(header.department),
-            },
-            {
-              label: 'Priority',
-              value: PURCHASE_REQUISITION_PRIORITY_LABELS[header.priority],
-              highlight: header.priority === 'urgent',
-            },
-            {
-              label: 'After approval',
-              value: header.rfqRequired ? 'Create RFQ' : 'Create Purchase Order',
-              highlight: !header.rfqRequired,
-            },
-            {
-              label: 'Est. Total',
-              value: formatCurrency(summary.estimatedTotal),
-              highlight: true,
-            },
-            ...(dirty
-              ? [{ label: 'Changes', value: 'Unsaved', highlight: true as const }]
-              : []),
-          ]}
-          actions={[
-            {
-              id: 'draft',
-              label: saving ? 'Saving…' : 'Save Draft',
-              icon: Save,
-              onClick: () => void saveDraft(true),
-              disabled: !editable || saving,
-            },
-            ...(perms.canSubmitRequisition
-              ? [
-                  {
-                    id: 'submit',
-                    label: 'Submit for Approval',
-                    icon: Send,
-                    primary: true as const,
-                    onClick: () => void submitForApproval(),
-                    disabled: !editable || saving,
-                  },
-                ]
-              : []),
-          ]}
-        >
-          <ul className="mt-3 list-disc space-y-1 pl-4 text-[11px] text-erp-muted">
-            <li>PR Number is auto-generated on first save.</li>
-            <li>Urgent PRs require Purpose before submit.</li>
-            <li>Production / Maintenance sources need linked order numbers.</li>
-          </ul>
-          {dirty ? (
-            <div className="mt-2">
-              <Badge color="orange">Unsaved changes</Badge>
-            </div>
-          ) : null}
-        </PurchaseEnterpriseFactBox>
-      }
-      stickyFooter
-      footer={
-        <ErpStickySaveBar
-          sticky
-          isSubmitting={saving}
-          cancelLabel="Cancel"
-          onCancel={() => navigate('/purchase/requisitions')}
-          actions={
-            <ErpButtonGroup>
-              <ErpButton
-                type="button"
-                variant="ghost"
-                disabled={saving}
-                onClick={() => navigate('/purchase/requisitions')}
-              >
-                Cancel
-              </ErpButton>
-              <ErpButton
-                type="button"
-                variant="secondary"
-                icon={Save}
-                disabled={!editable || saving}
-                onClick={() => void saveDraft(true)}
-              >
-                {saving ? 'Saving…' : 'Save Draft'}
-              </ErpButton>
-              {workspace === 'requisition' ? (
-                <ErpButton
-                  type="button"
-                  variant="primary"
-                  icon={ArrowRight}
-                  disabled={!editable || saving}
-                  onClick={() => setWorkspace('line_items')}
-                >
-                  Continue to Line Items
-                </ErpButton>
-              ) : (
-                <ErpButton
-                  type="button"
-                  variant="primary"
-                  icon={Send}
-                  disabled={!editable || saving || (attemptedSubmit && validation.errors.length > 0)}
-                  disabledReason={
-                    !editable
-                      ? 'Document is read-only'
-                      : attemptedSubmit && validation.errors.length
-                        ? 'Fix validation errors first'
-                        : undefined
-                  }
-                  onClick={() => void submitForApproval()}
-                >
-                  Submit for Approval
-                </ErpButton>
-              )}
-            </ErpButtonGroup>
-          }
-        />
-      }
-      onSaveShortcut={() => void saveDraft(true)}
-    >
-      <EnterpriseFormMetrics metrics={formMetrics} />
 
-      <PurchaseRequisitionWorkspaceTabs
-        active={workspace}
-        onChange={setWorkspace}
-        tabs={workspaceTabs}
-      />
-
-      {workspace === 'requisition' ? (
-        <div
-          id="pr-workspace-panel-requisition"
-          role="tabpanel"
-          aria-labelledby="pr-workspace-tab-requisition"
-          className="space-y-3"
-        >
-          <ErpQuickEntrySection
+          <ErpCardSection
             id={purchaseSectionId('general')}
-            title="Quick Entry"
-            subtitle="Essentials to start this requisition — date, requester, classification, location, need-by"
-            icon={Zap}
+            title="Requisition Header"
+            subtitle="PR identity, warehouse, priority, and RFQ path"
+            collapsedSummary={quickEntrySummaryText || undefined}
+            icon={FileText}
+            accent="blue"
             collapsible
             defaultOpen
+            dense
             columns={3}
           >
-            <ErpFormSpan span={3}>
-              <p className="erp-field-group__label">Document</p>
-            </ErpFormSpan>
-            <ErpFieldRow label="PR Number" readOnly>
+            <ErpFieldRow
+              label="PR Number"
+              readOnly
+              horizontal={false}
+              hint={isNew ? 'Preview from number series — assigned when you save' : undefined}
+            >
               <Input
                 value={documentNumber ?? ''}
-                placeholder="Auto-generated on save"
+                placeholder="Loading number…"
                 readOnly
                 className="bg-erp-surface-alt"
               />
             </ErpFieldRow>
-            <ErpFieldRow label="PR Date" required>
+            <ErpFieldRow label="Requisition Date" required horizontal={false}>
               <Input
                 type="date"
                 value={header.documentDate}
@@ -1079,16 +981,10 @@ export function PurchaseRequisitionEditorPage() {
                 onChange={(e) => patchHeader({ documentDate: e.target.value })}
               />
             </ErpFieldRow>
-            <ErpFieldRow label="Requested By" readOnly>
-              <Input value={header.requesterName} readOnly className="bg-erp-surface-alt" />
-            </ErpFieldRow>
-
-            <ErpFormSpan span={3}>
-              <p className="erp-field-group__label">Request details</p>
-            </ErpFormSpan>
             <ErpFieldRow
               label="Department"
               required
+              horizontal={false}
               fieldError={showErrors ? validation.fieldErrors.department : undefined}
               fieldState={showErrors && validation.fieldErrors.department ? 'error' : 'idle'}
             >
@@ -1098,16 +994,61 @@ export function PurchaseRequisitionEditorPage() {
                 onChange={(e) => patchHeader({ department: e.target.value })}
               >
                 <option value="">Select department</option>
-                {['Production Planning', 'Stores', 'Maintenance', 'Dispatch', 'Purchase', 'Quality'].map(
-                  (d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ),
-                )}
+                {PR_DEPARTMENT_OPTIONS.map((d) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
+                ))}
               </Select>
             </ErpFieldRow>
-            <ErpFieldRow label="Priority">
+            <ErpFieldRow label="Requested By" readOnly horizontal={false}>
+              <Input value={header.requesterName} readOnly className="bg-erp-surface-alt" />
+            </ErpFieldRow>
+            <ErpFieldRow
+              label="Required By Date"
+              horizontal={false}
+              fieldError={showErrors ? validation.fieldErrors.expectedDeliveryDate : undefined}
+              fieldState={
+                showErrors && validation.fieldErrors.expectedDeliveryDate ? 'error' : 'idle'
+              }
+            >
+              <Input
+                type="date"
+                value={header.expectedDeliveryDate}
+                disabled={!editable}
+                onChange={(e) => patchHeader({ expectedDeliveryDate: e.target.value })}
+              />
+            </ErpFieldRow>
+            <ErpFieldRow
+              label="Warehouse"
+              required
+              horizontal={false}
+              fieldError={showErrors ? validation.fieldErrors.locationId : undefined}
+              fieldState={showErrors && validation.fieldErrors.locationId ? 'error' : 'idle'}
+            >
+              <Select
+                value={header.locationId}
+                disabled={!editable}
+                onChange={(e) => {
+                  const loc = locationOptions.find((l) => l.id === e.target.value)
+                  if (!loc) return
+                  patchHeader({
+                    locationId: loc.id,
+                    locationCode: loc.code,
+                    locationName: loc.name,
+                    locationState: loc.state,
+                    locationCity: loc.city,
+                  })
+                }}
+              >
+                {locationOptions.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </Select>
+            </ErpFieldRow>
+            <ErpFieldRow label="Priority" horizontal={false}>
               <Select
                 value={header.priority}
                 disabled={!editable}
@@ -1122,30 +1063,14 @@ export function PurchaseRequisitionEditorPage() {
                 ))}
               </Select>
             </ErpFieldRow>
-            <ErpFieldRow label="Requisition Type">
-              <Select
-                value={header.requisitionType}
-                disabled={!editable}
-                onChange={(e) =>
-                  patchHeader({
-                    requisitionType: e.target.value as PrEditorHeader['requisitionType'],
-                  })
-                }
-              >
-                {Object.entries(PURCHASE_REQUISITION_TYPE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
-            </ErpFieldRow>
             <ErpFieldRow
-              label="RFQ required?"
+              label="RFQ Required?"
               required
+              horizontal={false}
               hint={
                 header.rfqRequired
-                  ? 'After approval, create an RFQ and collect vendor quotations.'
-                  : 'After approval, this PR is ready for a Purchase Order (skip RFQ).'
+                  ? 'RFQ is required to create PO'
+                  : 'Create Direct PO'
               }
             >
               <Select
@@ -1153,59 +1078,14 @@ export function PurchaseRequisitionEditorPage() {
                 disabled={!editable}
                 onChange={(e) => patchHeader({ rfqRequired: e.target.value === 'yes' })}
               >
-                <option value="yes">Yes — create RFQ after approval</option>
-                <option value="no">No — ready for Purchase Order after approval</option>
-              </Select>
-            </ErpFieldRow>
-
-            <ErpFormSpan span={3}>
-              <p className="erp-field-group__label">Location &amp; need-by</p>
-            </ErpFormSpan>
-            <ErpFieldRow
-              label="Location"
-              required
-              fieldError={showErrors ? validation.fieldErrors.locationId : undefined}
-              fieldState={showErrors && validation.fieldErrors.locationId ? 'error' : 'idle'}
-            >
-              <Select
-                value={header.locationId}
-                disabled={!editable}
-                onChange={(e) => {
-                  const loc = LOCATION_OPTIONS.find((l) => l.id === e.target.value)
-                  if (!loc) return
-                  patchHeader({
-                    locationId: loc.id,
-                    locationCode: loc.code,
-                    locationName: loc.name,
-                    locationState: loc.state,
-                    locationCity: loc.city,
-                  })
-                }}
-              >
-                {LOCATION_OPTIONS.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
               </Select>
             </ErpFieldRow>
             <ErpFieldRow
-              label="Required By Date"
-              fieldError={showErrors ? validation.fieldErrors.expectedDeliveryDate : undefined}
-              fieldState={
-                showErrors && validation.fieldErrors.expectedDeliveryDate ? 'error' : 'idle'
-              }
-            >
-              <Input
-                type="date"
-                value={header.expectedDeliveryDate}
-                disabled={!editable}
-                onChange={(e) => patchHeader({ expectedDeliveryDate: e.target.value })}
-              />
-            </ErpFieldRow>
-            <ErpFieldRow
-              label="Purpose"
+              label="Purchase Purpose"
               required={header.priority === 'urgent'}
+              horizontal={false}
               fieldError={showErrors ? validation.fieldErrors.purpose : undefined}
               fieldState={showErrors && validation.fieldErrors.purpose ? 'error' : 'idle'}
             >
@@ -1218,95 +1098,7 @@ export function PurchaseRequisitionEditorPage() {
                 }
               />
             </ErpFieldRow>
-          </ErpQuickEntrySection>
-
-          <ErpCardSection
-            id={purchaseSectionId('costing')}
-            title="Additional Information"
-            subtitle="Source links, costing, remarks, and approval activity"
-            collapsedSummary={additionalSummaryText || quickEntrySummaryText || undefined}
-            icon={Layers}
-            accent="slate"
-            collapsible
-            defaultOpen={additionalDefaultOpen}
-            forceOpenKey={forceOpenAdditionalKey || undefined}
-            dense
-          >
-            <ErpFormSpan span={3}>
-              <p className="erp-field-group__label">Source &amp; costing</p>
-            </ErpFormSpan>
-            <ErpFieldRow label="Requisition Source">
-              <Select
-                value={header.source}
-                disabled={!editable}
-                onChange={(e) =>
-                  patchHeader({ source: e.target.value as PrEditorHeader['source'] })
-                }
-              >
-                {Object.entries(PURCHASE_REQUISITION_SOURCE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
-            </ErpFieldRow>
-            <ErpFieldRow label="Cost Centre">
-              <Input
-                value={header.costCentre}
-                disabled={!editable}
-                onChange={(e) => patchHeader({ costCentre: e.target.value })}
-                placeholder="e.g. CC-PROD-01"
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Project">
-              <Input
-                value={header.project}
-                disabled={!editable}
-                onChange={(e) => patchHeader({ project: e.target.value })}
-              />
-            </ErpFieldRow>
-            <ErpFieldRow
-              label="Production Order"
-              required={header.source === 'work_order'}
-              fieldError={showErrors ? validation.fieldErrors.productionOrderNo : undefined}
-              fieldState={
-                showErrors && validation.fieldErrors.productionOrderNo ? 'error' : 'idle'
-              }
-            >
-              <Input
-                value={header.productionOrderNo}
-                disabled={!editable}
-                onChange={(e) => patchHeader({ productionOrderNo: e.target.value })}
-                placeholder="WO / Production order no."
-              />
-            </ErpFieldRow>
-            <ErpFieldRow
-              label="Maintenance Order"
-              required={header.source === 'maintenance'}
-              fieldError={showErrors ? validation.fieldErrors.maintenanceOrderNo : undefined}
-              fieldState={
-                showErrors && validation.fieldErrors.maintenanceOrderNo ? 'error' : 'idle'
-              }
-            >
-              <Input
-                value={header.maintenanceOrderNo}
-                disabled={!editable}
-                onChange={(e) => patchHeader({ maintenanceOrderNo: e.target.value })}
-                placeholder="MO number"
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Reference Number">
-              <Input
-                value={header.referenceNumber}
-                disabled={!editable}
-                onChange={(e) => patchHeader({ referenceNumber: e.target.value })}
-              />
-            </ErpFieldRow>
-
-            <ErpFormSpan span={3}>
-              <p className="erp-field-group__label">Remarks</p>
-            </ErpFormSpan>
-            <ErpFieldRow label="Remarks" colSpan={3}>
+            <ErpFieldRow label="Remarks" horizontal={false} colSpan={3}>
               <Textarea
                 value={header.remarks}
                 disabled={!editable}
@@ -1314,73 +1106,18 @@ export function PurchaseRequisitionEditorPage() {
                 rows={2}
               />
             </ErpFieldRow>
-
-            <ErpFormSpan span={3}>
-              <p className="erp-field-group__label">Approval and activity</p>
-            </ErpFormSpan>
-            <ErpViewField
-              label="Approval status"
-              value={PURCHASE_REQUISITION_STATUS_LABELS[status]}
-            />
-            <ErpViewField
-              label="Current approver"
-              value={status === 'pending_approval' ? 'Sneha Kulkarni (Purchase Head)' : '—'}
-            />
-            <ErpViewField label="Created by" value={createdMeta.by || '—'} />
-            <ErpViewField
-              label="Created date"
-              value={createdMeta.at ? formatDate(createdMeta.at.slice(0, 10)) : '—'}
-            />
-            <ErpViewField label="Last modified by" value={updatedMeta.by || '—'} />
-            <ErpViewField
-              label="Last modified date"
-              value={updatedMeta.at ? formatDate(updatedMeta.at.slice(0, 10)) : '—'}
-            />
-            <div className="erp-form-span erp-form-span--3 mt-1">
-              <p className="mb-2 text-[12px] font-semibold text-erp-text">Approval history</p>
-              {history.length === 0 ? (
-                <p className="text-[12px] text-erp-muted">No approval activity yet.</p>
-              ) : (
-                <ul className="divide-y divide-erp-border rounded-md border border-erp-border">
-                  {history.map((h) => (
-                    <li key={h.id} className="flex justify-between gap-3 px-3 py-2 text-[12px]">
-                      <span>
-                        <span className="font-medium capitalize text-erp-text">
-                          {h.action.replace(/_/g, ' ')}
-                        </span>
-                        <span className="text-erp-muted"> · {h.actorName}</span>
-                        {h.remarks ? (
-                          <span className="block text-erp-muted">{h.remarks}</span>
-                        ) : null}
-                      </span>
-                      <span className="shrink-0 tabular-nums text-erp-muted">
-                        {formatDate(h.actedAt.slice(0, 10))}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
           </ErpCardSection>
-        </div>
-      ) : (
-        <div
-          id="pr-workspace-panel-line_items"
-          role="tabpanel"
-          aria-labelledby="pr-workspace-tab-line_items"
-          className="space-y-3"
-        >
+
           <ErpCardSection
             id={purchaseSectionId('lines')}
-            title="Line Items"
-            subtitle="Catalog or manual lines — pick item and qty; secondary fields in line details"
+            title="Item Details"
+            subtitle="Item code, name, qty, rate, vendor, warehouse, BIN, and need-by date"
             icon={Package}
-            accent="teal"
+            accent="blue"
             collapsible
             defaultOpen
             dense
             columns={1}
-            className="ring-1 ring-teal-200/70 shadow-sm"
             badge={
               <span className="text-[11px] tabular-nums text-erp-muted">
                 {lines.length} line{lines.length === 1 ? '' : 's'}
@@ -1391,15 +1128,20 @@ export function PurchaseRequisitionEditorPage() {
               lines={lines}
               catalogItems={catalogItemsForPicker}
               vendors={vendors}
-              locationOptions={LOCATION_OPTIONS}
               editable={editable}
+              reqNo={documentNumber}
               showErrors={showErrors}
               lineErrors={validation.lineErrors}
               formatCurrency={formatCurrency}
               estimatedTotal={summary.estimatedTotal}
-              onAddLine={() => setLinesDirty([...lines, emptyLine()])}
-              onAddMultipleLines={() =>
-                setLinesDirty([...lines, emptyLine(), emptyLine(), emptyLine()])
+              onAddLine={() =>
+                setLinesDirty([
+                  ...lines,
+                  emptyLine({
+                    locationId: header.locationId,
+                    locationName: header.locationName,
+                  }),
+                ])
               }
               onCopyLastLine={() => {
                 const selected = lines[lines.length - 1]
@@ -1410,13 +1152,57 @@ export function PurchaseRequisitionEditorPage() {
                     ...selected,
                     key: crypto.randomUUID(),
                     id: '',
+                    purchaseOrderId: null,
+                    purchaseOrderNumber: '',
+                    purchaseQuoteNumber: '',
                   }),
                 ])
               }}
               onImportExcel={() => fileInputRef.current?.click()}
-              onClearLines={() => setLinesDirty([])}
+              onClearLines={() =>
+                setLinesDirty(
+                  threeEmptyLines({
+                    locationId: header.locationId,
+                    locationName: header.locationName,
+                  }),
+                )
+              }
               onPatchLine={patchLine}
-              onRemoveLine={(key) => setLinesDirty(lines.filter((l) => l.key !== key))}
+              onRemoveLine={(key) => {
+                void (async () => {
+                  const line = lines.find((l) => l.key === key)
+                  const hasContent = Boolean(
+                    line &&
+                      (line.itemId ||
+                        line.itemCode.trim() ||
+                        line.itemName.trim() ||
+                        Number(line.quantity) > 0),
+                  )
+                  if (hasContent) {
+                    const ok = await systemConfirm({
+                      title: 'Delete item line?',
+                      description: 'This line has entered data and will be removed.',
+                      confirmLabel: 'Delete',
+                      cancelLabel: 'Keep',
+                      variant: 'danger',
+                    })
+                    if (!ok) return
+                  }
+                  const next = lines.filter((l) => l.key !== key)
+                  if (next.length === 0) {
+                    setLinesDirty(
+                      [
+                        emptyLine({
+                          locationId: header.locationId,
+                          locationName: header.locationName,
+                        }),
+                      ].map((l, i) => ({ ...l, lineNo: i + 1 })),
+                    )
+                    return
+                  }
+                  setLinesDirty(next)
+                })()
+              }}
               onSelectCatalogItem={applyItemCatalog}
             />
             {showErrors &&
@@ -1426,7 +1212,8 @@ export function PurchaseRequisitionEditorPage() {
                 e.includes('Line') ||
                 e.includes('Quantity') ||
                 e.includes('description') ||
-                e.includes('Unit'),
+                e.includes('Unit') ||
+                e.includes('Product type'),
             ) ? (
               <p className="mt-2 text-[12px] text-erp-danger-fg">Fix line errors before submit.</p>
             ) : null}
@@ -1434,11 +1221,11 @@ export function PurchaseRequisitionEditorPage() {
 
           <ErpCardSection
             id={purchaseSectionId('finance')}
-            title="Financial Summary"
+            title="Commercial Information"
             subtitle="Provisional totals from estimated line amounts"
             collapsedSummary={financeSummaryText || undefined}
             icon={Banknote}
-            accent="amber"
+            accent="blue"
             collapsible
             defaultOpen={financeDefaultOpen}
             dense
@@ -1481,16 +1268,16 @@ export function PurchaseRequisitionEditorPage() {
             subtitle="Supporting files for this requisition (demo stub upload)"
             collapsedSummary={attachmentsSummaryText || undefined}
             icon={Paperclip}
-            accent="violet"
+            accent="blue"
             collapsible
             defaultOpen={false}
             dense
             columns={1}
           >
             <PurchaseDocumentAttachments
-              files={prPlaceholdersToRows(attachments)}
+              files={prPlaceholdersToRows(attachments, header.requesterName || createdMeta.by || 'User')}
               disabled={!editable}
-              uploadedBy={ACTOR.name}
+              uploadedBy={header.requesterName || createdMeta.by || 'User'}
               hint="Technical specs, drawings, requirement docs, and supporting files"
               onChange={(next) => {
                 setAttachments(rowsToPrPlaceholders(next, attachments))
@@ -1498,8 +1285,75 @@ export function PurchaseRequisitionEditorPage() {
               }}
             />
           </ErpCardSection>
-        </div>
-      )}
+
+          <ErpCardSection
+            id={purchaseSectionId('costing')}
+            title="Approval Information"
+            subtitle="Status and approver context for this requisition"
+            collapsedSummary={additionalSummaryText || undefined}
+            icon={Layers}
+            accent="blue"
+            collapsible
+            defaultOpen={additionalDefaultOpen}
+            forceOpenKey={forceOpenAdditionalKey || undefined}
+            dense
+          >
+            <ErpViewField
+              label="Approval status"
+              value={PURCHASE_REQUISITION_STATUS_LABELS[status]}
+            />
+            <ErpViewField
+              label="Current approver"
+              value={status === 'pending_approval' ? 'Sneha Kulkarni (Purchase Head)' : '—'}
+            />
+            <ErpViewField label="Created by" value={createdMeta.by || '—'} />
+            <ErpViewField
+              label="Created date"
+              value={createdMeta.at ? formatDate(createdMeta.at.slice(0, 10)) : '—'}
+            />
+            <ErpViewField label="Last modified by" value={updatedMeta.by || '—'} />
+            <ErpViewField
+              label="Last modified date"
+              value={updatedMeta.at ? formatDate(updatedMeta.at.slice(0, 10)) : '—'}
+            />
+          </ErpCardSection>
+
+          <ErpCardSection
+            id={purchaseSectionId('timeline')}
+            title="Timeline"
+            subtitle="Approval and activity history"
+            collapsedSummary={approvalSummaryText || undefined}
+            icon={ClipboardList}
+            accent="blue"
+            collapsible
+            defaultOpen={history.length > 0}
+            dense
+            columns={1}
+          >
+            {history.length === 0 ? (
+              <p className="text-[12px] text-erp-muted">No approval activity yet.</p>
+            ) : (
+              <ul className="divide-y divide-erp-border rounded-md border border-erp-border">
+                {history.map((h) => (
+                  <li key={h.id} className="flex justify-between gap-3 px-3 py-2 text-[12px]">
+                    <span>
+                      <span className="font-medium capitalize text-erp-text">
+                        {h.action.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-erp-muted"> · {h.actorName}</span>
+                      {h.remarks ? (
+                        <span className="block text-erp-muted">{h.remarks}</span>
+                      ) : null}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-erp-muted">
+                      {formatDate(h.actedAt.slice(0, 10))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </ErpCardSection>
+      </div>
     </PurchaseCardFormShell>
   )
 }

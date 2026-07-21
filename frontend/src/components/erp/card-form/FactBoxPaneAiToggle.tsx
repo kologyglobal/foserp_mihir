@@ -3,7 +3,7 @@ import { cn } from '../../../utils/cn'
 import { useFactBoxPane } from './FactBoxPaneContext'
 
 /**
- * Reopen collapsed Smart Context pane.
+ * Reopen collapsed Smart Context — always rendered above form sections (see smart-context-restore rule).
  * Canonical mount: `ErpCardFormPage` factbox-restore slot only.
  * Do not also mount this in page toolbars / section-nav trailing — that duplicates the FAB.
  */

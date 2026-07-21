@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified against codebase: **2026-07-18** (Accounting Phase 3C5 credit-note allocation backend; focused tests 11/11 and backend typecheck pass).
+Last verified against codebase: **2026-07-21** (Purchase Setup full persistence + Invoice/QI/Return; Accounting Phase 3C5 credit-note allocation backend verified 2026-07-18 — focused tests 11/11 and backend typecheck pass).
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
@@ -28,7 +28,7 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | **Not started** | Login activity module |
 | **Scaffolding (not shipped)** | — (Accounting operational screens: CoA demo, Vouchers, AR/AP, Bank, FA, Manufacturing Accounting, Tax, Reports, Budgeting, Commercial Commitments, Period Close — UI/mock only; **Finance Settings** at `/accounting/settings` is Phase 1 dual-mode, not a stub) |
 | **Blocked** | — (none currently) |
-| **Deferred by design** | Purchase / inventory / production / quality / maintenance backends; finance **Phase 3B6 receipt UI + Phase 3C6 credit-note UI + receipt/allocation/credit-note reversal**; SO MRP / dispatch |
+| **Deferred by design** | Purchase backends beyond RFQ award→draft PO (full PO lifecycle, GRN); inventory / production / quality / maintenance; finance **Phase 3B6 receipt UI + Phase 3C6 credit-note UI + receipt/allocation/credit-note reversal**; SO MRP / dispatch |
 
 ---
 
@@ -370,18 +370,18 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | API mode | ✅ | Commercial path only |
 | Remaining gap | **Accepted deferral:** MRP / dispatch / invoice posting (verification report G2) |
 
-### Purchase (demo only)
+### Purchase (PR–Return/Invoice/QI + Setup API)
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ✅ | Domain service + UI for Dashboard, PR, Approvals/**Setup (9-tab config)**, RFQ, Vendor Quotation, Comparison, **Purchase Order** (list/create/detail/revise/print), **GRN + Quality Inspection**, **Purchase Invoice** (list/create/detail/print, three-way matching, exception-gated post, debit-note stub), **Purchase Return**, **Reports & Analytics** (hub + 36 mock runners). Legacy Zustand GRN/invoice paths left unused at purchase invoice routes. |
-| Backend | 🔒 | Deferred by design |
-| DB | 🔒 | — |
-| API | 🔒 | — |
-| Tests | ✅ | Demo/smoke scripts including **`smoke-purchase-e2e-flow`** (umbrella PR→invoice→return→report), plus RFQ/VQ/PO/GRN/invoice/return smokes; `test:purchase:production` 39/39 |
-| Demo mode | ✅ | Nav + routes under `/purchase/*` |
-| API mode | ❌ | |
-| Remaining gap | Backend phase (see `purchase-workflow-map.md`). Inventory stock write on GRN post and AP/GL on invoice post deferred by design |
+| Frontend | ⚠️ | Domain UI rich; PR/Planning/RFQ/PO/GRN/Approvals/Setup dual-mode API-backed; **Purchase Setup** full nested API persistence (all editable tabs). Notifications ON_HOLD read-only. Registered editors use **Cancel \| Save**. Invoice/returns/QI UI still partially demo-oriented for some screens. **FE typecheck PASS** (2026-07-21). |
+| Backend | ⚠️ | PR + Planning + RFQ/VQ/comparison + PO + GRN + **Quality Inspection + Purchase Invoice + Purchase Return** lifecycles + Approvals + **Purchase Setup full persistence** with workflow enforcement. |
+| DB | ⚠️ | Purchase schema + PO + inventory masters + GRN + Setup migrations (deploy on all envs) |
+| API | ⚠️ | Existing routes plus `/purchase/invoices`, `/purchase/quality-inspections`, and `/purchase/returns` with explicit lifecycle actions. |
+| Tests | ⚠️ | Invoice policy/lifecycle unit coverage **4/4**; backend typecheck pass. Existing setup, PO, GRN, approvals, Phase 15, and inventory-master suites remain. |
+| Demo mode | ✅ | Full RFQ→VQ→comparison→award→PO + Planning→PO paths; Setup via `purchaseService` |
+| API mode | ⚠️ | Backend APIs now cover PR through PO/GRN/QI/invoice/return; frontend hydration remains to be wired for QI/invoice/return. |
+| Remaining gap | Inventory posting on GRN; QI/invoice/return frontend wiring; Setup deferred tabs; dashboard KPIs; reports |
 
 ### Inventory / Production / Quality / Maintenance / Finance (invoices)
 

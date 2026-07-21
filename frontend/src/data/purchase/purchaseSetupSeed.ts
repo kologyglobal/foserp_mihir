@@ -1,18 +1,22 @@
 import type { PurchaseSetup } from '../../types/purchaseDomain'
 import {
   PURCHASE_DEMO_LOCATION,
-  PURCHASE_DEMO_LOCATION_FG,
   PURCHASE_DOMAIN_ACTORS,
 } from './purchaseDomainSeed'
 
 /** Default purchase configuration — editable via Purchase Setup tabs. */
 export const DEFAULT_PURCHASE_SETUP: PurchaseSetup = {
+  id: null,
+  isConfigured: false,
+  version: 0,
+  selfApprovalPolicy: 'PERMISSION_ONLY',
   general: {
-    defaultPurchaseLocationId: PURCHASE_DEMO_LOCATION.id,
+    defaultPlantId: '',
     defaultWarehouseId: PURCHASE_DEMO_LOCATION.id,
     defaultBuyerId: PURCHASE_DOMAIN_ACTORS.buyer.id,
     defaultCurrency: 'INR',
     defaultPaymentTerms: 'Net 30',
+    defaultPaymentTermCode: 'credit_30',
     defaultDeliveryTerms: 'Ex-Works',
     allowDirectPo: true,
     requirePrBeforePo: false,
@@ -22,6 +26,9 @@ export const DEFAULT_PURCHASE_SETUP: PurchaseSetup = {
     allowOverReceipt: true,
     overReceiptTolerancePct: 5,
     allowShortClose: true,
+    requirePoWarehouse: false,
+    requireExpectedDeliveryDate: false,
+    requirePaymentTerms: false,
   },
   numberSeries: {
     purchaseRequisition: { prefix: 'PR', nextNumber: 1004, padLength: 4 },
@@ -75,6 +82,7 @@ export const DEFAULT_PURCHASE_SETUP: PurchaseSetup = {
       documentType: 'all',
     },
   ],
+  // Demo-only: shown on the approval review drawer; not persisted via API.
   availableBudgetPlaceholderInr: 2_500_000,
   tax: {
     defaultGstScheme: 'cgst_sgst',
@@ -105,18 +113,26 @@ export const DEFAULT_PURCHASE_SETUP: PurchaseSetup = {
     requireSerial: false,
     requireExpiry: false,
     autoCreateInspection: true,
-    defaultReceivingWarehouseId: PURCHASE_DEMO_LOCATION.id,
+    defaultReceivingLocationId: '',
+    duplicateChallanPolicy: 'BLOCK',
   },
   quality: {
     inspectionRequiredCategories: ['raw_material', 'component'],
     allowAcceptanceUnderDeviation: true,
     deviationApproverRole: 'purchase_head',
     allowRejectedStockInQuarantine: true,
-    defaultQuarantineWarehouseId: PURCHASE_DEMO_LOCATION_FG.id,
+    defaultQualityHoldLocationId: '',
+    defaultRejectedLocationId: '',
+    defaultVendorReturnLocationId: '',
+  },
+  requisition: {
+    skipRfq: false,
+    defaultWarehouseId: '',
+    autoCompleteRef: false,
   },
   print: {
     companyName: 'Vasant Trailers Pvt Ltd',
-    logoPlaceholderUrl: '/brand/vasant-logo-placeholder.svg',
+    logoUrl: '/brand/vasant-logo-placeholder.svg',
     showTermsOnPo: true,
     showTermsOnGrn: false,
     showTermsOnInvoice: true,
@@ -125,6 +141,9 @@ export const DEFAULT_PURCHASE_SETUP: PurchaseSetup = {
     orientation: 'portrait',
   },
   notifications: {
+    status: 'ON_HOLD',
+    message:
+      'Purchase notifications are not implemented yet. This tab is visible for planning only and is not saved.',
     prPendingApproval: { inApp: true, email: true },
     rfqResponseDue: { inApp: true, email: true },
     poDeliveryApproaching: { inApp: true, email: false },

@@ -4,8 +4,8 @@
  */
 
 import { useMemo } from 'react'
-import type { ManufacturingUiRole } from '@/types/manufacturingRoles'
-import { getManufacturingUiRole, useManufacturingUiRole } from '@/utils/manufacturing/uiRoleStore'
+import type { ManufacturingUiRole } from '../../types/manufacturingRoles'
+import { getManufacturingUiRole, useManufacturingUiRole } from '../manufacturing/uiRoleStore'
 
 export const MANUFACTURING_PERMISSIONS = [
   'manufacturing.view',

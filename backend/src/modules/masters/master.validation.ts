@@ -6,8 +6,11 @@ export const MASTER_REGISTRY_SLUGS = [
   'states',
   'cities',
   'uom',
+  'plants',
   'warehouses',
   'locations',
+  'storage-locations',
+  'bins',
   'item-categories',
   'hsn-sac',
   'gst-groups',
@@ -23,6 +26,8 @@ export const listMastersQuerySchema = paginationSchema.extend({
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
   stateId: z.string().uuid().optional(),
   warehouseId: z.string().uuid().optional(),
+  plantId: z.string().uuid().optional(),
+  storageLocationId: z.string().uuid().optional(),
   gstGroupId: z.string().uuid().optional(),
   parentId: z.string().uuid().optional(),
 })
@@ -55,13 +60,52 @@ export const createUomSchema = z.object({
 })
 export const updateUomSchema = createUomSchema.partial()
 
+export const createPlantSchema = z.object({
+  ...codeNameBase,
+  address: z.string().trim().max(2000).optional(),
+})
+export const updatePlantSchema = createPlantSchema.partial()
+
+export const WAREHOUSE_TYPES = [
+  // Legacy values kept for existing rows
+  'main',
+  'sub',
+  'wip',
+  'fg',
+  'quarantine',
+  // Production warehouse types
+  'raw_material',
+  'finished_goods',
+  'work_in_progress',
+  'receiving',
+  'quality_hold',
+  'rejected',
+  'vendor_return',
+  'maintenance',
+  'consumables',
+  'scrap',
+  'transit',
+  'dispatch',
+] as const
+
 export const createWarehouseSchema = z.object({
   ...codeNameBase,
-  warehouseType: z.enum(['main', 'sub', 'wip', 'fg', 'quarantine']).default('main'),
+  warehouseType: z.enum(WAREHOUSE_TYPES).default('main'),
+  plantId: z.string().uuid().nullable().optional(),
   plantCode: z.string().trim().max(32).default('PUNE'),
   address: z.string().trim().max(2000).optional(),
 })
 export const updateWarehouseSchema = createWarehouseSchema.partial()
+
+export const createBinSchema = z.object({
+  warehouseId: z.string().uuid(),
+  storageLocationId: z.string().uuid(),
+  code: z.string().trim().min(1).max(32),
+  name: z.string().trim().min(1).max(200),
+  binType: z.string().trim().max(32).optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+})
+export const updateBinSchema = createBinSchema.partial()
 
 export const createLocationSchema = z.object({
   warehouseId: z.string().uuid(),
@@ -178,8 +222,10 @@ export type CreateCountryInput = z.infer<typeof createCountrySchema>
 export type CreateStateInput = z.infer<typeof createStateSchema>
 export type CreateCityInput = z.infer<typeof createCitySchema>
 export type CreateUomInput = z.infer<typeof createUomSchema>
+export type CreatePlantInput = z.infer<typeof createPlantSchema>
 export type CreateWarehouseInput = z.infer<typeof createWarehouseSchema>
 export type CreateLocationInput = z.infer<typeof createLocationSchema>
+export type CreateBinInput = z.infer<typeof createBinSchema>
 export type CreateItemCategoryInput = z.infer<typeof createItemCategorySchema>
 export type CreateHsnSacInput = z.infer<typeof createHsnSacSchema>
 export type CreateGstGroupInput = z.infer<typeof createGstGroupSchema>

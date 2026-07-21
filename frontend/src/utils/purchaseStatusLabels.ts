@@ -158,7 +158,7 @@ export function buildPrProcessNextActions(
         label: 'Create Purchase Order',
         step: 9,
         href: `/purchase/orders/new?mode=pr&prId=${pr.id}`,
-        hint: 'Skip RFQ when vendor is already known',
+        hint: 'Direct purchase planning when RFQ is not required',
       })
     }
     actions.push({

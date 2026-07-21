@@ -1,0 +1,19 @@
+---
+description: Smart Context / AI sparkle restore sits above all form sections
+alwaysApply: true
+---
+
+# Smart Context restore (blue sparkle)
+
+When Smart Context / Purchase Insights / FactBox is **collapsed**, the blue sparkle (`FactBoxPaneAiToggle` / `PurchaseAiInsightsRestoreButton`) restores it.
+
+## Placement (required)
+
+1. **Above all body sections** — after Back, status strip, tabs, and validation; **before** the first `ErpCardSection` / line grid / TOTAL panel.
+2. **Right-aligned** in `erp-card-form-page__context-restore` (document forms) or the register insights collapsed band (lists).
+3. **Never** absolutely position it over TOTAL, lines, or mid-form cards.
+4. Prefer shell wiring (`ErpCardFormPage` / `PurchaseRegisterContextPanel`) — do not sprinkle one-off floating sparkles on individual sections.
+
+```text
+Back → Status / Tabs → Validation → [✦ restore] → Form sections…
+```

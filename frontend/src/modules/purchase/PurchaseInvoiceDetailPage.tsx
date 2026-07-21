@@ -134,7 +134,6 @@ export function PurchaseInvoiceDetailPage() {
           { label: 'Invoices', to: '/purchase/invoices' },
           { label: 'Loading' },
         ]}
-        backLink={{ to: '/purchase/invoices', label: 'Back to Invoices' }}
         footer={null}
         detailMode
       >
@@ -277,7 +276,6 @@ export function PurchaseInvoiceDetailPage() {
           { label: 'Invoices', to: '/purchase/invoices' },
           { label: inv.documentNumber },
         ]}
-        backLink={{ to: '/purchase/invoices', label: 'Back to Invoices' }}
         createdBy={inv.createdBy}
         createdDate={formatDate(inv.createdAt.slice(0, 10))}
         modifiedBy={inv.updatedBy ?? undefined}
@@ -624,7 +622,7 @@ export function PurchaseInvoiceDetailPage() {
                     {matching.summary.invoiceQty}
                   </p>
                 </div>
-                <div className="rounded-md border border-erp-border bg-gradient-to-br from-erp-surface to-white px-3 py-2.5">
+                <div className="rounded-md border border-erp-border bg-white px-3 py-2.5">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
                     Invoice total
                   </p>

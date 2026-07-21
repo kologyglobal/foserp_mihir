@@ -36,6 +36,16 @@ enum CodeSeriesEntity {
   OPPORTUNITY
   QUOTATION
   SALES_ORDER
+  PURCHASE_REQUISITION
+  PURCHASE_PLANNING
+  REQUEST_FOR_QUOTATION
+  VENDOR_QUOTATION
+  VENDOR_COMPARISON
+  PURCHASE_ORDER
+  GOODS_RECEIPT
+  QUALITY_INSPECTION
+  PURCHASE_INVOICE
+  PURCHASE_RETURN
 }
 
 enum ActivityType {
@@ -119,8 +129,10 @@ model Tenant {
   masterCities                     MasterCity[]
   masterProducts                   MasterProduct[]
   masterUoms                       MasterUom[]
+  masterPlants                     MasterPlant[]
   masterWarehouses                 MasterWarehouse[]
   masterLocations                  MasterLocation[]
+  masterBins                       MasterBin[]
   masterItemCategories             MasterItemCategory[]
   masterHsnCodes                   MasterHsnCode[]
   masterGstGroups                  MasterGstGroup[]
@@ -157,6 +169,33 @@ model Tenant {
   customerCreditNoteLines          CustomerCreditNoteLine[]
   customerCreditNoteAllocations       CustomerCreditNoteAllocation[]
   customerCreditNoteAllocationBatches CustomerCreditNoteAllocationBatch[]
+
+  purchaseRequisitions     PurchaseRequisition[]
+  purchaseRequisitionLines PurchaseRequisitionLine[]
+  purchasePlanningRows     PurchasePlanningRow[]
+  requestForQuotations     RequestForQuotation[]
+  requestForQuotationLines RequestForQuotationLine[]
+  rfqVendors               RfqVendor[]
+  vendorQuotations         VendorQuotation[]
+  vendorQuotationLines     VendorQuotationLine[]
+  vendorComparisons        VendorComparison[]
+  vendorComparisonLines    VendorComparisonLine[]
+  purchaseOrders           PurchaseOrder[]
+  purchaseOrderLines       PurchaseOrderLine[]
+  goodsReceipts            GoodsReceipt[]
+  goodsReceiptLines        GoodsReceiptLine[]
+  purchaseApprovals              PurchaseApproval[]
+  purchaseStatusHistories        PurchaseStatusHistory[]
+  purchaseSettings               PurchaseSettings?
+  purchasePlantSettings          PurchasePlantSettings[]
+  purchaseApprovalTiers          PurchaseApprovalTier[]
+  purchaseInspectionCategories   PurchaseInspectionCategory[]
+  qualityInspections             QualityInspection[]
+  qualityInspectionLines         QualityInspectionLine[]
+  purchaseInvoices               PurchaseInvoice[]
+  purchaseInvoiceLines           PurchaseInvoiceLine[]
+  purchaseReturns                PurchaseReturn[]
+  purchaseReturnLines            PurchaseReturnLine[]
 
   @@index([status])
   @@index([deletedAt])
@@ -1172,9 +1211,14 @@ model MasterUom {
   updatedAt     DateTime           @updatedAt
   deletedAt     DateTime?
 
-  tenant           Tenant       @relation(fields: [tenantId], references: [id])
-  itemsBaseUom     MasterItem[] @relation("ItemBaseUom")
-  itemsPurchaseUom MasterItem[] @relation("ItemPurchaseUom")
+  tenant                   Tenant                    @relation(fields: [tenantId], references: [id])
+  itemsBaseUom             MasterItem[]              @relation("ItemBaseUom")
+  itemsPurchaseUom         MasterItem[]              @relation("ItemPurchaseUom")
+  purchaseRequisitionLines PurchaseRequisitionLine[]
+  purchasePlanningRows     PurchasePlanningRow[]
+  requestForQuotationLines RequestForQuotationLine[]
+  vendorQuotationLines     VendorQuotationLine[]
+  purchaseOrderLines       PurchaseOrderLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1183,9 +1227,35 @@ model MasterUom {
   @@map("master_uoms")
 }
 
+model MasterPlant {
+  id        String             @id @default(uuid())
+  tenantId  String
+  code      String             @db.VarChar(32)
+  name      String             @db.VarChar(200)
+  address   String?            @db.Text
+  status    MasterRecordStatus @default(ACTIVE)
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  deletedAt DateTime?
+
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id])
+  warehouses            MasterWarehouse[]
+  purchaseSettings      PurchaseSettings[]     @relation("PurchaseSettingsDefaultPlant")
+  purchasePlantSettings PurchasePlantSettings[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("master_plants")
+}
+
 model MasterWarehouse {
   id            String             @id @default(uuid())
   tenantId      String
+  plantId       String?
   code          String             @db.VarChar(32)
   name          String             @db.VarChar(200)
   warehouseType String             @default("main") @db.VarChar(32)
@@ -1198,12 +1268,23 @@ model MasterWarehouse {
   updatedAt     DateTime           @updatedAt
   deletedAt     DateTime?
 
-  tenant     Tenant               @relation(fields: [tenantId], references: [id])
-  locations  MasterLocation[]
-  categories MasterItemCategory[]
+  tenant                   Tenant                    @relation(fields: [tenantId], references: [id])
+  plant                    MasterPlant?              @relation(fields: [plantId], references: [id])
+  locations                MasterLocation[]
+  bins                     MasterBin[]
+  categories               MasterItemCategory[]
+  purchaseRequisitions     PurchaseRequisition[]
+  purchaseRequisitionLines PurchaseRequisitionLine[]
+  goodsReceipts            GoodsReceipt[]
+  goodsReceiptLines        GoodsReceiptLine[]
+  purchaseOrdersDelivery   PurchaseOrder[]           @relation("PurchaseOrderDeliveryWarehouse")
+  purchaseSettingsDefault  PurchaseSettings[]        @relation("PurchaseSettingsDefaultWarehouse")
+  purchaseSettingsRequisitionDefault PurchaseSettings[] @relation("PurchaseSettingsRequisitionWarehouse")
+  plantSettingsDefault     PurchasePlantSettings[]   @relation("PurchasePlantSettingsDefaultWarehouse")
 
   @@unique([tenantId, code])
   @@index([tenantId])
+  @@index([tenantId, plantId])
   @@index([tenantId, status])
   @@index([tenantId, deletedAt])
   @@map("master_warehouses")
@@ -1234,8 +1315,18 @@ model MasterLocation {
   updatedAt       DateTime           @updatedAt
   deletedAt       DateTime?
 
-  tenant    Tenant          @relation(fields: [tenantId], references: [id])
-  warehouse MasterWarehouse @relation(fields: [warehouseId], references: [id])
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  warehouse         MasterWarehouse    @relation(fields: [warehouseId], references: [id])
+  bins              MasterBin[]
+  goodsReceiptLines GoodsReceiptLine[]
+  settingsReceiving PurchaseSettings[] @relation("PurchaseSettingsReceivingLocation")
+  settingsQcHold    PurchaseSettings[] @relation("PurchaseSettingsQcHoldLocation")
+  settingsRejected  PurchaseSettings[] @relation("PurchaseSettingsRejectedLocation")
+  settingsVendorRet PurchaseSettings[] @relation("PurchaseSettingsVendorReturnLocation")
+  plantReceiving    PurchasePlantSettings[] @relation("PurchasePlantSettingsReceivingLocation")
+  plantQcHold       PurchasePlantSettings[] @relation("PurchasePlantSettingsQcHoldLocation")
+  plantRejected     PurchasePlantSettings[] @relation("PurchasePlantSettingsRejectedLocation")
+  plantVendorRet    PurchasePlantSettings[] @relation("PurchasePlantSettingsVendorReturnLocation")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1243,6 +1334,35 @@ model MasterLocation {
   @@index([tenantId, status])
   @@index([tenantId, deletedAt])
   @@map("master_locations")
+}
+
+model MasterBin {
+  id                String             @id @default(uuid())
+  tenantId          String
+  warehouseId       String
+  storageLocationId String
+  code              String             @db.VarChar(32)
+  name              String             @db.VarChar(200)
+  binType           String?            @db.VarChar(32)
+  status            MasterRecordStatus @default(ACTIVE)
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  warehouse         MasterWarehouse    @relation(fields: [warehouseId], references: [id])
+  storageLocation   MasterLocation     @relation(fields: [storageLocationId], references: [id])
+  goodsReceiptLines GoodsReceiptLine[]
+
+  @@unique([tenantId, warehouseId, code])
+  @@index([tenantId])
+  @@index([tenantId, warehouseId])
+  @@index([tenantId, storageLocationId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("master_bins")
 }
 
 model MasterItemCategory {
@@ -1393,12 +1513,17 @@ model MasterItem {
   updatedAt            DateTime           @updatedAt
   deletedAt            DateTime?
 
-  tenant      Tenant             @relation(fields: [tenantId], references: [id])
-  category    MasterItemCategory @relation(fields: [categoryId], references: [id])
-  baseUom     MasterUom          @relation("ItemBaseUom", fields: [baseUomId], references: [id])
-  purchaseUom MasterUom?         @relation("ItemPurchaseUom", fields: [purchaseUomId], references: [id])
-  hsn         MasterHsnCode?     @relation(fields: [hsnId], references: [id])
-  gstGroup    MasterGstGroup?    @relation(fields: [gstGroupId], references: [id])
+  tenant                   Tenant                    @relation(fields: [tenantId], references: [id])
+  category                 MasterItemCategory        @relation(fields: [categoryId], references: [id])
+  baseUom                  MasterUom                 @relation("ItemBaseUom", fields: [baseUomId], references: [id])
+  purchaseUom              MasterUom?                @relation("ItemPurchaseUom", fields: [purchaseUomId], references: [id])
+  hsn                      MasterHsnCode?            @relation(fields: [hsnId], references: [id])
+  gstGroup                 MasterGstGroup?           @relation(fields: [gstGroupId], references: [id])
+  purchaseRequisitionLines PurchaseRequisitionLine[]
+  purchasePlanningRows     PurchasePlanningRow[]
+  requestForQuotationLines RequestForQuotationLine[]
+  vendorQuotationLines     VendorQuotationLine[]
+  purchaseOrderLines       PurchaseOrderLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1446,10 +1571,19 @@ model MasterVendor {
   updatedAt           DateTime           @updatedAt
   deletedAt           DateTime?
 
-  tenant     Tenant         @relation(fields: [tenantId], references: [id])
-  countryRef MasterCountry? @relation(fields: [countryId], references: [id])
-  stateRef   MasterState?   @relation(fields: [stateId], references: [id])
-  cityRef    MasterCity?    @relation(fields: [cityId], references: [id])
+  tenant                            Tenant                    @relation(fields: [tenantId], references: [id])
+  countryRef                        MasterCountry?            @relation(fields: [countryId], references: [id])
+  stateRef                          MasterState?              @relation(fields: [stateId], references: [id])
+  cityRef                           MasterCity?               @relation(fields: [cityId], references: [id])
+  purchaseRequisitionLinesPreferred PurchaseRequisitionLine[] @relation("PrLinePreferredVendor")
+  purchasePlanningPreferred         PurchasePlanningRow[]     @relation("PlanningPreferredVendor")
+  purchasePlanningSelected          PurchasePlanningRow[]     @relation("PlanningSelectedVendor")
+  purchasePlanningLastPurchase      PurchasePlanningRow[]     @relation("PlanningLastPurchaseVendor")
+  rfqVendors                        RfqVendor[]
+  vendorQuotations                  VendorQuotation[]
+  vendorComparisonsAwarded          VendorComparison[]        @relation("ComparisonAwardedVendor")
+  purchaseOrders                    PurchaseOrder[]
+  goodsReceipts                     GoodsReceipt[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -3287,6 +3421,1295 @@ model CustomerReceiptAllocation {
   @@index([tenantId, legalEntityId])
   @@index([batchId])
   @@map("customer_receipt_allocations")
+}
+
+// ─── Purchase (Phase 03 — PR / Planning / RFQ / PO foundation) ─────────────────
+// Soft-delete on headers; no ON DELETE CASCADE between purchase documents.
+// Money/qty: Decimal only. Actor fields store user UUID strings (no User FK).
+
+enum PurchaseRequisitionStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PARTIALLY_CONVERTED
+  CONVERTED_TO_PO
+  CANCELLED
+  CLOSED
+}
+
+enum PurchaseRequisitionLineStatus {
+  OPEN
+  CANCELLED
+  CONVERTED
+  CLOSED
+}
+
+enum PurchasePlanningStatus {
+  PENDING_PLANNING
+  UNDER_REVIEW
+  VENDOR_SELECTED
+  APPROVED
+  PO_PENDING
+  PO_CREATED
+  PARTIALLY_ORDERED
+  ON_HOLD
+  CANCELLED
+  COMPLETED
+}
+
+enum PurchasePlanningPurchaseType {
+  DIRECT_PURCHASE
+  RFQ_BASED
+  RATE_CONTRACT
+  OTHER
+}
+
+enum PurchasePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+  CRITICAL
+}
+
+enum RequestForQuotationStatus {
+  DRAFT
+  SENT
+  QUOTATION_RECEIVED
+  UNDER_COMPARISON
+  VENDOR_SELECTED
+  CONVERTED_TO_PO
+  CANCELLED
+  CLOSED
+}
+
+enum RfqVendorInviteStatus {
+  INVITED
+  SENT
+  RESPONDED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+enum VendorQuotationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  SELECTED
+  REJECTED
+  CANCELLED
+  CLOSED
+}
+
+enum VendorComparisonStatus {
+  DRAFT
+  UNDER_COMPARISON
+  VENDOR_SELECTED
+  CONVERTED_TO_PO
+  CANCELLED
+  CLOSED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SENT_BACK
+  SENT_TO_VENDOR
+  PARTIALLY_RECEIVED
+  FULLY_RECEIVED
+  PARTIALLY_INVOICED
+  FULLY_INVOICED
+  CANCELLED
+  CLOSED
+}
+
+enum PurchaseOrderOrigin {
+  MANUAL
+  PURCHASE_REQUISITION
+  PLANNING_SHEET
+  RFQ_COMPARISON
+  OTHER
+}
+
+enum PurchaseApprovalDocumentType {
+  PURCHASE_REQUISITION
+  PURCHASE_ORDER
+  REQUEST_FOR_QUOTATION
+  PURCHASE_PLANNING
+}
+
+enum PurchaseApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RETURNED
+  CANCELLED
+  SKIPPED
+}
+
+enum PurchaseStatusHistoryDocumentType {
+  PURCHASE_REQUISITION
+  PURCHASE_REQUISITION_LINE
+  PURCHASE_PLANNING_ROW
+  REQUEST_FOR_QUOTATION
+  VENDOR_QUOTATION
+  VENDOR_COMPARISON
+  PURCHASE_ORDER
+  PURCHASE_APPROVAL
+  GOODS_RECEIPT
+  QUALITY_INSPECTION
+  PURCHASE_INVOICE
+  PURCHASE_RETURN
+}
+
+model PurchaseRequisition {
+  id                String                    @id @default(uuid())
+  tenantId          String
+  requisitionNumber String                    @db.VarChar(64)
+  requisitionDate   DateTime                  @db.Date
+  departmentId      String?                   @db.VarChar(36)
+  requestedById     String?                   @db.VarChar(36)
+  warehouseId       String?
+  requiredDate      DateTime?                 @db.Date
+  priority          PurchasePriority          @default(NORMAL)
+  purchasePurpose   String?                   @db.Text
+  rfqRequired       Boolean                   @default(true)
+  status            PurchaseRequisitionStatus @default(DRAFT)
+  submittedAt       DateTime?
+  approvedAt        DateTime?
+  rejectedAt        DateTime?
+  rejectionReason   String?                   @db.Text
+  remarks           String?                   @db.Text
+  createdById       String?                   @db.VarChar(36)
+  updatedById       String?                   @db.VarChar(36)
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  deletedAt         DateTime?
+
+  tenant         Tenant                    @relation(fields: [tenantId], references: [id])
+  warehouse      MasterWarehouse?          @relation(fields: [warehouseId], references: [id])
+  lines          PurchaseRequisitionLine[]
+  planningRows   PurchasePlanningRow[]
+  rfqs           RequestForQuotation[]
+  purchaseOrders PurchaseOrder[]
+  approvals      PurchaseApproval[]        @relation("PurchaseApprovalPr")
+
+  @@unique([tenantId, requisitionNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, warehouseId])
+  @@index([tenantId, requestedById])
+  @@index([tenantId, requisitionDate])
+  @@index([tenantId, rfqRequired])
+  @@map("purchase_requisitions")
+}
+
+model PurchaseRequisitionLine {
+  id                          String                        @id @default(uuid())
+  tenantId                    String
+  purchaseRequisitionId       String
+  lineNumber                  Int
+  itemId                      String?
+  itemCodeSnapshot            String                        @default("") @db.VarChar(64)
+  itemNameSnapshot            String                        @default("") @db.VarChar(300)
+  description                 String?                       @db.Text
+  requiredQuantity            Decimal                       @default(0) @db.Decimal(18, 4)
+  uomId                       String?
+  estimatedRate               Decimal                       @default(0) @db.Decimal(18, 2)
+  estimatedAmount             Decimal                       @default(0) @db.Decimal(18, 2)
+  warehouseId                 String?
+  binId                       String?                       @db.VarChar(36)
+  preferredVendorId           String?
+  requiredDate                DateTime?                     @db.Date
+  remarks                     String?                       @db.Text
+  status                      PurchaseRequisitionLineStatus @default(OPEN)
+  /// Set when Planning→PO or RFQ→PO creates an order for this line (track record; not user-editable).
+  purchaseOrderId             String?
+  purchaseOrderNumberSnapshot String?                       @db.VarChar(64)
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime                      @updatedAt
+
+  tenant              Tenant                    @relation(fields: [tenantId], references: [id])
+  purchaseRequisition PurchaseRequisition       @relation(fields: [purchaseRequisitionId], references: [id])
+  item                MasterItem?               @relation(fields: [itemId], references: [id])
+  uom                 MasterUom?                @relation(fields: [uomId], references: [id])
+  warehouse           MasterWarehouse?          @relation(fields: [warehouseId], references: [id])
+  preferredVendor     MasterVendor?             @relation("PrLinePreferredVendor", fields: [preferredVendorId], references: [id])
+  purchaseOrder       PurchaseOrder?            @relation(fields: [purchaseOrderId], references: [id])
+  planningRow         PurchasePlanningRow?
+  rfqLines            RequestForQuotationLine[]
+  purchaseOrderLines  PurchaseOrderLine[]
+
+  @@unique([tenantId, purchaseRequisitionId, lineNumber])
+  @@index([tenantId])
+  @@index([tenantId, purchaseRequisitionId])
+  @@index([tenantId, itemId])
+  @@index([tenantId, status])
+  @@index([tenantId, preferredVendorId])
+  @@index([tenantId, purchaseOrderId])
+  @@map("purchase_requisition_lines")
+}
+
+model PurchasePlanningRow {
+  id                                String                       @id @default(uuid())
+  tenantId                          String
+  planningNumber                    String                       @db.VarChar(64)
+  planningDate                      DateTime                     @db.Date
+  purchaseRequisitionId             String
+  purchaseRequisitionLineId         String                       @unique
+  purchaseRequisitionNumberSnapshot String                       @db.VarChar(64)
+  departmentId                      String?                      @db.VarChar(36)
+  requestedById                     String?                      @db.VarChar(36)
+  itemId                            String?
+  itemCodeSnapshot                  String                       @default("") @db.VarChar(64)
+  itemNameSnapshot                  String                       @default("") @db.VarChar(300)
+  itemDescriptionSnapshot           String?                      @db.Text
+  requiredQuantity                  Decimal                      @default(0) @db.Decimal(18, 4)
+  uomId                             String?
+  currentStockQuantity              Decimal                      @default(0) @db.Decimal(18, 4)
+  openPurchaseOrderQuantity         Decimal                      @default(0) @db.Decimal(18, 4)
+  netPurchaseQuantity               Decimal                      @default(0) @db.Decimal(18, 4)
+  preferredVendorId                 String?
+  selectedVendorId                  String?
+  lastPurchaseVendorId              String?
+  lastPurchaseRate                  Decimal?                     @db.Decimal(18, 2)
+  expectedRate                      Decimal                      @default(0) @db.Decimal(18, 2)
+  negotiatedRate                    Decimal?                     @db.Decimal(18, 2)
+  estimatedAmount                   Decimal                      @default(0) @db.Decimal(18, 2)
+  requiredDate                      DateTime?                    @db.Date
+  purchaseType                      PurchasePlanningPurchaseType @default(DIRECT_PURCHASE)
+  priority                          PurchasePriority             @default(NORMAL)
+  buyerId                           String?                      @db.VarChar(36)
+  status                            PurchasePlanningStatus       @default(PENDING_PLANNING)
+  actionMessage                     Boolean                      @default(false)
+  purchaseOrderId                   String?
+  purchaseOrderNumberSnapshot       String?                      @db.VarChar(64)
+  convertedAt                       DateTime?
+  remarks                           String?                      @db.Text
+  createdById                       String?                      @db.VarChar(36)
+  updatedById                       String?                      @db.VarChar(36)
+  createdAt                         DateTime                     @default(now())
+  updatedAt                         DateTime                     @updatedAt
+  deletedAt                         DateTime?
+
+  tenant                  Tenant                  @relation(fields: [tenantId], references: [id])
+  purchaseRequisition     PurchaseRequisition     @relation(fields: [purchaseRequisitionId], references: [id])
+  purchaseRequisitionLine PurchaseRequisitionLine @relation(fields: [purchaseRequisitionLineId], references: [id])
+  item                    MasterItem?             @relation(fields: [itemId], references: [id])
+  uom                     MasterUom?              @relation(fields: [uomId], references: [id])
+  preferredVendor         MasterVendor?           @relation("PlanningPreferredVendor", fields: [preferredVendorId], references: [id])
+  selectedVendor          MasterVendor?           @relation("PlanningSelectedVendor", fields: [selectedVendorId], references: [id])
+  lastPurchaseVendor      MasterVendor?           @relation("PlanningLastPurchaseVendor", fields: [lastPurchaseVendorId], references: [id])
+  purchaseOrder           PurchaseOrder?          @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrderLines      PurchaseOrderLine[]
+
+  @@unique([tenantId, purchaseRequisitionLineId])
+  @@unique([tenantId, planningNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, purchaseRequisitionId])
+  @@index([tenantId, purchaseRequisitionLineId])
+  @@index([tenantId, selectedVendorId])
+  @@index([tenantId, buyerId])
+  @@index([tenantId, requiredDate])
+  @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, actionMessage])
+  @@map("purchase_planning_rows")
+}
+
+model RequestForQuotation {
+  id                    String                    @id @default(uuid())
+  tenantId              String
+  rfqNumber             String                    @db.VarChar(64)
+  rfqDate               DateTime                  @db.Date
+  purchaseRequisitionId String?
+  title                 String?                   @db.VarChar(300)
+  responseDueDate       DateTime?                 @db.Date
+  status                RequestForQuotationStatus @default(DRAFT)
+  remarks               String?                   @db.Text
+  sentAt                DateTime?
+  closedAt              DateTime?
+  createdById           String?                   @db.VarChar(36)
+  updatedById           String?                   @db.VarChar(36)
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  deletedAt             DateTime?
+
+  tenant              Tenant                    @relation(fields: [tenantId], references: [id])
+  purchaseRequisition PurchaseRequisition?      @relation(fields: [purchaseRequisitionId], references: [id])
+  lines               RequestForQuotationLine[]
+  vendors             RfqVendor[]
+  vendorQuotations    VendorQuotation[]
+  comparisons         VendorComparison[]
+  purchaseOrders      PurchaseOrder[]
+
+  @@unique([tenantId, rfqNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, purchaseRequisitionId])
+  @@index([tenantId, rfqDate])
+  @@map("request_for_quotations")
+}
+
+model RequestForQuotationLine {
+  id                        String    @id @default(uuid())
+  tenantId                  String
+  requestForQuotationId     String
+  lineNumber                Int
+  purchaseRequisitionLineId String?
+  itemId                    String?
+  itemCodeSnapshot          String    @default("") @db.VarChar(64)
+  itemNameSnapshot          String    @default("") @db.VarChar(300)
+  description               String?   @db.Text
+  requiredQuantity          Decimal   @default(0) @db.Decimal(18, 4)
+  uomId                     String?
+  targetRate                Decimal?  @db.Decimal(18, 2)
+  requiredDate              DateTime? @db.Date
+  remarks                   String?   @db.Text
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id])
+  requestForQuotation     RequestForQuotation      @relation(fields: [requestForQuotationId], references: [id])
+  purchaseRequisitionLine PurchaseRequisitionLine? @relation(fields: [purchaseRequisitionLineId], references: [id])
+  item                    MasterItem?              @relation(fields: [itemId], references: [id])
+  uom                     MasterUom?               @relation(fields: [uomId], references: [id])
+  vendorQuotationLines    VendorQuotationLine[]
+  comparisonLines         VendorComparisonLine[]
+
+  @@unique([tenantId, requestForQuotationId, lineNumber])
+  @@index([tenantId])
+  @@index([tenantId, requestForQuotationId])
+  @@index([tenantId, purchaseRequisitionLineId])
+  @@index([tenantId, itemId])
+  @@map("request_for_quotation_lines")
+}
+
+/// Vendor invite / participation on an RFQ (Prisma model name RfqVendor; table rfq_vendors).
+model RfqVendor {
+  id                    String                @id @default(uuid())
+  tenantId              String
+  requestForQuotationId String
+  vendorId              String
+  inviteStatus          RfqVendorInviteStatus @default(INVITED)
+  invitedAt             DateTime              @default(now())
+  respondedAt           DateTime?
+  remarks               String?               @db.Text
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id])
+  requestForQuotation RequestForQuotation @relation(fields: [requestForQuotationId], references: [id])
+  vendor              MasterVendor        @relation(fields: [vendorId], references: [id])
+
+  @@unique([tenantId, requestForQuotationId, vendorId])
+  @@index([tenantId])
+  @@index([tenantId, requestForQuotationId])
+  @@index([tenantId, vendorId])
+  @@index([tenantId, inviteStatus])
+  @@map("rfq_vendors")
+}
+
+model VendorQuotation {
+  id                    String                @id @default(uuid())
+  tenantId              String
+  quotationNumber       String                @db.VarChar(64)
+  quotationDate         DateTime              @db.Date
+  requestForQuotationId String?
+  vendorId              String
+  /** Vendor's own quotation / reference number (optional). */
+  vendorReferenceNumber String?               @db.VarChar(100)
+  status                VendorQuotationStatus @default(DRAFT)
+  currencyCode          String                @default("INR") @db.VarChar(8)
+  validUntil            DateTime?             @db.Date
+  paymentTerms          String?               @db.VarChar(200)
+  deliveryTerms         String?               @db.VarChar(200)
+  freightAmount         Decimal               @default(0) @db.Decimal(18, 2)
+  discountAmount        Decimal               @default(0) @db.Decimal(18, 2)
+  otherCharges          Decimal               @default(0) @db.Decimal(18, 2)
+  taxAmount             Decimal               @default(0) @db.Decimal(18, 2)
+  landedCost            Decimal               @default(0) @db.Decimal(18, 2)
+  totalAmount           Decimal               @default(0) @db.Decimal(18, 2)
+  warranty              String?               @db.VarChar(300)
+  remarks               String?               @db.Text
+  submittedAt           DateTime?
+  createdById           String?               @db.VarChar(36)
+  updatedById           String?               @db.VarChar(36)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  deletedAt             DateTime?
+
+  tenant              Tenant                 @relation(fields: [tenantId], references: [id])
+  requestForQuotation RequestForQuotation?   @relation(fields: [requestForQuotationId], references: [id])
+  vendor              MasterVendor           @relation(fields: [vendorId], references: [id])
+  lines               VendorQuotationLine[]
+  comparisonLines     VendorComparisonLine[]
+  purchaseOrders      PurchaseOrder[]
+
+  @@unique([tenantId, quotationNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, requestForQuotationId])
+  @@index([tenantId, vendorId])
+  @@map("vendor_quotations")
+}
+
+model VendorQuotationLine {
+  id                        String   @id @default(uuid())
+  tenantId                  String
+  vendorQuotationId         String
+  lineNumber                Int
+  requestForQuotationLineId String?
+  itemId                    String?
+  itemCodeSnapshot          String   @default("") @db.VarChar(64)
+  itemNameSnapshot          String   @default("") @db.VarChar(300)
+  description               String?  @db.Text
+  quantity                  Decimal  @default(0) @db.Decimal(18, 4)
+  uomId                     String?
+  rate                      Decimal  @default(0) @db.Decimal(18, 2)
+  amount                    Decimal  @default(0) @db.Decimal(18, 2)
+  leadTimeDays              Int?
+  remarks                   String?  @db.Text
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id])
+  vendorQuotation         VendorQuotation          @relation(fields: [vendorQuotationId], references: [id])
+  requestForQuotationLine RequestForQuotationLine? @relation(fields: [requestForQuotationLineId], references: [id])
+  item                    MasterItem?              @relation(fields: [itemId], references: [id])
+  uom                     MasterUom?               @relation(fields: [uomId], references: [id])
+  comparisonLines         VendorComparisonLine[]
+
+  @@unique([tenantId, vendorQuotationId, lineNumber])
+  @@index([tenantId])
+  @@index([tenantId, vendorQuotationId])
+  @@index([tenantId, requestForQuotationLineId])
+  @@index([tenantId, itemId])
+  @@map("vendor_quotation_lines")
+}
+
+model VendorComparison {
+  id                       String                 @id @default(uuid())
+  tenantId                 String
+  comparisonNumber         String                 @db.VarChar(64)
+  comparisonDate           DateTime               @db.Date
+  requestForQuotationId    String
+  status                   VendorComparisonStatus @default(DRAFT)
+  awardedVendorId          String?
+  awardedVendorQuotationId String?
+  selectionReason          String?                @db.Text
+  awardedById              String?                @db.VarChar(36)
+  remarks                  String?                @db.Text
+  selectedAt               DateTime?
+  createdById              String?                @db.VarChar(36)
+  updatedById              String?                @db.VarChar(36)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  deletedAt                DateTime?
+
+  tenant              Tenant                 @relation(fields: [tenantId], references: [id])
+  requestForQuotation RequestForQuotation    @relation(fields: [requestForQuotationId], references: [id])
+  awardedVendor       MasterVendor?          @relation("ComparisonAwardedVendor", fields: [awardedVendorId], references: [id])
+  lines               VendorComparisonLine[]
+  purchaseOrders      PurchaseOrder[]
+
+  @@unique([tenantId, comparisonNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, requestForQuotationId])
+  @@index([tenantId, awardedVendorId])
+  @@map("vendor_comparisons")
+}
+
+model VendorComparisonLine {
+  id                        String   @id @default(uuid())
+  tenantId                  String
+  vendorComparisonId        String
+  lineNumber                Int
+  requestForQuotationLineId String?
+  vendorQuotationId         String?
+  vendorQuotationLineId     String?
+  itemId                    String?  @db.VarChar(36)
+  quantity                  Decimal  @default(0) @db.Decimal(18, 4)
+  rate                      Decimal  @default(0) @db.Decimal(18, 2)
+  amount                    Decimal  @default(0) @db.Decimal(18, 2)
+  rank                      Int?
+  isSelected                Boolean  @default(false)
+  remarks                   String?  @db.Text
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id])
+  vendorComparison        VendorComparison         @relation(fields: [vendorComparisonId], references: [id])
+  requestForQuotationLine RequestForQuotationLine? @relation(fields: [requestForQuotationLineId], references: [id])
+  vendorQuotation         VendorQuotation?         @relation(fields: [vendorQuotationId], references: [id])
+  vendorQuotationLine     VendorQuotationLine?     @relation(fields: [vendorQuotationLineId], references: [id])
+
+  @@unique([tenantId, vendorComparisonId, lineNumber])
+  @@index([tenantId])
+  @@index([tenantId, vendorComparisonId])
+  @@index([tenantId, requestForQuotationLineId])
+  @@index([tenantId, vendorQuotationId])
+  @@index([tenantId, isSelected])
+  @@map("vendor_comparison_lines")
+}
+
+model PurchaseOrder {
+  id                    String              @id @default(uuid())
+  tenantId              String
+  orderNumber           String              @db.VarChar(64)
+  orderDate             DateTime            @db.Date
+  vendorId              String
+  origin                PurchaseOrderOrigin @default(MANUAL)
+  status                PurchaseOrderStatus @default(DRAFT)
+  purchaseRequisitionId String?
+  requestForQuotationId String?
+  vendorQuotationId     String?
+  vendorComparisonId    String?
+  currencyCode          String              @default("INR") @db.VarChar(8)
+  expectedDeliveryDate  DateTime?           @db.Date
+  paymentTerms          String?             @db.VarChar(200)
+  deliveryTerms         String?             @db.VarChar(200)
+  deliveryWarehouseId   String?
+  subtotalAmount        Decimal             @default(0) @db.Decimal(18, 2)
+  taxAmount             Decimal             @default(0) @db.Decimal(18, 2)
+  freightAmount         Decimal             @default(0) @db.Decimal(18, 2)
+  totalAmount           Decimal             @default(0) @db.Decimal(18, 2)
+  remarks               String?             @db.Text
+  submittedAt           DateTime?
+  approvedAt            DateTime?
+  rejectedAt            DateTime?
+  rejectionReason       String?             @db.Text
+  sentBackAt            DateTime?
+  sendBackReason        String?             @db.Text
+  sentAt                DateTime?
+  closedAt              DateTime?
+  cancelledAt           DateTime?
+  createdById           String?             @db.VarChar(36)
+  updatedById           String?             @db.VarChar(36)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  deletedAt             DateTime?
+
+  tenant                    Tenant                    @relation(fields: [tenantId], references: [id])
+  vendor                    MasterVendor              @relation(fields: [vendorId], references: [id])
+  purchaseRequisition       PurchaseRequisition?      @relation(fields: [purchaseRequisitionId], references: [id])
+  requestForQuotation       RequestForQuotation?      @relation(fields: [requestForQuotationId], references: [id])
+  vendorQuotation           VendorQuotation?          @relation(fields: [vendorQuotationId], references: [id])
+  vendorComparison          VendorComparison?         @relation(fields: [vendorComparisonId], references: [id])
+  deliveryWarehouse         MasterWarehouse?          @relation("PurchaseOrderDeliveryWarehouse", fields: [deliveryWarehouseId], references: [id])
+  lines                     PurchaseOrderLine[]
+  planningRows              PurchasePlanningRow[]
+  convertedRequisitionLines PurchaseRequisitionLine[]
+  goodsReceipts             GoodsReceipt[]
+  approvals                 PurchaseApproval[]        @relation("PurchaseApprovalPo")
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, vendorId])
+  @@index([tenantId, purchaseRequisitionId])
+  @@index([tenantId, requestForQuotationId])
+  @@index([tenantId, deliveryWarehouseId])
+  @@index([tenantId, orderDate])
+  @@index([tenantId, origin])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id                        String    @id @default(uuid())
+  tenantId                  String
+  purchaseOrderId           String
+  lineNumber                Int
+  purchaseRequisitionLineId String?
+  purchasePlanningRowId     String?
+  itemId                    String?
+  itemCodeSnapshot          String    @default("") @db.VarChar(64)
+  itemNameSnapshot          String    @default("") @db.VarChar(300)
+  description               String?   @db.Text
+  quantity                  Decimal   @default(0) @db.Decimal(18, 4)
+  uomId                     String?
+  rate                      Decimal   @default(0) @db.Decimal(18, 2)
+  amount                    Decimal   @default(0) @db.Decimal(18, 2)
+  receivedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
+  acceptedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
+  rejectedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
+  returnedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
+  invoicedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
+  requiredDate              DateTime? @db.Date
+  remarks                   String?   @db.Text
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id])
+  purchaseOrder           PurchaseOrder            @relation(fields: [purchaseOrderId], references: [id])
+  purchaseRequisitionLine PurchaseRequisitionLine? @relation(fields: [purchaseRequisitionLineId], references: [id])
+  purchasePlanningRow     PurchasePlanningRow?     @relation(fields: [purchasePlanningRowId], references: [id])
+  item                    MasterItem?              @relation(fields: [itemId], references: [id])
+  uom                     MasterUom?               @relation(fields: [uomId], references: [id])
+  goodsReceiptLines       GoodsReceiptLine[]
+
+  @@unique([tenantId, purchaseOrderId, lineNumber])
+  @@index([tenantId])
+  @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, purchaseRequisitionLineId])
+  @@index([tenantId, purchasePlanningRowId])
+  @@index([tenantId, itemId])
+  @@map("purchase_order_lines")
+}
+
+enum GoodsReceiptStatus {
+  DRAFT
+  SUBMITTED
+  RECEIVING_COMPLETED
+  QC_PENDING
+  PARTIALLY_ACCEPTED
+  FULLY_ACCEPTED
+  INVENTORY_POSTED
+  CANCELLED
+  REVERSED
+  CLOSED
+}
+
+model GoodsReceipt {
+  id                          String             @id @default(uuid())
+  tenantId                    String
+  grnNumber                   String             @db.VarChar(64)
+  receiptDate                 DateTime           @db.Date
+  purchaseOrderId             String
+  vendorId                    String
+  vendorCodeSnapshot          String             @default("") @db.VarChar(64)
+  vendorNameSnapshot          String             @default("") @db.VarChar(300)
+  purchaseOrderNumber         String             @default("") @db.VarChar(64)
+  status                      GoodsReceiptStatus @default(DRAFT)
+  plantId                     String?
+  warehouseId                 String
+  warehouseCodeSnapshot       String             @default("") @db.VarChar(32)
+  warehouseNameSnapshot       String             @default("") @db.VarChar(200)
+  storageLocationId           String?
+  storageLocationCodeSnapshot String             @default("") @db.VarChar(32)
+  storageLocationNameSnapshot String             @default("") @db.VarChar(200)
+  vendorChallanNumber         String?            @db.VarChar(100)
+  vendorChallanDate           DateTime?          @db.Date
+  vendorInvoiceNumber         String?            @db.VarChar(100)
+  vehicleNumber               String?            @db.VarChar(64)
+  transporterName             String?            @db.VarChar(200)
+  lrNumber                    String?            @db.VarChar(64)
+  gateEntryNumber             String?            @db.VarChar(64)
+  receivedById                String?            @db.VarChar(36)
+  receivedByName              String?            @db.VarChar(200)
+  inspectionRequired          Boolean            @default(false)
+  allowExcess                 Boolean            @default(false)
+  remarks                     String?            @db.Text
+  submittedAt                 DateTime?
+  cancelledAt                 DateTime?
+  reversedAt                  DateTime?
+  closedAt                    DateTime?
+  createdById                 String?            @db.VarChar(36)
+  updatedById                 String?            @db.VarChar(36)
+  createdAt                   DateTime           @default(now())
+  updatedAt                   DateTime           @updatedAt
+  deletedAt                   DateTime?
+
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+  purchaseOrder PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id])
+  vendor        MasterVendor       @relation(fields: [vendorId], references: [id])
+  warehouse     MasterWarehouse    @relation(fields: [warehouseId], references: [id])
+  lines         GoodsReceiptLine[]
+
+  @@unique([tenantId, grnNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, vendorId])
+  @@index([tenantId, warehouseId])
+  @@index([tenantId, receiptDate])
+  @@index([tenantId, vendorChallanNumber])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptLine {
+  id                         String    @id @default(uuid())
+  tenantId                   String
+  goodsReceiptId             String
+  lineNumber                 Int
+  purchaseOrderLineId        String
+  itemId                     String?
+  itemCodeSnapshot           String    @default("") @db.VarChar(64)
+  itemNameSnapshot           String    @default("") @db.VarChar(300)
+  description                String?   @db.Text
+  uomId                      String?
+  uomCodeSnapshot            String    @default("") @db.VarChar(32)
+  orderedQuantity            Decimal   @default(0) @db.Decimal(18, 4)
+  previouslyReceivedQuantity Decimal   @default(0) @db.Decimal(18, 4)
+  openQuantity               Decimal   @default(0) @db.Decimal(18, 4)
+  challanQuantity            Decimal   @default(0) @db.Decimal(18, 4)
+  receivedQuantity           Decimal   @default(0) @db.Decimal(18, 4)
+  damagedQuantity            Decimal   @default(0) @db.Decimal(18, 4)
+  shortQuantity              Decimal   @default(0) @db.Decimal(18, 4)
+  excessQuantity             Decimal   @default(0) @db.Decimal(18, 4)
+  acceptedForQcQuantity      Decimal   @default(0) @db.Decimal(18, 4)
+  acceptedQuantity           Decimal   @default(0) @db.Decimal(18, 4)
+  rejectedQuantity           Decimal   @default(0) @db.Decimal(18, 4)
+  rate                       Decimal   @default(0) @db.Decimal(18, 2)
+  amount                     Decimal   @default(0) @db.Decimal(18, 2)
+  warehouseId                String?
+  storageLocationId          String?
+  binId                      String?
+  binCodeSnapshot            String    @default("") @db.VarChar(32)
+  batchNumber                String?   @db.VarChar(64)
+  heatNumber                 String?   @db.VarChar(64)
+  lotNumber                  String?   @db.VarChar(64)
+  serialNumber               String?   @db.VarChar(100)
+  manufacturingDate          DateTime? @db.Date
+  expiryDate                 DateTime? @db.Date
+  qcRequired                 Boolean   @default(false)
+  remarks                    String?   @db.Text
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id])
+  goodsReceipt      GoodsReceipt      @relation(fields: [goodsReceiptId], references: [id])
+  purchaseOrderLine PurchaseOrderLine @relation(fields: [purchaseOrderLineId], references: [id])
+  warehouse         MasterWarehouse?  @relation(fields: [warehouseId], references: [id])
+  storageLocation   MasterLocation?   @relation(fields: [storageLocationId], references: [id])
+  bin               MasterBin?        @relation(fields: [binId], references: [id])
+
+  @@unique([tenantId, goodsReceiptId, lineNumber])
+  @@index([tenantId])
+  @@index([tenantId, goodsReceiptId])
+  @@index([tenantId, purchaseOrderLineId])
+  @@index([tenantId, warehouseId])
+  @@index([tenantId, storageLocationId])
+  @@index([tenantId, binId])
+  @@map("goods_receipt_lines")
+}
+
+model PurchaseApproval {
+  id                    String                       @id @default(uuid())
+  tenantId              String
+  documentType          PurchaseApprovalDocumentType
+  documentId            String                       @db.VarChar(36)
+  documentNumber        String?                      @db.VarChar(64)
+  purchaseRequisitionId String?
+  purchaseOrderId       String?
+  level                 Int                          @default(1)
+  status                PurchaseApprovalStatus       @default(PENDING)
+  approverRole          String?                      @db.VarChar(64)
+  approverId            String?                      @db.VarChar(36)
+  requesterId           String?                      @db.VarChar(36)
+  amount                Decimal?                     @db.Decimal(18, 2)
+  remarks               String?                      @db.Text
+  requestedAt           DateTime                     @default(now())
+  respondedAt           DateTime?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+
+  tenant              Tenant               @relation(fields: [tenantId], references: [id])
+  purchaseRequisition PurchaseRequisition? @relation("PurchaseApprovalPr", fields: [purchaseRequisitionId], references: [id])
+  purchaseOrder       PurchaseOrder?       @relation("PurchaseApprovalPo", fields: [purchaseOrderId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, documentType, documentId])
+  @@index([tenantId, status])
+  @@index([tenantId, purchaseRequisitionId])
+  @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, approverId])
+  @@map("purchase_approvals")
+}
+
+model PurchaseStatusHistory {
+  id             String                            @id @default(uuid())
+  tenantId       String
+  documentType   PurchaseStatusHistoryDocumentType
+  documentId     String                            @db.VarChar(36)
+  documentNumber String?                           @db.VarChar(64)
+  action         String                            @db.VarChar(64)
+  fromStatus     String?                           @db.VarChar(64)
+  toStatus       String?                           @db.VarChar(64)
+  actorId        String?                           @db.VarChar(36)
+  actorName      String?                           @db.VarChar(200)
+  remarks        String?                           @db.Text
+  actedAt        DateTime                          @default(now())
+  createdAt      DateTime                          @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, documentType, documentId])
+  @@index([tenantId, actedAt])
+  @@index([tenantId, action])
+  @@map("purchase_status_histories")
+}
+
+enum DuplicateChallanPolicy {
+  BLOCK
+  WARN
+  ALLOW
+}
+
+/// Maker-checker override for PR/PO approvals.
+/// NEVER — strict segregation of duties; PERMISSION_ONLY — only users holding
+/// purchase.approvals.self_approve may approve their own documents; EVERYONE — no restriction.
+enum SelfApprovalPolicy {
+  NEVER
+  PERMISSION_ONLY
+  EVERYONE
+}
+
+enum PurchaseGstScheme {
+  CGST_SGST
+  IGST
+}
+
+enum PurchaseGstRoundOffRule {
+  NONE
+  NEAREST_RUPEE
+  NEAREST_PAISA
+}
+
+enum PurchasePrintPaperSize {
+  A4
+  LETTER
+}
+
+enum PurchasePrintOrientation {
+  PORTRAIT
+  LANDSCAPE
+}
+
+enum PurchaseApprovalTierDocumentType {
+  ALL
+  PURCHASE_REQUISITION
+  PURCHASE_ORDER
+}
+
+enum PurchaseApprovalMatrixRole {
+  DEPARTMENT_HEAD
+  PURCHASE_HEAD
+  FINANCE_HEAD
+  MANAGEMENT
+}
+
+enum QualityInspectionStatus {
+  DRAFT
+  PENDING
+  IN_PROGRESS
+  ACCEPTED
+  PARTIALLY_ACCEPTED
+  REJECTED
+  DEVIATION_PENDING
+  CLOSED
+  CANCELLED
+}
+
+enum PurchaseInvoiceStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  MATCHED
+  PARTIALLY_MATCHED
+  MISMATCH
+  POSTED
+  CANCELLED
+  CLOSED
+}
+
+enum PurchaseReturnStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  SHIPPED
+  COMPLETED
+  CANCELLED
+  CLOSED
+}
+
+/// Tenant-scoped purchase configuration (one active core record per tenant).
+model PurchaseSettings {
+  id                              String                   @id @default(uuid())
+  tenantId                        String                   @unique
+  defaultPlantId                  String?
+  defaultWarehouseId              String?
+  /// Default warehouse pre-selected on new Purchase Requisitions (falls back to defaultWarehouseId).
+  defaultRequisitionWarehouseId   String?
+  defaultReceivingLocationId      String?
+  defaultQualityHoldLocationId    String?
+  defaultRejectedLocationId       String?
+  defaultVendorReturnLocationId   String?
+  defaultCurrencyCode             String                   @default("INR") @db.VarChar(8)
+  defaultPaymentTermCode          String?                  @db.VarChar(64)
+  defaultPaymentTermName          String?                  @db.VarChar(200)
+  defaultDeliveryTerms            String?                  @db.VarChar(200)
+  defaultBuyerId                  String?                  @db.VarChar(36)
+  defaultRfqRequired              Boolean                  @default(true)
+  allowDirectPo                   Boolean                  @default(true)
+  requirePrBeforePo               Boolean                  @default(false)
+  requireRfqAboveAmount           Decimal?                 @db.Decimal(18, 2)
+  minimumRfqVendorCount           Int                      @default(1)
+  requireQuotationComparison      Boolean                  @default(false)
+  requirePoWarehouse              Boolean                  @default(false)
+  requireExpectedDeliveryDate     Boolean                  @default(false)
+  requirePaymentTerms             Boolean                  @default(false)
+  allowOverReceipt                Boolean                  @default(false)
+  overReceiptTolerancePct         Decimal                  @default(0) @db.Decimal(5, 2)
+  allowShortClose                 Boolean                  @default(true)
+  requireVendorChallan            Boolean                  @default(false)
+  requireVehicleNumber            Boolean                  @default(false)
+  requireGateEntry                Boolean                  @default(false)
+  requireBatch                    Boolean                  @default(false)
+  requireSerial                   Boolean                  @default(false)
+  requireExpiry                   Boolean                  @default(false)
+  duplicateChallanPolicy          DuplicateChallanPolicy   @default(BLOCK)
+  autoCreateQualityInspection     Boolean                  @default(false)
+  autoCompleteRef                 Boolean                  @default(false)
+  allowAcceptanceUnderDeviation   Boolean                  @default(false)
+  deviationApproverRole           PurchaseApprovalMatrixRole?
+  allowRejectedStockInQuarantine  Boolean                  @default(true)
+  allowDirectInvoice              Boolean                  @default(false)
+  requirePoMatch                  Boolean                  @default(true)
+  requireGrnMatch                 Boolean                  @default(true)
+  quantityTolerancePct            Decimal                  @default(0) @db.Decimal(5, 2)
+  rateTolerancePct                Decimal                  @default(0) @db.Decimal(5, 2)
+  amountToleranceInr              Decimal                  @default(0) @db.Decimal(18, 2)
+  amountTolerancePct              Decimal                  @default(0) @db.Decimal(5, 2)
+  taxToleranceInr                 Decimal                  @default(0) @db.Decimal(18, 2)
+  taxTolerancePct                 Decimal                  @default(0) @db.Decimal(5, 2)
+  allowAuthorizedOverride         Boolean                  @default(true)
+  defaultGstScheme                PurchaseGstScheme        @default(CGST_SGST)
+  placeOfSupplyState              String?                  @db.VarChar(100)
+  placeOfSupplyStateCode          String?                  @db.VarChar(8)
+  reverseChargeDefault            Boolean                  @default(false)
+  tcsEnabled                      Boolean                  @default(false)
+  tdsEnabled                      Boolean                  @default(false)
+  roundOffRule                    PurchaseGstRoundOffRule  @default(NEAREST_RUPEE)
+  printCompanyName                String?                  @db.VarChar(300)
+  printLogoUrl                    String?                  @db.VarChar(500)
+  showTermsOnPo                   Boolean                  @default(true)
+  showTermsOnGrn                  Boolean                  @default(false)
+  showTermsOnInvoice              Boolean                  @default(true)
+  printDefaultCopies              Int                      @default(1)
+  printPaperSize                  PurchasePrintPaperSize   @default(A4)
+  printOrientation                PurchasePrintOrientation @default(PORTRAIT)
+  selfApprovalPolicy              SelfApprovalPolicy       @default(PERMISSION_ONLY)
+  version                         Int                      @default(1)
+  createdById                     String?                  @db.VarChar(36)
+  updatedById                     String?                  @db.VarChar(36)
+  createdAt                       DateTime                 @default(now())
+  updatedAt                       DateTime                 @updatedAt
+
+  tenant                       Tenant                         @relation(fields: [tenantId], references: [id])
+  defaultPlant                 MasterPlant?                   @relation("PurchaseSettingsDefaultPlant", fields: [defaultPlantId], references: [id])
+  defaultWarehouse             MasterWarehouse?               @relation("PurchaseSettingsDefaultWarehouse", fields: [defaultWarehouseId], references: [id])
+  defaultRequisitionWarehouse  MasterWarehouse?               @relation("PurchaseSettingsRequisitionWarehouse", fields: [defaultRequisitionWarehouseId], references: [id])
+  defaultReceivingLocation     MasterLocation?                @relation("PurchaseSettingsReceivingLocation", fields: [defaultReceivingLocationId], references: [id])
+  defaultQualityHoldLocation   MasterLocation?                @relation("PurchaseSettingsQcHoldLocation", fields: [defaultQualityHoldLocationId], references: [id])
+  defaultRejectedLocation      MasterLocation?                @relation("PurchaseSettingsRejectedLocation", fields: [defaultRejectedLocationId], references: [id])
+  defaultVendorReturnLocation  MasterLocation?                @relation("PurchaseSettingsVendorReturnLocation", fields: [defaultVendorReturnLocationId], references: [id])
+  approvalTiers                PurchaseApprovalTier[]
+  inspectionCategories         PurchaseInspectionCategory[]
+
+  @@index([tenantId])
+  @@index([tenantId, defaultWarehouseId])
+  @@map("purchase_settings")
+}
+
+/// Amount-band approval matrix tier (tenant-scoped via PurchaseSettings).
+model PurchaseApprovalTier {
+  id               String                           @id @default(uuid())
+  tenantId         String
+  purchaseSettingsId String
+  minAmount        Decimal                          @db.Decimal(18, 2)
+  maxAmount        Decimal?                         @db.Decimal(18, 2)
+  sortOrder        Int                              @default(1)
+  isActive         Boolean                          @default(true)
+  label            String                           @db.VarChar(200)
+  documentType     PurchaseApprovalTierDocumentType @default(ALL)
+  createdAt        DateTime                         @default(now())
+  updatedAt        DateTime                         @updatedAt
+
+  tenant           Tenant                       @relation(fields: [tenantId], references: [id])
+  purchaseSettings PurchaseSettings             @relation(fields: [purchaseSettingsId], references: [id], onDelete: Cascade)
+  roles            PurchaseApprovalTierRole[]
+
+  @@index([tenantId])
+  @@index([tenantId, purchaseSettingsId])
+  @@index([tenantId, sortOrder])
+  @@map("purchase_approval_tiers")
+}
+
+model PurchaseApprovalTierRole {
+  id     String                     @id @default(uuid())
+  tierId String
+  role   PurchaseApprovalMatrixRole
+  sortOrder Int                     @default(1)
+
+  tier PurchaseApprovalTier @relation(fields: [tierId], references: [id], onDelete: Cascade)
+
+  @@unique([tierId, role])
+  @@index([tierId])
+  @@map("purchase_approval_tier_roles")
+}
+
+/// Item-category codes that require QC on receipt (slug values, e.g. raw_material).
+model PurchaseInspectionCategory {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  purchaseSettingsId String
+  categoryCode       String   @db.VarChar(64)
+  createdAt          DateTime @default(now())
+
+  tenant           Tenant           @relation(fields: [tenantId], references: [id])
+  purchaseSettings PurchaseSettings @relation(fields: [purchaseSettingsId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, categoryCode])
+  @@index([tenantId])
+  @@index([tenantId, purchaseSettingsId])
+  @@map("purchase_inspection_categories")
+}
+
+/// Plant-level overrides for warehouse / storage-location defaults.
+model PurchasePlantSettings {
+  id                            String   @id @default(uuid())
+  tenantId                      String
+  plantId                       String
+  defaultWarehouseId            String?
+  defaultReceivingLocationId    String?
+  defaultQualityHoldLocationId  String?
+  defaultRejectedLocationId     String?
+  defaultVendorReturnLocationId String?
+  createdById                   String?  @db.VarChar(36)
+  updatedById                   String?  @db.VarChar(36)
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  tenant                      Tenant           @relation(fields: [tenantId], references: [id])
+  plant                       MasterPlant      @relation(fields: [plantId], references: [id])
+  defaultWarehouse            MasterWarehouse? @relation("PurchasePlantSettingsDefaultWarehouse", fields: [defaultWarehouseId], references: [id])
+  defaultReceivingLocation    MasterLocation?  @relation("PurchasePlantSettingsReceivingLocation", fields: [defaultReceivingLocationId], references: [id])
+  defaultQualityHoldLocation  MasterLocation?  @relation("PurchasePlantSettingsQcHoldLocation", fields: [defaultQualityHoldLocationId], references: [id])
+  defaultRejectedLocation     MasterLocation?  @relation("PurchasePlantSettingsRejectedLocation", fields: [defaultRejectedLocationId], references: [id])
+  defaultVendorReturnLocation MasterLocation?  @relation("PurchasePlantSettingsVendorReturnLocation", fields: [defaultVendorReturnLocationId], references: [id])
+
+  @@unique([tenantId, plantId])
+  @@index([tenantId])
+  @@index([tenantId, plantId])
+  @@map("purchase_plant_settings")
+}
+
+model QualityInspection {
+  id                   String                   @id @default(uuid())
+  tenantId             String
+  inspectionNumber     String                   @db.VarChar(64)
+  inspectionDate       DateTime                 @db.Date
+  goodsReceiptId       String?
+  purchaseOrderId      String?
+  vendorId             String?
+  status               QualityInspectionStatus  @default(DRAFT)
+  warehouseId          String?
+  remarks              String?                  @db.Text
+  deviationRemarks     String?                  @db.Text
+  inspectedById        String?                  @db.VarChar(36)
+  inspectedByName      String?                  @db.VarChar(200)
+  completedAt          DateTime?
+  createdById          String?                  @db.VarChar(36)
+  updatedById          String?                  @db.VarChar(36)
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  deletedAt            DateTime?
+
+  tenant  Tenant                   @relation(fields: [tenantId], references: [id])
+  lines   QualityInspectionLine[]
+
+  @@unique([tenantId, inspectionNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, goodsReceiptId])
+  @@index([tenantId, purchaseOrderId])
+  @@map("quality_inspections")
+}
+
+model QualityInspectionLine {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  qualityInspectionId   String
+  lineNumber            Int
+  goodsReceiptLineId    String?
+  purchaseOrderLineId   String?
+  itemId                String?
+  itemCodeSnapshot      String   @default("") @db.VarChar(64)
+  itemNameSnapshot      String   @default("") @db.VarChar(300)
+  inspectedQuantity     Decimal  @default(0) @db.Decimal(18, 4)
+  acceptedQuantity      Decimal  @default(0) @db.Decimal(18, 4)
+  rejectedQuantity      Decimal  @default(0) @db.Decimal(18, 4)
+  deviationQuantity     Decimal  @default(0) @db.Decimal(18, 4)
+  remarks               String?  @db.Text
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  tenant             Tenant             @relation(fields: [tenantId], references: [id])
+  qualityInspection  QualityInspection  @relation(fields: [qualityInspectionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, qualityInspectionId, lineNumber], map: "qi_lines_tenant_qi_lineno_key")
+  @@index([tenantId])
+  @@index([tenantId, qualityInspectionId])
+  @@map("quality_inspection_lines")
+}
+
+model PurchaseInvoice {
+  id                    String                @id @default(uuid())
+  tenantId              String
+  invoiceNumber         String                @db.VarChar(64)
+  invoiceDate           DateTime              @db.Date
+  vendorInvoiceNumber   String?               @db.VarChar(100)
+  vendorInvoiceDate     DateTime?             @db.Date
+  vendorId              String
+  purchaseOrderId       String?
+  goodsReceiptId        String?
+  status                PurchaseInvoiceStatus @default(DRAFT)
+  isDirectInvoice       Boolean               @default(false)
+  currencyCode          String                @default("INR") @db.VarChar(8)
+  gstScheme             PurchaseGstScheme     @default(CGST_SGST)
+  placeOfSupplyState    String?               @db.VarChar(100)
+  placeOfSupplyStateCode String?              @db.VarChar(8)
+  reverseCharge         Boolean               @default(false)
+  subtotalAmount        Decimal               @default(0) @db.Decimal(18, 2)
+  taxAmount             Decimal               @default(0) @db.Decimal(18, 2)
+  roundOffAmount        Decimal               @default(0) @db.Decimal(18, 2)
+  totalAmount           Decimal               @default(0) @db.Decimal(18, 2)
+  matchingStatus        String?               @db.VarChar(64)
+  matchingRemarks       String?               @db.Text
+  overrideAuthorized    Boolean               @default(false)
+  overrideRemarks       String?               @db.Text
+  remarks               String?               @db.Text
+  submittedAt           DateTime?
+  approvedAt            DateTime?
+  postedAt              DateTime?
+  cancelledAt           DateTime?
+  createdById           String?               @db.VarChar(36)
+  updatedById           String?               @db.VarChar(36)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  deletedAt             DateTime?
+
+  tenant Tenant                @relation(fields: [tenantId], references: [id])
+  lines  PurchaseInvoiceLine[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, vendorId])
+  @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, goodsReceiptId])
+  @@index([tenantId, invoiceDate])
+  @@map("purchase_invoices")
+}
+
+model PurchaseInvoiceLine {
+  id                   String   @id @default(uuid())
+  tenantId             String
+  purchaseInvoiceId    String
+  lineNumber           Int
+  purchaseOrderLineId  String?
+  goodsReceiptLineId   String?
+  itemId               String?
+  itemCodeSnapshot     String   @default("") @db.VarChar(64)
+  itemNameSnapshot     String   @default("") @db.VarChar(300)
+  description          String?  @db.Text
+  quantity             Decimal  @default(0) @db.Decimal(18, 4)
+  uomCodeSnapshot      String   @default("") @db.VarChar(32)
+  rate                 Decimal  @default(0) @db.Decimal(18, 2)
+  amount               Decimal  @default(0) @db.Decimal(18, 2)
+  taxRatePct           Decimal  @default(0) @db.Decimal(5, 2)
+  taxAmount            Decimal  @default(0) @db.Decimal(18, 2)
+  lineTotal            Decimal  @default(0) @db.Decimal(18, 2)
+  remarks              String?  @db.Text
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+  purchaseInvoice PurchaseInvoice @relation(fields: [purchaseInvoiceId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, purchaseInvoiceId, lineNumber], map: "pi_lines_tenant_pi_lineno_key")
+  @@index([tenantId])
+  @@index([tenantId, purchaseInvoiceId])
+  @@map("purchase_invoice_lines")
+}
+
+model PurchaseReturn {
+  id                String               @id @default(uuid())
+  tenantId          String
+  returnNumber      String               @db.VarChar(64)
+  returnDate        DateTime             @db.Date
+  vendorId          String
+  purchaseOrderId   String?
+  goodsReceiptId    String?
+  qualityInspectionId String?
+  status            PurchaseReturnStatus @default(DRAFT)
+  warehouseId       String?
+  reason            String?              @db.Text
+  remarks           String?              @db.Text
+  submittedAt       DateTime?
+  completedAt       DateTime?
+  cancelledAt       DateTime?
+  createdById       String?              @db.VarChar(36)
+  updatedById       String?              @db.VarChar(36)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  deletedAt         DateTime?
+
+  tenant Tenant               @relation(fields: [tenantId], references: [id])
+  lines  PurchaseReturnLine[]
+
+  @@unique([tenantId, returnNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, vendorId])
+  @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, goodsReceiptId])
+  @@map("purchase_returns")
+}
+
+model PurchaseReturnLine {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  purchaseReturnId   String
+  lineNumber         Int
+  goodsReceiptLineId String?
+  purchaseOrderLineId String?
+  itemId             String?
+  itemCodeSnapshot   String   @default("") @db.VarChar(64)
+  itemNameSnapshot   String   @default("") @db.VarChar(300)
+  returnQuantity     Decimal  @default(0) @db.Decimal(18, 4)
+  rate               Decimal  @default(0) @db.Decimal(18, 2)
+  amount             Decimal  @default(0) @db.Decimal(18, 2)
+  remarks            String?  @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+  purchaseReturn PurchaseReturn @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, purchaseReturnId, lineNumber], map: "prt_lines_tenant_prt_lineno_key")
+  @@index([tenantId])
+  @@index([tenantId, purchaseReturnId])
+  @@map("purchase_return_lines")
 }
 
 /// Phase 3C5 — groups one user allocation action of a credit note across one or more invoices.

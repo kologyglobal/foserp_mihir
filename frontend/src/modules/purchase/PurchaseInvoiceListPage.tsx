@@ -388,7 +388,15 @@ export function PurchaseInvoiceListPage() {
           />
         }
       >
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,minmax(0,1fr))_auto] xl:items-start">
+        <PurchaseRegisterContextPanel
+          ariaLabel="Purchase invoice overview and suggestions"
+          title="Invoice Insights"
+          subtitle="Bottlenecks and next actions for this register."
+          storageKey="purchase.ai-insights.invoices"
+          overview={registerOverview}
+          suggestions={registerSuggestions}
+          placement="split"
+        >
           <EnterpriseRegisterTableShell className="min-w-0">
             <PurchaseInvoicesTable
               rows={filtered}
@@ -445,14 +453,7 @@ export function PurchaseInvoiceListPage() {
               }
             />
           </EnterpriseRegisterTableShell>
-          <PurchaseRegisterContextPanel
-            ariaLabel="Purchase invoice overview and suggestions"
-            title="Invoice Insights"
-            subtitle="AI suggested bottlenecks and next actions for this register."
-            overview={registerOverview}
-            suggestions={registerSuggestions}
-          />
-        </div>
+        </PurchaseRegisterContextPanel>
       </OperationalPageShell>
 
       <CrmFilterDrawer

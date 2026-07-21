@@ -18,10 +18,32 @@ import { formatApiError } from '../../../services/api/apiErrors'
 import { notifyMasterSaved } from '../../../store/toastStore'
 import type { Warehouse, WarehouseType } from '../../../types/master'
 
+const WAREHOUSE_TYPE_OPTIONS: Array<{ value: WarehouseType; label: string }> = [
+  { value: 'main', label: 'Main Store' },
+  { value: 'sub', label: 'Sub Store' },
+  { value: 'wip', label: 'WIP' },
+  { value: 'fg', label: 'Finished Goods' },
+  { value: 'quarantine', label: 'Quarantine' },
+  { value: 'raw_material', label: 'Raw Material' },
+  { value: 'finished_goods', label: 'Finished Goods (Prod)' },
+  { value: 'work_in_progress', label: 'Work In Progress' },
+  { value: 'receiving', label: 'Receiving' },
+  { value: 'quality_hold', label: 'Quality Hold' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'vendor_return', label: 'Vendor Return' },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'consumables', label: 'Consumables' },
+  { value: 'scrap', label: 'Scrap' },
+  { value: 'transit', label: 'Transit' },
+  { value: 'dispatch', label: 'Dispatch' },
+]
+
 const schema = z.object({
   warehouseCode: z.string().min(1),
   warehouseName: z.string().min(1),
-  warehouseType: z.enum(['main', 'sub', 'wip', 'fg', 'quarantine']),
+  warehouseType: z.enum(
+    WAREHOUSE_TYPE_OPTIONS.map((o) => o.value) as [WarehouseType, ...WarehouseType[]],
+  ),
   plantCode: z.string().min(1),
   address: z.string(),
   isActive: z.boolean(),
@@ -173,7 +195,7 @@ export function WarehouseFormPage() {
         required
       />
       <FormField label="Warehouse Name" required error={errors.warehouseName?.message}><Input {...register('warehouseName')} error={!!errors.warehouseName} /></FormField>
-      <FormField label="Type" required><Select {...register('warehouseType')}><option value="main">Main Store</option><option value="sub">Sub Store</option><option value="wip">WIP</option><option value="fg">Finished Goods</option><option value="quarantine">Quarantine</option></Select></FormField>
+      <FormField label="Type" required><Select {...register('warehouseType')}>{WAREHOUSE_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</Select></FormField>
       <FormField label="Plant Code"><Input {...register('plantCode')} /></FormField>
       <FormField label="Address" className="md:col-span-2"><Input {...register('address')} /></FormField>
       <div className="flex items-end md:col-span-2"><Checkbox label="Active" {...register('isActive')} /></div>

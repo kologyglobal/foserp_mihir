@@ -9,6 +9,9 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:purchase-phase15": "vitest run tests/purchase-phase15-unit.test.ts tests/purchase-planning-workflow.test.ts tests/purchase-requisition-workflow.test.ts tests/purchase-error-catalog.test.ts tests/purchase-rbac-permissions.test.ts tests/purchase-rfq-workflow.test.ts tests/purchase-audit-timeline.test.ts",
+    "test:purchase-phase15-live": "vitest run tests/purchase-phase15-integration.test.ts tests/purchase-requisition-lifecycle.test.ts tests/purchase-planning-sheet.test.ts tests/purchase-module-coverage.test.ts --hookTimeout=120000",
+    "test:purchase-coverage-live": "vitest run tests/purchase-module-coverage.test.ts --hookTimeout=120000",
     "test:crm-live": "tsx scripts/run-crm-live-tests.ts",
     "test:backend-structure": "tsx scripts/test-backend-structure.ts",
     "db:purge-business": "tsx scripts/purge-business-data.ts",
@@ -17,6 +20,7 @@
     "db:migrate": "tsx scripts/prisma-cli.ts migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:purchase-demo": "tsx scripts/seed-purchase-demo-data.ts",
     "db:sync-permissions": "tsx scripts/sync-permissions.ts",
     "db:setup": "npm run db:generate && tsx scripts/prisma-cli.ts migrate deploy && npm run db:seed",
     "db:studio": "tsx scripts/prisma-cli.ts studio"

@@ -147,6 +147,10 @@ Seed (dev): **31 countries**, **36 Indian states**, **108 cities**, **3 products
 
 API responses use **frontend field names** (`leadNo`, `customerName`, `opportunityNo`) via mappers in CRM services.
 
+## Purchase (deferred)
+
+When purchase APIs are added, **each Purchase Requisition line must include its own `locationId`** (header location alone is not sufficient). Also plan `binCode`; `purchaseOrderNumber` / `purchaseQuoteNumber` / line `requiredDate` are future read-only fields once PO/quote exists.
+
 ## Live docs
 
 Swagger UI (development): `http://localhost:5000/api/docs`  

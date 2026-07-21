@@ -570,8 +570,222 @@ a.purchase-process-map__step:hover {
   outline-offset: 2px;
 }
 
+/* Register list band — above table, collapsible like CRM section cards */
+.purchase-register-insights {
+  width: 100%;
+  min-width: 0;
+}
+
+.purchase-register-insights--collapsed {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 34px;
+}
+
+/* Split: open = table left | insights right; closed = sparkle above full-width table */
+.purchase-register-split--collapsed .purchase-register-insights--collapsed {
+  justify-content: flex-end;
+}
+
+/* PR Quick Entry — stacked labels, 4 compact fields per row */
+.pr-quick-entry .erp-card-section__grid--cols-4 {
+  gap: 10px 12px;
+}
+
+.pr-quick-entry .erp-field-row:not(.erp-field-row--horizontal) .erp-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--erp-muted, #605e5c);
+}
+
+/* Right rail beside register table — always beside table in split (never stacked below) */
+.purchase-register-split > .purchase-register-insights--rail {
+  position: sticky;
+  top: 0.75rem;
+  width: 17.5rem;
+  max-width: 17.5rem;
+  flex-shrink: 0;
+}
+
+.purchase-register-insights--rail {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 1280px) {
+  .purchase-register-insights--rail:not(.purchase-register-split > .purchase-register-insights--rail) {
+    position: sticky;
+    top: 0.75rem;
+    width: 17.5rem;
+    max-width: 17.5rem;
+    flex-shrink: 0;
+  }
+
+  .purchase-register-insights--rail-collapsed {
+    width: auto;
+    max-width: none;
+    justify-content: flex-start;
+  }
+}
+
+.purchase-register-insights--rail .purchase-ai-panel--register {
+  height: fit-content;
+}
+
+.purchase-register-insights--rail .purchase-ai-panel__body {
+  max-height: min(70vh, 36rem);
+  overflow-y: auto;
+}
+
+.purchase-ai-panel--register {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, #0078d4 22%, #e5e7eb);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  padding: 0;
+}
+
+.purchase-ai-panel--register .purchase-ai-panel__head {
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, #0078d4 12%, #fff) 0%,
+      color-mix(in srgb, #0078d4 5%, #f8fafc) 100%
+    );
+  border-bottom: 1px solid color-mix(in srgb, #0078d4 14%, #edebe9);
+}
+
+.purchase-ai-panel--register .purchase-ai-panel__badge {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, #0078d4 28%, #e5e7eb);
+  background: color-mix(in srgb, #0078d4 14%, #fff);
+  color: #0078d4;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) inset;
+}
+
+.purchase-ai-panel--register .purchase-ai-panel__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #201f1e;
+}
+
+.purchase-ai-panel--register .purchase-ai-panel__subtitle {
+  margin-top: 1px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #605e5c;
+}
+
+.purchase-ai-panel__close--collapse {
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  margin-left: 4px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #605e5c;
+  box-shadow: none;
+  transform: none;
+}
+
+.purchase-ai-panel__close--collapse:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border: none;
+  color: #201f1e;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Full-width band above register table (not the narrow right rail) */
+.purchase-register-insights:not(.purchase-register-insights--rail)
+  .purchase-ai-panel--register
+  .purchase-ai-panel__body {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.purchase-register-insights:not(.purchase-register-insights--rail)
+  .purchase-ai-panel__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  grid-template-columns: none;
+}
+
+.purchase-register-insights:not(.purchase-register-insights--rail)
+  .purchase-ai-panel__metric {
+  flex: 1 1 auto;
+  min-width: 5.75rem;
+  max-width: 9rem;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+
+.purchase-register-insights:not(.purchase-register-insights--rail)
+  .purchase-ai-panel__metric dd {
+  font-size: 12px;
+}
+
+.purchase-register-insights:not(.purchase-register-insights--rail)
+  .purchase-ai-panel__suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.purchase-register-insights:not(.purchase-register-insights--rail)
+  .purchase-ai-panel__suggestion {
+  width: auto;
+  max-width: 100%;
+  flex: 0 1 auto;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.purchase-register-insights:not(.purchase-register-insights--rail)
+  .purchase-ai-panel__suggestion-label {
+  white-space: nowrap;
+}
+
+.purchase-ai-panel--register .purchase-ai-panel__body {
+  padding: 10px 12px 12px;
+}
+
+.purchase-register-insights--rail .purchase-ai-panel--register .purchase-ai-panel__body {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  max-height: min(70vh, 36rem);
+  overflow-y: auto;
+}
+
 .purchase-ai-panel__restore {
   flex-shrink: 0;
+}
+
+.purchase-ai-panel__restore--on {
+  border-color: color-mix(in srgb, #0078d4 40%, #c8c6c4);
+  background: color-mix(in srgb, #0078d4 12%, #fff);
+  color: #0078d4;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .purchase-ai-panel__restore {
+  width: 36px;
+  height: 36px;
 }
 
 .purchase-ai-panel--embedded .purchase-ai-panel__head {

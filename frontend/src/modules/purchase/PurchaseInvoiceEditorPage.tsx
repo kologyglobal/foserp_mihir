@@ -2,14 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
-  CheckCircle,
   ClipboardList,
   FileText,
   GitCompare,
   Package,
   Plus,
-  Save,
-  Send,
   StickyNote,
   Trash2,
   Truck,
@@ -30,10 +27,9 @@ import {
   ErpCardSection,
   ErpFieldRow,
   ErpFormSpan,
-  ErpStickySaveBar,
 } from '@/components/erp/card-form'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
-import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
+import { ErpButton } from '@/components/erp/ErpButton'
+import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { Badge } from '@/components/ui/Badge'
 import {
@@ -43,7 +39,6 @@ import {
   taxTotalsSummary,
 } from '@/modules/purchase/purchaseFastTabSummaries'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { EnterpriseFormMetrics } from '@/design-system/workspace'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
   createDirectPurchaseInvoice,
@@ -57,12 +52,11 @@ import {
   getPurchaseOrders,
   getPurchaseSetup,
   getVendors,
+  previewNextPurchaseInvoiceNumber,
   PurchaseServiceError,
   PURCHASE_INVOICE_ORIGIN_LABELS,
   PURCHASE_INVOICE_STATUS_LABELS,
-  submitPurchaseInvoiceForApproval,
   updatePurchaseInvoice,
-  verifyPurchaseInvoice,
 } from '@/services/purchase'
 import type {
   GoodsReceiptNote,
@@ -79,6 +73,7 @@ import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
 import { PURCHASE_PAYMENT_TERMS } from '@/data/purchase/purchaseCommercialTerms'
+import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 
 type EditorLine = PurchaseInvoiceLine & { key: string }
 
@@ -143,6 +138,7 @@ export function PurchaseInvoiceEditorPage() {
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [invoice, setInvoice] = useState<PurchaseInvoice | null>(null)
+  const [previewDocumentNumber, setPreviewDocumentNumber] = useState<string | null>(null)
   const [origin, setOrigin] = useState<PurchaseInvoiceOrigin>('purchase_order')
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [items, setItems] = useState<PurchaseItem[]>([])
@@ -166,7 +162,15 @@ export function PurchaseInvoiceEditorPage() {
   const [lines, setLines] = useState<EditorLine[]>([emptyLine()])
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
-  useUnsavedChangesGuard(dirty && !saving)
+  const {
+    markDirty: markGuardDirty,
+    resetDirty,
+  } = useUnsavedChangesGuard(true)
+
+  useEffect(() => {
+    if (dirty && !saving) markGuardDirty()
+    else resetDirty()
+  }, [dirty, markGuardDirty, resetDirty, saving])
 
   const canDirect =
     setup?.allowDirectInvoice || true /* demo admin session — gate still enforced in service */
@@ -257,6 +261,8 @@ export function PurchaseInvoiceEditorPage() {
           return
         }
         if (originParam) setOrigin(originParam)
+        const nextNumber = await previewNextPurchaseInvoiceNumber().catch(() => null)
+        if (nextNumber) setPreviewDocumentNumber(nextNumber)
       } catch (err) {
         notify.error(err instanceof PurchaseServiceError ? err.message : 'Failed to start invoice')
       } finally {
@@ -339,6 +345,7 @@ export function PurchaseInvoiceEditorPage() {
   }
 
   const saveDraft = async () => {
+    if (saving) return
     if (!validate()) {
       notify.error('Fix validation errors')
       return
@@ -352,34 +359,21 @@ export function PurchaseInvoiceEditorPage() {
           origin === 'direct'
             ? await createDirectPurchaseInvoice(input)
             : await createPurchaseInvoice(input)
-        notify.success('Draft saved')
+        notify.success(`Saved · ${row.documentNumber}`)
         setDirty(false)
-        navigate(`/purchase/invoices/${row.id}/edit`, { replace: true })
+        resetDirty()
       } else {
         row = await updatePurchaseInvoice(invoice.id, input)
         applyInvoice(row)
-        notify.success('Draft updated')
+        setDirty(false)
+        resetDirty()
+        notify.success(`Saved · ${row.documentNumber}`)
       }
+      navigate(PURCHASE_FORM_ROUTES.purchaseInvoice.list, { replace: true })
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
     } finally {
       setSaving(false)
-    }
-  }
-
-  const saveAndVerify = async () => {
-    await saveDraft()
-    if (!id && !invoice) return
-    const targetId = invoice?.id ?? id
-    if (!targetId || targetId === 'new') return
-    try {
-      const row = await verifyPurchaseInvoice(targetId)
-      applyInvoice(row)
-      notify.success(
-        row.status === 'mismatch' ? 'Verified with mismatches' : 'Invoice verified & matched',
-      )
-    } catch (err) {
-      notify.error(err instanceof PurchaseServiceError ? err.message : 'Verify failed')
     }
   }
 
@@ -409,7 +403,7 @@ export function PurchaseInvoiceEditorPage() {
   const recordHeaderFacts = useMemo(
     () => [
       ...(isNew
-        ? [{ label: 'Invoice No', value: invoice?.documentNumber ?? 'Auto-generated' }]
+        ? [{ label: 'Invoice No', value: invoice?.documentNumber ?? previewDocumentNumber ?? 'Loading…' }]
         : []),
       { label: 'Vendor', value: vendorFact },
       ...(poNumber ? [{ label: 'PO', value: poNumber }] : []),
@@ -419,34 +413,7 @@ export function PurchaseInvoiceEditorPage() {
         value: documentDate ? formatDate(documentDate) : 'Not selected',
       },
     ],
-    [isNew, invoice?.documentNumber, vendorFact, poNumber, grnNumber, documentDate],
-  )
-
-  const formMetrics = useMemo(
-    () => [
-      {
-        label: 'Lines',
-        value: String(totals.filledLines || totals.lineCount),
-        accent: 'green' as const,
-      },
-      {
-        label: 'Taxable',
-        value: formatCurrency(totals.taxableAmount),
-        accent: 'blue' as const,
-      },
-      {
-        label: 'Tax',
-        value: formatCurrency(totals.tax),
-        accent: 'violet' as const,
-      },
-      {
-        label: 'Total',
-        value: formatCurrency(totals.totalAmount),
-        accent: 'amber' as const,
-        highlight: totals.totalAmount > 0,
-      },
-    ],
-    [totals],
+    [isNew, invoice?.documentNumber, previewDocumentNumber, vendorFact, poNumber, grnNumber, documentDate],
   )
 
   const taxTotalsDefaultOpen = hasMeaningfulTaxTotals(
@@ -559,71 +526,25 @@ export function PurchaseInvoiceEditorPage() {
         { label: 'Invoices', to: '/purchase/invoices' },
         { label: isNew ? 'New' : invoice?.documentNumber ?? 'Edit' },
       ]}
-      backLink={{ to: '/purchase/invoices', label: 'Back to Invoices' }}
-      commandBar={
-        <ErpCommandBar
-          inline
-          sticky={false}
-          secondaryActions={[
-            {
-              id: 'verify',
-              label: 'Verify Invoice',
-              icon: CheckCircle,
-              onClick: () => void saveAndVerify(),
-              disabled: saving,
-            },
-            {
-              id: 'submit',
-              label: 'Send for Approval',
-              icon: Send,
-              onClick: async () => {
-                await saveDraft()
-                const targetId = invoice?.id ?? id
-                if (!targetId || targetId === 'new') return
-                try {
-                  const row = await submitPurchaseInvoiceForApproval(targetId)
-                  applyInvoice(row)
-                  notify.success('Sent for approval')
-                  navigate(`/purchase/invoices/${row.id}`)
-                } catch (err) {
-                  notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
-                }
-              },
-              disabled: saving,
-            },
-          ]}
-        />
-      }
+      commandBar={null}
       factBox={documentFactBox}
       collapsibleFactBox
       stickyFooter
       footer={
-        <ErpStickySaveBar
+        <FormActionBar
           sticky
-          isSubmitting={saving}
-          actions={
-            <ErpButtonGroup>
-              <ErpButton
-                type="button"
-                variant="ghost"
-                disabled={saving}
-                onClick={() => navigate('/purchase/invoices')}
-              >
-                Cancel
-              </ErpButton>
-              <ErpButton
-                type="button"
-                variant="secondary"
-                icon={Save}
-                disabled={saving}
-                onClick={() => void saveDraft()}
-              >
-                {saving ? 'Saving…' : 'Save Draft'}
-              </ErpButton>
-            </ErpButtonGroup>
-          }
+          cancelFirst
+          busy={saving}
+          dirty={dirty}
+          onCancel={() => {
+            setDirty(false)
+            resetDirty()
+            navigate(PURCHASE_FORM_ROUTES.purchaseInvoice.list)
+          }}
+          onSave={saveDraft}
         />
       }
+      onSaveShortcut={() => void saveDraft()}
     >
       {isNew ? (
         <ErpCardSection
@@ -773,8 +694,6 @@ export function PurchaseInvoiceEditorPage() {
         </ErpCardSection>
       ) : null}
 
-      <EnterpriseFormMetrics metrics={formMetrics} />
-
       <ErpCardSection
         title="Document & Vendor"
         subtitle="Vendor invoice identity, posting dates, and commercial terms"
@@ -788,9 +707,14 @@ export function PurchaseInvoiceEditorPage() {
         <ErpFormSpan span={3}>
           <p className="erp-field-group__label">Document</p>
         </ErpFormSpan>
-        <ErpFieldRow label="Invoice Number" readOnly>
+        <ErpFieldRow
+          label="Invoice Number"
+          readOnly
+          hint={isNew && !invoice ? 'Preview from number series — assigned when you save' : undefined}
+        >
           <Input
-            value={invoice?.documentNumber ?? 'Auto-generated'}
+            value={invoice?.documentNumber ?? previewDocumentNumber ?? ''}
+            placeholder="Loading number…"
             readOnly
             className="bg-erp-surface-alt"
           />

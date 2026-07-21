@@ -10,26 +10,16 @@ import {
   delegatePurchaseApproval,
   getPurchaseApprovalReview,
   PURCHASE_APPROVAL_ROLE_LABELS,
-  PURCHASE_APPROVAL_ROLES,
   PurchaseServiceError,
   rejectPurchaseDocument,
   sendBackPurchaseDocument,
 } from '@/services/purchase'
-import type {
-  PurchaseApprovalReviewDetail,
-  PurchaseApprovalRole,
-} from '@/types/purchaseDomain'
-import { actorForApprovalRole } from '@/utils/purchaseApprovalMatrix'
+import type { PurchaseApprovalReviewDetail } from '@/types/purchaseDomain'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 
 type DrawerMode = 'review' | 'history'
-
-function delegateOptionLabel(role: PurchaseApprovalRole): string {
-  const actor = actorForApprovalRole(role)
-  return `${actor.name} — ${PURCHASE_APPROVAL_ROLE_LABELS[role]}`
-}
 
 export function PurchaseApprovalReviewDrawer({
   open,
@@ -48,7 +38,7 @@ export function PurchaseApprovalReviewDrawer({
   const [loading, setLoading] = useState(false)
   const [comment, setComment] = useState('')
   const [busy, setBusy] = useState(false)
-  const [delegateRole, setDelegateRole] = useState<PurchaseApprovalRole>('purchase_head')
+  const [delegateUserId, setDelegateUserId] = useState('')
 
   useEffect(() => {
     if (!open || !approvalId) {
@@ -60,7 +50,10 @@ export function PurchaseApprovalReviewDrawer({
     setLoading(true)
     void getPurchaseApprovalReview(approvalId)
       .then((d) => {
-        if (!cancelled) setDetail(d)
+        if (!cancelled) {
+          setDetail(d)
+          setDelegateUserId(d.eligibleApprovers[0]?.id ?? '')
+        }
       })
       .catch((err) => {
         notify.error(err instanceof PurchaseServiceError ? err.message : 'Failed to load approval')
@@ -99,8 +92,13 @@ export function PurchaseApprovalReviewDrawer({
         await sendBackPurchaseDocument(documentType, documentId, comment.trim())
         notify.success('Sent back for correction')
       } else {
-        await delegatePurchaseApproval(id, delegateRole, comment.trim())
-        notify.success(`Delegated to ${delegateOptionLabel(delegateRole)}`)
+        if (!delegateUserId) {
+          notify.error('Select an eligible approver')
+          return
+        }
+        const selected = detail.eligibleApprovers.find((user) => user.id === delegateUserId)
+        await delegatePurchaseApproval(id, delegateUserId, comment.trim())
+        notify.success(`Delegated to ${selected?.name ?? 'selected approver'}`)
       }
       onChanged()
       onClose()
@@ -189,12 +187,14 @@ export function PurchaseApprovalReviewDrawer({
                 <span className="text-erp-muted">Approval level</span>
                 <p className="font-medium">{detail.row.approvalLevelLabel}</p>
               </div>
-              <div className="sm:col-span-2">
-                <span className="text-erp-muted">Required chain</span>
-                <p className="font-medium">
-                  {detail.chainRoles.map((r) => PURCHASE_APPROVAL_ROLE_LABELS[r]).join(' → ')}
-                </p>
-              </div>
+              {detail.chainRoles.length > 0 ? (
+                <div className="sm:col-span-2">
+                  <span className="text-erp-muted">Required chain</span>
+                  <p className="font-medium">
+                    {detail.chainRoles.map((r) => PURCHASE_APPROVAL_ROLE_LABELS[r]).join(' → ')}
+                  </p>
+                </div>
+              ) : null}
               {detail.purpose ? (
                 <div className="sm:col-span-2">
                   <span className="text-erp-muted">Purpose</span>
@@ -236,18 +236,6 @@ export function PurchaseApprovalReviewDrawer({
                 </tbody>
               </table>
             </div>
-          </section>
-
-          <section className="rounded-md border border-dashed border-erp-border bg-erp-surface-alt/40 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
-              Available budget (placeholder)
-            </p>
-            <p className="mt-1 text-lg font-semibold text-erp-text">
-              {formatCurrency(detail.availableBudgetPlaceholderInr)}
-            </p>
-            <p className="mt-1 text-[12px] text-erp-muted">
-              Configure placeholder in Purchase Setup — live budget check deferred.
-            </p>
           </section>
 
           <section>
@@ -312,6 +300,7 @@ export function PurchaseApprovalReviewDrawer({
                   placeholder="Required for Reject and Send Back"
                 />
               </section>
+              {detail.eligibleApprovers.length ? (
               <section>
                 <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
                   Delegate to
@@ -320,13 +309,13 @@ export function PurchaseApprovalReviewDrawer({
                   <Select
                     native
                     className="min-w-0 flex-1 sm:max-w-[14rem]"
-                    value={delegateRole}
-                    onChange={(e) => setDelegateRole(e.target.value as PurchaseApprovalRole)}
+                    value={delegateUserId}
+                    onChange={(e) => setDelegateUserId(e.target.value)}
                     aria-label="Delegate to approver"
                   >
-                    {PURCHASE_APPROVAL_ROLES.map((role) => (
-                      <option key={role} value={role}>
-                        {delegateOptionLabel(role)}
+                    {detail.eligibleApprovers.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} — {user.role}
                       </option>
                     ))}
                   </Select>
@@ -342,9 +331,10 @@ export function PurchaseApprovalReviewDrawer({
                   </ErpButton>
                 </div>
                 <p className="mt-1 text-[11px] text-erp-muted">
-                  Approvers from Purchase Setup matrix (demo users).
+                  Active users who hold the required approval permission.
                 </p>
               </section>
+              ) : null}
             </>
           ) : null}
         </div>

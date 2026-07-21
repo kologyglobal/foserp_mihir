@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertTriangle, RotateCw, Save } from 'lucide-react'
+import { AlertTriangle, RotateCw } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
-import { ErpCardSection, ErpFieldRow, ErpStickySaveBar } from '@/components/erp/card-form'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { ErpCardSection, ErpFieldRow } from '@/components/erp/card-form'
+import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Input, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
   getPurchaseOrderById,
   revisePurchaseOrder,
@@ -186,13 +187,26 @@ export function PurchaseOrderRevisePage() {
     deliveryTerms,
   })
   const notesPeek = notesSummary(termsAndConditions, internalNotes, remarks)
+  const dirty =
+    Boolean(reason.trim()) ||
+    lineChangeCount > 0 ||
+    commercialHints.length > 0 ||
+    internalNotes !== (po?.internalNotes ?? '') ||
+    termsAndConditions !== (po?.termsAndConditions ?? '') ||
+    remarks !== (po?.remarks ?? '')
+  const { markDirty, resetDirty } = useUnsavedChangesGuard(true)
+
+  useEffect(() => {
+    if (dirty && !saving) markDirty()
+    else resetDirty()
+  }, [dirty, markDirty, resetDirty, saving])
 
   const patchLine = (lineId: string, patch: Partial<Pick<RevisableLine, 'quantity' | 'rate'>>) => {
     setLines((prev) => prev.map((l) => (l.id === lineId ? { ...l, ...patch } : l)))
   }
 
   const save = async () => {
-    if (!po) return
+    if (!po || saving) return
     if (!reason.trim()) {
       notify.error('Revision reason is required')
       return
@@ -223,7 +237,8 @@ export function PurchaseOrderRevisePage() {
       }
       const revised = await revisePurchaseOrder(po.id, input)
       notify.success(`${revised.documentNumber} revised · Rev ${revised.revisionNo}`)
-      navigate(`/purchase/orders/${revised.id}`)
+      resetDirty()
+      navigate('/purchase/orders', { replace: true })
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Revision failed')
     } finally {
@@ -259,31 +274,23 @@ export function PurchaseOrderRevisePage() {
         { label: po.documentNumber, to: `/purchase/orders/${po.id}` },
         { label: 'Revise' },
       ]}
-      commandBar={
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={{
-            id: 'save',
-            label: saving ? 'Saving…' : `Save as Rev ${po.revisionNo + 1}`,
-            icon: Save,
-            onClick: () => void save(),
-            disabled: saving || !reason.trim(),
+      commandBar={null}
+      footer={
+        <FormActionBar
+          sticky
+          cancelFirst
+          busy={saving}
+          dirty={dirty}
+          onSave={() => void save()}
+          disabled={!reason.trim()}
+          disabledReason={!reason.trim() ? 'Revision reason is required' : undefined}
+          onCancel={() => {
+            resetDirty()
+            navigate('/purchase/orders')
           }}
         />
       }
-      footer={
-        <ErpStickySaveBar
-          sticky
-          onSave={() => void save()}
-          submitLabel={`Save as Rev ${po.revisionNo + 1}`}
-          isSubmitting={saving}
-          submitDisabled={saving || !reason.trim()}
-          submitDisabledReason={!reason.trim() ? 'Revision reason is required' : undefined}
-          cancelLabel="Back"
-          onCancel={() => navigate(`/purchase/orders/${po.id}`)}
-        />
-      }
+      onSaveShortcut={() => void save()}
     >
       <ErpCardSection title="Revision Reason" collapsible defaultOpen>
         <div className="flex items-start gap-2 rounded-md border border-erp-warning-border bg-erp-warning-soft p-3 text-[12px] text-erp-warning-fg">

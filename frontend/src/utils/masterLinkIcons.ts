@@ -54,6 +54,7 @@ const CRM_LINK_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   'qc-rules': ShieldCheck,
   'grn-tolerance': Percent,
   'return-reasons': Truck,
+  'bin-codes': MapPin,
   'qc-parameters': ShieldCheck,
   'inspection-plans': ShieldCheck,
 }

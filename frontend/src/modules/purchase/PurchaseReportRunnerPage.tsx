@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import {
-  ArrowLeft,
   Download,
   FileDown,
   Filter,
@@ -95,7 +94,6 @@ function exportPdfDemo(result: PurchaseReportResult) {
 
 export function PurchaseReportRunnerPage() {
   const { reportId: reportIdParam } = useParams<{ reportId: string }>()
-  const navigate = useNavigate()
   const reportId = reportIdParam && isPurchaseReportId(reportIdParam) ? reportIdParam : null
   const catalogEntry = reportId ? getPurchaseReportEntry(reportId) : null
 
@@ -272,18 +270,12 @@ export function PurchaseReportRunnerPage() {
       commandBar={
         <ErpCommandBar
           primaryAction={{
-            id: 'back',
-            label: 'All Reports',
-            icon: ArrowLeft,
-            onClick: () => navigate('/purchase/reports'),
+            id: 'apply',
+            label: 'Apply Filters',
+            icon: Filter,
+            onClick: applyFilters,
           }}
           secondaryActions={[
-            {
-              id: 'apply',
-              label: 'Apply Filters',
-              icon: Filter,
-              onClick: applyFilters,
-            },
             {
               id: 'reset',
               label: 'Reset Filters',

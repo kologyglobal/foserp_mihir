@@ -111,6 +111,11 @@ export const PERMISSIONS = [
   'master.uom.update',
   'master.uom.delete',
 
+  'master.plant.view',
+  'master.plant.create',
+  'master.plant.update',
+  'master.plant.delete',
+
   'master.warehouse.view',
   'master.warehouse.create',
   'master.warehouse.update',
@@ -120,6 +125,11 @@ export const PERMISSIONS = [
   'master.location.create',
   'master.location.update',
   'master.location.delete',
+
+  'master.bin.view',
+  'master.bin.create',
+  'master.bin.update',
+  'master.bin.delete',
 
   'master.item_category.view',
   'master.item_category.create',
@@ -160,41 +170,72 @@ export const PERMISSIONS = [
 
   'master.hsn.import',
 
-  // Purchase module (catalog reserved for future purchase API — FE gates on these keys today)
+  // Purchase module — canonical keys (PR / Planning / RFQ / PO)
   /** Module shell / nav gate (Route matrix `purchase.view`). */
   'purchase.view',
   'purchase.dashboard.view',
-  'purchase.requisition.view',
-  'purchase.requisition.create',
-  'purchase.requisition.edit',
-  'purchase.requisition.submit',
-  'purchase.requisition.approve',
+  'purchase.pr.view',
+  'purchase.pr.create',
+  'purchase.pr.edit',
+  'purchase.pr.submit',
+  'purchase.pr.approve',
+  'purchase.pr.reject',
+  'purchase.pr.cancel',
+  'purchase.pr.reopen',
+  'purchase.planning.view',
+  'purchase.planning.edit',
+  'purchase.planning.assign_buyer',
+  'purchase.planning.select_vendor',
+  'purchase.planning.approve',
+  'purchase.planning.create_po',
+  'purchase.planning.cancel',
   'purchase.rfq.view',
   'purchase.rfq.create',
   'purchase.rfq.send',
-  'purchase.quotation.view',
-  'purchase.quotation.create',
-  'purchase.quotation.compare',
-  'purchase.order.view',
-  'purchase.order.create',
-  'purchase.order.edit',
-  'purchase.order.approve',
-  'purchase.order.release',
-  'purchase.order.cancel',
+  'purchase.rfq.enter_quote',
+  'purchase.rfq.compare',
+  'purchase.rfq.award',
+  'purchase.rfq.convert_to_po',
+  'purchase.po.view',
+  'purchase.po.create',
+  'purchase.po.edit',
+  'purchase.po.approve',
+  'purchase.po.send',
+  'purchase.po.cancel',
+  'purchase.po.close',
+  /**
+   * Maker-checker override: approve documents you created/requested yourself.
+   * Only effective when Purchase Setup selfApprovalPolicy = PERMISSION_ONLY.
+   * Deliberately excluded from PURCHASE_OPS — grant explicitly (admin/CEO roles get it via full sets).
+   */
+  'purchase.approvals.self_approve',
   'purchase.grn.view',
   'purchase.grn.create',
   'purchase.grn.post',
   'purchase.quality.view',
   'purchase.quality.inspect',
+  'purchase.qi.view',
+  'purchase.qi.create',
+  'purchase.qi.edit',
+  'purchase.qi.complete',
+  'purchase.qi.cancel',
   'purchase.invoice.view',
   'purchase.invoice.create',
+  'purchase.invoice.edit',
+  'purchase.invoice.submit',
   'purchase.invoice.verify',
   'purchase.invoice.approve',
   'purchase.invoice.post',
+  'purchase.invoice.cancel',
   'purchase.return.view',
   'purchase.return.create',
+  'purchase.return.edit',
+  'purchase.return.submit',
+  'purchase.return.complete',
+  'purchase.return.cancel',
   'purchase.return.post',
   'purchase.reports.view',
+  'purchase.setup.view',
   'purchase.setup.manage',
 
   // Finance / Accounting Phase 1 — setup only (no GL posting)
@@ -268,7 +309,12 @@ export type PermissionName = (typeof PERMISSIONS)[number]
 
 const MASTER_VIEW_PERMISSIONS = PERMISSIONS.filter((p) => p.startsWith('master.') && p.endsWith('.view'))
 const PURCHASE_PERMISSIONS = PERMISSIONS.filter((p) => p.startsWith('purchase.'))
-const PURCHASE_OPS = PURCHASE_PERMISSIONS.filter((p) => p !== 'purchase.setup.manage')
+const PURCHASE_OPS = PURCHASE_PERMISSIONS.filter(
+  (p) =>
+    p !== 'purchase.setup.manage' &&
+    p !== 'purchase.setup.view' &&
+    p !== 'purchase.approvals.self_approve',
+)
 const FINANCE_PERMISSIONS = PERMISSIONS.filter((p) => p.startsWith('finance.'))
 const FINANCE_VIEW_PERMISSIONS = FINANCE_PERMISSIONS.filter(
   (p) => p.endsWith('.view') || p === 'finance.view' || p === 'finance.audit.view',
@@ -307,6 +353,8 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
   Admin: PERMISSIONS.filter((p) => p !== 'tenant.manage' && p !== 'tenant.create' && p !== 'tenant.delete'),
   /** Product persona name — same grant set as Tenant Admin (includes purchase.setup.manage). */
   Administrator: PERMISSIONS.filter((p) => p !== 'tenant.manage' && p !== 'tenant.create' && p !== 'tenant.delete'),
+  /** Executive alias — full workspace access for testing / leadership accounts. */
+  CEO: PERMISSIONS.filter((p) => p !== 'tenant.manage' && p !== 'tenant.create' && p !== 'tenant.delete'),
   'Master Data Manager': PERMISSIONS.filter((p) => p.startsWith('master.')),
   'Purchase Manager': [
     ...MASTER_VIEW_PERMISSIONS,
@@ -320,43 +368,66 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     ...MASTER_VIEW_PERMISSIONS,
     'purchase.view',
     'purchase.dashboard.view',
-    'purchase.requisition.view',
-    'purchase.requisition.create',
-    'purchase.requisition.edit',
-    'purchase.requisition.submit',
+    'purchase.pr.view',
+    'purchase.pr.create',
+    'purchase.pr.edit',
+    'purchase.pr.submit',
+    'purchase.planning.view',
+    'purchase.planning.edit',
+    'purchase.planning.assign_buyer',
+    'purchase.planning.select_vendor',
+    'purchase.planning.create_po',
     'purchase.rfq.view',
     'purchase.rfq.create',
     'purchase.rfq.send',
-    'purchase.quotation.view',
-    'purchase.quotation.create',
-    'purchase.quotation.compare',
-    'purchase.order.view',
-    'purchase.order.create',
-    'purchase.order.edit',
+    'purchase.rfq.enter_quote',
+    'purchase.rfq.compare',
+    'purchase.po.view',
+    'purchase.po.create',
+    'purchase.po.edit',
     'purchase.grn.view',
     'purchase.quality.view',
     'purchase.invoice.view',
     'purchase.return.view',
     'purchase.reports.view',
   ],
+  /** Requester: create / edit own drafts / view / submit PR only. */
   Requester: [
     'purchase.view',
     'purchase.dashboard.view',
-    'purchase.requisition.view',
-    'purchase.requisition.create',
-    'purchase.requisition.edit',
-    'purchase.requisition.submit',
+    'purchase.pr.view',
+    'purchase.pr.create',
+    'purchase.pr.edit',
+    'purchase.pr.submit',
+    'master.lookup.view',
+    'master.item.view',
+  ],
+  /**
+   * Department Manager — view department PRs; approve / reject / send back.
+   * `Department Head` kept as an alias for existing tenants.
+   */
+  'Department Manager': [
+    'purchase.view',
+    'purchase.dashboard.view',
+    'purchase.pr.view',
+    'purchase.pr.create',
+    'purchase.pr.edit',
+    'purchase.pr.submit',
+    'purchase.pr.approve',
+    'purchase.pr.reject',
+    'purchase.reports.view',
     'master.lookup.view',
     'master.item.view',
   ],
   'Department Head': [
     'purchase.view',
     'purchase.dashboard.view',
-    'purchase.requisition.view',
-    'purchase.requisition.create',
-    'purchase.requisition.edit',
-    'purchase.requisition.submit',
-    'purchase.requisition.approve',
+    'purchase.pr.view',
+    'purchase.pr.create',
+    'purchase.pr.edit',
+    'purchase.pr.submit',
+    'purchase.pr.approve',
+    'purchase.pr.reject',
     'purchase.reports.view',
     'master.lookup.view',
     'master.item.view',
@@ -365,13 +436,18 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     ...MASTER_VIEW_PERMISSIONS,
     'purchase.view',
     'purchase.dashboard.view',
-    'purchase.order.view',
+    'purchase.po.view',
     'purchase.grn.view',
     'purchase.grn.create',
     'purchase.grn.post',
     'purchase.quality.view',
+    'purchase.qi.view',
     'purchase.return.view',
     'purchase.return.create',
+    'purchase.return.edit',
+    'purchase.return.submit',
+    'purchase.return.complete',
+    'purchase.return.cancel',
     'purchase.return.post',
     'purchase.reports.view',
   ],
@@ -381,6 +457,11 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'purchase.grn.view',
     'purchase.quality.view',
     'purchase.quality.inspect',
+    'purchase.qi.view',
+    'purchase.qi.create',
+    'purchase.qi.edit',
+    'purchase.qi.complete',
+    'purchase.qi.cancel',
     'purchase.return.view',
     'master.lookup.view',
     'master.item.view',
@@ -390,11 +471,14 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     ...FINANCE_EXECUTIVE_MANAGE,
     'purchase.view',
     'purchase.dashboard.view',
-    'purchase.order.view',
+    'purchase.po.view',
     'purchase.grn.view',
     'purchase.invoice.view',
     'purchase.invoice.create',
+    'purchase.invoice.edit',
+    'purchase.invoice.submit',
     'purchase.invoice.verify',
+    'purchase.invoice.cancel',
     'purchase.return.view',
     'purchase.reports.view',
     'master.lookup.view',
@@ -404,13 +488,16 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     ...FINANCE_PERMISSIONS,
     'purchase.view',
     'purchase.dashboard.view',
-    'purchase.order.view',
+    'purchase.po.view',
     'purchase.grn.view',
     'purchase.invoice.view',
     'purchase.invoice.create',
+    'purchase.invoice.edit',
+    'purchase.invoice.submit',
     'purchase.invoice.verify',
     'purchase.invoice.approve',
     'purchase.invoice.post',
+    'purchase.invoice.cancel',
     'purchase.return.view',
     'purchase.reports.view',
     'master.lookup.view',
@@ -419,15 +506,18 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
   Management: [
     'purchase.view',
     'purchase.dashboard.view',
-    'purchase.requisition.view',
-    'purchase.requisition.approve',
+    'purchase.pr.view',
+    'purchase.pr.approve',
+    'purchase.pr.reject',
+    'purchase.planning.view',
+    'purchase.planning.approve',
     'purchase.rfq.view',
-    'purchase.quotation.view',
-    'purchase.quotation.compare',
-    'purchase.order.view',
-    'purchase.order.approve',
-    'purchase.order.release',
-    'purchase.order.cancel',
+    'purchase.rfq.compare',
+    'purchase.rfq.award',
+    'purchase.po.view',
+    'purchase.po.approve',
+    'purchase.po.send',
+    'purchase.po.cancel',
     'purchase.grn.view',
     'purchase.quality.view',
     'purchase.invoice.view',
@@ -447,12 +537,18 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'master.uom.create',
     'master.uom.update',
     'master.uom.delete',
+    'master.plant.create',
+    'master.plant.update',
+    'master.plant.delete',
     'master.warehouse.create',
     'master.warehouse.update',
     'master.warehouse.delete',
     'master.location.create',
     'master.location.update',
     'master.location.delete',
+    'master.bin.create',
+    'master.bin.update',
+    'master.bin.delete',
   ],
   'Sales Manager': [
     'crm.lead.view', 'crm.lead.create', 'crm.lead.update', 'crm.lead.delete', 'crm.lead.assign', 'crm.lead.qualify', 'crm.lead.convert',
@@ -481,8 +577,10 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'master.product.view',
     'master.item_category.view',
     'master.uom.view',
+    'master.plant.view',
     'master.warehouse.view',
     'master.location.view',
+    'master.bin.view',
   ],
   'CRM Admin': PERMISSIONS.filter(
     (p) => p.startsWith('crm.') || p === 'user.view' || p === 'master.product.view' || p === 'master.lookup.view',
@@ -511,6 +609,39 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'user.view',
     ...MASTER_VIEW_PERMISSIONS,
   ],
+}
+
+/**
+ * Legacy → canonical purchase permission aliases.
+ * Existing JWT / DB grants using old names still authorize the new route checks.
+ */
+export const PURCHASE_PERMISSION_ALIASES: Record<string, PermissionName> = {
+  'purchase.requisition.view': 'purchase.pr.view',
+  'purchase.requisition.create': 'purchase.pr.create',
+  'purchase.requisition.edit': 'purchase.pr.edit',
+  'purchase.requisition.submit': 'purchase.pr.submit',
+  'purchase.requisition.approve': 'purchase.pr.approve',
+  'purchase.quotation.view': 'purchase.rfq.view',
+  'purchase.quotation.create': 'purchase.rfq.enter_quote',
+  'purchase.quotation.compare': 'purchase.rfq.compare',
+  'purchase.order.view': 'purchase.po.view',
+  'purchase.order.create': 'purchase.po.create',
+  'purchase.order.edit': 'purchase.po.edit',
+  'purchase.order.approve': 'purchase.po.approve',
+  'purchase.order.release': 'purchase.po.send',
+  'purchase.order.cancel': 'purchase.po.cancel',
+}
+
+/** True if the permission set satisfies `required` (direct, alias, or tenant.manage). */
+export function permissionSetIncludes(granted: readonly string[], required: string): boolean {
+  if (granted.includes('tenant.manage') || granted.includes(required)) return true
+  for (const g of granted) {
+    const canonical = PURCHASE_PERMISSION_ALIASES[g]
+    if (canonical === required) return true
+  }
+  const asCanonical = PURCHASE_PERMISSION_ALIASES[required]
+  if (asCanonical && granted.includes(asCanonical)) return true
+  return false
 }
 
 /** Canonical CRM opportunity pipeline — keep in sync with frontend opportunity-stages master / OPPORTUNITY_STAGES. */

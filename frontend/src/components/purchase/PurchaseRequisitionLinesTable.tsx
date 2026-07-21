@@ -1,47 +1,55 @@
-import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
-import {
-  Copy,
-  FileSpreadsheet,
-  Package,
-  PanelRight,
-  Plus,
-  Trash2,
-} from 'lucide-react'
+import { useMemo, type KeyboardEvent, type ReactNode } from 'react'
+import { Copy, FileSpreadsheet, Package, Plus, Trash2 } from 'lucide-react'
 import { ErpButton } from '@/components/erp/ErpButton'
 import {
   PurchaseItemCodeCell,
   type PurchaseItemCodeCatalogOption,
 } from '@/components/purchase/PurchaseItemCodeCell'
-import { PurchaseLineDetailsDrawer, PurchaseLineDrawerSection, PurchaseLineDrawerStat } from '@/components/purchase/PurchaseLineDetailsDrawer'
+import { Select } from '@/components/forms/Inputs'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { Input, Textarea } from '@/components/forms/Inputs'
-import { ErpFieldRow } from '@/components/erp/card-form'
+import { TableLink } from '@/components/ui/AppLink'
+import { useBinCodeOptions } from '@/hooks/usePurchaseMasters'
 import { cn } from '@/utils/cn'
 import type { PrEditorLine } from '@/utils/purchaseRequisitionValidation'
-import type { Vendor } from '@/types/purchaseDomain'
+import {
+  PURCHASE_ITEM_CATEGORIES,
+  PURCHASE_ITEM_CATEGORY_LABELS,
+  type PurchaseItemCategory,
+  type Vendor,
+} from '@/types/purchaseDomain'
+import { formatDate } from '@/utils/dates/format'
 
 export type PurchaseRequisitionLinesTableProps = {
   lines: PrEditorLine[]
   catalogItems: PurchaseItemCodeCatalogOption[]
   vendors: Vendor[]
-  locationOptions: Array<{ id: string; name: string }>
   editable: boolean
+  readOnly?: boolean
+  reqNo?: string | null
   showErrors?: boolean
   lineErrors?: Record<string, string | undefined>
   formatCurrency: (n: number) => string
   estimatedTotal: number
-  onAddLine: () => void
-  onAddMultipleLines: () => void
-  onCopyLastLine: () => void
-  onImportExcel: () => void
-  onClearLines: () => void
-  onPatchLine: (key: string, patch: Partial<PrEditorLine>) => void
-  onRemoveLine: (key: string) => void
-  onSelectCatalogItem: (key: string, itemId: string) => void
+  onAddLine?: () => void
+  onCopyLastLine?: () => void
+  onImportExcel?: () => void
+  onClearLines?: () => void
+  onPatchLine?: (key: string, patch: Partial<PrEditorLine>) => void
+  onRemoveLine?: (key: string) => void
+  onSelectCatalogItem?: (key: string, itemId: string) => void
   toolbarExtra?: ReactNode
+  title?: string
 }
 
 function missingMandatory(line: PrEditorLine) {
+  const started = Boolean(
+    line.category ||
+      line.itemId ||
+      line.itemCode.trim() ||
+      line.itemName.trim() ||
+      Number(line.quantity) > 0,
+  )
+  if (!started) return { missingItem: false, missingQty: false, any: false }
   const missingItem = !line.itemId && !line.itemCode.trim() && !line.itemName.trim()
   const missingQty = !(Number(line.quantity) > 0)
   return { missingItem, missingQty, any: missingItem || missingQty }
@@ -65,22 +73,27 @@ function onCellKeyDown(e: KeyboardEvent<HTMLElement>) {
   }
 }
 
+function displayOrDash(value: string | number | null | undefined) {
+  if (value === null || value === undefined) return '—'
+  const text = String(value).trim()
+  return text || '—'
+}
+
 /**
- * PR Item Lines grid — primary columns + row-details drawer for secondary fields.
- * Shares sticky / empty-state / rich item picker UX with the PO lines table.
+ * PR item details — Product Type + Item Code sticky left; Actions sticky right.
+ * Columns include read-only PO No. after conversion (Planning→PO / RFQ→PO).
  */
 export function PurchaseRequisitionLinesTable({
   lines,
   catalogItems,
   vendors,
-  locationOptions,
   editable,
+  readOnly = false,
   showErrors,
   lineErrors,
   formatCurrency,
   estimatedTotal,
   onAddLine,
-  onAddMultipleLines,
   onCopyLastLine,
   onImportExcel,
   onClearLines,
@@ -89,8 +102,8 @@ export function PurchaseRequisitionLinesTable({
   onSelectCatalogItem,
   toolbarExtra,
 }: PurchaseRequisitionLinesTableProps) {
-  const [detailsKey, setDetailsKey] = useState<string | null>(null)
-  const detailsLine = lines.find((l) => l.key === detailsKey) ?? null
+  const canEdit = editable && !readOnly
+  const binCodeOptions = useBinCodeOptions()
 
   const totals = useMemo(() => {
     return lines.reduce(
@@ -102,62 +115,115 @@ export function PurchaseRequisitionLinesTable({
     )
   }, [lines])
 
-  const openDetails = (key: string) => setDetailsKey(key)
-  const closeDetails = () => setDetailsKey(null)
+  const patch = (key: string, next: Partial<PrEditorLine>) => onPatchLine?.(key, next)
+
+  const catalogForLine = (category: PurchaseItemCategory | '') => {
+    if (!category) return []
+    return catalogItems.filter((item) => item.category === category)
+  }
+
+  const setRowProductType = (line: PrEditorLine, category: PurchaseItemCategory | '') => {
+    if (!category) {
+      patch(line.key, {
+        category: '',
+        itemId: '',
+        itemCode: '',
+        itemName: '',
+        uomId: null,
+        uom: 'NOS',
+        hsnCode: '',
+        sacCode: null,
+        estimatedRate: 0,
+        preferredVendorId: null,
+        preferredVendorName: null,
+        vendorNumber: '',
+        currentStock: 0,
+        openPoQty: 0,
+      })
+      return
+    }
+    const matched = line.itemId
+      ? catalogItems.find((i) => i.id === line.itemId && i.category === category)
+      : undefined
+    if (matched) {
+      patch(line.key, { category })
+      return
+    }
+    patch(line.key, {
+      category,
+      itemId: '',
+      itemCode: '',
+      itemName: '',
+      uomId: null,
+      uom: 'NOS',
+      hsnCode: '',
+      sacCode: null,
+      estimatedRate: 0,
+      preferredVendorId: null,
+      preferredVendorName: null,
+      vendorNumber: '',
+      currentStock: 0,
+      openPoQty: 0,
+    })
+  }
 
   return (
     <>
-      <div className="mb-3 flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <ErpButton
-            type="button"
-            size="sm"
-            variant="secondary"
-            icon={Plus}
-            disabled={!editable}
-            onClick={onAddLine}
-          >
-            Add Item
-          </ErpButton>
-          <ErpButton
-            type="button"
-            size="sm"
-            variant="outline"
-            icon={Plus}
-            disabled={!editable}
-            onClick={onAddMultipleLines}
-          >
-            Add Multiple Items
-          </ErpButton>
-          <ErpButton
-            type="button"
-            size="sm"
-            variant="outline"
-            icon={Copy}
-            disabled={!editable || lines.length === 0}
-            onClick={onCopyLastLine}
-          >
-            Copy Lines
-          </ErpButton>
-          <ErpButton
-            type="button"
-            size="sm"
-            variant="outline"
-            icon={FileSpreadsheet}
-            disabled={!editable}
-            onClick={onImportExcel}
-          >
-            Import from Excel
-          </ErpButton>
-          <ErpButton type="button" size="sm" variant="ghost" disabled={!editable} onClick={onClearLines}>
-            Clear Lines
-          </ErpButton>
-          {toolbarExtra}
+      {!readOnly ? (
+        <div className="mb-3 flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            <ErpButton
+              type="button"
+              size="sm"
+              variant="secondary"
+              icon={Plus}
+              disabled={!canEdit}
+              onClick={onAddLine}
+            >
+              Add Item
+            </ErpButton>
+            <ErpButton
+              type="button"
+              size="sm"
+              variant="secondary"
+              icon={Copy}
+              disabled={!canEdit || lines.length === 0}
+              onClick={onCopyLastLine}
+            >
+              Copy Lines
+            </ErpButton>
+            <ErpButton
+              type="button"
+              size="sm"
+              variant="secondary"
+              icon={FileSpreadsheet}
+              disabled={!canEdit}
+              onClick={onImportExcel}
+            >
+              Import from Excel
+            </ErpButton>
+            <ErpButton
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={!canEdit}
+              onClick={onClearLines}
+            >
+              Clear Lines
+            </ErpButton>
+            {toolbarExtra}
+          </div>
+          <span className="shrink-0 text-[12px] tabular-nums text-erp-muted">
+            {lines.length} line{lines.length === 1 ? '' : 's'} · {formatCurrency(estimatedTotal)}
+          </span>
         </div>
-        <span className="shrink-0 text-[12px] tabular-nums text-erp-muted">
-          {lines.length} line{lines.length === 1 ? '' : 's'} · {formatCurrency(estimatedTotal)}
-        </span>
-      </div>
+      ) : (
+        <div className="mb-3 flex justify-end">
+          <span className="shrink-0 text-[12px] tabular-nums text-erp-muted">
+            {lines.length} line{lines.length === 1 ? '' : 's'} · {formatCurrency(estimatedTotal)}
+          </span>
+        </div>
+      )}
 
       {lines.length === 0 ? (
         <EmptyState
@@ -166,7 +232,7 @@ export function PurchaseRequisitionLinesTable({
           description="Add catalog or manual lines for this purchase requisition."
           className="rounded-md border border-dashed border-erp-border bg-erp-surface-alt/40 py-12"
           action={
-            editable ? (
+            canEdit && onAddLine ? (
               <ErpButton type="button" size="sm" variant="secondary" icon={Plus} onClick={onAddLine}>
                 Add Item
               </ErpButton>
@@ -174,338 +240,404 @@ export function PurchaseRequisitionLinesTable({
           }
         />
       ) : (
-        <div className="erp-table-wrap max-h-[min(28rem,55vh)] overflow-auto rounded-md border border-erp-border">
-          <table className="erp-table purchase-doc-lines-grid w-full text-[12px]">
+        <div className="purchase-pr-lines-scroll max-h-[min(32rem,60vh)] overflow-auto rounded-md border border-erp-border">
+          <table className="erp-table purchase-pr-lines-grid w-max min-w-full text-[12px]">
             <thead>
               <tr>
                 <th className="purchase-doc-lines-grid__sticky-line">#</th>
-                <th className="purchase-doc-lines-grid__sticky-item">Item</th>
-                <th className="min-w-[11rem]">Description</th>
+                <th className="purchase-doc-lines-grid__sticky-type">Product Type</th>
+                <th className="purchase-doc-lines-grid__sticky-item">Item Code</th>
+                <th className="min-w-[10rem]">Item Name</th>
                 <th className="min-w-[9rem]">Specification</th>
+                <th className="num">Required Qty</th>
                 <th>UOM</th>
-                <th className="num">Qty</th>
                 <th className="num">Est. Rate</th>
                 <th className="num">Est. Amount</th>
-                <th className="purchase-doc-lines-grid__sticky-actions">Actions</th>
+                <th className="min-w-[9rem]">Preferred Vendor</th>
+                <th className="min-w-[8rem]">Warehouse</th>
+                <th className="min-w-[7rem]">BIN</th>
+                <th className="min-w-[8rem]">Required Date</th>
+                <th className="min-w-[8rem]">PO No.</th>
+                <th className="min-w-[8rem]">Remarks</th>
+                {!readOnly ? (
+                  <th className="purchase-doc-lines-grid__sticky-actions">Action</th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
               {lines.map((line) => {
                 const miss = missingMandatory(line)
                 const qtyError = showErrors && lineErrors?.[`${line.key}:quantity`]
+                const typeError = showErrors && lineErrors?.[`${line.key}:category`]
+                const rowCatalog = catalogForLine(line.category)
+                const itemReady = Boolean(line.category)
+                const lineLocked = Boolean(line.purchaseOrderId)
+                const rowEditable = canEdit && !lineLocked
                 return (
                   <tr
                     key={line.key}
-                    className={cn(
-                      'cursor-pointer',
-                      (miss.any || qtyError) && 'bg-amber-50/50',
-                      detailsKey === line.key && 'bg-sky-50/60',
-                    )}
-                    onClick={(e) => {
-                      if ((e.target as HTMLElement).closest('button, input, select, textarea, a')) return
-                      openDetails(line.key)
-                    }}
+                    className={cn((miss.any || qtyError || typeError) && rowEditable && 'bg-amber-50/50')}
                   >
                     <td className="purchase-doc-lines-grid__sticky-line tabular-nums">{line.lineNo}</td>
                     <td
                       className={cn(
-                        'purchase-doc-lines-grid__sticky-item',
-                        miss.missingItem && 'ring-1 ring-inset ring-amber-400/70',
+                        'purchase-doc-lines-grid__sticky-type',
+                        typeError && rowEditable && 'ring-1 ring-inset ring-amber-400/70',
                       )}
-                      onKeyDown={onCellKeyDown}
+                      onKeyDown={rowEditable ? onCellKeyDown : undefined}
                     >
-                      <PurchaseItemCodeCell
-                        itemId={line.itemId}
-                        itemCode={line.itemCode}
-                        catalogItems={catalogItems}
-                        disabled={!editable}
-                        onSelectItem={(id) => onSelectCatalogItem(line.key, id)}
-                        onClearCatalog={() => onPatchLine(line.key, { itemId: '', itemCode: '' })}
-                        onManualCodeChange={(code) => onPatchLine(line.key, { itemCode: code })}
-                      />
-                    </td>
-                    <td onKeyDown={onCellKeyDown}>
-                      <input
-                        className="erp-input h-8 min-w-[11rem] text-[12px]"
-                        disabled={!editable}
-                        value={line.itemName}
-                        onChange={(e) => onPatchLine(line.key, { itemName: e.target.value })}
-                        placeholder="Description"
-                      />
-                    </td>
-                    <td onKeyDown={onCellKeyDown}>
-                      <input
-                        className="erp-input h-8 min-w-[9rem] text-[12px]"
-                        disabled={!editable}
-                        value={line.specification}
-                        onChange={(e) => onPatchLine(line.key, { specification: e.target.value })}
-                      />
-                    </td>
-                    <td onKeyDown={onCellKeyDown}>
-                      <input
-                        className="erp-input h-8 w-16 text-[12px]"
-                        disabled={!editable}
-                        value={line.uom}
-                        onChange={(e) => onPatchLine(line.key, { uom: e.target.value })}
-                      />
+                      {rowEditable ? (
+                        <select
+                          className="erp-input h-8 w-full min-w-0 text-[12px]"
+                          value={line.category}
+                          onChange={(e) =>
+                            setRowProductType(line, e.target.value as PurchaseItemCategory | '')
+                          }
+                        >
+                          <option value="">Select…</option>
+                          {PURCHASE_ITEM_CATEGORIES.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {PURCHASE_ITEM_CATEGORY_LABELS[cat]}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        displayOrDash(
+                          line.category ? PURCHASE_ITEM_CATEGORY_LABELS[line.category] : '',
+                        )
+                      )}
                     </td>
                     <td
-                      className={cn('num', (miss.missingQty || qtyError) && 'ring-1 ring-inset ring-amber-400/70')}
-                      onKeyDown={onCellKeyDown}
+                      className={cn(
+                        'purchase-doc-lines-grid__sticky-item',
+                        miss.missingItem &&
+                          rowEditable &&
+                          itemReady &&
+                          'ring-1 ring-inset ring-amber-400/70',
+                      )}
+                      onKeyDown={rowEditable ? onCellKeyDown : undefined}
                     >
-                      <input
-                        type="number"
-                        min={0}
-                        step="any"
-                        className="erp-input h-8 w-20 text-right text-[12px]"
-                        disabled={!editable}
-                        value={line.quantity}
-                        onChange={(e) => onPatchLine(line.key, { quantity: Number(e.target.value) })}
-                      />
+                      {rowEditable && onSelectCatalogItem ? (
+                        <PurchaseItemCodeCell
+                          itemId={line.itemId}
+                          itemCode={line.itemCode}
+                          itemName={line.itemName}
+                          catalogItems={rowCatalog}
+                          disabled={!itemReady}
+                          labelMode="code"
+                          allowManual={false}
+                          onSelectItem={(id) => onSelectCatalogItem(line.key, id)}
+                          onClearCatalog={() =>
+                            patch(line.key, { itemId: '', itemCode: '', itemName: '' })
+                          }
+                          onManualCodeChange={() => undefined}
+                        />
+                      ) : (
+                        <span className="block truncate font-mono text-[12px]">
+                          {displayOrDash(line.itemCode)}
+                        </span>
+                      )}
                     </td>
-                    <td className="num" onKeyDown={onCellKeyDown}>
-                      <input
-                        type="number"
-                        min={0}
-                        step="any"
-                        className="erp-input h-8 w-24 text-right text-[12px]"
-                        disabled={!editable}
-                        value={line.estimatedRate}
-                        onChange={(e) =>
-                          onPatchLine(line.key, { estimatedRate: Number(e.target.value) })
-                        }
-                      />
+                    <td onKeyDown={rowEditable ? onCellKeyDown : undefined}>
+                      {rowEditable ? (
+                        <input
+                          className="erp-input h-8 min-w-[10rem] text-[12px]"
+                          value={line.itemName}
+                          onChange={(e) => patch(line.key, { itemName: e.target.value })}
+                          placeholder="Item name"
+                        />
+                      ) : (
+                        displayOrDash(line.itemName)
+                      )}
+                    </td>
+                    <td onKeyDown={rowEditable ? onCellKeyDown : undefined}>
+                      {rowEditable ? (
+                        <input
+                          className="erp-input h-8 min-w-[9rem] text-[12px]"
+                          value={line.specification}
+                          onChange={(e) => patch(line.key, { specification: e.target.value })}
+                        />
+                      ) : (
+                        displayOrDash(line.specification)
+                      )}
+                    </td>
+                    <td
+                      className={cn(
+                        'num',
+                        (miss.missingQty || qtyError) && rowEditable && 'ring-1 ring-inset ring-amber-400/70',
+                      )}
+                      onKeyDown={rowEditable ? onCellKeyDown : undefined}
+                    >
+                      {rowEditable ? (
+                        <input
+                          type="number"
+                          min={0}
+                          step="any"
+                          className="erp-input h-8 w-20 text-right text-[12px]"
+                          value={line.quantity}
+                          onChange={(e) => patch(line.key, { quantity: Number(e.target.value) })}
+                        />
+                      ) : (
+                        <span className="tabular-nums">{line.quantity}</span>
+                      )}
+                    </td>
+                    <td onKeyDown={rowEditable ? onCellKeyDown : undefined}>
+                      {rowEditable ? (
+                        <input
+                          className="erp-input h-8 w-16 text-[12px]"
+                          value={line.uom}
+                          onChange={(e) => patch(line.key, { uom: e.target.value })}
+                        />
+                      ) : (
+                        displayOrDash(line.uom)
+                      )}
+                    </td>
+                    <td className="num" onKeyDown={rowEditable ? onCellKeyDown : undefined}>
+                      {rowEditable ? (
+                        <input
+                          type="number"
+                          min={0}
+                          step="any"
+                          className="erp-input h-8 w-24 text-right text-[12px]"
+                          value={line.estimatedRate}
+                          onChange={(e) =>
+                            patch(line.key, { estimatedRate: Number(e.target.value) })
+                          }
+                        />
+                      ) : (
+                        <span className="tabular-nums">{formatCurrency(line.estimatedRate)}</span>
+                      )}
                     </td>
                     <td className="num tabular-nums">{formatCurrency(line.amount)}</td>
-                    <td className="purchase-doc-lines-grid__sticky-actions">
-                      <div className="flex items-center justify-center gap-0.5">
-                        <button
-                          type="button"
-                          className="rounded p-1 text-erp-muted hover:bg-erp-surface-alt hover:text-erp-text"
-                          onClick={() => openDetails(line.key)}
-                          title="Line details"
-                          aria-label="Line details"
+                    <td onKeyDown={rowEditable ? onCellKeyDown : undefined}>
+                      {rowEditable ? (
+                        <Select
+                          className="h-8 min-w-[9rem] text-[12px]"
+                          value={line.preferredVendorId ?? ''}
+                          onChange={(e) => {
+                            const id = e.target.value || null
+                            const vendor = id ? vendors.find((v) => v.id === id) : undefined
+                            patch(line.key, {
+                              preferredVendorId: id,
+                              preferredVendorName: vendor?.vendorName ?? null,
+                              vendorNumber: vendor?.vendorCode ?? '',
+                            })
+                          }}
                         >
-                          <PanelRight className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          className="rounded p-1 text-erp-danger-fg hover:bg-red-50 disabled:opacity-40"
-                          disabled={!editable}
-                          onClick={() => onRemoveLine(line.key)}
-                          title="Delete line"
-                          aria-label="Delete line"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                          <option value="">— Select —</option>
+                          {vendors.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.vendorName}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : (
+                        displayOrDash(line.preferredVendorName)
+                      )}
                     </td>
+                    <td onKeyDown={rowEditable ? onCellKeyDown : undefined}>
+                      {rowEditable ? (
+                        <input
+                          className="erp-input h-8 min-w-[8rem] text-[12px]"
+                          value={line.locationName}
+                          onChange={(e) => patch(line.key, { locationName: e.target.value })}
+                        />
+                      ) : (
+                        displayOrDash(line.locationName)
+                      )}
+                    </td>
+                    <td onKeyDown={rowEditable ? onCellKeyDown : undefined}>
+                      {rowEditable ? (
+                        <Select
+                          className="h-8 min-w-[7rem] text-[12px]"
+                          value={line.binCode}
+                          onChange={(e) => patch(line.key, { binCode: e.target.value })}
+                        >
+                          <option value="">— Select —</option>
+                          {binCodeOptions.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.value} — {opt.label}
+                            </option>
+                          ))}
+                          {line.binCode &&
+                          !binCodeOptions.some((opt) => opt.value === line.binCode) ? (
+                            <option value={line.binCode}>{line.binCode}</option>
+                          ) : null}
+                        </Select>
+                      ) : (
+                        <span className="font-mono">{displayOrDash(line.binCode)}</span>
+                      )}
+                    </td>
+                    <td onKeyDown={rowEditable ? onCellKeyDown : undefined}>
+                      {rowEditable ? (
+                        <input
+                          type="date"
+                          className="erp-input h-8 min-w-[8rem] text-[12px]"
+                          value={line.requiredDate}
+                          onChange={(e) => patch(line.key, { requiredDate: e.target.value })}
+                        />
+                      ) : (
+                        displayOrDash(line.requiredDate ? formatDate(line.requiredDate) : '')
+                      )}
+                    </td>
+                    <td>
+                      {line.purchaseOrderNumber ? (
+                        line.purchaseOrderId ? (
+                          <TableLink
+                            to={`/purchase/orders/${line.purchaseOrderId}`}
+                            className="font-mono text-[12px]"
+                          >
+                            {line.purchaseOrderNumber}
+                          </TableLink>
+                        ) : (
+                          <span className="font-mono text-[12px]">{line.purchaseOrderNumber}</span>
+                        )
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td onKeyDown={rowEditable ? onCellKeyDown : undefined}>
+                      {rowEditable ? (
+                        <input
+                          className="erp-input h-8 min-w-[8rem] text-[12px]"
+                          value={line.remarks}
+                          onChange={(e) => patch(line.key, { remarks: e.target.value })}
+                        />
+                      ) : (
+                        displayOrDash(line.remarks)
+                      )}
+                    </td>
+                    {!readOnly ? (
+                      <td className="purchase-doc-lines-grid__sticky-actions">
+                        <div className="flex items-center justify-center">
+                          <button
+                            type="button"
+                            className="rounded p-1 text-erp-danger-fg hover:bg-red-50 disabled:opacity-40"
+                            disabled={!rowEditable}
+                            onClick={() => onRemoveLine?.(line.key)}
+                            title="Delete line"
+                            aria-label="Delete line"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    ) : null}
                   </tr>
                 )
               })}
             </tbody>
             <tfoot>
-              <tr className="purchase-doc-lines-grid__totals bg-erp-surface-alt font-semibold">
-                <td className="purchase-doc-lines-grid__sticky-line" colSpan={2}>
-                  Total
-                </td>
-                <td colSpan={3} />
+              <tr className="bg-erp-surface-alt font-semibold">
+                <td className="purchase-doc-lines-grid__sticky-line">Total</td>
+                <td className="purchase-doc-lines-grid__sticky-type" />
+                <td className="purchase-doc-lines-grid__sticky-item" />
+                <td colSpan={2} />
                 <td className="num tabular-nums">{totals.qty}</td>
+                <td />
                 <td className="num" />
                 <td className="num tabular-nums">{formatCurrency(totals.amount)}</td>
-                <td className="purchase-doc-lines-grid__sticky-actions" />
+                <td colSpan={6} />
+                {!readOnly ? <td className="purchase-doc-lines-grid__sticky-actions" /> : null}
               </tr>
             </tfoot>
           </table>
         </div>
       )}
 
-      <PurchaseLineDetailsDrawer
-        open={Boolean(detailsLine)}
-        onClose={closeDetails}
-        title={
-          detailsLine
-            ? `Line ${detailsLine.lineNo}${detailsLine.itemCode ? ` · ${detailsLine.itemCode}` : ''}`
-            : 'Line details'
-        }
-        subtitle={detailsLine?.itemName || undefined}
-        footer={
-          <ErpButton type="button" size="sm" variant="primary" onClick={closeDetails}>
-            Done
-          </ErpButton>
-        }
-      >
-        {detailsLine ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <PurchaseLineDrawerStat label="Available stock" value={detailsLine.currentStock} />
-              <PurchaseLineDrawerStat label="Open PO qty" value={detailsLine.openPoQty} />
-            </div>
-
-            <PurchaseLineDrawerSection
-              title="Delivery"
-              description="When and where this line should be received."
-            >
-              <ErpFieldRow label="Required delivery date" horizontal={false}>
-                <Input
-                  type="date"
-                  disabled={!editable}
-                  value={detailsLine.requiredDate}
-                  onChange={(e) => onPatchLine(detailsLine.key, { requiredDate: e.target.value })}
-                />
-              </ErpFieldRow>
-              <ErpFieldRow label="Delivery location" horizontal={false}>
-                <select
-                  className="erp-input h-9 w-full text-[13px]"
-                  disabled={!editable}
-                  value={detailsLine.locationId}
-                  title={detailsLine.locationName || undefined}
-                  onChange={(e) => {
-                    const loc = locationOptions.find((l) => l.id === e.target.value)
-                    onPatchLine(detailsLine.key, {
-                      locationId: loc?.id ?? e.target.value,
-                      locationName: loc?.name ?? '',
-                    })
-                  }}
-                >
-                  {locationOptions.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </select>
-              </ErpFieldRow>
-            </PurchaseLineDrawerSection>
-
-            <PurchaseLineDrawerSection
-              title="Sourcing"
-              description="Tax code and preferred supplier for this line."
-            >
-              <ErpFieldRow label="HSN / SAC" horizontal={false}>
-                <Input
-                  className="font-mono"
-                  disabled={!editable}
-                  value={detailsLine.hsnCode || detailsLine.sacCode || ''}
-                  onChange={(e) =>
-                    onPatchLine(detailsLine.key, {
-                      hsnCode: detailsLine.itemType === 'service' ? '' : e.target.value,
-                      sacCode: detailsLine.itemType === 'service' ? e.target.value : detailsLine.sacCode,
-                    })
-                  }
-                />
-              </ErpFieldRow>
-              <ErpFieldRow label="Preferred vendor" horizontal={false}>
-                <select
-                  className="erp-input h-9 w-full text-[13px]"
-                  disabled={!editable}
-                  value={detailsLine.preferredVendorId ?? ''}
-                  title={detailsLine.preferredVendorName ?? undefined}
-                  onChange={(e) => {
-                    const vendor = vendors.find((v) => v.id === e.target.value)
-                    onPatchLine(detailsLine.key, {
-                      preferredVendorId: vendor?.id ?? null,
-                      preferredVendorName: vendor?.vendorName ?? null,
-                    })
-                  }}
-                >
-                  <option value="">No preferred vendor</option>
-                  {vendors.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.vendorName}
-                    </option>
-                  ))}
-                </select>
-              </ErpFieldRow>
-            </PurchaseLineDrawerSection>
-
-            <PurchaseLineDrawerSection title="Notes & attachments">
-              <ErpFieldRow label="Purpose" horizontal={false}>
-                <Input
-                  disabled={!editable}
-                  value={detailsLine.purpose}
-                  onChange={(e) => onPatchLine(detailsLine.key, { purpose: e.target.value })}
-                  placeholder="Why this line is needed"
-                />
-              </ErpFieldRow>
-              <ErpFieldRow label="Remarks" horizontal={false}>
-                <Textarea
-                  disabled={!editable}
-                  value={detailsLine.remarks}
-                  onChange={(e) => onPatchLine(detailsLine.key, { remarks: e.target.value })}
-                  rows={3}
-                  placeholder="Optional line remarks"
-                />
-              </ErpFieldRow>
-              <ErpFieldRow label="Attachments" horizontal={false}>
-                <Input
-                  disabled={!editable}
-                  value={detailsLine.attachmentNote}
-                  onChange={(e) => onPatchLine(detailsLine.key, { attachmentNote: e.target.value })}
-                  placeholder="File reference or note"
-                />
-              </ErpFieldRow>
-            </PurchaseLineDrawerSection>
-          </div>
-        ) : null}
-      </PurchaseLineDetailsDrawer>
-
       <style>{`
-        .purchase-doc-lines-grid thead th {
+        .purchase-pr-lines-grid {
+          border-collapse: separate !important;
+          border-spacing: 0;
+        }
+        .purchase-pr-lines-grid thead th {
           position: sticky;
           top: 0;
           z-index: 20;
           background: var(--erp-surface-alt, #f8fafc);
+          white-space: nowrap;
         }
-        .purchase-doc-lines-grid__sticky-line {
+        .purchase-pr-lines-grid .purchase-doc-lines-grid__sticky-line {
           position: sticky;
           left: 0;
-          z-index: 12;
-          min-width: 2.5rem;
+          z-index: 13;
           width: 2.5rem;
+          min-width: 2.5rem;
+          max-width: 2.5rem;
+          box-sizing: border-box;
           background: #fff;
           box-shadow: 2px 0 4px rgb(15 23 42 / 0.04);
         }
-        .purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-line,
-        .purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-line {
-          z-index: 22;
+        .purchase-pr-lines-grid thead .purchase-doc-lines-grid__sticky-line,
+        .purchase-pr-lines-grid tfoot .purchase-doc-lines-grid__sticky-line {
+          top: 0;
+          z-index: 31;
           background: var(--erp-surface-alt, #f8fafc);
         }
-        .purchase-doc-lines-grid__sticky-item {
+        .purchase-pr-lines-grid .purchase-doc-lines-grid__sticky-type {
           position: sticky;
           left: 2.5rem;
-          z-index: 11;
-          min-width: 10.5rem;
-          max-width: 14rem;
+          z-index: 12;
+          width: 9.5rem;
+          min-width: 9.5rem;
+          max-width: 9.5rem;
+          box-sizing: border-box;
           background: #fff;
-          box-shadow: 4px 0 8px -4px rgb(15 23 42 / 0.12);
-          overflow: visible;
+          box-shadow: 2px 0 4px rgb(15 23 42 / 0.04);
         }
-        .purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-item,
-        .purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-item {
-          z-index: 21;
+        .purchase-pr-lines-grid thead .purchase-doc-lines-grid__sticky-type,
+        .purchase-pr-lines-grid tfoot .purchase-doc-lines-grid__sticky-type {
+          top: 0;
+          z-index: 30;
           background: var(--erp-surface-alt, #f8fafc);
         }
-        .purchase-doc-lines-grid__sticky-actions {
+        .purchase-pr-lines-grid .purchase-doc-lines-grid__sticky-item {
+          position: sticky;
+          left: 12rem;
+          z-index: 11;
+          width: 10rem;
+          min-width: 10rem;
+          max-width: 10rem;
+          box-sizing: border-box;
+          background: #fff;
+          box-shadow: 4px 0 8px -4px rgb(15 23 42 / 0.12);
+          overflow: hidden;
+        }
+        .purchase-pr-lines-grid .purchase-doc-lines-grid__sticky-item > * {
+          width: 100%;
+          max-width: 100%;
+          min-width: 0 !important;
+        }
+        .purchase-pr-lines-grid thead .purchase-doc-lines-grid__sticky-item,
+        .purchase-pr-lines-grid tfoot .purchase-doc-lines-grid__sticky-item {
+          top: 0;
+          z-index: 29;
+          background: var(--erp-surface-alt, #f8fafc);
+          overflow: hidden;
+        }
+        .purchase-pr-lines-grid .purchase-doc-lines-grid__sticky-actions {
           position: sticky;
           right: 0;
           z-index: 12;
-          min-width: 4.5rem;
-          width: 4.5rem;
+          min-width: 3.25rem;
+          width: 3.25rem;
           text-align: center;
           background: #fff;
           box-shadow: -4px 0 8px rgb(15 23 42 / 0.06);
         }
-        .purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-actions,
-        .purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-actions {
-          z-index: 22;
+        .purchase-pr-lines-grid thead .purchase-doc-lines-grid__sticky-actions,
+        .purchase-pr-lines-grid tfoot .purchase-doc-lines-grid__sticky-actions {
+          top: 0;
+          z-index: 30;
           background: var(--erp-surface-alt, #f8fafc);
         }
-        .purchase-doc-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-line,
-        .purchase-doc-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-item,
-        .purchase-doc-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-actions {
+        .purchase-pr-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-line,
+        .purchase-pr-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-type,
+        .purchase-pr-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-item,
+        .purchase-pr-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-actions {
           background: #f0f7ff;
         }
-        .purchase-doc-lines-grid tfoot td {
+        .purchase-pr-lines-grid tfoot td {
           border-top: 1px solid var(--erp-border-strong, #cbd5e1);
         }
       `}</style>

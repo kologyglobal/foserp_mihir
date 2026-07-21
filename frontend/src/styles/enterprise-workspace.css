@@ -527,6 +527,10 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.enterprise-workspace .erp-card-section__grid--cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .enterprise-workspace .erp-card-section__title {
   font-size: 18px;
 }
@@ -547,6 +551,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .enterprise-workspace .erp-card-section__grid--cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .enterprise-workspace--dynamics-form .erp-field-row--horizontal {
     display: flex;
     flex-direction: column;
@@ -559,10 +567,17 @@
   }
 }
 
+@media (min-width: 1100px) {
+  .enterprise-workspace .erp-card-section__grid--cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 767px) {
   .enterprise-workspace .erp-card-section__grid,
   .enterprise-workspace .erp-card-section__grid--cols-2,
-  .enterprise-workspace .erp-card-section__grid--cols-3 {
+  .enterprise-workspace .erp-card-section__grid--cols-3,
+  .enterprise-workspace .erp-card-section__grid--cols-4 {
     grid-template-columns: 1fr;
   }
 }
@@ -1252,18 +1267,18 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
   border-bottom: 2px solid #edebe9;
   position: sticky;
   top: 0;
   z-index: 10;
-  background: linear-gradient(180deg, #f8fafc 85%, transparent);
+  background: #fff;
 }
 
 .dyn-form-section-nav {
   display: flex;
   flex: 1 1 auto;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 2px;
   min-width: 0;
   padding: 8px 0 12px;
@@ -1271,6 +1286,31 @@
   border-bottom: none;
   position: static;
   background: transparent;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.dyn-form-section-nav__tab {
+  flex-shrink: 0;
+}
+
+.dyn-form-section-nav__check {
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* Tab-panel mode: section nav is the header — hide FastTab chrome to avoid double titles */
+.erp-card-section--tab-panel > .erp-card-section__header {
+  display: none;
+}
+
+.erp-card-section--tab-panel > .erp-card-section__body {
+  border-radius: 4px;
+}
+
+.enterprise-workspace--dynamics-form .erp-card-section--tab-panel {
+  scroll-margin-top: 12px;
 }
 
 .dyn-form-section-nav__trailing {
@@ -1447,6 +1487,39 @@
   font-size: 11px;
   color: #8a8886;
   line-height: 1.2;
+}
+
+/* Compact inline metrics — PR / dense document forms */
+.dyn-form-metrics--compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.dyn-form-metrics--compact .dyn-form-metrics__item {
+  flex: 1 1 auto;
+  min-width: 5.5rem;
+  max-width: 9.5rem;
+  padding: 6px 10px;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.dyn-form-metrics--compact .dyn-form-metrics__label {
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
+.dyn-form-metrics--compact .dyn-form-metrics__value {
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.15;
+}
+
+.dyn-form-metrics--compact .dyn-form-metrics__hint {
+  font-size: 10px;
 }
 
 .dyn-form-metrics--factbox {
@@ -2339,18 +2412,27 @@
   padding-bottom: 8px;
 }
 
-.erp-card-form-page__factbox-restore {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  z-index: 12;
+/* Smart Context / AI restore — always above form sections, never overlaid on TOTAL/lines */
+.erp-card-form-page__context-restore {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  flex-shrink: 0;
+  margin: 0 0 0.5rem;
+  padding: 0 0.125rem;
+  min-height: 2.25rem;
 }
 
-/* Keep restore visible above scrollable main when factbox is collapsed */
+/* Legacy class kept as alias for any remaining call sites */
+.erp-card-form-page__factbox-restore {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin: 0 0 0.5rem;
+}
+
 .erp-card-form-page__layout--factbox-collapsed {
-  position: relative;
+  position: static;
 }
 
 .erp-factbox-pane__ai-toggle {

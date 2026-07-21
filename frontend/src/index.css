@@ -1733,17 +1733,27 @@
   }
 
   .erp-checkbox-label {
+    position: relative;
     display: inline-flex;
     cursor: pointer;
     align-items: center;
     gap: 0.5rem;
   }
 
+  .erp-checkbox-label:has(.erp-checkbox-input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
   .erp-checkbox-input {
     position: absolute;
+    inset: 0;
+    z-index: 1;
+    margin: 0;
     opacity: 0;
-    width: 0;
-    height: 0;
+    width: 1.125rem;
+    height: 1.125rem;
+    cursor: inherit;
   }
 
   .erp-checkbox-box {
@@ -1757,6 +1767,7 @@
     border: 1.5px solid var(--erp-border-strong);
     background: var(--erp-surface);
     transition: all 0.15s ease;
+    pointer-events: none;
   }
 
   .erp-checkbox-input:checked + .erp-checkbox-box,
@@ -2059,23 +2070,28 @@
     left: 40px;
   }
 
-  .erp-table-sticky-first--with-select th:first-child,
-  .erp-table-sticky-first--with-select td:first-child {
-    position: static;
-    box-shadow: none;
-    min-width: unset;
-    max-width: unset;
-    background-color: transparent;
+  .erp-table-wrap .erp-table.erp-table-sticky-first--with-select thead .erp-table-select-cell {
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 33;
+    background-color: var(--erp-surface-alt, #f8fafc);
   }
 
-  .erp-table-wrap .erp-table-sticky-first thead .erp-table-select-cell {
+  .erp-table-wrap .erp-table.erp-table-sticky-first thead .erp-table-sticky-data-cell {
+    position: sticky;
+    top: 0;
     z-index: 32;
     background-color: var(--erp-surface-alt, #f8fafc);
   }
 
-  .erp-table-wrap .erp-table-sticky-first thead .erp-table-sticky-data-cell {
-    z-index: 31;
-    background-color: var(--erp-surface-alt, #f8fafc);
+  .erp-table-wrap .erp-table.erp-table-sticky-first--with-select thead .erp-table-sticky-data-cell {
+    left: 40px;
+  }
+
+  .erp-table.erp-table-sticky-first {
+    border-collapse: separate;
+    border-spacing: 0;
   }
 
   .erp-table-sticky-first.erp-table-zebra tbody tr:nth-child(even) td:first-child,

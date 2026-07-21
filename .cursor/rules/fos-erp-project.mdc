@@ -13,6 +13,9 @@ alwaysApply: true
 
 ## Architecture & data
 
+3b. **Dropdowns:** Closed control shows `— Select —` (`SELECT_PLACEHOLDER`); options appear only on click/focus via shared `Select` / `ErpSmartSelect`. Filter bars may use `All` / `Any`. See `.cursor/rules/form-select-standard.mdc`.
+3c. **Smart Context restore (✦):** When factbox/insights are collapsed, the blue sparkle sits **above all form sections** (`erp-card-form-page__context-restore`) — never over TOTAL/lines. See `.cursor/rules/smart-context-restore.mdc`.
+
 4. **Dual-mode frontend:** `VITE_USE_API=false` → Zustand demo; `VITE_USE_API=true` → API hydration. **Never mix demo and API data.**
 5. **Multi-tenant:** Every query filters `tenantId`. Routes use `/api/v1/t/:tenantSlug/…`. Never trust `tenantId` from request bodies.
 6. **Code is source of truth.** When docs disagree with code, trust code and update docs.
