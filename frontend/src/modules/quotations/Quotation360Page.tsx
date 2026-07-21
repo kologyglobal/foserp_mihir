@@ -84,7 +84,6 @@ export function Quotation360Page() {
   const submitForApproval = useCrmStore((s) => s.submitQuotationDocumentForApproval)
   const markSent = useCrmStore((s) => s.markQuotationDocumentSent)
   const approveDocument = useCrmStore((s) => s.approveQuotationDocument)
-  const rejectQuotationDocument = useCrmStore((s) => s.rejectQuotationDocument)
   const recallQuotationDocument = useCrmStore((s) => s.recallQuotationDocumentFromApproval)
   const customerApproveDocument = useCrmStore((s) => s.customerApproveQuotationDocument)
   const createRevision = useCrmStore((s) => s.createQuotationRevision)

@@ -287,6 +287,12 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
     expect(stages.some((s) => s.code === 'on_hold')).toBe(true)
     const docTypes = rows.filter((r) => r.kind === 'document-types')
     expect(docTypes.some((d) => d.code === 'general')).toBe(true)
+    const deliveryTerms = rows.filter((r) => r.kind === 'delivery-terms')
+    expect(deliveryTerms.length).toBeGreaterThanOrEqual(5)
+    expect(deliveryTerms.some((d) => d.code === 'ex_works')).toBe(true)
+    expect(deliveryTerms.some((d) => d.code === 'for_site')).toBe(true)
+    const warrantyTerms = rows.filter((r) => r.kind === 'warranty-terms')
+    expect(warrantyTerms.some((w) => w.code === 'std_12m')).toBe(true)
   })
 
   it('lists seeded locations master', async () => {

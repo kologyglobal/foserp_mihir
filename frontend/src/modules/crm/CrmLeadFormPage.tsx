@@ -1190,8 +1190,6 @@ export function CrmLeadFormPage() {
         showToast('Lead updated successfully', 'success')
         if (mode === 'default' && leadId) {
           navigate(routes.view(leadId))
-        } else if (mode === 'close') {
-          navigate(routes.base)
         }
       } catch (err) {
         showToast(err instanceof Error ? err.message : 'Lead save failed', 'error')

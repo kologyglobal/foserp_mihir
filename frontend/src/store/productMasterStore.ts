@@ -14,7 +14,6 @@ import {
   assertProductSellableForSales,
   createInitialRevision,
   deriveCostsFromBomAndRouting,
-  isProductSellable,
   makeAttachment,
 } from '../utils/productMaster'
 import { getSessionUser } from '../utils/permissions'
