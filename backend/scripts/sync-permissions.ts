@@ -1,7 +1,7 @@
 /**
- * Backfill the permission catalog and role→permission links on an existing database.
+ * Backfill the permission catalog and role?permission links on an existing database.
  *
- * Safe for production: idempotent upserts only — never touches users, tenants,
+ * Safe for production: idempotent upserts only ? never touches users, tenants,
  * business data, or removes existing grants. Run after deploying a build that
  * added new permissions (e.g. crm.quotation.convert) so already-seeded roles
  * like Tenant Admin / Sales Manager pick them up.
@@ -10,7 +10,7 @@
  *   npx tsx scripts/sync-permissions.ts            # apply
  *   npx tsx scripts/sync-permissions.ts --dry-run  # report only
  *
- * Users must log out and back in afterwards — session permissions are issued at login.
+ * Users must log out and back in afterwards ? session permissions are issued at login.
  */
 import { prisma } from '../src/config/database.js'
 import { PERMISSIONS, ROLE_PERMISSIONS } from '../src/constants/permissions.js'
