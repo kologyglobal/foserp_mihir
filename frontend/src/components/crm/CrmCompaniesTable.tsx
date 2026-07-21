@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { ColumnDef, RowSelectionState } from '@tanstack/react-table'
-import { Calendar, Copy, Eye, FileText, Mail, Pencil, Phone, Target, Trash2, UserPlus } from 'lucide-react'
+import { Calendar, Eye, FileText, Mail, Pencil, Phone, Target, Trash2 } from 'lucide-react'
 import { ErpDataGrid } from '../erp/ErpDataGrid'
 import { TableLink } from '../ui/AppLink'
 import { entity360CustomerPath } from '../../config/entity360Routes'
@@ -31,6 +31,8 @@ export interface CrmCompaniesTableProps {
   onBulkExport?: (rows: EnrichedCompanyRow[]) => void
   onBulkDelete?: (rows: EnrichedCompanyRow[]) => void
   onDelete?: (row: EnrichedCompanyRow) => void
+  /** Opens company master edit form (not 360). */
+  onEditCompany?: (customerId: string) => void
   onBulkInactive?: (rows: EnrichedCompanyRow[]) => void
   onBulkActive?: (rows: EnrichedCompanyRow[]) => void
   canEdit?: boolean
@@ -92,6 +94,7 @@ export function CrmCompaniesTable({
   onBulkExport,
   onBulkDelete,
   onDelete,
+  onEditCompany,
   onBulkInactive,
   onBulkActive,
   canEdit = false,
@@ -357,8 +360,14 @@ export function CrmCompaniesTable({
                 actions={[
                   { id: 'view', label: 'Open 360', icon: Eye, onClick: () => onOpen360(id) },
                   { id: 'preview', label: 'Quick Preview', icon: Eye, onClick: () => onPreview?.(row.original), disabled: !onPreview },
-                  { id: 'edit', label: 'Edit Company', icon: Pencil, onClick: () => onOpen360(id), disabled: !canEdit },
-                  { id: 'assign', label: 'Assign Owner', icon: UserPlus, onClick: () => onFollowUp(id), disabled: !canEdit },
+                  {
+                    id: 'edit',
+                    label: 'Edit Company',
+                    icon: Pencil,
+                    onClick: () => onEditCompany?.(id),
+                    disabled: !canEdit || !onEditCompany,
+                    disabledReason: !canEdit ? 'Requires crm.company.update' : undefined,
+                  },
                   { id: 'sep-workflow', separator: true, label: '' },
                   {
                     id: 'opp',
@@ -383,7 +392,6 @@ export function CrmCompaniesTable({
                   },
                   { id: 'call', label: 'Call Contact', icon: Phone, onClick: () => contactPhone && window.open(`tel:${contactPhone}`), disabled: !contactPhone },
                   { id: 'email', label: 'Email Contact', icon: Mail, onClick: () => contactEmail && window.open(`mailto:${contactEmail}`), disabled: !contactEmail },
-                  { id: 'duplicate', label: 'Duplicate', icon: Copy, onClick: () => onOpportunity(id), disabled: !canEdit },
                   { id: 'sep-danger', separator: true, label: '' },
                   {
                     id: 'delete',
@@ -400,7 +408,7 @@ export function CrmCompaniesTable({
         },
       },
     ],
-    [onOpen360, onOpportunity, onFollowUp, onQuotation, onPreview, onDelete, canEdit, canDelete, enableColumnSorting],
+    [onOpen360, onOpportunity, onFollowUp, onQuotation, onPreview, onDelete, onEditCompany, canEdit, canDelete, enableColumnSorting],
   )
 
   const emptyMessage = hasActiveFilters ? 'No companies match current filters.' : 'No companies found.'

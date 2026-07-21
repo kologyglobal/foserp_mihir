@@ -76,7 +76,7 @@ export type CrmCustomersPageProps = {
 }
 
 export function CrmCustomersPage({
-  hubPath = '/crm/customers',
+  hubPath = '/crm/companies',
   title = 'Companies',
   description = 'CRM account hub — pipeline, opportunities, quotations, and activity by company (not Sales operations)',
   badge = 'CRM',
@@ -108,6 +108,8 @@ export function CrmCustomersPage({
   const [importOpen, setImportOpen] = useState(false)
   const deleteCustomer = useMasterStore((s) => s.deleteCustomer)
   const canDelete = canCrmPermission('crm.company.delete')
+  const canEditCompany = canCrmPermission('crm.company.update')
+  const canCreateCompany = canCrmPermission('crm.company.create')
   const [deleteCompanyTarget, setDeleteCompanyTarget] = useState<{ id: string; name: string } | null>(null)
   const [isDeletingCompany, setIsDeletingCompany] = useState(false)
 
@@ -357,12 +359,16 @@ export function CrmCustomersPage({
           <ErpCommandBar
             inline
             sticky={false}
-            primaryAction={{
-              id: 'new-company',
-              label: COMPANY_TERMINOLOGY.new,
-              icon: Plus,
-              onClick: () => navigate('/masters/companies/new'),
-            }}
+            primaryAction={
+              canCreateCompany
+                ? {
+                    id: 'new-company',
+                    label: COMPANY_TERMINOLOGY.new,
+                    icon: Plus,
+                    onClick: () => navigate('/masters/companies/new'),
+                  }
+                : undefined
+            }
             secondaryActions={[
               { id: 'new-opp', label: 'New Opportunity', icon: Target, onClick: () => navigate('/crm/opportunities/new') },
               { id: 'quick-fu', label: 'Quick Follow-up', icon: Calendar, onClick: () => setQuickFollowUpOpen(true) },
@@ -416,9 +422,11 @@ export function CrmCustomersPage({
             emptyAction={
               sorted.length === 0 ? (
                 <div className="flex flex-wrap justify-center gap-2">
-                  <button type="button" className="erp-btn erp-btn--primary text-[13px]" onClick={() => navigate('/masters/companies/new')}>
-                    {COMPANY_TERMINOLOGY.new}
-                  </button>
+                  {canCreateCompany ? (
+                    <button type="button" className="erp-btn erp-btn--primary text-[13px]" onClick={() => navigate('/masters/companies/new')}>
+                      {COMPANY_TERMINOLOGY.new}
+                    </button>
+                  ) : null}
                   <button type="button" className="erp-btn erp-btn--secondary text-[13px]" onClick={openCompanyImport}>
                     Import Companies
                   </button>
@@ -433,7 +441,9 @@ export function CrmCustomersPage({
             onBulkExport={exportSelectedCompanies}
             onDelete={openDeleteCompany}
             onBulkDelete={(selected) => selected.forEach((r) => openDeleteCompany(r))}
+            canEdit={canEditCompany}
             canDelete={canDelete}
+            onEditCompany={(id) => navigate(`/masters/companies/${id}/edit`)}
           />
         </EnterpriseRegisterTableShell>
       </OperationalPageShell>
@@ -498,6 +508,8 @@ export function CrmContactsPage() {
   const [importOpen, setImportOpen] = useState(false)
   const deleteContact = useCrmStore((s) => s.deleteContact)
   const canDelete = canCrmPermission('crm.contact.delete')
+  const canEditContact = canCrmPermission('crm.contact.update')
+  const canCreateContact = canCrmPermission('crm.contact.create')
   const [deleteContactTarget, setDeleteContactTarget] = useState<{ id: string; name: string } | null>(null)
   const [isDeletingContact, setIsDeletingContact] = useState(false)
 
@@ -775,7 +787,7 @@ export function CrmContactsPage() {
       customerId: row.contact.customerId,
       duplicateFrom: row.contact.id,
     })
-    navigate(`/masters/contacts/new?${params.toString()}`)
+    navigate(`/crm/contacts/new?${params.toString()}`)
   }
 
   function exportSelectedContacts(selected: EnrichedContactRow[]) {
@@ -838,12 +850,16 @@ export function CrmContactsPage() {
           <ErpCommandBar
             inline
             sticky={false}
-            primaryAction={{
-              id: 'new-contact',
-              label: 'New Contact',
-              icon: UserPlus,
-              onClick: () => navigate('/masters/contacts/new'),
-            }}
+            primaryAction={
+              canCreateContact
+                ? {
+                    id: 'new-contact',
+                    label: 'New Contact',
+                    icon: UserPlus,
+                    onClick: () => navigate('/crm/contacts/new'),
+                  }
+                : undefined
+            }
             secondaryActions={[
               { id: 'import', label: 'Import', icon: Upload, onClick: openContactImport },
               { id: 'export', label: 'Export', icon: Download, onClick: exportAllContacts },
@@ -895,9 +911,11 @@ export function CrmContactsPage() {
             emptyAction={
               rows.length === 0 ? (
                 <div className="flex flex-wrap justify-center gap-2">
-                  <button type="button" className="erp-btn erp-btn--primary text-[13px]" onClick={() => navigate('/masters/contacts/new')}>
-                    New Contact
-                  </button>
+                  {canCreateContact ? (
+                    <button type="button" className="erp-btn erp-btn--primary text-[13px]" onClick={() => navigate('/crm/contacts/new')}>
+                      New Contact
+                    </button>
+                  ) : null}
                   <button type="button" className="erp-btn erp-btn--secondary text-[13px]" onClick={openContactImport}>
                     Import Contacts
                   </button>
@@ -906,8 +924,7 @@ export function CrmContactsPage() {
             }
             onPreview={openContactPreview}
             onEdit={(row) => navigate(`/crm/contacts/${row.contact.id}/edit`)}
-            canEdit
-            onView={(row) => navigate(`/crm/contacts/${row.contact.id}`)}
+            canEdit={canEditContact} onView={(row) => navigate(`/crm/contacts/${row.contact.id}`)}
             onDuplicate={duplicateContact}
             onFollowUp={setFollowUpContact}
             onCreateOpportunity={(row) => navigate(`/crm/opportunities/new?customerId=${row.contact.customerId}`)}

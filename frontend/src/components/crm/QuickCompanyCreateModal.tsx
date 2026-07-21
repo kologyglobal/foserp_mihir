@@ -4,7 +4,6 @@ import { Building2, ChevronDown, X } from 'lucide-react'
 import { FormField, inputClassName } from '../forms/FormField'
 import { Input, Select, Checkbox, MobileInput } from '../forms/Inputs'
 import { StateSelect, CitySelect, CountrySelect, MasterEnumSelect } from '../masters/GeographySelects'
-import { INDUSTRY_OPTIONS } from '../../data/masters/geographySeed'
 import { ErpButton, ErpButtonGroup } from '../erp/ErpButton'
 import { COMPANY_TERMINOLOGY } from '../../utils/companyLabels'
 import { saveQuickCreateEntity } from '../../utils/quickCreateService'
@@ -17,6 +16,7 @@ import { DEFAULT_CUSTOMER_COUNTRY } from '../../config/countries'
 import { useInlineFormValidation } from '../../hooks/useInlineFormValidation'
 import { validateEmail, normalizeEmail } from '../../utils/validation/email'
 import { validateMobileForCountry } from '../../utils/validation/mobilePhone'
+import { useIndustryOptions, useTerritoryOptions } from '../../hooks/useCrmMasters'
 import type { QuickCreateResult } from '../../types/quickCreate'
 import type { Customer, CustomerType, SalesTerritory } from '../../types/master'
 import { cn } from '../../utils/cn'
@@ -69,7 +69,7 @@ function emptyForm(defaultName = ''): CompanyForm {
     email: '',
     industry: '',
     customerType: 'corporate',
-    salesTerritory: 'West',
+    salesTerritory: '',
     gstin: '',
     pan: '',
     creditDays: 30,
@@ -129,11 +129,22 @@ export function QuickCompanyCreateModal({
   onClose,
   onCreated,
 }: QuickCompanyCreateModalProps) {
+  const industryOptions = useIndustryOptions()
+  const territoryOptions = useTerritoryOptions()
   const [form, setForm] = useState<CompanyForm>(() => emptyForm(defaultName))
   const [showAdditional, setShowAdditional] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [gstinError, setGstinError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setForm((prev) => {
+      if (prev.salesTerritory) return prev
+      const firstTerritory = territoryOptions[0]?.value
+      return firstTerritory ? { ...prev, salesTerritory: firstTerritory } : prev
+    })
+  }, [open, territoryOptions])
 
   const validationValues = useMemo(
     () => ({
@@ -457,7 +468,11 @@ export function QuickCompanyCreateModal({
                     <MasterEnumSelect
                       value={form.industry}
                       onChange={(v) => setField('industry', v)}
-                      options={INDUSTRY_OPTIONS}
+                      options={
+                        industryOptions.length > 0
+                          ? industryOptions.map((o) => o.label || o.value)
+                          : []
+                      }
                       placeholder="— Select industry —"
                     />
                   </FormField>
@@ -470,10 +485,10 @@ export function QuickCompanyCreateModal({
                   </FormField>
                   <FormField label="Sales Territory">
                     <Select native value={form.salesTerritory} onChange={(e) => setField('salesTerritory', e.target.value)}>
-                      <option value="West">West</option>
-                      <option value="North">North</option>
-                      <option value="South">South</option>
-                      <option value="East">East</option>
+                      <option value="">— Select territory —</option>
+                      {territoryOptions.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
                     </Select>
                   </FormField>
                 </div>

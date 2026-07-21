@@ -29,6 +29,7 @@ import { TableLink } from '../../components/ui/AppLink'
 import { Badge, formatStatus, statusColor } from '../../components/ui/Badge'
 import { salesOrderStatusLabel } from '../../utils/salesOrderStatus'
 import { Toast } from '../../components/ui/Toast'
+import { notify } from '../../store/toastStore'
 import { useMrpStore } from '../../store/mrpStore'
 import { useSalesStore } from '../../store/salesStore'
 import { useWorkOrderStore } from '../../store/workOrderStore'
@@ -36,6 +37,7 @@ import { useDispatchStore } from '../../store/dispatchStore'
 import { useQualityStore } from '../../store/qualityStore'
 import { useMasterStore } from '../../store/masterStore'
 import { useCrmStore } from '../../store/crmStore'
+import { canCrmPermission } from '../../utils/permissions/crm'
 import { resolveCompany360Path } from '../../config/entity360Routes'
 import { crmQuotationPath } from '../../utils/crmQuotationNavigation'
 import {
@@ -134,6 +136,7 @@ export function SalesOrder360Page() {
   const editPath = id ? buildSalesOrderEditUrl(id, { fromCrm: crmMode }) : listPath
   const so = useMrpStore((s) => (id ? s.salesOrders.find((o) => o.id === id) : undefined))
   const confirmSalesOrder = useSalesStore((s) => s.confirmSalesOrder)
+  const canConfirmSalesOrder = canCrmPermission('crm.sales_order.confirm')
   const triggerProductionForOrder = useSalesStore((s) => s.triggerProductionForOrder)
   const getQuotation = useSalesStore((s) => s.getQuotation)
   const getLatestQuotationDocument = useCrmStore((s) => s.getLatestQuotationDocument)
@@ -165,11 +168,15 @@ export function SalesOrder360Page() {
   useEffect(() => {
     if (!so || so.status !== 'open') return
     if (searchParams.get('confirm') !== '1') return
-    setConfirmOpen(true)
+    if (!canConfirmSalesOrder) {
+      notify.error('Requires crm.sales_order.confirm')
+    } else {
+      setConfirmOpen(true)
+    }
     const next = new URLSearchParams(searchParams)
     next.delete('confirm')
     setSearchParams(next, { replace: true })
-  }, [so, searchParams, setSearchParams])
+  }, [so, searchParams, setSearchParams, canConfirmSalesOrder])
 
   const orderWos = useMemo(
     () => (id ? workOrders.filter((w) => w.salesOrderId === id) : []),
@@ -270,6 +277,10 @@ export function SalesOrder360Page() {
   const order = so
 
   function openConfirmDialog() {
+    if (!canConfirmSalesOrder) {
+      notify.error('Requires crm.sales_order.confirm')
+      return
+    }
     setConfirmOpen(true)
   }
 
@@ -293,7 +304,7 @@ export function SalesOrder360Page() {
         )
         const updated = await apiUpdateSalesOrder(order.id, patch)
         if (!updated.ok) {
-          setToast(updated.error ?? 'Could not save confirmation details')
+          notify.error(updated.error ?? 'Could not save confirmation details')
           return
         }
 
@@ -322,7 +333,7 @@ export function SalesOrder360Page() {
                 documentType: values.documentTypeCode.trim(),
               })
             } catch {
-              setToast('Order details saved, but document upload failed. Confirm aborted.')
+              notify.error('Order details saved, but document upload failed. Confirm aborted.')
               return
             }
           } else {
@@ -332,17 +343,17 @@ export function SalesOrder360Page() {
 
         const r = await apiConfirmSalesOrder(order.id)
         if (!r.ok) {
-          setToast(r.error ?? 'Failed to confirm order')
+          notify.error(r.error ?? 'Failed to confirm order')
           return
         }
         setConfirmOpen(false)
-        setToast('Order confirmed')
+        notify.success('Order confirmed')
         return
       }
 
       const saved = updateSalesOrderDraft(order.id, patch)
       if (!saved.ok) {
-        setToast(saved.error ?? 'Could not save confirmation details')
+        notify.error(saved.error ?? 'Could not save confirmation details')
         return
       }
 
@@ -352,11 +363,11 @@ export function SalesOrder360Page() {
 
       const r = confirmSalesOrder(order.id)
       if (!r.ok) {
-        setToast(r.error ?? 'Failed to confirm order')
+        notify.error(r.error ?? 'Failed to confirm order')
         return
       }
       setConfirmOpen(false)
-      setToast('Order confirmed')
+      notify.success('Order confirmed')
     } finally {
       setConfirmBusy(false)
     }
@@ -411,7 +422,9 @@ export function SalesOrder360Page() {
     <ErpCardCommandBar
       inline
       homeActions={[
-        ...(so.status === 'open' ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }] : []),
+        ...(so.status === 'open' && canConfirmSalesOrder
+          ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }]
+          : []),
         ...(so.status === 'confirmed' ? [{ id: 'mrp', label: 'Trigger MRP', icon: Play, primary: true, onClick: handleMrp }] : []),
         ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit', icon: Pencil, onClick: () => navigate(editPath) }] : []),
         ...(so.status !== 'open' && !activeProforma ? [{ id: 'proforma', label: 'Create Proforma', icon: Receipt, onClick: () => navigate(buildProformaNewUrl(so.id)) }] : []),
@@ -454,7 +467,9 @@ export function SalesOrder360Page() {
           { label: 'Quotation', value: so.quotationNo ? `${so.quotationNo} Rev ${so.quotationRevisionNo ?? 1}` : '—' },
         ]}
         actions={[
-          ...(so.status === 'open' ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }] : []),
+          ...(so.status === 'open' && canConfirmSalesOrder
+            ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }]
+            : []),
           ...(so.status === 'confirmed' ? [{ id: 'mrp', label: 'Trigger MRP', icon: Play, primary: true, onClick: handleMrp }] : []),
           ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit Draft', icon: Pencil, onClick: () => navigate(editPath) }] : []),
         ]}
@@ -548,7 +563,7 @@ export function SalesOrder360Page() {
                     <OrderNextActionPanel
                       status={so.status}
                       overdue={overdue}
-                      onConfirm={so.status === 'open' ? openConfirmDialog : undefined}
+                      onConfirm={so.status === 'open' && canConfirmSalesOrder ? openConfirmDialog : undefined}
                       onTriggerMrp={so.status === 'confirmed' ? handleMrp : undefined}
                     />
                   </div>

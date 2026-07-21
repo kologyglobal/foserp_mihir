@@ -1,6 +1,7 @@
-import type { CrmQuotationDocument } from '@prisma/client'
-import { InvalidStateError } from '../../../utils/errors.js'
+import type { CrmQuotation, CrmQuotationDocument } from '@prisma/client'
+import { InvalidStateError, ValidationError } from '../../../utils/errors.js'
 import type { QuotationApprovalEntryDto } from './quotation.types.js'
+import type { UpdateQuotationDocumentInput, UpdateQuotationInput } from './quotation.validation.js'
 
 /**
  * Quotation document lifecycle (enforced):
@@ -9,6 +10,52 @@ import type { QuotationApprovalEntryDto } from './quotation.types.js'
  * customerApproval is independent of document status and is set only via
  * customer-approve / customer-reject after the document is sent.
  */
+
+/** Header fields that must only change via dedicated lifecycle endpoints. */
+const QUOTATION_WORKFLOW_ONLY_FIELDS = ['status', 'customerApproval'] as const
+
+/** Document fields that must only change via dedicated lifecycle endpoints. */
+const QUOTATION_DOCUMENT_WORKFLOW_ONLY_FIELDS = ['status'] as const
+
+/**
+ * Reject lifecycle fields on generic PATCH — mirror opportunity sanitize pattern.
+ * Approval / send / customer decision / convert must use dedicated routes.
+ */
+export function sanitizeQuotationUpdateInput(
+  quotation: CrmQuotation,
+  input: UpdateQuotationInput,
+): UpdateQuotationInput {
+  if (quotation.deletedAt) {
+    throw new InvalidStateError('Deleted quotation cannot be updated')
+  }
+
+  for (const key of QUOTATION_WORKFLOW_ONLY_FIELDS) {
+    if (key in input && input[key as keyof UpdateQuotationInput] !== undefined) {
+      throw new ValidationError(
+        `Field "${key}" cannot be changed via update — use the dedicated workflow action`,
+      )
+    }
+  }
+
+  return input
+}
+
+export function sanitizeQuotationDocumentUpdateInput(
+  doc: CrmQuotationDocument,
+  input: UpdateQuotationDocumentInput,
+): UpdateQuotationDocumentInput {
+  assertDocumentEditable(doc)
+
+  for (const key of QUOTATION_DOCUMENT_WORKFLOW_ONLY_FIELDS) {
+    if (key in input && input[key as keyof UpdateQuotationDocumentInput] !== undefined) {
+      throw new ValidationError(
+        `Field "${key}" cannot be changed via update — use the dedicated workflow action`,
+      )
+    }
+  }
+
+  return input
+}
 
 export function assertDocumentEditable(doc: CrmQuotationDocument): void {
   if (doc.locked && doc.status !== 'draft' && doc.status !== 'rejected') {

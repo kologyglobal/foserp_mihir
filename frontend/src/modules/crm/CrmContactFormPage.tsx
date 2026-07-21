@@ -347,14 +347,6 @@ export function CrmContactFormPage() {
 
   const recordTitle = watched.name?.trim() || (isEdit ? 'Edit Contact' : 'New Contact')
 
-  const commandBarMoreActions = [
-    ...(isEdit && id
-      ? [{ id: '360', label: 'View 360', icon: User, onClick: () => navigate(`/crm/contacts/${id}`) }]
-      : []),
-    ...(customer
-      ? [{ id: 'company', label: 'Company 360', icon: Building2, onClick: () => navigate(entity360CustomerPath(customer.id)) }]
-      : []),
-  ]
   const smartOverviewInput = useMemo(() => ({
     name: watched.name ?? '',
     customerId: watched.customerId?.trim() || null,
@@ -457,15 +449,6 @@ export function CrmContactFormPage() {
         company={customer?.customerName}
         favoritePath={isEdit ? `/crm/contacts/${id}/edit` : '/crm/contacts/new'}
         breadcrumbs={isEdit ? contactEditBreadcrumbs(existing?.name) : contactNewBreadcrumbs()}
-        formSaveActions={{
-          isSubmitting,
-          saveLabel: isEdit ? 'Save' : 'Save',
-          onSave: () => void saveContact('default'),
-          onSaveAndNew: isEdit ? undefined : () => void saveContact('new'),
-          onSaveAndClose: () => void saveContact('close'),
-          onCancel: cancelForm,
-          moreActions: commandBarMoreActions.length ? commandBarMoreActions : undefined,
-        }}
         documentStrip={documentStrip}
         factBox={factBox}
         suppressFactBoxRecord

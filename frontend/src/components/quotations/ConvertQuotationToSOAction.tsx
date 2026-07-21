@@ -4,7 +4,7 @@ import { ShoppingCart, ExternalLink } from 'lucide-react'
 import { useCrmStore } from '../../store/crmStore'
 import { ErpButton } from '../erp/ErpButton'
 import { resolveCreateSalesOrderGateForQuotationDocument } from '../../utils/opportunitySalesOrderDraft'
-import { isCrmPath, resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
+import { buildSalesOrderNewUrl, isCrmPath, resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
 
 interface ConvertQuotationToSOActionProps {
   documentId: string
@@ -83,6 +83,10 @@ export function ConvertQuotationToSOAction({
           if (onConvert) {
             onConvert(documentId)
             return
+          }
+          // Fallback when list/card has no conversion dialog host — open SO create with prefill.
+          if (doc.opportunityId) {
+            navigate(buildSalesOrderNewUrl(doc.opportunityId, documentId, { fromCrm }))
           }
         }}
       >

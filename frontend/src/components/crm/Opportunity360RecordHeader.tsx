@@ -36,6 +36,8 @@ export interface Opportunity360RecordHeaderProps {
   favoritePath: string
   isOpen: boolean
   canDelete: boolean
+  /** Require crm.opportunity.close for Mark Won / Mark Lost. */
+  canClose?: boolean
   /** Show Create SO control (hide when SO already linked). */
   showCreateSalesOrder: boolean
   /** Enable Create SO — quotation accepted + Won/Order Confirmed. */
@@ -85,6 +87,7 @@ export function Opportunity360RecordHeader({
   favoritePath,
   isOpen,
   canDelete,
+  canClose = true,
   showCreateSalesOrder,
   canCreateSalesOrder,
   createSalesOrderDisabledReason,
@@ -158,7 +161,7 @@ export function Opportunity360RecordHeader({
     },
     { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, onClick: onLogActivity },
     { id: 'meeting', label: 'Meeting', icon: Video, onClick: onLogActivity },
-    ...(isOpen
+    ...(isOpen && canClose
       ? [
           { id: 'won', label: 'Mark as Won', icon: CheckCircle2, onClick: onMarkWon },
           { id: 'lost', label: 'Mark as Lost', icon: XCircle, onClick: onMarkLost, danger: true },

@@ -55,6 +55,7 @@ import {
 } from '../../../utils/crmMasterUtils'
 import { crmBreadcrumbs } from '../../../utils/crmNavigation'
 import { notify, notifyMasterSaved } from '../../../store/toastStore'
+import { canCrmPermission } from '../../../utils/permissions/crm'
 import { CrmMasterContextPanel } from '@/components/crm/masters/CrmMasterContextPanel'
 import { CrmMasterEditorDrawer } from '@/components/crm/masters/CrmMasterEditorDrawer'
 import { MasterFormField, renderCatalogField } from '@/components/crm/masters/CrmMasterFormFields'
@@ -167,6 +168,9 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
   const deleteEntry = useCrmMasterStore((s) => s.deleteEntry)
   const narrow = useMediaQuery(MQ_BELOW_LG, true)
   const prefersDrawer = catalog ? crmMasterPrefersDrawerForm(catalog) : false
+  const canCreateMaster = canCrmPermission('crm.master.create')
+  const canUpdateMaster = canCrmPermission('crm.master.update')
+  const canDeleteMaster = canCrmPermission('crm.master.delete')
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -431,8 +435,11 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
                 activateEntry: mutateActivate,
                 deactivateEntry: mutateDeactivate,
                 deleteEntry: mutateDelete,
-                onEdit: prefersDrawer ? openEdit : undefined,
+                onEdit: prefersDrawer && canUpdateMaster ? openEdit : undefined,
                 onFeedback: (msg, variant = 'success') => pushToast(msg, variant),
+                canCreate: canCreateMaster,
+                canUpdate: canUpdateMaster,
+                canDelete: canDeleteMaster,
               })}
             />
           </div>
@@ -440,9 +447,9 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
       },
     })
     return cols
-  }, [navigate, basePath, duplicateEntry, mutateActivate, mutateDeactivate, mutateDelete, prefersDrawer, openEdit, showCols])
+  }, [navigate, basePath, duplicateEntry, mutateActivate, mutateDeactivate, mutateDelete, prefersDrawer, openEdit, showCols, canCreateMaster, canUpdateMaster, canDeleteMaster])
 
-  const importSecondary = catalog.importExport !== false
+  const importSecondary = catalog.importExport !== false && canCreateMaster
     ? [{ id: 'import', label: 'Import', icon: Upload, onClick: openMasterImport }]
     : []
 
@@ -461,12 +468,16 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
           inline
           sticky={false}
           collapseSecondaryOnNarrow
-          primaryAction={{
-            id: 'new-master',
-            label: 'New',
-            icon: Plus,
-            onClick: openCreate,
-          }}
+          primaryAction={
+            canCreateMaster
+              ? {
+                  id: 'new-master',
+                  label: 'New',
+                  icon: Plus,
+                  onClick: openCreate,
+                }
+              : undefined
+          }
           secondaryActions={[
             ...importSecondary,
             { id: 'export-csv', label: 'Export', icon: Download, onClick: handleExportCsv },
@@ -530,11 +541,11 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
                 <button type="button" className="text-[13px] font-semibold text-erp-primary" onClick={clearMasterFilters}>
                   Clear Filters
                 </button>
-              ) : (
+              ) : canCreateMaster ? (
                 <button type="button" className="erp-btn erp-btn--primary text-[13px]" onClick={openCreate}>
                   New {catalog.title.replace(/ Master$/i, '')}
                 </button>
-              )
+              ) : undefined
             }
             bulkActions={(
               <BulkActionToolbar
@@ -552,8 +563,8 @@ export function CrmMasterListPage({ fixedSlug }: { fixedSlug?: string } = {}) {
                   onActive: (rows) => {
                     void runBulk(rows.map((r) => r.id), mutateActivate, 'Activated')
                   },
-                  canDelete: true,
-                  canSetStatus: true,
+                  canDelete: canDeleteMaster,
+                  canSetStatus: canUpdateMaster,
                 }).filter((a) => ['export', 'delete', 'inactive', 'active'].includes(a.id))}
               />
             )}

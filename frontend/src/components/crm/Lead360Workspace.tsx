@@ -18,6 +18,7 @@ import { canCrmPermission } from '@/utils/permissions/crm'
 import { AppLink } from '@/components/ui/AppLink'
 import { Button } from '@/components/ui/Button'
 import { Toast } from '@/components/ui/Toast'
+import { notify } from '@/store/toastStore'
 import { formatStatus } from '@/components/ui/Badge'
 import {
   ErpAdditionalInfoToggle,
@@ -77,7 +78,7 @@ import {
 import {
   leadPriorityLabel,
   leadStageLabel,
-  resolveLeadConvertToOpportunityGate,
+  resolveLeadConvertActionGate,
 } from '@/utils/leadUtils'
 import {
   formatMissingStageFieldsMessage,
@@ -124,6 +125,7 @@ export function Lead360Workspace() {
   const [notesComposerOpen, setNotesComposerOpen] = useState(false)
   const deleteActivity = useCrmStore((s) => s.deleteActivity)
   const deleteFollowUp = useCrmStore((s) => s.deleteFollowUp)
+  const completeActivity = useCrmStore((s) => s.completeActivity)
 
   const attachmentItems = useLeadAttachmentStore((s) => s.items)
   const leadAttachments = useMemo(
@@ -201,9 +203,9 @@ export function Lead360Workspace() {
         : undefined,
       onCreateOpportunity: lead
         ? () => {
-            const gate = resolveLeadConvertToOpportunityGate(lead)
+            const gate = resolveLeadConvertActionGate(lead, canCrmPermission('crm.lead.convert'))
             if (!gate.ok) {
-              setToast(gate.reason)
+              notify.warning(gate.reason)
               return
             }
             navigate(`/crm/opportunities/new?customerId=${encodeURIComponent(lead.customerId!)}&leadId=${encodeURIComponent(lead.id)}`)
@@ -336,7 +338,13 @@ export function Lead360Workspace() {
   const engagementCtx = leadEngagementContext(lead)
   const editPolicy = resolveLeadEditPolicy(lead)
   const canEdit = canOpenLeadEditor(editPolicy)
-  const canConvertOpp = canEdit && editPolicy.mode !== 'limited' && lead.stage === 'qualified' && Boolean(lead.customerId) && !isConverted
+  const canConvertLeadPerm = canCrmPermission('crm.lead.convert')
+  const canConvertOpp =
+    canConvertLeadPerm
+    && editPolicy.mode !== 'limited'
+    && lead.stage === 'qualified'
+    && Boolean(lead.customerId)
+    && !isConverted
   const canClose = canEdit && editPolicy.canChangeStage && lead.stage !== 'closed' && !isConverted
 
   const {
@@ -346,7 +354,10 @@ export function Lead360Workspace() {
     statusNote: pipelineStatusNote,
     tone: pipelineTone,
   } = buildLeadCrmPipeline(lead, leadActivities)
-  const canChangeStage = editPolicy.canChangeStage && canCrmPermission('crm.lead.update')
+  /** Stage picker stays visible when user can update OR qualify (qualify covers Qualified/Not Qualified). */
+  const canChangeStage =
+    editPolicy.canChangeStage
+    && (canCrmPermission('crm.lead.update') || canCrmPermission('crm.lead.qualify'))
   const systemEvents = buildLeadSystemEvents(
     lead,
     customerQuotations.length > 0,
@@ -393,8 +404,21 @@ export function Lead360Workspace() {
   const canAddFollowUp = canCrmPermission('crm.follow_up.create')
   const canEditActivity = canCrmPermission('crm.activity.update')
   const canDeleteActivity = canCrmPermission('crm.activity.delete')
+  const canCompleteActivity = canCrmPermission('crm.activity.complete')
   const canEditFollowUp = canCrmPermission('crm.follow_up.update')
   const canDeleteFollowUp = canCrmPermission('crm.follow_up.delete')
+
+  function handleCompleteActivity(activity: CrmActivity) {
+    setPendingActivityId(activity.id)
+    void (async () => {
+      try {
+        const r = await resolveStoreAction(completeActivity(activity.id, activity.outcome ?? 'Completed'))
+        if (!r.ok) notify.error(r.error ?? 'Could not complete activity')
+      } finally {
+        setPendingActivityId(null)
+      }
+    })()
+  }
 
   function selectAdditionalSection(sectionId: string) {
     const normalized =
@@ -510,7 +534,14 @@ export function Lead360Workspace() {
         if (!quoteOpportunityId) return
         navigate(`/crm/quotations/new?opportunityId=${quoteOpportunityId}`)
       }}
-      onConvert={() => navigate(`/crm/opportunities/new?customerId=${lead.customerId ?? ''}&leadId=${lead.id}`)}
+      onConvert={() => {
+        const gate = resolveLeadConvertActionGate(lead, canCrmPermission('crm.lead.convert'))
+        if (!gate.ok) {
+          notify.warning(gate.reason)
+          return
+        }
+        navigate(`/crm/opportunities/new?customerId=${encodeURIComponent(lead.customerId ?? '')}&leadId=${encodeURIComponent(lead.id)}`)
+      }}
       onLogActivity={() => setLogActivityOpen(true)}
       onViewHistory={() => setHistoryOpen(true)}
       onDuplicate={() => navigate(`${routes.new}?duplicateFrom=${lead.id}`)}
@@ -524,9 +555,9 @@ export function Lead360Workspace() {
       input={smartOverviewInput}
       onGoToSection={handleSmartOverviewAction}
       onCreateOpportunity={() => {
-        const gate = resolveLeadConvertToOpportunityGate(lead)
+        const gate = resolveLeadConvertActionGate(lead, canCrmPermission('crm.lead.convert'))
         if (!gate.ok) {
-          setToast(gate.reason)
+          notify.warning(gate.reason)
           return
         }
         navigate(`/crm/opportunities/new?customerId=${encodeURIComponent(lead.customerId!)}&leadId=${encodeURIComponent(lead.id)}`)
@@ -696,6 +727,7 @@ export function Lead360Workspace() {
                     setFollowUpOpen(true)
                   } : undefined}
                   onDeleteFollowUp={canDeleteFollowUp ? (followUp) => setDeleteFollowUpTarget(followUp) : undefined}
+                  onCompleteActivity={canCompleteActivity ? handleCompleteActivity : undefined}
                   pendingActivityId={pendingActivityId}
                   pendingFollowUpId={pendingFollowUpId}
                 />

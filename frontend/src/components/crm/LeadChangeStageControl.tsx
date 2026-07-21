@@ -10,10 +10,18 @@ import {
   getMissingLeadStageFields,
   type StageRequirementField,
 } from '@/config/crmStageRequirements'
+import { canCrmPermission } from '@/utils/permissions/crm'
 import { cn } from '@/utils/cn'
 
 /** Stages that need dedicated Convert / Close workflows — omit from quick picker. */
 const STAGE_PICKER_EXCLUDE = new Set<LeadStage>(['converted_to_opportunity'])
+
+function canSelectLeadStage(stage: LeadStage): boolean {
+  if (stage === 'qualified' || stage === 'not_qualified') {
+    return canCrmPermission('crm.lead.qualify')
+  }
+  return canCrmPermission('crm.lead.update')
+}
 
 export function LeadChangeStageControl({
   leadId,
@@ -37,7 +45,9 @@ export function LeadChangeStageControl({
   const [busy, setBusy] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  const options = (LEAD_STAGE_FLOW[currentStage] ?? []).filter((s) => !STAGE_PICKER_EXCLUDE.has(s))
+  const options = (LEAD_STAGE_FLOW[currentStage] ?? [])
+    .filter((s) => !STAGE_PICKER_EXCLUDE.has(s))
+    .filter((s) => canSelectLeadStage(s))
 
   useEffect(() => {
     if (!open) return

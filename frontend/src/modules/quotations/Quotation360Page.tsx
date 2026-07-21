@@ -89,6 +89,7 @@ export function Quotation360Page() {
   const approveDocument = useCrmStore((s) => s.approveQuotationDocument)
   const recallQuotationDocument = useCrmStore((s) => s.recallQuotationDocumentFromApproval)
   const customerApproveDocument = useCrmStore((s) => s.customerApproveQuotationDocument)
+  const customerRejectDocument = useCrmStore((s) => s.customerRejectQuotationDocument)
   const createRevision = useCrmStore((s) => s.createQuotationRevision)
   const deleteQuotation = useCrmStore((s) => s.deleteQuotation)
   const updateOpportunity = useCrmStore((s) => s.updateOpportunity)
@@ -117,6 +118,10 @@ export function Quotation360Page() {
   const canEditFollowUp = canCrmPermission('crm.follow_up.update')
   const canDeleteFollowUp = canCrmPermission('crm.follow_up.delete')
   const canDeleteQuotationPerm = canCrmPermission('crm.quotation.delete')
+  const canUpdateQuotationPerm = canCrmPermission('crm.quotation.update')
+  const canApproveQuotationPerm = canCrmPermission('crm.quotation.approve')
+  const canCompleteActivity = canCrmPermission('crm.activity.complete')
+  const completeActivity = useCrmStore((s) => s.completeActivity)
   const conversion = useQuotationConversion()
 
   const doc = id ? getLatest(id) : undefined
@@ -316,13 +321,19 @@ export function Quotation360Page() {
     customerApproval: quo?.customerApproval ?? 'pending',
     isLatest: true,
   })
-  const canEdit = revisionPolicy.canDirectEdit && !quoDoc.locked
-  const canSubmit = (quoDoc.status === 'draft' || quoDoc.status === 'rejected') && !quoDoc.locked
-  const canApprove = quoDoc.status === 'pending_approval'
-  const canRecall = quoDoc.status === 'pending_approval'
-  const canMarkSent = quoDoc.status === 'approved'
-  const canCustomerApprove = quoDoc.status === 'sent' && quo?.customerApproval === 'pending'
-  const canRevise = revisionPolicy.canCreateRevision
+  const canEdit = revisionPolicy.canDirectEdit && !quoDoc.locked && canUpdateQuotationPerm
+  const canSubmit =
+    canUpdateQuotationPerm
+    && (quoDoc.status === 'draft' || quoDoc.status === 'rejected')
+    && !quoDoc.locked
+  const canApprove = canApproveQuotationPerm && quoDoc.status === 'pending_approval'
+  /** Recall is demo-only — API mode has no recall endpoint. */
+  const canRecall = !apiMode && canUpdateQuotationPerm && quoDoc.status === 'pending_approval'
+  const canMarkSent = canUpdateQuotationPerm && quoDoc.status === 'approved'
+  const canCustomerApprove =
+    canUpdateQuotationPerm && quoDoc.status === 'sent' && quo?.customerApproval === 'pending'
+  const canCustomerReject = canCustomerApprove
+  const canRevise = revisionPolicy.canCreateRevision && canUpdateQuotationPerm
   const canDeleteQuotation =
     canDeleteQuotationPerm
     && isQuotationDeletableStatus(quoDoc.status)
@@ -402,6 +413,30 @@ export function Quotation360Page() {
     }
   }
 
+  async function handleCustomerReject() {
+    const remarks = await systemPrompt({
+      title: 'Customer rejection',
+      description: 'Record why the customer declined this quotation.',
+      fieldLabel: 'Rejection remarks',
+      placeholder: 'Customer feedback…',
+      confirmLabel: 'Record rejection',
+      variant: 'danger',
+      required: true,
+    })
+    if (!remarks) return
+    setActionBusy(true)
+    try {
+      const r = await resolveStoreAction(customerRejectDocument(quoDoc.id, remarks))
+      if (!r.ok) {
+        notify.error(r.error ?? 'Could not record customer rejection')
+        return
+      }
+      notify.success('Customer rejection recorded')
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
   async function handleNewRevision() {
     const reason = await systemPrompt({
       title: 'Create revision',
@@ -424,6 +459,18 @@ export function Quotation360Page() {
     } finally {
       setActionBusy(false)
     }
+  }
+
+  function handleCompleteActivity(activity: CrmActivity) {
+    setPendingActivityId(activity.id)
+    void (async () => {
+      try {
+        const r = await resolveStoreAction(completeActivity(activity.id, activity.outcome ?? 'Completed'))
+        if (!r.ok) notify.error(r.error ?? 'Could not complete activity')
+      } finally {
+        setPendingActivityId(null)
+      }
+    })()
   }
 
   function selectAdditionalSection(sectionId: string) {
@@ -501,6 +548,7 @@ export function Quotation360Page() {
       canApprove={canApprove}
       canRecall={canRecall}
       canCustomerApprove={canCustomerApprove}
+      canCustomerReject={canCustomerReject}
       canRevise={canRevise}
       canDelete={canDeleteQuotation}
       showCreateSalesOrder={soGate.enabled || Boolean(soGate.salesOrderId)}
@@ -513,8 +561,9 @@ export function Quotation360Page() {
       onMarkSent={() => void handleMarkSent()}
       onSubmitApproval={() => void handleSubmitApproval()}
       onApprove={() => void handleApprove()}
-      onRecall={() => void handleRecall()}
+      onRecall={canRecall ? () => void handleRecall() : undefined}
       onCustomerApprove={() => void handleCustomerApprove()}
+      onCustomerReject={canCustomerReject ? () => void handleCustomerReject() : undefined}
       onNewRevision={() => void handleNewRevision()}
       onCreateSalesOrder={openConvertToSalesOrder}
       onDelete={canDeleteQuotation ? () => setDeleteQuotationOpen(true) : undefined}
@@ -795,6 +844,7 @@ export function Quotation360Page() {
                       setFollowUpOpen(true)
                     } : undefined}
                     onDeleteFollowUp={canDeleteFollowUp ? (followUp) => setDeleteFollowUpTarget(followUp) : undefined}
+                    onCompleteActivity={canCompleteActivity ? handleCompleteActivity : undefined}
                     pendingActivityId={pendingActivityId}
                     pendingFollowUpId={pendingFollowUpId}
                   />

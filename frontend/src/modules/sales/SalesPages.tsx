@@ -92,7 +92,6 @@ import { QuickCreateSelect } from '../../components/quick-create/QuickCreateSele
 import { useQuickCreate } from '../../hooks/useQuickCreate'
 import { usePendingCustomerApprovals } from '../../hooks/useStableStoreData'
 import { ErpCommandBar } from '../../components/erp/ErpCommandBar'
-import { Lead360Workspace } from '@/components/crm/Lead360Workspace'
 
 function useMasterLabels() {
   const customers = useMasterStore((s) => s.customers)
@@ -207,12 +206,6 @@ export function SalesDashboardPage() {
       </SectionCard>
     </div>
   )
-}
-
-export { LeadListPage } from '../crm/CrmLeadListPage'
-
-export function LeadDetailPage() {
-  return <Lead360Workspace />
 }
 
 function DashboardQuotationTable({

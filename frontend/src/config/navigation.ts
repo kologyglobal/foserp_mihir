@@ -128,7 +128,7 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Quotations', path: '/crm/quotations', icon: FileText },
       { label: 'Quotation Templates', path: '/crm/quotation-templates', icon: Bookmark },
       { label: 'Sales Orders', path: '/crm/sales-orders', icon: ShoppingCart },
-      { label: 'Companies', path: '/crm/customers', icon: Building2 },
+      { label: 'Companies', path: '/crm/companies', icon: Building2 },
       { label: 'Contacts', path: '/crm/contacts', icon: Users },
       { label: 'Reports', path: '/crm/reports', icon: BarChart3 },
       { label: 'Masters', path: '/crm/masters', icon: Settings2 },

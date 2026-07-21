@@ -46,6 +46,12 @@ export interface CrmLeadsTableProps {
   onBulkEmail?: (rows: EnrichedLeadRow[]) => void
   canDelete: boolean
   canEdit: boolean
+  /** Defaults to canEdit when omitted. */
+  canAssign?: boolean
+  /** Defaults to canEdit when omitted — should be crm.lead.convert. */
+  canConvert?: boolean
+  /** Defaults to canEdit when omitted — should be crm.activity.create. */
+  canScheduleActivity?: boolean
   search: string
   onSearchChange: (value: string) => void
   filterSlot?: React.ReactNode
@@ -79,6 +85,9 @@ export function CrmLeadsTable({
   onBulkEmail,
   canDelete,
   canEdit,
+  canAssign = canEdit,
+  canConvert = canEdit,
+  canScheduleActivity: canScheduleActivityPerm = canEdit,
   search,
   onSearchChange,
   filterSlot,
@@ -237,28 +246,28 @@ export function CrmLeadsTable({
                     label: 'Assign',
                     icon: UserPlus,
                     onClick: () => onAssign?.([row.original]),
-                    disabled: !canEdit || !onAssign,
-                    disabledReason: !canEdit ? 'No edit permission' : undefined,
+                    disabled: !canAssign || !onAssign,
+                    disabledReason: !canAssign ? 'Requires crm.lead.assign' : undefined,
                   },
                   { id: 'sep-workflow', separator: true, label: '' },
                   {
                     id: 'create-opportunity',
                     label: 'Create Opportunity',
                     icon: Handshake,
-                    primary: canConvertHint,
+                    primary: canConvertHint && canConvert,
                     // Business rules (qualified / company / already converted) are enforced in
                     // the page handler with a toast — do not hard-disable (looks clickable with no feedback).
                     onClick: () => onCreateOpportunity?.(row.original),
-                    disabled: !onCreateOpportunity || !canEdit,
-                    disabledReason: !canEdit ? 'No edit permission' : undefined,
+                    disabled: !onCreateOpportunity || !canConvert,
+                    disabledReason: !canConvert ? 'Requires crm.lead.convert' : undefined,
                   },
                   {
                     id: 'schedule-activity',
                     label: 'Schedule Activity',
                     icon: Calendar,
                     onClick: () => onScheduleActivity?.(row.original),
-                    disabled: !canEdit || !onScheduleActivity,
-                    disabledReason: !canEdit ? 'No edit permission' : undefined,
+                    disabled: !canScheduleActivityPerm || !onScheduleActivity,
+                    disabledReason: !canScheduleActivityPerm ? 'Requires crm.activity.create' : undefined,
                   },
                   {
                     id: 'create-quotation',
@@ -278,7 +287,7 @@ export function CrmLeadsTable({
         },
       },
     ],
-    [onView, onEdit, onDelete, onAssign, onCreateOpportunity, onScheduleActivity, onCreateQuotation, linkedOpportunityId, canDelete, canEdit, enableColumnSorting, routes.view],
+    [onView, onEdit, onDelete, onAssign, onCreateOpportunity, onScheduleActivity, onCreateQuotation, linkedOpportunityId, canDelete, canEdit, canAssign, canConvert, canScheduleActivityPerm, enableColumnSorting, routes.view],
   )
 
   const emptyMessage = hasActiveFilters ? 'No leads match current filters.' : 'No leads found.'
