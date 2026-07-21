@@ -84,6 +84,43 @@ export class SalesInvoicePostingNotAllowedError extends SalesInvoicePostingError
   }
 }
 
+export class SalesInvoiceReversalNotAllowedError extends SalesInvoicePostingError {
+  constructor(message = 'Missing permission: finance.ar.invoice.reverse') {
+    super(403, message, 'SALES_INVOICE_REVERSAL_NOT_ALLOWED')
+    this.name = 'SalesInvoiceReversalNotAllowedError'
+  }
+}
+
+export class SalesInvoiceNotPostedForReversalError extends SalesInvoicePostingError {
+  constructor(message = 'Only POSTED sales invoices can be reversed') {
+    super(422, message, 'SALES_INVOICE_NOT_POSTED_FOR_REVERSAL')
+    this.name = 'SalesInvoiceNotPostedForReversalError'
+  }
+}
+
+export class SalesInvoiceAllocationsMustBeReversedError extends SalesInvoicePostingError {
+  constructor(
+    message = 'All posted receipt and credit-note allocations must be reversed before reversing the invoice',
+  ) {
+    super(422, message, 'SALES_INVOICE_ALLOCATIONS_MUST_BE_REVERSED')
+    this.name = 'SalesInvoiceAllocationsMustBeReversedError'
+  }
+}
+
+export class SalesInvoiceReversalDebitNotClearError extends SalesInvoicePostingError {
+  constructor(message = 'Invoice debit open item must be fully unallocated before reversal') {
+    super(422, message, 'SALES_INVOICE_REVERSAL_DEBIT_NOT_CLEAR')
+    this.name = 'SalesInvoiceReversalDebitNotClearError'
+  }
+}
+
+export class SalesInvoiceReversalEligibilityError extends SalesInvoicePostingError {
+  constructor(message: string, errors?: Array<{ field: string; message: string }>) {
+    super(422, message, 'SALES_INVOICE_REVERSAL_ELIGIBILITY', errors)
+    this.name = 'SalesInvoiceReversalEligibilityError'
+  }
+}
+
 export function mapPostingErrorToSalesInvoiceError(error: unknown): never {
   if (error instanceof SalesInvoicePostingError || error instanceof SalesInvoiceConcurrentPostError) {
     throw error

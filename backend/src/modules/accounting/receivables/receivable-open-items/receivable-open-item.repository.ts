@@ -196,3 +196,65 @@ export async function applyCreditAllocation(tx: AllocationTx, input: ApplyOpenIt
   })
   return result.count
 }
+
+/**
+ * Internal: conditional debit open-item revert for allocation reversal (Phase 3B6/3C6).
+ * Mirror of applyDebitAllocation — increments open, decrements allocated, reopens the item.
+ * Not HTTP-routable.
+ */
+export async function revertDebitAllocation(tx: AllocationTx, input: ApplyOpenItemAllocationInput): Promise<number> {
+  const result = await tx.receivableOpenItem.updateMany({
+    where: {
+      id: input.openItemId,
+      tenantId: input.tenantId,
+      legalEntityId: input.legalEntityId,
+      side: 'DEBIT',
+      openAmount: input.expectedOpenAmount,
+      allocatedAmount: input.expectedAllocatedAmount,
+      baseOpenAmount: input.expectedBaseOpenAmount,
+      baseAllocatedAmount: input.expectedBaseAllocatedAmount,
+      status: { in: ['OPEN', 'PARTIALLY_SETTLED', 'SETTLED'] },
+    },
+    data: {
+      openAmount: { increment: input.allocationAmount },
+      allocatedAmount: { decrement: input.allocationAmount },
+      baseOpenAmount: { increment: input.baseAllocationAmount },
+      baseAllocatedAmount: { decrement: input.baseAllocationAmount },
+      status: input.newStatus,
+      settledAt: input.settledAt,
+      updatedBy: input.updatedBy ?? null,
+    },
+  })
+  return result.count
+}
+
+/**
+ * Internal: conditional credit open-item revert for allocation reversal (Phase 3B6/3C6).
+ * Mirror of applyCreditAllocation — increments open, decrements allocated, reopens the item.
+ * Not HTTP-routable.
+ */
+export async function revertCreditAllocation(tx: AllocationTx, input: ApplyOpenItemAllocationInput): Promise<number> {
+  const result = await tx.receivableOpenItem.updateMany({
+    where: {
+      id: input.openItemId,
+      tenantId: input.tenantId,
+      legalEntityId: input.legalEntityId,
+      side: 'CREDIT',
+      openAmount: input.expectedOpenAmount,
+      allocatedAmount: input.expectedAllocatedAmount,
+      baseOpenAmount: input.expectedBaseOpenAmount,
+      baseAllocatedAmount: input.expectedBaseAllocatedAmount,
+      status: { in: ['OPEN', 'PARTIALLY_SETTLED', 'SETTLED'] },
+    },
+    data: {
+      openAmount: { increment: input.allocationAmount },
+      allocatedAmount: { decrement: input.allocationAmount },
+      baseOpenAmount: { increment: input.baseAllocationAmount },
+      baseAllocatedAmount: { decrement: input.baseAllocationAmount },
+      status: input.newStatus,
+      settledAt: input.settledAt,
+      updatedBy: input.updatedBy ?? null,
+    },
+  })
+  return result.count
+}

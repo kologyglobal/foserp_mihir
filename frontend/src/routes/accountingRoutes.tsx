@@ -1,18 +1,66 @@
+import type { ReactNode } from 'react'
 import type { RouteObject } from 'react-router-dom'
 import { Navigate, useParams } from 'react-router-dom'
+import { isApiMode } from '@/config/apiConfig'
+import { demoOnlyRoute } from '@/components/system/DemoOnlyRouteGate'
+
+/**
+ * Phase 8C Wave 1 (8B-R-010): legacy demo AR/AP workspaces must never render
+ * seed balances in API mode — deep links land on live Money In / Money Out.
+ * Demo mode (VITE_USE_API=false) keeps the legacy pages.
+ */
+const legacyArRoute = (element: ReactNode): ReactNode =>
+  isApiMode() ? <Navigate to="/accounting/money-in" replace /> : element
+const legacyApRoute = (element: ReactNode): ReactNode =>
+  isApiMode() ? <Navigate to="/accounting/money-out" replace /> : element
+
+/** Gate copy for seed-backed bank/cash sub-registers (live treasury: liquidity, statements, reconciliation). */
+const BANK_CASH_DEMO_GATE = {
+  title: 'Bank & Cash register',
+  description:
+    'This bank/cash sub-register is a demo-only screen with seed balances. Live treasury runs from the Bank & Cash overview, statements, reconciliation, transfers and cheques.',
+  links: [
+    { label: 'Bank & Cash overview', to: '/accounting/bank-cash' },
+    { label: 'Bank statements', to: '/accounting/bank-cash/statements' },
+  ],
+}
+
+/** Gate copy for seed-backed financial report pages. */
+const FINANCIAL_REPORTS_DEMO_GATE = {
+  title: 'Financial Reports',
+  description:
+    'Financial statement reports (P&L, balance sheet, trial balance, MIS) are demo-only screens with seed figures. Live GL truth is available from Journals and Ledger Entries.',
+  links: [
+    { label: 'Open Journals', to: '/accounting/entries/journals' },
+    { label: 'Open Ledger Entries', to: '/accounting/ledger-entries' },
+  ],
+}
 
 /** Legacy deep-link from Accounting dashboard overdue table → Customer Receivable Card */
 function LegacyReceivablesCustomerRedirect() {
   const { partyId } = useParams()
+  if (isApiMode()) return <Navigate to="/accounting/money-in" replace />
   return <Navigate to={partyId ? `/accounting/receivables/customer/${partyId}` : '/accounting/receivables/outstanding'} replace />
+}
+
+/** Legacy demo vouchers → live journals (edit keeps id param). */
+function LegacyVoucherEditRedirect() {
+  const { voucherId } = useParams()
+  return <Navigate to={voucherId ? `/accounting/entries/journals/${voucherId}/edit` : '/accounting/entries/journals'} replace />
+}
+
+/** Legacy demo voucher detail → GL voucher ledger (Money In/Out accountingVoucherId is a GL voucher UUID). */
+function LegacyVoucherDetailRedirect() {
+  const { voucherId } = useParams()
+  return (
+    <Navigate
+      to={voucherId ? `/accounting/ledger-entries/voucher/${voucherId}` : '/accounting/entries/journals'}
+      replace
+    />
+  )
 }
 import { CommercialCommitmentsPage } from '@/modules/accounting/CommercialCommitmentsPage'
 import { AccountingDashboardPage } from '@/modules/accounting/AccountingDashboardPage'
-import { ChartOfAccountsPage } from '@/modules/accounting/ChartOfAccountsPage'
-import { AccountCardPage } from '@/modules/accounting/AccountCardPage'
-import { VouchersRegisterPage } from '@/modules/accounting/VouchersRegisterPage'
-import { VoucherNewPage, VoucherEditPage } from '@/modules/accounting/VoucherEditorPage'
-import { VoucherDetailPage } from '@/modules/accounting/VoucherDetailPage'
 import { LedgerEntriesPage } from '@/modules/accounting/LedgerEntriesPage'
 import { AccountLedgerPage } from '@/modules/accounting/AccountLedgerPage'
 import { VoucherLedgerPage } from '@/modules/accounting/VoucherLedgerPage'
@@ -120,20 +168,50 @@ import {
   PayablesReportsPage,
   PayablesSetupPage,
 } from '@/modules/accounting/payables'
-import { BankCashOverviewPage } from '@/modules/accounting/BankCashOverviewPage'
+import { BankCashTransactionsPage } from '@/modules/accounting/BankCashTransactionsPage'
 import { BankAccountsPage } from '@/modules/accounting/BankAccountsPage'
 import { BankAccountCardPage } from '@/modules/accounting/BankAccountCardPage'
 import { CashAccountsPage } from '@/modules/accounting/CashAccountsPage'
 import { CashAccountCardPage } from '@/modules/accounting/CashAccountCardPage'
-import { BankCashTransactionsPage } from '@/modules/accounting/BankCashTransactionsPage'
-import { FundTransfersPage } from '@/modules/accounting/FundTransfersPage'
-import { FundTransferNewPage, FundTransferDetailPage } from '@/modules/accounting/FundTransferEditorPage'
-import { BankStatementsPage } from '@/modules/accounting/BankStatementsPage'
-import { BankStatementImportPage } from '@/modules/accounting/BankStatementImportPage'
-import { BankStatementDetailPage } from '@/modules/accounting/BankStatementDetailPage'
-import { BankReconciliationPage } from '@/modules/accounting/BankReconciliationPage'
-import { BankReconciliationWorkbenchPage } from '@/modules/accounting/BankReconciliationWorkbenchPage'
-import { ChequeManagementPage } from '@/modules/accounting/ChequeManagementPage'
+import {
+  TransferListPage,
+  TransferCreatePage,
+  TransferEditPage,
+  TransferDetailPage,
+  TransferInTransitPage,
+  TransferApprovalsPage,
+} from '@/modules/accounting/treasury/transfers'
+import {
+  BankStatementListPage,
+  BankStatementImportPage,
+  BankStatementDetailPage,
+  BankStatementManualCreatePage,
+  BankStatementEditPage,
+  BankStatementImportBatchPage,
+  BankStatementMappingTemplatesPage,
+} from '@/modules/accounting/treasury/bank-statements'
+import {
+  ReconciliationListPage,
+  ReconciliationWorkspacePage,
+  ReconciliationMatchDetailPage,
+  ReconciliationHistoryPage,
+  ReconciliationExceptionsPage,
+} from '@/modules/accounting/treasury/bank-reconciliation'
+import { ChequeListPage, ChequeCreatePage, ChequeDetailPage } from '@/modules/accounting/treasury/cheques'
+import { LiquidityDashboardPage } from '@/modules/accounting/treasury/liquidity'
+import {
+  AdjustmentListPage,
+  AdjustmentCreatePage,
+  AdjustmentDetailPage,
+  BankPostingRuleListPage,
+} from '@/modules/accounting/treasury/adjustments'
+import {
+  SIListPage,
+  SICreatePage,
+  SIDetailPage,
+} from '@/modules/accounting/treasury/standing-instructions'
+import { BankbookPage, CashbookPage } from '@/modules/accounting/treasury/books'
+import { ConnectorListPage } from '@/modules/accounting/treasury/connectors'
 import { BankDepositsPage } from '@/modules/accounting/BankDepositsPage'
 import { CashBookPage } from '@/modules/accounting/CashBookPage'
 import { CashCountsPage } from '@/modules/accounting/CashCountsPage'
@@ -226,25 +304,68 @@ import {
   InvoiceNewPage as MoneyInInvoiceNewPage,
   MoneyInOverviewPage,
   OutstandingPage as MoneyInOutstandingPage,
+  ReceiptAllocatePage as MoneyInReceiptAllocatePage,
+  ReceiptDetailPage as MoneyInReceiptDetailPage,
+  ReceiptEditPage as MoneyInReceiptEditPage,
+  ReceiptListPage as MoneyInReceiptListPage,
+  ReceiptNewPage as MoneyInReceiptNewPage,
   ReconciliationPage as MoneyInReconciliationPage,
 } from '@/modules/accounting/money-in'
+import {
+  MoneyOutOverviewPage,
+  PayableAllocationDetailPage as MoneyOutAllocationDetailPage,
+  PayablesPage as MoneyOutPayablesPage,
+  VendorAdvanceListPage as MoneyOutVendorAdvanceListPage,
+  VendorInvoiceApprovalDetailPage as MoneyOutApprovalDetailPage,
+  VendorInvoiceApprovalListPage as MoneyOutApprovalListPage,
+  VendorInvoiceDetailPage as MoneyOutVendorInvoiceDetailPage,
+  VendorInvoiceEditPage as MoneyOutVendorInvoiceEditPage,
+  VendorInvoiceListPage as MoneyOutVendorInvoiceListPage,
+  VendorInvoiceNewPage as MoneyOutVendorInvoiceNewPage,
+  VendorPaymentAllocatePage as MoneyOutVendorPaymentAllocatePage,
+  VendorPaymentDetailPage as MoneyOutVendorPaymentDetailPage,
+  VendorPaymentEditPage as MoneyOutVendorPaymentEditPage,
+  VendorPaymentListPage as MoneyOutVendorPaymentListPage,
+  VendorPaymentNewPage as MoneyOutVendorPaymentNewPage,
+  VendorAdjustmentAllocatePage as MoneyOutVendorAdjustmentAllocatePage,
+  VendorAdjustmentDetailPage as MoneyOutVendorAdjustmentDetailPage,
+  VendorAdjustmentEditPage as MoneyOutVendorAdjustmentEditPage,
+  VendorAdjustmentListPage as MoneyOutVendorAdjustmentListPage,
+  VendorAdjustmentNewPage as MoneyOutVendorAdjustmentNewPage,
+  CorrectionsWorkspacePage as MoneyOutCorrectionsWorkspacePage,
+  ReversalHistoryPage as MoneyOutReversalHistoryPage,
+  ReversalPreviewPage as MoneyOutReversalPreviewPage,
+  PayableOutstandingPage as MoneyOutOutstandingPage,
+  PayableAgeingPage as MoneyOutAgeingPage,
+  PayableVendorListPage as MoneyOutVendorListPage,
+  PayableVendorDetailPage as MoneyOutVendorDetailPage,
+  PaymentPlanningPage as MoneyOutPaymentPlanningPage,
+  PayableReconciliationPage as MoneyOutPayableReconciliationPage,
+  PayableReconciliationRunListPage as MoneyOutPayableReconciliationRunListPage,
+  PayableReconciliationRunDetailPage as MoneyOutPayableReconciliationRunDetailPage,
+  PayableReconciliationExceptionsPage as MoneyOutPayableReconciliationExceptionsPage,
+  PayableReconciliationExceptionDetailPage as MoneyOutPayableReconciliationExceptionDetailPage,
+  PayableCloseGatePage as MoneyOutPayableCloseGatePage,
+  PayableCloseGateRunDetailPage as MoneyOutPayableCloseGateRunDetailPage,
+} from '@/modules/accounting/money-out'
 
 /**
- * Accounting module routes — demo/UI-only (no backend posting engine).
- * CoA, Vouchers, Ledger, Receivables, Payables, Tax, Bank & Cash, Fixed Assets,
- * Manufacturing Accounting, Financial Reports, Period Close are full FE modules.
+ * Accounting module routes — mix of dual-mode live workspaces and demo/UI-only screens.
+ * Legacy CoA (`/accounting/chart-of-accounts*`) and vouchers (`/accounting/vouchers*`) redirect to
+ * settings CoA / journals / GL voucher ledger; page components retained but unmounted.
  */
 export const accountingRouteChildren: RouteObject[] = [
   { path: 'accounting', element: <AccountingDashboardPage /> },
   { path: 'accounting/dashboard', element: <Navigate to="/accounting" replace /> },
 
-  { path: 'accounting/coa', element: <Navigate to="/accounting/chart-of-accounts" replace /> },
-  { path: 'accounting/chart-of-accounts', element: <ChartOfAccountsPage /> },
-  { path: 'accounting/chart-of-accounts/:accountId', element: <AccountCardPage /> },
-  { path: 'accounting/vouchers', element: <VouchersRegisterPage /> },
-  { path: 'accounting/vouchers/new', element: <VoucherNewPage /> },
-  { path: 'accounting/vouchers/:voucherId/edit', element: <VoucherEditPage /> },
-  { path: 'accounting/vouchers/:voucherId', element: <VoucherDetailPage /> },
+  /** Legacy CoA / vouchers → live settings CoA + journals / GL voucher ledger (page files retained, unmounted). */
+  { path: 'accounting/coa', element: <Navigate to="/accounting/settings/chart-of-accounts" replace /> },
+  { path: 'accounting/chart-of-accounts', element: <Navigate to="/accounting/settings/chart-of-accounts" replace /> },
+  { path: 'accounting/chart-of-accounts/:accountId', element: <Navigate to="/accounting/settings/chart-of-accounts" replace /> },
+  { path: 'accounting/vouchers', element: <Navigate to="/accounting/entries/journals" replace /> },
+  { path: 'accounting/vouchers/new', element: <Navigate to="/accounting/entries/journals/new" replace /> },
+  { path: 'accounting/vouchers/:voucherId/edit', element: <LegacyVoucherEditRedirect /> },
+  { path: 'accounting/vouchers/:voucherId', element: <LegacyVoucherDetailRedirect /> },
 
   /** Manual journals — Phase 2C1 API + demo dual-mode */
   { path: 'accounting/entries', element: <Navigate to="/accounting/entries/journals" replace /> },
@@ -260,6 +381,12 @@ export const accountingRouteChildren: RouteObject[] = [
   { path: 'accounting/money-in/invoices/new', element: <MoneyInInvoiceNewPage /> },
   { path: 'accounting/money-in/invoices/:id', element: <MoneyInInvoiceDetailPage /> },
   { path: 'accounting/money-in/invoices/:id/edit', element: <MoneyInInvoiceEditPage /> },
+  /** Customer receipts — Phase 3B6 AR frontend (API + demo dual-mode) */
+  { path: 'accounting/money-in/receipts', element: <MoneyInReceiptListPage /> },
+  { path: 'accounting/money-in/receipts/new', element: <MoneyInReceiptNewPage /> },
+  { path: 'accounting/money-in/receipts/:id', element: <MoneyInReceiptDetailPage /> },
+  { path: 'accounting/money-in/receipts/:id/edit', element: <MoneyInReceiptEditPage /> },
+  { path: 'accounting/money-in/receipts/:id/allocate', element: <MoneyInReceiptAllocatePage /> },
   /** Credit notes — Phase 3C6 AR frontend (API + demo dual-mode) */
   { path: 'accounting/money-in/credit-notes', element: <MoneyInCreditNoteListPage /> },
   { path: 'accounting/money-in/credit-notes/new', element: <MoneyInCreditNoteNewPage /> },
@@ -272,71 +399,138 @@ export const accountingRouteChildren: RouteObject[] = [
   { path: 'accounting/money-in/ageing', element: <MoneyInAgeingPage /> },
   { path: 'accounting/money-in/reconciliation', element: <MoneyInReconciliationPage /> },
 
-  { path: 'accounting/receivables', element: <ReceivablesDashboardPage /> },
+  /** Money Out — Phase 4A5 AP vendor-invoice frontend (API mode) */
+  { path: 'accounting/money-out', element: <MoneyOutOverviewPage /> },
+  { path: 'accounting/money-out/vendor-invoices', element: <MoneyOutVendorInvoiceListPage /> },
+  { path: 'accounting/money-out/vendor-invoices/new', element: <MoneyOutVendorInvoiceNewPage /> },
+  { path: 'accounting/money-out/vendor-invoices/:id', element: <MoneyOutVendorInvoiceDetailPage /> },
+  { path: 'accounting/money-out/vendor-invoices/:id/edit', element: <MoneyOutVendorInvoiceEditPage /> },
+  /** Vendor payments / advances / allocations / payables — Phase 4B5 AP frontend (API mode) */
+  { path: 'accounting/money-out/vendor-payments', element: <MoneyOutVendorPaymentListPage /> },
+  { path: 'accounting/money-out/vendor-payments/new', element: <MoneyOutVendorPaymentNewPage /> },
+  { path: 'accounting/money-out/vendor-payments/:id', element: <MoneyOutVendorPaymentDetailPage /> },
+  { path: 'accounting/money-out/vendor-payments/:id/edit', element: <MoneyOutVendorPaymentEditPage /> },
+  { path: 'accounting/money-out/vendor-payments/:id/allocate', element: <MoneyOutVendorPaymentAllocatePage /> },
+  { path: 'accounting/money-out/vendor-advances', element: <MoneyOutVendorAdvanceListPage /> },
+  { path: 'accounting/money-out/payables', element: <MoneyOutPayablesPage /> },
+  { path: 'accounting/money-out/outstanding', element: <MoneyOutOutstandingPage /> },
+  { path: 'accounting/money-out/vendors', element: <MoneyOutVendorListPage /> },
+  { path: 'accounting/money-out/vendors/:vendorId', element: <MoneyOutVendorDetailPage /> },
+  { path: 'accounting/money-out/ageing', element: <MoneyOutAgeingPage /> },
+  { path: 'accounting/money-out/payment-planning', element: <MoneyOutPaymentPlanningPage /> },
+  { path: 'accounting/money-out/allocations/:allocationId', element: <MoneyOutAllocationDetailPage /> },
+  { path: 'accounting/money-out/approvals', element: <MoneyOutApprovalListPage /> },
+  { path: 'accounting/money-out/approvals/:id', element: <MoneyOutApprovalDetailPage /> },
+  /** Vendor adjustments + corrections — Phase 4C2 AP frontend (API mode) */
+  { path: 'accounting/money-out/vendor-adjustments', element: <MoneyOutVendorAdjustmentListPage /> },
+  { path: 'accounting/money-out/vendor-adjustments/new', element: <MoneyOutVendorAdjustmentNewPage /> },
+  { path: 'accounting/money-out/vendor-adjustments/:id', element: <MoneyOutVendorAdjustmentDetailPage /> },
+  { path: 'accounting/money-out/vendor-adjustments/:id/edit', element: <MoneyOutVendorAdjustmentEditPage /> },
+  { path: 'accounting/money-out/vendor-adjustments/:id/allocate', element: <MoneyOutVendorAdjustmentAllocatePage /> },
+  { path: 'accounting/money-out/corrections', element: <MoneyOutCorrectionsWorkspacePage /> },
+  { path: 'accounting/money-out/reversals', element: <MoneyOutReversalHistoryPage /> },
+  { path: 'accounting/money-out/reversals/:type/:id', element: <MoneyOutReversalPreviewPage /> },
+  /** AP reconciliation + close gate — Phase 4D2 (API mode) */
+  { path: 'accounting/money-out/reconciliation', element: <MoneyOutPayableReconciliationPage /> },
+  { path: 'accounting/money-out/reconciliation/runs', element: <MoneyOutPayableReconciliationRunListPage /> },
+  { path: 'accounting/money-out/reconciliation/runs/:id', element: <MoneyOutPayableReconciliationRunDetailPage /> },
+  { path: 'accounting/money-out/reconciliation/exceptions', element: <MoneyOutPayableReconciliationExceptionsPage /> },
+  { path: 'accounting/money-out/reconciliation/exceptions/:id', element: <MoneyOutPayableReconciliationExceptionDetailPage /> },
+  { path: 'accounting/money-out/close-gate', element: <MoneyOutPayableCloseGatePage /> },
+  { path: 'accounting/money-out/close-gate/runs/:id', element: <MoneyOutPayableCloseGateRunDetailPage /> },
+
+  /** Legacy demo AR — API mode redirects every deep link to live Money In (8B-R-010). */
+  { path: 'accounting/receivables', element: legacyArRoute(<ReceivablesDashboardPage />) },
   { path: 'accounting/commercial-commitments', element: <CommercialCommitmentsPage /> },
-  { path: 'accounting/receivables/customers', element: <CustomerOutstandingPage /> },
-  { path: 'accounting/receivables/outstanding', element: <CustomerOutstandingPage /> },
-  { path: 'accounting/receivables/invoices', element: <ReceivableInvoicesPage /> },
-  { path: 'accounting/receivables/ageing', element: <ReceivablesAgeingPage /> },
-  { path: 'accounting/receivables/collections', element: <CollectionWorklistPage /> },
-  { path: 'accounting/receivables/receipts', element: <CustomerReceiptsPage /> },
-  { path: 'accounting/receivables/receipts/new', element: <CustomerReceiptNewPage /> },
-  { path: 'accounting/receivables/receipts/:receiptId/edit', element: <CustomerReceiptEditPage /> },
-  { path: 'accounting/receivables/receipts/:receiptId', element: <CustomerReceiptDetailPage /> },
-  { path: 'accounting/receivables/allocations', element: <AllocationsPage /> },
-  { path: 'accounting/receivables/credit-notes', element: <CreditNotesPage /> },
-  { path: 'accounting/receivables/disputes', element: <DisputesPage /> },
-  { path: 'accounting/receivables/reminders', element: <ReminderCentrePage /> },
-  { path: 'accounting/receivables/customer/:customerId', element: <CustomerReceivableCardPage /> },
-  { path: 'accounting/receivables/invoice/:invoiceId', element: <InvoiceReceivableDetailsPage /> },
+  { path: 'accounting/receivables/customers', element: legacyArRoute(<CustomerOutstandingPage />) },
+  { path: 'accounting/receivables/outstanding', element: legacyArRoute(<CustomerOutstandingPage />) },
+  { path: 'accounting/receivables/invoices', element: legacyArRoute(<ReceivableInvoicesPage />) },
+  { path: 'accounting/receivables/ageing', element: legacyArRoute(<ReceivablesAgeingPage />) },
+  { path: 'accounting/receivables/collections', element: legacyArRoute(<CollectionWorklistPage />) },
+  { path: 'accounting/receivables/receipts', element: legacyArRoute(<CustomerReceiptsPage />) },
+  { path: 'accounting/receivables/receipts/new', element: legacyArRoute(<CustomerReceiptNewPage />) },
+  { path: 'accounting/receivables/receipts/:receiptId/edit', element: legacyArRoute(<CustomerReceiptEditPage />) },
+  { path: 'accounting/receivables/receipts/:receiptId', element: legacyArRoute(<CustomerReceiptDetailPage />) },
+  { path: 'accounting/receivables/allocations', element: legacyArRoute(<AllocationsPage />) },
+  { path: 'accounting/receivables/credit-notes', element: legacyArRoute(<CreditNotesPage />) },
+  { path: 'accounting/receivables/disputes', element: legacyArRoute(<DisputesPage />) },
+  { path: 'accounting/receivables/reminders', element: legacyArRoute(<ReminderCentrePage />) },
+  { path: 'accounting/receivables/customer/:customerId', element: legacyArRoute(<CustomerReceivableCardPage />) },
+  { path: 'accounting/receivables/invoice/:invoiceId', element: legacyArRoute(<InvoiceReceivableDetailsPage />) },
   {
     path: 'accounting/receivables/customers/:partyId',
     element: <LegacyReceivablesCustomerRedirect />,
   },
-  { path: 'accounting/payables', element: <PayablesDashboardPage /> },
-  { path: 'accounting/payables/outstanding', element: <VendorOutstandingPage /> },
-  { path: 'accounting/payables/invoices', element: <PayableInvoicesPage /> },
-  { path: 'accounting/payables/invoice/:invoiceId', element: <PayableInvoiceDetailPage /> },
-  { path: 'accounting/payables/ageing', element: <PayablesAgeingPage /> },
-  { path: 'accounting/payables/payment-planning', element: <PaymentPlanningPage /> },
-  { path: 'accounting/payables/payment-proposals', element: <PaymentProposalsPage /> },
-  { path: 'accounting/payables/payment-proposals/:proposalId', element: <PaymentProposalDetailPage /> },
-  { path: 'accounting/payables/payments', element: <VendorPaymentsPage /> },
-  { path: 'accounting/payables/payments/new', element: <VendorPaymentNewPage /> },
-  { path: 'accounting/payables/payments/:paymentId/edit', element: <VendorPaymentEditPage /> },
-  { path: 'accounting/payables/payments/:paymentId', element: <VendorPaymentDetailPage /> },
-  { path: 'accounting/payables/allocations', element: <PaymentAllocationsPage /> },
-  { path: 'accounting/payables/advances', element: <VendorAdvancesPage /> },
-  { path: 'accounting/payables/debit-notes', element: <PayableDebitNotesPage /> },
-  { path: 'accounting/payables/disputes', element: <VendorDisputesPage /> },
-  { path: 'accounting/payables/vendor/:vendorId', element: <VendorPayablesCardPage /> },
-  { path: 'accounting/payables/reports', element: <PayablesReportsPage /> },
-  { path: 'accounting/payables/setup', element: <PayablesSetupPage /> },
+  /** Legacy demo AP — API mode redirects every deep link to live Money Out (8B-R-010). */
+  { path: 'accounting/payables', element: legacyApRoute(<PayablesDashboardPage />) },
+  { path: 'accounting/payables/outstanding', element: legacyApRoute(<VendorOutstandingPage />) },
+  { path: 'accounting/payables/invoices', element: legacyApRoute(<PayableInvoicesPage />) },
+  { path: 'accounting/payables/invoice/:invoiceId', element: legacyApRoute(<PayableInvoiceDetailPage />) },
+  { path: 'accounting/payables/ageing', element: legacyApRoute(<PayablesAgeingPage />) },
+  { path: 'accounting/payables/payment-planning', element: legacyApRoute(<PaymentPlanningPage />) },
+  { path: 'accounting/payables/payment-proposals', element: legacyApRoute(<PaymentProposalsPage />) },
+  { path: 'accounting/payables/payment-proposals/:proposalId', element: legacyApRoute(<PaymentProposalDetailPage />) },
+  { path: 'accounting/payables/payments', element: legacyApRoute(<VendorPaymentsPage />) },
+  { path: 'accounting/payables/payments/new', element: legacyApRoute(<VendorPaymentNewPage />) },
+  { path: 'accounting/payables/payments/:paymentId/edit', element: legacyApRoute(<VendorPaymentEditPage />) },
+  { path: 'accounting/payables/payments/:paymentId', element: legacyApRoute(<VendorPaymentDetailPage />) },
+  { path: 'accounting/payables/allocations', element: legacyApRoute(<PaymentAllocationsPage />) },
+  { path: 'accounting/payables/advances', element: legacyApRoute(<VendorAdvancesPage />) },
+  { path: 'accounting/payables/debit-notes', element: legacyApRoute(<PayableDebitNotesPage />) },
+  { path: 'accounting/payables/disputes', element: legacyApRoute(<VendorDisputesPage />) },
+  { path: 'accounting/payables/vendor/:vendorId', element: legacyApRoute(<VendorPayablesCardPage />) },
+  { path: 'accounting/payables/reports', element: legacyApRoute(<PayablesReportsPage />) },
+  { path: 'accounting/payables/setup', element: legacyApRoute(<PayablesSetupPage />) },
 
   /** Bank & Cash — full demo frontend module */
   { path: 'accounting/bank', element: <Navigate to="/accounting/bank-cash" replace /> },
   { path: 'accounting/bank/:bankAccountId/reconcile', element: <Navigate to="/accounting/bank-cash/reconciliation" replace /> },
-  { path: 'accounting/bank-cash', element: <BankCashOverviewPage /> },
-  { path: 'accounting/bank-cash/bank-accounts', element: <BankAccountsPage /> },
-  { path: 'accounting/bank-cash/bank-accounts/:id', element: <BankAccountCardPage /> },
-  { path: 'accounting/bank-cash/cash-accounts', element: <CashAccountsPage /> },
-  { path: 'accounting/bank-cash/cash-accounts/:id', element: <CashAccountCardPage /> },
-  { path: 'accounting/bank-cash/transactions', element: <BankCashTransactionsPage /> },
-  { path: 'accounting/bank-cash/transfers', element: <FundTransfersPage /> },
-  { path: 'accounting/bank-cash/transfers/new', element: <FundTransferNewPage /> },
-  { path: 'accounting/bank-cash/transfers/:id', element: <FundTransferDetailPage /> },
-  { path: 'accounting/bank-cash/statements', element: <BankStatementsPage /> },
+  { path: 'accounting/bank-cash', element: <LiquidityDashboardPage /> },
+  { path: 'accounting/bank-cash/liquidity', element: <LiquidityDashboardPage /> },
+  /** Seed-backed bank/cash account registers — demo-only; live treasury runs via liquidity/statements/recon (8B-R-010). */
+  { path: 'accounting/bank-cash/bank-accounts', element: demoOnlyRoute(<BankAccountsPage />, BANK_CASH_DEMO_GATE) },
+  { path: 'accounting/bank-cash/bank-accounts/:id', element: demoOnlyRoute(<BankAccountCardPage />, BANK_CASH_DEMO_GATE) },
+  { path: 'accounting/bank-cash/cash-accounts', element: demoOnlyRoute(<CashAccountsPage />, BANK_CASH_DEMO_GATE) },
+  { path: 'accounting/bank-cash/cash-accounts/:id', element: demoOnlyRoute(<CashAccountCardPage />, BANK_CASH_DEMO_GATE) },
+  { path: 'accounting/bank-cash/transactions', element: demoOnlyRoute(<BankCashTransactionsPage />, BANK_CASH_DEMO_GATE) },
+  { path: 'accounting/bank-cash/transfers', element: <TransferListPage /> },
+  { path: 'accounting/bank-cash/transfers/new', element: <TransferCreatePage /> },
+  { path: 'accounting/bank-cash/transfers/in-transit', element: <TransferInTransitPage /> },
+  { path: 'accounting/bank-cash/transfers/approvals', element: <TransferApprovalsPage /> },
+  { path: 'accounting/bank-cash/transfers/:id/edit', element: <TransferEditPage /> },
+  { path: 'accounting/bank-cash/transfers/:id', element: <TransferDetailPage /> },
+  { path: 'accounting/bank-cash/statements', element: <BankStatementListPage /> },
   { path: 'accounting/bank-cash/statements/import', element: <BankStatementImportPage /> },
+  { path: 'accounting/bank-cash/statements/manual', element: <BankStatementManualCreatePage /> },
+  { path: 'accounting/bank-cash/statements/:id/edit', element: <BankStatementEditPage /> },
   { path: 'accounting/bank-cash/statements/:id', element: <BankStatementDetailPage /> },
-  { path: 'accounting/bank-cash/reconciliation', element: <BankReconciliationPage /> },
-  { path: 'accounting/bank-cash/reconciliation/:id', element: <BankReconciliationWorkbenchPage /> },
-  { path: 'accounting/bank-cash/cheques', element: <ChequeManagementPage /> },
-  { path: 'accounting/bank-cash/deposits', element: <BankDepositsPage /> },
-  { path: 'accounting/bank-cash/cash-book', element: <CashBookPage /> },
-  { path: 'accounting/bank-cash/cash-counts', element: <CashCountsPage /> },
-  { path: 'accounting/bank-cash/cash-counts/new', element: <CashCountEditorPage /> },
-  { path: 'accounting/bank-cash/reports', element: <BankCashReportsPage /> },
-  { path: 'accounting/bank-cash/setup', element: <BankCashSetupPage /> },
+  { path: 'accounting/bank-cash/import-batches/:id', element: <BankStatementImportBatchPage /> },
+  { path: 'accounting/bank-cash/mapping-templates', element: <BankStatementMappingTemplatesPage /> },
+  { path: 'accounting/bank-cash/reconciliation', element: <ReconciliationListPage /> },
+  { path: 'accounting/bank-cash/reconciliation/history', element: <ReconciliationHistoryPage /> },
+  { path: 'accounting/bank-cash/reconciliation/exceptions', element: <ReconciliationExceptionsPage /> },
+  { path: 'accounting/bank-cash/reconciliation/matches/:matchId', element: <ReconciliationMatchDetailPage /> },
+  { path: 'accounting/bank-cash/reconciliation/:statementId', element: <ReconciliationWorkspacePage /> },
+  { path: 'accounting/bank-cash/cheques', element: <ChequeListPage /> },
+  { path: 'accounting/bank-cash/cheques/new', element: <ChequeCreatePage /> },
+  { path: 'accounting/bank-cash/cheques/:id', element: <ChequeDetailPage /> },
+  { path: 'accounting/bank-cash/treasury-adjustments', element: <AdjustmentListPage /> },
+  { path: 'accounting/bank-cash/treasury-adjustments/new', element: <AdjustmentCreatePage /> },
+  { path: 'accounting/bank-cash/treasury-adjustments/:id/edit', element: <AdjustmentDetailPage /> },
+  { path: 'accounting/bank-cash/treasury-adjustments/:id', element: <AdjustmentDetailPage /> },
+  { path: 'accounting/bank-cash/standing-instructions', element: <SIListPage /> },
+  { path: 'accounting/bank-cash/standing-instructions/new', element: <SICreatePage /> },
+  { path: 'accounting/bank-cash/standing-instructions/:id', element: <SIDetailPage /> },
+  { path: 'accounting/bank-cash/posting-rules', element: <BankPostingRuleListPage /> },
+  { path: 'accounting/bank-cash/connectors', element: <ConnectorListPage /> },
+  { path: 'accounting/bank-cash/bankbook', element: <BankbookPage /> },
+  { path: 'accounting/bank-cash/cashbook', element: <CashbookPage /> },
+  { path: 'accounting/bank-cash/deposits', element: demoOnlyRoute(<BankDepositsPage />, BANK_CASH_DEMO_GATE) },
+  { path: 'accounting/bank-cash/cash-book', element: demoOnlyRoute(<CashBookPage />, BANK_CASH_DEMO_GATE) },
+  { path: 'accounting/bank-cash/cash-counts', element: demoOnlyRoute(<CashCountsPage />, BANK_CASH_DEMO_GATE) },
+  { path: 'accounting/bank-cash/cash-counts/new', element: demoOnlyRoute(<CashCountEditorPage />, BANK_CASH_DEMO_GATE) },
+  { path: 'accounting/bank-cash/reports', element: demoOnlyRoute(<BankCashReportsPage />, BANK_CASH_DEMO_GATE) },
+  { path: 'accounting/bank-cash/setup', element: demoOnlyRoute(<BankCashSetupPage />, BANK_CASH_DEMO_GATE) },
 
   /** Fixed Assets — full demo frontend module */
   { path: 'accounting/fixed-assets', element: <FixedAssetsOverviewPage /> },
@@ -357,7 +551,7 @@ export const accountingRouteChildren: RouteObject[] = [
   { path: 'accounting/fixed-assets/reports', element: <FixedAssetsReportsPage /> },
   { path: 'accounting/fixed-assets/setup', element: <FixedAssetsSetupPage /> },
 
-  /** Manufacturing Accounting & Costing — full demo frontend module */
+  /** Manufacturing Accounting & Costing — existing demo frontend module */
   { path: 'accounting/manufacturing', element: <ManufacturingAccountingOverviewPage /> },
   { path: 'accounting/manufacturing/material-consumption', element: <ManufacturingMaterialConsumptionPage /> },
   { path: 'accounting/manufacturing/wip', element: <ManufacturingWipRegisterPage /> },
@@ -426,22 +620,23 @@ export const accountingRouteChildren: RouteObject[] = [
   { path: 'accounting/ledger-entries/voucher/:voucherId', element: <VoucherLedgerPage /> },
   { path: 'accounting/ledger-entries/party/:partyType/:partyId', element: <PartyLedgerPage /> },
   { path: 'accounting/ledger-entries/:entryId', element: <LedgerEntryDetailPage /> },
-  { path: 'accounting/reports', element: <FinancialReportsDashboardPage /> },
-  { path: 'accounting/reports/trial-balance', element: <TrialBalancePage /> },
-  { path: 'accounting/reports/profit-loss', element: <ProfitLossPage /> },
-  { path: 'accounting/reports/balance-sheet', element: <BalanceSheetPage /> },
-  { path: 'accounting/reports/cash-flow', element: <CashFlowPage /> },
-  { path: 'accounting/reports/general-ledger', element: <GeneralLedgerReportPage /> },
-  { path: 'accounting/reports/account-schedules', element: <AccountSchedulesPage /> },
-  { path: 'accounting/reports/cost-centre', element: <CostCentreProfitabilityPage /> },
-  { path: 'accounting/reports/department', element: <DepartmentPerformancePage /> },
-  { path: 'accounting/reports/project', element: <ProjectProfitabilityPage /> },
-  { path: 'accounting/reports/manufacturing', element: <ManufacturingCostSummaryPage /> },
-  { path: 'accounting/reports/budget-vs-actual', element: <BudgetVsActualPage /> },
-  { path: 'accounting/reports/comparative', element: <ComparativeStatementsPage /> },
-  { path: 'accounting/reports/ratios', element: <RatioAnalysisPage /> },
-  { path: 'accounting/reports/mis', element: <FinancialMisPage /> },
-  { path: 'accounting/reports/setup', element: <FinancialReportSetupPage /> },
+  /** Seed-backed financial reports — demo-only screens; hard-stop in API mode (8B-R-010). */
+  { path: 'accounting/reports', element: demoOnlyRoute(<FinancialReportsDashboardPage />, FINANCIAL_REPORTS_DEMO_GATE) },
+  { path: 'accounting/reports/trial-balance', element: demoOnlyRoute(<TrialBalancePage />, FINANCIAL_REPORTS_DEMO_GATE) },
+  { path: 'accounting/reports/profit-loss', element: demoOnlyRoute(<ProfitLossPage />, FINANCIAL_REPORTS_DEMO_GATE) },
+  { path: 'accounting/reports/balance-sheet', element: demoOnlyRoute(<BalanceSheetPage />, FINANCIAL_REPORTS_DEMO_GATE) },
+  { path: 'accounting/reports/cash-flow', element: demoOnlyRoute(<CashFlowPage />, FINANCIAL_REPORTS_DEMO_GATE) },
+  { path: 'accounting/reports/general-ledger', element: demoOnlyRoute(<GeneralLedgerReportPage />, FINANCIAL_REPORTS_DEMO_GATE) },
+  { path: 'accounting/reports/account-schedules', element: demoOnlyRoute(<AccountSchedulesPage />, FINANCIAL_REPORTS_DEMO_GATE) },
+  { path: 'accounting/reports/cost-centre', element: demoOnlyRoute(<CostCentreProfitabilityPage />, FINANCIAL_REPORTS_DEMO_GATE) },
+  { path: 'accounting/reports/department', element: demoOnlyRoute(<DepartmentPerformancePage />, FINANCIAL_REPORTS_DEMO_GATE) },
+  { path: 'accounting/reports/project', element: demoOnlyRoute(<ProjectProfitabilityPage />, FINANCIAL_REPORTS_DEMO_GATE) },
+  { path: 'accounting/reports/manufacturing', element: demoOnlyRoute(<ManufacturingCostSummaryPage />, FINANCIAL_REPORTS_DEMO_GATE) },
+  { path: 'accounting/reports/budget-vs-actual', element: demoOnlyRoute(<BudgetVsActualPage />, FINANCIAL_REPORTS_DEMO_GATE) },
+  { path: 'accounting/reports/comparative', element: demoOnlyRoute(<ComparativeStatementsPage />, FINANCIAL_REPORTS_DEMO_GATE) },
+  { path: 'accounting/reports/ratios', element: demoOnlyRoute(<RatioAnalysisPage />, FINANCIAL_REPORTS_DEMO_GATE) },
+  { path: 'accounting/reports/mis', element: demoOnlyRoute(<FinancialMisPage />, FINANCIAL_REPORTS_DEMO_GATE) },
+  { path: 'accounting/reports/setup', element: demoOnlyRoute(<FinancialReportSetupPage />, FINANCIAL_REPORTS_DEMO_GATE) },
   { path: 'accounting/period-close', element: <CloseDashboardPage /> },
   { path: 'accounting/period-close/calendar', element: <CloseCalendarPage /> },
   { path: 'accounting/period-close/checklist', element: <CloseChecklistPage /> },

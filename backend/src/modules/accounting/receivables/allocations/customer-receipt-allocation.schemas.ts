@@ -60,6 +60,15 @@ export const receiptIdParamSchema = z.object({
   receiptId: z.string().uuid(),
 })
 
+export const receiptAllocationBatchParamSchema = z.object({
+  receiptId: z.string().uuid(),
+  batchId: z.string().uuid(),
+})
+
+export const reverseAllocationBodySchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+})
+
 export const invoiceIdParamSchema = z.object({
   invoiceId: z.string().uuid(),
 })
@@ -67,3 +76,4 @@ export const invoiceIdParamSchema = z.object({
 export type AllocateCustomerReceiptBodyInput = z.infer<typeof allocateCustomerReceiptBodySchema>
 export type ListReceiptAllocationsQueryInput = z.infer<typeof listReceiptAllocationsQuerySchema>
 export type ListCustomerCreditsQueryInput = z.infer<typeof listCustomerCreditsQuerySchema>
+export type ReverseAllocationBodyInput = z.infer<typeof reverseAllocationBodySchema>

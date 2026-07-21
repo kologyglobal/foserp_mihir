@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { RefreshCw } from 'lucide-react'
-import { BudgetingShell } from '@/components/accounting/budgeting'
+import { BudgetingPhase1NaBanner, BudgetingShell } from '@/components/accounting/budgeting'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { useBudgetingPermissions } from '@/utils/permissions/budgeting'
@@ -76,6 +76,7 @@ export function DepartmentBudgetsPage() {
         />
       }
     >
+      <BudgetingPhase1NaBanner />
       {!perms.canView ? <p className="text-[13px] text-rose-700">No view permission.</p> : null}
       {loading ? <LoadingState /> : null}
       {!loading ? (

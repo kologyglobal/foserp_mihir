@@ -60,7 +60,7 @@ export function TaxComplianceOverviewPage() {
   return (
     <TaxComplianceShell
       title="GST & TDS Overview"
-      description="Compliance workspace dashboard (demo preview)."
+      description="Compliance workspace dashboard — live GST extract KPIs when API mode is on."
       periodFilter={filter}
       onPeriodChange={setFilter}
       kpiStrip={kpis}

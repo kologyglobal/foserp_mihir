@@ -455,7 +455,7 @@ export function CustomerReceiptsPage() {
                             type="button"
                             className="rounded p-1 text-erp-muted hover:bg-erp-surface-alt"
                             title="Open Voucher"
-                            onClick={() => navigate(`/accounting/vouchers/${r.relatedVoucherId}`)}
+                            onClick={() => navigate(`/accounting/ledger-entries/voucher/${r.relatedVoucherId}`)}
                           >
                             <MoreHorizontal className="h-4 w-4" />
                           </button>

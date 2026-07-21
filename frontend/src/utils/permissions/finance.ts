@@ -6,6 +6,7 @@ import { useMemo } from 'react'
 import { isApiMode } from '../../config/apiConfig'
 import { getStoredSession } from '../../services/api/client'
 import { getSessionUser, type ErpRole } from './index'
+import { hasWorkspaceAdminRole } from './workspaceAdmin'
 
 export const FINANCE_PERMISSIONS = [
   'finance.view',
@@ -40,7 +41,10 @@ export const FINANCE_PERMISSIONS = [
   'finance.voucher.cancel',
   'finance.voucher.approve',
   'finance.voucher.post',
+  'finance.voucher.reverse',
   'finance.gl.view',
+  'finance.tax.view',
+  'finance.tax.extract',
 ] as const
 
 export type FinancePermission = (typeof FINANCE_PERMISSIONS)[number]
@@ -61,6 +65,7 @@ const VIEWER: FinancePermission[] = [
   'finance.approval_rule.view',
   'finance.audit.view',
   'finance.voucher.view',
+  'finance.tax.view',
 ]
 
 const MANAGER: FinancePermission[] = [
@@ -84,7 +89,9 @@ const MANAGER: FinancePermission[] = [
   'finance.voucher.cancel',
   'finance.voucher.approve',
   'finance.voucher.post',
+  'finance.voucher.reverse',
   'finance.gl.view',
+  'finance.tax.extract',
 ]
 
 const ROLE_PACKS: Partial<Record<ErpRole, FinancePermission[]>> = {
@@ -107,6 +114,7 @@ function resolveApiPermissions(): Set<FinancePermission> {
 }
 
 export function hasFinancePermission(permission: FinancePermission, role?: ErpRole): boolean {
+  if (isApiMode() && hasWorkspaceAdminRole()) return true
   if (isApiMode()) return resolveApiPermissions().has(permission)
   const effective = role ?? getSessionUser().role
   return resolveDemoPermissions(effective).has(permission)
@@ -115,7 +123,12 @@ export function hasFinancePermission(permission: FinancePermission, role?: ErpRo
 export function useFinancePermissions() {
   const user = getSessionUser()
   return useMemo(() => {
-    const set = isApiMode() ? resolveApiPermissions() : resolveDemoPermissions(user.role)
+    const set =
+      isApiMode() && hasWorkspaceAdminRole()
+        ? new Set<FinancePermission>(FINANCE_PERMISSIONS)
+        : isApiMode()
+          ? resolveApiPermissions()
+          : resolveDemoPermissions(user.role)
     const can = (p: FinancePermission) => set.has(p)
     return {
       role: user.role,
@@ -141,6 +154,7 @@ export function useFinancePermissions() {
       canCancelVoucher: can('finance.voucher.cancel'),
       canApproveVoucher: can('finance.voucher.approve'),
       canPostVoucher: can('finance.voucher.post'),
+      canReverseVoucher: can('finance.voucher.reverse'),
       canViewGl: can('finance.gl.view'),
       can,
     }

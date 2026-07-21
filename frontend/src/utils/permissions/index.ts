@@ -13,6 +13,7 @@ import {
 import { isApiMode } from '../../config/apiConfig'
 import { getStoredSession } from '../../services/api/client'
 import type { AuthSession } from '../../services/api/client'
+import { hasWorkspaceAdminRole } from './workspaceAdmin'
 
 /** Primary ERP roles — legacy aliases retained for backward compatibility */
 export type ErpRole =
@@ -188,6 +189,12 @@ export function resetSessionUserForTests() {
 }
 
 export function canPermission(module: PermissionModule, action: PermissionAction): boolean {
+  if (isApiMode() && hasWorkspaceAdminRole()) return true
+  if (isApiMode()) {
+    const key = `${module}.${action}` as PermissionKey
+    const perms = getStoredSession()?.user.permissions ?? []
+    if (perms.includes(key)) return true
+  }
   const user = getSessionUser()
   const perms = ROLE_PERMISSION_MATRIX[user.role]
   if (perms === '*') return true

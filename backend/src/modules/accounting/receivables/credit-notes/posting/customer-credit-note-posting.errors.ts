@@ -34,6 +34,21 @@ export class CustomerCreditNotePostingNotAllowedError extends CustomerCreditNote
 export class CustomerCreditNoteNumberSeriesError extends CustomerCreditNotePostingError {
   constructor() { super(422, 'Customer credit note number series is not configured', 'CUSTOMER_CREDIT_NOTE_NUMBER_SERIES_NOT_CONFIGURED') }
 }
+export class CustomerCreditNoteReversalNotAllowedError extends CustomerCreditNotePostingError {
+  constructor() { super(403, 'Missing permission: finance.ar.credit_note.reverse', 'CUSTOMER_CREDIT_NOTE_REVERSAL_NOT_ALLOWED') }
+}
+export class CustomerCreditNoteNotPostedForReversalError extends CustomerCreditNotePostingError {
+  constructor(message = 'Only POSTED credit notes can be reversed') { super(422, message, 'CUSTOMER_CREDIT_NOTE_NOT_POSTED_FOR_REVERSAL') }
+}
+export class CustomerCreditNoteAllocationsMustBeReversedError extends CustomerCreditNotePostingError {
+  constructor() { super(422, 'All posted allocations must be reversed before reversing the credit note', 'CUSTOMER_CREDIT_NOTE_ALLOCATIONS_MUST_BE_REVERSED') }
+}
+export class CustomerCreditNoteReversalCreditNotClearError extends CustomerCreditNotePostingError {
+  constructor(message = 'Credit note credit open item must be fully unallocated before reversal') { super(422, message, 'CUSTOMER_CREDIT_NOTE_REVERSAL_CREDIT_NOT_CLEAR') }
+}
+export class CustomerCreditNoteReversalEligibilityError extends CustomerCreditNotePostingError {
+  constructor(message: string, errors?: Array<{ field: string; message: string }>) { super(422, message, 'CUSTOMER_CREDIT_NOTE_REVERSAL_NOT_ELIGIBLE', errors) }
+}
 
 export function mapPostingError(error: unknown): never {
   if (error instanceof CustomerCreditNotePostingError) throw error

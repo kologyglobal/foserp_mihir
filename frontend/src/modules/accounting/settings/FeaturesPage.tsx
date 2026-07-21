@@ -84,6 +84,47 @@ export function FeaturesPage() {
               />
             </div>
           </section>
+          <section className="rounded border border-erp-border p-4">
+            <h2 className="text-[13px] font-semibold text-erp-text">Bank &amp; Cash — bank transactions</h2>
+            <p className="mt-1 text-[12px] text-erp-muted">
+              Controls statement-led bank charges, interest and direct debits/credits (Phase 5B3).
+            </p>
+            <div className="mt-3 space-y-3">
+              <Checkbox
+                label="Create bank transactions from statement lines (Treasury Adjustment)"
+                checked={settings.useTreasuryAdjustmentsForStatementItems ?? true}
+                onChange={(e) =>
+                  setSettings((s) => s && ({ ...s, useTreasuryAdjustmentsForStatementItems: e.target.checked }))
+                }
+                disabled={!perms.canManage}
+              />
+              <Checkbox
+                label="Prevent self-approval of treasury adjustments"
+                checked={settings.treasuryAdjustmentPreventSelfApprove ?? true}
+                onChange={(e) =>
+                  setSettings((s) => s && ({ ...s, treasuryAdjustmentPreventSelfApprove: e.target.checked }))
+                }
+                disabled={!perms.canManage}
+              />
+              <FormField label="Treasury adjustment approval limit (base currency)">
+                <Input
+                  type="number"
+                  min={0}
+                  value={settings.treasuryAdjustmentApprovalLimit ?? ''}
+                  onChange={(e) =>
+                    setSettings((s) =>
+                      s && {
+                        ...s,
+                        treasuryAdjustmentApprovalLimit: e.target.value === '' ? null : Number(e.target.value),
+                      },
+                    )
+                  }
+                  disabled={!perms.canManage}
+                  placeholder="Blank = no amount limit"
+                />
+              </FormField>
+            </div>
+          </section>
           <details className="rounded border border-erp-border p-4">
             <summary className="cursor-pointer text-[13px] font-semibold text-erp-text">Advanced limits</summary>
             <div className="mt-3 grid gap-3 md:grid-cols-2">

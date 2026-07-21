@@ -26,3 +26,23 @@ export interface CustomerReceiptPostingValidationContext {
 export function buildCustomerReceiptPostEventKey(receiptId: string): string {
   return `CUSTOMER_RECEIPT_POST:${receiptId}:V1`
 }
+
+export function buildCustomerReceiptReverseEventKey(receiptId: string): string {
+  return `CUSTOMER_RECEIPT_REVERSE:${receiptId}:V1`
+}
+
+export interface ReverseCustomerReceiptInput {
+  tenantId: string
+  receiptId: string
+  reason: string
+  userId: string
+  ipAddress?: string | null
+  userAgent?: string | null
+}
+
+export interface ReverseCustomerReceiptResult {
+  receipt: CustomerReceiptDto
+  posting: PostingResult
+  reversalVoucherId: string
+  idempotentReplay: boolean
+}

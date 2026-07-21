@@ -3,10 +3,11 @@ import { getRouteParam, getTenantId } from '../../../../types/request-context.js
 import { asyncHandler } from '../../../../utils/asyncHandler.js'
 import { buildPaginationMeta } from '../../../../utils/pagination.js'
 import { sendCreated, sendPaginated, sendSuccess } from '../../../../utils/response.js'
-import type { ListSalesInvoicesQueryInput } from './sales-invoice.schemas.js'
+import type { ListSalesInvoicesQueryInput, ReverseSalesInvoiceBody } from './sales-invoice.schemas.js'
 import * as draftService from './sales-invoice-draft.service.js'
 import * as readService from './sales-invoice-read.service.js'
 import * as postingService from '../posting/sales-invoice-posting.service.js'
+import * as reverseService from '../posting/sales-invoice-reverse.service.js'
 
 export const listSalesInvoices = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
@@ -64,4 +65,12 @@ export const postSalesInvoice = asyncHandler(async (req: Request, res: Response)
   const id = getRouteParam(req, 'id')
   const result = await postingService.postSalesInvoiceFromRequest(req, tenantId, id)
   return sendSuccess(res, 'sales invoice posted', result)
+})
+
+export const reverseSalesInvoice = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const body = req.body as ReverseSalesInvoiceBody
+  const result = await reverseService.reverseSalesInvoiceFromRequest(req, tenantId, id, body.reason)
+  return sendSuccess(res, 'sales invoice reversed', result)
 })

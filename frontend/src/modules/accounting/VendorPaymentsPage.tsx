@@ -450,7 +450,7 @@ export function VendorPaymentsPage() {
                             type="button"
                             className="rounded p-1 text-erp-muted hover:bg-erp-surface-alt"
                             title="Open Voucher"
-                            onClick={() => navigate(`/accounting/vouchers/${p.voucherId}`)}
+                            onClick={() => navigate(`/accounting/ledger-entries/voucher/${p.voucherId}`)}
                           >
                             <MoreHorizontal className="h-4 w-4" />
                           </button>

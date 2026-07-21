@@ -258,9 +258,8 @@ export const moduleCategories: NavCategory[] = [
     title: 'Accounting',
     items: [
       { label: 'Dashboard', path: '/accounting', icon: LayoutDashboard, end: true, workspace: true },
-      { label: 'Chart of Accounts', path: '/accounting/chart-of-accounts', icon: BookOpen },
+      { label: 'Chart of Accounts', path: '/accounting/settings/chart-of-accounts', icon: BookOpen },
       { label: 'Journals', path: '/accounting/entries/journals', icon: FileText },
-      { label: 'Vouchers (demo)', path: '/accounting/vouchers', icon: FileText, subNav: false as const },
       /** Receivables workspace — DynamicsTabs dropdown group */
       ...RECEIVABLES_NAV.map((item) => ({
         label: item.label,
@@ -290,6 +289,8 @@ export const moduleCategories: NavCategory[] = [
       })),
       /** API-backed Money In (Phase 3A) — discover via deep link / search */
       { label: 'Money In (API)', path: '/accounting/money-in', icon: ArrowDownToLine, subNav: false as const },
+      /** API-backed Money Out (Phase 4A5) — vendor invoices; payments/ageing preview later */
+      { label: 'Money Out (API)', path: '/accounting/money-out', icon: ArrowUpFromLine, subNav: false as const },
       {
         label: 'Commercial Commitments',
         path: '/accounting/commercial-commitments',
@@ -325,8 +326,8 @@ export const moduleCategories: NavCategory[] = [
       })),
       { label: 'Ledger Entries', path: '/accounting/ledger-entries', icon: ClipboardList },
       { label: 'Financial Reports', path: '/accounting/reports', icon: IndianRupee },
-      /** Parent tab — children use subNav:false (in-page Budgeting tree) */
-      { label: 'Budgeting & Forecasting', path: '/accounting/budgeting', icon: TrendingUp },
+      /** Budgeting is demo-only — demoted from Accounting primary tabs (discover via search / deep link) */
+      { label: 'Budgeting & Forecasting', path: '/accounting/budgeting', icon: TrendingUp, subNav: false },
       ...BUDGETING_NAV.map((item) => ({
         label: item.label,
         path: item.path,

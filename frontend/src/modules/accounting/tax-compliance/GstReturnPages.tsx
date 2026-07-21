@@ -56,7 +56,8 @@ function GstReturnPrepPage({ returnType }: { returnType: 'GSTR-1' | 'GSTR-3B' })
   return (
     <TaxComplianceShell
       title={returnType}
-      description={`${returnType} preparation workspace — frontend preview totals only.`}
+      description={`${returnType} preparation workspace — extract totals may be live; filing actions are demo-only.`}
+      bannerVariant="filing-demo"
       periodFilter={filter}
       onPeriodChange={setFilter}
       commandBar={

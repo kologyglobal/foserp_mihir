@@ -360,3 +360,61 @@ export async function apiDownloadBlob(path: string): Promise<{ blob: Blob; filen
   const blob = await res.blob()
   return { blob, filename: match?.[1] }
 }
+
+/** Authenticated blob download for POST endpoints that accept a filter body (e.g. report exports). */
+export async function apiPostDownloadBlob(
+  path: string,
+  body: unknown = {},
+): Promise<{ blob: Blob; filename?: string }> {
+  let session = getStoredSession()
+  const headers = new Headers({ 'Content-Type': 'application/json' })
+
+  let accessToken = session?.accessToken
+  if (session && accessTokenNeedsRefresh(session)) {
+    accessToken = (await ensureFreshAccessToken()) ?? accessToken
+    session = getStoredSession()
+  }
+  if (accessToken) {
+    headers.set('Authorization', `Bearer ${accessToken}`)
+  }
+
+  const init: RequestInit = { method: 'POST', headers, body: JSON.stringify(body ?? {}) }
+  let res = await fetch(`${API_CONFIG.baseUrl}${path}`, init)
+
+  if (res.status === 401 && session?.refreshToken) {
+    if (!refreshPromise) {
+      refreshPromise = refreshAccessToken().finally(() => {
+        refreshPromise = null
+      })
+    }
+    const newToken = await refreshPromise
+    if (newToken) {
+      headers.set('Authorization', `Bearer ${newToken}`)
+      res = await fetch(`${API_CONFIG.baseUrl}${path}`, { ...init, headers })
+    } else {
+      throw new ApiError('Session expired. Please sign in again.', 401)
+    }
+  }
+
+  if (!res.ok) {
+    if (res.status === 401) setStoredSession(null)
+    let message = `Export failed (${res.status})`
+    try {
+      const body2 = (await res.json()) as ApiResponse<unknown>
+      if (body2.message) {
+        message =
+          body2.message === 'Invalid or expired access token'
+            ? 'Session expired. Please sign in again.'
+            : body2.message
+      }
+    } catch {
+      // non-JSON error body
+    }
+    throw new ApiError(message, res.status)
+  }
+
+  const disposition = res.headers.get('Content-Disposition') ?? ''
+  const match = disposition.match(/filename="([^"]+)"/)
+  const blob = await res.blob()
+  return { blob, filename: match?.[1] }
+}

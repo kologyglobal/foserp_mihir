@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { RefreshCw } from 'lucide-react'
 import {
   BudgetingCollapsedSection,
+  BudgetingPhase1NaBanner,
   BudgetingShell,
   BudgetingWorkspacePanelTabs,
 } from '@/components/accounting/budgeting'
@@ -55,6 +56,7 @@ export function CapexBudgetPage() {
         />
       }
     >
+      <BudgetingPhase1NaBanner />
       {loading ? <LoadingState /> : null}
       {!loading ? (
         <div className="overflow-x-auto rounded border border-erp-border">

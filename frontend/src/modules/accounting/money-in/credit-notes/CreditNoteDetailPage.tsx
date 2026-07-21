@@ -13,6 +13,8 @@ import {
   markCustomerCreditNoteReady,
   postCustomerCreditNote,
   rejectCustomerCreditNote,
+  reverseCustomerCreditNote,
+  reverseCreditNoteAllocation,
   submitCustomerCreditNote,
   validateCustomerCreditNote,
 } from '@/services/bridges/receivablesApiBridge'
@@ -40,6 +42,10 @@ export function CreditNoteDetailPage() {
   const [showReject, setShowReject] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [comments, setComments] = useState('')
+  const [showReverse, setShowReverse] = useState(false)
+  const [reverseReason, setReverseReason] = useState('')
+  const [reverseBatchId, setReverseBatchId] = useState<string | null>(null)
+  const [allocReverseReason, setAllocReverseReason] = useState('')
 
   const load = useCallback(async () => {
     if (!id) return
@@ -171,6 +177,45 @@ export function CreditNoteDetailPage() {
     }
   }
 
+  const runReverse = async () => {
+    if (!id || !reverseReason.trim()) {
+      notify.error('Reversal reason is required')
+      return
+    }
+    setActing(true)
+    try {
+      const result = await reverseCustomerCreditNote(id, reverseReason.trim(), crypto.randomUUID())
+      setNote(result.creditNote)
+      setShowReverse(false)
+      setReverseReason('')
+      notify.success(result.idempotentReplay ? 'Reversal replayed (idempotent)' : 'Credit note reversed')
+      await load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Reverse failed')
+    } finally {
+      setActing(false)
+    }
+  }
+
+  const runReverseAllocation = async () => {
+    if (!id || !reverseBatchId || !allocReverseReason.trim()) {
+      notify.error('Reversal reason is required')
+      return
+    }
+    setActing(true)
+    try {
+      await reverseCreditNoteAllocation(id, reverseBatchId, allocReverseReason.trim(), crypto.randomUUID())
+      setReverseBatchId(null)
+      setAllocReverseReason('')
+      notify.success('Allocation batch reversed')
+      await load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Allocation reverse failed')
+    } finally {
+      setActing(false)
+    }
+  }
+
   if (!perms.canViewCreditNote) {
     return (
       <MoneyInWorkspaceShell title="Credit Note">
@@ -197,7 +242,9 @@ export function CreditNoteDetailPage() {
           ? 'Pending approval — awaiting an approver decision.'
           : note.status === 'REJECTED'
             ? 'Rejected — edit and resubmit, or cancel.'
-            : null
+            : note.status === 'REVERSED'
+              ? 'Reversed — a reversing voucher was posted and the credit was closed. Read-only.'
+              : null
 
   return (
     <MoneyInWorkspaceShell
@@ -249,8 +296,13 @@ export function CreditNoteDetailPage() {
               Allocate
             </ErpButton>
           )}
-          {note.status === 'POSTED' && note.accountingVoucherId && (
-            <Link to={`/accounting/vouchers/${note.accountingVoucherId}`}>
+          {mergeAllowedAction(perms.canReverseCreditNote, actions?.reverse) && (
+            <ErpButton variant="ghost" onClick={() => setShowReverse(true)} disabled={acting}>
+              Reverse Document
+            </ErpButton>
+          )}
+          {(note.status === 'POSTED' || note.status === 'REVERSED') && note.accountingVoucherId && (
+            <Link to={`/accounting/ledger-entries/voucher/${note.accountingVoucherId}`}>
               <ErpButton variant="secondary">View Accounting</ErpButton>
             </Link>
           )}
@@ -337,7 +389,8 @@ export function CreditNoteDetailPage() {
                     <th className="py-1.5 pr-2">Invoice</th>
                     <th className="py-1.5 pr-2 text-right">Amount</th>
                     <th className="py-1.5 pr-2 text-right">Invoice outstanding after</th>
-                    <th className="py-1.5">Status</th>
+                    <th className="py-1.5 pr-2">Status</th>
+                    {perms.canReverseAllocation && <th className="py-1.5">Action</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -349,7 +402,24 @@ export function CreditNoteDetailPage() {
                       <td className="py-1.5 pr-2 text-right tabular-nums">
                         {row.invoiceOutstandingAfter ? formatCurrency(parseDecimal(row.invoiceOutstandingAfter)) : '—'}
                       </td>
-                      <td className="py-1.5">{row.status}</td>
+                      <td className="py-1.5 pr-2">{row.status}</td>
+                      {perms.canReverseAllocation && (
+                        <td className="py-1.5">
+                          {row.status === 'POSTED' && row.batchId && (
+                            <button
+                              type="button"
+                              className="text-[12px] font-medium text-rose-700 hover:underline"
+                              onClick={() => {
+                                setReverseBatchId(row.batchId)
+                                setAllocReverseReason('')
+                              }}
+                              disabled={acting}
+                            >
+                              Reverse batch
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -368,8 +438,8 @@ export function CreditNoteDetailPage() {
             <p className="mt-2 text-[13px] text-erp-muted">
               Posting <strong>{creditNoteDisplayNumber(note)}</strong> for{' '}
               <strong>₹{Number(note.grandTotal).toLocaleString('en-IN')}</strong> will create a system voucher, GL
-              entries, and a credit open item that can be allocated to open invoices. This action cannot be undone
-              from Money In.
+              entries, and a credit open item that can be allocated to open invoices. If needed later, a posted
+              credit note can be reversed (after reversing any allocations), which posts a reversing voucher.
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <ErpButton variant="secondary" onClick={() => setShowPost(false)} disabled={acting}>
@@ -411,6 +481,60 @@ export function CreditNoteDetailPage() {
               </ErpButton>
               <ErpButton variant="primary" onClick={() => void runCancel()} disabled={acting}>
                 Confirm cancel
+              </ErpButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReverse && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded border border-erp-border bg-white p-5 shadow-lg">
+            <h3 className="text-[15px] font-semibold text-erp-text">Reverse credit note?</h3>
+            <p className="mt-2 text-[13px] text-erp-muted">
+              Reversing <strong>{creditNoteDisplayNumber(note)}</strong> posts a reversing voucher, closes the credit
+              open item, and marks the credit note REVERSED. All posted allocations must be reversed first.
+            </p>
+            <Textarea
+              className="mt-3"
+              rows={3}
+              placeholder="Reason for reversal"
+              value={reverseReason}
+              onChange={(e) => setReverseReason(e.target.value)}
+            />
+            <div className="mt-3 flex justify-end gap-2">
+              <ErpButton variant="secondary" onClick={() => setShowReverse(false)} disabled={acting}>
+                Close
+              </ErpButton>
+              <ErpButton variant="primary" onClick={() => void runReverse()} disabled={acting}>
+                {acting ? 'Reversing…' : 'Reverse to GL'}
+              </ErpButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reverseBatchId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded border border-erp-border bg-white p-5 shadow-lg">
+            <h3 className="text-[15px] font-semibold text-erp-text">Reverse allocation batch?</h3>
+            <p className="mt-2 text-[13px] text-erp-muted">
+              This restores invoice outstanding balances and the credit note&apos;s unallocated advance. No GL entries
+              are created (subledger-only).
+            </p>
+            <Textarea
+              className="mt-3"
+              rows={3}
+              placeholder="Reason for reversal"
+              value={allocReverseReason}
+              onChange={(e) => setAllocReverseReason(e.target.value)}
+            />
+            <div className="mt-3 flex justify-end gap-2">
+              <ErpButton variant="secondary" onClick={() => setReverseBatchId(null)} disabled={acting}>
+                Close
+              </ErpButton>
+              <ErpButton variant="primary" onClick={() => void runReverseAllocation()} disabled={acting}>
+                {acting ? 'Reversing…' : 'Reverse batch'}
               </ErpButton>
             </div>
           </div>

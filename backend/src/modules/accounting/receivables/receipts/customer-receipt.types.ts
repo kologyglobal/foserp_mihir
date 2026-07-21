@@ -7,7 +7,7 @@ import type {
 } from './calculation/customer-receipt-calculation.types.js'
 import type { CustomerReceiptAllowedActions } from './customer-receipt-allowed-actions.js'
 
-export type CustomerReceiptStatus = 'DRAFT' | 'READY_TO_POST' | 'POSTED' | 'CANCELLED'
+export type CustomerReceiptStatus = 'DRAFT' | 'READY_TO_POST' | 'POSTED' | 'CANCELLED' | 'REVERSED'
 export type CustomerReceiptPaymentMethod = 'BANK_TRANSFER' | 'CASH' | 'CHEQUE' | 'UPI' | 'CARD' | 'OTHER'
 export type CustomerReceiptSourceType = 'DIRECT' | 'BANK_IMPORT'
 export type CustomerReceiptAllocationStatus = 'DRAFT' | 'POSTED' | 'REVERSED'
@@ -100,6 +100,10 @@ export interface CustomerReceiptDto {
   cancelledAt: string | null
   cancelledBy: string | null
   cancellationReason: string | null
+  reversalVoucherId: string | null
+  reversedAt: string | null
+  reversedBy: string | null
+  reversalReason: string | null
   createdBy: string | null
   updatedBy: string | null
   createdAt: string

@@ -1,8 +1,10 @@
 /**
- * Period Close mock service — Promise-based for future API swap.
- * Demo mutations are in-memory only; no GL or period enforcement.
+ * Period Close service — dual-mode.
+ * Demo (`VITE_USE_API=false`): in-memory mock seed (no GL enforcement).
+ * API (`VITE_USE_API=true`): real AccountingPeriod close/reopen + FE-composed readiness.
  */
 
+import { isApiMode } from '@/config/apiConfig'
 import {
   DEFAULT_PERIOD_FILTER,
   PERIOD_CLOSE_SETUP,
@@ -24,6 +26,19 @@ import {
   SEED_YEAR_END,
   buildCloseDashboard,
 } from '@/data/accounting/periodCloseSeed'
+import {
+  apiClosePeriod,
+  apiMarkPeriodUnderReview,
+  apiReopenPeriod,
+  buildApiCloseDashboard,
+  buildApiCloseTasks,
+  composePeriodCloseReadiness,
+  listApiPeriodsForLocking,
+  loadApiModuleLocks,
+  loadApiPeriodCloseSetup,
+  resolveApiPeriodFilter,
+} from '@/services/accounting/periodCloseApiComposer'
+import type { AccountingPeriod } from '@/types/financeSetup'
 import type {
   AccrualEntry,
   CloseCalendarEvent,
@@ -34,6 +49,7 @@ import type {
   FxRevaluationLine,
   ModuleLockStatus,
   ModulePeriodLock,
+  PeriodCloseReadiness,
   PeriodCloseSetup,
   PeriodFilterState,
   PrepaidExpense,
@@ -68,23 +84,47 @@ export function savePeriodCloseFilter(next: PeriodFilterState): void {
 }
 
 export async function getPeriodCloseSetup(): Promise<PeriodCloseSetup> {
+  if (isApiMode()) return loadApiPeriodCloseSetup()
   await delay()
   return PERIOD_CLOSE_SETUP
 }
 
 export async function getCloseDashboard(filter?: PeriodFilterState): Promise<CloseDashboardData> {
+  if (isApiMode()) {
+    const resolved = await resolveApiPeriodFilter(filter ?? periodFilter)
+    savePeriodCloseFilter(resolved.filter)
+    return buildApiCloseDashboard(resolved.filter)
+  }
   await delay()
   const f = filter ?? periodFilter
   return buildCloseDashboard(f.periodCode)
 }
 
+export async function getPeriodCloseReadiness(filter?: PeriodFilterState): Promise<PeriodCloseReadiness | null> {
+  if (!isApiMode()) return null
+  const resolved = await resolveApiPeriodFilter(filter ?? periodFilter)
+  savePeriodCloseFilter(resolved.filter)
+  return composePeriodCloseReadiness(resolved.filter)
+}
+
 export async function getCloseCalendar(periodCode?: string): Promise<CloseCalendarEvent[]> {
+  if (isApiMode()) {
+    // Phase 2 — calendar remains demo-only scaffolding in API mode
+    return []
+  }
   await delay()
   const code = periodCode ?? periodFilter.periodCode
   return SEED_CALENDAR.filter((e) => e.periodCode === code)
 }
 
 export async function getCloseTasks(periodCode?: string): Promise<CloseTask[]> {
+  if (isApiMode()) {
+    return buildApiCloseTasks(
+      periodCode
+        ? { ...periodFilter, periodCode }
+        : periodFilter,
+    )
+  }
   await delay()
   const code = periodCode ?? periodFilter.periodCode
   return tasks.filter((t) => t.periodCode === code).map((t) => ({ ...t }))
@@ -95,6 +135,11 @@ export async function updateCloseTaskStatus(
   status: CloseTaskStatus,
   completionPct?: number,
 ): Promise<CloseTask> {
+  if (isApiMode()) {
+    throw new Error(
+      'API-mode readiness checklist is computed from finance data. Resolve the underlying issue (journals, AP close gate, bank recon) instead of marking tasks manually.',
+    )
+  }
   await delay()
   const idx = tasks.findIndex((t) => t.id === taskId)
   if (idx < 0) throw new Error('Task not found')
@@ -110,12 +155,14 @@ export async function updateCloseTaskStatus(
 }
 
 export async function getSubledgerReconciliations(periodCode?: string): Promise<SubledgerReconciliation[]> {
+  if (isApiMode()) return []
   await delay()
   const code = periodCode ?? periodFilter.periodCode
   return recons.filter((r) => r.periodCode === code).map((r) => ({ ...r }))
 }
 
 export async function markReconciliationReviewed(id: string, note?: string): Promise<SubledgerReconciliation> {
+  if (isApiMode()) throw new Error('Subledger reconciliation workbench is demo-only in Phase 1. Use Money Out AP reconciliation.')
   await delay()
   const idx = recons.findIndex((r) => r.id === id)
   if (idx < 0) throw new Error('Reconciliation not found')
@@ -132,6 +179,7 @@ export async function markReconciliationReviewed(id: string, note?: string): Pro
 }
 
 export async function addReconciliationNote(id: string, note: string): Promise<SubledgerReconciliation> {
+  if (isApiMode()) throw new Error('Subledger reconciliation workbench is demo-only in Phase 1.')
   await delay()
   const idx = recons.findIndex((r) => r.id === id)
   if (idx < 0) throw new Error('Reconciliation not found')
@@ -223,8 +271,27 @@ export async function getTrialBalanceReview(): Promise<TrialBalanceLine[]> {
 }
 
 export async function getModuleLocks(): Promise<ModulePeriodLock[]> {
+  if (isApiMode()) return loadApiModuleLocks(periodFilter)
   await delay()
   return locks.map((l) => ({ ...l }))
+}
+
+export async function listPeriodClosePeriods(): Promise<AccountingPeriod[]> {
+  if (isApiMode()) return listApiPeriodsForLocking(periodFilter)
+  await delay()
+  return []
+}
+
+export async function closeAccountingPeriod(periodId: string): Promise<AccountingPeriod> {
+  return apiClosePeriod(periodId)
+}
+
+export async function reopenAccountingPeriod(periodId: string, reason: string): Promise<AccountingPeriod> {
+  return apiReopenPeriod(periodId, reason)
+}
+
+export async function markAccountingPeriodUnderReview(periodId: string): Promise<AccountingPeriod> {
+  return apiMarkPeriodUnderReview(periodId)
 }
 
 export async function updateModuleLock(
@@ -233,6 +300,11 @@ export async function updateModuleLock(
   lockedBy: string,
   overrideReason?: string,
 ): Promise<ModulePeriodLock> {
+  if (isApiMode()) {
+    throw new Error(
+      'Use Close / Under Review / Reopen on the accounting period (finance.period.*) instead of module soft/hard locks.',
+    )
+  }
   await delay()
   const idx = locks.findIndex((l) => l.id === id)
   if (idx < 0) throw new Error('Module lock not found')
@@ -249,6 +321,7 @@ export async function updateModuleLock(
 }
 
 export async function getReopenRequests(): Promise<ReopenRequest[]> {
+  if (isApiMode()) return []
   await delay()
   return reopenRequests.map((r) => ({ ...r, audit: r.audit.map((a) => ({ ...a })) }))
 }
@@ -256,6 +329,9 @@ export async function getReopenRequests(): Promise<ReopenRequest[]> {
 export async function submitReopenRequest(
   input: Omit<ReopenRequest, 'id' | 'status' | 'audit'>,
 ): Promise<ReopenRequest> {
+  if (isApiMode()) {
+    throw new Error('Reopen request workflow is Phase 2. Use Period Locking → Reopen with a reason (finance.period.reopen).')
+  }
   await delay()
   const row: ReopenRequest = {
     ...input,
@@ -279,6 +355,7 @@ export async function updateReopenStatus(
   by: string,
   note?: string,
 ): Promise<ReopenRequest> {
+  if (isApiMode()) throw new Error('Reopen request workflow is Phase 2.')
   await delay()
   const idx = reopenRequests.findIndex((r) => r.id === id)
   if (idx < 0) throw new Error('Reopen request not found')

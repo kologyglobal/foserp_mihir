@@ -1,6 +1,6 @@
 /**
- * Period Close & Year-End — frontend types (demo / preview only).
- * No real period enforcement or GL posting.
+ * Period Close & Year-End — frontend types.
+ * Demo mode: mock seed. API mode (Phase 1): real AccountingPeriod close/reopen + readiness compose.
  */
 
 export type CloseWorkflowStage =
@@ -80,6 +80,43 @@ export interface PeriodFilterState {
   periodCode: string
   periodLabel: string
   locationId?: string
+  /** API mode: AccountingPeriod UUID */
+  periodId?: string
+  /** API mode: FinancialYear UUID */
+  fiscalYearId?: string
+}
+
+export type PeriodCloseReadinessSeverity = 'info' | 'warning' | 'blocking' | 'ok'
+
+export type PeriodCloseReadinessCheckCode =
+  | 'PERIOD_STATUS'
+  | 'AP_CLOSE_GATE'
+  | 'UNPOSTED_JOURNALS'
+  | 'BANK_RECON'
+
+export interface PeriodCloseReadinessCheck {
+  code: PeriodCloseReadinessCheckCode
+  label: string
+  status: CloseTaskStatus
+  severity: PeriodCloseReadinessSeverity
+  message: string
+  href?: string
+  count?: number
+}
+
+export interface PeriodCloseReadiness {
+  periodId: string
+  periodCode: string
+  periodLabel: string
+  periodStatus: string
+  legalEntityId: string
+  overallProgressPct: number
+  blockingCount: number
+  warningCount: number
+  unpostedJournalCount: number
+  checks: PeriodCloseReadinessCheck[]
+  /** Soft warnings only — backend close is not blocked by these. */
+  canCloseSoft: boolean
 }
 
 export interface CloseTask {
@@ -285,7 +322,7 @@ export interface CloseReportDef {
 
 export interface PeriodCloseSetup {
   fiscalYears: { code: string; label: string; start: string; end: string }[]
-  periods: { code: string; label: string; fiscalYear: string; start: string; end: string }[]
+  periods: { code: string; label: string; fiscalYear: string; start: string; end: string; id?: string }[]
   taskTemplates: { id: string; task: string; module: CloseTaskModule; defaultOwnerRole: string }[]
   lockPolicies: { module: string; softLockDaysBefore: number; hardLockOnClose: boolean }[]
   fxRates: { currency: string; closingRate: number; asOf: string }[]

@@ -642,8 +642,10 @@ describe.skipIf(!dbAvailable)('Finance Phase 3B4 — AR customer receipt posting
     expect(detail.body.data.allowedActions.edit).toBe(false)
     expect(detail.body.data.allowedActions.cancel).toBe(false)
     expect(detail.body.data.allowedActions.post).toBe(false)
-    expect(detail.body.data.allowedActions.allocate).toBe(false)
-    expect(detail.body.data.allowedActions.reverse).toBe(false)
+    // Phase 3B5: posted receipt with unallocated credit is allocatable
+    expect(detail.body.data.allowedActions.allocate).toBe(true)
+    // Phase 3D: reverse allowed when POSTED and no posted allocation batches
+    expect(detail.body.data.allowedActions.reverse).toBe(true)
     expect(detail.body.data.allowedActions.viewAccounting).toBe(true)
     expect(detail.body.data.allowedActions.viewCreditOpenItem).toBe(true)
     expect(detail.body.data.creditOpenItem).toBeTruthy()

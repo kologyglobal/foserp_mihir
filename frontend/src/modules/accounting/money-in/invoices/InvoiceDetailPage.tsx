@@ -10,6 +10,7 @@ import {
   getSalesInvoice,
   markSalesInvoiceReady,
   postSalesInvoice,
+  reverseSalesInvoice,
   validateSalesInvoice,
 } from '@/services/bridges/receivablesApiBridge'
 import type { SalesInvoiceDto, SalesInvoiceValidationPreview } from '@/types/moneyIn'
@@ -34,6 +35,8 @@ export function InvoiceDetailPage() {
   const [showPost, setShowPost] = useState(false)
   const [showCancel, setShowCancel] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
+  const [showReverse, setShowReverse] = useState(false)
+  const [reverseReason, setReverseReason] = useState('')
 
   const load = useCallback(async () => {
     if (!id) return
@@ -111,6 +114,26 @@ export function InvoiceDetailPage() {
     }
   }
 
+  const runReverse = async () => {
+    if (!id || !reverseReason.trim()) {
+      notify.error('Reversal reason is required')
+      return
+    }
+    setActing(true)
+    try {
+      const result = await reverseSalesInvoice(id, reverseReason.trim(), crypto.randomUUID())
+      setInvoice(result.invoice)
+      setShowReverse(false)
+      setReverseReason('')
+      notify.success(result.idempotentReplay ? 'Reversal replayed (idempotent)' : 'Sales invoice reversed')
+      await load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Reverse failed')
+    } finally {
+      setActing(false)
+    }
+  }
+
   if (!perms.canViewInvoice) {
     return (
       <MoneyInWorkspaceShell title="Invoice">
@@ -130,10 +153,16 @@ export function InvoiceDetailPage() {
   const actions = invoice.allowedActions
   const statusBanner =
     invoice.status === 'POSTED'
-      ? 'Posted to GL — read-only. View accounting voucher from actions.'
+      ? actions?.reverse === false && perms.canReverseInvoice
+        ? 'Posted to GL — reverse posted receipt/credit-note allocations first, then use Reverse Document.'
+        : 'Posted to GL — read-only. View accounting voucher from actions.'
       : invoice.status === 'READY_TO_POST'
         ? 'Ready to post — validate then post when period is open.'
-        : null
+        : invoice.status === 'REVERSED'
+          ? 'Reversed — a reversing voucher was posted and the invoice debit was closed. Read-only.'
+          : invoice.status === 'CANCELLED'
+            ? 'Cancelled — read-only.'
+            : null
 
   return (
     <MoneyInWorkspaceShell
@@ -165,8 +194,13 @@ export function InvoiceDetailPage() {
               Cancel
             </ErpButton>
           )}
-          {invoice.status === 'POSTED' && invoice.accountingVoucherId && (
-            <Link to={`/accounting/vouchers/${invoice.accountingVoucherId}`}>
+          {mergeAllowedAction(perms.canReverseInvoice, actions?.reverse) && (
+            <ErpButton variant="ghost" onClick={() => setShowReverse(true)} disabled={acting}>
+              Reverse Document
+            </ErpButton>
+          )}
+          {(invoice.status === 'POSTED' || invoice.status === 'REVERSED') && invoice.accountingVoucherId && (
+            <Link to={`/accounting/ledger-entries/voucher/${invoice.accountingVoucherId}`}>
               <ErpButton variant="secondary">View Accounting</ErpButton>
             </Link>
           )}
@@ -228,6 +262,13 @@ export function InvoiceDetailPage() {
         </p>
       )}
 
+      {invoice.status === 'REVERSED' && invoice.reversalReason && (
+        <p className="mt-3 text-[12px] text-erp-muted">
+          Reversal reason: {invoice.reversalReason}
+          {invoice.reversalVoucherId ? ` · Reversal voucher linked` : ''}
+        </p>
+      )}
+
       <ValidationDrawer open={showValidate} onClose={() => setShowValidate(false)} report={report} />
       <PostConfirmModal
         open={showPost}
@@ -249,6 +290,33 @@ export function InvoiceDetailPage() {
               </ErpButton>
               <ErpButton variant="primary" onClick={() => void runCancel()} disabled={acting}>
                 Confirm cancel
+              </ErpButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReverse && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-md rounded border border-erp-border bg-white p-4">
+            <h3 className="text-[14px] font-semibold">Reverse sales invoice</h3>
+            <p className="mt-1 text-[12px] text-erp-muted">
+              Posts a reversing voucher and closes the debit open item. Reverse all posted receipt and credit-note
+              allocations first.
+            </p>
+            <Textarea
+              className="mt-2"
+              rows={3}
+              placeholder="Reason"
+              value={reverseReason}
+              onChange={(e) => setReverseReason(e.target.value)}
+            />
+            <div className="mt-3 flex justify-end gap-2">
+              <ErpButton variant="secondary" onClick={() => setShowReverse(false)}>
+                Close
+              </ErpButton>
+              <ErpButton variant="primary" onClick={() => void runReverse()} disabled={acting}>
+                Confirm reverse
               </ErpButton>
             </div>
           </div>

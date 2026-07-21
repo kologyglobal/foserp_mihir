@@ -20,6 +20,8 @@ export const CREDIT_NOTE_ALLOCATION_ERROR_CODES = {
   CREDIT_NOTE_ALLOCATION_IN_PROGRESS: 'CREDIT_NOTE_ALLOCATION_IN_PROGRESS',
   CREDIT_NOTE_ALLOCATION_NOT_ALLOWED: 'CREDIT_NOTE_ALLOCATION_NOT_ALLOWED',
   CREDIT_NOTE_ALLOCATION_FAILED: 'CREDIT_NOTE_ALLOCATION_FAILED',
+  CREDIT_NOTE_ALLOCATION_BATCH_NOT_FOUND: 'CREDIT_NOTE_ALLOCATION_BATCH_NOT_FOUND',
+  CREDIT_NOTE_ALLOCATION_BATCH_NOT_REVERSIBLE: 'CREDIT_NOTE_ALLOCATION_BATCH_NOT_REVERSIBLE',
 } as const
 
 export type CreditNoteAllocationErrorCode =
@@ -134,5 +136,22 @@ export class CreditNoteAllocationForexRequiredError extends CreditNoteAllocation
       CREDIT_NOTE_ALLOCATION_ERROR_CODES.CREDIT_NOTE_ALLOCATION_FOREX_REQUIRED,
     )
     this.name = 'CreditNoteAllocationForexRequiredError'
+  }
+}
+
+export class CreditNoteAllocationBatchNotFoundError extends NotFoundError {
+  constructor() {
+    super('Credit note allocation batch not found')
+    Object.defineProperty(this, 'code', {
+      value: CREDIT_NOTE_ALLOCATION_ERROR_CODES.CREDIT_NOTE_ALLOCATION_BATCH_NOT_FOUND,
+    })
+    this.name = 'CreditNoteAllocationBatchNotFoundError'
+  }
+}
+
+export class CreditNoteAllocationBatchNotReversibleError extends CreditNoteAllocationValidationError {
+  constructor(message = 'Only POSTED allocation batches can be reversed') {
+    super(message, CREDIT_NOTE_ALLOCATION_ERROR_CODES.CREDIT_NOTE_ALLOCATION_BATCH_NOT_REVERSIBLE)
+    this.name = 'CreditNoteAllocationBatchNotReversibleError'
   }
 }

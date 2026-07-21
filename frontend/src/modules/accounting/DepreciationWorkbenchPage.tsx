@@ -107,8 +107,6 @@ export function DepreciationWorkbenchPage() {
   }
 
   const handlePost = async () => {
-    const runId = selectedRunId || preview?.period
-    if (!runId) return
     if (!perms.canApproveDepreciation && !perms.canRunDepreciation) {
       notify.error('Missing depreciation permission')
       return
@@ -116,9 +114,8 @@ export function DepreciationWorkbenchPage() {
     setBusy(true)
     try {
       const targetId = selectedRunId || runs.find((r) => r.period === period)?.id
-      if (!targetId) throw new FixedAssetsServiceError('No depreciation run to post')
-      const result = await postDepreciationDemo(targetId)
-      notify.success(result.message || 'Depreciation marked posted in demo mode. Ledger was not updated.')
+      const result = await postDepreciationDemo(targetId ?? period, period)
+      notify.success(result.message)
       setConfirmPost(false)
       setPreview(null)
       setRefreshToken((n) => n + 1)
@@ -138,6 +135,7 @@ export function DepreciationWorkbenchPage() {
   }
 
   const isPosted = selectedRun?.status === 'Posted'
+  const isLiveApi = perms.isApiMode
 
   return (
     <OperationalPageShell
@@ -161,7 +159,12 @@ export function DepreciationWorkbenchPage() {
           }
           secondaryActions={[
             ...(perms.canApproveDepreciation && !isPosted
-              ? [{ id: 'post', label: 'Post in Demo', icon: Check, onClick: () => setConfirmPost(true) }]
+              ? [{
+                  id: 'post',
+                  label: isLiveApi ? 'Post Depreciation' : 'Post in Demo',
+                  icon: Check,
+                  onClick: () => setConfirmPost(true),
+                }]
               : []),
             { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => setRefreshToken((n) => n + 1) },
           ]}
@@ -170,7 +173,7 @@ export function DepreciationWorkbenchPage() {
     >
       <FixedAssetsWorkspaceTabs active="depreciation" />
       <div className="space-y-3 p-4">
-        <FixedAssetsDemoBanner message="Depreciation workbench uses frontend demo calculations. Posting does not update the live general ledger." />
+        <FixedAssetsDemoBanner variant="auto" />
 
         <div className="sticky top-0 z-10 grid gap-2 rounded-md border border-erp-border bg-white/95 p-3 shadow-sm backdrop-blur sm:grid-cols-2 lg:grid-cols-5">
           <label className="text-[11px] text-erp-muted">
@@ -257,9 +260,13 @@ export function DepreciationWorkbenchPage() {
       <FixedAssetsConfirmModal
         open={confirmPost}
         onClose={() => setConfirmPost(false)}
-        title="Post depreciation in demo mode"
-        description="This marks the depreciation run as posted in frontend demo data only. No general ledger journals will be created."
-        confirmLabel={busy ? 'Posting…' : 'Confirm demo post'}
+        title={isLiveApi ? 'Post depreciation' : 'Post depreciation in demo mode'}
+        description={
+          isLiveApi
+            ? 'This posts depreciation for the selected period to the general ledger.'
+            : 'This marks the depreciation run as posted in frontend demo data only. No general ledger journals will be created.'
+        }
+        confirmLabel={busy ? 'Posting…' : isLiveApi ? 'Confirm post' : 'Confirm demo post'}
         onConfirm={() => void handlePost()}
       />
     </OperationalPageShell>

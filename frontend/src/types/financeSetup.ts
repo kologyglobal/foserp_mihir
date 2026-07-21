@@ -243,6 +243,21 @@ export interface FinanceSettings {
   writeOffTolerance?: number | null
   bankChargeTolerance?: number | null
   allowManualControlAccountPosting?: boolean
+  /** Phase 5B1 */
+  treasuryTransferBankBalancePolicy?: 'ALLOW' | 'WARN' | 'BLOCK'
+  treasuryTransferRequireInTransit?: boolean
+  treasuryTransferInTransitThreshold?: number | null
+  treasuryTransferApprovalLimit?: number | null
+  treasuryTransferPreventSelfApprove?: boolean
+  treasuryTransferPreventDispatcherReceive?: boolean
+  /** Phase 5B2 */
+  treasuryChequeApprovalLimit?: number | null
+  treasuryChequePreventSelfApprove?: boolean
+  treasuryChequeRequireCounterpartAccount?: boolean
+  /** Phase 5B3 — prefer TreasuryAdjustment from statement lines (default true). */
+  useTreasuryAdjustmentsForStatementItems?: boolean
+  treasuryAdjustmentApprovalLimit?: number | null
+  treasuryAdjustmentPreventSelfApprove?: boolean
   financeActivated: boolean
   activatedAt?: string | null
   activatedBy?: string | null

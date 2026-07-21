@@ -1,75 +1,73 @@
 /**
- * Budgeting & Forecasting fine-grained frontend permissions.
- *
- * SECURITY: Backend must enforce tenant isolation + RBAC on every budgeting
- * read/write when APIs exist. UI gating alone is not security.
+ * Budgeting fine-grained frontend permissions (demo packs + API session keys).
+ * Backend keys: finance.budget.*.
  */
 
 import { useMemo } from 'react'
+import { isApiMode } from '../../config/apiConfig'
+import { getStoredSession } from '../../services/api/client'
 import { getSessionUser, type ErpRole } from './index'
+import { hasWorkspaceAdminRole } from './workspaceAdmin'
 
 export const BUDGETING_PERMISSIONS = [
-  'accounting.budgeting.view',
-  'accounting.budgeting.create',
-  'accounting.budgeting.edit',
-  'accounting.budgeting.approve',
-  'accounting.budgeting.export',
-  'accounting.budgeting.setup',
+  'finance.budget.view',
+  'finance.budget.create',
+  'finance.budget.edit',
+  'finance.budget.approve',
 ] as const
 
 export type BudgetingPermission = (typeof BUDGETING_PERMISSIONS)[number]
 
-const ALL = [...BUDGETING_PERMISSIONS]
+const ALL: BudgetingPermission[] = [...BUDGETING_PERMISSIONS]
 
-const VIEWER: BudgetingPermission[] = ['accounting.budgeting.view', 'accounting.budgeting.export']
+const VIEWER: BudgetingPermission[] = ['finance.budget.view']
 
-const PREPARER: BudgetingPermission[] = [
-  ...VIEWER,
-  'accounting.budgeting.create',
-  'accounting.budgeting.edit',
-]
-
-const APPROVER: BudgetingPermission[] = [...PREPARER, 'accounting.budgeting.approve']
-
-const ADMIN: BudgetingPermission[] = [...ALL]
+const MANAGER: BudgetingPermission[] = [...ALL]
 
 const ROLE_PACKS: Partial<Record<ErpRole, BudgetingPermission[]>> = {
-  admin: ADMIN,
-  ceo: ADMIN,
-  director: ADMIN,
-  accounts_head: ADMIN,
-  accounts_user: PREPARER,
-  accounts: PREPARER,
-  management: APPROVER,
-  purchase_head: VIEWER,
-  purchase_user: ['accounting.budgeting.view'],
-  sales_manager: VIEWER,
-  sales: ['accounting.budgeting.view'],
+  admin: ALL,
+  ceo: MANAGER,
+  director: MANAGER,
+  accounts_head: MANAGER,
+  accounts_user: VIEWER,
+  accounts: VIEWER,
+  management: VIEWER,
 }
 
-function resolveBudgetingPermissions(role: ErpRole): Set<BudgetingPermission> {
-  return new Set(ROLE_PACKS[role] ?? PREPARER)
+function resolveDemoPermissions(role: ErpRole): Set<BudgetingPermission> {
+  return new Set(ROLE_PACKS[role] ?? VIEWER)
+}
+
+function resolveApiPermissions(): Set<BudgetingPermission> {
+  const perms = getStoredSession()?.user.permissions ?? []
+  return new Set(perms.filter((p): p is BudgetingPermission => (BUDGETING_PERMISSIONS as readonly string[]).includes(p)))
 }
 
 export function hasBudgetingPermission(permission: BudgetingPermission, role?: ErpRole): boolean {
+  if (isApiMode() && hasWorkspaceAdminRole()) return true
+  if (isApiMode()) return resolveApiPermissions().has(permission)
   const effective = role ?? getSessionUser().role
-  return resolveBudgetingPermissions(effective).has(permission)
+  return resolveDemoPermissions(effective).has(permission)
 }
 
 export function useBudgetingPermissions() {
-  const role = getSessionUser().role
+  const user = getSessionUser()
   return useMemo(() => {
-    const set = resolveBudgetingPermissions(role)
+    const set =
+      isApiMode() && hasWorkspaceAdminRole()
+        ? new Set<BudgetingPermission>(BUDGETING_PERMISSIONS)
+        : isApiMode()
+          ? resolveApiPermissions()
+          : resolveDemoPermissions(user.role)
     const can = (p: BudgetingPermission) => set.has(p)
     return {
-      role,
-      can,
-      canView: can('accounting.budgeting.view'),
-      canCreate: can('accounting.budgeting.create'),
-      canEdit: can('accounting.budgeting.edit'),
-      canApprove: can('accounting.budgeting.approve'),
-      canExport: can('accounting.budgeting.export'),
-      canSetup: can('accounting.budgeting.setup'),
+      canView: can('finance.budget.view'),
+      canCreate: can('finance.budget.create'),
+      canEdit: can('finance.budget.edit'),
+      canApprove: can('finance.budget.approve'),
+      /** Demo UI aliases — no separate backend keys yet */
+      canExport: can('finance.budget.view'),
+      canSetup: can('finance.budget.edit') || can('finance.budget.approve'),
     }
-  }, [role])
+  }, [user.role])
 }

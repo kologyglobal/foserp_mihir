@@ -106,7 +106,7 @@ export function CloseDashboardPage() {
   return (
     <PeriodCloseShell
       title="Close Dashboard"
-      description="Monitor month-end, quarter-end and year-end close progress across modules."
+      description="Monitor month-end close progress. API mode uses real period status and finance readiness."
       periodFilter={filter}
       onPeriodChange={setFilter}
       kpiStrip={kpis}

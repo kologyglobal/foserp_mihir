@@ -100,7 +100,7 @@ export function FixedAssetsRegisterPage() {
     >
       <FixedAssetsWorkspaceTabs active="register" />
       <div className="space-y-3 p-4">
-        <FixedAssetsDemoBanner />
+        <FixedAssetsDemoBanner variant="auto" />
         <FixedAssetsSummaryCards items={kpis} columns={5} />
 
         <div className="flex flex-wrap items-end gap-2 rounded-md border border-erp-border bg-white p-3">

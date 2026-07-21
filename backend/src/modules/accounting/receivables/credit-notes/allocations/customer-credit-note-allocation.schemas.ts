@@ -42,5 +42,15 @@ export const creditNoteIdParamSchema = z.object({
   creditNoteId: z.string().uuid(),
 })
 
+export const creditNoteAllocationBatchParamSchema = z.object({
+  creditNoteId: z.string().uuid(),
+  batchId: z.string().uuid(),
+})
+
+export const reverseCreditNoteAllocationBodySchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+})
+
 export type AllocateCustomerCreditNoteBodyInput = z.infer<typeof allocateCustomerCreditNoteBodySchema>
 export type ListCreditNoteAllocationsQueryInput = z.infer<typeof listCreditNoteAllocationsQuerySchema>
+export type ReverseCreditNoteAllocationBodyInput = z.infer<typeof reverseCreditNoteAllocationBodySchema>

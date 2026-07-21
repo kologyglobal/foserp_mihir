@@ -15,12 +15,24 @@ import type {
   ListSalesInvoicesQuery,
   PaginatedResult,
   PostCreditNoteResult,
+  PostCustomerReceiptResult,
   PostSalesInvoiceResult,
+  ReverseSalesInvoiceResult,
+  ReceiptAllocationHistoryRow,
+  ReceiptAllocationPreview,
+  ReceiptAllocationRequest,
+  ReceiptAllocationResult,
   ReceivableOverviewDto,
   ReceivableReconciliationDto,
+  CreateCustomerReceiptInput,
+  CustomerReceiptDto,
+  CustomerReceiptListItemDto,
+  CustomerReceiptValidationPreview,
+  ListCustomerReceiptsQuery,
   SalesInvoiceDto,
   SalesInvoiceValidationPreview,
   UpdateCustomerCreditNoteInput,
+  UpdateCustomerReceiptInput,
   UpdateSalesInvoiceInput,
 } from '../../types/moneyIn'
 import * as api from '../api/receivablesApi'
@@ -138,6 +150,25 @@ export async function postSalesInvoice(id: string): Promise<PostSalesInvoiceResu
   }
   try {
     return getReceivablesDemoState().postInvoice(id)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function reverseSalesInvoice(
+  id: string,
+  reason: string,
+  idempotencyKey?: string,
+): Promise<ReverseSalesInvoiceResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.reverseSalesInvoice(id, reason, idempotencyKey))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().reverseInvoiceDemo(id, reason)
   } catch (e) {
     rethrowMapped(e)
   }
@@ -443,6 +474,245 @@ export async function listCreditNoteAllocations(creditNoteId: string): Promise<C
     }
   }
   return getReceivablesDemoState().listCreditNoteAllocationsDemo(creditNoteId)
+}
+
+export async function reverseCreditNoteAllocation(
+  creditNoteId: string,
+  batchId: string,
+  reason: string,
+  idempotencyKey: string,
+): Promise<CreditNoteAllocationResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.reverseCreditNoteAllocation(creditNoteId, batchId, reason, idempotencyKey))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().reverseCreditNoteAllocationDemo(creditNoteId, batchId, reason)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function reverseCustomerCreditNote(
+  id: string,
+  reason: string,
+  idempotencyKey: string,
+): Promise<PostCreditNoteResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.reverseCustomerCreditNote(id, reason, idempotencyKey))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().reverseCreditNoteDemo(id, reason)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+// ─── Customer receipts (Phase 3B6) ─────────────────────────────────────────
+
+export async function listCustomerReceipts(filters?: Partial<ListCustomerReceiptsQuery>): Promise<CustomerReceiptListItemDto[]> {
+  const legalEntityId = resolveLegalEntityId(filters?.legalEntityId)
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.listCustomerReceipts({ legalEntityId, ...filters }))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  seedReceivablesDemoIfEmpty(legalEntityId)
+  return getReceivablesDemoState().listReceipts({ legalEntityId, ...filters })
+}
+
+export async function getCustomerReceipt(id: string): Promise<CustomerReceiptDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.getCustomerReceipt(id))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  const receipt = getReceivablesDemoState().getReceipt(id)
+  if (!receipt) throw new Error('Customer receipt not found')
+  return receipt
+}
+
+export async function createCustomerReceipt(input: CreateCustomerReceiptInput): Promise<CustomerReceiptDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.createCustomerReceipt(input))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  return getReceivablesDemoState().createReceipt(input)
+}
+
+export async function updateCustomerReceipt(id: string, input: UpdateCustomerReceiptInput): Promise<CustomerReceiptDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.updateCustomerReceipt(id, input))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().updateReceipt(id, input)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function validateCustomerReceipt(id: string): Promise<CustomerReceiptValidationPreview> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.validateCustomerReceipt(id))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().validateReceipt(id)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function markCustomerReceiptReady(id: string): Promise<CustomerReceiptDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.markCustomerReceiptReady(id))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().markReceiptReady(id)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function cancelCustomerReceipt(id: string, cancellationReason: string): Promise<CustomerReceiptDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.cancelCustomerReceipt(id, cancellationReason))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().cancelReceipt(id, cancellationReason)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function postCustomerReceipt(id: string): Promise<PostCustomerReceiptResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.postCustomerReceipt(id))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().postReceipt(id)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+// ─── Receipt allocations ────────────────────────────────────────────────────
+
+export async function previewReceiptAllocation(receiptId: string, body: ReceiptAllocationRequest): Promise<ReceiptAllocationPreview> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.previewReceiptAllocation(receiptId, body))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().previewReceiptAllocationDemo(receiptId, body)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function allocateReceipt(
+  receiptId: string,
+  body: ReceiptAllocationRequest,
+  idempotencyKey: string,
+): Promise<ReceiptAllocationResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.allocateReceipt(receiptId, body, idempotencyKey))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().allocateReceiptDemo(receiptId, body)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function listReceiptAllocations(receiptId: string): Promise<ReceiptAllocationHistoryRow[]> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.listReceiptAllocations(receiptId))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  return getReceivablesDemoState().listReceiptAllocationsDemo(receiptId)
+}
+
+export async function reverseReceiptAllocation(
+  receiptId: string,
+  batchId: string,
+  reason: string,
+  idempotencyKey: string,
+): Promise<ReceiptAllocationResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.reverseReceiptAllocation(receiptId, batchId, reason, idempotencyKey))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().reverseReceiptAllocationDemo(receiptId, batchId, reason)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function reverseCustomerReceipt(
+  id: string,
+  reason: string,
+  idempotencyKey: string,
+): Promise<PostCustomerReceiptResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.reverseCustomerReceipt(id, reason, idempotencyKey))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().reverseReceiptDemo(id, reason)
+  } catch (e) {
+    rethrowMapped(e)
+  }
 }
 
 /** Demo customer options for invoice form */

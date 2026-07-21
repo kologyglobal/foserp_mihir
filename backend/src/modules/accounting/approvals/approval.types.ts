@@ -1,6 +1,19 @@
 import type { FinanceApprovalRequest, FinanceApprovalStep } from '@prisma/client'
 
-export type ApprovalDocumentType = 'JOURNAL' | 'PAYMENT' | 'RECEIPT' | 'CREDIT_NOTE' | 'DEBIT_NOTE' | 'PERIOD_REOPEN'
+export type ApprovalDocumentType =
+  | 'JOURNAL'
+  | 'PAYMENT'
+  | 'RECEIPT'
+  | 'CREDIT_NOTE'
+  | 'DEBIT_NOTE'
+  | 'PERIOD_REOPEN'
+  | 'VENDOR_INVOICE'
+  | 'VENDOR_PAYMENT'
+  | 'VENDOR_ADJUSTMENT'
+  | 'TREASURY_TRANSFER'
+  | 'TREASURY_CHEQUE'
+  | 'TREASURY_ADJUSTMENT'
+  | 'FIXED_ASSET_DISPOSAL'
 
 export type ApprovalRequestStatus = 'PENDING' | 'APPROVED' | 'SENT_BACK' | 'REJECTED' | 'CANCELLED'
 

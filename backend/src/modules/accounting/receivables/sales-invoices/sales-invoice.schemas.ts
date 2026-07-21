@@ -200,6 +200,12 @@ export const cancelSalesInvoiceSchema = z.object({
 
 export type CancelSalesInvoiceInput = z.infer<typeof cancelSalesInvoiceSchema>
 
+export const reverseSalesInvoiceSchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+})
+
+export type ReverseSalesInvoiceBody = z.infer<typeof reverseSalesInvoiceSchema>
+
 export const listSalesInvoicesQuerySchema = z.object({
   legalEntityId: z.string().uuid(),
   branchId: z.string().uuid().optional(),

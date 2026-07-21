@@ -1,7 +1,7 @@
 import type { ReceivableOpenItemStatus } from '@prisma/client'
 
 export type CustomerReceiptAllocationStatus = 'DRAFT' | 'POSTED' | 'REVERSED'
-export type CustomerReceiptAllocationBatchStatus = 'PROCESSING' | 'POSTED' | 'FAILED'
+export type CustomerReceiptAllocationBatchStatus = 'PROCESSING' | 'POSTED' | 'FAILED' | 'REVERSED'
 
 export interface AllocationLineInput {
   invoiceId: string
@@ -16,6 +16,20 @@ export interface AllocateCustomerReceiptInput {
 }
 
 export interface AllocateCustomerReceiptContext {
+  tenantId: string
+  userId: string
+  idempotencyKey: string
+  ipAddress?: string | null
+  userAgent?: string | null
+}
+
+export interface ReverseCustomerReceiptAllocationInput {
+  receiptId: string
+  batchId: string
+  reason: string
+}
+
+export interface ReverseCustomerReceiptAllocationContext {
   tenantId: string
   userId: string
   idempotencyKey: string
@@ -75,6 +89,9 @@ export interface CustomerReceiptAllocationBatchDto {
   failedAt: string | null
   failureCode: string | null
   failureMessage: string | null
+  reversedAt: string | null
+  reversedBy: string | null
+  reversalReason: string | null
 }
 
 export interface AllocationPreviewIssue {

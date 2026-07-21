@@ -167,7 +167,7 @@ export function AssetAcquisitionPage() {
     >
       <FixedAssetsWorkspaceTabs active="acquisition" />
       <div className="space-y-3 p-4">
-        <FixedAssetsDemoBanner />
+        <FixedAssetsDemoBanner variant="partial" />
         <FixedAssetsSummaryCards items={kpis} columns={3} />
 
         <div className="flex flex-wrap items-end gap-2">

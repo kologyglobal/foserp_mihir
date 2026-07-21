@@ -124,7 +124,14 @@ export async function closeFinancialYear(id: string): Promise<FinancialYear> {
 
 export async function listPeriods(legalEntityId?: string, financialYearId?: string): Promise<AccountingPeriod[]> {
   const leId = resolveLegalEntityId(legalEntityId)
-  if (isApiMode()) return unwrap(await api.listPeriods(leId, financialYearId ? { financialYearId } : undefined))
+  if (isApiMode()) {
+    return unwrap(
+      await api.listPeriods(leId, {
+        ...(financialYearId ? { financialYearId } : {}),
+        limit: 100,
+      }),
+    )
+  }
   return getFinanceSetupStoreState().listPeriods(leId, financialYearId)
 }
 

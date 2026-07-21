@@ -9,6 +9,28 @@ const DEFAULT_PREFIX: Record<CodeSeriesEntity, string> = {
   OPPORTUNITY: 'OPP',
   QUOTATION: 'QUO',
   SALES_ORDER: 'SO',
+  PRODUCTION_DEMAND: 'PD',
+  PRODUCTION_ORDER: 'WO',
+  DAILY_PRODUCTION_BATCH: 'DP',
+  PRODUCTION_ISSUE: 'PI',
+  STOCK_MOVEMENT: 'STM',
+  STOCK_RESERVATION: 'RES',
+  PURCHASE_REQUISITION: 'PR',
+  QUALITY_INSPECTION: 'QI',
+  QUALITY_NCR: 'NCR',
+  JOB_WORK_ORDER: 'JW',
+  PRODUCTION_RUNTIME_CHANGE: 'RC',
+  PRODUCTION_WIP_MOVEMENT: 'WM',
+  MANUFACTURING_CORRECTION: 'MC',
+  PRODUCTION_PLAN: 'PP',
+  DEMAND_CONSOLIDATION_PLAN: 'PP',
+  OUTBOUND_DISPATCH: 'DSP',
+  PRODUCTION_FG_RECEIPT: 'FG',
+  DISPATCH_REQUIREMENT: 'DRQ',
+  DISPATCH_PICK_LIST: 'PKL',
+  DISPATCH_PACKING_SESSION: 'DPS',
+  DISPATCH_PACKAGE: 'PKG',
+  DELIVERY_CHALLAN: 'DC',
 }
 
 export async function ensureCodeSeries(
@@ -56,7 +78,15 @@ export async function nextCode(
 }
 
 export async function initTenantCodeSeries(tenantId: string, tx?: Prisma.TransactionClient): Promise<void> {
-  const types: CodeSeriesEntity[] = ['USER', 'LEAD', 'CONTACT', 'CRM_COMPANY', 'OPPORTUNITY', 'QUOTATION', 'SALES_ORDER']
+  const types: CodeSeriesEntity[] = [
+    'USER',
+    'LEAD',
+    'CONTACT',
+    'CRM_COMPANY',
+    'OPPORTUNITY',
+    'QUOTATION',
+    'SALES_ORDER',
+  ]
   for (const entityType of types) {
     await ensureCodeSeries(tenantId, entityType, tx)
   }

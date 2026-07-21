@@ -9,8 +9,10 @@ import * as controller from './customer-credit-note-allocation.controller.js'
 import {
   allocateCustomerCreditNoteBodySchema,
   allocateCustomerCreditNotePreviewBodySchema,
+  creditNoteAllocationBatchParamSchema,
   creditNoteIdParamSchema,
   listCreditNoteAllocationsQuerySchema,
+  reverseCreditNoteAllocationBodySchema,
 } from './customer-credit-note-allocation.schemas.js'
 
 const router = Router({ mergeParams: true })
@@ -37,6 +39,14 @@ router.post(
   requirePermission('finance.ar.allocation.create'),
   validateBody(allocateCustomerCreditNoteBodySchema),
   controller.postCreditNoteAllocation,
+)
+
+router.post(
+  '/credit-notes/:creditNoteId/allocations/:batchId/reverse',
+  validateParams(creditNoteAllocationBatchParamSchema),
+  requirePermission('finance.ar.allocation.reverse'),
+  validateBody(reverseCreditNoteAllocationBodySchema),
+  controller.reverseCreditNoteAllocation,
 )
 
 router.get(

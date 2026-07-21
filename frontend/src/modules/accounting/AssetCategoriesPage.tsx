@@ -88,7 +88,7 @@ export function AssetCategoriesPage() {
     >
       <FixedAssetsWorkspaceTabs active="categories" />
       <div className="space-y-3 p-4">
-        <FixedAssetsDemoBanner />
+        <FixedAssetsDemoBanner variant="auto" />
         <FixedAssetsSummaryCards items={kpis} columns={3} />
 
         <div className="flex flex-wrap items-end gap-2">

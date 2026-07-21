@@ -1,0 +1,22 @@
+/** @deprecated Import from `../treasury.errors.js` — canonical error definitions live there. */
+export {
+  BankStatementColumnLimitExceededError,
+  BankStatementDuplicateFileError,
+  BankStatementDuplicateStatementError,
+  BankStatementFileSecurityRejectedError,
+  BankStatementFileTooLargeError,
+  BankStatementFileTypeRejectedError,
+  BankStatementImportBatchInvalidStateError,
+  BankStatementImportBatchNotFoundError,
+  BankStatementImportBatchStaleVersionError,
+  BankStatementImportStrictErrorsError,
+  BankStatementInvalidStateError,
+  BankStatementLineNotFoundError,
+  BankStatementMappingTemplateNameConflictError,
+  BankStatementMappingTemplateNotFoundError,
+  BankStatementMappingTemplateStaleVersionError,
+  BankStatementNotFoundError,
+  BankStatementRowLimitExceededError,
+  BankStatementStaleVersionError,
+  BankStatementTreasuryAccountInvalidError,
+} from '../treasury.errors.js'

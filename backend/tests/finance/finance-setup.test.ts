@@ -181,6 +181,36 @@ describe.skipIf(!dbAvailable)('Finance setup APIs', () => {
     expect(periodsRes.body.data.length).toBe(12)
   })
 
+  it('closes and reopens an accounting period (posting lock lifecycle)', async () => {
+    const periodsRes = await request(app)
+      .get(`/api/v1/t/${ctx.slug}/accounting/periods?legalEntityId=${legalEntityId}&financialYearId=${financialYearId}&limit=100`)
+      .set('Authorization', `Bearer ${ctx.token}`)
+    expect(periodsRes.status).toBe(200)
+    const period = periodsRes.body.data[0] as { id: string; status: string }
+    expect(period.status).toBe('OPEN')
+
+    const underReviewRes = await request(app)
+      .post(`/api/v1/t/${ctx.slug}/accounting/periods/${period.id}/mark-under-review`)
+      .set('Authorization', `Bearer ${ctx.token}`)
+    expect(underReviewRes.status).toBe(200)
+    expect(underReviewRes.body.data.status).toBe('UNDER_REVIEW')
+
+    const closeRes = await request(app)
+      .post(`/api/v1/t/${ctx.slug}/accounting/periods/${period.id}/close`)
+      .set('Authorization', `Bearer ${ctx.token}`)
+    expect(closeRes.status).toBe(200)
+    expect(closeRes.body.data.status).toBe('CLOSED')
+    expect(closeRes.body.data.closedAt).toBeTruthy()
+
+    const reopenRes = await request(app)
+      .post(`/api/v1/t/${ctx.slug}/accounting/periods/${period.id}/reopen`)
+      .set('Authorization', `Bearer ${ctx.token}`)
+      .send({ reason: 'Period close Phase 1 test reopen' })
+    expect(reopenRes.status).toBe(200)
+    expect(reopenRes.body.data.status).toBe('REOPENED')
+    expect(reopenRes.body.data.reopenReason).toBe('Period close Phase 1 test reopen')
+  })
+
   it('rejects circular account parent', async () => {
     const templateRes = await request(app)
       .post(`/api/v1/t/${ctx.slug}/accounting/accounts/apply-template`)

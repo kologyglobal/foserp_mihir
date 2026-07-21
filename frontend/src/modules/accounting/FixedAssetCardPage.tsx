@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, RefreshCw } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
@@ -16,6 +16,8 @@ import {
   getAssetLedger,
   getAuditTrail,
   getMaintenance,
+  capitalizeAssetDemo,
+  FixedAssetsServiceError,
 } from '@/services/accounting/fixedAssetsService'
 import type {
   AssetLedgerEntry,
@@ -29,6 +31,7 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate, formatDateTime } from '@/utils/dates/format'
 import { FIXED_ASSETS_BREADCRUMB } from './fixedAssetsUi'
 import { cn } from '@/utils/cn'
+import { notify } from '@/store/toastStore'
 import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
 
 type CardTab =
@@ -77,6 +80,7 @@ export function FixedAssetCardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<CardTab>('general')
+  const [capitalizing, setCapitalizing] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -110,6 +114,28 @@ export function FixedAssetCardPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const canCapitalizeAsset =
+    perms.canCapitalize &&
+    (asset?.status === 'Draft' || asset?.status === 'Pending Capitalization')
+
+  const handleCapitalize = async () => {
+    if (!asset || !canCapitalizeAsset) return
+    setCapitalizing(true)
+    try {
+      const result = await capitalizeAssetDemo(asset.id)
+      notify.success(
+        perms.isApiMode
+          ? `Asset ${result.assetNumber} capitalized and posted to the ledger.`
+          : `Asset ${result.assetNumber} capitalized (demo only).`,
+      )
+      await load()
+    } catch (err) {
+      notify.error(err instanceof FixedAssetsServiceError ? err.message : 'Capitalization failed')
+    } finally {
+      setCapitalizing(false)
+    }
+  }
 
   const breadcrumbs = [
     ...FIXED_ASSETS_BREADCRUMB,
@@ -173,6 +199,17 @@ export function FixedAssetCardPage() {
         <ErpCommandBar
           inline
           sticky={false}
+          primaryAction={
+            canCapitalizeAsset
+              ? {
+                  id: 'capitalize',
+                  label: capitalizing ? 'Capitalizing…' : 'Capitalize',
+                  icon: CheckCircle2,
+                  variant: 'primary',
+                  onClick: () => void handleCapitalize(),
+                }
+              : undefined
+          }
           secondaryActions={[
             { id: 'back', label: 'Register', icon: ArrowLeft, onClick: () => navigate('/accounting/fixed-assets/register') },
             { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load() },
@@ -181,7 +218,7 @@ export function FixedAssetCardPage() {
       )}
     >
       <div className="space-y-3 p-4">
-        <FixedAssetsDemoBanner />
+        <FixedAssetsDemoBanner variant="auto" />
         <div className="flex flex-wrap items-center gap-2">
           <AssetStatusBadge status={asset.status} />
           <span className="text-[12px] text-erp-muted">{asset.plant} · {asset.department}</span>

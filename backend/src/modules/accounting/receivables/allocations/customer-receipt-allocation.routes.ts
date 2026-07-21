@@ -12,7 +12,9 @@ import {
   invoiceIdParamSchema,
   listCustomerCreditsQuerySchema,
   listReceiptAllocationsQuerySchema,
+  receiptAllocationBatchParamSchema,
   receiptIdParamSchema,
+  reverseAllocationBodySchema,
 } from './customer-receipt-allocation.schemas.js'
 
 const router = Router({ mergeParams: true })
@@ -46,6 +48,14 @@ router.post(
   requirePermission('finance.ar.allocation.create'),
   validateBody(allocateCustomerReceiptBodySchema),
   controller.postReceiptAllocation,
+)
+
+router.post(
+  '/receipts/:receiptId/allocations/:batchId/reverse',
+  validateParams(receiptAllocationBatchParamSchema),
+  requirePermission('finance.ar.allocation.reverse'),
+  validateBody(reverseAllocationBodySchema),
+  controller.reverseReceiptAllocation,
 )
 
 router.get(

@@ -103,7 +103,18 @@ export async function reserveSourceDocumentNumber(
   tenantId: string,
   legalEntityId: string,
   financialYearId: string,
-  documentType: 'SALES_INVOICE' | 'CUSTOMER_RECEIPT' | 'CUSTOMER_CREDIT_NOTE',
+  documentType:
+    | 'SALES_INVOICE'
+    | 'CUSTOMER_RECEIPT'
+    | 'CUSTOMER_CREDIT_NOTE'
+    | 'VENDOR_INVOICE'
+    | 'VENDOR_PAYMENT'
+    | 'VENDOR_DEBIT_NOTE'
+    | 'VENDOR_CREDIT_ADJUSTMENT'
+    | 'BANK_RECONCILIATION_MATCH'
+    | 'TREASURY_TRANSFER'
+    | 'TREASURY_CHEQUE'
+    | 'TREASURY_ADJUSTMENT',
   event: PostingEvent,
 ): Promise<ReservedSourceDocumentNumber> {
   if (event.reservedSourceDocumentNumber && event.sourceNumberSeriesId) {
