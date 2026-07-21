@@ -1,11 +1,15 @@
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { Save, X } from 'lucide-react'
 import { ErpButton, ErpButtonGroup } from './ErpButton'
 import { ErpFormFooter } from './ErpFormFooter'
 import { systemConfirm } from '@/utils/systemConfirm'
+import {
+  runFormActionSingleFlight,
+  type FormActionSingleFlightGate,
+} from './formActionSingleFlight'
 
 export interface FormActionBarProps {
-  onSave: () => void
+  onSave: () => void | Promise<unknown>
   onSaveAndNew?: () => void
   onSaveAndClose?: () => void
   onCancel: () => void
@@ -23,9 +27,13 @@ export interface FormActionBarProps {
   saveAndNewLabel?: string
   saveAndCloseLabel?: string
   cancelLabel?: string
+  /** Render Cancel before Save. Purchase document create/edit forms use this order. */
+  cancelFirst?: boolean
   hint?: ReactNode
   /** Stick to the bottom of the viewport (form footer chrome) */
   sticky?: boolean
+  /** Render only the responsive action group when a drawer/modal already supplies footer chrome. */
+  embedded?: boolean
   className?: string
   /** Extra buttons between save variants and Cancel */
   extraActions?: ReactNode
@@ -48,12 +56,20 @@ export function FormActionBar({
   saveAndNewLabel = 'Save & New',
   saveAndCloseLabel = 'Save & Close',
   cancelLabel = 'Cancel',
+  cancelFirst = false,
   hint,
   sticky = false,
+  embedded = false,
   className,
   extraActions,
 }: FormActionBarProps) {
   const saveDisabled = disabled || busy
+  const saveGate = useRef<FormActionSingleFlightGate>({ locked: false })
+
+  function handleSave() {
+    if (saveDisabled) return
+    void runFormActionSingleFlight(saveGate.current, onSave)
+  }
 
   async function handleCancel() {
     if (dirty) {
@@ -69,18 +85,36 @@ export function FormActionBar({
     onCancel()
   }
 
+  const cancelAction = (
+    <ErpButton
+      type="button"
+      variant="secondary"
+      icon={X}
+      className="min-w-0 flex-1 sm:flex-none"
+      disabled={busy}
+      onClick={() => void handleCancel()}
+    >
+      {cancelLabel}
+    </ErpButton>
+  )
+
+  const saveAction = (
+    <ErpButton
+      type="button"
+      variant="primary"
+      icon={Save}
+      className="min-w-0 flex-1 sm:flex-none"
+      disabled={saveDisabled}
+      disabledReason={disabledReason}
+      onClick={handleSave}
+    >
+      {busy ? 'Saving…' : saveLabel}
+    </ErpButton>
+  )
+
   const actions = (
-    <ErpButtonGroup>
-      <ErpButton
-        type="button"
-        variant="primary"
-        icon={Save}
-        disabled={saveDisabled}
-        disabledReason={disabledReason}
-        onClick={onSave}
-      >
-        {busy ? 'Saving…' : saveLabel}
-      </ErpButton>
+    <ErpButtonGroup className="w-full sm:w-auto">
+      {cancelFirst ? cancelAction : saveAction}
       {onSaveAndNew ? (
         <ErpButton
           type="button"
@@ -106,11 +140,11 @@ export function FormActionBar({
         </ErpButton>
       ) : null}
       {extraActions}
-      <ErpButton type="button" variant="ghost" icon={X} disabled={busy} onClick={() => void handleCancel()}>
-        {cancelLabel}
-      </ErpButton>
+      {cancelFirst ? saveAction : cancelAction}
     </ErpButtonGroup>
   )
+
+  if (embedded) return actions
 
   return (
     <ErpFormFooter

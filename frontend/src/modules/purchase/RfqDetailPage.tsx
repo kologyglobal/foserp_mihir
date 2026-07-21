@@ -177,7 +177,6 @@ export function RfqDetailPage() {
         description="Loading…"
         status="…"
         favoritePath="/purchase/rfqs"
-        backLink={{ to: '/purchase/rfqs', label: 'Back to RFQs' }}
         breadcrumbs={[
           { label: 'Purchase', to: '/purchase' },
           { label: 'RFQs', to: '/purchase/rfqs' },
@@ -265,7 +264,6 @@ export function RfqDetailPage() {
         statusTone={purchaseStatusTone(rfq.status)}
         company={sourcePrLabel === 'Manual' ? 'Manual RFQ' : `From ${sourcePrLabel}`}
         favoritePath={`/purchase/rfqs/${rfq.id}`}
-        backLink={{ to: '/purchase/rfqs', label: 'Back to RFQs' }}
         breadcrumbs={[
           { label: 'Purchase', to: '/purchase' },
           { label: 'RFQs', to: '/purchase/rfqs' },
@@ -589,16 +587,17 @@ export function RfqDetailPage() {
             Enquiry due date: <strong>{formatDate(rfq.bidDueDate)}</strong>.
           </p>
           <ul className="divide-y divide-erp-border rounded-md border border-erp-border">
-            {selectedVendors.map((v) => (
-              <li key={v.id} className="px-3 py-2">
-                <p className="font-medium">
-                  {v.vendorCode} — {v.vendorName}
-                </p>
-                <p className="text-erp-muted">
-                  {v.contactEmail} · {v.contactPhone}
-                </p>
-              </li>
-            ))}
+            {selectedVendors.map((v) => {
+              const title =
+                [v.vendorCode, v.vendorName].filter(Boolean).join(' — ') || 'Vendor (details unavailable)'
+              const contact = [v.contactEmail, v.contactPhone].filter(Boolean).join(' · ')
+              return (
+                <li key={v.id} className="px-3 py-2">
+                  <p className="font-medium">{title}</p>
+                  {contact ? <p className="text-erp-muted">{contact}</p> : null}
+                </li>
+              )
+            })}
           </ul>
           <p className="text-erp-muted">
             {rfq.lines.length} line(s) · Estimated value {formatCurrency(rfq.estimatedValue)}

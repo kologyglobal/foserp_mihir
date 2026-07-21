@@ -11,8 +11,6 @@ import {
   MapPin,
   Package,
   Plus,
-  Save,
-  Send,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
 import {
@@ -44,9 +42,9 @@ import {
   ErpCardSection,
   ErpFieldRow,
   ErpFormSpan,
-  ErpStickySaveBar,
 } from '@/components/erp/card-form'
-import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
+import { ErpButton } from '@/components/erp/ErpButton'
+import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Input, Select } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
@@ -73,8 +71,8 @@ import {
   getVendorQuotations,
   getVendors,
   getPurchaseWarehouses,
+  previewNextPurchaseOrderNumber,
   PurchaseServiceError,
-  submitPurchaseOrder,
   updatePurchaseOrder,
   PURCHASE_ORDER_DOMAIN_STATUS_LABELS,
   PURCHASE_ORDER_ORIGIN_LABELS,
@@ -113,13 +111,15 @@ import {
 } from '@/utils/purchaseOrderValidation'
 import { notify } from '@/store/toastStore'
 import { purchaseUserMessage } from '@/utils/purchase/purchaseErrorMessages'
+import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 import { useOptionalAuth } from '@/context/AuthProvider'
 import { isApiMode } from '@/config/apiConfig'
 
 type LocationOption = { id: string; code: string; name: string; state: string; city: string }
 const EMPTY_LOCATION: LocationOption = { id: '', code: '', name: '', state: '', city: '' }
 
-const EDITABLE_STATUSES: PurchaseOrder['status'][] = ['draft', 'pending_approval']
+// Backend rule: only draft and sent-back POs are editable (submitted POs are locked).
+const EDITABLE_STATUSES: PurchaseOrder['status'][] = ['draft', 'sent_back']
 const REVISABLE_STATUSES: PurchaseOrder['status'][] = [
   'released',
   'partially_received',
@@ -702,7 +702,7 @@ export function PurchaseOrderEditorPage() {
   const recordHeaderFacts = useMemo(
     () => [
       ...(isNew
-        ? [{ label: 'PO No', value: documentNumber ?? 'Auto-generated' }]
+        ? [{ label: 'PO No', value: documentNumber ?? 'Loading…' }]
         : []),
       { label: 'Vendor', value: vendorFact },
       { label: 'Buyer', value: ACTOR.name },
@@ -787,12 +787,25 @@ export function PurchaseOrderEditorPage() {
         city: w.city,
       }))
       setLocationOptions(locs)
-      if (isNew && locs[0]) {
+      if (isNew) {
+        const preferred =
+          (setup.general.defaultWarehouseId &&
+            locs.find((l) => l.id === setup.general.defaultWarehouseId)?.id) ||
+          ''
         setHeader((prev) => ({
           ...prev,
-          purchaseLocationId: prev.purchaseLocationId || locs[0].id,
-          deliveryLocationId: prev.deliveryLocationId || locs[0].id,
+          purchaseLocationId: prev.purchaseLocationId || preferred,
+          deliveryLocationId: prev.deliveryLocationId || preferred,
+          paymentTerms: prev.paymentTerms || setup.general.defaultPaymentTerms || prev.paymentTerms,
+          deliveryTerms: prev.deliveryTerms || setup.general.defaultDeliveryTerms || prev.deliveryTerms,
         }))
+        void previewNextPurchaseOrderNumber()
+          .then((next) => {
+            if (next) setDocumentNumber(next)
+          })
+          .catch(() => {
+            /* preview is optional — save still allocates server-side */
+          })
       }
       setApprovedPrs(
         prs
@@ -869,13 +882,9 @@ export function PurchaseOrderEditorPage() {
 
   const toInput = useCallback(() => {
     const purchaseLocation =
-      locationOptions.find((l) => l.id === header.purchaseLocationId) ??
-      locationOptions[0] ??
-      EMPTY_LOCATION
+      locationOptions.find((l) => l.id === header.purchaseLocationId) ?? EMPTY_LOCATION
     const deliveryLocation =
-      locationOptions.find((l) => l.id === header.deliveryLocationId) ??
-      locationOptions[0] ??
-      EMPTY_LOCATION
+      locationOptions.find((l) => l.id === header.deliveryLocationId) ?? EMPTY_LOCATION
     return {
       vendorId: header.vendorId,
       documentDate: header.documentDate,
@@ -946,8 +955,8 @@ export function PurchaseOrderEditorPage() {
     })
   }, [activeValidation])
 
-  const saveDraft = async (andView = false) => {
-    if (!editable) return
+  const saveDraft = async () => {
+    if (!editable || saving) return
     if (draftValidation.errors.length) {
       revealValidation(draftValidation, 'draft')
       return
@@ -960,53 +969,22 @@ export function PurchaseOrderEditorPage() {
         setDocumentNumber(updated.documentNumber)
         setStatus(updated.status)
         setUpdatedMeta({ by: updated.updatedBy ?? '', at: updated.updatedAt ?? '' })
-        notify.success(`Draft saved · ${updated.documentNumber}`)
+        notify.success(`Saved · ${updated.documentNumber}`)
         setLastSavedAt(new Date())
         resetDirty()
-        if (andView) navigate(`/purchase/orders/${recordId}`)
       } else {
         const created = await createPurchaseOrder(input)
         setRecordId(created.id)
         setDocumentNumber(created.documentNumber)
         setStatus(created.status)
         setCreatedMeta({ by: created.createdBy, at: created.createdAt })
-        notify.success(`Draft created · ${created.documentNumber}`)
+        notify.success(`Saved · ${created.documentNumber}`)
         setLastSavedAt(new Date())
         resetDirty()
-        navigate(`/purchase/orders/${created.id}/edit`, { replace: true })
       }
+      navigate(PURCHASE_FORM_ROUTES.purchaseOrder.list, { replace: true })
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const submitForApproval = async () => {
-    if (validation.errors.length) {
-      revealValidation(validation, 'submit')
-      return
-    }
-    setSaving(true)
-    try {
-      let poId = recordId
-      const input = toInput()
-      if (!poId) {
-        const created = await createPurchaseOrder(input)
-        poId = created.id
-        setRecordId(created.id)
-        setDocumentNumber(created.documentNumber)
-      } else {
-        await updatePurchaseOrder(poId, input)
-      }
-      const submitted = await submitPurchaseOrder(poId)
-      setStatus(submitted.status)
-      setLastSavedAt(new Date())
-      resetDirty()
-      notify.success(`${submitted.documentNumber} submitted for approval`)
-      navigate(`/purchase/orders/${poId}`)
-    } catch (err) {
-      notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
     } finally {
       setSaving(false)
     }
@@ -1074,7 +1052,6 @@ export function PurchaseOrderEditorPage() {
   const apiOriginDisabled = useMemo((): Partial<Record<PurchaseOrderOrigin, string>> | undefined => {
     if (!isApiMode()) return undefined
     return {
-      manual: 'Manual PO create is not available in API mode yet. Use Planning or Comparison.',
       vendor_quotation: 'Use Quotation Comparison → Create PO (VQ→PO direct is not API-backed yet).',
       blanket_order: 'Blanket call-off is not available in API mode yet.',
     }
@@ -1184,52 +1161,27 @@ export function PurchaseOrderEditorPage() {
       collapsibleFactBox={!awaitingOriginCreate}
       stickyFooter
       footer={
-        <ErpStickySaveBar
+        <FormActionBar
           sticky
-          isSubmitting={saving}
-          actions={
-            <ErpButtonGroup>
-              <ErpButton
-                type="button"
-                variant="secondary"
-                disabled={saving}
-                onClick={() => navigate('/purchase/orders')}
-              >
-                Cancel
-              </ErpButton>
-              <ErpButton
-                type="button"
-                variant={isNew ? 'primary' : 'secondary'}
-                icon={Save}
-                disabled={awaitingOriginCreate || !editable || saving}
-                onClick={() => void saveDraft(false)}
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </ErpButton>
-              <ErpButton
-                type="button"
-                variant="primary"
-                icon={Send}
-                disabled={
-                  awaitingOriginCreate ||
-                  !editable ||
-                  saving ||
-                  (showErrors && validation.errors.length > 0)
-                }
-                disabledReason={
-                  showErrors && validation.errors.length > 0
-                    ? 'Fix validation errors first'
-                    : undefined
-                }
-                onClick={() => void submitForApproval()}
-              >
-                Submit for Approval
-              </ErpButton>
-            </ErpButtonGroup>
+          cancelFirst
+          busy={saving}
+          dirty={dirty}
+          disabled={awaitingOriginCreate || !editable}
+          disabledReason={
+            awaitingOriginCreate
+              ? 'Choose a purchase order origin first'
+              : !editable
+                ? 'Document is read-only'
+                : undefined
           }
+          onCancel={() => {
+            resetDirty()
+            navigate(PURCHASE_FORM_ROUTES.purchaseOrder.list)
+          }}
+          onSave={saveDraft}
         />
       }
-      onSaveShortcut={() => void saveDraft(false)}
+      onSaveShortcut={() => void saveDraft()}
     >
       {isNew && !recordId ? (
         <div className="mb-3 space-y-3">
@@ -1452,8 +1404,13 @@ export function PurchaseOrderEditorPage() {
             forceOpenKey={forceOpenSections.general}
             dense
           >
-            <ErpFieldRow label="PO Number" readOnly>
-              <Input value={documentNumber ?? 'Auto-generated'} readOnly className="bg-erp-surface-alt" />
+            <ErpFieldRow label="PO Number" readOnly hint={isNew ? 'Preview from number series — assigned when you save' : undefined}>
+              <Input
+                value={documentNumber ?? ''}
+                placeholder="Loading number…"
+                readOnly
+                className="bg-erp-surface-alt"
+              />
             </ErpFieldRow>
             <ErpFieldRow
               id={purchaseFieldId('documentDate')}

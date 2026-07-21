@@ -6,8 +6,6 @@ import {
   Link2,
   Package,
   Plus,
-  Save,
-  Send,
   Trash2,
   Truck,
 } from 'lucide-react'
@@ -19,8 +17,9 @@ import {
   buildPurchaseRelatedLinks,
   purchaseDocumentApprovalFact,
 } from '@/components/purchase/PurchaseDocumentFactBox'
-import { ErpCardSection, ErpFieldRow, ErpFormSpan, ErpStickySaveBar } from '@/components/erp/card-form'
-import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
+import { ErpCardSection, ErpFieldRow, ErpFormSpan } from '@/components/erp/card-form'
+import { ErpButton } from '@/components/erp/ErpButton'
+import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Checkbox, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -41,11 +40,11 @@ import {
   getQualityInspections,
   getVendors,
   getPurchaseWarehouses,
+  previewNextPurchaseReturnNumber,
   PurchaseServiceError,
   PURCHASE_RETURN_DOMAIN_STATUS_LABELS,
   PURCHASE_RETURN_ORIGIN_LABELS,
   PURCHASE_RETURN_REASON_LABELS,
-  submitPurchaseReturn,
   updatePurchaseReturn,
 } from '@/services/purchase'
 import type {
@@ -63,6 +62,7 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
+import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -155,7 +155,7 @@ export function PurchaseReturnEditorPage() {
   const [inspections, setInspections] = useState<QualityInspection[]>([])
   const [locations, setLocations] = useState<Array<{ id: string; code: string; name: string }>>([])
 
-  const { markDirty, resetDirty } = useUnsavedChangesGuard(true)
+  const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(true)
 
   const selectedVendor = useMemo(() => vendors.find((v) => v.id === vendorId), [vendors, vendorId])
 
@@ -192,7 +192,7 @@ export function PurchaseReturnEditorPage() {
   const recordHeaderFacts = useMemo(
     () => [
       ...(isNew
-        ? [{ label: 'Return No', value: documentNumber ?? 'Auto-generated' }]
+        ? [{ label: 'Return No', value: documentNumber ?? 'Loading…' }]
         : []),
       { label: 'Vendor', value: vendorFact },
       {
@@ -444,6 +444,9 @@ export function PurchaseReturnEditorPage() {
           } finally {
             if (!cancelled) setLoading(false)
           }
+        } else {
+          const nextNumber = await previewNextPurchaseReturnNumber().catch(() => null)
+          if (!cancelled && nextNumber) setDocumentNumber(nextNumber)
         }
       }
     })()
@@ -476,7 +479,8 @@ export function PurchaseReturnEditorPage() {
     }
   }
 
-  const saveDraft = async (andSubmit: boolean) => {
+  const saveDraft = async () => {
+    if (saving) return
     if (!vendorId) {
       notify.error('Select a vendor')
       return
@@ -496,16 +500,10 @@ export function PurchaseReturnEditorPage() {
         setRecordId(doc.id)
         setDocumentNumber(doc.documentNumber)
       }
-      if (andSubmit) {
-        doc = await submitPurchaseReturn(doc.id)
-        notify.success('Return submitted for approval')
-        resetDirty()
-        navigate(`/purchase/returns/${doc.id}`)
-        return
-      }
       hydrate(doc)
-      notify.success('Draft saved')
-      if (isNew) navigate(`/purchase/returns/${doc.id}/edit`, { replace: true })
+      resetDirty()
+      notify.success(`Saved · ${doc.documentNumber}`)
+      navigate(PURCHASE_FORM_ROUTES.purchaseReturn.list, { replace: true })
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
     } finally {
@@ -557,42 +555,21 @@ export function PurchaseReturnEditorPage() {
       commandBar={null}
       stickyFooter
       footer={
-        <ErpStickySaveBar
+        <FormActionBar
           sticky
-          isSubmitting={saving}
-          actions={
-            <ErpButtonGroup>
-              <ErpButton
-                type="button"
-                variant="secondary"
-                disabled={saving}
-                onClick={() => navigate('/purchase/returns')}
-              >
-                Cancel
-              </ErpButton>
-              <ErpButton
-                type="button"
-                variant="secondary"
-                icon={Save}
-                disabled={!editable || saving}
-                onClick={() => void saveDraft(false)}
-              >
-                {saving ? 'Saving…' : 'Save Draft'}
-              </ErpButton>
-              <ErpButton
-                type="button"
-                variant="primary"
-                icon={Send}
-                disabled={!editable || saving}
-                onClick={() => void saveDraft(true)}
-              >
-                Submit for Approval
-              </ErpButton>
-            </ErpButtonGroup>
-          }
+          cancelFirst
+          busy={saving}
+          dirty={dirty}
+          disabled={!editable}
+          disabledReason={!editable ? 'Document is read-only' : undefined}
+          onCancel={() => {
+            resetDirty()
+            navigate(PURCHASE_FORM_ROUTES.purchaseReturn.list)
+          }}
+          onSave={saveDraft}
         />
       }
-      onSaveShortcut={() => void saveDraft(false)}
+      onSaveShortcut={() => void saveDraft()}
     >
       {showOriginPicker ? (
         <ErpCardSection
@@ -700,9 +677,14 @@ export function PurchaseReturnEditorPage() {
         <ErpFormSpan span={3}>
           <p className="erp-field-group__label">Document</p>
         </ErpFormSpan>
-        <ErpFieldRow label="Return Number" readOnly>
+        <ErpFieldRow
+          label="Return Number"
+          readOnly
+          hint={isNew && !recordId ? 'Preview from number series — assigned when you save' : undefined}
+        >
           <Input
-            value={documentNumber ?? 'Auto on save'}
+            value={documentNumber ?? ''}
+            placeholder="Loading number…"
             readOnly
             className="bg-erp-surface-alt"
           />

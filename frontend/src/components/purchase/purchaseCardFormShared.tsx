@@ -11,7 +11,7 @@ export function purchaseBreadcrumbs(...trail: { label: string; to?: string }[]) 
 
 export function purchaseStatusTone(status: string): 'success' | 'warning' | 'critical' | 'info' | 'neutral' {
   if (status === 'draft') return 'neutral'
-  if (status === 'submitted' || status === 'sent' || status === 'pending_qc') return 'warning'
+  if (status === 'submitted' || status === 'sent' || status === 'pending_qc' || status === 'sent_back') return 'warning'
   if (status === 'approved' || status === 'quoted' || status === 'posted' || status === 'released') return 'success'
   if (status === 'cancelled' || status === 'rejected') return 'critical'
   if (status === 'converted' || status === 'closed' || status === 'received' || status === 'partial') return 'info'

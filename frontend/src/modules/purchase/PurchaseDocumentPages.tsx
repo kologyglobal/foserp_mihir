@@ -572,7 +572,6 @@ export function RfqDocumentPage() {
           { label: 'RFQs', to: '/purchase/rfqs' },
           { label: rfq.rfqNo },
         ]}
-        backLink={{ to: '/purchase/rfqs', label: 'Back to RFQs' }}
         commandBar={commandBar}
         documentStrip={purchaseStatusStripToDocumentStrip(statusStrip)}
         detailMode
@@ -963,7 +962,6 @@ export function PurchaseOrderDocumentPage() {
           { label: 'Purchase Orders', to: '/purchase/orders' },
           { label: po.poNo },
         ]}
-        backLink={{ to: '/purchase/orders', label: 'Back to Purchase Orders' }}
         commandBar={commandBar}
         documentStrip={purchaseStatusStripToDocumentStrip(statusStrip)}
         detailMode
@@ -1260,7 +1258,6 @@ export function GrnDocumentPage() {
         { label: 'Gate Entry & GRN', to: '/purchase/grn' },
         { label: grn.grnNo },
       ]}
-      backLink={{ to: '/purchase/grn', label: 'Back to Goods Receipts' }}
       commandBar={commandBar}
       documentStrip={purchaseStatusStripToDocumentStrip(statusStrip)}
       detailMode

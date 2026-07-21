@@ -377,7 +377,6 @@ export function QuotationComparisonPage() {
         status="—"
         favoritePath="/purchase/comparison"
         breadcrumbs={purchaseBreadcrumbs('Comparison')}
-        backLink={{ to: '/purchase/comparison', label: 'Back to Comparison' }}
         footer={null}
         detailMode
       >
@@ -394,7 +393,6 @@ export function QuotationComparisonPage() {
         status="—"
         favoritePath="/purchase/comparison"
         breadcrumbs={purchaseBreadcrumbs('Not Found')}
-        backLink={{ to: '/purchase/comparison', label: 'Back to Comparison' }}
         footer={null}
         detailMode
       >
@@ -414,7 +412,6 @@ export function QuotationComparisonPage() {
         label: 'Comparison',
         to: '/purchase/comparison',
       })}
-      backLink={{ to: '/purchase/comparison', label: 'Back to Comparison' }}
       detailMode
       footer={null}
       commandBar={

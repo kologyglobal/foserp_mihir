@@ -8,8 +8,6 @@ import {
   FileText,
   Package,
   Plus,
-  Save,
-  Send,
   Trash2,
   Truck,
 } from 'lucide-react'
@@ -25,9 +23,9 @@ import {
   ErpCardSection,
   ErpFieldRow,
   ErpFormSpan,
-  ErpStickySaveBar,
 } from '@/components/erp/card-form'
-import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
+import { ErpButton } from '@/components/erp/ErpButton'
+import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { Badge } from '@/components/ui/Badge'
 import { LoadingState } from '@/design-system/components/LoadingState'
@@ -37,8 +35,8 @@ import {
   getRFQs,
   getVendorQuotationById,
   getVendors,
+  previewNextVendorQuotationNumber,
   PurchaseServiceError,
-  submitVendorQuotation,
   updateVendorQuotation,
 } from '@/services/purchase'
 import {
@@ -62,6 +60,7 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
+import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -555,6 +554,21 @@ export function VendorQuotationEditorPage() {
   }, [])
 
   useEffect(() => {
+    if (!isNew) return
+    let cancelled = false
+    void previewNextVendorQuotationNumber()
+      .then((next) => {
+        if (!cancelled && next) setDocumentNumber(next)
+      })
+      .catch(() => {
+        /* preview is optional — save still allocates server-side */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isNew])
+
+  useEffect(() => {
     if (!rfqId || !selectedRfq) return
     if (isNew && lines.length === 1 && !lines[0]?.itemId) {
       applyRfqLines(selectedRfq)
@@ -630,6 +644,7 @@ export function VendorQuotationEditorPage() {
   })
 
   const saveDraft = async (): Promise<string | null> => {
+    if (saving) return null
     if (!rfqId) {
       notify.error('Select an RFQ')
       return null
@@ -649,36 +664,22 @@ export function VendorQuotationEditorPage() {
         const updated = await updateVendorQuotation(recordId, input)
         setDocumentNumber(updated.documentNumber)
         setStatus(updated.status)
-        notify.success(`Draft saved · ${updated.documentNumber}`)
+        notify.success(`Saved · ${updated.documentNumber}`)
         resetDirty()
+        navigate(PURCHASE_FORM_ROUTES.vendorQuotation.list, { replace: true })
         return updated.id
       }
       const created = await createVendorQuotation(input)
       setRecordId(created.id)
       setDocumentNumber(created.documentNumber)
       setStatus(created.status)
-      notify.success(`Draft created · ${created.documentNumber}`)
+      notify.success(`Saved · ${created.documentNumber}`)
       resetDirty()
-      navigate(`/purchase/vendor-quotations/${created.id}/edit`, { replace: true })
+      navigate(PURCHASE_FORM_ROUTES.vendorQuotation.list, { replace: true })
       return created.id
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
       return null
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const saveAndSubmit = async () => {
-    const savedId = await saveDraft()
-    if (!savedId) return
-    setSaving(true)
-    try {
-      const submitted = await submitVendorQuotation(savedId)
-      notify.success(`${submitted.documentNumber} submitted`)
-      navigate(`/purchase/vendor-quotations/${submitted.id}`)
-    } catch (err) {
-      notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
     } finally {
       setSaving(false)
     }
@@ -694,7 +695,7 @@ export function VendorQuotationEditorPage() {
   const recordHeaderFacts = useMemo(
     () => [
       ...(isNew
-        ? [{ label: 'VQ No', value: documentNumber ?? 'Auto-generated' }]
+        ? [{ label: 'VQ No', value: documentNumber ?? 'Loading…' }]
         : []),
       { label: 'Vendor', value: vendorFact },
       {
@@ -836,39 +837,18 @@ export function VendorQuotationEditorPage() {
       commandBar={null}
       stickyFooter
       footer={
-        <ErpStickySaveBar
+        <FormActionBar
           sticky
-          isSubmitting={saving}
-          actions={
-            <ErpButtonGroup>
-              <ErpButton
-                type="button"
-                variant="secondary"
-                disabled={saving}
-                onClick={() => navigate('/purchase/vendor-quotations')}
-              >
-                Cancel
-              </ErpButton>
-              <ErpButton
-                type="button"
-                variant="secondary"
-                icon={Save}
-                disabled={saving || status !== 'draft'}
-                onClick={() => void saveDraft()}
-              >
-                {saving ? 'Saving…' : 'Save Draft'}
-              </ErpButton>
-              <ErpButton
-                type="button"
-                variant="primary"
-                icon={Send}
-                disabled={saving || status !== 'draft'}
-                onClick={() => void saveAndSubmit()}
-              >
-                Save & Submit
-              </ErpButton>
-            </ErpButtonGroup>
-          }
+          cancelFirst
+          busy={saving}
+          dirty={dirty}
+          disabled={status !== 'draft'}
+          disabledReason={status !== 'draft' ? 'Document is read-only' : undefined}
+          onCancel={() => {
+            resetDirty()
+            navigate(PURCHASE_FORM_ROUTES.vendorQuotation.list)
+          }}
+          onSave={saveDraft}
         />
       }
       onSaveShortcut={() => void saveDraft()}
@@ -886,8 +866,17 @@ export function VendorQuotationEditorPage() {
         <ErpFormSpan span={3}>
           <p className="erp-field-group__label">Document</p>
         </ErpFormSpan>
-        <ErpFieldRow label="VQ Number" readOnly>
-          <Input value={documentNumber ?? 'Auto-generated'} readOnly className="bg-erp-surface-alt" />
+        <ErpFieldRow
+          label="VQ Number"
+          readOnly
+          hint={isNew ? 'Preview from number series — assigned when you save' : undefined}
+        >
+          <Input
+            value={documentNumber ?? ''}
+            placeholder="Loading number…"
+            readOnly
+            className="bg-erp-surface-alt"
+          />
         </ErpFieldRow>
         <ErpFieldRow label="Quotation Date" required>
           <Input

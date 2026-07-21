@@ -134,7 +134,6 @@ export function PurchaseInvoiceDetailPage() {
           { label: 'Invoices', to: '/purchase/invoices' },
           { label: 'Loading' },
         ]}
-        backLink={{ to: '/purchase/invoices', label: 'Back to Invoices' }}
         footer={null}
         detailMode
       >
@@ -277,7 +276,6 @@ export function PurchaseInvoiceDetailPage() {
           { label: 'Invoices', to: '/purchase/invoices' },
           { label: inv.documentNumber },
         ]}
-        backLink={{ to: '/purchase/invoices', label: 'Back to Invoices' }}
         createdBy={inv.createdBy}
         createdDate={formatDate(inv.createdAt.slice(0, 10))}
         modifiedBy={inv.updatedBy ?? undefined}

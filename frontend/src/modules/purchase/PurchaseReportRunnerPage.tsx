@@ -241,7 +241,6 @@ export function PurchaseReportRunnerPage() {
         badge="Purchase"
         variant="dynamics"
         breadcrumbs={purchaseBreadcrumbs('Reports', { label: 'Reports', to: '/purchase/reports' })}
-        backLink={{ to: '/purchase/reports', label: 'Back to Reports' }}
       >
         <EmptyState
           icon={Filter}
@@ -268,7 +267,6 @@ export function PurchaseReportRunnerPage() {
         label: 'Reports',
         to: '/purchase/reports',
       })}
-      backLink={{ to: '/purchase/reports', label: 'Back to Reports' }}
       commandBar={
         <ErpCommandBar
           primaryAction={{

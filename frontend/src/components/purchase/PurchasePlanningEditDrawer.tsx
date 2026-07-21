@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CrmDrawerShell } from '@/components/crm/CrmDrawerShell'
-import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
+import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { ErpFieldRow, ErpViewField } from '@/components/erp/card-form'
 import { TableLink } from '@/components/ui/AppLink'
@@ -66,6 +66,16 @@ export function PurchasePlanningEditDrawer({
   if (!row) return null
 
   const selectedBuyer = buyers.find((b) => b.id === buyerId)
+  const dirty =
+    preferredVendorId !== (row.preferredVendorId ?? '') ||
+    Number(expectedRate) !== Number(row.expectedRate) ||
+    negotiatedRate !== (row.negotiatedRate == null ? '' : String(row.negotiatedRate)) ||
+    requiredByDate !== (row.requiredByDate || '') ||
+    purchaseType !== row.purchaseType ||
+    buyerId !== (row.buyerId || '') ||
+    priority !== row.priority ||
+    actionMessage !== Boolean(row.actionMessage) ||
+    remarks !== (row.remarks || '')
 
   return (
     <CrmDrawerShell
@@ -76,32 +86,27 @@ export function PurchasePlanningEditDrawer({
       eyebrow="Purchase"
       width="lg"
       footer={
-        <ErpButtonGroup className="justify-end">
-          <ErpButton type="button" variant="secondary" disabled={saving} onClick={onClose}>
-            Cancel
-          </ErpButton>
-          <ErpButton
-            type="button"
-            variant="primary"
-            disabled={saving}
-            onClick={() =>
-              void onSave({
-                preferredVendorId: preferredVendorId || null,
-                expectedRate: Number(expectedRate) || 0,
-                negotiatedRate: negotiatedRate.trim() === '' ? null : Number(negotiatedRate),
-                requiredByDate,
-                purchaseType,
-                buyerId,
-                buyerName: selectedBuyer?.name ?? row.buyerName,
-                priority,
-                actionMessage,
-                remarks,
-              })
-            }
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </ErpButton>
-        </ErpButtonGroup>
+        <FormActionBar
+          embedded
+          cancelFirst
+          busy={saving}
+          dirty={dirty}
+          onCancel={onClose}
+          onSave={() =>
+            onSave({
+              preferredVendorId: preferredVendorId || null,
+              expectedRate: Number(expectedRate) || 0,
+              negotiatedRate: negotiatedRate.trim() === '' ? null : Number(negotiatedRate),
+              requiredByDate,
+              purchaseType,
+              buyerId,
+              buyerName: selectedBuyer?.name ?? row.buyerName,
+              priority,
+              actionMessage,
+              remarks,
+            })
+          }
+        />
       }
     >
       <div className="space-y-4 p-1">

@@ -20,9 +20,9 @@ import {
 import {
   ErpCardSection,
   ErpFieldRow,
-  ErpStickySaveBar,
 } from '@/components/erp/card-form'
-import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
+import { ErpButton } from '@/components/erp/ErpButton'
+import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Checkbox, Input, Select, Textarea } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { Badge } from '@/components/ui/Badge'
@@ -35,6 +35,7 @@ import {
   getRecommendedVendorsForItems,
   getRFQById,
   getVendors,
+  previewNextRfqNumber,
   PurchaseServiceError,
   updateRFQ,
 } from '@/services/purchase'
@@ -60,6 +61,7 @@ import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
 import { useOptionalAuth } from '@/context/AuthProvider'
+import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 
 type LocationOption = { id: string; code: string; name: string; state: string; city: string }
 
@@ -224,6 +226,21 @@ export function RfqEditorPage() {
   useEffect(() => {
     if (ACTOR.name) setCommercialContact((prev) => prev || ACTOR.name)
   }, [ACTOR.name])
+
+  useEffect(() => {
+    if (!isNew) return
+    let cancelled = false
+    void previewNextRfqNumber()
+      .then((next) => {
+        if (!cancelled && next) setDocumentNumber(next)
+      })
+      .catch(() => {
+        /* preview is optional — save still allocates server-side */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isNew])
 
   useEffect(() => {
     void Promise.all([
@@ -391,6 +408,7 @@ export function RfqEditorPage() {
   }
 
   const saveDraft = async (): Promise<string | null> => {
+    if (saving) return null
     setSaving(true)
     try {
       const input = toInput()
@@ -405,16 +423,17 @@ export function RfqEditorPage() {
       if (recordId) {
         const updated = await updateRFQ(recordId, input)
         setDocumentNumber(updated.documentNumber)
-        notify.success(`Draft saved · ${updated.documentNumber}`)
+        notify.success(`Saved · ${updated.documentNumber}`)
         resetDirty()
+        navigate(PURCHASE_FORM_ROUTES.rfq.list, { replace: true })
         return updated.id
       }
       const created = await createRFQ(input)
       setRecordId(created.id)
       setDocumentNumber(created.documentNumber)
-      notify.success(`Draft created · ${created.documentNumber}`)
+      notify.success(`Saved · ${created.documentNumber}`)
       resetDirty()
-      navigate(`/purchase/rfqs/${created.id}/edit`, { replace: true })
+      navigate(PURCHASE_FORM_ROUTES.rfq.list, { replace: true })
       return created.id
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
@@ -431,7 +450,7 @@ export function RfqEditorPage() {
   const recordHeaderFacts = useMemo(
     () => [
       ...(isNew
-        ? [{ label: 'RFQ No', value: documentNumber ?? 'Auto-generated' }]
+        ? [{ label: 'RFQ No', value: documentNumber ?? 'Loading…' }]
         : []),
       {
         label: 'Source',
@@ -510,7 +529,7 @@ export function RfqEditorPage() {
         <PurchaseEnterpriseFactBox
           title="RFQ insight"
           summary={[
-            { label: 'RFQ No.', value: documentNumber ?? 'Auto-generated on save' },
+            { label: 'RFQ No.', value: documentNumber ?? (isNew ? 'Loading…' : '—') },
             { label: 'Status', value: 'Draft' },
             { label: 'Source', value: SOURCE_MODE_LABELS[sourceMode] },
             {
@@ -540,29 +559,16 @@ export function RfqEditorPage() {
       }
       stickyFooter
       footer={
-        <ErpStickySaveBar
+        <FormActionBar
           sticky
-          isSubmitting={saving}
-          actions={
-            <ErpButtonGroup>
-              <ErpButton
-                type="button"
-                variant="secondary"
-                disabled={saving}
-                onClick={() => navigate('/purchase/rfqs')}
-              >
-                Cancel
-              </ErpButton>
-              <ErpButton
-                type="button"
-                variant="primary"
-                disabled={saving}
-                onClick={() => void saveDraft()}
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </ErpButton>
-            </ErpButtonGroup>
-          }
+          cancelFirst
+          busy={saving}
+          dirty={dirty}
+          onCancel={() => {
+            resetDirty()
+            navigate(PURCHASE_FORM_ROUTES.rfq.list)
+          }}
+          onSave={saveDraft}
         />
       }
       onSaveShortcut={() => void saveDraft()}
@@ -674,7 +680,7 @@ export function RfqEditorPage() {
         >
           <Input
             value={documentNumber ?? ''}
-            placeholder="Auto-generated on save"
+            placeholder="Loading number…"
             readOnly
             className="bg-erp-surface-alt"
           />

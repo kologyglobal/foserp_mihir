@@ -72,10 +72,15 @@ export function PurchasePlanningCreatePoModal({
     const ineligible = rows.filter((r) => !canSelectPlanningRowForPo(r))
     for (const r of ineligible) {
       const gaps: string[] = []
+      if (!r.actionMessage) gaps.push('Action Message')
+      if (!['vendor_selected', 'approved', 'po_pending'].includes(r.status)) {
+        gaps.push('ready status')
+      }
       if (!r.preferredVendorId) gaps.push('vendor')
       const qty = r.netPurchaseQuantity > 0 ? r.netPurchaseQuantity : r.requiredQuantity
       if (!(qty > 0)) gaps.push('quantity')
       if (!(r.expectedRate > 0)) gaps.push('rate')
+      if (!r.requiredByDate) gaps.push('required date')
       errors.push(`${r.planningNumber}: missing ${gaps.join(', ') || 'eligibility'}`)
     }
 

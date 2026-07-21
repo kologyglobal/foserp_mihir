@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft,
   CheckCircle,
   ClipboardList,
   FileText,
@@ -398,9 +397,6 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
       hint={<span className="text-[12px] text-erp-muted">Esc Back · Print</span>}
       actions={(
         <ErpButtonGroup>
-          <Link to="/purchase/requisitions">
-            <ErpButton type="button" variant="ghost" icon={ArrowLeft}>Back</ErpButton>
-          </Link>
           <ErpButton type="button" variant="secondary" icon={Send} disabled={status !== 'draft'} onClick={() => { const r = submitPr(existing!.id); showToast(r.ok ? 'Submitted for requisition approval' : r.error ?? 'Failed') }}>
             Submit for Approval
           </ErpButton>
@@ -499,7 +495,7 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
         },
       ]}
       keyDetails={[
-        { label: 'PR No.', value: isCreate ? 'Auto on save' : docNo },
+        { label: 'PR No.', value: isCreate ? 'New' : docNo },
         { label: 'Status', value: isCreate ? 'Draft' : prStatusLabel(status) },
         { label: 'Lines', value: String(linesWithItems || lines.length) },
         { label: 'Est. Value', value: estimatedValue > 0 ? formatCurrency(estimatedValue) : '—' },
@@ -989,7 +985,6 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
           { label: 'Requisitions', to: '/purchase/requisitions' },
           { label: isCreate ? 'New' : docNo },
         ]}
-        backLink={{ to: '/purchase/requisitions', label: 'Back to Requisitions' }}
         commandBar={isCreate ? createCommandBar : commandBar}
         documentStrip={purchaseStatusStripToDocumentStrip(statusStrip)}
         detailMode={isView}

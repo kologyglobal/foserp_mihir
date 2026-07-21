@@ -29,10 +29,9 @@ import {
   ErpCardSection,
   ErpFieldRow,
   ErpFormSpan,
-  ErpStickySaveBar,
   ErpViewField,
 } from '@/components/erp/card-form'
-import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
+import { FormActionBar } from '@/components/erp/FormActionBar'
 import { Input, Textarea, Select } from '@/components/forms/Inputs'
 import {
   approvalActivitySummary,
@@ -55,7 +54,6 @@ import {
   getVendors,
   previewNextPurchaseRequisitionNumber,
   PurchaseServiceError,
-  submitPurchaseRequisition,
   updatePurchaseRequisition,
   PURCHASE_REQUISITION_ATTACHMENT_KIND_LABELS,
   PURCHASE_REQUISITION_PRIORITY_LABELS,
@@ -85,7 +83,8 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { systemConfirm } from '@/utils/systemConfirm'
-import { usePurchasePermissions } from '@/utils/permissions'
+import { getSessionUser } from '@/utils/permissions'
+import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 
 const ACTOR = { id: '', code: '', name: '' }
 
@@ -199,7 +198,8 @@ function resolveLocation(
   locationId: string,
   options: LocationOption[],
 ): LocationOption {
-  return options.find((l) => l.id === locationId) ?? options[0] ?? EMPTY_LOCATION
+  if (!locationId) return EMPTY_LOCATION
+  return options.find((l) => l.id === locationId) ?? EMPTY_LOCATION
 }
 
 function defaultHeader(opts?: {
@@ -273,7 +273,6 @@ function linesFromPr(pr: PurchaseRequisition): PrEditorLine[] {
 }
 
 export function PurchaseRequisitionEditorPage() {
-  const perms = usePurchasePermissions()
   const auth = useOptionalAuth()
   const session = auth?.session ?? null
   const { id } = useParams()
@@ -430,7 +429,7 @@ export function PurchaseRequisitionEditorPage() {
       ...(documentNumber
         ? [{ label: 'PR No', value: documentNumber }]
         : isNew
-          ? [{ label: 'PR No', value: 'Auto-generated on save' }]
+          ? [{ label: 'PR No', value: 'Loading…' }]
           : []),
       { label: 'Department', value: departmentFact },
       { label: 'Requester', value: header.requesterName },
@@ -531,19 +530,30 @@ export function PurchaseRequisitionEditorPage() {
             }))
           : []
       setLocationOptions(locs)
+      // Requisition Setup default wins; fall back to the General Setup warehouse.
+      const candidateIds = [
+        setup.requisition.defaultWarehouseId,
+        setup.general.defaultWarehouseId,
+      ]
       const preferredId =
-        locs.some((l) => l.id === setup.requisition.defaultLocationId)
-          ? setup.requisition.defaultLocationId
-          : locs[0]?.id
+        candidateIds.find((id) => id && locs.some((l) => l.id === id)) ?? ''
       const loc = resolveLocation(preferredId ?? '', locs)
-      setHeader(
-        defaultHeader({
+      setHeader((prev) => {
+        // Preserve the session-derived requester — this effect resolves after the
+        // session effect and must not reset it back to the empty ACTOR default.
+        const fallback = getSessionUser()
+        return defaultHeader({
           locationId: loc.id,
           skipRfq: setup.requisition.skipRfq,
           locations: locs,
-        }),
-      )
-      const lineLoc = { locationId: loc.id, locationName: loc.name }
+          requester: prev.requesterId
+            ? { id: prev.requesterId, code: prev.requesterCode, name: prev.requesterName }
+            : { id: fallback.id, code: '', name: fallback.name },
+        })
+      })
+      const lineLoc = loc.id
+        ? { locationId: loc.id, locationName: loc.name }
+        : undefined
       setLines(threeEmptyLines(lineLoc))
       resetDirty()
       setLoading(false)
@@ -652,7 +662,7 @@ export function PurchaseRequisitionEditorPage() {
   }, [attachments, header, lines, session, summary.estimatedTaxPct])
 
   const saveDraft = async () => {
-    if (!editable) return
+    if (!editable || saving) return
     setAttemptedSubmit(true)
     if (validation.errors.length) {
       const section =
@@ -687,7 +697,7 @@ export function PurchaseRequisitionEditorPage() {
         setLastSavedAt(new Date())
       }
       resetDirty()
-      navigate('/purchase/requisitions')
+      navigate(PURCHASE_FORM_ROUTES.requisition.list, { replace: true })
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
     } finally {
@@ -734,46 +744,6 @@ export function PurchaseRequisitionEditorPage() {
     },
     [validation.fieldErrors.productionOrderNo, validation.fieldErrors.maintenanceOrderNo],
   )
-
-  const submitForApproval = async () => {
-    setAttemptedSubmit(true)
-    if (validation.errors.length) {
-      const section =
-        validation.fieldErrors.department ||
-        validation.fieldErrors.locationId ||
-        validation.fieldErrors.purpose ||
-        validation.fieldErrors.productionOrderNo ||
-        validation.fieldErrors.maintenanceOrderNo ||
-        validation.fieldErrors.expectedDeliveryDate
-          ? 'general'
-          : validation.errors.some((e) => /line|quantity|description|unit/i.test(e))
-            ? 'lines'
-            : 'general'
-      focusValidationSection(section)
-      return
-    }
-    setSaving(true)
-    try {
-      let prId = recordId
-      if (!prId) {
-        const created = await createPurchaseRequisition(toInput())
-        prId = created.id
-        setRecordId(created.id)
-        setDocumentNumber(created.documentNumber)
-      } else {
-        await updatePurchaseRequisition(prId, toInput())
-      }
-      const submitted = await submitPurchaseRequisition(prId)
-      setStatus(submitted.status)
-      resetDirty()
-      notify.success(`${submitted.documentNumber} submitted for approval`)
-      navigate(`/purchase/requisitions/${prId}`)
-    } catch (err) {
-      notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
-    } finally {
-      setSaving(false)
-    }
-  }
 
   const applyItemCatalog = (key: string, itemId: string) => {
     const line = lines.find((l) => l.key === key)
@@ -906,7 +876,7 @@ export function PurchaseRequisitionEditorPage() {
           title="PR insight"
           metrics={formMetrics}
           summary={[
-            { label: 'PR No.', value: documentNumber ?? 'Auto-generated on save' },
+            { label: 'PR No.', value: documentNumber ?? (isNew ? 'Loading…' : '—') },
             { label: 'Status', value: PURCHASE_REQUISITION_STATUS_LABELS[status] },
             {
               label: 'Department',
@@ -946,50 +916,18 @@ export function PurchaseRequisitionEditorPage() {
       }
       stickyFooter
       footer={
-        <ErpStickySaveBar
+        <FormActionBar
           sticky
-          isSubmitting={saving}
-          actions={
-            <ErpButtonGroup>
-              <ErpButton
-                type="button"
-                variant="secondary"
-                disabled={saving}
-                onClick={() => navigate('/purchase/requisitions')}
-              >
-                Cancel
-              </ErpButton>
-              <ErpButton
-                type="button"
-                variant={isNew ? 'primary' : 'secondary'}
-                disabled={!editable || saving}
-                onClick={() => void saveDraft()}
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </ErpButton>
-              {!isNew && perms.canSubmitRequisition ? (
-                <ErpButton
-                  type="button"
-                  variant="primary"
-                  disabled={
-                    !editable ||
-                    saving ||
-                    (attemptedSubmit && validation.errors.length > 0)
-                  }
-                  disabledReason={
-                    attemptedSubmit && validation.errors.length
-                      ? 'Fix validation errors first'
-                      : !editable
-                        ? 'Document is read-only'
-                        : undefined
-                  }
-                  onClick={() => void submitForApproval()}
-                >
-                  Submit for Approval
-                </ErpButton>
-              ) : null}
-            </ErpButtonGroup>
-          }
+          cancelFirst
+          busy={saving}
+          dirty={dirty}
+          disabled={!editable}
+          disabledReason={!editable ? 'Document is read-only' : undefined}
+          onCancel={() => {
+            resetDirty()
+            navigate(PURCHASE_FORM_ROUTES.requisition.list)
+          }}
+          onSave={saveDraft}
         />
       }
       onSaveShortcut={() => void saveDraft()}

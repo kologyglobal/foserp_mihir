@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Plus, Save, Trash2 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
@@ -6,8 +6,20 @@ import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { Checkbox, Input, Select } from '@/components/forms/Inputs'
 import { FormField } from '@/components/forms/FormField'
+import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { TabStrip } from '@/components/ui/TabStrip'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { isApiMode } from '@/config/apiConfig'
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
+import {
+  useBuyerOptions,
+  useDeliveryTermOptions,
+  usePaymentTermOptions,
+} from '@/hooks/usePurchaseMasters'
+import { useMasterStore } from '@/store/masterStore'
+import { fetchMasterLocations, fetchMasterPlants } from '@/services/api/masterApi'
+import { fetchAdminUsersApi } from '@/services/api/adminApi'
+import { ApiError, formatApiError } from '@/services/api/apiErrors'
 import {
   getPurchaseSetup,
   getPurchaseWarehouses,
@@ -26,24 +38,18 @@ import type {
   PurchaseGstRoundOffRule,
   PurchaseGstScheme,
   PurchaseItemCategory,
-  PurchaseNotificationChannelFlags,
+  PurchaseNotificationEventKey,
   PurchaseNumberSeriesConfig,
   PurchasePrintOrientation,
   PurchasePrintPaperSize,
   PurchaseSetup,
-  PurchaseSetupNotifications,
   PurchaseSetupNumberSeries,
   PurchaseSetupTabId,
 } from '@/types/purchaseDomain'
-import {
-  PURCHASE_DELIVERY_TERMS,
-  PURCHASE_PAYMENT_TERMS,
-  withCurrentTermOption,
-} from '@/data/purchase/purchaseCommercialTerms'
+import { PURCHASE_DELIVERY_TERMS, withCurrentTermOption } from '@/data/purchase/purchaseCommercialTerms'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { notify } from '@/store/toastStore'
 import { usePurchasePermissions } from '@/utils/permissions'
-import { isApiMode } from '@/config/apiConfig'
 
 const SETUP_TABS: PurchaseSetupTabId[] = [
   'general',
@@ -56,6 +62,15 @@ const SETUP_TABS: PurchaseSetupTabId[] = [
   'quality',
   'print',
   'notifications',
+]
+
+const DUPLICATE_CHALLAN_POLICY_OPTIONS: Array<{
+  value: PurchaseSetup['receiving']['duplicateChallanPolicy']
+  label: string
+}> = [
+  { value: 'BLOCK', label: 'Block duplicate challan' },
+  { value: 'WARN', label: 'Warn on duplicate challan' },
+  { value: 'ALLOW', label: 'Allow duplicate challan' },
 ]
 
 const INDIAN_STATES: { name: string; code: string }[] = [
@@ -81,7 +96,7 @@ const NUMBER_SERIES_ROWS: { key: keyof PurchaseSetupNumberSeries; label: string 
 ]
 
 const NOTIFICATION_ROWS: {
-  key: keyof PurchaseSetupNotifications
+  key: PurchaseNotificationEventKey
   label: string
   hint: string
 }[] = [
@@ -93,6 +108,8 @@ const NOTIFICATION_ROWS: {
   { key: 'invoiceMismatch', label: 'Invoice mismatch', hint: 'Alert when 3-way match exceeds tolerance.' },
   { key: 'invoicePendingApproval', label: 'Invoice pending approval', hint: 'Notify finance when an invoice awaits approval.' },
 ]
+
+type MasterOption = { id: string; label: string }
 
 function emptyTier(sortOrder: number): PurchaseApprovalMatrixTier {
   return {
@@ -115,6 +132,10 @@ function tabFromHash(hash: string): PurchaseSetupTabId {
   if (hash === '#approval-matrix' || hash === '#approval') return 'approval'
   const id = hash.replace(/^#/, '') as PurchaseSetupTabId
   return SETUP_TABS.includes(id) ? id : 'general'
+}
+
+function masterLocationLabel(code: string | undefined, name: string): string {
+  return code ? `${name} (${code})` : name
 }
 
 function SectionCard({
@@ -146,51 +167,140 @@ function FieldGrid({ children }: { children: React.ReactNode }) {
 export function PurchaseSetupPage() {
   const location = useLocation()
   const perms = usePurchasePermissions()
+  const paymentTermOptions = usePaymentTermOptions()
+  const deliveryTermOptions = useDeliveryTermOptions()
+  const buyerOptions = useBuyerOptions()
+  const storeLocations = useMasterStore((s) => s.locations)
+
   const [setup, setSetup] = useState<PurchaseSetup | null>(null)
-  const [locationOptions, setLocationOptions] = useState<Array<{ id: string; label: string }>>([])
-  const [buyerOptions, setBuyerOptions] = useState<Array<{ id: string; label: string }>>([])
+  const [warehouseOptions, setWarehouseOptions] = useState<MasterOption[]>([])
+  const [plantOptions, setPlantOptions] = useState<MasterOption[]>([])
+  const [buyerUserOptions, setBuyerUserOptions] = useState<MasterOption[]>([])
+  const [warehouseLocationOptions, setWarehouseLocationOptions] = useState<MasterOption[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [tab, setTab] = useState<PurchaseSetupTabId>(() => tabFromHash(location.hash))
 
-  useEffect(() => {
-    if (location.hash) setTab(tabFromHash(location.hash))
-  }, [location.hash])
+  const canEdit = perms.canManageSetup && !loading && setup !== null
+  const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(canEdit)
+
+  const resolveFieldError = useCallback(
+    (...fields: string[]) => fields.map((f) => fieldErrors[f]).find(Boolean),
+    [fieldErrors],
+  )
+
+  const loadWarehouseLocations = useCallback(
+    async (warehouseId: string) => {
+      if (!warehouseId) {
+        setWarehouseLocationOptions([])
+        return
+      }
+
+      const fromStore = storeLocations.filter(
+        (l) => l.isActive && l.warehouseId === warehouseId,
+      )
+      if (fromStore.length > 0 || !isApiMode()) {
+        setWarehouseLocationOptions(
+          fromStore.map((l) => ({
+            id: l.id,
+            label: masterLocationLabel(l.locationCode, l.locationName),
+          })),
+        )
+        return
+      }
+
+      try {
+        const rows = await fetchMasterLocations()
+        setWarehouseLocationOptions(
+          rows
+            .filter((r) => r.status === 'ACTIVE' && r.warehouseId === warehouseId)
+            .map((r) => ({
+              id: r.id,
+              label: masterLocationLabel(r.code, r.name),
+            })),
+        )
+      } catch {
+        setWarehouseLocationOptions([])
+      }
+    },
+    [storeLocations],
+  )
 
   const load = async () => {
     setLoading(true)
+    setFieldErrors({})
     try {
       const [nextSetup, warehouses] = await Promise.all([
         getPurchaseSetup(),
         getPurchaseWarehouses(),
       ])
       setSetup(nextSetup)
-      setLocationOptions(
+      setWarehouseOptions(
         warehouses.map((w) => ({
           id: w.id,
           label: w.code ? `${w.name} (${w.code})` : w.name,
         })),
       )
-      const buyerId = nextSetup.general.defaultBuyerId
-      setBuyerOptions(
-        buyerId
-          ? [{ id: buyerId, label: buyerId }]
-          : [],
-      )
+
+      if (isApiMode()) {
+        try {
+          const plants = await fetchMasterPlants()
+          setPlantOptions(
+            plants
+              .filter((p) => p.status === 'ACTIVE')
+              .map((p) => ({
+                id: p.id,
+                label: p.code ? `${p.name} (${p.code})` : p.name,
+              })),
+          )
+        } catch {
+          setPlantOptions([])
+        }
+
+        // Backend validates defaultBuyerId as an active tenant user UUID — offer
+        // real users, not demo buyer-master codes. Requires `user.view`; swallow 403.
+        try {
+          const users = await fetchAdminUsersApi({ status: 'ACTIVE' })
+          setBuyerUserOptions(
+            users.map((u) => ({
+              id: u.id,
+              label: `${u.firstName} ${u.lastName}`.trim() || u.email,
+            })),
+          )
+        } catch {
+          setBuyerUserOptions([])
+        }
+      } else {
+        setPlantOptions([])
+        setBuyerUserOptions([])
+      }
+
+      await loadWarehouseLocations(nextSetup.general.defaultWarehouseId)
+      resetDirty()
     } catch (err) {
-      notify.error(err instanceof PurchaseServiceError ? err.message : 'Failed to load setup')
+      notify.error(err instanceof PurchaseServiceError ? err.message : formatApiError(err))
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
+    if (location.hash) setTab(tabFromHash(location.hash))
+  }, [location.hash])
+
+  useEffect(() => {
     void load()
   }, [])
 
+  useEffect(() => {
+    void loadWarehouseLocations(setup?.general.defaultWarehouseId ?? '')
+  }, [setup?.general.defaultWarehouseId, loadWarehouseLocations])
+
   const save = async () => {
-    if (!setup) return
+    if (!setup || saving) return
     setSaving(true)
+    setFieldErrors({})
     try {
       const {
         updatedAt: _a,
@@ -199,18 +309,37 @@ export function PurchaseSetupPage() {
       } = setup
       const updated = await updatePurchaseSetup(patch)
       setSetup(updated)
+      resetDirty()
       notify.success('Purchase Setup saved')
     } catch (err) {
-      notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
+      if (err instanceof ApiError && err.fieldErrors?.length) {
+        const next: Record<string, string> = {}
+        for (const fe of err.fieldErrors) next[fe.field] = fe.message
+        setFieldErrors(next)
+      }
+      notify.error(err instanceof PurchaseServiceError ? err.message : formatApiError(err))
+      // Version conflict — someone else saved; reload the latest server copy.
+      if (
+        err instanceof ApiError &&
+        (err.statusCode === 409 || err.code === 'SETUP_VERSION_CONFLICT')
+      ) {
+        await load()
+      }
     } finally {
       setSaving(false)
     }
   }
 
+  const touch = useCallback(() => {
+    markDirty()
+    setFieldErrors({})
+  }, [markDirty])
+
   const patchGeneral = <K extends keyof PurchaseSetup['general']>(
     key: K,
     value: PurchaseSetup['general'][K],
   ) => {
+    touch()
     setSetup((prev) => (prev ? { ...prev, general: { ...prev.general, [key]: value } } : prev))
   }
 
@@ -218,12 +347,14 @@ export function PurchaseSetupPage() {
     key: K,
     value: PurchaseSetup['requisition'][K],
   ) => {
+    touch()
     setSetup((prev) =>
       prev ? { ...prev, requisition: { ...prev.requisition, [key]: value } } : prev,
     )
   }
 
   const patchNumberSeries = (key: keyof PurchaseSetupNumberSeries, entry: Partial<PurchaseNumberSeriesConfig>) => {
+    touch()
     setSetup((prev) =>
       prev
         ? {
@@ -238,6 +369,7 @@ export function PurchaseSetupPage() {
   }
 
   const patchTax = <K extends keyof PurchaseSetup['tax']>(key: K, value: PurchaseSetup['tax'][K]) => {
+    touch()
     setSetup((prev) => (prev ? { ...prev, tax: { ...prev.tax, [key]: value } } : prev))
   }
 
@@ -245,6 +377,7 @@ export function PurchaseSetupPage() {
     key: K,
     value: PurchaseSetup['invoiceMatchTolerances'][K],
   ) => {
+    touch()
     setSetup((prev) =>
       prev
         ? {
@@ -259,6 +392,7 @@ export function PurchaseSetupPage() {
     key: K,
     value: PurchaseSetup['receiving'][K],
   ) => {
+    touch()
     setSetup((prev) => (prev ? { ...prev, receiving: { ...prev.receiving, [key]: value } } : prev))
   }
 
@@ -266,32 +400,17 @@ export function PurchaseSetupPage() {
     key: K,
     value: PurchaseSetup['quality'][K],
   ) => {
+    touch()
     setSetup((prev) => (prev ? { ...prev, quality: { ...prev.quality, [key]: value } } : prev))
   }
 
   const patchPrint = <K extends keyof PurchaseSetup['print']>(key: K, value: PurchaseSetup['print'][K]) => {
+    touch()
     setSetup((prev) => (prev ? { ...prev, print: { ...prev.print, [key]: value } } : prev))
   }
 
-  const patchNotification = (
-    key: keyof PurchaseSetupNotifications,
-    channel: keyof PurchaseNotificationChannelFlags,
-    value: boolean,
-  ) => {
-    setSetup((prev) =>
-      prev
-        ? {
-            ...prev,
-            notifications: {
-              ...prev.notifications,
-              [key]: { ...prev.notifications[key], [channel]: value },
-            },
-          }
-        : prev,
-    )
-  }
-
   const patchTier = (id: string, patch: Partial<PurchaseApprovalMatrixTier>) => {
+    touch()
     setSetup((prev) =>
       prev
         ? {
@@ -303,6 +422,7 @@ export function PurchaseSetupPage() {
   }
 
   const toggleCategory = (category: PurchaseItemCategory) => {
+    touch()
     setSetup((prev) => {
       if (!prev) return prev
       const list = prev.quality.inspectionRequiredCategories
@@ -310,6 +430,61 @@ export function PurchaseSetupPage() {
       return { ...prev, quality: { ...prev.quality, inspectionRequiredCategories: next } }
     })
   }
+
+  const onDefaultWarehouseChange = (warehouseId: string) => {
+    touch()
+    setSetup((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        general: { ...prev.general, defaultWarehouseId: warehouseId },
+        receiving: {
+          ...prev.receiving,
+          defaultReceivingLocationId: '',
+        },
+        quality: {
+          ...prev.quality,
+          defaultQualityHoldLocationId: '',
+          defaultRejectedLocationId: '',
+          defaultVendorReturnLocationId: '',
+        },
+      }
+    })
+  }
+
+  const paymentTermSelectOptions = useMemo(() => {
+    const rows = [...paymentTermOptions]
+    const currentCode = setup?.general.defaultPaymentTermCode
+    if (currentCode && !rows.some((o) => o.value === currentCode)) {
+      rows.unshift({
+        value: currentCode,
+        label: setup?.general.defaultPaymentTerms || currentCode,
+        text: setup?.general.defaultPaymentTerms || currentCode,
+        attributes: {},
+      })
+    }
+    return rows
+  }, [paymentTermOptions, setup?.general.defaultPaymentTermCode, setup?.general.defaultPaymentTerms])
+
+  const deliveryTermSelectOptions = useMemo(() => {
+    const current = setup?.general.defaultDeliveryTerms ?? ''
+    const fromMasters = deliveryTermOptions.map((o) => o.text || o.label)
+    if (fromMasters.length > 0) return fromMasters
+    return [...withCurrentTermOption(PURCHASE_DELIVERY_TERMS, current)]
+  }, [deliveryTermOptions, setup?.general.defaultDeliveryTerms])
+
+  const buyerSelectOptions = useMemo(() => {
+    // API mode: buyer must be a tenant user UUID (backend validates it).
+    // Demo mode: buyer-master codes from the demo store.
+    const rows = isApiMode()
+      ? buyerUserOptions.map((o) => ({ id: o.id, label: o.label }))
+      : buyerOptions.map((o) => ({ id: o.value, label: o.label }))
+    const currentId = setup?.general.defaultBuyerId
+    if (currentId && !rows.some((o) => o.id === currentId)) {
+      rows.unshift({ id: currentId, label: currentId })
+    }
+    return rows
+  }, [buyerOptions, buyerUserOptions, setup?.general.defaultBuyerId])
 
   const tabItems = useMemo(
     () => SETUP_TABS.map((id) => ({ id, label: PURCHASE_SETUP_TAB_LABELS[id] })),
@@ -330,7 +505,6 @@ export function PurchaseSetupPage() {
         { label: 'Masters', to: '/purchase/masters' },
         { label: 'Setup' },
       ]}
-      backLink={{ to: '/purchase/masters', label: 'Back to Purchase Masters' }}
       commandBar={
         <ErpCommandBar
           inline
@@ -339,7 +513,7 @@ export function PurchaseSetupPage() {
             perms.canManageSetup
               ? {
                   id: 'save',
-                  label: saving ? 'Saving…' : 'Save Setup',
+                  label: saving ? 'Saving…' : dirty ? 'Save Setup' : 'Save Setup',
                   icon: Save,
                   onClick: () => void save(),
                   disabled: saving || loading,
@@ -350,9 +524,13 @@ export function PurchaseSetupPage() {
       }
     >
       {!isApiMode() ? (
-      <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
-        Demo mode — Purchase Setup is saved in browser memory only until the purchase API is wired.
-      </p>
+        <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+          Demo mode — Purchase Setup is saved in browser memory only until the purchase API is wired.
+        </p>
+      ) : setup && !setup.isConfigured ? (
+        <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+          Using server defaults — not yet configured.
+        </p>
       ) : null}
 
       <TabStrip tabs={tabItems} active={tab} onChange={setTab} className="mb-4" />
@@ -367,46 +545,53 @@ export function PurchaseSetupPage() {
               description="Default masters and document policy flags used when creating purchase documents."
             >
               <FieldGrid>
-                <FormField label="Default purchase location">
+                <FormField
+                  label="Default plant"
+                  hint="Optional — used when plant-scoped defaults apply."
+                  error={resolveFieldError('defaultPlantId')}
+                >
                   <Select
-                    value={setup.general.defaultPurchaseLocationId}
-                    onChange={(e) => patchGeneral('defaultPurchaseLocationId', e.target.value)}
+                    value={setup.general.defaultPlantId}
+                    onChange={(e) => patchGeneral('defaultPlantId', e.target.value)}
                   >
-                    <option value="">Select location</option>
-                    {locationOptions.map((o) => (
+                    <option value="">{SELECT_PLACEHOLDER}</option>
+                    {plantOptions.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.label}
                       </option>
                     ))}
                   </Select>
                 </FormField>
-                <FormField label="Default warehouse">
+                <FormField
+                  label="Default warehouse"
+                  error={resolveFieldError('defaultWarehouseId')}
+                >
                   <Select
                     value={setup.general.defaultWarehouseId}
-                    onChange={(e) => patchGeneral('defaultWarehouseId', e.target.value)}
+                    onChange={(e) => onDefaultWarehouseChange(e.target.value)}
                   >
-                    <option value="">Select warehouse</option>
-                    {locationOptions.map((o) => (
+                    <option value="">{SELECT_PLACEHOLDER}</option>
+                    {warehouseOptions.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.label}
                       </option>
                     ))}
                   </Select>
                 </FormField>
-                <FormField label="Default buyer">
+                <FormField label="Default buyer" error={resolveFieldError('defaultBuyerId')}>
                   <Select
                     value={setup.general.defaultBuyerId}
                     onChange={(e) => patchGeneral('defaultBuyerId', e.target.value)}
                   >
-                    <option value="">Not set</option>
-                    {buyerOptions.map((o) => (
+                    <option value="">{SELECT_PLACEHOLDER}</option>
+                    {buyerSelectOptions.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.label}
                       </option>
                     ))}
                   </Select>
                 </FormField>
-                <FormField label="Default currency" hint="Demo tenancy is INR-only.">
+                <FormField label="Default currency" hint="Tenancy is INR-only in Phase 1.">
                   <Select
                     value={setup.general.defaultCurrency}
                     onChange={(e) => patchGeneral('defaultCurrency', e.target.value as 'INR')}
@@ -414,14 +599,34 @@ export function PurchaseSetupPage() {
                     <option value="INR">INR — Indian Rupee</option>
                   </Select>
                 </FormField>
-                <FormField label="Default payment terms">
+                <FormField
+                  label="Default payment terms"
+                  error={resolveFieldError('defaultPaymentTermCode')}
+                >
                   <Select
-                    value={setup.general.defaultPaymentTerms}
-                    onChange={(e) => patchGeneral('defaultPaymentTerms', e.target.value)}
+                    value={setup.general.defaultPaymentTermCode}
+                    onChange={(e) => {
+                      const code = e.target.value
+                      const opt = paymentTermSelectOptions.find((o) => o.value === code)
+                      touch()
+                      setSetup((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              general: {
+                                ...prev.general,
+                                defaultPaymentTermCode: code,
+                                defaultPaymentTerms: opt?.text ?? opt?.label ?? '',
+                              },
+                            }
+                          : prev,
+                      )
+                    }}
                   >
-                    {withCurrentTermOption(PURCHASE_PAYMENT_TERMS, setup.general.defaultPaymentTerms).map((t) => (
-                      <option key={t} value={t}>
-                        {t}
+                    <option value="">{SELECT_PLACEHOLDER}</option>
+                    {paymentTermSelectOptions.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.value} — {t.label}
                       </option>
                     ))}
                   </Select>
@@ -431,7 +636,8 @@ export function PurchaseSetupPage() {
                     value={setup.general.defaultDeliveryTerms}
                     onChange={(e) => patchGeneral('defaultDeliveryTerms', e.target.value)}
                   >
-                    {withCurrentTermOption(PURCHASE_DELIVERY_TERMS, setup.general.defaultDeliveryTerms).map((t) => (
+                    <option value="">{SELECT_PLACEHOLDER}</option>
+                    {deliveryTermSelectOptions.map((t) => (
                       <option key={t} value={t}>
                         {t}
                       </option>
@@ -464,6 +670,7 @@ export function PurchaseSetupPage() {
                 <FormField
                   label="Over-receipt tolerance (%)"
                   hint="Allowed % above ordered qty when over-receipt is enabled."
+                  error={resolveFieldError('overReceiptTolerancePct')}
                 >
                   <Input
                     type="number"
@@ -483,21 +690,9 @@ export function PurchaseSetupPage() {
                   onChange={(e) => patchGeneral('allowDirectPo', e.target.checked)}
                 />
                 <Checkbox
-                  label="Allow direct invoice"
-                  checked={setup.allowDirectInvoice}
-                  onChange={(e) =>
-                    setSetup((prev) => (prev ? { ...prev, allowDirectInvoice: e.target.checked } : prev))
-                  }
-                />
-                <Checkbox
                   label="Require PR before PO"
                   checked={setup.general.requirePrBeforePo}
                   onChange={(e) => patchGeneral('requirePrBeforePo', e.target.checked)}
-                />
-                <Checkbox
-                  label="Require quotation comparison"
-                  checked={setup.general.requireQuotationComparison}
-                  onChange={(e) => patchGeneral('requireQuotationComparison', e.target.checked)}
                 />
                 <Checkbox
                   label="Allow over receipt"
@@ -505,9 +700,19 @@ export function PurchaseSetupPage() {
                   onChange={(e) => patchGeneral('allowOverReceipt', e.target.checked)}
                 />
                 <Checkbox
-                  label="Allow short close"
-                  checked={setup.general.allowShortClose}
-                  onChange={(e) => patchGeneral('allowShortClose', e.target.checked)}
+                  label="Require warehouse on PO"
+                  checked={setup.general.requirePoWarehouse}
+                  onChange={(e) => patchGeneral('requirePoWarehouse', e.target.checked)}
+                />
+                <Checkbox
+                  label="Require expected delivery date on PO"
+                  checked={setup.general.requireExpectedDeliveryDate}
+                  onChange={(e) => patchGeneral('requireExpectedDeliveryDate', e.target.checked)}
+                />
+                <Checkbox
+                  label="Require payment terms on PO"
+                  checked={setup.general.requirePaymentTerms}
+                  onChange={(e) => patchGeneral('requirePaymentTerms', e.target.checked)}
                 />
               </div>
             </SectionCard>
@@ -520,15 +725,16 @@ export function PurchaseSetupPage() {
             >
               <FieldGrid>
                 <FormField
-                  label="Default location"
-                  hint="Pre-fills Location on /purchase/requisitions/new."
+                  label="Default warehouse (new PRs)"
+                  hint="Pre-selected on new requisitions. Leave empty to use General Setup → default warehouse."
+                  error={resolveFieldError('defaultRequisitionWarehouseId')}
                 >
                   <Select
-                    value={setup.requisition.defaultLocationId}
-                    onChange={(e) => patchRequisition('defaultLocationId', e.target.value)}
+                    value={setup.requisition.defaultWarehouseId}
+                    onChange={(e) => patchRequisition('defaultWarehouseId', e.target.value)}
                   >
-                    <option value="">Select location</option>
-                    {locationOptions.map((o) => (
+                    <option value="">{SELECT_PLACEHOLDER}</option>
+                    {warehouseOptions.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.label}
                       </option>
@@ -567,7 +773,7 @@ export function PurchaseSetupPage() {
           {tab === 'number_series' && (
             <SectionCard
               title="Number Series"
-              description="Demo prefixes and next numbers per document type. Future API will allocate atomically per tenant."
+              description="Prefix and zero-padding per document type. Next number is allocated by the server and shown read-only."
             >
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[36rem] text-left text-[13px]">
@@ -595,17 +801,12 @@ export function PurchaseSetupPage() {
                             />
                           </td>
                           <td className="py-2 pr-3">
-                            <Input
-                              type="number"
-                              className="max-w-[8rem]"
-                              min={1}
-                              value={row.nextNumber}
-                              onChange={(e) =>
-                                patchNumberSeries(key, {
-                                  nextNumber: Math.max(1, Number(e.target.value) || 1),
-                                })
-                              }
-                            />
+                            <span
+                              className="inline-block min-w-[4rem] font-mono text-[13px] text-erp-text"
+                              title="Allocated by the server — read-only"
+                            >
+                              {row.nextNumber}
+                            </span>
                           </td>
                           <td className="py-2 pr-3">
                             <Input
@@ -634,6 +835,33 @@ export function PurchaseSetupPage() {
           {tab === 'approval' && (
             <div className="space-y-4">
               <SectionCard
+                id="self-approval-policy"
+                title="Self-approval policy"
+                description="Maker-checker control: whether the person who created / requested a PR or PO may approve it themselves. Self-approvals are always recorded in the audit log."
+              >
+                <div className="max-w-xl">
+                  <FormField
+                    label="Who may approve their own documents?"
+                    hint="Permission-based: only users granted purchase.approvals.self_approve (e.g. CEO / admin roles) bypass the restriction."
+                  >
+                    <Select
+                      value={setup.selfApprovalPolicy}
+                      onChange={(e) => {
+                        touch()
+                        const value = e.target.value as PurchaseSetup['selfApprovalPolicy']
+                        setSetup((prev) => (prev ? { ...prev, selfApprovalPolicy: value } : prev))
+                      }}
+                    >
+                      <option value="NEVER">Never allow</option>
+                      <option value="PERMISSION_ONLY">
+                        Allow only users with self-approval permission (default)
+                      </option>
+                      <option value="EVERYONE">Allow everyone (not recommended)</option>
+                    </Select>
+                  </FormField>
+                </div>
+              </SectionCard>
+              <SectionCard
                 id="approval-matrix"
                 title="Approval matrix"
                 description="Amount thresholds (INR document total) determine which roles must approve, in order. Masters Approval Matrix redirects here."
@@ -644,7 +872,8 @@ export function PurchaseSetupPage() {
                     size="sm"
                     variant="secondary"
                     icon={Plus}
-                    onClick={() =>
+                    onClick={() => {
+                      touch()
                       setSetup((prev) =>
                         prev
                           ? {
@@ -656,7 +885,7 @@ export function PurchaseSetupPage() {
                             }
                           : prev,
                       )
-                    }
+                    }}
                   >
                     Add tier
                   </ErpButton>
@@ -765,7 +994,8 @@ export function PurchaseSetupPage() {
                           type="button"
                           className="rounded p-1 text-erp-danger-fg hover:bg-red-50"
                           title="Remove tier"
-                          onClick={() =>
+                          onClick={() => {
+                            touch()
                             setSetup((prev) =>
                               prev
                                 ? {
@@ -774,7 +1004,7 @@ export function PurchaseSetupPage() {
                                   }
                                 : prev,
                             )
-                          }
+                          }}
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -791,38 +1021,13 @@ export function PurchaseSetupPage() {
                     ))}
                 </div>
               </SectionCard>
-
-              <SectionCard
-                title="Budget placeholder"
-                description="Shown on the approval review drawer until live budget integration ships."
-              >
-                <Input
-                  type="number"
-                  className="max-w-xs"
-                  value={setup.availableBudgetPlaceholderInr}
-                  onChange={(e) =>
-                    setSetup((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            availableBudgetPlaceholderInr: Number(e.target.value) || 0,
-                          }
-                        : prev,
-                    )
-                  }
-                />
-                <p className="mt-2 text-[12px] text-erp-muted">
-                  Current: {formatCurrency(setup.availableBudgetPlaceholderInr)} · Last updated by{' '}
-                  {setup.updatedBy}
-                </p>
-              </SectionCard>
             </div>
           )}
 
           {tab === 'tax' && (
             <SectionCard
               title="Tax Setup"
-              description="Demo GST defaults for Indian purchase documents. Future API will apply these as tenant tax config."
+              description="GST defaults applied to Indian purchase documents for this tenant."
             >
               <FieldGrid>
                 <FormField
@@ -843,6 +1048,7 @@ export function PurchaseSetupPage() {
                     onChange={(e) => {
                       const found = INDIAN_STATES.find((s) => s.code === e.target.value)
                       if (!found) return
+                      touch()
                       setSetup((prev) =>
                         prev
                           ? {
@@ -989,16 +1195,39 @@ export function PurchaseSetupPage() {
           {tab === 'receiving' && (
             <SectionCard
               title="Receiving Setup"
-              description="Gate-in and GRN capture rules. Stored for configuration APIs — GRN screens may enforce later."
+              description="Gate-in and GRN capture rules under the default warehouse."
             >
               <FieldGrid>
-                <FormField label="Default receiving warehouse">
+                <FormField
+                  label="Default receiving location"
+                  hint="Master location under the default warehouse."
+                  error={resolveFieldError('defaultReceivingLocationId')}
+                >
                   <Select
-                    value={setup.receiving.defaultReceivingWarehouseId}
-                    onChange={(e) => patchReceiving('defaultReceivingWarehouseId', e.target.value)}
+                    value={setup.receiving.defaultReceivingLocationId}
+                    onChange={(e) => patchReceiving('defaultReceivingLocationId', e.target.value)}
+                    disabled={!setup.general.defaultWarehouseId}
                   >
-                    {locationOptions.map((o) => (
+                    <option value="">{SELECT_PLACEHOLDER}</option>
+                    {warehouseLocationOptions.map((o) => (
                       <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+                <FormField label="Duplicate challan policy">
+                  <Select
+                    value={setup.receiving.duplicateChallanPolicy}
+                    onChange={(e) =>
+                      patchReceiving(
+                        'duplicateChallanPolicy',
+                        e.target.value as PurchaseSetup['receiving']['duplicateChallanPolicy'],
+                      )
+                    }
+                  >
+                    {DUPLICATE_CHALLAN_POLICY_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
                         {o.label}
                       </option>
                     ))}
@@ -1048,7 +1277,7 @@ export function PurchaseSetupPage() {
           {tab === 'quality' && (
             <SectionCard
               title="Quality Setup"
-              description="Inspection requirements by item category and deviation / quarantine defaults."
+              description="Inspection requirements by item category and location defaults under the default warehouse."
             >
               <FormField
                 label="Quality inspection required by item category"
@@ -1067,6 +1296,57 @@ export function PurchaseSetupPage() {
                 </div>
               </FormField>
               <FieldGrid>
+                <FormField
+                  label="Default quality hold location"
+                  error={resolveFieldError('defaultQualityHoldLocationId')}
+                >
+                  <Select
+                    value={setup.quality.defaultQualityHoldLocationId}
+                    onChange={(e) => patchQuality('defaultQualityHoldLocationId', e.target.value)}
+                    disabled={!setup.general.defaultWarehouseId}
+                  >
+                    <option value="">{SELECT_PLACEHOLDER}</option>
+                    {warehouseLocationOptions.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+                <FormField
+                  label="Default rejected location"
+                  error={resolveFieldError('defaultRejectedLocationId')}
+                >
+                  <Select
+                    value={setup.quality.defaultRejectedLocationId}
+                    onChange={(e) => patchQuality('defaultRejectedLocationId', e.target.value)}
+                    disabled={!setup.general.defaultWarehouseId}
+                  >
+                    <option value="">{SELECT_PLACEHOLDER}</option>
+                    {warehouseLocationOptions.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+                <FormField
+                  label="Default vendor return location"
+                  error={resolveFieldError('defaultVendorReturnLocationId')}
+                >
+                  <Select
+                    value={setup.quality.defaultVendorReturnLocationId}
+                    onChange={(e) => patchQuality('defaultVendorReturnLocationId', e.target.value)}
+                    disabled={!setup.general.defaultWarehouseId}
+                  >
+                    <option value="">{SELECT_PLACEHOLDER}</option>
+                    {warehouseLocationOptions.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
                 <FormField label="Deviation approver role">
                   <Select
                     value={setup.quality.deviationApproverRole}
@@ -1077,18 +1357,6 @@ export function PurchaseSetupPage() {
                     {PURCHASE_APPROVAL_ROLES.map((role) => (
                       <option key={role} value={role}>
                         {PURCHASE_APPROVAL_ROLE_LABELS[role]}
-                      </option>
-                    ))}
-                  </Select>
-                </FormField>
-                <FormField label="Default quarantine warehouse">
-                  <Select
-                    value={setup.quality.defaultQuarantineWarehouseId}
-                    onChange={(e) => patchQuality('defaultQuarantineWarehouseId', e.target.value)}
-                  >
-                    {locationOptions.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.label}
                       </option>
                     ))}
                   </Select>
@@ -1112,7 +1380,7 @@ export function PurchaseSetupPage() {
           {tab === 'print' && (
             <SectionCard
               title="Print Setup"
-              description="Demo print defaults for PO / GRN / invoice layouts. Logo is a placeholder path only."
+              description="Print defaults for PO / GRN / invoice layouts. Logo is referenced by URL — no upload here."
             >
               <FieldGrid>
                 <FormField label="Company name">
@@ -1121,10 +1389,10 @@ export function PurchaseSetupPage() {
                     onChange={(e) => patchPrint('companyName', e.target.value)}
                   />
                 </FormField>
-                <FormField label="Logo placeholder URL">
+                <FormField label="Logo URL">
                   <Input
-                    value={setup.print.logoPlaceholderUrl}
-                    onChange={(e) => patchPrint('logoPlaceholderUrl', e.target.value)}
+                    value={setup.print.logoUrl}
+                    onChange={(e) => patchPrint('logoUrl', e.target.value)}
                   />
                 </FormField>
                 <FormField label="Default copies">
@@ -1182,8 +1450,12 @@ export function PurchaseSetupPage() {
           {tab === 'notifications' && (
             <SectionCard
               title="Notifications"
-              description="In-app and email toggles per event. Demo-only persistence until a notification service exists."
+              description="In-app and email toggles per event — visible for planning only."
             >
+              <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+                {setup.notifications.message ||
+                  'Purchase notifications are on hold — this tab is read-only and is not saved.'}
+              </p>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[28rem] text-left text-[13px]">
                   <thead>
@@ -1203,15 +1475,17 @@ export function PurchaseSetupPage() {
                         <td className="py-3 pr-3">
                           <Checkbox
                             checked={setup.notifications[key].inApp}
-                            onChange={(e) => patchNotification(key, 'inApp', e.target.checked)}
-                            aria-label={`${label} in-app`}
+                            disabled
+                            readOnly
+                            aria-label={`${label} in-app (on hold)`}
                           />
                         </td>
                         <td className="py-3">
                           <Checkbox
                             checked={setup.notifications[key].email}
-                            onChange={(e) => patchNotification(key, 'email', e.target.checked)}
-                            aria-label={`${label} email`}
+                            disabled
+                            readOnly
+                            aria-label={`${label} email (on hold)`}
                           />
                         </td>
                       </tr>

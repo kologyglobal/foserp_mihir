@@ -136,7 +136,6 @@ export function VendorQuotationDetailPage() {
         { label: 'Vendor Quotations', to: '/purchase/vendor-quotations' },
         { label: quote.vendorQuoteNo },
       ]}
-      backLink={{ to: '/purchase/vendor-quotations', label: 'Back to Vendor Quotations' }}
       detailMode
       documentStrip={[
         { label: 'Quote', value: quote.vendorQuoteNo, highlight: true },
@@ -276,7 +275,6 @@ export function QuotationComparisonPage() {
       variant="dynamics"
       breadcrumbs={purchaseBreadcrumbs('Comparison', { label: 'RFQs', to: '/purchase/rfqs' })}
       favoritePath={`/purchase/comparison/${rfq.id}`}
-      backLink={{ to: '/purchase/comparison', label: 'Back to Comparison' }}
       insights={[
         { label: 'Quotes', value: comparison.length, accent: 'blue' },
         { label: 'Lowest', value: lowest?.vendorName ?? '—', accent: 'green' },
@@ -396,7 +394,6 @@ export function PurchaseReturnDetailPage() {
       variant="dynamics"
       breadcrumbs={purchaseBreadcrumbs(ret.returnNo, { label: 'Returns', to: '/purchase/returns' })}
       favoritePath={`/purchase/returns/${ret.id}`}
-      backLink={{ to: '/purchase/returns', label: 'Back to Returns' }}
       commandBar={
         <>
           {ret.status === 'draft' && <ErpButton onClick={() => approve(ret.id)}>Approve</ErpButton>}

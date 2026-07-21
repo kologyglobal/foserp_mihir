@@ -385,7 +385,6 @@ export function PoCreateDocumentPage() {
           { label: 'Orders', to: '/purchase/orders' },
           { label: 'New PO' },
         ]}
-        backLink={{ to: '/purchase/orders', label: 'Back to Purchase Orders' }}
         commandBar={commandBar}
         documentStrip={documentStrip}
         className="enterprise-workspace--crm-smart-overview"

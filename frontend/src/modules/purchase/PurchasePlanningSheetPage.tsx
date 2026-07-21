@@ -98,18 +98,54 @@ const DEFAULT_FILTERS: CrmFilterValues = {
   poPending: false,
 }
 
+const HIDDEN_FROM_PENDING_VIEW: PurchasePlanningStatus[] = [
+  'po_created',
+  'completed',
+  'cancelled',
+]
+
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
 }
 
 function isOverdue(row: PurchasePlanningSheetRow) {
   if (!row.requiredByDate) return false
-  if (['completed', 'cancelled', 'po_created'].includes(row.status)) return false
+  if (HIDDEN_FROM_PENDING_VIEW.includes(row.status)) return false
   return row.requiredByDate < todayIso()
 }
 
 function isSelectionDisabled(row: PurchasePlanningSheetRow) {
-  return ['completed', 'cancelled', 'po_created'].includes(row.status)
+  return HIDDEN_FROM_PENDING_VIEW.includes(row.status)
+}
+
+/** Human-readable gaps preventing Create PO for one row (mirrors canSelectPlanningRowForPo). */
+function planningRowPoGaps(row: PurchasePlanningSheetRow): string[] {
+  const gaps: string[] = []
+  if (!['vendor_selected', 'approved', 'po_pending'].includes(row.status)) {
+    gaps.push(
+      `status is ${PURCHASE_PLANNING_STATUS_LABELS[row.status] ?? row.status} (needs Vendor Selected / Approved / PO Pending)`,
+    )
+  }
+  if (!row.actionMessage) gaps.push('Action Message off')
+  if (!row.preferredVendorId) gaps.push('no vendor')
+  const qty = row.netPurchaseQuantity > 0 ? row.netPurchaseQuantity : row.requiredQuantity
+  if (!(qty > 0)) gaps.push('quantity is 0')
+  if (!(row.expectedRate > 0)) gaps.push('rate is 0')
+  if (!row.requiredByDate) gaps.push('no required date')
+  return gaps
+}
+
+/** Tooltip text for the header Create PO button when selected rows are not eligible. */
+function createPoDisabledReason(selected: PurchasePlanningSheetRow[]): string | undefined {
+  const blocked = selected
+    .map((r) => ({ row: r, gaps: planningRowPoGaps(r) }))
+    .filter((e) => e.gaps.length > 0)
+  if (blocked.length === 0) return undefined
+  const shown = blocked
+    .slice(0, 3)
+    .map((e) => `${e.row.planningNumber}: ${e.gaps.join(', ')}`)
+  const more = blocked.length > 3 ? ` (+${blocked.length - 3} more row(s))` : ''
+  return `${shown.join(' • ')}${more}`
 }
 
 function filterRows(rows: PurchasePlanningSheetRow[], f: CrmFilterValues) {
@@ -153,7 +189,13 @@ function filterRows(rows: PurchasePlanningSheetRow[], f: CrmFilterValues) {
     if (f.vendor && r.preferredVendorName !== f.vendor) return false
     if (f.buyer && r.buyerName !== f.buyer) return false
     if (f.priority && r.priority !== f.priority) return false
-    if (f.status && r.status !== f.status) return false
+    if (f.status) {
+      if (r.status !== f.status) return false
+    } else if (HIDDEN_FROM_PENDING_VIEW.includes(r.status)) {
+      // Default Pending Planning view (no Status column on grid): hide converted / terminal rows.
+      // Pick Status = PO Created / Completed / Cancelled in filters to review them.
+      return false
+    }
     if (f.purchaseType && r.purchaseType !== f.purchaseType) return false
     if (f.planningDateFrom && r.planningDate < String(f.planningDateFrom)) return false
     if (f.planningDateTo && r.planningDate > String(f.planningDateTo)) return false
@@ -431,7 +473,7 @@ export function PurchasePlanningSheetPage() {
   }
 
   const openCreatePoDialog = async (rowsOverride?: PurchasePlanningSheetRow[]) => {
-    if (!perms.canCreatePoFromPlanning && !perms.canCreateOrder) {
+    if (!perms.canCreatePoFromPlanning) {
       notify.error('You do not have permission to create purchase orders from planning')
       return
     }
@@ -442,7 +484,10 @@ export function PurchasePlanningSheetPage() {
     }
     const eligible = target.every((r) => canSelectPlanningRowForPo(r))
     if (!eligible) {
-      notify.error('All selected rows must have vendor, quantity, and rate before Create PO')
+      notify.error(
+        createPoDisabledReason(target) ??
+          'All selected rows need Action Message, vendor, quantity, rate, and a ready status before Create PO',
+      )
       return
     }
     try {
@@ -587,7 +632,7 @@ export function PurchasePlanningSheetPage() {
         },
         disabled:
           !canSelectPlanningRowForPo(row) ||
-          (!perms.canCreatePoFromPlanning && !perms.canCreateOrder),
+          !perms.canCreatePoFromPlanning,
       },
       {
         id: 'hold',
@@ -882,14 +927,12 @@ export function PurchasePlanningSheetPage() {
               disabled:
                 creatingPo ||
                 !allSelectedEligible ||
-                (!perms.canCreatePoFromPlanning && !perms.canCreateOrder),
-              disabledReason: !perms.canCreatePoFromPlanning && !perms.canCreateOrder
+                !perms.canCreatePoFromPlanning,
+              disabledReason: !perms.canCreatePoFromPlanning
                 ? 'Missing purchase.planning.create_po permission'
                 : selectedRows.length === 0
                   ? 'Select rows first'
-                  : !allSelectedEligible
-                    ? 'All selected rows need vendor, quantity, and rate'
-                    : undefined,
+                  : createPoDisabledReason(selectedRows),
             }}
             secondaryActions={[
               {
@@ -984,7 +1027,7 @@ export function PurchasePlanningSheetPage() {
                 emptyMessage={
                   rows.length === 0
                     ? 'No planning rows yet. Approved PRs with RFQ Required = No create one row per item automatically.'
-                    : 'No rows match filters.'
+                    : 'No pending planning rows match filters. Converted (PO Created) / completed / cancelled rows are hidden by default — use Status filter to view them.'
                 }
                 registerBar={
                   <CrmListFilterBar

@@ -150,7 +150,6 @@ export function QualityInspectionDetailPage() {
           { label: 'Quality Inspections', to: '/purchase/quality-inspections' },
           { label: 'Loading' },
         ]}
-        backLink={{ to: '/purchase/quality-inspections', label: 'Back to Quality Inspections' }}
         footer={null}
         detailMode
       >
@@ -179,7 +178,6 @@ export function QualityInspectionDetailPage() {
         { label: 'Quality Inspections', to: '/purchase/quality-inspections' },
         { label: qi.documentNumber },
       ]}
-      backLink={{ to: '/purchase/quality-inspections', label: 'Back to Quality Inspections' }}
       detailMode={!canEdit}
       commandBar={
         <ErpCommandBar

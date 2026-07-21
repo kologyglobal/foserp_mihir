@@ -324,7 +324,6 @@ export function PoAmendFormPage() {
           { label: po.poNo, to: `/purchase/orders/${po.id}` },
           { label: 'Amend' },
         ]}
-        backLink={{ to: `/purchase/orders/${po.id}`, label: `Back to ${po.poNo}` }}
         commandBar={commandBar}
         documentStrip={purchaseStatusStripToDocumentStrip(statusStrip)}
         onSubmit={(e) => { e.preventDefault(); persist() }}

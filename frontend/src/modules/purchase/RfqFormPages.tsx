@@ -387,7 +387,6 @@ export function RfqCreateDocumentPage() {
           { label: 'RFQs', to: '/purchase/rfqs' },
           { label: 'New' },
         ]}
-        backLink={{ to: '/purchase/rfqs', label: 'Back to RFQs' }}
         commandBar={commandBar}
         documentStrip={purchaseStatusStripToDocumentStrip(statusStrip)}
         className="enterprise-workspace--dynamics-form enterprise-workspace--crm-smart-overview"

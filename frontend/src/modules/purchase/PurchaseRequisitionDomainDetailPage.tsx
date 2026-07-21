@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ClipboardList, Pencil, Printer, ShoppingCart } from 'lucide-react'
+import { ClipboardList, Pencil, Printer, Send, ShoppingCart } from 'lucide-react'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '../../components/erp/ErpCommandBar'
 import { ErpViewField } from '../../components/erp/card-form/ErpViewField'
@@ -20,6 +20,7 @@ import {
   getRFQById,
   getPurchaseOrderById,
   getVendors,
+  submitPurchaseRequisition,
   updatePurchaseRequisition,
   PURCHASE_REQUISITION_PRIORITY_LABELS,
   PURCHASE_REQUISITION_SOURCE_LABELS,
@@ -56,6 +57,7 @@ export function PurchaseRequisitionDomainDetailPage({
   const [remarks, setRemarks] = useState('')
   const [department, setDepartment] = useState('')
   const [saving, setSaving] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [converting, setConverting] = useState(false)
   const [vendors, setVendors] = useState<Vendor[]>([])
 
@@ -152,13 +154,26 @@ export function PurchaseRequisitionDomainDetailPage({
     }
   }
 
+  const submit = async () => {
+    if (!pr || submitting) return
+    setSubmitting(true)
+    try {
+      const submitted = await submitPurchaseRequisition(pr.id)
+      setPr(submitted)
+      notify.success(`${submitted.documentNumber} submitted for approval`)
+    } catch (err) {
+      notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   if (loading) {
     return (
       <OperationalPageShell
         title="Purchase Requisition"
         badge="Purchase"
         variant="dynamics"
-        backLink={{ to: '/purchase/requisitions', label: 'Back to Requisitions' }}
       >
         <LoadingState variant="form" rows={6} />
       </OperationalPageShell>
@@ -175,7 +190,6 @@ export function PurchaseRequisitionDomainDetailPage({
         title="Purchase Requisition"
         badge="Purchase"
         variant="dynamics"
-        backLink={{ to: '/purchase/requisitions', label: 'Back to Requisitions' }}
       >
         <EmptyState
           icon={ClipboardList}
@@ -198,7 +212,6 @@ export function PurchaseRequisitionDomainDetailPage({
       badge="Purchase"
       variant="dynamics"
       favoritePath={`/purchase/requisitions/${pr.id}`}
-      backLink={{ to: '/purchase/requisitions', label: 'Back to Requisitions' }}
       commandBar={
         <ErpCommandBar
           inline
@@ -259,6 +272,14 @@ export function PurchaseRequisitionDomainDetailPage({
                   label: saving ? 'Saving…' : 'Save',
                   onClick: () => void save(),
                 }
+              : mode === 'view' && pr.status === 'draft' && perms.canSubmitRequisition
+                ? {
+                    id: 'submit',
+                    label: submitting ? 'Submitting…' : 'Submit',
+                    icon: Send,
+                    onClick: () => void submit(),
+                    disabled: submitting,
+                  }
               : undefined
           }
         />
