@@ -251,11 +251,11 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 |-------|-------|
 | Module | Purchase |
 | Description | PR/PO/GRN API |
-| Reason | **Partial** — Phase 16 QA + typecheck/coverage remediation done. Core PR + Planning/RFQ → draft PO verified. **Next: proper GRN backend.** |
-| Dependencies | Items, vendors (done); PR schema Phase 03 (done) |
-| Next step | GRN foundation (API + DB + RBAC + tests); then PO approval/release. Ensure `20260720170000_pr_line_purchase_order_track` on all envs. |
-| Test required | `npm run test:purchase-phase15` + `test:purchase-phase15-live` (includes coverage); `frontend` `typecheck` + `test:purchase-phase15-all` |
-| Status | partial (ready for GRN phase; PO lifecycle still open) |
+| Reason | **Partial** — PO lifecycle + inventory masters + GRN + Approvals + **Purchase Setup full persistence** (all editable tabs + enforcement) + Invoice/QI/Return APIs shipped 2026-07-21. Remaining gaps: richer inventory posting, reports, and fuller FE wiring for invoice/QI/return beyond Setup enforcement. |
+| Dependencies | Items, vendors (done); PR schema Phase 03 (done); PO lifecycle (done); Approvals queue (done); Setup 1A (done) |
+| Next step | Quality inspections / invoice / returns backends when prioritized. **Approvals next iteration:** backend Approval Matrix enforcement (amount bands → role chain, currently demo-only frontend config) + per-user Approval Limits, layered on the existing RBAC + self-approval policy. |
+| Test required | Setup **13/13**; PO lifecycle (warehouse resolution); GRN **15/15** (Setup policies); approvals 11/11 + flow 4/4. Continue quality/invoice suites next. |
+| Status | partial (Setup 1A done; quality/invoice/returns next) |
 
 ### P3-3: Inventory / production / quality / finance backends
 

@@ -1,3 +1,230 @@
+## 2026-07-21 — Purchase Setup full persistence
+
+### Shipped
+
+- Nested Purchase Setup API contract for General, Requisition, Number Series, Approval matrix, Tax, Invoice Matching, Receiving, Quality, and Print.
+- Prisma migration `20260721120000_purchase_setup_full_persistence` (+ status-history docs enum) — extended `purchase_settings`, approval tiers/roles, inspection categories, QI/Invoice/Return tables, CodeSeries entities `QUALITY_INSPECTION` / `PURCHASE_INVOICE` / `PURCHASE_RETURN`.
+- Atomic save with optimistic `version`, FK validation, non-overlapping approval bands, editable series prefix/pad (next number read-only).
+- Notifications tab remains visible, read-only, `ON_HOLD` — excluded from save payloads.
+- Frontend `/purchase/setup` is API-only in API mode (no Phase 1 “not persisted” notices; no silent demo merge).
+- Workflow enforcement: direct-PO / PR-before-PO, RFQ vendor count, GRN batch/serial/expiry + receiving flags, short-close, multi-level approval chain from persisted matrix, invoice matching/tax defaults via invoice module.
+
+### Verification
+
+- `npx tsc --noEmit` (backend) — **PASS**
+- `tests/purchase-setup.test.ts` — **15/15 PASS**
+- `tests/purchase-invoice-lifecycle.test.ts` — **4/4 PASS**
+- Frontend `tsc -p tsconfig.app.json` — **PASS**
+- Migrations applied to local `fos_erp` (including recovery after MySQL identifier-length fix)
+
+---
+
+## 2026-07-21 — Purchase Invoice, QI, and Return backend
+
+### Shipped
+
+- Added complete controller/service/repository/mapper/validation/workflow/routes stacks for Purchase Invoice, Quality Inspection, and Purchase Return.
+- Added explicit lifecycle endpoints and tenant-scoped, soft-delete-aware persistence.
+- Enforced Purchase Setup direct-invoice/matching/tolerance/tax defaults/authorized override, QI category/deviation/quarantine settings, and default vendor-return location.
+- Added canonical invoice/QI/return permissions and mounted `/purchase/invoices`, `/purchase/quality-inspections`, and `/purchase/returns`.
+- Document numbers use tenant code series entities only (`PURCHASE_INVOICE`, `QUALITY_INSPECTION`, `PURCHASE_RETURN`).
+
+### Verification
+
+- Backend typecheck — PASS.
+- `purchase-invoice-lifecycle.test.ts` — 4/4 PASS.
+- Purchase RBAC test — 4/4 PASS.
+- Combined purchase regression — 11/12; pre-existing planning create-PO concurrency case failed with both requests returning 400.
+
+## 2026-07-21 — Purchase create/edit footer standard
+
+### Shipped
+
+- Standardized all registered Purchase document editors (PR, RFQ, Vendor Quotation, PO, GRN, Return, Invoice), PO revision, Purchase master forms, and the Planning edit drawer on the shared responsive `FormActionBar`: **Cancel | Save** only.
+- Save now performs create/update only, uses single-flight duplicate-click protection, reports backend errors, and redirects to the explicit module list route after backend success.
+- Cancel uses stable list routes and the shared unsaved-changes confirmation; no browser confirm or history-back navigation.
+- Removed lifecycle Submit / Verify actions from editor footers. PR and Vendor Quotation Submit were added to their detail pages; PO, GRN, Return, and Invoice lifecycle actions remain on existing detail pages.
+- Added an explicit Purchase form route map and standardized the Planning Sheet edit drawer on the same shared action component.
+- Added `test:purchase-form-footers` (route/footer/API wiring, unsaved confirmation, mobile layout, duplicate click, and detail lifecycle contracts).
+
+### Verification
+
+- `npm run test:purchase-form-footers` — **80/80 PASS**
+- `npm run typecheck` — **PASS**
+- `npm run test:purchase:production` — **39/39 PASS** (runner uses `tsconfig.app.json` for path aliases)
+- `npm run build` — **PASS**
+- Targeted `oxlint` — **PASS** (4 pre-existing hook warnings in PO/VQ editors)
+- Full `npm run lint` remains non-zero because of the existing syntax error in `scripts/generate-uat-deliverables.ts` and the repository-wide warning baseline.
+- Full route/action audit: [`PURCHASE_FORM_FOOTER_AUDIT.md`](PURCHASE_FORM_FOOTER_AUDIT.md).
+
+---
+
+## 2026-07-21 — Purchase form number previews
+
+### Shipped
+
+- **Backend** — Non-consuming `GET …/next-number` for RFQ, Vendor Quotation, PO, and GRN (PR already had it)
+- **Frontend** — Create forms show the actual next sequence instead of “Auto-generated”; demo peeks for invoice/return
+- **Tests** — `purchase-number-previews.test.ts` **4/4**
+
+### Run
+
+```bash
+cd backend && npx vitest run tests/purchase-number-previews.test.ts
+cd frontend && npm run typecheck
+```
+
+---
+
+## 2026-07-21 — Self-approval policy (maker-checker override)
+
+### Shipped
+
+- **Schema** — `SelfApprovalPolicy` enum (`NEVER` / `PERMISSION_ONLY` / `EVERYONE`) + `PurchaseSettings.selfApprovalPolicy` (default `PERMISSION_ONLY`) — `20260721110000_self_approval_policy`, additive, applied
+- **Permission** — `purchase.approvals.self_approve` (238 perms synced); excluded from `PURCHASE_OPS` (Purchase Manager does NOT get it); Tenant Admin / Admin / Administrator / CEO get it via full grant sets
+- **Backend enforcement** — PR + PO `assertApprovable` accept `allowSelfApproval`; approve services resolve `isSelfApprovalAllowed(tenantId, actorPermissions)` (policy `EVERYONE` → yes; `PERMISSION_ONLY` → requires the permission; `NEVER` → maker-checker for all); controllers pass `req.context.permissions`; self-approvals audit `selfApproved: true` in `PR_APPROVED` / `PO_APPROVED` newValue
+- **Approvals queue** — `pending_mine` keeps the actor's own requests (and `canAct: true`) when self-approval is allowed; assigned-to-another-user check still applies
+- **Setup API + UI** — `selfApprovalPolicy` in setup GET/PUT/PATCH + defaults; Purchase Setup → Approval tab "Self-approval policy" select (Never / Permission-only (default) / Everyone)
+- **Tests** — `purchase-approval-flow.test.ts` 7/7 (new: permission-based self-approve + audit flag, NEVER blocks, EVERYONE allows); `purchase-approvals.test.ts` 11/11 (requester now provisioned without the bypass permission); backend + frontend typecheck PASS
+
+### Deferred (next iteration per product direction)
+
+Approval Matrix enforcement (amount bands → role chain) and per-user Approval Limits — currently demo-only frontend config; backend approvals remain single-level.
+
+### Run
+
+```bash
+cd backend && npx tsx scripts/prisma-cli.ts migrate deploy
+cd backend && npx tsx scripts/sync-permissions.ts
+cd backend && npx vitest run tests/purchase-approval-flow.test.ts tests/purchase-approvals.test.ts
+```
+
+---
+
+## 2026-07-21 — Purchase form number previews
+
+### Shipped
+
+- **Backend** — Non-consuming `GET …/next-number` for RFQ, Vendor Quotation, PO, and GRN (PR already had it); uses `previewNextCode` / `previewPurchaseDocumentNumber`
+- **Frontend** — New create forms show the actual next sequence (e.g. `GRN-000001`) instead of “Auto-generated”; demo peeks for invoice/return (no API series yet)
+- **Tests** — `backend/tests/purchase-number-previews.test.ts` **4/4** (non-consume, RBAC, tenant isolation)
+
+### Run
+
+```bash
+cd backend && npx vitest run tests/purchase-number-previews.test.ts
+cd frontend && npm run typecheck
+```
+
+---
+
+## 2026-07-21 — Purchase Setup Phase 1A (semantics 2A)
+
+### Shipped
+
+- **Schema** — `PurchaseSettings` + `PurchasePlantSettings`; `DuplicateChallanPolicy` enum; `PurchaseOrder.deliveryWarehouseId` FK (`20260721090000_purchase_setup_phase1`, additive, applied)
+- **Backend** — `GET/PUT/PATCH /purchase/setup` + plant overrides; defaults-on-empty GET (no persist-on-read); optimistic `version` concurrency; FK validation (plant/warehouse/location + CRM payment terms); audit `SETUP_*`; shared `purchase-defaults` resolution
+- **PO/GRN enforcement** — PO resolves/stores `deliveryWarehouseId` (explicit → PR → setup); `requirePoWarehouse` / expected delivery / payment terms on submit; GRN ignores client `allowExcess` and uses Setup over-receipt + tolerance; challan/vehicle/gate + duplicate challan policy; inspection default from Setup
+- **Permissions** — `purchase.setup.view` (+ existing manage); `sync-permissions.ts` (237 perms)
+- **Frontend** — `purchaseSetupApi` + facade (no API-mode memory fallback); Setup page 2A warehouse → dependent locations, CRM payment terms, unsaved guard, Phase-1 non-persisted tab notices; PR/PO/GRN drop first-warehouse fallback and prefill from Setup; `getPurchaseWarehouses` lazy-hydrates masters
+- **Tests** — `purchase-setup.test.ts` **13/13**; PO lifecycle warehouse/setup cases **3** added (suite pass); GRN setup policy cases **3** added (suite **15/15**); backend `tsc` + frontend `typecheck` **PASS**
+
+### Explicitly deferred (not Phase 1)
+
+Multi-level approval matrix, QI/Returns/Invoice Setup enforcement, currency master, number-series/print/notification/tax persistence (number series stays on `CodeSeries`).
+
+### Run
+
+```bash
+cd backend && npx tsx scripts/prisma-cli.ts migrate deploy
+cd backend && npx tsx scripts/sync-permissions.ts
+cd backend && npx vitest run tests/purchase-setup.test.ts tests/purchase-order-lifecycle.test.ts tests/goods-receipt-lifecycle.test.ts
+cd frontend && npm run typecheck
+```
+
+---
+
+## 2026-07-21 — Purchase Approvals queue (PR + PO, production API)
+
+### Shipped
+
+- **Backend** — `GET /purchase/approvals` (+ `GET /:id` review) from `PurchaseApproval` rows for PR + PO; orphan `PENDING_APPROVAL` docs healed into queue; RBAC via `purchase.pr/po.approve|view`
+- **PR send-back** — `POST /requisitions/:id/send-back` (pending → draft + reason); approval resolved as `RETURNED`; no longer uses reopen from Approvals
+- **Maker-checker + assignment** — PR/PO creators cannot approve their own documents; delegated approvals are actionable only by the assigned user; `pending_mine`, `approved_by_me`, and `rejected_by_me` are actor-scoped
+- **Delegation** — `POST /purchase/approvals/:id/delegate` validates a real active user with the required PR/PO approval permission and records delegation in status history
+- **Frontend** — Approvals page uses the live queue API (PR + PO); send-back uses the real PR endpoint; review shows named status-history actors and eligible live approvers; no hardcoded Finance Head or fake budget/matrix chrome
+- **Tests** — approval queue **11/11**, maker-checker/delegation flow **4/4**, full PR+PO+approval regression **26/26**, frontend API contract **9 assertions**, backend/app typechecks pass
+
+### Run
+
+```bash
+cd backend && npx vitest run tests/purchase-approvals.test.ts tests/purchase-approval-flow.test.ts --hookTimeout=120000
+cd frontend && npm run test:purchase-approvals-api
+```
+
+---
+
+## 2026-07-21 — GRN Phase 3 (production backend + FE wiring)
+
+### Shipped
+
+- **Schema** — `GoodsReceipt` + `GoodsReceiptLine`; `GoodsReceiptStatus` enum; `CodeSeriesEntity.GOODS_RECEIPT`; status-history doc type (`20260721080000_grn_phase3`, additive, applied)
+- **Backend** — GRN CRUD + `POST /:id/{submit,cancel,reverse}` + `GET /orders/:id/receivable-lines`; submit updates PO `receivedQuantity` + header `PARTIALLY_RECEIVED`/`FULLY_RECEIVED` in one transaction; reverse restores qty; warehouse master required; over-receipt blocked without `allowExcess`; duplicate challan blocked; RBAC (`purchase.grn.*`); audit + status history
+- **Frontend** — GRN list/editor/detail use real APIs in API mode; API-mode “not available” save/submit blocks removed; warehouse/location/bin dropdowns from Phase 2 masters
+- **Tests** — `backend/tests/goods-receipt-lifecycle.test.ts` (12 live) — all pass
+
+### Run
+
+```bash
+cd backend && npx vitest run tests/goods-receipt-lifecycle.test.ts
+cd frontend && npm run typecheck
+```
+
+---
+
+## 2026-07-21 — Inventory masters Phase 2 (Plant/Warehouse/Location/Bin)
+
+### Shipped
+
+- **Schema** — `MasterPlant` + `MasterBin` models; `MasterWarehouse.plantId` FK (`20260721070000_inventory_masters_phase2`, additive, applied)
+- **Backend** — registry-driven CRUD for `plants` / `bins` / `storage-locations` (alias of locations) via existing masters engine; hierarchy FK guards (warehouse→plant, bin→warehouse+location, location-must-match-warehouse, inactive parents blocked); reference guards block hard delete (plant←warehouses, warehouse←bins, location←bins); dependent list/lookup filters `plantId` / `warehouseId` / `storageLocationId`
+- **Routes** — `/api/v1/t/:slug/inventory/{plants|warehouses|storage-locations|bins}` alias (restricted) + existing `/masters/:resource`
+- **RBAC** — new `master.plant.*` + `master.bin.*` permissions; `scripts/sync-permissions.ts` (idempotent DB sync — 236 perms, roles re-granted)
+- **Seed** — `scripts/seed-inventory-setup.ts` (controlled): plants from warehouse plantCodes, links warehouses, default bin per location (vasant-trailers: 2 plants, 8 WH, 8 loc, 8 bins)
+- **Frontend** — GRN editor: warehouse free-text → API-backed `Select`; receiving location → dependent Select; line BIN → Select from bins lookup (API mode); warehouse master form supports production warehouse types (receiving/quality_hold/rejected/vendor_return/…)
+- **Tests** — `backend/tests/inventory-masters.test.ts` (17 live tests: hierarchy, unique codes, inactive blocks, delete guards, dependent filters, tenant isolation, RBAC, audit, persistence) — all pass
+
+### Run
+
+```bash
+cd backend && npx vitest run tests/inventory-masters.test.ts
+cd backend && npx tsx scripts/sync-permissions.ts
+cd backend && npx tsx scripts/seed-inventory-setup.ts [tenantSlug]
+```
+
+---
+
+## 2026-07-21 — PO lifecycle Phase 1 (production backend + FE wiring)
+
+### Shipped
+
+- **Schema** — `PurchaseOrderStatus` += `REJECTED`, `SENT_BACK`, `PARTIALLY_INVOICED`, `FULLY_INVOICED`; PO header `rejectedAt/rejectionReason/sentBackAt/sendBackReason`; PO line `acceptedQuantity/rejectedQuantity/returnedQuantity/invoicedQuantity` (`20260721060000_po_lifecycle_phase1`, additive, applied)
+- **Backend** — full PO CRUD + lifecycle: `POST /purchase/orders`, `PATCH /:id`, `POST /:id/{submit,approve,reject,send-back,send-to-vendor,cancel,close,reopen}` — RBAC per action, tenant-scoped, Zod-validated, transactional, status history + `PurchaseApproval` rows + audit logs; DTO includes `allowedActions` + line `openQuantity`
+- **Rules** — draft/sent-back editable only; reject/send-back require reason; only approved → send-to-vendor; receipts block cancel (close instead); reopen: rejected/cancelled→draft, closed→receipt-derived status; numbering via code-series only
+- **Frontend** — PO editor save/submit, detail lifecycle buttons (incl. new Reject / Send Back with `appPromptNote`), list row actions and approvals queue all hit real APIs in API mode; refetch after mutation; eligibility from backend `allowedActions`; manual PO create unblocked in API mode; API-mode block notice removed; `revisePurchaseOrder` explicitly NOT_SUPPORTED in API mode (no silent demo fallback)
+- **Domain** — FE `PurchaseOrderDomainStatus` += `rejected`, `sent_back`
+- **Tests** — `backend/tests/purchase-order-lifecycle.test.ts` (17 live tests: CRUD, all transitions, invalid transitions, tenant isolation, RBAC denial, audit logs, persistence) — all pass
+
+### Run
+
+```bash
+cd backend && npx vitest run tests/purchase-order-lifecycle.test.ts
+cd backend && npm run typecheck
+cd frontend && npm run typecheck
+```
+
+---
+
 ## 2026-07-20 — PR line PO track (read-only)
 
 ### Shipped

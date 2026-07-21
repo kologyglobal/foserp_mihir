@@ -1,6 +1,100 @@
+# Purchase backend lifecycle verification (2026-07-21)
+
+- `cd backend && npm run typecheck` — **PASS**.
+- `cd backend && npx vitest run tests/purchase-invoice-lifecycle.test.ts` — **4/4 PASS** (create/code series, direct-invoice policy, PO/GRN requirements, tolerance override).
+- Purchase RBAC regression — **4/4 PASS**.
+- Broader combined purchase run — **11/12 PASS**; one existing planning create-PO concurrency test returned `[400, 400]` instead of one `201` and is outside the new invoice/QI/return modules.
+
+## Purchase create/edit footer verification (2026-07-21)
+
+- `npm run test:purchase-form-footers` — **80/80 PASS** (registered editor footer, API wiring, redirect, duplicate-save, unsaved-confirmation, mobile layout, and detail lifecycle contracts).
+- `npm run typecheck` — **PASS**.
+- `npm run build` — **PASS** (existing Tailwind/chunk warnings only).
+- Targeted changed-file `oxlint` — **PASS** with four pre-existing hook dependency warnings.
+- Full `npm run lint` — **BLOCKED** by the existing syntax error in `scripts/generate-uat-deliverables.ts`.
+- `npm run test:purchase:production` — **39/39 PASS** (runner uses `tsconfig.app.json` for path aliases).
+
+See [`PURCHASE_FORM_FOOTER_AUDIT.md`](PURCHASE_FORM_FOOTER_AUDIT.md).
+
+---
+
+## Purchase create/edit footer standard — 2026-07-21
+
+- `cd frontend && npm run test:purchase-form-footers` — **80/80 PASS**
+  - Registered PR/RFQ/VQ/PO/GRN/Return/Invoice editors use shared Cancel | Save actions.
+  - Stable route-map redirects, unsaved confirmation, backend API wiring, lifecycle action placement, mobile widths, and duplicate-click single-flight behavior covered.
+- `cd frontend && npm run build` — **PASS**
+- `cd frontend && npm run test:purchase:production` — **39/39 PASS** (script now uses `tsconfig.app.json` for path aliases).
+- Targeted `oxlint` on changed files — **PASS** with four pre-existing hook dependency warnings.
+- Full `npm run lint` — non-zero on the existing repository-wide warning baseline; no changed-file lint errors.
+
+---
+
 # Testing Status
 
-Last run: **2026-07-20** (Purchase typecheck fix + coverage gap tests; prior Phase 16 QA).
+### 2026-07-21 — Self-approval policy (maker-checker override)
+
+| Check | Result |
+|-------|--------|
+| `purchase-approval-flow.test.ts` | **7/7 PASS** — new: PERMISSION_ONLY default allows holder of `purchase.approvals.self_approve` (queue `canAct` + approve + `selfApproved` audit flag); NEVER blocks everyone; EVERYONE allows without permission; legacy maker-checker/delegation/send-back still pass |
+| `purchase-approvals.test.ts` | **11/11 PASS** — requester provisioned without the bypass permission; self-approval block re-verified |
+| Migration `20260721110000_self_approval_policy` | **Applied** |
+| `sync-permissions.ts` | **PASS** (238 perms incl. `purchase.approvals.self_approve`) |
+| Backend `tsc --noEmit` | **PASS** |
+| Frontend `npm run typecheck` | **PASS** |
+
+---
+
+### 2026-07-21 — Purchase Setup full persistence
+
+| Check | Result |
+|-------|--------|
+| `purchase-setup.test.ts` | **15/15 PASS** — nested DTO round-trip, approval bands, number series prefix/pad, notifications ON_HOLD, version 409, FK/RBAC/tenant isolation, audit |
+| `purchase-invoice-lifecycle.test.ts` | **4/4 PASS** — matching / direct-invoice setup enforcement |
+| Backend `tsc --noEmit` | **PASS** |
+| Frontend `tsc -p tsconfig.app.json` | **PASS** |
+| Migrations `20260721120000_purchase_setup_full_persistence` + `20260721130000_purchase_status_history_docs` | **Applied** |
+
+### 2026-07-21 — Purchase Setup Phase 1A
+
+| Check | Result |
+|-------|--------|
+| `purchase-setup.test.ts` | Superseded by full persistence suite (was 13/13 on Phase 1A flat DTO) |
+| `purchase-order-lifecycle.test.ts` | **PASS** — includes deliveryWarehouseId resolution, `requirePoWarehouse`, retain warehouse after setup change |
+| `goods-receipt-lifecycle.test.ts` | **15/15 PASS** — Setup over-receipt tolerance (client `allowExcess` ignored), challan/vehicle/gate requirements |
+| Backend `tsc --noEmit` | **PASS** |
+| Frontend `npm run typecheck` | **PASS** |
+| `prisma validate` + migrate `20260721090000_purchase_setup_phase1` | **Applied** |
+| `sync-permissions.ts` | **PASS** (237 perms incl. `purchase.setup.view`) |
+
+---
+
+### 2026-07-21 — Purchase Planning Sheet E2E audit
+
+| Check | Result |
+|-------|--------|
+| `purchase-planning-workflow.test.ts` | **6/6 PASS** — net qty, transitions, Action Message + PO-ready codes |
+| `purchase-planning-sheet.test.ts` | **5/5 PASS** — approve→PPS sync, edit/bulk, create-po grouping, RFQ-required never syncs |
+| FE Create PO eligibility | Aligns with backend: Action Message + vendor_selected/approved/po_pending + vendor/qty/rate/date |
+| Who can Create PO | `purchase.planning.create_po` (Purchase Manager / Purchase Executive); Requester & Dept Manager cannot |
+| Frontend `/purchase/planning-sheet` HTTP | **200** |
+
+---
+
+Last run: **2026-07-21** (Purchase Planning Sheet E2E + approvals).
+
+### 2026-07-21 — Purchase approvals
+
+| Check | Result |
+|-------|--------|
+| `purchase-approvals.test.ts` | **11/11 PASS** — PR+PO queue/review/actions/RBAC/tenant/empty state |
+| `purchase-approval-flow.test.ts` | **4/4 PASS** — maker-checker, actor inbox, real-user delegation/assignment, PR send-back |
+| PR + PO + approval combined regression | **26/26 PASS** |
+| Frontend `test:purchase-approvals-api` | **PASS — 9 assertions** |
+| Backend typecheck | **PASS** |
+| Frontend app typecheck (`tsconfig.app.json`) | **PASS** |
+| Running API smoke | **PASS** — pending + history queue |
+| `/purchase/approvals` HTTP smoke | **200** |
 
 ### 2026-07-20 — Purchase typecheck + coverage gaps
 

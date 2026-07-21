@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified against codebase: **2026-07-20** (Purchase typecheck + coverage tests; Phase 16 QA report).
+Last verified against codebase: **2026-07-21** (Purchase Setup full persistence + Invoice/QI/Return).
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
@@ -370,18 +370,18 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | API mode | ✅ | Commercial path only |
 | Remaining gap | **Accepted deferral:** MRP / dispatch / invoice posting (verification report G2) |
 
-### Purchase (PR backend started; rest demo)
+### Purchase (PR–Return/Invoice/QI + Setup API)
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ⚠️ | Domain UI rich; PR/Planning/RFQ dual-mode API-backed; PR line grid shows read-only PO No. PO/GRN/invoice/returns/reports still demo. **FE typecheck PASS** (2026-07-20). |
-| Backend | ⚠️ | PR + Planning + RFQ/VQ/comparison/award→draft PO + Create PO from Planning; PR lines stamp `purchaseOrderId`/`purchaseOrderNumberSnapshot` + `CONVERTED` on PO create. Full PO approval/release and **GRN** remain deferred (next). |
-| DB | ⚠️ | Purchase schema + `20260720170000_pr_line_purchase_order_track` (deploy on all envs) |
-| API | ⚠️ | `/purchase/requisitions`, `/planning-sheet` (+ `create-po`), `/rfqs`, `/vendor-quotations`, `/comparisons`, timeline |
-| Tests | ⚠️ | Phase 15 unit **29** + integration **9** + coverage **4** + FE phase15 + E2E A/B |
-| Demo mode | ✅ | Full RFQ→VQ→comparison→award→PO + Planning→PO paths |
-| API mode | ⚠️ | Dual-mode for PR + Planning + RFQ flow + create-PO; not full Purchase surface |
-| Remaining gap | GRN backend (planned); PO approval/release; see Phase 16 report |
+| Frontend | ⚠️ | Domain UI rich; PR/Planning/RFQ/PO/GRN/Approvals/Setup dual-mode API-backed; **Purchase Setup** full nested API persistence (all editable tabs). Notifications ON_HOLD read-only. Registered editors use **Cancel \| Save**. Invoice/returns/QI UI still partially demo-oriented for some screens. **FE typecheck PASS** (2026-07-21). |
+| Backend | ⚠️ | PR + Planning + RFQ/VQ/comparison + PO + GRN + **Quality Inspection + Purchase Invoice + Purchase Return** lifecycles + Approvals + **Purchase Setup full persistence** with workflow enforcement. |
+| DB | ⚠️ | Purchase schema + PO + inventory masters + GRN + Setup migrations (deploy on all envs) |
+| API | ⚠️ | Existing routes plus `/purchase/invoices`, `/purchase/quality-inspections`, and `/purchase/returns` with explicit lifecycle actions. |
+| Tests | ⚠️ | Invoice policy/lifecycle unit coverage **4/4**; backend typecheck pass. Existing setup, PO, GRN, approvals, Phase 15, and inventory-master suites remain. |
+| Demo mode | ✅ | Full RFQ→VQ→comparison→award→PO + Planning→PO paths; Setup via `purchaseService` |
+| API mode | ⚠️ | Backend APIs now cover PR through PO/GRN/QI/invoice/return; frontend hydration remains to be wired for QI/invoice/return. |
+| Remaining gap | Inventory posting on GRN; QI/invoice/return frontend wiring; Setup deferred tabs; dashboard KPIs; reports |
 
 ### Inventory / Production / Quality / Maintenance / Finance (invoices)
 
