@@ -45,6 +45,7 @@ export const DEMO_PERMISSION_NAMES = [
   'purchase.invoice.view', 'purchase.invoice.create', 'purchase.invoice.verify', 'purchase.invoice.approve', 'purchase.invoice.post',
   'purchase.return.view', 'purchase.return.create', 'purchase.return.post',
   'purchase.reports.view',
+  'purchase.setup.view',
   'purchase.setup.manage',
 ] as const
 
@@ -58,7 +59,9 @@ export const seedPermissionCatalog: AdminPermission[] = DEMO_PERMISSION_NAMES.ma
 const ALL_PERMS = DEMO_PERMISSION_NAMES as readonly string[]
 const MASTER_VIEW = ALL_PERMS.filter((p) => p.startsWith('master.') && p.endsWith('.view'))
 const PURCHASE_ALL = ALL_PERMS.filter((p) => p.startsWith('purchase.'))
-const PURCHASE_OPS = PURCHASE_ALL.filter((p) => p !== 'purchase.setup.manage')
+const PURCHASE_OPS = PURCHASE_ALL.filter(
+  (p) => p !== 'purchase.setup.manage' && p !== 'purchase.setup.view',
+)
 
 const ROLE_PERMISSION_DEMO: Record<string, string[]> = {
   'Super Admin': [...ALL_PERMS],

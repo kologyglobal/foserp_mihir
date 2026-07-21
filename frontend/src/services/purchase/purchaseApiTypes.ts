@@ -71,11 +71,28 @@ export type ApiPurchaseOrderStatus =
   | 'draft'
   | 'pending_approval'
   | 'approved'
+  | 'rejected'
+  | 'sent_back'
   | 'sent_to_vendor'
   | 'partially_received'
   | 'fully_received'
+  | 'partially_invoiced'
+  | 'fully_invoiced'
   | 'cancelled'
   | 'closed'
+
+export interface ApiPurchaseOrderAllowedActions {
+  canEdit: boolean
+  canSubmit: boolean
+  canApprove: boolean
+  canReject: boolean
+  canSendBack: boolean
+  canSendToVendor: boolean
+  canCancel: boolean
+  canClose: boolean
+  canReopen: boolean
+  canReceive: boolean
+}
 
 /* ─── Requisition ─── */
 
@@ -296,6 +313,14 @@ export interface ApiRecalculatePlanningPayload {
 export interface ApiRfqVendor {
   id: string
   vendorId: string
+  vendorCode?: string
+  vendorName?: string
+  gstin?: string
+  state?: string
+  contactPerson?: string
+  contactEmail?: string
+  contactPhone?: string
+  vendorRating?: number | null
   inviteStatus: string
   invitedAt: string | null
   respondedAt: string | null
@@ -323,6 +348,10 @@ export interface ApiRequestForQuotation {
   rfqNumber: string
   rfqDate: string | null
   purchaseRequisitionId: string | null
+  purchaseRequisitionNumber?: string | null
+  warehouseId?: string | null
+  warehouseCode?: string
+  warehouseName?: string
   title: string | null
   responseDueDate: string | null
   status: ApiRfqStatus | string
@@ -330,6 +359,7 @@ export interface ApiRequestForQuotation {
   sentAt?: string | null
   closedAt?: string | null
   createdById?: string | null
+  createdByName?: string | null
   updatedById?: string | null
   vendors?: ApiRfqVendor[]
   lines?: ApiRfqLine[]
@@ -358,7 +388,13 @@ export interface ApiVendorQuotation {
   quotationNumber: string
   quotationDate: string | null
   requestForQuotationId: string | null
+  requestForQuotationNumber?: string | null
   vendorId: string
+  vendorCode?: string
+  vendorName?: string
+  vendorGstin?: string
+  vendorState?: string
+  vendorReferenceNumber?: string | null
   status: ApiVendorQuotationStatus | string
   currencyCode?: string
   validUntil?: string | null
@@ -392,6 +428,11 @@ export interface ApiPurchaseOrderLine {
   rate: number
   amount: number
   receivedQuantity?: number
+  acceptedQuantity?: number
+  rejectedQuantity?: number
+  returnedQuantity?: number
+  invoicedQuantity?: number
+  openQuantity?: number
   requiredDate: string | null
   purchaseRequisitionLineId: string | null
   purchasePlanningRowId: string | null
@@ -421,6 +462,10 @@ export interface ApiPurchaseOrder {
   expectedDeliveryDate?: string | null
   paymentTerms?: string | null
   deliveryTerms?: string | null
+  deliveryWarehouseId?: string | null
+  deliveryWarehouseCode?: string
+  deliveryWarehouseName?: string
+  deliveryWarehousePlantId?: string | null
   subtotalAmount?: number
   taxAmount?: number
   freightAmount?: number
@@ -428,15 +473,185 @@ export interface ApiPurchaseOrder {
   remarks?: string | null
   submittedAt?: string | null
   approvedAt?: string | null
+  rejectedAt?: string | null
+  rejectionReason?: string | null
+  sentBackAt?: string | null
+  sendBackReason?: string | null
   sentAt?: string | null
   closedAt?: string | null
   cancelledAt?: string | null
+  allowedActions?: ApiPurchaseOrderAllowedActions
   lines?: ApiPurchaseOrderLine[]
   createdAt?: string | null
   updatedAt?: string | null
+}
+
+export interface ApiPurchaseOrderLineInput {
+  id?: string
+  lineNumber?: number
+  itemId?: string | null
+  itemCode?: string | null
+  itemName?: string | null
+  description?: string | null
+  quantity: number
+  uomId?: string | null
+  rate?: number
+  requiredDate?: string | null
+  remarks?: string | null
+  purchaseRequisitionLineId?: string | null
+  purchasePlanningRowId?: string | null
+}
+
+export interface ApiPurchaseOrderInput {
+  orderDate?: string
+  vendorId: string
+  purchaseRequisitionId?: string | null
+  expectedDeliveryDate?: string | null
+  currencyCode?: string
+  paymentTerms?: string | null
+  deliveryTerms?: string | null
+  deliveryWarehouseId?: string | null
+  freightAmount?: number
+  taxAmount?: number
+  remarks?: string | null
+  lines: ApiPurchaseOrderLineInput[]
 }
 
 export interface ApiCreatePoFromPlanningPayload {
   rowIds: string[]
   seriesPrefix?: string
 }
+
+export type ApiGoodsReceiptStatus =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'RECEIVING_COMPLETED'
+  | 'QC_PENDING'
+  | 'PARTIALLY_ACCEPTED'
+  | 'FULLY_ACCEPTED'
+  | 'INVENTORY_POSTED'
+  | 'CANCELLED'
+  | 'REVERSED'
+  | 'CLOSED'
+  | string
+
+export interface ApiGoodsReceiptAllowedActions {
+  canEdit: boolean
+  canSubmit: boolean
+  canCancel: boolean
+  canReverse: boolean
+}
+
+export interface ApiGoodsReceiptLine {
+  id: string
+  lineNumber: number
+  purchaseOrderLineId: string
+  itemId: string | null
+  itemCode: string
+  itemName: string
+  description: string | null
+  uomId: string | null
+  uom: string
+  orderedQuantity: number
+  previouslyReceivedQuantity: number
+  openQuantity: number
+  challanQuantity: number
+  receivedQuantity: number
+  damagedQuantity: number
+  shortQuantity: number
+  excessQuantity: number
+  acceptedForQcQuantity: number
+  acceptedQuantity: number
+  rejectedQuantity: number
+  rate: number
+  amount: number
+  warehouseId: string | null
+  storageLocationId: string | null
+  binId: string | null
+  binCode: string
+  batchNumber: string | null
+  heatNumber: string | null
+  lotNumber: string | null
+  serialNumber: string | null
+  manufacturingDate: string | null
+  expiryDate: string | null
+  qcRequired: boolean
+  remarks: string | null
+}
+
+export interface ApiGoodsReceipt {
+  id: string
+  grnNumber: string
+  documentNumber: string
+  receiptDate: string | null
+  documentDate: string | null
+  status: ApiGoodsReceiptStatus
+  purchaseOrderId: string
+  purchaseOrderNumber: string
+  vendorId: string
+  vendorCode: string
+  vendorName: string
+  vendorGstin: string
+  plantId: string | null
+  warehouseId: string
+  warehouseCode: string
+  warehouseName: string
+  storageLocationId: string | null
+  storageLocationCode: string
+  storageLocationName: string
+  vendorChallanNumber: string | null
+  vendorChallanDate: string | null
+  vendorInvoiceNumber: string | null
+  vehicleNumber: string | null
+  transporterName: string | null
+  lrNumber: string | null
+  gateEntryNumber: string | null
+  receivedById: string | null
+  receivedByName: string | null
+  inspectionRequired: boolean
+  allowExcess: boolean
+  remarks: string | null
+  submittedAt: string | null
+  cancelledAt: string | null
+  reversedAt: string | null
+  closedAt: string | null
+  createdAt: string | null
+  updatedAt: string | null
+  lineCount: number
+  totalReceivedQty: number
+  totalAcceptedQty: number
+  totalRejectedQty: number
+  totalAmount: number
+  currencyCode: string
+  expectedDeliveryDate: string | null
+  paymentTerms: string
+  deliveryTerms: string
+  allowedActions: ApiGoodsReceiptAllowedActions
+  lines: ApiGoodsReceiptLine[]
+}
+
+export interface ApiReceivableLine {
+  purchaseOrderLineId: string
+  lineNumber: number
+  itemId: string | null
+  itemCode: string
+  itemName: string
+  description: string | null
+  uomId: string | null
+  uom: string
+  orderedQuantity: number
+  previouslyReceivedQuantity: number
+  openQuantity: number
+  rate: number
+}
+
+export interface ApiReceivableLinesResponse {
+  purchaseOrderId: string
+  orderNumber: string
+  status: string
+  vendorId: string
+  vendorCode: string
+  vendorName: string
+  lines: ApiReceivableLine[]
+}
+

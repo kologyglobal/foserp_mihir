@@ -58,6 +58,8 @@ export const PURCHASE_PERMISSIONS = [
   'purchase.po.send',
   'purchase.po.cancel',
   'purchase.po.close',
+  /** Maker-checker bypass — approve own PR/PO when Setup policy = PERMISSION_ONLY. */
+  'purchase.approvals.self_approve',
   'purchase.grn.view',
   'purchase.grn.create',
   'purchase.grn.post',
@@ -72,6 +74,7 @@ export const PURCHASE_PERMISSIONS = [
   'purchase.return.create',
   'purchase.return.post',
   'purchase.reports.view',
+  'purchase.setup.view',
   'purchase.setup.manage',
 ] as const
 
@@ -142,7 +145,9 @@ const PURCHASE_EXECUTIVE: PurchasePermission[] = [
 ]
 
 /** Broad purchase ops; setup reserved for Administrator. */
-const PURCHASE_MANAGER: PurchasePermission[] = ALL.filter((p) => p !== 'purchase.setup.manage')
+const PURCHASE_MANAGER: PurchasePermission[] = ALL.filter(
+  (p) => p !== 'purchase.setup.manage' && p !== 'purchase.setup.view',
+)
 
 const STORE_EXECUTIVE: PurchasePermission[] = [
   'purchase.view',
@@ -250,8 +255,8 @@ export const PURCHASE_ROUTE_VIEW_PERMISSIONS: Array<{
   permission: PurchasePermission
   pageName: string
 }> = [
-  { prefix: '/purchase/setup', permission: 'purchase.setup.manage', pageName: 'Purchase Setup' },
-  { prefix: '/purchase/masters', permission: 'purchase.setup.manage', pageName: 'Purchase Masters' },
+  { prefix: '/purchase/setup', permission: 'purchase.setup.view', pageName: 'Purchase Setup' },
+  { prefix: '/purchase/masters', permission: 'purchase.setup.view', pageName: 'Purchase Masters' },
   { prefix: '/purchase/approvals', permission: 'purchase.pr.approve', pageName: 'Purchase Approvals' },
   { prefix: '/purchase/requisitions', permission: 'purchase.pr.view', pageName: 'Purchase Requisitions' },
   { prefix: '/purchase/planning-sheet', permission: 'purchase.planning.view', pageName: 'Purchase Planning Sheet' },
@@ -286,8 +291,8 @@ export const PURCHASE_NAV_ITEM_PERMISSIONS: Record<string, PurchasePermission> =
   '/purchase/returns': 'purchase.return.view',
   '/purchase/vendor-performance': 'purchase.reports.view',
   '/purchase/reports': 'purchase.reports.view',
-  '/purchase/setup': 'purchase.setup.manage',
-  '/purchase/masters': 'purchase.setup.manage',
+  '/purchase/setup': 'purchase.setup.view',
+  '/purchase/masters': 'purchase.setup.view',
 }
 
 function demoPermissionsForRole(role: ErpRole): Set<string> | '*' {

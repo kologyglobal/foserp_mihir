@@ -20,6 +20,7 @@ import type {
   PurchaseItem,
   PurchaseItemCategory,
   PurchaseOrder,
+  PurchaseOrderInput,
   PurchaseOrderLinkedDocuments,
   PurchaseOrderListRow,
   PurchasePlanningSheetInput,
@@ -27,6 +28,7 @@ import type {
   PurchaseRequisition,
   PurchaseRequisitionInput,
   PurchaseRequisitionListRow,
+  PurchaseSetup,
   QuotationComparison,
   QuotationComparisonInput,
   QuotationSelectionMode,
@@ -37,26 +39,28 @@ import type {
   VendorQuotationInput,
   VendorQuotationListRow,
   RfqListRow,
+  GoodsReceiptNote,
+  GrnInput,
+  GrnListRow,
 } from '../../types/purchaseDomain'
-import {
-  PURCHASE_APPROVAL_DOCUMENT_TYPE_LABELS,
-  PURCHASE_APPROVAL_STATUS_LABELS,
-  PURCHASE_REQUISITION_PRIORITY_LABELS,
-} from '../../types/purchaseDomain'
-import { prDepartmentLabel } from '../../utils/purchaseRequisitionValidation'
-import { getStoredSession } from '../api/client'
+import { ApiError } from '../api/apiErrors'
 import * as demo from './purchaseService'
-import { PurchaseServiceError } from './purchaseService'
+import { PurchaseServiceError, type PurchaseOrderSeriesOption } from './purchaseService'
 import * as prApi from './purchaseRequisitionApi'
+import * as approvalApi from './purchaseApprovalApi'
 import * as planningApi from './purchasePlanningApi'
 import * as rfqApi from './rfqApi'
 import * as vqApi from './vendorQuotationApi'
 import * as comparisonApi from './comparisonApi'
 import * as poApi from './purchaseOrderApi'
+import * as grnApi from './goodsReceiptApi'
+import * as setupApi from '../api/purchaseSetupApi'
 import {
   formatPurchaseApiError,
   isBackendMissingError,
   mapApiComparisonToDomain,
+  mapApiGoodsReceiptToDomain,
+  mapApiGoodsReceiptToListRow,
   mapApiPlanningRowToDomain,
   mapApiPurchaseOrderToDomain,
   mapApiPurchaseOrderToListRow,
@@ -66,7 +70,9 @@ import {
   mapApiRfqToListRow,
   mapApiVendorQuotationToDomain,
   mapApiVendorQuotationToListRow,
+  mapDomainGrnInputToApiPayload,
   mapDomainInputToApiPayload,
+  mapDomainPoInputToApiPayload,
   mapDomainRfqInputToApiPayload,
   mapDomainVendorQuotationInputToApiPayload,
   mapPlanningPatchToApi,
@@ -123,6 +129,60 @@ export async function previewNextPurchaseRequisitionNumber(): Promise<string> {
   } catch (err) {
     throwApi(err)
   }
+}
+
+/** Peek next RFQ number without consuming the series. */
+export async function previewNextRfqNumber(): Promise<string> {
+  if (!isApiMode()) return demo.previewNextRfqNumber()
+  try {
+    const res = await rfqApi.previewNextRfqNumberApi()
+    return res.data.rfqNumber
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+/** Peek next vendor quotation number without consuming the series. */
+export async function previewNextVendorQuotationNumber(): Promise<string> {
+  if (!isApiMode()) return demo.previewNextVendorQuotationNumber()
+  try {
+    const res = await vqApi.previewNextVendorQuotationNumberApi()
+    return res.data.quotationNumber
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+/** Peek next PO number without consuming the series. */
+export async function previewNextPurchaseOrderNumber(): Promise<string> {
+  if (!isApiMode()) return demo.previewNextPurchaseOrderNumber()
+  try {
+    const res = await poApi.previewNextPurchaseOrderNumberApi()
+    return res.data.orderNumber
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+/** Peek next GRN number without consuming the series. */
+export async function previewNextGoodsReceiptNumber(): Promise<string> {
+  if (!isApiMode()) return demo.previewNextGoodsReceiptNumber()
+  try {
+    const res = await grnApi.previewNextGoodsReceiptNumberApi()
+    return res.data.grnNumber
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+/** Peek next invoice number (demo-only; no API series yet). */
+export async function previewNextPurchaseInvoiceNumber(): Promise<string> {
+  return demo.previewNextPurchaseInvoiceNumber()
+}
+
+/** Peek next return number (demo-only; no API series yet). */
+export async function previewNextPurchaseReturnNumber(): Promise<string> {
+  return demo.previewNextPurchaseReturnNumber()
 }
 
 export async function getPurchaseRequisitionListSummary(): Promise<{
@@ -265,8 +325,22 @@ export async function getPurchasePlanningSheet(): Promise<PurchasePlanningSheetR
   if (!isApiMode()) return demo.getPurchasePlanningSheet()
   try {
     await ensureMasterVendorsForMapping()
-    const res = await planningApi.listPlanningSheetApi({ page: 1, pageSize: 100, sortOrder: 'desc' })
-    return res.data.map(mapApiPlanningRowToDomain)
+    const pageSize = 100
+    let page = 1
+    const rows: ReturnType<typeof mapApiPlanningRowToDomain>[] = []
+    for (;;) {
+      const res = await planningApi.listPlanningSheetApi({
+        page,
+        pageSize,
+        sortOrder: 'desc',
+      })
+      rows.push(...res.data.map(mapApiPlanningRowToDomain))
+      const total = res.meta?.total ?? rows.length
+      if (rows.length >= total || res.data.length < pageSize) break
+      page += 1
+      if (page > 50) break
+    }
+    return rows
   } catch (err) {
     throwApi(err)
   }
@@ -672,6 +746,138 @@ export async function getPurchaseOrderList(): Promise<PurchaseOrderListRow[]> {
   }
 }
 
+/* ─── Purchase Orders (create / update / lifecycle) — backend is source of truth ─── */
+
+export async function createPurchaseOrder(input: PurchaseOrderInput): Promise<PurchaseOrder> {
+  if (!isApiMode()) return demo.createPurchaseOrder(input)
+  try {
+    const res = await poApi.createPurchaseOrderApi(
+      mapDomainPoInputToApiPayload(input) as unknown as Record<string, unknown>,
+    )
+    return mapApiPurchaseOrderToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function updatePurchaseOrder(
+  id: string,
+  input: PurchaseOrderInput,
+): Promise<PurchaseOrder> {
+  if (!isApiMode()) return demo.updatePurchaseOrder(id, input)
+  try {
+    const res = await poApi.updatePurchaseOrderApi(
+      id,
+      mapDomainPoInputToApiPayload(input) as unknown as Record<string, unknown>,
+    )
+    return mapApiPurchaseOrderToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function submitPurchaseOrder(id: string): Promise<PurchaseOrder> {
+  if (!isApiMode()) return demo.submitPurchaseOrder(id)
+  try {
+    const res = await poApi.submitPurchaseOrderApi(id, {})
+    return mapApiPurchaseOrderToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function approvePurchaseOrder(id: string, remarks = ''): Promise<PurchaseOrder> {
+  if (!isApiMode()) return demo.approvePurchaseOrder(id, remarks)
+  try {
+    const res = await poApi.approvePurchaseOrderApi(id, remarks ? { remarks } : {})
+    return mapApiPurchaseOrderToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function rejectPurchaseOrder(id: string, reason: string): Promise<PurchaseOrder> {
+  if (!isApiMode()) {
+    throw new PurchaseServiceError('NOT_SUPPORTED', 'PO rejection requires API mode.')
+  }
+  try {
+    const res = await poApi.rejectPurchaseOrderApi(id, { reason })
+    return mapApiPurchaseOrderToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function sendBackPurchaseOrder(id: string, reason: string): Promise<PurchaseOrder> {
+  if (!isApiMode()) {
+    throw new PurchaseServiceError('NOT_SUPPORTED', 'PO send-back requires API mode.')
+  }
+  try {
+    const res = await poApi.sendBackPurchaseOrderApi(id, { reason })
+    return mapApiPurchaseOrderToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+/** "Release" maps to send-to-vendor on the backend (approved → sent_to_vendor). */
+export async function releasePurchaseOrder(id: string): Promise<PurchaseOrder> {
+  if (!isApiMode()) return demo.releasePurchaseOrder(id)
+  return sendPurchaseOrderToVendor(id)
+}
+
+export async function sendPurchaseOrderToVendor(id: string): Promise<PurchaseOrder> {
+  if (!isApiMode()) return demo.sendPurchaseOrderToVendor(id)
+  try {
+    const res = await poApi.sendPurchaseOrderToVendorApi(id, {})
+    return mapApiPurchaseOrderToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function cancelPurchaseOrder(id: string, reason = ''): Promise<PurchaseOrder> {
+  if (!isApiMode()) return demo.cancelPurchaseOrder(id, reason)
+  try {
+    const res = await poApi.cancelPurchaseOrderApi(id, reason ? { remarks: reason } : {})
+    return mapApiPurchaseOrderToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function closePurchaseOrder(id: string): Promise<PurchaseOrder> {
+  if (!isApiMode()) return demo.closePurchaseOrder(id)
+  try {
+    const res = await poApi.closePurchaseOrderApi(id, {})
+    return mapApiPurchaseOrderToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function reopenPurchaseOrder(id: string): Promise<PurchaseOrder> {
+  if (!isApiMode()) return demo.reopenPurchaseOrder(id)
+  try {
+    const res = await poApi.reopenPurchaseOrderApi(id, {})
+    return mapApiPurchaseOrderToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+/** PO revision (versioned amendments) has no backend yet — never simulate it in API mode. */
+export async function revisePurchaseOrder(
+  id: string,
+  input: Parameters<typeof demo.revisePurchaseOrder>[1],
+): Promise<PurchaseOrder> {
+  if (!isApiMode()) return demo.revisePurchaseOrder(id, input)
+  throw new PurchaseServiceError(
+    'PURCHASE_API_NOT_IMPLEMENTED',
+    'PO revision is not available yet. Reopen or edit the draft/sent-back PO instead.',
+  )
+}
+
 export async function getPurchaseOrderLinkedDocuments(
   id: string,
 ): Promise<PurchaseOrderLinkedDocuments> {
@@ -705,6 +911,107 @@ export async function getPurchaseOrderLinkedDocuments(
     grns: [],
     invoices: [],
     returns: [],
+  }
+}
+
+/* ─── Goods Receipt Notes (GRN) ─── */
+
+export async function getGRNs(): Promise<GoodsReceiptNote[]> {
+  if (!isApiMode()) return demo.getGRNs()
+  try {
+    const res = await grnApi.listGoodsReceiptsApi({ page: 1, pageSize: 100, sortOrder: 'desc' })
+    return res.data.map(mapApiGoodsReceiptToDomain)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function getGrnList(): Promise<GrnListRow[]> {
+  if (!isApiMode()) return demo.getGrnList()
+  try {
+    const res = await grnApi.listGoodsReceiptsApi({ page: 1, pageSize: 100, sortOrder: 'desc' })
+    return res.data.map(mapApiGoodsReceiptToListRow)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function getGRNById(id: string): Promise<GoodsReceiptNote | null> {
+  if (!isApiMode()) return demo.getGRNById(id)
+  try {
+    const res = await grnApi.getGoodsReceiptApi(id)
+    return mapApiGoodsReceiptToDomain(res.data)
+  } catch (err) {
+    if (isBackendMissingError(err)) return null
+    const { code } = formatPurchaseApiError(err)
+    if (code === 'GRN_NOT_FOUND' || code === 'NOT_FOUND') return null
+    throwApi(err)
+  }
+}
+
+export async function createGRNFromPo(input: GrnInput): Promise<GoodsReceiptNote> {
+  if (!isApiMode()) return demo.createGRNFromPo(input)
+  try {
+    const res = await grnApi.createGoodsReceiptApi(mapDomainGrnInputToApiPayload(input))
+    return mapApiGoodsReceiptToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function createGRN(input: GrnInput): Promise<GoodsReceiptNote> {
+  return createGRNFromPo(input)
+}
+
+export async function updateGRN(id: string, input: Partial<GrnInput>): Promise<GoodsReceiptNote> {
+  if (!isApiMode()) return demo.updateGRN(id, input)
+  try {
+    const payload = mapDomainGrnInputToApiPayload({
+      purchaseOrderId: input.purchaseOrderId || '',
+      lines: input.lines || [],
+      ...input,
+    } as GrnInput)
+    // purchaseOrderId cannot change on update
+    delete payload.purchaseOrderId
+    if (!input.lines) delete payload.lines
+    const res = await grnApi.updateGoodsReceiptApi(id, payload)
+    return mapApiGoodsReceiptToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function submitGRN(id: string): Promise<GoodsReceiptNote> {
+  if (!isApiMode()) return demo.submitGRN(id)
+  try {
+    const res = await grnApi.submitGoodsReceiptApi(id, {})
+    return mapApiGoodsReceiptToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function cancelGRN(id: string, remarks = ''): Promise<GoodsReceiptNote> {
+  if (!isApiMode()) {
+    throw new PurchaseServiceError('NOT_SUPPORTED', 'Cancel GRN is only available in API mode.')
+  }
+  try {
+    const res = await grnApi.cancelGoodsReceiptApi(id, remarks ? { remarks } : {})
+    return mapApiGoodsReceiptToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function reverseGRN(id: string, remarks = ''): Promise<GoodsReceiptNote> {
+  if (!isApiMode()) {
+    throw new PurchaseServiceError('NOT_SUPPORTED', 'Reverse GRN is only available in API mode.')
+  }
+  try {
+    const res = await grnApi.reverseGoodsReceiptApi(id, remarks ? { remarks } : {})
+    return mapApiGoodsReceiptToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
   }
 }
 
@@ -1044,62 +1351,6 @@ export async function createPurchaseOrderFromComparison(
   }
 }
 
-function daysSince(iso: string | null | undefined): number {
-  if (!iso) return 0
-  const t = Date.parse(iso)
-  if (Number.isNaN(t)) return 0
-  return Math.max(0, Math.floor((Date.now() - t) / 86_400_000))
-}
-
-function mapPrToApprovalQueueRow(pr: PurchaseRequisition): PurchaseApprovalQueueRow {
-  const status =
-    pr.status === 'approved'
-      ? 'approved'
-      : pr.status === 'rejected'
-        ? 'rejected'
-        : pr.status === 'cancelled'
-          ? 'cancelled'
-          : 'pending'
-  const session = getStoredSession()
-  const canAct =
-    status === 'pending' &&
-    Boolean(
-      session?.user?.permissions?.includes('purchase.pr.approve') ||
-        session?.user?.permissions?.includes('tenant.manage'),
-    )
-  const warehouses = useMasterStore.getState().warehouses
-  const wh = warehouses.find((w) => w.id === pr.location.id)
-  const submittedDate = pr.updatedAt || pr.createdAt
-  return {
-    approvalId: pr.id,
-    documentType: 'purchase_requisition',
-    documentTypeLabel: PURCHASE_APPROVAL_DOCUMENT_TYPE_LABELS.purchase_requisition,
-    documentId: pr.id,
-    documentNumber: pr.documentNumber,
-    documentDate: pr.documentDate,
-    requestedBy: pr.requester.name || pr.requester.id || '—',
-    requesterId: pr.requester.id,
-    department: prDepartmentLabel(pr.department || ''),
-    locationId: pr.location.id,
-    locationName: pr.location.name || wh?.warehouseName || wh?.warehouseCode || '—',
-    amount: pr.totalAmount,
-    priority: pr.priority,
-    priorityLabel: PURCHASE_REQUISITION_PRIORITY_LABELS[pr.priority],
-    submittedDate,
-    pendingSinceDays: daysSince(submittedDate),
-    approvalLevel: 1,
-    approvalLevelLabel: '1 of 1 · Approver',
-    chainLength: 1,
-    status,
-    statusLabel: PURCHASE_APPROVAL_STATUS_LABELS[status],
-    approverId: '',
-    approverName: '',
-    approverRole: 'purchase_head',
-    approverRoleLabel: 'Purchase Head',
-    canAct: canAct || status === 'pending',
-  }
-}
-
 function applyApprovalQueueFilters(
   rows: PurchaseApprovalQueueRow[],
   filters: PurchaseApprovalQueueFilters = {},
@@ -1129,36 +1380,30 @@ function applyApprovalQueueFilters(
   })
 }
 
-/** Approvals inbox — API mode uses pending/approved/rejected PRs from backend. */
+/** Approvals inbox — API mode uses GET /purchase/approvals (PR + PO). */
 export async function getPurchaseApprovalQueue(
   tab: PurchaseApprovalQueueTab = 'pending_mine',
   filters: PurchaseApprovalQueueFilters = {},
 ): Promise<PurchaseApprovalQueueRow[]> {
   if (!isApiMode()) return demo.getPurchaseApprovalQueue(tab, filters)
   try {
-    const statusByTab: Record<PurchaseApprovalQueueTab, string | undefined> = {
-      pending_mine: 'PENDING_APPROVAL',
-      approved_by_me: 'APPROVED',
-      rejected_by_me: 'REJECTED',
-      all_history: undefined,
-    }
-    const status = statusByTab[tab]
-    const res = await prApi.listPurchaseRequisitionsApi({
+    const documentType =
+      filters.documentType === 'purchase_requisition'
+        ? 'PURCHASE_REQUISITION'
+        : filters.documentType === 'purchase_order'
+          ? 'PURCHASE_ORDER'
+          : undefined
+    const res = await approvalApi.listPurchaseApprovalsApi({
       page: 1,
       limit: 100,
-      sortOrder: 'desc',
-      ...(status ? { status } : {}),
+      tab,
+      documentType,
+      documentNumber: filters.documentNumber,
+      requester: filters.requester,
+      department: filters.department,
+      locationId: filters.locationId,
     })
-    let rows = res.data
-      .map(mapApiRequisitionToDomain)
-      .filter((pr) => {
-        if (tab === 'pending_mine') return pr.status === 'pending_approval'
-        if (tab === 'approved_by_me') return pr.status === 'approved'
-        if (tab === 'rejected_by_me') return pr.status === 'rejected'
-        return ['pending_approval', 'approved', 'rejected', 'cancelled'].includes(pr.status)
-      })
-      .map(mapPrToApprovalQueueRow)
-      .sort((a, b) => b.submittedDate.localeCompare(a.submittedDate))
+    let rows = res.data ?? []
     rows = applyApprovalQueueFilters(rows, filters)
     return rows
   } catch (err) {
@@ -1171,32 +1416,16 @@ export async function getPurchaseApprovalReview(
 ): Promise<PurchaseApprovalReviewDetail> {
   if (!isApiMode()) return demo.getPurchaseApprovalReview(approvalId)
   try {
-    const pr = await getPurchaseRequisitionById(approvalId)
-    if (!pr) {
-      throw new PurchaseServiceError('APPROVAL_NOT_FOUND', `Approval not found: ${approvalId}`)
-    }
-    const row = mapPrToApprovalQueueRow(pr)
+    const res = await approvalApi.getPurchaseApprovalApi(approvalId)
+    const detail = res.data
     return {
-      row,
-      purpose: pr.purpose ?? '',
-      requesterRemarks: pr.remarks,
-      expectedDeliveryDate: pr.expectedDeliveryDate,
-      lines: pr.lines.map((l) => ({
-        lineNo: l.lineNo,
-        itemCode: l.itemCode,
-        itemName: l.itemName,
-        quantity: l.quantity,
-        uom: l.uom,
-        rate: l.estimatedRate,
-        amount: l.amount,
-      })),
-      availableBudgetPlaceholderInr: 0,
-      previousApprovals: [],
-      attachments: [],
-      chainRoles: ['purchase_head'] as PurchaseApprovalRole[],
+      ...detail,
+      previousApprovals: detail.previousApprovals ?? [],
+      attachments: detail.attachments ?? [],
+      chainRoles: detail.chainRoles ?? [],
+      eligibleApprovers: detail.eligibleApprovers ?? [],
     }
   } catch (err) {
-    if (err instanceof PurchaseServiceError) throw err
     throwApi(err)
   }
 }
@@ -1207,13 +1436,16 @@ export async function approvePurchaseDocument(
   remarks = 'Approved',
 ): Promise<PurchaseRequisition | PurchaseOrder> {
   if (!isApiMode()) return demo.approvePurchaseDocument(documentType, documentId, remarks)
-  if (documentType !== 'purchase_requisition') {
-    throw new PurchaseServiceError(
-      'NOT_SUPPORTED',
-      'Only purchase requisition approval is available in API mode yet.',
-    )
+  if (documentType === 'purchase_requisition') {
+    return approvePurchaseRequisition(documentId, remarks)
   }
-  return approvePurchaseRequisition(documentId, remarks)
+  if (documentType === 'purchase_order') {
+    return approvePurchaseOrder(documentId, remarks)
+  }
+  throw new PurchaseServiceError(
+    'NOT_SUPPORTED',
+    'Only PR and PO approvals are available in API mode yet.',
+  )
 }
 
 export async function rejectPurchaseDocument(
@@ -1225,13 +1457,16 @@ export async function rejectPurchaseDocument(
   if (!remarks.trim()) {
     throw new PurchaseServiceError('REMARKS_REQUIRED', 'Rejection comments are mandatory')
   }
-  if (documentType !== 'purchase_requisition') {
-    throw new PurchaseServiceError(
-      'NOT_SUPPORTED',
-      'Only purchase requisition rejection is available in API mode yet.',
-    )
+  if (documentType === 'purchase_requisition') {
+    return rejectPurchaseRequisition(documentId, remarks)
   }
-  return rejectPurchaseRequisition(documentId, remarks)
+  if (documentType === 'purchase_order') {
+    return rejectPurchaseOrder(documentId, remarks)
+  }
+  throw new PurchaseServiceError(
+    'NOT_SUPPORTED',
+    'Only PR and PO rejection are available in API mode yet.',
+  )
 }
 
 export async function sendBackPurchaseDocument(
@@ -1243,14 +1478,20 @@ export async function sendBackPurchaseDocument(
   if (!remarks.trim()) {
     throw new PurchaseServiceError('REMARKS_REQUIRED', 'Send-back comments are mandatory')
   }
+  if (documentType === 'purchase_order') {
+    return sendBackPurchaseOrder(documentId, remarks)
+  }
   if (documentType !== 'purchase_requisition') {
     throw new PurchaseServiceError(
       'NOT_SUPPORTED',
-      'Only purchase requisition send-back is available in API mode yet.',
+      'Only PR and PO send-back are available in API mode yet.',
     )
   }
   try {
-    const res = await prApi.reopenPurchaseRequisitionApi(documentId, { remarks })
+    const res = await prApi.sendBackPurchaseRequisitionApi(documentId, {
+      reason: remarks,
+      remarks,
+    })
     return mapApiRequisitionToDomain(res.data)
   } catch (err) {
     throwApi(err)
@@ -1259,20 +1500,57 @@ export async function sendBackPurchaseDocument(
 
 export async function delegatePurchaseApproval(
   approvalId: string,
-  toRole: PurchaseApprovalRole,
+  toUserId: string,
   remarks = '',
 ) {
-  if (!isApiMode()) return demo.delegatePurchaseApproval(approvalId, toRole, remarks)
-  throw new PurchaseServiceError(
-    'NOT_SUPPORTED',
-    'Approval delegation is not available in API mode yet.',
-  )
+  if (!isApiMode()) {
+    return demo.delegatePurchaseApproval(
+      approvalId,
+      toUserId as PurchaseApprovalRole,
+      remarks,
+    )
+  }
+  try {
+    return (await approvalApi.delegatePurchaseApprovalApi(approvalId, {
+      toUserId,
+      remarks,
+    })).data
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function getPurchaseOrderSeriesOptions(): Promise<PurchaseOrderSeriesOption[]> {
+  // Demo and API mode both use the Purchase Setup series config for the modal label.
+  // Server still issues the real PO number on create-po.
+  if (!isApiMode()) return demo.getPurchaseOrderSeriesOptions()
+  try {
+    const setup = await getPurchaseSetup()
+    const series = setup.numberSeries.purchaseOrder
+    const prefix = series.prefix || 'PO'
+    return [
+      {
+        id: 'po-master',
+        code: prefix,
+        label: `Purchase Order (${prefix})`,
+        prefix,
+      },
+    ]
+  } catch {
+    return [
+      {
+        id: 'po-master',
+        code: 'PO',
+        label: 'Purchase Order (PO)',
+        prefix: 'PO',
+      },
+    ]
+  }
 }
 
 export {
   canCreatePoFromPlanningRow,
   canSelectPlanningRowForPo,
-  getPurchaseOrderSeriesOptions,
 } from './purchaseService'
 
 /**
@@ -1592,9 +1870,18 @@ export async function getPurchaseWarehouses(): Promise<PurchaseWarehouseOption[]
       },
     ]
   }
-  return useMasterStore
-    .getState()
-    .warehouses.filter((w) => w.isActive !== false)
+  let warehouses = useMasterStore.getState().warehouses
+  if (!warehouses.length) {
+    try {
+      const { syncCoreMastersFromApi } = await import('../bridges/masterApiBridge')
+      await syncCoreMastersFromApi()
+      warehouses = useMasterStore.getState().warehouses
+    } catch {
+      /* keep empty */
+    }
+  }
+  return warehouses
+    .filter((w) => w.isActive !== false)
     .map((w) => ({
       id: w.id,
       code: w.warehouseCode,
@@ -1605,3 +1892,335 @@ export async function getPurchaseWarehouses(): Promise<PurchaseWarehouseOption[]
 }
 
 export type { PlanningSheetSummary }
+
+const emptyIdToNull = (value: string | null | undefined): string | null => value || null
+
+const NUMBER_SERIES_KEYS: readonly (keyof PurchaseSetup['numberSeries'])[] = [
+  'purchaseRequisition',
+  'rfq',
+  'vendorQuotation',
+  'purchaseOrder',
+  'grn',
+  'qualityInspection',
+  'purchaseInvoice',
+  'purchaseReturn',
+]
+
+function mapApiSetupToDomain(api: setupApi.ApiPurchaseSetup): PurchaseSetup {
+  const g = api.general
+  return {
+    id: api.id,
+    isConfigured: api.isConfigured,
+    version: api.version,
+    selfApprovalPolicy: api.selfApprovalPolicy ?? 'PERMISSION_ONLY',
+    general: {
+      defaultPlantId: g.defaultPlantId ?? '',
+      defaultWarehouseId: g.defaultWarehouseId ?? '',
+      defaultBuyerId: g.defaultBuyerId ?? '',
+      defaultCurrency: (g.defaultCurrency as PurchaseSetup['general']['defaultCurrency']) || 'INR',
+      defaultPaymentTerms: g.defaultPaymentTerms ?? '',
+      defaultPaymentTermCode: g.defaultPaymentTermCode ?? '',
+      defaultDeliveryTerms: g.defaultDeliveryTerms ?? '',
+      allowDirectPo: g.allowDirectPo,
+      requirePrBeforePo: g.requirePrBeforePo,
+      requireRfqAboveAmountInr: Number(g.requireRfqAboveAmountInr ?? 0),
+      minimumRfqVendorCount: g.minimumRfqVendorCount,
+      requireQuotationComparison: g.requireQuotationComparison,
+      allowOverReceipt: g.allowOverReceipt,
+      overReceiptTolerancePct: Number(g.overReceiptTolerancePct ?? 0),
+      allowShortClose: g.allowShortClose,
+      requirePoWarehouse: g.requirePoWarehouse,
+      requireExpectedDeliveryDate: g.requireExpectedDeliveryDate,
+      requirePaymentTerms: g.requirePaymentTerms,
+    },
+    requisition: {
+      skipRfq: api.requisition.skipRfq,
+      defaultWarehouseId: api.requisition.defaultWarehouseId ?? '',
+      autoCompleteRef: api.requisition.autoCompleteRef,
+    },
+    numberSeries: NUMBER_SERIES_KEYS.reduce((acc, key) => {
+      const entry = api.numberSeries[key]
+      acc[key] = {
+        prefix: entry.prefix,
+        padLength: entry.padLength,
+        nextNumber: entry.nextNumber,
+      }
+      return acc
+    }, {} as PurchaseSetup['numberSeries']),
+    approvalMatrix: api.approvalMatrix.map((tier) => ({
+      id: tier.id,
+      minAmount: Number(tier.minAmount ?? 0),
+      maxAmount: tier.maxAmount == null ? null : Number(tier.maxAmount),
+      requiredRoles: tier.requiredRoles as PurchaseApprovalRole[],
+      sortOrder: tier.sortOrder,
+      isActive: tier.isActive,
+      label: tier.label,
+      documentType:
+        (tier.documentType as NonNullable<PurchaseSetup['approvalMatrix'][number]['documentType']>) ||
+        'all',
+    })),
+    tax: {
+      defaultGstScheme: api.tax.defaultGstScheme,
+      placeOfSupplyState: api.tax.placeOfSupplyState ?? '',
+      placeOfSupplyStateCode: api.tax.placeOfSupplyStateCode ?? '',
+      reverseChargeDefault: api.tax.reverseChargeDefault,
+      tcsEnabled: api.tax.tcsEnabled,
+      tdsEnabled: api.tax.tdsEnabled,
+      roundOffRule: api.tax.roundOffRule,
+    },
+    invoiceMatchTolerances: {
+      requirePoMatch: api.invoiceMatchTolerances.requirePoMatch,
+      requireGrnMatch: api.invoiceMatchTolerances.requireGrnMatch,
+      quantityTolerancePct: Number(api.invoiceMatchTolerances.quantityTolerancePct ?? 0),
+      rateTolerancePct: Number(api.invoiceMatchTolerances.rateTolerancePct ?? 0),
+      amountToleranceInr: Number(api.invoiceMatchTolerances.amountToleranceInr ?? 0),
+      amountTolerancePct: Number(api.invoiceMatchTolerances.amountTolerancePct ?? 0),
+      taxToleranceInr: Number(api.invoiceMatchTolerances.taxToleranceInr ?? 0),
+      taxTolerancePct: Number(api.invoiceMatchTolerances.taxTolerancePct ?? 0),
+      allowAuthorizedOverride: api.invoiceMatchTolerances.allowAuthorizedOverride,
+    },
+    allowDirectInvoice: api.allowDirectInvoice,
+    receiving: {
+      requireGateEntry: api.receiving.requireGateEntry,
+      requireVendorChallan: api.receiving.requireVendorChallan,
+      requireVehicleNumber: api.receiving.requireVehicleNumber,
+      requireBatch: api.receiving.requireBatch,
+      requireSerial: api.receiving.requireSerial,
+      requireExpiry: api.receiving.requireExpiry,
+      autoCreateInspection: api.receiving.autoCreateInspection,
+      defaultReceivingLocationId: api.receiving.defaultReceivingLocationId ?? '',
+      duplicateChallanPolicy: api.receiving.duplicateChallanPolicy,
+    },
+    quality: {
+      inspectionRequiredCategories:
+        api.quality.inspectionRequiredCategories as PurchaseItemCategory[],
+      allowAcceptanceUnderDeviation: api.quality.allowAcceptanceUnderDeviation,
+      deviationApproverRole: api.quality.deviationApproverRole as PurchaseApprovalRole,
+      allowRejectedStockInQuarantine: api.quality.allowRejectedStockInQuarantine,
+      defaultQualityHoldLocationId: api.quality.defaultQualityHoldLocationId ?? '',
+      defaultRejectedLocationId: api.quality.defaultRejectedLocationId ?? '',
+      defaultVendorReturnLocationId: api.quality.defaultVendorReturnLocationId ?? '',
+    },
+    print: {
+      companyName: api.print.companyName ?? '',
+      logoUrl: api.print.logoUrl ?? api.print.logoPlaceholderUrl ?? '',
+      showTermsOnPo: api.print.showTermsOnPo,
+      showTermsOnGrn: api.print.showTermsOnGrn,
+      showTermsOnInvoice: api.print.showTermsOnInvoice,
+      defaultCopies: api.print.defaultCopies,
+      paperSize: api.print.paperSize,
+      orientation: api.print.orientation,
+    },
+    notifications: { ...api.notifications },
+    updatedAt: api.updatedAt ?? '',
+    updatedBy: api.updatedById ?? 'System',
+  }
+}
+
+/** Full nested PUT payload — round-trips every editable field. Notifications are omitted (read-only ON_HOLD). */
+function mapDomainSetupToApiPayload(setup: PurchaseSetup): setupApi.ApiPurchaseSetupInput {
+  return {
+    version: setup.version || undefined,
+    selfApprovalPolicy: setup.selfApprovalPolicy,
+    general: {
+      defaultPlantId: emptyIdToNull(setup.general.defaultPlantId),
+      defaultWarehouseId: emptyIdToNull(setup.general.defaultWarehouseId),
+      defaultBuyerId: emptyIdToNull(setup.general.defaultBuyerId),
+      defaultCurrency: setup.general.defaultCurrency || 'INR',
+      defaultPaymentTerms: setup.general.defaultPaymentTerms ?? '',
+      defaultPaymentTermCode: setup.general.defaultPaymentTermCode || null,
+      defaultDeliveryTerms: setup.general.defaultDeliveryTerms ?? '',
+      allowDirectPo: setup.general.allowDirectPo,
+      requirePrBeforePo: setup.general.requirePrBeforePo,
+      requireRfqAboveAmountInr: setup.general.requireRfqAboveAmountInr,
+      minimumRfqVendorCount: setup.general.minimumRfqVendorCount,
+      requireQuotationComparison: setup.general.requireQuotationComparison,
+      allowOverReceipt: setup.general.allowOverReceipt,
+      overReceiptTolerancePct: setup.general.overReceiptTolerancePct,
+      allowShortClose: setup.general.allowShortClose,
+      requirePoWarehouse: setup.general.requirePoWarehouse,
+      requireExpectedDeliveryDate: setup.general.requireExpectedDeliveryDate,
+      requirePaymentTerms: setup.general.requirePaymentTerms,
+    },
+    requisition: {
+      skipRfq: setup.requisition.skipRfq,
+      defaultWarehouseId: emptyIdToNull(setup.requisition.defaultWarehouseId),
+      autoCompleteRef: setup.requisition.autoCompleteRef,
+    },
+    // nextNumber is server-allocated and read-only — only prefix / padLength are sent.
+    numberSeries: NUMBER_SERIES_KEYS.reduce((acc, key) => {
+      acc[key] = {
+        prefix: setup.numberSeries[key].prefix,
+        padLength: setup.numberSeries[key].padLength,
+      }
+      return acc
+    }, {} as NonNullable<setupApi.ApiPurchaseSetupInput['numberSeries']>),
+    // Tier ids are demo/local values; backend replaces the whole matrix per save.
+    approvalMatrix: setup.approvalMatrix.map((tier) => ({
+      minAmount: tier.minAmount,
+      maxAmount: tier.maxAmount,
+      requiredRoles: tier.requiredRoles,
+      sortOrder: tier.sortOrder,
+      isActive: tier.isActive,
+      label: tier.label,
+      documentType: tier.documentType ?? 'all',
+    })),
+    tax: { ...setup.tax },
+    invoiceMatchTolerances: { ...setup.invoiceMatchTolerances },
+    allowDirectInvoice: setup.allowDirectInvoice,
+    receiving: {
+      requireGateEntry: setup.receiving.requireGateEntry,
+      requireVendorChallan: setup.receiving.requireVendorChallan,
+      requireVehicleNumber: setup.receiving.requireVehicleNumber,
+      requireBatch: setup.receiving.requireBatch,
+      requireSerial: setup.receiving.requireSerial,
+      requireExpiry: setup.receiving.requireExpiry,
+      autoCreateInspection: setup.receiving.autoCreateInspection,
+      defaultReceivingLocationId: emptyIdToNull(setup.receiving.defaultReceivingLocationId),
+      duplicateChallanPolicy: setup.receiving.duplicateChallanPolicy,
+    },
+    quality: {
+      inspectionRequiredCategories: setup.quality.inspectionRequiredCategories,
+      allowAcceptanceUnderDeviation: setup.quality.allowAcceptanceUnderDeviation,
+      deviationApproverRole: setup.quality.deviationApproverRole,
+      allowRejectedStockInQuarantine: setup.quality.allowRejectedStockInQuarantine,
+      defaultQualityHoldLocationId: emptyIdToNull(setup.quality.defaultQualityHoldLocationId),
+      defaultRejectedLocationId: emptyIdToNull(setup.quality.defaultRejectedLocationId),
+      defaultVendorReturnLocationId: emptyIdToNull(setup.quality.defaultVendorReturnLocationId),
+    },
+    print: {
+      companyName: setup.print.companyName,
+      logoUrl: setup.print.logoUrl || null,
+      showTermsOnPo: setup.print.showTermsOnPo,
+      showTermsOnGrn: setup.print.showTermsOnGrn,
+      showTermsOnInvoice: setup.print.showTermsOnInvoice,
+      defaultCopies: setup.print.defaultCopies,
+      paperSize: setup.print.paperSize,
+      orientation: setup.print.orientation,
+    },
+  }
+}
+
+/** Load tenant Purchase Setup — API is source of truth in API mode (no memory fallback). */
+export async function getPurchaseSetup(): Promise<PurchaseSetup> {
+  if (!isApiMode()) return demo.getPurchaseSetup()
+  try {
+    const res = await setupApi.getPurchaseSetupApi()
+    return mapApiSetupToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+/** Persist Purchase Setup — success only after backend confirmation. */
+export async function updatePurchaseSetup(
+  patch: Partial<Omit<PurchaseSetup, 'updatedAt' | 'updatedBy'>>,
+): Promise<PurchaseSetup> {
+  if (!isApiMode()) return demo.updatePurchaseSetup(patch)
+  try {
+    const current = await getPurchaseSetup()
+    const merged: PurchaseSetup = {
+      ...current,
+      ...patch,
+      general: { ...current.general, ...(patch.general ?? {}) },
+      requisition: { ...current.requisition, ...(patch.requisition ?? {}) },
+      numberSeries: NUMBER_SERIES_KEYS.reduce((acc, key) => {
+        acc[key] = { ...current.numberSeries[key], ...(patch.numberSeries?.[key] ?? {}) }
+        return acc
+      }, {} as PurchaseSetup['numberSeries']),
+      approvalMatrix: patch.approvalMatrix ?? current.approvalMatrix,
+      tax: { ...current.tax, ...(patch.tax ?? {}) },
+      invoiceMatchTolerances: {
+        ...current.invoiceMatchTolerances,
+        ...(patch.invoiceMatchTolerances ?? {}),
+      },
+      receiving: { ...current.receiving, ...(patch.receiving ?? {}) },
+      quality: { ...current.quality, ...(patch.quality ?? {}) },
+      print: { ...current.print, ...(patch.print ?? {}) },
+      // Local-only merge — notifications are stripped from the API payload below.
+      notifications: { ...current.notifications, ...(patch.notifications ?? {}) },
+    }
+    const res = await setupApi.putPurchaseSetupApi(mapDomainSetupToApiPayload(merged))
+    return mapApiSetupToDomain(res.data)
+  } catch (err) {
+    // Preserve ApiError so the page can surface field errors and version conflicts.
+    if (err instanceof ApiError) throw err
+    throwApi(err)
+  }
+}
+
+export type PurchasePlantSetup = {
+  id: string | null
+  plantId: string
+  defaultWarehouseId: string | null
+  defaultReceivingLocationId: string | null
+  defaultQualityHoldLocationId: string | null
+  defaultRejectedLocationId: string | null
+  defaultVendorReturnLocationId: string | null
+  isConfigured: boolean
+}
+
+function mapApiPlantSetupToDomain(api: setupApi.ApiPurchasePlantSetup): PurchasePlantSetup {
+  return {
+    id: api.id,
+    plantId: api.plantId,
+    defaultWarehouseId: api.defaultWarehouseId,
+    defaultReceivingLocationId: api.defaultReceivingLocationId,
+    defaultQualityHoldLocationId: api.defaultQualityHoldLocationId,
+    defaultRejectedLocationId: api.defaultRejectedLocationId,
+    defaultVendorReturnLocationId: api.defaultVendorReturnLocationId,
+    isConfigured: api.isConfigured ?? api.id != null,
+  }
+}
+
+/** List plant-level Purchase Setup overrides (API mode only; demo returns empty). */
+export async function getPurchasePlantSettings(): Promise<PurchasePlantSetup[]> {
+  if (!isApiMode()) return []
+  try {
+    const res = await setupApi.listPurchasePlantSetupsApi()
+    return (res.data ?? []).map(mapApiPlantSetupToDomain)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+/** Load one plant override — API is source of truth (no memory fallback). */
+export async function getPurchasePlantSetup(plantId: string): Promise<PurchasePlantSetup> {
+  if (!isApiMode()) {
+    return {
+      id: null,
+      plantId,
+      defaultWarehouseId: null,
+      defaultReceivingLocationId: null,
+      defaultQualityHoldLocationId: null,
+      defaultRejectedLocationId: null,
+      defaultVendorReturnLocationId: null,
+      isConfigured: false,
+    }
+  }
+  try {
+    const res = await setupApi.getPurchasePlantSetupApi(plantId)
+    return mapApiPlantSetupToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+/** Persist plant-level Purchase Setup override. */
+export async function updatePurchasePlantSetup(
+  plantId: string,
+  body: setupApi.ApiPurchasePlantSetupInput,
+): Promise<PurchasePlantSetup> {
+  if (!isApiMode()) {
+    throw new PurchaseServiceError(
+      'DEMO_NOT_SUPPORTED',
+      'Plant setup overrides are only available in API mode.',
+    )
+  }
+  try {
+    const res = await setupApi.putPurchasePlantSetupApi(plantId, body)
+    return mapApiPlantSetupToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}

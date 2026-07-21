@@ -11,11 +11,13 @@ import type {
   ApiCreatePurchaseRequisitionPayload,
   ApiRequestForQuotation,
   ApiVendorQuotation,
+  ApiGoodsReceipt,
 } from './purchaseApiTypes'
 import type { ApiVendorComparison } from './comparisonApi'
 import type {
   PurchaseOrder,
   PurchaseOrderDomainStatus,
+  PurchaseOrderInput,
   PurchaseOrderLine,
   PurchaseOrderListRow,
   PurchaseOrderOrigin,
@@ -42,6 +44,10 @@ import type {
   VendorQuotationDomainStatus,
   VendorQuotationLine,
   VendorQuotationListRow,
+  GoodsReceiptNote,
+  GrnDomainStatus,
+  GrnInput,
+  GrnListRow,
 } from '../../types/purchaseDomain'
 import {
   PURCHASE_ORDER_APPROVAL_STATUS_LABELS,
@@ -599,18 +605,18 @@ export function mapApiRfqToDomain(api: ApiRequestForQuotation): RequestForQuotat
     id: v.id,
     rfqId: api.id,
     vendorId: v.vendorId,
-    vendorCode: '',
-    vendorName: '',
-    gstin: '',
-    state: '',
+    vendorCode: v.vendorCode ?? '',
+    vendorName: v.vendorName ?? '',
+    gstin: v.gstin ?? '',
+    state: v.state ?? '',
     isInterstate: false,
     status: mapRfqVendorInviteStatus(v.inviteStatus),
     sentAt: v.invitedAt,
     respondedAt: v.respondedAt,
-    contactPerson: '',
-    contactEmail: '',
-    contactPhone: '',
-    vendorRating: 0,
+    contactPerson: v.contactPerson ?? '',
+    contactEmail: v.contactEmail ?? '',
+    contactPhone: v.contactPhone ?? '',
+    vendorRating: Number(v.vendorRating ?? 0),
     lastPurchasePrice: null,
     selected: true,
     remarks: v.remarks ?? '',
@@ -623,11 +629,21 @@ export function mapApiRfqToDomain(api: ApiRequestForQuotation): RequestForQuotat
     documentDate: api.rfqDate ?? today,
     status,
     purchaseRequisitionId: api.purchaseRequisitionId,
-    purchaseRequisitionNumber: null,
+    purchaseRequisitionNumber: api.purchaseRequisitionNumber ?? null,
     purchaseRequisitionIds: api.purchaseRequisitionId ? [api.purchaseRequisitionId] : [],
-    purchaseRequisitionNumbers: [],
-    buyer: { ...EMPTY_PARTY },
-    location: { ...EMPTY_LOCATION },
+    purchaseRequisitionNumbers: api.purchaseRequisitionNumber ? [api.purchaseRequisitionNumber] : [],
+    buyer: api.createdById
+      ? { id: api.createdById, code: '', name: api.createdByName ?? '' }
+      : { ...EMPTY_PARTY },
+    location: api.warehouseId
+      ? {
+          id: api.warehouseId,
+          code: api.warehouseCode ?? '',
+          name: api.warehouseName ?? '',
+          state: '',
+          city: '',
+        }
+      : { ...EMPTY_LOCATION },
     purchaseLocation: { ...EMPTY_LOCATION },
     deliveryLocation: { ...EMPTY_LOCATION },
     department: '',
@@ -770,16 +786,16 @@ export function mapApiVendorQuotationToDomain(api: ApiVendorQuotation): VendorQu
     documentDate: api.quotationDate ?? new Date().toISOString().slice(0, 10),
     status,
     rfqId: api.requestForQuotationId ?? '',
-    rfqNumber: '',
+    rfqNumber: api.requestForQuotationNumber ?? '',
     vendor: {
       id: api.vendorId,
-      code: '',
-      name: '',
-      gstin: '',
-      state: '',
+      code: api.vendorCode ?? '',
+      name: api.vendorName ?? '',
+      gstin: api.vendorGstin ?? '',
+      state: api.vendorState ?? '',
       isInterstate: false,
     },
-    vendorReferenceNumber: '',
+    vendorReferenceNumber: api.vendorReferenceNumber ?? '',
     paymentTerms: api.paymentTerms ?? '',
     deliveryTerms: api.deliveryTerms ?? '',
     freightTerms: '',
@@ -812,10 +828,10 @@ export function mapApiVendorQuotationToListRow(api: ApiVendorQuotation): VendorQ
     documentNumber: api.quotationNumber,
     documentDate: api.quotationDate ?? new Date().toISOString().slice(0, 10),
     rfqId: api.requestForQuotationId ?? '',
-    rfqNumber: '',
-    vendorName: '',
-    vendorCode: '',
-    vendorReferenceNumber: '',
+    rfqNumber: api.requestForQuotationNumber ?? '',
+    vendorName: api.vendorName ?? '',
+    vendorCode: api.vendorCode ?? '',
+    vendorReferenceNumber: api.vendorReferenceNumber ?? '',
     validTill: api.validUntil ?? '',
     totalAmount: Number(api.totalAmount ?? 0),
     status,
@@ -827,6 +843,7 @@ export function mapDomainVendorQuotationInputToApiPayload(input: {
   documentDate?: string | null
   rfqId: string
   vendorId: string
+  vendorReferenceNumber?: string | null
   validTill?: string | null
   paymentTerms?: string | null
   deliveryTerms?: string | null
@@ -851,6 +868,7 @@ export function mapDomainVendorQuotationInputToApiPayload(input: {
     quotationDate: input.documentDate ?? null,
     requestForQuotationId: input.rfqId,
     vendorId: input.vendorId,
+    vendorReferenceNumber: input.vendorReferenceNumber ?? null,
     validUntil: input.validTill ?? null,
     paymentTerms: input.paymentTerms ?? null,
     deliveryTerms: input.deliveryTerms ?? null,
@@ -1031,8 +1049,11 @@ function mapApiPoStatus(status: string): PurchaseOrderDomainStatus {
   const s = status.toLowerCase()
   if (s === 'sent_to_vendor') return 'released'
   if (s === 'pending_approval') return 'pending_approval'
+  if (s === 'rejected') return 'rejected'
+  if (s === 'sent_back') return 'sent_back'
   if (s === 'partially_received') return 'partially_received'
   if (s === 'fully_received') return 'fully_received'
+  if (s === 'partially_invoiced' || s === 'fully_invoiced') return 'invoiced'
   if (s === 'cancelled') return 'cancelled'
   if (s === 'closed') return 'closed'
   if (s === 'approved') return 'approved'
@@ -1085,8 +1106,8 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
     project: '',
     productionOrder: '',
     receivedQty: received,
-    pendingQty: Math.max(0, qty - received),
-    invoicedQty: 0,
+    pendingQty: line.openQuantity ?? Math.max(0, qty - received),
+    invoicedQty: Number(line.invoicedQuantity) || 0,
     lineStatus: received >= qty && qty > 0 ? 'received' : received > 0 ? 'partial' : 'open',
     locationId: '',
     locationName: '',
@@ -1117,11 +1138,11 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
     address: api.vendorAddress ?? '',
   }
   const approvalStatus =
-    status === 'draft'
+    status === 'draft' || status === 'sent_back'
       ? 'not_required'
       : status === 'pending_approval'
         ? 'pending'
-        : status === 'cancelled'
+        : status === 'cancelled' || status === 'rejected'
           ? 'rejected'
           : 'approved'
 
@@ -1136,7 +1157,15 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
     buyer: { ...EMPTY_PARTY },
     location: { ...EMPTY_LOCATION },
     purchaseLocation: { ...EMPTY_LOCATION },
-    deliveryLocation: { ...EMPTY_LOCATION },
+    deliveryLocation: api.deliveryWarehouseId
+      ? {
+          id: api.deliveryWarehouseId,
+          code: api.deliveryWarehouseCode ?? '',
+          name: api.deliveryWarehouseName ?? '',
+          state: '',
+          city: '',
+        }
+      : { ...EMPTY_LOCATION },
     department: '',
     requester: { ...EMPTY_PARTY },
     approver: null,
@@ -1183,8 +1212,16 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
     termsAndConditions: '',
     internalNotes: '',
     remarks: api.remarks ?? '',
+    rejectionReason: api.rejectionReason ?? null,
+    sendBackReason: api.sendBackReason ?? null,
+    allowedActions: api.allowedActions,
     approvalStatus,
-    invoiceStatus: 'not_invoiced',
+    invoiceStatus:
+      String(api.status).toLowerCase() === 'partially_invoiced'
+        ? 'partially_invoiced'
+        : String(api.status).toLowerCase() === 'fully_invoiced'
+          ? 'fully_invoiced'
+          : 'not_invoiced',
     approvalIds: [],
     changeHistory: [],
     revisions: [],
@@ -1230,4 +1267,229 @@ export function mapApiPurchaseOrderToListRow(api: ApiPurchaseOrder): PurchaseOrd
   }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function uuidOrNull(value: string | null | undefined): string | null {
+  return value && UUID_RE.test(value) ? value : null
+}
+
+/** Domain PO editor input → backend create/update payload. Backend owns numbering and totals. */
+export function mapDomainPoInputToApiPayload(
+  input: PurchaseOrderInput,
+): import('./purchaseApiTypes').ApiPurchaseOrderInput {
+  return {
+    vendorId: input.vendorId,
+    orderDate: input.documentDate ?? undefined,
+    purchaseRequisitionId: uuidOrNull(input.purchaseRequisitionId ?? null),
+    expectedDeliveryDate: input.expectedDeliveryDate ?? null,
+    paymentTerms: input.paymentTerms ?? null,
+    deliveryTerms: input.deliveryTerms ?? null,
+    deliveryWarehouseId: uuidOrNull(input.deliveryLocation?.id ?? null),
+    freightAmount: input.freight ?? undefined,
+    remarks: input.remarks ?? null,
+    lines: (input.lines ?? []).map((line, index) => ({
+      id: uuidOrNull(line.id ?? null) ?? undefined,
+      lineNumber: line.lineNo ?? index + 1,
+      itemId: uuidOrNull(line.itemId ?? null),
+      itemCode: line.itemCode ?? null,
+      itemName: line.itemName ?? null,
+      description: line.description ?? null,
+      quantity: Number(line.quantity) || 0,
+      rate: Number(line.rate) || 0,
+      requiredDate: line.requiredDate ?? null,
+      remarks: line.remarks ?? null,
+      purchaseRequisitionLineId: uuidOrNull(line.prLineId ?? null),
+    })),
+  }
+}
+
 export { EMPTY_PARTY, toApiPriority, toApiPlanningPriority, toApiPurchaseType }
+
+function mapApiGrnStatus(status: string): GrnDomainStatus {
+  const key = status.toUpperCase()
+  switch (key) {
+    case 'DRAFT':
+      return 'draft'
+    case 'QC_PENDING':
+      return 'pending_inspection'
+    case 'PARTIALLY_ACCEPTED':
+      return 'partially_accepted'
+    case 'FULLY_ACCEPTED':
+    case 'SUBMITTED':
+    case 'RECEIVING_COMPLETED':
+      return 'accepted'
+    case 'INVENTORY_POSTED':
+    case 'CLOSED':
+      return 'posted'
+    case 'CANCELLED':
+    case 'REVERSED':
+      return 'cancelled'
+    default:
+      return 'draft'
+  }
+}
+
+export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNote {
+  const status = mapApiGrnStatus(String(api.status))
+  return {
+    id: api.id,
+    documentNumber: api.documentNumber || api.grnNumber,
+    documentDate: api.documentDate || api.receiptDate || '',
+    status,
+    location: {
+      id: api.storageLocationId || api.warehouseId,
+      code: api.storageLocationCode || api.warehouseCode || '',
+      name: api.storageLocationName || api.warehouseName,
+      state: '',
+      city: '',
+    },
+    department: '',
+    requester: { id: api.receivedById || '', code: '', name: api.receivedByName || '' },
+    receivedBy: { id: api.receivedById || '', code: '', name: api.receivedByName || '' },
+    vendor: {
+      id: api.vendorId,
+      code: api.vendorCode,
+      name: api.vendorName,
+      gstin: api.vendorGstin || '',
+    },
+    purchaseOrderId: api.purchaseOrderId,
+    purchaseOrderNumber: api.purchaseOrderNumber,
+    expectedDeliveryDate: api.expectedDeliveryDate,
+    currency: (api.currencyCode as GoodsReceiptNote['currency']) || 'INR',
+    paymentTerms: api.paymentTerms || '',
+    deliveryTerms: api.deliveryTerms || '',
+    vendorChallanNumber: api.vendorChallanNumber || '',
+    vendorChallanDate: api.vendorChallanDate,
+    vehicleNo: api.vehicleNumber,
+    transporterName: api.transporterName,
+    lrNumber: api.lrNumber,
+    gateEntryNo: api.gateEntryNumber,
+    warehouseId: api.warehouseId,
+    warehouseName: api.warehouseName,
+    receivingLocation: api.storageLocationName || '',
+    qcRequired: api.inspectionRequired,
+    inspectionRequired: api.inspectionRequired,
+    allowExcess: api.allowExcess,
+    qualityInspectionId: null,
+    lines: (api.lines ?? []).map((l) => ({
+      id: l.id,
+      lineNo: l.lineNumber,
+      purchaseOrderLineId: l.purchaseOrderLineId,
+      itemId: l.itemId || '',
+      itemCode: l.itemCode,
+      itemName: l.itemName,
+      description: l.description || l.itemName,
+      uom: l.uom,
+      hsnCode: '',
+      orderedQty: Number(l.orderedQuantity) || 0,
+      previouslyReceivedQty: Number(l.previouslyReceivedQuantity) || 0,
+      pendingQty: Number(l.openQuantity) || 0,
+      receivedQty: Number(l.receivedQuantity) || 0,
+      acceptedQty: Number(l.acceptedQuantity) || 0,
+      rejectedQty: Number(l.rejectedQuantity) || 0,
+      shortQty: Number(l.shortQuantity) || 0,
+      excessQty: Number(l.excessQuantity) || 0,
+      damagedQty: Number(l.damagedQuantity) || 0,
+      pendingInspectionQty: Number(l.acceptedForQcQuantity) || 0,
+      rate: Number(l.rate) || 0,
+      taxableAmount: Number(l.amount) || 0,
+      batchNumber: l.batchNumber || '',
+      lotNumber: l.lotNumber || '',
+      serialNumber: l.serialNumber || '',
+      manufacturingDate: l.manufacturingDate,
+      expiryDate: l.expiryDate,
+      warehouseId: l.warehouseId || api.warehouseId,
+      warehouseName: api.warehouseName,
+      bin: l.binCode || '',
+      locationId: l.storageLocationId || api.storageLocationId || '',
+      locationName: api.storageLocationName || '',
+      inspectionStatus: l.qcRequired ? 'pending' : 'not_required',
+      allowExcess: api.allowExcess,
+      batchControlled: false,
+      serialControlled: false,
+      expiryControlled: false,
+      qcRequired: l.qcRequired,
+      remarks: l.remarks || '',
+    })),
+    postedAt: api.status === 'INVENTORY_POSTED' ? api.updatedAt : null,
+    inventoryPostDeferred: api.status !== 'INVENTORY_POSTED',
+    subtotal: api.totalAmount,
+    discount: 0,
+    taxableAmount: api.totalAmount,
+    cgst: 0,
+    sgst: 0,
+    igst: 0,
+    freight: 0,
+    otherCharges: 0,
+    roundOff: 0,
+    totalAmount: api.totalAmount,
+    createdAt: api.createdAt || new Date().toISOString(),
+    updatedAt: api.updatedAt || new Date().toISOString(),
+    createdBy: api.receivedByName || '',
+    updatedBy: api.receivedByName || '',
+    remarks: api.remarks || '',
+    attachmentIds: [],
+  }
+}
+
+export function mapApiGoodsReceiptToListRow(api: ApiGoodsReceipt): GrnListRow {
+  const status = mapApiGrnStatus(String(api.status))
+  return {
+    id: api.id,
+    documentNumber: api.documentNumber || api.grnNumber,
+    documentDate: api.documentDate || api.receiptDate || '',
+    purchaseOrderId: api.purchaseOrderId,
+    purchaseOrderNumber: api.purchaseOrderNumber,
+    vendorName: api.vendorName,
+    vendorCode: api.vendorCode,
+    warehouseName: api.warehouseName,
+    gateEntryNo: api.gateEntryNumber,
+    vehicleNo: api.vehicleNumber,
+    lineCount: api.lineCount,
+    totalReceivedQty: api.totalReceivedQty,
+    totalAcceptedQty: api.totalAcceptedQty,
+    totalRejectedQty: api.totalRejectedQty,
+    totalAmount: api.totalAmount,
+    status,
+    statusLabel: status.replace(/_/g, ' '),
+    inspectionRequired: api.inspectionRequired,
+    qualityInspectionId: null,
+  }
+}
+
+export function mapDomainGrnInputToApiPayload(input: GrnInput): Record<string, unknown> {
+  const loc = useMasterStore
+    .getState()
+    .locations.find((l) => l.id === input.receivingLocation || l.locationName === input.receivingLocation)
+  return {
+    purchaseOrderId: input.purchaseOrderId,
+    receiptDate: input.documentDate,
+    warehouseId: input.warehouseId,
+    storageLocationId: loc?.id ?? null,
+    vendorChallanNumber: input.vendorChallanNumber ?? null,
+    vendorChallanDate: input.vendorChallanDate ?? null,
+    vehicleNumber: input.vehicleNo ?? null,
+    transporterName: input.transporterName ?? null,
+    lrNumber: input.lrNumber ?? null,
+    gateEntryNumber: input.gateEntryNo ?? null,
+    receivedByName: input.receivedByName ?? null,
+    inspectionRequired: input.inspectionRequired ?? false,
+    allowExcess: input.allowExcess ?? false,
+    remarks: input.remarks ?? null,
+    lines: input.lines.map((line) => ({
+      purchaseOrderLineId: line.purchaseOrderLineId,
+      receivedQuantity: Number(line.receivedQty) || 0,
+      damagedQuantity: Number(line.damagedQty) || 0,
+      shortQuantity: Number(line.shortQty) || 0,
+      excessQuantity: Number(line.excessQty) || 0,
+      warehouseId: line.warehouseId || input.warehouseId,
+      batchNumber: line.batchNumber || null,
+      lotNumber: line.lotNumber || null,
+      serialNumber: line.serialNumber || null,
+      manufacturingDate: line.manufacturingDate ?? null,
+      expiryDate: line.expiryDate ?? null,
+      remarks: line.remarks || null,
+    })),
+  }
+}
+

@@ -22,6 +22,10 @@ export async function getRfqApi(id: string) {
   return apiRequest<ApiRequestForQuotation>(`${base()}/${id}`)
 }
 
+export async function previewNextRfqNumberApi() {
+  return apiRequest<{ rfqNumber: string }>(`${base()}/next-number`)
+}
+
 export async function createRfqApi(payload: Record<string, unknown>) {
   return apiRequest<ApiRequestForQuotation>(base(), {
     method: 'POST',

@@ -99,3 +99,13 @@ export async function reopenPurchaseRequisitionApi(
     body: JSON.stringify(payload),
   })
 }
+
+export async function sendBackPurchaseRequisitionApi(
+  id: string,
+  payload: { reason?: string; remarks?: string } = {},
+) {
+  return apiRequest<ApiPurchaseRequisition>(`${base()}/${id}/send-back`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}

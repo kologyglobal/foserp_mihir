@@ -105,6 +105,7 @@ import {
   PURCHASE_REQUISITION_APPROVAL_STATUS_LABELS,
   PURCHASE_REQUISITION_PRIORITY_LABELS,
   PURCHASE_REQUISITION_SOURCE_LABELS,
+  PURCHASE_NOTIFICATION_EVENT_KEYS,
   PURCHASE_REQUISITION_STATUS_LABELS,
   QUALITY_INSPECTION_RESULT_LABELS,
   QUALITY_INSPECTION_STATUS_LABELS,
@@ -191,11 +192,15 @@ interface PurchaseMockState {
 
 function emptyApiModeState(): PurchaseMockState {
   const setup = structuredClone(DEFAULT_PURCHASE_SETUP)
-  // Strip demo location / buyer IDs so Setup and editors never default to seed entities.
-  setup.general.defaultPurchaseLocationId = ''
+  // Strip demo warehouse / buyer IDs so Setup and editors never default to seed entities.
   setup.general.defaultWarehouseId = ''
+  setup.general.defaultPlantId = ''
   setup.general.defaultBuyerId = ''
-  setup.requisition.defaultLocationId = ''
+  setup.requisition.defaultWarehouseId = ''
+  setup.receiving.defaultReceivingLocationId = ''
+  setup.quality.defaultQualityHoldLocationId = ''
+  setup.quality.defaultRejectedLocationId = ''
+  setup.quality.defaultVendorReturnLocationId = ''
   for (const key of Object.keys(setup.numberSeries) as (keyof typeof setup.numberSeries)[]) {
     setup.numberSeries[key] = { ...setup.numberSeries[key], nextNumber: 1 }
   }
@@ -408,6 +413,36 @@ function docNo(kind: string, n: number): string {
 /** Peek next PR number without consuming the sequence (demo mode). */
 export function previewNextPurchaseRequisitionNumber(): string {
   return docNo('PR', state.seq.pr)
+}
+
+/** Peek next RFQ number without consuming the sequence (demo mode). */
+export function previewNextRfqNumber(): string {
+  return docNo('RFQ', state.seq.rfq)
+}
+
+/** Peek next vendor quotation number without consuming the sequence (demo mode). */
+export function previewNextVendorQuotationNumber(): string {
+  return docNo('VQ', state.seq.vq)
+}
+
+/** Peek next PO number without consuming the sequence (demo mode). */
+export function previewNextPurchaseOrderNumber(): string {
+  return docNo('PO', state.seq.po)
+}
+
+/** Peek next GRN number without consuming the sequence (demo mode). */
+export function previewNextGoodsReceiptNumber(): string {
+  return docNo('GRN', state.seq.grn)
+}
+
+/** Peek next invoice number without consuming the sequence (demo mode). */
+export function previewNextPurchaseInvoiceNumber(): string {
+  return docNo('PINV', state.seq.inv)
+}
+
+/** Peek next return number without consuming the sequence (demo mode). */
+export function previewNextPurchaseReturnNumber(): string {
+  return docNo('PRTN', state.seq.ret)
 }
 
 function requireVendor(vendorId: string): Vendor {
@@ -1109,10 +1144,15 @@ export function canCreatePoFromPlanningRow(row: PurchasePlanningSheetRow): boole
 
 /** Selected planning rows ready for header Create PO (Action Message). */
 export function canSelectPlanningRowForPo(row: PurchasePlanningSheetRow): boolean {
-  if (['completed', 'cancelled', 'po_created'].includes(row.status)) return false
+  if (['completed', 'cancelled', 'po_created', 'partially_ordered'].includes(row.status)) {
+    return false
+  }
+  // Match backend PO-eligible statuses (vendor_selected / approved / po_pending).
+  if (!['vendor_selected', 'approved', 'po_pending'].includes(row.status)) return false
+  if (!row.actionMessage) return false
   if (!row.preferredVendorId) return false
   const qty = row.netPurchaseQuantity > 0 ? row.netPurchaseQuantity : row.requiredQuantity
-  return qty > 0 && row.expectedRate > 0
+  return qty > 0 && row.expectedRate > 0 && Boolean(row.requiredByDate)
 }
 
 export type PurchaseOrderSeriesOption = {
@@ -6342,7 +6382,7 @@ export async function updatePurchaseSetup(
   }
   if (patch.notifications) {
     const next = { ...state.setup.notifications }
-    for (const key of Object.keys(patch.notifications) as (keyof typeof next)[]) {
+    for (const key of PURCHASE_NOTIFICATION_EVENT_KEYS) {
       const flags = patch.notifications[key]
       if (flags) next[key] = { ...state.setup.notifications[key], ...flags }
     }
@@ -6528,6 +6568,15 @@ export async function getPurchaseApprovalReview(
 
   const attachments = state.attachments.filter((a) => a.entityId === approval.documentId)
   const chainRoles = resolveApprovalRolesForAmount(row.amount, state.setup)
+  const eligibleApprovers = chainRoles.map((role) => {
+    const actor = actorForApprovalRole(role)
+    return {
+      id: role,
+      name: actor.name,
+      email: '',
+      role,
+    }
+  })
 
   if (approval.documentType === 'purchase_requisition') {
     const pr = state.requisitions.find((r) => r.id === approval.documentId)!
@@ -6545,10 +6594,11 @@ export async function getPurchaseApprovalReview(
         rate: l.estimatedRate,
         amount: l.amount,
       })),
-      availableBudgetPlaceholderInr: state.setup.availableBudgetPlaceholderInr,
+      availableBudgetPlaceholderInr: state.setup.availableBudgetPlaceholderInr ?? 0,
       previousApprovals: structuredClone(previousApprovals),
       attachments: structuredClone(attachments),
       chainRoles,
+      eligibleApprovers,
     }
   }
 
@@ -6567,10 +6617,11 @@ export async function getPurchaseApprovalReview(
       rate: l.rate,
       amount: l.lineTotal,
     })),
-    availableBudgetPlaceholderInr: state.setup.availableBudgetPlaceholderInr,
+    availableBudgetPlaceholderInr: state.setup.availableBudgetPlaceholderInr ?? 0,
     previousApprovals: structuredClone(previousApprovals),
     attachments: structuredClone(attachments),
     chainRoles,
+    eligibleApprovers,
   }
 }
 

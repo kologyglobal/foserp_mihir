@@ -70,6 +70,12 @@ export {
   getPurchaseRequisitionListSummary,
   getPurchaseRequisitionById,
   previewNextPurchaseRequisitionNumber,
+  previewNextRfqNumber,
+  previewNextVendorQuotationNumber,
+  previewNextPurchaseOrderNumber,
+  previewNextGoodsReceiptNumber,
+  previewNextPurchaseInvoiceNumber,
+  previewNextPurchaseReturnNumber,
   createPurchaseRequisition,
   updatePurchaseRequisition,
   submitPurchaseRequisition,
@@ -127,25 +133,18 @@ export {
   getPurchaseOrderById,
   getPurchaseOrderList,
   getPurchaseOrderLinkedDocuments,
-} from './purchaseApiFacade'
-
-export {
-  PurchaseServiceError,
-  resetPurchaseMockData,
-  getBlanketOrders,
-  getBlanketOrderById,
   createPurchaseOrder,
   updatePurchaseOrder,
   submitPurchaseOrder,
   approvePurchaseOrder,
+  rejectPurchaseOrder,
+  sendBackPurchaseOrder,
   releasePurchaseOrder,
   reopenPurchaseOrder,
   sendPurchaseOrderToVendor,
   closePurchaseOrder,
   cancelPurchaseOrder,
   revisePurchaseOrder,
-  createPurchaseOrderFromVendorQuotation,
-  createPurchaseOrderFromBlanket,
   createGRN,
   createGRNFromPo,
   getGRNs,
@@ -153,6 +152,17 @@ export {
   getGRNById,
   updateGRN,
   submitGRN,
+  cancelGRN,
+  reverseGRN,
+} from './purchaseApiFacade'
+
+export {
+  PurchaseServiceError,
+  resetPurchaseMockData,
+  getBlanketOrders,
+  getBlanketOrderById,
+  createPurchaseOrderFromVendorQuotation,
+  createPurchaseOrderFromBlanket,
   postGRN,
   createQualityInspection,
   getQualityInspections,
@@ -198,8 +208,6 @@ export {
   getApprovals,
   getApprovalHistory,
   getAttachments,
-  getPurchaseSetup,
-  updatePurchaseSetup,
   emptyMoney,
 } from './purchaseService'
 
@@ -210,6 +218,11 @@ export {
   rejectPurchaseDocument,
   sendBackPurchaseDocument,
   delegatePurchaseApproval,
+  getPurchaseSetup,
+  updatePurchaseSetup,
+  getPurchasePlantSettings,
+  getPurchasePlantSetup,
+  updatePurchasePlantSetup,
 } from './purchaseApiFacade'
 
 export {

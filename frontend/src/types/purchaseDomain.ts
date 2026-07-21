@@ -103,6 +103,8 @@ export type PurchaseOrderDomainStatus =
   | 'draft'
   | 'pending_approval'
   | 'approved'
+  | 'rejected'
+  | 'sent_back'
   | 'released'
   | 'partially_received'
   | 'fully_received'
@@ -114,6 +116,8 @@ export const PURCHASE_ORDER_DOMAIN_STATUSES: readonly PurchaseOrderDomainStatus[
   'draft',
   'pending_approval',
   'approved',
+  'rejected',
+  'sent_back',
   'released',
   'partially_received',
   'fully_received',
@@ -126,12 +130,28 @@ export const PURCHASE_ORDER_DOMAIN_STATUS_LABELS: Record<PurchaseOrderDomainStat
   draft: 'Draft',
   pending_approval: 'Pending Approval',
   approved: 'Approved',
+  rejected: 'Rejected',
+  sent_back: 'Sent Back',
   released: 'Released',
   partially_received: 'Partially Received',
   fully_received: 'Fully Received',
   invoiced: 'Invoiced',
   closed: 'Closed',
   cancelled: 'Cancelled',
+}
+
+/** Backend-provided lifecycle eligibility — the frontend never derives these. */
+export interface PurchaseOrderAllowedActions {
+  canEdit: boolean
+  canSubmit: boolean
+  canApprove: boolean
+  canReject: boolean
+  canSendBack: boolean
+  canSendToVendor: boolean
+  canCancel: boolean
+  canClose: boolean
+  canReopen: boolean
+  canReceive: boolean
 }
 
 export type PurchaseOrderOrigin =
@@ -485,13 +505,14 @@ export const QUOTATION_COMPLIANCE_STATUS_LABELS: Record<QuotationComplianceStatu
   not_assessed: 'Not assessed',
 }
 
-export type PurchaseApprovalStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+export type PurchaseApprovalStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'sent_back'
 
 export const PURCHASE_APPROVAL_STATUS_LABELS: Record<PurchaseApprovalStatus, string> = {
   pending: 'Pending',
   approved: 'Approved',
   rejected: 'Rejected',
   cancelled: 'Cancelled',
+  sent_back: 'Sent Back',
 }
 
 export type RfqVendorInviteStatus =
@@ -708,11 +729,14 @@ export interface PurchaseNumberSeriesConfig {
 }
 
 export interface PurchaseSetupGeneral {
-  defaultPurchaseLocationId: string
+  defaultPlantId: string
   defaultWarehouseId: string
   defaultBuyerId: string
   defaultCurrency: IndianCurrencyCode
+  /** Display label / name from CRM payment-terms master. */
   defaultPaymentTerms: string
+  /** CRM payment-terms master code (API mode). */
+  defaultPaymentTermCode: string
   defaultDeliveryTerms: string
   allowDirectPo: boolean
   requirePrBeforePo: boolean
@@ -724,6 +748,9 @@ export interface PurchaseSetupGeneral {
   /** Percent over ordered qty allowed on GRN when over-receipt is enabled. */
   overReceiptTolerancePct: number
   allowShortClose: boolean
+  requirePoWarehouse: boolean
+  requireExpectedDeliveryDate: boolean
+  requirePaymentTerms: boolean
 }
 
 export interface PurchaseSetupNumberSeries {
@@ -780,7 +807,9 @@ export interface PurchaseSetupReceiving {
   requireSerial: boolean
   requireExpiry: boolean
   autoCreateInspection: boolean
-  defaultReceivingWarehouseId: string
+  /** MasterLocation under the default warehouse. */
+  defaultReceivingLocationId: string
+  duplicateChallanPolicy: 'BLOCK' | 'WARN' | 'ALLOW'
 }
 
 export interface PurchaseSetupQuality {
@@ -789,18 +818,23 @@ export interface PurchaseSetupQuality {
   allowAcceptanceUnderDeviation: boolean
   deviationApproverRole: PurchaseApprovalRole
   allowRejectedStockInQuarantine: boolean
-  defaultQuarantineWarehouseId: string
+  /** MasterLocation under the default warehouse (quality hold). */
+  defaultQualityHoldLocationId: string
+  /** MasterLocation under the default warehouse (rejected). */
+  defaultRejectedLocationId: string
+  /** MasterLocation under the default warehouse (vendor return). */
+  defaultVendorReturnLocationId: string
 }
 
 /** Defaults applied when creating a new Purchase Requisition. */
 export interface PurchaseSetupRequisition {
-  /** Default location on PR create (Quick Entry). */
-  defaultLocationId: string
   /**
    * When true, new PRs default to Direct Purchase Planning (`rfqRequired: false`).
    * When false, RFQ is required after approval.
    */
   skipRfq: boolean
+  /** Warehouse pre-selected on new PRs; empty falls back to General → default warehouse. */
+  defaultWarehouseId: string
   /**
    * Auto-complete Reference Number from linked source docs.
    * Reserved — not wired yet.
@@ -813,8 +847,8 @@ export type PurchasePrintOrientation = 'portrait' | 'landscape'
 
 export interface PurchaseSetupPrint {
   companyName: string
-  /** Demo logo URL / placeholder path — not uploaded here. */
-  logoPlaceholderUrl: string
+  /** Print logo URL (empty when unset). Persisted by the API as `print.logoUrl`. */
+  logoUrl: string
   showTermsOnPo: boolean
   showTermsOnGrn: boolean
   showTermsOnInvoice: boolean
@@ -829,6 +863,10 @@ export interface PurchaseNotificationChannelFlags {
 }
 
 export interface PurchaseSetupNotifications {
+  /** From API: ON_HOLD means notifications are read-only and never persisted. */
+  status?: 'ON_HOLD'
+  /** From API: explanation shown on the Notifications tab when on hold. */
+  message?: string
   prPendingApproval: PurchaseNotificationChannelFlags
   rfqResponseDue: PurchaseNotificationChannelFlags
   poDeliveryApproaching: PurchaseNotificationChannelFlags
@@ -838,13 +876,42 @@ export interface PurchaseSetupNotifications {
   invoicePendingApproval: PurchaseNotificationChannelFlags
 }
 
+/** Event keys of `PurchaseSetupNotifications` (excludes API status/message metadata). */
+export type PurchaseNotificationEventKey = Exclude<
+  keyof PurchaseSetupNotifications,
+  'status' | 'message'
+>
+
+export const PURCHASE_NOTIFICATION_EVENT_KEYS: readonly PurchaseNotificationEventKey[] = [
+  'prPendingApproval',
+  'rfqResponseDue',
+  'poDeliveryApproaching',
+  'poOverdue',
+  'grnPendingInspection',
+  'invoiceMismatch',
+  'invoicePendingApproval',
+]
+
+/**
+ * Maker-checker override for PR/PO approvals.
+ * NEVER — nobody approves own documents; PERMISSION_ONLY — only users holding
+ * purchase.approvals.self_approve; EVERYONE — no restriction (not recommended).
+ */
+export type PurchaseSelfApprovalPolicy = 'NEVER' | 'PERMISSION_ONLY' | 'EVERYONE'
+
 export interface PurchaseSetup {
+  /** Present when loaded from backend; null for server defaults / demo. */
+  id: string | null
+  isConfigured: boolean
+  version: number
+  /** Self-approval (maker-checker bypass) policy for PR/PO approvals. */
+  selfApprovalPolicy: PurchaseSelfApprovalPolicy
   general: PurchaseSetupGeneral
   numberSeries: PurchaseSetupNumberSeries
   /** Amount-band matrix consumed by `purchaseApprovalMatrix` / approvals service. */
   approvalMatrix: PurchaseApprovalMatrixTier[]
-  /** Placeholder available-budget figure shown on approval review. */
-  availableBudgetPlaceholderInr: number
+  /** @deprecated Demo-only budget figure on approval review; not persisted via API. */
+  availableBudgetPlaceholderInr?: number
   tax: PurchaseSetupTax
   /** Three-way matching tolerances for purchase invoices (read by invoice module). */
   invoiceMatchTolerances: PurchaseInvoiceMatchTolerances
@@ -1024,6 +1091,12 @@ export interface PurchaseApprovalReviewDetail {
   previousApprovals: ApprovalHistory[]
   attachments: Attachment[]
   chainRoles: PurchaseApprovalRole[]
+  eligibleApprovers: Array<{
+    id: string
+    name: string
+    email: string
+    role: string
+  }>
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1817,6 +1890,12 @@ export interface PurchaseOrder extends PurchaseMoneyTotals, PurchaseAuditFields 
   releasedAt: IsoDateTime | null
   closedAt: IsoDateTime | null
   cancelledAt: IsoDateTime | null
+  /** Server-side rejection reason (API mode). */
+  rejectionReason?: string | null
+  /** Server-side send-back reason (API mode). */
+  sendBackReason?: string | null
+  /** Backend-provided action eligibility (API mode). */
+  allowedActions?: PurchaseOrderAllowedActions
 }
 
 export interface PurchaseOrderListRow {

@@ -24,6 +24,10 @@ export async function getVendorQuotationApi(id: string) {
   return apiRequest<ApiVendorQuotation>(`${base()}/${id}`)
 }
 
+export async function previewNextVendorQuotationNumberApi() {
+  return apiRequest<{ quotationNumber: string }>(`${base()}/next-number`)
+}
+
 export async function createVendorQuotationApi(payload: Record<string, unknown>) {
   return apiRequest<ApiVendorQuotation>(base(), {
     method: 'POST',

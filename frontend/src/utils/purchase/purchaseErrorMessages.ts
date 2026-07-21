@@ -27,6 +27,10 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   PR_UOM_REQUIRED: 'UOM is required.',
   PR_REQUIRED_DATE_BEFORE_REQUISITION: 'Required date cannot be before requisition date.',
   PR_REJECTION_REASON_REQUIRED: 'Rejection reason is required.',
+  PR_SEND_BACK_REASON_REQUIRED: 'Send-back reason is required.',
+  APPROVAL_SELF_ACTION_NOT_ALLOWED: 'You cannot approve a document that you requested or created.',
+  APPROVAL_DELEGATE_INVALID: 'Select another active user who can approve this document.',
+  APPROVAL_ASSIGNED_TO_ANOTHER_USER: 'This approval is assigned to another user.',
 
   PPS_NOT_FOUND: 'Planning sheet row not found.',
   PPS_DUPLICATE_LINE: 'Planning row already exists for this requisition line.',

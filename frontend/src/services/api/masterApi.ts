@@ -10,6 +10,9 @@ export interface MasterRecordDto {
   status: 'ACTIVE' | 'INACTIVE'
   stateId?: string
   warehouseId?: string
+  plantId?: string | null
+  storageLocationId?: string
+  binType?: string | null
   parentId?: string | null
   level?: number
   defaultWarehouseId?: string | null
@@ -114,8 +117,27 @@ export async function fetchMasterLocations() {
   return fetchAllPages('locations')
 }
 
+export async function fetchMasterPlants() {
+  return fetchAllPages('plants')
+}
+
+export async function fetchMasterBins(params?: { warehouseId?: string; storageLocationId?: string }) {
+  return fetchAllPages('bins', params)
+}
+
+export interface MasterLookupRow {
+  id: string
+  code?: string
+  name: string
+  stateId?: string
+  warehouseId?: string
+  plantId?: string | null
+  storageLocationId?: string
+  warehouseType?: string
+}
+
 export async function fetchLookup(resource: string, params?: Record<string, string | undefined>) {
-  return apiRequest<Array<{ id: string; code?: string; name: string; stateId?: string; warehouseId?: string }>>(
+  return apiRequest<MasterLookupRow[]>(
     `${tenantPath(`/lookups/${resource}`)}${buildQuery(params)}`,
   )
 }
@@ -253,6 +275,7 @@ export function mapWarehouseDto(row: MasterRecordDto): Warehouse {
     warehouseCode: row.code ?? '',
     warehouseName: row.name,
     warehouseType: (row.warehouseType ?? 'main') as Warehouse['warehouseType'],
+    plantId: row.plantId ?? null,
     plantCode: row.plantCode ?? 'PUNE',
     address: row.address ?? '',
     isActive: row.status === 'ACTIVE',

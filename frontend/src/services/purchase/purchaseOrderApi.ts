@@ -24,6 +24,10 @@ export async function getPurchaseOrderApi(id: string) {
   return apiRequest<ApiPurchaseOrder>(`${base()}/${id}`)
 }
 
+export async function previewNextPurchaseOrderNumberApi() {
+  return apiRequest<{ orderNumber: string }>(`${base()}/next-number`)
+}
+
 export async function createPurchaseOrderApi(payload: Record<string, unknown>) {
   return apiRequest<ApiPurchaseOrder>(base(), {
     method: 'POST',
@@ -54,6 +58,44 @@ export async function approvePurchaseOrderApi(id: string, payload: Record<string
 
 export async function cancelPurchaseOrderApi(id: string, payload: Record<string, unknown> = {}) {
   return apiRequest<ApiPurchaseOrder>(`${base()}/${id}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function rejectPurchaseOrderApi(id: string, payload: Record<string, unknown> = {}) {
+  return apiRequest<ApiPurchaseOrder>(`${base()}/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function sendBackPurchaseOrderApi(id: string, payload: Record<string, unknown> = {}) {
+  return apiRequest<ApiPurchaseOrder>(`${base()}/${id}/send-back`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function sendPurchaseOrderToVendorApi(
+  id: string,
+  payload: Record<string, unknown> = {},
+) {
+  return apiRequest<ApiPurchaseOrder>(`${base()}/${id}/send-to-vendor`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function closePurchaseOrderApi(id: string, payload: Record<string, unknown> = {}) {
+  return apiRequest<ApiPurchaseOrder>(`${base()}/${id}/close`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function reopenPurchaseOrderApi(id: string, payload: Record<string, unknown> = {}) {
+  return apiRequest<ApiPurchaseOrder>(`${base()}/${id}/reopen`, {
     method: 'POST',
     body: JSON.stringify(payload),
   })
