@@ -395,64 +395,67 @@ export function PurchaseInvoiceListPage() {
           storageKey="purchase.ai-insights.invoices"
           overview={registerOverview}
           suggestions={registerSuggestions}
-          placement="split"
+          placement="filterBar"
         >
-          <EnterpriseRegisterTableShell className="min-w-0">
-            <PurchaseInvoicesTable
-              rows={filtered}
-              handlers={rowHandlers}
-              hasActiveFilters={activeFilters}
-              onClearFilters={clearFilters}
-              onExport={exportList}
-              registerFilter={{
-                search: filters.search,
-                onSearchChange: (search) => setFilters((f) => ({ ...f, search })),
-                searchPlaceholder: 'Search invoice, vendor, PO, GRN…',
-                activeFilterCount: filterDrawer.activeCount,
-                onOpenFilters: filterDrawer.openDrawer,
-                chips: filterDrawer.chips,
-                onRemoveChip: filterDrawer.removeChip,
-                onClearAll: clearFilters,
-                savedView: savedViews.activeView,
-                onSavedViewChange: savedViews.selectView,
-                savedViews: savedViews.viewNames,
-                onSaveView: savedViews.openSaveDialog,
-                showCommandPaletteHint: false,
-                sort: (
-                  <CrmListSortSelect
-                    value={sortBy}
-                    onChange={(v) => setSortBy(v as InvoiceSortKey)}
-                    aria-label="Sort purchase invoices"
-                    options={INVOICE_SORT_OPTIONS}
-                  />
-                ),
-              }}
-              emptyAction={
-                filtered.length === 0 ? (
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {rows.length === 0 && perms.canCreateInvoice ? (
-                      <button
-                        type="button"
-                        className="erp-btn erp-btn--primary text-[13px]"
-                        onClick={() => navigate('/purchase/invoices/new')}
-                      >
-                        New Invoice
-                      </button>
-                    ) : null}
-                    {activeFilters ? (
-                      <button
-                        type="button"
-                        className="erp-btn erp-btn--secondary text-[13px]"
-                        onClick={clearFilters}
-                      >
-                        Clear Filters
-                      </button>
-                    ) : null}
-                  </div>
-                ) : undefined
-              }
-            />
-          </EnterpriseRegisterTableShell>
+          {({ restoreButton }) => (
+            <EnterpriseRegisterTableShell className="min-w-0">
+              <PurchaseInvoicesTable
+                rows={filtered}
+                handlers={rowHandlers}
+                hasActiveFilters={activeFilters}
+                onClearFilters={clearFilters}
+                onExport={exportList}
+                registerFilter={{
+                  search: filters.search,
+                  onSearchChange: (search) => setFilters((f) => ({ ...f, search })),
+                  searchPlaceholder: 'Search invoice, vendor, PO, GRN…',
+                  activeFilterCount: filterDrawer.activeCount,
+                  onOpenFilters: filterDrawer.openDrawer,
+                  chips: filterDrawer.chips,
+                  onRemoveChip: filterDrawer.removeChip,
+                  onClearAll: clearFilters,
+                  savedView: savedViews.activeView,
+                  onSavedViewChange: savedViews.selectView,
+                  savedViews: savedViews.viewNames,
+                  onSaveView: savedViews.openSaveDialog,
+                  showCommandPaletteHint: false,
+                  afterFilters: restoreButton,
+                  sort: (
+                    <CrmListSortSelect
+                      value={sortBy}
+                      onChange={(v) => setSortBy(v as InvoiceSortKey)}
+                      aria-label="Sort purchase invoices"
+                      options={INVOICE_SORT_OPTIONS}
+                    />
+                  ),
+                }}
+                emptyAction={
+                  filtered.length === 0 ? (
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {rows.length === 0 && perms.canCreateInvoice ? (
+                        <button
+                          type="button"
+                          className="erp-btn erp-btn--primary text-[13px]"
+                          onClick={() => navigate('/purchase/invoices/new')}
+                        >
+                          New Invoice
+                        </button>
+                      ) : null}
+                      {activeFilters ? (
+                        <button
+                          type="button"
+                          className="erp-btn erp-btn--secondary text-[13px]"
+                          onClick={clearFilters}
+                        >
+                          Clear Filters
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : undefined
+                }
+              />
+            </EnterpriseRegisterTableShell>
+          )}
         </PurchaseRegisterContextPanel>
       </OperationalPageShell>
 

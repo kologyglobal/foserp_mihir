@@ -20,6 +20,7 @@ import { useCrmApiSync } from '../../hooks/useCrmApiSync'
 import { useMasterApiSync } from '../../hooks/useMasterApiSync'
 import { isApiMode } from '@/config/apiConfig'
 import { runDemoCrmBootstrap } from '@/bootstrap/demoBootstrap'
+import { Loader } from '../ui/Loader'
 import { cn } from '../../utils/cn'
 
 export function AppShell() {
@@ -43,11 +44,7 @@ export function AppShell() {
   }, [])
 
   if (isApiMode() && (apiSyncStatus === 'loading' || masterSyncStatus === 'loading')) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-erp-muted">
-        Loading data from server…
-      </div>
-    )
+    return <Loader fullScreen size="lg" label="Loading data from server" />
   }
 
   if (isApiMode() && (apiSyncStatus === 'error' || masterSyncStatus === 'error')) {

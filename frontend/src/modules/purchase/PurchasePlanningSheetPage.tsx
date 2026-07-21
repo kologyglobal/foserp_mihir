@@ -633,6 +633,9 @@ export function PurchasePlanningSheetPage() {
         disabled:
           !canSelectPlanningRowForPo(row) ||
           !perms.canCreatePoFromPlanning,
+        disabledReason: !perms.canCreatePoFromPlanning
+          ? 'You do not have permission to create purchase orders (purchase.planning.create_po)'
+          : planningRowPoGaps(row).join(', ') || undefined,
       },
       {
         id: 'hold',
@@ -929,10 +932,13 @@ export function PurchasePlanningSheetPage() {
                 !allSelectedEligible ||
                 !perms.canCreatePoFromPlanning,
               disabledReason: !perms.canCreatePoFromPlanning
-                ? 'Missing purchase.planning.create_po permission'
-                : selectedRows.length === 0
-                  ? 'Select rows first'
-                  : createPoDisabledReason(selectedRows),
+                ? 'You do not have permission to create purchase orders (purchase.planning.create_po). Contact your administrator.'
+                : creatingPo
+                  ? 'Purchase order creation is in progress…'
+                  : selectedRows.length === 0
+                    ? 'Select at least one planning row first'
+                    : createPoDisabledReason(selectedRows) ??
+                      'Selected rows are not ready for PO (need Action Message, vendor, quantity, rate, and required date)',
             }}
             secondaryActions={[
               {

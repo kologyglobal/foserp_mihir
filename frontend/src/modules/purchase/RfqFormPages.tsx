@@ -359,10 +359,10 @@ export function RfqCreateDocumentPage() {
       )}
       actions={(
         <ErpButtonGroup>
-          <ErpButton type="button" variant="ghost" icon={X} onClick={() => navigate('/purchase/rfqs')}>
+          <ErpButton type="button" variant="ghost" onClick={() => navigate('/purchase/rfqs')}>
             Cancel
           </ErpButton>
-          <ErpButton type="button" variant="primary" icon={Save} onClick={handleCreate} disabled={!canCreate}>
+          <ErpButton type="button" variant="primary" onClick={handleCreate} disabled={!canCreate}>
             Create RFQ
           </ErpButton>
         </ErpButtonGroup>

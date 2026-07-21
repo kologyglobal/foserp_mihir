@@ -1,4 +1,13 @@
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
+import { createPortal } from 'react-dom'
 import type { LucideIcon } from 'lucide-react'
 import { ChevronDown, Circle } from 'lucide-react'
 import { cn } from '../../utils/cn'
@@ -39,19 +48,71 @@ interface CommandBarButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> 
   accent?: boolean
 }
 
-export function CommandBarButton({ icon: Icon, label, primary, accent, className, ...props }: CommandBarButtonProps) {
-  return (
+/** Portal tooltip — escapes stacking contexts / overflow clipping so it always paints on top. */
+function DisabledReasonTooltip({ anchor, text }: { anchor: HTMLElement; text: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [style, setStyle] = useState<CSSProperties>({ position: 'fixed', opacity: 0 })
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const rect = anchor.getBoundingClientRect()
+    const width = el.offsetWidth
+    const height = el.offsetHeight
+    const left = Math.max(8, Math.min(rect.left + rect.width / 2 - width / 2, window.innerWidth - width - 8))
+    const below = rect.bottom + 6
+    const top = below + height > window.innerHeight - 8 ? Math.max(8, rect.top - height - 6) : below
+    setStyle({ position: 'fixed', left, top, zIndex: 10060 })
+  }, [anchor, text])
+
+  return createPortal(
+    <div ref={ref} role="tooltip" className="erp-tooltip-bubble" style={style}>
+      {text}
+    </div>,
+    document.body,
+  )
+}
+
+export function CommandBarButton({
+  icon: Icon,
+  label,
+  primary,
+  accent,
+  className,
+  title,
+  disabled,
+  onMouseEnter,
+  onMouseLeave,
+  onFocus,
+  onBlur,
+  ...props
+}: CommandBarButtonProps) {
+  // Disabled buttons get an instant portal tooltip (native title is too slow / easy to miss)
+  const disabledTooltip = disabled && title ? title : undefined
+  const [tipAnchor, setTipAnchor] = useState<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!disabledTooltip) setTipAnchor(null)
+  }, [disabledTooltip])
+
+  const button = (
     <button
       type="button"
+      disabled={disabled}
+      title={disabledTooltip ? undefined : title}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onFocus={onFocus}
+      onBlur={onBlur}
       className={cn(
         'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold',
         'transition-[transform,box-shadow,background,border-color,filter] duration-150',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-erp-primary/30 focus-visible:ring-offset-1',
-        'disabled:pointer-events-none disabled:opacity-40',
-        'hover:-translate-y-px active:translate-y-px active:scale-[0.98]',
+        'disabled:cursor-not-allowed disabled:opacity-40',
+        'enabled:hover:-translate-y-px enabled:active:translate-y-px enabled:active:scale-[0.98]',
         primary && 'erp-command-btn-primary text-white',
         accent && !primary && 'erp-command-btn-accent',
-        !primary && !accent && 'border border-erp-border bg-erp-surface text-erp-text shadow-sm hover:border-erp-primary/35 hover:bg-erp-primary-soft hover:shadow-md',
+        !primary && !accent && 'border border-erp-border bg-erp-surface text-erp-text shadow-sm enabled:hover:border-erp-primary/35 enabled:hover:bg-erp-primary-soft enabled:hover:shadow-md',
         className,
       )}
       {...props}
@@ -65,6 +126,20 @@ export function CommandBarButton({ icon: Icon, label, primary, accent, className
       />
       <span>{label}</span>
     </button>
+  )
+
+  // Browsers do not dispatch JS mouse events on disabled form controls, so the
+  // hover handlers must live on a wrapper element instead of the button itself.
+  if (!disabledTooltip) return button
+  return (
+    <span
+      className="inline-flex"
+      onMouseEnter={(e) => setTipAnchor(e.currentTarget)}
+      onMouseLeave={() => setTipAnchor(null)}
+    >
+      {button}
+      {tipAnchor ? <DisabledReasonTooltip anchor={tipAnchor} text={disabledTooltip} /> : null}
+    </span>
   )
 }
 
