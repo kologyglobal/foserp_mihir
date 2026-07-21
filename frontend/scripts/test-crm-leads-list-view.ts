@@ -123,6 +123,9 @@ const created = sales.createLead({
   lifecycleStatus: 'open',
   stage: 'new',
   productRequirement: 'Test',
+  remarks: 'Test notes',
+  contactPerson: 'Test Contact',
+  mobile: '9876543210',
   source: 'referral',
   industry: 'Logistics',
 })

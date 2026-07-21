@@ -41,6 +41,9 @@ export interface Opportunity360RecordHeaderProps {
   /** Enable Create SO — quotation accepted + Won/Order Confirmed. */
   canCreateSalesOrder: boolean
   createSalesOrderDisabledReason?: string | null
+  /** Create Quotation gate — stage + mandatory fields. */
+  canCreateQuotation?: boolean
+  createQuotationDisabledReason?: string | null
   contactPhone?: string
   contactEmail?: string
   onEdit: () => void
@@ -85,6 +88,8 @@ export function Opportunity360RecordHeader({
   showCreateSalesOrder,
   canCreateSalesOrder,
   createSalesOrderDisabledReason,
+  canCreateQuotation = true,
+  createQuotationDisabledReason,
   contactPhone,
   contactEmail,
   onEdit,
@@ -123,7 +128,8 @@ export function Opportunity360RecordHeader({
             label: 'Create Quotation',
             icon: FileText,
             onClick: onCreateQuotation,
-            disabled: !isOpen,
+            disabled: !isOpen || !canCreateQuotation,
+            disabledReason: createQuotationDisabledReason ?? undefined,
           },
           ...(showCreateSalesOrder
             ? [{
@@ -227,7 +233,8 @@ export function Opportunity360RecordHeader({
               variant="secondary"
               icon={FileText}
               onClick={onCreateQuotation}
-              disabled={!isOpen}
+              disabled={!isOpen || !canCreateQuotation}
+              disabledReason={createQuotationDisabledReason ?? undefined}
             >
               Create Quotation
             </ErpButton>

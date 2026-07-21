@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, FileText } from 'lucide-react'
 import { useCrmStore } from '../../../store/crmStore'
 import { resolveStoreAction } from '../../../store/storeAction'
 import { formatApiError } from '../../../services/api/apiErrors'
 import { notify } from '../../../store/toastStore'
-import { useActiveCustomers, useActiveProducts } from '../../../hooks/useMasterLists'
+import { useActiveCustomers, useSellableProducts } from '../../../hooks/useMasterLists'
 import { buildOpportunityLineFromProduct } from '../../../utils/opportunityLineCalc'
 import { useMasterStore } from '../../../store/masterStore'
 import { crmQuotationEditorPath, crmQuotationPath } from '../../../utils/crmQuotationNavigation'
@@ -31,7 +31,7 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
   const createDirect = useCrmStore((s) => s.createQuotationDirect)
   const templates = useCrmStore((s) => s.quotationTemplates)
   const customers = useActiveCustomers()
-  const products = useActiveProducts()
+  const products = useSellableProducts()
   const getProduct = useMasterStore((s) => s.getProduct)
   const items = useMasterStore((s) => s.items)
 
@@ -44,7 +44,7 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
   const [templateId, setTemplateId] = useState(defaultTemplateId)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [savedDocId, setSavedDocId] = useState<string | null>(null)
+  const [savedIds, setSavedIds] = useState<{ quotationId: string; documentId: string } | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -57,10 +57,10 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
     setTemplateId(templates[0]?.id ?? '')
     setSubmitting(false)
     setError(null)
-    setSavedDocId(null)
+    setSavedIds(null)
   }, [open, customers, products, templates])
 
-  const productOptions = useMemo(() => products.filter((p) => p.isActive), [products])
+  const productOptions = products
 
   function handleProductChange(id: string) {
     setProductId(id)
@@ -77,8 +77,8 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
       return
     }
     if (!productId) {
-      setError('Select a product.')
-      notify.warning('Select a product.')
+      setError('Select a released product. Unreleased products cannot be used in quotations.')
+      notify.warning('Select a released product.')
       return
     }
     const price = Number(unitPrice)
@@ -113,14 +113,14 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
             validityDate,
           }),
         )
-        if (!r.ok || !r.documentId) {
+        if (!r.ok || !r.documentId || !r.quotationId) {
           const msg = r.error ?? formatApiError('Failed to create quotation')
           setError(msg)
           notify.error(msg)
           return
         }
         notify.success('Draft quotation created')
-        setSavedDocId(r.documentId)
+        setSavedIds({ quotationId: r.quotationId, documentId: r.documentId })
       } finally {
         setSubmitting(false)
       }
@@ -136,14 +136,14 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
       onClose={onClose}
       width="lg"
       footer={
-        savedDocId ? null : (
+        savedIds ? null : (
           <Button type="submit" form="crm-quick-quote-form" className="w-full" disabled={submitting}>
-            Create Draft Quote
+            {submitting ? 'Creating…' : 'Create Draft Quote'}
           </Button>
         )
       }
     >
-      {savedDocId ? (
+      {savedIds ? (
         <div className="space-y-3">
           <p className="text-[14px] font-semibold text-emerald-900">Draft quotation created</p>
           <ErpButtonGroup>
@@ -151,7 +151,10 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
               type="button"
               variant="primary"
               icon={FileText}
-              onClick={() => { onClose(); navigate(crmQuotationEditorPath(savedDocId)) }}
+              onClick={() => {
+                onClose()
+                navigate(crmQuotationEditorPath(savedIds.quotationId, savedIds.documentId))
+              }}
             >
               Open Full Quotation
             </ErpButton>
@@ -159,7 +162,10 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
               type="button"
               variant="secondary"
               icon={Eye}
-              onClick={() => { onClose(); navigate(crmQuotationPath(savedDocId)) }}
+              onClick={() => {
+                onClose()
+                navigate(crmQuotationPath(savedIds.quotationId))
+              }}
             >
               View 360
             </ErpButton>
@@ -176,9 +182,9 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
               ))}
             </Select>
           </FormField>
-          <FormField label="Product" required>
+          <FormField label="Product" required hint="Only products released for sale are listed.">
             <Select value={productId} onChange={(e) => handleProductChange(e.target.value)} required>
-              <option value="">Select product…</option>
+              <option value="">Select released product…</option>
               {productOptions.map((p) => (
                 <option key={p.id} value={p.id}>{p.productName}</option>
               ))}

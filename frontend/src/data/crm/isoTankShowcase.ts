@@ -22,6 +22,7 @@ export function isoTankSamplePriceLines() {
     {
       id: 'pl-iso-26kl-main',
       productOrItem: '26 KL ISO Tank Container',
+      productId: 'prod-iso',
       description:
         "20' ISO full frame collar tank, Type UN Portable Tank T7 — SS 316L vessel, CSC / IMDG / ADR compliant, complete fittings, testing, and documentation",
       qty: 1,
@@ -43,7 +44,7 @@ export function buildIsoTankShowcaseDocument(audit: AuditStamp & { createdAt: st
   return {
     id: ISO_TANK_SHOWCASE_DOCUMENT_ID,
     quotationId: ISO_TANK_SHOWCASE_QUOTATION_ID,
-    revisionNo: 0,
+    revisionNo: 1,
     templateId: ISO_TANK_TEMPLATE_ID,
     opportunityId: ISO_TANK_SHOWCASE_OPPORTUNITY_ID,
     sections,
@@ -89,7 +90,7 @@ export function buildIsoTankShowcaseSalesQuotation(audit: AuditStamp & { created
     customerId: 'cust-crm-01',
     productId: 'prod-iso',
     qty: 1,
-    revisionNo: 0,
+    revisionNo: 1,
     rootQuotationId: ISO_TANK_SHOWCASE_QUOTATION_ID,
     isLatestRevision: true,
     locked: false,

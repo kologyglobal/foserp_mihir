@@ -210,27 +210,51 @@ export function QuickCompanyCreateModal({
 
   async function handleSubmit() {
     inline.touchAll()
-    const gstErr = validateGstin(form.gstin)
-    if (gstErr) {
-      setGstinError(gstErr)
-      setShowAdditional(true)
-    }
 
     const name = form.customerName.trim()
     const mobileErr = validateMobileForCountry(form.mobile, form.country || DEFAULT_CUSTOMER_COUNTRY)
     const emailErr = validateEmail(form.email)
+    const contactValue = form.contactPerson
+    const contactErr =
+      contactValue.trim() && /[^A-Za-z\s]/.test(contactValue)
+        ? 'Contact Person allows letters only'
+        : null
 
-    if (!name || mobileErr || emailErr || gstErr) {
+    // Account-detail fields (GSTIN etc.) only gate submit when the accordion is open
+    // or the user has already entered a partial/full GSTIN.
+    const gstinRaw = form.gstin.trim()
+    const shouldValidateAccountDetails = showAdditional || gstinRaw.length > 0
+    const gstErr = shouldValidateAccountDetails
+      ? validateGstin(form.gstin, { required: false })
+      : null
+
+    if (gstErr) {
+      setGstinError(gstErr)
+      setShowAdditional(true)
+    } else {
+      setGstinError(null)
+    }
+
+    if (!name || mobileErr || emailErr || contactErr || gstErr) {
       const msg =
         !name
           ? `${COMPANY_TERMINOLOGY.name} is required`
-          : mobileErr || emailErr || gstErr || 'Please fix the highlighted fields'
+          : contactErr || mobileErr || emailErr || gstErr || 'Please fix the highlighted fields'
       setError(msg)
       notify.warning(msg)
+      // Defer focus until touched errors paint
+      window.requestAnimationFrame(() => {
+        const root = document.getElementById('quick-company-modal-title')?.closest('.erp-modal-panel')
+        const invalid = root?.querySelector<HTMLElement>(
+          '[aria-invalid="true"], .erp-field-row--error input, input.erp-input--error, textarea.erp-input--error',
+        )
+        invalid?.focus({ preventScroll: true })
+        invalid?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
       return
     }
-    setGstinError(null)
 
+    setGstinError(null)
     setSubmitting(true)
     setError(null)
 
@@ -334,6 +358,15 @@ export function QuickCompanyCreateModal({
         </header>
 
         <div className="px-5 py-4">
+          {error ? (
+            <p
+              role="alert"
+              className="mb-3 rounded-md border border-erp-danger-solid/30 bg-red-50 px-3 py-2 text-[12px] font-medium text-erp-danger-fg"
+            >
+              {error}
+            </p>
+          ) : null}
+
           <section className="space-y-3">
             <h3 className="text-[13px] font-semibold text-erp-text">Quick entry</h3>
             <div className="grid gap-3 sm:grid-cols-3">
@@ -399,7 +432,14 @@ export function QuickCompanyCreateModal({
             <button
               type="button"
               className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-erp-border bg-erp-surface px-4 py-3 text-left text-[13px] font-semibold text-erp-primary hover:bg-erp-primary-soft/40"
-              onClick={() => setShowAdditional((v) => !v)}
+              onClick={() => {
+                setShowAdditional((v) => {
+                  const next = !v
+                  // Closing unused account details clears GSTIN gate errors
+                  if (!next && !form.gstin.trim()) setGstinError(null)
+                  return next
+                })
+              }}
               aria-expanded={showAdditional}
             >
               <span>{showAdditional ? 'Hide account details' : 'Add account details'}</span>
@@ -626,12 +666,6 @@ export function QuickCompanyCreateModal({
                 />
               </section>
             </div>
-          ) : null}
-
-          {error ? (
-            <p className="mb-3 rounded-md border border-erp-danger-solid/30 bg-red-50 px-3 py-2 text-[12px] font-medium text-erp-danger-fg">
-              {error}
-            </p>
           ) : null}
 
           <ErpButtonGroup className="sticky bottom-0 justify-end border-t border-erp-border bg-white py-4">

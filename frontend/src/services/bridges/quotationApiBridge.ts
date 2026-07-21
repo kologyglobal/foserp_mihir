@@ -226,6 +226,38 @@ export async function apiMarkQuotationDocumentSent(quotationId: string, document
   })
 }
 
+export async function apiCustomerApproveQuotationDocument(
+  quotationId: string,
+  documentId: string,
+  remarks?: string,
+): Promise<StoreActionResult> {
+  return withSubmitLock(lockKey('quotation:customer-approve', documentId), async () => {
+    try {
+      const res = await quotationApi.customerApproveQuotationDocumentApi(quotationId, documentId, { remarks })
+      applyQuotationApiResponse(res.data)
+      return { ok: true }
+    } catch (err) {
+      return fail(err)
+    }
+  })
+}
+
+export async function apiCustomerRejectQuotationDocument(
+  quotationId: string,
+  documentId: string,
+  remarks?: string,
+): Promise<StoreActionResult> {
+  return withSubmitLock(lockKey('quotation:customer-reject', documentId), async () => {
+    try {
+      const res = await quotationApi.customerRejectQuotationDocumentApi(quotationId, documentId, { remarks })
+      applyQuotationApiResponse(res.data)
+      return { ok: true }
+    } catch (err) {
+      return fail(err)
+    }
+  })
+}
+
 export async function apiDeleteQuotation(id: string): Promise<StoreActionResult> {
   return withSubmitLock(lockKey('quotation:delete', id), async () => {
     try {

@@ -186,6 +186,9 @@ const leadCreated = sales.createLead({
   lifecycleStatus: 'open',
   stage: 'new',
   productRequirement: 'Tipper trailer',
+  remarks: 'Test notes',
+  contactPerson: 'Test Contact',
+  mobile: '9876543210',
   source: 'referral',
   industry: 'Mining',
 })

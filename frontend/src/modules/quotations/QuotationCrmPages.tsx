@@ -38,6 +38,8 @@ import {
   quotationStatusLabel,
 } from '@/components/quotations'
 import { QuickFollowUpDrawer } from '@/components/crm'
+import { useCrmRecordLoadState } from '@/components/crm/CrmRecordLoadGate'
+import { PageLoadingFallback } from '@/components/system/PageLoadingFallback'
 import { resolveQuotationPrintLayout } from '../../utils/quotationEngine/printLayout'
 import { QuotationPrintDocument } from '@/components/quotations/QuotationPrintDocument'
 import { QuotationTemplateBuilder } from '@/components/quotations/QuotationTemplateBuilder'
@@ -535,8 +537,8 @@ export function CrmQuotationListPage() {
           onPrint={(item) => navigate(`/crm/quotations/${item.document.quotationId}/preview?doc=${item.document.id}`)}
           onSubmitApproval={(item) => {
             void (async () => {
-              if (item.document.status !== 'draft') {
-                notify.warning('Only draft quotations can be submitted for approval')
+              if (item.document.status !== 'draft' && item.document.status !== 'rejected') {
+                notify.warning('Only draft or rejected quotations can be submitted for approval')
                 return
               }
               const submit = useCrmStore.getState().submitQuotationDocumentForApproval
@@ -547,6 +549,79 @@ export function CrmQuotationListPage() {
               }
               notify.success('Quotation submitted for approval')
               navigate('/crm/quotations')
+            })()
+          }}
+          onApprove={(item) => {
+            void (async () => {
+              if (item.document.status !== 'pending_approval') {
+                notify.warning('Only pending quotations can be approved')
+                return
+              }
+              const r = await resolveStoreAction(
+                useCrmStore.getState().approveQuotationDocument(item.document.id, 'Approved from list'),
+              )
+              if (!r.ok) {
+                notify.error(r.error ?? 'Could not approve')
+                return
+              }
+              notify.success('Quotation approved')
+            })()
+          }}
+          onReject={(item) => {
+            void (async () => {
+              if (item.document.status !== 'pending_approval') {
+                notify.warning('Only pending quotations can be rejected')
+                return
+              }
+              const remarks = await systemPrompt({
+                title: 'Reject quotation',
+                description: 'Provide a reason for rejection.',
+                fieldLabel: 'Rejection reason',
+                defaultValue: '',
+                confirmLabel: 'Reject',
+                required: true,
+              })
+              if (!remarks) return
+              const r = await resolveStoreAction(
+                useCrmStore.getState().rejectQuotationDocument(item.document.id, remarks),
+              )
+              if (!r.ok) {
+                notify.error(r.error ?? 'Could not reject')
+                return
+              }
+              notify.success('Quotation rejected')
+            })()
+          }}
+          onMarkSent={(item) => {
+            void (async () => {
+              if (item.document.status !== 'approved') {
+                notify.warning('Only approved quotations can be sent')
+                return
+              }
+              const r = await resolveStoreAction(
+                useCrmStore.getState().markQuotationDocumentSent(item.document.id),
+              )
+              if (!r.ok) {
+                notify.error(r.error ?? 'Could not send quotation')
+                return
+              }
+              notify.success('Quotation sent to customer')
+            })()
+          }}
+          onCustomerApprove={(item) => {
+            void (async () => {
+              if (item.document.status !== 'sent') {
+                notify.warning('Only sent quotations can receive customer approval')
+                return
+              }
+              const r = await resolveStoreAction(
+                useCrmStore.getState().customerApproveQuotationDocument(item.document.id, 'Customer approved from list'),
+              )
+              if (!r.ok) {
+                notify.error(r.error ?? 'Could not record customer approval')
+                return
+              }
+              notify.success('Customer approval recorded')
             })()
           }}
           onScheduleActivity={(item) => setFollowUpQuotation(item)}
@@ -606,9 +681,20 @@ export function CrmQuotationEditorPage() {
   const [params] = useSearchParams()
   const docId = params.get('doc')
   const getLatest = useCrmStore((s) => s.getLatestQuotationDocument)
+  const getDoc = useCrmStore((s) => s.getQuotationDocument)
   const documentId = docId ?? (id ? getLatest(id)?.id : undefined)
+  const found = Boolean(documentId && getDoc(documentId!))
+  const { showLoader, showNotFound } = useCrmRecordLoadState(found)
 
-  if (!documentId) {
+  if (showLoader) {
+    return (
+      <OperationalPageShell title="Quotation Editor" variant="dynamics" badge="CRM">
+        <PageLoadingFallback label="Loading quotation editor…" />
+      </OperationalPageShell>
+    )
+  }
+
+  if (showNotFound || !documentId) {
     return (
       <OperationalPageShell title="Quotation Editor" variant="dynamics" badge="CRM">
         <div className="quo-editor-empty">

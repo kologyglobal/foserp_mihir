@@ -43,12 +43,14 @@ import { resolveCompany360Path } from '../../config/entity360Routes'
 import { notify } from '../../store/toastStore'
 import { validateSalesOrderCreate } from '../../utils/validation/crmSchemas/salesOrderSchema'
 import { handleInvalidSubmit, type FieldErrorMap } from '../../utils/formValidation'
+import { assertProductSellableForSales, isProductSellable, productNotSellableForSalesMessage } from '../../utils/productMaster'
+import { PRODUCT_STATUS_LABELS } from '../../types/productMaster'
 import { useSalesStore } from '../../store/salesStore'
 import { useCrmStore } from '../../store/crmStore'
 import { useMasterStore } from '../../store/masterStore'
 import { isApiMode } from '../../config/apiConfig'
 import { apiCreateSalesOrder } from '../../services/bridges/salesOrderApiBridge'
-import { useActiveCustomers, useActiveProducts } from '../../hooks/useMasterLists'
+import { useActiveCustomers, useSellableProducts } from '../../hooks/useMasterLists'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import {
@@ -178,7 +180,8 @@ export function SalesOrderNewPage() {
   const getOpportunity = useCrmStore((s) => s.getOpportunity)
   const getQuotation = useSalesStore((s) => s.getQuotation)
   const customers = useActiveCustomers()
-  const products = useActiveProducts()
+  const sellableProducts = useSellableProducts()
+  const allProducts = useMasterStore((s) => s.products)
   const getCustomer = useMasterStore((s) => s.getCustomer)
   const getProduct = useMasterStore((s) => s.getProduct)
   const locations = useMasterStore((s) => s.locations)
@@ -278,15 +281,26 @@ export function SalesOrderNewPage() {
     [customers],
   )
 
-  const productSmartOptions = useMemo(
-    () =>
-      products.map((p) => ({
+  const productSmartOptions = useMemo(() => {
+    const retainIds = new Set(lines.map((l) => l.productId).filter(Boolean))
+    const sellableOpts = sellableProducts.map((p) => ({
+      value: p.id,
+      label: `${p.productCode} · ${p.productName}`,
+      searchText: `${p.productCode} ${p.productName}`.toLowerCase(),
+    }))
+    const retained = allProducts
+      .filter((p) => retainIds.has(p.id) && !isProductSellable(p))
+      .map((p) => ({
         value: p.id,
         label: `${p.productCode} · ${p.productName}`,
-        searchText: `${p.productCode} ${p.productName}`.toLowerCase(),
-      })),
-    [products],
-  )
+        searchText: `${p.productCode} ${p.productName} not released`.toLowerCase(),
+        badge: `Not released · ${PRODUCT_STATUS_LABELS[p.status] ?? p.status}`,
+        subtitle: productNotSellableForSalesMessage(p),
+      }))
+    return [...sellableOpts, ...retained]
+  }, [sellableProducts, allProducts, lines])
+
+  const products = sellableProducts
 
   const computedLines = useMemo(
     () => lines.map((line) => {
@@ -415,7 +429,7 @@ export function SalesOrderNewPage() {
   }
 
   function validate(): FieldErrorMap {
-    return validateSalesOrderCreate({
+    const fieldErrors = validateSalesOrderCreate({
       createMode,
       fromOpportunity: Boolean(fromOpportunity),
       opportunitySoGateEnabled: opportunitySoGate?.enabled,
@@ -428,6 +442,16 @@ export function SalesOrderNewPage() {
       paymentTerms,
       deliveryTerms,
     }).fieldErrors
+
+    for (const line of lines) {
+      if (!line.productId) continue
+      const sellable = assertProductSellableForSales(getProduct(line.productId))
+      if (!sellable.ok) {
+        fieldErrors.lines = sellable.error
+        break
+      }
+    }
+    return fieldErrors
   }
 
   async function persist(saveMode: 'save' | 'save_new' | 'save_close') {
@@ -890,18 +914,25 @@ export function SalesOrderNewPage() {
                       value={draft.productId}
                       onChange={(id) => {
                         if (!id) return
+                        const nextProduct = getProduct(id)
+                        const sellable = assertProductSellableForSales(nextProduct)
+                        if (!sellable.ok) {
+                          notify.warning(sellable.error)
+                          return
+                        }
                         updateLine(line.key, {
                           productId: id,
-                          unitPrice: getProduct(id)?.standardPrice ?? draft.unitPrice,
+                          unitPrice: nextProduct?.standardPrice ?? draft.unitPrice,
                         })
                       }}
-                      placeholder="Select product…"
+                      placeholder="Select released product…"
                       appearance="dropdown"
                       dropdownMinWidth={360}
+                      emptyMessage="No released products match. Only products released for sale can be selected."
                     />
-                    {product?.status === 'draft' ? (
+                    {product && !isProductSellable(product) ? (
                       <p className="so-pricing-warn">
-                        <ShieldAlert className="h-3 w-3" /> Not engineering-released
+                        <ShieldAlert className="h-3 w-3" /> {productNotSellableForSalesMessage(product)}
                       </p>
                     ) : null}
                   </td>

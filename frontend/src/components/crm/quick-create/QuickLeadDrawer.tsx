@@ -125,6 +125,7 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
           createLead({
             prospectName: name,
             customerId,
+            contactPerson: name,
             mobile: mobile.trim() || null,
             email: email.trim() ? normalizeEmail(email) : null,
             source,
@@ -135,6 +136,7 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
             probability: 20,
             stage: 'new',
             productRequirement: '',
+            remarks: 'Quick lead capture',
             createdDate: new Date().toISOString().slice(0, 10),
             activityStatus: 'active',
             lifecycleStatus: 'open',

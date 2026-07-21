@@ -48,7 +48,17 @@ export function QuotationLineItemsEditor({
   const products = useMasterStore((s) => s.products)
   const items = useMasterStore((s) => s.items)
   const uoms = useMasterStore((s) => s.uoms)
-  const { options: productOptions, pickMap } = useProductMasterOptionMap(products, items, uoms)
+  const retainProductIds = useMemo(
+    () => priceLines.map((l) => l.productId),
+    [priceLines],
+  )
+  const { options: productOptions, pickMap } = useProductMasterOptionMap(
+    products,
+    items,
+    uoms,
+    undefined,
+    retainProductIds,
+  )
 
   const oppLines = useMemo(
     () => quotationPriceLinesToOpportunityLines(priceLines),

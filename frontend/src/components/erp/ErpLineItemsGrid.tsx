@@ -18,6 +18,8 @@ import type { ProductMasterPick } from '../../utils/opportunityProductOptions'
 import { buildOpportunityLineFromProduct } from '../../utils/opportunityLineCalc'
 import { useMasterStore } from '../../store/masterStore'
 import { cn } from '../../utils/cn'
+import { isProductSellable, productNotSellableForSalesMessage } from '../../utils/productMaster'
+import { notify } from '../../store/toastStore'
 
 interface ErpLineItemsGridProps {
   lines: OpportunityLine[]
@@ -95,6 +97,10 @@ export function ErpLineItemsGrid({
   function selectProduct(lineId: string, productId: string) {
     const pick = productPickMap.get(productId)
     if (!pick) return
+    if (!isProductSellable(pick.product)) {
+      notify.warning(productNotSellableForSalesMessage(pick.product))
+      return
+    }
     const idx = synced.findIndex((l) => l.id === lineId)
     const built = buildOpportunityLineFromProduct(pick.product, pick.item, pick.uomName, idx + 1)
     updateLine(lineId, built)
@@ -240,8 +246,9 @@ export function ErpLineItemsGrid({
                               options={productOptions}
                               value={line.productId ?? ''}
                               onChange={(pid) => selectProduct(line.id, pid)}
-                              placeholder="Select product…"
+                              placeholder="Select released product…"
                               appearance="dropdown"
+                              emptyMessage="Only products released for sale are listed."
                             />
                           )}
                           {line.itemCode ? (

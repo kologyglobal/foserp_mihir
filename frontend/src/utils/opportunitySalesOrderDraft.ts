@@ -11,13 +11,13 @@ import {
 
 export { canConvertQuotationToSalesOrderPermission }
 
-export const CREATE_SALES_ORDER_LOCKED_REASON = 'Available after quotation approval.'
+export const CREATE_SALES_ORDER_LOCKED_REASON = 'Available after customer approval.'
 
 const REASON_NO_QUOTATION = 'Create and approve a quotation before creating a sales order.'
-/** Single commercial approval step (internal approve also records customer acceptance). */
-const REASON_NOT_APPROVED = 'Approve the quotation before creating a sales order.'
-const REASON_DRAFT = 'Draft quotations cannot be converted — submit and approve first.'
-const REASON_PENDING = 'Quotation is pending approval — convert is available after approval.'
+const REASON_NOT_APPROVED = 'Send the quotation and record customer approval before creating a sales order.'
+const REASON_DRAFT = 'Draft quotations cannot be converted — submit, approve, send, then get customer approval.'
+const REASON_PENDING = 'Quotation is not ready for conversion — complete approve → send → customer approve first.'
+const REASON_NOT_SENT = 'Send the quotation to the customer before creating a sales order.'
 const REASON_EXPIRED = 'Quotation validity has expired.'
 const REASON_NO_OPPORTUNITY = 'Link this quotation to an opportunity before creating a sales order.'
 const REASON_COMMERCIAL = 'Complete commercial requirements on the quotation first.'
@@ -77,7 +77,7 @@ export function isOpportunitySalesOrderStage(
 /**
  * Convert Quotation → Sales Order is allowed when:
  * - user has crm.quotation.convert + crm.sales_order.create (not owner-gated)
- * - quotation exists, approved (+ customer accepted), commercial checks pass
+ * - quotation exists, sent + customer accepted, commercial checks pass
  * - opportunity linked and not Lost/Archived (Won is OK — convert links SO)
  * - no sales order linked yet
  *
@@ -158,9 +158,15 @@ export function resolveOpportunityCreateSalesOrderGate(
     : undefined
 
   const hasQuotation = Boolean(prefill.quotationId || prefill.quotationDocumentId)
+  const quotationSent = Boolean(
+    (doc && (doc.status === 'sent' || doc.status === 'converted'))
+    || (salesQuo && (salesQuo.status === 'sent' || salesQuo.status === 'converted')),
+  )
   const quotationApproved = Boolean(
-    (doc && (doc.status === 'approved' || doc.status === 'converted'))
-    || (salesQuo && (salesQuo.status === 'approved' || salesQuo.status === 'converted')),
+    quotationSent
+    || (doc && doc.status === 'approved')
+    || (salesQuo && salesQuo.status === 'approved')
+    || (doc?.approvalHistory ?? []).some((a) => a.action === 'approved')
   )
   const customerAccepted = salesQuo?.customerApproval === 'approved'
   const commercialComplete = Boolean(prefill.canConvertQuotation)
@@ -168,7 +174,7 @@ export function resolveOpportunityCreateSalesOrderGate(
 
   const enabled =
     hasQuotation
-    && quotationApproved
+    && quotationSent
     && customerAccepted
     && commercialComplete
 
@@ -179,11 +185,15 @@ export function resolveOpportunityCreateSalesOrderGate(
       disabledReason = REASON_NO_QUOTATION
     } else if (docStatus === 'draft') {
       disabledReason = REASON_DRAFT
-    } else if (docStatus === 'pending_approval' || docStatus === 'sent') {
+    } else if (docStatus === 'pending_approval') {
       disabledReason = REASON_PENDING
+    } else if (docStatus === 'approved') {
+      disabledReason = REASON_NOT_SENT
+    } else if (docStatus === 'sent' && !customerAccepted) {
+      disabledReason = REASON_NOT_APPROVED
     } else if (isQuotationExpired(salesQuo)) {
       disabledReason = REASON_EXPIRED
-    } else if (!quotationApproved || !customerAccepted) {
+    } else if (!quotationApproved || !customerAccepted || !quotationSent) {
       disabledReason = REASON_NOT_APPROVED
     } else if (!commercialComplete) {
       disabledReason = prefill.convertDisabledReason?.trim() || REASON_COMMERCIAL
@@ -199,7 +209,7 @@ export function resolveOpportunityCreateSalesOrderGate(
     salesOrderId: null,
     quotationDocumentId: prefill.quotationDocumentId,
     hasQuotation,
-    quotationApproved,
+    quotationApproved: quotationSent && customerAccepted,
     customerAccepted,
     commercialComplete,
     stageReady,

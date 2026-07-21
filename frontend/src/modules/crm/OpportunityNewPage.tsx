@@ -133,7 +133,6 @@ export function OpportunityNewPage() {
     () => (priorityOptions.length > 0 ? priorityOptions : resolveOpportunityPriorityOptions().map((p) => ({ value: p.value, label: p.label }))),
     [priorityOptions],
   )
-  const { options: productOptions, pickMap } = useProductMasterOptionMap(products, items, uoms)
 
   const initialCustomerId = prefillCustomerId || lead?.customerId || ''
   const initialOwnerId = lead?.leadOwnerId ?? ownerOptions[0]?.value ?? user.id
@@ -149,7 +148,7 @@ export function OpportunityNewPage() {
   const [saveAttempted, setSaveAttempted] = useState(false)
 
   const [customerId, setCustomerId] = useState(initialCustomerId)
-  const [contactId, setContactId] = useState('')
+  const [contactId, setContactId] = useState(() => lead?.contactId ?? '')
   const [opportunityName, setOpportunityName] = useState('')
   const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
   const [productRequirement, setProductRequirement] = useState(() =>
@@ -157,6 +156,14 @@ export function OpportunityNewPage() {
   )
   const [lines, setLines] = useState<OpportunityLine[]>(() =>
     initialLinesFromLead(lead?.productRequirement, lead?.remarks),
+  )
+  const retainProductIds = useMemo(() => lines.map((l) => l.productId), [lines])
+  const { options: productOptions, pickMap } = useProductMasterOptionMap(
+    products,
+    items,
+    uoms,
+    undefined,
+    retainProductIds,
   )
   const [probability, setProbability] = useState(initialProbability)
   const [expectedCloseDate, setExpectedCloseDate] = useState(lead?.expectedCloseDate?.slice(0, 10) || defaultCloseDate())
@@ -232,15 +239,19 @@ export function OpportunityNewPage() {
     if (!valid) setOwnerId(ownerOptions[0]!.value)
   }, [ownerOptions, ownerId, user.id])
 
-  // Prefill contact from lead contact person / primary company contact
+  // Prefill contact: lead.contactId → name match → company primary → first contact
   useEffect(() => {
     if (!prefillLeadId || !customerId || contactId) return
+    if (lead?.contactId && customerContacts.some((c) => c.id === lead.contactId)) {
+      setContactId(lead.contactId)
+      return
+    }
     const byName = lead?.contactPerson
       ? customerContacts.find((c) => c.name.trim().toLowerCase() === lead.contactPerson!.trim().toLowerCase())
       : undefined
     const next = byName ?? customerContacts.find((c) => c.isPrimary) ?? customerContacts[0]
     if (next) setContactId(next.id)
-  }, [prefillLeadId, lead?.contactPerson, customerId, customerContacts, contactId])
+  }, [prefillLeadId, lead?.contactId, lead?.contactPerson, customerId, customerContacts, contactId])
 
   useEffect(() => {
     setAttachmentsState(useOpportunityAttachmentStore.getState().getForOpportunity(attachmentScopeId))

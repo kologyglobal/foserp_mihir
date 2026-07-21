@@ -24,6 +24,7 @@ export {
   QuotationWorkflowStepper,
   QuotationCommercialSummary,
   QuotationSectionList,
+  quotationRevisionLabel,
 } from './Quotation360Sections'
 export {
   QuotationCrmCard, QuotationCrmList, QuotationCrmEmptyState, QuotationPortfolioToolbar,

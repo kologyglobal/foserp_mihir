@@ -3,6 +3,7 @@ export const QUOTATION_STATUSES = [
   'submitted',
   'pending_approval',
   'approved',
+  'sent',
   'rejected',
   'superseded',
   'converted',

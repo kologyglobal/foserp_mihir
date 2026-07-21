@@ -18,6 +18,10 @@ export interface LeadFormValidationInput {
   email: string
   mobile: string
   mobileCountry: string | null | undefined
+  /** Primary contact display name (free-text or selected contact). */
+  contactPerson?: string
+  /** Linked CRM contact id when company is selected. */
+  contactId?: string | null
   remarks: string
   leadStage: LeadStage
   requirementText: string
@@ -34,6 +38,7 @@ export interface LeadFormValidationInput {
 
 /**
  * Shared Lead form validation — same rules as CrmLeadFormPage.validate().
+ * Also used by store/bridge create guards so API/demo paths cannot bypass the form.
  * Returns a field → message map for handleInvalidSubmit.
  */
 export function validateLeadForm(input: LeadFormValidationInput): FieldErrorMap {
@@ -72,13 +77,17 @@ export function validateLeadForm(input: LeadFormValidationInput): FieldErrorMap 
     errors.productRequirement = 'Add at least one product / requirement line for this stage'
   }
 
-  if (
-    !input.mobile.trim()
-    && !input.email.trim()
-    && (input.leadStage === 'new' || input.leadStage === 'contacted')
-  ) {
-    if (!input.customerId && !errors.mobile) {
-      errors.mobile = 'Provide a mobile number or email (or link a company)'
+  // Early stages always need a reachable contact — linking a company alone is not enough.
+  if (input.leadStage === 'new' || input.leadStage === 'contacted') {
+    const hasReachableContact = Boolean(input.mobile.trim() || input.email.trim())
+    if (!hasReachableContact && !errors.mobile) {
+      errors.mobile = 'Provide a mobile number or email'
+    }
+    const hasPrimaryContact = Boolean(
+      String(input.contactPerson ?? '').trim() || String(input.contactId ?? '').trim(),
+    )
+    if (!hasPrimaryContact && !errors.contactPerson) {
+      errors.contactPerson = 'Primary Contact is required'
     }
   }
 
@@ -126,4 +135,39 @@ export function validateLeadForm(input: LeadFormValidationInput): FieldErrorMap 
   }
 
   return errors
+}
+
+/**
+ * Guard for store / API bridge createLead — maps a create payload into validateLeadForm.
+ * Returns the first error message, or null when valid.
+ */
+export function getLeadCreateValidationError(input: Record<string, unknown>): string | null {
+  const stage = (input.stage as LeadStage | undefined) ?? 'new'
+  const productRequirement = String(input.productRequirement ?? '')
+  const errors = validateLeadForm({
+    prospectName: String(input.prospectName ?? ''),
+    customerId: (input.customerId as string | null | undefined) ?? null,
+    leadOwnerId: String(input.leadOwnerId ?? ''),
+    priority: String(input.priority ?? ''),
+    createdDate: String(input.createdDate ?? '').slice(0, 10),
+    email: String(input.email ?? ''),
+    mobile: String(input.mobile ?? ''),
+    mobileCountry: null,
+    contactPerson: String(input.contactPerson ?? ''),
+    contactId: (input.contactId as string | null | undefined) ?? null,
+    remarks: String(input.remarks ?? ''),
+    leadStage: stage,
+    requirementText: productRequirement.trim(),
+    hasRequirementLines: productRequirement.trim().length > 0,
+    expectedCloseDate: String(input.expectedCloseDate ?? '').slice(0, 10),
+    nextFollowUpDate: String(input.nextFollowUpDate ?? '').slice(0, 10),
+    activityStatus: String(input.activityStatus ?? 'active'),
+    inactiveReason: String(input.inactiveReason ?? ''),
+    notQualifiedReason: String(input.notQualifiedReason ?? ''),
+    closedDate: String(input.closedDate ?? '').slice(0, 10),
+    closedReason: String(input.closedReason ?? ''),
+    isEdit: false,
+  })
+  const first = Object.values(errors)[0]
+  return first ?? null
 }

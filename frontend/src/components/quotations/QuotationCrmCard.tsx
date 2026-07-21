@@ -21,7 +21,7 @@ export interface QuotationListItem {
 }
 
 function statusTone(status: QuotationDocumentStatus): 'live' | 'healthy' | 'warning' | 'critical' {
-  if (status === 'approved' || status === 'converted') return 'healthy'
+  if (status === 'approved' || status === 'converted' || status === 'sent') return 'healthy'
   if (status === 'rejected') return 'critical'
   if (status === 'pending_approval' || status === 'draft') return 'warning'
   return 'live'

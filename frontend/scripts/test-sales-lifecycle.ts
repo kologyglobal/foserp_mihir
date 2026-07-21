@@ -50,6 +50,9 @@ const leadR = sales.createLead({
   lifecycleStatus: 'open',
   stage: 'new',
   productRequirement: 'Test bulker requirement',
+  remarks: 'Test notes',
+  contactPerson: 'Test Contact',
+  mobile: '9876543210',
   source: 'referral',
   industry: 'Cement',
   probability: 60,
@@ -135,11 +138,22 @@ check('MRP run created', mrpR.runId != null && useMrpStore.getState().getRun(mrp
 
 // Rejection path
 const lead2 = sales.createLead({
+  remarks: 'Test notes',
+  contactPerson: 'Test Contact',
+  mobile: '9876543210',
   source: 'cold_call',
   industry: 'Oil',
   customerId: 'cust-ioc',
   prospectName: 'Indian Oil',
+  leadOwnerId: 'user-rajesh',
+  leadOwnerName: 'Rep 2',
   salesOwner: 'Rep 2',
+  priority: 'medium',
+  createdDate: new Date().toISOString().slice(0, 10),
+  activityStatus: 'active',
+  lifecycleStatus: 'open',
+  stage: 'new',
+  productRequirement: '',
   expectedValue: 8000000,
   probability: 40,
 })

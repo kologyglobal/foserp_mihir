@@ -117,6 +117,7 @@ function todayIso() {
 /** Field order for invalid-submit focus (Lead create/edit reference). */
 const LEAD_FIELD_ORDER = [
   'prospectName',
+  'contactPerson',
   'leadOwnerId',
   'priority',
   'createdDate',
@@ -134,6 +135,7 @@ const LEAD_FIELD_ORDER = [
 
 const LEAD_SECTION_BY_FIELD: Record<string, string> = {
   prospectName: 'lead-section-quick',
+  contactPerson: 'lead-section-quick',
   leadOwnerId: 'lead-section-quick',
   priority: 'lead-section-quick',
   createdDate: 'lead-section-quick',
@@ -407,7 +409,13 @@ export function CrmLeadFormPage() {
   const products = useMasterStore((s) => s.products)
   const items = useMasterStore((s) => s.items)
   const uoms = useMasterStore((s) => s.uoms)
-  const { options: productOptions, pickMap } = useProductMasterOptionMap(products, items, uoms)
+  const { options: productOptions, pickMap } = useProductMasterOptionMap(
+    products,
+    items,
+    uoms,
+    undefined,
+    requirementLines.map((l) => l.productId),
+  )
 
   const requirementText = useMemo(
     () => summarizeLeadRequirementLines(requirementLines),
@@ -918,6 +926,8 @@ export function CrmLeadFormPage() {
       email,
       mobile,
       mobileCountry: resolveLeadMobileCountry(),
+      contactPerson,
+      contactId,
       remarks,
       leadStage,
       requirementText,
@@ -1170,6 +1180,7 @@ export function CrmLeadFormPage() {
           return
         }
 
+        // Edit Save — persist then return to Lead 360 / stage page
         const saved = useSalesStore.getState().getLead(leadId!)
         setSavedLeadId(leadId!)
         setSavedLeadNo(saved?.leadNo ?? null)
@@ -1177,6 +1188,11 @@ export function CrmLeadFormPage() {
         dirtyBaselineReady.current = true
         resetDirty()
         showToast('Lead updated successfully', 'success')
+        if (mode === 'default' && leadId) {
+          navigate(routes.view(leadId))
+        } else if (mode === 'close') {
+          navigate(routes.base)
+        }
       } catch (err) {
         showToast(err instanceof Error ? err.message : 'Lead save failed', 'error')
       } finally {
@@ -1261,7 +1277,9 @@ export function CrmLeadFormPage() {
       setLeadAttachments('draft:new', [])
     }
     resetDirty()
-    navigate(routes.base)
+    // Edit: discard and return to Lead 360. Create: back to register.
+    if (isEdit && id) navigate(routes.view(id))
+    else navigate(routes.base)
   }
 
   const factBox = (
@@ -1421,7 +1439,16 @@ export function CrmLeadFormPage() {
 
           <ErpFieldGroup label="Contact">
             {company.customerId ? (
-              <ErpFieldRow label="Contact Person" colSpan={3} dataField="contactPerson">
+              <ErpFieldRow
+                label="Contact Person"
+                required
+                colSpan={3}
+                dataField="contactPerson"
+                fieldState={
+                  (validationErrors.contactPerson) ? 'error' : undefined
+                }
+                fieldError={validationErrors.contactPerson}
+              >
                 <LeadContactSelect
                   customerId={company.customerId}
                   contactId={contactId || null}
@@ -1430,21 +1457,35 @@ export function CrmLeadFormPage() {
                 />
               </ErpFieldRow>
             ) : (
-              <ErpFieldRow label="Contact Person" dataField="contactPerson">
+              <ErpFieldRow
+                label="Contact Person"
+                required
+                dataField="contactPerson"
+                fieldState={validationErrors.contactPerson ? 'error' : undefined}
+                fieldError={validationErrors.contactPerson}
+              >
                 <Input
                   value={contactPerson}
                   onChange={(e) => {
                     setContactId('')
                     setContactPerson(e.target.value)
+                    setValidationErrors((prev) => {
+                      if (!prev.contactPerson) return prev
+                      const next = { ...prev }
+                      delete next.contactPerson
+                      return next
+                    })
                   }}
                   placeholder="Primary contact"
                   className="erp-input"
+                  error={Boolean(validationErrors.contactPerson)}
                   disabled={fieldLocked('contactPerson')}
                 />
               </ErpFieldRow>
             )}
             <ErpFieldRow
               label="Mobile"
+              required
               dataField="mobile"
               fieldState={
                 (inlineValidation.fieldError('mobile') ?? validationErrors.mobile)

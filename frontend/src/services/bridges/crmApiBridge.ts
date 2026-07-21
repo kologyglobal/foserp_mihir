@@ -21,6 +21,7 @@ import {
   getMissingLeadStageFields,
   getMissingOpportunityStageFields,
 } from '../../config/crmStageRequirements'
+import { getLeadCreateValidationError } from '../../utils/validation/crmSchemas/leadSchema'
 
 const submitLocks = new Set<string>()
 let defaultPipelineCache: PipelineDto | null = null
@@ -422,6 +423,8 @@ export async function apiDeleteContact(id: string): Promise<StoreActionResult> {
 }
 
 export async function apiCreateLead(input: Record<string, unknown>): Promise<StoreActionResult & { leadId?: string }> {
+  const createError = getLeadCreateValidationError(input)
+  if (createError) return { ok: false, error: createError }
   return withSubmitLock(lockKey('lead:create'), async () => {
     try {
       const res = await api.createLeadApi(mapLeadCreatePayload(input))
@@ -657,6 +660,7 @@ export async function apiCreateOpportunity(
           value: input.value,
           expectedCloseDate: toApiDateTime(input.expectedCloseDate),
           lines: mapOpportunityLinesForApi(input.lines),
+          contactId: isUuid(input.contactId ?? undefined) ? input.contactId : null,
         })
         upsertLead(res.data.lead)
         if (res.data.opportunity) upsertOpportunity(res.data.opportunity)

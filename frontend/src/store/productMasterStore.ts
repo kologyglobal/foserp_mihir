@@ -11,6 +11,7 @@ import { useWorkOrderStore } from './workOrderStore'
 import { getReleasedRoutingForProduct } from '../utils/routing'
 import {
   appendChangeLog,
+  assertProductSellableForSales,
   createInitialRevision,
   deriveCostsFromBomAndRouting,
   isProductSellable,
@@ -269,10 +270,8 @@ const productMasterActions: ProductMasterActions = {
 
   canUseProductInSales: (productId) => {
     const product = useMasterStore.getState().getProduct(productId)
-    if (!product) return { ok: false, error: 'Product not found' }
-    if (!isProductSellable(product)) {
-      return { ok: false, error: `Product ${product.productCode} is not released for sales (${product.status})` }
-    }
+    const check = assertProductSellableForSales(product)
+    if (!check.ok) return check
     return { ok: true }
   },
 }

@@ -152,12 +152,27 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
     const res = await authPost(`${BASE}/leads`, {
       prospectName: 'E2E Prospect',
       customerId: companyId,
+      contactId,
+      contactPerson: 'E2E Contact',
+      mobile: '9876543210',
+      remarks: 'E2E lead notes',
+      priority: 'medium',
       source: 'website',
       expectedValue: 500000,
+      productRequirement: 'E2E product requirement',
       leadOwnerId: userId,
     })
     expect(res.status).toBe(201)
     leadId = res.body.data.id
+  })
+
+  it('rejects lead create without notes / contact', async () => {
+    const res = await authPost(`${BASE}/leads`, {
+      prospectName: 'Incomplete Lead',
+      customerId: companyId,
+      leadOwnerId: userId,
+    })
+    expect(res.status).toBe(400)
   })
 
   it('updates CRM lead', async () => {
@@ -381,21 +396,30 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
     const leadRes = await authPost(`${BASE}/leads`, {
       prospectName: 'E2E Convert Lead',
       customerId: companyId,
+      contactId,
+      contactPerson: 'E2E Contact',
+      mobile: '9876543210',
+      remarks: 'Ready to convert',
+      priority: 'high',
       source: 'referral',
       expectedValue: 300000,
+      productRequirement: 'Convert product line',
       leadOwnerId: userId,
       stage: 'qualified',
     })
     expect(leadRes.status).toBe(201)
     const convertLeadId = leadRes.body.data.id
+    expect(leadRes.body.data.contactId).toBe(contactId)
 
     const convertRes = await authPost(`${BASE}/leads/${convertLeadId}/convert`, {
       opportunityName: 'E2E Converted Opp',
       value: 300000,
+      contactId,
     })
     expect(convertRes.status).toBe(200)
     expect(convertRes.body.data.lead.stage).toBe('converted_to_opportunity')
     convertOppId = convertRes.body.data.opportunity.id
+    expect(convertRes.body.data.opportunity.contactId).toBe(contactId)
 
     const loseRes = await authPost(`${BASE}/opportunities/${convertOppId}/lose`, {
       lostReason: 'Budget constraints',
@@ -673,9 +697,24 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
     expect(res.status).toBe(200)
     expect(res.body.data.status).toBe('approved')
     expect(res.body.data.documents[0].status).toBe('approved')
+    expect(res.body.data.customerApproval).toBe('pending')
   })
 
-  it('converts approved quotation to sales order', async () => {
+  it('sends approved quotation to customer then records customer approval', async () => {
+    const sent = await authPost(`${BASE}/quotations/${quotationId}/documents/${quotationDocId}/mark-sent`, {})
+    expect(sent.status).toBe(200)
+    expect(sent.body.data.documents[0].status).toBe('sent')
+    expect(sent.body.data.status).toBe('sent')
+
+    const cust = await authPost(
+      `${BASE}/quotations/${quotationId}/documents/${quotationDocId}/customer-approve`,
+      { remarks: 'Customer accepted' },
+    )
+    expect(cust.status).toBe(200)
+    expect(cust.body.data.customerApproval).toBe('approved')
+  })
+
+  it('converts customer-approved quotation to sales order', async () => {
     const res = await authPost(`${BASE}/quotations/${quotationId}/convert-to-sales-order`, {
       documentId: quotationDocId,
       customerPoNumber: 'PO-E2E-001',
@@ -837,6 +876,17 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
       {},
     )
     expect(submitRes.status).toBe(200)
+
+    const sentRes = await authPost(
+      `${BASE}/quotations/${lostQuoId}/documents/${lostDocId}/mark-sent`,
+      {},
+    )
+    expect(sentRes.status).toBe(200)
+    const custRes = await authPost(
+      `${BASE}/quotations/${lostQuoId}/documents/${lostDocId}/customer-approve`,
+      {},
+    )
+    expect(custRes.status).toBe(200)
 
     const loseRes = await authPost(`${BASE}/opportunities/${lostOppId}/lose`, {
       lostReason: 'Budget withdrawn',
@@ -1001,6 +1051,11 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
     const leadRes = await authPost(`${BASE}/leads`, {
       prospectName: 'E2E Disqualify Lead',
       customerId: companyId,
+      contactId,
+      contactPerson: 'E2E Contact',
+      mobile: '9876543210',
+      remarks: 'Will disqualify',
+      priority: 'low',
       source: 'other',
       expectedValue: 10000,
       leadOwnerId: userId,

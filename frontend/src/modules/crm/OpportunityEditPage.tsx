@@ -17,7 +17,6 @@ import {
   Mail,
   Save,
   User,
-  X,
   XCircle,
 } from 'lucide-react'
 import { ErpCardSection, ErpFieldRow, ErpStickySaveBar, ErpViewField } from '../../components/erp/card-form'
@@ -203,24 +202,6 @@ export function OpportunityEditPage() {
     <ErpCardCommandBar
       inline
       homeActions={[
-        {
-          id: 'save',
-          label: isSaving ? 'Saving…' : 'Save',
-          icon: Save,
-          primary: true,
-          disabled: isSaving || !isDirty || !canUpdate,
-          disabledReason: !canUpdate ? 'No update permission' : !isDirty ? 'No unsaved changes' : undefined,
-          onClick: () => void executeAction('save'),
-        },
-        {
-          id: 'save-close',
-          label: 'Save & Close',
-          icon: X,
-          disabled: isSaving || (isDirty && !canUpdate),
-          disabledReason: isDirty && !canUpdate ? 'No update permission' : undefined,
-          onClick: () => void executeAction('saveAndClose'),
-        },
-        { id: 'cancel', label: 'Cancel', icon: X, onClick: () => void executeAction('cancel') },
         { id: '360', label: 'View 360', icon: Building2, onClick: () => void executeAction('open360') },
         {
           id: 'quote',

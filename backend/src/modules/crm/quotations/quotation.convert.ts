@@ -91,25 +91,24 @@ function assertConvertible(quotation: CrmQuotation, doc: CrmQuotationDocument, l
       quotation.salesOrderNo ?? doc.salesOrderNo,
     )
   }
-  // Default company config: require approved (no Sent shortcut). Accepted = approved + customerApproval.
-  if (doc.status !== 'approved') {
-    throw new InvalidStateError(`Quotation document must be approved — current status is ${doc.status}`)
-  }
-  if (quotation.status !== 'approved') {
-    throw new InvalidStateError(`Quotation must be approved — current status is ${quotation.status}`)
+  // Lifecycle: must be sent to customer and customer-approved before SO conversion.
+  if (doc.status !== 'sent') {
+    throw new InvalidStateError(
+      `Quotation must be sent to the customer before creating a sales order — current status is ${doc.status}`,
+    )
   }
   if (quotation.customerApproval !== 'approved') {
-    throw new InvalidStateError('Approve the quotation before creating a sales order')
+    throw new InvalidStateError('Customer must approve the quotation before creating a sales order')
   }
   if (latestDoc && latestDoc.id !== doc.id) {
-    throw new InvalidStateError('Only the latest approved quotation revision can be converted to a sales order')
+    throw new InvalidStateError('Only the latest quotation revision can be converted to a sales order')
   }
   if (quotation.validityDate && quotation.validityDate < todayDateOnly()) {
     throw new ValidationError('Quotation validity has expired')
   }
   const history = Array.isArray(doc.approvalHistory) ? doc.approvalHistory : []
   if (!history.some((e) => (e as { action?: string }).action === 'approved')) {
-    throw new ValidationError('Quotation approval must be completed')
+    throw new ValidationError('Quotation internal approval must be completed')
   }
 }
 

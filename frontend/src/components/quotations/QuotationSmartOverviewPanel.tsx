@@ -15,6 +15,10 @@ export interface QuotationSmartOverviewPanelProps {
   onGoToSection: (sectionId: string) => void
   onEdit?: () => void
   onPreview?: () => void
+  onSubmitApproval?: () => void
+  onApprove?: () => void
+  onMarkSent?: () => void
+  onCustomerApprove?: () => void
   onCreateSalesOrder?: () => void
   canEdit?: boolean
 }
@@ -25,6 +29,10 @@ export function QuotationSmartOverviewPanel({
   onGoToSection,
   onEdit,
   onPreview,
+  onSubmitApproval,
+  onApprove,
+  onMarkSent,
+  onCustomerApprove,
   onCreateSalesOrder,
   canEdit = false,
 }: QuotationSmartOverviewPanelProps) {
@@ -32,6 +40,22 @@ export function QuotationSmartOverviewPanel({
   const readiness = computeQuotationCompleteness(input)
 
   function runAction(action: CrmSmartNextAction) {
+    if (action.id === 'submit_approval' && onSubmitApproval) {
+      onSubmitApproval()
+      return
+    }
+    if (action.id === 'approve' && onApprove) {
+      onApprove()
+      return
+    }
+    if (action.id === 'send' && onMarkSent) {
+      onMarkSent()
+      return
+    }
+    if (action.id === 'customer_approve' && onCustomerApprove) {
+      onCustomerApprove()
+      return
+    }
     if (action.id === 'convert_so' && onCreateSalesOrder) {
       onCreateSalesOrder()
       return

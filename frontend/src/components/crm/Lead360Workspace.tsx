@@ -12,6 +12,8 @@ import { LogActivityDrawer } from '@/components/crm/CrmQuickCreateDrawers'
 import { LeadHistoryDrawer } from '@/components/crm/LeadHistoryDrawer'
 import { CrmUnifiedActivityFeed } from '@/components/crm/CrmUnifiedActivityFeed'
 import { CrmDeleteConfirmModal } from '@/components/crm/CrmDeleteConfirmModal'
+import { useCrmRecordLoadState } from '@/components/crm/CrmRecordLoadGate'
+import { PageLoadingFallback } from '@/components/system/PageLoadingFallback'
 import { canCrmPermission } from '@/utils/permissions/crm'
 import { AppLink } from '@/components/ui/AppLink'
 import { Button } from '@/components/ui/Button'
@@ -298,7 +300,14 @@ export function Lead360Workspace() {
     lead, requirementLineCount, leadAttachments.length, leadActivities.length,
   ])
 
-  if (!lead) {
+  const recordReady = Boolean(lead)
+  const { showLoader, showNotFound } = useCrmRecordLoadState(recordReady)
+
+  if (showLoader) {
+    return <PageLoadingFallback label="Loading lead…" />
+  }
+
+  if (showNotFound || !lead) {
     return (
       <div className="erp-page flex flex-col items-center justify-center gap-3 p-12">
         <p className="text-erp-muted">Lead not found.</p>

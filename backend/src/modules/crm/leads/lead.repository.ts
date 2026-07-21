@@ -267,13 +267,20 @@ export async function convertLead(
     const lead = await tx.crmLead.findFirst({ where: { id, ...tenantActiveFilter(tenantId) } })
     if (!lead) return null
 
+    const companyId = lead.companyId ?? (await ensureLeadCompany(tx, tenantId, lead, userId))
+    let contactId = input.contactId ?? lead.contactId ?? null
+
+    if (!contactId && lead.contactPerson?.trim()) {
+      contactId = await ensureLeadContact(tx, tenantId, userId, companyId, lead)
+    }
+
     const opportunity = await tx.crmOpportunity.create({
       data: {
         tenantId,
         opportunityCode: input.opportunityCode,
         name: input.opportunityName ?? lead.prospectName,
-        companyId: lead.companyId ?? (await ensureLeadCompany(tx, tenantId, lead, userId)),
-        contactId: lead.contactId,
+        companyId,
+        contactId,
         leadId: lead.id,
         pipelineId: input.pipelineId,
         stageId: input.stageId,
@@ -297,6 +304,8 @@ export async function convertLead(
         stage: 'converted_to_opportunity',
         lifecycleStatus: 'converted',
         opportunityId: opportunity.id,
+        companyId: lead.companyId ? undefined : companyId,
+        contactId: lead.contactId ? undefined : (contactId ?? undefined),
         convertedAt: new Date(),
         updatedBy: userId,
       },
@@ -315,6 +324,52 @@ export async function convertLead(
 
     return { lead: updatedLead, opportunity }
   })
+}
+
+async function ensureLeadContact(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  userId: string,
+  companyId: string,
+  lead: {
+    contactPerson: string | null
+    mobile: string | null
+    email: string | null
+    designation: string | null
+  },
+): Promise<string> {
+  const { nextCode } = await import('../../../services/codeSeries.service.js')
+  const { splitContactName } = await import('../contacts/contact.types.js')
+  const personName = lead.contactPerson!.trim()
+  const existing = await tx.crmContact.findMany({
+    where: { tenantId, companyId, deletedAt: null },
+    orderBy: { createdAt: 'asc' },
+  })
+  const byName = existing.find(
+    (c) => `${c.firstName} ${c.lastName}`.trim().toLowerCase() === personName.toLowerCase(),
+  )
+  if (byName) return byName.id
+
+  const contactCode = await nextCode(tenantId, 'CONTACT', tx)
+  const { firstName, lastName } = splitContactName(personName)
+  const created = await tx.crmContact.create({
+    data: {
+      tenantId,
+      contactCode,
+      companyId,
+      firstName,
+      lastName,
+      designation: lead.designation ?? 'Primary Contact',
+      email: lead.email || null,
+      mobile: lead.mobile || null,
+      isPrimary: existing.length === 0,
+      isActive: true,
+      status: 'active',
+      createdBy: userId,
+      updatedBy: userId,
+    },
+  })
+  return created.id
 }
 
 async function ensureLeadCompany(

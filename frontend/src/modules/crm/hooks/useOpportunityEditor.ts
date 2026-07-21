@@ -105,7 +105,6 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
   const ownerOptions = useCrmOwnerOptions()
   const priorityOptions = useOpportunityPriorityOptions()
   const stageOptions = useResolvedOpportunityStages()
-  const { options: productOptions, pickMap } = useProductMasterOptionMap(products, items, uoms)
 
   const canUpdate = canCrmPermission('crm.opportunity.update')
   const canClose = canCrmPermission('crm.opportunity.close')
@@ -134,6 +133,17 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
   const [opportunityName, setOpportunityName] = useState(opportunity?.opportunityName ?? '')
   const [contactId, setContactId] = useState(opportunity?.contactId ?? '')
   const [lines, setLines] = useState<OpportunityLine[]>(initialLines)
+  const retainProductIds = useMemo(
+    () => [...lines.map((l) => l.productId), opportunity?.productId],
+    [lines, opportunity?.productId],
+  )
+  const { options: productOptions, pickMap } = useProductMasterOptionMap(
+    products,
+    items,
+    uoms,
+    undefined,
+    retainProductIds,
+  )
   const [probability, setProbability] = useState(String(opportunity?.probability ?? 0))
   const [expectedCloseDate, setExpectedCloseDate] = useState(opportunity?.expectedCloseDate?.slice(0, 10) ?? '')
   const [priority, setPriority] = useState<OpportunityPriority>(opportunity?.priority ?? 'medium')
@@ -411,9 +421,13 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
   ])
 
   const save = useCallback(async () => {
-    if (!isDirty) return
-    await persist()
-  }, [isDirty, persist])
+    if (!opportunityId) return
+    if (isDirty) {
+      const ok = await persist()
+      if (!ok) return
+    }
+    navigate(detailsPath(opportunityId))
+  }, [isDirty, persist, opportunityId, navigate])
 
   const saveAndClose = useCallback(async () => {
     if (!opportunityId) return

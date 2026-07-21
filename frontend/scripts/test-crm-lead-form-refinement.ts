@@ -113,6 +113,9 @@ check(21, 'Lead saves successfully', (() => {
     lifecycleStatus: 'open',
     stage: 'new',
     productRequirement: '45 m³ bulker',
+    remarks: 'Test notes',
+    contactPerson: 'Test Contact',
+    mobile: '9876543210',
     source: 'referral',
     industry: 'Cement',
   })

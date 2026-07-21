@@ -34,6 +34,9 @@ export interface OpportunitySmartOverviewInput {
   /** Ready for Create Sales Order (quotation accepted + Won / Order Confirmed). */
   canCreateSalesOrder?: boolean
   createSalesOrderLockedReason?: string
+  /** Ready for Create Quotation (stage + mandatory fields). */
+  canCreateQuotation?: boolean
+  createQuotationLockedReason?: string
   lastSavedLabel?: string
 }
 
@@ -273,6 +276,16 @@ export function resolveOpportunityNextBestAction(input: OpportunitySmartOverview
     }
   }
   if (!input.quotationId && input.isOpen !== false) {
+    if (input.canCreateQuotation === false) {
+      return {
+        id: 'create_quotation',
+        title: 'Quotation Blocked',
+        description: input.createQuotationLockedReason
+          ?? 'Complete stage requirements (lines, value, contact) before creating a quotation.',
+        ctaLabel: 'Review Deal',
+        sectionId: 'products',
+      }
+    }
     return {
       id: 'create_quotation',
       title: 'Create Quotation',
@@ -293,7 +306,7 @@ export function resolveOpportunityNextBestAction(input: OpportunitySmartOverview
       id: 'await_so',
       title: 'Sales Order Blocked',
       description: input.createSalesOrderLockedReason
-        ?? 'Create Sales Order becomes available after quotation approval.',
+        ?? 'Create Sales Order becomes available after Send → Customer Approve.',
       ctaLabel: 'Review Deal',
     }
   }

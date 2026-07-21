@@ -300,8 +300,8 @@ export function ApprovalQueuePage() {
   return (
     <div className="erp-page">
       <PageHeader
-        title="Company Approval Queue"
-        description="Quotations awaiting customer sign-off — approve or reject before creating sales order"
+        title="Customer Approval Queue"
+        description="Quotations sent to the customer — record acceptance before creating a sales order"
         breadcrumbs={[{ label: 'Sales', to: '/sales' }, { label: 'Approvals' }]}
         commandBar={
           <CommandBar>
@@ -529,6 +529,9 @@ export function QuotationDetailPage() {
   const crmDoc = useCrmStore((s) => (id ? s.getLatestQuotationDocument(id) : undefined))
   const getRevisionChain = useSalesStore((s) => s.getRevisionChain)
   const submitQuotationForApproval = useSalesStore((s) => s.submitQuotationForApproval)
+  const approveQuotationInternally = useSalesStore((s) => s.approveQuotationInternally)
+  const rejectQuotationInternally = useSalesStore((s) => s.rejectQuotationInternally)
+  const markQuotationSent = useSalesStore((s) => s.markQuotationSent)
   const recordCustomerApproval = useSalesStore((s) => s.recordCustomerApproval)
   const createQuotationRevision = useSalesStore((s) => s.createQuotationRevision)
   const createSalesOrderFromQuotation = useSalesStore((s) => s.createSalesOrderFromQuotation)
@@ -588,20 +591,35 @@ export function QuotationDetailPage() {
         </Button>
         {quotation.status === 'draft' && !quotation.locked && (
           <Button size="sm" onClick={() => setToast(submitQuotationForApproval(quotation.id).ok ? 'Sent for approval' : submitQuotationForApproval(quotation.id).error ?? 'Failed')}>
-            Submit for Company Approval
+            Submit for Approval
           </Button>
         )}
         {quotation.status === 'pending_approval' && quotation.isLatestRevision && (
           <>
-            <Button size="sm" variant="primary" onClick={() => setToast(recordCustomerApproval(quotation.id, 'approved').ok ? 'Quotation approved' : recordCustomerApproval(quotation.id, 'approved').error ?? 'Failed')}>
+            <Button size="sm" variant="primary" onClick={() => setToast(approveQuotationInternally(quotation.id).ok ? 'Quotation approved' : approveQuotationInternally(quotation.id).error ?? 'Failed')}>
               <CheckCircle className="mr-1 h-4 w-4" /> Approve
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => setToast(recordCustomerApproval(quotation.id, 'rejected', 'Price too high').ok ? 'Customer rejected' : 'Failed')}>
+            <Button size="sm" variant="secondary" onClick={() => setToast(rejectQuotationInternally(quotation.id).ok ? 'Quotation rejected' : 'Failed')}>
               Reject
             </Button>
           </>
         )}
-        {quotation.status === 'approved' && quotation.isLatestRevision && !quotation.salesOrderId && (
+        {quotation.status === 'approved' && quotation.isLatestRevision && (
+          <Button size="sm" variant="primary" onClick={() => setToast(markQuotationSent(quotation.id).ok ? 'Quotation sent' : markQuotationSent(quotation.id).error ?? 'Failed')}>
+            Send to Customer
+          </Button>
+        )}
+        {quotation.status === 'sent' && quotation.customerApproval === 'pending' && quotation.isLatestRevision && (
+          <>
+            <Button size="sm" variant="primary" onClick={() => setToast(recordCustomerApproval(quotation.id, 'approved').ok ? 'Customer approved' : recordCustomerApproval(quotation.id, 'approved').error ?? 'Failed')}>
+              <CheckCircle className="mr-1 h-4 w-4" /> Customer Approve
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setToast(recordCustomerApproval(quotation.id, 'rejected', 'Price too high').ok ? 'Customer rejected' : 'Failed')}>
+              Customer Reject
+            </Button>
+          </>
+        )}
+        {quotation.status === 'sent' && quotation.customerApproval === 'approved' && quotation.isLatestRevision && !quotation.salesOrderId && (
           <Button
             size="sm"
             variant="primary"

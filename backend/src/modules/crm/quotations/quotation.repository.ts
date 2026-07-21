@@ -369,15 +369,12 @@ export async function approveDocument(
         updatedBy: userId,
       },
     })
+    // Internal approval only — customerApproval stays pending until customer-approve after send.
     await tx.crmQuotation.update({
       where: { id: quotationId, tenantId },
       data: {
         status: 'approved',
         locked: true,
-        customerApproval: 'approved',
-        customerApprovalAt: new Date(),
-        customerApprovalBy: userId,
-        customerRejectionReason: null,
         updatedBy: userId,
       },
     })
@@ -390,7 +387,7 @@ export async function rejectDocument(
   quotationId: string,
   docId: string,
   userId: string,
-  remarks: string | undefined,
+  _remarks: string | undefined,
   approvalHistory: Prisma.InputJsonValue,
 ) {
   return prisma.$transaction(async (tx) => {
@@ -408,8 +405,6 @@ export async function rejectDocument(
       data: {
         status: 'rejected',
         locked: false,
-        customerApproval: 'rejected',
-        customerRejectionReason: remarks ?? null,
         updatedBy: userId,
       },
     })
@@ -422,15 +417,47 @@ export async function markDocumentSent(
   quotationId: string,
   docId: string,
   userId: string,
+  approvalHistory: Prisma.InputJsonValue,
 ) {
   return prisma.$transaction(async (tx) => {
     await tx.crmQuotationDocument.update({
       where: { id: docId },
-      data: { status: 'sent', locked: true, updatedBy: userId },
+      data: { status: 'sent', locked: true, approvalHistory, updatedBy: userId },
     })
     await tx.crmQuotation.update({
       where: { id: quotationId, tenantId },
-      data: { status: 'submitted', locked: true, updatedBy: userId },
+      data: { status: 'sent', locked: true, updatedBy: userId },
+    })
+    return tx.crmQuotation.findUniqueOrThrow({ where: { id: quotationId }, include: includeRelations })
+  })
+}
+
+export async function recordCustomerApproval(
+  tenantId: string,
+  quotationId: string,
+  docId: string,
+  userId: string,
+  decision: 'approved' | 'rejected',
+  remarks: string | undefined,
+  approvalHistory: Prisma.InputJsonValue,
+) {
+  return prisma.$transaction(async (tx) => {
+    await tx.crmQuotationDocument.update({
+      where: { id: docId },
+      data: {
+        approvalHistory,
+        updatedBy: userId,
+      },
+    })
+    await tx.crmQuotation.update({
+      where: { id: quotationId, tenantId },
+      data: {
+        customerApproval: decision,
+        customerApprovalAt: new Date(),
+        customerApprovalBy: userId,
+        customerRejectionReason: decision === 'rejected' ? (remarks ?? null) : null,
+        updatedBy: userId,
+      },
     })
     return tx.crmQuotation.findUniqueOrThrow({ where: { id: quotationId }, include: includeRelations })
   })

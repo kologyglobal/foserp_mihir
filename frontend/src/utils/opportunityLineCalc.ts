@@ -2,6 +2,8 @@ import type { Opportunity, OpportunityLine, QuotationPriceLine } from '../types/
 import type { Item, Product } from '../types/master'
 import type { TaxCategory } from '../types/productMaster'
 import { PRODUCT_FAMILY_LABELS } from '../types/productMaster'
+import { useMasterStore } from '../store/masterStore'
+import { assertProductSellableForSales } from './productMaster'
 
 export function taxCategoryToPct(tax: TaxCategory | string | undefined): number {
   if (tax === 'gst_12') return 12
@@ -241,9 +243,14 @@ export function validateOpportunityLines(
     errors.push('At least one product / item line is required.')
   }
 
+  const getProduct = useMasterStore.getState().getProduct
   for (const line of meaningfulLines.length ? meaningfulLines : requireCommercialLines ? lines : []) {
     const row: string[] = []
     if (!line.productId && !line.productOrItem.trim()) row.push('Product / item is required.')
+    if (line.productId) {
+      const sellable = assertProductSellableForSales(getProduct(line.productId))
+      if (!sellable.ok) row.push(sellable.error)
+    }
     if (!line.qty || line.qty <= 0) row.push('Quantity must be greater than zero.')
     if (line.unitPrice == null || Number.isNaN(line.unitPrice) || line.unitPrice <= 0) {
       row.push(UNIT_PRICE_REQUIRED_MESSAGE)

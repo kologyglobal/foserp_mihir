@@ -40,6 +40,7 @@ import {
   buildSalesOrderNewUrl,
   resolveOpportunityCreateSalesOrderGate,
 } from '../../utils/opportunitySalesOrderDraft'
+import { resolveOpportunityCreateQuotationGate } from '../../utils/opportunityCreateQuotationGate'
 import { resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
 import { notify } from '../../store/toastStore'
 import { isApiMode } from '../../config/apiConfig'
@@ -508,7 +509,14 @@ export function OpportunityPipelinePage() {
                 onPreview={openOpportunityPreview}
                 onView={(row) => navigate(`/crm/opportunities/${row.id}`)}
                 onEdit={(row) => navigate(`/crm/opportunities/${row.id}/edit`)}
-                onCreateQuotation={(row) => navigate(`/crm/quotations/new?opportunityId=${row.id}`)}
+                onCreateQuotation={(row) => {
+                  const gate = resolveOpportunityCreateQuotationGate(row.id)
+                  if (!gate.enabled) {
+                    notify.error(gate.disabledReason ?? 'Complete opportunity requirements before creating a quotation.')
+                    return
+                  }
+                  navigate(`/crm/quotations/new?opportunityId=${row.id}`)
+                }}
                 onScheduleActivity={(row) => setFollowUpOpp(row)}
                 onLogActivity={(row) => setLogActivityOpp(row)}
                 onCreateSalesOrder={(row) => {
@@ -518,7 +526,7 @@ export function OpportunityPipelinePage() {
                     return
                   }
                   if (!gate.enabled) {
-                    notify.error(gate.disabledReason ?? 'Available after quotation approval.')
+                    notify.error(gate.disabledReason ?? 'Available after customer approval.')
                     return
                   }
                   navigate(buildSalesOrderNewUrl(row.id, gate.quotationDocumentId, { fromCrm: true }))

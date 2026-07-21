@@ -21,8 +21,10 @@ import type {
 import {
   appendApprovalHistory,
   assertDocumentApprovable,
+  assertDocumentCustomerApprovable,
   assertDocumentEditable,
   assertDocumentRejectable,
+  assertDocumentSendable,
   assertDocumentSubmittable,
   assertQuotationDeletable,
 } from './quotation.workflow.js'
@@ -211,7 +213,50 @@ export async function rejectDocument(
 export async function markDocumentSent(tenantId: string, quotationId: string, docId: string, userId: string) {
   const doc = await repo.findQuotationDocumentById(tenantId, quotationId, docId)
   if (!doc) throw new NotFoundError('Quotation document not found')
-  const quotation = await repo.markDocumentSent(tenantId, quotationId, docId, userId)
+  assertDocumentSendable(doc)
+  const userName = await getUserName(tenantId, userId)
+  const history = appendApprovalHistory(doc, 'sent', userId, userName, 'Sent to customer')
+  const quotation = await repo.markDocumentSent(
+    tenantId,
+    quotationId,
+    docId,
+    userId,
+    history as unknown as import('@prisma/client').Prisma.InputJsonValue,
+  )
+  return mapQuotationWithNames(tenantId, quotation)
+}
+
+export async function recordCustomerApproval(
+  tenantId: string,
+  quotationId: string,
+  docId: string,
+  userId: string,
+  input: ApprovalRemarksInput & { decision?: 'approved' | 'rejected' },
+) {
+  const doc = await repo.findQuotationDocumentById(tenantId, quotationId, docId)
+  if (!doc) throw new NotFoundError('Quotation document not found')
+  const header = await repo.findQuotationById(tenantId, quotationId)
+  if (!header) throw new NotFoundError('Quotation not found')
+  assertDocumentCustomerApprovable(doc, header)
+
+  const decision = input.decision ?? 'approved'
+  const userName = await getUserName(tenantId, userId)
+  const history = appendApprovalHistory(
+    doc,
+    decision === 'approved' ? 'customer_approved' : 'customer_rejected',
+    userId,
+    userName,
+    input.remarks ?? (decision === 'approved' ? 'Customer approved' : 'Customer rejected'),
+  )
+  const quotation = await repo.recordCustomerApproval(
+    tenantId,
+    quotationId,
+    docId,
+    userId,
+    decision,
+    input.remarks,
+    history as unknown as import('@prisma/client').Prisma.InputJsonValue,
+  )
   return mapQuotationWithNames(tenantId, quotation)
 }
 

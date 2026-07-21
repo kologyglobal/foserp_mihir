@@ -124,6 +124,9 @@ const created = sales.createLead({
   lifecycleStatus: 'open',
   stage: 'new',
   productRequirement: 'Flatbed trailer',
+  remarks: 'UAT-02 create notes',
+  contactPerson: 'UAT Contact',
+  mobile: '9876543210',
   source: 'referral',
   industry: 'Logistics',
 })
@@ -149,10 +152,13 @@ const missingProspect = sales.createLead({
   lifecycleStatus: 'open',
   stage: 'new',
   productRequirement: '',
+  remarks: 'notes',
+  contactPerson: 'A',
+  mobile: '9876543210',
   source: 'other',
   industry: '',
 })
-check('UAT-02.12', 'Required-field validation', 'Empty prospect still creates in store (UI blocks)', Boolean(missingProspect.ok), 'UI validation is form-layer')
+check('UAT-02.12', 'Required-field validation', 'Empty prospect rejected by store createLead', !missingProspect.ok, missingProspect.error)
 
 // ─── UAT-02.3 Edit / view / list / search / filter ───────────────────────────
 
@@ -232,6 +238,9 @@ const dupCreated = sales.createLead({
   lifecycleStatus: 'open',
   stage: 'contacted',
   productRequirement: 'Copy test',
+  remarks: 'Test notes',
+  contactPerson: 'Test Contact',
+  mobile: '9876543210',
   source: 'referral',
   industry: 'Steel',
 })
@@ -249,6 +258,9 @@ const dupLead = sales.createLead({
   lifecycleStatus: 'open',
   stage: 'new',
   productRequirement: sourceLead.productRequirement,
+  remarks: 'Test notes',
+  contactPerson: 'Test Contact',
+  mobile: '9876543210',
   source: sourceLead.source,
   industry: sourceLead.industry,
 })

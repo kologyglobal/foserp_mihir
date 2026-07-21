@@ -155,7 +155,7 @@ export const seedProducts: Product[] = [
       specifications: 'Design code: ADR / UN portable tank. Shell: SS 316L. Insulation: Optional.',
     },
     {
-      status: 'engineering_review',
+      status: 'released',
       productRevision: 'Rev-1',
       drawingRevision: 'DWG-ISO26K-Rev-A',
       bomRevision: 'Rev-A',

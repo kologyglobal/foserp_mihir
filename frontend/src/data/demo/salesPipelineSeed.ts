@@ -21,9 +21,9 @@ const BASE_CUSTOMERS = [
 ] as const
 
 const BASE_PRODUCTS = [
-  'prod-45m3', 'prod-iso', 'prod-sidewall', 'prod-tipping', 'prod-cement-bulker',
-  'prod-flyash', 'prod-pneumatic', 'prod-lowbed', 'prod-flatbed', 'prod-ss-tank',
-  'prod-tanker-30kl', 'prod-bulk-50m3', 'prod-container-40ft', 'prod-dumper-25t', 'prod-chemical-18kl',
+  'prod-45m3', 'prod-iso', 'prod-tipping', 'prod-cement-bulker',
+  'prod-flyash', 'prod-pneumatic', 'prod-flatbed',
+  'prod-tanker-30kl', 'prod-bulk-50m3', 'prod-container-40ft', 'prod-chemical-18kl',
 ] as const
 
 const STAGES: Lead['stage'][] = [
@@ -105,11 +105,14 @@ export function buildDemoSalesPipeline(): { leads: Lead[]; quotations: Quotation
       revisionNo: 1,
       rootQuotationId: link.quotationId,
       isLatestRevision: true,
-      locked: converted,
+      locked: converted || quoStatus === 'sent' || quoStatus === 'approved',
       status: quoStatus,
-      customerApproval: quoStatus === 'approved' || converted ? 'approved' : 'pending',
-      customerApprovalAt: quoStatus === 'approved' || converted ? audit.createdAt : null,
-      customerApprovalBy: quoStatus === 'approved' || converted ? 'Customer Portal' : null,
+      customerApproval:
+        converted || (quoStatus === 'sent' && i % 2 === 0) ? 'approved' : 'pending',
+      customerApprovalAt:
+        converted || (quoStatus === 'sent' && i % 2 === 0) ? audit.createdAt : null,
+      customerApprovalBy:
+        converted || (quoStatus === 'sent' && i % 2 === 0) ? 'Customer Portal' : null,
       customerRejectionReason: null,
       terms: 'Standard manufacturing terms apply.',
       paymentTerms: '30% advance, balance before dispatch',
