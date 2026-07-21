@@ -1,3 +1,63 @@
+## 2026-07-21 - Quotation template catalog trimmed to the two VF ISO products
+
+### Context
+
+- User supplied the two real VF quotation docs (VF/QUO/26-27/76 → 26 KL ISO Tank Container; VF/QUO/26-27/109 → 20' ISO Dry Bulk Tanker 25 CBM). Frontend `DEFAULT_QUOTATION_TEMPLATES` and `prisma/quotationTemplateSeedData.ts` already contain exactly these two — but the DB still carried 9 legacy trailer templates (Standard/45M3 Bulker/Sidewall/Flatbed/Lowbed/Tipper/Job Work/Spare Parts/Custom) from the old seed.
+
+### Shipped
+
+- **New** `backend/scripts/cleanup-quotation-templates.ts` — per-tenant, idempotent: soft-deletes (deletedAt + isActive=0) every template whose code is not `ISO-TANK-26KL` / `ISO-DRY-BULK-25CBM`, then upserts/restores the two keep rows from `quotationTemplateSeedData`. `--dry-run` reports only; `--emit-sql` writes `scripts/quotation-template-cleanup.sql` (phpMyAdmin-ready, backslash + quote escaped JSON) for the live DB without SSH.
+- **Applied on local DB:** 9 legacy templates soft-deleted; ISO-DRY-BULK-25CBM created (was missing). Verified list repo filters `tenantActiveFilter` → only the two ISO templates are served. Quotations referencing old templates are untouched (soft delete, catalog-only).
+- Frontend demo mode already correct: `RETIRED_BUILTIN_QUOTATION_TEMPLATE_IDS` drops the same 9 on merge.
+
+### Live fix (no terminal): run `backend/scripts/quotation-template-cleanup.sql` in phpMyAdmin, then hard-refresh the templates page.
+
+---
+
+## 2026-07-21 - Canonical CrmStageNotes component (replaces 3 duplicated notes cards)
+
+### Shipped
+
+- **New** `frontend/src/components/crm/shared/CrmStageNotes.tsx` — single canonical stage-stamped Notes card for CRM 360 pages. Props: `entityType`/`entityId` (useEntityNotes), `sectionId` (preserves `lead-section-notes` / `opp-section-notes` / `quo-section-notes` jump anchors), `stageOptions`, `currentStage`, `historyLabel`, plus the shared demo/composer/onNotesChange contract. Reuses existing `lead-notes-card` CSS — zero visual change vs the correct local design.
+- **New** `frontend/src/utils/crmNoteStageOptions.ts` — `LEAD_NOTE_STAGE_OPTIONS`, `OPPORTUNITY_NOTE_STAGE_OPTIONS`, `QUOTATION_NOTE_STAGE_OPTIONS`, `quotationNoteStageLabel` (moved out of the deleted QuotationNotesCard; Quotation360Page unified-feed import updated).
+- **Deleted** `LeadNotesCard.tsx`, `OpportunityNotesCard.tsx`, `QuotationNotesCard.tsx`; removed the `QuotationNotesCard` barrel export. Rewired `Lead360Workspace`, `Opportunity360Page`, `Quotation360Page` to render `CrmStageNotes`. No other consumers existed (verified by search). Contact/Customer 360 keep `EntityNotesPanel` (no stage workflow).
+- Demo mode preserved: demoNotes list + editPath fallback behave exactly as before.
+
+### Verification
+
+- `typecheck` clean; `npm run build` clean; oxlint clean on changed files.
+- Bundle proof of consolidation: `dist/assets/index-j7v20-mn.js` contains exactly **one** copy of the Notes-card strings ("No notes yet. Add the first note…", `lead-notes-card__composer`) — previously three duplicated components.
+- `npm run test:crm` fails at startup with a **pre-existing** tsx alias error (`Cannot find package '@/utils'` from `permissions/manufacturing.ts`) — verified identical failure with all changes stashed; unrelated to this refactor.
+
+### Live deploy
+
+- Live still serves old `assets/index-DeT-0V6R.js`. Upload the new `frontend/dist/` (index.html + assets) to Hostinger public_html, hard-refresh, and confirm index.html now references `index-j7v20-mn.js`.
+
+---
+
+## 2026-07-21 - Live Convert Quotation → SO blocked: stale permission catalog on live DB
+
+### Diagnosis
+
+- `POST /:id/convert-to-sales-order` (backend `quotation.routes.ts`) requires **both** `crm.quotation.convert` and `crm.sales_order.create` (`requirePermission` is all-of). Frontend gate `canConvertQuotationToSalesOrderPermission()` requires the same pair, so the Convert button/action reports "You do not have permission".
+- Live DB catalog only has the pre-convert-era CRM keys (`crm.quotation.view/create/update/delete/approve`, `crm.sales_order.view`, `crm.lead.convert`) — neither `crm.quotation.convert` nor `crm.sales_order.create/update/delete/confirm` exists there. Same RBAC seed-drift class as the Notes issue below: the live DB was seeded from the old catalog (old deploy bundle gated convert on `crm.quotation.update` only), then the new backend shipped with the expanded catalog but no permission sync was run.
+- Code side is already complete: both keys are in `backend/src/constants/permissions.ts` PERMISSIONS and mapped in ROLE_PERMISSIONS (Tenant Admin/Admin/Administrator, Sales Manager, Sales Executive, CRM Admin). No code changes needed; no RBAC bypass.
+
+### Live fix (idempotent, no code deploy needed if backend is current)
+
+**Option A — server terminal available:** from `backend/`: `npx tsx scripts/sync-permissions.ts --dry-run`, review, then re-run without `--dry-run` (upsert-only; never removes grants or touches users/tenants).
+
+**Option B — no SSH/terminal (phpMyAdmin only):** new generator `backend/scripts/generate-permission-sync-sql.ts` emits `backend/scripts/permission-sync.sql` — a self-contained idempotent script (INSERT IGNORE against `permissions.name` and `role_permissions.roleId+permissionId` unique keys) mirroring the same PERMISSIONS/ROLE_PERMISSIONS source of truth. Import/paste it into phpMyAdmin on the live DB. Validated locally: all 244 statements execute cleanly and re-running is a 0-row no-op. Regenerate after any catalog/role-map change.
+
+Then in both cases:
+1. Users log out / log in (frontend session permissions are issued at login; backend checks read the DB per request and take effect immediately).
+2. Verify: `fos-erp-auth` → `user.permissions` includes both keys; Convert to Sales Order on a Sent + Customer Approved quotation creates an Open SO and marks the opportunity Won.
+3. SQL spot-check: `SELECT name FROM permissions WHERE name IN ('crm.quotation.convert','crm.sales_order.create');` and per-role link counts via `role_permissions` join.
+
+Local DB verified in sync (224/224 catalog; applied 3 pending `crm.note.*` links for Sales Executive from the entry below).
+
+---
+
 ## 2026-07-21 - Live Notes still looks old after Hostinger SPA redeploy
 
 ### Diagnosis
