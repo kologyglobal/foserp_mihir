@@ -40,7 +40,8 @@ import type { CrmActivity, FollowUp } from '@/types/crm'
 import { Lead360RecordHeader } from '@/components/crm/Lead360RecordHeader'
 import { LeadChangeStageControl } from '@/components/crm/LeadChangeStageControl'
 import { LeadSummaryCard, resolveLeadContactDesignation } from '@/components/crm/LeadSummaryCard'
-import { LeadNotesCard } from '@/components/crm/LeadNotesCard'
+import { CrmStageNotes } from '@/components/crm/shared/CrmStageNotes'
+import { LEAD_NOTE_STAGE_OPTIONS } from '@/utils/crmNoteStageOptions'
 import { LeadSmartOverviewPanel } from '@/components/crm/LeadSmartOverviewPanel'
 import { ErpLineItemsGrid } from '@/components/erp/ErpLineItemsGrid'
 import { CrmCardFormShell, ENTERPRISE_FORM_CLASS } from '@/components/crm/CrmCardFormShell'
@@ -615,8 +616,12 @@ export function Lead360Workspace() {
           lastActivityLabel={lastActivity?.subject ?? null}
         />
 
-        <LeadNotesCard
-          leadId={currentLead.id}
+        <CrmStageNotes
+          entityType="LEAD"
+          entityId={currentLead.id}
+          sectionId="lead-section-notes"
+          stageOptions={LEAD_NOTE_STAGE_OPTIONS}
+          historyLabel="Lead notes history"
           currentStage={currentLead.stage}
           demoNotes={leadDemoNotes}
           editPath={routes.edit(currentLead.id)}

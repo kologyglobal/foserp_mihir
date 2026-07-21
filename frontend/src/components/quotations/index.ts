@@ -17,7 +17,6 @@ export { ConvertQuotationToSOAction } from './ConvertQuotationToSOAction'
 export { QuotationConversionDialog } from './QuotationConversionDialog'
 export { Quotation360RecordHeader } from './Quotation360RecordHeader'
 export { QuotationSummaryCard } from './QuotationSummaryCard'
-export { QuotationNotesCard } from './QuotationNotesCard'
 export { QuotationSmartOverviewPanel } from './QuotationSmartOverviewPanel'
 export {
   QuotationHeroCard,

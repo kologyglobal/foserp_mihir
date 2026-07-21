@@ -23,7 +23,13 @@ import { StatusBadge } from '../../design-system/list-page'
 import { resolveCreateSalesOrderGateForQuotationDocument } from '../../utils/opportunitySalesOrderDraft'
 import { isQuotationDeletableStatus } from '../../utils/quotationDeletePolicy'
 import { resolveQuotationRevisionPolicy } from '../../utils/quotationRevisionPolicy'
-import { useSalesStore } from '../../store/salesStore'
+
+function listStatusLabel(item: QuotationListItem): string {
+  if (item.document.status === 'sent' && item.customerApproval === 'approved') {
+    return 'Customer Approved'
+  }
+  return quotationStatusLabel(item.document.status)
+}
 
 export interface CrmQuotationsTableProps {
   rows: QuotationListItem[]
@@ -165,11 +171,15 @@ export function CrmQuotationsTable({
       {
         id: 'status',
         header: 'Status',
-        accessorFn: (r) => r.document.status,
+        accessorFn: listStatusLabel,
         cell: ({ row }) => (
           <StatusBadge
-            label={quotationStatusLabel(row.original.document.status)}
-            status={row.original.document.status}
+            label={listStatusLabel(row.original)}
+            status={
+              row.original.document.status === 'sent' && row.original.customerApproval === 'approved'
+                ? 'approved'
+                : row.original.document.status
+            }
           />
         ),
       },
@@ -189,14 +199,13 @@ export function CrmQuotationsTable({
         cell: ({ row }) => {
           const item = row.original
           const d = item.document
-          const salesQuo = useSalesStore.getState().getQuotation(d.quotationId)
           const soGate = resolveCreateSalesOrderGateForQuotationDocument(d.id)
           const soAlreadyExists = Boolean(soGate.salesOrderId)
           const canCreateSo = Boolean(onCreateSalesOrder) && (soAlreadyExists || soGate.enabled)
           const canRevise = Boolean(onRevise)
             && resolveQuotationRevisionPolicy({
               status: d.status,
-              customerApproval: salesQuo?.customerApproval ?? 'pending',
+              customerApproval: item.customerApproval ?? 'pending',
               isLatest: true,
             }).canCreateRevision
             && !soAlreadyExists
@@ -205,7 +214,7 @@ export function CrmQuotationsTable({
           const canRejectRow = Boolean(onReject) && d.status === 'pending_approval'
           const canSend = Boolean(onMarkSent) && d.status === 'approved'
           const canCustomerApproveRow =
-            Boolean(onCustomerApprove) && d.status === 'sent' && salesQuo?.customerApproval === 'pending'
+            Boolean(onCustomerApprove) && d.status === 'sent' && item.customerApproval === 'pending'
           return (
             <div onClick={(e) => e.stopPropagation()}>
               <EnterpriseRowActionsMenu

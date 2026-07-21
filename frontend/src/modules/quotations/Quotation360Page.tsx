@@ -18,7 +18,7 @@ import {
 import { CrmCardFormShell, ENTERPRISE_FORM_CLASS } from '@/components/crm/CrmCardFormShell'
 import { Quotation360RecordHeader } from '@/components/quotations/Quotation360RecordHeader'
 import { QuotationSummaryCard } from '@/components/quotations/QuotationSummaryCard'
-import { QuotationNotesCard } from '@/components/quotations/QuotationNotesCard'
+import { CrmStageNotes } from '@/components/crm/shared/CrmStageNotes'
 import { QuotationSmartOverviewPanel } from '@/components/quotations/QuotationSmartOverviewPanel'
 import { crmBreadcrumbs } from '../../utils/crmNavigation'
 import { formatDate } from '../../utils/dates/format'
@@ -44,7 +44,7 @@ import { CrmDeleteConfirmModal } from '@/components/crm/CrmDeleteConfirmModal'
 import { EntityAttachmentsPanel } from '../../components/crm/shared/EntityAttachmentsPanel'
 import { demoNotesFromTexts, entityNotesToFeedNotes } from '../../utils/crmEntityNotes'
 import { opportunityRequirementDisplay } from '../../utils/leadRequirementLines'
-import { quotationNoteStageLabel } from '@/components/quotations/QuotationNotesCard'
+import { QUOTATION_NOTE_STAGE_OPTIONS, quotationNoteStageLabel } from '@/utils/crmNoteStageOptions'
 import type { CrmEntityNoteDto } from '../../services/api/crmApi'
 import type { CrmActivity, FollowUp, QuotationDocumentStatus } from '../../types/crm'
 import { ErpButton } from '../../components/erp/ErpButton'
@@ -682,8 +682,12 @@ export function Quotation360Page() {
             lastActivityLabel={lastActivity?.subject ?? null}
           />
 
-          <QuotationNotesCard
-            quotationId={quoId}
+          <CrmStageNotes
+            entityType="QUOTATION"
+            entityId={quoId}
+            sectionId="quo-section-notes"
+            stageOptions={QUOTATION_NOTE_STAGE_OPTIONS}
+            historyLabel="Quotation notes history"
             currentStage={quoDoc.status}
             demoNotes={quoDemoNotes}
             editPath={canEdit ? `/crm/quotations/${quoId}/editor?doc=${quoDoc.id}` : undefined}

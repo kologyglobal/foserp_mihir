@@ -182,6 +182,7 @@ export function CrmQuotationListPage() {
         quotationNo: q?.quotationNo ?? document.quotationId,
         customerName: cust?.customerName ?? 'Customer',
         opportunityName: opp?.opportunityName,
+        customerApproval: q?.customerApproval,
         revisionCount: revCounts.get(document.quotationId) ?? 1,
         quotationDate: document.createdAt?.slice(0, 10) ?? q?.createdAt?.slice(0, 10) ?? '',
         expiryDate: q?.validityDate?.slice(0, 10) ?? '',
@@ -299,7 +300,13 @@ export function CrmQuotationListPage() {
       subtitle: `${item.customerName}${item.opportunityName ? ` · ${item.opportunityName}` : ''}`,
       fields: [
         { label: 'Customer', value: item.customerName },
-        { label: 'Status', value: quotationStatusLabel(d.status) },
+        {
+          label: 'Status',
+          value:
+            d.status === 'sent' && item.customerApproval === 'approved'
+              ? 'Customer Approved'
+              : quotationStatusLabel(d.status),
+        },
         { label: 'Revision', value: `R${d.revisionNo} (${item.revisionCount} total)` },
         { label: 'Total', value: formatCrmCurrency(d.totalAmount) },
         { label: 'Last Modified', value: d.modifiedAt ? new Date(d.modifiedAt).toLocaleDateString('en-IN') : '—' },
@@ -362,7 +369,9 @@ export function CrmQuotationListPage() {
         item.quotationDate,
         item.expiryDate,
         item.document.totalAmount,
-        quotationStatusLabel(item.document.status),
+        item.document.status === 'sent' && item.customerApproval === 'approved'
+          ? 'Customer Approved'
+          : quotationStatusLabel(item.document.status),
         item.ownerName,
         item.document.revisionNo,
       ]),

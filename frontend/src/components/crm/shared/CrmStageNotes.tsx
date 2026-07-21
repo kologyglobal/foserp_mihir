@@ -9,17 +9,26 @@ import { useEntityNotes } from '@/hooks/useEntityNotes'
 import { canCrmPermission } from '@/utils/permissions/crm'
 import { notify } from '@/store/toastStore'
 import { formatDateTime } from '@/utils/dates/format'
-import type { DemoEntityNote } from '@/types/crmEntity'
+import type { CrmEntityTypeApi, DemoEntityNote } from '@/types/crmEntity'
 import type { CrmEntityNoteDto } from '@/services/api/crmApi'
 import { crmNoteTypeLabel } from '@/types/crmNote'
-import { LEAD_STAGE_LABELS, type LeadStage } from '@/types/sales'
+import type { CrmNoteStageOption } from '@/utils/crmNoteStageOptions'
 import { cn } from '@/utils/cn'
 
-export interface LeadNotesCardProps {
-  leadId: string
-  /** Current lead stage — stamped on new notes only (additive history). */
-  currentStage?: LeadStage | string | null
+export interface CrmStageNotesProps {
+  /** API notes entity (LEAD | OPPORTUNITY | QUOTATION | …). */
+  entityType: CrmEntityTypeApi
+  entityId: string
+  /** DOM anchor id so page-level “jump to notes” keeps working (e.g. lead-section-notes). */
+  sectionId: string
+  /** Stage codes offered in the composer + used to label stamped notes. */
+  stageOptions: CrmNoteStageOption[]
+  /** Current workflow stage — stamped on new notes only (additive history). */
+  currentStage?: string | null
+  /** Drawer subtitle, e.g. “Lead notes history”. */
+  historyLabel?: string
   demoNotes?: DemoEntityNote[]
+  /** Demo-mode fallback: navigate here when API notes are unavailable. */
   editPath?: string
   className?: string
   /** Controlled add-note composer (e.g. from timeline “Add note”). */
@@ -38,23 +47,27 @@ type UnifiedNote = {
   noteType?: string | null
 }
 
-const LEAD_STAGE_OPTIONS = (Object.keys(LEAD_STAGE_LABELS) as LeadStage[]).map((code) => ({
-  code,
-  label: LEAD_STAGE_LABELS[code],
-}))
-
-export function LeadNotesCard({
-  leadId,
+/**
+ * Canonical stage-stamped Notes card for CRM 360/detail pages
+ * (single source of truth — replaces the former Lead/Opportunity/Quotation notes cards).
+ * Styling reuses the existing `lead-notes-card` classes from enterprise-workspace.css.
+ */
+export function CrmStageNotes({
+  entityType,
+  entityId,
+  sectionId,
+  stageOptions,
   currentStage = null,
+  historyLabel,
   demoNotes = [],
   editPath,
   className,
   composerOpen,
   onComposerOpenChange,
   onNotesChange,
-}: LeadNotesCardProps) {
+}: CrmStageNotesProps) {
   const navigate = useNavigate()
-  const { notes, loading, pending, createNote, isApiBacked, refresh } = useEntityNotes('LEAD', leadId)
+  const { notes, loading, pending, createNote, isApiBacked, refresh } = useEntityNotes(entityType, entityId)
   const [internalAdding, setInternalAdding] = useState(false)
   const [viewAllOpen, setViewAllOpen] = useState(false)
   const canCreate = canCrmPermission('crm.note.create')
@@ -101,7 +114,7 @@ export function LeadNotesCard({
       )
       const n = sorted[0]!
       return {
-        id: `demo-0`,
+        id: 'demo-0',
         content: n.content,
         authorName: n.authorName || 'User',
         createdAt: n.createdAt ?? '',
@@ -130,12 +143,14 @@ export function LeadNotesCard({
     setViewAllOpen(true)
   }
 
+  function stageLabel(code: string): string {
+    return stageOptions.find((s) => s.code === code)?.label ?? code.replace(/_/g, ' ')
+  }
+
   const latestMeta = latest
     ? [
         crmNoteTypeLabel(latest.noteType),
-        latest.stageCode
-          ? `Stage: ${LEAD_STAGE_LABELS[latest.stageCode as LeadStage] ?? latest.stageCode}`
-          : '',
+        latest.stageCode ? `Stage: ${stageLabel(latest.stageCode)}` : '',
         latest.authorName,
         latest.createdAt ? formatDateTime(latest.createdAt) : '',
       ]
@@ -145,7 +160,7 @@ export function LeadNotesCard({
 
   return (
     <>
-      <section className={cn('lead-notes-card', className)} id="lead-section-notes" aria-label="Notes">
+      <section className={cn('lead-notes-card', className)} id={sectionId} aria-label="Notes">
         <header className="lead-notes-card__head">
           <div className="lead-notes-card__head-main">
             <MessageSquare className="lead-notes-card__icon" aria-hidden />
@@ -174,7 +189,7 @@ export function LeadNotesCard({
               pending={pending}
               submitLabel="Save note"
               defaultStageCode={currentStage ?? null}
-              stageOptions={LEAD_STAGE_OPTIONS}
+              stageOptions={stageOptions}
               onCancel={() => setAdding(false)}
               onSubmit={async (input) => {
                 const r = await createNote(input)
@@ -204,16 +219,16 @@ export function LeadNotesCard({
         open={viewAllOpen}
         onClose={() => setViewAllOpen(false)}
         title="All notes"
-        subtitle="Lead notes history"
+        subtitle={historyLabel ?? 'Notes history'}
         width="md"
       >
         <EntityNotesPanel
-          entityType="LEAD"
-          entityId={leadId}
+          entityType={entityType}
+          entityId={entityId}
           demoNotes={demoNotes}
           title="Notes"
           defaultStageCode={currentStage ?? null}
-          stageOptions={LEAD_STAGE_OPTIONS}
+          stageOptions={stageOptions}
         />
       </CrmDrawerShell>
     </>

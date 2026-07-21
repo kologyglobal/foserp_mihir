@@ -32,7 +32,8 @@ import {
 import { CrmUnifiedActivityFeed } from '../../components/crm/CrmUnifiedActivityFeed'
 import { Opportunity360RecordHeader } from '../../components/crm/Opportunity360RecordHeader'
 import { OpportunitySummaryCard } from '../../components/crm/OpportunitySummaryCard'
-import { OpportunityNotesCard } from '../../components/crm/OpportunityNotesCard'
+import { CrmStageNotes } from '../../components/crm/shared/CrmStageNotes'
+import { OPPORTUNITY_NOTE_STAGE_OPTIONS } from '../../utils/crmNoteStageOptions'
 import { OpportunitySmartOverviewPanel } from '../../components/crm/OpportunitySmartOverviewPanel'
 import { useCrmStore } from '../../store/crmStore'
 import { resolveStoreAction } from '../../store/storeAction'
@@ -674,14 +675,21 @@ export function Opportunity360Page() {
             dealValue={commercial.estimatedDealValue}
           />
 
-          <OpportunityNotesCard
-            opportunityId={opportunity.id}
+          <CrmStageNotes
+            entityType="OPPORTUNITY"
+            entityId={opportunity.id}
+            sectionId="opp-section-notes"
+            stageOptions={
+              stageOptions.length > 0
+                ? stageOptions.map((s) => ({ code: s.id, label: s.label }))
+                : OPPORTUNITY_NOTE_STAGE_OPTIONS
+            }
+            historyLabel="Opportunity notes history"
             currentStage={opportunity.stage}
             demoNotes={oppDemoNotes}
             editPath={`/crm/opportunities/${opportunity.id}/edit`}
             composerOpen={noteComposerOpen}
             onComposerOpenChange={setNoteComposerOpen}
-            stageOptions={stageOptions.map((s) => ({ code: s.id, label: s.label }))}
             onNotesChange={setEntityNotes}
           />
 

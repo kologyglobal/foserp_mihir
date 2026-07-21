@@ -7,6 +7,7 @@ import { ConvertQuotationToSOAction } from './ConvertQuotationToSOAction'
 import { Select } from '../forms/Inputs'
 import { RecordLink } from '../common/RecordLink'
 import { entity360CustomerPath } from '../../config/entity360Routes'
+import type { CustomerApprovalStatus } from '../../types/quotation'
 
 export interface QuotationListItem {
   document: QuotationDocument
@@ -14,6 +15,7 @@ export interface QuotationListItem {
   customerName: string
   customerId?: string | null
   opportunityName?: string
+  customerApproval?: CustomerApprovalStatus
   revisionCount: number
   quotationDate: string
   expiryDate: string
