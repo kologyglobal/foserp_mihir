@@ -161,6 +161,8 @@ export function QuotationNotesCard({
             <EntityNoteEditor
               pending={pending}
               submitLabel="Save note"
+              defaultStageCode={currentStage ?? null}
+              stageOptions={QUOTATION_NOTE_STAGE_OPTIONS}
               onCancel={() => setAdding(false)}
               onSubmit={async (input) => {
                 const r = await createNote(input)
@@ -179,10 +181,14 @@ export function QuotationNotesCard({
         ) : latest ? (
           <article className="lead-notes-card__latest">
             <p className="lead-notes-card__meta">
-              <span className="lead-notes-card__author">{latest.authorName}</span>
-              {latest.createdAt ? (
-                <span className="lead-notes-card__time">{formatDateTime(latest.createdAt)}</span>
-              ) : null}
+              {[
+                crmNoteTypeLabel(latest.noteType),
+                latest.stageCode ? `Stage: ${quotationNoteStageLabel(latest.stageCode)}` : '',
+                latest.authorName,
+                latest.createdAt ? formatDateTime(latest.createdAt) : '',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </p>
             <p className="lead-notes-card__body">{latest.content}</p>
           </article>
@@ -203,6 +209,8 @@ export function QuotationNotesCard({
           entityId={quotationId}
           demoNotes={demoNotes}
           title="Notes"
+          defaultStageCode={currentStage ?? null}
+          stageOptions={QUOTATION_NOTE_STAGE_OPTIONS}
         />
       </CrmDrawerShell>
     </>
