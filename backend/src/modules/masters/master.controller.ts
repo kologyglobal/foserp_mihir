@@ -84,6 +84,10 @@ export const listLookups = asyncHandler(async (req: Request, res: Response) => {
   const extra: Record<string, unknown> = {}
   if (req.query.stateId) extra.stateId = String(req.query.stateId)
   if (req.query.warehouseId) extra.warehouseId = String(req.query.warehouseId)
+  if (req.query.plantId && config.slug === 'warehouses') extra.plantId = String(req.query.plantId)
+  if (req.query.storageLocationId && config.slug === 'bins') {
+    extra.storageLocationId = String(req.query.storageLocationId)
+  }
   const items = await service.listLookups(tenantId, config, extra)
   return sendSuccess(res, `${config.slug} lookups`, items)
 })

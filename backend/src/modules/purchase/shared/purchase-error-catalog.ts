@@ -27,6 +27,11 @@ export const PURCHASE_ERROR_CODE = {
   PR_UOM_REQUIRED: 'PR_UOM_REQUIRED',
   PR_REQUIRED_DATE_BEFORE_REQUISITION: 'PR_REQUIRED_DATE_BEFORE_REQUISITION',
   PR_REJECTION_REASON_REQUIRED: 'PR_REJECTION_REASON_REQUIRED',
+  PR_SEND_BACK_REASON_REQUIRED: 'PR_SEND_BACK_REASON_REQUIRED',
+  APPROVAL_NOT_FOUND: 'APPROVAL_NOT_FOUND',
+  APPROVAL_SELF_ACTION_NOT_ALLOWED: 'APPROVAL_SELF_ACTION_NOT_ALLOWED',
+  APPROVAL_DELEGATE_INVALID: 'APPROVAL_DELEGATE_INVALID',
+  APPROVAL_ASSIGNED_TO_ANOTHER_USER: 'APPROVAL_ASSIGNED_TO_ANOTHER_USER',
 
   // Planning
   PPS_NOT_FOUND: 'PPS_NOT_FOUND',
@@ -44,6 +49,7 @@ export const PURCHASE_ERROR_CODE = {
   PPS_ALREADY_CONVERTED: 'PPS_ALREADY_CONVERTED',
   PPS_CANCELLED: 'PPS_CANCELLED',
   PPS_RFQ_REQUIRED: 'PPS_RFQ_REQUIRED',
+  PPS_NOT_SELECTED: 'PPS_NOT_SELECTED',
 
   // PO creation
   PO_NO_ELIGIBLE_ROWS: 'PO_NO_ELIGIBLE_ROWS',
@@ -56,6 +62,52 @@ export const PURCHASE_ERROR_CODE = {
   PO_CREATE_FAILED: 'PO_CREATE_FAILED',
   PO_NOT_FOUND: 'PO_NOT_FOUND',
   PO_INVALID_STATUS: 'PO_INVALID_STATUS',
+
+  // PO lifecycle
+  PO_NOT_EDITABLE: 'PO_NOT_EDITABLE',
+  PO_NOT_SUBMITTABLE: 'PO_NOT_SUBMITTABLE',
+  PO_NOT_APPROVABLE: 'PO_NOT_APPROVABLE',
+  PO_NOT_SENDABLE: 'PO_NOT_SENDABLE',
+  PO_NOT_CLOSABLE: 'PO_NOT_CLOSABLE',
+  PO_NOT_REOPENABLE: 'PO_NOT_REOPENABLE',
+  PO_CANNOT_CANCEL_RECEIVED: 'PO_CANNOT_CANCEL_RECEIVED',
+  PO_REJECTION_REASON_REQUIRED: 'PO_REJECTION_REASON_REQUIRED',
+  PO_SEND_BACK_REASON_REQUIRED: 'PO_SEND_BACK_REASON_REQUIRED',
+  PO_VENDOR_REQUIRED: 'PO_VENDOR_REQUIRED',
+  PO_NO_LINES: 'PO_NO_LINES',
+  PO_QTY_INVALID: 'PO_QTY_INVALID',
+  PO_RATE_INVALID: 'PO_RATE_INVALID',
+  PO_VALIDATION_FAILED: 'PO_VALIDATION_FAILED',
+
+  // GRN
+  GRN_NOT_FOUND: 'GRN_NOT_FOUND',
+  GRN_NOT_EDITABLE: 'GRN_NOT_EDITABLE',
+  GRN_NOT_SUBMITTABLE: 'GRN_NOT_SUBMITTABLE',
+  GRN_NOT_CANCELLABLE: 'GRN_NOT_CANCELLABLE',
+  GRN_NOT_REVERSIBLE: 'GRN_NOT_REVERSIBLE',
+  GRN_PO_NOT_RECEIVABLE: 'GRN_PO_NOT_RECEIVABLE',
+  GRN_WAREHOUSE_REQUIRED: 'GRN_WAREHOUSE_REQUIRED',
+  GRN_NO_LINES: 'GRN_NO_LINES',
+  GRN_QTY_INVALID: 'GRN_QTY_INVALID',
+  GRN_QTY_EXCEEDS: 'GRN_QTY_EXCEEDS',
+  GRN_LINE_PO_MISMATCH: 'GRN_LINE_PO_MISMATCH',
+  GRN_DUPLICATE_CHALLAN: 'GRN_DUPLICATE_CHALLAN',
+  GRN_VALIDATION_FAILED: 'GRN_VALIDATION_FAILED',
+  GRN_ALREADY_SUBMITTED: 'GRN_ALREADY_SUBMITTED',
+  GRN_CHALLAN_REQUIRED: 'GRN_CHALLAN_REQUIRED',
+  GRN_VEHICLE_REQUIRED: 'GRN_VEHICLE_REQUIRED',
+  GRN_GATE_ENTRY_REQUIRED: 'GRN_GATE_ENTRY_REQUIRED',
+
+  // Purchase Setup
+  SETUP_VALIDATION_FAILED: 'SETUP_VALIDATION_FAILED',
+  SETUP_VERSION_CONFLICT: 'SETUP_VERSION_CONFLICT',
+  SETUP_WAREHOUSE_INACTIVE: 'SETUP_WAREHOUSE_INACTIVE',
+  SETUP_LOCATION_WAREHOUSE_MISMATCH: 'SETUP_LOCATION_WAREHOUSE_MISMATCH',
+  SETUP_PLANT_WAREHOUSE_MISMATCH: 'SETUP_PLANT_WAREHOUSE_MISMATCH',
+  SETUP_PAYMENT_TERM_INVALID: 'SETUP_PAYMENT_TERM_INVALID',
+  PO_WAREHOUSE_REQUIRED: 'PO_WAREHOUSE_REQUIRED',
+  PO_EXPECTED_DELIVERY_REQUIRED: 'PO_EXPECTED_DELIVERY_REQUIRED',
+  PO_PAYMENT_TERMS_REQUIRED: 'PO_PAYMENT_TERMS_REQUIRED',
 
   // Shared
   TENANT_MISMATCH: 'TENANT_MISMATCH',
@@ -89,6 +141,14 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   [PURCHASE_ERROR_CODE.PR_REQUIRED_DATE_BEFORE_REQUISITION]:
     'Required date cannot be before requisition date.',
   [PURCHASE_ERROR_CODE.PR_REJECTION_REASON_REQUIRED]: 'Rejection reason is required.',
+  [PURCHASE_ERROR_CODE.PR_SEND_BACK_REASON_REQUIRED]: 'Send-back reason is required.',
+  [PURCHASE_ERROR_CODE.APPROVAL_NOT_FOUND]: 'Purchase approval not found.',
+  [PURCHASE_ERROR_CODE.APPROVAL_SELF_ACTION_NOT_ALLOWED]:
+    'You cannot approve a document that you requested or created.',
+  [PURCHASE_ERROR_CODE.APPROVAL_DELEGATE_INVALID]:
+    'Select another active user who has permission to approve this document.',
+  [PURCHASE_ERROR_CODE.APPROVAL_ASSIGNED_TO_ANOTHER_USER]:
+    'This approval is assigned to another user.',
 
   [PURCHASE_ERROR_CODE.PPS_NOT_FOUND]: 'Planning sheet row not found.',
   [PURCHASE_ERROR_CODE.PPS_DUPLICATE_LINE]: 'Planning row already exists for this requisition line.',
@@ -105,6 +165,7 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   [PURCHASE_ERROR_CODE.PPS_ALREADY_CONVERTED]: 'PO-created rows cannot be edited or converted again.',
   [PURCHASE_ERROR_CODE.PPS_CANCELLED]: 'Cancelled rows cannot be converted.',
   [PURCHASE_ERROR_CODE.PPS_RFQ_REQUIRED]: 'RFQ-required PR items cannot be processed from Planning.',
+  [PURCHASE_ERROR_CODE.PPS_NOT_SELECTED]: 'Tick Action Message on each row before creating a PO.',
 
   [PURCHASE_ERROR_CODE.PO_NO_ELIGIBLE_ROWS]: 'Select at least one eligible Planning row.',
   [PURCHASE_ERROR_CODE.PO_TENANT_MISMATCH]: 'All rows must belong to the current tenant.',
@@ -116,6 +177,51 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   [PURCHASE_ERROR_CODE.PO_CREATE_FAILED]: 'Purchase order could not be created. Please try again.',
   [PURCHASE_ERROR_CODE.PO_NOT_FOUND]: 'Purchase order not found.',
   [PURCHASE_ERROR_CODE.PO_INVALID_STATUS]: 'This action is not allowed for the current PO status.',
+  [PURCHASE_ERROR_CODE.PO_NOT_EDITABLE]: 'Only draft or sent-back purchase orders can be edited.',
+  [PURCHASE_ERROR_CODE.PO_NOT_SUBMITTABLE]: 'Purchase order cannot be submitted in its current state.',
+  [PURCHASE_ERROR_CODE.PO_NOT_APPROVABLE]: 'Only purchase orders pending approval can be approved, rejected, or sent back.',
+  [PURCHASE_ERROR_CODE.PO_NOT_SENDABLE]: 'Only approved purchase orders can be sent to the vendor.',
+  [PURCHASE_ERROR_CODE.PO_NOT_CLOSABLE]: 'Purchase order cannot be closed in its current state.',
+  [PURCHASE_ERROR_CODE.PO_NOT_REOPENABLE]: 'Purchase order cannot be reopened in its current state.',
+  [PURCHASE_ERROR_CODE.PO_CANNOT_CANCEL_RECEIVED]: 'A purchase order with receipts cannot be cancelled. Close it instead.',
+  [PURCHASE_ERROR_CODE.PO_REJECTION_REASON_REQUIRED]: 'Rejection reason is required.',
+  [PURCHASE_ERROR_CODE.PO_SEND_BACK_REASON_REQUIRED]: 'Send-back reason is required.',
+  [PURCHASE_ERROR_CODE.PO_VENDOR_REQUIRED]: 'Vendor is required.',
+  [PURCHASE_ERROR_CODE.PO_NO_LINES]: 'Add at least one line with quantity greater than zero.',
+  [PURCHASE_ERROR_CODE.PO_QTY_INVALID]: 'Line quantity must be greater than zero.',
+  [PURCHASE_ERROR_CODE.PO_RATE_INVALID]: 'Line rate cannot be negative.',
+  [PURCHASE_ERROR_CODE.PO_VALIDATION_FAILED]: 'Please correct the highlighted fields and try again.',
+
+  [PURCHASE_ERROR_CODE.GRN_NOT_FOUND]: 'Goods receipt note not found.',
+  [PURCHASE_ERROR_CODE.GRN_NOT_EDITABLE]: 'Only draft goods receipts can be edited.',
+  [PURCHASE_ERROR_CODE.GRN_NOT_SUBMITTABLE]: 'Goods receipt cannot be submitted in its current state.',
+  [PURCHASE_ERROR_CODE.GRN_NOT_CANCELLABLE]: 'Goods receipt cannot be cancelled in its current state.',
+  [PURCHASE_ERROR_CODE.GRN_NOT_REVERSIBLE]: 'Only submitted goods receipts can be reversed.',
+  [PURCHASE_ERROR_CODE.GRN_PO_NOT_RECEIVABLE]: 'Purchase order is not open for receipt.',
+  [PURCHASE_ERROR_CODE.GRN_WAREHOUSE_REQUIRED]: 'Warehouse is required.',
+  [PURCHASE_ERROR_CODE.GRN_NO_LINES]: 'Add at least one receipt line with quantity greater than zero.',
+  [PURCHASE_ERROR_CODE.GRN_QTY_INVALID]: 'Received quantity must be greater than zero.',
+  [PURCHASE_ERROR_CODE.GRN_QTY_EXCEEDS]: 'Received quantity exceeds open PO quantity. Excess beyond tolerance requires approval.',
+  [PURCHASE_ERROR_CODE.GRN_LINE_PO_MISMATCH]: 'GRN line must belong to the selected purchase order.',
+  [PURCHASE_ERROR_CODE.GRN_DUPLICATE_CHALLAN]: 'A goods receipt with this vendor challan already exists.',
+  [PURCHASE_ERROR_CODE.GRN_VALIDATION_FAILED]: 'Please correct the highlighted fields and try again.',
+  [PURCHASE_ERROR_CODE.GRN_ALREADY_SUBMITTED]: 'This goods receipt has already been submitted.',
+  [PURCHASE_ERROR_CODE.GRN_CHALLAN_REQUIRED]: 'Vendor challan number is required.',
+  [PURCHASE_ERROR_CODE.GRN_VEHICLE_REQUIRED]: 'Vehicle number is required.',
+  [PURCHASE_ERROR_CODE.GRN_GATE_ENTRY_REQUIRED]: 'Gate entry number is required.',
+
+  [PURCHASE_ERROR_CODE.SETUP_VALIDATION_FAILED]: 'Please correct the highlighted Purchase Setup fields.',
+  [PURCHASE_ERROR_CODE.SETUP_VERSION_CONFLICT]:
+    'Purchase Setup was updated by another user. Reload and try again.',
+  [PURCHASE_ERROR_CODE.SETUP_WAREHOUSE_INACTIVE]: 'Selected warehouse is inactive or not found.',
+  [PURCHASE_ERROR_CODE.SETUP_LOCATION_WAREHOUSE_MISMATCH]:
+    'Storage location must belong to the selected warehouse.',
+  [PURCHASE_ERROR_CODE.SETUP_PLANT_WAREHOUSE_MISMATCH]:
+    'Warehouse must belong to the selected plant.',
+  [PURCHASE_ERROR_CODE.SETUP_PAYMENT_TERM_INVALID]: 'Payment term is invalid or inactive.',
+  [PURCHASE_ERROR_CODE.PO_WAREHOUSE_REQUIRED]: 'Delivery warehouse is required.',
+  [PURCHASE_ERROR_CODE.PO_EXPECTED_DELIVERY_REQUIRED]: 'Expected delivery date is required.',
+  [PURCHASE_ERROR_CODE.PO_PAYMENT_TERMS_REQUIRED]: 'Payment terms are required.',
 
   [PURCHASE_ERROR_CODE.TENANT_MISMATCH]: 'Tenant access denied.',
   [PURCHASE_ERROR_CODE.FORBIDDEN]: 'You do not have permission for this action.',

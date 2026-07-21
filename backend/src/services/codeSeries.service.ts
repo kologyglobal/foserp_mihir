@@ -15,6 +15,10 @@ const DEFAULT_PREFIX: Record<CodeSeriesEntity, string> = {
   VENDOR_QUOTATION: 'VQ',
   VENDOR_COMPARISON: 'CMP',
   PURCHASE_ORDER: 'PO',
+  GOODS_RECEIPT: 'GRN',
+  QUALITY_INSPECTION: 'QI',
+  PURCHASE_INVOICE: 'PI',
+  PURCHASE_RETURN: 'PRT',
 }
 
 export async function ensureCodeSeries(
@@ -93,6 +97,10 @@ export async function initTenantCodeSeries(tenantId: string, tx?: Prisma.Transac
     'VENDOR_QUOTATION',
     'VENDOR_COMPARISON',
     'PURCHASE_ORDER',
+    'GOODS_RECEIPT',
+    'QUALITY_INSPECTION',
+    'PURCHASE_INVOICE',
+    'PURCHASE_RETURN',
   ]
   for (const entityType of types) {
     await ensureCodeSeries(tenantId, entityType, tx)

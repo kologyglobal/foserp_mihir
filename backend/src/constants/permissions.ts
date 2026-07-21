@@ -111,6 +111,11 @@ export const PERMISSIONS = [
   'master.uom.update',
   'master.uom.delete',
 
+  'master.plant.view',
+  'master.plant.create',
+  'master.plant.update',
+  'master.plant.delete',
+
   'master.warehouse.view',
   'master.warehouse.create',
   'master.warehouse.update',
@@ -120,6 +125,11 @@ export const PERMISSIONS = [
   'master.location.create',
   'master.location.update',
   'master.location.delete',
+
+  'master.bin.view',
+  'master.bin.create',
+  'master.bin.update',
+  'master.bin.delete',
 
   'master.item_category.view',
   'master.item_category.create',
@@ -193,20 +203,39 @@ export const PERMISSIONS = [
   'purchase.po.send',
   'purchase.po.cancel',
   'purchase.po.close',
+  /**
+   * Maker-checker override: approve documents you created/requested yourself.
+   * Only effective when Purchase Setup selfApprovalPolicy = PERMISSION_ONLY.
+   * Deliberately excluded from PURCHASE_OPS — grant explicitly (admin/CEO roles get it via full sets).
+   */
+  'purchase.approvals.self_approve',
   'purchase.grn.view',
   'purchase.grn.create',
   'purchase.grn.post',
   'purchase.quality.view',
   'purchase.quality.inspect',
+  'purchase.qi.view',
+  'purchase.qi.create',
+  'purchase.qi.edit',
+  'purchase.qi.complete',
+  'purchase.qi.cancel',
   'purchase.invoice.view',
   'purchase.invoice.create',
+  'purchase.invoice.edit',
+  'purchase.invoice.submit',
   'purchase.invoice.verify',
   'purchase.invoice.approve',
   'purchase.invoice.post',
+  'purchase.invoice.cancel',
   'purchase.return.view',
   'purchase.return.create',
+  'purchase.return.edit',
+  'purchase.return.submit',
+  'purchase.return.complete',
+  'purchase.return.cancel',
   'purchase.return.post',
   'purchase.reports.view',
+  'purchase.setup.view',
   'purchase.setup.manage',
 
   // Finance / Accounting Phase 1 — setup only (no GL posting)
@@ -272,7 +301,12 @@ export type PermissionName = (typeof PERMISSIONS)[number]
 
 const MASTER_VIEW_PERMISSIONS = PERMISSIONS.filter((p) => p.startsWith('master.') && p.endsWith('.view'))
 const PURCHASE_PERMISSIONS = PERMISSIONS.filter((p) => p.startsWith('purchase.'))
-const PURCHASE_OPS = PURCHASE_PERMISSIONS.filter((p) => p !== 'purchase.setup.manage')
+const PURCHASE_OPS = PURCHASE_PERMISSIONS.filter(
+  (p) =>
+    p !== 'purchase.setup.manage' &&
+    p !== 'purchase.setup.view' &&
+    p !== 'purchase.approvals.self_approve',
+)
 const FINANCE_PERMISSIONS = PERMISSIONS.filter((p) => p.startsWith('finance.'))
 const FINANCE_VIEW_PERMISSIONS = FINANCE_PERMISSIONS.filter(
   (p) => p.endsWith('.view') || p === 'finance.view' || p === 'finance.audit.view',
@@ -394,8 +428,13 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'purchase.grn.create',
     'purchase.grn.post',
     'purchase.quality.view',
+    'purchase.qi.view',
     'purchase.return.view',
     'purchase.return.create',
+    'purchase.return.edit',
+    'purchase.return.submit',
+    'purchase.return.complete',
+    'purchase.return.cancel',
     'purchase.return.post',
     'purchase.reports.view',
   ],
@@ -405,6 +444,11 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'purchase.grn.view',
     'purchase.quality.view',
     'purchase.quality.inspect',
+    'purchase.qi.view',
+    'purchase.qi.create',
+    'purchase.qi.edit',
+    'purchase.qi.complete',
+    'purchase.qi.cancel',
     'purchase.return.view',
     'master.lookup.view',
     'master.item.view',
@@ -418,7 +462,10 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'purchase.grn.view',
     'purchase.invoice.view',
     'purchase.invoice.create',
+    'purchase.invoice.edit',
+    'purchase.invoice.submit',
     'purchase.invoice.verify',
+    'purchase.invoice.cancel',
     'purchase.return.view',
     'purchase.reports.view',
     'master.lookup.view',
@@ -432,9 +479,12 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'purchase.grn.view',
     'purchase.invoice.view',
     'purchase.invoice.create',
+    'purchase.invoice.edit',
+    'purchase.invoice.submit',
     'purchase.invoice.verify',
     'purchase.invoice.approve',
     'purchase.invoice.post',
+    'purchase.invoice.cancel',
     'purchase.return.view',
     'purchase.reports.view',
     'master.lookup.view',
@@ -474,12 +524,18 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'master.uom.create',
     'master.uom.update',
     'master.uom.delete',
+    'master.plant.create',
+    'master.plant.update',
+    'master.plant.delete',
     'master.warehouse.create',
     'master.warehouse.update',
     'master.warehouse.delete',
     'master.location.create',
     'master.location.update',
     'master.location.delete',
+    'master.bin.create',
+    'master.bin.update',
+    'master.bin.delete',
   ],
   'Sales Manager': [
     'crm.lead.view', 'crm.lead.create', 'crm.lead.update', 'crm.lead.delete', 'crm.lead.assign', 'crm.lead.qualify', 'crm.lead.convert',
@@ -508,8 +564,10 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'master.product.view',
     'master.item_category.view',
     'master.uom.view',
+    'master.plant.view',
     'master.warehouse.view',
     'master.location.view',
+    'master.bin.view',
   ],
   'CRM Admin': PERMISSIONS.filter(
     (p) => p.startsWith('crm.') || p === 'user.view' || p === 'master.product.view' || p === 'master.lookup.view',

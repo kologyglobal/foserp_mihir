@@ -8,6 +8,8 @@ export const PURCHASE_AUDIT_ENTITY = {
   VQ: 'VendorQuotation',
   COMPARISON: 'VendorComparison',
   PO: 'PurchaseOrder',
+  GRN: 'GoodsReceipt',
+  SETUP: 'PurchaseSettings',
 } as const
 
 export type PurchaseAuditEntity = (typeof PURCHASE_AUDIT_ENTITY)[keyof typeof PURCHASE_AUDIT_ENTITY]
@@ -57,11 +59,24 @@ export const PURCHASE_AUDIT_ACTION = {
   PO_UPDATED: 'PO_UPDATED',
   PO_SUBMITTED: 'PO_SUBMITTED',
   PO_APPROVED: 'PO_APPROVED',
+  PO_REJECTED: 'PO_REJECTED',
+  PO_SENT_BACK: 'PO_SENT_BACK',
   PO_SENT_TO_VENDOR: 'PO_SENT_TO_VENDOR',
   PO_PARTIALLY_RECEIVED: 'PO_PARTIALLY_RECEIVED',
   PO_FULLY_RECEIVED: 'PO_FULLY_RECEIVED',
   PO_CANCELLED: 'PO_CANCELLED',
   PO_CLOSED: 'PO_CLOSED',
+  PO_REOPENED: 'PO_REOPENED',
+  // GRN
+  GRN_CREATED: 'GRN_CREATED',
+  GRN_UPDATED: 'GRN_UPDATED',
+  GRN_SUBMITTED: 'GRN_SUBMITTED',
+  GRN_CANCELLED: 'GRN_CANCELLED',
+  GRN_REVERSED: 'GRN_REVERSED',
+  // Setup
+  SETUP_CREATED: 'SETUP_CREATED',
+  SETUP_UPDATED: 'SETUP_UPDATED',
+  SETUP_PLANT_UPDATED: 'SETUP_PLANT_UPDATED',
 } as const
 
 export type PurchaseAuditAction = (typeof PURCHASE_AUDIT_ACTION)[keyof typeof PURCHASE_AUDIT_ACTION]
@@ -105,11 +120,22 @@ export const PURCHASE_AUDIT_ACTION_LABELS: Record<string, string> = {
   PO_UPDATED: 'Updated',
   PO_SUBMITTED: 'Submitted',
   PO_APPROVED: 'Approved',
+  PO_REJECTED: 'Rejected',
+  PO_SENT_BACK: 'Sent back',
+  PO_REOPENED: 'Reopened',
   PO_SENT_TO_VENDOR: 'Sent to vendor',
   PO_PARTIALLY_RECEIVED: 'Partially received',
   PO_FULLY_RECEIVED: 'Fully received',
   PO_CANCELLED: 'Cancelled',
   PO_CLOSED: 'Closed',
+  GRN_CREATED: 'GRN created',
+  GRN_UPDATED: 'GRN updated',
+  GRN_SUBMITTED: 'GRN submitted',
+  GRN_CANCELLED: 'GRN cancelled',
+  GRN_REVERSED: 'GRN reversed',
+  SETUP_CREATED: 'Setup created',
+  SETUP_UPDATED: 'Setup updated',
+  SETUP_PLANT_UPDATED: 'Plant setup updated',
   // Legacy verbs still present in older rows
   CREATE: 'Created',
   UPDATE: 'Updated',

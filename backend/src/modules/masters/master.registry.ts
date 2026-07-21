@@ -1,5 +1,6 @@
 import type { z } from 'zod'
 import {
+  createBinSchema,
   createCitySchema,
   createCountrySchema,
   createGstGroupSchema,
@@ -7,11 +8,13 @@ import {
   createHsnSacSchema,
   createItemCategorySchema,
   createLocationSchema,
+  createPlantSchema,
   createProductSchema,
   createStateSchema,
   createUomSchema,
   createWarehouseSchema,
   listMastersQuerySchema,
+  updateBinSchema,
   updateCitySchema,
   updateCountrySchema,
   updateGstGroupSchema,
@@ -19,6 +22,7 @@ import {
   updateHsnSacSchema,
   updateItemCategorySchema,
   updateLocationSchema,
+  updatePlantSchema,
   updateProductSchema,
   updateStateSchema,
   updateUomSchema,
@@ -30,8 +34,11 @@ export type MasterResourceSlug =
   | 'states'
   | 'cities'
   | 'uom'
+  | 'plants'
   | 'warehouses'
   | 'locations'
+  | 'storage-locations'
+  | 'bins'
   | 'item-categories'
   | 'hsn-sac'
   | 'gst-groups'
@@ -46,8 +53,10 @@ export interface MasterResourceConfig {
     | 'masterState'
     | 'masterCity'
     | 'masterUom'
+    | 'masterPlant'
     | 'masterWarehouse'
     | 'masterLocation'
+    | 'masterBin'
     | 'masterItemCategory'
     | 'masterHsnCode'
     | 'masterGstGroup'
@@ -96,6 +105,15 @@ export const MASTER_RESOURCES: Record<MasterResourceSlug, MasterResourceConfig> 
     updateSchema: updateUomSchema,
     lookupFields: ['id', 'code', 'name'],
   },
+  plants: {
+    slug: 'plants',
+    permissionKey: 'plant',
+    prismaModel: 'masterPlant',
+    listQuerySchema: listMastersQuerySchema,
+    createSchema: createPlantSchema,
+    updateSchema: updatePlantSchema,
+    lookupFields: ['id', 'code', 'name'],
+  },
   warehouses: {
     slug: 'warehouses',
     permissionKey: 'warehouse',
@@ -112,6 +130,25 @@ export const MASTER_RESOURCES: Record<MasterResourceSlug, MasterResourceConfig> 
     listQuerySchema: listMastersQuerySchema,
     createSchema: createLocationSchema,
     updateSchema: updateLocationSchema,
+    lookupFields: ['id', 'code', 'name'],
+  },
+  // Alias for the GRN/inventory naming — same model as `locations`.
+  'storage-locations': {
+    slug: 'storage-locations',
+    permissionKey: 'location',
+    prismaModel: 'masterLocation',
+    listQuerySchema: listMastersQuerySchema,
+    createSchema: createLocationSchema,
+    updateSchema: updateLocationSchema,
+    lookupFields: ['id', 'code', 'name'],
+  },
+  bins: {
+    slug: 'bins',
+    permissionKey: 'bin',
+    prismaModel: 'masterBin',
+    listQuerySchema: listMastersQuerySchema,
+    createSchema: createBinSchema,
+    updateSchema: updateBinSchema,
     lookupFields: ['id', 'code', 'name'],
   },
   'item-categories': {
