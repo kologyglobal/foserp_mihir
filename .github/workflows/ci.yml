@@ -1,0 +1,45 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hostinger-build:
+    name: Verify Hostinger production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+            backend/package-lock.json
+
+      - name: Install root tooling
+        run: npm ci
+
+      - name: Build exactly as Hostinger
+        run: npm run build
+        env:
+          VITE_USE_API: "true"
+          VITE_API_BASE_URL: /api/v1
+          VITE_TENANT_SLUG: vasant-trailers
+
+      - name: Verify published SPA and backend
+        run: npm run verify:deployment
