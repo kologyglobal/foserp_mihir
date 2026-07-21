@@ -10,8 +10,9 @@ import {
   Target,
 } from 'lucide-react'
 import { Select } from '../../components/forms/Inputs'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import { CrmCardFormShell, ENTERPRISE_FORM_CLASS } from '@/components/crm/CrmCardFormShell'
+import { useCrmRecordLoadState } from '@/components/crm/CrmRecordLoadGate'
+import { PageLoadingFallback } from '@/components/system/PageLoadingFallback'
 import {
   ErpAdditionalInfoToggle,
   ErpAdditionalInfoPanel,
@@ -21,7 +22,6 @@ import {
 import { ErpButton } from '../../components/erp/ErpButton'
 import { ErpLineItemsGrid } from '../../components/erp/ErpLineItemsGrid'
 import { Button } from '../../components/ui/Button'
-import { Toast } from '../../components/ui/Toast'
 import { DynamicsStatusChip } from '../../components/dynamics/DynamicsStatusChip'
 import {
   QuickFollowUpDrawer,
@@ -32,7 +32,8 @@ import {
 import { CrmUnifiedActivityFeed } from '../../components/crm/CrmUnifiedActivityFeed'
 import { Opportunity360RecordHeader } from '../../components/crm/Opportunity360RecordHeader'
 import { OpportunitySummaryCard } from '../../components/crm/OpportunitySummaryCard'
-import { OpportunityNotesCard } from '../../components/crm/OpportunityNotesCard'
+import { CrmStageNotes } from '../../components/crm/shared/CrmStageNotes'
+import { OPPORTUNITY_NOTE_STAGE_OPTIONS } from '../../utils/crmNoteStageOptions'
 import { OpportunitySmartOverviewPanel } from '../../components/crm/OpportunitySmartOverviewPanel'
 import { useCrmStore } from '../../store/crmStore'
 import { resolveStoreAction } from '../../store/storeAction'
@@ -58,7 +59,8 @@ import {
 } from '../../design-system/workspace360'
 import { EntityAttachmentsPanel } from '../../components/crm/shared/EntityAttachmentsPanel'
 import { OpportunityHistoryPanel } from '../../components/crm/shared/OpportunityHistoryPanel'
-import { demoNotesFromTexts } from '../../utils/crmEntityNotes'
+import { demoNotesFromTexts, entityNotesToFeedNotes } from '../../utils/crmEntityNotes'
+import type { CrmEntityNoteDto } from '../../services/api/crmApi'
 import {
   buildOpportunitySystemEvents,
   buildUnifiedFeed,
@@ -72,15 +74,15 @@ import {
   buildSalesOrderNewUrl,
   resolveOpportunityCreateSalesOrderGate,
 } from '../../utils/opportunitySalesOrderDraft'
+import { resolveOpportunityCreateQuotationGate } from '../../utils/opportunityCreateQuotationGate'
+import { findFeaturedQuotationTemplate } from '../../utils/quotationTemplates'
 import { crmBreadcrumbs } from '../../utils/crmNavigation'
 import { sanitizeOpportunityScopeNotes } from '../../utils/leadRequirementLines'
 import { OpportunityQuotationValueMismatchBanner } from '../../components/crm/OpportunityQuotationValueMismatchBanner'
 import { notify } from '../../store/toastStore'
-import { StageCompletenessPanel } from '@/components/crm/StageCompletenessPanel'
 import {
   formatMissingStageFieldsMessage,
   getOpportunityStageCompleteness,
-  type StageRequirementField,
 } from '@/config/crmStageRequirements'
 
 export function Opportunity360Page() {
@@ -104,9 +106,14 @@ export function Opportunity360Page() {
   const uoms = useMasterStore((s) => s.uoms)
   const getQuotation = useSalesStore((s) => s.getQuotation)
   const attachmentItems = useOpportunityAttachmentStore((s) => s.items)
-  const { options: productOptions, pickMap } = useProductMasterOptionMap(products, items, uoms)
+  const { options: productOptions, pickMap } = useProductMasterOptionMap(
+    products,
+    items,
+    uoms,
+    undefined,
+    opportunity ? [opportunity.productId, ...(opportunity.lines?.map((l) => l.productId) ?? [])] : undefined,
+  )
 
-  const [toast, setToast] = useState<string | null>(null)
   const [followUpOpen, setFollowUpOpen] = useState(false)
   const [logActivityOpen, setLogActivityOpen] = useState(false)
   const [editingActivity, setEditingActivity] = useState<CrmActivity | null>(null)
@@ -121,7 +128,7 @@ export function Opportunity360Page() {
   const [targetStage, setTargetStage] = useState<OpportunityStage>('qualified')
   const [lostReason, setLostReason] = useState('')
   const [manualWon, setManualWon] = useState(false)
-  const [templateId, setTemplateId] = useState(templates[0]?.id ?? '')
+  const [templateId, setTemplateId] = useState(() => findFeaturedQuotationTemplate(templates)?.id ?? templates[0]?.id ?? '')
   const canDelete = canCrmPermission('crm.opportunity.delete')
   const canChangeOppStagePerm = canCrmPermission('crm.opportunity.update')
   const canAddActivity = canCrmPermission('crm.activity.create')
@@ -136,8 +143,6 @@ export function Opportunity360Page() {
   const [pendingActivityId, setPendingActivityId] = useState<string | null>(null)
   const [noteComposerOpen, setNoteComposerOpen] = useState(false)
   const [activeAdditionalSection, setActiveAdditionalSection] = useState<string | null>('products')
-  const [gateMissingFields, setGateMissingFields] = useState<StageRequirementField[] | null>(null)
-  const [gateStageLabel, setGateStageLabel] = useState<string | null>(null)
   const stageOptions = useResolvedOpportunityStages()
 
   const oppActivities = useMemo(
@@ -167,15 +172,17 @@ export function Opportunity360Page() {
     ]),
     [opportunity?.productRequirement, opportunity?.lostReason, opportunity?.modifiedAt, opportunity?.createdAt],
   )
+  /** API entity notes reported by the Notes card — merged into the unified feed. */
+  const [entityNotes, setEntityNotes] = useState<CrmEntityNoteDto[]>([])
   const unifiedFeedItems = useMemo(() => {
     if (!opportunity) return []
     return buildUnifiedFeed({
       activities: oppActivities,
       followUps: oppFollowUps,
-      notes: oppDemoNotes,
+      notes: [...oppDemoNotes, ...entityNotesToFeedNotes(entityNotes, opportunityStageLabel)],
       systemEvents: buildOpportunitySystemEvents(opportunity),
     })
-  }, [opportunity, oppActivities, oppFollowUps, oppDemoNotes])
+  }, [opportunity, oppActivities, oppFollowUps, oppDemoNotes, entityNotes])
 
   const oppDocs = useMemo(() => {
     if (!opportunity?.quotationId) return []
@@ -278,7 +285,14 @@ export function Opportunity360Page() {
     oppDocs.length,
   ])
 
-  if (!opportunity) {
+  const recordReady = Boolean(opportunity)
+  const { showLoader, showNotFound } = useCrmRecordLoadState(recordReady)
+
+  if (showLoader) {
+    return <PageLoadingFallback label="Loading opportunity…" />
+  }
+
+  if (showNotFound || !opportunity) {
     return (
       <div className="erp-page opp-360-empty flex flex-col items-center justify-center gap-4 p-12 text-center">
         <div className="opp-360-empty__icon">
@@ -320,20 +334,9 @@ export function Opportunity360Page() {
         : null
   const canChangeOppStage = isOpen && canChangeOppStagePerm
   const soGate = resolveOpportunityCreateSalesOrderGate(opp.id, latestDoc?.id)
+  const quoteGate = resolveOpportunityCreateQuotationGate(opp.id)
   const favoritePath = `/crm/opportunities/${opp.id}`
   const statusTone = opp.stage === 'won' ? 'success' as const : opp.stage === 'lost' ? 'critical' as const : 'info' as const
-
-  const stageCompleteness = getOpportunityStageCompleteness(opportunity, opportunity.stage)
-  const panelMissing = gateMissingFields ?? stageCompleteness.missingFields
-  const panelCompleted = gateMissingFields
-    ? Math.max(0, stageCompleteness.requiredCount - gateMissingFields.length)
-    : stageCompleteness.completedCount
-  const panelPercent = gateMissingFields
-    ? (stageCompleteness.requiredCount === 0
-      ? 100
-      : Math.round((panelCompleted / stageCompleteness.requiredCount) * 100))
-    : stageCompleteness.percent
-  const panelStageLabel = gateStageLabel ?? opportunityStageLabel(opportunity.stage)
 
   const moveGateEntity = {
     ...opportunity,
@@ -344,9 +347,6 @@ export function Opportunity360Page() {
   function confirmMove() {
     void (async () => {
       if (!targetCompleteness.isComplete) {
-        setGateMissingFields(targetCompleteness.missingFields)
-        setGateStageLabel(opportunityStageLabel(targetStage))
-        setToast(formatMissingStageFieldsMessage(targetCompleteness.missingFields, opportunityStageLabel(targetStage)))
         notify.error(formatMissingStageFieldsMessage(targetCompleteness.missingFields, opportunityStageLabel(targetStage)))
         return
       }
@@ -359,30 +359,53 @@ export function Opportunity360Page() {
         }),
       )
       if (r.ok) {
-        setGateMissingFields(null)
-        setGateStageLabel(null)
         setMoveOpen(false)
       } else {
-        if (r.missingFields?.length) {
-          setGateMissingFields(r.missingFields)
-          setGateStageLabel(opportunityStageLabel(targetStage))
-          notify.error(r.error ?? 'Could not change stage')
-        } else {
-          notify.error(r.error ?? 'Could not change stage')
-        }
-        setToast(r.error ?? 'Could not change stage')
+        notify.error(r.error ?? 'Could not change stage')
       }
     })()
   }
 
   function createQuote() {
     void (async () => {
-      const r = await resolveStoreAction(createQuotation(opp.id, templateId, opp.value / 1.18))
+      const gate = resolveOpportunityCreateQuotationGate(opp.id)
+      if (!gate.enabled) {
+        notify.error(gate.disabledReason ?? 'Complete opportunity requirements before creating a quotation.')
+        return
+      }
+      const tpl = templateId || findFeaturedQuotationTemplate(templates)?.id || templates[0]?.id
+      if (!tpl) {
+        notify.error('Select a quotation template first')
+        return
+      }
+      if (!templateId && tpl) setTemplateId(tpl)
+      const unitPrice = opp.value > 0 ? opp.value / 1.18 : (opp.lines?.[0]?.unitPrice ?? 0)
+      if (!(unitPrice > 0)) {
+        notify.error('Deal value or line unit price must be greater than zero')
+        return
+      }
+      const r = await resolveStoreAction(createQuotation(opp.id, tpl, unitPrice))
       if (r.ok && r.documentId) {
         setQuoteOpen(false)
+        notify.success('Quotation created')
         navigate(`/crm/quotations/${r.quotationId}/editor?doc=${r.documentId}`)
+        return
       }
+      notify.error(r.error ?? 'Could not create quotation')
     })()
+  }
+
+  function openCreateQuotation() {
+    const gate = resolveOpportunityCreateQuotationGate(opp.id)
+    if (!gate.enabled) {
+      notify.error(gate.disabledReason ?? 'Complete opportunity requirements before creating a quotation.')
+      return
+    }
+    if (!templateId) {
+      const featured = findFeaturedQuotationTemplate(templates)?.id ?? templates[0]?.id ?? ''
+      if (featured) setTemplateId(featured)
+    }
+    setQuoteOpen(true)
   }
 
   function openMoveStage(stage: OpportunityStage) {
@@ -406,7 +429,7 @@ export function Opportunity360Page() {
         if (r.ok) {
           navigate('/crm/opportunities')
         } else {
-          setToast(r.error ?? 'Delete failed')
+          notify.error(r.error ?? 'Delete failed')
         }
       } finally {
         setIsDeleting(false)
@@ -420,7 +443,7 @@ export function Opportunity360Page() {
     void (async () => {
       try {
         const r = await resolveStoreAction(completeActivity(activity.id, activity.outcome ?? 'Completed'))
-        if (!r.ok) setToast(r.error ?? 'Could not complete activity')
+        if (!r.ok) notify.error(r.error ?? 'Could not complete activity')
       } finally {
         setPendingActivityId(null)
       }
@@ -489,6 +512,8 @@ export function Opportunity360Page() {
     isOpen,
     canCreateSalesOrder: soGate.enabled,
     createSalesOrderLockedReason: soGate.disabledReason ?? CREATE_SALES_ORDER_LOCKED_REASON,
+    canCreateQuotation: quoteGate.enabled,
+    createQuotationLockedReason: quoteGate.disabledReason ?? undefined,
     lastSavedLabel: opportunity.modifiedAt ? `Last updated ${formatDate(opportunity.modifiedAt)}` : undefined,
   }
 
@@ -498,17 +523,22 @@ export function Opportunity360Page() {
       favoritePath={favoritePath}
       isOpen={isOpen}
       canDelete={canDelete}
-      showCreateSalesOrder={soGate.showCreate}
+      showCreateSalesOrder={soGate.enabled || Boolean(soGate.salesOrderId)}
       canCreateSalesOrder={soGate.enabled}
       createSalesOrderDisabledReason={soGate.disabledReason}
+      canCreateQuotation={quoteGate.enabled}
+      createQuotationDisabledReason={quoteGate.disabledReason}
       contactPhone={contactPhone}
       contactEmail={contactEmail}
       onEdit={() => navigate(`/crm/opportunities/${opportunity.id}/edit`)}
       onMoveStage={() => openMoveStage(opportunity.stage)}
       onScheduleActivity={() => setFollowUpOpen(true)}
-      onCreateQuotation={() => setQuoteOpen(true)}
+      onCreateQuotation={openCreateQuotation}
       onCreateSalesOrder={() => {
-        if (!soGate.enabled) return
+        if (!soGate.enabled) {
+          notify.error(soGate.disabledReason ?? 'Available after customer approval.')
+          return
+        }
         navigate(buildSalesOrderNewUrl(opportunity.id, soGate.quotationDocumentId, { fromCrm: true }))
       }}
       onLogActivity={() => setLogActivityOpen(true)}
@@ -525,9 +555,12 @@ export function Opportunity360Page() {
       input={smartOverviewInput}
       onGoToSection={scrollToSection}
       onScheduleFollowUp={() => setFollowUpOpen(true)}
-      onCreateQuotation={() => setQuoteOpen(true)}
+      onCreateQuotation={openCreateQuotation}
       onCreateSalesOrder={() => {
-        if (!soGate.enabled) return
+        if (!soGate.enabled) {
+          notify.error(soGate.disabledReason ?? 'Available after customer approval.')
+          return
+        }
         navigate(buildSalesOrderNewUrl(opportunity.id, soGate.quotationDocumentId, { fromCrm: true }))
       }}
       onLogActivity={() => setLogActivityOpen(true)}
@@ -563,9 +596,6 @@ export function Opportunity360Page() {
         stickyFooter={false}
       >
         <div className="erp-form-body crm-lead-form-body">
-          <div className="erp-form-body__toolbar">
-            <FactBoxPaneAiToggle />
-          </div>
 
           {overdueFu ? (
             <div className="dyn-detail-banner">
@@ -627,13 +657,6 @@ export function Opportunity360Page() {
                 ) : null
               }
             />
-            <StageCompletenessPanel
-              percent={panelPercent}
-              requiredCount={stageCompleteness.requiredCount}
-              completedCount={panelCompleted}
-              missingFields={panelMissing}
-              stageLabel={panelStageLabel}
-            />
           </div>
 
           <OpportunitySummaryCard
@@ -652,13 +675,22 @@ export function Opportunity360Page() {
             dealValue={commercial.estimatedDealValue}
           />
 
-          <OpportunityNotesCard
-            opportunityId={opportunity.id}
+          <CrmStageNotes
+            entityType="OPPORTUNITY"
+            entityId={opportunity.id}
+            sectionId="opp-section-notes"
+            stageOptions={
+              stageOptions.length > 0
+                ? stageOptions.map((s) => ({ code: s.id, label: s.label }))
+                : OPPORTUNITY_NOTE_STAGE_OPTIONS
+            }
+            historyLabel="Opportunity notes history"
             currentStage={opportunity.stage}
             demoNotes={oppDemoNotes}
             editPath={`/crm/opportunities/${opportunity.id}/edit`}
             composerOpen={noteComposerOpen}
             onComposerOpenChange={setNoteComposerOpen}
+            onNotesChange={setEntityNotes}
           />
 
           <ErpAdditionalInfoToggle
@@ -756,16 +788,27 @@ export function Opportunity360Page() {
                         <FileText className="h-8 w-8 text-erp-muted" />
                         <p>No quotation documents linked</p>
                         {isOpen && !opportunity.quotationId ? (
-                          <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
-                            <QuotationTemplateSelector
-                              templates={templates}
-                              value={templateId}
-                              onChange={setTemplateId}
-                              variant="select"
-                            />
-                            <ErpButton type="button" size="sm" onClick={createQuote}>
-                              Create quotation
-                            </ErpButton>
+                          <div className="mt-2 flex flex-col items-center gap-2">
+                            {!quoteGate.enabled && quoteGate.disabledReason ? (
+                              <p className="max-w-md text-center text-[12px] text-amber-800">{quoteGate.disabledReason}</p>
+                            ) : null}
+                            <div className="flex flex-wrap items-center justify-center gap-2">
+                              <QuotationTemplateSelector
+                                templates={templates}
+                                value={templateId}
+                                onChange={setTemplateId}
+                                variant="select"
+                              />
+                              <ErpButton
+                                type="button"
+                                size="sm"
+                                onClick={openCreateQuotation}
+                                disabled={!quoteGate.enabled}
+                                disabledReason={quoteGate.disabledReason ?? undefined}
+                              >
+                                Create quotation
+                              </ErpButton>
+                            </div>
                           </div>
                         ) : null}
                       </div>
@@ -840,9 +883,9 @@ export function Opportunity360Page() {
               const r = await resolveStoreAction(deleteActivity(deleteActivityTarget.id))
               if (r.ok) {
                 setDeleteActivityTarget(null)
-                setToast('Activity deleted')
+                notify.success('Activity deleted')
               } else {
-                setToast(r.error ?? 'Failed to delete activity')
+                notify.error(r.error ?? 'Failed to delete activity')
               }
             } finally {
               setPendingActivityId(null)
@@ -867,9 +910,9 @@ export function Opportunity360Page() {
               const r = await resolveStoreAction(deleteFollowUp(deleteFollowUpTarget.id))
               if (r.ok) {
                 setDeleteFollowUpTarget(null)
-                setToast('Follow-up deleted')
+                notify.success('Follow-up deleted')
               } else {
-                setToast(r.error ?? 'Failed to delete follow-up')
+                notify.error(r.error ?? 'Failed to delete follow-up')
               }
             } finally {
               setPendingFollowUpId(null)
@@ -900,14 +943,11 @@ export function Opportunity360Page() {
                 Manual win approval
               </label>
             ) : null}
-            <StageCompletenessPanel
-              percent={targetCompleteness.percent}
-              requiredCount={targetCompleteness.requiredCount}
-              completedCount={targetCompleteness.completedCount}
-              missingFields={targetCompleteness.missingFields}
-              stageLabel={opportunityStageLabel(targetStage)}
-              className="mt-3"
-            />
+            {!targetCompleteness.isComplete && targetCompleteness.missingFields.length > 0 ? (
+              <p className="mt-3 text-sm text-amber-800">
+                {formatMissingStageFieldsMessage(targetCompleteness.missingFields, opportunityStageLabel(targetStage))}
+              </p>
+            ) : null}
             <div className="crm-opp-move-modal__actions">
               <button type="button" className="crm-opp-move-modal__btn" onClick={() => setMoveOpen(false)}>
                 Cancel
@@ -930,6 +970,9 @@ export function Opportunity360Page() {
                 ? 'A quotation is already linked — this will create a new document from the selected template.'
                 : 'Generate a quotation document from this opportunity using a template.'}
             </p>
+            {!quoteGate.enabled && quoteGate.disabledReason ? (
+              <p className="mt-2 text-sm text-amber-800">{quoteGate.disabledReason}</p>
+            ) : null}
             <label className="block text-sm">
               <span className="font-medium text-erp-text">Template</span>
               <div className="mt-1">
@@ -946,7 +989,12 @@ export function Opportunity360Page() {
               <button type="button" className="crm-opp-move-modal__btn" onClick={() => setQuoteOpen(false)}>
                 Cancel
               </button>
-              <button type="button" className="crm-opp-move-modal__btn crm-opp-move-modal__btn--primary inline-flex items-center justify-center gap-1.5" onClick={createQuote}>
+              <button
+                type="button"
+                className="crm-opp-move-modal__btn crm-opp-move-modal__btn--primary inline-flex items-center justify-center gap-1.5"
+                onClick={createQuote}
+                disabled={!quoteGate.enabled}
+              >
                 Create quotation
               </button>
             </div>
@@ -961,7 +1009,6 @@ export function Opportunity360Page() {
         onConfirm={confirmDeleteOpportunity}
         isDeleting={isDeleting}
       />
-      {toast ? <Toast message={toast} /> : null}
     </>
   )
 }

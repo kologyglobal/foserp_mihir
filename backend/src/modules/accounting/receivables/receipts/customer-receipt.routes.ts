@@ -69,5 +69,11 @@ router.post(
   validateBody(cancelCustomerReceiptSchema),
   controller.cancelCustomerReceipt,
 )
+router.post(
+  '/:id/post',
+  validateParams(uuidParamSchema),
+  requirePermission('finance.ar.receipt.post'),
+  controller.postCustomerReceipt,
+)
 
 export default router

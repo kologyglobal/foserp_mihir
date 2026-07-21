@@ -1,6 +1,8 @@
 import { prisma } from '../../../../config/database.js'
-import { formatForPersistence, sumDecimals } from '../../shared/finance-decimal.js'
+import { formatForPersistence, subtract, sumDecimals, toDecimal } from '../../shared/finance-decimal.js'
+import { DEBIT_OPEN_ITEM_SIDE_FILTER } from '../receipts/receivable-open-item-side.validators.js'
 import {
+  buildOutstandingStatusFilter,
   findOutstandingOpenItems,
   mapOpenItemToOutstandingDto,
 } from './receivable-outstanding.repository.js'
@@ -15,8 +17,12 @@ import type {
 
 function buildCustomerRows(
   items: ReturnType<typeof mapOpenItemToOutstandingDto>[],
+  creditByCustomer: Map<string, string>,
 ): CustomerReceivableSummaryRow[] {
-  const byCustomer = new Map<string, CustomerReceivableSummaryRow & { amounts: string[]; baseAmounts: string[]; currencies: Map<string, CurrencyBreakdownRow> }>()
+  const byCustomer = new Map<
+    string,
+    CustomerReceivableSummaryRow & { amounts: string[]; baseAmounts: string[]; currencies: Map<string, CurrencyBreakdownRow> }
+  >()
 
   for (const item of items) {
     const existing = byCustomer.get(item.customerId)
@@ -28,6 +34,9 @@ function buildCustomerRows(
         openItemCount: 1,
         outstandingAmount: item.outstandingAmount,
         baseOutstandingAmount: item.baseOutstandingAmount,
+        debitOutstandingBase: item.baseOutstandingAmount,
+        creditOutstandingBase: '0.0000',
+        netReceivableBase: item.baseOutstandingAmount,
         oldestDueDate: item.dueDate,
         maxDaysOverdue: item.daysOverdue,
         disputedCount: item.isDisputed ? 1 : 0,
@@ -71,12 +80,45 @@ function buildCustomerRows(
     row.currencies.set(item.currencyCode, currencyRow)
   }
 
-  return [...byCustomer.values()].map(({ amounts, baseAmounts, currencies, ...row }) => ({
-    ...row,
-    outstandingAmount: formatForPersistence(sumDecimals(amounts)),
-    baseOutstandingAmount: formatForPersistence(sumDecimals(baseAmounts)),
-    currencyBreakdown: [...currencies.values()].sort((a, b) => a.currencyCode.localeCompare(b.currencyCode)),
-  }))
+  // Include customers that only have credits
+  for (const [customerId, creditBase] of creditByCustomer) {
+    if (!byCustomer.has(customerId)) {
+      byCustomer.set(customerId, {
+        customerId,
+        customerCode: null,
+        customerName: null,
+        openItemCount: 0,
+        outstandingAmount: '0.0000',
+        baseOutstandingAmount: '0.0000',
+        debitOutstandingBase: '0.0000',
+        creditOutstandingBase: creditBase,
+        netReceivableBase: formatForPersistence(subtract('0', creditBase)),
+        oldestDueDate: null,
+        maxDaysOverdue: null,
+        disputedCount: 0,
+        onHoldCount: 0,
+        currencyBreakdown: [],
+        amounts: [],
+        baseAmounts: [],
+        currencies: new Map(),
+      })
+    }
+  }
+
+  return [...byCustomer.values()].map(({ amounts, baseAmounts, currencies, ...row }) => {
+    const debitOutstandingBase = formatForPersistence(sumDecimals(baseAmounts.length ? baseAmounts : ['0']))
+    const creditOutstandingBase = creditByCustomer.get(row.customerId) ?? '0.0000'
+    const netReceivableBase = formatForPersistence(subtract(debitOutstandingBase, creditOutstandingBase))
+    return {
+      ...row,
+      outstandingAmount: formatForPersistence(sumDecimals(amounts.length ? amounts : ['0'])),
+      baseOutstandingAmount: debitOutstandingBase,
+      debitOutstandingBase,
+      creditOutstandingBase,
+      netReceivableBase,
+      currencyBreakdown: [...currencies.values()].sort((a, b) => a.currencyCode.localeCompare(b.currencyCode)),
+    }
+  })
 }
 
 function sortCustomerRows(rows: CustomerReceivableSummaryRow[], query: CustomerSummaryQuery): CustomerReceivableSummaryRow[] {
@@ -93,14 +135,41 @@ function sortCustomerRows(rows: CustomerReceivableSummaryRow[], query: CustomerS
         return factor * (a.oldestDueDate ?? '9999-99-99').localeCompare(b.oldestDueDate ?? '9999-99-99')
       case 'outstandingAmount':
       default:
-        return factor * Number(a.baseOutstandingAmount) - Number(b.baseOutstandingAmount)
+        return factor * Number(a.netReceivableBase) - Number(b.netReceivableBase)
     }
   })
 }
 
+async function loadCreditOutstandingByCustomer(
+  tenantId: string,
+  legalEntityId: string,
+  includeSettled?: boolean,
+  customerId?: string,
+): Promise<Map<string, string>> {
+  const items = await prisma.receivableOpenItem.findMany({
+    where: {
+      tenantId,
+      legalEntityId,
+      side: 'CREDIT',
+      ...(customerId ? { customerId } : {}),
+      ...buildOutstandingStatusFilter(includeSettled),
+    },
+    select: { customerId: true, baseOpenAmount: true, customerNameSnapshot: true },
+  })
+  const map = new Map<string, string>()
+  for (const item of items) {
+    const prev = map.get(item.customerId) ?? '0'
+    map.set(item.customerId, formatForPersistence(toDecimal(prev).add(item.baseOpenAmount)))
+  }
+  return map
+}
+
 export async function listCustomerSummaries(tenantId: string, query: CustomerSummaryQuery) {
   const ctx = await resolveReceivableReportingContext(tenantId, query.legalEntityId, query.reportDate)
-  const rows = await findOutstandingOpenItems(ctx, { includeSettled: query.includeSettled })
+  const [rows, creditByCustomer] = await Promise.all([
+    findOutstandingOpenItems(ctx, { includeSettled: query.includeSettled }),
+    loadCreditOutstandingByCustomer(tenantId, query.legalEntityId, query.includeSettled),
+  ])
   let items = rows.map((row) => mapOpenItemToOutstandingDto(row, ctx.reportDate))
   if (query.search?.trim()) {
     const term = query.search.trim().toLowerCase()
@@ -110,7 +179,7 @@ export async function listCustomerSummaries(tenantId: string, query: CustomerSum
         item.customerCode?.toLowerCase().includes(term),
     )
   }
-  const allRows = sortCustomerRows(buildCustomerRows(items), query)
+  const allRows = sortCustomerRows(buildCustomerRows(items, creditByCustomer), query)
   const page = query.page ?? 1
   const pageSize = query.pageSize ?? 20
   const start = (page - 1) * pageSize
@@ -133,9 +202,12 @@ export async function getCustomerSummary(
   const customer = await prisma.crmCompany.findFirst({ where: { id: customerId, tenantId } })
   if (!customer) throw new ReceivableCustomerNotFoundError(customerId)
 
-  const rows = await findOutstandingOpenItems(ctx, { includeSettled: query.includeSettled, customerId })
+  const [rows, creditByCustomer] = await Promise.all([
+    findOutstandingOpenItems(ctx, { includeSettled: query.includeSettled, customerId }),
+    loadCreditOutstandingByCustomer(tenantId, query.legalEntityId, query.includeSettled, customerId),
+  ])
   const items = rows.map((row) => mapOpenItemToOutstandingDto(row, ctx.reportDate))
-  const summaries = buildCustomerRows(items)
+  const summaries = buildCustomerRows(items, creditByCustomer)
   const summary = summaries[0]
   if (!summary) {
     return {
@@ -145,6 +217,9 @@ export async function getCustomerSummary(
       openItemCount: 0,
       outstandingAmount: '0.0000',
       baseOutstandingAmount: '0.0000',
+      debitOutstandingBase: '0.0000',
+      creditOutstandingBase: '0.0000',
+      netReceivableBase: '0.0000',
       oldestDueDate: null,
       maxDaysOverdue: null,
       disputedCount: 0,
@@ -162,3 +237,6 @@ export async function getCustomerSummary(
     limitations: ctx.limitations,
   }
 }
+
+// Keep DEBIT filter import used for documentation / future credit-only paths
+void DEBIT_OPEN_ITEM_SIDE_FILTER

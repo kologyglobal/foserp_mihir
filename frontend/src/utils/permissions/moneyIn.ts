@@ -15,6 +15,16 @@ export const MONEY_IN_PERMISSIONS = [
   'finance.ar.invoice.post',
   'finance.ar.invoice.cancel',
   'finance.ar.reconcile.view',
+  'finance.ar.credit_note.view',
+  'finance.ar.credit_note.create',
+  'finance.ar.credit_note.edit',
+  'finance.ar.credit_note.submit',
+  'finance.ar.credit_note.approve',
+  'finance.ar.credit_note.cancel',
+  'finance.ar.credit_note.post',
+  'finance.ar.credit_note.mark_ready',
+  'finance.ar.allocation.view',
+  'finance.ar.allocation.create',
 ] as const
 
 export type MoneyInPermission = (typeof MONEY_IN_PERMISSIONS)[number]
@@ -22,6 +32,7 @@ export type MoneyInPermission = (typeof MONEY_IN_PERMISSIONS)[number]
 const VIEWER: MoneyInPermission[] = [
   'finance.ar.view',
   'finance.ar.invoice.view',
+  'finance.ar.credit_note.view',
 ]
 
 const EXEC: MoneyInPermission[] = [
@@ -29,12 +40,21 @@ const EXEC: MoneyInPermission[] = [
   'finance.ar.invoice.create',
   'finance.ar.invoice.edit',
   'finance.ar.invoice.cancel',
+  'finance.ar.credit_note.create',
+  'finance.ar.credit_note.edit',
+  'finance.ar.credit_note.submit',
+  'finance.ar.credit_note.cancel',
+  'finance.ar.credit_note.mark_ready',
+  'finance.ar.allocation.create',
 ]
 
 const MANAGER: MoneyInPermission[] = [
   ...EXEC,
   'finance.ar.invoice.post',
   'finance.ar.reconcile.view',
+  'finance.ar.credit_note.approve',
+  'finance.ar.credit_note.post',
+  'finance.ar.allocation.view',
 ]
 
 const ROLE_PACKS: Partial<Record<ErpRole, MoneyInPermission[]>> = {
@@ -81,6 +101,16 @@ export function useMoneyInPermissions() {
       canPostInvoice: can('finance.ar.invoice.post'),
       canCancelInvoice: can('finance.ar.invoice.cancel'),
       canReconcile: can('finance.ar.reconcile.view'),
+      canViewCreditNote: can('finance.ar.credit_note.view') || can('finance.ar.view'),
+      canCreateCreditNote: can('finance.ar.credit_note.create'),
+      canEditCreditNote: can('finance.ar.credit_note.edit'),
+      canSubmitCreditNote: can('finance.ar.credit_note.submit'),
+      canApproveCreditNote: can('finance.ar.credit_note.approve'),
+      canCancelCreditNote: can('finance.ar.credit_note.cancel'),
+      canPostCreditNote: can('finance.ar.credit_note.post'),
+      canMarkReadyCreditNote: can('finance.ar.credit_note.mark_ready'),
+      canAllocate: can('finance.ar.allocation.create'),
+      canViewAllocations: can('finance.ar.allocation.view') || can('finance.ar.allocation.create'),
       can,
     }
   }, [user.role])

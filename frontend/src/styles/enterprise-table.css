@@ -438,11 +438,22 @@
 }
 
 .ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__sort-wrap {
-  width: 11rem !important;
+  min-width: 13.5rem !important;
+  width: max-content !important;
+  max-width: min(18rem, 100%) !important;
 }
 
 .ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__view-wrap {
-  width: 9rem !important;
+  min-width: 9rem !important;
+  width: max-content !important;
+  max-width: 12rem !important;
+}
+
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__select-wrap .erp-select,
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__sort-select,
+.ent-data-grid--register .crm-list-filter-bar--embedded .crm-list-filter-bar__view-select {
+  padding-right: 2.5rem !important;
+  padding-left: 0.75rem !important;
 }
 
 /* Shared control chrome — same height + same 8px radius */
@@ -608,6 +619,19 @@
   box-shadow: none;
   /* Let Columns / Filters panels paint above sticky thead */
   overflow: visible;
+  display: flex;
+  flex-direction: column;
+}
+
+.erp-register-table-shell .ent-data-grid .erp-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.erp-register-table-shell .ent-data-grid .ent-data-grid__footer {
+  position: relative;
+  z-index: 30;
+  margin-top: 0;
 }
 
 .erp-register-table-shell {

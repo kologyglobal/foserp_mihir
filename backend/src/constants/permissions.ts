@@ -295,6 +295,14 @@ export const PERMISSIONS = [
   'finance.ar.allocation.view',
   'finance.ar.allocation.create',
   'finance.ar.allocation.reverse',
+  'finance.ar.credit_note.view',
+  'finance.ar.credit_note.create',
+  'finance.ar.credit_note.edit',
+  'finance.ar.credit_note.submit',
+  'finance.ar.credit_note.approve',
+  'finance.ar.credit_note.cancel',
+  'finance.ar.credit_note.post',
+  'finance.ar.credit_note.mark_ready',
 ] as const
 
 export type PermissionName = (typeof PERMISSIONS)[number]
@@ -330,6 +338,11 @@ const FINANCE_EXECUTIVE_MANAGE: PermissionName[] = [
   'finance.ar.receipt.edit',
   'finance.ar.receipt.cancel',
   'finance.ar.allocation.create',
+  'finance.ar.credit_note.create',
+  'finance.ar.credit_note.edit',
+  'finance.ar.credit_note.submit',
+  'finance.ar.credit_note.cancel',
+  'finance.ar.credit_note.mark_ready',
 ]
 
 export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
@@ -582,6 +595,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'crm.opportunity.view', 'crm.opportunity.create', 'crm.opportunity.update',
     'crm.quotation.view', 'crm.quotation.create', 'crm.quotation.update', 'crm.quotation.convert',
     'crm.sales_order.view', 'crm.sales_order.create', 'crm.sales_order.update',
+    'crm.note.view', 'crm.note.create', 'crm.note.update',
     'crm.dashboard.view', 'crm.report.view', 'crm.search.view',
     'master.lookup.view',
     'master.item.view',

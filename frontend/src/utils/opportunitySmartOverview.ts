@@ -34,6 +34,9 @@ export interface OpportunitySmartOverviewInput {
   /** Ready for Create Sales Order (quotation accepted + Won / Order Confirmed). */
   canCreateSalesOrder?: boolean
   createSalesOrderLockedReason?: string
+  /** Ready for Create Quotation (stage + mandatory fields). */
+  canCreateQuotation?: boolean
+  createQuotationLockedReason?: string
   lastSavedLabel?: string
 }
 
@@ -209,21 +212,21 @@ export function buildOpportunitySmartSignals(input: OpportunitySmartOverviewInpu
   const missing: CrmSmartSignal[] = []
   const ok: CrmSmartSignal[] = []
 
-  if (!input.customerId) missing.push({ id: 'company', label: 'Company not linked', tone: 'warn' })
+  if (!input.customerId) missing.push({ id: 'company', label: 'Link a company', tone: 'warn' })
   else ok.push({ id: 'company', label: 'Company linked', tone: 'ok' })
 
-  if (!input.hasValidLine) missing.push({ id: 'lines', label: 'Product lines incomplete', tone: 'warn' })
+  if (!input.hasValidLine) missing.push({ id: 'lines', label: 'Add product lines', tone: 'warn' })
   else ok.push({ id: 'lines', label: `${input.lineCount} line item(s)`, tone: 'ok' })
 
-  if (input.dealValue <= 0) missing.push({ id: 'value', label: 'Deal value not set', tone: 'warn' })
+  if (input.dealValue <= 0) missing.push({ id: 'value', label: 'Set deal value', tone: 'warn' })
   else ok.push({ id: 'value', label: 'Deal value set', tone: 'ok' })
 
-  if (input.overdueFollowUp) missing.push({ id: 'followup', label: 'Follow-up overdue', tone: 'warn' })
-  else if (!input.nextFollowUpDate) missing.push({ id: 'followup', label: 'Follow-up not scheduled', tone: 'warn' })
+  if (input.overdueFollowUp) missing.push({ id: 'followup', label: 'Follow-up is overdue', tone: 'warn' })
+  else if (!input.nextFollowUpDate) missing.push({ id: 'followup', label: 'Plan a follow-up', tone: 'warn' })
   else ok.push({ id: 'followup', label: 'Follow-up scheduled', tone: 'ok' })
 
   if (!input.quotationId && input.isOpen !== false) {
-    missing.push({ id: 'quote', label: 'No quotation yet', tone: 'warn' })
+    missing.push({ id: 'quote', label: 'Create a quotation when ready', tone: 'warn' })
   } else if (input.quotationId) {
     ok.push({ id: 'quote', label: 'Quotation linked', tone: 'ok' })
   }
@@ -238,6 +241,8 @@ export function resolveOpportunityNextBestAction(input: OpportunitySmartOverview
       title: 'Link Company',
       description: 'Select the customer account before you build the deal.',
       ctaLabel: 'Link Company',
+      focusField: 'customerId',
+      sectionId: 'general',
     }
   }
   if (!input.hasValidLine) {
@@ -246,6 +251,8 @@ export function resolveOpportunityNextBestAction(input: OpportunitySmartOverview
       title: 'Add Product Lines',
       description: 'Capture at least one product or item line to size the opportunity.',
       ctaLabel: 'Add Lines',
+      focusField: 'products',
+      sectionId: 'products',
     }
   }
   if (input.dealValue <= 0) {
@@ -254,6 +261,8 @@ export function resolveOpportunityNextBestAction(input: OpportunitySmartOverview
       title: 'Set Deal Value',
       description: 'Enter commercial value so pipeline and forecast stay accurate.',
       ctaLabel: 'Set Value',
+      focusField: 'products',
+      sectionId: 'products',
     }
   }
   if (input.overdueFollowUp || !input.nextFollowUpDate) {
@@ -267,6 +276,16 @@ export function resolveOpportunityNextBestAction(input: OpportunitySmartOverview
     }
   }
   if (!input.quotationId && input.isOpen !== false) {
+    if (input.canCreateQuotation === false) {
+      return {
+        id: 'create_quotation',
+        title: 'Quotation Blocked',
+        description: input.createQuotationLockedReason
+          ?? 'Complete stage requirements (lines, value, contact) before creating a quotation.',
+        ctaLabel: 'Review Deal',
+        sectionId: 'products',
+      }
+    }
     return {
       id: 'create_quotation',
       title: 'Create Quotation',
@@ -287,7 +306,7 @@ export function resolveOpportunityNextBestAction(input: OpportunitySmartOverview
       id: 'await_so',
       title: 'Sales Order Blocked',
       description: input.createSalesOrderLockedReason
-        ?? 'Create Sales Order becomes available after quotation approval.',
+        ?? 'Create Sales Order becomes available after Send → Customer Approve.',
       ctaLabel: 'Review Deal',
     }
   }

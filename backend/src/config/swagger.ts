@@ -1651,9 +1651,9 @@ export const swaggerSpec = {
       },
     },
 
-    // ─── Accounting — Receivables / Customer receipts (Phase 3B3) ─────────────
-    // Draft workflow only — no posting, no GL, no receiptNumber issuance, no open-item
-    // creation, and no allocation persistence. Those ship in Phase 3B4.
+    // ─── Accounting — Receivables / Customer receipts (Phase 3B3 draft + 3B4 posting) ─
+    // Draft/validate/mark-ready/cancel workflow (3B3) plus atomic posting to GL (3B4).
+    // Allocation persistence and receipt reversal remain deferred beyond 3B4.
     '/t/{tenantSlug}/accounting/receivables/receipts': {
       get: {
         tags: ['Accounting Receivables', 'Customer Receipts'],
@@ -1669,7 +1669,7 @@ export const swaggerSpec = {
           { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
           { name: 'limit', in: 'query', schema: { type: 'integer', default: 20 } },
         ],
-        responses: { 200: { description: 'Paginated receipt list with allowedActions per row (post/allocate always false)' } },
+        responses: { 200: { description: 'Paginated receipt list with allowedActions per row (post true only when READY_TO_POST + permission; allocate always false)' } },
       },
       post: {
         tags: ['Accounting Receivables', 'Customer Receipts'],
@@ -1718,7 +1718,7 @@ export const swaggerSpec = {
         tags: ['Accounting Receivables', 'Customer Receipts'],
         summary: 'Mark draft ready to post',
         description:
-          'Permission: `finance.ar.receipt.edit`. DRAFT only. Full validation + CUSTOMER_RECEIPT number series preview (non-consuming). Status → READY_TO_POST. No receiptNumber issued and no posting in 3B3.',
+          'Permission: `finance.ar.receipt.edit`. DRAFT only. Full validation + CUSTOMER_RECEIPT number series preview (non-consuming). Status → READY_TO_POST. receiptNumber is still null — issued at post time.',
         parameters: [tenantSlugParam, idParam],
         responses: {
           200: { description: 'Receipt ready to post (receiptNumber still null)' },
@@ -1733,6 +1733,211 @@ export const swaggerSpec = {
         description: 'Permission: `finance.ar.receipt.cancel`. Body: `{ cancellationReason }`. DRAFT|READY_TO_POST → CANCELLED.',
         parameters: [tenantSlugParam, idParam],
         responses: { 200: { description: 'Cancelled receipt' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/receipts/{id}/post': {
+      post: {
+        tags: ['Accounting Receivables', 'Customer Receipts'],
+        summary: 'Post customer receipt to GL (atomic)',
+        description:
+          'Permission: `finance.ar.receipt.post`. Empty body OK. READY_TO_POST → POSTED in one transaction: SYSTEM voucher + GL + credit-side ReceivableOpenItem (side=CREDIT) + receipt number (CUSTOMER_RECEIPT series) + PostingEvent. Dr bank/cash (+ TDS + bank charges + other deductions), Cr customer receivable = gross receipt amount. Idempotent event key `CUSTOMER_RECEIPT_POST:{id}:V1`. Does not create CustomerReceiptAllocation rows or mutate invoice open items — allocation persistence is deferred beyond Phase 3B4.',
+        parameters: [tenantSlugParam, idParam],
+        responses: {
+          200: { description: '{ receipt, posting, creditOpenItemId, idempotentReplay }' },
+          403: { description: 'CUSTOMER_RECEIPT_POSTING_NOT_ALLOWED' },
+          409: { description: 'CUSTOMER_RECEIPT_CONCURRENT_POST' },
+          422: { description: 'CUSTOMER_RECEIPT_NOT_READY / CUSTOMER_RECEIPT_CHANGED_AFTER_READY / period closed / account not ready' },
+        },
+      },
+    },
+
+    // ─── Accounting — Customer credit notes (Phase 3C1-3C4) ─────────────────
+    '/t/{tenantSlug}/accounting/receivables/credit-notes': {
+      get: {
+        tags: ['Accounting Receivables', 'Customer Credit Notes'],
+        summary: 'List customer credit notes',
+        description: 'Permission: `finance.ar.credit_note.view`. Tenant and legal-entity scoped.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Paginated credit notes' } },
+      },
+      post: {
+        tags: ['Accounting Receivables', 'Customer Credit Notes'],
+        summary: 'Create customer credit note draft',
+        description: 'Permission: `finance.ar.credit_note.create`. Server recalculates GST reversals from the posted source invoice.',
+        parameters: [tenantSlugParam],
+        responses: { 201: { description: 'Credit note draft' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/credit-notes/{id}/post': {
+      post: {
+        tags: ['Accounting Receivables', 'Customer Credit Notes'],
+        summary: 'Post customer credit note atomically',
+        description:
+          'Permission: `finance.ar.credit_note.post`. Creates a CREDIT_NOTE voucher, balanced GL, customer credit-note number, PostingEvent, and CREDIT receivable open item. It does not reduce invoice outstanding, create allocations, return inventory, issue a refund, or reverse any document.',
+        parameters: [tenantSlugParam, idParam],
+        responses: {
+          200: { description: '{ creditNote, posting, creditOpenItemId, idempotentReplay }' },
+          403: { description: 'CUSTOMER_CREDIT_NOTE_POSTING_NOT_ALLOWED' },
+          409: { description: 'CUSTOMER_CREDIT_NOTE_CONCURRENT_POST' },
+          422: { description: 'Not ready, approval not satisfied, over-credit, period, account, or number-series error' },
+        },
+      },
+    },
+
+    // ─── Accounting — Credit note allocations (Phase 3C5) ─────────────────────
+    // Subledger settlement only — does NOT create AccountingVoucher, GL, PostingEvent, or number series.
+    '/t/{tenantSlug}/accounting/receivables/credit-notes/{creditNoteId}/allocations/preview': {
+      post: {
+        tags: ['Accounting Receivables', 'Credit Note Allocations'],
+        summary: 'Preview credit note allocation (no writes)',
+        description:
+          'Permission: `finance.ar.allocation.view`. Validates same-customer / same-legal-entity / same-currency / forex base compatibility and proposed amounts against invoice DEBIT open items. Does not create allocation batch or mutate balances.',
+        parameters: [tenantSlugParam, { name: 'creditNoteId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['allocationDate', 'allocations'],
+                properties: {
+                  allocationDate: { type: 'string', format: 'date' },
+                  allocations: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['invoiceId', 'invoiceOpenItemId'],
+                      properties: {
+                        invoiceId: { type: 'string', format: 'uuid' },
+                        invoiceOpenItemId: { type: 'string', format: 'uuid' },
+                        amount: { type: 'string', description: 'Preferred field' },
+                        allocationAmount: { type: 'string', description: 'Alias for amount' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'Allocation preview' }, 422: { description: 'Validation failed' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/credit-notes/{creditNoteId}/allocations': {
+      post: {
+        tags: ['Accounting Receivables', 'Credit Note Allocations'],
+        summary: 'Allocate posted credit note credit to invoice debit open items (atomic)',
+        description:
+          'Permission: `finance.ar.allocation.create`. Requires `Idempotency-Key` header. Credit note allocation updates AR subledger balances only. It does not create an accounting voucher, GL entries, inventory returns, or refunds. Supports partial / multi-invoice allocation and remaining customer advance. No reversal in this phase.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'creditNoteId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          200: { description: '{ batch, allocations, creditNote, creditOpenItem, invoices, customerAdvance, idempotentReplay }' },
+          403: { description: 'Missing finance.ar.allocation.create' },
+          409: { description: 'PAYLOAD_MISMATCH / CONCURRENT_CHANGE / IN_PROGRESS' },
+          422: { description: 'Eligibility / amount / currency / forex validation errors' },
+        },
+      },
+      get: {
+        tags: ['Accounting Receivables', 'Credit Note Allocations'],
+        summary: 'List allocations for a credit note',
+        description: 'Permission: `finance.ar.allocation.view`.',
+        parameters: [tenantSlugParam, { name: 'creditNoteId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Paginated allocation history' } },
+      },
+    },
+
+    // ─── Accounting — Receipt allocations (Phase 3B5) ─────────────────────────
+    // Subledger settlement only — does NOT create AccountingVoucher, GL, PostingEvent, or number series.
+    '/t/{tenantSlug}/accounting/receivables/receipts/{receiptId}/allocations/preview': {
+      post: {
+        tags: ['Accounting Receivables', 'Receipt Allocations'],
+        summary: 'Preview receipt allocation (no writes)',
+        description:
+          'Permission: `finance.ar.allocation.view`. Validates same-customer / same-legal-entity / same-currency / forex base compatibility and proposed amounts. Does not create allocation batch or mutate balances.',
+        parameters: [tenantSlugParam, { name: 'receiptId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['allocationDate', 'allocations'],
+                properties: {
+                  allocationDate: { type: 'string', format: 'date' },
+                  allocations: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['invoiceId', 'invoiceOpenItemId'],
+                      properties: {
+                        invoiceId: { type: 'string', format: 'uuid' },
+                        invoiceOpenItemId: { type: 'string', format: 'uuid' },
+                        amount: { type: 'string', description: 'Preferred field' },
+                        allocationAmount: { type: 'string', description: 'Alias for amount' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'Allocation preview' }, 422: { description: 'Validation failed' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/receipts/{receiptId}/allocations': {
+      post: {
+        tags: ['Accounting Receivables', 'Receipt Allocations'],
+        summary: 'Allocate posted receipt credit to invoice debit open items (atomic)',
+        description:
+          'Permission: `finance.ar.allocation.create`. Requires `Idempotency-Key` header. Receipt allocation updates AR subledger balances only. It does not create an accounting voucher or GL entries. Supports partial / multi-invoice allocation and remaining customer advance. No reversal in this phase.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'receiptId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          200: { description: '{ batch, allocations, receipt, creditOpenItem, invoices, customerAdvance, idempotentReplay }' },
+          403: { description: 'Missing finance.ar.allocation.create' },
+          409: { description: 'PAYLOAD_MISMATCH / CONCURRENT_CHANGE / IN_PROGRESS' },
+          422: { description: 'Eligibility / amount / currency / forex validation errors' },
+        },
+      },
+      get: {
+        tags: ['Accounting Receivables', 'Receipt Allocations'],
+        summary: 'List allocations for a receipt',
+        description: 'Permission: `finance.ar.allocation.view`.',
+        parameters: [tenantSlugParam, { name: 'receiptId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Paginated allocation history' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/invoices/{invoiceId}/allocations': {
+      get: {
+        tags: ['Accounting Receivables', 'Receipt Allocations'],
+        summary: 'List receipt and credit note allocations applied to an invoice',
+        description:
+          'Permission: `finance.ar.allocation.view`. Phase 3C5: merges receipt-sourced and credit-note-sourced allocation rows; each row carries `sourceType` (`CUSTOMER_RECEIPT` | `CUSTOMER_CREDIT_NOTE`) plus either receipt or credit-note identifiers.',
+        parameters: [tenantSlugParam, { name: 'invoiceId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Paginated invoice allocation history' } },
+      },
+    },
+    '/t/{tenantSlug}/accounting/receivables/customer-credits': {
+      get: {
+        tags: ['Accounting Receivables', 'Receipt Allocations'],
+        summary: 'List outstanding customer credit open items (advances)',
+        description:
+          'Permission: `finance.ar.view`. Returns CREDIT-side receivable open items from posted receipts and posted credit notes (Phase 3C5). Each row carries `sourceType` (`CUSTOMER_RECEIPT` | `CUSTOMER_CREDIT_NOTE`). Not overdue invoices — do not mix into invoice ageing.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'legalEntityId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'customerId', in: 'query', schema: { type: 'string', format: 'uuid' } },
+          { name: 'currencyCode', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: { 200: { description: 'Paginated customer credits' } },
       },
     },
 

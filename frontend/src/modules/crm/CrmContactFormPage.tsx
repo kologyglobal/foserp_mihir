@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { z } from 'zod'
 import { useForm, useWatch, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
@@ -15,7 +14,6 @@ import {
 import { Input, Checkbox, Select, MobileInput } from '../../components/forms/Inputs'
 import { ErpSmartSelect } from '../../components/erp/ErpSmartSelect'
 import { ErpCardSection, ErpFieldRow, ErpStickySaveBar, ErpQuickEntrySection, ErpAdditionalInfoToggle, ErpAdditionalInfoPanel, useErpAdditionalInfo } from '../../components/erp/card-form'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
 import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
 import {
@@ -48,58 +46,20 @@ import {
   resolveContactNextBestAction,
 } from '../../utils/contactSmartOverview'
 import { DEFAULT_CUSTOMER_COUNTRY } from '../../config/countries'
-import { mobileDigitsOnly, validateMobileForCountry } from '../../utils/validation/mobilePhone'
 import { normalizeEmail } from '../../utils/validation/email'
-import { optionalEmailField } from '../../utils/validation/emailZod'
+import {
+  buildContactSchema,
+  CONTACT_FIELD_ORDER,
+  CONTACT_SECTION_BY_FIELD,
+  type ContactFormData,
+} from '../../utils/validation/crmSchemas/contactSchema'
 import {
   handleInvalidSubmit,
   rhfErrorsToFieldMap,
+  crmShowCompletenessHints,
 } from '../../utils/formValidation'
 
-function buildContactSchema(getCountry: () => string | null | undefined) {
-  return z.object({
-    contactCode: z.string().min(1, 'Contact code is required'),
-    customerId: z.string().min(1, 'Company is required'),
-    name: z.string().min(1, 'Contact name is required'),
-    designation: z.string().optional(),
-    department: z.string().optional(),
-    email: optionalEmailField,
-    phone: z
-      .string()
-      .trim()
-      .transform((s) => mobileDigitsOnly(s))
-      .superRefine((digits, ctx) => {
-        if (!digits) return
-        const message = validateMobileForCountry(digits, getCountry() ?? DEFAULT_CUSTOMER_COUNTRY)
-        if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, message })
-      })
-      .optional(),
-    isPrimary: z.boolean().optional(),
-    isActive: z.boolean().optional(),
-  })
-}
-
-type FormData = z.infer<ReturnType<typeof buildContactSchema>>
-
-const CONTACT_FIELD_ORDER = [
-  'contactCode',
-  'name',
-  'customerId',
-  'phone',
-  'email',
-  'designation',
-  'department',
-] as const
-
-const CONTACT_SECTION_BY_FIELD: Record<string, string> = {
-  contactCode: 'contact-section-quick',
-  name: 'contact-section-quick',
-  customerId: 'contact-section-quick',
-  phone: 'contact-section-quick',
-  email: 'contact-section-quick',
-  designation: 'contact-section-quick',
-  department: 'contact-section-details',
-}
+type FormData = ContactFormData
 
 export function CrmContactFormPage() {
   const { id } = useParams()
@@ -146,8 +106,10 @@ export function CrmContactFormPage() {
     [],
   )
 
-  const { register, handleSubmit, control, setValue, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, control, setValue, reset, formState: { errors, isSubmitting, isDirty, isSubmitted } } = useForm<FormData>({
     resolver: zodResolver(contactSchema) as Resolver<FormData>,
+    mode: 'onTouched',
+    reValidateMode: 'onChange',
     defaultValues: prefill
       ? {
           contactCode: duplicateSource && !existing ? '' : (prefill.contactCode ?? ''),
@@ -255,15 +217,6 @@ export function CrmContactFormPage() {
     { label: 'Phone', value: watched.phone?.trim() || '—' },
     { label: 'Email', value: watched.email?.trim() || '—' },
   ]
-
-  const validationGuideItems = useMemo(
-    () => Object.entries(errors).map(([key, err]) => ({
-      id: key,
-      label: err?.message?.toString() ?? key,
-      message: err?.message?.toString(),
-    })),
-    [errors],
-  )
 
   function scrollToSection(sectionId: string) {
     const additionalIds = new Set(['details', 'documents'])
@@ -440,12 +393,14 @@ export function CrmContactFormPage() {
       progressLabel="Contact readiness"
       progressPercent={computeContactCompleteness(smartOverviewInput)}
       signals={buildContactSmartSignals(smartOverviewInput)}
+      showGapSignals={crmShowCompletenessHints({
+        isEdit,
+        dirty: isDirty,
+        saveAttempted: isSubmitted,
+      })}
       nextAction={nextAction}
       onNextAction={() => {
-        if (nextAction.id === 'enter_name') scrollToSection('quick')
-        else if (nextAction.id === 'link_company') scrollToSection('quick')
-        else if (nextAction.id === 'add_reach') scrollToSection('quick')
-        else scrollToSection('quick')
+        scrollToSection(nextAction.sectionId ?? 'quick')
       }}
       quickActions={[
         {
@@ -512,7 +467,6 @@ export function CrmContactFormPage() {
           moreActions: commandBarMoreActions.length ? commandBarMoreActions : undefined,
         }}
         documentStrip={documentStrip}
-        validationItems={validationGuideItems.length ? validationGuideItems : undefined}
         factBox={factBox}
         suppressFactBoxRecord
         collapsibleFactBox
@@ -547,7 +501,6 @@ export function CrmContactFormPage() {
           sections={sectionNavItems}
           activeId={activeSection}
           onSelect={scrollToSection}
-          trailing={<FactBoxPaneAiToggle />}
         />
 
         <EnterpriseFormMetrics metrics={formMetrics} />

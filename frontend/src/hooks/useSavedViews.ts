@@ -108,6 +108,11 @@ export function useSavedViews({ pageId, filters, onApply, systemPresets = {} }: 
     setDefaultView(name)
   }, [])
 
+  /** Filters changed outside the View dropdown (chip remove, Clear all) — drop the stale view label. */
+  const markFiltersCustomized = useCallback(() => {
+    setActiveView('My View')
+  }, [])
+
   return {
     activeView,
     viewNames,
@@ -121,5 +126,6 @@ export function useSavedViews({ pageId, filters, onApply, systemPresets = {} }: 
     renameView,
     setAsDefaultView,
     defaultView,
+    markFiltersCustomized,
   }
 }

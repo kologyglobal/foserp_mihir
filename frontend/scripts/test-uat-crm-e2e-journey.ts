@@ -83,16 +83,20 @@ const cust = useMasterStore.getState().customers[0]
   const leadRes = useSalesStore.getState().createLead({
     prospectName: 'E2E Journey A Prospect',
     customerId: cust.id,
-    ownerId: 'user-rajesh',
-    ownerName: 'Rajesh Kumar',
+    leadOwnerId: 'user-rajesh',
+    leadOwnerName: 'Rajesh Kumar',
     stage: 'new',
     priority: 'medium',
-    leadSource: 'website',
+    source: 'website',
     followUpType: 'call',
     locationId: null,
     industry: 'Manufacturing',
     expectedValue: 500000,
-    notes: 'E2E journey A',
+    remarks: 'E2E journey A',
+    contactPerson: 'Journey Contact',
+    mobile: '9876543210',
+    createdDate: new Date().toISOString().slice(0, 10),
+    productRequirement: '',
     lifecycleStatus: 'open',
     activityStatus: 'active',
   })
@@ -155,7 +159,7 @@ const cust = useMasterStore.getState().customers[0]
 // Journey C: Opportunity → quotation → approval → revision
 {
   const oppRes = makeOpp(cust.id, 'E2E Journey C Opportunity')
-  const quo = useCrmStore.getState().createQuotationFromOpportunity(oppRes.opportunityId!, 'qtpl-standard-trailer', 1200000)
+  const quo = useCrmStore.getState().createQuotationFromOpportunity(oppRes.opportunityId!, 'qtpl-iso-tank', 1200000)
   const docId = quo.documentId
   const submit = docId ? useCrmStore.getState().submitQuotationDocumentForApproval(docId) : { ok: false }
   const approve = docId ? useCrmStore.getState().approveQuotationDocument(docId) : { ok: false }
@@ -170,7 +174,7 @@ const cust = useMasterStore.getState().customers[0]
 // Journey D: Approved quotation → SO conversion → persistence
 {
   const oppRes = makeOpp(cust.id, 'E2E Journey D Opportunity')
-  const quo = useCrmStore.getState().createQuotationFromOpportunity(oppRes.opportunityId!, 'qtpl-standard-trailer', 1200000)
+  const quo = useCrmStore.getState().createQuotationFromOpportunity(oppRes.opportunityId!, 'qtpl-iso-tank', 1200000)
   const docId = quo.documentId!
   useCrmStore.getState().submitQuotationDocumentForApproval(docId)
   useCrmStore.getState().approveQuotationDocument(docId)

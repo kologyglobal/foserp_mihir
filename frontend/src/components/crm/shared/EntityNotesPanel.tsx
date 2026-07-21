@@ -24,26 +24,39 @@ interface EntityNotesPanelProps {
   stageOptions?: Array<{ code: string; label: string }>
 }
 
-function noteMetaParts(note: {
-  authorName?: string
-  createdAt?: string
-  updatedAt?: string
-  stageCode?: string | null
-  noteType?: string | null
-  label?: string
-}) {
+function noteMetaParts(
+  note: {
+    authorName?: string
+    createdAt?: string
+    updatedAt?: string
+    stageCode?: string | null
+    noteType?: string | null
+    label?: string
+  },
+  stageOptions?: Array<{ code: string; label: string }>,
+) {
   const parts: string[] = []
   if (note.label) parts.push(note.label)
   const typeLabel = crmNoteTypeLabel(note.noteType)
   if (typeLabel) parts.push(typeLabel)
-  if (note.stageCode) parts.push(`Stage: ${note.stageCode}`)
+  if (note.stageCode) {
+    const stageLabel =
+      stageOptions?.find((s) => s.code === note.stageCode)?.label ?? note.stageCode.replace(/_/g, ' ')
+    parts.push(`Stage: ${stageLabel}`)
+  }
   parts.push(note.authorName || 'User')
   if (note.createdAt) parts.push(formatDateTime(note.createdAt))
   if (note.updatedAt && note.createdAt && note.updatedAt !== note.createdAt) parts.push('(edited)')
   return parts.join(' · ')
 }
 
-function DemoNotesList({ notes }: { notes: DemoEntityNote[] }) {
+function DemoNotesList({
+  notes,
+  stageOptions,
+}: {
+  notes: DemoEntityNote[]
+  stageOptions?: Array<{ code: string; label: string }>
+}) {
   if (notes.length === 0) {
     return <p className="text-[13px] text-erp-muted">No notes yet.</p>
   }
@@ -51,7 +64,7 @@ function DemoNotesList({ notes }: { notes: DemoEntityNote[] }) {
     <ul className="ent-360-notes space-y-3">
       {notes.map((note, index) => (
         <li key={`${note.label ?? 'note'}-${index}`} className="ent-360-notes__item">
-          <p className="ent-360-notes__meta">{noteMetaParts(note)}</p>
+          <p className="ent-360-notes__meta">{noteMetaParts(note, stageOptions)}</p>
           <p className="ent-360-notes__body whitespace-pre-wrap">{note.content}</p>
         </li>
       ))}
@@ -86,7 +99,7 @@ export function EntityNotesPanel({
           <MessageSquare className="h-4 w-4 text-erp-muted" />
           <h3 className="text-[14px] font-semibold text-erp-text">{title}</h3>
         </div>
-        <DemoNotesList notes={demoNotes} />
+        <DemoNotesList notes={demoNotes} stageOptions={stageOptions} />
       </section>
     )
   }
@@ -134,7 +147,7 @@ export function EntityNotesPanel({
                 />
               ) : (
                 <>
-                  <p className="ent-360-notes__meta">{noteMetaParts(note)}</p>
+                  <p className="ent-360-notes__meta">{noteMetaParts(note, stageOptions)}</p>
                   <p className="ent-360-notes__body whitespace-pre-wrap">{note.content}</p>
                   {canUpdate || canDelete ? (
                     <div className="mt-2 flex gap-2">

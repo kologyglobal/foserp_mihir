@@ -62,6 +62,15 @@ export function useActiveProducts() {
   return useMemo(() => products.filter((p) => p.isActive), [products])
 }
 
+/** Released + active products only — for CRM / quotation / sales order pickers. */
+export function useSellableProducts() {
+  const products = useMasterStore((s) => s.products)
+  return useMemo(
+    () => products.filter((p) => p.isActive && p.status === 'released'),
+    [products],
+  )
+}
+
 /** Active vendors for purchase forms. */
 export function useActiveVendors() {
   const vendors = useMasterStore((s) => s.vendors)

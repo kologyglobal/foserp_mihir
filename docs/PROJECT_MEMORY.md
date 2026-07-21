@@ -1,6 +1,6 @@
 # FOS ERP — Project Memory
 
-> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-20** (PR line PO track: id + number snapshot + CONVERTED on Planning/RFQ→PO; UI PO No. read-only; GRN still next).
+> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-20** (PR line PO track: id + number snapshot + CONVERTED on Planning/RFQ→PO; UI PO No. read-only; GRN still next; finance Phase 3C5 credit-note allocation backend verified 2026-07-18).
 
 ---
 
@@ -14,8 +14,8 @@
 | **Architecture** | React SPA + Node.js/Express API + MySQL 8 |
 | **Tenancy** | Multi-tenant SaaS — shared database, shared schema |
 | **Tenant scope** | Every tenant-owned record scoped by `tenantId` |
-| **Current backend scope** | Auth, RBAC, CRM, masters; finance Phase 1–3B3 as before; **Purchase** PR + Planning (+ create-po) + RFQ/VQ/comparison/award→draft PO; Phase 14–16 (validation, tests, final QA); FE dual-mode for that slice only |
-| **Deferred backend** | Finance **Phase 3B4+**; purchase full PO lifecycle/GRN; inventory/production; SO MRP/dispatch/invoice beyond CRM Phase 1 |
+| **Current backend scope** | Auth, RBAC, CRM, masters; finance Phase 1 setup; Phase 2A ledger foundation; Phase 2B internal posting engine; Phase 2C1 manual journal drafts; Phase 2C2A approvals; Phase 2C2B post approved journals to GL; Phase 3A1–3A6 AR sales invoice + Money In FE; Phase 3B1–3B5 customer receipt/allocation; Phase 3C1–3C4 customer credit-note foundation through atomic posting; **Phase 3C5 credit-note allocation (subledger-only, applies posted CN credit to invoice DEBIT open items, unified with receipt allocation read APIs)**; **Purchase** PR + Planning (+ create-po) + RFQ/VQ/comparison/award→draft PO; Phase 14–16 (validation, tests, final QA); FE dual-mode for that slice only |
+| **Deferred backend** | Finance **Phase 3B6** receipt workspace UI; **Phase 3C6** credit-note frontend; receipt/allocation/credit-note reversal; **Phase 2C3** journal reversal; purchase full PO lifecycle/GRN; inventory/production; SO MRP/dispatch/invoice beyond CRM Phase 1 |
 
 ---
 

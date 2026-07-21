@@ -35,12 +35,12 @@ export function computeCompanyCompleteness(input: CompanySmartOverviewInput): nu
 export function buildCompanySmartSignals(input: CompanySmartOverviewInput): CrmSmartSignal[] {
   const missing: CrmSmartSignal[] = []
 
-  if (!input.customerName.trim()) missing.push({ id: 'name', label: 'Company name missing', tone: 'warn' })
+  if (!input.customerName.trim()) missing.push({ id: 'name', label: 'Add company name', tone: 'warn' })
   if (!input.hasBillingAddress || !input.city.trim() || !input.state.trim()) {
-    missing.push({ id: 'address', label: 'Billing address incomplete', tone: 'warn' })
+    missing.push({ id: 'address', label: 'Complete billing address', tone: 'warn' })
   }
-  if (!input.gstin.trim()) missing.push({ id: 'gstin', label: 'GSTIN pending', tone: 'warn' })
-  if (!input.salesTerritory.trim()) missing.push({ id: 'territory', label: 'Territory not set', tone: 'warn' })
+  if (!input.gstin.trim()) missing.push({ id: 'gstin', label: 'Add GSTIN when available', tone: 'warn' })
+  if (!input.salesTerritory.trim()) missing.push({ id: 'territory', label: 'Set sales territory', tone: 'warn' })
 
   return missing.slice(0, 3)
 }
@@ -52,6 +52,8 @@ export function resolveCompanyNextBestAction(input: CompanySmartOverviewInput): 
       title: 'Enter Company Name',
       description: 'Required before this company can be used in CRM and transactions.',
       ctaLabel: 'Enter Company Name',
+      focusField: 'customerName',
+      sectionId: 'quick',
     }
   }
   if (!input.hasBillingAddress || !input.city.trim() || !input.state.trim()) {
@@ -60,6 +62,8 @@ export function resolveCompanyNextBestAction(input: CompanySmartOverviewInput): 
       title: 'Complete Billing Address',
       description: 'City, state, and address are needed for tax and logistics.',
       ctaLabel: 'Complete Billing Address',
+      focusField: 'addressLine1',
+      sectionId: 'billing',
     }
   }
   if (!input.gstin.trim()) {
@@ -68,6 +72,8 @@ export function resolveCompanyNextBestAction(input: CompanySmartOverviewInput): 
       title: 'Add GSTIN',
       description: 'Capture GSTIN for compliant quotations and invoices.',
       ctaLabel: 'Add GSTIN',
+      focusField: 'gstin',
+      sectionId: 'tax',
     }
   }
   if (!input.salesTerritory.trim()) {
@@ -76,6 +82,8 @@ export function resolveCompanyNextBestAction(input: CompanySmartOverviewInput): 
       title: 'Set Territory',
       description: 'Assign a sales territory for ownership and reporting.',
       ctaLabel: 'Set Territory',
+      focusField: 'salesTerritory',
+      sectionId: 'quick',
     }
   }
   return {

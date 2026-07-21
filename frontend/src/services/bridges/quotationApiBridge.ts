@@ -103,10 +103,11 @@ export async function syncQuotationsFromApi(): Promise<{
   quotationDocuments: QuotationDocument[]
 }> {
   const quotations = await crmApi.fetchAllCrmPages<quotationApi.QuotationApiDto>('/crm/quotations')
-  return {
-    quotationHeaders: quotations.map(quotationHeaderFromApi),
-    quotationDocuments: quotations.flatMap((q) => q.documents ?? []),
-  }
+  const quotationHeaders = quotations.map(quotationHeaderFromApi)
+  const quotationDocuments = quotations.flatMap((q) => q.documents ?? [])
+  useSalesStore.setState({ quotations: quotationHeaders })
+  useCrmStore.setState({ quotationDocuments })
+  return { quotationHeaders, quotationDocuments }
 }
 
 export async function apiCreateQuotation(input: Record<string, unknown>): Promise<StoreActionResult & { quotationId?: string; documentId?: string }> {
@@ -217,6 +218,38 @@ export async function apiMarkQuotationDocumentSent(quotationId: string, document
   return withSubmitLock(lockKey('quotation:sent', documentId), async () => {
     try {
       const res = await quotationApi.markQuotationDocumentSentApi(quotationId, documentId)
+      applyQuotationApiResponse(res.data)
+      return { ok: true }
+    } catch (err) {
+      return fail(err)
+    }
+  })
+}
+
+export async function apiCustomerApproveQuotationDocument(
+  quotationId: string,
+  documentId: string,
+  remarks?: string,
+): Promise<StoreActionResult> {
+  return withSubmitLock(lockKey('quotation:customer-approve', documentId), async () => {
+    try {
+      const res = await quotationApi.customerApproveQuotationDocumentApi(quotationId, documentId, { remarks })
+      applyQuotationApiResponse(res.data)
+      return { ok: true }
+    } catch (err) {
+      return fail(err)
+    }
+  })
+}
+
+export async function apiCustomerRejectQuotationDocument(
+  quotationId: string,
+  documentId: string,
+  remarks?: string,
+): Promise<StoreActionResult> {
+  return withSubmitLock(lockKey('quotation:customer-reject', documentId), async () => {
+    try {
+      const res = await quotationApi.customerRejectQuotationDocumentApi(quotationId, documentId, { remarks })
       applyQuotationApiResponse(res.data)
       return { ok: true }
     } catch (err) {

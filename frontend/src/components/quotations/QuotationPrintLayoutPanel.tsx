@@ -62,6 +62,16 @@ export function QuotationPrintLayoutPanel({ layout, onChange }: QuotationPrintLa
             <option value="cover">Cover — large title block</option>
           </Select>
         </label>
+        <label className="quo-layout-panel__field">
+          <span>Print skin</span>
+          <Select
+            value={layout.printSkin ?? 'default'}
+            onChange={(e) => patch({ printSkin: e.target.value as QuotationPrintLayout['printSkin'] })}
+          >
+            <option value="default">Default — ERP branded</option>
+            <option value="vf_word">VF Word — letter-style (ISO templates)</option>
+          </Select>
+        </label>
       </div>
 
       <fieldset className="quo-layout-panel__checks">

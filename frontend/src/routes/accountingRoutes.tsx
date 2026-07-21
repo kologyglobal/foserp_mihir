@@ -18,6 +18,7 @@ import { AccountLedgerPage } from '@/modules/accounting/AccountLedgerPage'
 import { VoucherLedgerPage } from '@/modules/accounting/VoucherLedgerPage'
 import { PartyLedgerPage } from '@/modules/accounting/PartyLedgerPage'
 import { LedgerEntryDetailPage } from '@/modules/accounting/LedgerEntryDetailPage'
+import { ReceivablesDashboardPage } from '@/modules/accounting/ReceivablesDashboardPage'
 import { CustomerOutstandingPage } from '@/modules/accounting/CustomerOutstandingPage'
 import { ReceivableInvoicesPage } from '@/modules/accounting/ReceivableInvoicesPage'
 import { ReceivablesAgeingPage } from '@/modules/accounting/ReceivablesAgeingPage'
@@ -212,6 +213,11 @@ import {
 } from '@/modules/accounting/journals'
 import {
   AgeingPage as MoneyInAgeingPage,
+  CreditNoteAllocatePage as MoneyInCreditNoteAllocatePage,
+  CreditNoteDetailPage as MoneyInCreditNoteDetailPage,
+  CreditNoteEditPage as MoneyInCreditNoteEditPage,
+  CreditNoteListPage as MoneyInCreditNoteListPage,
+  CreditNoteNewPage as MoneyInCreditNoteNewPage,
   CustomerDetailPage as MoneyInCustomerDetailPage,
   CustomerListPage as MoneyInCustomerListPage,
   InvoiceDetailPage as MoneyInInvoiceDetailPage,
@@ -254,13 +260,19 @@ export const accountingRouteChildren: RouteObject[] = [
   { path: 'accounting/money-in/invoices/new', element: <MoneyInInvoiceNewPage /> },
   { path: 'accounting/money-in/invoices/:id', element: <MoneyInInvoiceDetailPage /> },
   { path: 'accounting/money-in/invoices/:id/edit', element: <MoneyInInvoiceEditPage /> },
+  /** Credit notes — Phase 3C6 AR frontend (API + demo dual-mode) */
+  { path: 'accounting/money-in/credit-notes', element: <MoneyInCreditNoteListPage /> },
+  { path: 'accounting/money-in/credit-notes/new', element: <MoneyInCreditNoteNewPage /> },
+  { path: 'accounting/money-in/credit-notes/:id', element: <MoneyInCreditNoteDetailPage /> },
+  { path: 'accounting/money-in/credit-notes/:id/edit', element: <MoneyInCreditNoteEditPage /> },
+  { path: 'accounting/money-in/credit-notes/:id/allocate', element: <MoneyInCreditNoteAllocatePage /> },
   { path: 'accounting/money-in/outstanding', element: <MoneyInOutstandingPage /> },
   { path: 'accounting/money-in/customers', element: <MoneyInCustomerListPage /> },
   { path: 'accounting/money-in/customers/:customerId', element: <MoneyInCustomerDetailPage /> },
   { path: 'accounting/money-in/ageing', element: <MoneyInAgeingPage /> },
   { path: 'accounting/money-in/reconciliation', element: <MoneyInReconciliationPage /> },
 
-  { path: 'accounting/receivables', element: <Navigate to="/accounting/money-in" replace /> },
+  { path: 'accounting/receivables', element: <ReceivablesDashboardPage /> },
   { path: 'accounting/commercial-commitments', element: <CommercialCommitmentsPage /> },
   { path: 'accounting/receivables/customers', element: <CustomerOutstandingPage /> },
   { path: 'accounting/receivables/outstanding', element: <CustomerOutstandingPage /> },

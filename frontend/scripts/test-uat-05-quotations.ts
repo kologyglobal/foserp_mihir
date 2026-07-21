@@ -160,7 +160,7 @@ let quotationId: string | undefined
 let documentId: string | undefined
 
 if (oppResult.ok && oppResult.opportunityId) {
-  const q = useCrmStore.getState().createQuotationFromOpportunity(oppResult.opportunityId, 'qtpl-standard-trailer', 2_100_000)
+  const q = useCrmStore.getState().createQuotationFromOpportunity(oppResult.opportunityId, 'qtpl-iso-tank', 2_100_000)
   quotationId = q.quotationId
   documentId = q.documentId
   check('UAT-05.19', 'Create quotation', 'Quotation created from opportunity', q.ok, quotationId)
@@ -225,7 +225,7 @@ const highOpp = useCrmStore.getState().createOpportunity({
 })
 
 if (highOpp.ok && highOpp.opportunityId) {
-  const hq = useCrmStore.getState().createQuotationFromOpportunity(highOpp.opportunityId, 'qtpl-standard-trailer', 6_000_000)
+  const hq = useCrmStore.getState().createQuotationFromOpportunity(highOpp.opportunityId, 'qtpl-iso-tank', 6_000_000)
   highDocId = hq.documentId
   if (highDocId) {
     useCrmStore.getState().submitQuotationDocumentForApproval(highDocId)

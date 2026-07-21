@@ -1,15 +1,26 @@
 import type {
   AgeingReportDto,
+  CreateCustomerCreditNoteInput,
   CreateSalesInvoiceInput,
+  CreditNoteAllocationHistoryRow,
+  CreditNoteAllocationPreview,
+  CreditNoteAllocationRequest,
+  CreditNoteAllocationResult,
+  CreditNoteValidationPreview,
+  CustomerCreditNoteDto,
+  CustomerCreditNoteListItemDto,
   CustomerReceivableDetailDto,
+  ListCustomerCreditNotesQuery,
   ListSalesInvoicesQuery,
   OutstandingOpenItemDto,
   PaginatedResult,
+  PostCreditNoteResult,
   PostSalesInvoiceResult,
   ReceivableOverviewDto,
   ReceivableReconciliationDto,
   SalesInvoiceDto,
   SalesInvoiceValidationPreview,
+  UpdateCustomerCreditNoteInput,
   UpdateSalesInvoiceInput,
 } from '../../types/moneyIn'
 import { apiRequest, tenantPath } from './client'
@@ -67,6 +78,95 @@ export async function cancelSalesInvoice(id: string, cancellationReason: string)
 
 export async function postSalesInvoice(id: string) {
   return apiRequest<PostSalesInvoiceResult>(tenantPath(`${BASE}/invoices/${id}/post`), { method: 'POST', body: '{}' })
+}
+
+// ─── Credit notes ───────────────────────────────────────────────────────────
+
+export async function listCustomerCreditNotes(params: ListCustomerCreditNotesQuery) {
+  return apiRequest<CustomerCreditNoteListItemDto[]>(
+    `${tenantPath(`${BASE}/credit-notes`)}${buildQuery(params as unknown as Record<string, string | number | boolean | undefined>)}`,
+  )
+}
+
+export async function getCustomerCreditNote(id: string) {
+  return apiRequest<CustomerCreditNoteDto>(tenantPath(`${BASE}/credit-notes/${id}`))
+}
+
+export async function createCustomerCreditNote(data: CreateCustomerCreditNoteInput) {
+  return apiRequest<CustomerCreditNoteDto>(tenantPath(`${BASE}/credit-notes`), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateCustomerCreditNote(id: string, data: UpdateCustomerCreditNoteInput) {
+  return apiRequest<CustomerCreditNoteDto>(tenantPath(`${BASE}/credit-notes/${id}`), {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function validateCustomerCreditNote(id: string) {
+  return apiRequest<CreditNoteValidationPreview>(tenantPath(`${BASE}/credit-notes/${id}/validate`), { method: 'POST' })
+}
+
+export async function submitCustomerCreditNote(id: string, comments?: string) {
+  return apiRequest<CustomerCreditNoteDto>(tenantPath(`${BASE}/credit-notes/${id}/submit`), {
+    method: 'POST',
+    body: JSON.stringify({ comments }),
+  })
+}
+
+export async function approveCustomerCreditNote(id: string, comments?: string) {
+  return apiRequest<CustomerCreditNoteDto>(tenantPath(`${BASE}/credit-notes/${id}/approve`), {
+    method: 'POST',
+    body: JSON.stringify({ comments }),
+  })
+}
+
+export async function rejectCustomerCreditNote(id: string, comments?: string) {
+  return apiRequest<CustomerCreditNoteDto>(tenantPath(`${BASE}/credit-notes/${id}/reject`), {
+    method: 'POST',
+    body: JSON.stringify({ comments }),
+  })
+}
+
+export async function markCustomerCreditNoteReady(id: string) {
+  return apiRequest<CustomerCreditNoteDto>(tenantPath(`${BASE}/credit-notes/${id}/mark-ready`), { method: 'POST' })
+}
+
+export async function cancelCustomerCreditNote(id: string, cancellationReason: string) {
+  return apiRequest<CustomerCreditNoteDto>(tenantPath(`${BASE}/credit-notes/${id}/cancel`), {
+    method: 'POST',
+    body: JSON.stringify({ cancellationReason }),
+  })
+}
+
+export async function postCustomerCreditNote(id: string) {
+  return apiRequest<PostCreditNoteResult>(tenantPath(`${BASE}/credit-notes/${id}/post`), { method: 'POST', body: '{}' })
+}
+
+// ─── Credit note allocations ───────────────────────────────────────────────
+
+export async function previewCreditNoteAllocation(creditNoteId: string, body: CreditNoteAllocationRequest) {
+  return apiRequest<CreditNoteAllocationPreview>(
+    tenantPath(`${BASE}/credit-notes/${creditNoteId}/allocations/preview`),
+    { method: 'POST', body: JSON.stringify(body) },
+  )
+}
+
+export async function allocateCreditNote(creditNoteId: string, body: CreditNoteAllocationRequest, idempotencyKey: string) {
+  return apiRequest<CreditNoteAllocationResult>(tenantPath(`${BASE}/credit-notes/${creditNoteId}/allocations`), {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { 'Idempotency-Key': idempotencyKey },
+  })
+}
+
+export async function listCreditNoteAllocations(creditNoteId: string, params?: Record<string, string | number | boolean | undefined>) {
+  return apiRequest<CreditNoteAllocationHistoryRow[]>(
+    `${tenantPath(`${BASE}/credit-notes/${creditNoteId}/allocations`)}${buildQuery(params)}`,
+  )
 }
 
 // ─── Reporting ──────────────────────────────────────────────────────────────

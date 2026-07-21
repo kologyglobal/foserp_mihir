@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import type { ColumnDef, RowSelectionState } from '@tanstack/react-table'
-import { Copy, Eye, FileText, Pencil, Printer, Send, Trash2, Calendar } from 'lucide-react'
+import { Copy, Eye, FileText, GitBranch, Pencil, Printer, Send, Trash2, Calendar, CheckCircle2, ThumbsUp, XCircle } from 'lucide-react'
 import { ErpDataGrid } from '../erp/ErpDataGrid'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
 import { formatDate } from '../../utils/dates/format'
 import { quotationStatusLabel } from './QuotationCrmCard'
 import type { QuotationListItem } from './QuotationCrmCard'
+import { quotationRevisionLabel } from './Quotation360Sections'
 import {
   EnterpriseIdCell,
   EnterpriseNumericCell,
@@ -20,17 +21,31 @@ import { CrmListFilterBar, type CrmListFilterBarProps } from '@/components/crm/C
 import { cn } from '../../utils/cn'
 import { StatusBadge } from '../../design-system/list-page'
 import { resolveCreateSalesOrderGateForQuotationDocument } from '../../utils/opportunitySalesOrderDraft'
+import { isQuotationDeletableStatus } from '../../utils/quotationDeletePolicy'
+import { resolveQuotationRevisionPolicy } from '../../utils/quotationRevisionPolicy'
+
+function listStatusLabel(item: QuotationListItem): string {
+  if (item.document.status === 'sent' && item.customerApproval === 'approved') {
+    return 'Customer Approved'
+  }
+  return quotationStatusLabel(item.document.status)
+}
 
 export interface CrmQuotationsTableProps {
   rows: QuotationListItem[]
   onView: (item: QuotationListItem) => void
   onEdit: (item: QuotationListItem) => void
   onDuplicate?: (item: QuotationListItem) => void
+  onRevise?: (item: QuotationListItem) => void
   onPreview?: (item: QuotationListItem) => void
   onScheduleActivity?: (item: QuotationListItem) => void
   onCreateSalesOrder?: (item: QuotationListItem) => void
   onPrint?: (item: QuotationListItem) => void
   onSubmitApproval?: (item: QuotationListItem) => void
+  onApprove?: (item: QuotationListItem) => void
+  onReject?: (item: QuotationListItem) => void
+  onMarkSent?: (item: QuotationListItem) => void
+  onCustomerApprove?: (item: QuotationListItem) => void
   onBulkAssign?: (rows: QuotationListItem[]) => void
   onBulkExport?: (rows: QuotationListItem[]) => void
   onBulkDelete?: (rows: QuotationListItem[]) => void
@@ -55,11 +70,16 @@ export function CrmQuotationsTable({
   onView,
   onEdit,
   onDuplicate,
+  onRevise,
   onPreview,
   onScheduleActivity,
   onCreateSalesOrder,
   onPrint,
   onSubmitApproval,
+  onApprove,
+  onReject,
+  onMarkSent,
+  onCustomerApprove,
   onBulkAssign,
   onBulkExport,
   onBulkDelete,
@@ -86,6 +106,14 @@ export function CrmQuotationsTable({
     return rows.filter((r) => ids.includes(r.document.id))
   }, [rowSelection, rows])
 
+  const selectedDraftRows = useMemo(
+    () => selectedRows.filter((r) => isQuotationDeletableStatus(r.document.status)),
+    [selectedRows],
+  )
+  const canBulkDeleteDrafts = Boolean(
+    canDelete && onBulkDelete && selectedRows.length > 0 && selectedDraftRows.length === selectedRows.length,
+  )
+
   const columns: ColumnDef<QuotationListItem>[] = useMemo(
     () => [
       {
@@ -96,6 +124,10 @@ export function CrmQuotationsTable({
         cell: ({ row }) => (
           <button type="button" className="text-left" onClick={(e) => { e.stopPropagation(); onView(row.original) }}>
             <EnterpriseIdCell id={row.original.quotationNo} />
+            <p className="mt-0.5 text-[11px] font-medium text-erp-muted">
+              {quotationRevisionLabel(row.original.document.revisionNo)}
+              {row.original.revisionCount > 1 ? ` · ${row.original.revisionCount} versions` : null}
+            </p>
             {row.original.opportunityName ? (
               <p className="mt-0.5 max-w-[200px] truncate text-[12px] text-erp-muted">{row.original.opportunityName}</p>
             ) : null}
@@ -139,11 +171,15 @@ export function CrmQuotationsTable({
       {
         id: 'status',
         header: 'Status',
-        accessorFn: (r) => r.document.status,
+        accessorFn: listStatusLabel,
         cell: ({ row }) => (
           <StatusBadge
-            label={quotationStatusLabel(row.original.document.status)}
-            status={row.original.document.status}
+            label={listStatusLabel(row.original)}
+            status={
+              row.original.document.status === 'sent' && row.original.customerApproval === 'approved'
+                ? 'approved'
+                : row.original.document.status
+            }
           />
         ),
       },
@@ -166,6 +202,19 @@ export function CrmQuotationsTable({
           const soGate = resolveCreateSalesOrderGateForQuotationDocument(d.id)
           const soAlreadyExists = Boolean(soGate.salesOrderId)
           const canCreateSo = Boolean(onCreateSalesOrder) && (soAlreadyExists || soGate.enabled)
+          const canRevise = Boolean(onRevise)
+            && resolveQuotationRevisionPolicy({
+              status: d.status,
+              customerApproval: item.customerApproval ?? 'pending',
+              isLatest: true,
+            }).canCreateRevision
+            && !soAlreadyExists
+          const canSubmit = Boolean(onSubmitApproval) && (d.status === 'draft' || d.status === 'rejected')
+          const canApproveRow = Boolean(onApprove) && d.status === 'pending_approval'
+          const canRejectRow = Boolean(onReject) && d.status === 'pending_approval'
+          const canSend = Boolean(onMarkSent) && d.status === 'approved'
+          const canCustomerApproveRow =
+            Boolean(onCustomerApprove) && d.status === 'sent' && item.customerApproval === 'pending'
           return (
             <div onClick={(e) => e.stopPropagation()}>
               <EnterpriseRowActionsMenu
@@ -173,8 +222,65 @@ export function CrmQuotationsTable({
                   { id: 'view', label: 'View', icon: Eye, onClick: () => onView(item) },
                   { id: 'edit', label: 'Edit', icon: Pencil, onClick: () => onEdit(item), disabled: !canEdit },
                   { id: 'duplicate', label: 'Duplicate', icon: Copy, onClick: () => (onDuplicate ? onDuplicate(item) : onEdit(item)), disabled: !canEdit },
-                  { id: 'delete', label: 'Delete', icon: Trash2, onClick: () => onBulkDelete?.([item]), danger: true, disabled: !canDelete },
+                  ...(canDelete && onBulkDelete && isQuotationDeletableStatus(d.status)
+                    ? [{
+                        id: 'delete',
+                        label: 'Delete',
+                        icon: Trash2,
+                        onClick: () => onBulkDelete([item]),
+                        danger: true as const,
+                      }]
+                    : []),
                   { id: 'sep-workflow', separator: true, label: '' },
+                  ...(canSubmit
+                    ? [{
+                        id: 'approval',
+                        label: 'Submit for Internal Approval',
+                        icon: FileText,
+                        onClick: () => onSubmitApproval?.(item),
+                      }]
+                    : []),
+                  ...(canApproveRow
+                    ? [{
+                        id: 'approve',
+                        label: 'Approve',
+                        icon: CheckCircle2,
+                        onClick: () => onApprove?.(item),
+                      }]
+                    : []),
+                  ...(canRejectRow
+                    ? [{
+                        id: 'reject',
+                        label: 'Reject',
+                        icon: XCircle,
+                        onClick: () => onReject?.(item),
+                        danger: true as const,
+                      }]
+                    : []),
+                  ...(canSend
+                    ? [{
+                        id: 'send',
+                        label: 'Send to Customer',
+                        icon: Send,
+                        onClick: () => onMarkSent?.(item),
+                      }]
+                    : []),
+                  ...(canCustomerApproveRow
+                    ? [{
+                        id: 'customer-approve',
+                        label: 'Customer Approve',
+                        icon: ThumbsUp,
+                        onClick: () => onCustomerApprove?.(item),
+                      }]
+                    : []),
+                  ...(canRevise
+                    ? [{
+                        id: 'revise',
+                        label: 'Revised Quotation',
+                        icon: GitBranch,
+                        onClick: () => onRevise?.(item),
+                      }]
+                    : []),
                   {
                     id: 'convert',
                     label: soAlreadyExists ? 'View Sales Order' : 'Convert to Sales Order',
@@ -183,13 +289,6 @@ export function CrmQuotationsTable({
                     onClick: () => onCreateSalesOrder?.(item),
                     disabled: !canCreateSo,
                     disabledReason: soAlreadyExists ? undefined : (soGate.disabledReason ?? undefined),
-                  },
-                  {
-                    id: 'approval',
-                    label: 'Submit for Approval',
-                    icon: FileText,
-                    onClick: () => onSubmitApproval?.(item),
-                    disabled: !onSubmitApproval || d.status !== 'draft',
                   },
                   {
                     id: 'follow-up',
@@ -211,7 +310,7 @@ export function CrmQuotationsTable({
         },
       },
     ],
-    [onView, onEdit, onDuplicate, onPreview, onScheduleActivity, onCreateSalesOrder, onPrint, onSubmitApproval, onBulkDelete, canEdit, canDelete, enableColumnSorting],
+    [onView, onEdit, onDuplicate, onRevise, onPreview, onScheduleActivity, onCreateSalesOrder, onPrint, onSubmitApproval, onApprove, onReject, onMarkSent, onCustomerApprove, onBulkDelete, canEdit, canDelete, enableColumnSorting],
   )
 
   const emptyMessage = hasActiveFilters ? 'No quotations match current filters.' : 'No quotations found.'
@@ -259,13 +358,13 @@ export function CrmQuotationsTable({
           actions={buildEnterpriseBulkActions(selectedRows, {
             onAssign: onBulkAssign,
             onExport: onBulkExport,
-            onDelete: onBulkDelete,
+            onDelete: canBulkDeleteDrafts ? (rows) => onBulkDelete?.(rows) : undefined,
             onInactive: onBulkInactive,
             onActive: onBulkActive,
             canAssign: canEdit,
-            canDelete,
+            canDelete: canBulkDeleteDrafts,
             canSetStatus: canEdit,
-          })}
+          }).filter((action) => action.id !== 'delete' || canBulkDeleteDrafts)}
         />
       }
     />

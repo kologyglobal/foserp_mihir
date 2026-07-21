@@ -6,7 +6,6 @@ import { ErpCardSection } from '../../../components/erp/card-form'
 import type { ErpCardSectionProps } from '../../../components/erp/card-form/ErpCardSection'
 import { ErpStickySaveBar } from '../../../components/erp/card-form/ErpStickySaveBar'
 import { ErpCommandBar } from '../../../components/erp/ErpCommandBar'
-import { FactBoxPaneAiToggle } from '../../../components/erp/card-form/FactBoxPaneAiToggle'
 import type { MasterCatalogGroupId } from '../../../config/mastersSetupCatalog'
 import { getMasterGroupById } from '../../../config/mastersSetupCatalog'
 import {
@@ -239,7 +238,6 @@ export function EnterpriseMasterWorkspace({
         sections={sectionNavItems}
         activeId={activeSection}
         onSelect={onSectionSelect}
-        trailing={<FactBoxPaneAiToggle />}
       />
       <EnterpriseFormMetrics metrics={formMetrics} />
       {children}
@@ -350,7 +348,6 @@ export function EnterpriseMasterDetailWorkspace({
         sections={sections}
         activeId={activeSection}
         onSelect={onSectionSelect ?? (() => undefined)}
-        trailing={<FactBoxPaneAiToggle />}
       />
       {formMetrics.length > 0 ? <EnterpriseFormMetrics metrics={formMetrics} /> : null}
       {children}

@@ -95,6 +95,9 @@ export function CrmSalesForecastPage() {
           ? 'Weighted pipeline by close month, owner, and stage (server forecast)'
           : 'Weighted pipeline by close month, owner, and stage'
       }
+      favoritePath="/crm/forecast"
+      badge="CRM"
+      variant="dynamics"
       autoBreadcrumbs={false}
       breadcrumbs={crmModuleBreadcrumbs('Sales Forecast', '/crm/forecast')}
       kpiStrip={forecastKpiStrip}

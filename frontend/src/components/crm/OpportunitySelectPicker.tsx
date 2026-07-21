@@ -171,26 +171,24 @@ export function OpportunitySelectPicker({
 
   return (
     <div ref={wrapRef} className="crm-opp-picker">
-      <label className="block text-sm">
-        <span className="font-medium text-erp-text">Opportunity</span>
-        <div ref={anchorRef} className="erp-search-field mt-1" onClick={() => openList()}>
-          <Search className="erp-search-field__icon" strokeWidth={2} aria-hidden />
-          <input
-            ref={inputRef}
-            type="search"
-            className="erp-input erp-search-field__input w-full"
-            value={displayValue}
-            disabled={disabled}
-            placeholder="Search by deal no, name, customer, product, owner, or stage…"
-            onChange={(e) => handleFilterChange(e.target.value)}
-            onFocus={() => {
-              if (disabled) return
-              if (!open) openList()
-            }}
-            autoComplete="off"
-          />
-        </div>
-      </label>
+      <div ref={anchorRef} className="erp-search-field" onClick={() => openList()}>
+        <Search className="erp-search-field__icon" strokeWidth={2} aria-hidden />
+        <input
+          ref={inputRef}
+          type="search"
+          className="erp-input erp-search-field__input w-full"
+          value={displayValue}
+          disabled={disabled}
+          placeholder="Search by deal no, name, customer, product, owner, or stage…"
+          aria-label="Opportunity"
+          onChange={(e) => handleFilterChange(e.target.value)}
+          onFocus={() => {
+            if (disabled) return
+            if (!open) openList()
+          }}
+          autoComplete="off"
+        />
+      </div>
 
       {open && !disabled
         ? createPortal(

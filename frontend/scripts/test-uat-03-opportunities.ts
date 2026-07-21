@@ -186,6 +186,9 @@ const leadCreated = sales.createLead({
   lifecycleStatus: 'open',
   stage: 'new',
   productRequirement: 'Tipper trailer',
+  remarks: 'Test notes',
+  contactPerson: 'Test Contact',
+  mobile: '9876543210',
   source: 'referral',
   industry: 'Mining',
 })
@@ -232,7 +235,7 @@ check('UAT-03.16', 'Create from lead', 'Second conversion rejected', !repeatFrom
 
 // ─── UAT-03.3 Customer / company / contact linkage ───────────────────────────
 
-check('UAT-03.17', 'Customer linkage', 'Form requires Company', newPage.includes('Company is required') || validateOpportunityLines(validLines(), { ownerId: 'user-rajesh', stage: 'new_lead', probability: 30 }).errors.some((e) => e.includes('Company')))
+check('UAT-03.17', 'Customer linkage', 'Form requires Customer', newPage.includes('Customer is required') || validateOpportunityLines(validLines(), { ownerId: 'user-rajesh', stage: 'new_lead', probability: 30 }).errors.some((e) => /customer|company/i.test(e)))
 check('UAT-03.18', 'Customer linkage', 'New page customer select', newPage.includes('customerId') && newPage.includes('customers'))
 check('UAT-03.19', 'Customer linkage', 'Edit page shows linked customer', editPage.includes('customer?.customerName'))
 check('UAT-03.20', 'Customer linkage', 'Contact filtered by customer', newPage.includes('customerContacts') || editPage.includes('customerContacts'))

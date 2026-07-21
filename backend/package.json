@@ -21,6 +21,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:purchase-demo": "tsx scripts/seed-purchase-demo-data.ts",
+    "db:sync-permissions": "tsx scripts/sync-permissions.ts",
     "db:setup": "npm run db:generate && tsx scripts/prisma-cli.ts migrate deploy && npm run db:seed",
     "db:studio": "tsx scripts/prisma-cli.ts studio"
   },

@@ -15,6 +15,7 @@ import {
   validateFollowUpAt,
 } from '../../utils/validation/crmDatePolicy'
 import { handleInvalidSubmit } from '../../utils/formValidation'
+import { notify } from '../../store/toastStore'
 import { CrmDrawerShell } from './CrmDrawerShell'
 import { FormField } from '../forms/FormField'
 import { Input, Select, Textarea } from '../forms/Inputs'
@@ -184,9 +185,12 @@ export function QuickFollowUpDrawer({ open, onClose, context, onCreated, followU
             notes,
           }))
           if (!result.ok) {
-            setError(result.error ?? formatApiError('Failed to update follow-up'))
+            const msg = result.error ?? formatApiError('Failed to update follow-up')
+            setError(msg)
+            notify.error(msg)
             return
           }
+          notify.success('Follow-up updated')
           onClose()
           return
         }
@@ -206,10 +210,13 @@ export function QuickFollowUpDrawer({ open, onClose, context, onCreated, followU
           reminder: true,
         }))
         if (!result.ok) {
-          setError(result.error ?? formatApiError('Failed to schedule follow-up'))
+          const msg = result.error ?? formatApiError('Failed to schedule follow-up')
+          setError(msg)
+          notify.error(msg)
           return
         }
         if (result.followUpId) {
+          notify.success('Follow-up scheduled')
           setLastFollowUpId(result.followUpId)
           onCreated?.()
           if (!outcomeMode) onClose()

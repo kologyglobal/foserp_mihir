@@ -498,35 +498,242 @@ cd frontend && npm run test:purchase-phase15-all
 
 ---
 
+## 2026-07-21 - Quotation template catalog trimmed to the two VF ISO products
+
+### Context
+
+- User supplied the two real VF quotation docs (VF/QUO/26-27/76 → 26 KL ISO Tank Container; VF/QUO/26-27/109 → 20' ISO Dry Bulk Tanker 25 CBM). Frontend `DEFAULT_QUOTATION_TEMPLATES` and `prisma/quotationTemplateSeedData.ts` already contain exactly these two — but the DB still carried 9 legacy trailer templates (Standard/45M3 Bulker/Sidewall/Flatbed/Lowbed/Tipper/Job Work/Spare Parts/Custom) from the old seed.
+
+### Shipped
+
+- **New** `backend/scripts/cleanup-quotation-templates.ts` — per-tenant, idempotent: soft-deletes (deletedAt + isActive=0) every template whose code is not `ISO-TANK-26KL` / `ISO-DRY-BULK-25CBM`, then upserts/restores the two keep rows from `quotationTemplateSeedData`. `--dry-run` reports only; `--emit-sql` writes `scripts/quotation-template-cleanup.sql` (phpMyAdmin-ready, backslash + quote escaped JSON) for the live DB without SSH.
+- **Applied on local DB:** 9 legacy templates soft-deleted; ISO-DRY-BULK-25CBM created (was missing). Verified list repo filters `tenantActiveFilter` → only the two ISO templates are served. Quotations referencing old templates are untouched (soft delete, catalog-only).
+- Frontend demo mode already correct: `RETIRED_BUILTIN_QUOTATION_TEMPLATE_IDS` drops the same 9 on merge.
+
+### Live fix (no terminal): run `backend/scripts/quotation-template-cleanup.sql` in phpMyAdmin, then hard-refresh the templates page.
+
+---
+
+## 2026-07-21 - Canonical CrmStageNotes component (replaces 3 duplicated notes cards)
+
+### Shipped
+
+- **New** `frontend/src/components/crm/shared/CrmStageNotes.tsx` — single canonical stage-stamped Notes card for CRM 360 pages. Props: `entityType`/`entityId` (useEntityNotes), `sectionId` (preserves `lead-section-notes` / `opp-section-notes` / `quo-section-notes` jump anchors), `stageOptions`, `currentStage`, `historyLabel`, plus the shared demo/composer/onNotesChange contract. Reuses existing `lead-notes-card` CSS — zero visual change vs the correct local design.
+- **New** `frontend/src/utils/crmNoteStageOptions.ts` — `LEAD_NOTE_STAGE_OPTIONS`, `OPPORTUNITY_NOTE_STAGE_OPTIONS`, `QUOTATION_NOTE_STAGE_OPTIONS`, `quotationNoteStageLabel` (moved out of the deleted QuotationNotesCard; Quotation360Page unified-feed import updated).
+- **Deleted** `LeadNotesCard.tsx`, `OpportunityNotesCard.tsx`, `QuotationNotesCard.tsx`; removed the `QuotationNotesCard` barrel export. Rewired `Lead360Workspace`, `Opportunity360Page`, `Quotation360Page` to render `CrmStageNotes`. No other consumers existed (verified by search). Contact/Customer 360 keep `EntityNotesPanel` (no stage workflow).
+- Demo mode preserved: demoNotes list + editPath fallback behave exactly as before.
+
+### Verification
+
+- `typecheck` clean; `npm run build` clean; oxlint clean on changed files.
+- Bundle proof of consolidation: `dist/assets/index-j7v20-mn.js` contains exactly **one** copy of the Notes-card strings ("No notes yet. Add the first note…", `lead-notes-card__composer`) — previously three duplicated components.
+- `npm run test:crm` fails at startup with a **pre-existing** tsx alias error (`Cannot find package '@/utils'` from `permissions/manufacturing.ts`) — verified identical failure with all changes stashed; unrelated to this refactor.
+
+### Live deploy
+
+- Live still serves old `assets/index-DeT-0V6R.js`. Upload the new `frontend/dist/` (index.html + assets) to Hostinger public_html, hard-refresh, and confirm index.html now references `index-j7v20-mn.js`.
+
+---
+
+## 2026-07-21 - Live Convert Quotation → SO blocked: stale permission catalog on live DB
+
+### Diagnosis
+
+- `POST /:id/convert-to-sales-order` (backend `quotation.routes.ts`) requires **both** `crm.quotation.convert` and `crm.sales_order.create` (`requirePermission` is all-of). Frontend gate `canConvertQuotationToSalesOrderPermission()` requires the same pair, so the Convert button/action reports "You do not have permission".
+- Live DB catalog only has the pre-convert-era CRM keys (`crm.quotation.view/create/update/delete/approve`, `crm.sales_order.view`, `crm.lead.convert`) — neither `crm.quotation.convert` nor `crm.sales_order.create/update/delete/confirm` exists there. Same RBAC seed-drift class as the Notes issue below: the live DB was seeded from the old catalog (old deploy bundle gated convert on `crm.quotation.update` only), then the new backend shipped with the expanded catalog but no permission sync was run.
+- Code side is already complete: both keys are in `backend/src/constants/permissions.ts` PERMISSIONS and mapped in ROLE_PERMISSIONS (Tenant Admin/Admin/Administrator, Sales Manager, Sales Executive, CRM Admin). No code changes needed; no RBAC bypass.
+
+### Live fix (idempotent, no code deploy needed if backend is current)
+
+**Option A — server terminal available:** from `backend/`: `npx tsx scripts/sync-permissions.ts --dry-run`, review, then re-run without `--dry-run` (upsert-only; never removes grants or touches users/tenants).
+
+**Option B — no SSH/terminal (phpMyAdmin only):** new generator `backend/scripts/generate-permission-sync-sql.ts` emits `backend/scripts/permission-sync.sql` — a self-contained idempotent script (INSERT IGNORE against `permissions.name` and `role_permissions.roleId+permissionId` unique keys) mirroring the same PERMISSIONS/ROLE_PERMISSIONS source of truth. Import/paste it into phpMyAdmin on the live DB. Validated locally: all 244 statements execute cleanly and re-running is a 0-row no-op. Regenerate after any catalog/role-map change.
+
+Then in both cases:
+1. Users log out / log in (frontend session permissions are issued at login; backend checks read the DB per request and take effect immediately).
+2. Verify: `fos-erp-auth` → `user.permissions` includes both keys; Convert to Sales Order on a Sent + Customer Approved quotation creates an Open SO and marks the opportunity Won.
+3. SQL spot-check: `SELECT name FROM permissions WHERE name IN ('crm.quotation.convert','crm.sales_order.create');` and per-role link counts via `role_permissions` join.
+
+Local DB verified in sync (224/224 catalog; applied 3 pending `crm.note.*` links for Sales Executive from the entry below).
+
+---
+
+## 2026-07-21 - Live Notes still looks old after Hostinger SPA redeploy
+
+### Diagnosis
+
+- Live already serves a SPA that includes the new Notes card (`lead-notes-card` + `crm.note.create` present in `https://erp.dhurandharcrm.com/assets/index-DeT-0V6R.js`). Rebuild succeeded — this is not a “missing frontend upload” problem anymore.
+- In API mode, Add Note only opens the new inline composer when the session has `crm.note.create`. Without it, the UI used to navigate to the record **edit** page (legacy remarks) — which looks like the previous Notes design.
+- `Sales Executive` had no `crm.note.*` grants in `ROLE_PERMISSIONS` (same RBAC seed-drift class as Convert → SO).
+
+### Shipped
+
+- Grant `crm.note.view` / `create` / `update` to Sales Executive.
+- Lead / Opportunity / Quotation Notes cards: missing `crm.note.create` now shows a clear permission toast instead of silently opening the edit form.
+
+### Live fix
+
+1. Deploy these code changes (or at least run permissions sync with updated role map).
+2. On Hostinger app: `npm run db:sync-permissions`
+3. Log out / log in; hard refresh.
+4. Confirm `fos-erp-auth` → `user.permissions` includes `crm.note.create`.
+5. Add Note should open Note type + Stage composer on the 360 page.
+
+---
+
+## 2026-07-18 - Finance Phase 3C5: Atomic Credit Note Allocation
+
+### Shipped (subledger allocation only — no GL / voucher / PostingEvent / number series)
+
+- **Migration** `20260718130000_finance_phase3c5_credit_note_allocations` — 6 allocation totals columns on `customer_credit_notes` (`allocatableAmount`/`allocatedAmount`/`unallocatedAmount` + base) + new `CustomerCreditNoteAllocationBatch` / `CustomerCreditNoteAllocation` tables (own enums `CustomerCreditNoteAllocationStatus` / `CustomerCreditNoteAllocationBatchStatus`; new relation names `CreditNoteCreditOpenItem` / `CreditNoteInvoiceDebitOpenItem` / `CreditNoteCreditAllocationBatch` on `ReceivableOpenItem` — distinct from the 3B5 receipt relations)
+- **Module** `receivables/credit-notes/allocations/` — preview, atomic allocate (idempotent batch), credit-note/invoice history — mirrors `receivables/allocations/` (3B5) exactly, reusing `applyDebitAllocation` / `applyCreditAllocation` from `receivable-open-item.repository.ts`
+- **APIs:**
+  - `POST …/credit-notes/:creditNoteId/allocations/preview` (`finance.ar.allocation.view`)
+  - `POST …/credit-notes/:creditNoteId/allocations` (`finance.ar.allocation.create` + `Idempotency-Key`)
+  - `GET …/credit-notes/:creditNoteId/allocations` / reuses `GET …/invoices/:invoiceId/allocations`
+  - Reused permissions only — no new `credit_note.allocate` permission
+- **Posting hook:** `customer-credit-note-posting.service.ts` now seeds `allocatableAmount = allocatedAmount = 0` / `unallocatedAmount = grandTotal` (+ base) when a CN posts
+- **Repository helper:** `customer-credit-note.repository.ts` — `updateCreditNoteAfterAllocation` (conditional/optimistic, mirrors `updateReceiptAfterAllocation`)
+- **Allowed actions:** `customer-credit-note-allowed-actions.ts` — `allocate` when `POSTED` + `unallocatedAmount > 0` + `finance.ar.allocation.create`; `viewAllocations` when `POSTED` + `finance.ar.allocation.view`; `reverse: false`
+- **Unified read APIs (shared with receipts):**
+  - `listCustomerCredits` — now also returns `CUSTOMER_CREDIT_NOTE` CREDIT open items alongside `CUSTOMER_RECEIPT`; each row carries `sourceType` + (`receiptId`/`receiptNumber`) or (`creditNoteId`/`creditNoteNumber`)
+  - `listAllocationsForInvoice` — merges receipt-sourced and credit-note-sourced allocation rows (sorted by date), each tagged with `sourceType`
+- **Bug fix (uncovered by new reconciliation test):** `receivable-reconciliation.service.ts` `CONTROL_ACCOUNT_MANUAL_POSTING` check was missing `CUSTOMER_CREDIT_NOTE` from the allowed `sourceDocumentType` list, so any tenant with a posted credit note falsely failed reconciliation — fixed by adding it alongside `SALES_INVOICE` / `CUSTOMER_RECEIPT`
+- **Tests:** `finance-ar-credit-note-allocation.test.ts` (new, 11 cases) — full/partial settlement, multi-invoice from one CN, multiple CNs against one invoice, multiple batches on one CN, unallocated CN stays a customer advance, over-allocation/empty/zero rejection, cross-customer rejection, idempotent replay, permission boundary (`credit_note.post` alone insufficient), invoice outstanding unchanged until allocation + reconciliation MATCHED
+
+### Not in scope
+
+- Allocation reversal, credit-note reversal, forex GL, frontend allocation screens (Phase 3C6), inventory return/refund
+
+### Verify
+
+- `npx prisma generate` + `npx tsx scripts/prisma-cli.ts migrate deploy` — pass
+- `npx tsc --noEmit -p tsconfig.json` — pass
+- `npx vitest run tests/finance/finance-ar-credit-note-allocation.test.ts` — **11/11**
+- Regression: `finance-ar-credit-note-posting`, `finance-ar-credit-note-foundation`, `finance-ar-receipt-allocation`, `finance-ar-reporting`, `finance-ar-receipt-drafts` — all pass; `finance-ar-receipt-posting` — 11/12 (one pre-existing Phase 3B4 expectation, documented in the 3C1-3C4 entry below, still asserts posted receipts cannot allocate — unrelated to this phase)
+
+### Next
+
+- **Phase 3C6** — Credit note workspace UI (create/edit/validate/post/allocate/history)
+
+---
+
+## 2026-07-18 - Finance Phase 3C1-3C4: Customer Credit Notes
+
+### Shipped
+
+- Customer credit-note Prisma foundation, MySQL migration, tenant-scoped reasons, invoice-linked adjustment lines, approval state, posting links, and CREDIT open-item relation.
+- Draft create/update/list/detail/validate/mark-ready/cancel plus minimal submit/approve/reject workflow.
+- Proportional invoice GST reversal for full-line, quantity, value, rate, tax-only, and full-invoice adjustment modes with posted-credit over-claim checks.
+- Atomic posting through the central posting engine: CREDIT_NOTE voucher, GL, CUSTOMER_CREDIT_NOTE number, PostingEvent, and CREDIT receivable open item.
+- Invoice debit open item and invoice outstanding remain unchanged. Allocation, inventory return, refunds, reversal, and frontend pages remain deferred.
+
+### Verification
+
+- `npx prisma format` + `npx prisma generate` — pass.
+- `npx tsx scripts/prisma-cli.ts migrate deploy` — migration applied to local MySQL.
+- `npx tsc --noEmit` — pass.
+- Focused credit-note tests — **8/8 pass** (calculation, atomic post, idempotency, unchanged invoice outstanding, over-credit, status, concurrency, permission boundary).
+- Full finance suite — **232/233 pass**; one pre-existing Phase 3B4 expectation still asserts posted receipts cannot allocate, while Phase 3B5 now correctly enables allocation.
+
+---
+
+## 2026-07-18 - Finance Phase 3B5: Atomic Receipt Allocation
+
+### Shipped (subledger allocation only ? no GL / voucher / PostingEvent / number series)
+
+- **Migration** `20260718110000_finance_phase3b5_receipt_allocations` ? `CustomerReceiptAllocationBatch` + `batchId` / invoice outstanding snapshots on `CustomerReceiptAllocation` + `ReceivableOpenItem.settledAt`
+- **Module** `receivables/allocations/` ? preview, atomic allocate (idempotent batch), receipt/invoice history, customer-credits list
+- **APIs:**
+  - `POST ?/receipts/:receiptId/allocations/preview` (`finance.ar.allocation.view`)
+  - `POST ?/receipts/:receiptId/allocations` (`finance.ar.allocation.create` + `Idempotency-Key`)
+  - `GET ?/receipts/:receiptId/allocations` / `GET ?/invoices/:invoiceId/allocations`
+  - `GET ?/customer-credits` (`finance.ar.view`)
+- **Reporting:** AR reconciliation subledger = debit ? credit open base; customer summary adds `debitOutstandingBase` / `creditOutstandingBase` / `netReceivableBase`; outstanding/ageing remain DEBIT-only
+- **Allowed actions:** posted receipt `allocate` when credit outstanding > 0 + create perm; `viewAllocations` on receipt/invoice
+- **Tests:** `finance-ar-receipt-allocation.test.ts` ? **11/11**
+
+### Not in scope
+
+- Allocation reversal, receipt reversal, cross-currency forex posting, frontend allocation screens (Phase 3B6)
+
+### Verify
+
+- `npx vitest run tests/finance/finance-ar-receipt-allocation.test.ts --hookTimeout=120000` ? **11/11**
+- `npx tsc --noEmit` ? **PASS**
+
+### Next
+
+- **Phase 3B6** ? Receipt workspace UI (create/edit/validate/post/allocate/history)
+
+---
+
+## 2026-07-18 - Finance Phase 3B4: Atomic Customer Receipt Posting
+
+### Shipped (backend atomic post to GL - mirrors sales invoice Phase 3A4; no allocation persistence)
+
+- **`posting/posting-number.service.ts`** - `reserveSourceDocumentNumber` `documentType` widened to `'SALES_INVOICE' | 'CUSTOMER_RECEIPT'`
+- **Module** `receivables/receipts/posting/` - new files mirroring `receivables/posting/`:
+  - `customer-receipt-posting.types.ts` - `PostCustomerReceiptInput/Result`, `buildCustomerReceiptPostEventKey`
+  - `customer-receipt-posting.schemas.ts` - empty-body Zod schema for `POST .../post`
+  - `customer-receipt-posting.errors.ts` - `CustomerReceiptPosting*Error` classes + `mapPostingErrorToCustomerReceiptError`
+  - `customer-receipt-accounting-builder.service.ts` - builds balanced `PostingRequest` (Dr bank/cash + TDS + bank charges + other deductions, Cr customer receivable)
+  - `customer-receipt-number.service.ts` - `reserveCustomerReceiptNumber` wraps `reserveSourceDocumentNumber('CUSTOMER_RECEIPT', ...)`
+  - `customer-receipt-posting-validation.service.ts` - re-validates status/amount-drift/deduction-sum/customer-active/posting-period/account-readiness before building the posting request
+  - `customer-receipt-posting.service.ts` - orchestrates `post()` with `beforeTransaction` (reserve receipt number) + `afterAccounting` (create `CREDIT` `ReceivableOpenItem`, conditional `READY_TO_POST` -> `POSTED` update, audit log); idempotent replay when already `POSTED`
+- **Wired into existing:**
+  - `customer-receipt.controller.ts` / `.routes.ts` - `POST /:id/post` behind `finance.ar.receipt.post`
+  - `customer-receipt-allowed-actions.ts` - `post: true` when `READY_TO_POST` + permission; `POSTED` -> `viewAccounting`/`viewCreditOpenItem: true`, `allocate`/`reverse: false`
+  - `customer-receipt-read.service.ts` / `customer-receipt.types.ts` - detail response adds `creditOpenItem` summary + `ledgerEntryCount` once posted
+  - `swagger.ts` - documents `POST /accounting/receivables/receipts/{id}/post`
+- **Credit open item:** `side=CREDIT`, `documentType=CUSTOMER_RECEIPT`, `customerReceiptId`, `originalAmount=openAmount=grossReceiptAmount`, `allocatedAmount=0`, `status=OPEN`, `accountingVoucherId`, `receivableAccountId`, `dueDate=null`; `CustomerReceipt.creditOpenItemId` set on the same update
+- **Tests:** `finance-ar-receipt-posting.test.ts` (new, 12 cases) mirroring `finance-ar-invoice-posting.test.ts` - happy/TDS/bank-charge/combined-deduction posts, credit-open-item assertions, idempotent replay, concurrent post, forced-fail-before-GL retry, DRAFT/POSTED guard rails, permission check, posted-immutability, no-allocation assertions
+- **Fix to existing test** `finance-ar-receipt-drafts.test.ts` - `mark-ready` test's `allowedActions.post` expectation flipped `false` -> `true` (Phase 3B4 makes `post` available once `READY_TO_POST` + permission)
+
+### Not in scope (deferred to Phase 3B5+)
+
+- `CustomerReceiptAllocation` persistence, invoice open-item mutation, receipt reversal, frontend receipt pages/post action
+
+### Verify
+
+- `cd backend && npx vitest run tests/finance/finance-ar-receipt-posting.test.ts --hookTimeout=120000` -> **12/12**
+- `cd backend && npx vitest run tests/finance --hookTimeout=120000` -> **218/218** (17 files; one unrelated `finance-journals.test.ts` MariaDB write-conflict flake seen on a mixed parallel run, reproduced green in isolation and on full-suite rerun)
+- `cd backend && npm run typecheck` -> **PASS**
+- `cd frontend && npm run typecheck` -> **PASS**
+
+### Next
+
+- **Phase 3B5** - `CustomerReceiptAllocation` persistence against invoice open items; then frontend Money In receipts tab (post action)
+
+---
+
 ## 2026-07-18 ? Finance Phase 3B3: Customer Receipt Draft Workflow
 
 ### Shipped (backend draft CRUD + validate + mark-ready + cancel APIs ? no posting/GL/allocation persistence)
 
-- **Migration** `20260718090000_finance_phase3b3_receipt_draft_fields` ? customer snapshot columns, `valueDate`, `calculationContext` JSON, TDS mode/value/base/section/certificate/account fields on `CustomerReceipt`; new `CustomerReceiptDeductionLine` table (`BANK_CHARGE`|`OTHER_DEDUCTION`) with per-line account id
-- **Errors** `customer-receipt.errors.ts` ? 16 new draft-workflow error classes mirroring `SalesInvoice*Error` (`CUSTOMER_RECEIPT_NOT_EDITABLE`, `..._STALE_UPDATE` (409), `..._SOURCE_NOT_SUPPORTED`, `..._DRAFT_CALCULATION_FAILED`, `..._VALIDATION_FAILED`, `..._CANCELLATION_REASON_REQUIRED`, etc.)
-- **Schemas** `customer-receipt.schemas.ts` ? create/update/cancel/validate/list Zod schemas; API field mapping `notes?internalRemarks`, `bankReference?customerBankReference`, `instrumentNumber?chequeNumber`, `instrumentDate?chequeDate`; **fixed a circular import** between `customer-receipt.schemas.ts` and `calculation/customer-receipt-calculation.schemas.ts` by moving `customerReceiptPaymentMethodSchema` into the calculation schema file (was causing an intermittent `ZodObject._parse` crash ? HTTP 500 on every create)
-- **Module** `receivables/receipts/` ? `customer-receipt-allowed-actions.ts` (post/allocate always `false` in 3B3), `customer-receipt-validation.service.ts` (build/parse calculation context for recalc without trusting client totals), `customer-receipt-draft.service.ts` (create/update/validate/mark-ready/cancel), `customer-receipt-read.service.ts` (detail/list serialization with `bankCharges`/`otherDeductions` split, `allowedActions`, `validationSummary` from last `CUSTOMER_RECEIPT_VALIDATED` audit), `customer-receipt.controller.ts` + `customer-receipt.routes.ts`
-- **Repository** `customer-receipt.repository.ts` ? `draftReferenceForDate`/`generateUniqueDraftReference` (`RCPT-DRAFT-YYYYMMDD-XXXXXX`), `createCustomerReceiptDraft`, `replaceEditableReceiptDeductions` (optimistic concurrency via `updatedAt`; reopens `READY_TO_POST`?`DRAFT` on edit), `persistRecalculatedAmounts`, `markCustomerReceiptReady`, `cancelCustomerReceiptDraft`, expanded `listCustomerReceiptRecords` (search across draft reference/receipt number/customer snapshot/instrument/bank+transaction refs/source doc number)
-- **Routes** `GET/POST /t/:slug/accounting/receivables/receipts`, `GET/PUT /:id`, `POST /:id/validate`, `POST /:id/mark-ready`, `POST /:id/cancel` ? **no post/allocate routes**; permissions `finance.ar.receipt.view|create|edit|cancel`
-- **Swagger** paths added for all 5 endpoints, explicitly documenting no posting/GL/number/open-item/allocation in this phase
-- **Draft-save account filter:** missing bank-charge/other-deduction/TDS/bank-cash account errors are deferred to mark-ready (not blocking on create/update), matching the spec; payment-method structural errors (e.g. cheque without instrument number/date) still block draft save
-- **Tests:** `finance-ar-receipt-drafts.test.ts` (12 cases: create direct draft, TDS+charges+deductions calc, reject `BANK_IMPORT` source, reject cheque without instrument fields, update + reopen ready?draft, stale-update 409, validate has no side effects, mark-ready without issuing number/consuming series, cancel with reason, list+detail with search/allowedActions, reject edit of POSTED/CANCELLED, permission enforcement); full finance suite **206/206** (16 files)
+- **Migration** `20260718090000_finance_phase3b3_receipt_draft_fields` ? customer snapshot columns, `valueDate`, `calculationContext` JSON, TDS mode/value/base/section/certificate fields on `CustomerReceipt`; new `CustomerReceiptDeductionLine` table (`BANK_CHARGE`|`OTHER_DEDUCTION`) with per-line account id
+- **Errors** `customer-receipt.errors.ts` ? 16 new draft-workflow error classes mirroring `SalesInvoice*Error`
+- **Schemas** `customer-receipt.schemas.ts` ? create/update/cancel/validate/list Zod schemas; API field mapping `notes`?`internalRemarks`, `bankReference`?`customerBankReference`, `instrumentNumber`?`chequeNumber`, `instrumentDate`?`chequeDate`
+- **Module** `receivables/receipts/` ? draft/read/validation services, allowed-actions (`post`/`allocate` always false), controller, routes
+- **Repository** draft CRUD with `RCPT-DRAFT-YYYYMMDD-XXXXXX`, optimistic concurrency via `updatedAt`, READY?DRAFT on edit
+- **Routes** under `/accounting/receivables/receipts` ? **no post/allocate routes**
+- **Swagger** documents Phase 3B3 lifecycle; explicitly no posting/GL/number/open-item/allocation
+- **Tests:** `finance-ar-receipt-drafts.test.ts` (12); finance suite **206/206**
 
 ### Not in scope (Phase 3B4+)
 
-- Receipt posting, GL, `PostingEvent`, receipt number issuance, credit-side open items, allocation persistence, frontend receipt pages
+- Receipt posting, GL, PostingEvent, receipt number issuance, credit open items, allocation persistence, frontend receipt pages
 
 ### Verify
 
-- `cd backend && npx tsx scripts/prisma-cli.ts migrate deploy && npx prisma generate` ? applied
-- `cd backend && npx tsc --noEmit` ? pass
-- `cd backend && npx vitest run tests/finance --hookTimeout=120000` ? 206 passed
-- `cd frontend && npm run typecheck` ? **pre-existing failure, unrelated to this phase** (`PurchaseApprovalsPage.tsx` TS2304 `tabStrip`, `PurchaseSetupPage.tsx` TS17001 duplicate JSX attribute) ? no receipt/finance frontend code touched in 3B3
+- migrate deploy + prisma generate ? applied
+- backend typecheck ? pass
+- finance vitest ? 206 passed
+- frontend typecheck ? pass
 
 ### Next
 
-- **Phase 3B4** ? receipt posting (GL, `PostingEvent`, receipt number issuance) + allocation persistence against invoice open items
-- Unrelated: fix pre-existing frontend typecheck errors in `PurchaseApprovalsPage.tsx` / `PurchaseSetupPage.tsx`
+- **Phase 3B4** ? atomic receipt posting (number + voucher + GL + credit open item)
 
 ---
 

@@ -12,6 +12,7 @@ import type { SalesOrder } from '../../types/mrp'
 import { resolveSalesOrderValue } from './SalesOrder360Sections'
 import { getSalesOrderFulfillmentLabel, isSalesOrderOverdue } from '../../utils/salesDashboardMetrics'
 import { resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
+import { isPendingSalesOrderHandover } from '../../utils/pendingSalesOrderHandover'
 import { cn } from '../../utils/cn'
 import {
   EnterpriseIdCell,
@@ -93,11 +94,24 @@ export function SalesOrdersTable({
         accessorKey: 'salesOrderNo',
         header: 'SO No',
         meta: { columnLabel: 'SO No' },
-        cell: ({ row }) => (
-          <TableLink to={resolveSalesOrderDetailPath(row.original.id, crmMode)}>
-            <EnterpriseIdCell id={row.original.salesOrderNo} />
-          </TableLink>
-        ),
+        cell: ({ row }) => {
+          const so = row.original
+          if (isPendingSalesOrderHandover(so)) {
+            const href = so.quotationId
+              ? `/crm/quotations/${so.quotationId}`
+              : '#'
+            return (
+              <TableLink to={href}>
+                <EnterpriseIdCell id={so.salesOrderNo} />
+              </TableLink>
+            )
+          }
+          return (
+            <TableLink to={resolveSalesOrderDetailPath(so.id, crmMode)}>
+              <EnterpriseIdCell id={so.salesOrderNo} />
+            </TableLink>
+          )
+        },
       },
       {
         accessorKey: 'status',
@@ -225,16 +239,32 @@ export function SalesOrdersTable({
         meta: { align: 'center', columnLabel: 'Actions' },
         cell: ({ row }) => {
           const so = row.original
-          const activeProforma = proformaInvoices.find(
-            (p) => p.salesOrderId === so.id && p.status !== 'cancelled',
-          )
+          const pending = isPendingSalesOrderHandover(so)
+          const activeProforma = pending
+            ? undefined
+            : proformaInvoices.find(
+              (p) => p.salesOrderId === so.id && p.status !== 'cancelled',
+            )
           const ai = buildAiRowActions({
             onAiSummary: onPreview ? () => onPreview(so) : undefined,
             onSuggestNext: () => onPreview?.(so),
           })
           return (
             <EnterpriseRowActionsMenu
-              actions={[
+              actions={
+                pending
+                  ? [
+                      { id: 'view', label: 'View Quotation', icon: Eye, onClick: () => onView(so) },
+                      {
+                        id: 'convert',
+                        label: 'Create Sales Order',
+                        icon: Send,
+                        onClick: () => onConvert?.(so),
+                      },
+                      ...ai,
+                      { id: 'more', label: 'More Actions', icon: MoreHorizontal, onClick: () => onPreview?.(so) },
+                    ]
+                  : [
                 { id: 'view', label: 'View', icon: Eye, onClick: () => onView(so) },
                 {
                   id: 'edit',
@@ -271,7 +301,8 @@ export function SalesOrdersTable({
                 },
                 ...ai,
                 { id: 'more', label: 'More Actions', icon: MoreHorizontal, onClick: () => onPreview?.(so) },
-              ]}
+              ]
+              }
             />
           )
         },

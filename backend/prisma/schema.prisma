@@ -105,64 +105,70 @@ model Tenant {
   updatedAt          DateTime     @updatedAt
   deletedAt          DateTime?
 
-  users                         User[]
-  roles                         Role[]
-  codeSeries                    CodeSeries[]
-  auditLogs                     AuditLog[]
-  crmCompanies                  CrmCompany[]
-  crmContacts                   CrmContact[]
-  crmLeads                      CrmLead[]
-  crmActivities                 CrmActivity[]
-  crmPipelines                  CrmPipeline[]
-  crmPipelineStages             CrmPipelineStage[]
-  crmOpportunities              CrmOpportunity[]
-  crmFollowUps                  CrmFollowUp[]
-  crmMasters                    CrmMaster[]
-  crmNotes                      CrmNote[]
-  crmAttachments                CrmAttachment[]
-  crmQuotations                 CrmQuotation[]
-  crmQuotationDocuments         CrmQuotationDocument[]
-  crmQuotationTemplates         CrmQuotationTemplate[]
-  crmSalesOrders                CrmSalesOrder[]
-  masterCountries               MasterCountry[]
-  masterStates                  MasterState[]
-  masterCities                  MasterCity[]
-  masterProducts                MasterProduct[]
-  masterUoms                    MasterUom[]
-  masterPlants                  MasterPlant[]
-  masterWarehouses              MasterWarehouse[]
-  masterLocations               MasterLocation[]
-  masterBins                    MasterBin[]
-  masterItemCategories          MasterItemCategory[]
-  masterHsnCodes                MasterHsnCode[]
-  masterGstGroups               MasterGstGroup[]
-  masterGstRates                MasterGstRate[]
-  masterItems                   MasterItem[]
-  masterVendors                 MasterVendor[]
-  legalEntities                 LegalEntity[]
-  branches                      Branch[]
-  financialYears                FinancialYear[]
-  accountingPeriods             AccountingPeriod[]
-  accounts                      Account[]
-  defaultAccountMappings        DefaultAccountMapping[]
-  financeSettings               FinanceSettings[]
-  costCentres                   CostCentre[]
-  financeFeatureControls        FinanceFeatureControl[]
-  financeApprovalRules          FinanceApprovalRule[]
-  financeNumberSeries           FinanceNumberSeries[]
-  accountingVouchers            AccountingVoucher[]
-  accountingVoucherLines        AccountingVoucherLine[]
-  generalLedgerEntries          GeneralLedgerEntry[]
-  postingEvents                 PostingEvent[]
-  postingRules                  PostingRule[]
-  financeApprovalRequests       FinanceApprovalRequest[]
-  financeApprovalSteps          FinanceApprovalStep[]
-  salesInvoices                 SalesInvoice[]
-  salesInvoiceLines             SalesInvoiceLine[]
-  receivableOpenItems           ReceivableOpenItem[]
-  customerReceipts              CustomerReceipt[]
-  customerReceiptAllocations    CustomerReceiptAllocation[]
-  customerReceiptDeductionLines CustomerReceiptDeductionLine[]
+  users                            User[]
+  roles                            Role[]
+  codeSeries                       CodeSeries[]
+  auditLogs                        AuditLog[]
+  crmCompanies                     CrmCompany[]
+  crmContacts                      CrmContact[]
+  crmLeads                         CrmLead[]
+  crmActivities                    CrmActivity[]
+  crmPipelines                     CrmPipeline[]
+  crmPipelineStages                CrmPipelineStage[]
+  crmOpportunities                 CrmOpportunity[]
+  crmFollowUps                     CrmFollowUp[]
+  crmMasters                       CrmMaster[]
+  crmNotes                         CrmNote[]
+  crmAttachments                   CrmAttachment[]
+  crmQuotations                    CrmQuotation[]
+  crmQuotationDocuments            CrmQuotationDocument[]
+  crmQuotationTemplates            CrmQuotationTemplate[]
+  crmSalesOrders                   CrmSalesOrder[]
+  masterCountries                  MasterCountry[]
+  masterStates                     MasterState[]
+  masterCities                     MasterCity[]
+  masterProducts                   MasterProduct[]
+  masterUoms                       MasterUom[]
+  masterPlants                     MasterPlant[]
+  masterWarehouses                 MasterWarehouse[]
+  masterLocations                  MasterLocation[]
+  masterBins                       MasterBin[]
+  masterItemCategories             MasterItemCategory[]
+  masterHsnCodes                   MasterHsnCode[]
+  masterGstGroups                  MasterGstGroup[]
+  masterGstRates                   MasterGstRate[]
+  masterItems                      MasterItem[]
+  masterVendors                    MasterVendor[]
+  legalEntities                    LegalEntity[]
+  branches                         Branch[]
+  financialYears                   FinancialYear[]
+  accountingPeriods                AccountingPeriod[]
+  accounts                         Account[]
+  defaultAccountMappings           DefaultAccountMapping[]
+  financeSettings                  FinanceSettings[]
+  costCentres                      CostCentre[]
+  financeFeatureControls           FinanceFeatureControl[]
+  financeApprovalRules             FinanceApprovalRule[]
+  financeNumberSeries              FinanceNumberSeries[]
+  accountingVouchers               AccountingVoucher[]
+  accountingVoucherLines           AccountingVoucherLine[]
+  generalLedgerEntries             GeneralLedgerEntry[]
+  postingEvents                    PostingEvent[]
+  postingRules                     PostingRule[]
+  financeApprovalRequests          FinanceApprovalRequest[]
+  financeApprovalSteps             FinanceApprovalStep[]
+  salesInvoices                    SalesInvoice[]
+  salesInvoiceLines                SalesInvoiceLine[]
+  receivableOpenItems              ReceivableOpenItem[]
+  customerReceipts                 CustomerReceipt[]
+  customerReceiptAllocations       CustomerReceiptAllocation[]
+  customerReceiptDeductionLines    CustomerReceiptDeductionLine[]
+  customerReceiptAllocationBatches CustomerReceiptAllocationBatch[]
+  creditNoteReasons                CreditNoteReason[]
+  customerCreditNotes              CustomerCreditNote[]
+  customerCreditNoteLines          CustomerCreditNoteLine[]
+  customerCreditNoteAllocations       CustomerCreditNoteAllocation[]
+  customerCreditNoteAllocationBatches CustomerCreditNoteAllocationBatch[]
 
   purchaseRequisitions     PurchaseRequisition[]
   purchaseRequisitionLines PurchaseRequisitionLine[]
@@ -1725,6 +1731,8 @@ enum FinanceDocumentType {
   SALES_INVOICE
   /// Customer-facing receipt number series — distinct from voucher RECEIPT (Phase 3B1).
   CUSTOMER_RECEIPT
+  /// Customer-facing AR credit note number series (Phase 3C).
+  CUSTOMER_CREDIT_NOTE
 }
 
 enum RoundingMethod {
@@ -1758,30 +1766,35 @@ model LegalEntity {
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
-  tenant                        Tenant                         @relation(fields: [tenantId], references: [id])
-  branches                      Branch[]
-  financialYears                FinancialYear[]
-  accountingPeriods             AccountingPeriod[]
-  accounts                      Account[]
-  defaultAccountMappings        DefaultAccountMapping[]
-  financeSettings               FinanceSettings?
-  costCentres                   CostCentre[]
-  financeFeatureControls        FinanceFeatureControl[]
-  financeApprovalRules          FinanceApprovalRule[]
-  financeNumberSeries           FinanceNumberSeries[]
-  accountingVouchers            AccountingVoucher[]
-  accountingVoucherLines        AccountingVoucherLine[]
-  generalLedgerEntries          GeneralLedgerEntry[]
-  postingEvents                 PostingEvent[]
-  postingRules                  PostingRule[]
-  financeApprovalRequests       FinanceApprovalRequest[]
-  financeApprovalSteps          FinanceApprovalStep[]
-  salesInvoices                 SalesInvoice[]
-  salesInvoiceLines             SalesInvoiceLine[]
-  receivableOpenItems           ReceivableOpenItem[]
-  customerReceipts              CustomerReceipt[]
-  customerReceiptAllocations    CustomerReceiptAllocation[]
-  customerReceiptDeductionLines CustomerReceiptDeductionLine[]
+  tenant                           Tenant                           @relation(fields: [tenantId], references: [id])
+  branches                         Branch[]
+  financialYears                   FinancialYear[]
+  accountingPeriods                AccountingPeriod[]
+  accounts                         Account[]
+  defaultAccountMappings           DefaultAccountMapping[]
+  financeSettings                  FinanceSettings?
+  costCentres                      CostCentre[]
+  financeFeatureControls           FinanceFeatureControl[]
+  financeApprovalRules             FinanceApprovalRule[]
+  financeNumberSeries              FinanceNumberSeries[]
+  accountingVouchers               AccountingVoucher[]
+  accountingVoucherLines           AccountingVoucherLine[]
+  generalLedgerEntries             GeneralLedgerEntry[]
+  postingEvents                    PostingEvent[]
+  postingRules                     PostingRule[]
+  financeApprovalRequests          FinanceApprovalRequest[]
+  financeApprovalSteps             FinanceApprovalStep[]
+  salesInvoices                    SalesInvoice[]
+  salesInvoiceLines                SalesInvoiceLine[]
+  receivableOpenItems              ReceivableOpenItem[]
+  customerReceipts                 CustomerReceipt[]
+  customerReceiptAllocations       CustomerReceiptAllocation[]
+  customerReceiptDeductionLines    CustomerReceiptDeductionLine[]
+  customerReceiptAllocationBatches CustomerReceiptAllocationBatch[]
+  customerCreditNotes              CustomerCreditNote[]
+  customerCreditNoteLines          CustomerCreditNoteLine[]
+  customerCreditNoteAllocations       CustomerCreditNoteAllocation[]
+  customerCreditNoteAllocationBatches CustomerCreditNoteAllocationBatch[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1817,6 +1830,7 @@ model Branch {
   salesInvoices        SalesInvoice[]
   receivableOpenItems  ReceivableOpenItem[]
   customerReceipts     CustomerReceipt[]
+  customerCreditNotes  CustomerCreditNote[]
 
   @@unique([legalEntityId, code])
   @@index([tenantId])
@@ -1848,6 +1862,7 @@ model FinancialYear {
   generalLedgerEntries GeneralLedgerEntry[]
   salesInvoices        SalesInvoice[]
   customerReceipts     CustomerReceipt[]
+  customerCreditNotes  CustomerCreditNote[]
 
   @@index([tenantId])
   @@index([legalEntityId])
@@ -1912,21 +1927,23 @@ model Account {
   createdAt              DateTime        @default(now())
   updatedAt              DateTime        @updatedAt
 
-  tenant                         Tenant                         @relation(fields: [tenantId], references: [id])
-  legalEntity                    LegalEntity                    @relation(fields: [legalEntityId], references: [id])
-  parent                         Account?                       @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
-  children                       Account[]                      @relation("AccountHierarchy")
-  mappings                       DefaultAccountMapping[]
-  voucherLines                   AccountingVoucherLine[]
-  generalLedgerEntries           GeneralLedgerEntry[]
-  salesInvoiceLines              SalesInvoiceLine[]
-  receivableOpenItems            ReceivableOpenItem[]
-  customerReceiptsBankCash       CustomerReceipt[]              @relation("ReceiptBankCashAccount")
-  customerReceiptsReceivable     CustomerReceipt[]              @relation("ReceiptCustomerReceivableAccount")
-  customerReceiptsBankCharge     CustomerReceipt[]              @relation("ReceiptBankChargeAccount")
-  customerReceiptsTdsReceivable  CustomerReceipt[]              @relation("ReceiptTdsReceivableAccount")
-  customerReceiptsOtherDeduction CustomerReceipt[]              @relation("ReceiptOtherDeductionAccount")
-  customerReceiptDeductionLines  CustomerReceiptDeductionLine[] @relation("ReceiptDeductionLineAccount")
+  tenant                             Tenant                         @relation(fields: [tenantId], references: [id])
+  legalEntity                        LegalEntity                    @relation(fields: [legalEntityId], references: [id])
+  parent                             Account?                       @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
+  children                           Account[]                      @relation("AccountHierarchy")
+  mappings                           DefaultAccountMapping[]
+  voucherLines                       AccountingVoucherLine[]
+  generalLedgerEntries               GeneralLedgerEntry[]
+  salesInvoiceLines                  SalesInvoiceLine[]
+  receivableOpenItems                ReceivableOpenItem[]
+  customerReceiptsBankCash           CustomerReceipt[]              @relation("ReceiptBankCashAccount")
+  customerReceiptsReceivable         CustomerReceipt[]              @relation("ReceiptCustomerReceivableAccount")
+  customerReceiptsBankCharge         CustomerReceipt[]              @relation("ReceiptBankChargeAccount")
+  customerReceiptsTdsReceivable      CustomerReceipt[]              @relation("ReceiptTdsReceivableAccount")
+  customerReceiptsOtherDeduction     CustomerReceipt[]              @relation("ReceiptOtherDeductionAccount")
+  customerReceiptDeductionLines      CustomerReceiptDeductionLine[] @relation("ReceiptDeductionLineAccount")
+  creditNoteReasonsDefaultAdjustment CreditNoteReason[]             @relation("CreditNoteReasonDefaultAccount")
+  customerCreditNoteRevenueReversals CustomerCreditNoteLine[]       @relation("CreditNoteRevenueReversalAccount")
 
   @@unique([legalEntityId, accountCode])
   @@index([tenantId])
@@ -2007,13 +2024,14 @@ model CostCentre {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  tenant               Tenant                  @relation(fields: [tenantId], references: [id])
-  legalEntity          LegalEntity             @relation(fields: [legalEntityId], references: [id])
-  parent               CostCentre?             @relation("CostCentreHierarchy", fields: [parentId], references: [id])
-  children             CostCentre[]            @relation("CostCentreHierarchy")
-  voucherLines         AccountingVoucherLine[]
-  generalLedgerEntries GeneralLedgerEntry[]
-  salesInvoiceLines    SalesInvoiceLine[]
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id])
+  legalEntity             LegalEntity              @relation(fields: [legalEntityId], references: [id])
+  parent                  CostCentre?              @relation("CostCentreHierarchy", fields: [parentId], references: [id])
+  children                CostCentre[]             @relation("CostCentreHierarchy")
+  voucherLines            AccountingVoucherLine[]
+  generalLedgerEntries    GeneralLedgerEntry[]
+  salesInvoiceLines       SalesInvoiceLine[]
+  customerCreditNoteLines CustomerCreditNoteLine[]
 
   @@unique([legalEntityId, code])
   @@index([tenantId])
@@ -2206,6 +2224,7 @@ model AccountingVoucher {
   salesInvoice         SalesInvoice?
   receivableOpenItems  ReceivableOpenItem[]
   customerReceipt      CustomerReceipt?
+  customerCreditNote   CustomerCreditNote?
 
   @@unique([tenantId, legalEntityId, financialYearId, voucherType, voucherNumber], map: "acc_vch_tenant_le_fy_type_num_key")
   @@index([tenantId])
@@ -2389,11 +2408,12 @@ model PostingEvent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant          Tenant             @relation(fields: [tenantId], references: [id])
-  legalEntity     LegalEntity        @relation(fields: [legalEntityId], references: [id])
-  voucher         AccountingVoucher? @relation(fields: [voucherId], references: [id])
-  salesInvoice    SalesInvoice?
-  customerReceipt CustomerReceipt?
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  legalEntity        LegalEntity         @relation(fields: [legalEntityId], references: [id])
+  voucher            AccountingVoucher?  @relation(fields: [voucherId], references: [id])
+  salesInvoice       SalesInvoice?
+  customerReceipt    CustomerReceipt?
+  customerCreditNote CustomerCreditNote?
 
   @@unique([tenantId, legalEntityId, eventKey])
   @@index([status])
@@ -2502,9 +2522,10 @@ model FinanceApprovalRequest {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant      Tenant                @relation(fields: [tenantId], references: [id])
-  legalEntity LegalEntity           @relation(fields: [legalEntityId], references: [id])
-  steps       FinanceApprovalStep[]
+  tenant             Tenant                @relation(fields: [tenantId], references: [id])
+  legalEntity        LegalEntity           @relation(fields: [legalEntityId], references: [id])
+  steps              FinanceApprovalStep[]
+  customerCreditNote CustomerCreditNote?
 
   @@unique([tenantId, legalEntityId, documentType, documentId, cycleNumber], map: "fin_appr_req_doc_cycle_key")
   @@index([tenantId, legalEntityId, status], map: "fin_appr_req_le_status_idx")
@@ -2585,6 +2606,7 @@ enum SalesInvoiceTaxTreatment {
 enum ReceivableDocumentType {
   SALES_INVOICE
   CREDIT_NOTE
+  CUSTOMER_CREDIT_NOTE
   DEBIT_NOTE
   OPENING_BALANCE
   /// Customer receipt credit open item (Phase 3B1).
@@ -2702,6 +2724,7 @@ model SalesInvoice {
   lines               SalesInvoiceLine[]
   receivableOpenItems ReceivableOpenItem[]
   receiptAllocations  CustomerReceiptAllocation[]
+  creditNoteAllocations CustomerCreditNoteAllocation[]
 
   @@unique([legalEntityId, invoiceNumber], map: "sales_inv_le_number_key")
   @@unique([legalEntityId, draftReference], map: "sales_inv_le_draft_ref_key")
@@ -2788,6 +2811,8 @@ model ReceivableOpenItem {
   salesInvoiceId         String?                @unique
   /// FK to CustomerReceipt when side=CREDIT.
   customerReceiptId      String?                @unique
+  /// FK to CustomerCreditNote when side=CREDIT.
+  customerCreditNoteId   String?                @unique
 
   /// CrmCompany.id — application-validated, no DB FK.
   customerId           String
@@ -2813,6 +2838,8 @@ model ReceivableOpenItem {
   documentDate DateTime?                @db.Date
   dueDate      DateTime?                @db.Date
   status       ReceivableOpenItemStatus @default(OPEN)
+  /// Set when status becomes SETTLED (Phase 3B5 allocation).
+  settledAt    DateTime?
 
   accountingVoucherId String?
 
@@ -2821,16 +2848,24 @@ model ReceivableOpenItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant            Tenant                      @relation(fields: [tenantId], references: [id])
-  legalEntity       LegalEntity                 @relation(fields: [legalEntityId], references: [id])
-  branch            Branch?                     @relation(fields: [branchId], references: [id])
-  salesInvoice      SalesInvoice?               @relation(fields: [salesInvoiceId], references: [id])
-  customerReceipt   CustomerReceipt?            @relation("ReceiptOpenItemSide", fields: [customerReceiptId], references: [id])
-  receivableAccount Account?                    @relation(fields: [receivableAccountId], references: [id])
-  accountingVoucher AccountingVoucher?          @relation(fields: [accountingVoucherId], references: [id])
-  linkedReceipt     CustomerReceipt?            @relation("ReceiptCreditOpenItemLink")
-  creditAllocations CustomerReceiptAllocation[] @relation("ReceiptCreditOpenItem")
-  debitAllocations  CustomerReceiptAllocation[] @relation("InvoiceDebitOpenItem")
+  tenant                  Tenant                           @relation(fields: [tenantId], references: [id])
+  legalEntity             LegalEntity                      @relation(fields: [legalEntityId], references: [id])
+  branch                  Branch?                          @relation(fields: [branchId], references: [id])
+  salesInvoice            SalesInvoice?                    @relation(fields: [salesInvoiceId], references: [id])
+  customerReceipt         CustomerReceipt?                 @relation("ReceiptOpenItemSide", fields: [customerReceiptId], references: [id])
+  customerCreditNote      CustomerCreditNote?              @relation("CreditNoteOpenItemSide", fields: [customerCreditNoteId], references: [id])
+  receivableAccount       Account?                         @relation(fields: [receivableAccountId], references: [id])
+  accountingVoucher       AccountingVoucher?               @relation(fields: [accountingVoucherId], references: [id])
+  linkedReceipt           CustomerReceipt?                 @relation("ReceiptCreditOpenItemLink")
+  linkedCreditNote        CustomerCreditNote?              @relation("CreditNoteCreditOpenItemLink")
+  creditAllocations       CustomerReceiptAllocation[]      @relation("ReceiptCreditOpenItem")
+  debitAllocations        CustomerReceiptAllocation[]      @relation("InvoiceDebitOpenItem")
+  creditAllocationBatches CustomerReceiptAllocationBatch[] @relation("ReceiptCreditAllocationBatch")
+
+  /// Phase 3C5 — credit note allocation relations.
+  creditNoteCreditAllocations       CustomerCreditNoteAllocation[]      @relation("CreditNoteCreditOpenItem")
+  creditNoteDebitAllocations        CustomerCreditNoteAllocation[]      @relation("CreditNoteInvoiceDebitOpenItem")
+  creditNoteCreditAllocationBatches CustomerCreditNoteAllocationBatch[] @relation("CreditNoteCreditAllocationBatch")
 
   @@unique([tenantId, legalEntityId, documentType, documentId], map: "recv_open_doc_key")
   @@index([tenantId])
@@ -2843,9 +2878,224 @@ model ReceivableOpenItem {
   @@index([tenantId, legalEntityId, receivableAccountId, status])
   @@index([tenantId, legalEntityId, side, status])
   @@index([customerReceiptId])
+  @@index([customerCreditNoteId])
   @@index([receivableAccountId])
   @@index([accountingVoucherId])
   @@map("receivable_open_items")
+}
+
+enum CustomerCreditNoteStatus {
+  DRAFT
+  PENDING_APPROVAL
+  READY_TO_POST
+  POSTED
+  REJECTED
+  CANCELLED
+}
+
+enum CreditNotePurpose {
+  SALES_RETURN
+  PRICE_ADJUSTMENT
+  QUANTITY_ADJUSTMENT
+  QUALITY_CLAIM
+  DISCOUNT
+  FREIGHT_ADJUSTMENT
+  TAX_CORRECTION
+  COMMERCIAL_SETTLEMENT
+  OTHER
+}
+
+enum CreditNoteAdjustmentMode {
+  FULL_LINE
+  QUANTITY
+  VALUE
+  RATE
+  TAX_ONLY
+  FULL_INVOICE
+}
+
+enum CreditNoteSourceType {
+  SALES_INVOICE
+  DIRECT
+}
+
+model CreditNoteReason {
+  id                         String            @id @default(uuid())
+  tenantId                   String
+  code                       String            @db.VarChar(32)
+  name                       String            @db.VarChar(200)
+  purpose                    CreditNotePurpose
+  isActive                   Boolean           @default(true)
+  allowsFullReversal         Boolean           @default(false)
+  allowsTaxOnly              Boolean           @default(false)
+  allowsQuantity             Boolean           @default(true)
+  allowsValue                Boolean           @default(true)
+  defaultAdjustmentAccountId String?
+  createdAt                  DateTime          @default(now())
+  updatedAt                  DateTime          @updatedAt
+
+  tenant                   Tenant               @relation(fields: [tenantId], references: [id])
+  defaultAdjustmentAccount Account?             @relation("CreditNoteReasonDefaultAccount", fields: [defaultAdjustmentAccountId], references: [id])
+  creditNotes              CustomerCreditNote[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+  @@index([defaultAdjustmentAccountId])
+  @@map("credit_note_reasons")
+}
+
+model CustomerCreditNote {
+  id              String  @id @default(uuid())
+  tenantId        String
+  legalEntityId   String
+  branchId        String?
+  financialYearId String?
+
+  creditNoteNumber              String?                  @db.VarChar(64)
+  draftReference                String?                  @db.VarChar(64)
+  status                        CustomerCreditNoteStatus @default(DRAFT)
+  purpose                       CreditNotePurpose
+  reasonId                      String?
+  reasonCodeSnapshot            String?                  @db.VarChar(32)
+  reasonNameSnapshot            String?                  @db.VarChar(200)
+  sourceType                    CreditNoteSourceType     @default(SALES_INVOICE)
+  originalInvoiceId             String?
+  originalInvoiceNumberSnapshot String?                  @db.VarChar(64)
+
+  customerId                     String
+  customerCodeSnapshot           String? @db.VarChar(32)
+  customerNameSnapshot           String  @db.VarChar(300)
+  customerGstinSnapshot          String? @db.VarChar(20)
+  customerPanSnapshot            String? @db.VarChar(20)
+  customerStateCodeSnapshot      String? @db.VarChar(8)
+  customerBillingAddressSnapshot Json?
+
+  creditNoteDate     DateTime                 @db.Date
+  postingDate        DateTime?                @db.Date
+  supplyType         SalesInvoiceSupplyType   @default(INTRA_STATE)
+  taxTreatment       SalesInvoiceTaxTreatment @default(REGISTERED)
+  currencyCode       String                   @default("INR") @db.VarChar(8)
+  exchangeRate       Decimal                  @default(1) @db.Decimal(18, 8)
+  calculationContext Json?
+
+  taxableAmount          Decimal @default(0) @db.Decimal(18, 4)
+  cgstAmount             Decimal @default(0) @db.Decimal(18, 4)
+  sgstAmount             Decimal @default(0) @db.Decimal(18, 4)
+  igstAmount             Decimal @default(0) @db.Decimal(18, 4)
+  cessAmount             Decimal @default(0) @db.Decimal(18, 4)
+  totalTaxAmount         Decimal @default(0) @db.Decimal(18, 4)
+  discountAmount         Decimal @default(0) @db.Decimal(18, 4)
+  freightAmount          Decimal @default(0) @db.Decimal(18, 4)
+  otherChargesAmount     Decimal @default(0) @db.Decimal(18, 4)
+  roundOffAmount         Decimal @default(0) @db.Decimal(18, 4)
+  grandTotal             Decimal @default(0) @db.Decimal(18, 4)
+  baseTaxableAmount      Decimal @default(0) @db.Decimal(18, 4)
+  baseCgstAmount         Decimal @default(0) @db.Decimal(18, 4)
+  baseSgstAmount         Decimal @default(0) @db.Decimal(18, 4)
+  baseIgstAmount         Decimal @default(0) @db.Decimal(18, 4)
+  baseCessAmount         Decimal @default(0) @db.Decimal(18, 4)
+  baseTotalTaxAmount     Decimal @default(0) @db.Decimal(18, 4)
+  baseDiscountAmount     Decimal @default(0) @db.Decimal(18, 4)
+  baseFreightAmount      Decimal @default(0) @db.Decimal(18, 4)
+  baseOtherChargesAmount Decimal @default(0) @db.Decimal(18, 4)
+  baseRoundOffAmount     Decimal @default(0) @db.Decimal(18, 4)
+  baseGrandTotal         Decimal @default(0) @db.Decimal(18, 4)
+
+  /// Phase 3C5 — credit note allocation totals (subledger-only; no GL impact).
+  allocatableAmount     Decimal @default(0) @db.Decimal(18, 4)
+  allocatedAmount       Decimal @default(0) @db.Decimal(18, 4)
+  unallocatedAmount     Decimal @default(0) @db.Decimal(18, 4)
+  baseAllocatableAmount Decimal @default(0) @db.Decimal(18, 4)
+  baseAllocatedAmount   Decimal @default(0) @db.Decimal(18, 4)
+  baseUnallocatedAmount Decimal @default(0) @db.Decimal(18, 4)
+
+  inventoryReturnRequired Boolean   @default(false)
+  inventoryReturnMetadata Json?
+  approvalRequired        Boolean   @default(false)
+  approvalRequestId       String?   @unique
+  accountingVoucherId     String?   @unique
+  postingEventId          String?   @unique
+  creditOpenItemId        String?   @unique
+  postedAt                DateTime?
+  postedBy                String?
+  cancelledAt             DateTime?
+  cancelledBy             String?
+  cancellationReason      String?   @db.VarChar(500)
+  createdBy               String?
+  updatedBy               String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  tenant            Tenant                   @relation(fields: [tenantId], references: [id])
+  legalEntity       LegalEntity              @relation(fields: [legalEntityId], references: [id])
+  branch            Branch?                  @relation(fields: [branchId], references: [id])
+  financialYear     FinancialYear?           @relation(fields: [financialYearId], references: [id])
+  reason            CreditNoteReason?        @relation(fields: [reasonId], references: [id])
+  approvalRequest   FinanceApprovalRequest?  @relation(fields: [approvalRequestId], references: [id])
+  accountingVoucher AccountingVoucher?       @relation(fields: [accountingVoucherId], references: [id])
+  postingEvent      PostingEvent?            @relation(fields: [postingEventId], references: [id])
+  creditOpenItem    ReceivableOpenItem?      @relation("CreditNoteCreditOpenItemLink", fields: [creditOpenItemId], references: [id])
+  openItemFromSide  ReceivableOpenItem?      @relation("CreditNoteOpenItemSide")
+  lines             CustomerCreditNoteLine[]
+  allocations       CustomerCreditNoteAllocation[]
+  allocationBatches CustomerCreditNoteAllocationBatch[]
+
+  @@unique([legalEntityId, creditNoteNumber], map: "cust_cn_le_number_key")
+  @@unique([legalEntityId, draftReference], map: "cust_cn_le_draft_ref_key")
+  @@index([tenantId, legalEntityId])
+  @@index([legalEntityId, status])
+  @@index([legalEntityId, customerId])
+  @@index([originalInvoiceId])
+  @@index([creditNoteDate])
+  @@map("customer_credit_notes")
+}
+
+model CustomerCreditNoteLine {
+  id                       String                   @id @default(uuid())
+  tenantId                 String
+  legalEntityId            String
+  customerCreditNoteId     String
+  lineNumber               Int
+  originalInvoiceLineId    String?
+  itemId                   String?
+  itemCodeSnapshot         String?                  @db.VarChar(64)
+  itemNameSnapshot         String?                  @db.VarChar(300)
+  hsnCodeSnapshot          String?                  @db.VarChar(16)
+  uomSnapshot              String?                  @db.VarChar(32)
+  description              String?                  @db.VarChar(500)
+  adjustmentMode           CreditNoteAdjustmentMode
+  quantity                 Decimal                  @db.Decimal(18, 6)
+  unitRate                 Decimal                  @db.Decimal(18, 4)
+  revisedUnitRate          Decimal?                 @db.Decimal(18, 4)
+  grossAmount              Decimal                  @default(0) @db.Decimal(18, 4)
+  discountAmount           Decimal                  @default(0) @db.Decimal(18, 4)
+  taxableAmount            Decimal                  @default(0) @db.Decimal(18, 4)
+  cgstRate                 Decimal                  @default(0) @db.Decimal(9, 4)
+  cgstAmount               Decimal                  @default(0) @db.Decimal(18, 4)
+  sgstRate                 Decimal                  @default(0) @db.Decimal(9, 4)
+  sgstAmount               Decimal                  @default(0) @db.Decimal(18, 4)
+  igstRate                 Decimal                  @default(0) @db.Decimal(9, 4)
+  igstAmount               Decimal                  @default(0) @db.Decimal(18, 4)
+  cessRate                 Decimal                  @default(0) @db.Decimal(9, 4)
+  cessAmount               Decimal                  @default(0) @db.Decimal(18, 4)
+  lineTotal                Decimal                  @default(0) @db.Decimal(18, 4)
+  revenueReversalAccountId String?
+  costCentreId             String?
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+
+  tenant                 Tenant             @relation(fields: [tenantId], references: [id])
+  legalEntity            LegalEntity        @relation(fields: [legalEntityId], references: [id])
+  customerCreditNote     CustomerCreditNote @relation(fields: [customerCreditNoteId], references: [id])
+  revenueReversalAccount Account?           @relation("CreditNoteRevenueReversalAccount", fields: [revenueReversalAccountId], references: [id])
+  costCentre             CostCentre?        @relation(fields: [costCentreId], references: [id])
+
+  @@unique([customerCreditNoteId, lineNumber])
+  @@index([tenantId, legalEntityId])
+  @@index([originalInvoiceLineId])
+  @@index([revenueReversalAccountId])
+  @@index([costCentreId])
+  @@map("customer_credit_note_lines")
 }
 
 enum CustomerReceiptStatus {
@@ -2873,6 +3123,26 @@ enum CustomerReceiptAllocationStatus {
   DRAFT
   POSTED
   REVERSED
+}
+
+enum CustomerReceiptAllocationBatchStatus {
+  PROCESSING
+  POSTED
+  FAILED
+}
+
+/// Phase 3C5 — credit note allocation lifecycle. Same values as CustomerReceiptAllocationStatus.
+enum CustomerCreditNoteAllocationStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+/// Phase 3C5 — credit note allocation batch lifecycle. Same values as CustomerReceiptAllocationBatchStatus.
+enum CustomerCreditNoteAllocationBatchStatus {
+  PROCESSING
+  POSTED
+  FAILED
 }
 
 enum CustomerReceiptDeductionType {
@@ -2977,20 +3247,21 @@ model CustomerReceipt {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant                       Tenant                         @relation(fields: [tenantId], references: [id])
-  legalEntity                  LegalEntity                    @relation(fields: [legalEntityId], references: [id])
-  branch                       Branch?                        @relation(fields: [branchId], references: [id])
-  financialYear                FinancialYear?                 @relation(fields: [financialYearId], references: [id])
-  bankCashAccount              Account?                       @relation("ReceiptBankCashAccount", fields: [bankCashAccountId], references: [id])
-  customerReceivableAccount    Account?                       @relation("ReceiptCustomerReceivableAccount", fields: [customerReceivableAccountId], references: [id])
-  bankChargeAccount            Account?                       @relation("ReceiptBankChargeAccount", fields: [bankChargeAccountId], references: [id])
-  customerTdsReceivableAccount Account?                       @relation("ReceiptTdsReceivableAccount", fields: [customerTdsReceivableAccountId], references: [id])
-  otherDeductionAccount        Account?                       @relation("ReceiptOtherDeductionAccount", fields: [otherDeductionAccountId], references: [id])
-  accountingVoucher            AccountingVoucher?             @relation(fields: [accountingVoucherId], references: [id])
-  postingEvent                 PostingEvent?                  @relation(fields: [postingEventId], references: [id])
-  creditOpenItem               ReceivableOpenItem?            @relation("ReceiptCreditOpenItemLink", fields: [creditOpenItemId], references: [id])
-  openItemFromSide             ReceivableOpenItem?            @relation("ReceiptOpenItemSide")
+  tenant                       Tenant                           @relation(fields: [tenantId], references: [id])
+  legalEntity                  LegalEntity                      @relation(fields: [legalEntityId], references: [id])
+  branch                       Branch?                          @relation(fields: [branchId], references: [id])
+  financialYear                FinancialYear?                   @relation(fields: [financialYearId], references: [id])
+  bankCashAccount              Account?                         @relation("ReceiptBankCashAccount", fields: [bankCashAccountId], references: [id])
+  customerReceivableAccount    Account?                         @relation("ReceiptCustomerReceivableAccount", fields: [customerReceivableAccountId], references: [id])
+  bankChargeAccount            Account?                         @relation("ReceiptBankChargeAccount", fields: [bankChargeAccountId], references: [id])
+  customerTdsReceivableAccount Account?                         @relation("ReceiptTdsReceivableAccount", fields: [customerTdsReceivableAccountId], references: [id])
+  otherDeductionAccount        Account?                         @relation("ReceiptOtherDeductionAccount", fields: [otherDeductionAccountId], references: [id])
+  accountingVoucher            AccountingVoucher?               @relation(fields: [accountingVoucherId], references: [id])
+  postingEvent                 PostingEvent?                    @relation(fields: [postingEventId], references: [id])
+  creditOpenItem               ReceivableOpenItem?              @relation("ReceiptCreditOpenItemLink", fields: [creditOpenItemId], references: [id])
+  openItemFromSide             ReceivableOpenItem?              @relation("ReceiptOpenItemSide")
   allocations                  CustomerReceiptAllocation[]
+  allocationBatches            CustomerReceiptAllocationBatch[]
   deductionLines               CustomerReceiptDeductionLine[]
 
   @@unique([legalEntityId, receiptNumber], map: "cust_rcpt_le_number_key")
@@ -3040,12 +3311,66 @@ model CustomerReceiptDeductionLine {
   @@map("customer_receipt_deduction_lines")
 }
 
+/// Groups one user allocation action across one or more invoices (Phase 3B5).
+/// Subledger-only — does not create PostingEvent, voucher, or GL.
+model CustomerReceiptAllocationBatch {
+  id            String @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+
+  receiptId         String
+  receiptOpenItemId String
+  customerId        String
+
+  idempotencyKey String @db.VarChar(128)
+  payloadHash    String @db.VarChar(128)
+
+  status CustomerReceiptAllocationBatchStatus @default(PROCESSING)
+
+  allocationDate DateTime @db.Date
+
+  currencyCode String  @default("INR") @db.VarChar(8)
+  exchangeRate Decimal @default(1) @db.Decimal(18, 8)
+
+  totalAllocatedAmount     Decimal @default(0) @db.Decimal(18, 4)
+  baseTotalAllocatedAmount Decimal @default(0) @db.Decimal(18, 4)
+  allocationCount          Int     @default(0)
+
+  attemptCount Int @default(1)
+
+  createdBy   String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  failedAt       DateTime?
+  failureCode    String?   @db.VarChar(64)
+  failureMessage String?   @db.VarChar(500)
+
+  tenant          Tenant                      @relation(fields: [tenantId], references: [id])
+  legalEntity     LegalEntity                 @relation(fields: [legalEntityId], references: [id])
+  receipt         CustomerReceipt             @relation(fields: [receiptId], references: [id])
+  receiptOpenItem ReceivableOpenItem          @relation("ReceiptCreditAllocationBatch", fields: [receiptOpenItemId], references: [id])
+  allocations     CustomerReceiptAllocation[]
+
+  @@unique([tenantId, receiptId, idempotencyKey], map: "cust_rcpt_alloc_batch_idem_key")
+  @@index([tenantId, legalEntityId])
+  @@index([receiptId])
+  @@index([receiptOpenItemId])
+  @@index([customerId])
+  @@index([status])
+  @@index([allocationDate])
+  @@index([createdAt])
+  @@map("customer_receipt_allocation_batches")
+}
+
 /// Allocation of receipt credit to invoice debit open items.
 model CustomerReceiptAllocation {
   id            String @id @default(uuid())
   tenantId      String
   legalEntityId String
   customerId    String
+
+  batchId String?
 
   receiptId         String
   receiptOpenItemId String
@@ -3060,6 +3385,12 @@ model CustomerReceiptAllocation {
   allocatedAmount     Decimal @db.Decimal(18, 4)
   baseAllocatedAmount Decimal @db.Decimal(18, 4)
 
+  /// Snapshots at allocation time (invoice debit open item).
+  invoiceOutstandingBefore     Decimal? @db.Decimal(18, 4)
+  invoiceOutstandingAfter      Decimal? @db.Decimal(18, 4)
+  baseInvoiceOutstandingBefore Decimal? @db.Decimal(18, 4)
+  baseInvoiceOutstandingAfter  Decimal? @db.Decimal(18, 4)
+
   status             CustomerReceiptAllocationStatus @default(DRAFT)
   allocationSequence Int
 
@@ -3070,14 +3401,16 @@ model CustomerReceiptAllocation {
   reversedBy     String?
   reversalReason String?   @db.VarChar(500)
 
-  tenant          Tenant             @relation(fields: [tenantId], references: [id])
-  legalEntity     LegalEntity        @relation(fields: [legalEntityId], references: [id])
-  receipt         CustomerReceipt    @relation(fields: [receiptId], references: [id])
-  receiptOpenItem ReceivableOpenItem @relation("ReceiptCreditOpenItem", fields: [receiptOpenItemId], references: [id])
-  invoice         SalesInvoice?      @relation(fields: [invoiceId], references: [id])
-  invoiceOpenItem ReceivableOpenItem @relation("InvoiceDebitOpenItem", fields: [invoiceOpenItemId], references: [id])
+  tenant          Tenant                          @relation(fields: [tenantId], references: [id])
+  legalEntity     LegalEntity                     @relation(fields: [legalEntityId], references: [id])
+  batch           CustomerReceiptAllocationBatch? @relation(fields: [batchId], references: [id])
+  receipt         CustomerReceipt                 @relation(fields: [receiptId], references: [id])
+  receiptOpenItem ReceivableOpenItem              @relation("ReceiptCreditOpenItem", fields: [receiptOpenItemId], references: [id])
+  invoice         SalesInvoice?                   @relation(fields: [invoiceId], references: [id])
+  invoiceOpenItem ReceivableOpenItem              @relation("InvoiceDebitOpenItem", fields: [invoiceOpenItemId], references: [id])
 
   @@unique([tenantId, legalEntityId, receiptId, allocationSequence], map: "cust_rcpt_alloc_seq_key")
+  @@unique([batchId, allocationSequence], map: "cust_rcpt_alloc_batch_seq_key")
   @@index([receiptId])
   @@index([invoiceId])
   @@index([receiptOpenItemId])
@@ -3086,6 +3419,7 @@ model CustomerReceiptAllocation {
   @@index([status])
   @@index([allocationDate])
   @@index([tenantId, legalEntityId])
+  @@index([batchId])
   @@map("customer_receipt_allocations")
 }
 
@@ -4376,4 +4710,116 @@ model PurchaseReturnLine {
   @@index([tenantId])
   @@index([tenantId, purchaseReturnId])
   @@map("purchase_return_lines")
+}
+
+/// Phase 3C5 — groups one user allocation action of a credit note across one or more invoices.
+/// Subledger-only — does not create PostingEvent, voucher, or GL.
+model CustomerCreditNoteAllocationBatch {
+  id            String @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+
+  creditNoteId         String
+  creditNoteOpenItemId String
+  customerId           String
+
+  idempotencyKey String @db.VarChar(128)
+  payloadHash    String @db.VarChar(128)
+
+  status CustomerCreditNoteAllocationBatchStatus @default(PROCESSING)
+
+  allocationDate DateTime @db.Date
+
+  currencyCode String  @default("INR") @db.VarChar(8)
+  exchangeRate Decimal @default(1) @db.Decimal(18, 8)
+
+  totalAllocatedAmount     Decimal @default(0) @db.Decimal(18, 4)
+  baseTotalAllocatedAmount Decimal @default(0) @db.Decimal(18, 4)
+  allocationCount          Int     @default(0)
+
+  attemptCount Int @default(1)
+
+  createdBy   String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  failedAt       DateTime?
+  failureCode    String?   @db.VarChar(64)
+  failureMessage String?   @db.VarChar(500)
+
+  tenant              Tenant                          @relation(fields: [tenantId], references: [id])
+  legalEntity         LegalEntity                     @relation(fields: [legalEntityId], references: [id])
+  creditNote          CustomerCreditNote              @relation(fields: [creditNoteId], references: [id])
+  creditNoteOpenItem  ReceivableOpenItem              @relation("CreditNoteCreditAllocationBatch", fields: [creditNoteOpenItemId], references: [id])
+  allocations         CustomerCreditNoteAllocation[]
+
+  @@unique([tenantId, creditNoteId, idempotencyKey], map: "cust_cn_alloc_batch_idem_key")
+  @@index([tenantId, legalEntityId])
+  @@index([creditNoteId])
+  @@index([creditNoteOpenItemId])
+  @@index([customerId])
+  @@index([status])
+  @@index([allocationDate])
+  @@index([createdAt])
+  @@map("customer_credit_note_allocation_batches")
+}
+
+/// Phase 3C5 — allocation of credit note credit to invoice debit open items.
+model CustomerCreditNoteAllocation {
+  id            String @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+  customerId    String
+
+  batchId String?
+
+  creditNoteId         String
+  creditNoteOpenItemId String
+  invoiceId            String?
+  invoiceOpenItemId    String
+
+  allocationDate DateTime  @db.Date
+  postingDate    DateTime? @db.Date
+  currencyCode   String    @default("INR") @db.VarChar(8)
+  exchangeRate   Decimal   @default(1) @db.Decimal(18, 8)
+
+  allocatedAmount     Decimal @db.Decimal(18, 4)
+  baseAllocatedAmount Decimal @db.Decimal(18, 4)
+
+  /// Snapshots at allocation time (invoice debit open item).
+  invoiceOutstandingBefore     Decimal? @db.Decimal(18, 4)
+  invoiceOutstandingAfter      Decimal? @db.Decimal(18, 4)
+  baseInvoiceOutstandingBefore Decimal? @db.Decimal(18, 4)
+  baseInvoiceOutstandingAfter  Decimal? @db.Decimal(18, 4)
+
+  status             CustomerCreditNoteAllocationStatus @default(DRAFT)
+  allocationSequence Int
+
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  reversedAt     DateTime?
+  reversedBy     String?
+  reversalReason String?   @db.VarChar(500)
+
+  tenant             Tenant                             @relation(fields: [tenantId], references: [id])
+  legalEntity        LegalEntity                        @relation(fields: [legalEntityId], references: [id])
+  batch              CustomerCreditNoteAllocationBatch? @relation(fields: [batchId], references: [id])
+  creditNote         CustomerCreditNote                 @relation(fields: [creditNoteId], references: [id])
+  creditNoteOpenItem ReceivableOpenItem                 @relation("CreditNoteCreditOpenItem", fields: [creditNoteOpenItemId], references: [id])
+  invoice            SalesInvoice?                      @relation(fields: [invoiceId], references: [id])
+  invoiceOpenItem    ReceivableOpenItem                 @relation("CreditNoteInvoiceDebitOpenItem", fields: [invoiceOpenItemId], references: [id])
+
+  @@unique([tenantId, legalEntityId, creditNoteId, allocationSequence], map: "cust_cn_alloc_seq_key")
+  @@unique([batchId, allocationSequence], map: "cust_cn_alloc_batch_seq_key")
+  @@index([creditNoteId])
+  @@index([invoiceId])
+  @@index([creditNoteOpenItemId])
+  @@index([invoiceOpenItemId])
+  @@index([customerId])
+  @@index([status])
+  @@index([allocationDate])
+  @@index([tenantId, legalEntityId])
+  @@index([batchId])
+  @@map("customer_credit_note_allocations")
 }

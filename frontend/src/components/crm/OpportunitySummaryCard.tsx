@@ -1,4 +1,6 @@
+import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Banknote, Building2, CalendarClock, UserRound } from 'lucide-react'
 import type { Opportunity } from '@/types/crm'
 import { AppLink } from '@/components/ui/AppLink'
 import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
@@ -8,6 +10,8 @@ import { formatCrmCurrency } from '@/utils/crmMetrics'
 import { formatDate, formatDateTime } from '@/utils/dates/format'
 import { opportunityPriorityLabel, opportunityStageLabel } from '@/utils/opportunityUtils'
 import { opportunityRequirementDisplay } from '@/utils/leadRequirementLines'
+
+const EMPTY = '—'
 
 export interface OpportunitySummaryCardProps {
   opportunity: Opportunity
@@ -27,14 +31,21 @@ export interface OpportunitySummaryCardProps {
 
 function SummaryGroup({
   title,
+  icon: Icon,
   children,
 }: {
   title: string
+  icon: LucideIcon
   children: ReactNode
 }) {
   return (
     <section className="lead-summary-card__group" aria-label={title}>
-      <h3 className="lead-summary-card__group-title">{title}</h3>
+      <header className="lead-summary-card__group-head">
+        <span className="lead-summary-card__group-icon" aria-hidden>
+          <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+        </span>
+        <h3 className="lead-summary-card__group-title">{title}</h3>
+      </header>
       <div className="lead-summary-card__fields">{children}</div>
     </section>
   )
@@ -73,56 +84,68 @@ export function OpportunitySummaryCard({
   return (
     <section className="lead-summary-card" id="opp-section-summary" aria-label="Opportunity Summary">
       <header className="lead-summary-card__head">
-        <h2 className="lead-summary-card__title">Opportunity Summary</h2>
-        <p className="lead-summary-card__subtitle">
-          Customer, contact, ownership, and deal status at a glance.
-        </p>
+        <div>
+          <h2 className="lead-summary-card__title">Opportunity Summary</h2>
+          <p className="lead-summary-card__subtitle">
+            Customer, contact, ownership, and deal status at a glance.
+          </p>
+        </div>
       </header>
 
       <div className="lead-summary-card__grid">
-        <SummaryGroup title="Customer">
-          <ErpViewField label="Opportunity Name" value={opportunity.opportunityName} />
-          <ErpViewField label="Customer">
+        <SummaryGroup title="Customer" icon={Building2}>
+          <ErpViewField
+            label="Opportunity Name"
+            value={opportunity.opportunityName}
+            emptyLabel={EMPTY}
+            className="lead-summary-card__field--primary"
+          />
+          <ErpViewField label="Customer" emptyLabel={EMPTY}>
             {resolvedCustomerId && customerName ? (
               <AppLink to={entity360CustomerPath(resolvedCustomerId)} className="erp-view-field__link">
                 {customerName}
               </AppLink>
             ) : undefined}
           </ErpViewField>
-          <ErpViewField label="City" value={city} />
-          <ErpViewField label="Product Requirement" value={opportunityRequirementDisplay(opportunity.productRequirement)} />
+          <ErpViewField label="City" value={city} emptyLabel={EMPTY} />
+          <ErpViewField
+            label="Product Requirement"
+            value={opportunityRequirementDisplay(opportunity.productRequirement)}
+            emptyLabel={EMPTY}
+          />
           {productName ? (
-            <ErpViewField label="Linked Product" value={productName} />
+            <ErpViewField label="Linked Product" value={productName} emptyLabel={EMPTY} />
           ) : null}
         </SummaryGroup>
 
-        <SummaryGroup title="Primary Contact">
-          <ErpViewField label="Contact Person" value={contactName} />
-          <ErpViewPhone label="Mobile" value={contactPhone} />
-          <ErpViewEmail label="Email" value={contactEmail} />
+        <SummaryGroup title="Primary Contact" icon={UserRound}>
+          <ErpViewField label="Contact Person" value={contactName} emptyLabel={EMPTY} />
+          <ErpViewPhone label="Mobile" value={contactPhone} emptyLabel={EMPTY} />
+          <ErpViewEmail label="Email" value={contactEmail} emptyLabel={EMPTY} />
         </SummaryGroup>
 
-        <SummaryGroup title="Ownership">
-          <ErpViewField label="Owner" value={opportunity.ownerName} />
-          <ErpViewField label="Priority" value={opportunityPriorityLabel(opportunity.priority)} />
-          <ErpViewField label="Created Date" value={formatDate(opportunity.createdAt)} />
+        <SummaryGroup title="Ownership" icon={Banknote}>
+          <ErpViewField label="Owner" value={opportunity.ownerName} emptyLabel={EMPTY} />
+          <ErpViewField label="Priority" value={opportunityPriorityLabel(opportunity.priority)} emptyLabel={EMPTY} />
+          <ErpViewField label="Created Date" value={formatDate(opportunity.createdAt)} emptyLabel={EMPTY} />
           <ErpViewField
             label={dealValueLabel}
             value={formatCrmCurrency(dealValue ?? opportunity.value)}
             hint={dealValueHint}
+            emptyLabel={EMPTY}
           />
         </SummaryGroup>
 
-        <SummaryGroup title="Status">
-          <ErpViewField label="Stage">
+        <SummaryGroup title="Status" icon={CalendarClock}>
+          <ErpViewField label="Stage" emptyLabel={EMPTY}>
             <DynamicsStatusChip
               label={opportunityStageLabel(opportunity.stage)}
               tone={stageTone(opportunity.stage)}
             />
           </ErpViewField>
-          <ErpViewField label="Status" value={opportunity.status} />
-          <ErpViewField label="Next Follow-up" value={nextFollowUp} />
-          <ErpViewField label="Last Activity" value={lastActivityDisplay} />
+          <ErpViewField label="Status" value={opportunity.status} emptyLabel={EMPTY} />
+          <ErpViewField label="Next Follow-up" value={nextFollowUp} emptyLabel={EMPTY} />
+          <ErpViewField label="Last Activity" value={lastActivityDisplay} emptyLabel={EMPTY} />
         </SummaryGroup>
       </div>
     </section>

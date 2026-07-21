@@ -186,4 +186,15 @@ export const CRM_MASTER_SEED_ROWS: Array<{
   { kind: 'payment-terms', code: 'against_delivery', name: 'Payment Against Delivery', sortOrder: 13, attributes: { advancePct: 0, creditDays: 0, approvalRequired: false } },
   { kind: 'payment-terms', code: 'against_proforma', name: 'Against Proforma Invoice', sortOrder: 14, attributes: { advancePct: 30, creditDays: 0, approvalRequired: false } },
   { kind: 'payment-terms', code: 'retention_10', name: '10% Retention for 12 Months', sortOrder: 15, attributes: { advancePct: 90, creditDays: 0, approvalRequired: true } },
+  // Delivery terms — delivery timeline / lead-time commitments (quotation + SO dropdowns)
+  { kind: 'delivery-terms', code: 'ex_works', name: 'Ex Works', sortOrder: 1, attributes: { defaultDeliveryTime: '4-6 weeks', approvalRequired: false } },
+  { kind: 'delivery-terms', code: 'for_site', name: 'FOR Site', sortOrder: 2, attributes: { defaultDeliveryTime: '6-8 weeks', approvalRequired: false } },
+  { kind: 'delivery-terms', code: 'customer_pickup', name: 'Customer Pickup', sortOrder: 3, attributes: { defaultDeliveryTime: '4 weeks', approvalRequired: false } },
+  { kind: 'delivery-terms', code: 'freight_extra', name: 'Freight Extra', sortOrder: 4, attributes: { defaultDeliveryTime: '6-8 weeks', approvalRequired: false } },
+  { kind: 'delivery-terms', code: 'freight_included', name: 'Freight Included', sortOrder: 5, attributes: { defaultDeliveryTime: '8-10 weeks', approvalRequired: true } },
+  // Warranty terms — quotation warranty section master picker
+  { kind: 'warranty-terms', code: 'std_12m', name: '12 months against manufacturing defect', sortOrder: 1, attributes: { warrantyDuration: '12 months', approvalRequired: false } },
+  { kind: 'warranty-terms', code: 'no_hydraulic', name: 'No warranty on hydraulic parts', sortOrder: 2, attributes: { warrantyDuration: '12 months', approvalRequired: false } },
+  { kind: 'warranty-terms', code: 'oem_brought_out', name: 'Brought-out items as per OEM warranty', sortOrder: 3, attributes: { warrantyDuration: 'As per OEM', approvalRequired: false } },
+  { kind: 'warranty-terms', code: 'custom', name: 'Custom warranty terms', sortOrder: 4, attributes: { warrantyDuration: 'Custom', approvalRequired: true } },
 ]

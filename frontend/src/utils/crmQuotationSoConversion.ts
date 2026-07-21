@@ -4,6 +4,8 @@ import type { Quotation } from '../types/sales'
 import { calcPriceSummary, syncLineTotals } from './crmQuotationCalc'
 import { sectionContent } from './crmIntegration'
 import { quotationLineItemsSummary, summarizeQuotationLinesForSo } from './crmQuotationSoLines'
+import { useMasterStore } from '../store/masterStore'
+import { assertProductSellableForSales } from './productMaster'
 
 export interface CrmSalesOrderHandoverInput {
   customerPoNumber?: string
@@ -59,8 +61,12 @@ export function validateQuotationForSoConversion(ctx: QuotationSoConversionConte
   if (document.status === 'converted' || document.salesOrderId || salesQuotation?.salesOrderId) {
     issues.push({ id: 'already-converted', message: 'Quotation is already converted to a Sales Order.', blocking: true })
   }
-  if (document.status !== 'approved' && document.status !== 'converted') {
-    issues.push({ id: 'not-approved', message: `Quotation status is ${document.status.replace(/_/g, ' ')} — approval required.`, blocking: true })
+  if (document.status !== 'sent' && document.status !== 'converted') {
+    issues.push({
+      id: 'not-sent',
+      message: `Quotation must be sent to the customer before conversion — current status is ${document.status.replace(/_/g, ' ')}.`,
+      blocking: true,
+    })
   }
   if (latestDocument && latestDocument.id !== document.id) {
     issues.push({ id: 'not-latest', message: DISABLED_NOT_LATEST, blocking: true })
@@ -78,12 +84,12 @@ export function validateQuotationForSoConversion(ctx: QuotationSoConversionConte
     issues.push({ id: 'no-contact', message: 'Contact person is required.', blocking: true })
   }
   if (!document.approvalHistory.some((a) => a.action === 'approved')) {
-    issues.push({ id: 'no-approval', message: 'Quotation approval must be completed.', blocking: true })
+    issues.push({ id: 'no-approval', message: 'Quotation internal approval must be completed.', blocking: true })
   }
   if (salesQuotation && salesQuotation.customerApproval !== 'approved') {
     issues.push({
       id: 'not-customer-accepted',
-      message: 'Approve the quotation before creating a sales order.',
+      message: 'Customer must approve the quotation before creating a sales order.',
       blocking: true,
     })
   }
@@ -92,12 +98,30 @@ export function validateQuotationForSoConversion(ctx: QuotationSoConversionConte
   if (!lines.length) {
     issues.push({ id: 'no-lines', message: 'At least one product / price line is required.', blocking: true })
   } else {
+    const masters = useMasterStore.getState()
+    const checkedIds = new Set<string>()
     for (const line of lines) {
       if (!line.qty || line.qty <= 0) {
         issues.push({ id: `qty-${line.id}`, message: `Quantity required for ${line.description || 'line item'}.`, blocking: true })
       }
       if (!line.unitPrice || line.unitPrice <= 0) {
         issues.push({ id: `price-${line.id}`, message: `Unit price required for ${line.description || 'line item'}.`, blocking: true })
+      }
+      const productId = line.productId ?? salesQuotation?.productId ?? null
+      if (productId && !checkedIds.has(productId)) {
+        checkedIds.add(productId)
+        const product = masters.getProduct(productId)
+        const sellable = assertProductSellableForSales(product)
+        if (!sellable.ok) {
+          issues.push({ id: `product-not-released-${productId}`, message: sellable.error, blocking: true })
+        }
+      }
+    }
+    if (salesQuotation?.productId && !checkedIds.has(salesQuotation.productId)) {
+      const product = masters.getProduct(salesQuotation.productId)
+      const sellable = assertProductSellableForSales(product)
+      if (!sellable.ok) {
+        issues.push({ id: `product-not-released-${salesQuotation.productId}`, message: sellable.error, blocking: true })
       }
     }
   }

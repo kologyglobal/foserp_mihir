@@ -10,7 +10,7 @@ type LocationFieldRowProps = {
   label?: string
   required?: boolean
   readOnly?: boolean
-  colSpan?: 1 | 2
+  colSpan?: 1 | 2 | 3
   hint?: string
 }
 

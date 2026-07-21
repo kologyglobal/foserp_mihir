@@ -71,15 +71,26 @@ export function buildSalesOrderRegisterKpis(input: {
   total: number
   draftCount: number
   confirmedCount: number
+  pendingSoCount?: number
   fromQuotation: number
   directOrders: number
   totalValue: number
   filters: { status: string; source: string }
   onFilter: (patch: { status?: string; source?: string }) => void
 }): EnterpriseKpiItem[] {
-  const { total, draftCount, confirmedCount, fromQuotation, directOrders, totalValue, filters, onFilter } = input
+  const {
+    total,
+    draftCount,
+    confirmedCount,
+    pendingSoCount = 0,
+    fromQuotation,
+    directOrders,
+    totalValue,
+    filters,
+    onFilter,
+  } = input
 
-  // Cap to 4 — Direct SO demoted; source mix kept in Sales Value context
+  // Cap to 4 — Pending SO (won quotes) promoted for handover visibility
   return [
     {
       id: 'total',
@@ -87,20 +98,26 @@ export function buildSalesOrderRegisterKpis(input: {
       value: total,
       icon: ShoppingCart,
       accent: 'blue',
-      trend: draftCount > 0 ? { direction: 'up', label: `${draftCount} draft`, tone: 'neutral' } : undefined,
-      context: `${confirmedCount} confirmed · ${fromQuotation} from quote`,
+      trend: pendingSoCount > 0
+        ? { direction: 'up', label: `${pendingSoCount} pending SO`, tone: 'neutral' }
+        : draftCount > 0
+          ? { direction: 'up', label: `${draftCount} draft`, tone: 'neutral' }
+          : undefined,
+      context: `${confirmedCount} confirmed · ${draftCount} draft`,
       updatedAt: now(),
     },
     {
-      id: 'draft',
-      label: 'Draft SO',
-      value: draftCount,
+      id: 'pending_so',
+      label: 'Pending SO',
+      value: pendingSoCount,
       icon: FileText,
       accent: 'amber',
-      trend: draftCount > 0 ? { direction: 'up', label: 'Awaiting confirmation', tone: 'neutral' } : undefined,
-      context: 'Needs confirmation',
-      active: filters.status === 'open',
-      onClick: () => onFilter({ status: filters.status === 'open' ? '' : 'open' }),
+      trend: pendingSoCount > 0
+        ? { direction: 'up', label: 'Won quotes awaiting SO', tone: 'neutral' }
+        : undefined,
+      context: 'Approved quotation → create SO',
+      active: filters.status === 'pending_so',
+      onClick: () => onFilter({ status: filters.status === 'pending_so' ? '' : 'pending_so' }),
       updatedAt: now(),
     },
     {
@@ -110,7 +127,7 @@ export function buildSalesOrderRegisterKpis(input: {
       icon: KPI_ICON_PRESETS.qualified,
       accent: 'green',
       trend: confirmedCount > 0 ? { direction: 'up', label: 'In fulfillment', tone: 'positive' } : undefined,
-      context: percentOf(confirmedCount, total) + ' of book',
+      context: percentOf(confirmedCount, Math.max(total - pendingSoCount, 0)) + ' of book',
       active: filters.status === 'confirmed',
       onClick: () => onFilter({ status: filters.status === 'confirmed' ? '' : 'confirmed' }),
       updatedAt: now(),

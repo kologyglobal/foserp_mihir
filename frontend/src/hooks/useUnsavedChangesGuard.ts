@@ -4,7 +4,10 @@ import { appConfirm } from '@/store/confirmDialogStore'
 
 /**
  * Blocks in-app navigation and browser unload when the form has unsaved changes.
- * Call `resetDirty()` after a successful save.
+ * Call `resetDirty()` after a successful save (before `navigate()`).
+ *
+ * Uses a ref for the blocker decision so `resetDirty()` + immediate `navigate()`
+ * does not race React state and show a false "Unsaved changes" dialog.
  *
  * In-app leave uses `ConfirmDialog` via `appConfirm` — never `window.confirm`.
  * Tab/window close still uses the native beforeunload prompt (browsers require it).
@@ -39,7 +42,13 @@ export function useUnsavedChangesGuard(enabled: boolean) {
   )
 
   const blocker = useBlocker(
-    useCallback(() => Boolean(enabledRef.current && dirtyRef.current), []),
+    useCallback(({ currentLocation, nextLocation }) => {
+      if (!enabledRef.current || !dirtyRef.current) return false
+      return (
+        currentLocation.pathname !== nextLocation.pathname
+        || currentLocation.search !== nextLocation.search
+      )
+    }, []),
   )
 
   useEffect(() => {

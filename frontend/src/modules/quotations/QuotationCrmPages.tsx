@@ -22,6 +22,8 @@ import { useSalesStore } from '../../store/salesStore'
 import { useMasterStore } from '../../store/masterStore'
 import { useUIStore } from '../../store/uiStore'
 import { notify } from '@/store/toastStore'
+import { isApiMode } from '../../config/apiConfig'
+import { syncQuotationsFromApi } from '../../services/bridges/quotationApiBridge'
 import { systemPrompt } from '@/utils/systemConfirm'
 import {
   CreateBlankQuotationTemplateModal,
@@ -36,6 +38,8 @@ import {
   quotationStatusLabel,
 } from '@/components/quotations'
 import { QuickFollowUpDrawer } from '@/components/crm'
+import { useCrmRecordLoadState } from '@/components/crm/CrmRecordLoadGate'
+import { PageLoadingFallback } from '@/components/system/PageLoadingFallback'
 import { resolveQuotationPrintLayout } from '../../utils/quotationEngine/printLayout'
 import { QuotationPrintDocument } from '@/components/quotations/QuotationPrintDocument'
 import { QuotationTemplateBuilder } from '@/components/quotations/QuotationTemplateBuilder'
@@ -45,11 +49,13 @@ import { buildCrmQuotationRegisterKpis, buildQuotationTemplateKpis } from '../..
 import type { QuotationDocumentStatus } from '../../types/crm'
 import type { QuotationListItem } from '@/components/quotations/QuotationCrmCard'
 import { Quotation360Page } from './Quotation360Page'
-import { Toast } from '../../components/ui/Toast'
 import { resolveCreateSalesOrderGateForQuotationDocument } from '../../utils/opportunitySalesOrderDraft'
 import { resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
 import { useQuotationConversion } from '../crm/hooks/useQuotationConversion'
 import { QuotationConversionDialog } from '@/components/quotations/QuotationConversionDialog'
+import { CrmDeleteConfirmModal } from '@/components/crm/CrmDeleteConfirmModal'
+import { canCrmPermission } from '@/utils/permissions/crm'
+import { isQuotationDeletableStatus } from '@/utils/quotationDeletePolicy'
 
 const QUOTATION_FILTER_FIELDS: CrmFilterField[] = [
   {
@@ -79,7 +85,7 @@ const QUOTATION_FILTER_FIELDS: CrmFilterField[] = [
 
 export function CrmQuotationListPage() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const openDetailPanel = useUIStore((s) => s.openDetailPanel)
   const quotationDocuments = useCrmStore((s) => s.quotationDocuments)
   const conversion = useQuotationConversion()
@@ -93,20 +99,47 @@ export function CrmQuotationListPage() {
   const [segment, setSegment] = useState<'all' | 'pending' | 'draft' | 'approved'>('all')
   const [ownerFilter, setOwnerFilter] = useState('')
   const [followUpQuotation, setFollowUpQuotation] = useState<QuotationListItem | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
+  const [deleteTargets, setDeleteTargets] = useState<QuotationListItem[]>([])
+  const [deleting, setDeleting] = useState(false)
+  const [urlSeeded, setUrlSeeded] = useState(false)
+  const canDelete = canCrmPermission('crm.quotation.delete')
+  const deleteQuotation = useCrmStore((s) => s.deleteQuotation)
 
   useEffect(() => {
+    if (!isApiMode()) return
+    void syncQuotationsFromApi().catch(() => {
+      notify.error('Could not refresh quotations from server')
+    })
+  }, [])
+
+  useEffect(() => {
+    if (urlSeeded) return
     const status = searchParams.get('status')
-    const segment = searchParams.get('segment')
+    const segmentParam = searchParams.get('segment')
     const owner = searchParams.get('owner')
     if (status) setStatusFilter(status as QuotationDocumentStatus)
-    if (segment === 'pending' || segment === 'draft' || segment === 'approved') {
-      setSegment(segment)
-    } else if (segment === 'all') {
+    if (segmentParam === 'pending' || segmentParam === 'draft' || segmentParam === 'approved') {
+      setSegment(segmentParam)
+    } else if (segmentParam === 'all') {
       setSegment('all')
     }
     if (owner) setOwnerFilter(owner)
-  }, [searchParams])
+    setUrlSeeded(true)
+  }, [searchParams, urlSeeded])
+
+  useEffect(() => {
+    if (!urlSeeded) return
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (statusFilter) next.set('status', statusFilter)
+      else next.delete('status')
+      if (segment && segment !== 'all') next.set('segment', segment)
+      else next.delete('segment')
+      if (ownerFilter) next.set('owner', ownerFilter)
+      else next.delete('owner')
+      return next
+    }, { replace: true })
+  }, [statusFilter, segment, ownerFilter, urlSeeded, setSearchParams])
 
   const applyQuotationFilters = useCallback((saved: Record<string, string>) => {
     setSearch(saved.search ?? '')
@@ -149,6 +182,7 @@ export function CrmQuotationListPage() {
         quotationNo: q?.quotationNo ?? document.quotationId,
         customerName: cust?.customerName ?? 'Customer',
         opportunityName: opp?.opportunityName,
+        customerApproval: q?.customerApproval,
         revisionCount: revCounts.get(document.quotationId) ?? 1,
         quotationDate: document.createdAt?.slice(0, 10) ?? q?.createdAt?.slice(0, 10) ?? '',
         expiryDate: q?.validityDate?.slice(0, 10) ?? '',
@@ -266,7 +300,13 @@ export function CrmQuotationListPage() {
       subtitle: `${item.customerName}${item.opportunityName ? ` · ${item.opportunityName}` : ''}`,
       fields: [
         { label: 'Customer', value: item.customerName },
-        { label: 'Status', value: quotationStatusLabel(d.status) },
+        {
+          label: 'Status',
+          value:
+            d.status === 'sent' && item.customerApproval === 'approved'
+              ? 'Customer Approved'
+              : quotationStatusLabel(d.status),
+        },
         { label: 'Revision', value: `R${d.revisionNo} (${item.revisionCount} total)` },
         { label: 'Total', value: formatCrmCurrency(d.totalAmount) },
         { label: 'Last Modified', value: d.modifiedAt ? new Date(d.modifiedAt).toLocaleDateString('en-IN') : '—' },
@@ -315,7 +355,7 @@ export function CrmQuotationListPage() {
       },
       'crm-quotations.csv',
     ).then((r) => {
-      if (!r.ok) setToast(r.error ?? 'Export failed')
+      if (!r.ok) notify.error(r.error ?? 'Export failed')
     })
   }
 
@@ -329,7 +369,9 @@ export function CrmQuotationListPage() {
         item.quotationDate,
         item.expiryDate,
         item.document.totalAmount,
-        quotationStatusLabel(item.document.status),
+        item.document.status === 'sent' && item.customerApproval === 'approved'
+          ? 'Customer Approved'
+          : quotationStatusLabel(item.document.status),
         item.ownerName,
         item.document.revisionNo,
       ]),
@@ -342,6 +384,66 @@ export function CrmQuotationListPage() {
     const q = getQuotation(item.document.quotationId)
     if (q?.customerId) params.set('customerId', q.customerId)
     navigate(`/crm/quotations/new?${params.toString()}`)
+  }
+
+  async function reviseQuotation(item: QuotationListItem) {
+    const soGate = resolveCreateSalesOrderGateForQuotationDocument(item.document.id)
+    if (item.document.status !== 'approved' || soGate.salesOrderId) {
+      notify.error(
+        soGate.salesOrderId
+          ? 'Revised quotation is not available after a sales order is created.'
+          : 'Revised quotation is only available for approved quotations.',
+      )
+      return
+    }
+    const reason = await systemPrompt({
+      title: 'Revised Quotation',
+      description: 'Describe why a new revision is needed. Company details stay locked on the revision.',
+      fieldLabel: 'Revision reason',
+      defaultValue: 'Customer requested changes',
+      confirmLabel: 'Create revision',
+      required: true,
+    })
+    if (!reason) return
+    const createRevision = useCrmStore.getState().createQuotationRevision
+    const r = await resolveStoreAction(createRevision(item.document.id, reason))
+    if (r.ok && r.documentId) {
+      notify.success('Quotation revised successfully')
+      navigate(`/crm/quotations/${item.document.quotationId}/editor?doc=${r.documentId}`)
+    } else {
+      notify.error(r.error ?? 'Could not create revised quotation')
+    }
+  }
+
+  function requestDeleteQuotations(rows: QuotationListItem[]) {
+    const draftRows = rows.filter((r) => isQuotationDeletableStatus(r.document.status))
+    if (draftRows.length === 0) {
+      notify.warning('Only draft quotations can be deleted')
+      return
+    }
+    if (draftRows.length !== rows.length) {
+      notify.warning('Non-draft quotations cannot be deleted and were excluded')
+    }
+    setDeleteTargets(draftRows)
+  }
+
+  async function confirmDeleteQuotations() {
+    if (deleteTargets.length === 0) return
+    setDeleting(true)
+    try {
+      let okCount = 0
+      for (const row of deleteTargets) {
+        const r = await resolveStoreAction(deleteQuotation(row.document.quotationId))
+        if (r.ok) okCount += 1
+        else notify.error(r.error ?? `Could not delete ${row.quotationNo}`)
+      }
+      if (okCount > 0) {
+        notify.success(okCount === 1 ? 'Quotation deleted' : `${okCount} quotations deleted`)
+        setDeleteTargets([])
+      }
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -427,6 +529,7 @@ export function CrmQuotationListPage() {
           onView={openQuotation}
           onEdit={editQuotation}
           onDuplicate={duplicateQuotation}
+          onRevise={(item) => void reviseQuotation(item)}
           onPreview={openQuotationPreview}
           onCreateSalesOrder={(item) => {
             const gate = resolveCreateSalesOrderGateForQuotationDocument(item.document.id)
@@ -441,10 +544,100 @@ export function CrmQuotationListPage() {
             conversion.openConversionModal(item.document.id)
           }}
           onPrint={(item) => navigate(`/crm/quotations/${item.document.quotationId}/preview?doc=${item.document.id}`)}
-          onSubmitApproval={(item) => navigate(`/crm/quotations/${item.document.quotationId}/editor?doc=${item.document.id}`)}
+          onSubmitApproval={(item) => {
+            void (async () => {
+              if (item.document.status !== 'draft' && item.document.status !== 'rejected') {
+                notify.warning('Only draft or rejected quotations can be submitted for approval')
+                return
+              }
+              const submit = useCrmStore.getState().submitQuotationDocumentForApproval
+              const r = await resolveStoreAction(submit(item.document.id))
+              if (!r.ok) {
+                notify.error(r.error ?? 'Could not submit for approval')
+                return
+              }
+              notify.success('Quotation submitted for approval')
+              navigate('/crm/quotations')
+            })()
+          }}
+          onApprove={(item) => {
+            void (async () => {
+              if (item.document.status !== 'pending_approval') {
+                notify.warning('Only pending quotations can be approved')
+                return
+              }
+              const r = await resolveStoreAction(
+                useCrmStore.getState().approveQuotationDocument(item.document.id, 'Approved from list'),
+              )
+              if (!r.ok) {
+                notify.error(r.error ?? 'Could not approve')
+                return
+              }
+              notify.success('Quotation approved')
+            })()
+          }}
+          onReject={(item) => {
+            void (async () => {
+              if (item.document.status !== 'pending_approval') {
+                notify.warning('Only pending quotations can be rejected')
+                return
+              }
+              const remarks = await systemPrompt({
+                title: 'Reject quotation',
+                description: 'Provide a reason for rejection.',
+                fieldLabel: 'Rejection reason',
+                defaultValue: '',
+                confirmLabel: 'Reject',
+                required: true,
+              })
+              if (!remarks) return
+              const r = await resolveStoreAction(
+                useCrmStore.getState().rejectQuotationDocument(item.document.id, remarks),
+              )
+              if (!r.ok) {
+                notify.error(r.error ?? 'Could not reject')
+                return
+              }
+              notify.success('Quotation rejected')
+            })()
+          }}
+          onMarkSent={(item) => {
+            void (async () => {
+              if (item.document.status !== 'approved') {
+                notify.warning('Only approved quotations can be sent')
+                return
+              }
+              const r = await resolveStoreAction(
+                useCrmStore.getState().markQuotationDocumentSent(item.document.id),
+              )
+              if (!r.ok) {
+                notify.error(r.error ?? 'Could not send quotation')
+                return
+              }
+              notify.success('Quotation sent to customer')
+            })()
+          }}
+          onCustomerApprove={(item) => {
+            void (async () => {
+              if (item.document.status !== 'sent') {
+                notify.warning('Only sent quotations can receive customer approval')
+                return
+              }
+              const r = await resolveStoreAction(
+                useCrmStore.getState().customerApproveQuotationDocument(item.document.id, 'Customer approved from list'),
+              )
+              if (!r.ok) {
+                notify.error(r.error ?? 'Could not record customer approval')
+                return
+              }
+              notify.success('Customer approval recorded')
+            })()
+          }}
           onScheduleActivity={(item) => setFollowUpQuotation(item)}
           onBulkExport={exportSelectedQuotations}
+          onBulkDelete={canDelete ? requestDeleteQuotations : undefined}
           canEdit
+          canDelete={canDelete}
         />
       </EnterpriseRegisterTableShell>
       <QuotationConversionDialog
@@ -452,6 +645,19 @@ export function CrmQuotationListPage() {
         onViewSalesOrder={(salesOrderId) => navigate(resolveSalesOrderDetailPath(salesOrderId, true))}
       />
     </OperationalPageShell>
+    <CrmDeleteConfirmModal
+      open={deleteTargets.length > 0}
+      title={deleteTargets.length > 1 ? `Delete ${deleteTargets.length} quotations?` : 'Delete quotation?'}
+      description={
+        deleteTargets.length === 1
+          ? `"${deleteTargets[0]!.quotationNo}" will be permanently removed. Only draft quotations can be deleted.`
+          : 'Selected draft quotations will be permanently removed. Non-draft quotations cannot be deleted.'
+      }
+      confirmLabel={deleteTargets.length > 1 ? 'Delete quotations' : 'Delete quotation'}
+      onCancel={() => setDeleteTargets([])}
+      onConfirm={() => void confirmDeleteQuotations()}
+      isDeleting={deleting}
+    />
     <CrmFilterDrawer
       open={filterDrawer.open}
       onClose={filterDrawer.closeDrawer}
@@ -475,7 +681,6 @@ export function CrmQuotationListPage() {
         customerId: followUpQuotation ? getQuotation(followUpQuotation.document.quotationId)?.customerId : undefined,
       }}
     />
-    {toast ? <Toast message={toast} variant="error" /> : null}
     </>
   )
 }
@@ -485,9 +690,20 @@ export function CrmQuotationEditorPage() {
   const [params] = useSearchParams()
   const docId = params.get('doc')
   const getLatest = useCrmStore((s) => s.getLatestQuotationDocument)
+  const getDoc = useCrmStore((s) => s.getQuotationDocument)
   const documentId = docId ?? (id ? getLatest(id)?.id : undefined)
+  const found = Boolean(documentId && getDoc(documentId!))
+  const { showLoader, showNotFound } = useCrmRecordLoadState(found)
 
-  if (!documentId) {
+  if (showLoader) {
+    return (
+      <OperationalPageShell title="Quotation Editor" variant="dynamics" badge="CRM">
+        <PageLoadingFallback label="Loading quotation editor…" />
+      </OperationalPageShell>
+    )
+  }
+
+  if (showNotFound || !documentId) {
     return (
       <OperationalPageShell title="Quotation Editor" variant="dynamics" badge="CRM">
         <div className="quo-editor-empty">

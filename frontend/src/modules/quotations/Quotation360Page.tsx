@@ -9,7 +9,6 @@ import {
   GitBranch,
   Paperclip,
 } from 'lucide-react'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import {
   ErpAdditionalInfoToggle,
   ErpAdditionalInfoPanel,
@@ -19,7 +18,7 @@ import {
 import { CrmCardFormShell, ENTERPRISE_FORM_CLASS } from '@/components/crm/CrmCardFormShell'
 import { Quotation360RecordHeader } from '@/components/quotations/Quotation360RecordHeader'
 import { QuotationSummaryCard } from '@/components/quotations/QuotationSummaryCard'
-import { QuotationNotesCard } from '@/components/quotations/QuotationNotesCard'
+import { CrmStageNotes } from '@/components/crm/shared/CrmStageNotes'
 import { QuotationSmartOverviewPanel } from '@/components/quotations/QuotationSmartOverviewPanel'
 import { crmBreadcrumbs } from '../../utils/crmNavigation'
 import { formatDate } from '../../utils/dates/format'
@@ -37,12 +36,16 @@ import {
   QuotationCommercialSummary,
   QuotationSectionList,
   quotationStatusLabel,
+  quotationRevisionLabel,
 } from '@/components/quotations'
 import { QuickFollowUpDrawer, LogActivityDrawer } from '@/components/crm'
 import { CrmUnifiedActivityFeed } from '@/components/crm/CrmUnifiedActivityFeed'
 import { CrmDeleteConfirmModal } from '@/components/crm/CrmDeleteConfirmModal'
 import { EntityAttachmentsPanel } from '../../components/crm/shared/EntityAttachmentsPanel'
-import { demoNotesFromTexts } from '../../utils/crmEntityNotes'
+import { demoNotesFromTexts, entityNotesToFeedNotes } from '../../utils/crmEntityNotes'
+import { opportunityRequirementDisplay } from '../../utils/leadRequirementLines'
+import { QUOTATION_NOTE_STAGE_OPTIONS, quotationNoteStageLabel } from '@/utils/crmNoteStageOptions'
+import type { CrmEntityNoteDto } from '../../services/api/crmApi'
 import type { CrmActivity, FollowUp, QuotationDocumentStatus } from '../../types/crm'
 import { ErpButton } from '../../components/erp/ErpButton'
 import { Enterprise360Documents } from '../../design-system/workspace360'
@@ -50,16 +53,20 @@ import { useQuotationAttachmentStore } from '../../store/quotationAttachmentStor
 import { useApiMode } from '../../hooks/useApiMode'
 import { resolveCreateSalesOrderGateForQuotationDocument } from '../../utils/opportunitySalesOrderDraft'
 import { resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
+import { resolveQuotationRevisionPolicy } from '../../utils/quotationRevisionPolicy'
 import { OpportunityQuotationValueMismatchBanner } from '../../components/crm/OpportunityQuotationValueMismatchBanner'
 import { buildUnifiedFeed } from '../../utils/crmUnifiedFeed'
 import { canCrmPermission } from '../../utils/permissions/crm'
+import { isQuotationDeletableStatus } from '../../utils/quotationDeletePolicy'
 import { useQuotationConversion } from '../crm/hooks/useQuotationConversion'
 import { QuotationConversionDialog } from '@/components/quotations/QuotationConversionDialog'
+import { useCrmRecordLoadState } from '@/components/crm/CrmRecordLoadGate'
+import { PageLoadingFallback } from '@/components/system/PageLoadingFallback'
 
 function mapStatusTone(
   status: QuotationDocumentStatus,
 ): 'neutral' | 'info' | 'success' | 'warning' | 'critical' {
-  if (status === 'approved' || status === 'converted') return 'success'
+  if (status === 'approved' || status === 'converted' || status === 'sent') return 'success'
   if (status === 'rejected') return 'critical'
   if (status === 'pending_approval' || status === 'draft') return 'warning'
   return 'info'
@@ -80,7 +87,10 @@ export function Quotation360Page() {
   const submitForApproval = useCrmStore((s) => s.submitQuotationDocumentForApproval)
   const markSent = useCrmStore((s) => s.markQuotationDocumentSent)
   const approveDocument = useCrmStore((s) => s.approveQuotationDocument)
+  const recallQuotationDocument = useCrmStore((s) => s.recallQuotationDocumentFromApproval)
+  const customerApproveDocument = useCrmStore((s) => s.customerApproveQuotationDocument)
   const createRevision = useCrmStore((s) => s.createQuotationRevision)
+  const deleteQuotation = useCrmStore((s) => s.deleteQuotation)
   const updateOpportunity = useCrmStore((s) => s.updateOpportunity)
   const getQuotation = useSalesStore((s) => s.getQuotation)
   const customers = useMasterStore((s) => s.customers)
@@ -95,14 +105,18 @@ export function Quotation360Page() {
   const [editingFollowUp, setEditingFollowUp] = useState<FollowUp | null>(null)
   const [deleteActivityTarget, setDeleteActivityTarget] = useState<CrmActivity | null>(null)
   const [deleteFollowUpTarget, setDeleteFollowUpTarget] = useState<FollowUp | null>(null)
+  const [deleteQuotationOpen, setDeleteQuotationOpen] = useState(false)
+  const [deletingQuotation, setDeletingQuotation] = useState(false)
   const [pendingActivityId, setPendingActivityId] = useState<string | null>(null)
   const [pendingFollowUpId, setPendingFollowUpId] = useState<string | null>(null)
+  const [actionBusy, setActionBusy] = useState(false)
   const canAddActivity = canCrmPermission('crm.activity.create')
   const canAddFollowUp = canCrmPermission('crm.follow_up.create')
   const canEditActivity = canCrmPermission('crm.activity.update')
   const canDeleteActivity = canCrmPermission('crm.activity.delete')
   const canEditFollowUp = canCrmPermission('crm.follow_up.update')
   const canDeleteFollowUp = canCrmPermission('crm.follow_up.delete')
+  const canDeleteQuotationPerm = canCrmPermission('crm.quotation.delete')
   const conversion = useQuotationConversion()
 
   const doc = id ? getLatest(id) : undefined
@@ -142,12 +156,15 @@ export function Quotation360Page() {
   }, [quoActivities])
 
   const quoDemoNotes = useMemo(
+    // opportunityRequirementDisplay: legacy docs stored the encoded <!--fos-lead-lines--> payload here.
     () => demoNotesFromTexts([
-      { label: 'Commercial notes', text: doc?.commercialNotes },
-      { label: 'Technical notes', text: doc?.technicalNotes },
+      { label: 'Commercial notes', text: opportunityRequirementDisplay(doc?.commercialNotes) },
+      { label: 'Technical notes', text: opportunityRequirementDisplay(doc?.technicalNotes) },
     ]),
     [doc?.commercialNotes, doc?.technicalNotes],
   )
+  /** API entity notes reported by the Notes card — merged into the unified feed. */
+  const [entityNotes, setEntityNotes] = useState<CrmEntityNoteDto[]>([])
 
   const nextQuoFollowUp = useMemo(
     () => quoFollowUps.find((f) => f.status === 'pending' || f.status === 'overdue') ?? null,
@@ -158,12 +175,12 @@ export function Quotation360Page() {
     () => buildUnifiedFeed({
       activities: quoActivities,
       followUps: quoFollowUps,
-      notes: quoDemoNotes,
+      notes: [...quoDemoNotes, ...entityNotesToFeedNotes(entityNotes, quotationNoteStageLabel)],
       systemEvents: doc
         ? [{ id: 'created', label: 'Quotation Document', date: doc.createdAt?.slice(0, 10) || doc.modifiedAt?.slice(0, 10) || new Date().toISOString().slice(0, 10) }]
         : [],
     }),
-    [quoActivities, quoFollowUps, quoDemoNotes, doc],
+    [quoActivities, quoFollowUps, quoDemoNotes, entityNotes, doc],
   )
 
   const quotationAttachments = useMemo(
@@ -268,7 +285,14 @@ export function Quotation360Page() {
     quoDocs.length,
   ])
 
-  if (!id || !doc || !quotation) {
+  const recordReady = Boolean(id && doc && quotation)
+  const { showLoader, showNotFound } = useCrmRecordLoadState(recordReady)
+
+  if (showLoader) {
+    return <PageLoadingFallback label="Loading quotation…" />
+  }
+
+  if (showNotFound || !id || !doc || !quotation) {
     return (
       <div className="erp-page flex flex-col items-center justify-center gap-3 p-12 text-center">
         <p className="text-erp-muted">Quotation not found.</p>
@@ -287,26 +311,95 @@ export function Quotation360Page() {
   const contactEmail = contact?.email || customer?.contactEmail || ''
   const contactName = contact?.name ?? customer?.contactPerson
 
-  const canEdit = !quoDoc.locked && quoDoc.status !== 'converted'
-  const canSubmit = ['draft', 'sent'].includes(quoDoc.status) && !quoDoc.locked
-  const canMarkSent = quoDoc.status === 'draft' && !quoDoc.locked
+  const revisionPolicy = resolveQuotationRevisionPolicy({
+    status: quoDoc.status,
+    customerApproval: quo?.customerApproval ?? 'pending',
+    isLatest: true,
+  })
+  const canEdit = revisionPolicy.canDirectEdit && !quoDoc.locked
+  const canSubmit = (quoDoc.status === 'draft' || quoDoc.status === 'rejected') && !quoDoc.locked
   const canApprove = quoDoc.status === 'pending_approval'
-  const canRevise = quoDoc.locked || quoDoc.status === 'approved' || quoDoc.status === 'rejected'
+  const canRecall = quoDoc.status === 'pending_approval'
+  const canMarkSent = quoDoc.status === 'approved'
+  const canCustomerApprove = quoDoc.status === 'sent' && quo?.customerApproval === 'pending'
+  const canRevise = revisionPolicy.canCreateRevision
+  const canDeleteQuotation =
+    canDeleteQuotationPerm
+    && isQuotationDeletableStatus(quoDoc.status)
+    && isQuotationDeletableStatus(quotation?.status ?? quoDoc.status)
   const soGate = resolveCreateSalesOrderGateForQuotationDocument(quoDoc.id)
 
   async function handleSubmitApproval() {
-    const r = await resolveStoreAction(submitForApproval(quoDoc.id))
-    if (!r.ok) notify.error(r.error ?? 'Could not submit')
+    setActionBusy(true)
+    try {
+      const r = await resolveStoreAction(submitForApproval(quoDoc.id))
+      if (!r.ok) {
+        notify.error(r.error ?? 'Could not submit')
+        return
+      }
+      notify.success('Quotation submitted for approval')
+      navigate('/crm/quotations')
+    } finally {
+      setActionBusy(false)
+    }
   }
 
   async function handleMarkSent() {
-    const r = await resolveStoreAction(markSent(quoDoc.id))
-    if (!r.ok) notify.error(r.error ?? 'Could not mark sent')
+    setActionBusy(true)
+    try {
+      const r = await resolveStoreAction(markSent(quoDoc.id))
+      if (!r.ok) {
+        notify.error(r.error ?? 'Could not mark sent')
+        return
+      }
+      notify.success('Quotation sent to customer')
+    } finally {
+      setActionBusy(false)
+    }
   }
 
   async function handleApprove() {
-    const r = await resolveStoreAction(approveDocument(quoDoc.id, 'Approved from Quotation 360'))
-    if (!r.ok) notify.error(r.error ?? 'Could not approve')
+    setActionBusy(true)
+    try {
+      const r = await resolveStoreAction(approveDocument(quoDoc.id, 'Approved from Quotation 360'))
+      if (!r.ok) {
+        notify.error(r.error ?? 'Could not approve')
+        return
+      }
+      notify.success('Quotation approved')
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  async function handleRecall() {
+    setActionBusy(true)
+    try {
+      const r = await resolveStoreAction(
+        recallQuotationDocument(quoDoc.id, 'Recalled to Draft from Quotation 360'),
+      )
+      if (!r.ok) {
+        notify.error(r.error ?? 'Could not recall quotation')
+        return
+      }
+      notify.success('Quotation recalled to Draft — you can edit directly')
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  async function handleCustomerApprove() {
+    setActionBusy(true)
+    try {
+      const r = await resolveStoreAction(customerApproveDocument(quoDoc.id, 'Customer approved from Quotation 360'))
+      if (!r.ok) {
+        notify.error(r.error ?? 'Could not record customer approval')
+        return
+      }
+      notify.success('Customer approval recorded')
+    } finally {
+      setActionBusy(false)
+    }
   }
 
   async function handleNewRevision() {
@@ -319,11 +412,17 @@ export function Quotation360Page() {
       required: true,
     })
     if (!reason) return
-    const r = await resolveStoreAction(createRevision(quoDoc.id, reason))
-    if (r.ok && r.documentId) {
-      navigate(`/crm/quotations/${quoId}/editor?doc=${r.documentId}`)
-    } else {
-      notify.error(r.error ?? 'Could not create revision')
+    setActionBusy(true)
+    try {
+      const r = await resolveStoreAction(createRevision(quoDoc.id, reason))
+      if (r.ok && r.documentId) {
+        notify.success('Quotation revised successfully')
+        navigate(`/crm/quotations/${quoId}/editor?doc=${r.documentId}`)
+      } else {
+        notify.error(r.error ?? 'Could not create revision')
+      }
+    } finally {
+      setActionBusy(false)
     }
   }
 
@@ -365,7 +464,7 @@ export function Quotation360Page() {
       return
     }
     if (!soGate.enabled) {
-      notify.error(soGate.disabledReason ?? 'Available after quotation approval.')
+      notify.error(soGate.disabledReason ?? 'Available after customer approval.')
       return
     }
     conversion.openConversionModal(quoDoc.id)
@@ -375,7 +474,8 @@ export function Quotation360Page() {
     quotationNo: quo.quotationNo,
     customerName: customer?.customerName ?? '',
     customerId: quo.customerId,
-    status: quotationStatusLabel(quoDoc.status),
+    status: quoDoc.status,
+    customerApproval: quo?.customerApproval ?? 'pending',
     lineCount: quoDoc.priceLines.length,
     hasValidLine: quoDoc.priceLines.some((l) => l.productOrItem?.trim() && l.qty > 0 && l.unitPrice > 0),
     grandTotal: quoDoc.totalAmount,
@@ -399,8 +499,11 @@ export function Quotation360Page() {
       canMarkSent={canMarkSent}
       canSubmitApproval={canSubmit}
       canApprove={canApprove}
+      canRecall={canRecall}
+      canCustomerApprove={canCustomerApprove}
       canRevise={canRevise}
-      showCreateSalesOrder={soGate.showCreate || Boolean(soGate.salesOrderId)}
+      canDelete={canDeleteQuotation}
+      showCreateSalesOrder={soGate.enabled || Boolean(soGate.salesOrderId)}
       canCreateSalesOrder={soGate.enabled}
       createSalesOrderDisabledReason={soGate.disabledReason}
       salesOrderId={soGate.salesOrderId ?? quo.salesOrderId ?? quoDoc.salesOrderId ?? null}
@@ -410,8 +513,11 @@ export function Quotation360Page() {
       onMarkSent={() => void handleMarkSent()}
       onSubmitApproval={() => void handleSubmitApproval()}
       onApprove={() => void handleApprove()}
+      onRecall={() => void handleRecall()}
+      onCustomerApprove={() => void handleCustomerApprove()}
       onNewRevision={() => void handleNewRevision()}
       onCreateSalesOrder={openConvertToSalesOrder}
+      onDelete={canDeleteQuotation ? () => setDeleteQuotationOpen(true) : undefined}
       onViewSalesOrder={
         (soGate.salesOrderId ?? quo.salesOrderId ?? quoDoc.salesOrderId)
           ? () =>
@@ -433,6 +539,10 @@ export function Quotation360Page() {
       onGoToSection={scrollToSection}
       onEdit={() => navigate(`/crm/quotations/${quoId}/editor?doc=${quoDoc.id}`)}
       onPreview={() => navigate(`/crm/quotations/${quoId}/preview?doc=${quoDoc.id}`)}
+      onSubmitApproval={() => void handleSubmitApproval()}
+      onApprove={() => void handleApprove()}
+      onMarkSent={() => void handleMarkSent()}
+      onCustomerApprove={() => void handleCustomerApprove()}
       onCreateSalesOrder={openConvertToSalesOrder}
       canEdit={canEdit}
     />
@@ -440,6 +550,15 @@ export function Quotation360Page() {
 
   return (
     <>
+      {actionBusy ? (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-white/60"
+          role="status"
+          aria-live="polite"
+        >
+          <PageLoadingFallback label="Updating quotation…" />
+        </div>
+      ) : null}
       <QuotationConversionDialog
         conversion={conversion}
         onViewSalesOrder={(salesOrderId) => navigate(resolveSalesOrderDetailPath(salesOrderId, true))}
@@ -451,7 +570,7 @@ export function Quotation360Page() {
         recordTitle={quo.quotationNo}
         status={quotationStatusLabel(quoDoc.status)}
         statusTone={mapStatusTone(quoDoc.status)}
-        stage={quo.inquiryNo ?? `R${quoDoc.revisionNo}`}
+        stage={quo.inquiryNo ?? quotationRevisionLabel(quoDoc.revisionNo)}
         createdDate={formatDate(quo.createdAt)}
         owner={quoDoc.salesOwnerName ?? 'Unassigned'}
         company={customer?.customerName}
@@ -470,22 +589,42 @@ export function Quotation360Page() {
         stickyFooter={false}
       >
         <div className="erp-form-body crm-lead-form-body">
-          <div className="erp-form-body__toolbar">
-            <FactBoxPaneAiToggle />
-          </div>
 
-          {quoDoc.status === 'converted' && (quoDoc.salesOrderNo || quo.salesOrderId) ? (
+          {quoDoc.status === 'converted' && (quoDoc.salesOrderNo || quo.salesOrderId || soGate.salesOrderId) ? (
             <div className="dyn-detail-banner dyn-detail-banner--success">
-              Converted
-              {quoDoc.salesOrderNo ? ` — linked to ${quoDoc.salesOrderNo}` : ''}.
-              {' '}
-              Operational actions run from the Sales module.
+              Converted to Sales Order
+              {quoDoc.salesOrderNo || quo.salesOrderNo ? (
+                <>
+                  {' '}
+                  —
+                  {' '}
+                  <button
+                    type="button"
+                    className="font-mono font-semibold underline-offset-2 hover:underline"
+                    onClick={() => {
+                      const soId = soGate.salesOrderId ?? quo.salesOrderId ?? quoDoc.salesOrderId
+                      if (soId) navigate(resolveSalesOrderDetailPath(soId, true))
+                    }}
+                  >
+                    {quoDoc.salesOrderNo ?? quo.salesOrderNo}
+                  </button>
+                </>
+              ) : null}
+              . Operational actions continue in Sales.
             </div>
           ) : null}
 
-          {quoDoc.status === 'rejected' ? (
+          {quoDoc.status === 'rejected' || quo?.customerApproval === 'rejected' ? (
             <div className="dyn-detail-banner dyn-detail-banner--critical">
-              Quotation rejected — create a new revision to address feedback and resubmit.
+              {quoDoc.status === 'rejected'
+                ? 'Internally rejected — create a new revision (or edit and resubmit) to continue.'
+                : 'Customer rejected — create a new revision to address feedback and resend.'}
+            </div>
+          ) : null}
+
+          {quoDoc.status === 'pending_approval' ? (
+            <div className="dyn-detail-banner dyn-detail-banner--warning">
+              Pending internal approval — revision is not available. Approve, Reject, or Recall to Draft first.
             </div>
           ) : null}
 
@@ -508,7 +647,23 @@ export function Quotation360Page() {
           ) : null}
 
           <div className="dyn-detail-pipeline">
-            <QuotationWorkflowStepper status={quoDoc.status} />
+            <QuotationWorkflowStepper
+              status={quoDoc.status}
+              customerApproval={quo?.customerApproval}
+              salesOrderId={soGate.salesOrderId ?? quo.salesOrderId ?? quoDoc.salesOrderId ?? null}
+              salesOrderNo={quoDoc.salesOrderNo ?? quo.salesOrderNo ?? null}
+              onViewSalesOrder={
+                (soGate.salesOrderId ?? quo.salesOrderId ?? quoDoc.salesOrderId)
+                  ? () =>
+                      navigate(
+                        resolveSalesOrderDetailPath(
+                          soGate.salesOrderId ?? quo.salesOrderId ?? quoDoc.salesOrderId!,
+                          true,
+                        ),
+                      )
+                  : undefined
+              }
+            />
           </div>
 
           <QuotationSummaryCard
@@ -527,12 +682,18 @@ export function Quotation360Page() {
             lastActivityLabel={lastActivity?.subject ?? null}
           />
 
-          <QuotationNotesCard
-            quotationId={quoId}
+          <CrmStageNotes
+            entityType="QUOTATION"
+            entityId={quoId}
+            sectionId="quo-section-notes"
+            stageOptions={QUOTATION_NOTE_STAGE_OPTIONS}
+            historyLabel="Quotation notes history"
+            currentStage={quoDoc.status}
             demoNotes={quoDemoNotes}
             editPath={canEdit ? `/crm/quotations/${quoId}/editor?doc=${quoDoc.id}` : undefined}
             composerOpen={noteComposerOpen}
             onComposerOpenChange={setNoteComposerOpen}
+            onNotesChange={setEntityNotes}
           />
 
           <ErpAdditionalInfoToggle
@@ -560,7 +721,7 @@ export function Quotation360Page() {
                     probability={opportunity?.probability ?? 0}
                     readOnly
                     showFreightExtras
-                    scopeNotes={quoDoc.commercialNotes ?? ''}
+                    scopeNotes={opportunityRequirementDisplay(quoDoc.commercialNotes)}
                   />
                 ),
                 commercial: (
@@ -694,6 +855,31 @@ export function Quotation360Page() {
           opportunityId: doc.opportunityId,
         }}
         activity={editingActivity}
+      />
+      <CrmDeleteConfirmModal
+        open={deleteQuotationOpen}
+        title="Delete quotation?"
+        description={`"${quo.quotationNo}" will be permanently removed. Only draft quotations can be deleted.`}
+        confirmLabel="Delete quotation"
+        onCancel={() => setDeleteQuotationOpen(false)}
+        onConfirm={() => {
+          void (async () => {
+            setDeletingQuotation(true)
+            try {
+              const r = await resolveStoreAction(deleteQuotation(quoId))
+              if (r.ok) {
+                notify.success('Quotation deleted')
+                setDeleteQuotationOpen(false)
+                navigate('/crm/quotations')
+              } else {
+                notify.error(r.error ?? 'Could not delete quotation')
+              }
+            } finally {
+              setDeletingQuotation(false)
+            }
+          })()
+        }}
+        isDeleting={deletingQuotation}
       />
       <CrmDeleteConfirmModal
         open={Boolean(deleteActivityTarget)}

@@ -454,7 +454,7 @@ describe.skipIf(!dbAvailable)('Finance Phase 3A5 — AR reporting', () => {
     expect(res.body.data.exceptions).toEqual([])
   })
 
-  it('returns MISMATCH when open item amount is altered after post', async () => {
+  it('returns MISMATCH when open item balance invariant is broken after post', async () => {
     const invoiceId = await postInvoice(fx)
     const openItem = await prisma.receivableOpenItem.findFirst({ where: { tenantId: fx.tenantId, salesInvoiceId: invoiceId } })
     expect(openItem).toBeTruthy()
@@ -469,7 +469,12 @@ describe.skipIf(!dbAvailable)('Finance Phase 3A5 — AR reporting', () => {
       .query({ legalEntityId: fx.legalEntityId })
     expect(res.status).toBe(200)
     expect(res.body.data.status).toBe('MISMATCH')
-    expect(res.body.data.exceptions.some((e: { code: string }) => e.code === 'OPEN_ITEM_GL_AMOUNT_MISMATCH')).toBe(true)
+    expect(
+      res.body.data.exceptions.some(
+        (e: { code: string }) =>
+          e.code === 'DEBIT_OPEN_ITEM_BALANCE_MISMATCH' || e.code === 'OPEN_ITEM_GL_AMOUNT_MISMATCH',
+      ),
+    ).toBe(true)
 
     await prisma.receivableOpenItem.update({
       where: { id: openItem!.id },

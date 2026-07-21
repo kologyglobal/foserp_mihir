@@ -1,48 +1,82 @@
 /**
- * Idempotent permission sync: upserts every PERMISSIONS entry and re-attaches
- * role grants per ROLE_PERMISSIONS for all existing roles (system + tenant).
- * Safe to run on live databases — never deletes grants.
+ * Backfill the permission catalog and role→permission links on an existing database.
  *
- * Run: npx tsx scripts/sync-permissions.ts
+ * Safe for production: idempotent upserts only — never touches users, tenants,
+ * business data, or removes existing grants. Run after deploying a build that
+ * added new permissions (e.g. crm.quotation.convert) so already-seeded roles
+ * like Tenant Admin / Sales Manager pick them up.
+ *
+ * Usage (from backend/):
+ *   npx tsx scripts/sync-permissions.ts            # apply
+ *   npx tsx scripts/sync-permissions.ts --dry-run  # report only
+ *
+ * Users must log out and back in afterwards — session permissions are issued at login.
  */
-import { PERMISSIONS, ROLE_PERMISSIONS } from '../src/constants/permissions.js'
 import { prisma } from '../src/config/database.js'
+import { PERMISSIONS, ROLE_PERMISSIONS } from '../src/constants/permissions.js'
+
+const dryRun = process.argv.includes('--dry-run')
 
 async function main() {
-  const permIdByName = new Map<string, string>()
-  for (const name of PERMISSIONS) {
+  const existing = await prisma.permission.findMany({ select: { id: true, name: true } })
+  const permissionIdByName = new Map(existing.map((p) => [p.name, p.id]))
+
+  const missingCatalog = PERMISSIONS.filter((name) => !permissionIdByName.has(name))
+  console.log(`Permission catalog: ${existing.length} in DB, ${PERMISSIONS.length} in code, ${missingCatalog.length} missing`)
+  for (const name of missingCatalog) {
+    console.log(`  + permission ${name}`)
+    if (dryRun) continue
     const [module] = name.split('.')
     const perm = await prisma.permission.upsert({
       where: { name },
       create: { name, module, description: name },
       update: {},
     })
-    permIdByName.set(name, perm.id)
+    permissionIdByName.set(name, perm.id)
   }
-  console.log(`Permissions upserted: ${permIdByName.size}`)
 
-  const roles = await prisma.role.findMany({ select: { id: true, name: true, tenantId: true } })
-  let grants = 0
+  const roles = await prisma.role.findMany({
+    where: { name: { in: Object.keys(ROLE_PERMISSIONS) }, deletedAt: null },
+    include: { rolePermissions: { select: { permissionId: true } } },
+  })
+  console.log(`\nRoles found in DB: ${roles.length} (of ${Object.keys(ROLE_PERMISSIONS).length} known role names)`)
+
+  let totalLinked = 0
   for (const role of roles) {
-    const wanted = ROLE_PERMISSIONS[role.name]
-    if (!wanted) continue
-    for (const permName of wanted) {
-      const permissionId = permIdByName.get(permName)
-      if (!permissionId) continue
+    const granted = new Set(role.rolePermissions.map((rp) => rp.permissionId))
+    const wanted = ROLE_PERMISSIONS[role.name] ?? []
+    const missing = wanted.filter((name) => {
+      const id = permissionIdByName.get(name)
+      return id !== undefined && !granted.has(id)
+    })
+    const scope = role.tenantId ? `tenant ${role.tenantId}` : 'system'
+    console.log(`  ${role.name} (${scope}): ${granted.size} granted, ${missing.length} to add`)
+    for (const name of missing) {
+      const permissionId = permissionIdByName.get(name)!
+      console.log(`    + ${name}`)
+      totalLinked += 1
+      if (dryRun) continue
       await prisma.rolePermission.upsert({
         where: { roleId_permissionId: { roleId: role.id, permissionId } },
         create: { roleId: role.id, permissionId },
         update: {},
       })
-      grants += 1
     }
   }
-  console.log(`Role grants ensured: ${grants} across ${roles.length} roles`)
+
+  console.log(
+    dryRun
+      ? `\nDry run: would create ${missingCatalog.length} permissions and ${totalLinked} role links.`
+      : `\nDone: created ${missingCatalog.length} permissions and ${totalLinked} role links.`,
+  )
+  if (!dryRun && (missingCatalog.length > 0 || totalLinked > 0)) {
+    console.log('Users must log out and log in again to receive the updated permissions.')
+  }
 }
 
 main()
-  .catch((e) => {
-    console.error(e)
+  .catch((err) => {
+    console.error(err)
     process.exit(1)
   })
   .finally(async () => {

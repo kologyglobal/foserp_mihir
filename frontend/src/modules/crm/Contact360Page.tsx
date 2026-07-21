@@ -9,21 +9,16 @@ import {
   Paperclip,
   Pencil,
   Phone,
+  StickyNote,
   User,
 } from 'lucide-react'
 import { ErpCardCommandBar } from '../../components/erp/card-form/ErpCardCommandBar'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
+import { ContactSummaryCard } from '@/components/crm/ContactSummaryCard'
 import { ENTERPRISE_FORM_DETAIL_CLASS } from '../../design-system/workspace'
-import {
-  ErpCardSection,
-  ErpViewEmail,
-  ErpViewField,
-  ErpViewPhone,
-} from '../../components/erp/card-form'
+import { ErpCardSection } from '../../components/erp/card-form'
 import { AppLink } from '../../components/ui/AppLink'
 import { TableLink } from '../../components/ui/AppLink'
-import { DynamicsStatusChip } from '../../components/dynamics/DynamicsStatusChip'
 import {
   LogActivityDrawer,
   QuickFollowUpDrawer,
@@ -211,10 +206,10 @@ export function Contact360Page() {
   ]
 
   const sectionNavItems = [
-    { id: 'profile', label: 'Profile', icon: User },
-    { id: 'company', label: 'Company', icon: Building2 },
+    { id: 'profile', label: 'Summary', icon: User },
     { id: 'opportunities', label: 'Opportunities', icon: Handshake },
     { id: 'engagement', label: 'Engagement', icon: Activity },
+    { id: 'notes', label: 'Notes', icon: StickyNote },
     { id: 'attachments', label: 'Attachments', icon: Paperclip, done: contactAttachments.length > 0 },
   ]
 
@@ -300,9 +295,15 @@ export function Contact360Page() {
       signals={buildContactSmartSignals(smartOverviewInput)}
       nextAction={nextAction}
       onNextAction={() => {
-        if (nextAction.id === 'add_reach') scrollToSection('profile')
-        else if (nextAction.id === 'link_company') navigate(entity360CustomerPath(contact.customerId))
-        else scrollToSection('profile')
+        if (nextAction.id === 'link_company' && contact.customerId) {
+          navigate(entity360CustomerPath(contact.customerId))
+          return
+        }
+        if (nextAction.id === 'enter_name' || nextAction.id === 'add_reach' || nextAction.id === 'link_company') {
+          navigate(`/crm/contacts/${contact.id}/edit`)
+          return
+        }
+        scrollToSection('profile')
       }}
       quickActions={[
         {
@@ -341,7 +342,7 @@ export function Contact360Page() {
         title={contact.name}
         description={`${contact.designation}${customer ? ` · ${customer.customerName}` : ''}`}
         badge={contact.isPrimary ? 'Primary Contact' : 'CRM'}
-        className={`${ENTERPRISE_FORM_DETAIL_CLASS} enterprise-workspace--crm-smart-overview`}
+        className={`${ENTERPRISE_FORM_DETAIL_CLASS} enterprise-workspace--crm-smart-overview contact-360-page`}
         recordTitle={contact.name}
         status={contact.isPrimary ? 'Primary' : contact.isActive === false ? 'Inactive' : 'Active'}
         statusTone={contact.isPrimary ? 'success' : contact.isActive === false ? 'neutral' : 'info'}
@@ -361,59 +362,22 @@ export function Contact360Page() {
           sections={sectionNavItems}
           activeId={activeSection}
           onSelect={scrollToSection}
-          trailing={<FactBoxPaneAiToggle />}
         />
 
         <EnterpriseFormMetrics metrics={metrics} />
 
-        <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-          <ErpCardSection
-            id="contact-section-profile"
-            title="Contact Profile"
-            subtitle="Directory and communication details"
-            icon={User}
-            accent="blue"
-            columns={2}
-            collapsible
-            defaultOpen
-          >
-            <ErpViewField label="Full Name" value={contact.name} />
-            <ErpViewField label="Designation" value={contact.designation} />
-            <ErpViewField label="Department" value={contact.department} />
-            <ErpViewField label="Primary Contact">
-              <DynamicsStatusChip
-                label={contact.isPrimary ? 'Primary' : 'Secondary'}
-                tone={contact.isPrimary ? 'success' : 'neutral'}
-              />
-            </ErpViewField>
-            <ErpViewEmail label="Email" value={contact.email} colSpan={2} />
-            <ErpViewPhone label="Phone" value={contact.phone} />
-          </ErpCardSection>
-
-          <ErpCardSection
-            id="contact-section-company"
-            title="Company"
-            subtitle="Linked customer account"
-            icon={Building2}
-            accent="teal"
-            columns={2}
-            collapsible
-            defaultOpen
-          >
-            <ErpViewField label="Company" colSpan={2}>
-              <TableLink
-                to={entity360CustomerPath(contact.customerId)}
-                className="erp-view-field__link"
-              >
-                {customer?.customerName ?? contact.customerId}
-              </TableLink>
-            </ErpViewField>
-            <ErpViewField label="Company Code" value={customer?.customerCode} />
-            <ErpViewField label="City" value={customer?.city} />
-            <ErpViewField label="Territory" value={customer?.salesTerritory} />
-            <ErpViewField label="Industry" value={customer?.industry} />
-          </ErpCardSection>
-        </div>
+        <ContactSummaryCard
+          contact={contact}
+          customerName={customer?.customerName}
+          customerCode={customer?.customerCode}
+          city={customer?.city}
+          territory={customer?.salesTerritory}
+          industry={customer?.industry}
+          lastActivityAt={lastActivity?.activityDate}
+          lastActivityLabel={lastActivity?.subject}
+          nextFollowUpDate={nextFollowUp?.dueDate}
+          openOpportunityCount={contactOpportunities.length}
+        />
 
           <ErpCardSection
             id="contact-section-opportunities"
@@ -423,24 +387,44 @@ export function Contact360Page() {
             accent="green"
             collapsible
             defaultOpen
+            className="contact-360-section"
           >
             {contactOpportunities.length === 0 ? (
-              <p className="text-sm text-erp-muted">No open opportunities for this contact.</p>
+              <div className="contact-360-empty" role="status">
+                <span className="contact-360-empty__icon" aria-hidden>
+                  <Handshake className="h-5 w-5" strokeWidth={1.75} />
+                </span>
+                <div>
+                  <p className="contact-360-empty__title">No open opportunities</p>
+                  <p className="contact-360-empty__copy">
+                    This contact is not linked to an active deal yet. Open the company 360 or create an
+                    opportunity when the conversation progresses.
+                  </p>
+                </div>
+                <div className="contact-360-empty__actions">
+                  <AppLink
+                    to={entity360CustomerPath(contact.customerId)}
+                    className="contact-360-empty__link"
+                  >
+                    Open company 360
+                  </AppLink>
+                </div>
+              </div>
             ) : (
-              <ul className="divide-y divide-erp-border">
+              <ul className="contact-360-opp-list">
                 {contactOpportunities.map((opp) => (
-                  <li key={opp.id} className="flex items-center justify-between gap-3 py-3">
-                    <div className="min-w-0">
-                      <TableLink to={`/crm/opportunities/${opp.id}`} className="font-semibold">
+                  <li key={opp.id} className="contact-360-opp-list__item">
+                    <div className="contact-360-opp-list__main">
+                      <TableLink to={`/crm/opportunities/${opp.id}`} className="contact-360-opp-list__name">
                         {opp.opportunityName}
                       </TableLink>
-                      <p className="text-xs text-erp-muted">
+                      <p className="contact-360-opp-list__meta">
                         {opp.opportunityNo} · {opportunityStageLabel(opp.stage)}
                       </p>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-semibold text-erp-text">{formatCrmCurrency(opp.value)}</p>
-                      <p className="text-xs text-erp-muted">{opp.probability}% probability</p>
+                    <div className="contact-360-opp-list__value">
+                      <p className="contact-360-opp-list__amount">{formatCrmCurrency(opp.value)}</p>
+                      <p className="contact-360-opp-list__prob">{opp.probability}% probability</p>
                     </div>
                   </li>
                 ))}
@@ -452,10 +436,11 @@ export function Contact360Page() {
             id="contact-section-engagement"
             title="Activity Timeline"
             subtitle="Calls, emails, notes, and follow-ups"
-            icon={Handshake}
+            icon={Activity}
             accent="slate"
             collapsible
             defaultOpen
+            className="contact-360-section"
           >
             <CrmUnifiedActivityFeed
               items={unifiedFeedItems}
@@ -495,10 +480,11 @@ export function Contact360Page() {
             id="contact-section-notes"
             title="Notes"
             subtitle="Internal notes on this contact."
-            icon={Mail}
+            icon={StickyNote}
             accent="slate"
             collapsible
             defaultOpen={false}
+            className="contact-360-section"
           >
             {contact ? (
               <EntityNotesPanel
@@ -520,6 +506,7 @@ export function Contact360Page() {
             accent="slate"
             collapsible
             defaultOpen={contactAttachments.length > 0}
+            className="contact-360-section"
           >
             {apiMode && contact ? (
               <EntityAttachmentsPanel entityType="CONTACT" entityId={contact.id} />

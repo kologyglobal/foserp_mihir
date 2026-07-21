@@ -90,6 +90,9 @@ check(10, 'Lead Owner dropdown shows active users', getActiveLeadUsers().every((
 check(11, 'Lead Owner defaults to current user', formSrc.includes('session.id'))
 check(12, 'Priority dropdown exists', formSrc.includes('Priority') && formSrc.includes("'medium'"))
 check(13, 'Created Date defaults to current date', formSrc.includes('todayIso') || formSrc.includes('createdDate'))
+check(13b, 'Lead form validates CRM date/year bounds', formSrc.includes('validateCrmCalendarDate') && formSrc.includes('getCrmDateInputMax'))
+check(13c, 'Created Date cannot be in the future', formSrc.includes('Created Date cannot be in the future'))
+check(13d, 'Expected close date past blocked on create', formSrc.includes('Expected Closing Date cannot be in the past'))
 check(14, 'Activity status single dropdown', formSrc.includes('activityStatus') && formSrc.includes('<option value="active">Active</option>') && !formSrc.includes('crm-lead-status-toggle'))
 check(15, 'Inactive Reason required when inactive', formSrc.includes('inactiveReason') && formSrc.includes('activityStatus === \'inactive\''))
 check(16, 'Closed Date defaults when lead stage is Closed', formSrc.includes("leadStage === 'closed'") && formSrc.includes('closedDate'))
@@ -110,6 +113,9 @@ check(21, 'Lead saves successfully', (() => {
     lifecycleStatus: 'open',
     stage: 'new',
     productRequirement: '45 m³ bulker',
+    remarks: 'Test notes',
+    contactPerson: 'Test Contact',
+    mobile: '9876543210',
     source: 'referral',
     industry: 'Cement',
   })

@@ -703,12 +703,15 @@
 }
 
 .ent-data-grid__footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
+  /* Keep pagination in normal flow below .erp-table-wrap — sticky bottom overlays last rows */
+  position: relative;
+  z-index: 30;
+  flex-shrink: 0;
+  isolation: isolate;
   border-top: 1px solid #e4e7ec;
   background: #f8fafc;
   padding: 10px 16px;
+  box-shadow: 0 -1px 0 rgb(15 23 42 / 0.04);
 }
 
 .ent-data-grid__record-label {
@@ -720,7 +723,7 @@
 
 .ent-data-grid__record-label span {
   font-weight: 500;
-  color: #667085;
+  color: #667085; 
 }
 
 /* ── Enterprise controls (CRM/Sales/dynamics pages) ── */

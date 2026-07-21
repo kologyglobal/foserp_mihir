@@ -33,18 +33,45 @@
 
 @media (min-width: 1024px) {
   .enterprise-workspace .erp-card-form-page__layout--with-factbox {
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .enterprise-workspace .erp-card-form-page__layout--with-factbox {
+    grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr);
+  }
+
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
   }
 
   .enterprise-workspace .erp-card-form-page__factbox {
     position: sticky;
     top: 12px;
     align-self: start;
+    max-height: none;
+    overflow: visible;
+    z-index: 4;
+  }
+
+  .enterprise-workspace:not(.enterprise-workspace--crm-smart-overview) .erp-card-form-page__factbox {
+    align-self: stretch;
     max-height: calc(100dvh - 96px);
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
-    z-index: 4;
+  }
+}
+
+@media (min-width: 1440px) {
+  .enterprise-workspace .erp-card-form-page__layout--with-factbox {
+    grid-template-columns: minmax(0, 68fr) minmax(340px, 32fr);
+  }
+
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
+    grid-template-columns: minmax(0, 1fr) 340px;
   }
 }
 
@@ -519,13 +546,24 @@
   font-size: 14px;
 }
 
-@media (max-width: 1099px) {
+@media (max-width: 1279px) {
   .enterprise-workspace .erp-card-section__grid--cols-3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .enterprise-workspace .erp-card-section__grid--cols-4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .enterprise-workspace--dynamics-form .erp-field-row--horizontal {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .enterprise-workspace--dynamics-form .erp-field-row__dots {
+    display: none;
   }
 }
 
@@ -947,6 +985,44 @@
 .erp-field-row--error select,
 .erp-field-row--error textarea {
   border-color: #dc2626;
+}
+
+/* Next Best Action: guide the eye to the target field / section */
+.erp-nba-highlight {
+  position: relative;
+  border-radius: 6px;
+  animation: erp-nba-highlight-pulse 2.2s ease-out;
+}
+
+.erp-nba-highlight .erp-input,
+.erp-nba-highlight input:not([type='hidden']),
+.erp-nba-highlight select,
+.erp-nba-highlight textarea,
+.erp-nba-highlight [role='combobox'] {
+  border-color: var(--erp-primary, #2563eb) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--erp-primary, #2563eb) 28%, transparent);
+}
+
+@keyframes erp-nba-highlight-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--erp-primary, #2563eb) 35%, transparent);
+    background-color: color-mix(in srgb, var(--erp-primary, #2563eb) 10%, transparent);
+  }
+  40% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--erp-primary, #2563eb) 18%, transparent);
+    background-color: color-mix(in srgb, var(--erp-primary, #2563eb) 6%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    background-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erp-nba-highlight {
+    animation: none;
+    background-color: color-mix(in srgb, var(--erp-primary, #2563eb) 8%, transparent);
+  }
 }
 
 .erp-field-row__error {
@@ -1677,7 +1753,7 @@
 }
 
 .enterprise-workspace--dynamics-form .erp-input:focus,
-.enterprise-workspace--dynamics-form input:focus,
+.enterprise-workspace--dynamics-form input:not([type='range']):focus,
 .enterprise-workspace--dynamics-form select:focus,
 .enterprise-workspace--dynamics-form textarea:focus {
   border-color: #0078d4;
@@ -1685,7 +1761,7 @@
   outline: none;
 }
 
-/* Probability slider */
+/* Probability slider — single native range (no duplicate fill bar) */
 .dyn-probability-field {
   display: flex;
   flex-direction: column;
@@ -1702,8 +1778,20 @@
 .dyn-probability-field__range {
   flex: 1;
   height: 4px;
+  margin: 0;
   accent-color: #0078d4;
   cursor: pointer;
+  outline: none;
+  box-shadow: none;
+  border: none;
+  background: transparent;
+}
+
+.dyn-probability-field__range:focus,
+.dyn-probability-field__range:focus-visible,
+.dyn-probability-field__range:active {
+  outline: none;
+  box-shadow: none;
 }
 
 .dyn-probability-field__value {
@@ -1715,18 +1803,9 @@
   text-align: right;
 }
 
+/* Legacy markup may still include a decorative bar — never show it under the range */
 .dyn-probability-field__bar {
-  height: 4px;
-  border-radius: 2px;
-  background: #edebe9;
-  overflow: hidden;
-}
-
-.dyn-probability-field__fill {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #0078d4, #00bcf2);
-  transition: width 0.15s ease;
+  display: none;
 }
 
 /* Typed document upload — document type master + preview */
@@ -2011,14 +2090,35 @@
   border-radius: 4px;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox .erp-card-form-page__layout--with-factbox {
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+    grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr);
+  }
+
+  .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
   }
 
   .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox .erp-card-form-page__factbox {
     top: 8px;
     max-height: calc(100dvh - 88px);
+  }
+
+  .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox.enterprise-workspace--crm-smart-overview .erp-card-form-page__factbox {
+    max-height: none;
+    height: fit-content;
+    align-self: start;
+  }
+}
+
+@media (min-width: 1440px) {
+  .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox .erp-card-form-page__layout--with-factbox {
+    grid-template-columns: minmax(0, 68fr) minmax(340px, 32fr);
+  }
+
+  .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
+    grid-template-columns: minmax(0, 1fr) 340px;
   }
 }
 
@@ -2585,17 +2685,23 @@
 }
 
 .erp-view-field__link {
+  position: relative;
+  z-index: 1;
   color: var(--erp-primary, #0078d4);
   text-decoration: none;
   font-weight: 600;
   min-width: 0;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .erp-view-field__link--truncate {
-  display: block;
+  display: inline-block;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .erp-view-field__link:hover {
@@ -2715,51 +2821,82 @@
   }
 }
 
-/* Lead 360 compact summary card */
+/* Lead / Opportunity / Quotation 360 summary card */
 .lead-summary-card {
-  margin-bottom: 12px;
-  padding: 14px 16px 16px;
+  margin-bottom: 16px;
+  padding: 18px 20px 20px;
   border: 1px solid var(--erp-border, #e1dfdd);
-  border-radius: 8px;
+  border-radius: 10px;
   background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .lead-summary-card__head {
-  margin-bottom: 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--erp-border, #edebe9);
 }
 
 .lead-summary-card__title {
   margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--erp-text, #323130);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--erp-text, #242424);
 }
 
 .lead-summary-card__subtitle {
-  margin: 2px 0 0;
-  font-size: 12px;
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
   color: var(--erp-muted, #605e5c);
 }
 
 .lead-summary-card__grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 14px 20px;
+  gap: 12px;
 }
 
 .lead-summary-card__group {
   min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid #edebe9;
-  border-radius: 6px;
-  background: #faf9f8;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--erp-border, #edebe9);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #fcfcfb 0%, #fff 48%);
+}
+
+.lead-summary-card__group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f3f2f1;
+}
+
+.lead-summary-card__group-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--erp-primary, #2563eb) 10%, #fff);
+  color: var(--erp-primary, #2563eb);
+  flex-shrink: 0;
 }
 
 .lead-summary-card__group-title {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--erp-muted, #605e5c);
 }
@@ -2767,22 +2904,257 @@
 .lead-summary-card__fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 16px;
+  gap: 12px 20px;
+  align-items: start;
 }
 
 .lead-summary-card__fields .erp-view-field {
   padding: 0;
+  gap: 3px;
+  min-height: 2.75rem;
+}
+
+.lead-summary-card__fields .erp-view-field__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--erp-muted, #8a8886);
+  line-height: 1.25;
+}
+
+.lead-summary-card__fields .erp-view-field__value {
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.35;
+  color: var(--erp-text, #242424);
+  word-break: break-word;
+}
+
+.lead-summary-card__field--primary .erp-view-field__value {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.lead-summary-card__fields .erp-view-field__empty {
+  color: #c8c6c4;
+  font-weight: 450;
+  font-style: normal;
+}
+
+.lead-summary-card__fields .erp-view-field__link {
+  font-weight: 600;
 }
 
 @media (min-width: 900px) {
   .lead-summary-card__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
   }
 }
 
 @media (max-width: 599px) {
+  .lead-summary-card {
+    padding: 14px;
+  }
+
   .lead-summary-card__fields {
     grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .lead-summary-card__fields .erp-view-field {
+    min-height: 0;
+  }
+}
+
+/* Contact 360 — summary identity + section polish */
+.contact-summary-card__identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.contact-summary-card__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--erp-primary, #2563eb);
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--erp-primary, #2563eb) 14%, #fff) 0%,
+    color-mix(in srgb, var(--erp-primary, #2563eb) 6%, #f8fafc) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--erp-primary, #2563eb) 18%, #e2e8f0);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.contact-summary-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.contact-360-page .contact-360-section {
+  margin-top: 4px;
+}
+
+.contact-360-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 14px 18px;
+  padding: 18px 16px;
+  border: 1px dashed var(--erp-border, #e1dfdd);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
+}
+
+.contact-360-empty__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  color: var(--erp-primary, #2563eb);
+  background: color-mix(in srgb, var(--erp-primary, #2563eb) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--erp-primary, #2563eb) 14%, #e2e8f0);
+}
+
+.contact-360-empty__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--erp-text, #242424);
+}
+
+.contact-360-empty__copy {
+  margin: 4px 0 0;
+  max-width: 42rem;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--erp-muted, #605e5c);
+}
+
+.contact-360-empty__actions {
+  margin-left: auto;
+  align-self: center;
+}
+
+.contact-360-empty__link {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--erp-primary, #2563eb);
+  text-decoration: none;
+}
+
+.contact-360-empty__link:hover {
+  text-decoration: underline;
+}
+
+.contact-360-opp-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.contact-360-opp-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--erp-border, #edebe9);
+  border-radius: 9px;
+  background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.contact-360-opp-list__item:hover {
+  border-color: color-mix(in srgb, var(--erp-primary, #2563eb) 28%, #e1dfdd);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.contact-360-opp-list__main {
+  min-width: 0;
+}
+
+.contact-360-opp-list__name {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--erp-primary, #2563eb);
+  text-decoration: none;
+}
+
+.contact-360-opp-list__name:hover {
+  text-decoration: underline;
+}
+
+.contact-360-opp-list__meta {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--erp-muted, #605e5c);
+}
+
+.contact-360-opp-list__value {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.contact-360-opp-list__amount {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--erp-text, #242424);
+  font-variant-numeric: tabular-nums;
+}
+
+.contact-360-opp-list__prob {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: var(--erp-muted, #605e5c);
+}
+
+@media (max-width: 599px) {
+  .contact-summary-card__identity {
+    gap: 10px;
+  }
+
+  .contact-summary-card__avatar {
+    width: 38px;
+    height: 38px;
+    font-size: 12.5px;
+  }
+
+  .contact-summary-card .lead-summary-card__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .contact-summary-card__badges {
+    justify-content: flex-start;
+  }
+
+  .contact-360-empty__actions {
+    margin-left: 0;
+    width: 100%;
   }
 }
 
@@ -2906,4 +3278,82 @@
 .crm-lead-notes-card .erp-field-row--wide,
 .crm-lead-notes-card textarea.erp-input {
   min-height: 96px;
+}
+
+/*
+ * CRM Smart Context — fixed narrow rail beside flexible main content.
+ * Stack below 1280; 320px rail at ≥1280; 340px at ≥1440. Content-sized card height.
+ */
+@media (min-width: 1280px) {
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+    gap: 20px;
+  }
+
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__main,
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__factbox {
+    grid-column: auto;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__main {
+    overflow-x: auto;
+  }
+
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__factbox {
+    display: block;
+    width: 100%;
+    height: fit-content;
+    min-height: 0;
+    max-height: none;
+    align-self: start;
+    position: sticky;
+    top: 12px;
+    overflow: visible;
+  }
+
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-factbox-pane {
+    width: 100%;
+    max-width: none;
+    height: auto;
+    max-height: none;
+    flex: 0 0 auto;
+  }
+}
+
+@media (min-width: 1440px) {
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
+@media (max-width: 1279px) {
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    flex-direction: unset;
+  }
+
+  .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__factbox {
+    position: static;
+    max-width: none;
+    max-height: none;
+    z-index: auto;
+  }
+}
+
+.enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-line-items-grid,
+.enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-line-items-grid__wrap,
+.enterprise-workspace.enterprise-workspace--crm-smart-overview .quo-editor-price__table-wrap {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-additional-panel,
+.enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-additional-info-panel__inner {
+  min-width: 0;
+  max-width: 100%;
 }

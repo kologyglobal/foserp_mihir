@@ -152,12 +152,27 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
     const res = await authPost(`${BASE}/leads`, {
       prospectName: 'E2E Prospect',
       customerId: companyId,
+      contactId,
+      contactPerson: 'E2E Contact',
+      mobile: '9876543210',
+      remarks: 'E2E lead notes',
+      priority: 'medium',
       source: 'website',
       expectedValue: 500000,
+      productRequirement: 'E2E product requirement',
       leadOwnerId: userId,
     })
     expect(res.status).toBe(201)
     leadId = res.body.data.id
+  })
+
+  it('rejects lead create without notes / contact', async () => {
+    const res = await authPost(`${BASE}/leads`, {
+      prospectName: 'Incomplete Lead',
+      customerId: companyId,
+      leadOwnerId: userId,
+    })
+    expect(res.status).toBe(400)
   })
 
   it('updates CRM lead', async () => {
@@ -272,6 +287,12 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
     expect(stages.some((s) => s.code === 'on_hold')).toBe(true)
     const docTypes = rows.filter((r) => r.kind === 'document-types')
     expect(docTypes.some((d) => d.code === 'general')).toBe(true)
+    const deliveryTerms = rows.filter((r) => r.kind === 'delivery-terms')
+    expect(deliveryTerms.length).toBeGreaterThanOrEqual(5)
+    expect(deliveryTerms.some((d) => d.code === 'ex_works')).toBe(true)
+    expect(deliveryTerms.some((d) => d.code === 'for_site')).toBe(true)
+    const warrantyTerms = rows.filter((r) => r.kind === 'warranty-terms')
+    expect(warrantyTerms.some((w) => w.code === 'std_12m')).toBe(true)
   })
 
   it('lists seeded locations master', async () => {
@@ -381,21 +402,30 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
     const leadRes = await authPost(`${BASE}/leads`, {
       prospectName: 'E2E Convert Lead',
       customerId: companyId,
+      contactId,
+      contactPerson: 'E2E Contact',
+      mobile: '9876543210',
+      remarks: 'Ready to convert',
+      priority: 'high',
       source: 'referral',
       expectedValue: 300000,
+      productRequirement: 'Convert product line',
       leadOwnerId: userId,
       stage: 'qualified',
     })
     expect(leadRes.status).toBe(201)
     const convertLeadId = leadRes.body.data.id
+    expect(leadRes.body.data.contactId).toBe(contactId)
 
     const convertRes = await authPost(`${BASE}/leads/${convertLeadId}/convert`, {
       opportunityName: 'E2E Converted Opp',
       value: 300000,
+      contactId,
     })
     expect(convertRes.status).toBe(200)
     expect(convertRes.body.data.lead.stage).toBe('converted_to_opportunity')
     convertOppId = convertRes.body.data.opportunity.id
+    expect(convertRes.body.data.opportunity.contactId).toBe(contactId)
 
     const loseRes = await authPost(`${BASE}/opportunities/${convertOppId}/lose`, {
       lostReason: 'Budget constraints',
@@ -673,9 +703,24 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
     expect(res.status).toBe(200)
     expect(res.body.data.status).toBe('approved')
     expect(res.body.data.documents[0].status).toBe('approved')
+    expect(res.body.data.customerApproval).toBe('pending')
   })
 
-  it('converts approved quotation to sales order', async () => {
+  it('sends approved quotation to customer then records customer approval', async () => {
+    const sent = await authPost(`${BASE}/quotations/${quotationId}/documents/${quotationDocId}/mark-sent`, {})
+    expect(sent.status).toBe(200)
+    expect(sent.body.data.documents[0].status).toBe('sent')
+    expect(sent.body.data.status).toBe('sent')
+
+    const cust = await authPost(
+      `${BASE}/quotations/${quotationId}/documents/${quotationDocId}/customer-approve`,
+      { remarks: 'Customer accepted' },
+    )
+    expect(cust.status).toBe(200)
+    expect(cust.body.data.customerApproval).toBe('approved')
+  })
+
+  it('converts customer-approved quotation to sales order', async () => {
     const res = await authPost(`${BASE}/quotations/${quotationId}/convert-to-sales-order`, {
       documentId: quotationDocId,
       customerPoNumber: 'PO-E2E-001',
@@ -838,6 +883,17 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
     )
     expect(submitRes.status).toBe(200)
 
+    const sentRes = await authPost(
+      `${BASE}/quotations/${lostQuoId}/documents/${lostDocId}/mark-sent`,
+      {},
+    )
+    expect(sentRes.status).toBe(200)
+    const custRes = await authPost(
+      `${BASE}/quotations/${lostQuoId}/documents/${lostDocId}/customer-approve`,
+      {},
+    )
+    expect(custRes.status).toBe(200)
+
     const loseRes = await authPost(`${BASE}/opportunities/${lostOppId}/lose`, {
       lostReason: 'Budget withdrawn',
     })
@@ -932,13 +988,62 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
     await authPost(`${BASE}/quotations/${approvalQuotationId}/documents/${approvalDocId}/approve`, {
       remarks: 'E2E cleanup approve',
     })
-    await authDelete(`${BASE}/quotations/${approvalQuotationId}`)
+    // Approved quotations cannot be deleted via API — soft-delete for cleanup only
+    await prisma.crmQuotationDocument.updateMany({
+      where: { quotationId: approvalQuotationId },
+      data: { deletedAt: new Date() },
+    })
+    await prisma.crmQuotation.update({
+      where: { id: approvalQuotationId },
+      data: { deletedAt: new Date(), status: 'cancelled' },
+    })
     await authDelete(`${BASE}/opportunities/${approvalOppId}`)
   })
 
-  it('deletes CRM quotation', async () => {
+  it('rejects delete for non-draft CRM quotation', async () => {
     const res = await authDelete(`${BASE}/quotations/${quotationId}`)
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(422)
+    expect(String(res.body?.message ?? res.body?.error ?? '')).toMatch(/draft/i)
+  })
+
+  it('deletes draft CRM quotation only', async () => {
+    const createRes = await authPost(`${BASE}/quotations`, {
+      customerId: companyId,
+      opportunityId: quotationOppId,
+      qty: 1,
+      unitPrice: 100000,
+      validityDate: new Date(Date.now() + 30 * 86400000).toISOString(),
+      priceLines: [
+        {
+          productOrItem: 'Draft Delete Target',
+          description: 'Supply',
+          qty: 1,
+          uom: 'NOS',
+          unitPrice: 100000,
+          discountPct: 0,
+          taxPct: 18,
+        },
+      ],
+    })
+    expect(createRes.status).toBe(201)
+    const draftId = createRes.body.data.id as string
+    expect(createRes.body.data.status).toBe('draft')
+
+    const del = await authDelete(`${BASE}/quotations/${draftId}`)
+    expect(del.status).toBe(200)
+
+    const getGone = await authGet(`${BASE}/quotations/${draftId}`)
+    expect(getGone.status).toBe(404)
+
+    // Converted main quotation — cleanup without DELETE API
+    await prisma.crmQuotationDocument.updateMany({
+      where: { quotationId },
+      data: { deletedAt: new Date() },
+    })
+    await prisma.crmQuotation.update({
+      where: { id: quotationId },
+      data: { deletedAt: new Date(), status: 'cancelled' },
+    })
     await authDelete(`${BASE}/opportunities/${quotationOppId}`)
     if (salesOrderId) {
       await prisma.crmSalesOrder.update({
@@ -952,6 +1057,11 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
     const leadRes = await authPost(`${BASE}/leads`, {
       prospectName: 'E2E Disqualify Lead',
       customerId: companyId,
+      contactId,
+      contactPerson: 'E2E Contact',
+      mobile: '9876543210',
+      remarks: 'Will disqualify',
+      priority: 'low',
       source: 'other',
       expectedValue: 10000,
       leadOwnerId: userId,

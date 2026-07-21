@@ -44,11 +44,10 @@ export function OpportunitySmartOverviewPanel({
       onCreateSalesOrder()
       return
     }
-    const sectionId = (action as { sectionId?: string }).sectionId
-      ?? (action.id === 'add_lines' ? 'products'
-        : action.id === 'set_value' ? 'commercial'
-          : action.id === 'link_company' ? 'summary'
-            : undefined)
+    const sectionId = action.sectionId
+      ?? (action.id === 'add_lines' || action.id === 'set_value' ? 'products'
+        : action.id === 'link_company' ? 'summary'
+          : undefined)
     if (sectionId) onGoToSection(sectionId)
   }
 

@@ -209,7 +209,7 @@ export function ErpCardFormPage({
           >
             <div
               className="erp-card-form-page__layout-wrap"
-              data-factbox-open={collapsibleFactBox && factBox ? String(factBoxOpen) : undefined}
+              data-factbox-open={showSplitLayout ? 'true' : factBox && collapsibleFactBox ? 'false' : undefined}
             >
               <div
                 className={cn(
@@ -218,9 +218,9 @@ export function ErpCardFormPage({
                   factBoxCollapsed && 'erp-card-form-page__layout--factbox-collapsed',
                 )}
               >
-                <div className="erp-card-form-page__main">{children}</div>
+                <div className="erp-card-form-page__main min-w-0">{children}</div>
                 {showSplitLayout && factBoxContent ? (
-                  <div className="erp-card-form-page__factbox">{factBoxContent}</div>
+                  <div className="erp-card-form-page__factbox min-w-0">{factBoxContent}</div>
                 ) : null}
               </div>
             </div>

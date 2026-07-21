@@ -1,4 +1,6 @@
+import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Banknote, Building2, CalendarClock, UserRound } from 'lucide-react'
 import type { QuotationDocument } from '@/types/crm'
 import type { Quotation } from '@/types/sales'
 import { AppLink } from '@/components/ui/AppLink'
@@ -8,6 +10,8 @@ import { entity360CustomerPath } from '@/config/entity360Routes'
 import { formatCrmCurrency } from '@/utils/crmMetrics'
 import { formatDate, formatDateTime } from '@/utils/dates/format'
 import { quotationStatusLabel } from './QuotationCrmCard'
+
+const EMPTY = '—'
 
 export interface QuotationSummaryCardProps {
   quotation: Quotation
@@ -27,14 +31,21 @@ export interface QuotationSummaryCardProps {
 
 function SummaryGroup({
   title,
+  icon: Icon,
   children,
 }: {
   title: string
+  icon: LucideIcon
   children: ReactNode
 }) {
   return (
     <section className="lead-summary-card__group" aria-label={title}>
-      <h3 className="lead-summary-card__group-title">{title}</h3>
+      <header className="lead-summary-card__group-head">
+        <span className="lead-summary-card__group-icon" aria-hidden>
+          <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+        </span>
+        <h3 className="lead-summary-card__group-title">{title}</h3>
+      </header>
       <div className="lead-summary-card__fields">{children}</div>
     </section>
   )
@@ -73,50 +84,57 @@ export function QuotationSummaryCard({
   return (
     <section className="lead-summary-card" id="quo-section-summary" aria-label="Quotation Summary">
       <header className="lead-summary-card__head">
-        <h2 className="lead-summary-card__title">Quotation Summary</h2>
-        <p className="lead-summary-card__subtitle">
-          Customer, commercial totals, and document status at a glance.
-        </p>
+        <div>
+          <h2 className="lead-summary-card__title">Quotation Summary</h2>
+          <p className="lead-summary-card__subtitle">
+            Customer, commercial totals, and document status at a glance.
+          </p>
+        </div>
       </header>
 
       <div className="lead-summary-card__grid">
-        <SummaryGroup title="Customer">
-          <ErpViewField label="Quotation No." value={quotation.quotationNo} />
-          <ErpViewField label="Customer">
+        <SummaryGroup title="Customer" icon={Building2}>
+          <ErpViewField
+            label="Quotation No."
+            value={quotation.quotationNo}
+            emptyLabel={EMPTY}
+            className="lead-summary-card__field--primary"
+          />
+          <ErpViewField label="Customer" emptyLabel={EMPTY}>
             {resolvedCustomerId && customerName ? (
               <AppLink to={entity360CustomerPath(resolvedCustomerId)} className="erp-view-field__link">
                 {customerName}
               </AppLink>
             ) : undefined}
           </ErpViewField>
-          <ErpViewField label="City" value={city} />
-          {productName ? <ErpViewField label="Product" value={productName} /> : null}
+          <ErpViewField label="City" value={city} emptyLabel={EMPTY} />
+          {productName ? <ErpViewField label="Product" value={productName} emptyLabel={EMPTY} /> : null}
           {opportunityId && opportunityNo ? (
-            <ErpViewField label="Opportunity">
+            <ErpViewField label="Opportunity" emptyLabel={EMPTY}>
               <AppLink to={`/crm/opportunities/${opportunityId}`} className="erp-view-field__link">
                 {opportunityNo}
               </AppLink>
             </ErpViewField>
           ) : (
-            <ErpViewField label="Inquiry" value={quotation.inquiryNo} />
+            <ErpViewField label="Inquiry" value={quotation.inquiryNo} emptyLabel={EMPTY} />
           )}
         </SummaryGroup>
 
-        <SummaryGroup title="Primary Contact">
-          <ErpViewField label="Contact Person" value={contactName} />
-          <ErpViewPhone label="Mobile" value={contactPhone} />
-          <ErpViewEmail label="Email" value={contactEmail} />
+        <SummaryGroup title="Primary Contact" icon={UserRound}>
+          <ErpViewField label="Contact Person" value={contactName} emptyLabel={EMPTY} />
+          <ErpViewPhone label="Mobile" value={contactPhone} emptyLabel={EMPTY} />
+          <ErpViewEmail label="Email" value={contactEmail} emptyLabel={EMPTY} />
         </SummaryGroup>
 
-        <SummaryGroup title="Ownership">
-          <ErpViewField label="Owner" value={document.salesOwnerName} />
-          <ErpViewField label="Revision" value={`R${document.revisionNo}`} />
-          <ErpViewField label="Created Date" value={formatDate(quotation.createdAt)} />
-          <ErpViewField label="Grand Total" value={formatCrmCurrency(document.totalAmount)} />
+        <SummaryGroup title="Ownership" icon={Banknote}>
+          <ErpViewField label="Owner" value={document.salesOwnerName} emptyLabel={EMPTY} />
+          <ErpViewField label="Revision" value={`R${document.revisionNo}`} emptyLabel={EMPTY} />
+          <ErpViewField label="Created Date" value={formatDate(quotation.createdAt)} emptyLabel={EMPTY} />
+          <ErpViewField label="Grand Total" value={formatCrmCurrency(document.totalAmount)} emptyLabel={EMPTY} />
         </SummaryGroup>
 
-        <SummaryGroup title="Status">
-          <ErpViewField label="Document Status">
+        <SummaryGroup title="Status" icon={CalendarClock}>
+          <ErpViewField label="Document Status" emptyLabel={EMPTY}>
             <DynamicsStatusChip
               label={quotationStatusLabel(document.status)}
               tone={statusTone(document.status)}
@@ -125,12 +143,14 @@ export function QuotationSummaryCard({
           <ErpViewField
             label="Valid Until"
             value={quotation.validityDate ? formatDate(quotation.validityDate) : undefined}
+            emptyLabel={EMPTY}
           />
           <ErpViewField
             label="Customer Approval"
             value={quotation.customerApproval?.replace(/_/g, ' ')}
+            emptyLabel={EMPTY}
           />
-          <ErpViewField label="Last Activity" value={lastActivityDisplay} />
+          <ErpViewField label="Last Activity" value={lastActivityDisplay} emptyLabel={EMPTY} />
         </SummaryGroup>
       </div>
     </section>

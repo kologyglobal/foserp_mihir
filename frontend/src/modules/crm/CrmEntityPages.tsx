@@ -28,8 +28,6 @@ import { formatCompactCurrency } from '../../utils/formatters/currency'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
 import { exportRowsToCsv } from '../../utils/exportCsv'
 import { runCrmExport } from '../../utils/crmServerExport'
-import { downloadCompanyImportTemplate } from '../../utils/companyImport'
-import { downloadContactImportTemplate } from '../../utils/contactImport'
 import { ErpCommandBar } from '../../components/erp/ErpCommandBar'
 import { crmModuleBreadcrumbs } from '../../utils/crmNavigation'
 import { useSavedViews } from '../../hooks/useSavedViews'
@@ -58,9 +56,9 @@ import {
 } from '../../utils/crmCompaniesPortfolio'
 import { COMPANY_REGISTER_PRESETS, CONTACT_REGISTER_PRESETS } from '../../config/savedViewPresets'
 import type { CrmContact } from '../../types/crm'
-import { Toast } from '../../components/ui/Toast'
 import { CrmDeleteConfirmModal } from '../../components/crm/CrmDeleteConfirmModal'
 import { resolveStoreAction } from '../../store/storeAction'
+import { notify } from '../../store/toastStore'
 import { canCrmPermission } from '../../utils/permissions'
 
 export type CrmCustomersPageProps = {
@@ -108,8 +106,6 @@ export function CrmCustomersPage({
   const [followUpCustomer, setFollowUpCustomer] = useState<string | null>(null)
   const [quickFollowUpOpen, setQuickFollowUpOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
-  const [toastVariant, setToastVariant] = useState<'error' | 'success'>('error')
   const deleteCustomer = useMasterStore((s) => s.deleteCustomer)
   const canDelete = canCrmPermission('crm.company.delete')
   const [deleteCompanyTarget, setDeleteCompanyTarget] = useState<{ id: string; name: string } | null>(null)
@@ -310,11 +306,6 @@ export function CrmCustomersPage({
     )
   }
 
-  function showToast(message: string, variant: 'error' | 'success' = 'error') {
-    setToast(message)
-    setToastVariant(variant)
-  }
-
   function openDeleteCompany(row: { customer: { id: string; customerName: string } }) {
     setDeleteCompanyTarget({ id: row.customer.id, name: row.customer.customerName })
   }
@@ -327,9 +318,9 @@ export function CrmCustomersPage({
         const r = await resolveStoreAction(deleteCustomer(deleteCompanyTarget.id))
         if (r.ok) {
           setDeleteCompanyTarget(null)
-          showToast('Company deleted', 'success')
+          notify.success('Company deleted')
         } else {
-          showToast(r.error ?? 'Delete failed')
+          notify.error(r.error ?? 'Delete failed')
         }
       } finally {
         setIsDeletingCompany(false)
@@ -338,9 +329,7 @@ export function CrmCustomersPage({
   }
 
   function openCompanyImport() {
-    downloadCompanyImportTemplate()
     setImportOpen(true)
-    showToast('Company import template downloaded — fill it and upload in the dialog', 'success')
   }
 
   function exportAllCompanies() {
@@ -349,7 +338,7 @@ export function CrmCustomersPage({
       () => exportSelectedCompanies(sorted),
       { search: filters.search || undefined },
     ).then((r) => {
-      if (!r.ok) showToast(r.error ?? 'Export failed')
+      if (!r.ok) notify.error(r.error ?? 'Export failed')
     })
   }
 
@@ -453,7 +442,7 @@ export function CrmCustomersPage({
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={(count) => {
-          showToast(`${count} compan${count === 1 ? 'y' : 'ies'} imported`, 'success')
+          notify.success(`${count} compan${count === 1 ? 'y' : 'ies'} imported`)
         }}
       />
       <CrmFilterDrawer
@@ -480,7 +469,6 @@ export function CrmCustomersPage({
         onConfirm={confirmDeleteCompany}
         isDeleting={isDeletingCompany}
       />
-      {toast ? <Toast message={toast} variant={toastVariant} /> : null}
     </>
   )
 }
@@ -508,8 +496,6 @@ export function CrmContactsPage() {
   const [sortBy, setSortBy] = useState<'name' | 'company' | 'designation' | 'lastActivity' | 'followUp'>('name')
   const [followUpContact, setFollowUpContact] = useState<CrmContact | null>(null)
   const [importOpen, setImportOpen] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
-  const [toastVariant, setToastVariant] = useState<'error' | 'success'>('error')
   const deleteContact = useCrmStore((s) => s.deleteContact)
   const canDelete = canCrmPermission('crm.contact.delete')
   const [deleteContactTarget, setDeleteContactTarget] = useState<{ id: string; name: string } | null>(null)
@@ -715,11 +701,6 @@ export function CrmContactsPage() {
     [kpis],
   )
 
-  function showToast(message: string, variant: 'error' | 'success' = 'error') {
-    setToast(message)
-    setToastVariant(variant)
-  }
-
   function openDeleteContact(row: EnrichedContactRow) {
     setDeleteContactTarget({ id: row.contact.id, name: row.contact.name })
   }
@@ -732,9 +713,9 @@ export function CrmContactsPage() {
         const r = await resolveStoreAction(deleteContact(deleteContactTarget.id))
         if (r.ok) {
           setDeleteContactTarget(null)
-          showToast('Contact deleted', 'success')
+          notify.success('Contact deleted')
         } else {
-          showToast(r.error ?? 'Delete failed')
+          notify.error(r.error ?? 'Delete failed')
         }
       } finally {
         setIsDeletingContact(false)
@@ -743,9 +724,7 @@ export function CrmContactsPage() {
   }
 
   function openContactImport() {
-    downloadContactImportTemplate()
     setImportOpen(true)
-    showToast('Contact import template downloaded — fill it and upload in the dialog', 'success')
   }
 
   function exportAllContacts() {
@@ -754,7 +733,7 @@ export function CrmContactsPage() {
       () => exportSelectedContacts(rows),
       { search: search || undefined },
     ).then((r) => {
-      if (!r.ok) showToast(r.error ?? 'Export failed')
+      if (!r.ok) notify.error(r.error ?? 'Export failed')
     })
   }
 
@@ -945,7 +924,7 @@ export function CrmContactsPage() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={(count) => {
-          showToast(`${count} contact${count === 1 ? '' : 's'} imported`, 'success')
+          notify.success(`${count} contact${count === 1 ? '' : 's'} imported`)
         }}
       />
       <CrmFilterDrawer
@@ -975,7 +954,6 @@ export function CrmContactsPage() {
         onConfirm={confirmDeleteContact}
         isDeleting={isDeletingContact}
       />
-      {toast ? <Toast message={toast} variant={toastVariant} /> : null}
     </>
   )
 }

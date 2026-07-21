@@ -1,12 +1,9 @@
 /**
- * Build the standard required-fields toast / notification body.
+ * Build the standard required-fields toast / notification body (top-right notify).
  *
- * Example:
- * ```
- * Please complete the required fields:
- * • Company
- * • Opportunity Name
- * ```
+ * Examples:
+ * - One field → `Please fill in Customer before saving.`
+ * - Several → bullet list under a short intro
  */
 export function formatRequiredFieldsNotifyMessage(fieldLabels: string[]): string {
   const unique: string[] = []
@@ -19,13 +16,14 @@ export function formatRequiredFieldsNotifyMessage(fieldLabels: string[]): string
     seen.add(key)
     unique.push(label)
   }
-  if (!unique.length) return 'Please complete the required fields.'
-  return `Please complete the required fields:\n${unique.map((l) => `• ${l}`).join('\n')}`
+  if (!unique.length) return 'Please complete the required fields before saving.'
+  if (unique.length === 1) return `Please fill in ${unique[0]} before saving.`
+  return `Please complete the required fields before saving:\n${unique.map((l) => `• ${l}`).join('\n')}`
 }
 
 /** Known display labels for common CRM / ERP "… is required" messages. */
 const KNOWN_REQUIRED_LABELS: Record<string, string> = {
-  company: 'Company',
+  company: 'Customer',
   'opportunity name': 'Opportunity Name',
   'expected close date': 'Expected Close Date',
   'opportunity owner': 'Owner',
@@ -33,13 +31,13 @@ const KNOWN_REQUIRED_LABELS: Record<string, string> = {
   stage: 'Stage',
   probability: 'Probability',
   priority: 'Priority',
-  customer: 'Company',
+  customer: 'Customer',
   'unit price': 'Unit Price',
 }
 
 /**
  * Turn an error message into a short field label for notify / ValidationGuide.
- * `"Company is required."` → `"Company"`
+ * `"Customer is required."` → `"Customer"`
  */
 export function toRequiredFieldLabel(message: string): string {
   const trimmed = message.trim().replace(/\.$/, '')

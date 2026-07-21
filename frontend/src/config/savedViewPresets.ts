@@ -50,6 +50,7 @@ export const OPPORTUNITY_REGISTER_PRESETS: Record<string, Record<string, string>
 
 export const SALES_ORDER_REGISTER_PRESETS: Record<string, Record<string, string>> = {
   'My View': { search: '', status: '', source: '', sortBy: 'orderDate' },
+  'Pending SO': { search: '', status: 'pending_so', source: '', sortBy: 'orderDate' },
   'Draft Orders': { search: '', status: 'open', source: '', sortBy: 'orderDate' },
   Confirmed: { search: '', status: 'confirmed', source: '', sortBy: 'orderDate' },
   'From Quotation': { search: '', status: '', source: 'quotation', sortBy: 'orderDate' },

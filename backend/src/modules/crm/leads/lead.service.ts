@@ -92,6 +92,27 @@ export async function createLead(tenantId: string, userId: string, input: Create
   // Default owner to creating user when form / client omits leadOwnerId
   const leadOwnerId = input.leadOwnerId ?? userId
   await assertUserInTenant(tenantId, leadOwnerId, 'Lead owner')
+
+  const stage = input.stage ?? 'new'
+  if (stage !== 'new') {
+    assertLeadStageRequirements(
+      {
+        prospectName: input.prospectName,
+        customerId: input.customerId ?? null,
+        contactId: input.contactId ?? null,
+        contactPerson: input.contactPerson ?? null,
+        mobile: input.mobile ?? null,
+        email: input.email ?? null,
+        productRequirement: input.productRequirement ?? null,
+        expectedValue: input.expectedValue ?? null,
+        leadOwnerId,
+        notQualifiedReason: null,
+        closedReason: null,
+      },
+      stage,
+    )
+  }
+
   const leadCode = input.leadNo ?? (await nextCode(tenantId, 'LEAD'))
   const lead = await repo.createLead(tenantId, userId, { ...input, leadOwnerId, leadCode })
   // Resolve display names — create response is upserted into the FE list store
@@ -211,9 +232,14 @@ export async function convertLead(tenantId: string, id: string, userId: string, 
     if (!stage) throw new NotFoundError('Pipeline stage not found')
   }
 
+  const contactId = input.contactId
+    ? await assertConvertibleContactId(tenantId, existing, input.contactId)
+    : (existing.contactId ?? null)
+
   const opportunityCode = await nextCode(tenantId, 'OPPORTUNITY')
   const result = await repo.convertLead(tenantId, id, userId, {
     ...input,
+    contactId,
     opportunityCode,
     pipelineId: pipelineId!,
     stageId: stageId!,
@@ -231,6 +257,22 @@ export async function convertLead(tenantId: string, id: string, userId: string, 
     lead: (await mapLeadWithNames(tenantId, result.lead))!,
     opportunity: opportunity ? mapOpportunityToDto(opportunity) : null,
   }
+}
+
+async function assertConvertibleContactId(
+  tenantId: string,
+  lead: NonNullable<Awaited<ReturnType<typeof repo.findLeadById>>>,
+  contactId: string,
+): Promise<string> {
+  await assertContactInTenant(tenantId, contactId)
+  const contact = await prisma.crmContact.findFirst({
+    where: { id: contactId, tenantId, deletedAt: null },
+    select: { id: true, companyId: true },
+  })
+  if (lead.companyId && contact?.companyId && contact.companyId !== lead.companyId) {
+    throw new InvalidStateError('Contact does not belong to the lead company')
+  }
+  return contactId
 }
 
 export async function getLeadStatusHistory(tenantId: string, leadId: string) {

@@ -36,13 +36,15 @@ import { CrmDeleteConfirmModal } from '../../components/crm/CrmDeleteConfirmModa
 import { AssignOwnerDialog } from '../../components/crm/AssignOwnerDialog'
 import { resolveStoreAction } from '../../store/storeAction'
 import { canCrmPermission } from '../../utils/permissions'
-import { Toast } from '../../components/ui/Toast'
 import {
   buildSalesOrderNewUrl,
   resolveOpportunityCreateSalesOrderGate,
 } from '../../utils/opportunitySalesOrderDraft'
+import { resolveOpportunityCreateQuotationGate } from '../../utils/opportunityCreateQuotationGate'
 import { resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
 import { notify } from '../../store/toastStore'
+import { isApiMode } from '../../config/apiConfig'
+import { syncOpportunitiesFromApi } from '../../services/bridges/crmApiBridge'
 
 type PipelineView = 'kanban' | 'list' | 'follow-ups' | 'activities'
 
@@ -78,7 +80,7 @@ export function OpportunityPipelinePage() {
   const navigate = useNavigate()
   const openDetailPanel = useUIStore((s) => s.openDetailPanel)
   const customers = useMasterStore((s) => s.customers)
-  const [params] = useSearchParams()
+  const [params, setSearchParams] = useSearchParams()
   const [view, setView] = usePipelineView()
   const opportunities = useCrmStore((s) => s.opportunities)
   const deleteOpportunity = useCrmStore((s) => s.deleteOpportunity)
@@ -87,20 +89,45 @@ export function OpportunityPipelinePage() {
   const canEdit = canCrmPermission('crm.opportunity.update')
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<OpportunitySortKey>('value')
-  const [stageFilter, setStageFilter] = useState<OpportunityStage | ''>((params.get('stage') as OpportunityStage) ?? '')
-  const [ownerFilter, setOwnerFilter] = useState(params.get('owner') ?? '')
-  const [lostReasonFilter, setLostReasonFilter] = useState(params.get('lostReason') ?? '')
+  const [stageFilter, setStageFilter] = useState<OpportunityStage | ''>('')
+  const [ownerFilter, setOwnerFilter] = useState('')
+  const [lostReasonFilter, setLostReasonFilter] = useState('')
+  const [urlSeeded, setUrlSeeded] = useState(false)
 
   useEffect(() => {
-    const lr = params.get('lostReason') ?? ''
-    if (lr) setLostReasonFilter(lr)
-  }, [params])
+    if (!isApiMode()) return
+    void syncOpportunitiesFromApi().catch(() => {
+      notify.error('Could not refresh opportunities from server')
+    })
+  }, [])
+
+  useEffect(() => {
+    if (urlSeeded) return
+    setStageFilter((params.get('stage') as OpportunityStage) ?? '')
+    setOwnerFilter(params.get('owner') ?? '')
+    setLostReasonFilter(params.get('lostReason') ?? '')
+    setUrlSeeded(true)
+  }, [params, urlSeeded])
+
+  useEffect(() => {
+    if (!urlSeeded) return
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (stageFilter) next.set('stage', stageFilter)
+      else next.delete('stage')
+      if (ownerFilter) next.set('owner', ownerFilter)
+      else next.delete('owner')
+      if (lostReasonFilter) next.set('lostReason', lostReasonFilter)
+      else next.delete('lostReason')
+      return next
+    }, { replace: true })
+  }, [stageFilter, ownerFilter, lostReasonFilter, urlSeeded, setSearchParams])
+
   const [followUpOpp, setFollowUpOpp] = useState<Opportunity | null>(null)
   const [logActivityOpp, setLogActivityOpp] = useState<Opportunity | null>(null)
   const [deleteOppTarget, setDeleteOppTarget] = useState<Opportunity | null>(null)
   const [isDeletingOpp, setIsDeletingOpp] = useState(false)
   const [assignTargets, setAssignTargets] = useState<Opportunity[] | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
 
   const owners = useMemo(() => [...new Set(opportunities.map((o) => o.ownerName))].sort(), [opportunities])
   const masterEntries = useCrmMasterStore((s) => s.entries)
@@ -150,7 +177,16 @@ export function OpportunityPipelinePage() {
     filterDrawer.clearAll()
     setLostReasonFilter('')
     setSortBy('value')
-  }, [filterDrawer])
+    savedViews.markFiltersCustomized()
+  }, [filterDrawer, savedViews])
+
+  const removeOppFilterChip = useCallback(
+    (chipId: string) => {
+      filterDrawer.removeChip(chipId)
+      savedViews.markFiltersCustomized()
+    },
+    [filterDrawer, savedViews],
+  )
 
   const filtered = useMemo(() => {
     return opportunities.filter((o) => {
@@ -294,7 +330,7 @@ export function OpportunityPipelinePage() {
         search: search || undefined,
       },
     ).then((r) => {
-      if (!r.ok) setToast(r.error ?? 'Export failed')
+      if (!r.ok) notify.error(r.error ?? 'Export failed')
     })
   }
 
@@ -307,7 +343,7 @@ export function OpportunityPipelinePage() {
         if (r.ok) {
           setDeleteOppTarget(null)
         } else {
-          setToast(r.error ?? 'Delete failed')
+          notify.error(r.error ?? 'Delete failed')
         }
       } finally {
         setIsDeletingOpp(false)
@@ -393,7 +429,7 @@ export function OpportunityPipelinePage() {
             activeFilterCount={filterDrawer.activeCount}
             onOpenFilters={filterDrawer.openDrawer}
             chips={filterDrawer.chips}
-            onRemoveChip={filterDrawer.removeChip}
+            onRemoveChip={removeOppFilterChip}
             onClearAll={filterDrawer.chips.length > 0 ? clearFilters : undefined}
             resultCount={sorted.length}
             savedView={savedViews.activeView}
@@ -438,7 +474,7 @@ export function OpportunityPipelinePage() {
                   activeFilterCount: filterDrawer.activeCount,
                   onOpenFilters: filterDrawer.openDrawer,
                   chips: filterDrawer.chips,
-                  onRemoveChip: filterDrawer.removeChip,
+                  onRemoveChip: removeOppFilterChip,
                   onClearAll: clearFilters,
                   savedView: savedViews.activeView,
                   onSavedViewChange: savedViews.selectView,
@@ -473,7 +509,14 @@ export function OpportunityPipelinePage() {
                 onPreview={openOpportunityPreview}
                 onView={(row) => navigate(`/crm/opportunities/${row.id}`)}
                 onEdit={(row) => navigate(`/crm/opportunities/${row.id}/edit`)}
-                onCreateQuotation={(row) => navigate(`/crm/quotations/new?opportunityId=${row.id}`)}
+                onCreateQuotation={(row) => {
+                  const gate = resolveOpportunityCreateQuotationGate(row.id)
+                  if (!gate.enabled) {
+                    notify.error(gate.disabledReason ?? 'Complete opportunity requirements before creating a quotation.')
+                    return
+                  }
+                  navigate(`/crm/quotations/new?opportunityId=${row.id}`)
+                }}
                 onScheduleActivity={(row) => setFollowUpOpp(row)}
                 onLogActivity={(row) => setLogActivityOpp(row)}
                 onCreateSalesOrder={(row) => {
@@ -483,7 +526,7 @@ export function OpportunityPipelinePage() {
                     return
                   }
                   if (!gate.enabled) {
-                    notify.error(gate.disabledReason ?? 'Available after quotation approval.')
+                    notify.error(gate.disabledReason ?? 'Available after customer approval.')
                     return
                   }
                   navigate(buildSalesOrderNewUrl(row.id, gate.quotationDocumentId, { fromCrm: true }))
@@ -556,7 +599,6 @@ export function OpportunityPipelinePage() {
         currentOwnerName={assignTargets?.length === 1 ? assignTargets[0]?.ownerName : undefined}
         onAssign={confirmAssignOwner}
       />
-      {toast ? <Toast message={toast} variant="error" /> : null}
     </>
   )
 }

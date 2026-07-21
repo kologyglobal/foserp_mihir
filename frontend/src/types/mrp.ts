@@ -18,6 +18,8 @@ export type SalesOrderStatus =
   | 'dispatched'
   | 'invoiced'
   | 'closed'
+  /** UI register only — approved quotation awaiting SO conversion (not persisted). */
+  | 'pending_so'
 
 export type SalesOrderSource = 'quotation' | 'direct'
 

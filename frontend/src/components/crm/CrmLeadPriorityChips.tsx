@@ -7,6 +7,7 @@ interface CrmLeadPriorityChipsProps {
   onChange: (value: LeadPriority) => void
   options: { value: LeadPriority; label: string }[]
   disabled?: boolean
+  onBlur?: () => void
 }
 
 const TONE: Record<LeadPriority, string> = {
@@ -17,7 +18,7 @@ const TONE: Record<LeadPriority, string> = {
 }
 
 /** Visual priority picker — faster than a dropdown for sales users */
-export function CrmLeadPriorityChips({ value, onChange, options, disabled }: CrmLeadPriorityChipsProps) {
+export function CrmLeadPriorityChips({ value, onChange, options, disabled, onBlur }: CrmLeadPriorityChipsProps) {
   const groupRef = useRef<HTMLDivElement>(null)
 
   function focusChip(index: number) {
@@ -66,6 +67,11 @@ export function CrmLeadPriorityChips({ value, onChange, options, disabled }: Crm
       aria-label="Lead priority"
       aria-disabled={disabled || undefined}
       onKeyDown={onKeyDown}
+      onBlur={(e) => {
+        if (!groupRef.current?.contains(e.relatedTarget as Node | null)) {
+          onBlur?.()
+        }
+      }}
     >
       {options.map((opt) => (
         <button

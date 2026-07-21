@@ -19,17 +19,54 @@ import { LiveStatusBadge } from '../premium/LiveStatusBadge'
 import { quotationStatusLabel, quotationStatusTone } from './QuotationCrmCard'
 import { cn } from '../../utils/cn'
 
-const WORKFLOW_STEPS: { id: QuotationDocumentStatus; label: string }[] = [
+import type { CustomerApprovalStatus } from '../../types/quotation'
+import { resolveSalesOrderDetailPath } from '../../utils/crmSalesOrderNavigation'
+import { resolveQuotationRevisionPolicy } from '../../utils/quotationRevisionPolicy'
+import { opportunityRequirementDisplay } from '../../utils/leadRequirementLines'
+
+type WorkflowStepId =
+  | 'draft'
+  | 'submit'
+  | 'send'
+  | 'sent'
+  | 'customer_approved'
+  | 'convert'
+
+const WORKFLOW_STEPS: { id: WorkflowStepId; label: string }[] = [
   { id: 'draft', label: 'Draft' },
+  { id: 'submit', label: 'Submit for Internal Approval' },
+  { id: 'send', label: 'Send to Customer' },
   { id: 'sent', label: 'Sent' },
-  { id: 'pending_approval', label: 'Approval' },
-  { id: 'approved', label: 'Approved' },
-  { id: 'converted', label: 'Converted' },
+  { id: 'customer_approved', label: 'Customer Approved' },
+  { id: 'convert', label: 'Convert to Sales Order' },
 ]
 
-function workflowIndex(status: QuotationDocumentStatus): number {
-  if (status === 'rejected') return 2
-  return WORKFLOW_STEPS.findIndex((s) => s.id === status)
+function resolveCurrentStepId(
+  status: QuotationDocumentStatus,
+  customerApproval?: CustomerApprovalStatus | null,
+): WorkflowStepId {
+  if (status === 'converted') return 'convert'
+  if (status === 'sent' && customerApproval === 'approved') return 'customer_approved'
+  if (status === 'sent') return 'sent'
+  if (status === 'approved') return 'send'
+  if (status === 'pending_approval') return 'submit'
+  if (status === 'rejected') return 'draft'
+  if (status === 'draft' || status === 'superseded') return 'draft'
+  return 'draft'
+}
+
+/** Index of the active / next-action step (0-based). */
+function workflowIndex(
+  status: QuotationDocumentStatus,
+  customerApproval?: CustomerApprovalStatus | null,
+): number {
+  const id = resolveCurrentStepId(status, customerApproval)
+  return Math.max(0, WORKFLOW_STEPS.findIndex((s) => s.id === id))
+}
+
+/** Display label Q1, Q2… — revision numbers are 1-based (API + new creates). Legacy 0 maps to Q1. */
+export function quotationRevisionLabel(revisionNo: number): string {
+  return `Q${revisionNo < 1 ? 1 : revisionNo}`
 }
 
 function initials(name: string) {
@@ -75,7 +112,7 @@ export function QuotationHeroCard({
           <div className="min-w-0 flex-1">
             <div className="quotation-360-hero__badges">
               <LiveStatusBadge label={quotationStatusLabel(doc.status)} tone={quotationStatusTone(doc.status)} size="md" pulse={false} />
-              <span className="quotation-360-hero__rev">Rev {doc.revisionNo}</span>
+              <span className="quotation-360-hero__rev">{quotationRevisionLabel(doc.revisionNo)}</span>
               {doc.locked ? (
                 <span className="quotation-360-hero__flag quotation-360-hero__flag--warn">
                   <Lock className="h-3 w-3" aria-hidden />
@@ -173,9 +210,26 @@ export function QuotationHeroCard({
   )
 }
 
-export function QuotationWorkflowStepper({ status }: { status: QuotationDocumentStatus }) {
-  const idx = workflowIndex(status)
-  const isRejected = status === 'rejected'
+export function QuotationWorkflowStepper({
+  status,
+  customerApproval,
+  salesOrderId,
+  salesOrderNo,
+  onViewSalesOrder,
+}: {
+  status: QuotationDocumentStatus
+  customerApproval?: CustomerApprovalStatus | null
+  salesOrderId?: string | null
+  salesOrderNo?: string | null
+  onViewSalesOrder?: () => void
+}) {
+  const idx = workflowIndex(status, customerApproval)
+  const currentStepId = resolveCurrentStepId(status, customerApproval)
+  const isConverted = status === 'converted'
+  const isInternalRejected = status === 'rejected'
+  const isCustomerRejected = status === 'sent' && customerApproval === 'rejected'
+  const policy = resolveQuotationRevisionPolicy({ status, customerApproval })
+  const currentLabel = WORKFLOW_STEPS.find((s) => s.id === currentStepId)?.label ?? policy.stageTitle
 
   return (
     <div className="rounded-xl border border-erp-border bg-erp-surface p-4 shadow-[var(--erp-shadow-card)]">
@@ -183,46 +237,107 @@ export function QuotationWorkflowStepper({ status }: { status: QuotationDocument
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Document workflow</p>
           <p className="mt-0.5 text-[14px] font-bold text-erp-text">
-            {isRejected ? 'Rejected — revision required' : `Step ${idx + 1} of ${WORKFLOW_STEPS.length}`}
+            {isInternalRejected
+              ? 'Internally rejected — revision available'
+              : isCustomerRejected
+                ? 'Customer rejected — revision available'
+                : isConverted
+                  ? 'Converted to Sales Order'
+                  : `${currentLabel} · Step ${idx + 1} of ${WORKFLOW_STEPS.length}`}
           </p>
         </div>
         <LiveStatusBadge label={quotationStatusLabel(status)} tone={quotationStatusTone(status)} pulse={false} />
       </div>
 
-      {isRejected ? (
-        <div className="flex items-start gap-2 rounded-lg border border-erp-danger/30 bg-erp-danger-soft/30 px-4 py-3">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-erp-danger" />
-          <p className="text-[13px] text-erp-danger-fg">Create a new revision to address feedback and resubmit for approval.</p>
-        </div>
-      ) : (
-        <div className="flex gap-1">
-          {WORKFLOW_STEPS.map((s, i) => {
-            const isCurrent = s.id === status
-            const isPast = i < idx
-            return (
-              <div key={s.id} className="group flex flex-1 flex-col items-center gap-1.5 rounded-md px-0.5 py-1">
-                <div className="flex w-full items-center gap-0.5">
-                  <div
-                    className={cn(
-                      'h-2 flex-1 rounded-full transition-all',
-                      isPast ? 'bg-erp-primary' : isCurrent ? 'bg-erp-primary ring-2 ring-erp-primary/30 ring-offset-1' : 'bg-erp-surface-alt',
-                    )}
-                  />
-                </div>
-                <span
+      <div className="flex gap-1 overflow-x-auto pb-1">
+        {WORKFLOW_STEPS.map((s, i) => {
+          const isCurrent = s.id === currentStepId
+          const isPast = i < idx || (isConverted && i <= idx)
+          return (
+            <div
+              key={s.id}
+              className="flex min-w-[5.5rem] flex-1 flex-col items-center gap-1.5 rounded-md px-0.5 py-1"
+            >
+              <div className="flex w-full items-center gap-0.5">
+                <div
                   className={cn(
-                    'text-center text-[8px] font-medium leading-tight text-erp-muted sm:text-[9px]',
-                    isCurrent && 'font-bold text-erp-primary',
-                    isPast && 'text-erp-text',
+                    'h-2 flex-1 rounded-full transition-all',
+                    isPast || (isConverted && isCurrent)
+                      ? 'bg-erp-primary'
+                      : isCurrent
+                        ? 'bg-erp-primary ring-2 ring-erp-primary/30 ring-offset-1'
+                        : 'bg-erp-surface-alt',
                   )}
-                >
-                  {s.label}
-                </span>
+                />
               </div>
-            )
-          })}
+              <span
+                className={cn(
+                  'text-center text-[10px] font-medium leading-snug text-erp-muted sm:text-[11px]',
+                  isCurrent && 'font-bold text-erp-primary',
+                  isPast && !isCurrent && 'text-erp-text',
+                )}
+              >
+                {s.label}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      <div
+        className={cn(
+          'mt-3 rounded-lg border px-3 py-2.5',
+          isInternalRejected || isCustomerRejected
+            ? 'border-erp-danger/30 bg-erp-danger-soft/25'
+            : 'border-erp-border/80 bg-erp-surface-alt/40',
+        )}
+      >
+        <p className="text-[12px] font-semibold text-erp-text">{policy.stageTitle}</p>
+        <ul className="mt-1.5 space-y-1">
+          {policy.guidance.map((line) => (
+            <li key={line} className="flex items-start gap-1.5 text-[12px] leading-snug text-erp-muted">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-erp-muted" aria-hidden />
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+        {(isInternalRejected || isCustomerRejected) ? (
+          <p className="mt-2 flex items-start gap-1.5 text-[12px] text-erp-danger">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            Create a new revision to address feedback, then continue the workflow from Draft.
+          </p>
+        ) : null}
+      </div>
+
+      {isConverted && (salesOrderId || salesOrderNo) ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2">
+          <p className="text-[13px] text-emerald-900">
+            Linked sales order
+            {salesOrderNo ? (
+              <>
+                {' '}
+                <span className="font-mono font-semibold">{salesOrderNo}</span>
+              </>
+            ) : null}
+          </p>
+          {salesOrderId && onViewSalesOrder ? (
+            <button
+              type="button"
+              className="text-[12px] font-semibold text-emerald-800 underline-offset-2 hover:underline"
+              onClick={onViewSalesOrder}
+            >
+              Open Sales Order
+            </button>
+          ) : salesOrderId ? (
+            <a
+              href={resolveSalesOrderDetailPath(salesOrderId, true)}
+              className="text-[12px] font-semibold text-emerald-800 underline-offset-2 hover:underline"
+            >
+              Open Sales Order
+            </a>
+          ) : null}
         </div>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -264,7 +379,10 @@ export function QuotationCommercialSummary({ document: doc }: { document: Quotat
 }
 
 export function QuotationSectionList({ document: doc }: { document: QuotationDocument }) {
-  const sorted = [...doc.sections].sort((a, b) => a.sequenceNo - b.sequenceNo)
+  const sorted = [...doc.sections]
+    .sort((a, b) => a.sequenceNo - b.sequenceNo)
+    // Legacy docs stored the encoded <!--fos-lead-lines--> payload in scope/technical sections.
+    .map((sec) => ({ ...sec, content: opportunityRequirementDisplay(sec.content) }))
 
   return (
     <div className="space-y-2">

@@ -139,6 +139,57 @@ export function extractCommercialTermsFromSections(sections: QuotationSection[])
   }
 }
 
+/** Apply header payment/delivery values onto matching quotation sections (keeps editor + sections in sync). */
+export function syncCommercialTermsIntoSections(
+  sections: QuotationSection[],
+  patch: { paymentTerms?: string; deliveryTerms?: string; warrantyTerms?: string },
+): QuotationSection[] {
+  return sections.map((section) => {
+    if (section.sectionType === 'payment' && patch.paymentTerms != null) {
+      const content = patch.paymentTerms.trim()
+      return {
+        ...section,
+        content,
+        masterCode: content ? matchCommercialTermCode('payment-terms', content) : section.masterCode,
+      }
+    }
+    if (section.sectionType === 'delivery' && patch.deliveryTerms != null) {
+      const content = patch.deliveryTerms.trim()
+      return {
+        ...section,
+        content,
+        masterCode: content ? matchCommercialTermCode('delivery-terms', content) : section.masterCode,
+      }
+    }
+    if (section.sectionType === 'warranty' && patch.warrantyTerms != null) {
+      const content = patch.warrantyTerms.trim()
+      return {
+        ...section,
+        content,
+        masterCode: content ? matchCommercialTermCode('warranty-terms', content) : section.masterCode,
+      }
+    }
+    return section
+  })
+}
+
+/**
+ * Prefer a master term *name* for CommercialTermSelect binding.
+ * Falls back to stored text when no master match exists.
+ */
+export function resolveCommercialTermSelectValue(
+  kind: QuotationCommercialTermKind,
+  stored: string | null | undefined,
+): string {
+  const raw = stored?.trim() ?? ''
+  if (!raw) return ''
+  const code = matchCommercialTermCode(kind, raw)
+  if (!code) return raw
+  const entries = masterEntries(kind, false)
+  const entry = entries.find((e) => e.code === code)
+  return entry?.name ?? raw
+}
+
 export function commercialTermsNeedApproval(sections: QuotationSection[]): string[] {
   const warnings: string[] = []
   for (const section of sections) {

@@ -6,6 +6,30 @@ export function isValidGstin(gstin: string): boolean {
   return GSTIN_RE.test(gstin.trim().toUpperCase())
 }
 
+/**
+ * Validate GSTIN when provided. Empty is allowed (optional on quick create).
+ * @returns error message, or null when valid / empty.
+ */
+export function validateGstin(
+  gstin: string | null | undefined,
+  options?: { required?: boolean },
+): string | null {
+  const raw = String(gstin ?? '').trim().toUpperCase()
+  if (!raw) {
+    return options?.required ? 'GSTIN is required' : null
+  }
+  if (raw.length !== 15) {
+    return 'GSTIN must be exactly 15 characters'
+  }
+  if (!/^[0-9A-Z]+$/.test(raw)) {
+    return 'GSTIN must contain only letters and numbers'
+  }
+  if (!isValidGstin(raw)) {
+    return 'Enter a valid GSTIN (e.g. 27AABCU9603R1ZM)'
+  }
+  return null
+}
+
 export function panFromGstin(gstin: string): string {
   const g = gstin.trim().toUpperCase()
   if (g.length !== 15) return ''

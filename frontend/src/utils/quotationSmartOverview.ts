@@ -12,7 +12,9 @@ export interface QuotationSmartOverviewInput {
   quotationNo: string
   customerName: string
   customerId: string | null
+  /** Raw document status: draft | pending_approval | approved | sent | converted | … */
   status: string
+  customerApproval?: 'pending' | 'approved' | 'rejected' | null
   lineCount: number
   hasValidLine: boolean
   grandTotal: number
@@ -185,16 +187,16 @@ export function buildQuotationSmartSignals(input: QuotationSmartOverviewInput): 
   const missing: CrmSmartSignal[] = []
   const ok: CrmSmartSignal[] = []
 
-  if (!input.customerId) missing.push({ id: 'company', label: 'Customer not linked', tone: 'warn' })
+  if (!input.customerId) missing.push({ id: 'company', label: 'Link a customer', tone: 'warn' })
   else ok.push({ id: 'company', label: 'Customer linked', tone: 'ok' })
 
-  if (!input.hasValidLine) missing.push({ id: 'lines', label: 'Line items incomplete', tone: 'warn' })
+  if (!input.hasValidLine) missing.push({ id: 'lines', label: 'Add line items', tone: 'warn' })
   else ok.push({ id: 'lines', label: `${input.lineCount} line(s)`, tone: 'ok' })
 
-  if (input.grandTotal <= 0) missing.push({ id: 'total', label: 'Total not calculated', tone: 'warn' })
+  if (input.grandTotal <= 0) missing.push({ id: 'total', label: 'Review totals', tone: 'warn' })
   else ok.push({ id: 'total', label: 'Totals ready', tone: 'ok' })
 
-  if (!input.validUntil) missing.push({ id: 'validity', label: 'Validity date missing', tone: 'warn' })
+  if (!input.validUntil) missing.push({ id: 'validity', label: 'Set validity date', tone: 'warn' })
   else ok.push({ id: 'validity', label: 'Validity set', tone: 'ok' })
 
   return [...missing, ...ok].slice(0, 3)
@@ -207,6 +209,8 @@ export function resolveQuotationNextBestAction(input: QuotationSmartOverviewInpu
       title: 'Link Customer',
       description: 'Select the company this quotation is for.',
       ctaLabel: 'Link Customer',
+      focusField: 'customerId',
+      sectionId: 'quick',
     }
   }
   if (!input.hasValidLine) {
@@ -215,6 +219,8 @@ export function resolveQuotationNextBestAction(input: QuotationSmartOverviewInpu
       title: 'Add Line Items',
       description: 'Add products or services so the quotation has a commercial offer.',
       ctaLabel: 'Add Lines',
+      focusField: 'products',
+      sectionId: 'products',
     }
   }
   if (!input.validUntil) {
@@ -223,20 +229,76 @@ export function resolveQuotationNextBestAction(input: QuotationSmartOverviewInpu
       title: 'Set Validity',
       description: 'Define how long this quotation remains valid for the customer.',
       ctaLabel: 'Set Validity',
+      focusField: 'validUntil',
+      sectionId: 'commercial',
     }
   }
-  if (!input.salesOrderId && ['accepted', 'approved'].includes(input.status.toLowerCase())) {
+
+  if (input.salesOrderId) {
+    return {
+      id: 'review',
+      title: 'View Sales Order',
+      description: 'This quotation is converted. Continue fulfilment from the sales order.',
+      ctaLabel: 'Review Quotation',
+    }
+  }
+
+  const status = input.status.toLowerCase().replace(/\s+/g, '_')
+  const customerApproval = input.customerApproval ?? 'pending'
+
+  if (status === 'draft' || status === 'rejected') {
+    return {
+      id: 'submit_approval',
+      title: 'Submit for Internal Approval',
+      description: 'Submit this quotation for internal approval before sending it to the customer.',
+      ctaLabel: 'Submit for Approval',
+    }
+  }
+  if (status === 'pending_approval') {
+    return {
+      id: 'approve',
+      title: 'Approve Quotation',
+      description: 'Pending internal approval — approve or reject this quotation.',
+      ctaLabel: 'Approve',
+    }
+  }
+  if (status === 'approved') {
+    return {
+      id: 'send',
+      title: 'Send to Customer',
+      description: 'Internally approved — send this quotation to the customer next.',
+      ctaLabel: 'Send to Customer',
+    }
+  }
+  if (status === 'sent' && customerApproval === 'pending') {
+    return {
+      id: 'customer_approve',
+      title: 'Customer Approve',
+      description: 'Quotation is with the customer — record their approval before converting to a sales order.',
+      ctaLabel: 'Customer Approve',
+    }
+  }
+  if (status === 'sent' && customerApproval === 'approved') {
     return {
       id: 'convert_so',
       title: 'Convert to Sales Order',
-      description: 'Quotation is approved — convert to an Open sales order (marks the opportunity Won).',
+      description: 'Customer approved — convert to an Open sales order (marks the opportunity Won).',
       ctaLabel: 'Convert to Sales Order',
     }
   }
+  if (status === 'converted') {
+    return {
+      id: 'review',
+      title: 'Converted',
+      description: 'Quotation is already converted to a sales order.',
+      ctaLabel: 'Review Quotation',
+    }
+  }
+
   return {
     id: 'review',
-    title: 'Review & Send',
-    description: 'Quotation looks ready. Preview, share, or follow up with the customer.',
+    title: 'Review Quotation',
+    description: 'Continue the lifecycle: Submit → Approve → Send → Customer Approve → Convert.',
     ctaLabel: 'Review Quotation',
   }
 }
@@ -246,6 +308,11 @@ export function buildQuotationAiInsight(input: QuotationSmartOverviewInput): str
   if (!input.hasValidLine) return 'Customer is set. Add line items to build a sendable commercial offer.'
   if (!input.validUntil) return 'Lines look good. Set a validity date before sharing the quotation.'
   if (input.salesOrderId) return 'This quotation already has a sales order. Use Order 360 for execution.'
+  const status = input.status.toLowerCase().replace(/\s+/g, '_')
+  if (status === 'approved') return 'Approved internally. Send to the customer before conversion.'
+  if (status === 'sent' && (input.customerApproval ?? 'pending') === 'pending') {
+    return 'Sent to customer. Record customer approval to unlock Convert to Sales Order.'
+  }
   return null
 }
 
@@ -267,12 +334,13 @@ export function buildQuotationKeyDetails(input: QuotationSmartOverviewInput): Cr
 }
 
 export function quotationOverviewChips(input: QuotationSmartOverviewInput): CrmSmartChip[] {
-  const s = input.status.toLowerCase()
+  const s = input.status.toLowerCase().replace(/\s+/g, '_')
   const tone: CrmSmartChip['tone'] =
-    s === 'accepted' || s === 'approved' ? 'success'
-      : s === 'rejected' || s === 'expired' || s === 'cancelled' ? 'critical'
-        : s === 'sent' ? 'info'
-          : 'neutral'
+    s === 'converted' || (s === 'sent' && input.customerApproval === 'approved') ? 'success'
+      : s === 'rejected' || s === 'expired' || s === 'cancelled' || input.customerApproval === 'rejected' ? 'critical'
+        : s === 'sent' || s === 'approved' ? 'info'
+          : s === 'pending_approval' ? 'warning'
+            : 'neutral'
   return [{ label: input.status || 'Draft', tone }]
 }
 

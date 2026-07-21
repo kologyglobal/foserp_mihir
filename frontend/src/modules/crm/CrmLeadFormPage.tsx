@@ -44,10 +44,14 @@ import { sanitizePhoneDigits } from '../../utils/phoneValidation'
 import { normalizeEmail, validateEmail } from '../../utils/validation/email'
 import { validateMobileForCountry } from '../../utils/validation/mobilePhone'
 import {
+  getCrmDateInputMax,
+  getCrmDateInputMin,
   getDateInputMin,
   suggestFollowUpDueTime,
+  validateCrmCalendarDate,
   validateFollowUpAt,
 } from '../../utils/validation/crmDatePolicy'
+import { validateLeadForm } from '../../utils/validation/crmSchemas/leadSchema'
 import { DEFAULT_CUSTOMER_COUNTRY } from '../../config/countries'
 import { getActiveLeadUsers } from '../../data/crm/leadUsers'
 import {
@@ -81,15 +85,14 @@ import { ErpCardSection, ErpFieldRow, ErpQuickEntrySection, ErpFieldGroup, ErpAd
 import { FormActionBar } from '../../components/erp/FormActionBar'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
 import { EnterpriseFormSectionNav } from '../../design-system/workspace'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import { useFormDraftAutosave } from '../../hooks/useFormDraftAutosave'
 import { useInlineFormValidation } from '../../hooks/useInlineFormValidation'
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard'
 import {
   handleInvalidSubmit,
+  crmShowCompletenessHints,
   type FieldErrorMap,
 } from '../../utils/formValidation'
-import { ValidationSummary } from '../../components/forms/validation'
 import { useLeadAttachmentStore } from '../../store/leadAttachmentStore'
 import type { CrmTypedAttachment } from '../../types/crmDocuments'
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
@@ -114,12 +117,16 @@ function todayIso() {
 /** Field order for invalid-submit focus (Lead create/edit reference). */
 const LEAD_FIELD_ORDER = [
   'prospectName',
+  'contactPerson',
   'leadOwnerId',
   'priority',
   'createdDate',
   'mobile',
   'email',
+  'remarks',
   'productRequirement',
+  'expectedCloseDate',
+  'nextFollowUpDate',
   'inactiveReason',
   'notQualifiedReason',
   'closedDate',
@@ -128,12 +135,16 @@ const LEAD_FIELD_ORDER = [
 
 const LEAD_SECTION_BY_FIELD: Record<string, string> = {
   prospectName: 'lead-section-quick',
+  contactPerson: 'lead-section-quick',
   leadOwnerId: 'lead-section-quick',
   priority: 'lead-section-quick',
   createdDate: 'lead-section-quick',
   mobile: 'lead-section-quick',
   email: 'lead-section-quick',
+  remarks: 'lead-section-enquiry-notes',
   productRequirement: 'lead-section-requirement',
+  expectedCloseDate: 'lead-section-commercial',
+  nextFollowUpDate: 'lead-section-followup',
   inactiveReason: 'lead-section-status',
   notQualifiedReason: 'lead-section-status',
   closedDate: 'lead-section-status',
@@ -166,6 +177,7 @@ export function CrmLeadFormPage() {
   const fieldLocked = (field: string) => isEdit && isLeadFieldLocked(formPolicy, field)
 
   const [validationErrors, setValidationErrors] = useState<FieldErrorMap>({})
+  const [saveAttempted, setSaveAttempted] = useState(false)
   const [sectionForceOpenKey, setSectionForceOpenKey] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [savedLeadId, setSavedLeadId] = useState<string | null>(null)
@@ -188,7 +200,11 @@ export function CrmLeadFormPage() {
   const [source, setSource] = useState<LeadSource>(existing?.source ?? 'other')
   const [industry, setIndustry] = useState(existing?.industry ?? '')
   const [requirementLines, setRequirementLines] = useState<OpportunityLine[]>(() =>
-    decodeLeadRequirementLines(existing?.productRequirement ?? '', existing?.expectedQty ?? null).lines,
+    decodeLeadRequirementLines(
+      existing?.productRequirement ?? '',
+      existing?.expectedQty ?? null,
+      existing?.remarks,
+    ).lines,
   )
   const [expectedValue, setExpectedValue] = useState(existing?.expectedValue ?? 0)
   const [probability, setProbability] = useState(existing?.probability ?? 30)
@@ -279,7 +295,11 @@ export function CrmLeadFormPage() {
     setSource(duplicateSource.source)
     setIndustry(duplicateSource.industry ?? '')
     setRequirementLines(
-      decodeLeadRequirementLines(duplicateSource.productRequirement ?? '', duplicateSource.expectedQty ?? null).lines,
+      decodeLeadRequirementLines(
+        duplicateSource.productRequirement ?? '',
+        duplicateSource.expectedQty ?? null,
+        duplicateSource.remarks,
+      ).lines,
     )
     setExpectedValue(duplicateSource.expectedValue ?? 0)
     setProbability(duplicateSource.probability ?? 30)
@@ -311,7 +331,11 @@ export function CrmLeadFormPage() {
     setSource(existing.source)
     setIndustry(existing.industry ?? '')
     setRequirementLines(
-      decodeLeadRequirementLines(existing.productRequirement ?? '', existing.expectedQty ?? null).lines,
+      decodeLeadRequirementLines(
+        existing.productRequirement ?? '',
+        existing.expectedQty ?? null,
+        existing.remarks,
+      ).lines,
     )
     setExpectedValue(existing.expectedValue ?? 0)
     setProbability(existing.probability ?? 30)
@@ -385,7 +409,13 @@ export function CrmLeadFormPage() {
   const products = useMasterStore((s) => s.products)
   const items = useMasterStore((s) => s.items)
   const uoms = useMasterStore((s) => s.uoms)
-  const { options: productOptions, pickMap } = useProductMasterOptionMap(products, items, uoms)
+  const { options: productOptions, pickMap } = useProductMasterOptionMap(
+    products,
+    items,
+    uoms,
+    undefined,
+    requirementLines.map((l) => l.productId),
+  )
 
   const requirementText = useMemo(
     () => summarizeLeadRequirementLines(requirementLines),
@@ -406,24 +436,13 @@ export function CrmLeadFormPage() {
   const customer = company.customerId ? useMasterStore.getState().getCustomer(company.customerId) : undefined
   const territory = customer?.salesTerritory ?? companyInfo?.salesTerritory ?? '—'
 
+  // New Lead policy: the form always opens blank — drafts are never persisted or restored.
+  // clearDraft stays wired so any legacy stale draft key is purged on mount / cancel / save.
   const draftKey = `erp-lead-draft-${id ?? 'new'}`
-  const draftPayload = useMemo(
-    () => ({
-      company, contactId, contactPerson, mobile, email, leadOwnerId, priority, createdDate, source, industry,
-      requirementLines, expectedValue, probability, expectedCloseDate, remarks,
-      leadStage, nextFollowUpDate, followUpType, followUpNotes, internalNotes, reference,
-    }),
-    [
-      company, contactId, contactPerson, mobile, email, leadOwnerId, priority, createdDate, source, industry,
-      requirementLines, expectedValue, probability, expectedCloseDate, remarks,
-      leadStage, nextFollowUpDate, followUpType, followUpNotes, internalNotes, reference,
-    ],
-  )
-
-  const { statusLabel: autosaveLabel, clearDraft, loadDraft } = useFormDraftAutosave({
+  const { statusLabel: autosaveLabel, clearDraft } = useFormDraftAutosave({
     key: draftKey,
-    data: draftPayload,
-    enabled: !isEdit,
+    data: null,
+    enabled: false,
   })
 
   /** After a successful create, clear every field for the next entry. */
@@ -470,42 +489,13 @@ export function CrmLeadFormPage() {
     captureDirtyBaseline()
   }
 
+  // Create mode must start completely blank: purge any stale draft (from older builds or
+  // abandoned sessions) and any leftover draft:new attachments from a previous lead entry.
   useEffect(() => {
-    if (isEdit) return
-    const draft = loadDraft()
-    if (!draft) return
-    setCompany(draft.company ?? company)
-    setContactId(draft.contactId ?? '')
-    setContactPerson(draft.contactPerson ?? '')
-    setMobile(sanitizePhoneDigits(draft.mobile ?? ''))
-    setEmail(draft.email ?? '')
-    setLeadOwnerId(draft.leadOwnerId ?? session.id)
-    setPriority(draft.priority ?? 'medium')
-    setCreatedDate(draft.createdDate ?? todayIso())
-    setSource(draft.source ?? 'other')
-    setIndustry(draft.industry ?? '')
-    if (Array.isArray(draft.requirementLines) && draft.requirementLines.length > 0) {
-      setRequirementLines(syncOpportunityLines(draft.requirementLines as OpportunityLine[]))
-    } else {
-      setRequirementLines(
-        decodeLeadRequirementLines(
-          String((draft as { productRequirement?: string }).productRequirement ?? ''),
-          (draft as { expectedQty?: number | null }).expectedQty != null
-            ? Number((draft as { expectedQty?: number | null }).expectedQty)
-            : null,
-        ).lines,
-      )
-    }
-    setExpectedValue(draft.expectedValue ?? 0)
-    setProbability(draft.probability ?? 30)
-    setExpectedCloseDate(draft.expectedCloseDate ?? '')
-    setRemarks(draft.remarks ?? '')
-    setLeadStage(draft.leadStage ?? 'new')
-    setNextFollowUpDate(draft.nextFollowUpDate ?? '')
-    setFollowUpType(draft.followUpType ?? 'call')
-    setFollowUpNotes(draft.followUpNotes ?? '')
-    setInternalNotes(draft.internalNotes ?? '')
-    setReference(draft.reference ?? '')
+    if (id) return
+    clearDraft()
+    setLeadAttachments('draft:new', [])
+    setAttachmentsState([])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -525,23 +515,38 @@ export function CrmLeadFormPage() {
       createdDate,
       mobile,
       email,
-      productRequirement: requirementText || remarks.trim() || (hasLeadRequirementLines(requirementLines) ? 'set' : ''),
+      productRequirement: requirementText || (hasLeadRequirementLines(requirementLines) ? 'set' : ''),
+      remarks,
       expectedValue,
     },
     {
       prospectName: { required: true, message: 'Company / Prospect is required' },
       leadOwnerId: { required: true, message: 'Lead Owner is required' },
       priority: { required: true, message: 'Priority is required' },
-      createdDate: { required: true, message: 'Created Date is required' },
+      createdDate: {
+        required: true,
+        message: 'Created Date is required',
+        validate: (v) =>
+          validateCrmCalendarDate(String(v ?? ''), {
+            label: 'Created Date',
+            required: true,
+            notAfter: getDateInputMin(),
+            notAfterMessage: 'Created Date cannot be in the future',
+          }),
+      },
       mobile: {
         validate: (v) => validateMobileForCountry(String(v ?? ''), resolveLeadMobileCountry()),
       },
       email: {
         validate: (v) => validateEmail(String(v ?? '')),
       },
+      remarks: {
+        required: true,
+        message: 'Notes are required',
+      },
       productRequirement: {
         validate: (v) => {
-          // Minimum-first: requirement only when the deal is serious enough.
+          // Minimum-first: product lines only when the deal is serious enough.
           const reqStages: LeadStage[] = ['requirement_collected', 'qualified']
           if (reqStages.includes(leadStage) && !String(v).trim()) {
             return 'Add at least one product / requirement line for this stage'
@@ -871,44 +876,30 @@ export function CrmLeadFormPage() {
 
   function validate(): FieldErrorMap {
     inlineValidation.touchAll()
-    const errors: FieldErrorMap = {}
-    // Must resolve a real prospect name — customerId alone is not enough if the master row is missing
-    const prospect = resolveProspectName()
-    if (!prospect) errors.prospectName = 'Company / Prospect is required'
-    if (!String(leadOwnerId ?? '').trim()) errors.leadOwnerId = 'Lead Owner is required'
-    if (!priority) errors.priority = 'Priority is required'
-    if (!String(createdDate ?? '').trim()) errors.createdDate = 'Created Date is required'
-    const emailError = validateEmail(email)
-    if (emailError) errors.email = emailError
-    if (mobile.trim()) {
-      const mobileError = validateMobileForCountry(mobile, resolveLeadMobileCountry())
-      if (mobileError) errors.mobile = mobileError
-    }
-
-    const requirement = requirementText || remarks.trim()
-    const reqStages: LeadStage[] = ['requirement_collected', 'qualified']
-    // Minimum-first: early stages can save without product notes; stage gates ask later.
-    if (reqStages.includes(leadStage) && !requirement) {
-      errors.productRequirement = 'Add at least one product / requirement line for this stage'
-    }
-    if (!mobile.trim() && !email.trim() && (leadStage === 'new' || leadStage === 'contacted')) {
-      // Soft early capture — prefer a contact path without blocking when company is linked
-      if (!company.customerId && !errors.mobile) {
-        errors.mobile = 'Provide a mobile number or email (or link a company)'
-      }
-    }
-
-    if (activityStatus === 'inactive' && !inactiveReason) {
-      errors.inactiveReason = 'Inactive Reason is required when lead is inactive.'
-    }
-    if (leadStage === 'not_qualified' && !notQualifiedReason) {
-      errors.notQualifiedReason = 'Not Qualified Reason is required.'
-    }
-    if (leadStage === 'closed') {
-      if (!closedDate) errors.closedDate = 'Closed Date is required when lead stage is Closed.'
-      if (!closedReason) errors.closedReason = 'Closed Reason is required when lead stage is Closed.'
-    }
-    return errors
+    return validateLeadForm({
+      prospectName: resolveProspectName(),
+      customerId: company.customerId,
+      leadOwnerId,
+      priority,
+      createdDate,
+      email,
+      mobile,
+      mobileCountry: resolveLeadMobileCountry(),
+      contactPerson,
+      contactId,
+      remarks,
+      leadStage,
+      requirementText,
+      hasRequirementLines: hasLeadRequirementLines(requirementLines),
+      expectedCloseDate,
+      nextFollowUpDate,
+      activityStatus,
+      inactiveReason,
+      notQualifiedReason,
+      closedDate,
+      closedReason,
+      isEdit,
+    })
   }
 
   function expandLeadSectionForField(sectionId: string) {
@@ -957,7 +948,7 @@ export function CrmLeadFormPage() {
       closedDate: leadStage === 'closed' ? (closedDate || todayIso()) : null,
       closedReason: leadStage === 'closed' ? closedReason : null,
       notQualifiedReason: leadStage === 'not_qualified' ? notQualifiedReason : null,
-      productRequirement: encodeLeadRequirementLines(requirementLines) || remarks.trim(),
+      productRequirement: encodeLeadRequirementLines(requirementLines),
       expectedQty: requirementLineSummary.totalQty > 0 ? requirementLineSummary.totalQty : null,
       expectedValue: Number(expectedValue) || requirementLineSummary.grandTotal || 0,
       expectedCloseDate: expectedCloseDate || null,
@@ -983,6 +974,7 @@ export function CrmLeadFormPage() {
     }
     const errors = validate()
     if (Object.keys(errors).length) {
+      setSaveAttempted(true)
       handleInvalidSubmit({
         errors,
         fieldOrder: [...LEAD_FIELD_ORDER],
@@ -990,7 +982,6 @@ export function CrmLeadFormPage() {
         root: formRootRef.current,
         expandSection: expandLeadSectionForField,
         onFieldErrors: setValidationErrors,
-        notifyMessage: Object.values(errors)[0] ?? 'Please fix the highlighted fields before saving',
       })
       return
     }
@@ -1050,6 +1041,7 @@ export function CrmLeadFormPage() {
           clearDraft()
           bindDraftAttachments('draft:new', leadId)
           setLeadAttachments(leadId, attachments.map((a) => ({ ...a, leadId })))
+          setLeadAttachments('draft:new', [])
           // Side effects must not undo a confirmed create (toast/redirect still succeed)
           try {
             await resolveStoreAction(
@@ -1127,18 +1119,27 @@ export function CrmLeadFormPage() {
         }
 
         if (!isEdit) {
-          // Save & New — stay on blank form; default Save — Lead 360 (id from API/store)
+          // Save & New — stay on blank form; default Save — lead list register
           if (mode === 'new') {
             resetBlankNewLeadForm()
             showToast('Lead saved — form cleared for next entry', 'success')
             return
           }
           resetDirty()
-          navigate(routes.view(leadId!))
+          if (isApiMode()) {
+            try {
+              const { syncLeadsFromApi } = await import('../../services/bridges/crmApiBridge')
+              await syncLeadsFromApi()
+            } catch {
+              /* upsert already applied */
+            }
+          }
+          navigate(routes.base)
           showToast('Lead created', 'success')
           return
         }
 
+        // Edit Save — persist then return to Lead 360 / stage page
         const saved = useSalesStore.getState().getLead(leadId!)
         setSavedLeadId(leadId!)
         setSavedLeadNo(saved?.leadNo ?? null)
@@ -1146,6 +1147,9 @@ export function CrmLeadFormPage() {
         dirtyBaselineReady.current = true
         resetDirty()
         showToast('Lead updated successfully', 'success')
+        if (mode === 'default' && leadId) {
+          navigate(routes.view(leadId))
+        }
       } catch (err) {
         showToast(err instanceof Error ? err.message : 'Lead save failed', 'error')
       } finally {
@@ -1159,15 +1163,11 @@ export function CrmLeadFormPage() {
     saveLead('default')
   }
 
-  const validationErrorMessages = useMemo(
-    () => Object.values(validationErrors).filter(Boolean),
-    [validationErrors],
-  )
-
-  const validationGuideItems = useMemo(() => {
-    if (!validationErrorMessages.length) return []
-    return validationErrorMessages.map((err, i) => ({ id: `err-${i}`, label: err }))
-  }, [validationErrorMessages])
+  const showGapSignals = crmShowCompletenessHints({
+    isEdit,
+    dirty,
+    saveAttempted,
+  })
 
   if (id && !existing) {
     return (
@@ -1229,13 +1229,20 @@ export function CrmLeadFormPage() {
   ) : undefined
 
   function handleCancel() {
+    if (!isEdit) {
+      clearDraft()
+      setLeadAttachments('draft:new', [])
+    }
     resetDirty()
-    navigate(isEdit && id ? routes.view(id) : routes.base)
+    // Edit: discard and return to Lead 360. Create: back to register.
+    if (isEdit && id) navigate(routes.view(id))
+    else navigate(routes.base)
   }
 
   const factBox = (
     <LeadSmartOverviewPanel
       input={smartOverviewInput}
+      showGapSignals={showGapSignals}
       onGoToSection={scrollToSection}
       onCreateOpportunity={() => {
         if (isEdit) {
@@ -1290,8 +1297,6 @@ export function CrmLeadFormPage() {
         favoritePath={isEdit && id ? routes.view(id) : routes.new}
         breadcrumbs={isEdit ? leadEditBreadcrumbs(routes) : leadNewBreadcrumbs(routes)}
         commandBar={commandBar}
-        validationItems={validationGuideItems}
-        validationErrors={validationGuideItems.length ? undefined : validationErrorMessages}
         factBox={factBox}
         suppressFactBoxRecord
         onSubmit={handleSubmit}
@@ -1347,28 +1352,7 @@ export function CrmLeadFormPage() {
           sections={sectionNavItems}
           activeId={activeSection}
           onSelect={scrollToSection}
-          trailing={<FactBoxPaneAiToggle />}
         />
-
-        {validationErrorMessages.length > 0 ? (
-          <ValidationSummary
-            className="mb-3"
-            errors={validationErrors}
-            fieldOrder={[...LEAD_FIELD_ORDER]}
-            onSelectField={(fieldKey) => {
-              const sectionId = LEAD_SECTION_BY_FIELD[fieldKey]
-              if (sectionId) expandLeadSectionForField(sectionId)
-              handleInvalidSubmit({
-                errors: validationErrors,
-                fieldOrder: [fieldKey, ...LEAD_FIELD_ORDER],
-                sectionByField: LEAD_SECTION_BY_FIELD,
-                root: formRootRef.current,
-                silentNotify: true,
-                delayMs: 80,
-              })
-            }}
-          />
-        ) : null}
 
         <ErpQuickEntrySection
           id="lead-section-quick"
@@ -1392,7 +1376,6 @@ export function CrmLeadFormPage() {
                   if (companyChanged && !v.customerId) {
                     setContactId('')
                   }
-                  inlineValidation.touch('prospectName')
                   if (v.customerId || v.prospectName.trim()) {
                     setValidationErrors((prev) => {
                       if (!prev.prospectName) return prev
@@ -1402,8 +1385,9 @@ export function CrmLeadFormPage() {
                     })
                   }
                 }}
+                onBlur={() => inlineValidation.touch('prospectName')}
                 onCompanyLinked={onCompanyLinked}
-                error={inlineValidation.fieldError('prospectName')}
+                error={Boolean(inlineValidation.fieldError('prospectName') ?? validationErrors.prospectName)}
                 autoFocus={!isEdit}
                 disabled={fieldLocked('customerId') || fieldLocked('prospectName')}
               />
@@ -1412,7 +1396,16 @@ export function CrmLeadFormPage() {
 
           <ErpFieldGroup label="Contact">
             {company.customerId ? (
-              <ErpFieldRow label="Contact Person" colSpan={3}>
+              <ErpFieldRow
+                label="Contact Person"
+                required
+                colSpan={3}
+                dataField="contactPerson"
+                fieldState={
+                  (validationErrors.contactPerson) ? 'error' : undefined
+                }
+                fieldError={validationErrors.contactPerson}
+              >
                 <LeadContactSelect
                   customerId={company.customerId}
                   contactId={contactId || null}
@@ -1421,21 +1414,35 @@ export function CrmLeadFormPage() {
                 />
               </ErpFieldRow>
             ) : (
-              <ErpFieldRow label="Contact Person">
+              <ErpFieldRow
+                label="Contact Person"
+                required
+                dataField="contactPerson"
+                fieldState={validationErrors.contactPerson ? 'error' : undefined}
+                fieldError={validationErrors.contactPerson}
+              >
                 <Input
                   value={contactPerson}
                   onChange={(e) => {
                     setContactId('')
                     setContactPerson(e.target.value)
+                    setValidationErrors((prev) => {
+                      if (!prev.contactPerson) return prev
+                      const next = { ...prev }
+                      delete next.contactPerson
+                      return next
+                    })
                   }}
                   placeholder="Primary contact"
                   className="erp-input"
+                  error={Boolean(validationErrors.contactPerson)}
                   disabled={fieldLocked('contactPerson')}
                 />
               </ErpFieldRow>
             )}
             <ErpFieldRow
               label="Mobile"
+              required
               dataField="mobile"
               fieldState={
                 (inlineValidation.fieldError('mobile') ?? validationErrors.mobile)
@@ -1448,7 +1455,6 @@ export function CrmLeadFormPage() {
                 value={mobile}
                 onChange={(e) => {
                   setMobile(e.target.value)
-                  inlineValidation.touch('mobile')
                   setValidationErrors((prev) => {
                     if (!prev.mobile) return prev
                     const next = { ...prev }
@@ -1456,6 +1462,7 @@ export function CrmLeadFormPage() {
                     return next
                   })
                 }}
+                onBlur={() => inlineValidation.touch('mobile')}
                 placeholder="10-digit mobile"
                 maxDigits={15}
                 className="erp-input"
@@ -1478,7 +1485,6 @@ export function CrmLeadFormPage() {
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value)
-                  inlineValidation.touch('email')
                   setValidationErrors((prev) => {
                     if (!prev.email) return prev
                     const next = { ...prev }
@@ -1486,6 +1492,7 @@ export function CrmLeadFormPage() {
                     return next
                   })
                 }}
+                onBlur={() => inlineValidation.touch('email')}
                 placeholder="contact@company.com"
                 className="erp-input"
                 error={Boolean(inlineValidation.fieldError('email') ?? validationErrors.email)}
@@ -1505,9 +1512,11 @@ export function CrmLeadFormPage() {
               <ErpSmartSelect
                 options={ownerSelectOptions}
                 value={leadOwnerId}
-                onChange={(v) => { if (v) { setLeadOwnerId(v); inlineValidation.touch('leadOwnerId') } }}
+                onChange={(v) => { if (v) setLeadOwnerId(v) }}
+                onBlur={() => inlineValidation.touch('leadOwnerId')}
                 placeholder="Select owner…"
                 appearance="dropdown"
+                error={Boolean(inlineValidation.fieldError('leadOwnerId') ?? validationErrors.leadOwnerId)}
                 disabled={fieldLocked('leadOwnerId')}
               />
             </ErpFieldRow>
@@ -1535,7 +1544,16 @@ export function CrmLeadFormPage() {
               fieldState={inlineValidation.fieldState('priority')}
               fieldError={inlineValidation.fieldError('priority') ?? validationErrors.priority}
             >
-              <CrmLeadPriorityChips value={priority} onChange={setPriority} options={leadPriorityOptions} disabled={fieldLocked('priority')} />
+              <CrmLeadPriorityChips
+                value={priority}
+                onChange={(v) => {
+                  setPriority(v)
+                  inlineValidation.touch('priority')
+                }}
+                onBlur={() => inlineValidation.touch('priority')}
+                options={leadPriorityOptions}
+                disabled={fieldLocked('priority')}
+              />
             </ErpFieldRow>
             <ErpFieldRow label="Lead Stage" required>
               <ErpSmartSelect
@@ -1554,7 +1572,17 @@ export function CrmLeadFormPage() {
               fieldState={inlineValidation.fieldState('createdDate')}
               fieldError={inlineValidation.fieldError('createdDate') ?? validationErrors.createdDate}
             >
-              <Input type="date" value={createdDate} onChange={(e) => { setCreatedDate(e.target.value); inlineValidation.touch('createdDate') }} className="erp-input" disabled={fieldLocked('createdDate')} />
+              <Input
+                type="date"
+                value={createdDate}
+                min={getCrmDateInputMin()}
+                max={getDateInputMin()}
+                onChange={(e) => setCreatedDate(e.target.value)}
+                onBlur={() => inlineValidation.touch('createdDate')}
+                className="erp-input"
+                error={Boolean(inlineValidation.fieldError('createdDate') ?? validationErrors.createdDate)}
+                disabled={fieldLocked('createdDate')}
+              />
             </ErpFieldRow>
           </ErpFieldGroup>
         </ErpQuickEntrySection>
@@ -1576,25 +1604,24 @@ export function CrmLeadFormPage() {
             required
             colSpan={3}
             horizontal={false}
-            dataField="productRequirement"
+            dataField="remarks"
             fieldState={
-              (inlineValidation.fieldError('productRequirement') ?? validationErrors.productRequirement)
+              (inlineValidation.fieldError('remarks') ?? validationErrors.remarks)
                 ? 'error'
-                : inlineValidation.fieldState('productRequirement')
+                : inlineValidation.fieldState('remarks')
             }
-            fieldError={inlineValidation.fieldError('productRequirement') ?? validationErrors.productRequirement}
+            fieldError={inlineValidation.fieldError('remarks') ?? validationErrors.remarks}
             hint="Capture call summaries, requirements, and next steps."
           >
             <Textarea
               rows={5}
               value={remarks}
-              onChange={(e) => {
-                setRemarks(e.target.value)
-                inlineValidation.touch('productRequirement')
-              }}
+              onChange={(e) => setRemarks(e.target.value)}
+              onBlur={() => inlineValidation.touch('remarks')}
               placeholder="Context from first call or enquiry…"
               className="erp-input"
-              disabled={fieldLocked('remarks') && fieldLocked('productRequirement')}
+              error={Boolean(inlineValidation.fieldError('remarks') ?? validationErrors.remarks)}
+              disabled={fieldLocked('remarks')}
             />
           </ErpFieldRow>
         </ErpCardSection>
@@ -1665,7 +1692,7 @@ export function CrmLeadFormPage() {
               accent="green"
               columns={3}
             >
-              <ErpFieldRow label="Expected Revenue (₹)" fieldState={inlineValidation.fieldState('expectedValue')}>
+              <ErpFieldRow label="Expected Revenue (₹)" dataField="expectedValue" fieldState={inlineValidation.fieldState('expectedValue')}>
                 <Input
                   type="number"
                   min={0}
@@ -1691,13 +1718,22 @@ export function CrmLeadFormPage() {
                     />
                     <span className="dyn-probability-field__value">{probability}%</span>
                   </div>
-                  <div className="dyn-probability-field__bar" aria-hidden>
-                    <div className="dyn-probability-field__fill" style={{ width: `${probability}%` }} />
-                  </div>
                 </div>
               </ErpFieldRow>
-              <ErpFieldRow label="Expected Closing Date">
-                <Input type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} className="erp-input" />
+              <ErpFieldRow
+                label="Expected Closing Date"
+                dataField="expectedCloseDate"
+                fieldState={validationErrors.expectedCloseDate ? 'error' : 'idle'}
+                fieldError={validationErrors.expectedCloseDate}
+              >
+                <Input
+                  type="date"
+                  value={expectedCloseDate}
+                  min={isEdit ? getCrmDateInputMin() : getDateInputMin()}
+                  max={getCrmDateInputMax()}
+                  onChange={(e) => setExpectedCloseDate(e.target.value)}
+                  className="erp-input"
+                />
               </ErpFieldRow>
               <ErpFieldRow label="Currency" readOnly>
                 <Input value="INR (₹)" readOnly className="erp-input" />
@@ -1714,12 +1750,18 @@ export function CrmLeadFormPage() {
               accent="amber"
               columns={3}
             >
-              <ErpFieldRow label="Next Follow-up Date">
+              <ErpFieldRow
+                label="Next Follow-up Date"
+                dataField="nextFollowUpDate"
+                fieldState={validationErrors.nextFollowUpDate ? 'error' : 'idle'}
+                fieldError={validationErrors.nextFollowUpDate}
+              >
                 <Input
                   type="date"
                   data-field="nextFollowUpDate"
                   value={nextFollowUpDate}
                   min={getDateInputMin()}
+                  max={getCrmDateInputMax()}
                   onChange={(e) => setNextFollowUpDate(e.target.value)}
                   className="erp-input"
                 />
@@ -1846,7 +1888,14 @@ export function CrmLeadFormPage() {
                     fieldState={validationErrors.closedDate ? 'error' : 'idle'}
                     fieldError={validationErrors.closedDate}
                   >
-                    <Input type="date" value={closedDate} onChange={(e) => setClosedDate(e.target.value)} className="erp-input" />
+                    <Input
+                      type="date"
+                      value={closedDate}
+                      min={createdDate.trim() || getCrmDateInputMin()}
+                      max={getDateInputMin()}
+                      onChange={(e) => setClosedDate(e.target.value)}
+                      className="erp-input"
+                    />
                   </ErpFieldRow>
                   <ErpFieldRow
                     label="Closed Reason"

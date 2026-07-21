@@ -58,6 +58,7 @@ export function QuotationTemplateDesigner({ templateId, previewMode }: Quotation
   const [activeTab, setActiveTab] = useState<DesignerTab>('sections')
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
   const [previewZoom, setPreviewZoom] = useState(0.55)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({})
 
   useEffect(() => {
@@ -184,24 +185,32 @@ export function QuotationTemplateDesigner({ templateId, previewMode }: Quotation
   }
 
   async function saveTemplate() {
-    const stripped: QuotationTemplateSection[] = sorted.map(({ id: _id, specRows, ...rest }) => ({
-      ...rest,
-      specRows: specRows?.map(({ id: _rid, ...row }) => row),
-    }))
-    const r = await resolveStoreAction(
-      updateTemplate(templateId, {
-        templateName: meta.templateName,
-        productFamily: meta.productFamily,
-        defaultTerms: meta.defaultTerms,
-        defaultWarranty: meta.defaultWarranty,
-        defaultExclusions: meta.defaultExclusions,
-        isActive: meta.isActive,
-        sections: stripped,
-        printLayout,
-        version: (tpl?.version ?? 1) + 1,
-      }),
-    )
-    if (!r.ok) notify.error(r.error ?? 'Could not save template')
+    if (isSubmitting) return false
+    setIsSubmitting(true)
+    try {
+      const stripped: QuotationTemplateSection[] = sorted.map(({ id: _id, specRows, ...rest }) => ({
+        ...rest,
+        specRows: specRows?.map(({ id: _rid, ...row }) => row),
+      }))
+      const r = await resolveStoreAction(
+        updateTemplate(templateId, {
+          templateName: meta.templateName,
+          productFamily: meta.productFamily,
+          defaultTerms: meta.defaultTerms,
+          defaultWarranty: meta.defaultWarranty,
+          defaultExclusions: meta.defaultExclusions,
+          isActive: meta.isActive,
+          sections: stripped,
+          printLayout,
+          version: (tpl?.version ?? 1) + 1,
+        }),
+      )
+      if (!r.ok) notify.error(r.error ?? 'Could not save template')
+      else notify.success('Template saved')
+      return r.ok
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   function scrollToSection(sectionId: string) {
@@ -277,25 +286,46 @@ export function QuotationTemplateDesigner({ templateId, previewMode }: Quotation
           sticky={false}
           primaryAction={{
             id: 'save',
-            label: 'Save',
+            label: isSubmitting ? 'Saving…' : 'Save',
             icon: Save,
-            onClick: saveTemplate,
+            onClick: () => { void saveTemplate() },
+            disabled: isSubmitting,
           }}
           secondaryActions={[
             {
               id: 'save-close',
               label: 'Save & Close',
               icon: Bookmark,
-              onClick: () => { saveTemplate(); navigate('/crm/quotation-templates') },
+              disabled: isSubmitting,
+              onClick: () => {
+                void saveTemplate().then((ok) => {
+                  if (ok) navigate('/crm/quotation-templates')
+                })
+              },
             },
             {
               id: 'preview',
               label: 'Full Preview',
               icon: Eye,
-              onClick: () => { saveTemplate(); navigate(`/crm/quotation-templates/${templateId}/preview`) },
+              disabled: isSubmitting,
+              onClick: () => {
+                void saveTemplate().then((ok) => {
+                  if (ok) navigate(`/crm/quotation-templates/${templateId}/preview`)
+                })
+              },
             },
             { id: 'print', label: 'Print', icon: Printer, onClick: printQuotationDocument },
-            { id: 'pdf', label: 'Export PDF', icon: Download, onClick: () => { saveTemplate(); printQuotationDocument() } },
+            {
+              id: 'pdf',
+              label: 'Export PDF',
+              icon: Download,
+              disabled: isSubmitting,
+              onClick: () => {
+                void saveTemplate().then((ok) => {
+                  if (ok) printQuotationDocument()
+                })
+              },
+            },
           ]}
           moreActions={[
             { id: 'templates', label: 'All Templates', icon: Bookmark, onClick: () => navigate('/crm/quotation-templates') },

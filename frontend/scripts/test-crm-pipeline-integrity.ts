@@ -73,6 +73,9 @@ const leadR = sales.createLead({
   lifecycleStatus: 'open',
   stage: 'new',
   productRequirement: 'Integrity test bulker',
+  remarks: 'Test notes',
+  contactPerson: 'Test Contact',
+  mobile: '9876543210',
   source: 'referral',
   industry: 'Cement',
   probability: 50,
@@ -116,7 +119,7 @@ if (leadR.ok && leadR.leadId) {
   check(8, 'Lead convertLeadToInquiry is disabled', !sales.convertLeadToInquiry(leadR.leadId, productId, 2, '2026-10-01').ok)
 
   if (oppR.ok && oppR.opportunityId) {
-    const quoR = crm.createQuotationFromOpportunity(oppR.opportunityId, 'qtpl-standard-trailer', 2100000)
+    const quoR = crm.createQuotationFromOpportunity(oppR.opportunityId, 'qtpl-iso-tank', 2100000)
     check(9, 'Quotation created from opportunity', quoR.ok, quoR.quotationId)
 
     const quo = quoR.quotationId ? useSalesStore.getState().getQuotation(quoR.quotationId) : undefined

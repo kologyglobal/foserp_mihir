@@ -1,12 +1,14 @@
 import { useMemo, useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
   Bookmark,
   Building2,
   ClipboardList,
+  ExternalLink,
   FileText,
   Handshake,
+  MapPin,
   Paperclip,
   PenLine,
 } from 'lucide-react'
@@ -14,10 +16,18 @@ import { DynamicsStatusChip } from '../../components/dynamics/DynamicsStatusChip
 import { OpportunitySelectPicker } from '../../components/crm/OpportunitySelectPicker'
 import { QuotationTemplateSelector } from '@/components/quotations/QuotationTemplateSelector'
 import { QuotationLineItemsEditor } from '@/components/quotations/QuotationLineItemsEditor'
-import { ErpCardSection, ErpFieldRow, ErpStickySaveBar } from '../../components/erp/card-form'
-import { ErpSegmentedControl } from '../../components/erp/ErpSegmentedControl'
+import {
+  ErpCardSection,
+  ErpFieldGroup,
+  ErpFieldRow,
+  ErpQuickEntrySection,
+  ErpStickySaveBar,
+} from '../../components/erp/card-form'
 import { ErpSmartSelect } from '../../components/erp/ErpSmartSelect'
 import { Input, Select } from '../../components/forms/Inputs'
+import { AppLink } from '../../components/ui/AppLink'
+import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
+import { QuotationCreateModeChooser } from '../../components/quotations/QuotationCreateModeChooser'
 import { resolveStoreAction } from '../../store/storeAction'
 import { useCrmStore } from '../../store/crmStore'
 import { useMasterStore } from '../../store/masterStore'
@@ -37,12 +47,11 @@ import {
   quotationPriceLinesToOpportunityLines,
   resolveOpportunityLines,
   syncOpportunityLines,
-  validateOpportunityLines,
   opportunityLineUnitPriceFieldKey,
   UNIT_PRICE_REQUIRED_MESSAGE,
 } from '../../utils/opportunityLineCalc'
-import { opportunityRowErrorsToFieldMap } from '../../utils/opportunityLineValidationFocus'
-import { handleInvalidSubmit } from '../../utils/formValidation'
+import { handleInvalidSubmit, crmShowCompletenessHints } from '../../utils/formValidation'
+import { validateQuotationCreate } from '../../utils/validation/crmSchemas/quotationSchema'
 import {
   decodeLeadRequirementLines,
   hasLeadRequirementLines,
@@ -55,16 +64,17 @@ import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { CommercialTermSelect } from '../../components/masters/GeographySelects'
 import { useDocumentLocation } from '../../hooks/useDocumentLocation'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import { crmChildBreadcrumbs } from '../../utils/crmNavigation'
 import { CrmTypedDocumentUpload } from '../../components/crm/CrmTypedDocumentUpload'
 import { useQuotationAttachmentStore } from '../../store/quotationAttachmentStore'
 import type { CrmTypedAttachment } from '../../types/crmDocuments'
 import {
+  ENTERPRISE_FORM_CLASS,
   EnterpriseFormMetrics,
   EnterpriseFormSectionNav,
 } from '../../design-system/workspace'
 import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
+import { resolveCompany360Path } from '../../config/entity360Routes'
 import {
   buildQuotationAiInsight,
   buildQuotationFormSectionCompletion,
@@ -111,6 +121,7 @@ function todayIsoDate(): string {
 
 export function CrmQuotationNewPage() {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const [searchParams] = useSearchParams()
   const templates = useCrmStore((s) => s.quotationTemplates) ?? []
   const opportunities = useCrmStore((s) => s.opportunities) ?? []
@@ -129,6 +140,9 @@ export function CrmQuotationNewPage() {
       ? 'direct'
       : 'opportunity'
 
+  /** Prefill / deep-link skips the chooser; blank New Quotation starts with path selection. */
+  const skipModeChooser = Boolean(prefillOppId || prefillCustomerId)
+
   const openOpps = useMemo(() => {
     const open = opportunities
       .filter((o) => o.status === 'open')
@@ -139,23 +153,24 @@ export function CrmQuotationNewPage() {
 
   const defaultOppId = prefillOppId && openOpps.some((o) => o.id === prefillOppId)
     ? prefillOppId
-    : openOpps[0]?.id ?? ''
+    : ''
 
   const featuredTemplate = findFeaturedQuotationTemplate(templates)
 
   const [createMode, setCreateMode] = useState<QuoteCreateMode>(initialMode)
-  const [activeSection, setActiveSection] = useState('source')
-  const [opportunityId, setOpportunityId] = useState(initialMode === 'opportunity' ? defaultOppId : '')
+  const [modeChosen, setModeChosen] = useState(skipModeChooser)
+  const [activeSection, setActiveSection] = useState('quick')
+  const [opportunityId, setOpportunityId] = useState(defaultOppId)
   const [customerId, setCustomerId] = useState(() => {
-    if (initialMode === 'direct' && prefillCustomerId) return prefillCustomerId
-    if (initialMode === 'opportunity' && defaultOppId) {
+    if (prefillCustomerId) return prefillCustomerId
+    if (defaultOppId) {
       return openOpps.find((o) => o.id === defaultOppId)?.customerId ?? ''
     }
-    return prefillCustomerId
+    return ''
   })
   const [templateId, setTemplateId] = useState(featuredTemplate?.id ?? '')
   const [lines, setLines] = useState<OpportunityLine[]>(() => {
-    if (initialMode !== 'opportunity') return [createEmptyOpportunityLine(1)]
+    if (!defaultOppId) return [createEmptyOpportunityLine(1)]
     const opp = openOpps.find((o) => o.id === defaultOppId)
     return opp
       ? linesFromOpportunity(opp, opp.productId ? products.find((p) => p.id === opp.productId) : undefined)
@@ -166,12 +181,21 @@ export function CrmQuotationNewPage() {
   /** Empty until set — missing validity must surface as Required, not Complete. */
   const [validUntil, setValidUntil] = useState('')
   const [validityPeriodDays, setValidityPeriodDays] = useState<number | 'custom'>(DEFAULT_VALIDITY_DAYS)
-  const [paymentTerms, setPaymentTerms] = useState(() => resolveDefaultCommercialTerm('payment-terms').text)
-  const [deliveryTerms, setDeliveryTerms] = useState(() => resolveDefaultCommercialTerm('delivery-terms').text)
+  const [paymentTerms, setPaymentTerms] = useState(() =>
+    defaultOppId || prefillCustomerId
+      ? resolveDefaultCommercialTerm('payment-terms').text
+      : '',
+  )
+  const [deliveryTerms, setDeliveryTerms] = useState(() =>
+    defaultOppId || prefillCustomerId
+      ? resolveDefaultCommercialTerm('delivery-terms').text
+      : '',
+  )
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [rowErrors, setRowErrors] = useState<Record<string, string[]>>({})
   const [forceOpenProductsKey, setForceOpenProductsKey] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [saveAttempted, setSaveAttempted] = useState(false)
 
   function handleQuotationDateChange(value: string) {
     setQuotationDate(value)
@@ -258,22 +282,36 @@ export function CrmQuotationNewPage() {
     if (mode === 'opportunity') {
       const nextOppId = opportunityId || defaultOppId
       setOpportunityId(nextOppId)
-      const opp = openOpps.find((o) => o.id === nextOppId)
+      const opp = nextOppId ? openOpps.find((o) => o.id === nextOppId) : undefined
       if (opp) {
         const product = opp.productId ? products.find((p) => p.id === opp.productId) : undefined
         setLines(linesFromOpportunity(opp, product))
         setScopeNotes(sanitizeOpportunityScopeNotes(opp.productRequirement))
         setCustomerId(opp.customerId)
         if (opp.locationId) setLocationId(opp.locationId)
+      } else {
+        setLines([createEmptyOpportunityLine(1)])
+        setScopeNotes('')
+        setCustomerId(prefillCustomerId)
       }
     } else {
       setOpportunityId('')
-      const fromOpp = selectedOpp?.customerId
-      const nextCustomer = customerId || fromOpp || prefillCustomerId
-      setCustomerId(nextCustomer)
+      setCustomerId(prefillCustomerId || customerId)
       setLines([createEmptyOpportunityLine(1)])
       setScopeNotes('')
     }
+  }
+
+  function chooseCreateMode(mode: QuoteCreateMode) {
+    handleCreateModeChange(mode)
+    setCreateMode(mode)
+    setModeChosen(true)
+    setActiveSection('quick')
+  }
+
+  function reopenModeChooser() {
+    setModeChosen(false)
+    setValidationErrors([])
   }
 
   function handleOpportunityChange(id: string) {
@@ -291,63 +329,70 @@ export function CrmQuotationNewPage() {
     }
   }
 
-  function validate(): string[] {
-    const errors: string[] = []
-    if (createMode === 'opportunity') {
-      if (!opportunityId) errors.push('Select an opportunity to link this quotation.')
-    } else if (!customerId) {
-      errors.push('Select a client / company for this quotation.')
-    }
-    if (!templateId) errors.push('Select a quotation template.')
-    if (!validUntil) errors.push('Set a valid-until date for this quotation.')
-    if (!paymentTerms.trim()) errors.push('Select payment terms.')
-    if (!deliveryTerms.trim()) errors.push('Select delivery terms / timeline.')
-    const lineValidation = validateOpportunityLines(syncedLines, {
-      customerId: effectiveCustomerId,
+  function validate() {
+    return validateQuotationCreate({
+      createMode,
+      opportunityId,
+      customerId: effectiveCustomerId || customerId,
+      templateId,
+      validUntil,
+      paymentTerms,
+      deliveryTerms,
+      lines: syncedLines,
       ownerId: selectedOpp?.ownerId ?? '',
       stage: selectedOpp?.stage ?? 'new_lead',
       probability: String(probability),
     })
-    if (!syncedLines.some((l) => l.productOrItem?.trim() && l.qty > 0 && l.unitPrice > 0)) {
-      errors.push('Add at least one product line with quantity and unit price.')
-    }
-    errors.push(...lineValidation.errors.filter((e) => !e.includes('customer') && !e.includes('owner')))
-    return errors
   }
 
   async function createQuotation(mode: 'editor' | 'close' | 'new') {
-    const errors = validate()
-    const { rowErrors: rErr } = validateOpportunityLines(syncedLines, {
-      customerId: effectiveCustomerId,
-      ownerId: selectedOpp?.ownerId ?? '',
-      stage: selectedOpp?.stage ?? 'new_lead',
-      probability: String(probability),
-    })
-    setValidationErrors(errors)
+    const { fieldErrors, rowErrors: rErr, messages } = validate()
+    setValidationErrors(messages)
     setRowErrors(rErr)
-    if (errors.length || Object.keys(rErr).length) {
-      const fieldMap = opportunityRowErrorsToFieldMap(rErr)
-      const lineKeys = Object.keys(fieldMap)
+    if (messages.length || Object.keys(rErr).length) {
+      const fieldMap = { ...fieldErrors }
+      const lineKeys = Object.keys(fieldMap).filter(
+        (k) => k.startsWith('unitPrice-') || k.startsWith('qty-') || k.startsWith('product-') || k.startsWith('taxPct-'),
+      )
       if (!lineKeys.length && Object.keys(rErr).length) {
         const firstLineId = Object.keys(rErr)[0]!
         fieldMap[opportunityLineUnitPriceFieldKey(firstLineId)] = UNIT_PRICE_REQUIRED_MESSAGE
       }
       const keys = Object.keys(fieldMap)
-      const fieldLabels: Record<string, string> = {}
-      const sectionByField: Record<string, string> = {}
-      for (const key of keys) {
-        sectionByField[key] = 'quote-section-products'
-        if (key.startsWith('unitPrice-')) fieldLabels[key] = 'Unit Price'
-        else if (key.startsWith('qty-')) fieldLabels[key] = 'Quantity'
-        else if (key.startsWith('product-')) fieldLabels[key] = 'Product / Item'
-        else fieldLabels[key] = 'Line item'
+      const fieldLabels: Record<string, string> = {
+        opportunityId: 'Opportunity',
+        customerId: 'Client / Company',
+        templateId: 'Template',
+        validUntil: 'Valid until',
+        paymentTerms: 'Payment terms',
+        deliveryTerms: 'Delivery terms',
+        lines: 'Line items',
       }
-      const headerOnly = errors.filter((e) => !/line|product|unit price/i.test(e))
-      const merged: Record<string, string> = { ...fieldMap }
-      headerOnly.forEach((e, i) => { if (!Object.values(merged).includes(e)) merged[`_msg_${i}`] = e })
+      const sectionByField: Record<string, string> = {
+        opportunityId: 'quote-section-quick',
+        customerId: 'quote-section-quick',
+        templateId: 'quote-section-quick',
+        validUntil: 'quote-section-commercial',
+        paymentTerms: 'quote-section-commercial',
+        deliveryTerms: 'quote-section-commercial',
+        lines: 'quote-section-products',
+      }
+      for (const key of keys) {
+        if (key.startsWith('unitPrice-') || key.startsWith('qty-') || key.startsWith('product-') || key.startsWith('taxPct-')) {
+          sectionByField[key] = 'quote-section-products'
+          if (key.startsWith('unitPrice-')) fieldLabels[key] = 'Unit Price'
+          else if (key.startsWith('qty-')) fieldLabels[key] = 'Quantity'
+          else if (key.startsWith('product-')) fieldLabels[key] = 'Product / Item'
+          else if (key.startsWith('taxPct-')) fieldLabels[key] = 'GST %'
+          else fieldLabels[key] = 'Line item'
+        } else if (key.startsWith('_msg_')) {
+          fieldLabels[key] = 'Form'
+        }
+      }
+      setSaveAttempted(true)
       handleInvalidSubmit({
-        errors: Object.keys(merged).length ? merged : errors,
-        fieldOrder: [...keys, ...Object.keys(merged).filter((k) => k.startsWith('_msg_'))],
+        errors: Object.keys(fieldMap).length ? fieldMap : messages,
+        fieldOrder: keys,
         fieldLabels,
         sectionByField,
         expandSection: (sectionId) => {
@@ -390,12 +435,15 @@ export function CrmQuotationNewPage() {
     setIsSubmitting(false)
 
     if (!r.ok || !r.quotationId) {
-      setValidationErrors([r.error ?? 'Could not create quotation'])
+      const msg = r.error ?? 'Could not create quotation'
+      setValidationErrors([msg])
+      notify.error(msg)
       return
     }
 
     bindDraftAttachments(attachmentScopeId, r.quotationId)
     setQuotationAttachments(r.quotationId, attachments.map((a) => ({ ...a, quotationId: r.quotationId })))
+    notify.success('Quotation created successfully')
 
     if (mode === 'new') {
       setAttachments([])
@@ -423,8 +471,9 @@ export function CrmQuotationNewPage() {
   }
 
   function scrollToSection(sectionId: string) {
-    setActiveSection(sectionId)
-    document.getElementById(`quote-section-${sectionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const mapped = sectionId === 'source' || sectionId === 'customer' ? 'quick' : sectionId
+    setActiveSection(mapped)
+    document.getElementById(`quote-section-${mapped}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   const hasValidLine = syncedLines.some((l) => l.productOrItem?.trim() && l.qty > 0 && l.unitPrice > 0)
@@ -487,44 +536,50 @@ export function CrmQuotationNewPage() {
   const mandatoryDoneCount = completionItems.filter((i) => i.mandatory && i.done).length
   const mandatoryTotal = completionItems.filter((i) => i.mandatory).length
 
-  const sectionNavItems = useMemo(() => [
-    {
-      id: 'source',
-      label: 'Source',
-      icon: createMode === 'opportunity' ? Handshake : PenLine,
-      status: completionItems.find((i) => i.id === 'source')?.status,
-    },
-    {
-      id: 'customer',
-      label: 'Customer',
-      icon: Building2,
-      status: completionItems.find((i) => i.id === 'customer')?.status,
-    },
-    {
-      id: 'template',
-      label: 'Template',
-      icon: Bookmark,
-      status: completionItems.find((i) => i.id === 'template')?.status,
-    },
-    {
-      id: 'products',
-      label: 'Products',
-      icon: ClipboardList,
-      status: completionItems.find((i) => i.id === 'products')?.status,
-    },
-    {
-      id: 'commercial',
-      label: 'Commercial',
-      icon: Banknote,
-      status: completionItems.find((i) => i.id === 'commercial')?.status,
-    },
-    {
-      id: 'documents',
-      label: 'Review',
-      icon: Paperclip,
-      status: completionItems.find((i) => i.id === 'documents')?.status,
-    },
-  ], [completionItems, createMode])
+  const sectionNavItems = useMemo(() => {
+    const sourceStatus = completionItems.find((i) => i.id === 'source')?.status
+    const customerStatus = completionItems.find((i) => i.id === 'customer')?.status
+    const quickStatus =
+      sourceStatus === 'error' || customerStatus === 'error'
+        ? 'error' as const
+        : sourceStatus === 'complete' && customerStatus === 'complete'
+          ? 'complete' as const
+          : sourceStatus === 'in_progress' || customerStatus === 'in_progress'
+            ? 'in_progress' as const
+            : 'required' as const
+    return [
+      {
+        id: 'quick',
+        label: 'Quick',
+        icon: createMode === 'opportunity' ? Handshake : Building2,
+        status: quickStatus,
+      },
+      {
+        id: 'template',
+        label: 'Template',
+        icon: Bookmark,
+        status: completionItems.find((i) => i.id === 'template')?.status,
+      },
+      {
+        id: 'products',
+        label: 'Products',
+        icon: ClipboardList,
+        status: completionItems.find((i) => i.id === 'products')?.status,
+      },
+      {
+        id: 'commercial',
+        label: 'Commercial',
+        icon: Banknote,
+        status: completionItems.find((i) => i.id === 'commercial')?.status,
+      },
+      {
+        id: 'documents',
+        label: 'Review',
+        icon: Paperclip,
+        status: completionItems.find((i) => i.id === 'documents')?.status,
+      },
+    ]
+  }, [completionItems, createMode])
 
   const formMetrics = useMemo(() => [
     {
@@ -548,11 +603,6 @@ export function CrmQuotationNewPage() {
     { label: 'Grand Total', value: lineSummary.grandTotal > 0 ? formatCrmCurrency(lineSummary.grandTotal) : '—', highlight: lineSummary.grandTotal > 0 },
     { label: 'Owner', value: selectedOpp?.ownerName ?? '—' },
   ]
-
-  const validationGuideItems = useMemo(
-    () => validationErrors.map((err, i) => ({ id: `err-${i}`, label: err })),
-    [validationErrors],
-  )
 
   const smartOverviewInput = useMemo(() => ({
     quotationNo: '',
@@ -594,13 +644,13 @@ export function CrmQuotationNewPage() {
       progressLabel="Quotation readiness"
       progressPercent={computeQuotationCompleteness(smartOverviewInput)}
       signals={buildQuotationSmartSignals(smartOverviewInput)}
+      showGapSignals={crmShowCompletenessHints({
+        dirty: Boolean(customerId || opportunityId || syncedLines.some((l) => l.productOrItem?.trim())),
+        saveAttempted,
+      })}
       nextAction={nextAction}
       onNextAction={() => {
-        if (nextAction.id === 'link_customer') scrollToSection('customer')
-        else if (nextAction.id === 'add_lines') scrollToSection('products')
-        else if (nextAction.id === 'set_validity') scrollToSection('commercial')
-        else if (nextAction.id === 'review') scrollToSection('documents')
-        else scrollToSection('source')
+        scrollToSection(nextAction.sectionId ?? 'source')
       }}
       quickActions={[
         {
@@ -630,11 +680,28 @@ export function CrmQuotationNewPage() {
     ?? selectedCustomer?.customerName
     ?? 'New Quotation'
 
+  if (!modeChosen) {
+    return (
+      <OperationalPageShell
+        title="New Quotation"
+        badge="CRM"
+        variant="dynamics"
+        favoritePath="/crm/quotations/new"
+        breadcrumbs={crmChildBreadcrumbs('Quotations', '/crm/quotations', 'New Quotation')}
+      >
+        <QuotationCreateModeChooser
+          onSelect={chooseCreateMode}
+          onCancel={() => navigate('/crm/quotations')}
+        />
+      </OperationalPageShell>
+    )
+  }
+
   return (
     <CrmCardFormShell
       title="New Quotation"
       badge="CRM"
-      className="enterprise-workspace--dynamics-form enterprise-workspace--crm-smart-overview"
+      className={`${ENTERPRISE_FORM_CLASS} enterprise-workspace--crm-smart-overview crm-quote-create-page`}
       recordNo="New"
       recordTitle={recordTitle}
       status="Draft"
@@ -646,8 +713,6 @@ export function CrmQuotationNewPage() {
       favoritePath="/crm/quotations/new"
       breadcrumbs={crmChildBreadcrumbs('Quotations', '/crm/quotations', 'New Quotation')}
       documentStrip={documentStrip}
-      validationItems={validationGuideItems}
-      validationErrors={validationGuideItems.length ? undefined : validationErrors}
       factBox={factBox}
       suppressFactBoxRecord
       collapsibleFactBox
@@ -657,14 +722,6 @@ export function CrmQuotationNewPage() {
       onSaveCloseShortcut={() => createQuotation('close')}
       onSaveAndNewShortcut={() => createQuotation('new')}
       stickyFooter
-      formSaveActions={{
-        isSubmitting,
-        saveLabel: 'Save',
-        onSave: () => void createQuotation('editor'),
-        onSaveAndNew: () => void createQuotation('new'),
-        onSaveAndClose: () => void createQuotation('close'),
-        onCancel: () => navigate('/crm/quotations'),
-      }}
       footer={(
         <ErpStickySaveBar
           sticky
@@ -676,7 +733,9 @@ export function CrmQuotationNewPage() {
           onSaveAndClose={() => void createQuotation('close')}
           hint={(
             <span className="text-[12px] text-erp-muted">
-              {completionPercent}% complete · Ctrl+S Save · Ctrl+Shift+S Save &amp; Close · Alt+N Save &amp; New
+              {completionPercent}% complete · {formatCrmCurrency(lineSummary.grandTotal)} grand total
+              {validUntil ? ` · Valid until ${formatDate(validUntil)}` : ''}
+              {' · Ctrl+S Save · Ctrl+Shift+S Save & Close · Alt+N Save & New'}
             </span>
           )}
         />
@@ -686,11 +745,11 @@ export function CrmQuotationNewPage() {
         sections={sectionNavItems}
         activeId={activeSection}
         onSelect={scrollToSection}
-        trailing={<FactBoxPaneAiToggle />}
       />
 
       <EnterpriseFormMetrics metrics={formMetrics} />
 
+      <div className="erp-form-body crm-quote-create-body">
       {selectedOpp && lineSummary.grandTotal > 0 ? (
         <OpportunityQuotationValueMismatchBanner
           opportunityId={selectedOpp.id}
@@ -708,156 +767,198 @@ export function CrmQuotationNewPage() {
         />
       ) : null}
 
-      <ErpCardSection
-        id="quote-section-source"
-        title="Quotation Source"
-        subtitle="Create from an open opportunity, or quote a client directly."
-        icon={Handshake}
-        accent="blue"
+      <ErpQuickEntrySection
+        id="quote-section-quick"
+        title="Quick Entry"
+        subtitle="Create path, customer, and fulfilment location."
+        icon={createMode === 'opportunity' ? Handshake : Building2}
         collapsible
         defaultOpen
+        columns={1}
+        className="!max-w-none"
+        collapsedSummary={
+          selectedCustomer
+            ? `${createMode === 'opportunity' ? 'From opportunity' : 'Direct'} · ${selectedCustomer.customerName}`
+            : createMode === 'opportunity'
+              ? 'From opportunity · select a deal'
+              : 'Direct quote · select a client'
+        }
       >
-        <div className="col-span-2 space-y-4">
-          <ErpFieldRow label="Create from" colSpan={2}>
-            <ErpSegmentedControl<QuoteCreateMode>
-              name="Quotation create mode"
-              value={createMode}
-              onChange={handleCreateModeChange}
-              options={[
-                {
-                  value: 'opportunity',
-                  label: 'From opportunity',
-                  description: 'Link an open deal — customer and lines flow from the opportunity.',
-                  icon: Handshake,
-                },
-                {
-                  value: 'direct',
-                  label: 'Direct (select client)',
-                  description: 'Quote a client without a deal — sales order can also be created directly later.',
-                  icon: PenLine,
-                },
-              ]}
-            />
-          </ErpFieldRow>
-          {createMode === 'direct' ? (
-            <p className="rounded-lg border border-erp-border bg-erp-surface-alt px-3 py-2 text-[12px] text-erp-text">
-              Direct quotation: early pricing without a pipeline deal. You can still create a sales order
-              directly later when the customer and items exist.
-            </p>
+        <div className="so-create-path-chip" role="status">
+          <span className="so-create-path-chip__mode" aria-hidden>
+            {createMode === 'opportunity' ? <Handshake className="h-3.5 w-3.5" /> : <PenLine className="h-3.5 w-3.5" />}
+          </span>
+          <span className="so-create-path-chip__label">Creating</span>
+          <span className="so-create-path-chip__value">
+            {createMode === 'opportunity' ? 'From opportunity' : 'Direct quotation'}
+          </span>
+          {!skipModeChooser ? (
+            <button type="button" className="so-create-path-chip__change" onClick={reopenModeChooser}>
+              Change path
+            </button>
           ) : null}
+        </div>
 
+        <ErpFieldGroup
+          label={createMode === 'direct' ? 'Client' : undefined}
+          className="so-qe-customer-group"
+        >
           {createMode === 'opportunity' ? (
             <>
-              <OpportunitySelectPicker
-                opportunities={openOpps}
-                customers={customers}
-                products={products}
-                value={opportunityId}
-                onChange={handleOpportunityChange}
-              />
+              <ErpFieldRow label="Opportunity" required colSpan={3}>
+                <OpportunitySelectPicker
+                  opportunities={openOpps}
+                  customers={customers}
+                  products={products}
+                  value={opportunityId}
+                  onChange={handleOpportunityChange}
+                />
+              </ErpFieldRow>
               {selectedOpp ? (
-                <div className="crm-quotation-new__opp-summary">
-                  <div>
-                    <p className="crm-quotation-new__opp-label">Deal no.</p>
-                    <p className="crm-quotation-new__opp-value">{selectedOpp.opportunityNo}</p>
+                <aside className="crm-so-handover" aria-label="Linked opportunity">
+                  <div className="crm-quotation-new__opp-summary">
+                    <div>
+                      <p className="crm-quotation-new__opp-label">Deal no.</p>
+                      <p className="crm-quotation-new__opp-value">{selectedOpp.opportunityNo}</p>
+                    </div>
+                    <div>
+                      <p className="crm-quotation-new__opp-label">Product</p>
+                      <p className="crm-quotation-new__opp-value">
+                        {(selectedProduct?.productName
+                          || summarizeLeadRequirementLines(syncedLines)
+                          || opportunityRequirementDisplay(selectedOpp.productRequirement)
+                        ) || '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="crm-quotation-new__opp-label">Deal value</p>
+                      <p className="crm-quotation-new__opp-value">{formatCrmCurrency(selectedOpp.value)}</p>
+                    </div>
+                    <div>
+                      <p className="crm-quotation-new__opp-label">Owner</p>
+                      <p className="crm-quotation-new__opp-value">{selectedOpp.ownerName}</p>
+                    </div>
+                    <div>
+                      <p className="crm-quotation-new__opp-label">Stage</p>
+                      <DynamicsStatusChip label={opportunityStageLabel(selectedOpp.stage)} tone="info" />
+                    </div>
                   </div>
-                  <div>
-                    <p className="crm-quotation-new__opp-label">Customer</p>
-                    <p className="crm-quotation-new__opp-value">{selectedCustomer?.customerName ?? '—'}</p>
-                  </div>
-                  <div>
-                    <p className="crm-quotation-new__opp-label">Product</p>
-                    <p className="crm-quotation-new__opp-value">
-                      {(selectedProduct?.productName
-                        || summarizeLeadRequirementLines(syncedLines)
-                        || opportunityRequirementDisplay(selectedOpp.productRequirement)
-                      ) || '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="crm-quotation-new__opp-label">Deal value</p>
-                    <p className="crm-quotation-new__opp-value">{formatCrmCurrency(selectedOpp.value)}</p>
-                  </div>
-                  <div>
-                    <p className="crm-quotation-new__opp-label">Owner</p>
-                    <p className="crm-quotation-new__opp-value">{selectedOpp.ownerName}</p>
-                  </div>
-                  <div>
-                    <p className="crm-quotation-new__opp-label">Stage</p>
-                    <DynamicsStatusChip label={opportunityStageLabel(selectedOpp.stage)} tone="info" />
-                  </div>
-                </div>
+                </aside>
               ) : (
                 <p className="text-sm text-erp-muted">
                   {prefillCustomerId && openOpps.length === 0
-                    ? 'No open opportunities for this customer — switch to Direct, or create a deal from the pipeline.'
-                    : 'No open opportunities — switch to Direct, or create a deal from the pipeline first.'}
+                    ? 'No open opportunities for this customer — change path to Direct, or create a deal from the pipeline.'
+                    : 'Select an open opportunity to load the customer and product lines.'}
                 </p>
               )}
             </>
-          ) : (
-            <p className="text-sm text-erp-muted">
-              Direct quote — select the client in the next section. Set validity under Commercial.
-            </p>
-          )}
-        </div>
-      </ErpCardSection>
+          ) : null}
+        </ErpFieldGroup>
 
-      <ErpCardSection
-        id="quote-section-customer"
-        title="Customer"
-        subtitle="Bill-to company and sales location for this quotation."
-        icon={Building2}
-        accent="blue"
-        collapsible
-        defaultOpen
-      >
-        <div className="col-span-2 space-y-4">
+        <ErpFieldGroup label="Bill-to customer" className="so-qe-customer-group">
           {createMode === 'direct' ? (
-            <>
-              <ErpFieldRow label="Client / Company" required colSpan={2} hint="Required for a direct quotation">
-                <ErpSmartSelect
-                  options={customerOptions}
-                  value={customerId}
-                  onChange={(v) => setCustomerId(v)}
-                  placeholder="Search customer code, name, or city…"
-                  appearance="dropdown"
-                />
-              </ErpFieldRow>
-              {selectedCustomer ? (
-                <div className="crm-quotation-new__opp-summary">
-                  <div>
-                    <p className="crm-quotation-new__opp-label">Customer</p>
-                    <p className="crm-quotation-new__opp-value">{selectedCustomer.customerName}</p>
-                  </div>
-                  <div>
-                    <p className="crm-quotation-new__opp-label">Code</p>
-                    <p className="crm-quotation-new__opp-value">{selectedCustomer.customerCode}</p>
-                  </div>
-                  <div>
-                    <p className="crm-quotation-new__opp-label">City</p>
-                    <p className="crm-quotation-new__opp-value">{selectedCustomer.city || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="crm-quotation-new__opp-label">Contact</p>
-                    <p className="crm-quotation-new__opp-value">{selectedCustomer.contactPerson || '—'}</p>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-erp-muted">
-                  Select a client to continue. Direct quotes skip the opportunity — you can still create a sales order later when customer and items exist.
-                </p>
-              )}
-            </>
-          ) : (
-            <ErpFieldRow label="Customer" readOnly colSpan={2} hint="From the linked opportunity">
-              <Input value={selectedCustomer?.customerName ?? '—'} readOnly className="erp-input" />
+            <ErpFieldRow label="Client / Company" required colSpan={3} dataField="customerId" hint="Required for a direct quotation">
+              <ErpSmartSelect
+                options={customerOptions}
+                value={customerId}
+                onChange={(v) => setCustomerId(v)}
+                placeholder="Search customer code, name, or city…"
+                appearance="dropdown"
+              />
             </ErpFieldRow>
-          )}
+          ) : null}
 
-          <LocationFieldRow value={locationId} onChange={(locId) => setLocationId(locId)} usage="sales" colSpan={2} />
-        </div>
-      </ErpCardSection>
+          {selectedCustomer ? (
+            <aside className="so-customer-card" aria-label="Selected customer">
+              <div className="so-customer-card__header">
+                <div className="so-customer-card__avatar" aria-hidden>
+                  {selectedCustomer.customerName
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((w) => w[0])
+                    .join('')
+                    .toUpperCase()}
+                </div>
+                <div className="so-customer-card__identity">
+                  <div className="so-customer-card__title-row">
+                    <h3 className="so-customer-card__name">{selectedCustomer.customerName}</h3>
+                    <span className="so-customer-card__code">{selectedCustomer.customerCode}</span>
+                  </div>
+                  <p className="so-customer-card__location">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    <span>
+                      {[selectedCustomer.city, selectedCustomer.state, selectedCustomer.pincode]
+                        .filter(Boolean)
+                        .join(', ') || 'Location not set'}
+                    </span>
+                  </p>
+                </div>
+                <AppLink
+                  to={resolveCompany360Path(selectedCustomer.id, pathname)}
+                  className="so-customer-card__360"
+                >
+                  View 360
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                </AppLink>
+              </div>
+              <dl className="so-customer-card__facts">
+                <div className="so-customer-card__fact">
+                  <dt>GSTIN</dt>
+                  <dd className="tabular-nums">{selectedCustomer.gstin?.trim() || '—'}</dd>
+                </div>
+                <div className="so-customer-card__fact">
+                  <dt>Credit days</dt>
+                  <dd className="tabular-nums">{selectedCustomer.creditDays} days</dd>
+                </div>
+                <div className="so-customer-card__fact">
+                  <dt>Credit limit</dt>
+                  <dd className="tabular-nums">
+                    {selectedCustomer.creditLimit != null && selectedCustomer.creditLimit > 0
+                      ? formatCrmCurrency(selectedCustomer.creditLimit)
+                      : 'No limit'}
+                  </dd>
+                </div>
+                {selectedCustomer.contactPerson ? (
+                  <div className="so-customer-card__fact so-customer-card__fact--wide">
+                    <dt>Primary contact</dt>
+                    <dd>
+                      {selectedCustomer.contactPerson}
+                      {selectedCustomer.contactPhone ? (
+                        <span className="so-customer-card__contact-meta"> · {selectedCustomer.contactPhone}</span>
+                      ) : null}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            </aside>
+          ) : (
+            <div className="so-customer-card so-customer-card--empty" role="status">
+              <div className="so-customer-card__empty-icon" aria-hidden>
+                <Building2 className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="so-customer-card__empty-title">No customer selected</p>
+                <p className="so-customer-card__empty-copy">
+                  {createMode === 'opportunity'
+                    ? 'Link an opportunity to load the bill-to company, GSTIN, and credit terms.'
+                    : 'Search and select a client to load GSTIN, credit terms, and contact details.'}
+                </p>
+              </div>
+            </div>
+          )}
+        </ErpFieldGroup>
+
+        <ErpFieldGroup label="Fulfilment" className="so-qe-po-group">
+          <LocationFieldRow
+            value={locationId}
+            onChange={(locId) => setLocationId(locId)}
+            usage="sales"
+            colSpan={3}
+            label="Sales location"
+            hint="Where goods will ship from — inherited from the opportunity when available"
+          />
+        </ErpFieldGroup>
+      </ErpQuickEntrySection>
 
       <ErpCardSection
         id="quote-section-template"
@@ -880,101 +981,127 @@ export function CrmQuotationNewPage() {
 
       <ErpCardSection
         id="quote-section-products"
+        nbaTarget="products"
         forceOpenKey={forceOpenProductsKey || undefined}
-        title="Product / Item Lines"
-        subtitle="Search products, set qty and pricing — totals roll up to the quotation."
+        title="Product & Pricing"
+        subtitle="Build line items, then review the live quotation total."
         icon={ClipboardList}
         accent="violet"
         collapsible
         defaultOpen
+        className="!max-w-none so-pricing-section"
+        columns={1}
       >
-        <div className="col-span-3">
-          <QuotationLineItemsEditor
-            priceLines={priceLines}
-            onChange={(nextLines) => setLines(quotationPriceLinesToOpportunityLines(nextLines))}
-            probability={probability}
-            scopeNotes={scopeNotes}
-            onScopeNotesChange={setScopeNotes}
-            rowErrors={rowErrors}
-          />
+        <div className="so-pricing-panel so-pricing-panel--pro">
+          <div className="so-pricing-table-wrap quote-pricing-lines">
+            <QuotationLineItemsEditor
+              priceLines={priceLines}
+              onChange={(nextLines) => setLines(quotationPriceLinesToOpportunityLines(nextLines))}
+              probability={probability}
+              scopeNotes={scopeNotes}
+              onScopeNotesChange={setScopeNotes}
+              rowErrors={rowErrors}
+            />
+          </div>
+          <div className="so-pricing-totals quote-pricing-totals">
+            <div className="quote-pricing-totals__spacer" aria-hidden />
+            <aside className="so-pricing-summary" aria-label="Quotation totals">
+              <p className="so-pricing-summary__title">Quote summary</p>
+              <div className="so-pricing-summary__rows">
+                <div className="so-pricing-summary__row">
+                  <span>Lines</span>
+                  <span className="tabular-nums">{syncedLines.length}</span>
+                </div>
+                <div className="so-pricing-summary__row">
+                  <span>Taxable</span>
+                  <span className="tabular-nums">{formatCrmCurrency(lineSummary.taxableAmount)}</span>
+                </div>
+                <div className="so-pricing-summary__row">
+                  <span>GST</span>
+                  <span className="tabular-nums">{formatCrmCurrency(lineSummary.gstAmount)}</span>
+                </div>
+                {createMode === 'opportunity' ? (
+                  <div className="so-pricing-summary__row">
+                    <span>Weighted ({probability}%)</span>
+                    <span className="tabular-nums">{formatCrmCurrency(weighted)}</span>
+                  </div>
+                ) : null}
+              </div>
+              <div className="so-pricing-summary__grand">
+                <span>Grand total</span>
+                <strong className="tabular-nums">{formatCrmCurrency(lineSummary.grandTotal)}</strong>
+              </div>
+            </aside>
+          </div>
         </div>
       </ErpCardSection>
 
       <ErpCardSection
         id="quote-section-commercial"
-        title="Commercial Terms"
-        subtitle="Validity, currency, payment and delivery — incomplete until valid-until and terms are set."
+        title="Commercial & Validity"
+        subtitle="Validity window, payment and delivery terms."
         icon={Banknote}
         accent="green"
         collapsible
         defaultOpen
+        className="!max-w-none so-commercial-section"
+        columns={1}
       >
-        <ErpFieldRow label="Quotation date" required hint="Issue date used to derive validity period">
-          <Input
-            type="date"
-            value={quotationDate}
-            onChange={(e) => handleQuotationDateChange(e.target.value)}
-            className="erp-input"
-          />
-        </ErpFieldRow>
-        <ErpFieldRow label="Valid until" required hint="Critical — quotation expires after this date">
-          <Input
-            type="date"
-            value={validUntil}
-            onChange={(e) => handleValidUntilChange(e.target.value)}
-            className="erp-input"
-          />
-        </ErpFieldRow>
-        <ErpFieldRow label="Validity period" hint="Updates valid-until from quotation date">
-          <Select
-            native
-            value={validityPeriodDays === 'custom' ? 'custom' : String(validityPeriodDays)}
-            onChange={(e) => handleValidityPeriodChange(e.target.value)}
-            className="erp-input"
-          >
-            {VALIDITY_PERIOD_OPTIONS.map((d) => (
-              <option key={d} value={d}>{d} days</option>
-            ))}
-            <option value="custom">Custom (from dates)</option>
-          </Select>
-        </ErpFieldRow>
-        <ErpFieldRow label="Currency" readOnly hint="Tenant / document currency (INR)">
-          <Input value="INR" readOnly className="erp-input" />
-        </ErpFieldRow>
-        <ErpFieldRow label="Payment terms" required colSpan={2}>
-          <CommercialTermSelect
-            termType="payment"
-            value={paymentTerms}
-            onChange={setPaymentTerms}
-            placeholder="Select payment terms"
-          />
-        </ErpFieldRow>
-        <ErpFieldRow label="Delivery timeline" required colSpan={2} hint="Delivery terms / lead-time commitment">
-          <CommercialTermSelect
-            termType="delivery"
-            value={deliveryTerms}
-            onChange={setDeliveryTerms}
-            placeholder="Select delivery terms"
-          />
-        </ErpFieldRow>
-        <ErpFieldRow label="Grand Total (₹)" readOnly>
-          <Input value={formatCrmCurrency(lineSummary.grandTotal)} readOnly className="erp-input" />
-        </ErpFieldRow>
-        <ErpFieldRow label="GST Amount" readOnly>
-          <Input value={formatCrmCurrency(lineSummary.gstAmount)} readOnly className="erp-input" />
-        </ErpFieldRow>
-        <ErpFieldRow label="Probability" readOnly>
-          <Input value={createMode === 'opportunity' ? `${probability}%` : '—'} readOnly className="erp-input" />
-        </ErpFieldRow>
-        <ErpFieldRow label="Weighted Value" readOnly>
-          <Input value={createMode === 'opportunity' ? formatCrmCurrency(weighted) : '—'} readOnly className="erp-input" />
-        </ErpFieldRow>
-        <ErpFieldRow label="Customer" readOnly>
-          <Input value={selectedCustomer?.customerName ?? '—'} readOnly className="erp-input" />
-        </ErpFieldRow>
-        <ErpFieldRow label="Billing city" readOnly>
-          <Input value={selectedCustomer?.city ?? '—'} readOnly className="erp-input" />
-        </ErpFieldRow>
+        <div className="so-commercial-body">
+          <ErpFieldGroup label="Validity" className="so-commercial-group" columns={3}>
+            <ErpFieldRow label="Quotation date" required hint="Issue date used to derive validity period">
+              <Input
+                type="date"
+                value={quotationDate}
+                onChange={(e) => handleQuotationDateChange(e.target.value)}
+                className="erp-input"
+              />
+            </ErpFieldRow>
+            <ErpFieldRow label="Valid until" required dataField="validUntil" hint="Critical — quotation expires after this date">
+              <Input
+                type="date"
+                value={validUntil}
+                onChange={(e) => handleValidUntilChange(e.target.value)}
+                className="erp-input"
+              />
+            </ErpFieldRow>
+            <ErpFieldRow label="Validity period" hint="Updates valid-until from quotation date">
+              <Select
+                native
+                value={validityPeriodDays === 'custom' ? 'custom' : String(validityPeriodDays)}
+                onChange={(e) => handleValidityPeriodChange(e.target.value)}
+                className="erp-input"
+              >
+                {VALIDITY_PERIOD_OPTIONS.map((d) => (
+                  <option key={d} value={d}>{d} days</option>
+                ))}
+                <option value="custom">Custom (from dates)</option>
+              </Select>
+            </ErpFieldRow>
+            <ErpFieldRow label="Currency" readOnly hint="Tenant / document currency (INR)">
+              <Input value="INR" readOnly className="erp-input" />
+            </ErpFieldRow>
+          </ErpFieldGroup>
+
+          <ErpFieldGroup label="Commercial terms" className="so-commercial-group" columns={2}>
+            <ErpFieldRow label="Payment terms" required dataField="paymentTerms">
+              <CommercialTermSelect
+                termType="payment"
+                value={paymentTerms}
+                onChange={setPaymentTerms}
+                placeholder="Select payment terms"
+              />
+            </ErpFieldRow>
+            <ErpFieldRow label="Delivery timeline" required dataField="deliveryTerms" hint="Delivery terms / lead-time commitment">
+              <CommercialTermSelect
+                termType="delivery"
+                value={deliveryTerms}
+                onChange={setDeliveryTerms}
+                placeholder="Select delivery terms"
+              />
+            </ErpFieldRow>
+          </ErpFieldGroup>
+        </div>
       </ErpCardSection>
 
       <ErpCardSection
@@ -991,6 +1118,7 @@ export function CrmQuotationNewPage() {
           onChange={setAttachments}
         />
       </ErpCardSection>
+      </div>
     </CrmCardFormShell>
   )
 }

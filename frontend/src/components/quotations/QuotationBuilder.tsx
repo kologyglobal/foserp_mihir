@@ -23,11 +23,16 @@ import { QuotationApprovalPanel } from './QuotationApprovalPanel'
 import { QuotationRevisionHistory } from './QuotationRevisionHistory'
 import { QuotationDataSourcePanel } from './QuotationDataSourcePanel'
 import { quotationStatusLabel, quotationStatusTone } from './QuotationCrmCard'
+import { quotationRevisionLabel } from './Quotation360Sections'
+import { resolveQuotationRevisionPolicy } from '../../utils/quotationRevisionPolicy'
 import { LiveStatusBadge } from '../premium/LiveStatusBadge'
 import { DocumentFooterActions } from '../../design-system'
 import { sectionCompletionStatus, validateQuotationForPrint } from '../../utils/quotationEngine/validation'
 import { saveQuotationPdfToDms } from '../../utils/quotationEngine/pdfExport'
-import { commercialTermsNeedApproval, extractCommercialTermsFromSections } from '../../utils/quotationTermUtils'
+import { commercialTermsNeedApproval, extractCommercialTermsFromSections, resolveCommercialTermSelectValue, syncCommercialTermsIntoSections } from '../../utils/quotationTermUtils'
+import { opportunityRequirementDisplay } from '../../utils/leadRequirementLines'
+import { useCrmRecordLoadState } from '../crm/CrmRecordLoadGate'
+import { PageLoadingFallback } from '../system/PageLoadingFallback'
 import type { QuotationPriceLine, QuotationSection } from '../../types/crm'
 import { cn } from '../../utils/cn'
 import { crmBreadcrumbs } from '../../utils/crmNavigation'
@@ -84,6 +89,54 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
     }
   }, [doc?.quotationId])
 
+  /** One-shot fulfill: header commercial fields ↔ section content, and empty productIds from quotation header. */
+  const commercialHydratedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!doc || !quotation) return
+    if (commercialHydratedFor.current === doc.id) return
+    commercialHydratedFor.current = doc.id
+
+    const fromSections = extractCommercialTermsFromSections(doc.sections)
+    const headerPatch: Partial<{ paymentTerms: string; deliveryTerms: string; validityDate: string }> = {}
+
+    if (!quotation.paymentTerms?.trim() && fromSections.paymentTerms) {
+      headerPatch.paymentTerms = resolveCommercialTermSelectValue('payment-terms', fromSections.paymentTerms)
+    }
+    if (!quotation.deliveryTerms?.trim() && fromSections.deliveryTerms) {
+      headerPatch.deliveryTerms = resolveCommercialTermSelectValue('delivery-terms', fromSections.deliveryTerms)
+    }
+    if (!quotation.validityDate && headerPatch.validityDate === undefined) {
+      /* leave empty — user must set */
+    }
+
+    if (Object.keys(headerPatch).length > 0) {
+      void resolveStoreAction(updateQuotationDraft(doc.quotationId, headerPatch))
+    }
+
+    const sectionPatch: { paymentTerms?: string; deliveryTerms?: string } = {}
+    if (quotation.paymentTerms?.trim() && !fromSections.paymentTerms) {
+      sectionPatch.paymentTerms = quotation.paymentTerms
+    }
+    if (quotation.deliveryTerms?.trim() && !fromSections.deliveryTerms) {
+      sectionPatch.deliveryTerms = quotation.deliveryTerms
+    }
+    if (Object.keys(sectionPatch).length > 0) {
+      void resolveStoreAction(
+        updateSections(documentId, syncCommercialTermsIntoSections(doc.sections, sectionPatch)),
+      )
+    }
+
+    const headerProductId = quotation.productId
+    if (headerProductId && doc.priceLines.some((l) => !l.productId)) {
+      const filled = doc.priceLines.map((l, idx) =>
+        l.productId ? l : { ...l, productId: idx === 0 ? headerProductId : l.productId },
+      )
+      if (filled.some((l, i) => l.productId !== doc.priceLines[i]?.productId)) {
+        void resolveStoreAction(updatePriceTable(documentId, filled))
+      }
+    }
+  }, [doc, quotation, documentId, updateQuotationDraft, updateSections, updatePriceTable])
+
   function setAttachments(next: CrmTypedAttachment[]) {
     setAttachmentsState(next)
     if (doc?.quotationId) {
@@ -106,7 +159,18 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
     [doc],
   )
 
-  if (!doc || !quotation) {
+  const recordReady = Boolean(doc && quotation)
+  const { showLoader, showNotFound } = useCrmRecordLoadState(recordReady)
+
+  if (showLoader) {
+    return (
+      <OperationalPageShell title="Quotation Editor" variant="dynamics" badge="CRM">
+        <PageLoadingFallback label="Loading quotation…" />
+      </OperationalPageShell>
+    )
+  }
+
+  if (showNotFound || !doc || !quotation) {
     return (
       <OperationalPageShell title="Quotation Editor" variant="dynamics" badge="CRM">
         <div className="quo-editor-empty">
@@ -123,8 +187,19 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
   const customer = customers.find((c) => c.id === quotation.customerId)
   const opportunity = doc.opportunityId ? opportunities.find((o) => o.id === doc.opportunityId) : undefined
   const contact = doc.contactId ? useCrmStore.getState().getContact(doc.contactId) : null
+  const latestDoc = useCrmStore.getState().getLatestQuotationDocument(doc.quotationId)
+  const revisionPolicy = resolveQuotationRevisionPolicy({
+    status: doc.status,
+    customerApproval: quotation.customerApproval ?? 'pending',
+    isLatest: latestDoc?.id === doc.id,
+  })
   const locked = doc.locked
-  const canEdit = !locked && doc.status !== 'converted'
+    || doc.status === 'superseded'
+    || doc.status === 'converted'
+    || !revisionPolicy.canDirectEdit
+  const canEdit = revisionPolicy.canDirectEdit && !doc.locked && doc.status !== 'superseded'
+  /** Company is locked only after a real revision (reason set), not on the first document. */
+  const companyLocked = Boolean(doc.revisionReason)
   const maxDiscount = doc.priceLines.reduce((m, l) => Math.max(m, l.discountPct), 0)
   const completion = sectionCompletionStatus(doc)
   const printIssues = validateQuotationForPrint(doc, customer)
@@ -167,6 +242,14 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
   ) {
     if (!canEdit || !doc) return
     void resolveStoreAction(updateQuotationDraft(doc.quotationId, patch))
+    if (patch.paymentTerms != null || patch.deliveryTerms != null) {
+      void resolveStoreAction(
+        updateSections(documentId, syncCommercialTermsIntoSections(doc.sections, {
+          paymentTerms: patch.paymentTerms,
+          deliveryTerms: patch.deliveryTerms,
+        })),
+      )
+    }
     flashSaved()
   }
 
@@ -186,7 +269,12 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
     })
     if (!reason) return
     const r = await resolveStoreAction(createRevision(documentId, reason))
-    if (r.ok && r.documentId) navigate(`/crm/quotations/${doc!.quotationId}/editor?doc=${r.documentId}`)
+    if (r.ok && r.documentId) {
+      notify.success('Quotation revised successfully')
+      navigate(`/crm/quotations/${doc!.quotationId}/editor?doc=${r.documentId}`)
+    } else {
+      notify.error(r.error ?? 'Could not create revision')
+    }
   }
 
   function handleSaveAndClose() {
@@ -200,7 +288,12 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
 
   async function handleSubmitApprovalClick() {
     const r = await resolveStoreAction(submitApproval(documentId))
-    if (!r.ok) notify.error(r.error ?? 'Could not submit for approval')
+    if (!r.ok) {
+      notify.error(r.error ?? 'Could not submit for approval')
+      return
+    }
+    notify.success('Quotation submitted for approval')
+    navigate('/crm/quotations')
   }
 
   function handleSavePdfToDms() {
@@ -223,18 +316,18 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
     { id: 'dms', label: 'Save to DMS', icon: FileText, onClick: handleSavePdfToDms },
   ]
 
-  if (!locked && doc.status === 'draft') {
-    secondaryActions.splice(3, 0, { id: 'mark-sent', label: 'Mark Sent', icon: Send, onClick: () => { markSent(documentId) } })
+  if (doc.status === 'approved') {
+    secondaryActions.splice(3, 0, { id: 'mark-sent', label: 'Send to Customer', icon: Send, onClick: () => { void markSent(documentId) } })
   }
 
-  if (locked && doc.status !== 'converted') {
+  if (revisionPolicy.canCreateRevision) {
     secondaryActions.push({ id: 'new-revision', label: 'New Revision', icon: GitBranch, onClick: handleNewRevision })
   }
 
   return (
     <OperationalPageShell
       title={quotation.quotationNo}
-      description={`Revision ${doc.revisionNo} · ${customer?.customerName ?? 'Customer'} · ${quotationStatusLabel(doc.status)}`}
+      description={`${quotationRevisionLabel(doc.revisionNo)} · ${customer?.customerName ?? 'Customer'} · ${quotationStatusLabel(doc.status)}${locked ? ' · View only' : ''}`}
       favoritePath={`/crm/quotations/${doc.quotationId}/editor?doc=${documentId}`}
       badge="Quote Editor"
       variant="dynamics"
@@ -254,7 +347,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
           sticky={false}
           primaryAction={
             !locked && doc.status === 'draft'
-              ? { id: 'submit-approval', label: 'Submit Approval', icon: CheckCircle, onClick: () => submitApproval(documentId) }
+              ? { id: 'submit-approval', label: 'Submit Approval', icon: CheckCircle, onClick: () => void handleSubmitApprovalClick() }
               : { id: 'preview', label: 'Preview Document', icon: Eye, onClick: () => navigate(`/crm/quotations/${doc.quotationId}/preview?doc=${documentId}`) }
           }
           secondaryActions={secondaryActions}
@@ -272,7 +365,13 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
       <div className={cn('quo-editor-status-bar', locked ? 'quo-editor-status-bar--locked' : 'quo-editor-status-bar--editable')}>
         {locked ? <Lock className="h-4 w-4 shrink-0" /> : <Unlock className="h-4 w-4 shrink-0" />}
         <div className="min-w-0 flex-1">
-          <p className="quo-editor-status-bar__title">{locked ? 'Document is locked' : 'Editing mode — changes save automatically'}</p>
+          <p className="quo-editor-status-bar__title">
+            {doc.status === 'superseded'
+              ? `${quotationRevisionLabel(doc.revisionNo)} is locked — prior revision (view only)`
+              : locked
+                ? 'Document is locked'
+                : 'Editing mode — changes save automatically'}
+          </p>
           <p className="quo-editor-status-bar__hint">
             {approvalWarnings.length > 0
               ? approvalWarnings[0]
@@ -325,6 +424,18 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
             <section className="quo-editor-commercial-fields" aria-label="Commercial terms">
               <p className="quo-editor-outline__title">Commercial</p>
               <ErpFormGrid columns={2} dense>
+                <ErpFieldRow
+                  label="Client / Company"
+                  readOnly
+                  colSpan={2}
+                  hint={companyLocked ? 'Company is locked on revised quotations' : 'Linked from the quotation customer'}
+                >
+                  <Input
+                    value={customer?.customerName ?? '—'}
+                    readOnly
+                    className="erp-input"
+                  />
+                </ErpFieldRow>
                 <ErpFieldRow label="Quotation date" readOnly>
                   <Input type="date" value={quotationDate} readOnly className="erp-input" />
                 </ErpFieldRow>
@@ -360,17 +471,19 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
                 <ErpFieldRow label="Payment terms" required colSpan={2}>
                   <CommercialTermSelect
                     termType="payment"
-                    value={quotation.paymentTerms ?? ''}
+                    value={resolveCommercialTermSelectValue('payment-terms', quotation.paymentTerms)}
                     onChange={(v) => patchCommercial({ paymentTerms: v })}
                     placeholder="Select payment terms"
+                    disabled={!canEdit}
                   />
                 </ErpFieldRow>
                 <ErpFieldRow label="Delivery timeline" required colSpan={2}>
                   <CommercialTermSelect
                     termType="delivery"
-                    value={quotation.deliveryTerms ?? ''}
+                    value={resolveCommercialTermSelectValue('delivery-terms', quotation.deliveryTerms)}
                     onChange={(v) => patchCommercial({ deliveryTerms: v })}
                     placeholder="Select delivery terms"
+                    disabled={!canEdit}
                   />
                 </ErpFieldRow>
               </ErpFormGrid>
@@ -391,7 +504,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
                   probability={opportunity?.probability ?? 0}
                   readOnly={!canEdit}
                   showFreightExtras
-                  scopeNotes={doc.commercialNotes ?? ''}
+                  scopeNotes={opportunityRequirementDisplay(doc.commercialNotes)}
                   onChange={canEdit ? handlePrice : undefined}
                 />
               )}

@@ -8,6 +8,8 @@ export interface ErpQuickEntrySectionProps {
   id?: string
   title?: string
   subtitle?: string
+  /** BC-style peek when collapsed */
+  collapsedSummary?: ReactNode
   icon?: LucideIcon
   children: ReactNode
   columns?: 1 | 2 | 3 | 4
@@ -24,6 +26,7 @@ export function ErpQuickEntrySection({
   id = 'form-section-quick',
   title = 'Quick Entry',
   subtitle = 'Capture the essentials — expand additional information only when needed.',
+  collapsedSummary,
   icon = Zap,
   children,
   columns = 3,
@@ -36,11 +39,13 @@ export function ErpQuickEntrySection({
       id={id}
       title={title}
       subtitle={subtitle}
+      collapsedSummary={collapsedSummary}
       icon={icon}
       columns={columns}
       collapsible={collapsible}
       defaultOpen={defaultOpen}
       className={cn('erp-quick-entry', className)}
+      accent="blue"
       badge={<span className="erp-additional-info-toggle__badge">Core</span>}
     >
       {children}

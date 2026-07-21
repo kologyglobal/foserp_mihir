@@ -21,7 +21,7 @@ export const listLeadsQuerySchema = paginationSchema.extend({
   isArchived: z.coerce.boolean().optional(),
 })
 
-export const createLeadSchema = z.object({
+const createLeadBaseSchema = z.object({
   leadNo: z.string().trim().max(32).optional(),
   prospectName: z.string().trim().min(1).max(300),
   companyName: z.string().trim().max(300).optional(),
@@ -52,7 +52,41 @@ export const createLeadSchema = z.object({
   temperature: z.string().trim().max(16).optional().nullable(),
 })
 
-export const updateLeadSchema = createLeadSchema.partial()
+export const createLeadSchema = createLeadBaseSchema.superRefine((data, ctx) => {
+  const remarks = (data.remarks ?? '').trim()
+  if (!remarks) {
+    ctx.addIssue({ code: 'custom', message: 'Notes are required', path: ['remarks'] })
+  }
+
+  const stage = data.stage ?? 'new'
+  if (stage === 'new' || stage === 'contacted') {
+    const mobile = String(data.mobile ?? '').replace(/\D/g, '')
+    const email = String(data.email ?? '').trim()
+    if (!mobile && !email) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Provide a mobile number or email',
+        path: ['mobile'],
+      })
+    }
+    const hasPrimary = Boolean(
+      String(data.contactPerson ?? '').trim() || data.contactId,
+    )
+    if (!hasPrimary) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Primary Contact is required',
+        path: ['contactPerson'],
+      })
+    }
+  }
+
+  if (!data.priority) {
+    ctx.addIssue({ code: 'custom', message: 'Priority is required', path: ['priority'] })
+  }
+})
+
+export const updateLeadSchema = createLeadBaseSchema.partial()
 
 export const assignLeadSchema = z.object({
   leadOwnerId: z.string().uuid(),
@@ -83,6 +117,7 @@ export const convertLeadSchema = z.object({
   stageId: z.string().uuid().optional(),
   expectedCloseDate: z.string().datetime().optional(),
   value: z.coerce.number().min(0).optional(),
+  contactId: z.string().uuid().optional().nullable(),
   lines: z.array(z.object({
     lineNo: z.coerce.number().int().min(1).optional(),
     productId: z.string().uuid().optional().nullable(),

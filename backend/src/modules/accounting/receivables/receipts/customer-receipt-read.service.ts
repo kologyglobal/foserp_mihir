@@ -1,5 +1,6 @@
 import type { Request } from 'express'
 import { prisma } from '../../../../config/database.js'
+import { formatForPersistence } from '../../shared/finance-decimal.js'
 import * as repo from './customer-receipt.repository.js'
 import { resolveCustomerReceiptAllowedActions } from './customer-receipt-allowed-actions.js'
 import type {
@@ -27,13 +28,44 @@ async function getLastValidationSummary(tenantId: string, receiptId: string) {
   }
 }
 
+async function getPostingSummary(
+  tenantId: string,
+  receipt: CustomerReceiptWithDeductions,
+): Promise<Pick<CustomerReceiptDto, 'creditOpenItem' | 'ledgerEntryCount'>> {
+  if (receipt.status !== 'POSTED' || !receipt.accountingVoucherId) {
+    return { creditOpenItem: undefined, ledgerEntryCount: undefined }
+  }
+  const [openItem, ledgerEntryCount] = await Promise.all([
+    prisma.receivableOpenItem.findFirst({
+      where: { tenantId, customerReceiptId: receipt.id },
+      select: { id: true, status: true, openAmount: true, originalAmount: true },
+    }),
+    prisma.generalLedgerEntry.count({ where: { tenantId, voucherId: receipt.accountingVoucherId } }),
+  ])
+  return {
+    creditOpenItem: openItem
+      ? {
+          id: openItem.id,
+          status: openItem.status,
+          outstandingAmount: formatForPersistence(openItem.openAmount),
+          originalAmount: formatForPersistence(openItem.originalAmount),
+        }
+      : null,
+    ledgerEntryCount,
+  }
+}
+
 export async function serializeCustomerReceiptDetail(
   req: Request,
   receipt: CustomerReceiptWithDeductions,
   options?: { includeValidationSummary?: boolean },
 ): Promise<CustomerReceiptDto> {
   const base = repo.mapCustomerReceiptToDto(receipt, receipt.deductionLines)
-  const allowedActions = resolveCustomerReceiptAllowedActions(req, receipt.status)
+  const postingSummary = await getPostingSummary(receipt.tenantId, receipt)
+  const allowedActions = resolveCustomerReceiptAllowedActions(req, receipt.status, {
+    creditOutstanding:
+      postingSummary.creditOpenItem?.outstandingAmount ?? formatForPersistence(receipt.unallocatedAmount),
+  })
   const validationSummary =
     options?.includeValidationSummary === false
       ? undefined
@@ -43,6 +75,7 @@ export async function serializeCustomerReceiptDetail(
     ...base,
     allowedActions,
     validationSummary,
+    ...postingSummary,
   }
 }
 

@@ -7,12 +7,13 @@ import {
   ClipboardList,
   Paperclip,
 } from 'lucide-react'
-import { FactBoxPaneAiToggle } from '@/components/erp/card-form/FactBoxPaneAiToggle'
 import { QuickFollowUpDrawer } from '@/components/crm/QuickFollowUpDrawer'
 import { LogActivityDrawer } from '@/components/crm/CrmQuickCreateDrawers'
 import { LeadHistoryDrawer } from '@/components/crm/LeadHistoryDrawer'
 import { CrmUnifiedActivityFeed } from '@/components/crm/CrmUnifiedActivityFeed'
 import { CrmDeleteConfirmModal } from '@/components/crm/CrmDeleteConfirmModal'
+import { useCrmRecordLoadState } from '@/components/crm/CrmRecordLoadGate'
+import { PageLoadingFallback } from '@/components/system/PageLoadingFallback'
 import { canCrmPermission } from '@/utils/permissions/crm'
 import { AppLink } from '@/components/ui/AppLink'
 import { Button } from '@/components/ui/Button'
@@ -31,14 +32,16 @@ import { Enterprise360Documents,
   useEnterprise360Keyboard,
 } from '@/design-system/workspace360'
 import { EntityAttachmentsPanel } from '@/components/crm/shared/EntityAttachmentsPanel'
-import { demoNotesFromTexts } from '@/utils/crmEntityNotes'
+import { demoNotesFromTexts, entityNotesToFeedNotes } from '@/utils/crmEntityNotes'
+import type { CrmEntityNoteDto } from '@/services/api/crmApi'
+import type { LeadStage } from '@/types/sales'
 import { useApiMode } from '@/hooks/useApiMode'
 import type { CrmActivity, FollowUp } from '@/types/crm'
 import { Lead360RecordHeader } from '@/components/crm/Lead360RecordHeader'
 import { LeadChangeStageControl } from '@/components/crm/LeadChangeStageControl'
-import { StageCompletenessPanel } from '@/components/crm/StageCompletenessPanel'
 import { LeadSummaryCard, resolveLeadContactDesignation } from '@/components/crm/LeadSummaryCard'
-import { LeadNotesCard } from '@/components/crm/LeadNotesCard'
+import { CrmStageNotes } from '@/components/crm/shared/CrmStageNotes'
+import { LEAD_NOTE_STAGE_OPTIONS } from '@/utils/crmNoteStageOptions'
 import { LeadSmartOverviewPanel } from '@/components/crm/LeadSmartOverviewPanel'
 import { ErpLineItemsGrid } from '@/components/erp/ErpLineItemsGrid'
 import { CrmCardFormShell, ENTERPRISE_FORM_CLASS } from '@/components/crm/CrmCardFormShell'
@@ -79,13 +82,12 @@ import {
 import {
   formatMissingStageFieldsMessage,
   getLeadStageCompleteness,
-  type StageRequirementField,
 } from '@/config/crmStageRequirements'
 import { canOpenLeadEditor, resolveLeadEditPolicy } from '@/utils/leadEditPolicy'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { useProductMasterOptionMap } from '@/utils/opportunityProductOptions'
-import { decodeLeadRequirementLines } from '@/utils/leadRequirementLines'
+import { decodeLeadRequirementLines, resolveLeadRequirementLinesRaw } from '@/utils/leadRequirementLines'
 
 export function Lead360Workspace() {
   const apiMode = useApiMode()
@@ -120,8 +122,6 @@ export function Lead360Workspace() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [activeAdditionalSection, setActiveAdditionalSection] = useState<string | null>('requirement')
   const [notesComposerOpen, setNotesComposerOpen] = useState(false)
-  const [gateMissingFields, setGateMissingFields] = useState<StageRequirementField[] | null>(null)
-  const [gateStageLabel, setGateStageLabel] = useState<string | null>(null)
   const deleteActivity = useCrmStore((s) => s.deleteActivity)
   const deleteFollowUp = useCrmStore((s) => s.deleteFollowUp)
 
@@ -142,6 +142,15 @@ export function Lead360Workspace() {
       { label: 'Follow-up notes', text: lead?.followUpNotes, authorName: lead?.leadOwnerName },
     ]),
     [lead],
+  )
+  /** API entity notes reported by the Notes card — merged into the unified feed. */
+  const [entityNotes, setEntityNotes] = useState<CrmEntityNoteDto[]>([])
+  const feedNotes = useMemo(
+    () => [
+      ...leadDemoNotes,
+      ...entityNotesToFeedNotes(entityNotes, (code) => leadStageLabel(code as LeadStage)),
+    ],
+    [leadDemoNotes, entityNotes],
   )
 
   const customerName = useCallback(
@@ -221,7 +230,8 @@ export function Lead360Workspace() {
   }, [leadActivities])
 
   const hasOptionalDetailData = Boolean(
-    lead?.productRequirement?.trim()
+    lead?.remarks?.trim()
+    || resolveLeadRequirementLinesRaw(lead?.productRequirement, lead?.remarks)
     || (lead?.expectedValue ?? 0) > 0
     || lead?.expectedCloseDate
     || lead?.nextFollowUpDate
@@ -244,8 +254,11 @@ export function Lead360Workspace() {
   })
 
   const requirementLineCount = useMemo(
-    () => decodeLeadRequirementLines(lead?.productRequirement ?? '', lead?.expectedQty).lines.filter((l) => l.productOrItem?.trim()).length,
-    [lead?.productRequirement, lead?.expectedQty],
+    () =>
+      decodeLeadRequirementLines(lead?.productRequirement ?? '', lead?.expectedQty, lead?.remarks).lines.filter(
+        (l) => l.productOrItem?.trim(),
+      ).length,
+    [lead?.productRequirement, lead?.expectedQty, lead?.remarks],
   )
 
   const additionalSectionItems = useMemo(() => {
@@ -299,7 +312,14 @@ export function Lead360Workspace() {
     lead, requirementLineCount, leadAttachments.length, leadActivities.length,
   ])
 
-  if (!lead) {
+  const recordReady = Boolean(lead)
+  const { showLoader, showNotFound } = useCrmRecordLoadState(recordReady)
+
+  if (showLoader) {
+    return <PageLoadingFallback label="Loading lead…" />
+  }
+
+  if (showNotFound || !lead) {
     return (
       <div className="erp-page flex flex-col items-center justify-center gap-3 p-12">
         <p className="text-erp-muted">Lead not found.</p>
@@ -327,17 +347,6 @@ export function Lead360Workspace() {
     tone: pipelineTone,
   } = buildLeadCrmPipeline(lead, leadActivities)
   const canChangeStage = editPolicy.canChangeStage && canCrmPermission('crm.lead.update')
-  const stageCompleteness = getLeadStageCompleteness(currentLead, currentLead.stage)
-  const panelMissing = gateMissingFields ?? stageCompleteness.missingFields
-  const panelCompleted = gateMissingFields
-    ? Math.max(0, stageCompleteness.requiredCount - gateMissingFields.length)
-    : stageCompleteness.completedCount
-  const panelPercent = gateMissingFields
-    ? (stageCompleteness.requiredCount === 0
-      ? 100
-      : Math.round((panelCompleted / stageCompleteness.requiredCount) * 100))
-    : stageCompleteness.percent
-  const panelStageLabel = gateStageLabel ?? leadStageLabel(currentLead.stage)
   const systemEvents = buildLeadSystemEvents(
     lead,
     customerQuotations.length > 0,
@@ -347,7 +356,7 @@ export function Lead360Workspace() {
   const unifiedFeedItems = buildLeadUnifiedFeed({
     activities: leadActivities,
     followUps: leadFollowUps,
-    notes: leadDemoNotes,
+    notes: feedNotes,
     systemEvents,
   })
   const relAge = formatRelationshipAge(relationshipAgeDays(lead.createdDate))
@@ -558,9 +567,6 @@ export function Lead360Workspace() {
         stickyFooter={false}
       >
         <div className="erp-form-body crm-lead-form-body">
-        <div className="erp-form-body__toolbar">
-          <FactBoxPaneAiToggle />
-        </div>
 
         {isConverted ? (
           <div className="dyn-detail-banner dyn-detail-banner--success">
@@ -592,27 +598,13 @@ export function Lead360Workspace() {
                 <LeadChangeStageControl
                   leadId={currentLead.id}
                   currentStage={currentLead.stage}
-                  onDone={(msg) => {
-                    if (msg.startsWith('Stage updated')) {
-                      setGateMissingFields(null)
-                      setGateStageLabel(null)
-                    }
-                    setToast(msg)
-                  }}
+                  onDone={(msg) => setToast(msg)}
                   onBlocked={(missing, target) => {
-                    setGateMissingFields(missing)
-                    setGateStageLabel(leadStageLabel(target))
+                    setToast(formatMissingStageFieldsMessage(missing, leadStageLabel(target)))
                   }}
                 />
               ) : null
             }
-          />
-          <StageCompletenessPanel
-            percent={panelPercent}
-            requiredCount={stageCompleteness.requiredCount}
-            completedCount={panelCompleted}
-            missingFields={panelMissing}
-            stageLabel={panelStageLabel}
           />
         </div>
 
@@ -624,13 +616,18 @@ export function Lead360Workspace() {
           lastActivityLabel={lastActivity?.subject ?? null}
         />
 
-        <LeadNotesCard
-          leadId={currentLead.id}
+        <CrmStageNotes
+          entityType="LEAD"
+          entityId={currentLead.id}
+          sectionId="lead-section-notes"
+          stageOptions={LEAD_NOTE_STAGE_OPTIONS}
+          historyLabel="Lead notes history"
           currentStage={currentLead.stage}
           demoNotes={leadDemoNotes}
           editPath={routes.edit(currentLead.id)}
           composerOpen={notesComposerOpen}
           onComposerOpenChange={setNotesComposerOpen}
+          onNotesChange={setEntityNotes}
         />
 
         <ErpAdditionalInfoToggle
@@ -654,7 +651,7 @@ export function Lead360Workspace() {
               requirement: (
                 <div className="space-y-4">
                   <ErpLineItemsGrid
-                    lines={decodeLeadRequirementLines(lead.productRequirement ?? '', lead.expectedQty).lines}
+                    lines={decodeLeadRequirementLines(lead.productRequirement ?? '', lead.expectedQty, lead.remarks).lines}
                     onChange={() => {}}
                     productOptions={productOptions}
                     productPickMap={pickMap}
@@ -754,23 +751,11 @@ export function Lead360Workspace() {
                               const target = stage as Lead['stage']
                               const missing = getLeadStageCompleteness(currentLead, target).missingFields
                               if (missing.length > 0) {
-                                setGateMissingFields(missing)
-                                setGateStageLabel(leadStageLabel(target))
                                 setToast(formatMissingStageFieldsMessage(missing, leadStageLabel(target)))
                                 return
                               }
                               const r = await resolveStoreAction(advanceLeadStage(lead.id, target))
-                              if (r.ok) {
-                                setGateMissingFields(null)
-                                setGateStageLabel(null)
-                                setToast(`Moved to ${leadStageLabel(target)}`)
-                              } else {
-                                if (r.missingFields?.length) {
-                                  setGateMissingFields(r.missingFields)
-                                  setGateStageLabel(leadStageLabel(target))
-                                }
-                                setToast(r.error ?? 'Failed')
-                              }
+                              setToast(r.ok ? `Moved to ${leadStageLabel(target)}` : (r.error ?? 'Failed'))
                             })()
                           }}
                         >

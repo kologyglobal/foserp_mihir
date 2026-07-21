@@ -5,6 +5,8 @@ import { cn } from '../../../utils/cn'
 
 export interface ErpCardSectionProps {
   id?: string
+  /** Stable target for Next Best Action focus/highlight (`data-nba-target`) */
+  nbaTarget?: string
   title: string
   subtitle?: string
   /**
@@ -39,6 +41,7 @@ export interface ErpCardSectionProps {
 /** BC FastTab panel — dense section card for card forms */
 export function ErpCardSection({
   id,
+  nbaTarget,
   title,
   subtitle,
   collapsedSummary,
@@ -88,6 +91,7 @@ export function ErpCardSection({
   return (
     <section
       id={id}
+      data-nba-target={nbaTarget || undefined}
       className={cn(
         'erp-card-section',
         accent && `erp-card-section--accent-${accent}`,

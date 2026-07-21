@@ -55,12 +55,18 @@ export function useCrmFilterDrawer<T extends CrmFilterValues>({
   }, [defaults, fields])
 
   const clearAll = useCallback(() => {
-    onChange({ ...defaults })
+    const next = { ...defaults } as T
+    onChange(next)
+    // Keep drawer dropdowns in sync when chips / Clear all change applied filters
+    setDraft(next)
   }, [defaults, onChange])
 
   const removeChip = useCallback(
     (chipId: string) => {
-      onChange(clearCrmFilterChip(values, chipId, fields) as T)
+      const next = clearCrmFilterChip(values, chipId, fields) as T
+      onChange(next)
+      // Chip removal updates applied values; draft must match or Filters dropdowns stay stale
+      setDraft(next)
     },
     [values, fields, onChange],
   )

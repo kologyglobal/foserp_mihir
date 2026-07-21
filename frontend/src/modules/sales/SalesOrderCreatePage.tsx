@@ -4,26 +4,26 @@ import {
   Banknote,
   Building2,
   ClipboardList,
+  ExternalLink,
   FileImage,
   FileSpreadsheet,
   FileText,
   Handshake,
+  MapPin,
   Paperclip,
   PenLine,
   Plus,
   ShieldAlert,
   Trash2,
+  Zap,
 } from 'lucide-react'
 import {
-  ErpAdditionalInfoPanel,
-  ErpAdditionalInfoToggle,
   ErpCardSection,
+  ErpFieldGroup,
   ErpFieldRow,
   ErpQuickEntrySection,
   ErpStickySaveBar,
-  useErpAdditionalInfo,
 } from '../../components/erp/card-form'
-import { FactBoxPaneAiToggle } from '../../components/erp/card-form/FactBoxPaneAiToggle'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
 import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
 import { DynamicsStatusChip } from '../../components/dynamics/DynamicsStatusChip'
@@ -35,19 +35,22 @@ import {
 import { salesChildBreadcrumbs } from '../../utils/salesNavigation'
 import { crmChildBreadcrumbs } from '../../utils/crmNavigation'
 import { ErpSmartSelect } from '../../components/erp/ErpSmartSelect'
-import { ErpSegmentedControl } from '../../components/erp/ErpSegmentedControl'
 import { CommercialTermSelect } from '../../components/masters/GeographySelects'
 import { QuickCreateSelect } from '../../components/quick-create/QuickCreateSelect'
 import { Input, Textarea } from '../../components/forms/Inputs'
 import { AppLink } from '../../components/ui/AppLink'
 import { resolveCompany360Path } from '../../config/entity360Routes'
-import { Toast } from '../../components/ui/Toast'
+import { notify } from '../../store/toastStore'
+import { validateSalesOrderCreate } from '../../utils/validation/crmSchemas/salesOrderSchema'
+import { handleInvalidSubmit, type FieldErrorMap } from '../../utils/formValidation'
+import { assertProductSellableForSales, isProductSellable, productNotSellableForSalesMessage } from '../../utils/productMaster'
+import { PRODUCT_STATUS_LABELS } from '../../types/productMaster'
 import { useSalesStore } from '../../store/salesStore'
 import { useCrmStore } from '../../store/crmStore'
 import { useMasterStore } from '../../store/masterStore'
 import { isApiMode } from '../../config/apiConfig'
 import { apiCreateSalesOrder } from '../../services/bridges/salesOrderApiBridge'
-import { useActiveCustomers, useActiveProducts } from '../../hooks/useMasterLists'
+import { useActiveCustomers, useSellableProducts } from '../../hooks/useMasterLists'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import {
@@ -64,10 +67,15 @@ import { buildSalesOrderLinesFromQuotationDocument } from '../../utils/crmQuotat
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { useDocumentLocation } from '../../hooks/useDocumentLocation'
 import { locationDisplayLabel } from '../../utils/locationUtils'
+import {
+  SalesOrderCreateModeChooser,
+  type SalesOrderCreateMode,
+} from '../../components/sales/SalesOrderCreateModeChooser'
+import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
 
 const GST_RATE_OPTIONS = [0, 5, 12, 18, 28] as const
 
-type SoCreateMode = 'quotation' | 'direct'
+type SoCreateMode = SalesOrderCreateMode
 
 interface SoLineDraft {
   key: string
@@ -83,12 +91,6 @@ interface SoAttachment {
   name: string
   kind: 'pdf' | 'image' | 'excel' | 'drawing' | 'customer_po'
   uploadedAt: string
-}
-
-function addDays(isoDate: string, days: number): string {
-  const d = new Date(isoDate.slice(0, 10))
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
 }
 
 function round2(n: number) {
@@ -162,6 +164,14 @@ export function SalesOrderNewPage() {
       ? 'quotation'
       : 'direct'
 
+  /** Prefill / deep-link skips the chooser; blank New SO starts with path selection. */
+  const skipModeChooser = Boolean(
+    opportunityIdParam
+    || quotationDocumentIdParam
+    || duplicateCustomerId
+    || duplicateProductId,
+  )
+
   const createDirect = useSalesStore((s) => s.createDirectSalesOrder)
   const convertQuotation = useCrmStore((s) => s.convertQuotationDocumentToSalesOrder)
   const updateOpportunity = useCrmStore((s) => s.updateOpportunity)
@@ -170,49 +180,46 @@ export function SalesOrderNewPage() {
   const getOpportunity = useCrmStore((s) => s.getOpportunity)
   const getQuotation = useSalesStore((s) => s.getQuotation)
   const customers = useActiveCustomers()
-  const products = useActiveProducts()
+  const sellableProducts = useSellableProducts()
+  const allProducts = useMasterStore((s) => s.products)
   const getCustomer = useMasterStore((s) => s.getCustomer)
   const getProduct = useMasterStore((s) => s.getProduct)
   const locations = useMasterStore((s) => s.locations)
 
   const [activeSection, setActiveSection] = useState('quick')
   const [createMode, setCreateMode] = useState<SoCreateMode>(initialCreateMode)
-  const [toast, setToast] = useState<string | null>(null)
-  const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [modeChosen, setModeChosen] = useState(skipModeChooser)
+  const [validationErrors, setValidationErrors] = useState<FieldErrorMap>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const {
-    open: showAdditionalDetails,
-    setOpen: setShowAdditionalDetails,
-    toggle: toggleAdditionalDetails,
-    panelId: additionalPanelId,
-  } = useErpAdditionalInfo({
-    preferOpen: Boolean(opportunityIdParam || quotationDocumentIdParam),
-  })
-
   const [customerId, setCustomerId] = useState(
-    opportunityPrefill?.customerId ?? duplicateCustomerId ?? customers[0]?.id ?? '',
+    opportunityPrefill?.customerId ?? duplicateCustomerId ?? '',
   )
   const [quotationDocumentId, setQuotationDocumentId] = useState(opportunityPrefill?.quotationDocumentId ?? '')
   const [lines, setLines] = useState<SoLineDraft[]>(() => {
-    const productId = opportunityPrefill?.productId ?? duplicateProductId ?? products[0]?.id ?? ''
-    const unitPrice = opportunityPrefill?.unitPrice ?? getProduct(productId)?.standardPrice ?? 0
+    const fromUpstream = Boolean(opportunityPrefill || duplicateProductId)
+    if (!fromUpstream) {
+      return [{ ...newLineDraft('', 0), qty: 1 }]
+    }
+    const productId = opportunityPrefill?.productId ?? duplicateProductId ?? ''
+    const unitPrice = opportunityPrefill?.unitPrice ?? (productId ? getProduct(productId)?.standardPrice ?? 0 : 0)
     const qty = opportunityPrefill?.qty ?? (duplicateQty > 0 ? duplicateQty : 1)
     return [{ ...newLineDraft(productId, unitPrice), qty }]
   })
   const [customerPoNumber, setCustomerPoNumber] = useState('')
   const [customerPoDate, setCustomerPoDate] = useState('')
-  const [paymentTerms, setPaymentTerms] = useState(opportunityPrefill?.paymentTerms ?? '30% advance, balance before dispatch')
-  const [deliveryTerms, setDeliveryTerms] = useState(opportunityPrefill?.deliveryTerms ?? 'Ex-works Pune')
+  const [paymentTerms, setPaymentTerms] = useState(opportunityPrefill?.paymentTerms ?? '')
+  const [deliveryTerms, setDeliveryTerms] = useState(opportunityPrefill?.deliveryTerms ?? '')
   const [directSoReason, setDirectSoReason] = useState(opportunityPrefill?.directSoReason ?? '')
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState(
-    opportunityPrefill?.expectedDeliveryDate ?? addDays(new Date().toISOString(), 60),
+    opportunityPrefill?.expectedDeliveryDate ?? '',
   )
   const [deliveryLocation, setDeliveryLocation] = useState(opportunityPrefill?.deliveryLocation ?? '')
   const { locationId, setLocationId } = useDocumentLocation('sales', opportunityPrefill?.locationId)
   const [internalRemarks, setInternalRemarks] = useState(opportunityPrefill?.internalRemarks ?? '')
   const [freightAmount, setFreightAmount] = useState(0)
-  const [orderDiscountAmount, setOrderDiscountAmount] = useState(0)
+  const [orderDiscountMode, setOrderDiscountMode] = useState<'flat' | 'percent'>('flat')
+  const [orderDiscountInput, setOrderDiscountInput] = useState(0)
   const [attachments, setAttachments] = useState<SoAttachment[]>([])
 
   const customer = customerId ? getCustomer(customerId) : undefined
@@ -274,15 +281,26 @@ export function SalesOrderNewPage() {
     [customers],
   )
 
-  const productSmartOptions = useMemo(
-    () =>
-      products.map((p) => ({
+  const productSmartOptions = useMemo(() => {
+    const retainIds = new Set(lines.map((l) => l.productId).filter(Boolean))
+    const sellableOpts = sellableProducts.map((p) => ({
+      value: p.id,
+      label: `${p.productCode} · ${p.productName}`,
+      searchText: `${p.productCode} ${p.productName}`.toLowerCase(),
+    }))
+    const retained = allProducts
+      .filter((p) => retainIds.has(p.id) && !isProductSellable(p))
+      .map((p) => ({
         value: p.id,
         label: `${p.productCode} · ${p.productName}`,
-        searchText: `${p.productCode} ${p.productName}`.toLowerCase(),
-      })),
-    [products],
-  )
+        searchText: `${p.productCode} ${p.productName} not released`.toLowerCase(),
+        badge: `Not released · ${PRODUCT_STATUS_LABELS[p.status] ?? p.status}`,
+        subtitle: productNotSellableForSalesMessage(p),
+      }))
+    return [...sellableOpts, ...retained]
+  }, [sellableProducts, allProducts, lines])
+
+  const products = sellableProducts
 
   const computedLines = useMemo(
     () => lines.map((line) => {
@@ -303,9 +321,23 @@ export function SalesOrderNewPage() {
       gstByRate.set(line.taxPct, round2((gstByRate.get(line.taxPct) ?? 0) + line.gstAmount))
     }
     const totalGst = round2([...gstByRate.values()].reduce((s, v) => s + v, 0))
+    const discountBase = round2(subtotal + totalGst)
+    const orderDiscountAmount =
+      orderDiscountMode === 'percent'
+        ? round2(discountBase * (Math.min(100, Math.max(0, orderDiscountInput)) / 100))
+        : round2(Math.min(Math.max(0, orderDiscountInput), discountBase + freightAmount))
     const grandTotal = round2(subtotal + totalGst + freightAmount - orderDiscountAmount)
-    return { totalQty, basicAmount, subtotal, totalLineDiscount, gstByRate, totalGst, grandTotal }
-  }, [computedLines, freightAmount, orderDiscountAmount])
+    return {
+      totalQty,
+      basicAmount,
+      subtotal,
+      totalLineDiscount,
+      gstByRate,
+      totalGst,
+      orderDiscountAmount,
+      grandTotal,
+    }
+  }, [computedLines, freightAmount, orderDiscountInput, orderDiscountMode])
 
   function applyQuotation(docId: string) {
     if (!docId) return
@@ -345,7 +377,7 @@ export function SalesOrderNewPage() {
   function handleCreateModeChange(mode: SoCreateMode) {
     if (mode === createMode) return
     setCreateMode(mode)
-    setValidationErrors([])
+    setValidationErrors({})
     if (mode === 'direct') {
       setQuotationDocumentId('')
       if (directSoReason.startsWith('Approved quotation handover')) setDirectSoReason('')
@@ -358,13 +390,23 @@ export function SalesOrderNewPage() {
     if (restoreId) applyQuotation(restoreId)
   }
 
+  function chooseCreateMode(mode: SoCreateMode) {
+    handleCreateModeChange(mode)
+    setModeChosen(true)
+    setActiveSection('quick')
+  }
+
+  function reopenModeChooser() {
+    setModeChosen(false)
+    setValidationErrors({})
+  }
+
   function updateLine(key: string, patch: Partial<SoLineDraft>) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)))
   }
 
   function addLine() {
-    const productId = products[0]?.id ?? ''
-    setLines((prev) => [...prev, newLineDraft(productId, getProduct(productId)?.standardPrice ?? 0)])
+    setLines((prev) => [...prev, newLineDraft('', 0)])
   }
 
   function removeLine(key: string) {
@@ -386,35 +428,50 @@ export function SalesOrderNewPage() {
     e.target.value = ''
   }
 
-  function validate(): string[] {
-    const errors: string[] = []
-    const effectiveQuoteId = quotationDocumentId || opportunityPrefill?.quotationDocumentId || null
+  function validate(): FieldErrorMap {
+    const fieldErrors = validateSalesOrderCreate({
+      createMode,
+      fromOpportunity: Boolean(fromOpportunity),
+      opportunitySoGateEnabled: opportunitySoGate?.enabled,
+      opportunitySoGateReason: opportunitySoGate?.disabledReason,
+      quotationDocumentId: quotationDocumentId || null,
+      opportunityPrefillQuotationDocumentId: opportunityPrefill?.quotationDocumentId ?? null,
+      customerId,
+      lines,
+      customerPoNumber,
+      paymentTerms,
+      deliveryTerms,
+    }).fieldErrors
 
-    if (fromOpportunity && createMode === 'quotation' && opportunitySoGate && !opportunitySoGate.enabled) {
-      errors.push(opportunitySoGate.disabledReason ?? 'Available after quotation approval.')
+    for (const line of lines) {
+      if (!line.productId) continue
+      const sellable = assertProductSellableForSales(getProduct(line.productId))
+      if (!sellable.ok) {
+        fieldErrors.lines = sellable.error
+        break
+      }
     }
-
-    if (createMode === 'quotation' && !effectiveQuoteId) {
-      errors.push('Select an approved quotation.')
-    }
-    if (!customerId) errors.push('Select a customer.')
-    if (!lines.length) errors.push('Add at least one product line.')
-    if (lines.some((l) => !l.productId)) errors.push('Every line needs a product.')
-    if (lines.some((l) => !l.qty || l.qty < 1)) errors.push('Line quantities must be at least 1.')
-    if (lines.some((l) => l.unitPrice <= 0)) errors.push('Line unit prices must be greater than zero.')
-    if (!customerPoNumber.trim()) errors.push('Customer PO number is required.')
-    if (!paymentTerms.trim()) errors.push('Payment terms are required.')
-    if (!deliveryTerms.trim()) errors.push('Delivery terms are required.')
-    if (createMode === 'direct' && directSoReason.trim().length < 10) {
-      errors.push('Provide a clear reason for direct SO (minimum 10 characters).')
-    }
-    return errors
+    return fieldErrors
   }
 
   async function persist(saveMode: 'save' | 'save_new' | 'save_close') {
     const errors = validate()
-    setValidationErrors(errors)
-    if (errors.length) return
+    if (Object.keys(errors).length) {
+      handleInvalidSubmit({
+        errors,
+        fieldOrder: [
+          'quotationDocumentId',
+          'customerId',
+          'lines',
+          'customerPoNumber',
+          'paymentTerms',
+          'deliveryTerms',
+        ],
+        onFieldErrors: setValidationErrors,
+      })
+      return
+    }
+    setValidationErrors({})
 
     setIsSubmitting(true)
     const attachmentNote = attachments.length
@@ -511,7 +568,7 @@ export function SalesOrderNewPage() {
           quotationDocumentId: quotationDocumentId || null,
           customerPoDate: customerPoDate || undefined,
           freightAmount,
-          orderDiscountAmount,
+          orderDiscountAmount: orderSummary.orderDiscountAmount,
           lines: lines.map((l) => ({
             productId: l.productId,
             qty: l.qty,
@@ -533,7 +590,7 @@ export function SalesOrderNewPage() {
     setIsSubmitting(false)
     if (r.ok && r.salesOrderId) {
       if (saveMode === 'save_new') {
-        setToast('Sales order saved — ready for next entry')
+        notify.success('Sales order saved — ready for next entry')
         setCustomerPoNumber('')
         setCustomerPoDate('')
         setAttachments([])
@@ -547,7 +604,7 @@ export function SalesOrderNewPage() {
       navigate(resolveSalesOrderDetailPath(r.salesOrderId, fromCrm))
       return
     }
-    setToast(r.error ?? 'Could not create sales order')
+    notify.error(r.error ?? 'Could not create sales order')
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -555,7 +612,7 @@ export function SalesOrderNewPage() {
     persist('save')
   }
 
-  const needsDirectReason = createMode === 'direct'
+  const needsDirectReasonField = createMode === 'direct'
   const isQuoteHandover = createMode === 'quotation' && Boolean(
     quotationDocumentId || opportunityPrefill?.quotationDocumentId || opportunityPrefill?.canConvertQuotation,
   )
@@ -578,11 +635,7 @@ export function SalesOrderNewPage() {
     {
       id: 'commercial',
       label: 'Commercial',
-      done: Boolean(
-        paymentTerms.trim()
-        && deliveryTerms.trim()
-        && (!needsDirectReason || directSoReason.trim().length >= 10),
-      ),
+      done: Boolean(paymentTerms.trim() && deliveryTerms.trim()),
     },
     { id: 'documents', label: 'Documents', done: attachments.length > 0 },
   ], [
@@ -594,49 +647,33 @@ export function SalesOrderNewPage() {
     hasValidLines,
     paymentTerms,
     deliveryTerms,
-    needsDirectReason,
-    directSoReason,
     attachments.length,
   ])
 
   const completionPercent = Math.round((completionItems.filter((i) => i.done).length / completionItems.length) * 100)
 
   function scrollToSection(sectionId: string) {
-    const additionalIds = new Set(['lines', 'commercial', 'documents'])
-    const needsExpand = additionalIds.has(sectionId) && !showAdditionalDetails
-    if (needsExpand) setShowAdditionalDetails(true)
     const navId = sectionId === 'customer' ? 'quick' : sectionId
     setActiveSection(navId)
-    window.setTimeout(() => {
+    window.requestAnimationFrame(() => {
       const elId = (sectionId === 'customer' || sectionId === 'quick')
         ? 'so-section-quick'
         : `so-section-${sectionId}`
       document.getElementById(elId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, needsExpand ? 300 : 0)
+    })
   }
 
-  const sectionNavItems = useMemo(() => {
-    const quick = {
+  const sectionNavItems = useMemo(() => [
+    {
       id: 'quick',
       label: 'Quick',
       icon: Building2,
       done: completionItems.find((i) => i.id === 'quick')?.done,
-    }
-    if (!showAdditionalDetails) return [quick]
-    return [
-      quick,
-      { id: 'lines', label: 'Products', icon: ClipboardList, done: completionItems.find((i) => i.id === 'lines')?.done },
-      { id: 'commercial', label: 'Commercial', icon: Banknote, done: completionItems.find((i) => i.id === 'commercial')?.done },
-      { id: 'documents', label: 'Documents', icon: Paperclip, done: completionItems.find((i) => i.id === 'documents')?.done },
-    ]
-  }, [completionItems, showAdditionalDetails])
-
-  const additionalSectionCount = 3
-  const additionalAttentionCount = [
-    !hasValidLines,
-    !paymentTerms.trim() || !deliveryTerms.trim() || (needsDirectReason && directSoReason.trim().length < 10),
-    attachments.length === 0 && !customerPoNumber.trim(),
-  ].filter(Boolean).length
+    },
+    { id: 'lines', label: 'Products', icon: ClipboardList, done: completionItems.find((i) => i.id === 'lines')?.done },
+    { id: 'commercial', label: 'Commercial', icon: Banknote, done: completionItems.find((i) => i.id === 'commercial')?.done },
+    { id: 'documents', label: 'Documents', icon: Paperclip, done: completionItems.find((i) => i.id === 'documents')?.done },
+  ], [completionItems])
 
   const formMetrics = useMemo(() => [
     { label: 'Completion', value: `${completionPercent}%`, accent: 'blue' as const, hint: `${completionItems.filter((i) => i.done).length} of ${completionItems.length} sections` },
@@ -664,11 +701,6 @@ export function SalesOrderNewPage() {
     { label: 'Grand Total', value: orderSummary.grandTotal > 0 ? formatCurrency(orderSummary.grandTotal) : '—', highlight: orderSummary.grandTotal > 0 },
   ]
 
-  const validationGuideItems = useMemo(
-    () => validationErrors.map((err, i) => ({ id: `err-${i}`, label: err, message: err })),
-    [validationErrors],
-  )
-
   const recordTitle = fromOpportunity && opportunityPrefill
     ? opportunityPrefill.opportunityName
     : customer?.customerName ?? 'New Sales Order'
@@ -689,16 +721,56 @@ export function SalesOrderNewPage() {
   const canSave = !isSubmitting && hasValidLines && !gateBlocked
 
   const nextSmartAction = createMode === 'quotation' && !quotationDocumentId && !opportunityPrefill?.quotationDocumentId
-    ? { id: 'quotation', title: 'Select quotation', description: 'Search an approved quotation to auto-fill customer, lines, and terms.', ctaLabel: 'Choose quotation' }
+    ? {
+        id: 'quotation',
+        title: 'Select quotation',
+        description: 'Search an approved quotation to auto-fill customer, lines, and terms.',
+        ctaLabel: 'Choose quotation',
+        focusField: 'quotationDocumentId',
+        sectionId: 'quick',
+      }
     : !customerId
-      ? { id: 'customer', title: 'Select customer', description: 'Choose the bill-to company for this sales order.', ctaLabel: 'Go to customer' }
+      ? {
+          id: 'customer',
+          title: 'Select customer',
+          description: 'Choose the bill-to company for this sales order.',
+          ctaLabel: 'Go to customer',
+          focusField: 'customerId',
+          sectionId: 'quick',
+        }
       : !customerPoNumber.trim()
-        ? { id: 'po', title: 'Enter customer PO', description: 'Customer PO number is required before saving.', ctaLabel: 'Enter PO' }
+        ? {
+            id: 'po',
+            title: 'Enter customer PO',
+            description: 'Customer PO number is required before saving.',
+            ctaLabel: 'Enter PO',
+            focusField: 'customerPoNumber',
+            sectionId: 'quick',
+          }
         : !hasValidLines
-          ? { id: 'lines', title: 'Complete product lines', description: 'Add quantity and unit price for each line.', ctaLabel: 'Go to products' }
-          : needsDirectReason && directSoReason.trim().length < 10
-            ? { id: 'commercial', title: 'Add direct SO reason', description: 'Explain why this order bypasses quotation conversion.', ctaLabel: 'Commercial terms' }
-            : { id: 'save', title: 'Ready to save', description: 'Review totals and save the draft sales order.', ctaLabel: 'Save Draft SO' }
+          ? {
+              id: 'lines',
+              title: 'Complete product lines',
+              description: 'Add quantity and unit price for each line.',
+              ctaLabel: 'Go to products',
+              focusField: 'lines',
+              sectionId: 'lines',
+            }
+          : !paymentTerms.trim() || !deliveryTerms.trim()
+            ? {
+                id: 'commercial',
+                title: 'Set commercial terms',
+                description: 'Choose payment and delivery terms before saving.',
+                ctaLabel: 'Commercial terms',
+                focusField: !paymentTerms.trim() ? 'paymentTerms' : 'deliveryTerms',
+                sectionId: 'commercial',
+              }
+            : {
+                id: 'save',
+                title: 'Ready to save',
+                description: 'Review totals and save the draft sales order.',
+                ctaLabel: 'Save Draft SO',
+              }
 
   const factBox = (
     <CrmSmartOverviewPanel
@@ -748,10 +820,11 @@ export function SalesOrderNewPage() {
       ]}
       nextAction={nextSmartAction}
       onNextAction={() => {
-        if (nextSmartAction.id === 'save') persist('save')
-        else if (nextSmartAction.id === 'lines') scrollToSection('lines')
-        else if (nextSmartAction.id === 'commercial') scrollToSection('commercial')
-        else scrollToSection('quick')
+        if (nextSmartAction.id === 'save') {
+          persist('save')
+          return
+        }
+        scrollToSection(nextSmartAction.sectionId ?? 'quick')
       }}
       quickActions={[
         {
@@ -796,7 +869,7 @@ export function SalesOrderNewPage() {
   )
 
   const lineGrid = (
-    <div className="so-pricing-panel">
+    <div className="so-pricing-panel so-pricing-panel--pro">
       <div className="so-pricing-table-wrap">
         <table className="so-pricing-table">
           <colgroup>
@@ -816,13 +889,13 @@ export function SalesOrderNewPage() {
               <th className="so-pricing-th so-pricing-th--center">#</th>
               <th className="so-pricing-th">Product</th>
               <th className="so-pricing-th so-pricing-th--right">Qty</th>
-              <th className="so-pricing-th so-pricing-th--right">Unit Price</th>
+              <th className="so-pricing-th so-pricing-th--right">Unit price</th>
               <th className="so-pricing-th so-pricing-th--right">Disc %</th>
               <th className="so-pricing-th so-pricing-th--right">GST %</th>
-              <th className="so-pricing-th so-pricing-th--right">Taxable</th>
-              <th className="so-pricing-th so-pricing-th--right">GST</th>
-              <th className="so-pricing-th so-pricing-th--right">Line Total</th>
-              <th className="so-pricing-th" aria-label="Actions" />
+              <th className="so-pricing-th so-pricing-th--right so-pricing-th--calc">Taxable</th>
+              <th className="so-pricing-th so-pricing-th--right so-pricing-th--calc">GST</th>
+              <th className="so-pricing-th so-pricing-th--right so-pricing-th--calc">Line total</th>
+              <th className="so-pricing-th so-pricing-th--center" aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
@@ -831,7 +904,7 @@ export function SalesOrderNewPage() {
               if (!draft) return null
               const product = draft.productId ? getProduct(draft.productId) : undefined
               return (
-                <tr key={line.key}>
+                <tr key={line.key} className="so-pricing-row">
                   <td className="so-pricing-td so-pricing-td--center tabular-nums text-erp-muted">
                     {idx + 1}
                   </td>
@@ -841,18 +914,25 @@ export function SalesOrderNewPage() {
                       value={draft.productId}
                       onChange={(id) => {
                         if (!id) return
+                        const nextProduct = getProduct(id)
+                        const sellable = assertProductSellableForSales(nextProduct)
+                        if (!sellable.ok) {
+                          notify.warning(sellable.error)
+                          return
+                        }
                         updateLine(line.key, {
                           productId: id,
-                          unitPrice: getProduct(id)?.standardPrice ?? draft.unitPrice,
+                          unitPrice: nextProduct?.standardPrice ?? draft.unitPrice,
                         })
                       }}
-                      placeholder="Select product…"
+                      placeholder="Select released product…"
                       appearance="dropdown"
                       dropdownMinWidth={360}
+                      emptyMessage="No released products match. Only products released for sale can be selected."
                     />
-                    {product?.status === 'draft' ? (
-                      <p className="mt-1 flex items-center gap-1 text-[11px] text-amber-700">
-                        <ShieldAlert className="h-3 w-3" /> Not engineering-released
+                    {product && !isProductSellable(product) ? (
+                      <p className="so-pricing-warn">
+                        <ShieldAlert className="h-3 w-3" /> {productNotSellableForSalesMessage(product)}
                       </p>
                     ) : null}
                   </td>
@@ -895,10 +975,10 @@ export function SalesOrderNewPage() {
                       ))}
                     </select>
                   </td>
-                  <td className="so-pricing-td so-pricing-td--right tabular-nums">
+                  <td className="so-pricing-td so-pricing-td--right so-pricing-td--calc tabular-nums">
                     {formatCurrency(line.taxableValue)}
                   </td>
-                  <td className="so-pricing-td so-pricing-td--right tabular-nums">
+                  <td className="so-pricing-td so-pricing-td--right so-pricing-td--calc tabular-nums">
                     {formatCurrency(line.gstAmount)}
                   </td>
                   <td className="so-pricing-td so-pricing-td--right so-pricing-td--total tabular-nums">
@@ -910,8 +990,9 @@ export function SalesOrderNewPage() {
                       className="so-pricing-remove"
                       onClick={() => removeLine(line.key)}
                       aria-label="Remove line"
+                      disabled={lines.length <= 1}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </td>
                 </tr>
@@ -921,113 +1002,177 @@ export function SalesOrderNewPage() {
         </table>
       </div>
 
-      <button type="button" className="so-pricing-add" onClick={addLine}>
-        <Plus className="h-3.5 w-3.5" /> Add product line
-      </button>
+      <div className="so-pricing-toolbar">
+        <button type="button" className="so-pricing-add" onClick={addLine}>
+          <Plus className="h-4 w-4" />
+          Add product line
+        </button>
+        <p className="so-pricing-toolbar__hint">
+          <span className="so-pricing-toolbar__count">{lines.length}</span>
+          {' '}line{lines.length === 1 ? '' : 's'} · qty, price & GST edit inline
+        </p>
+      </div>
 
-      <div className="so-pricing-footer">
-        <div className="so-pricing-charges">
-          <label className="so-pricing-charge">
-            <span className="so-pricing-charge__label">Freight (₹)</span>
-            <Input
-              type="number"
-              min={0}
-              className="so-pricing-input so-pricing-input--num"
-              value={freightAmount}
-              onChange={(e) => setFreightAmount(Math.max(0, Number(e.target.value) || 0))}
-            />
-          </label>
-          <label className="so-pricing-charge">
-            <span className="so-pricing-charge__label">Order Discount (₹)</span>
-            <Input
-              type="number"
-              min={0}
-              className="so-pricing-input so-pricing-input--num"
-              value={orderDiscountAmount}
-              onChange={(e) => setOrderDiscountAmount(Math.max(0, Number(e.target.value) || 0))}
-            />
-          </label>
-        </div>
-
-        <div className="quo-editor-price__summary so-direct-order-summary">
-          <div className="quo-editor-price__summary-row">
-            <span>Total Quantity</span>
-            <span className="tabular-nums">{orderSummary.totalQty}</span>
-          </div>
-          <div className="quo-editor-price__summary-row">
-            <span>Basic Amount</span>
-            <span className="tabular-nums">{formatCurrency(orderSummary.basicAmount)}</span>
-          </div>
-          {orderSummary.totalLineDiscount > 0 ? (
-            <div className="quo-editor-price__summary-row">
-              <span>Line Discount</span>
-              <span className="tabular-nums">−{formatCurrency(orderSummary.totalLineDiscount)}</span>
-            </div>
-          ) : null}
-          <div className="quo-editor-price__summary-row">
-            <span>Taxable Amount</span>
-            <span className="tabular-nums">{formatCurrency(orderSummary.subtotal)}</span>
-          </div>
-          {[...orderSummary.gstByRate.entries()]
-            .sort(([a], [b]) => a - b)
-            .map(([rate, amount]) => (
-              <div key={rate} className="quo-editor-price__summary-row">
-                <span>GST @ {rate}%</span>
-                <span className="tabular-nums">{formatCurrency(amount)}</span>
+      <div className="so-pricing-totals">
+        <div className="so-pricing-adjust">
+          <p className="so-pricing-adjust__title">Order adjustments</p>
+          <div className="so-pricing-charges">
+            <label className="so-pricing-charge">
+              <span className="so-pricing-charge__label">Freight</span>
+              <div className="so-pricing-charge__control">
+                <span className="so-pricing-charge__prefix" aria-hidden>₹</span>
+                <Input
+                  type="number"
+                  min={0}
+                  className="so-pricing-input so-pricing-input--num"
+                  value={freightAmount}
+                  onChange={(e) => setFreightAmount(Math.max(0, Number(e.target.value) || 0))}
+                />
               </div>
-            ))}
-          <div className="quo-editor-price__summary-row">
-            <span>Total GST</span>
-            <span className="tabular-nums">{formatCurrency(orderSummary.totalGst)}</span>
-          </div>
-          <div className="quo-editor-price__summary-row">
-            <span>Freight</span>
-            <span className="tabular-nums">{formatCurrency(freightAmount)}</span>
-          </div>
-          <div className="quo-editor-price__summary-row">
-            <span>Order Discount</span>
-            <span className="tabular-nums">
-              {orderDiscountAmount > 0 ? `−${formatCurrency(orderDiscountAmount)}` : formatCurrency(0)}
-            </span>
-          </div>
-          <div className="quo-editor-price__summary-row quo-editor-price__summary-row--total">
-            <span>Grand Total</span>
-            <span className="tabular-nums">{formatCurrency(orderSummary.grandTotal)}</span>
+            </label>
+            <div className="so-pricing-charge">
+              <div className="so-pricing-charge__label-row">
+                <span className="so-pricing-charge__label">Order discount</span>
+                <div className="so-pricing-discount-mode" role="group" aria-label="Discount type">
+                  <button
+                    type="button"
+                    className={`so-pricing-discount-mode__btn${orderDiscountMode === 'flat' ? ' so-pricing-discount-mode__btn--active' : ''}`}
+                    aria-pressed={orderDiscountMode === 'flat'}
+                    onClick={() => {
+                      if (orderDiscountMode === 'flat') return
+                      setOrderDiscountMode('flat')
+                      setOrderDiscountInput(0)
+                    }}
+                  >
+                    Flat ₹
+                  </button>
+                  <button
+                    type="button"
+                    className={`so-pricing-discount-mode__btn${orderDiscountMode === 'percent' ? ' so-pricing-discount-mode__btn--active' : ''}`}
+                    aria-pressed={orderDiscountMode === 'percent'}
+                    onClick={() => {
+                      if (orderDiscountMode === 'percent') return
+                      setOrderDiscountMode('percent')
+                      setOrderDiscountInput(0)
+                    }}
+                  >
+                    % Discount
+                  </button>
+                </div>
+              </div>
+              <label className="so-pricing-charge__control">
+                <span className="so-pricing-charge__prefix" aria-hidden>
+                  {orderDiscountMode === 'percent' ? '%' : '₹'}
+                </span>
+                <Input
+                  type="number"
+                  min={0}
+                  max={orderDiscountMode === 'percent' ? 100 : undefined}
+                  step={orderDiscountMode === 'percent' ? 0.5 : 1}
+                  className="so-pricing-input so-pricing-input--num"
+                  value={orderDiscountInput}
+                  onChange={(e) => {
+                    const raw = Math.max(0, Number(e.target.value) || 0)
+                    setOrderDiscountInput(
+                      orderDiscountMode === 'percent' ? Math.min(100, raw) : raw,
+                    )
+                  }}
+                  aria-label={orderDiscountMode === 'percent' ? 'Order discount percent' : 'Order discount amount'}
+                />
+              </label>
+              {orderDiscountMode === 'percent' && orderDiscountInput > 0 ? (
+                <p className="so-pricing-charge__hint">
+                  Equals {formatCurrency(orderSummary.orderDiscountAmount)} off taxable + GST
+                </p>
+              ) : null}
+            </div>
           </div>
         </div>
+
+        <aside className="so-pricing-summary" aria-label="Order summary">
+          <p className="so-pricing-summary__title">Order summary</p>
+          <div className="so-pricing-summary__rows">
+            <div className="so-pricing-summary__row">
+              <span>Total quantity</span>
+              <span className="tabular-nums">{orderSummary.totalQty}</span>
+            </div>
+            <div className="so-pricing-summary__row">
+              <span>Basic amount</span>
+              <span className="tabular-nums">{formatCurrency(orderSummary.basicAmount)}</span>
+            </div>
+            {orderSummary.totalLineDiscount > 0 ? (
+              <div className="so-pricing-summary__row">
+                <span>Line discount</span>
+                <span className="tabular-nums">−{formatCurrency(orderSummary.totalLineDiscount)}</span>
+              </div>
+            ) : null}
+            <div className="so-pricing-summary__row">
+              <span>Taxable amount</span>
+              <span className="tabular-nums">{formatCurrency(orderSummary.subtotal)}</span>
+            </div>
+            {[...orderSummary.gstByRate.entries()]
+              .sort(([a], [b]) => a - b)
+              .map(([rate, amount]) => (
+                <div key={rate} className="so-pricing-summary__row">
+                  <span>GST @ {rate}%</span>
+                  <span className="tabular-nums">{formatCurrency(amount)}</span>
+                </div>
+              ))}
+            <div className="so-pricing-summary__row">
+              <span>Total GST</span>
+              <span className="tabular-nums">{formatCurrency(orderSummary.totalGst)}</span>
+            </div>
+            <div className="so-pricing-summary__row">
+              <span>Freight</span>
+              <span className="tabular-nums">{formatCurrency(freightAmount)}</span>
+            </div>
+            <div className="so-pricing-summary__row">
+              <span>
+                Order discount
+                {orderDiscountMode === 'percent' && orderDiscountInput > 0
+                  ? ` (${orderDiscountInput}%)`
+                  : ''}
+              </span>
+              <span className="tabular-nums">
+                {orderSummary.orderDiscountAmount > 0
+                  ? `−${formatCurrency(orderSummary.orderDiscountAmount)}`
+                  : formatCurrency(0)}
+              </span>
+            </div>
+          </div>
+          <div className="so-pricing-summary__grand">
+            <span>Grand total</span>
+            <strong className="tabular-nums">{formatCurrency(orderSummary.grandTotal)}</strong>
+          </div>
+        </aside>
       </div>
     </div>
   )
 
   const customerFields = (
     <>
-      <ErpFieldRow label="Create from" colSpan={2}>
-        <ErpSegmentedControl<SoCreateMode>
-          name="Sales order create mode"
-          value={createMode}
-          onChange={handleCreateModeChange}
-          options={[
-            {
-              value: 'quotation',
-              label: 'From quotation',
-              description: 'Search an approved quotation — customer, lines, and terms auto-fill.',
-              icon: FileText,
-            },
-            {
-              value: 'direct',
-              label: 'Direct sales order',
-              description: 'Choose the customer first and build the order without a quotation (items required).',
-              icon: PenLine,
-            },
-          ]}
-        />
-      </ErpFieldRow>
+      <div className="so-create-path-chip" role="status">
+        <span className="so-create-path-chip__mode" aria-hidden>
+          {createMode === 'quotation' ? <FileText className="h-3.5 w-3.5" /> : <Zap className="h-3.5 w-3.5" />}
+        </span>
+        <span className="so-create-path-chip__label">Creating</span>
+        <span className="so-create-path-chip__value">
+          {createMode === 'quotation' ? 'From quotation' : 'Direct sales order'}
+        </span>
+        {!skipModeChooser ? (
+          <button type="button" className="so-create-path-chip__change" onClick={reopenModeChooser}>
+            Change path
+          </button>
+        ) : null}
+      </div>
 
       {createMode === 'quotation' ? (
         <ErpFieldRow
           label="Quotation Number"
           required
-          colSpan={2}
+          colSpan={3}
+          dataField="quotationDocumentId"
+          fieldError={validationErrors.quotationDocumentId}
           hint="Approved quotations only — selecting one fills customer, lines, and terms"
         >
           <ErpSmartSelect
@@ -1042,62 +1187,128 @@ export function SalesOrderNewPage() {
             dropdownMinWidth={480}
           />
         </ErpFieldRow>
-      ) : (
-        <div className="col-span-2">
-          <p className="pi-create-mode-hint">
-            <PenLine className="h-4 w-4 shrink-0" aria-hidden />
-            Direct mode — choose the bill-to customer below. Quotation is not required; a direct SO reason is needed in Commercial.
-          </p>
-        </div>
-      )}
-
-      <ErpFieldRow label="Customer" required>
-        <QuickCreateSelect
-          entityType="customer"
-          value={customerId}
-          onChange={setCustomerId}
-          options={customerOptions}
-          placeholder="Search customers…"
-        />
-      </ErpFieldRow>
-      {customer ? (
-        <div className="col-span-2 so-direct-customer-chip">
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-erp-primary/10 text-erp-primary">
-              <Building2 className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-semibold text-erp-text">{customer.customerName}</p>
-              <p className="mt-0.5 text-[12px] text-erp-muted">{customer.customerCode} · {customer.city}, {customer.state}</p>
-            </div>
-            <AppLink to={resolveCompany360Path(customer.id, pathname)} className="shrink-0 text-[11px] font-semibold">
-              View 360
-            </AppLink>
-          </div>
-        </div>
       ) : null}
-      <ErpFieldRow label="Customer PO Number" required>
-        <Input value={customerPoNumber} onChange={(e) => setCustomerPoNumber(e.target.value)} placeholder="e.g. PO/2026/1842" />
-      </ErpFieldRow>
-      <ErpFieldRow label="Customer PO Date">
-        <Input type="date" value={customerPoDate} onChange={(e) => setCustomerPoDate(e.target.value)} />
-      </ErpFieldRow>
-      <ErpFieldRow label="Expected Delivery Date">
-        <Input type="date" value={expectedDeliveryDate} onChange={(e) => setExpectedDeliveryDate(e.target.value)} />
-      </ErpFieldRow>
+
+      <ErpFieldGroup label="Bill-to customer" className="so-qe-customer-group">
+        <ErpFieldRow label="Customer" required colSpan={3} dataField="customerId" fieldError={validationErrors.customerId}>
+          <QuickCreateSelect
+            entityType="customer"
+            value={customerId}
+            onChange={setCustomerId}
+            options={customerOptions}
+            placeholder="Search by code, name, or city…"
+          />
+        </ErpFieldRow>
+        {customer ? (
+          <aside className="so-customer-card" aria-label="Selected customer">
+            <div className="so-customer-card__header">
+              <div className="so-customer-card__avatar" aria-hidden>
+                {customer.customerName
+                  .split(/\s+/)
+                  .slice(0, 2)
+                  .map((w) => w[0])
+                  .join('')
+                  .toUpperCase()}
+              </div>
+              <div className="so-customer-card__identity">
+                <div className="so-customer-card__title-row">
+                  <h3 className="so-customer-card__name">{customer.customerName}</h3>
+                  <span className="so-customer-card__code">{customer.customerCode}</span>
+                </div>
+                <p className="so-customer-card__location">
+                  <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span>
+                    {[customer.city, customer.state, customer.pincode].filter(Boolean).join(', ')}
+                  </span>
+                </p>
+              </div>
+              <AppLink
+                to={resolveCompany360Path(customer.id, pathname)}
+                className="so-customer-card__360"
+              >
+                View 360
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+              </AppLink>
+            </div>
+
+            <dl className="so-customer-card__facts">
+              <div className="so-customer-card__fact">
+                <dt>GSTIN</dt>
+                <dd className="tabular-nums">{customer.gstin?.trim() || '—'}</dd>
+              </div>
+              <div className="so-customer-card__fact">
+                <dt>Credit days</dt>
+                <dd className="tabular-nums">{customer.creditDays} days</dd>
+              </div>
+              <div className="so-customer-card__fact">
+                <dt>Credit limit</dt>
+                <dd className="tabular-nums">
+                  {customer.creditLimit != null && customer.creditLimit > 0
+                    ? formatCurrency(customer.creditLimit)
+                    : 'No limit'}
+                </dd>
+              </div>
+              {customer.contactPerson ? (
+                <div className="so-customer-card__fact so-customer-card__fact--wide">
+                  <dt>Primary contact</dt>
+                  <dd>
+                    {customer.contactPerson}
+                    {customer.contactPhone ? (
+                      <span className="so-customer-card__contact-meta"> · {customer.contactPhone}</span>
+                    ) : null}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          </aside>
+        ) : (
+          <div className="so-customer-card so-customer-card--empty" role="status">
+            <div className="so-customer-card__empty-icon" aria-hidden>
+              <Building2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="so-customer-card__empty-title">No customer selected</p>
+              <p className="so-customer-card__empty-copy">
+                Search and select a bill-to company to load GSTIN, credit terms, and contact details.
+              </p>
+            </div>
+          </div>
+        )}
+      </ErpFieldGroup>
+
+      <ErpFieldGroup label="Customer purchase order" className="so-qe-po-group">
+        <ErpFieldRow label="Customer PO Number" required dataField="customerPoNumber" fieldError={validationErrors.customerPoNumber}>
+          <Input
+            value={customerPoNumber}
+            onChange={(e) => setCustomerPoNumber(e.target.value)}
+            placeholder="e.g. PO/2026/1842"
+          />
+        </ErpFieldRow>
+        <ErpFieldRow label="Customer PO Date">
+          <Input type="date" value={customerPoDate} onChange={(e) => setCustomerPoDate(e.target.value)} />
+        </ErpFieldRow>
+        <ErpFieldRow label="Expected Delivery Date">
+          <Input
+            type="date"
+            value={expectedDeliveryDate}
+            onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+          />
+        </ErpFieldRow>
+      </ErpFieldGroup>
     </>
   )
 
   const linesSection = (
     <ErpCardSection
       id="so-section-lines"
+      nbaTarget="lines"
       title="Product & Pricing"
-      subtitle="Set quantity, price, discount and GST per product line."
+      subtitle="Build line items, then review adjustments and the live order total."
       icon={ClipboardList}
-      accent="violet"
+      accent="blue"
       collapsible
       defaultOpen
-      className="!max-w-none"
+      className="!max-w-none so-pricing-section"
       columns={1}
     >
       {lineGrid}
@@ -1108,48 +1319,74 @@ export function SalesOrderNewPage() {
     <ErpCardSection
       id="so-section-commercial"
       title="Commercial & Delivery"
-      subtitle="Payment, delivery terms, and internal justification."
+      subtitle="Payment, fulfilment location, and optional notes."
       icon={Banknote}
       accent="green"
       collapsible
       defaultOpen
+      className="!max-w-none so-commercial-section"
+      columns={1}
     >
-      <ErpFieldRow label="Payment Terms" required>
-        <CommercialTermSelect termType="payment" value={paymentTerms} onChange={setPaymentTerms} placeholder="Select payment terms" />
-      </ErpFieldRow>
-      <ErpFieldRow label="Delivery Terms" required>
-        <CommercialTermSelect termType="delivery" value={deliveryTerms} onChange={setDeliveryTerms} placeholder="Select delivery terms" />
-      </ErpFieldRow>
-      <LocationFieldRow
-        value={locationId}
-        onChange={(locId) => {
-          setLocationId(locId)
-          const loc = locations.find((l) => l.id === locId)
-          if (loc) setDeliveryLocation(locationDisplayLabel(loc))
-        }}
-        usage="sales"
-        colSpan={2}
-        label="Location Code"
-        hint="Fulfilment location — flows from Lead → Opportunity → Quotation"
-      />
-      {needsDirectReason ? (
-        <ErpFieldRow label="Reason for Direct Sales Order" required className="col-span-2">
-          <Textarea
-            rows={3}
-            value={directSoReason}
-            onChange={(e) => setDirectSoReason(e.target.value)}
-            placeholder="Explain why this order bypasses the standard CRM quotation flow…"
+      <div className="so-commercial-body">
+        <ErpFieldGroup label="Commercial terms" className="so-commercial-group" columns={2}>
+          <ErpFieldRow label="Payment Terms" required dataField="paymentTerms" fieldError={validationErrors.paymentTerms}>
+            <CommercialTermSelect
+              termType="payment"
+              value={paymentTerms}
+              onChange={setPaymentTerms}
+              placeholder="Select payment terms"
+            />
+          </ErpFieldRow>
+          <ErpFieldRow label="Delivery Terms" required dataField="deliveryTerms" fieldError={validationErrors.deliveryTerms}>
+            <CommercialTermSelect
+              termType="delivery"
+              value={deliveryTerms}
+              onChange={setDeliveryTerms}
+              placeholder="Select delivery terms"
+            />
+          </ErpFieldRow>
+        </ErpFieldGroup>
+
+        <ErpFieldGroup label="Fulfilment" className="so-commercial-group" columns={2}>
+          <LocationFieldRow
+            value={locationId}
+            onChange={(locId) => {
+              setLocationId(locId)
+              const loc = locations.find((l) => l.id === locId)
+              if (loc) setDeliveryLocation(locationDisplayLabel(loc))
+            }}
+            usage="sales"
+            colSpan={2}
+            label="Fulfilment location"
+            hint="Where goods will ship from — inherited from Lead → Opportunity → Quotation when available"
           />
-        </ErpFieldRow>
-      ) : null}
-      <ErpFieldRow label="Internal Remarks" className="col-span-2">
-        <Textarea
-          rows={2}
-          value={internalRemarks}
-          onChange={(e) => setInternalRemarks(e.target.value)}
-          placeholder="Special instructions, freight notes, commercial exceptions…"
-        />
-      </ErpFieldRow>
+        </ErpFieldGroup>
+
+        <ErpFieldGroup label="Notes" className="so-commercial-group" columns={1}>
+          {needsDirectReasonField ? (
+            <ErpFieldRow
+              label="Reason for Direct Sales Order"
+              hint="Optional — useful for audit when skipping quotation conversion"
+              className="col-span-full"
+            >
+              <Textarea
+                rows={3}
+                value={directSoReason}
+                onChange={(e) => setDirectSoReason(e.target.value)}
+                placeholder="Optional: why this order bypasses the standard quotation flow…"
+              />
+            </ErpFieldRow>
+          ) : null}
+          <ErpFieldRow label="Internal Remarks" className="col-span-full">
+            <Textarea
+              rows={2}
+              value={internalRemarks}
+              onChange={(e) => setInternalRemarks(e.target.value)}
+              placeholder="Special instructions, freight notes, commercial exceptions…"
+            />
+          </ErpFieldRow>
+        </ErpFieldGroup>
+      </div>
     </ErpCardSection>
   )
 
@@ -1260,25 +1497,7 @@ export function SalesOrderNewPage() {
         </div>
       </div>
     </div>
-  ) : (
-    <div className="crm-so-handover">
-      <div className="crm-so-handover__header">
-        <div className="crm-so-handover__icon">
-          <FileText className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="crm-so-handover__eyebrow">Sales order create</p>
-          <p className="crm-so-handover__title">
-            {createMode === 'quotation' ? 'Convert an approved quotation' : 'Create a direct sales order'}
-          </p>
-        </div>
-        <DynamicsStatusChip
-          label={createMode === 'quotation' ? 'From quotation' : 'Direct SO'}
-          tone={createMode === 'quotation' ? 'success' : 'info'}
-        />
-      </div>
-    </div>
-  )
+  ) : null
 
   const formBody = (
     <div className="erp-form-body crm-so-create-body">
@@ -1291,28 +1510,44 @@ export function SalesOrderNewPage() {
             ? 'From quotation — pick an approved quote, then confirm PO details.'
             : 'Direct sales order — choose customer and PO; quotation not required.'
         }
+        collapsedSummary={
+          customer
+            ? `${customer.customerName}${customerPoNumber ? ` · PO ${customerPoNumber}` : ''}`
+            : createMode === 'quotation'
+              ? 'Select quotation and customer'
+              : 'Select customer and PO'
+        }
       >
         {customerFields}
       </ErpQuickEntrySection>
 
-      <ErpAdditionalInfoToggle
-        open={showAdditionalDetails}
-        onToggle={() => {
-          if (showAdditionalDetails) setActiveSection('quick')
-          toggleAdditionalDetails()
-        }}
-        panelId={additionalPanelId}
-        sectionCount={additionalSectionCount}
-        attentionCount={additionalAttentionCount}
-      />
-
-      <ErpAdditionalInfoPanel open={showAdditionalDetails} id={additionalPanelId}>
-        {linesSection}
-        {commercialSection}
-        {documentsSection}
-      </ErpAdditionalInfoPanel>
+      {linesSection}
+      {commercialSection}
+      {documentsSection}
     </div>
   )
+
+  if (!modeChosen) {
+    return (
+      <OperationalPageShell
+        title="New Sales Order"
+        badge={fromCrm ? 'CRM' : 'Sales'}
+        variant="dynamics"
+        favoritePath={fromCrm ? CRM_SALES_ORDERS_PATH : '/sales/orders/new'}
+        breadcrumbs={
+          fromCrm
+            ? crmChildBreadcrumbs('Sales Orders', CRM_SALES_ORDERS_PATH, 'New')
+            : salesChildBreadcrumbs('Sales Orders', '/sales/orders', 'New')
+        }
+      >
+        <SalesOrderCreateModeChooser
+          fromCrm={fromCrm}
+          onSelect={chooseCreateMode}
+          onCancel={() => navigate(listPath)}
+        />
+      </OperationalPageShell>
+    )
+  }
 
   return (
     <>
@@ -1344,21 +1579,11 @@ export function SalesOrderNewPage() {
             : salesChildBreadcrumbs('Sales Orders', '/sales/orders', createTitle)
         }
         documentStrip={documentStrip}
-        validationItems={validationGuideItems.length ? validationGuideItems : undefined}
-        validationErrors={validationGuideItems.length ? undefined : validationErrors}
         factBox={factBox}
         onSubmit={handleSubmit}
         onSaveShortcut={() => persist('save')}
         onSaveCloseShortcut={() => persist('save_close')}
         onSaveAndNewShortcut={() => persist('save_new')}
-        formSaveActions={{
-          isSubmitting,
-          saveLabel: 'Save',
-          onSave: () => void persist('save'),
-          onSaveAndNew: () => void persist('save_new'),
-          onSaveAndClose: () => void persist('save_close'),
-          onCancel: () => navigate(listPath),
-        }}
         footer={(
           <ErpStickySaveBar
             sticky
@@ -1382,14 +1607,12 @@ export function SalesOrderNewPage() {
           sections={sectionNavItems}
           activeId={activeSection}
           onSelect={scrollToSection}
-          trailing={<FactBoxPaneAiToggle />}
         />
 
         <EnterpriseFormMetrics metrics={formMetrics} />
 
         {formBody}
       </CrmCardFormShell>
-      {toast ? <Toast message={toast} variant={toast.includes('saved') ? 'success' : 'error'} /> : null}
     </>
   )
 }
