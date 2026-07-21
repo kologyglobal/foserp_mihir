@@ -9,6 +9,7 @@ import { useEntityNotes } from '@/hooks/useEntityNotes'
 import { canCrmPermission } from '@/utils/permissions/crm'
 import { formatDateTime } from '@/utils/dates/format'
 import type { DemoEntityNote } from '@/types/crmEntity'
+import type { CrmEntityNoteDto } from '@/services/api/crmApi'
 import { crmNoteTypeLabel } from '@/types/crmNote'
 import { OPPORTUNITY_STAGES, STAGE_LABEL, type OpportunityStage } from '@/types/crm'
 import { cn } from '@/utils/cn'
@@ -22,6 +23,10 @@ export interface OpportunityNotesCardProps {
   className?: string
   composerOpen?: boolean
   onComposerOpenChange?: (open: boolean) => void
+  /** Tenant-resolved stage options (falls back to static defaults). */
+  stageOptions?: Array<{ code: string; label: string }>
+  /** Reports API entity notes upward (e.g. to merge into the unified timeline). */
+  onNotesChange?: (notes: CrmEntityNoteDto[]) => void
 }
 
 type UnifiedNote = {
@@ -43,6 +48,8 @@ export function OpportunityNotesCard({
   className,
   composerOpen,
   onComposerOpenChange,
+  stageOptions,
+  onNotesChange,
 }: OpportunityNotesCardProps) {
   const navigate = useNavigate()
   const { notes, loading, pending, createNote, isApiBacked, refresh } = useEntityNotes(
@@ -53,6 +60,11 @@ export function OpportunityNotesCard({
   const [viewAllOpen, setViewAllOpen] = useState(false)
   const canCreate = canCrmPermission('crm.note.create')
   const adding = composerOpen ?? internalAdding
+  const resolvedStageOptions = stageOptions && stageOptions.length > 0 ? stageOptions : OPP_STAGE_OPTIONS
+
+  useEffect(() => {
+    if (isApiBacked) onNotesChange?.(notes)
+  }, [isApiBacked, notes, onNotesChange])
 
   function setAdding(open: boolean) {
     if (onComposerOpenChange) onComposerOpenChange(open)
@@ -114,7 +126,11 @@ export function OpportunityNotesCard({
     ? [
         crmNoteTypeLabel(latest.noteType),
         latest.stageCode
-          ? `Stage: ${STAGE_LABEL[latest.stageCode as OpportunityStage] ?? latest.stageCode}`
+          ? `Stage: ${
+              resolvedStageOptions.find((s) => s.code === latest.stageCode)?.label
+              ?? STAGE_LABEL[latest.stageCode as OpportunityStage]
+              ?? latest.stageCode
+            }`
           : '',
         latest.authorName,
         latest.createdAt ? formatDateTime(latest.createdAt) : '',
@@ -154,7 +170,7 @@ export function OpportunityNotesCard({
               pending={pending}
               submitLabel="Save note"
               defaultStageCode={currentStage ?? null}
-              stageOptions={OPP_STAGE_OPTIONS}
+              stageOptions={resolvedStageOptions}
               onCancel={() => setAdding(false)}
               onSubmit={async (input) => {
                 const r = await createNote(input)
@@ -193,7 +209,7 @@ export function OpportunityNotesCard({
           demoNotes={demoNotes}
           title="Notes"
           defaultStageCode={currentStage ?? null}
-          stageOptions={OPP_STAGE_OPTIONS}
+          stageOptions={resolvedStageOptions}
         />
       </CrmDrawerShell>
     </>

@@ -9,6 +9,7 @@ import { useEntityNotes } from '@/hooks/useEntityNotes'
 import { canCrmPermission } from '@/utils/permissions/crm'
 import { formatDateTime } from '@/utils/dates/format'
 import type { DemoEntityNote } from '@/types/crmEntity'
+import type { CrmEntityNoteDto } from '@/services/api/crmApi'
 import { crmNoteTypeLabel } from '@/types/crmNote'
 import { LEAD_STAGE_LABELS, type LeadStage } from '@/types/sales'
 import { cn } from '@/utils/cn'
@@ -23,6 +24,8 @@ export interface LeadNotesCardProps {
   /** Controlled add-note composer (e.g. from timeline “Add note”). */
   composerOpen?: boolean
   onComposerOpenChange?: (open: boolean) => void
+  /** Reports API entity notes upward (e.g. to merge into the unified timeline). */
+  onNotesChange?: (notes: CrmEntityNoteDto[]) => void
 }
 
 type UnifiedNote = {
@@ -47,6 +50,7 @@ export function LeadNotesCard({
   className,
   composerOpen,
   onComposerOpenChange,
+  onNotesChange,
 }: LeadNotesCardProps) {
   const navigate = useNavigate()
   const { notes, loading, pending, createNote, isApiBacked, refresh } = useEntityNotes('LEAD', leadId)
@@ -54,6 +58,10 @@ export function LeadNotesCard({
   const [viewAllOpen, setViewAllOpen] = useState(false)
   const canCreate = canCrmPermission('crm.note.create')
   const adding = composerOpen ?? internalAdding
+
+  useEffect(() => {
+    if (isApiBacked) onNotesChange?.(notes)
+  }, [isApiBacked, notes, onNotesChange])
 
   function setAdding(open: boolean) {
     if (onComposerOpenChange) onComposerOpenChange(open)

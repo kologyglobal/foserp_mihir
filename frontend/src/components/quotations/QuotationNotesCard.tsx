@@ -9,15 +9,37 @@ import { useEntityNotes } from '@/hooks/useEntityNotes'
 import { canCrmPermission } from '@/utils/permissions/crm'
 import { formatDateTime } from '@/utils/dates/format'
 import type { DemoEntityNote } from '@/types/crmEntity'
+import type { CrmEntityNoteDto } from '@/services/api/crmApi'
+import { crmNoteTypeLabel } from '@/types/crmNote'
+import type { QuotationDocumentStatus } from '@/types/crm'
 import { cn } from '@/utils/cn'
+
+/** Quotation notes are stage-stamped with the document workflow status. */
+export const QUOTATION_NOTE_STAGE_OPTIONS: Array<{ code: string; label: string }> = [
+  { code: 'draft', label: 'Draft' },
+  { code: 'pending_approval', label: 'Pending Internal Approval' },
+  { code: 'approved', label: 'Approved' },
+  { code: 'sent', label: 'Sent to Customer' },
+  { code: 'rejected', label: 'Rejected' },
+  { code: 'superseded', label: 'Superseded' },
+  { code: 'converted', label: 'Converted to Sales Order' },
+]
+
+export function quotationNoteStageLabel(code: string): string {
+  return QUOTATION_NOTE_STAGE_OPTIONS.find((s) => s.code === code)?.label ?? code.replace(/_/g, ' ')
+}
 
 export interface QuotationNotesCardProps {
   quotationId: string
+  /** Current document status — stamped on new notes only (additive history). */
+  currentStage?: QuotationDocumentStatus | string | null
   demoNotes?: DemoEntityNote[]
   editPath?: string
   className?: string
   composerOpen?: boolean
   onComposerOpenChange?: (open: boolean) => void
+  /** Reports API entity notes upward (e.g. to merge into the unified timeline). */
+  onNotesChange?: (notes: CrmEntityNoteDto[]) => void
 }
 
 type UnifiedNote = {
@@ -25,15 +47,19 @@ type UnifiedNote = {
   content: string
   authorName: string
   createdAt: string
+  stageCode?: string | null
+  noteType?: string | null
 }
 
 export function QuotationNotesCard({
   quotationId,
+  currentStage = null,
   demoNotes = [],
   editPath,
   className,
   composerOpen,
   onComposerOpenChange,
+  onNotesChange,
 }: QuotationNotesCardProps) {
   const navigate = useNavigate()
   const { notes, loading, pending, createNote, isApiBacked, refresh } = useEntityNotes(
@@ -44,6 +70,10 @@ export function QuotationNotesCard({
   const [viewAllOpen, setViewAllOpen] = useState(false)
   const canCreate = canCrmPermission('crm.note.create')
   const adding = composerOpen ?? internalAdding
+
+  useEffect(() => {
+    if (isApiBacked) onNotesChange?.(notes)
+  }, [isApiBacked, notes, onNotesChange])
 
   function setAdding(open: boolean) {
     if (onComposerOpenChange) onComposerOpenChange(open)
@@ -66,6 +96,8 @@ export function QuotationNotesCard({
         content: n.content,
         authorName: n.authorName || 'User',
         createdAt: n.createdAt,
+        stageCode: n.stageCode,
+        noteType: n.noteType,
       }
     }
     if (demoNotes.length > 0) {
@@ -78,6 +110,8 @@ export function QuotationNotesCard({
         content: n.content,
         authorName: n.authorName || 'User',
         createdAt: n.createdAt ?? '',
+        stageCode: n.stageCode,
+        noteType: n.noteType,
       }
     }
     return null
