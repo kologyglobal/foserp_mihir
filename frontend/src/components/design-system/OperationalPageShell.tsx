@@ -176,6 +176,7 @@ export function OperationalPageShell({
                       : 'border-erp-border bg-erp-surface text-erp-muted hover:border-erp-primary/30 hover:text-erp-primary',
                   )}
                   title={fav ? 'Remove from favorites' : 'Add to favorites'}
+                  aria-label={fav ? 'Remove from favorites' : 'Add to favorites'}
                 >
                   <Star className={cn('h-3.5 w-3.5', fav && 'fill-current')} />
                 </button>

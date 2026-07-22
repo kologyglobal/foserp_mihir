@@ -6,21 +6,24 @@ import {
   LayoutGrid,
   PauseCircle,
   Play,
+  Plus,
   RefreshCw,
-  Search,
-  Sparkles,
   Table2,
+  Wrench,
   XCircle,
 } from 'lucide-react'
-import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { SearchInput } from '@/components/ui/SearchInput'
+import { Select } from '@/components/forms/Inputs'
+import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
 import {
-  ManufacturingAiAssist,
-  ManufacturingDemoBanner,
   MfgTouchBtn,
   ShopfloorStatusChip,
 } from '@/components/manufacturing'
+import {
+  ProductionEmptyState,
+  ProductionPageHeader,
+} from '../ui'
 import {
   closeWorkOrderDemo,
   completeProductionQuantityDemo,
@@ -222,19 +225,71 @@ export function ShopfloorViewPage() {
     }
   }, [filtered, dashboard])
 
-  const aiSuggestions = useMemo(() => {
-    const tips: string[] = []
-    const shortage = filtered.filter((w) => w.materialStatus === 'shortage' && w.status === 'draft')
-    const due = filtered.filter((w) => w.dueDate === (dashboard?.asOfDate ?? '') && ['draft', 'in_progress', 'on_hold'].includes(w.status))
-    const hold = filtered.filter((w) => w.status === 'on_hold')
-    const qc = filtered.filter((w) => w.qualityHold)
-    if (shortage.length) tips.push(`${shortage.length} WO(s) have material shortage — fix before Start.`)
-    if (due.length) tips.push(`${due.length} order(s) due today — start or complete from Live Board.`)
-    if (hold.length) tips.push(`${hold.length} on hold — Resume when the blocker clears.`)
-    if (qc.length) tips.push(`${qc.length} awaiting QC — Send to QC / inspect from the work order.`)
-    if (!tips.length) tips.push('Shopfloor looks clear. Open Production Plan for the next batch.')
-    return tips
-  }, [filtered, dashboard?.asOfDate])
+  const kpiStrip = useMemo<EnterpriseKpiItem[]>(() => {
+    return [
+      {
+        id: 'ready',
+        label: 'Ready',
+        value: byLane.ready.length,
+        accent: 'slate',
+        active: tab === 'live' && mobileLane === 'ready',
+        onClick: () => {
+          setTab('live')
+          setMobileLane('ready')
+        },
+      },
+      {
+        id: 'running',
+        label: 'Running',
+        value: byLane.running.length,
+        accent: 'blue',
+        active: tab === 'live' && mobileLane === 'running',
+        onClick: () => {
+          setTab('live')
+          setMobileLane('running')
+        },
+      },
+      {
+        id: 'hold',
+        label: 'On Hold',
+        value: byLane.hold.length,
+        accent: 'amber',
+        active: tab === 'live' && mobileLane === 'hold',
+        onClick: () => {
+          setTab('live')
+          setMobileLane('hold')
+        },
+      },
+      {
+        id: 'qc',
+        label: 'QC',
+        value: byLane.qc.length,
+        accent: 'slate',
+        active: tab === 'live' && mobileLane === 'qc',
+        onClick: () => {
+          setTab('live')
+          setMobileLane('qc')
+        },
+      },
+      {
+        id: 'delayed',
+        label: 'Delayed',
+        value: summary.delayedWos,
+        accent: 'red',
+      },
+      {
+        id: 'done',
+        label: 'Done',
+        value: byLane.done.length,
+        accent: 'green',
+        active: tab === 'live' && mobileLane === 'done',
+        onClick: () => {
+          setTab('live')
+          setMobileLane('done')
+        },
+      },
+    ]
+  }, [byLane, mobileLane, summary.delayedWos, tab])
 
   const runAction = async (id: string, fn: () => Promise<{ ok: boolean; error?: string; warnings?: string[] }>, success: string) => {
     setBusyId(id)
@@ -372,6 +427,7 @@ export function ShopfloorViewPage() {
         type="button"
         className="w-full text-left touch-manipulation"
         onClick={() => navigate(`/manufacturing/work-orders/${wo.id}`)}
+        aria-label={`Open work order ${wo.woNumber}`}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -444,84 +500,67 @@ export function ShopfloorViewPage() {
 
   if (!perms.canViewWo) {
     return (
-      <OperationalPageShell variant="dynamics" layout="enterprise" badge="Manufacturing" title="Shopfloor">
-        <p className="text-sm text-erp-muted">You do not have permission to view the shopfloor.</p>
-      </OperationalPageShell>
+      <ProductionPageHeader title="Shopfloor" favoritePath="/manufacturing/shopfloor">
+        <ProductionEmptyState
+          icon={Wrench}
+          title="Access denied"
+          description="You do not have permission to view the shopfloor."
+        />
+      </ProductionPageHeader>
     )
   }
 
   return (
-    <OperationalPageShell
-      variant="dynamics"
-      layout="enterprise"
-      badge="Manufacturing"
+    <ProductionPageHeader
       title="Shopfloor View"
       description="What is happening now — live Work Orders by status and line. Open a WO to execute."
       breadcrumbs={[
         { label: 'Manufacturing & Production', to: '/manufacturing' },
         { label: 'Shopfloor View' },
       ]}
-      autoBreadcrumbs={false}
       favoritePath="/manufacturing/shopfloor"
-      showDescription
-      commandBar={(
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={
-            perms.canCreateWo
-              ? { id: 'new', label: 'New Work Order', onClick: () => navigate('/manufacturing/work-orders/new') }
-              : undefined
-          }
-          secondaryActions={[
-            { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => setRefreshToken((n) => n + 1) },
-            { id: 'list', label: 'WO Register', onClick: () => navigate('/manufacturing/work-orders') },
-          ]}
-        />
-      )}
-    >
-      <div className="space-y-3 p-1 sm:p-0">
-        <ManufacturingDemoBanner message="Shopfloor shows what is happening — open a Work Order card to execute. Demo actions update the local store only." />
-
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
-          <div className="flex flex-1 flex-wrap items-end gap-2 rounded-xl border border-erp-border bg-white p-3">
-            <label className="min-w-[180px] flex-1 text-[11px] font-medium text-erp-muted">
-              Search WO / item / line / operator
-              <div className="relative mt-0.5">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-erp-muted" />
-                <input
-                  className="h-10 w-full rounded-lg border border-erp-border pl-8 pr-3 text-[14px]"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="WO-2026-…"
-                />
-              </div>
-            </label>
-            <label className="text-[11px] font-medium text-erp-muted">
-              Plant
-              <select
-                className="mt-0.5 block h-10 min-w-[160px] rounded-lg border border-erp-border px-2 text-[13px]"
-                value={plantFilter}
-                onChange={(e) => setPlantFilter(e.target.value)}
-              >
-                <option value="">All plants</option>
-                {plants.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <ManufacturingAiAssist
-            className="w-full lg:max-w-sm"
-            title="Shopfloor Insights"
-            suggestions={aiSuggestions}
+      primaryAction={
+        perms.canCreateWo
+          ? { id: 'new', label: 'New Work Order', icon: Plus, onClick: () => navigate('/manufacturing/work-orders/new') }
+          : undefined
+      }
+      secondaryActions={[
+        { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => setRefreshToken((n) => n + 1) },
+        { id: 'list', label: 'WO Register', onClick: () => navigate('/manufacturing/work-orders') },
+      ]}
+      kpiStrip={loading ? undefined : kpiStrip}
+      filterBar={
+        <div className="flex flex-wrap items-end gap-2">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search WO / item / line / operator…"
+            className="min-w-[200px] max-w-md flex-1"
+            aria-label="Search shopfloor"
           />
+          <label className="text-[11px] font-medium text-erp-muted">
+            Plant
+            <Select
+              native
+              className="mt-0.5 block h-9 min-w-[160px]"
+              value={plantFilter}
+              onChange={(e) => setPlantFilter(e.target.value)}
+              aria-label="Filter by plant"
+            >
+              <option value="">All plants</option>
+              {plants.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </Select>
+          </label>
         </div>
-
+      }
+    >
+      <div className="space-y-3">
         <div
           role="tablist"
           aria-label="Shopfloor views"
-          className="flex flex-wrap gap-1 rounded-xl border border-erp-border bg-white p-1"
+          className="flex flex-wrap gap-1 rounded-lg border border-erp-border bg-white p-1"
         >
           {VIEW_TABS.map(({ id, label, icon: Icon }) => {
             const selected = tab === id
@@ -532,14 +571,14 @@ export function ShopfloorViewPage() {
                 role="tab"
                 aria-selected={selected}
                 className={cn(
-                  'inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg px-3 text-[13px] font-semibold transition sm:flex-none',
+                  'inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-md px-3 text-[12px] font-semibold transition sm:flex-none',
                   selected
-                    ? 'bg-erp-primary text-white shadow-sm'
-                    : 'text-erp-muted hover:bg-slate-50 hover:text-erp-text',
+                    ? 'bg-erp-primary text-white'
+                    : 'text-erp-muted hover:bg-erp-surface-alt hover:text-erp-text',
                 )}
                 onClick={() => setTab(id)}
               >
-                <Icon className="h-4 w-4" aria-hidden />
+                <Icon className="h-3.5 w-3.5" aria-hidden />
                 {label}
               </button>
             )
@@ -566,11 +605,12 @@ export function ShopfloorViewPage() {
                       type="button"
                       role="tab"
                       aria-selected={selected}
+                      aria-label={`${lane.title}, ${count} work orders`}
                       onClick={() => setMobileLane(lane.id)}
                       className={cn(
-                        'inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 text-[13px] font-semibold touch-manipulation',
+                        'inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md px-4 text-[13px] font-semibold touch-manipulation',
                         selected
-                          ? 'bg-erp-primary text-white shadow-sm'
+                          ? 'bg-erp-primary text-white'
                           : 'bg-white text-erp-text ring-1 ring-erp-border',
                       )}
                     >
@@ -696,22 +736,22 @@ export function ShopfloorViewPage() {
             </ul>
 
             {/* Desktop table */}
-            <div className="hidden overflow-hidden rounded-xl border border-erp-border bg-white md:block">
+            <div className="hidden overflow-hidden rounded-lg border border-erp-border bg-white md:block">
               <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-[13px]">
-                  <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-erp-muted">
+                <table className="erp-table min-w-full text-left text-[13px]">
+                  <thead>
                     <tr>
-                      <th className="px-3 py-2.5 font-semibold">Machine / Line</th>
-                      <th className="px-3 py-2.5 font-semibold">Current WO</th>
-                      <th className="px-3 py-2.5 font-semibold">Item</th>
-                      <th className="px-3 py-2.5 font-semibold">Current Op</th>
-                      <th className="px-3 py-2.5 font-semibold">Next Op</th>
-                      <th className="px-3 py-2.5 font-semibold">Operator</th>
-                      <th className="px-3 py-2.5 font-semibold">Status</th>
-                      <th className="px-3 py-2.5 font-semibold tabular-nums">Planned Qty</th>
-                      <th className="px-3 py-2.5 font-semibold tabular-nums">Completed Qty</th>
-                      <th className="px-3 py-2.5 font-semibold">Next WO</th>
-                      <th className="px-3 py-2.5 font-semibold">Hold Reason</th>
+                      <th>Machine / Line</th>
+                      <th>Current WO</th>
+                      <th>Item</th>
+                      <th>Current Op</th>
+                      <th>Next Op</th>
+                      <th>Operator</th>
+                      <th>Status</th>
+                      <th className="tabular-nums">Planned Qty</th>
+                      <th className="tabular-nums">Completed Qty</th>
+                      <th>Next WO</th>
+                      <th>Hold Reason</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -780,23 +820,23 @@ export function ShopfloorViewPage() {
         ) : null}
 
         {!loading && tab === 'summary' ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {[
-              { label: 'Today Planned Qty', value: summary.plannedQty, tone: 'border-sky-200 bg-sky-50/60' },
-              { label: 'Today Good Qty', value: summary.goodQty, tone: 'border-emerald-200 bg-emerald-50/60' },
-              { label: 'Scrap Qty', value: summary.scrapQty, tone: 'border-rose-200 bg-rose-50/50' },
-              { label: 'Rework Qty', value: summary.reworkQty, tone: 'border-amber-200 bg-amber-50/50' },
-              { label: 'Rejected Qty', value: summary.rejectedQty, tone: 'border-rose-200 bg-rose-50/50' },
-              { label: 'QC Pending Qty', value: summary.qcPendingQty, tone: 'border-violet-200 bg-violet-50/50' },
-              { label: 'Delayed WOs', value: summary.delayedWos, tone: 'border-orange-200 bg-orange-50/50' },
-              { label: 'Job Work Pending', value: summary.jobWorkPending, tone: 'border-slate-200 bg-white' },
+              { label: 'Today Planned Qty', value: summary.plannedQty },
+              { label: 'Today Good Qty', value: summary.goodQty },
+              { label: 'Scrap Qty', value: summary.scrapQty },
+              { label: 'Rework Qty', value: summary.reworkQty },
+              { label: 'Rejected Qty', value: summary.rejectedQty },
+              { label: 'QC Pending Qty', value: summary.qcPendingQty },
+              { label: 'Delayed WOs', value: summary.delayedWos },
+              { label: 'Job Work Pending', value: summary.jobWorkPending },
             ].map((card) => (
               <div
                 key={card.label}
-                className={cn('rounded-xl border p-4 shadow-sm', card.tone)}
+                className="rounded-lg border border-erp-border bg-white px-3 py-3"
               >
-                <p className="text-[12px] font-medium text-erp-muted">{card.label}</p>
-                <p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight text-erp-text">
+                <p className="text-[11px] font-medium text-erp-muted">{card.label}</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-erp-text">
                   {card.value}
                 </p>
               </div>
@@ -804,11 +844,10 @@ export function ShopfloorViewPage() {
           </div>
         ) : null}
 
-        <p className="flex items-center gap-1.5 text-[11px] text-erp-muted">
-          <Sparkles className="h-3.5 w-3.5" aria-hidden />
-          Tip: Keep execution on the Work Order — this board is for live status, not a full MES.
+        <p className="text-[11px] text-erp-muted">
+          Tip: Keep execution on the Work Order — this board is for live status, not a full MES. Demo actions update the local store only.
         </p>
       </div>
-    </OperationalPageShell>
+    </ProductionPageHeader>
   )
 }

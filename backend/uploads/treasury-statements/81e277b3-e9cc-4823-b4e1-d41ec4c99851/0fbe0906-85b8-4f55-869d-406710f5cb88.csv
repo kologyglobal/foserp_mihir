@@ -1,0 +1,4 @@
+Date,Description,Debit,Credit,Balance
+01/06/2026,Opening balance,,,1000.00
+02/06/2026,Customer receipt,,500.00,1500.00
+03/06/2026,Vendor payment,200.00,,1300.00

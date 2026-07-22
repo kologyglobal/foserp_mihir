@@ -132,8 +132,8 @@ const GUIDES: { prefix: string; guide: PageGuideEntry }[] = [
 
   // —— Accounting / Finance ——
   { prefix: '/accounting/settings', guide: { purpose: 'Finance setup — legal entities, years, periods, CoA, mappings, and approval rules.', nextStep: 'Complete the setup wizard, then open Chart of Accounts or periods.' } },
-  { prefix: '/accounting/chart-of-accounts', guide: { purpose: 'Chart of Accounts for the active legal entity.', nextStep: 'Create or open an account; keep postable leaves for vouchers.' } },
-  { prefix: '/accounting/vouchers', guide: { purpose: 'Journal and accounting vouchers register.', nextStep: 'Create a voucher, balance lines, then post when ready.' } },
+  { prefix: '/accounting/settings/chart-of-accounts', guide: { purpose: 'Chart of Accounts for the active legal entity.', nextStep: 'Create or open an account; keep postable leaves for journals.' } },
+  { prefix: '/accounting/entries/journals', guide: { purpose: 'Manual journals and accounting entries register.', nextStep: 'Create a journal, balance lines, then post when ready.' } },
   { prefix: '/accounting/money-in', guide: { purpose: 'Money In — sales invoices, outstanding, ageing, and AR-to-GL reconciliation.', nextStep: 'Create a draft invoice or review ready-to-post items.' } },
   { prefix: '/accounting/receivables', guide: { purpose: 'Legacy receivables demo — receipts and collections stubs.', nextStep: 'Use Money In for sales invoices and reporting.' } },
   { prefix: '/accounting/payables', guide: { purpose: 'Accounts payable — vendor invoices, payments, and ageing.', nextStep: 'Review payment planning, then create a vendor payment.' } },

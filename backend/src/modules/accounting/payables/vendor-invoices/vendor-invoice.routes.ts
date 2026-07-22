@@ -30,6 +30,18 @@ router.post('/', requirePermission('finance.ap.vendor_invoice.create'), validate
 router.get('/:id', validateParams(uuidParamSchema), requirePermission('finance.ap.vendor_invoice.view'), controller.getVendorInvoice)
 router.patch('/:id', validateParams(uuidParamSchema), requirePermission('finance.ap.vendor_invoice.edit'), validateBody(updateVendorInvoiceSchema), controller.updateVendorInvoice)
 router.post('/:id/validate', validateParams(uuidParamSchema), requirePermission('finance.ap.vendor_invoice.view'), controller.validateVendorInvoice)
+router.post(
+  '/:id/refresh-from-master/preview',
+  validateParams(uuidParamSchema),
+  requirePermission('finance.ap.vendor_invoice.view'),
+  controller.previewVendorInvoiceRefreshFromMaster,
+)
+router.post(
+  '/:id/refresh-from-master',
+  validateParams(uuidParamSchema),
+  requirePermission('finance.ap.vendor_invoice.edit'),
+  controller.applyVendorInvoiceRefreshFromMaster,
+)
 router.post('/:id/submit', validateParams(uuidParamSchema), requirePermission('finance.ap.vendor_invoice.submit'), validateBody(submitVendorInvoiceSchema), controller.submitVendorInvoice)
 router.post('/:id/approve', validateParams(uuidParamSchema), requirePermission('finance.ap.vendor_invoice.approve'), validateBody(approveVendorInvoiceSchema), controller.approveVendorInvoice)
 router.post('/:id/reject', validateParams(uuidParamSchema), requirePermission('finance.ap.vendor_invoice.approve'), validateBody(rejectVendorInvoiceSchema), controller.rejectVendorInvoice)

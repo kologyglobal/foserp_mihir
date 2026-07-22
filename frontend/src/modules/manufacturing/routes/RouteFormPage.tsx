@@ -120,7 +120,24 @@ export function RouteFormPage() {
     )
   }
 
-  if (loading) return <LoadingState variant="card" />
+  if (loading) {
+    return (
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Manufacturing"
+        title={isEdit ? 'Edit Route' : 'New Route'}
+        breadcrumbs={[
+          { label: 'Manufacturing', to: '/manufacturing' },
+          { label: 'Routes', to: '/manufacturing/routes' },
+        ]}
+        autoBreadcrumbs={false}
+        backLink={{ to: '/manufacturing/routes', label: 'Back to Routes' }}
+      >
+        <LoadingState variant="card" />
+      </OperationalPageShell>
+    )
+  }
 
   return (
     <OperationalPageShell
@@ -135,6 +152,7 @@ export function RouteFormPage() {
         { label: isEdit ? 'Edit' : 'New' },
       ]}
       autoBreadcrumbs={false}
+      backLink={{ to: '/manufacturing/routes', label: 'Back to Routes' }}
       commandBar={(
         <ErpCommandBar
           inline

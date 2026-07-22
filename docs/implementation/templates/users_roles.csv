@@ -1,0 +1,5 @@
+email,firstName,lastName,mobile,designation,department,status,roleName
+planner@pilot.example,Pilot,Planner,,Production Planner,Production,ACTIVE,Production Planner
+operator1@pilot.example,Pilot,Operator1,,Operator,Production,ACTIVE,Shopfloor Operator
+stores@pilot.example,Pilot,Stores,,Stores,Stores,ACTIVE,Stores
+qc@pilot.example,Pilot,QC,,Inspector,Quality,ACTIVE,Quality Inspector

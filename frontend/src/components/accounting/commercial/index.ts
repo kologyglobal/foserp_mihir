@@ -2,6 +2,7 @@ export { CrmDocumentLink, AccountingStatusBadge, CommercialAccountingExplanation
 export { CrmSourceDocumentPanel } from './CrmSourceDocumentPanel'
 export { ExpectedAccountingEntryDrawer } from './ExpectedAccountingEntryDrawer'
 export { SalesOrderAccountingSummary } from './SalesOrderAccountingSummary'
+export type { SalesOrderAccountingDemoMetrics } from './SalesOrderAccountingSummary'
 export { CommercialCommitmentSmartContext } from './CommercialCommitmentSmartContext'
 export {
   CommercialCommitmentKpiCards,

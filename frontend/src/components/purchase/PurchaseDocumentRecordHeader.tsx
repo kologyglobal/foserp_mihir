@@ -25,7 +25,7 @@ export type PurchaseDocumentRecordHeaderProps = {
 
 /**
  * CRM Quotation-style sticky document header for Purchase create/edit.
- * Large title + favorite, then compact: [id] · status badge · Label: value …
+ * Single dense row: title + fav · id · status · facts | actions
  */
 export function PurchaseDocumentRecordHeader({
   title,

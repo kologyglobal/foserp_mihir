@@ -814,10 +814,11 @@ describe.skipIf(!dbAvailable)('Finance Phase 4A1 — AP foundation', () => {
       await prisma.vendorInvoice.delete({ where: { id: invoice.id } })
     })
 
-    it('does not require deferred purchase/stock tables', async () => {
-      expect('purchaseOrder' in prisma).toBe(false)
-      expect('goodsReceipt' in prisma).toBe(false)
-
+    it('keeps source links soft — no Prisma FK to purchase/stock tables', async () => {
+      // Purchase module tables exist since Phase 15, but VendorInvoiceSourceLink
+      // must stay a soft reference: repository-level link creation with an id
+      // that has no PurchaseOrder row still succeeds (API-level validation is
+      // a separate Wave 2 service concern).
       const invoice = await createVendorInvoiceRecord(await buildInvoiceInput(fx))
       const links = await createVendorInvoiceSourceLinks(
         fx.tenantAId,

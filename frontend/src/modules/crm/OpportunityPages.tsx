@@ -384,10 +384,11 @@ export function OpportunityPipelinePage() {
             key={tab.id}
             type="button"
             aria-pressed={view === tab.id}
+            title={tab.label}
             onClick={() => setView(tab.id)}
           >
-            <Icon className="mr-1 inline h-3.5 w-3.5" />
-            {tab.label}
+            <Icon className="crm-opp-view-toggle__icon" aria-hidden />
+            <span className="crm-opp-view-toggle__label">{tab.label}</span>
           </button>
         )
       })}

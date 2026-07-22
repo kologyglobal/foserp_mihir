@@ -27,3 +27,9 @@ export const approvePurchaseInvoice = lifecycle(service.approvePurchaseInvoice, 
 export const rejectPurchaseInvoice = lifecycle(service.rejectPurchaseInvoice, 'Purchase invoice rejected')
 export const postPurchaseInvoice = lifecycle(service.postPurchaseInvoice, 'Purchase invoice posted')
 export const cancelPurchaseInvoice = lifecycle(service.cancelPurchaseInvoice, 'Purchase invoice cancelled')
+export const previewPurchaseInvoiceApHandoff = asyncHandler(async (req: Request, res: Response) =>
+  sendSuccess(
+    res,
+    'Purchase invoice AP handoff preview',
+    await service.previewPurchaseInvoiceApHandoff(getTenantId(req), getRouteParam(req, 'id')),
+  ))

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { HandCoins, RefreshCw, ShieldOff } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
@@ -10,6 +10,7 @@ import { EnterpriseRegisterTableShell } from '@/design-system/list-page/Enterpri
 import { TableLink } from '@/components/ui/AppLink'
 import { AllocationStatusBadge, ReceiptStatusBadge, ReceivablesWorkspaceTabs } from '@/components/accounting/receivables'
 import { DEFAULT_RECEIVABLE_FILTER, getCustomerReceipts } from '@/services/accounting/receivablesService'
+import { isApiMode } from '@/config/apiConfig'
 import type { CustomerReceipt, ReceivableFilter } from '@/types/receivables'
 import { useReceivablesPermissions } from '@/utils/permissions/receivables'
 import { formatCompactCurrency, formatCurrency } from '@/utils/formatters/currency'
@@ -24,16 +25,18 @@ const TABS = [
 
 export function AllocationsPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const perms = useReceivablesPermissions()
+  const customerIdFromUrl = searchParams.get('customerId') ?? ''
   const [filter, setFilter] = useState<ReceivableFilter>({ ...DEFAULT_RECEIVABLE_FILTER, receiptTab: 'unallocated' })
   const [allRows, setAllRows] = useState<CustomerReceipt[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
-    setAllRows(await getCustomerReceipts({ search: filter.search }))
+    setAllRows(await getCustomerReceipts({ search: filter.search, customerId: customerIdFromUrl }))
     setLoading(false)
-  }, [filter.search])
+  }, [filter.search, customerIdFromUrl])
 
   useEffect(() => {
     void load()
@@ -64,7 +67,7 @@ export function AllocationsPage() {
       layout="enterprise"
       badge="Accounting"
       title="Receipt Allocations"
-      description="Receipts with unallocated or partial balances — allocate against open invoices (demo)."
+      description="Receipts with unallocated or partial balances — allocate against open invoices."
       breadcrumbs={[{ label: 'Accounting', to: '/accounting' }, { label: 'Receivables', to: '/accounting/receivables' }, { label: 'Allocations' }]}
       autoBreadcrumbs={false}
       favoritePath="/accounting/receivables/allocations"
@@ -88,7 +91,18 @@ export function AllocationsPage() {
     >
       <ReceivablesWorkspaceTabs active="allocations" />
       <div className="mb-3 mt-3 space-y-3">
-        <SearchInput value={filter.search} onChange={(v) => setFilter((f) => ({ ...f, search: v }))} placeholder="Search receipt, customer…" />
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchInput value={filter.search} onChange={(v) => setFilter((f) => ({ ...f, search: v }))} placeholder="Search receipt, customer…" />
+          {customerIdFromUrl ? (
+            <button
+              type="button"
+              className="text-[11px] font-semibold text-erp-muted hover:text-erp-text"
+              onClick={() => setSearchParams({})}
+            >
+              Clear customer filter
+            </button>
+          ) : null}
+        </div>
         <div className="flex flex-wrap gap-1.5">
           {TABS.map((tab) => (
             <button
@@ -144,13 +158,16 @@ export function AllocationsPage() {
                         <button
                           type="button"
                           className="erp-btn erp-btn-secondary h-8 px-3 text-[12px]"
-                          onClick={() =>
-                            navigate(
-                              r.voucherStatus === 'Draft'
-                                ? `/accounting/receivables/receipts/${r.id}/edit`
-                                : `/accounting/receivables/receipts/${r.id}`,
-                            )
-                          }
+                          onClick={() => {
+                            if (r.voucherStatus === 'Draft') {
+                              navigate(`/accounting/receivables/receipts/${r.id}/edit`)
+                            } else if (isApiMode() && r.voucherStatus === 'Posted') {
+                              // Live allocation flow posts through the allocation batch API.
+                              navigate(`/accounting/receivables/receipts/${r.id}/allocate`)
+                            } else {
+                              navigate(`/accounting/receivables/receipts/${r.id}`)
+                            }
+                          }}
                         >
                           Allocate
                         </button>

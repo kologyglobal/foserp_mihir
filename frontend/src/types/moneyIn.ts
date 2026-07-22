@@ -1,7 +1,13 @@
 /** Money In (AR) DTOs — amounts as decimal strings matching backend Phase 3A. */
 
 export type SalesInvoiceStatus = 'DRAFT' | 'READY_TO_POST' | 'POSTED' | 'CANCELLED' | 'REVERSED'
-export type SalesInvoiceSourceType = 'DIRECT' | 'SALES_ORDER'
+export type SalesInvoiceSourceType = 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH'
+export type SalesInvoiceSettlementStatus =
+  | 'UNPAID'
+  | 'PARTIALLY_PAID'
+  | 'PAID'
+  | 'OVERDUE'
+  | 'NOT_APPLICABLE'
 export type SalesInvoiceSupplyType = 'INTRA_STATE' | 'INTER_STATE' | 'EXPORT' | 'SEZ' | 'NON_GST'
 export type SalesInvoiceTaxTreatment =
   | 'REGISTERED'
@@ -156,6 +162,109 @@ export interface SalesInvoiceDto {
   validationSummary?: SalesInvoiceValidationPreview | null
   metaWarnings?: Array<{ code: string; message: string }>
   receivableOpenItemId?: string | null
+  settlementStatus?: SalesInvoiceSettlementStatus
+  projectRef?: string | null
+  projectNameSnapshot?: string | null
+  sourceLinks?: SalesInvoiceSourceLinkDto[]
+}
+
+export interface SalesInvoiceSourceLinkDto {
+  id?: string
+  sourceType: 'SALES_ORDER' | 'OUTBOUND_DISPATCH' | 'DELIVERY_CHALLAN'
+  sourceDocumentId: string
+  sourceLineId: string | null
+  salesOrderId: string | null
+  salesOrderLineId: string | null
+  deliveryChallanId: string | null
+  deliveryChallanLineId: string | null
+  quantity: string
+  status?: 'ACTIVE' | 'RELEASED'
+  sourceDocumentNumberSnapshot?: string | null
+  itemId?: string | null
+  itemCodeSnapshot?: string | null
+  itemNameSnapshot?: string | null
+}
+
+export interface SalesInvoiceSourceLinkInput {
+  sourceType: 'SALES_ORDER' | 'OUTBOUND_DISPATCH' | 'DELIVERY_CHALLAN'
+  sourceDocumentId: string
+  sourceLineId?: string | null
+  salesOrderId?: string | null
+  salesOrderLineId?: string | null
+  deliveryChallanId?: string | null
+  deliveryChallanLineId?: string | null
+  quantity: string
+  itemId?: string | null
+}
+
+/** Confirmed dispatch line with remaining invoice-ready quantity (O2C Wave 2). */
+export interface DispatchLineInvoiceReadyDto {
+  outboundDispatchId: string
+  outboundDispatchLineId: string
+  dispatchNo: string
+  salesOrderId: string | null
+  salesOrderNo: string | null
+  salesOrderLineId: string | null
+  customerId: string | null
+  customerName: string | null
+  itemId: string
+  itemCode: string | null
+  itemName: string | null
+  warehouseId: string
+  dispatchedQty: string
+  invoicedQty: string
+  invoiceReadyQty: string
+  confirmedAt: string | null
+  deliveryChallanId: string | null
+  deliveryChallanNumber: string | null
+  deliveryChallanLineId: string | null
+}
+
+export interface InvoicePrefillFromDispatchDto {
+  customerId: string
+  sourceType: 'OUTBOUND_DISPATCH'
+  sourceDocumentId: string
+  salesOrderId: string | null
+  projectRef: string | null
+  projectNameSnapshot: string | null
+  billingAddress: unknown
+  shippingAddress: unknown
+  customerPoNumber: string | null
+  paymentTermsDays: number | null
+  freightAmount: string
+  lines: Array<{
+    lineNumber: number
+    itemId: string
+    itemCode: string | null
+    itemName: string | null
+    description: string
+    quantity: string
+    unitPrice: string
+    discountPct: number
+    taxPct: number
+    sourceLineId: string
+    outboundDispatchLineId: string
+    outboundDispatchId: string
+    salesOrderId: string | null
+    salesOrderLineId: string | null
+    deliveryChallanId: string | null
+    deliveryChallanLineId: string | null
+    projectRef: string | null
+    projectNameSnapshot: string | null
+    uom: string | null
+    hsnCode: string | null
+  }>
+  sourceLinks: SalesInvoiceSourceLinkInput[]
+}
+
+export interface ListInvoiceReadyQuery {
+  customerId?: string
+  salesOrderId?: string
+  outboundDispatchId?: string
+  search?: string
+  page?: number
+  limit?: number
+  readyOnly?: boolean
 }
 
 export type SalesInvoiceListItemDto = Omit<SalesInvoiceDto, 'lines' | 'validationSummary'>
@@ -200,6 +309,9 @@ export interface CreateSalesInvoiceInput {
   referenceNumber?: string | null
   customerPoNumber?: string | null
   narration?: string | null
+  projectRef?: string | null
+  projectNameSnapshot?: string | null
+  sourceLinks?: SalesInvoiceSourceLinkInput[]
   invoiceDiscountType?: 'PERCENTAGE' | 'AMOUNT'
   invoiceDiscountValue?: string
   lines: SalesInvoiceLineInput[]

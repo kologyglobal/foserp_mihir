@@ -228,8 +228,8 @@ export function Opportunity360RecordHeader({
 
         {!narrow ? (
           <>
-            <ErpButton size="sm" variant="secondary" icon={Calendar} onClick={onScheduleActivity}>
-              Schedule Activity
+            <ErpButton size="sm" variant="secondary" icon={Calendar} onClick={onScheduleActivity} title="Schedule Activity">
+              Schedule
             </ErpButton>
             <ErpButton
               size="sm"
@@ -238,8 +238,9 @@ export function Opportunity360RecordHeader({
               onClick={onCreateQuotation}
               disabled={!isOpen || !canCreateQuotation}
               disabledReason={createQuotationDisabledReason ?? undefined}
+              title="Create Quotation"
             >
-              Create Quotation
+              Quotation
             </ErpButton>
             {showCreateSalesOrder ? (
               <ErpButton
@@ -249,8 +250,9 @@ export function Opportunity360RecordHeader({
                 onClick={onCreateSalesOrder}
                 disabled={!canCreateSalesOrder}
                 disabledReason={createSalesOrderDisabledReason ?? undefined}
+                title="Create Sales Order"
               >
-                Create Sales Order
+                Sales Order
               </ErpButton>
             ) : null}
           </>

@@ -1,0 +1,3 @@
+routingCode,routingVersionNumber,stageGroupCode,code,name,sequence,workCentreCode,defaultMachineCode,setupTimeMinutes,runTimeValue,runTimeBasis,qualityRequired,qualityPlanRef,outsourced,isOptional,workInstructions
+RT-PILOT-SIMPLE,1,SG-FAB,OP10,Fabricate,10,WC-FAB,,,0,1,PER_UNIT,false,,false,false,
+RT-PILOT-SIMPLE,1,SG-FAB,OP20,Finish,20,WC-FAB,,,0,1,PER_UNIT,true,QP-FINAL,false,false,

@@ -1,6 +1,6 @@
 /**
  * Purchase domain service layer.
- * Dual-mode: PR + Planning Sheet use backend when `VITE_USE_API=true`.
+ * Dual-mode: PR + Planning Sheet + RFQ/PO/GRN + Invoice/QI/Return use backend when `VITE_USE_API=true`.
  * Domain models: `@/types/purchaseDomain`
  * Operational Zustand docs remain in `@/types/purchase` until migration.
  */
@@ -154,16 +154,6 @@ export {
   submitGRN,
   cancelGRN,
   reverseGRN,
-} from './purchaseApiFacade'
-
-export {
-  PurchaseServiceError,
-  resetPurchaseMockData,
-  getBlanketOrders,
-  getBlanketOrderById,
-  createPurchaseOrderFromVendorQuotation,
-  createPurchaseOrderFromBlanket,
-  postGRN,
   createQualityInspection,
   getQualityInspections,
   getQualityInspectionList,
@@ -205,8 +195,19 @@ export {
   cancelPurchaseReturn,
   createDebitNoteFromReturn,
   createReplacementPoFromReturn,
-  getApprovals,
+  cancelPurchaseInvoice,
+  postGRN,
   getApprovalHistory,
+} from './purchaseApiFacade'
+
+export {
+  PurchaseServiceError,
+  resetPurchaseMockData,
+  getBlanketOrders,
+  getBlanketOrderById,
+  createPurchaseOrderFromVendorQuotation,
+  createPurchaseOrderFromBlanket,
+  getApprovals,
   getAttachments,
   emptyMoney,
 } from './purchaseService'

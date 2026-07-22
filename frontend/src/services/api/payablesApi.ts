@@ -162,6 +162,29 @@ export async function getVendorInvoiceApproval(id: string) {
   return apiRequest<VendorInvoiceApprovalDetail>(tenantPath(`${BASE}/${id}/approval`))
 }
 
+/** DRAFT-only refresh of the vendor party snapshot from MasterVendor. */
+export interface VendorInvoiceMasterRefreshPreview {
+  invoiceId: string
+  vendorId: string
+  current: Record<string, unknown>
+  proposed: Record<string, unknown>
+  changedFields: string[]
+}
+
+export async function previewVendorInvoiceRefreshFromMaster(id: string) {
+  return apiRequest<VendorInvoiceMasterRefreshPreview>(
+    tenantPath(`${BASE}/${id}/refresh-from-master/preview`),
+    { method: 'POST', body: '{}' },
+  )
+}
+
+export async function applyVendorInvoiceRefreshFromMaster(id: string) {
+  return apiRequest<VendorInvoiceDto>(tenantPath(`${BASE}/${id}/refresh-from-master`), {
+    method: 'POST',
+    body: '{}',
+  })
+}
+
 // ─── Vendor payments (Phase 4B1–4B4) ───
 
 const VP_BASE = '/accounting/payables/vendor-payments'
@@ -617,4 +640,146 @@ export async function getLatestPayableCloseGateRun(params: { legalEntityId: stri
 
 export async function exportPayableCloseGateRun(runId: string) {
   return apiDownloadBlob(tenantPath(`${CLOSE_GATE_BASE}/runs/${runId}/export`))
+}
+
+// ─── AP disputes (vendor invoice + PO/GRN context) ───────────────────────────
+
+export type ApDisputeStatus =
+  | 'OPEN'
+  | 'UNDER_REVIEW'
+  | 'AWAITING_VENDOR'
+  | 'AWAITING_INTERNAL_TEAM'
+  | 'RESOLVED'
+  | 'REJECTED'
+  | 'CLOSED'
+
+export type ApDisputeType =
+  | 'PRICE_DIFFERENCE'
+  | 'QUANTITY_DIFFERENCE'
+  | 'QUALITY_ISSUE'
+  | 'DELIVERY_DELAY'
+  | 'SHORT_SUPPLY'
+  | 'TAX_ISSUE'
+  | 'MISSING_DOCUMENT'
+  | 'DUPLICATE_INVOICE'
+  | 'COMMERCIAL_TERMS'
+  | 'OTHER'
+
+export type ApDisputePriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+
+export interface ApDisputeSourceLinkDto {
+  sourceType: string
+  sourceDocumentId: string
+  sourceDocumentNumberSnapshot: string | null
+}
+
+export interface ApDisputeDto {
+  id: string
+  tenantId: string
+  legalEntityId: string
+  disputeNumber: string
+  vendorId: string
+  vendorCodeSnapshot: string
+  vendorNameSnapshot: string
+  vendorInvoiceId: string
+  payableOpenItemId: string | null
+  vendorInvoiceNumber: string
+  supplierInvoiceNumber: string
+  sourceLinks: ApDisputeSourceLinkDto[]
+  disputeDate: string
+  disputeType: ApDisputeType
+  disputedAmount: string
+  description: string
+  ownerName: string
+  responsibleDepartment: string
+  priority: ApDisputePriority
+  targetResolutionDate: string | null
+  status: ApDisputeStatus
+  resolution: string | null
+  debitNoteRequired: boolean
+  paymentHold: boolean
+  supportingDocuments: string[]
+  createdBy: string | null
+  updatedBy: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ListApDisputesQuery {
+  legalEntityId: string
+  status?: ApDisputeStatus
+  vendorId?: string
+  vendorInvoiceId?: string
+  purchaseOrderId?: string
+  search?: string
+  page?: number
+  limit?: number
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface CreateApDisputeInput {
+  legalEntityId: string
+  vendorInvoiceId: string
+  disputeDate: string
+  disputeType: ApDisputeType
+  disputedAmount: string
+  description: string
+  ownerName: string
+  responsibleDepartment: string
+  priority?: ApDisputePriority
+  targetResolutionDate?: string | null
+  debitNoteRequired?: boolean
+  paymentHold?: boolean
+  supportingDocuments?: string[]
+}
+
+export interface UpdateApDisputeInput {
+  disputeDate?: string
+  disputeType?: ApDisputeType
+  disputedAmount?: string
+  description?: string
+  ownerName?: string
+  responsibleDepartment?: string
+  priority?: ApDisputePriority
+  targetResolutionDate?: string | null
+  debitNoteRequired?: boolean
+  paymentHold?: boolean
+  supportingDocuments?: string[]
+}
+
+const AP_DISPUTE_BASE = '/accounting/payables/disputes'
+
+export async function listApDisputes(params: ListApDisputesQuery) {
+  return apiRequest<ApDisputeDto[]>(
+    `${tenantPath(AP_DISPUTE_BASE)}${buildQuery(params as unknown as Record<string, string | number | boolean | undefined>)}`,
+  )
+}
+
+export async function getApDispute(id: string) {
+  return apiRequest<ApDisputeDto>(tenantPath(`${AP_DISPUTE_BASE}/${id}`))
+}
+
+export async function createApDispute(data: CreateApDisputeInput) {
+  return apiRequest<ApDisputeDto>(tenantPath(AP_DISPUTE_BASE), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateApDispute(id: string, data: UpdateApDisputeInput) {
+  return apiRequest<ApDisputeDto>(tenantPath(`${AP_DISPUTE_BASE}/${id}`), {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function transitionApDispute(id: string, body: { status: ApDisputeStatus; resolution?: string | null }) {
+  return apiRequest<ApDisputeDto>(tenantPath(`${AP_DISPUTE_BASE}/${id}/transition`), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function deleteApDispute(id: string) {
+  return apiRequest<ApDisputeDto>(tenantPath(`${AP_DISPUTE_BASE}/${id}`), { method: 'DELETE' })
 }

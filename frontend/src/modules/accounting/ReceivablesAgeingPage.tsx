@@ -23,6 +23,7 @@ import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
 import { FINANCIAL_YEAR_OPTIONS, downloadTextFile } from './receivablesUi'
+import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { cn } from '@/utils/cn'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'empty'
@@ -180,7 +181,7 @@ export function ReceivablesAgeingPage() {
               }))
             }}
           >
-            <option value="">Select FY…</option>
+            <option value="">{SELECT_PLACEHOLDER}</option>
             {FINANCIAL_YEAR_OPTIONS.map((fy) => (
               <option key={fy.value} value={fy.value}>
                 {fy.value}
@@ -229,6 +230,23 @@ export function ReceivablesAgeingPage() {
           ) : null}
         </div>
       </div>
+
+      {result?.limitations?.length ? (
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
+          <p className="font-semibold">Reporting notes</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            {result.limitations.map((code) => (
+              <li key={code}>
+                {code === 'AGEING_USES_CURRENT_BALANCES'
+                  ? 'As-of date ages open items using current outstanding balances (historical balance reconstruction is not available).'
+                  : code === 'INVOICE_DATE_AGED_CLIENT_SIDE'
+                    ? 'Invoice Date basis is computed from invoice dates on open items (backend invoice-age uses posting date).'
+                    : code}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {result ? (
         <div className="mb-3">

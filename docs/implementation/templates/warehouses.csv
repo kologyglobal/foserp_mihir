@@ -1,0 +1,4 @@
+code,name,warehouseType,plantCode,address,status
+WH-RM,Pilot Raw Material,stores,PUNE,,ACTIVE
+WH-WIP,Pilot WIP,wip,PUNE,,ACTIVE
+WH-FG,Pilot Finished Goods,fg,PUNE,,ACTIVE

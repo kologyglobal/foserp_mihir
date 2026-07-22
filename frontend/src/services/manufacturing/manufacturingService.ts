@@ -21,8 +21,15 @@ import {
   seedProductionPlans,
 } from '../../data/manufacturing/seed'
 import { buildProductionPlanAiInsights } from '../../utils/manufacturing/insights'
+import { isApiMode } from '../../config/apiConfig'
+import * as planApi from '../api/manufacturingApi'
+import { mapApiProductionPlan, planSourceToApi } from './productionPlanApiMapper'
 
 const delay = (ms = 80) => new Promise((r) => setTimeout(r, ms))
+
+function apiErr(e: unknown): string {
+  return e instanceof Error ? e.message : 'Request failed'
+}
 
 let boms: BillOfMaterial[] = structuredClone(seedManufacturingBoms)
 let plans: ProductionPlan[] = structuredClone(seedProductionPlans)
@@ -492,6 +499,23 @@ export async function getProductionPlans(filter?: {
   source?: ProductionPlanSource | ''
   status?: ProductionPlanStatus | ''
 }): Promise<ProductionPlan[]> {
+  if (isApiMode()) {
+    try {
+      const res = await planApi.listProductionPlans({
+        search: filter?.search || undefined,
+        sourceType: filter?.source ? planSourceToApi(filter.source) : undefined,
+        status: filter?.status
+          ? filter.status === 'work_orders_created'
+            ? 'WORK_ORDERS_CREATED'
+            : filter.status.toUpperCase()
+          : undefined,
+        limit: 100,
+      })
+      return (res.data ?? []).map(mapApiProductionPlan)
+    } catch {
+      return []
+    }
+  }
   await delay()
   return plans
     .map(recomputePlan)
@@ -509,6 +533,14 @@ export async function getProductionPlans(filter?: {
 }
 
 export async function getProductionPlanById(id: string): Promise<ProductionPlan | null> {
+  if (isApiMode()) {
+    try {
+      const res = await planApi.getProductionPlanApi(id)
+      return res.data ? mapApiProductionPlan(res.data) : null
+    } catch {
+      return null
+    }
+  }
   await delay()
   const plan = plans.find((p) => p.id === id)
   return plan ? structuredClone(recomputePlan(plan)) : null
@@ -540,6 +572,28 @@ export type CreateProductionPlanInput = {
 export async function createProductionPlan(
   input: CreateProductionPlanInput,
 ): Promise<{ ok: true; plan: ProductionPlan } | { ok: false; error: string }> {
+  if (isApiMode()) {
+    try {
+      const res = await planApi.createProductionPlanApi({
+        planName: input.planName,
+        planDate: input.planDate,
+        sourceType: planSourceToApi(input.source),
+        warehouseId: input.warehouseId || undefined,
+        periodFrom: input.planningPeriodFrom || undefined,
+        periodTo: input.planningPeriodTo || undefined,
+        lines: input.lines.map((l) => ({
+          productItemId: l.finishedItemId,
+          demandQuantity: l.demandQuantity,
+          requiredDate: l.requiredDate,
+          sourceDocumentNo: l.sourceDocumentNo,
+        })),
+      })
+      if (!res.data) return { ok: false, error: 'Create failed' }
+      return { ok: true, plan: mapApiProductionPlan(res.data) }
+    } catch (e) {
+      return { ok: false, error: apiErr(e) }
+    }
+  }
   await delay()
   if (!input.planName.trim()) return { ok: false, error: 'Plan name is required' }
   if (!input.planDate) return { ok: false, error: 'Plan date is required' }
@@ -603,6 +657,16 @@ export async function createProductionPlan(
 export async function markProductionPlanPlanned(
   id: string,
 ): Promise<{ ok: true; plan: ProductionPlan } | { ok: false; error: string }> {
+  if (isApiMode()) {
+    try {
+      await planApi.previewProductionPlanNetting(id)
+      const res = await planApi.releaseProductionPlan(id)
+      if (!res.data) return { ok: false, error: 'Release failed' }
+      return { ok: true, plan: mapApiProductionPlan(res.data) }
+    } catch (e) {
+      return { ok: false, error: apiErr(e) }
+    }
+  }
   await delay()
   const idx = plans.findIndex((p) => p.id === id)
   if (idx < 0) return { ok: false, error: 'Plan not found' }
@@ -617,6 +681,15 @@ export async function markProductionPlanPlanned(
 export async function closeProductionPlan(
   id: string,
 ): Promise<{ ok: true; plan: ProductionPlan } | { ok: false; error: string }> {
+  if (isApiMode()) {
+    try {
+      const res = await planApi.closeProductionPlanApi(id)
+      if (!res.data) return { ok: false, error: 'Close failed' }
+      return { ok: true, plan: mapApiProductionPlan(res.data) }
+    } catch (e) {
+      return { ok: false, error: apiErr(e) }
+    }
+  }
   await delay()
   const idx = plans.findIndex((p) => p.id === id)
   if (idx < 0) return { ok: false, error: 'Plan not found' }
@@ -664,6 +737,19 @@ export async function checkPlannedMaterialAvailability(
 export async function createWorkOrderDraftFromPlanDemo(
   planLineId: string,
 ): Promise<{ ok: true; workOrderNo: string } | { ok: false; error: string }> {
+  if (isApiMode()) {
+    try {
+      const list = await planApi.listProductionPlans({ limit: 100 })
+      const parent = (list.data ?? []).find((p) => p.lines.some((l) => l.id === planLineId))
+      if (!parent) return { ok: false, error: 'Plan line not found' }
+      const res = await planApi.generateWorkOrdersFromPlanApi(parent.id, { lineIds: [planLineId] })
+      const created = res.data?.created?.[0]
+      if (!created) return { ok: false, error: 'No work order created' }
+      return { ok: true, workOrderNo: created.orderNumber }
+    } catch (e) {
+      return { ok: false, error: apiErr(e) }
+    }
+  }
   await delay()
   const found = findLine(planLineId)
   if (!found || found.line.ignored) return { ok: false, error: 'Plan line not found' }
@@ -706,6 +792,18 @@ export async function generateWorkOrdersFromPlan(
   planId: string,
   planLineIds?: string[],
 ): Promise<{ ok: true; created: string[] } | { ok: false; error: string }> {
+  if (isApiMode()) {
+    try {
+      const res = await planApi.generateWorkOrdersFromPlanApi(planId, {
+        lineIds: planLineIds,
+      })
+      const created = (res.data?.created ?? []).map((c) => c.orderNumber)
+      if (!created.length) return { ok: false, error: 'No work orders created' }
+      return { ok: true, created }
+    } catch (e) {
+      return { ok: false, error: apiErr(e) }
+    }
+  }
   await delay()
   const plan = plans.find((p) => p.id === planId)
   if (!plan) return { ok: false, error: 'Plan not found' }

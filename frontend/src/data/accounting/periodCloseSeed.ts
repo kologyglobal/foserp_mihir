@@ -810,7 +810,7 @@ export function buildCloseDashboard(periodCode: string): CloseDashboardData {
     unpostedItems: [
       { id: 'up-1', docType: 'Sales Invoice', docNo: 'SI-7842', amount: 2_45_000, href: '/accounting/receivables/invoices' },
       { id: 'up-2', docType: 'Purchase Invoice', docNo: 'PI-3310', amount: 1_18_000, href: '/accounting/payables/invoices' },
-      { id: 'up-3', docType: 'Journal Voucher', docNo: 'JV-2026-00041', amount: 85_000, href: '/accounting/vouchers' },
+      { id: 'up-3', docType: 'Journal Voucher', docNo: 'JV-2026-00041', amount: 85_000, href: '/accounting/entries/journals' },
       { id: 'up-4', docType: 'Inventory Adjustment', docNo: 'ADJ-INV-122', amount: 25_000, href: '/inventory' },
     ],
     approvalWorklist: [

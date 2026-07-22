@@ -2,8 +2,10 @@ import type { Request } from 'express'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../../../../config/database.js'
 import { auditFromRequest, createAuditLog } from '../../../../services/audit.service.js'
+import type { VendorInvoiceSourceMode } from '../../shared/master-resolvers/accounting-source-document-resolver.js'
 import { buildSupplierInvoiceUniquenessKey } from './vendor-invoice-number-normalization.js'
 import { recalculateVendorInvoice } from './vendor-invoice-draft.service.js'
+import { revalidateVendorInvoiceSourceLinks } from './vendor-invoice-source-validation.service.js'
 import * as repo from './vendor-invoice.repository.js'
 import {
   VendorInvoiceDuplicateUniquenessKeyError,
@@ -66,6 +68,17 @@ export async function releaseUniquenessKey(tx: Prisma.TransactionClient, invoice
 }
 
 async function assertReadyForWorkflow(tenantId: string, invoice: VendorInvoiceWithLines, userId?: string | null) {
+  const calcContext = invoice.calculationContext as { sourceMode?: VendorInvoiceSourceMode } | null
+  await revalidateVendorInvoiceSourceLinks(
+    tenantId,
+    invoice.vendorId,
+    (invoice.sourceLinks ?? []).map((link) => ({
+      sourceType: link.sourceType,
+      sourceDocumentId: link.sourceDocumentId,
+    })),
+    calcContext?.sourceMode,
+  )
+
   const result = await recalculateVendorInvoice(tenantId, invoice, userId)
   if (result.duplicateAssessment.isBlocking) {
     throw new VendorInvoiceExactDuplicateError()

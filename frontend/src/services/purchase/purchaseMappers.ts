@@ -12,6 +12,9 @@ import type {
   ApiRequestForQuotation,
   ApiVendorQuotation,
   ApiGoodsReceipt,
+  ApiPurchaseInvoice,
+  ApiQualityInspection,
+  ApiPurchaseReturn,
 } from './purchaseApiTypes'
 import type { ApiVendorComparison } from './comparisonApi'
 import type {
@@ -48,6 +51,24 @@ import type {
   GrnDomainStatus,
   GrnInput,
   GrnListRow,
+  PurchaseInvoice,
+  PurchaseInvoiceInput,
+  PurchaseInvoiceListRow,
+  PurchaseInvoiceOrigin,
+  PurchaseInvoiceStatus,
+  PurchaseGstScheme,
+  InvoiceMatchingResultStatus,
+  QualityInspection,
+  QualityInspectionInput,
+  QualityInspectionListRow,
+  QualityInspectionResult,
+  QualityInspectionStatus,
+  PurchaseReturn,
+  PurchaseReturnDomainStatus,
+  PurchaseReturnInput,
+  PurchaseReturnListRow,
+  PurchaseReturnOrigin,
+  PurchaseReturnReason,
 } from '../../types/purchaseDomain'
 import {
   PURCHASE_ORDER_APPROVAL_STATUS_LABELS,
@@ -59,6 +80,14 @@ import {
   PURCHASE_REQUISITION_STATUS_LABELS,
   RFQ_DOMAIN_STATUS_LABELS,
   VENDOR_QUOTATION_DOMAIN_STATUS_LABELS,
+  PURCHASE_INVOICE_STATUS_LABELS,
+  PURCHASE_INVOICE_ORIGIN_LABELS,
+  INVOICE_MATCHING_RESULT_STATUS_LABELS,
+  QUALITY_INSPECTION_STATUS_LABELS,
+  QUALITY_INSPECTION_RESULT_LABELS,
+  PURCHASE_RETURN_DOMAIN_STATUS_LABELS,
+  PURCHASE_RETURN_ORIGIN_LABELS,
+  PURCHASE_RETURN_REASON_LABELS,
   type PurchaseRequisitionApprovalStatus,
 } from '../../types/purchaseDomain'
 
@@ -1454,6 +1483,571 @@ export function mapApiGoodsReceiptToListRow(api: ApiGoodsReceipt): GrnListRow {
     statusLabel: status.replace(/_/g, ' '),
     inspectionRequired: api.inspectionRequired,
     qualityInspectionId: null,
+  }
+}
+
+/* ─── Purchase Invoice / Quality Inspection / Purchase Return (API mode) ─── */
+
+/** Resolve vendor snapshot from the hydrated master store (API mode). */
+function resolveVendorParty(vendorId: string | null | undefined): {
+  id: string
+  code: string
+  name: string
+  gstin: string
+  state: string
+} {
+  if (!vendorId) return { id: '', code: '', name: '', gstin: '', state: '' }
+  const vendor = useMasterStore.getState().vendors.find((v) => v.id === vendorId)
+  return {
+    id: vendorId,
+    code: vendor?.vendorCode ?? '',
+    name: vendor?.vendorName ?? '',
+    gstin: vendor?.gstin ?? '',
+    state: vendor?.state ?? '',
+  }
+}
+
+function resolveWarehouseLocation(warehouseId: string | null | undefined) {
+  if (!warehouseId) return { ...EMPTY_LOCATION }
+  const wh = useMasterStore.getState().warehouses.find((w) => w.id === warehouseId)
+  return {
+    id: warehouseId,
+    code: wh?.warehouseCode ?? '',
+    name: wh?.warehouseName ?? '',
+    state: '',
+    city: '',
+  }
+}
+
+function mapApiInvoiceStatus(status: string): PurchaseInvoiceStatus {
+  switch (status.toUpperCase()) {
+    case 'PENDING_APPROVAL':
+      return 'pending_approval'
+    case 'APPROVED':
+      return 'approved'
+    case 'MATCHED':
+    case 'PARTIALLY_MATCHED':
+      return 'matched'
+    case 'MISMATCH':
+      return 'mismatch'
+    case 'POSTED':
+      return 'posted'
+    case 'CLOSED':
+      return 'paid'
+    case 'CANCELLED':
+      return 'cancelled'
+    case 'DRAFT':
+    case 'REJECTED':
+    default:
+      return 'draft'
+  }
+}
+
+function deriveInvoiceOrigin(api: ApiPurchaseInvoice): PurchaseInvoiceOrigin {
+  if (api.isDirectInvoice) return 'direct'
+  if (api.goodsReceiptId) return 'goods_receipt'
+  if (api.purchaseOrderId) return 'purchase_order'
+  return 'direct'
+}
+
+function deriveInvoiceMatching(api: ApiPurchaseInvoice): {
+  matchStatus: 'unmatched' | 'matched' | 'mismatch'
+  matchingResultStatus: InvoiceMatchingResultStatus
+} {
+  const key = (api.matchingStatus ?? '').toUpperCase()
+  if (key === 'MATCHED') return { matchStatus: 'matched', matchingResultStatus: 'fully_matched' }
+  if (key === 'OVERRIDDEN') {
+    return { matchStatus: 'matched', matchingResultStatus: 'within_tolerance' }
+  }
+  if (key === 'MISMATCH') {
+    return { matchStatus: 'mismatch', matchingResultStatus: 'amount_mismatch' }
+  }
+  return { matchStatus: 'unmatched', matchingResultStatus: 'fully_matched' }
+}
+
+export function mapApiPurchaseInvoiceToDomain(api: ApiPurchaseInvoice): PurchaseInvoice {
+  const status = mapApiInvoiceStatus(String(api.status))
+  const vendor = resolveVendorParty(api.vendorId)
+  const gstScheme: PurchaseGstScheme = api.gstScheme === 'IGST' ? 'igst' : 'cgst_sgst'
+  const taxAmount = Number(api.taxAmount) || 0
+  const { matchStatus, matchingResultStatus } = deriveInvoiceMatching(api)
+  return {
+    id: api.id,
+    documentNumber: api.documentNumber || api.invoiceNumber,
+    documentDate: api.documentDate || api.invoiceDate || '',
+    status,
+    origin: deriveInvoiceOrigin(api),
+    vendorInvoiceNumber: api.vendorInvoiceNumber || '',
+    vendorInvoiceDate: api.vendorInvoiceDate || api.invoiceDate || '',
+    postingDate: api.documentDate || api.invoiceDate || '',
+    location: { ...EMPTY_LOCATION },
+    department: '',
+    requester: { ...EMPTY_PARTY },
+    approver: null,
+    vendor: {
+      id: vendor.id,
+      code: vendor.code,
+      name: vendor.name,
+      gstin: vendor.gstin,
+      state: vendor.state,
+      isInterstate: gstScheme === 'igst',
+    },
+    currency: 'INR',
+    paymentTerms: '',
+    deliveryTerms: '',
+    expectedDeliveryDate: null,
+    dueDate: null,
+    placeOfSupply: api.placeOfSupplyState || '',
+    reverseCharge: api.reverseCharge,
+    eInvoiceReference: null,
+    gstScheme,
+    purchaseOrderId: api.purchaseOrderId,
+    purchaseOrderNumber: null,
+    goodsReceiptId: api.goodsReceiptId,
+    goodsReceiptNumber: null,
+    matchStatus,
+    matchingResultStatus,
+    matchingExceptionApproved: api.overrideAuthorized,
+    exceptionApprovedBy: null,
+    exceptionApprovedAt: null,
+    verifiedAt: api.submittedAt,
+    verifiedBy: null,
+    onHoldReason: null,
+    holdAt: null,
+    debitNoteId: null,
+    debitNoteNumber: null,
+    lines: (api.lines ?? []).map((l) => {
+      const lineTax = Number(l.taxAmount) || 0
+      return {
+        id: l.id,
+        lineNo: l.lineNumber,
+        purchaseOrderLineId: l.purchaseOrderLineId,
+        goodsReceiptLineId: l.goodsReceiptLineId,
+        poLineNo: null,
+        grnLineNo: null,
+        itemId: l.itemId || '',
+        itemCode: l.itemCodeSnapshot || '',
+        itemName: l.itemNameSnapshot || '',
+        description: l.description || l.itemNameSnapshot || '',
+        uom: l.uomCodeSnapshot || '',
+        hsnCode: '',
+        sacCode: null,
+        quantity: Number(l.quantity) || 0,
+        rate: Number(l.rate) || 0,
+        discountAmount: 0,
+        taxableAmount: Number(l.amount) || 0,
+        gstRatePct: Number(l.taxRatePct) || 0,
+        cgst: gstScheme === 'cgst_sgst' ? lineTax / 2 : 0,
+        sgst: gstScheme === 'cgst_sgst' ? lineTax / 2 : 0,
+        igst: gstScheme === 'igst' ? lineTax : 0,
+        tdsAmount: 0,
+        tcsAmount: 0,
+        lineTotal: Number(l.lineTotal) || 0,
+        costCentre: '',
+        project: '',
+        account: '',
+        remarks: l.remarks || '',
+      }
+    }),
+    approvalIds: [],
+    postedAt: api.postedAt,
+    paidAt: null,
+    subtotal: Number(api.subtotalAmount) || 0,
+    discount: 0,
+    taxableAmount: Number(api.subtotalAmount) || 0,
+    cgst: gstScheme === 'cgst_sgst' ? taxAmount / 2 : 0,
+    sgst: gstScheme === 'cgst_sgst' ? taxAmount / 2 : 0,
+    igst: gstScheme === 'igst' ? taxAmount : 0,
+    freight: 0,
+    otherCharges: 0,
+    roundOff: Number(api.roundOffAmount) || 0,
+    totalAmount: Number(api.totalAmount) || 0,
+    createdAt: api.createdAt || new Date().toISOString(),
+    updatedAt: api.updatedAt,
+    createdBy: '',
+    updatedBy: null,
+    remarks: api.remarks || '',
+    attachmentIds: [],
+  }
+}
+
+export function mapApiPurchaseInvoiceToListRow(api: ApiPurchaseInvoice): PurchaseInvoiceListRow {
+  const status = mapApiInvoiceStatus(String(api.status))
+  const origin = deriveInvoiceOrigin(api)
+  const vendor = resolveVendorParty(api.vendorId)
+  const { matchStatus, matchingResultStatus } = deriveInvoiceMatching(api)
+  return {
+    id: api.id,
+    documentNumber: api.documentNumber || api.invoiceNumber,
+    documentDate: api.documentDate || api.invoiceDate || '',
+    status,
+    statusLabel: PURCHASE_INVOICE_STATUS_LABELS[status],
+    origin,
+    originLabel: PURCHASE_INVOICE_ORIGIN_LABELS[origin],
+    vendorName: vendor.name,
+    vendorGstin: vendor.gstin,
+    vendorInvoiceNumber: api.vendorInvoiceNumber || '',
+    purchaseOrderNumber: null,
+    goodsReceiptNumber: null,
+    matchingResultStatus,
+    matchingResultStatusLabel: INVOICE_MATCHING_RESULT_STATUS_LABELS[matchingResultStatus],
+    matchStatus,
+    totalAmount: Number(api.totalAmount) || 0,
+    currency: 'INR',
+    dueDate: null,
+    postingDate: api.documentDate || api.invoiceDate || '',
+  }
+}
+
+/** Domain invoice editor input → backend create/update payload. */
+export function mapDomainPurchaseInvoiceInputToApiPayload(
+  input: PurchaseInvoiceInput,
+): Record<string, unknown> {
+  return {
+    vendorId: input.vendorId,
+    invoiceDate: input.documentDate ?? undefined,
+    vendorInvoiceNumber: input.vendorInvoiceNumber || null,
+    vendorInvoiceDate: input.vendorInvoiceDate || null,
+    purchaseOrderId: uuidOrNull(input.purchaseOrderId ?? null),
+    goodsReceiptId: uuidOrNull(input.goodsReceiptId ?? null),
+    placeOfSupplyState: input.placeOfSupply || null,
+    reverseCharge: input.reverseCharge ?? false,
+    remarks: input.remarks || null,
+    lines: input.lines.map((line) => ({
+      purchaseOrderLineId: uuidOrNull(line.purchaseOrderLineId ?? null),
+      goodsReceiptLineId: uuidOrNull(line.goodsReceiptLineId ?? null),
+      itemId: uuidOrNull(line.itemId),
+      description: line.description || null,
+      quantity: Number(line.quantity) || 0,
+      rate: Number(line.rate) || 0,
+      taxRatePct: Number(line.gstRatePct) || 0,
+      remarks: line.remarks || null,
+    })),
+  }
+}
+
+function mapApiQiStatus(status: string): QualityInspectionStatus {
+  switch (status.toUpperCase()) {
+    case 'IN_PROGRESS':
+      return 'in_progress'
+    case 'ACCEPTED':
+    case 'CLOSED':
+      return 'accepted'
+    case 'PARTIALLY_ACCEPTED':
+      return 'partially_accepted'
+    case 'REJECTED':
+      return 'rejected'
+    case 'DEVIATION_PENDING':
+      return 'hold'
+    case 'CANCELLED':
+      return 'cancelled'
+    case 'DRAFT':
+    case 'PENDING':
+    default:
+      return 'pending'
+  }
+}
+
+function qiResultFromStatus(status: QualityInspectionStatus): QualityInspectionResult | null {
+  if (
+    status === 'accepted'
+    || status === 'partially_accepted'
+    || status === 'rejected'
+    || status === 'accepted_under_deviation'
+    || status === 'hold'
+  ) {
+    return status
+  }
+  return null
+}
+
+export function mapApiQualityInspectionToDomain(api: ApiQualityInspection): QualityInspection {
+  const status = mapApiQiStatus(String(api.status))
+  const vendor = resolveVendorParty(api.vendorId)
+  const first = api.lines?.[0]
+  const itemName = first?.itemNameSnapshot || ''
+  const extraLines = (api.lines?.length ?? 0) - 1
+  return {
+    id: api.id,
+    documentNumber: api.documentNumber || api.inspectionNumber,
+    documentDate: api.documentDate || api.inspectionDate || '',
+    status,
+    result: qiResultFromStatus(status),
+    goodsReceiptId: api.goodsReceiptId || '',
+    goodsReceiptNumber: '',
+    goodsReceiptLineId: first?.goodsReceiptLineId || '',
+    purchaseOrderId: api.purchaseOrderId || '',
+    purchaseOrderNumber: '',
+    vendor: { id: vendor.id, code: vendor.code, name: vendor.name },
+    location: resolveWarehouseLocation(api.warehouseId),
+    itemId: first?.itemId || '',
+    itemCode: first?.itemCodeSnapshot || '',
+    itemName: extraLines > 0 ? `${itemName} (+${extraLines} more)` : itemName,
+    batchLotNo: '',
+    receivedQty: Number(api.totals?.inspected) || 0,
+    sampleQty: Number(api.totals?.inspected) || 0,
+    acceptedQty: Number(api.totals?.accepted) || 0,
+    rejectedQty: Number(api.totals?.rejected) || 0,
+    inspectionPlan: '',
+    inspector: { id: api.inspectedById || '', code: '', name: api.inspectedByName || '' },
+    inspectedAt: api.completedAt,
+    deviationRequested: Boolean(api.deviationRemarks),
+    deviationRemarks: api.deviationRemarks || '',
+    parameters: [],
+    createdAt: api.createdAt || new Date().toISOString(),
+    updatedAt: api.updatedAt,
+    createdBy: '',
+    updatedBy: null,
+    remarks: api.remarks || '',
+    attachmentIds: [],
+  }
+}
+
+export function mapApiQualityInspectionToListRow(
+  api: ApiQualityInspection,
+): QualityInspectionListRow {
+  const status = mapApiQiStatus(String(api.status))
+  const result = qiResultFromStatus(status)
+  const first = api.lines?.[0]
+  const itemName = first?.itemNameSnapshot || ''
+  const extraLines = (api.lines?.length ?? 0) - 1
+  return {
+    id: api.id,
+    documentNumber: api.documentNumber || api.inspectionNumber,
+    documentDate: api.documentDate || api.inspectionDate || '',
+    goodsReceiptId: api.goodsReceiptId || '',
+    goodsReceiptNumber: '',
+    itemCode: first?.itemCodeSnapshot || '',
+    itemName: extraLines > 0 ? `${itemName} (+${extraLines} more)` : itemName,
+    batchLotNo: '',
+    receivedQty: Number(api.totals?.inspected) || 0,
+    sampleQty: Number(api.totals?.inspected) || 0,
+    inspectorName: api.inspectedByName || '',
+    status,
+    statusLabel: QUALITY_INSPECTION_STATUS_LABELS[status],
+    result,
+    resultLabel: result ? QUALITY_INSPECTION_RESULT_LABELS[result] : null,
+  }
+}
+
+/** Domain QI create input → backend create payload. Lines only when a sample qty is known. */
+export function mapDomainQualityInspectionInputToApiPayload(
+  input: QualityInspectionInput,
+): Record<string, unknown> {
+  const sampleQty = Number(input.sampleQty) || 0
+  const lines =
+    sampleQty > 0
+      ? [
+          {
+            goodsReceiptLineId: uuidOrNull(input.goodsReceiptLineId),
+            inspectedQuantity: sampleQty,
+            acceptedQuantity: Number(input.acceptedQty) || 0,
+            rejectedQuantity: Number(input.rejectedQty) || 0,
+            remarks: input.remarks || null,
+          },
+        ]
+      : undefined
+  return {
+    goodsReceiptId: uuidOrNull(input.goodsReceiptId),
+    inspectionDate: input.documentDate ?? undefined,
+    inspectedById: input.inspectorId || null,
+    inspectedByName: input.inspectorName || null,
+    remarks: input.remarks || null,
+    lines,
+  }
+}
+
+function mapApiReturnStatus(status: string): PurchaseReturnDomainStatus {
+  switch (status.toUpperCase()) {
+    case 'SUBMITTED':
+    case 'APPROVED':
+    case 'SHIPPED':
+      return 'approved'
+    case 'COMPLETED':
+      return 'posted'
+    case 'CLOSED':
+      return 'closed'
+    case 'CANCELLED':
+      return 'cancelled'
+    case 'DRAFT':
+    default:
+      return 'draft'
+  }
+}
+
+const RETURN_REASON_VALUES: readonly PurchaseReturnReason[] = [
+  'quality_rejection',
+  'damaged',
+  'wrong_item',
+  'excess_quantity',
+  'specification_mismatch',
+  'expired_material',
+  'short_shelf_life',
+  'other',
+]
+
+function parseReturnReason(reason: string | null | undefined): PurchaseReturnReason {
+  return RETURN_REASON_VALUES.includes(reason as PurchaseReturnReason)
+    ? (reason as PurchaseReturnReason)
+    : 'other'
+}
+
+function returnOriginFromReason(reason: PurchaseReturnReason): PurchaseReturnOrigin {
+  switch (reason) {
+    case 'quality_rejection':
+      return 'quality_rejection'
+    case 'damaged':
+      return 'damaged_material'
+    case 'excess_quantity':
+      return 'excess_receipt'
+    case 'wrong_item':
+      return 'wrong_material'
+    default:
+      return 'grn_rejected_quantity'
+  }
+}
+
+export function mapApiPurchaseReturnToDomain(api: ApiPurchaseReturn): PurchaseReturn {
+  const status = mapApiReturnStatus(String(api.status))
+  const vendor = resolveVendorParty(api.vendorId)
+  const returnReason = parseReturnReason(api.reason)
+  const location = resolveWarehouseLocation(api.warehouseId)
+  const totalAmount = Number(api.totalAmount) || 0
+  return {
+    id: api.id,
+    documentNumber: api.documentNumber || api.returnNumber,
+    documentDate: api.documentDate || api.returnDate || '',
+    status,
+    origin: returnOriginFromReason(returnReason),
+    location,
+    warehouseId: api.warehouseId || '',
+    warehouseName: location.name,
+    department: '',
+    requester: { ...EMPTY_PARTY },
+    approver: null,
+    vendor: { id: vendor.id, code: vendor.code, name: vendor.name, gstin: vendor.gstin },
+    paymentTerms: '',
+    deliveryTerms: '',
+    expectedDeliveryDate: null,
+    purchaseOrderId: api.purchaseOrderId,
+    purchaseOrderNumber: null,
+    goodsReceiptId: api.goodsReceiptId,
+    goodsReceiptNumber: null,
+    purchaseInvoiceId: null,
+    purchaseInvoiceNumber: null,
+    qualityInspectionId: api.qualityInspectionId,
+    qualityInspectionNumber: null,
+    returnReason,
+    transportDetails: '',
+    debitNoteRequired: false,
+    replacementRequired: false,
+    linkedReplacementPoId: null,
+    linkedReplacementPoNumber: null,
+    linkedDebitNoteId: null,
+    linkedDebitNoteNumber: null,
+    postedAt: api.completedAt,
+    lines: (api.lines ?? []).map((l) => {
+      const qty = Number(l.returnQuantity) || 0
+      const amount = Number(l.amount) || 0
+      return {
+        id: l.id,
+        lineNo: l.lineNumber,
+        goodsReceiptLineId: l.goodsReceiptLineId,
+        itemId: l.itemId || '',
+        itemCode: l.itemCodeSnapshot || '',
+        itemName: l.itemNameSnapshot || '',
+        description: l.itemNameSnapshot || '',
+        uom: '',
+        hsnCode: '',
+        batchLotNo: '',
+        serialNumber: '',
+        receivedQty: qty,
+        availableReturnQty: qty,
+        returnQty: qty,
+        unitCost: Number(l.rate) || 0,
+        gstRatePct: 0,
+        taxableAmount: amount,
+        cgst: 0,
+        sgst: 0,
+        igst: 0,
+        returnAmount: amount,
+        lineTotal: amount,
+        reason: returnReason,
+        replacementQty: 0,
+        remarks: l.remarks || '',
+      }
+    }),
+    currency: 'INR',
+    subtotal: totalAmount,
+    discount: 0,
+    taxableAmount: totalAmount,
+    cgst: 0,
+    sgst: 0,
+    igst: 0,
+    freight: 0,
+    otherCharges: 0,
+    roundOff: 0,
+    totalAmount,
+    createdAt: api.createdAt || new Date().toISOString(),
+    updatedAt: api.updatedAt,
+    createdBy: '',
+    updatedBy: null,
+    remarks: api.remarks || '',
+    attachmentIds: [],
+  }
+}
+
+export function mapApiPurchaseReturnToListRow(api: ApiPurchaseReturn): PurchaseReturnListRow {
+  const status = mapApiReturnStatus(String(api.status))
+  const vendor = resolveVendorParty(api.vendorId)
+  const returnReason = parseReturnReason(api.reason)
+  const origin = returnOriginFromReason(returnReason)
+  return {
+    id: api.id,
+    documentNumber: api.documentNumber || api.returnNumber,
+    documentDate: api.documentDate || api.returnDate || '',
+    vendorName: vendor.name,
+    vendorCode: vendor.code,
+    purchaseOrderNumber: null,
+    goodsReceiptNumber: null,
+    purchaseInvoiceNumber: null,
+    warehouseName: resolveWarehouseLocation(api.warehouseId).name,
+    origin,
+    originLabel: PURCHASE_RETURN_ORIGIN_LABELS[origin],
+    returnReason,
+    returnReasonLabel: PURCHASE_RETURN_REASON_LABELS[returnReason],
+    lineCount: api.lines?.length ?? 0,
+    totalReturnQty: Number(api.totalQuantity) || 0,
+    totalAmount: Number(api.totalAmount) || 0,
+    status,
+    statusLabel: PURCHASE_RETURN_DOMAIN_STATUS_LABELS[status],
+    debitNoteRequired: false,
+    replacementRequired: false,
+    linkedReplacementPoNumber: null,
+    linkedDebitNoteNumber: null,
+  }
+}
+
+/** Domain return editor input → backend create/update payload. */
+export function mapDomainPurchaseReturnInputToApiPayload(
+  input: PurchaseReturnInput,
+): Record<string, unknown> {
+  return {
+    vendorId: input.vendorId,
+    returnDate: input.documentDate ?? undefined,
+    purchaseOrderId: uuidOrNull(input.purchaseOrderId ?? null),
+    goodsReceiptId: uuidOrNull(input.goodsReceiptId ?? null),
+    qualityInspectionId: uuidOrNull(input.qualityInspectionId ?? null),
+    warehouseId: uuidOrNull(input.warehouseId ?? null),
+    reason: input.returnReason,
+    remarks: input.remarks || null,
+    lines: input.lines.map((line) => ({
+      goodsReceiptLineId: uuidOrNull(line.goodsReceiptLineId ?? null),
+      itemId: uuidOrNull(line.itemId),
+      returnQuantity: Number(line.returnQty) || 0,
+      rate: Number(line.unitCost ?? line.rate) || 0,
+      remarks: line.remarks || null,
+    })),
   }
 }
 

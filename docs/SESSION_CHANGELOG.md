@@ -1,4 +1,4 @@
-<<<<<<< Updated upstream
+﻿<<<<<<< Updated upstream
 ## 2026-07-21 — Purchase Setup full persistence
 
 ### Shipped

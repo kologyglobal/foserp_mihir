@@ -1,0 +1,18 @@
+bom_no,product_code,revision,description,effective_from,parent_item_code,item_code,item_name,node_level,qty_per_parent,uom,scrap_pct,source_type,issue_warehouse,lead_time_days,standard_cost,sort_order
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,,SA-CHASSIS-40,Chassis Assembly 40ft,sub_assembly,1,NOS,0,make,WH-PROD,5,185000,1
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,SA-CHASSIS-40,RM-IBEAM-450,I-Beam 450mm x 12m,component,2,NOS,2,buy,WH-STEEL,7,42000,1
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,SA-CHASSIS-40,RM-CROSSMEM,Cross Member Channel 250mm,component,14,NOS,3,buy,WH-STEEL,7,3800,2
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,SA-CHASSIS-40,RM-PLATE-6MM,MS Plate 6mm,component,85,KG,5,buy,WH-STEEL,5,68,3
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,,SA-AXLE-SET,Tandem Axle Set Assembly,sub_assembly,1,SET,0,make,WH-PROD,4,96000,2
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,SA-AXLE-SET,BO-AXLE-13T,Axle 13T with Hub,component,2,NOS,0,buy,WH-COMP,15,38500,1
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,SA-AXLE-SET,BO-SUSP-MECH,Mechanical Suspension Kit,component,1,SET,0,buy,WH-COMP,15,16500,2
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,SA-AXLE-SET,BO-BRAKE-KIT,Brake Chamber Kit,component,2,SET,0,buy,WH-COMP,10,5200,3
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,,BO-WHEEL-RIM,Wheel Rim 8.5x24,component,8,NOS,0,buy,WH-COMP,10,6800,3
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,,BO-TYRE-1000,Tyre 10.00 R20,component,8,NOS,0,buy,WH-COMP,7,18500,4
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,,BO-LANDING-GR,Landing Gear 28T,component,1,SET,0,buy,WH-COMP,20,14200,5
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,,BO-KINGPIN-2,Kingpin 2 inch SAE,component,1,NOS,0,buy,WH-COMP,12,3400,6
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,,RM-DECK-CHQ,Chequered Deck Plate 3mm,component,120,KG,4,buy,WH-STEEL,5,72,7
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,,CN-WELD-WIRE,Welding Wire ER70S-6 1.2mm,component,18,KG,8,buy,WH-CONS,3,210,8
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,,CN-PRIMER-EP,Epoxy Primer,component,12,LTR,5,buy,WH-CONS,5,480,9
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,,CN-PAINT-PU,PU Topcoat Paint,component,10,LTR,5,buy,WH-CONS,5,650,10
+BOM-0001,FG-TRL-40FB,Rev-A,40ft Flatbed Trailer - Production BOM,2026-07-01,,JW-GALV-SVC,Galvanizing Service (Subcontract),component,1,LOT,0,subcontract,WH-PROD,10,22000,11

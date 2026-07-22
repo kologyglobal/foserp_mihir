@@ -34,6 +34,8 @@ import { useMrpStore } from '../../store/mrpStore'
 import { useSalesStore } from '../../store/salesStore'
 import { useWorkOrderStore } from '../../store/workOrderStore'
 import { useDispatchStore } from '../../store/dispatchStore'
+import { isApiMode } from '../../config/apiConfig'
+import { SalesOrderDispatchFulfilmentPanel } from '../dispatch/SalesOrderDispatchFulfilmentPanel'
 import { useQualityStore } from '../../store/qualityStore'
 import { useMasterStore } from '../../store/masterStore'
 import { useCrmStore } from '../../store/crmStore'
@@ -74,7 +76,10 @@ import { ReservationsPanel } from '../../components/inventory/ReservationsPanel'
 import {
   ExpectedAccountingEntryDrawer,
   SalesOrderAccountingSummary,
+  type SalesOrderAccountingDemoMetrics,
 } from '../../components/accounting/commercial'
+import { useSalesOrderCommercialPosition } from '../../hooks/useCommercialPosition'
+import { useInvoiceStore } from '../../store/invoiceStore'
 import {
   SalesOrderConfirmDialog,
   type SalesOrderConfirmValues,
@@ -196,6 +201,29 @@ export function SalesOrder360Page() {
   const pendingMrp = Boolean(so?.status === 'confirmed' && orderWos.length === 0)
   const score = so ? healthScore(so) : 0
   const displayValue = so ? resolveSalesOrderValue(so, product) : 0
+  const commercialPosition = useSalesOrderCommercialPosition(id)
+  const demoInvoices = useInvoiceStore((s) =>
+    id ? s.invoices.filter((inv) => inv.salesOrderId === id) : [],
+  )
+  const demoCommercialMoney = useMemo((): SalesOrderAccountingDemoMetrics | null => {
+    if (isApiMode() || !so) return null
+    const posted = demoInvoices.filter((inv) => inv.status === 'posted')
+    const drafts = demoInvoices.filter((inv) => inv.status === 'draft')
+    const dispatchedStatuses = ['dispatched', 'in_transit', 'delivered', 'pod_received', 'closed']
+    const dispatchedAmount = orderDispatches.some((d) => dispatchedStatuses.includes(d.status))
+      ? displayValue
+      : 0
+    return {
+      orderedAmount: displayValue,
+      dispatchedAmount,
+      invoicedAmount: posted.reduce((sum, inv) => sum + inv.gst.grandTotal, 0),
+      collectedAmount: posted.reduce((sum, inv) => sum + inv.amountPaid, 0),
+      outstandingAmount: posted.reduce((sum, inv) => sum + inv.balanceDue, 0),
+      nextPaymentDueDate: posted.find((inv) => inv.balanceDue > 0)?.dueDate ?? null,
+      postedInvoiceCount: posted.length,
+      draftInvoiceCount: drafts.length,
+    }
+  }, [demoInvoices, displayValue, orderDispatches, so])
 
   const overdue = Boolean(
     so &&
@@ -554,6 +582,15 @@ export function SalesOrder360Page() {
                   salesOrderNo={so.salesOrderNo}
                   status={so.status}
                   value={displayValue}
+                  ops={commercialPosition.data?.ops ?? null}
+                  money={
+                    isApiMode()
+                      ? commercialPosition.data?.money ?? null
+                      : demoCommercialMoney
+                  }
+                  moneyVisible={isApiMode() ? commercialPosition.data?.moneyVisible ?? false : true}
+                  loading={isApiMode() ? commercialPosition.loading : false}
+                  error={isApiMode() ? commercialPosition.error : null}
                   onViewExpectedEntry={() => setExpectedEntryOpen(true)}
                 />
               ) : null}
@@ -639,34 +676,45 @@ export function SalesOrder360Page() {
         )}
 
         {tab === 'dispatch' && (
-          <Entity360Panel title="Dispatch plans" subtitle="Trailers scheduled for delivery">
-            <div className="p-4">
-              {orderDispatches.length === 0 ? (
-                <div className="so-360-empty">
-                  <Truck className="so-360-empty__icon" aria-hidden />
-                  <p className="so-360-empty__title">No dispatch plans linked</p>
-                  <p className="so-360-empty__text">
-                    Create a dispatch plan when FG is ready and delivery is scheduled.
-                  </p>
-                  <button
-                    type="button"
-                    className="so-360-empty__action"
-                    onClick={() => navigate('/dispatch/plan')}
-                  >
-                    Open dispatch planning →
-                  </button>
-                </div>
-              ) : (
-                <DataGrid
-                  data={orderDispatches}
-                  columns={dispatchColumns}
-                  compact
-                  toolbar="compact"
-                  showToolbarExport
-                  exportFileName={`${so.salesOrderNo}-dispatch`}
-                />
-              )}
-            </div>
+          <Entity360Panel
+            title={isApiMode() ? 'Fulfilment & dispatch' : 'Dispatch plans'}
+            subtitle={
+              isApiMode()
+                ? 'Server-side readiness and outbound dispatch history'
+                : 'Trailers scheduled for delivery'
+            }
+          >
+            {isApiMode() && id ? (
+              <SalesOrderDispatchFulfilmentPanel salesOrderId={id} />
+            ) : (
+              <div className="p-4">
+                {orderDispatches.length === 0 ? (
+                  <div className="so-360-empty">
+                    <Truck className="so-360-empty__icon" aria-hidden />
+                    <p className="so-360-empty__title">No dispatch plans linked</p>
+                    <p className="so-360-empty__text">
+                      Create a dispatch plan when FG is ready and delivery is scheduled.
+                    </p>
+                    <button
+                      type="button"
+                      className="so-360-empty__action"
+                      onClick={() => navigate('/dispatch/plan')}
+                    >
+                      Open dispatch planning →
+                    </button>
+                  </div>
+                ) : (
+                  <DataGrid
+                    data={orderDispatches}
+                    columns={dispatchColumns}
+                    compact
+                    toolbar="compact"
+                    showToolbarExport
+                    exportFileName={`${so.salesOrderNo}-dispatch`}
+                  />
+                )}
+              </div>
+            )}
           </Entity360Panel>
         )}
 
@@ -679,6 +727,15 @@ export function SalesOrder360Page() {
                   salesOrderNo={so.salesOrderNo}
                   status={so.status}
                   value={displayValue}
+                  ops={commercialPosition.data?.ops ?? null}
+                  money={
+                    isApiMode()
+                      ? commercialPosition.data?.money ?? null
+                      : demoCommercialMoney
+                  }
+                  moneyVisible={isApiMode() ? commercialPosition.data?.moneyVisible ?? false : true}
+                  loading={isApiMode() ? commercialPosition.loading : false}
+                  error={isApiMode() ? commercialPosition.error : null}
                   onViewExpectedEntry={() => setExpectedEntryOpen(true)}
                 />
               ) : null}

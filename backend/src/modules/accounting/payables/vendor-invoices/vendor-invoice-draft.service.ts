@@ -1,10 +1,15 @@
 import type { Request } from 'express'
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
 import { auditFromRequest, createAuditLog } from '../../../../services/audit.service.js'
 import { validateBranchOwnership } from '../../ledger/ledger.validators.js'
 import { getLegalEntityOrThrow, parseDateOnly } from '../../shared/finance.helpers.js'
 import { resolvePeriodByDate } from '../../posting/posting-period.service.js'
+import {
+  AccountingVendorInactiveError,
+  AccountingVendorNotFoundError,
+  requireActiveAccountingVendor,
+  type AccountingVendorParty,
+} from '../../shared/master-resolvers/accounting-vendor-resolver.js'
 import { calculateVendorInvoice } from './calculation/vendor-invoice-calculation.service.js'
 import type { VendorInvoiceCalculationInput, VendorInvoiceCalculationResult } from './calculation/vendor-invoice-calculation.types.js'
 import { normalizeSupplierInvoiceNumber } from './vendor-invoice-number-normalization.js'
@@ -17,39 +22,17 @@ import {
 import type { CreateVendorInvoiceInput, UpdateVendorInvoiceInput } from './vendor-invoice.schemas.js'
 import type { CreateVendorInvoiceSourceLinkInput, VendorInvoiceDraftHeaderInput, VendorInvoiceWithLines } from './vendor-invoice.types.js'
 import { serializeVendorInvoice } from './vendor-invoice-read.service.js'
+import { validateAndEnrichVendorInvoiceSourceLinks } from './vendor-invoice-source-validation.service.js'
 
-interface ActiveVendor {
-  id: string
-  code: string
-  name: string
-  gstin: string | null
-  pan: string | null
-  state: string | null
-  address: string | null
-  address2: string | null
-  city: string | null
-  pincode: string | null
-  country: string | null
-  paymentTermsDays: number
-}
+type ActiveVendor = AccountingVendorParty
 
 async function loadActiveVendor(tenantId: string, vendorId: string): Promise<ActiveVendor> {
-  const vendor = await prisma.masterVendor.findFirst({ where: { id: vendorId, tenantId, deletedAt: null } })
-  if (!vendor) throw new VendorInvoiceVendorNotFoundError()
-  if (vendor.status !== 'ACTIVE' || vendor.isBlocked) throw new VendorInvoiceInactiveVendorError()
-  return {
-    id: vendor.id,
-    code: vendor.code,
-    name: vendor.name,
-    gstin: vendor.gstin || null,
-    pan: vendor.pan,
-    state: vendor.state || null,
-    address: vendor.address,
-    address2: vendor.address2,
-    city: vendor.city,
-    pincode: vendor.pincode,
-    country: vendor.country,
-    paymentTermsDays: vendor.paymentTermsDays,
+  try {
+    return await requireActiveAccountingVendor(tenantId, vendorId)
+  } catch (err) {
+    if (err instanceof AccountingVendorNotFoundError) throw new VendorInvoiceVendorNotFoundError()
+    if (err instanceof AccountingVendorInactiveError) throw new VendorInvoiceInactiveVendorError()
+    throw err
   }
 }
 
@@ -123,7 +106,7 @@ function vendorSnapshot(vendor: ActiveVendor) {
     vendorNameSnapshot: vendor.name,
     vendorGstinSnapshot: vendor.gstin,
     vendorPanSnapshot: vendor.pan,
-    vendorStateCodeSnapshot: vendor.state,
+    vendorStateCodeSnapshot: vendor.stateCode ?? vendor.state,
     vendorAddressSnapshot: {
       line1: vendor.address,
       line2: vendor.address2,
@@ -169,7 +152,7 @@ async function buildHeaderInput(
     vendorSnapshot: vendorSnapshot(vendor),
     companyGstinSnapshot: companyGstin,
     companyStateCodeSnapshot: companyStateCode,
-    placeOfSupplyStateCode: body.placeOfSupply ?? vendor.state ?? null,
+    placeOfSupplyStateCode: body.placeOfSupply ?? vendor.stateCode ?? vendor.state ?? null,
     paymentTermsDaysSnapshot: body.paymentTermsDays ?? vendor.paymentTermsDays ?? null,
     paymentTermsSnapshot: body.paymentTerms ?? null,
     approvalRequired,
@@ -191,14 +174,30 @@ export async function createVendorInvoiceDraft(req: Request, tenantId: string, i
   const { financialYear } = await resolvePeriodByDate(tenantId, input.legalEntityId, input.documentDate)
   const draftReference = await repo.generateUniqueDraftReference(tenantId)
 
-  const calcInput = buildCalculationInputFromRequest(input.legalEntityId, input, legalEntity.stateCode, vendor.state)
+  const sourceValidation = await validateAndEnrichVendorInvoiceSourceLinks(
+    tenantId,
+    input.vendorId,
+    input.sourceLinks ?? [],
+    input.sourceMode,
+  )
+
+  const calcInput = buildCalculationInputFromRequest(
+    input.legalEntityId,
+    input,
+    legalEntity.stateCode,
+    vendor.stateCode ?? vendor.state,
+  )
   const result = await calculateVendorInvoice(calcInput, { tenantId, legalEntityId: input.legalEntityId, userId: req.context?.userId })
 
   const approvalRequired = input.approvalRequiredOverride ?? false
   const header = await buildHeaderInput(
     tenantId,
     input.legalEntityId,
-    input,
+    {
+      ...input,
+      sourceMode: sourceValidation.sourceMode,
+      sourceLinks: sourceValidation.sourceLinks,
+    },
     vendor,
     legalEntity.gstin,
     legalEntity.stateCode,
@@ -208,9 +207,17 @@ export async function createVendorInvoiceDraft(req: Request, tenantId: string, i
     req.context?.userId,
   )
 
-  const invoice = await repo.createVendorInvoiceDraft(header, result, mapSourceLinks(input.sourceLinks))
-  await audit(req, tenantId, invoice.id, 'VENDOR_INVOICE_CREATED', { draftReference: invoice.draftReference })
-  return serializeVendorInvoice(req, invoice, result)
+  const invoice = await repo.createVendorInvoiceDraft(header, result, mapSourceLinks(sourceValidation.sourceLinks))
+  await audit(req, tenantId, invoice.id, 'VENDOR_INVOICE_CREATED', {
+    draftReference: invoice.draftReference,
+    sourceMode: sourceValidation.sourceMode,
+  })
+  const serialized = await serializeVendorInvoice(req, invoice, result)
+  return {
+    ...serialized,
+    sourceMode: sourceValidation.sourceMode,
+    metaWarnings: sourceValidation.warnings.length > 0 ? sourceValidation.warnings : undefined,
+  }
 }
 
 export async function updateVendorInvoiceDraft(
@@ -231,14 +238,30 @@ export async function updateVendorInvoiceDraft(
   const vendor = await loadActiveVendor(tenantId, input.vendorId)
   const { financialYear } = await resolvePeriodByDate(tenantId, existing.legalEntityId, input.documentDate)
 
-  const calcInput = buildCalculationInputFromRequest(existing.legalEntityId, input, legalEntity.stateCode, vendor.state)
+  const sourceValidation = await validateAndEnrichVendorInvoiceSourceLinks(
+    tenantId,
+    input.vendorId,
+    input.sourceLinks ?? [],
+    input.sourceMode,
+  )
+
+  const calcInput = buildCalculationInputFromRequest(
+    existing.legalEntityId,
+    input,
+    legalEntity.stateCode,
+    vendor.stateCode ?? vendor.state,
+  )
   const result = await calculateVendorInvoice(calcInput, { tenantId, legalEntityId: existing.legalEntityId, userId: req.context?.userId })
 
   const approvalRequired = input.approvalRequiredOverride ?? existing.approvalRequired
   const header = await buildHeaderInput(
     tenantId,
     existing.legalEntityId,
-    input,
+    {
+      ...input,
+      sourceMode: sourceValidation.sourceMode,
+      sourceLinks: sourceValidation.sourceLinks,
+    },
     vendor,
     legalEntity.gstin,
     legalEntity.stateCode,
@@ -248,9 +271,21 @@ export async function updateVendorInvoiceDraft(
     req.context?.userId,
   )
 
-  const invoice = await repo.replaceVendorInvoiceDraft(tenantId, id, header, result, mapSourceLinks(input.sourceLinks), input.expectedUpdatedAt)
-  await audit(req, tenantId, id, 'VENDOR_INVOICE_UPDATED')
-  return serializeVendorInvoice(req, invoice, result)
+  const invoice = await repo.replaceVendorInvoiceDraft(
+    tenantId,
+    id,
+    header,
+    result,
+    mapSourceLinks(sourceValidation.sourceLinks),
+    input.expectedUpdatedAt,
+  )
+  await audit(req, tenantId, id, 'VENDOR_INVOICE_UPDATED', { sourceMode: sourceValidation.sourceMode })
+  const serialized = await serializeVendorInvoice(req, invoice, result)
+  return {
+    ...serialized,
+    sourceMode: sourceValidation.sourceMode,
+    metaWarnings: sourceValidation.warnings.length > 0 ? sourceValidation.warnings : undefined,
+  }
 }
 
 /** Re-runs the Phase 4A2 calculation engine from the stored `calculationContext` — used by validate/submit/mark-ready/approve. */
@@ -266,13 +301,27 @@ export async function recalculateVendorInvoice(
     invoice.legalEntityId,
     context,
     legalEntity.stateCode,
-    vendor?.state ?? invoice.vendorStateCodeSnapshot,
+    vendor?.stateCode ?? vendor?.state ?? invoice.vendorStateCodeSnapshot,
   )
   return calculateVendorInvoice(calcInput, { tenantId, legalEntityId: invoice.legalEntityId, vendorInvoiceId: invoice.id, userId })
 }
 
 export async function validateVendorInvoice(req: Request, tenantId: string, id: string) {
   const invoice = await repo.findVendorInvoiceWithLinesOrThrow(tenantId, id)
+  await loadActiveVendor(tenantId, invoice.vendorId)
+
+  const context = invoice.calculationContext as unknown as DraftBody & { sourceMode?: CreateVendorInvoiceInput['sourceMode'] }
+  const sourceLinks = (invoice.sourceLinks ?? []).map((link) => ({
+    sourceType: link.sourceType,
+    sourceDocumentId: link.sourceDocumentId,
+  }))
+  await validateAndEnrichVendorInvoiceSourceLinks(
+    tenantId,
+    invoice.vendorId,
+    sourceLinks,
+    context?.sourceMode,
+  )
+
   const result = await recalculateVendorInvoice(tenantId, invoice, req.context?.userId)
 
   if (['DRAFT', 'READY_TO_POST', 'REJECTED', 'PENDING_APPROVAL'].includes(invoice.status)) {

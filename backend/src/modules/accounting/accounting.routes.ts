@@ -20,9 +20,11 @@ import treasuryRoutes from './treasury/treasury.routes.js'
 import taxComplianceRoutes from './tax-compliance/tax-compliance.routes.js'
 import fixedAssetsRoutes from './fixed-assets/fixed-assets.routes.js'
 import budgetingRoutes from './budgeting/budgeting.routes.js'
+import accountingLookupRoutes from './lookups/accounting-lookup.routes.js'
 
 const router = Router({ mergeParams: true })
 
+router.use('/lookups', accountingLookupRoutes)
 router.use('/legal-entities', legalEntityRoutes)
 router.use('/legal-entities/:legalEntityId/branches', nestedBranchRouter)
 router.use('/branches', branchRoutes)

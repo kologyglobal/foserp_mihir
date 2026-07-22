@@ -10,6 +10,7 @@ import type { PayableOutstandingOpenItemDto, VendorPayableDetailDto } from '@/ty
 import { formatCurrency } from '@/utils/formatters/currency'
 import { useMoneyOutPermissions } from '@/utils/permissions/moneyOut'
 import { notify } from '@/store/toastStore'
+import { partyMasterRoute } from '@/modules/accounting/shared/invoices'
 import { parseDecimal } from '../moneyOutUi'
 import { MoneyOutWorkspaceShell } from '../MoneyOutWorkspaceShell'
 
@@ -70,9 +71,19 @@ export function VendorDetailPage() {
     <MoneyOutWorkspaceShell
       title={summary?.vendorName ?? 'Vendor'}
       commandBar={
-        <ErpButton variant="secondary" icon={RefreshCw} onClick={() => void load()}>
-          Refresh
-        </ErpButton>
+        <div className="flex flex-wrap items-center gap-2">
+          {vendorId && (
+            <Link
+              to={partyMasterRoute('purchase', vendorId)}
+              className="text-[12px] font-medium text-erp-accent hover:underline"
+            >
+              Open Vendor Master
+            </Link>
+          )}
+          <ErpButton variant="secondary" icon={RefreshCw} onClick={() => void load()}>
+            Refresh
+          </ErpButton>
+        </div>
       }
     >
       {loading ? (

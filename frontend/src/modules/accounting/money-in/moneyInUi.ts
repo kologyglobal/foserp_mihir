@@ -1,5 +1,13 @@
 import type { ErpStatusChipTone } from '@/components/erp/ErpStatusChip'
-import type { CalculationIssue, CustomerCreditNoteStatus, CustomerReceiptStatus, SalesInvoiceStatus } from '@/types/moneyIn'
+import type {
+  CalculationIssue,
+  CustomerCreditNoteStatus,
+  CustomerReceiptStatus,
+  SalesInvoiceDto,
+  SalesInvoiceSettlementStatus,
+  SalesInvoiceStatus,
+} from '@/types/moneyIn'
+import { isApiMode } from '../../../config/apiConfig'
 
 export const MONEY_IN_STATUS_LABELS: Record<SalesInvoiceStatus, string> = {
   DRAFT: 'Draft',
@@ -24,6 +32,59 @@ export function moneyInStatusTone(status: SalesInvoiceStatus): ErpStatusChipTone
     default:
       return 'neutral'
   }
+}
+
+/** Settlement / collection status labels for invoice list + detail chips. */
+export const SETTLEMENT_STATUS_LABELS: Record<SalesInvoiceSettlementStatus, string> = {
+  UNPAID: 'Unpaid',
+  PARTIALLY_PAID: 'Partially Paid',
+  PAID: 'Paid',
+  OVERDUE: 'Overdue',
+  NOT_APPLICABLE: '—',
+}
+
+export function settlementStatusTone(status: SalesInvoiceSettlementStatus): ErpStatusChipTone {
+  switch (status) {
+    case 'PAID':
+      return 'success'
+    case 'PARTIALLY_PAID':
+      return 'warning'
+    case 'OVERDUE':
+      return 'critical'
+    case 'UNPAID':
+      return 'neutral'
+    default:
+      return 'neutral'
+  }
+}
+
+/** Client-side fallback when API omits settlementStatus (demo mode). */
+export function resolveSettlementStatus(
+  invoice: Pick<SalesInvoiceDto, 'status' | 'outstandingAmount' | 'amountPaid' | 'dueDate' | 'settlementStatus'>,
+): SalesInvoiceSettlementStatus | null {
+  if (invoice.settlementStatus) return invoice.settlementStatus
+  if (invoice.status !== 'POSTED') return null
+  const open = parseDecimal(invoice.outstandingAmount)
+  const paid = parseDecimal(invoice.amountPaid)
+  if (open <= 0) return 'PAID'
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const dueDay = invoice.dueDate ? new Date(invoice.dueDate) : null
+  if (dueDay) dueDay.setHours(0, 0, 0, 0)
+  const pastDue = Boolean(dueDay && !Number.isNaN(dueDay.getTime()) && dueDay.getTime() < today.getTime())
+  if (paid > 0) return pastDue ? 'OVERDUE' : 'PARTIALLY_PAID'
+  return pastDue ? 'OVERDUE' : 'UNPAID'
+}
+
+/** Canonical AR workspace base path for the active mode. */
+export function moneyInBasePath(): string {
+  return isApiMode() ? '/accounting/receivables' : '/accounting/money-in'
+}
+
+export function moneyInPath(subpath: string): string {
+  const base = moneyInBasePath()
+  if (!subpath || subpath === '/') return base
+  return subpath.startsWith('/') ? `${base}${subpath}` : `${base}/${subpath}`
 }
 
 export const CREDIT_NOTE_STATUS_LABELS: Record<CustomerCreditNoteStatus, string> = {

@@ -8,6 +8,7 @@ import * as draft from './vendor-invoice-draft.service.js'
 import * as read from './vendor-invoice-read.service.js'
 import * as workflow from './vendor-invoice-workflow.service.js'
 import * as approval from './vendor-invoice-approval.service.js'
+import * as refresh from './vendor-invoice-refresh-from-master.service.js'
 
 export const listVendorInvoices = asyncHandler(async (req: Request, res: Response) => {
   const result = await read.listVendorInvoices(req, getTenantId(req), req.query as unknown as ListVendorInvoicesQuery)
@@ -46,3 +47,17 @@ export const rejectVendorInvoice = asyncHandler(async (req: Request, res: Respon
 
 export const getVendorInvoiceApproval = asyncHandler(async (req: Request, res: Response) =>
   sendSuccess(res, 'vendor invoice approval fetched', await approval.getVendorInvoiceApproval(req, getTenantId(req), getRouteParam(req, 'id'))))
+
+export const previewVendorInvoiceRefreshFromMaster = asyncHandler(async (req: Request, res: Response) =>
+  sendSuccess(
+    res,
+    'vendor invoice refresh-from-master preview',
+    await refresh.previewVendorInvoiceRefreshFromMaster(getTenantId(req), getRouteParam(req, 'id')),
+  ))
+
+export const applyVendorInvoiceRefreshFromMaster = asyncHandler(async (req: Request, res: Response) =>
+  sendSuccess(
+    res,
+    'vendor invoice refreshed from master',
+    await refresh.applyVendorInvoiceRefreshFromMaster(req, getTenantId(req), getRouteParam(req, 'id')),
+  ))

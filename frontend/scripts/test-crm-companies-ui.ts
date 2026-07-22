@@ -101,7 +101,7 @@ check(2, 'Navigation CRM tab order: Companies before Leads', (() => {
   const idxLeads = navSrc.indexOf("label: 'Leads'")
   return idxCompanies > 0 && idxCompanies < idxLeads
 })())
-check(3, 'Workspace chrome shows module sub-nav tabs (not route history)', chromeSrc.includes('moduleSubNav.items.map') && chromeSrc.includes('useModuleTabs'))
+check(3, 'Workspace chrome uses module tabs (no Zoho vertical rail)', chromeSrc.includes('DynamicsTabs') && chromeSrc.includes('useModuleTabs') && !chromeSrc.includes('ModuleSubNavRail'))
 const { readAllRouteSources } = await import('./routeSource')
 check(3.1, 'entity360 customer route registered', readAllRouteSources(ROOT).includes("path: 'entity360/customers/:id'"))
 check(4, 'KPI cards calculate from company data', kpis.totalCompanies >= 20 && kpis.pipelineValue >= 0)

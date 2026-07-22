@@ -67,8 +67,34 @@ export function assertCancellable(grn: Pick<GoodsReceipt, 'status' | 'deletedAt'
 
 export function assertReversible(grn: Pick<GoodsReceipt, 'status' | 'deletedAt'>): void {
   assertNotDeleted(grn)
-  if (!['SUBMITTED', 'RECEIVING_COMPLETED', 'QC_PENDING', 'PARTIALLY_ACCEPTED', 'FULLY_ACCEPTED'].includes(grn.status)) {
+  if (
+    ![
+      'SUBMITTED',
+      'RECEIVING_COMPLETED',
+      'QC_PENDING',
+      'PARTIALLY_ACCEPTED',
+      'FULLY_ACCEPTED',
+      'INVENTORY_POSTED',
+    ].includes(grn.status)
+  ) {
     throw workflowError(PURCHASE_ERROR_CODE.GRN_NOT_REVERSIBLE)
+  }
+}
+
+export function assertInventoryPostable(grn: Pick<GoodsReceipt, 'status' | 'deletedAt' | 'warehouseId' | 'inspectionRequired'>): void {
+  assertNotDeleted(grn)
+  if (!grn.warehouseId) {
+    throw new GoodsReceiptValidationError(
+      purchaseMessage(PURCHASE_ERROR_CODE.GRN_WAREHOUSE_REQUIRED),
+      PURCHASE_ERROR_CODE.GRN_WAREHOUSE_REQUIRED,
+    )
+  }
+  if (grn.status === 'INVENTORY_POSTED') return
+  const allowed = grn.inspectionRequired
+    ? ['PARTIALLY_ACCEPTED', 'FULLY_ACCEPTED']
+    : ['SUBMITTED', 'RECEIVING_COMPLETED', 'PARTIALLY_ACCEPTED', 'FULLY_ACCEPTED']
+  if (!allowed.includes(grn.status)) {
+    throw workflowError(PURCHASE_ERROR_CODE.GRN_NOT_EDITABLE)
   }
 }
 
@@ -82,21 +108,34 @@ export function qty(value: unknown): number {
   return Number.isFinite(n) ? n : 0
 }
 
-export function allowedActions(grn: Pick<GoodsReceipt, 'status' | 'deletedAt'>): {
+export function allowedActions(grn: Pick<GoodsReceipt, 'status' | 'deletedAt' | 'inspectionRequired'>): {
   canEdit: boolean
   canSubmit: boolean
   canCancel: boolean
   canReverse: boolean
+  canPostInventory: boolean
 } {
   const active = !grn.deletedAt
+  const canPostInventory =
+    active &&
+    grn.status !== 'INVENTORY_POSTED' &&
+    (grn.inspectionRequired
+      ? ['PARTIALLY_ACCEPTED', 'FULLY_ACCEPTED'].includes(grn.status)
+      : ['SUBMITTED', 'RECEIVING_COMPLETED', 'PARTIALLY_ACCEPTED', 'FULLY_ACCEPTED'].includes(grn.status))
   return {
     canEdit: active && grn.status === 'DRAFT',
     canSubmit: active && grn.status === 'DRAFT',
     canCancel: active && ['DRAFT', 'SUBMITTED', 'RECEIVING_COMPLETED', 'QC_PENDING'].includes(grn.status),
     canReverse:
       active &&
-      ['SUBMITTED', 'RECEIVING_COMPLETED', 'QC_PENDING', 'PARTIALLY_ACCEPTED', 'FULLY_ACCEPTED'].includes(
-        grn.status,
-      ),
+      [
+        'SUBMITTED',
+        'RECEIVING_COMPLETED',
+        'QC_PENDING',
+        'PARTIALLY_ACCEPTED',
+        'FULLY_ACCEPTED',
+        'INVENTORY_POSTED',
+      ].includes(grn.status),
+    canPostInventory,
   }
 }

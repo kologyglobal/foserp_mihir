@@ -1,5 +1,5 @@
 import { prisma } from '../../config/database.js'
-import { ROLE_PERMISSIONS } from '../../constants/permissions.js'
+import { TENANT_ADMIN_PERMISSIONS } from '../../constants/permissions.js'
 import { createAuditLog } from '../../services/audit.service.js'
 import { initTenantCodeSeries } from '../../services/codeSeries.service.js'
 import { ConflictError, NotFoundError } from '../../utils/errors.js'
@@ -33,9 +33,8 @@ export async function createTenant(
     throw new ConflictError('Tenant slug already exists')
   }
 
-  const permissionNames = ROLE_PERMISSIONS['Tenant Admin']
   const permissions = await prisma.permission.findMany({
-    where: { name: { in: [...permissionNames] } },
+    where: { name: { in: [...TENANT_ADMIN_PERMISSIONS] } },
   })
 
   const passwordHash = await hashPassword(input.adminUser.password)

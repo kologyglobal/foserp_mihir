@@ -1,6 +1,7 @@
 import { isApiMode } from '../../config/apiConfig'
 import { getStoredSession } from '../../services/api/client'
 import { canPermission } from './index'
+import { hasWorkspaceAdminRole } from './workspaceAdmin'
 
 /**
  * Permission gate for Convert Quotation → SO.
@@ -24,6 +25,7 @@ export function canAccessCrmShell(): boolean {
 
 /** Check CRM permission — uses session permissions in API mode, demo matrix otherwise. */
 export function canCrmPermission(permission: string): boolean {
+  if (isApiMode() && hasWorkspaceAdminRole()) return true
   if (isApiMode()) {
     const perms = getStoredSession()?.user.permissions ?? []
     // Backend requirePermission treats tenant.manage as a wildcard — mirror it here.

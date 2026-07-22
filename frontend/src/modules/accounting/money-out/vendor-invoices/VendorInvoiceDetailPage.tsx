@@ -22,6 +22,7 @@ import type { PostVendorInvoiceResult, VendorInvoiceApprovalDetail, VendorInvoic
 import { formatCurrency } from '@/utils/formatters/currency'
 import { mergeAllowedAction, useMoneyOutPermissions } from '@/utils/permissions/moneyOut'
 import { notify } from '@/store/toastStore'
+import { MasterRefreshModal, PartyMasterCard, SourceDocumentCard } from '@/modules/accounting/shared/invoices'
 import { PayableOpenItemSummary } from '../components/PayableOpenItemSummary'
 import { VendorInvoiceAccountingPreviewTable } from '../components/VendorInvoiceAccountingPreview'
 import { VendorInvoicePostConfirmModal } from '../components/VendorInvoicePostConfirmModal'
@@ -35,7 +36,7 @@ import {
 } from '../moneyOutUi'
 import { MoneyOutWorkspaceShell } from '../MoneyOutWorkspaceShell'
 
-type DetailTab = 'overview' | 'lines' | 'tax' | 'validation' | 'approval' | 'accounting' | 'sources'
+type DetailTab = 'overview' | 'lines' | 'vendor' | 'tax' | 'validation' | 'approval' | 'accounting' | 'sources'
 
 export function VendorInvoiceDetailPage() {
   const { id } = useParams()
@@ -55,6 +56,7 @@ export function VendorInvoiceDetailPage() {
   const [reason, setReason] = useState('')
   const [comments, setComments] = useState('')
   const [postResult, setPostResult] = useState<PostVendorInvoiceResult | null>(null)
+  const [showMasterRefresh, setShowMasterRefresh] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -236,6 +238,7 @@ export function VendorInvoiceDetailPage() {
   const tabs: Array<{ id: DetailTab; label: string }> = [
     { id: 'overview', label: 'Overview' },
     { id: 'lines', label: 'Lines' },
+    { id: 'vendor', label: 'Vendor' },
     { id: 'tax', label: 'Tax & TDS' },
     { id: 'validation', label: 'Validation' },
     { id: 'approval', label: 'Approval' },
@@ -484,6 +487,44 @@ export function VendorInvoiceDetailPage() {
         </>
       )}
 
+      {tab === 'vendor' && (
+        <div className="text-[12px]">
+          <h3 className="mb-1 font-semibold uppercase tracking-wide text-erp-muted">Document snapshot</h3>
+          <dl className="grid gap-1 sm:grid-cols-2">
+            <div>
+              Name: <span className="text-erp-text">{invoice.vendorNameSnapshot}</span>
+            </div>
+            <div>
+              Code: <span className="text-erp-text">{invoice.vendorCodeSnapshot}</span>
+            </div>
+            <div>
+              GSTIN: <span className="text-erp-text">{invoice.vendorGstinSnapshot ?? '—'}</span>
+            </div>
+            <div>
+              State code: <span className="text-erp-text">{invoice.vendorStateCodeSnapshot ?? '—'}</span>
+            </div>
+          </dl>
+          <PartyMasterCard
+            variant="purchase"
+            partyId={invoice.vendorId}
+            snapshot={{
+              name: invoice.vendorNameSnapshot,
+              code: invoice.vendorCodeSnapshot,
+              gstin: invoice.vendorGstinSnapshot,
+              pan: invoice.vendorPanSnapshot,
+            }}
+            onRefreshFromMaster={
+              invoice.status === 'DRAFT' && mergeAllowedAction(perms.canEditInvoice, actions?.edit)
+                ? () => setShowMasterRefresh(true)
+                : undefined
+            }
+          />
+          <p className="mt-2 text-[11px] text-erp-muted">
+            Posted vendor invoices always render the snapshot captured at posting time.
+          </p>
+        </div>
+      )}
+
       {tab === 'tax' && (
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded border border-erp-border p-3 text-[12px]">
@@ -658,20 +699,35 @@ export function VendorInvoiceDetailPage() {
 
       {tab === 'sources' && (
         <div className="text-[12px]">
-          {(invoice.sourceLinks ?? []).length === 0 ? (
-            <p className="text-erp-muted">This invoice was entered directly without a Purchase reference.</p>
-          ) : (
-            <ul className="space-y-2">
-              {invoice.sourceLinks!.map((s) => (
-                <li key={s.id} className="rounded border border-erp-border px-3 py-2">
-                  {s.sourceType.replace(/_/g, ' ')} — {s.sourceDocumentNumberSnapshot ?? s.sourceDocumentId}
-                  <div className="text-[11px] text-erp-muted">Purchase matching is not enforced in the current phase.</div>
-                </li>
-              ))}
-            </ul>
-          )}
+          <SourceDocumentCard
+            sources={(invoice.sourceLinks ?? []).map((s) => ({
+              sourceType: s.sourceType,
+              sourceDocumentId: s.sourceDocumentId,
+              documentNumber: s.sourceDocumentNumberSnapshot,
+              documentDate: s.sourceDocumentDateSnapshot,
+            }))}
+            emptyText="This invoice was entered directly without a Purchase reference."
+          />
+          <p className="mt-2 text-[11px] text-erp-muted">
+            Quantity/price matching against PO and GRN is not enforced in the current phase.
+          </p>
         </div>
       )}
+
+      <MasterRefreshModal
+        open={showMasterRefresh}
+        onClose={() => setShowMasterRefresh(false)}
+        variant="purchase"
+        documentId={invoice.id}
+        partyId={invoice.vendorId}
+        snapshot={{
+          name: invoice.vendorNameSnapshot,
+          code: invoice.vendorCodeSnapshot,
+          gstin: invoice.vendorGstinSnapshot,
+          pan: invoice.vendorPanSnapshot,
+        }}
+        onApplied={() => void load()}
+      />
 
       <VendorInvoiceValidationPanel open={showValidate} onClose={() => setShowValidate(false)} invoice={invoice} />
       <VendorInvoicePostConfirmModal

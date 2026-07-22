@@ -231,7 +231,7 @@ export function GrnDetailPage() {
                 navigate(
                   grn.qualityInspectionId
                     ? `/purchase/quality-inspections/${grn.qualityInspectionId}`
-                    : `/purchase/quality-inspections?grnId=${grn.id}`,
+                    : `/purchase/quality-inspections/new?grnId=${grn.id}`,
                 ),
               hidden: !perms.canViewQuality,
               disabled: !grn.inspectionRequired,

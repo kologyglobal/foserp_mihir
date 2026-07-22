@@ -4,6 +4,7 @@ import {
   Database,
   Factory,
   GitBranch,
+  HardHat,
   Landmark,
   LayoutGrid,
   QrCode,
@@ -31,6 +32,7 @@ export const SIDEBAR_ICON_MENU: {
   { categoryId: 'quality', label: 'Quality', icon: ShieldCheck },
   { categoryId: 'inventory', label: 'Inventory & Warehouse', icon: Warehouse },
   { categoryId: 'dispatch', label: 'Logistics', icon: Box },
+  { categoryId: 'gate', label: 'Gate & Security', icon: HardHat },
   { categoryId: 'engineering', label: 'Eng', icon: GitBranch },
   { categoryId: 'masters', label: 'Masters', icon: Database },
   { categoryId: 'traceability', label: 'Trace', icon: QrCode },
@@ -53,7 +55,7 @@ export const SIDEBAR_GROUPS = [
   {
     id: 'operations',
     label: 'Operations',
-    categoryIds: ['purchase', 'production', 'quality', 'dispatch', 'inventory'],
+    categoryIds: ['purchase', 'production', 'quality', 'dispatch', 'gate', 'inventory'],
   },
   {
     id: 'engineering',

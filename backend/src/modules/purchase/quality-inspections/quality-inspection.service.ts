@@ -2,7 +2,10 @@ import type { QualityInspectionStatus } from '@prisma/client'
 import { prisma } from '../../../config/database.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
+import { InventoryPostingService } from '../../inventory/shared/stock-posting.service.js'
 import { resolveEffectivePurchaseDefaults } from '../shared/purchase-defaults.js'
+import { postGrnStockInward } from '../shared/purchase-inventory-posting.js'
+import { tryRecordInventoryAccountingEventsForMovements } from '../../inventory/accounting/inventory-accounting-event.service.js'
 import { QualityInspectionNotFoundError, QualityInspectionValidationError, QualityInspectionWorkflowError } from './quality-inspection.errors.js'
 import { mapQualityInspection } from './quality-inspection.mapper.js'
 import * as repo from './quality-inspection.repository.js'
@@ -72,9 +75,9 @@ export async function createQualityInspection(tenantId: string, actorId: string,
     const grnLineIds = new Set(grn.lines.map((line) => line.id))
     if (lines.some((line) => line.goodsReceiptLineId && !grnLineIds.has(line.goodsReceiptLineId))) throw new QualityInspectionValidationError('Inspection line does not belong to the selected goods receipt.')
   }
-  const inspectionNumber = await nextCode(tenantId, 'QUALITY_INSPECTION')
+  const inspectionNumber = await nextCode(tenantId, 'PURCHASE_QUALITY_INSPECTION')
   const created = await prisma.$transaction(async (tx) => {
-    const row = await tx.qualityInspection.create({ data: {
+    const row = await tx.purchaseQualityInspection.create({ data: {
       tenantId, inspectionNumber, inspectionDate: qiDate(input.inspectionDate) ?? new Date(),
       goodsReceiptId: grn?.id ?? input.goodsReceiptId ?? null,
       purchaseOrderId: grn?.purchaseOrderId ?? input.purchaseOrderId ?? null,
@@ -145,7 +148,70 @@ export async function completeQualityInspection(
   }
   const accepted = lines.reduce((sum, line) => sum + line.acceptedQuantity + (defaults.allowAcceptanceUnderDeviation ? line.deviationQuantity : 0), 0)
   const status: QualityInspectionStatus = rejected && accepted ? 'PARTIALLY_ACCEPTED' : rejected ? 'REJECTED' : 'ACCEPTED'
-  await prisma.$transaction(async (tx) => {
+  const grn = existing.goodsReceiptId
+    ? await prisma.goodsReceipt.findFirst({
+        where: { id: existing.goodsReceiptId, tenantId, deletedAt: null },
+        include: { lines: true },
+      })
+    : null
+  const grnLineById = new Map(grn?.lines.map((line) => [line.id, line]) ?? [])
+  const qiInwardMovements = await prisma.$transaction(async (tx) => {
+    const inwardMovements: Awaited<ReturnType<typeof postGrnStockInward>> = []
+    if (grn) {
+      // Compatibility for QC-pending GRNs created before status buckets shipped.
+      inwardMovements.push(...await postGrnStockInward({
+        tenantId,
+        grnId: grn.id,
+        grnNumber: grn.grnNumber,
+        warehouseId: grn.warehouseId,
+        lines: grn.lines,
+        useAcceptedQuantity: true,
+        actorId,
+        tx,
+      }))
+      for (const line of lines) {
+        if (!line.goodsReceiptLineId || !line.itemId) continue
+        const source = grnLineById.get(line.goodsReceiptLineId)
+        if (!source) continue
+        const acceptedQty =
+          line.acceptedQuantity +
+          (defaults.allowAcceptanceUnderDeviation ? line.deviationQuantity : 0)
+        if (acceptedQty > 0) {
+          await InventoryPostingService.transferStatus({
+            tenantId,
+            itemId: line.itemId,
+            warehouseId: grn.warehouseId,
+            fromStockStatus: 'QC_HOLD',
+            stockStatus: 'UNRESTRICTED',
+            quantity: acceptedQty,
+            referenceType: 'QUALITY_RELEASE',
+            referenceNo: existing.inspectionNumber,
+            remarks: `QI accepted from ${grn.grnNumber}`,
+            idempotencyKey: `qi-release:${id}:${line.id}`,
+            batchNumber: source.batchNumber ?? undefined,
+            serialNumber: source.serialNumber ?? undefined,
+            createdBy: actorId,
+          }, tx)
+        }
+        if (line.rejectedQuantity > 0) {
+          await InventoryPostingService.transferStatus({
+            tenantId,
+            itemId: line.itemId,
+            warehouseId: grn.warehouseId,
+            fromStockStatus: 'QC_HOLD',
+            stockStatus: 'REJECTED',
+            quantity: line.rejectedQuantity,
+            referenceType: 'QUALITY_REJECT',
+            referenceNo: existing.inspectionNumber,
+            remarks: `QI rejected from ${grn.grnNumber}`,
+            idempotencyKey: `qi-reject:${id}:${line.id}`,
+            batchNumber: source.batchNumber ?? undefined,
+            serialNumber: source.serialNumber ?? undefined,
+            createdBy: actorId,
+          }, tx)
+        }
+      }
+    }
     await repo.replaceQualityInspectionLines(tenantId, id, lines.map((line) => ({
       lineNumber: line.lineNumber, goodsReceiptLineId: line.goodsReceiptLineId, purchaseOrderLineId: line.purchaseOrderLineId,
       itemId: line.itemId, itemCodeSnapshot: line.itemCodeSnapshot, itemNameSnapshot: line.itemNameSnapshot,
@@ -164,10 +230,20 @@ export async function completeQualityInspection(
       } })
     }
     if (existing.goodsReceiptId) await tx.goodsReceipt.updateMany({ where: { id: existing.goodsReceiptId, tenantId, deletedAt: null }, data: {
-      status: status === 'ACCEPTED' ? 'FULLY_ACCEPTED' : 'PARTIALLY_ACCEPTED', updatedById: actorId,
+      status: 'INVENTORY_POSTED',
+      updatedById: actorId,
     } })
     await repo.addQiHistory(tenantId, id, existing.inspectionNumber, 'QI_COMPLETED', existing.status, status, actorId, body.remarks, tx)
+    return inwardMovements
   })
+  if (grn) {
+    await tryRecordInventoryAccountingEventsForMovements(null, tenantId, qiInwardMovements, {
+      sourceDocumentType: 'GOODS_RECEIPT',
+      sourceDocumentId: grn.id,
+      narration: `GRN inward ${grn.grnNumber} (via QI ${existing.inspectionNumber})`,
+      userId: actorId,
+    })
+  }
   return mapQualityInspection(await loadOrThrow(tenantId, id))
 }
 

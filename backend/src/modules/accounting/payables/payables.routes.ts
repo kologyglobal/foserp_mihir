@@ -6,6 +6,7 @@ import vendorAdjustmentRoutes from './vendor-adjustments/vendor-adjustment.route
 import payableAllocationRoutes from './allocations/payable-allocation.routes.js'
 import payableReconciliationRoutes from './reconciliation/payable-reconciliation.routes.js'
 import payableCloseGateRoutes from './reconciliation/payable-close-gate.routes.js'
+import apDisputeRoutes from './disputes/ap-dispute.routes.js'
 
 const router = Router({ mergeParams: true })
 
@@ -16,5 +17,6 @@ router.use('/vendor-adjustments', vendorAdjustmentRoutes)
 router.use('/allocations', payableAllocationRoutes)
 router.use('/reconciliation', payableReconciliationRoutes)
 router.use('/close-gate', payableCloseGateRoutes)
+router.use('/disputes', apDisputeRoutes)
 
 export default router

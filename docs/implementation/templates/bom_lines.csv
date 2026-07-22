@@ -1,0 +1,2 @@
+bomCode,bomVersionNumber,sequence,level,itemCode,quantity,uomCode,quantityBasis,scrapPercent,yieldPercent,makeOrBuy,lineType,isOptional,qualityRequired,certificateRequired,drawingReference,notes
+BOM-PILOT-SIMPLE,1,10,1,PILOT-RM-PLATE,1,KG,PER_UNIT,0,100,BUY,COMPONENT,false,false,false,,

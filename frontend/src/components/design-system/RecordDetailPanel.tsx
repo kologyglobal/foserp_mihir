@@ -18,7 +18,7 @@ export function RecordDetailPanel() {
         onClick={closeDetailPanel}
         aria-hidden
       />
-      <aside className="erp-detail-panel fixed right-0 top-[var(--d365-suite-height)] z-50 flex h-[calc(100vh-var(--d365-suite-height))] w-full max-w-md flex-col border-l border-erp-border bg-erp-surface shadow-erp-lg">
+      <aside className="erp-detail-panel fixed right-0 top-0 z-50 flex h-screen w-full max-w-md flex-col border-l border-erp-border bg-erp-surface shadow-erp-lg">
         <div className="flex items-start justify-between gap-3 border-b border-erp-border bg-gradient-to-r from-erp-surface-alt/90 to-erp-surface px-4 py-3">
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-widest text-erp-muted">Quick View</p>

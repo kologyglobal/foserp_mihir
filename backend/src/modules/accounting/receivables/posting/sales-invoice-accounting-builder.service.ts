@@ -27,11 +27,14 @@ import { PostingError } from '../../posting/posting.errors.js'
 import type { PostingRequest, PostingRequestLine } from '../../posting/posting.types.js'
 import type { SalesInvoiceCalculationContext, SalesInvoiceWithLines } from '../sales-invoices/sales-invoice.types.js'
 import { buildSalesInvoicePostEventKey } from './sales-invoice-posting.types.js'
+import type { SalesInvoiceCogsPostingContext } from './sales-invoice-cogs.service.js'
 
 export interface BuildSalesInvoicePostingRequestInput {
   invoice: SalesInvoiceWithLines
   receivableAccountId: string
   calculationContext?: SalesInvoiceCalculationContext | null
+  /** Optional Wave 3 COGS pair — appended after revenue lines; self-balancing. */
+  cogs?: SalesInvoiceCogsPostingContext | null
 }
 
 function creditLine(
@@ -92,7 +95,7 @@ function debitLine(
 }
 
 export function buildSalesInvoicePostingRequest(input: BuildSalesInvoicePostingRequestInput): PostingRequest {
-  const { invoice, receivableAccountId, calculationContext } = input
+  const { invoice, receivableAccountId, calculationContext, cogs } = input
   const invoiceId = invoice.id
   const exchangeRate = invoice.exchangeRate.toString()
   const currencyCode = invoice.currencyCode
@@ -207,6 +210,32 @@ export function buildSalesInvoicePostingRequest(input: BuildSalesInvoicePostingR
         }),
       )
     }
+  }
+
+  if (cogs && !isZero(cogs.totalCogsAmount)) {
+    const cogsAmount = formatForPersistence(cogs.totalCogsAmount)
+    lines.push({
+      lineNumber: lineNumber++,
+      accountId: cogs.cogsAccountId,
+      debitAmount: cogsAmount,
+      creditAmount: '0.0000',
+      baseDebitAmount: formatForPersistence(convertToBase(cogsAmount, exchangeRate)),
+      baseCreditAmount: '0.0000',
+      currencyCode,
+      exchangeRate,
+      referenceDocumentType: 'SALES_INVOICE',
+      referenceDocumentId: invoiceId,
+      lineNarration: 'Cost of goods sold on sales invoice',
+    })
+    lines.push(
+      creditLine(lineNumber++, cogsAmount, {
+        accountId: cogs.fgInventoryAccountId,
+        exchangeRate,
+        currencyCode,
+        referenceDocumentId: invoiceId,
+        lineNarration: 'Finished goods inventory relief on sales invoice',
+      }),
+    )
   }
 
   const totalDebit = sumDecimals(lines.map((l) => l.debitAmount))

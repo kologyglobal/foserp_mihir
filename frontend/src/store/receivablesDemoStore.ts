@@ -48,6 +48,7 @@ import type {
   UpdateSalesInvoiceInput,
 } from '../types/moneyIn'
 import { DEMO_BRANCH_ID, DEMO_FY_ID, DEMO_LEGAL_ENTITY_ID } from './financeSetupStore'
+import { getMasterStoreState } from './storeBridge'
 import { formatDecimal, previewInterLineTotal, previewLineTotal } from '../modules/accounting/money-in/moneyInUi'
 
 function id() {
@@ -289,13 +290,35 @@ function recalcInvoice(inv: SalesInvoiceDto, lines: SalesInvoiceLineDto[]): Sale
 }
 
 function customerMeta(customerId: string) {
-  const c = CUSTOMERS.find((x) => x.id === customerId) ?? CUSTOMERS[0]
+  const c = CUSTOMERS.find((x) => x.id === customerId)
+  if (c) {
+    return {
+      customerCodeSnapshot: c.code,
+      customerNameSnapshot: c.name,
+      customerGstinSnapshot: c.gstin,
+      customerPanSnapshot: null,
+      customerStateCodeSnapshot: c.state,
+    }
+  }
+  // Documents created against master/CRM customers (CustomerMasterSelect) —
+  // resolve the snapshot from the customer master instead of demo fixtures.
+  const master = getMasterStoreState()?.customers.find((x) => x.id === customerId)
+  if (master) {
+    return {
+      customerCodeSnapshot: master.customerCode,
+      customerNameSnapshot: master.customerName,
+      customerGstinSnapshot: master.gstin || null,
+      customerPanSnapshot: master.pan ?? null,
+      customerStateCodeSnapshot: master.gstin ? master.gstin.slice(0, 2) : null,
+    }
+  }
+  const fallback = CUSTOMERS[0]
   return {
-    customerCodeSnapshot: c.code,
-    customerNameSnapshot: c.name,
-    customerGstinSnapshot: c.gstin,
+    customerCodeSnapshot: fallback.code,
+    customerNameSnapshot: fallback.name,
+    customerGstinSnapshot: fallback.gstin,
     customerPanSnapshot: null,
-    customerStateCodeSnapshot: c.state,
+    customerStateCodeSnapshot: fallback.state,
   }
 }
 

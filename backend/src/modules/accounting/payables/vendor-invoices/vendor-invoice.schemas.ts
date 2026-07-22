@@ -30,11 +30,20 @@ const sourceLinkSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).nullable().optional(),
 })
 
+/** Application-level source mode — not a Prisma column; validated against sourceLinks. */
+export const vendorInvoiceSourceModeSchema = z.enum([
+  'DIRECT',
+  'PURCHASE_ORDER',
+  'GRN',
+  'PURCHASE_ORDER_AND_GRN',
+])
+
 /** Shared draft header + line fields — reuses the Phase 4A2 calculation schemas for lines/config. */
 const draftFields = z.object({
   legalEntityId: z.string().uuid(),
   branchId: z.string().uuid().nullable().optional(),
   vendorId: z.string().uuid(),
+  sourceMode: vendorInvoiceSourceModeSchema.optional(),
   invoiceType: vendorInvoiceTypeSchema,
   supplierInvoiceNumber: z.string().min(1).max(128),
   supplierInvoiceDate: z.string(),

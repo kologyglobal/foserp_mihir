@@ -74,6 +74,16 @@ export const reverseGoodsReceipt = asyncHandler(async (req: Request, res: Respon
   sendSuccess(res, 'Goods receipt reversed', data)
 })
 
+export const postInventoryGoodsReceipt = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.postInventoryGoodsReceipt(
+    getTenantId(req),
+    getRouteParam(req, 'id'),
+    getUserId(req),
+    req.body ?? {},
+  )
+  sendSuccess(res, 'Goods receipt inventory posted', data)
+})
+
 export const getReceivableLines = asyncHandler(async (req: Request, res: Response) => {
   const data = await service.getReceivableLines(getTenantId(req), getRouteParam(req, 'id'))
   sendSuccess(res, 'Receivable PO lines retrieved', data)

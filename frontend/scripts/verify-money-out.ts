@@ -120,8 +120,32 @@ async function main() {
   check('Quick expense mode', formSrc.includes('Quick expense'))
   check('Unsaved change blocker', formSrc.includes('useBlocker'))
   check('Sends expectedUpdatedAt on edit', formSrc.includes('expectedUpdatedAt: updatedAt'))
-  check('Optional purchase refs', formSrc.includes('Purchase matching is not enforced'))
   check('No inventory / GRN create', !formSrc.includes('createGoodsReceipt') && !formSrc.includes('createPurchaseOrder'))
+
+  // Wave 6 — master reuse wiring (accounting lookups + refresh-from-master)
+  check('Vendor picker via VendorMasterSelect', formSrc.includes('<VendorMasterSelect'))
+  check('Vendor picker uses accounting lookup source', formSrc.includes('source="accounting"'))
+  check('PO picker uses accounting purchase-order lookups', formSrc.includes('listPurchaseOrderLookups'))
+  check('GRN picker uses accounting GRN lookups', formSrc.includes('listGrnLookups'))
+  check('PO/GRN lookups request eligibleOnly', formSrc.includes('eligibleOnly: true'))
+  check('No direct purchase list APIs on VI form', !formSrc.includes('listPurchaseOrdersApi') && !formSrc.includes('listGoodsReceiptsApi'))
+  check('Create-mode chooser DIRECT / PO / GRN', formSrc.includes("'DIRECT' | 'PURCHASE_ORDER' | 'GOODS_RECEIPT'"))
+  check('Shared PartyMasterCard on form', formSrc.includes('PartyMasterCard'))
+  check('Real source links only (no fabricated UUIDs)', !formSrc.toLowerCase().includes('fabricated uuid') || formSrc.includes('fabricated UUIDs are gone'))
+
+  const vendorSelectSrc = read('src/components/masters/VendorMasterSelect.tsx')
+  check('VendorMasterSelect wired to /accounting/lookups/vendors', vendorSelectSrc.includes('useAccountingVendorLookups'))
+
+  check('Refresh-from-master preview helper', apiSrc.includes('previewVendorInvoiceRefreshFromMaster'))
+  check('Refresh-from-master apply helper', apiSrc.includes('applyVendorInvoiceRefreshFromMaster'))
+
+  const refreshModalSrc = read('src/modules/accounting/shared/invoices/MasterRefreshModal.tsx')
+  check('MasterRefreshModal uses VI server preview', refreshModalSrc.includes('previewVendorInvoiceRefreshFromMaster'))
+  check('MasterRefreshModal has no Wave 1 TODO', !refreshModalSrc.includes('TODO(Wave 1)'))
+
+  const lookupsApiSrc = read('src/services/api/accountingLookupsApi.ts')
+  check('Accounting lookups client — vendors', lookupsApiSrc.includes('/vendors'))
+  check('Accounting lookups client — POs/GRNs + eligibility', lookupsApiSrc.includes('/grns') && lookupsApiSrc.includes('invoice-eligibility'))
 
   const overviewSrc = read('src/modules/accounting/money-out/MoneyOutOverviewPage.tsx')
   const moneyOutUiSrc = read('src/modules/accounting/money-out/moneyOutUi.ts')

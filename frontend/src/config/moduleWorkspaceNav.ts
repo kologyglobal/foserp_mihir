@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react'
 import {
   categoryIsActive,
   findActiveCategoryId,
@@ -22,9 +23,15 @@ export function getCategoryWorkspacePath(category: NavCategory): string {
   return first?.path ?? '/home'
 }
 
-export type ModuleSubNavItem = { label: string; path: string; end?: boolean; group?: string }
+export type ModuleSubNavItem = {
+  label: string
+  path: string
+  end?: boolean
+  group?: string
+  icon?: LucideIcon
+}
 
-/** Workspace sub-menu for the active module — drives Dynamics sub-nav in the work area */
+/** Workspace sub-menu for the active module — drives the Zoho-style vertical module rail */
 export function getModuleSubNavForPath(pathname: string): {
   categoryId: string
   categoryTitle: string
@@ -48,7 +55,13 @@ export function getModuleSubNavForPath(pathname: string): {
       if (category.id === 'inventory') return canViewInventoryNavItem(item.path)
       return true
     })
-    .map((item) => ({ label: item.label, path: item.path, end: item.end, group: item.group }))
+    .map((item) => ({
+      label: item.label,
+      path: item.path,
+      end: item.end,
+      group: item.group,
+      icon: item.icon,
+    }))
 
   return { categoryId, categoryTitle: category.title, base, items }
 }

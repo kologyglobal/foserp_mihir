@@ -6,6 +6,7 @@
  * (tenant isolation + accounting.payables.* permissions). UI gating alone is not security.
  */
 
+import { isApiMode } from '../../config/apiConfig'
 import {
   PAYABLE_BANK_ACCOUNTS,
   PAYABLES_REPORT_CATALOG,
@@ -23,6 +24,11 @@ import {
   seedVendorDisputes,
   seedVendorPayments,
 } from '../../data/accounting/payablesSeed'
+import {
+  createLiveVendorDispute,
+  getLiveVendorDisputes,
+  updateLiveVendorDispute,
+} from './payablesDisputeLiveService'
 import type {
   PayableAgeingBucket,
   PayableAgeingResult,
@@ -1484,6 +1490,13 @@ export async function applyDebitNoteDemo(debitNoteId: string, invoiceId: string,
 export async function createVendorDispute(
   input: Omit<VendorDispute, 'id' | 'disputeNumber' | 'createdAt'>,
 ): Promise<VendorDispute> {
+  if (isApiMode()) {
+    try {
+      return await createLiveVendorDispute(input)
+    } catch (e) {
+      throw new PayablesServiceError(e instanceof Error ? e.message : 'Failed to create vendor dispute')
+    }
+  }
   await delay()
   const user = getSessionUser()
   const seq = disputesStore.length + 1
@@ -1506,6 +1519,13 @@ export async function createVendorDispute(
 }
 
 export async function updateVendorDispute(id: string, patch: Partial<VendorDispute>): Promise<VendorDispute> {
+  if (isApiMode()) {
+    try {
+      return await updateLiveVendorDispute(id, patch)
+    } catch (e) {
+      throw new PayablesServiceError(e instanceof Error ? e.message : 'Failed to update vendor dispute')
+    }
+  }
   await delay()
   const idx = disputesStore.findIndex((d) => d.id === id)
   if (idx < 0) throw new PayablesServiceError('Vendor dispute not found.')
@@ -1847,6 +1867,13 @@ export async function getDisputes(filter: Partial<PayableFilter> = {}): Promise<
 }
 
 export async function getVendorDisputes(filter: Partial<PayableFilter> = {}): Promise<VendorDispute[]> {
+  if (isApiMode()) {
+    try {
+      return await getLiveVendorDisputes(filter)
+    } catch (e) {
+      throw new PayablesServiceError(e instanceof Error ? e.message : 'Failed to load vendor disputes')
+    }
+  }
   await delay()
   const f = { ...DEFAULT_PAYABLE_FILTER, ...filter }
   return clone(

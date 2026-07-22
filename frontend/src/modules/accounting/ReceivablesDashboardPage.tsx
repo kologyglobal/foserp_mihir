@@ -28,6 +28,7 @@ import {
 } from '@/services/accounting/receivablesService'
 import type { ReceivablesDashboardData } from '@/types/receivables'
 import { useReceivablesPermissions } from '@/utils/permissions/receivables'
+import { isApiMode } from '@/config/apiConfig'
 import { getCommercialCommitmentSummary } from '@/data/accounting/commercialCommitmentsSeed'
 import type { CommercialCommitmentSummary } from '@/types/commercialCommitments'
 import { formatCurrency, formatCompactCurrency } from '@/utils/formatters/currency'
@@ -62,7 +63,8 @@ export function ReceivablesDashboardPage() {
     try {
       const [result, commercial] = await Promise.all([
         getReceivablesDashboard(),
-        getCommercialCommitmentSummary(),
+        // Commercial commitments are a seed-backed panel — never surface seed data in API mode.
+        isApiMode() ? Promise.resolve(null) : getCommercialCommitmentSummary(),
       ])
       if (signal?.cancelled) return
       setData(result)

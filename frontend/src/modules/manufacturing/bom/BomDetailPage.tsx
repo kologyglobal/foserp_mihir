@@ -131,7 +131,24 @@ export function BomDetailPage() {
     )
   }
 
-  if (loading || !bom) return <LoadingState variant="card" />
+  if (loading || !bom) {
+    return (
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Manufacturing"
+        title="BOM"
+        breadcrumbs={[
+          { label: 'Manufacturing & Production', to: '/manufacturing' },
+          { label: 'BOM', to: '/manufacturing/bom' },
+        ]}
+        autoBreadcrumbs={false}
+        backLink={{ to: '/manufacturing/bom', label: 'Back to BOMs' }}
+      >
+        <LoadingState variant="card" />
+      </OperationalPageShell>
+    )
+  }
 
   const travelerDoc = getTravelerDocumentForManufacturingBom(bom.id)
   const tabs = travelerDoc
@@ -156,6 +173,7 @@ export function BomDetailPage() {
       ]}
       autoBreadcrumbs={false}
       favoritePath={`/manufacturing/bom/${bom.id}`}
+      backLink={{ to: '/manufacturing/bom', label: 'Back to BOMs' }}
       commandBar={(
         <ErpCommandBar
           inline

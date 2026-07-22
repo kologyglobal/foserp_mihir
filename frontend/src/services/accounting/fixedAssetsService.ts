@@ -13,6 +13,7 @@ import {
   capitalizeFixedAsset,
   completeFixedAssetTransfer,
   createDepreciationRun,
+  createFixedAsset,
   createFixedAssetTransfer,
   disposeFixedAsset,
   fetchDepreciationRun,
@@ -556,12 +557,76 @@ export async function getAssetComponents(parentAssetId?: string): Promise<FixedA
 
 // ─── Acquisition / capitalization ─────────────────────────────────────────────
 
+/** API mode: acquisitions are live draft / pending-capitalization assets. */
+function mapAssetDtoToAcquisition(dto: FixedAssetDto): AssetAcquisition {
+  return {
+    id: dto.id,
+    acquisitionNumber: dto.assetNumber || dto.draftReference || dto.id.slice(0, 8).toUpperCase(),
+    acquisitionDate: dto.acquisitionDate,
+    acquisitionType: 'Purchase',
+    assetName: dto.name,
+    categoryId: dto.categoryId,
+    categoryName: dto.categoryName,
+    vendorName: dto.vendorName,
+    poNumber: null,
+    invoiceNumber: null,
+    invoiceDate: null,
+    amount: money(dto.acquisitionCost),
+    gstAmount: 0,
+    totalAmount: money(dto.acquisitionCost),
+    currency: dto.currencyCode,
+    status: dto.status === 'Draft' ? 'Draft' : 'Pending Capitalization',
+    assetId: dto.id,
+    location: dto.location ?? '—',
+    plant: dto.plant ?? '—',
+    department: dto.department ?? '—',
+    notes: dto.notes,
+    createdBy: '—',
+    createdAt: dto.createdAt,
+  }
+}
+
 export async function getAcquisitions(): Promise<AssetAcquisition[]> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const [drafts, pending] = await Promise.all([
+      unwrapApiData(fetchFixedAssets({ legalEntityId: le.id, status: 'DRAFT' })),
+      unwrapApiData(fetchFixedAssets({ legalEntityId: le.id, status: 'PENDING_CAPITALIZATION' })),
+    ])
+    return [...pending, ...drafts]
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .map(mapAssetDtoToAcquisition)
+  }
+
   await delay()
   return clone(acquisitionsStore)
 }
 
 export async function createAcquisitionDemo(partial?: Partial<AssetAcquisition>): Promise<AssetAcquisition> {
+  if (isApiMode()) {
+    if (!partial?.assetName?.trim()) throw new FixedAssetsServiceError('Asset name is required')
+    if (!partial.categoryId) throw new FixedAssetsServiceError('Category is required')
+    const amount = partial.amount ?? 0
+    if (!(amount > 0)) throw new FixedAssetsServiceError('Amount must be greater than zero')
+    const le = await resolveDefaultLegalEntity()
+    const dto = await unwrapApiData(
+      createFixedAsset({
+        legalEntityId: le.id,
+        categoryId: partial.categoryId,
+        name: partial.assetName.trim(),
+        acquisitionDate: partial.acquisitionDate ?? new Date().toISOString().slice(0, 10),
+        acquisitionCost: String(amount),
+        vendorName: partial.vendorName || undefined,
+        location: partial.location || undefined,
+        plant: partial.plant || undefined,
+        department: partial.department || undefined,
+        notes: partial.notes || undefined,
+        status: 'PENDING_CAPITALIZATION',
+      }),
+    )
+    return mapAssetDtoToAcquisition(dto)
+  }
+
   await delay()
   const user = getSessionUser()
   const acq: AssetAcquisition = {
@@ -598,6 +663,38 @@ export async function createAcquisitionDemo(partial?: Partial<AssetAcquisition>)
 }
 
 export async function getCapitalizations(): Promise<AssetCapitalization[]> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const [pending, active] = await Promise.all([
+      unwrapApiData(fetchFixedAssets({ legalEntityId: le.id, status: 'PENDING_CAPITALIZATION' })),
+      unwrapApiData(fetchFixedAssets({ legalEntityId: le.id, status: 'ACTIVE' })),
+    ])
+    // Row id is the asset id so capitalizeAssetDemo(id) hits POST /assets/:id/capitalize.
+    const mapRow = (dto: FixedAssetDto, status: AssetCapitalization['status']): AssetCapitalization => ({
+      id: dto.id,
+      capitalizationNumber: dto.assetNumber || dto.draftReference || dto.id.slice(0, 8).toUpperCase(),
+      assetId: dto.id,
+      assetNumber: dto.assetNumber,
+      assetName: dto.name,
+      categoryName: dto.categoryName,
+      capitalizationDate: dto.capitalizationDate ?? dto.acquisitionDate,
+      totalCost: money(dto.acquisitionCost),
+      cwIpAmount: 0,
+      additionalCosts: 0,
+      status,
+      approvedBy: null,
+      approvedAt: dto.capitalizedAt,
+      glAssetAccount: '—',
+      notes: dto.notes,
+      createdBy: '—',
+      createdAt: dto.createdAt,
+    })
+    return [
+      ...pending.map((dto) => mapRow(dto, 'Pending Approval')),
+      ...active.map((dto) => mapRow(dto, 'Capitalized')),
+    ]
+  }
+
   await delay()
   return clone(capitalizationsStore)
 }

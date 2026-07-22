@@ -2,6 +2,9 @@ import type {
   AgeingReportDto,
   CreateCustomerCreditNoteInput,
   CreateSalesInvoiceInput,
+  DispatchLineInvoiceReadyDto,
+  InvoicePrefillFromDispatchDto,
+  ListInvoiceReadyQuery,
   CreditNoteAllocationHistoryRow,
   CreditNoteAllocationPreview,
   CreditNoteAllocationRequest,
@@ -56,6 +59,19 @@ export async function listSalesInvoices(params: ListSalesInvoicesQuery) {
   return apiRequest<SalesInvoiceDto[]>(`${tenantPath(`${BASE}/invoices`)}${buildQuery(params as unknown as Record<string, string | number | boolean | undefined>)}`)
 }
 
+export async function listInvoiceReadyDispatchLines(params?: ListInvoiceReadyQuery) {
+  return apiRequest<DispatchLineInvoiceReadyDto[]>(
+    `${tenantPath(`${BASE}/invoices/invoice-ready`)}${buildQuery(params as unknown as Record<string, string | number | boolean | undefined>)}`,
+  )
+}
+
+export async function prefillInvoiceFromDispatch(outboundDispatchLineIds: string[]) {
+  return apiRequest<InvoicePrefillFromDispatchDto>(tenantPath(`${BASE}/invoices/prefill-from-dispatch`), {
+    method: 'POST',
+    body: JSON.stringify({ outboundDispatchLineIds }),
+  })
+}
+
 export async function getSalesInvoice(id: string) {
   return apiRequest<SalesInvoiceDto>(tenantPath(`${BASE}/invoices/${id}`))
 }
@@ -98,6 +114,29 @@ export async function reverseSalesInvoice(id: string, reason: string, idempotenc
     method: 'POST',
     body: JSON.stringify({ reason }),
     headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+  })
+}
+
+/** DRAFT-only refresh of the customer party snapshot from CrmCompany. */
+export interface SalesInvoiceMasterRefreshPreview {
+  invoiceId: string
+  customerId: string
+  current: Record<string, unknown>
+  proposed: Record<string, unknown>
+  changedFields: string[]
+}
+
+export async function previewSalesInvoiceRefreshFromMaster(id: string) {
+  return apiRequest<SalesInvoiceMasterRefreshPreview>(
+    tenantPath(`${BASE}/invoices/${id}/refresh-from-master/preview`),
+    { method: 'POST', body: '{}' },
+  )
+}
+
+export async function applySalesInvoiceRefreshFromMaster(id: string) {
+  return apiRequest<SalesInvoiceDto>(tenantPath(`${BASE}/invoices/${id}/refresh-from-master`), {
+    method: 'POST',
+    body: '{}',
   })
 }
 
@@ -334,3 +373,141 @@ export async function listCustomerOpenItems(customerId: string, params: Record<s
 export async function getReconciliation(params: { legalEntityId: string; asOfDate?: string }) {
   return apiRequest<ReceivableReconciliationDto>(`${tenantPath(`${BASE}/reconciliation`)}${buildQuery(params)}`)
 }
+
+// ─── AR disputes (Wave 5) ───────────────────────────────────────────────────
+
+export type ArDisputeStatus =
+  | 'OPEN'
+  | 'UNDER_REVIEW'
+  | 'AWAITING_CUSTOMER'
+  | 'AWAITING_INTERNAL_TEAM'
+  | 'RESOLVED'
+  | 'REJECTED'
+  | 'CLOSED'
+
+export type ArDisputeType =
+  | 'PRICE_DIFFERENCE'
+  | 'QUANTITY_DIFFERENCE'
+  | 'QUALITY_ISSUE'
+  | 'DELIVERY_DELAY'
+  | 'SHORT_SUPPLY'
+  | 'TAX_ISSUE'
+  | 'MISSING_DOCUMENT'
+  | 'DUPLICATE_INVOICE'
+  | 'COMMERCIAL_TERMS'
+  | 'OTHER'
+
+export type ArDisputePriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+
+export interface ArDisputeDto {
+  id: string
+  tenantId: string
+  legalEntityId: string
+  disputeNumber: string
+  customerId: string
+  customerNameSnapshot: string
+  salesInvoiceId: string
+  openItemId: string | null
+  invoiceNumberSnapshot: string
+  sourceContext: {
+    invoiceSourceType: string
+    sourceDocumentId: string | null
+    salesOrders: Array<{ id: string; number: string }>
+    dispatches: Array<{ id: string; number: string | null }>
+  }
+  disputeDate: string
+  disputeType: ArDisputeType
+  disputedAmount: string
+  description: string
+  ownerName: string
+  responsibleDepartment: string
+  priority: ArDisputePriority
+  targetResolutionDate: string | null
+  status: ArDisputeStatus
+  resolution: string | null
+  creditNoteRequired: boolean
+  collectionHold: boolean
+  supportingDocuments: string[]
+  createdBy: string | null
+  updatedBy: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ListArDisputesQuery {
+  legalEntityId: string
+  status?: ArDisputeStatus
+  customerId?: string
+  salesInvoiceId?: string
+  salesOrderId?: string
+  search?: string
+  page?: number
+  limit?: number
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface CreateArDisputeInput {
+  legalEntityId: string
+  salesInvoiceId: string
+  disputeDate: string
+  disputeType: ArDisputeType
+  disputedAmount: string
+  description: string
+  ownerName: string
+  responsibleDepartment: string
+  priority?: ArDisputePriority
+  targetResolutionDate?: string | null
+  creditNoteRequired?: boolean
+  collectionHold?: boolean
+  supportingDocuments?: string[]
+}
+
+export interface UpdateArDisputeInput {
+  disputeDate?: string
+  disputeType?: ArDisputeType
+  disputedAmount?: string
+  description?: string
+  ownerName?: string
+  responsibleDepartment?: string
+  priority?: ArDisputePriority
+  targetResolutionDate?: string | null
+  creditNoteRequired?: boolean
+  collectionHold?: boolean
+  supportingDocuments?: string[]
+}
+
+export async function listArDisputes(params: ListArDisputesQuery) {
+  return apiRequest<ArDisputeDto[]>(
+    `${tenantPath(`${BASE}/disputes`)}${buildQuery(params as unknown as Record<string, string | number | boolean | undefined>)}`,
+  )
+}
+
+export async function getArDispute(id: string) {
+  return apiRequest<ArDisputeDto>(tenantPath(`${BASE}/disputes/${id}`))
+}
+
+export async function createArDispute(data: CreateArDisputeInput) {
+  return apiRequest<ArDisputeDto>(tenantPath(`${BASE}/disputes`), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateArDispute(id: string, data: UpdateArDisputeInput) {
+  return apiRequest<ArDisputeDto>(tenantPath(`${BASE}/disputes/${id}`), {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function transitionArDispute(id: string, body: { status: ArDisputeStatus; resolution?: string | null }) {
+  return apiRequest<ArDisputeDto>(tenantPath(`${BASE}/disputes/${id}/transition`), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function deleteArDispute(id: string) {
+  return apiRequest<ArDisputeDto>(tenantPath(`${BASE}/disputes/${id}`), { method: 'DELETE' })
+}
+

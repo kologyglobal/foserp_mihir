@@ -1007,18 +1007,24 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--erp-primary, #0078d4) 30%, transparent);
 }
 
-/* ── Sticky CRM record header (Lead 360) ── */
+/* ── Sticky record header (standard — Lead / Opp / Quote / Purchase) ── */
 .crm-sticky-record-header {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px 16px;
+  gap: 10px 12px;
   width: 100%;
   min-width: 0;
+  min-height: 36px;
 }
 
 .crm-sticky-record-header__identity {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px 10px;
   min-width: 0;
   flex: 1 1 auto;
 }
@@ -1026,15 +1032,17 @@
 .crm-sticky-record-header__title-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
+  flex: 0 1 auto;
+  max-width: min(280px, 36vw);
 }
 
 .crm-sticky-record-header__title {
   margin: 0;
-  font-size: 1.0625rem;
+  font-size: 15px;
   font-weight: 650;
-  line-height: 1.25;
+  line-height: 20px;
   color: var(--erp-text, #242424);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1049,35 +1057,46 @@
   height: 24px;
   flex-shrink: 0;
   border-radius: 6px;
-  border: 1px solid transparent;
+  border: 0;
   background: transparent;
   color: var(--erp-muted, #605e5c);
   cursor: pointer;
 }
 
 .crm-sticky-record-header__fav:hover {
-  border-color: var(--erp-border, #e1dfdd);
+  background: #f3f4f6;
   color: var(--erp-primary, #0078d4);
 }
 
 .crm-sticky-record-header__fav--on {
   color: #d97706;
+  background: #fffbeb;
 }
 
 .crm-sticky-record-header__meta {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px 8px;
-  margin-top: 4px;
+  margin-top: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.crm-sticky-record-header__meta::-webkit-scrollbar {
+  display: none;
 }
 
 .crm-sticky-record-header__id {
+  flex-shrink: 0;
   font-family: var(--erp-font-family-mono, ui-monospace, monospace);
-  font-size: 0.75rem;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.01em;
   color: var(--erp-muted, #605e5c);
+  white-space: nowrap;
 }
 
 .crm-sticky-record-header__sep {
@@ -1091,10 +1110,11 @@
   align-items: baseline;
   gap: 0.2rem;
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 12px;
   color: var(--erp-text-secondary, #484644);
-  line-height: 1.35;
+  line-height: 1.2;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .crm-sticky-record-header__owner-label {
@@ -1112,14 +1132,25 @@
   flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 4px;
   flex: 0 0 auto;
-  max-width: 100%;
+  max-width: none;
 }
 
 .crm-sticky-record-header__actions .erp-btn,
 .crm-sticky-record-header__actions button {
   white-space: nowrap;
+  min-height: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+
+.crm-sticky-record-header__meta .dyn-status-chip {
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 1px 6px;
+  font-size: 10px;
+  line-height: 16px;
 }
 
 .d365-workspace-unified-head:has(.crm-sticky-record-header),
@@ -1180,17 +1211,32 @@
 @media (max-width: 1023px) {
   .crm-sticky-record-header {
     flex-wrap: wrap;
-    align-items: flex-start;
+    align-items: center;
+    row-gap: 6px;
+  }
+
+  .crm-sticky-record-header__identity {
+    flex: 1 1 100%;
+  }
+
+  .crm-sticky-record-header__title-row {
+    max-width: min(220px, 50vw);
   }
 
   .crm-sticky-record-header__actions {
     width: 100%;
     justify-content: flex-start;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .crm-sticky-record-header__actions::-webkit-scrollbar {
+    display: none;
   }
 
   .crm-sticky-record-header__title {
-    white-space: normal;
+    white-space: nowrap;
   }
 }
 

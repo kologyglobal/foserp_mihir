@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ClipboardList, RefreshCw, Wrench } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
@@ -6,11 +6,10 @@ import { StatusDot, statusToneFromLabel } from '@/components/design-system/Statu
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { ManufacturingAiAssist, ManufacturingDemoBanner } from '@/components/manufacturing'
+import { ManufacturingDemoBanner } from '@/components/manufacturing'
 import {
   createWorkOrderDraftFromPlanDemo,
   generateWorkOrdersFromPlan,
-  getProductionPlanAiSuggestions,
   getProductionPlanById,
   markProductionPlanPlanned,
 } from '@/services/manufacturing'
@@ -60,11 +59,6 @@ export function ProductionPlanDetailPage() {
   useEffect(() => {
     void load()
   }, [load])
-
-  const aiSuggestions = useMemo(
-    () => (plan ? getProductionPlanAiSuggestions(plan) : []),
-    [plan],
-  )
 
   const generateAll = async () => {
     if (!plan || !perms.canCreateWoFromPlan) {
@@ -138,7 +132,24 @@ export function ProductionPlanDetailPage() {
     )
   }
 
-  if (loading || !plan) return <LoadingState variant="card" />
+  if (loading || !plan) {
+    return (
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Manufacturing"
+        title="Production Plan"
+        breadcrumbs={[
+          { label: 'Manufacturing & Production', to: '/manufacturing' },
+          { label: 'Production Plan', to: '/manufacturing/production-plan' },
+        ]}
+        autoBreadcrumbs={false}
+        backLink={{ to: '/manufacturing/production-plan', label: 'Back to Production Plans' }}
+      >
+        <LoadingState variant="card" />
+      </OperationalPageShell>
+    )
+  }
 
   const lines = plan.lines.filter((l) => !l.ignored)
   const canGenerate = plan.status !== 'closed' && plan.status !== 'cancelled'
@@ -157,6 +168,7 @@ export function ProductionPlanDetailPage() {
       ]}
       autoBreadcrumbs={false}
       favoritePath={`/manufacturing/production-plan/${plan.id}`}
+      backLink={{ to: '/manufacturing/production-plan', label: 'Back to Production Plans' }}
       commandBar={(
         <ErpCommandBar
           inline
@@ -182,11 +194,10 @@ export function ProductionPlanDetailPage() {
         />
       )}
     >
-      <div className="space-y-4">
+        <div className="space-y-4">
         <ManufacturingDemoBanner message="Generate Work Orders creates drafts for planning handoff — complete them on Work Orders / Shopfloor." />
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-          <section className="rounded-xl border border-erp-border bg-white p-4 shadow-sm">
+        <section className="rounded-lg border border-erp-border bg-white p-4">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <StatusDot
                 label={PRODUCTION_PLAN_STATUS_LABELS[plan.status]}
@@ -207,10 +218,8 @@ export function ProductionPlanDetailPage() {
               <Field label="Created By">{plan.createdBy}</Field>
             </dl>
           </section>
-          <ManufacturingAiAssist title="Planning AI Insights" suggestions={aiSuggestions} />
-        </div>
 
-        <section className="overflow-hidden rounded-xl border border-erp-border bg-white shadow-sm">
+        <section className="overflow-hidden rounded-lg border border-erp-border bg-white">
           <div className="border-b border-erp-border px-4 py-3">
             <h2 className="text-sm font-semibold text-erp-text">Plan Lines</h2>
             <p className="text-[12px] text-erp-muted">Review readiness, then create WO per line or generate all.</p>

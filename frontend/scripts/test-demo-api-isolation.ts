@@ -49,9 +49,29 @@ const forbiddenPatterns: Array<{ pattern: RegExp; reason: string }> = [
   { pattern: /['"][^'"]*\/demo\/factories/, reason: 'imports demo/factories' },
 ]
 
+/**
+ * CONTROLLED_DEMO services (Phase 8C Wave 1): module-level demo services that
+ * intentionally hydrate seed state for demo mode. Their routes are hard-gated
+ * in API mode (see PHASE8C_WAVE1_MOCK_AUDIT.md) so API mode never renders
+ * their data. Do NOT add new entries without a remediation-register note.
+ */
+const ALLOWED_DEMO_SERVICE_FILES = new Set([
+  // Demo WO service — API mode routes use services/api/* + Api* pages (WO edit route gated 8C Wave 1)
+  'src/services/manufacturing/workOrderService.ts',
+  // Demo routing service — legacy /manufacturing/routes* redirect to setup in API mode (8C Wave 1)
+  'src/services/manufacturing/routeService.ts',
+  // Purchase demo module — excluded from pilot scope (no GRN); demo-mode frontend only
+  'src/services/purchase/purchaseService.ts',
+  // Legacy CoA demo service — /accounting/coa* redirect to settings CoA in API mode
+  'src/services/accounting/chartOfAccountsService.ts',
+  // Seed financial reports — /accounting/reports/* hard-stop gated in API mode (8C Wave 1)
+  'src/services/accounting/financialReportsService.ts',
+])
+
 function scanServicesForForbiddenImports() {
   const files = walkTsFiles(SERVICES)
   for (const file of files) {
+    if (ALLOWED_DEMO_SERVICE_FILES.has(rel(file))) continue
     const content = readFileSync(file, 'utf8')
     const lines = content.split('\n')
     for (let i = 0; i < lines.length; i++) {

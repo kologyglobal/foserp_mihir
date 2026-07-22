@@ -51,6 +51,14 @@ const envSchema = z.object({
   BANK_CONNECTOR_ALLOWED_HOSTS: z.string().optional(),
   /** Comma-separated hostnames allowed for live SFTP (default localhost in non-prod). */
   BANK_CONNECTOR_SFTP_ALLOWED_HOSTS: z.string().optional(),
+  /**
+   * O2C Wave 3 — post Dr COGS / Cr FINISHED_GOODS_INVENTORY on sales invoice post when FG cost
+   * is available from dispatch inventory movements. Default OFF.
+   */
+  ENABLE_SI_COGS_POSTING: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
 })
 
 const parsed = envSchema.safeParse(process.env)

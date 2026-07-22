@@ -5,6 +5,13 @@ import { resolvePostingPeriod } from '../../../posting/posting-period.service.js
 import { PostingError } from '../../../posting/posting.errors.js'
 import type { PostingRequest } from '../../../posting/posting.types.js'
 import {
+  AccountingVendorInactiveError,
+  AccountingVendorNotFoundError,
+  requireActiveAccountingVendor,
+} from '../../../shared/master-resolvers/accounting-vendor-resolver.js'
+import { revalidateVendorInvoiceSourceLinks } from '../vendor-invoice-source-validation.service.js'
+import type { VendorInvoiceSourceMode } from '../../../shared/master-resolvers/accounting-source-document-resolver.js'
+import {
   VENDOR_INVOICE_CALCULATION_VERSION,
   type VendorInvoiceAccountingPreview,
 } from '../calculation/vendor-invoice-calculation.types.js'
@@ -100,12 +107,12 @@ function previewChanged(
 }
 
 async function assertVendorEligible(tenantId: string, vendorId: string): Promise<void> {
-  const vendor = await prisma.masterVendor.findFirst({
-    where: { id: vendorId, tenantId, deletedAt: null },
-  })
-  if (!vendor) throw new VendorInvoiceVendorNotFoundError()
-  if (vendor.status !== 'ACTIVE' || vendor.isBlocked) {
-    throw new VendorInvoiceVendorInactiveError()
+  try {
+    await requireActiveAccountingVendor(tenantId, vendorId)
+  } catch (err) {
+    if (err instanceof AccountingVendorNotFoundError) throw new VendorInvoiceVendorNotFoundError()
+    if (err instanceof AccountingVendorInactiveError) throw new VendorInvoiceVendorInactiveError()
+    throw err
   }
 }
 
@@ -228,6 +235,18 @@ export async function validateVendorInvoiceForPosting(
 
   await getLegalEntityOrThrow(tenantId, invoice.legalEntityId)
   await assertVendorEligible(tenantId, invoice.vendorId)
+
+  const calcContext = invoice.calculationContext as { sourceMode?: VendorInvoiceSourceMode } | null
+  await revalidateVendorInvoiceSourceLinks(
+    tenantId,
+    invoice.vendorId,
+    (invoice.sourceLinks ?? []).map((link) => ({
+      sourceType: link.sourceType,
+      sourceDocumentId: link.sourceDocumentId,
+    })),
+    calcContext?.sourceMode,
+  )
+
   await assertUniquenessKey(invoice)
   await assertApprovalState(invoice)
 

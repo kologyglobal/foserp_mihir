@@ -198,8 +198,8 @@ export function Lead360RecordHeader({
 
         {!narrow ? (
           <>
-            <ErpButton size="sm" variant="secondary" icon={Calendar} onClick={onScheduleActivity}>
-              Schedule Activity
+            <ErpButton size="sm" variant="secondary" icon={Calendar} onClick={onScheduleActivity} title="Schedule Activity">
+              Schedule
             </ErpButton>
             {canQuoteViaOpp ? (
               <ErpButton
@@ -207,8 +207,9 @@ export function Lead360RecordHeader({
                 variant={quotePrimary ? 'primary' : 'secondary'}
                 icon={FileText}
                 onClick={onCreateQuotation}
+                title="Create Quotation"
               >
-                Create Quotation
+                Quotation
               </ErpButton>
             ) : null}
           </>
@@ -223,8 +224,9 @@ export function Lead360RecordHeader({
           disabledReason={
             isConverted ? 'Already converted' : 'Qualify and link company first'
           }
+          title="Convert to Opportunity"
         >
-          Convert to Opportunity
+          Convert
         </ErpButton>
 
         <CommandBarOverflowMenu

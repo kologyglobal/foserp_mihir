@@ -1,0 +1,4 @@
+Date,Description,Reference,Debit,Credit,Balance
+01/06/2026,Opening,OPEN,,,1000.00
+05/06/2026,Customer receipt,RCPT-1,,500.00,1500.00
+10/06/2026,Vendor payment,PAY-1,200.00,,1300.00

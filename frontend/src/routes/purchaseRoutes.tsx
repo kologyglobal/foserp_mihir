@@ -26,6 +26,7 @@ import {
   GrnDetailPage,
   QualityInspectionListPage,
   QualityInspectionDetailPage,
+  QualityInspectionCreatePage,
 } from '../modules/purchase/GrnDomainPages'
 import { PurchaseReportsHubPage } from '../modules/purchase/PurchaseReportsHubPage'
 import { PurchaseReportRunnerPage } from '../modules/purchase/PurchaseReportRunnerPage'
@@ -101,6 +102,7 @@ export const purchaseRouteChildren = [
   { path: 'grns', element: <Navigate to="/purchase/grn" replace /> },
   { path: 'grns/:id', element: <GrnDetailPage /> },
   { path: 'quality-inspections', element: <QualityInspectionListPage /> },
+  { path: 'quality-inspections/new', element: <QualityInspectionCreatePage /> },
   { path: 'quality-inspections/:id', element: <QualityInspectionDetailPage /> },
   { path: 'returns', element: <PurchaseReturnListPage /> },
   { path: 'returns/new', element: <PurchaseReturnEditorPage /> },

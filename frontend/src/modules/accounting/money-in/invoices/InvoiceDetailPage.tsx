@@ -17,11 +17,69 @@ import type { SalesInvoiceDto, SalesInvoiceValidationPreview } from '@/types/mon
 import { formatCurrency } from '@/utils/formatters/currency'
 import { mergeAllowedAction, useMoneyInPermissions } from '@/utils/permissions/moneyIn'
 import { notify } from '@/store/toastStore'
-import { invoiceDisplayNumber, moneyInStatusTone, MONEY_IN_STATUS_LABELS, parseDecimal } from '../moneyInUi'
+import {
+  MasterRefreshModal,
+  PartyMasterCard,
+  SourceDocumentCard,
+  sourceTypeLabel,
+} from '@/modules/accounting/shared/invoices'
+import { invoiceDisplayNumber, moneyInStatusTone, MONEY_IN_STATUS_LABELS, parseDecimal, resolveSettlementStatus, SETTLEMENT_STATUS_LABELS, settlementStatusTone } from '../moneyInUi'
 import { PostConfirmModal } from '../components/PostConfirmModal'
 import { TotalsPanel } from '../components/TotalsPanel'
 import { ValidationDrawer } from '../components/ValidationDrawer'
 import { MoneyInWorkspaceShell } from '../MoneyInWorkspaceShell'
+
+/** Bordered card with a titled header band — document view chrome. */
+function DetailSection({
+  title,
+  subtitle,
+  children,
+  className,
+}: {
+  title: string
+  subtitle?: string
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <section className={`rounded-md border border-erp-border bg-white ${className ?? ''}`}>
+      <header className="border-b border-erp-border bg-erp-surface-alt/60 px-4 py-2">
+        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-erp-text">{title}</h3>
+        {subtitle && <p className="text-[11px] text-erp-muted">{subtitle}</p>}
+      </header>
+      <div className="p-4">{children}</div>
+    </section>
+  )
+}
+
+function InfoField({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return (
+    <div>
+      <dt className="text-[11px] font-medium uppercase tracking-wide text-erp-muted">{label}</dt>
+      <dd className={`mt-0.5 text-[13px] text-erp-text ${mono ? 'tabular-nums' : ''}`}>{value ?? '—'}</dd>
+    </div>
+  )
+}
+
+/** Best-effort renderer for the persisted address snapshot JSON. */
+function snapshotAddressLines(snapshot: Record<string, unknown> | null): string[] {
+  if (!snapshot) return []
+  const pick = (...keys: string[]) =>
+    keys
+      .map((k) => snapshot[k])
+      .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+  const line1 = pick('addressLine1', 'address1', 'line1', 'address')
+  const line2 = pick('addressLine2', 'address2', 'line2')
+  const cityState = pick('city', 'state')
+  const pinCountry = pick('pincode', 'postalCode', 'country')
+  return [line1.join(', '), line2.join(', '), [...cityState, ...pinCountry].join(', ')].filter(Boolean)
+}
+
+function lineTaxAmount(l: { cgstAmount: string; sgstAmount: string; igstAmount: string; cessAmount: string }) {
+  return (
+    parseDecimal(l.cgstAmount) + parseDecimal(l.sgstAmount) + parseDecimal(l.igstAmount) + parseDecimal(l.cessAmount)
+  )
+}
 
 export function InvoiceDetailPage() {
   const { id } = useParams()
@@ -37,6 +95,7 @@ export function InvoiceDetailPage() {
   const [cancelReason, setCancelReason] = useState('')
   const [showReverse, setShowReverse] = useState(false)
   const [reverseReason, setReverseReason] = useState('')
+  const [showMasterRefresh, setShowMasterRefresh] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -142,6 +201,8 @@ export function InvoiceDetailPage() {
     )
   }
 
+  const settlement = invoice ? resolveSettlementStatus(invoice) : null
+
   if (loading || !invoice) {
     return (
       <MoneyInWorkspaceShell title="Invoice">
@@ -211,63 +272,228 @@ export function InvoiceDetailPage() {
         <div className="mb-3 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-[12px] text-sky-900">{statusBanner}</div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <ErpStatusChip label={MONEY_IN_STATUS_LABELS[invoice.status]} tone={moneyInStatusTone(invoice.status)} />
-        <span className="text-[13px] text-erp-muted">{invoice.customerNameSnapshot}</span>
-        <span className="text-[13px] tabular-nums text-erp-muted">Invoice date: {invoice.invoiceDate}</span>
-        {invoice.dueDate && <span className="text-[13px] tabular-nums text-erp-muted">Due: {invoice.dueDate}</span>}
+      {/* ── Document masthead ────────────────────────────────────────────── */}
+      <div className="mb-3 rounded-md border border-erp-border bg-white px-4 py-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-[18px] font-semibold tracking-tight text-erp-text">
+                {invoice.invoiceNumber ?? invoice.draftReference ?? 'Invoice'}
+              </h2>
+              <ErpStatusChip label={MONEY_IN_STATUS_LABELS[invoice.status]} tone={moneyInStatusTone(invoice.status)} />
+              {settlement && (
+                <ErpStatusChip label={SETTLEMENT_STATUS_LABELS[settlement]} tone={settlementStatusTone(settlement)} />
+              )}
+            </div>
+            <p className="mt-0.5 text-[13px] text-erp-muted">
+              {invoice.customerNameSnapshot}
+              {invoice.customerCodeSnapshot ? ` · ${invoice.customerCodeSnapshot}` : ''} ·{' '}
+              {sourceTypeLabel(invoice.sourceType)}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-erp-muted">Invoice total</p>
+            <p className="text-[20px] font-semibold tabular-nums text-erp-text">
+              {formatCurrency(parseDecimal(invoice.totalAmount))}
+            </p>
+            {(invoice.status === 'POSTED' || invoice.status === 'REVERSED') && (
+              <p className="text-[11px] tabular-nums text-erp-muted">
+                Outstanding {formatCurrency(parseDecimal(invoice.outstandingAmount))} · Paid{' '}
+                {formatCurrency(parseDecimal(invoice.amountPaid))}
+              </p>
+            )}
+          </div>
+        </div>
+        <dl className="mt-3 grid gap-x-6 gap-y-3 border-t border-erp-border pt-3 sm:grid-cols-2 lg:grid-cols-4">
+          <InfoField label="Invoice date" value={invoice.invoiceDate} mono />
+          <InfoField label="Posting date" value={invoice.postingDate ?? '—'} mono />
+          <InfoField label="Due date" value={invoice.dueDate ?? '—'} mono />
+          <InfoField
+            label="Payment terms"
+            value={invoice.paymentTermsDays != null ? `${invoice.paymentTermsDays} days` : '—'}
+          />
+          <InfoField label="Customer PO" value={invoice.customerPoNumber ?? '—'} />
+          <InfoField label="Project ref" value={invoice.projectRef ?? '—'} />
+          <InfoField label="Project name" value={invoice.projectNameSnapshot ?? '—'} />
+          <InfoField label="Supply type" value={invoice.supplyType.replace(/_/g, ' ')} />
+          <InfoField label="Tax treatment" value={invoice.taxTreatment.replace(/_/g, ' ')} />
+          <InfoField
+            label="Place of supply"
+            value={invoice.placeOfSupply ? `State code ${invoice.placeOfSupply}` : '—'}
+          />
+          <InfoField label="Currency" value={`${invoice.currencyCode} @ ${invoice.exchangeRate}`} mono />
+          <InfoField label="Reference no." value={invoice.referenceNumber ?? '—'} />
+          <InfoField label="Source document" value={sourceTypeLabel(invoice.sourceType)} />
+          <InfoField
+            label="Posted at"
+            value={invoice.postedAt ? new Date(invoice.postedAt).toLocaleString() : 'Not posted'}
+          />
+        </dl>
       </div>
 
-      <div className="mb-4 overflow-x-auto">
-        <table className="w-full min-w-[640px] text-left text-[12px]">
-          <thead>
-            <tr className="border-b border-erp-border text-erp-muted">
-              <th className="py-2 pr-2">#</th>
-              <th className="py-2 pr-2">Description</th>
-              <th className="py-2 pr-2 text-right">Qty</th>
-              <th className="py-2 pr-2 text-right">Rate</th>
-              <th className="py-2 text-right">Line total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(invoice.lines ?? []).map((l) => (
-              <tr key={l.id} className="border-b border-erp-border/60">
-                <td className="py-2 pr-2">{l.lineNumber}</td>
-                <td className="py-2 pr-2">{l.description ?? l.itemNameSnapshot}</td>
-                <td className="py-2 pr-2 text-right tabular-nums">{l.quantity}</td>
-                <td className="py-2 pr-2 text-right tabular-nums">{formatCurrency(parseDecimal(l.unitRate))}</td>
-                <td className="py-2 text-right tabular-nums">{formatCurrency(parseDecimal(l.lineTotal))}</td>
+      {/* ── Bill To + Source / Accounting ────────────────────────────────── */}
+      <div className="mb-3 grid gap-3 lg:grid-cols-2">
+        <DetailSection title="Bill To" subtitle="Customer snapshot captured on the document.">
+          <p className="text-[14px] font-semibold text-erp-text">{invoice.customerNameSnapshot}</p>
+          {snapshotAddressLines(invoice.customerBillingAddressSnapshot).map((line) => (
+            <p key={line} className="text-[12px] text-erp-muted">
+              {line}
+            </p>
+          ))}
+          <dl className="mt-2 grid gap-x-4 gap-y-2 sm:grid-cols-2">
+            <InfoField label="Customer code" value={invoice.customerCodeSnapshot ?? '—'} />
+            <InfoField label="State code" value={invoice.customerStateCodeSnapshot ?? '—'} mono />
+            <InfoField label="GSTIN" value={invoice.customerGstinSnapshot ?? '—'} mono />
+            <InfoField label="PAN" value={invoice.customerPanSnapshot ?? '—'} mono />
+          </dl>
+          <PartyMasterCard
+            variant="crm"
+            partyId={invoice.customerId}
+            snapshot={{
+              name: invoice.customerNameSnapshot,
+              code: invoice.customerCodeSnapshot,
+              gstin: invoice.customerGstinSnapshot,
+              pan: invoice.customerPanSnapshot,
+            }}
+            onRefreshFromMaster={
+              invoice.status === 'DRAFT' && mergeAllowedAction(perms.canEditInvoice, actions?.edit)
+                ? () => setShowMasterRefresh(true)
+                : undefined
+            }
+          />
+        </DetailSection>
+
+        <DetailSection title="Source & Accounting" subtitle="Origin document, GL voucher, and receivable status.">
+          <SourceDocumentCard
+            sources={[
+              {
+                sourceType: invoice.sourceType,
+                sourceDocumentId: invoice.sourceDocumentId,
+                documentNumber:
+                  (invoice.sourceDocumentSnapshot as { salesOrderNo?: string; documentNumber?: string } | null)
+                    ?.salesOrderNo ??
+                  (invoice.sourceDocumentSnapshot as { documentNumber?: string } | null)?.documentNumber ??
+                  null,
+              },
+            ]}
+            emptyText="Direct invoice — no sales order reference."
+          />
+          {invoice.status === 'POSTED' || invoice.status === 'REVERSED' ? (
+            <dl className="mt-3 grid gap-x-4 gap-y-2 sm:grid-cols-2">
+              <InfoField
+                label="Accounting voucher"
+                value={
+                  invoice.accountingVoucherId ? (
+                    <Link
+                      to={`/accounting/ledger-entries/voucher/${invoice.accountingVoucherId}`}
+                      className="text-erp-accent hover:underline"
+                    >
+                      View accounting voucher
+                    </Link>
+                  ) : (
+                    '—'
+                  )
+                }
+              />
+              <InfoField label="Posted at" value={invoice.postedAt ? new Date(invoice.postedAt).toLocaleString() : '—'} />
+              <InfoField label="Outstanding" value={formatCurrency(parseDecimal(invoice.outstandingAmount))} mono />
+              <InfoField label="Amount paid" value={formatCurrency(parseDecimal(invoice.amountPaid))} mono />
+              <InfoField label="Amount adjusted" value={formatCurrency(parseDecimal(invoice.amountAdjusted))} mono />
+              <InfoField label="Open item" value={invoice.receivableOpenItemId ? 'Linked' : '—'} />
+            </dl>
+          ) : (
+            <p className="mt-3 text-[12px] text-erp-muted">
+              Revenue and receivable accounts resolve from default posting mappings on the server. Post the invoice to
+              create the voucher and open item.
+            </p>
+          )}
+          {invoice.status === 'REVERSED' && invoice.reversalReason && (
+            <p className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[12px] text-amber-900">
+              Reversal reason: {invoice.reversalReason}
+              {invoice.reversalVoucherId ? ' · Reversal voucher linked' : ''}
+            </p>
+          )}
+        </DetailSection>
+      </div>
+
+      {/* ── Lines ────────────────────────────────────────────────────────── */}
+      <DetailSection
+        title="Invoice Lines"
+        subtitle="Posted invoices always render the snapshot captured at posting time."
+        className="mb-3"
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-[12px]">
+            <thead>
+              <tr className="border-b border-erp-border bg-erp-surface-alt/60 text-[11px] uppercase tracking-wide text-erp-muted">
+                <th className="px-2 py-2">#</th>
+                <th className="px-2 py-2">Item</th>
+                <th className="px-2 py-2">Description</th>
+                <th className="px-2 py-2">HSN</th>
+                <th className="px-2 py-2 text-right">Qty</th>
+                <th className="px-2 py-2 text-right">Rate</th>
+                <th className="px-2 py-2 text-right">Taxable</th>
+                <th className="px-2 py-2 text-right">Tax</th>
+                <th className="px-2 py-2 text-right">Line total</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {(invoice.lines ?? []).map((l) => (
+                <tr key={l.id} className="border-b border-erp-border/60 hover:bg-erp-surface-alt/40">
+                  <td className="px-2 py-2 text-erp-muted">{l.lineNumber}</td>
+                  <td className="px-2 py-2">{l.itemCodeSnapshot ?? '—'}</td>
+                  <td className="px-2 py-2">{l.description ?? l.itemNameSnapshot}</td>
+                  <td className="px-2 py-2 tabular-nums">{l.hsnCodeSnapshot ?? '—'}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {l.quantity}
+                    {l.uomSnapshot ? ` ${l.uomSnapshot}` : ''}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(parseDecimal(l.unitRate))}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(parseDecimal(l.taxableAmount))}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(lineTaxAmount(l))}</td>
+                  <td className="px-2 py-2 text-right font-medium tabular-nums">
+                    {formatCurrency(parseDecimal(l.lineTotal))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </DetailSection>
+
+      {/* ── Narration + Totals ───────────────────────────────────────────── */}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <DetailSection title="Narration">
+          <p className="text-[13px] text-erp-text">{invoice.narration ?? '—'}</p>
+        </DetailSection>
+        <TotalsPanel
+          subtotal={invoice.subtotalAmount}
+          discount={invoice.discountAmount}
+          taxable={invoice.taxableAmount}
+          cgst={invoice.cgstAmount}
+          sgst={invoice.sgstAmount}
+          igst={invoice.igstAmount}
+          freight={invoice.freightAmount}
+          other={invoice.otherChargesAmount}
+          roundOff={invoice.roundOffAmount}
+          total={invoice.totalAmount}
+        />
       </div>
 
-      <TotalsPanel
-        subtotal={invoice.subtotalAmount}
-        discount={invoice.discountAmount}
-        taxable={invoice.taxableAmount}
-        cgst={invoice.cgstAmount}
-        sgst={invoice.sgstAmount}
-        igst={invoice.igstAmount}
-        freight={invoice.freightAmount}
-        other={invoice.otherChargesAmount}
-        roundOff={invoice.roundOffAmount}
-        total={invoice.totalAmount}
+      <MasterRefreshModal
+        open={showMasterRefresh}
+        onClose={() => setShowMasterRefresh(false)}
+        variant="crm"
+        documentId={invoice.id}
+        partyId={invoice.customerId}
+        snapshot={{
+          name: invoice.customerNameSnapshot,
+          code: invoice.customerCodeSnapshot,
+          gstin: invoice.customerGstinSnapshot,
+          pan: invoice.customerPanSnapshot,
+        }}
+        onApplied={() => void load()}
       />
-
-      {invoice.status === 'POSTED' && (
-        <p className="mt-3 text-[12px] text-erp-muted">
-          Outstanding: {formatCurrency(parseDecimal(invoice.outstandingAmount))} · Open item linked
-        </p>
-      )}
-
-      {invoice.status === 'REVERSED' && invoice.reversalReason && (
-        <p className="mt-3 text-[12px] text-erp-muted">
-          Reversal reason: {invoice.reversalReason}
-          {invoice.reversalVoucherId ? ` · Reversal voucher linked` : ''}
-        </p>
-      )}
 
       <ValidationDrawer open={showValidate} onClose={() => setShowValidate(false)} report={report} />
       <PostConfirmModal

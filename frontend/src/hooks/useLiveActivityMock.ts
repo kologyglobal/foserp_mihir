@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { isApiMode } from '../config/apiConfig'
 import type { LiveActivityEvent } from '../components/live-erp/types'
 
 const MOCK_EVENTS: Omit<LiveActivityEvent, 'id' | 'timestamp'>[] = [
@@ -25,17 +26,21 @@ function pickMockEvents(count: number): LiveActivityEvent[] {
 /**
  * Simulated live activity layer — does not modify business stores.
  * Rotates display events every 45s for a live manufacturing feel.
+ *
+ * Phase 8C Wave 1 (8B-R-010): hard-disabled in API mode. Simulated ticker
+ * events must never render alongside live operational data.
  */
 export function useLiveActivityMock(enabled = true, maxEvents = 3) {
-  const [events, setEvents] = useState<LiveActivityEvent[]>(() => (enabled ? pickMockEvents(maxEvents) : []))
+  const active = enabled && !isApiMode()
+  const [events, setEvents] = useState<LiveActivityEvent[]>(() => (active ? pickMockEvents(maxEvents) : []))
 
   useEffect(() => {
-    if (!enabled) return
+    if (!active) return
     const interval = setInterval(() => {
       setEvents(pickMockEvents(maxEvents))
     }, 45_000)
     return () => clearInterval(interval)
-  }, [enabled, maxEvents])
+  }, [active, maxEvents])
 
-  return events
+  return active ? events : []
 }

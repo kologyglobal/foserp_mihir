@@ -242,7 +242,17 @@ export async function postPurchaseInvoice(tenantId: string, id: string, actorId:
       where: { id: line.purchaseOrderLineId!, tenantId },
       data: { invoicedQuantity: { increment: invoiceQty(line.quantity) } },
     })))
-  return mapPurchaseInvoice(await loadOrThrow(tenantId, id))
+  // Soft AP handoff — create VendorInvoice draft (no GL posting from Purchase).
+  const { handoffPurchaseInvoiceToVendorInvoiceDraft } = await import('./purchase-invoice-ap-handoff.service.js')
+  const ap = await handoffPurchaseInvoiceToVendorInvoiceDraft(tenantId, id, actorId)
+  const mapped = mapPurchaseInvoice(await loadOrThrow(tenantId, id))
+  return { ...mapped, apHandoff: ap }
+}
+
+export async function previewPurchaseInvoiceApHandoff(tenantId: string, id: string) {
+  await loadOrThrow(tenantId, id)
+  const { buildVendorInvoiceDraftPreview } = await import('./purchase-invoice-ap-handoff.service.js')
+  return buildVendorInvoiceDraftPreview(tenantId, id)
 }
 export async function cancelPurchaseInvoice(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
   const existing = await loadOrThrow(tenantId, id); assertInvoiceStatus(existing.status, ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'MATCHED', 'PARTIALLY_MATCHED', 'MISMATCH'], 'cancelled')

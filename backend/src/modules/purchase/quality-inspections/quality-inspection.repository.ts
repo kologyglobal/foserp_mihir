@@ -10,7 +10,7 @@ export async function findQualityInspections(tenantId: string, query: ListQualit
     limit: query.limit ?? 50,
     sortOrder: query.sortOrder ?? 'desc',
   })
-  const where: Prisma.QualityInspectionWhereInput = {
+  const where: Prisma.PurchaseQualityInspectionWhereInput = {
     ...tenantActiveFilter(tenantId),
     ...(query.status ? { status: query.status as QualityInspectionStatus } : {}),
     ...(query.goodsReceiptId ? { goodsReceiptId: query.goodsReceiptId } : {}),
@@ -19,31 +19,31 @@ export async function findQualityInspections(tenantId: string, query: ListQualit
     ...(query.search ? { inspectionNumber: { contains: query.search } } : {}),
   }
   const [items, total] = await Promise.all([
-    prisma.qualityInspection.findMany({ where, include: includeQualityInspection, skip, take, orderBy: { inspectionDate: query.sortOrder } }),
-    prisma.qualityInspection.count({ where }),
+    prisma.purchaseQualityInspection.findMany({ where, include: includeQualityInspection, skip, take, orderBy: { inspectionDate: query.sortOrder } }),
+    prisma.purchaseQualityInspection.count({ where }),
   ])
   return { items, total, page: query.page ?? 1, limit: take }
 }
 export const findQualityInspectionById = (tenantId: string, id: string) =>
-  prisma.qualityInspection.findFirst({ where: { id, ...tenantActiveFilter(tenantId) }, include: includeQualityInspection })
-export async function updateQualityInspection(tenantId: string, id: string, data: Prisma.QualityInspectionUncheckedUpdateInput, tx: Prisma.TransactionClient = prisma) {
-  const result = await tx.qualityInspection.updateMany({ where: { id, tenantId, deletedAt: null }, data })
+  prisma.purchaseQualityInspection.findFirst({ where: { id, ...tenantActiveFilter(tenantId) }, include: includeQualityInspection })
+export async function updateQualityInspection(tenantId: string, id: string, data: Prisma.PurchaseQualityInspectionUncheckedUpdateInput, tx: Prisma.TransactionClient = prisma) {
+  const result = await tx.purchaseQualityInspection.updateMany({ where: { id, tenantId, deletedAt: null }, data })
   if (!result.count) return null
-  return tx.qualityInspection.findFirst({ where: { id, tenantId, deletedAt: null }, include: includeQualityInspection })
+  return tx.purchaseQualityInspection.findFirst({ where: { id, tenantId, deletedAt: null }, include: includeQualityInspection })
 }
 export async function replaceQualityInspectionLines(
   tenantId: string,
   qualityInspectionId: string,
   lines: Array<
     Omit<
-      Prisma.QualityInspectionLineUncheckedCreateInput,
+      Prisma.PurchaseQualityInspectionLineUncheckedCreateInput,
       'id' | 'tenantId' | 'qualityInspectionId' | 'createdAt' | 'updatedAt'
     >
   >,
   tx: Prisma.TransactionClient,
 ) {
-  await tx.qualityInspectionLine.deleteMany({ where: { tenantId, qualityInspectionId } })
-  await tx.qualityInspectionLine.createMany({
+  await tx.purchaseQualityInspectionLine.deleteMany({ where: { tenantId, qualityInspectionId } })
+  await tx.purchaseQualityInspectionLine.createMany({
     data: lines.map((line) => ({ ...line, tenantId, qualityInspectionId })),
   })
 }

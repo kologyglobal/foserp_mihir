@@ -196,6 +196,74 @@ export async function fetchFixedAssetCategory(id: string): Promise<ApiResponse<F
   return apiRequest<FixedAssetCategoryDto>(tenantPath(`${BASE}/categories/${id}`))
 }
 
+export interface CreateFixedAssetCategoryBody {
+  legalEntityId: string
+  code: string
+  name: string
+  usefulLifeYears: number
+  residualPercent: string
+  assetAccountId: string
+  accumDepAccountId: string
+  depExpenseAccountId: string
+}
+
+export async function createFixedAssetCategory(
+  body: CreateFixedAssetCategoryBody,
+): Promise<ApiResponse<FixedAssetCategoryDto>> {
+  return apiRequest<FixedAssetCategoryDto>(tenantPath(`${BASE}/categories`), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function updateFixedAssetCategory(
+  id: string,
+  body: Partial<Omit<CreateFixedAssetCategoryBody, 'legalEntityId' | 'code'>> & { isActive?: boolean },
+): Promise<ApiResponse<FixedAssetCategoryDto>> {
+  return apiRequest<FixedAssetCategoryDto>(tenantPath(`${BASE}/categories/${id}`), {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+export interface CreateFixedAssetBody {
+  legalEntityId: string
+  categoryId: string
+  name: string
+  acquisitionDate: string
+  acquisitionCost: string
+  usefulLifeYears?: number
+  draftReference?: string
+  location?: string
+  plant?: string
+  department?: string
+  custodian?: string
+  serialNumber?: string
+  manufacturer?: string
+  model?: string
+  vendorName?: string
+  notes?: string
+  currencyCode?: string
+  status?: 'DRAFT' | 'PENDING_CAPITALIZATION'
+}
+
+export async function createFixedAsset(body: CreateFixedAssetBody): Promise<ApiResponse<FixedAssetDto>> {
+  return apiRequest<FixedAssetDto>(tenantPath(`${BASE}/assets`), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function updateFixedAsset(
+  id: string,
+  body: Partial<Omit<CreateFixedAssetBody, 'legalEntityId'>> & { expectedUpdatedAt?: string },
+): Promise<ApiResponse<FixedAssetDto>> {
+  return apiRequest<FixedAssetDto>(tenantPath(`${BASE}/assets/${id}`), {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
 export async function fetchFixedAssets(params: {
   legalEntityId: string
   categoryId?: string

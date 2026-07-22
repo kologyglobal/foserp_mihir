@@ -1702,10 +1702,10 @@ export function CrmLeadFormPage() {
               subtitle="Search products, set qty and pricing — totals roll up to commercial value."
               icon={ClipboardList}
               accent="teal"
-              columns={3}
+              columns={4}
               forceOpenKey={sectionForceOpenKey}
             >
-              <div className="col-span-3" data-field="productRequirement">
+              <div className="col-span-full" data-field="productRequirement">
                 <ErpLineItemsGrid
                   lines={requirementLines}
                   onChange={(next) => {
@@ -1739,7 +1739,7 @@ export function CrmLeadFormPage() {
               }
               icon={Banknote}
               accent="green"
-              columns={3}
+              columns={4}
             >
               <ErpFieldRow label="Expected Revenue (₹)" dataField="expectedValue" fieldState={inlineValidation.fieldState('expectedValue')}>
                 <Input
@@ -1797,7 +1797,7 @@ export function CrmLeadFormPage() {
               subtitle="Schedule next action on save."
               icon={Calendar}
               accent="amber"
-              columns={3}
+              columns={4}
             >
               <ErpFieldRow
                 label="Next Follow-up Date"
@@ -1840,7 +1840,7 @@ export function CrmLeadFormPage() {
               subtitle="Internal notes and reference tags."
               icon={FileText}
               accent="slate"
-              columns={3}
+              columns={4}
             >
               <ErpFieldRow label="Internal Notes" colSpan={3} horizontal={false}>
                 <Textarea rows={5} value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} placeholder="Internal team notes" className="erp-input" />
@@ -1874,7 +1874,7 @@ export function CrmLeadFormPage() {
               subtitle="Territory, branch, and lifecycle."
               icon={Building2}
               accent="violet"
-              columns={3}
+              columns={4}
               forceOpenKey={sectionForceOpenKey}
             >
               <ErpFieldRow label="Territory" readOnly>

@@ -19,10 +19,17 @@ import inventoryMastersRoutes from './modules/masters/inventory-masters.routes.j
 import itemRoutes, { itemLookupRouter } from './modules/items/item.routes.js'
 import vendorRoutes, { vendorLookupRouter } from './modules/vendors/vendor.routes.js'
 import accountingRoutes from './modules/accounting/accounting.routes.js'
+import manufacturingRoutes from './modules/manufacturing/manufacturing.routes.js'
+import inventoryRoutes from './modules/inventory/inventory.routes.js'
+import qualityRoutes from './modules/quality/quality.routes.js'
+import dispatchRoutes from './modules/dispatch/dispatch.routes.js'
+import gateRoutes from './modules/gate/gate.routes.js'
+import opsReportsRoutes from './modules/ops-reports/ops-reports.routes.js'
+import operationalExceptionRoutes from './modules/ops-reports/exceptions/exception.routes.js'
 import roleRoutes from './modules/roles/role.routes.js'
 import tenantRoutes from './modules/tenants/tenant.routes.js'
 import userRoutes from './modules/users/user.routes.js'
-import { sendSuccess } from './utils/response.js'
+import { sendError, sendSuccess } from './utils/response.js'
 import { swaggerSpec } from './config/swagger.js'
 
 export function createApp() {
@@ -96,12 +103,22 @@ export function createApp() {
   app.use('/api/v1/tenants/:tenantId/masters/imports', masterImportRoutes)
   app.use('/api/v1/tenants/:tenantId/masters/exports', masterExportRoutes)
   app.use('/api/v1/tenants/:tenantId/masters', mastersRoutes)
+  // Stock routes must run before the inventory-master alias router, whose
+  // `/:resource` guard intentionally rejects unknown master resource names.
+  app.use('/api/v1/tenants/:tenantId/inventory', inventoryRoutes)
   app.use('/api/v1/tenants/:tenantId/inventory', inventoryMastersRoutes)
   app.use('/api/v1/tenants/:tenantId/lookups/items', itemLookupRouter)
   app.use('/api/v1/tenants/:tenantId/lookups/vendors', vendorLookupRouter)
   app.use('/api/v1/tenants/:tenantId/lookups', lookupRoutes)
   app.use('/api/v1/tenants/:tenantId/accounting', accountingRoutes)
+  app.use('/api/v1/tenants/:tenantId/manufacturing', manufacturingRoutes)
   app.use('/api/v1/tenants/:tenantId/purchase', purchaseRoutes)
+  app.use('/api/v1/tenants/:tenantId/quality', qualityRoutes)
+  app.use('/api/v1/tenants/:tenantId/dispatch', dispatchRoutes)
+  app.use('/api/v1/tenants/:tenantId/gate', gateRoutes)
+  // Phase 7D — reporting foundation (manufacturing/quality/dispatch reports, saved views, exception centre)
+  app.use('/api/v1/tenants/:tenantId/reports', opsReportsRoutes)
+  app.use('/api/v1/tenants/:tenantId/operations/exceptions', operationalExceptionRoutes)
 
   // Tenant slug aliases
   app.use('/api/v1/t/:tenantSlug/users', userRoutes)
@@ -112,12 +129,25 @@ export function createApp() {
   app.use('/api/v1/t/:tenantSlug/masters/imports', masterImportRoutes)
   app.use('/api/v1/t/:tenantSlug/masters/exports', masterExportRoutes)
   app.use('/api/v1/t/:tenantSlug/masters', mastersRoutes)
+  app.use('/api/v1/t/:tenantSlug/inventory', inventoryRoutes)
   app.use('/api/v1/t/:tenantSlug/inventory', inventoryMastersRoutes)
   app.use('/api/v1/t/:tenantSlug/lookups/items', itemLookupRouter)
   app.use('/api/v1/t/:tenantSlug/lookups/vendors', vendorLookupRouter)
   app.use('/api/v1/t/:tenantSlug/lookups', lookupRoutes)
   app.use('/api/v1/t/:tenantSlug/accounting', accountingRoutes)
+  app.use('/api/v1/t/:tenantSlug/manufacturing', manufacturingRoutes)
   app.use('/api/v1/t/:tenantSlug/purchase', purchaseRoutes)
+  app.use('/api/v1/t/:tenantSlug/quality', qualityRoutes)
+  app.use('/api/v1/t/:tenantSlug/dispatch', dispatchRoutes)
+  app.use('/api/v1/t/:tenantSlug/gate', gateRoutes)
+  app.use('/api/v1/t/:tenantSlug/reports', opsReportsRoutes)
+  app.use('/api/v1/t/:tenantSlug/operations/exceptions', operationalExceptionRoutes)
+
+  // Unknown API routes must return JSON 404 — never Express default HTML and
+  // never the SPA shell (Phase 8C Wave 1 / 8B-R-015 SPA gate).
+  app.all(/^\/api(?:\/|$).*/, (req, res) => {
+    sendError(res, 404, `API route not found: ${req.method} ${req.path}`)
+  })
 
   // Single-host production: serve Vite build from public/ (same origin as /api).
   // Docker Compose leaves this unused (frontend nginx container serves the SPA).

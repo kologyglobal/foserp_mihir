@@ -6,12 +6,11 @@
 import { listJournals } from '@/services/bridges/journalApiBridge'
 import {
   closePeriod as bridgeClosePeriod,
+  ensureLegalEntity,
   listFinancialYears,
-  listLegalEntities,
   listPeriods,
   markPeriodUnderReview as bridgeMarkUnderReview,
   reopenPeriod as bridgeReopenPeriod,
-  useFinanceSetupStore,
 } from '@/services/bridges/financeApiBridge'
 import { getLatestPayableCloseGateRun } from '@/services/bridges/payablesApiBridge'
 import { fetchReconciliationSessions } from '@/modules/accounting/treasury/bank-reconciliation/api/bank-reconciliation.api'
@@ -39,18 +38,7 @@ function periodCodeFromStart(startDate: string): string {
 }
 
 export async function resolvePeriodCloseLegalEntity(): Promise<LegalEntity> {
-  const entities = await listLegalEntities()
-  if (entities.length === 0) throw new Error('No legal entity available. Complete Finance Setup first.')
-  const store = useFinanceSetupStore.getState()
-  const selected = store.selectedLegalEntityId
-    ? entities.find((e) => e.id === store.selectedLegalEntityId)
-    : undefined
-  const preferred =
-    selected ?? entities.find((e) => e.isDefault && e.isActive) ?? entities.find((e) => e.isActive) ?? entities[0]
-  if (store.selectedLegalEntityId !== preferred.id) {
-    store.setSelectedLegalEntityId(preferred.id)
-  }
-  return preferred
+  return ensureLegalEntity()
 }
 
 function pickCurrentFy(years: FinancialYear[]): FinancialYear | undefined {

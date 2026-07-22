@@ -22,19 +22,24 @@ export function MoneyInWorkspaceShell({
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
 
-  const activePath = pathname.startsWith('/accounting/money-in/invoices')
-    ? '/accounting/money-in/invoices'
-    : pathname.startsWith('/accounting/money-in/receipts')
-      ? '/accounting/money-in/receipts'
-      : pathname.startsWith('/accounting/money-in/credit-notes')
-        ? '/accounting/money-in/credit-notes'
-        : MONEY_IN_WORKSPACE_TABS.find(
+  const arBase = pathname.startsWith('/accounting/receivables') ? '/accounting/receivables' : '/accounting/money-in'
+
+  const activePath = pathname.startsWith(`${arBase}/invoices`)
+    ? `${arBase}/invoices`
+    : pathname.startsWith(`${arBase}/receipts`)
+      ? `${arBase}/receipts`
+      : pathname.startsWith(`${arBase}/credit-notes`)
+        ? `${arBase}/credit-notes`
+        : MONEY_IN_WORKSPACE_TABS.map((t) => ({
+            ...t,
+            path: t.path.replace('/accounting/money-in', arBase),
+          })).find(
             (t) =>
-              t.path !== '/accounting/money-in/invoices' &&
-              t.path !== '/accounting/money-in/receipts' &&
-              t.path !== '/accounting/money-in/credit-notes' &&
+              t.path !== `${arBase}/invoices` &&
+              t.path !== `${arBase}/receipts` &&
+              t.path !== `${arBase}/credit-notes` &&
               (pathname === t.path || pathname.startsWith(`${t.path}/`)),
-          )?.path ?? '/accounting/money-in'
+          )?.path ?? arBase
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -68,7 +73,10 @@ export function MoneyInWorkspaceShell({
     >
       <div className="flex flex-col gap-2">
         <DynamicsTabs
-          items={[...MONEY_IN_WORKSPACE_TABS]}
+          items={MONEY_IN_WORKSPACE_TABS.map((t) => ({
+            ...t,
+            path: t.path.replace('/accounting/money-in', arBase),
+          }))}
           activePath={activePath}
           onChange={(path) => {
             if (shouldNavigate(pathname, path)) navigate(path)

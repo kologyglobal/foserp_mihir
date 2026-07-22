@@ -2,13 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { ClipboardList, Eye, Plus, RefreshCw, Wrench } from 'lucide-react'
-import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { Select } from '@/components/forms/Inputs'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { TableLink } from '@/components/ui/AppLink'
-import { EmptyState } from '@/components/ui/EmptyState'
 import { DataTable } from '@/components/tables/DataTable'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import {
@@ -16,6 +13,7 @@ import {
   type RowActionItem,
 } from '@/design-system/enterprise/EnterpriseTablePrimitives'
 import { ManufacturingDemoBanner } from '@/components/manufacturing'
+import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
 import { getProductionPlans } from '@/services/manufacturing'
 import type { ProductionPlan, ProductionPlanSource, ProductionPlanStatus } from '@/types/manufacturing'
 import {
@@ -25,6 +23,7 @@ import {
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { useManufacturingPermissions } from '@/utils/permissions/manufacturing'
+import { ProductionEmptyState, ProductionPageHeader } from '../ui'
 
 export function ProductionPlanPage() {
   const navigate = useNavigate()
@@ -54,6 +53,18 @@ export function ProductionPlanPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const kpiStrip = useMemo<EnterpriseKpiItem[]>(() => {
+    const open = rows.filter((p) => p.status !== 'closed' && p.status !== 'cancelled').length
+    const plannedQty = rows.reduce((sum, p) => sum + p.plannedQty, 0)
+    const wosCreated = rows.reduce((sum, p) => sum + p.wosCreated, 0)
+    return [
+      { id: 'total', label: 'Plans', value: rows.length, accent: 'blue' },
+      { id: 'open', label: 'Open', value: open, accent: 'amber' },
+      { id: 'qty', label: 'Planned Qty', value: plannedQty, accent: 'slate' },
+      { id: 'wos', label: 'WOs Created', value: wosCreated, accent: 'green' },
+    ]
+  }, [rows])
 
   const columns = useMemo<ColumnDef<ProductionPlan>[]>(() => [
     {
@@ -129,64 +140,43 @@ export function ProductionPlanPage() {
 
   if (!perms.canViewPlan) {
     return (
-      <OperationalPageShell
-        variant="dynamics"
-        layout="enterprise"
-        badge="Manufacturing"
-        title="Production Plan"
-        breadcrumbs={[
-          { label: 'Manufacturing & Production', to: '/manufacturing' },
-          { label: 'Production Plan' },
-        ]}
-        autoBreadcrumbs={false}
-      >
-        <EmptyState icon={ClipboardList} title="Access denied" description="Missing production plan view permission." />
-      </OperationalPageShell>
+      <ProductionPageHeader title="Production Plan" favoritePath="/manufacturing/production-plan">
+        <ProductionEmptyState
+          icon={ClipboardList}
+          title="Access denied"
+          description="Missing production plan view permission."
+        />
+      </ProductionPageHeader>
     )
   }
 
   return (
-    <OperationalPageShell
-      variant="dynamics"
-      layout="enterprise"
-      badge="Manufacturing"
+    <ProductionPageHeader
       title="Production Plan"
       description="Tells what to make — planning only. Generate Work Orders to execute on the shopfloor."
       breadcrumbs={[
         { label: 'Manufacturing & Production', to: '/manufacturing' },
         { label: 'Production Plan' },
       ]}
-      autoBreadcrumbs={false}
       favoritePath="/manufacturing/production-plan"
-      commandBar={(
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={
-            perms.canViewPlan
-              ? {
-                  id: 'new',
-                  label: 'New Plan',
-                  icon: Plus,
-                  onClick: () => navigate('/manufacturing/production-plan/new'),
-                }
-              : undefined
-          }
-          secondaryActions={[
-            { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load() },
-          ]}
-        />
-      )}
-    >
-      <div className="space-y-3">
-        <ManufacturingDemoBanner message="Production plans are demo documents. Generating WOs creates draft work orders only." />
-
+      kpiStrip={kpiStrip}
+      primaryAction={{
+        id: 'new',
+        label: 'New Plan',
+        icon: Plus,
+        onClick: () => navigate('/manufacturing/production-plan/new'),
+      }}
+      secondaryActions={[
+        { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load() },
+      ]}
+      filterBar={
         <div className="flex flex-wrap items-end gap-2">
           <SearchInput
             value={search}
             onChange={setSearch}
             placeholder="Search plan no / name / owner…"
-            className="max-w-xs"
+            className="min-w-[180px] max-w-xs"
+            aria-label="Search production plans"
           />
           <label className="text-[11px] font-medium text-erp-muted">
             Source
@@ -194,6 +184,7 @@ export function ProductionPlanPage() {
               value={source}
               onChange={(e) => setSource(e.target.value as ProductionPlanSource | '')}
               className="mt-0.5 block w-44"
+              aria-label="Filter by source"
             >
               <option value="">All sources</option>
               {(Object.keys(PRODUCTION_PLAN_SOURCE_LABELS) as ProductionPlanSource[]).map((s) => (
@@ -207,6 +198,7 @@ export function ProductionPlanPage() {
               value={status}
               onChange={(e) => setStatus(e.target.value as ProductionPlanStatus | '')}
               className="mt-0.5 block w-48"
+              aria-label="Filter by status"
             >
               <option value="">All statuses</option>
               {(Object.keys(PRODUCTION_PLAN_STATUS_LABELS) as ProductionPlanStatus[]).map((s) => (
@@ -215,26 +207,32 @@ export function ProductionPlanPage() {
             </Select>
           </label>
         </div>
+      }
+    >
+      <ManufacturingDemoBanner message="Production plans are demo documents. Generating WOs creates draft work orders only." />
 
-        {loading ? <LoadingState variant="table" rows={6} /> : null}
-        {!loading && rows.length === 0 ? (
-          <EmptyState
-            icon={ClipboardList}
-            title="No production plans"
-            description="Create a plan from sales orders, stock, forecast, or manual demand."
-            action={
-              <button
-                type="button"
-                className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"
-                onClick={() => navigate('/manufacturing/production-plan/new')}
-              >
-                New Plan
-              </button>
-            }
-          />
-        ) : null}
-        {!loading && rows.length > 0 ? <DataTable data={rows} columns={columns} /> : null}
-      </div>
-    </OperationalPageShell>
+      {loading ? <LoadingState variant="table" rows={6} /> : null}
+      {!loading && rows.length === 0 ? (
+        <ProductionEmptyState
+          icon={ClipboardList}
+          title="No production plans"
+          description="Create a plan from sales orders, stock, forecast, or manual demand."
+          action={
+            <button
+              type="button"
+              className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"
+              onClick={() => navigate('/manufacturing/production-plan/new')}
+            >
+              New Plan
+            </button>
+          }
+        />
+      ) : null}
+      {!loading && rows.length > 0 ? (
+        <div className="overflow-x-auto rounded-lg border border-erp-border bg-white">
+          <DataTable data={rows} columns={columns} />
+        </div>
+      ) : null}
+    </ProductionPageHeader>
   )
 }

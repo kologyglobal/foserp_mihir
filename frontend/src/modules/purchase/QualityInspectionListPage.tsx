@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { ClipboardCheck, Eye, RefreshCw } from 'lucide-react'
+import { ClipboardCheck, Eye, Plus, RefreshCw } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { PurchaseSimpleListFilterBar } from '@/components/purchase/PurchaseSimpleListFilterBar'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
@@ -19,9 +19,11 @@ import type { QualityInspectionListRow, QualityInspectionStatus } from '@/types/
 import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { purchaseBreadcrumbs } from '@/utils/purchaseNavigation'
+import { usePurchasePermissions } from '@/utils/permissions'
 
 export function QualityInspectionListPage() {
   const navigate = useNavigate()
+  const perms = usePurchasePermissions()
   const [searchParams] = useSearchParams()
   const grnFilter = searchParams.get('grnId') ?? ''
   const [rows, setRows] = useState<QualityInspectionListRow[]>([])
@@ -153,6 +155,17 @@ export function QualityInspectionListPage() {
         <ErpCommandBar
           inline
           sticky={false}
+          primaryAction={
+            grnFilter && perms.canInspectQuality
+              ? {
+                  id: 'create',
+                  label: 'Create Inspection',
+                  icon: Plus,
+                  onClick: () =>
+                    navigate(`/purchase/quality-inspections/new?grnId=${encodeURIComponent(grnFilter)}`),
+                }
+              : undefined
+          }
           secondaryActions={[
             {
               id: 'grn',
@@ -189,7 +202,24 @@ export function QualityInspectionListPage() {
         <EmptyState
           icon={ClipboardCheck}
           title="No quality inspections"
-          description="Submit a GRN that requires inspection to create a QI document."
+          description={
+            grnFilter
+              ? 'Create an inspection for this goods receipt.'
+              : 'Submit a GRN that requires inspection to create a QI document.'
+          }
+          action={
+            grnFilter && perms.canInspectQuality ? (
+              <button
+                type="button"
+                className="text-sm font-medium text-erp-primary"
+                onClick={() =>
+                  navigate(`/purchase/quality-inspections/new?grnId=${encodeURIComponent(grnFilter)}`)
+                }
+              >
+                Create inspection
+              </button>
+            ) : undefined
+          }
         />
       ) : (
         <DataTable columns={columns} data={filtered} />

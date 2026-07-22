@@ -46,6 +46,8 @@ const itemBaseSchema = z.object({
   purchaseUomId: z.string().uuid().nullable().optional(),
   purchaseQtyPerUom: z.coerce.number().min(0).default(1),
   qcRequired: z.boolean().optional(),
+  batchTracked: z.boolean().optional(),
+  serialTracked: z.boolean().optional(),
   qualityTestGroupCode: z.string().trim().max(32).nullable().optional(),
   productionBomId: z.string().trim().max(36).nullable().optional(),
   routingNo: z.string().trim().max(64).nullable().optional(),

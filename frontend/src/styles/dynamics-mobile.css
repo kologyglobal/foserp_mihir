@@ -138,8 +138,8 @@
     }
 
     .erp-detail-panel {
-      top: calc(var(--d365-suite-height) + var(--dyn-live-strip-height));
-      height: calc(100vh - var(--d365-suite-height) - var(--dyn-live-strip-height));
+      top: 0;
+      height: 100vh;
       max-width: 100%;
       width: 100%;
     }

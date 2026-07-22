@@ -2,6 +2,7 @@
  * Live factory pulse — UI simulation layer for activity feed (does not mutate business data).
  */
 import { useMemo, useState, useEffect } from 'react'
+import { isApiMode } from '../config/apiConfig'
 import { useLiveActivityMock } from './useLiveActivityMock'
 import { activityFromNotifications } from '../utils/liveErpMetrics'
 import { getErpNotifications } from '../services/erpAnalyticsService'
@@ -133,17 +134,24 @@ function storeLinkedEvents(): LiveActivityEvent[] {
   return events
 }
 
+/**
+ * Phase 8C Wave 1 (8B-R-010): in API mode this pulse is fully disabled —
+ * no mock events, no demo-notification synthesis, no reads from persisted
+ * demo Zustand slices. Callers receive an empty, non-live feed.
+ */
 export function useLiveFactoryPulse(minEvents = 10) {
-  const mock = useLiveActivityMock(true, Math.max(minEvents, 10))
+  const demoMode = !isApiMode()
+  const mock = useLiveActivityMock(demoMode, Math.max(minEvents, 10))
   const [lastUpdated, setLastUpdated] = useState(() => Date.now())
 
   useEffect(() => {
+    if (!demoMode) return
     const t = window.setInterval(() => setLastUpdated(Date.now()), 30_000)
     return () => window.clearInterval(t)
-  }, [])
+  }, [demoMode])
 
-  const notifications = useMemo(() => getErpNotifications(), [lastUpdated])
-  const linked = useMemo(() => storeLinkedEvents(), [lastUpdated])
+  const notifications = useMemo(() => (demoMode ? getErpNotifications() : []), [lastUpdated, demoMode])
+  const linked = useMemo(() => (demoMode ? storeLinkedEvents() : []), [lastUpdated, demoMode])
 
   const events = useMemo(() => {
     const merged = [
@@ -164,7 +172,7 @@ export function useLiveFactoryPulse(minEvents = 10) {
   return {
     events,
     lastUpdated,
-    live: true,
+    live: demoMode,
     eventCount: events.length,
   }
 }

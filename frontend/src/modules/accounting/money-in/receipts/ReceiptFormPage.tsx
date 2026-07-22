@@ -10,9 +10,10 @@ import { LoadingState } from '@/design-system/components/LoadingState'
 import {
   createCustomerReceipt,
   getCustomerReceipt,
-  listDemoCustomers,
   updateCustomerReceipt,
 } from '@/services/bridges/receivablesApiBridge'
+import { CustomerMasterSelect } from '@/components/masters/CustomerMasterSelect'
+import { PartyMasterCard } from '@/modules/accounting/shared/invoices'
 import { listAccounts, resolveLegalEntityId } from '@/services/bridges/financeApiBridge'
 import type { Account } from '@/types/financeSetup'
 import type { CustomerReceiptPaymentMethod, CustomerTdsMode } from '@/types/moneyIn'
@@ -73,7 +74,6 @@ export function ReceiptFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const perms = useMoneyInPermissions()
-  const customers = listDemoCustomers()
   const [loading, setLoading] = useState(mode === 'edit')
   const [saving, setSaving] = useState(false)
   const [updatedAt, setUpdatedAt] = useState<string>()
@@ -84,7 +84,7 @@ export function ReceiptFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      customerId: customers[0]?.id ?? '',
+      customerId: '',
       receiptDate: today(),
       postingDate: today(),
       paymentMethod: 'BANK_TRANSFER',
@@ -241,13 +241,11 @@ export function ReceiptFormPage({ mode }: { mode: 'create' | 'edit' }) {
           <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-erp-muted">Customer &amp; payment</h3>
           <div className="grid gap-3 md:grid-cols-2">
             <FormField label="Customer" error={form.formState.errors.customerId?.message}>
-              <Select {...form.register('customerId')}>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </Select>
+              <CustomerMasterSelect
+                value={watched.customerId}
+                onChange={(customerId) => form.setValue('customerId', customerId, { shouldDirty: true, shouldValidate: true })}
+                allowEmpty
+              />
             </FormField>
             <FormField label="Payment method">
               <Select {...form.register('paymentMethod')}>
@@ -284,6 +282,7 @@ export function ReceiptFormPage({ mode }: { mode: 'create' | 'edit' }) {
               )}
             </FormField>
           </div>
+          <PartyMasterCard variant="crm" partyId={watched.customerId} showQuickCreate />
         </section>
 
         {watched.paymentMethod === 'CHEQUE' && (

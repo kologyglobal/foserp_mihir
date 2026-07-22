@@ -61,7 +61,7 @@ import type {
 } from '../../types/moneyOut'
 import * as api from '../api/payablesApi'
 import { formatApiError } from '../api/apiErrors'
-import { resolveLegalEntityId } from './financeApiBridge'
+import { ensureLegalEntityId } from './financeApiBridge'
 import { mapMoneyOutError } from '../../modules/accounting/money-out/moneyOutUi'
 
 function unwrap<T>(res: { data: T }): T {
@@ -82,7 +82,7 @@ function rethrowMapped(err: unknown): never {
 
 export async function listVendorInvoices(filters?: Partial<ListVendorInvoicesQuery>): Promise<PaginatedVendorInvoices> {
   requireApiMode()
-  const legalEntityId = resolveLegalEntityId(filters?.legalEntityId)
+  const legalEntityId = await ensureLegalEntityId(filters?.legalEntityId)
   try {
     return unwrap(await api.listVendorInvoices({ legalEntityId, page: 1, limit: 50, ...filters }))
   } catch (e) {
@@ -102,7 +102,7 @@ export async function getVendorInvoice(id: string): Promise<VendorInvoiceDto> {
 export async function createVendorInvoiceDraft(input: CreateVendorInvoiceInput): Promise<VendorInvoiceDto> {
   requireApiMode()
   try {
-    return unwrap(await api.createVendorInvoiceDraft({ ...input, legalEntityId: resolveLegalEntityId(input.legalEntityId) }))
+    return unwrap(await api.createVendorInvoiceDraft({ ...input, legalEntityId: await ensureLegalEntityId(input.legalEntityId) }))
   } catch (e) {
     rethrowMapped(e)
   }
@@ -226,7 +226,7 @@ export async function listVendorPayments(
   filters?: Partial<ListVendorPaymentsQuery>,
 ): Promise<PaginatedVendorPayments> {
   requireApiMode()
-  const legalEntityId = resolveLegalEntityId(filters?.legalEntityId)
+  const legalEntityId = await ensureLegalEntityId(filters?.legalEntityId)
   try {
     return unwrap(await api.listVendorPayments({ legalEntityId, page: 1, limit: 50, ...filters }))
   } catch (e) {
@@ -247,7 +247,7 @@ export async function createVendorPaymentDraft(input: CreateVendorPaymentInput):
   requireApiMode()
   try {
     return unwrap(
-      await api.createVendorPaymentDraft({ ...input, legalEntityId: resolveLegalEntityId(input.legalEntityId) }),
+      await api.createVendorPaymentDraft({ ...input, legalEntityId: await ensureLegalEntityId(input.legalEntityId) }),
     )
   } catch (e) {
     rethrowMapped(e)
@@ -429,7 +429,7 @@ export async function listVendorAdjustments(
   filters?: Partial<ListVendorAdjustmentsQuery>,
 ): Promise<PaginatedVendorAdjustments> {
   requireApiMode()
-  const legalEntityId = resolveLegalEntityId(filters?.legalEntityId)
+  const legalEntityId = await ensureLegalEntityId(filters?.legalEntityId)
   try {
     return unwrap(await api.listVendorAdjustments({ legalEntityId, page: 1, limit: 50, ...filters }))
   } catch (e) {
@@ -450,7 +450,7 @@ export async function createVendorAdjustmentDraft(input: CreateVendorAdjustmentI
   requireApiMode()
   try {
     return unwrap(
-      await api.createVendorAdjustmentDraft({ ...input, legalEntityId: resolveLegalEntityId(input.legalEntityId) }),
+      await api.createVendorAdjustmentDraft({ ...input, legalEntityId: await ensureLegalEntityId(input.legalEntityId) }),
     )
   } catch (e) {
     rethrowMapped(e)
@@ -707,7 +707,7 @@ export async function listApReversalHistory(
 
 export async function getPayableOverview(legalEntityId?: string): Promise<PayableOverviewDto> {
   requireApiMode()
-  const leId = resolveLegalEntityId(legalEntityId)
+  const leId = await ensureLegalEntityId(legalEntityId)
   try {
     return unwrap(await api.getPayableOverview({ legalEntityId: leId }))
   } catch (e) {
@@ -719,7 +719,7 @@ export async function listPayableOutstanding(
   params?: Record<string, string | number | boolean | undefined>,
 ): Promise<PayableReportingListResult<PayableOutstandingOpenItemDto>> {
   requireApiMode()
-  const legalEntityId = resolveLegalEntityId(params?.legalEntityId as string | undefined)
+  const legalEntityId = await ensureLegalEntityId(params?.legalEntityId as string | undefined)
   try {
     return unwrap(await api.listPayableOutstanding({ legalEntityId, ...params }))
   } catch (e) {
@@ -731,7 +731,7 @@ export async function getPayableAgeingReport(
   params?: Record<string, string | number | boolean | undefined>,
 ): Promise<PayableAgeingReportDto> {
   requireApiMode()
-  const legalEntityId = resolveLegalEntityId(params?.legalEntityId as string | undefined)
+  const legalEntityId = await ensureLegalEntityId(params?.legalEntityId as string | undefined)
   try {
     return unwrap(await api.getPayableAgeingReport({ legalEntityId, ...params }))
   } catch (e) {
@@ -743,7 +743,7 @@ export async function listVendorPayableSummaries(
   params?: Record<string, string | number | boolean | undefined>,
 ): Promise<PayableReportingListResult<VendorPayableDetailDto>> {
   requireApiMode()
-  const legalEntityId = resolveLegalEntityId(params?.legalEntityId as string | undefined)
+  const legalEntityId = await ensureLegalEntityId(params?.legalEntityId as string | undefined)
   try {
     return unwrap(await api.listVendorPayableSummaries({ legalEntityId, ...params }))
   } catch (e) {
@@ -753,7 +753,7 @@ export async function listVendorPayableSummaries(
 
 export async function getVendorPayableSummary(vendorId: string, legalEntityId?: string): Promise<VendorPayableDetailDto> {
   requireApiMode()
-  const leId = resolveLegalEntityId(legalEntityId)
+  const leId = await ensureLegalEntityId(legalEntityId)
   try {
     return unwrap(await api.getVendorPayableSummary(vendorId, { legalEntityId: leId }))
   } catch (e) {
@@ -766,7 +766,7 @@ export async function listVendorPayableOpenItems(
   params?: Record<string, string | number | boolean | undefined>,
 ): Promise<PayableReportingListResult<PayableOutstandingOpenItemDto>> {
   requireApiMode()
-  const legalEntityId = resolveLegalEntityId(params?.legalEntityId as string | undefined)
+  const legalEntityId = await ensureLegalEntityId(params?.legalEntityId as string | undefined)
   try {
     return unwrap(await api.listVendorPayableOpenItems(vendorId, { legalEntityId, ...params }))
   } catch (e) {
@@ -778,7 +778,7 @@ export async function getPaymentPlanning(
   params?: Record<string, string | number | boolean | undefined>,
 ): Promise<PaymentPlanningDto> {
   requireApiMode()
-  const legalEntityId = resolveLegalEntityId(params?.legalEntityId as string | undefined)
+  const legalEntityId = await ensureLegalEntityId(params?.legalEntityId as string | undefined)
   try {
     return unwrap(await api.getPaymentPlanning({ legalEntityId, ...params }))
   } catch (e) {
@@ -796,7 +796,7 @@ export async function createPayableReconciliationRun(
     return unwrap(
       await api.createPayableReconciliationRun({
         ...input,
-        legalEntityId: resolveLegalEntityId(input.legalEntityId),
+        legalEntityId: await ensureLegalEntityId(input.legalEntityId),
       }),
     )
   } catch (e) {
@@ -808,7 +808,7 @@ export async function listPayableReconciliationRuns(
   filters?: Partial<ListPayableReconciliationRunsQuery>,
 ): Promise<PaginatedPayableReconciliationRuns> {
   requireApiMode()
-  const legalEntityId = resolveLegalEntityId(filters?.legalEntityId)
+  const legalEntityId = await ensureLegalEntityId(filters?.legalEntityId)
   try {
     return unwrap(await api.listPayableReconciliationRuns({ legalEntityId, page: 1, pageSize: 20, ...filters }))
   } catch (e) {
@@ -900,7 +900,7 @@ export async function createPayableCloseGateRun(
     return unwrap(
       await api.createPayableCloseGateRun({
         ...input,
-        legalEntityId: resolveLegalEntityId(input.legalEntityId),
+        legalEntityId: await ensureLegalEntityId(input.legalEntityId),
       }),
     )
   } catch (e) {
@@ -912,7 +912,7 @@ export async function listPayableCloseGateRuns(
   filters?: Partial<ListPayableCloseGateRunsQuery>,
 ): Promise<PaginatedPayableCloseGateRuns> {
   requireApiMode()
-  const legalEntityId = resolveLegalEntityId(filters?.legalEntityId)
+  const legalEntityId = await ensureLegalEntityId(filters?.legalEntityId)
   try {
     return unwrap(await api.listPayableCloseGateRuns({ legalEntityId, page: 1, pageSize: 20, ...filters }))
   } catch (e) {
@@ -934,7 +934,7 @@ export async function getLatestPayableCloseGateRun(
   legalEntityId?: string,
 ): Promise<PayableCloseGateRunDetailDto | null> {
   requireApiMode()
-  const leId = resolveLegalEntityId(legalEntityId)
+  const leId = await ensureLegalEntityId(legalEntityId)
   try {
     return unwrap(await api.getLatestPayableCloseGateRun({ legalEntityId: leId, periodId }))
   } catch (e) {
@@ -950,3 +950,71 @@ export async function exportPayableCloseGateRun(runId: string): Promise<{ blob: 
     rethrowMapped(e)
   }
 }
+
+// ─── AP disputes ─────────────────────────────────────────────────────────────
+
+export async function listApDisputes(
+  filters?: Partial<api.ListApDisputesQuery>,
+): Promise<api.ApDisputeDto[]> {
+  requireApiMode()
+  try {
+    const legalEntityId = await ensureLegalEntityId(filters?.legalEntityId)
+    return unwrap(await api.listApDisputes({ legalEntityId, ...filters }))
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function getApDispute(id: string): Promise<api.ApDisputeDto> {
+  requireApiMode()
+  try {
+    return unwrap(await api.getApDispute(id))
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function createApDispute(input: api.CreateApDisputeInput): Promise<api.ApDisputeDto> {
+  requireApiMode()
+  try {
+    return unwrap(
+      await api.createApDispute({
+        ...input,
+        legalEntityId: await ensureLegalEntityId(input.legalEntityId),
+      }),
+    )
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function updateApDispute(id: string, input: api.UpdateApDisputeInput): Promise<api.ApDisputeDto> {
+  requireApiMode()
+  try {
+    return unwrap(await api.updateApDispute(id, input))
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function transitionApDispute(
+  id: string,
+  body: { status: api.ApDisputeStatus; resolution?: string | null },
+): Promise<api.ApDisputeDto> {
+  requireApiMode()
+  try {
+    return unwrap(await api.transitionApDispute(id, body))
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export type {
+  ApDisputeDto,
+  ApDisputePriority,
+  ApDisputeStatus,
+  ApDisputeType,
+  CreateApDisputeInput,
+  ListApDisputesQuery,
+  UpdateApDisputeInput,
+} from '../api/payablesApi'

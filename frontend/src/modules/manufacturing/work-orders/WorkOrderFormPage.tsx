@@ -482,7 +482,24 @@ export function WorkOrderFormPage() {
     )
   }
 
-  if (loading) return <LoadingState variant="form" />
+  if (loading) {
+    return (
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Manufacturing"
+        title={isEdit ? 'Edit Work Order' : 'New Work Order'}
+        breadcrumbs={[
+          { label: 'Manufacturing & Production', to: '/manufacturing' },
+          { label: 'Work Orders', to: '/manufacturing/work-orders' },
+        ]}
+        autoBreadcrumbs={false}
+        backLink={{ to: '/manufacturing/work-orders', label: 'Back to Work Orders' }}
+      >
+        <LoadingState variant="form" />
+      </OperationalPageShell>
+    )
+  }
 
   return (
     <OperationalPageShell
@@ -498,6 +515,7 @@ export function WorkOrderFormPage() {
       ]}
       autoBreadcrumbs={false}
       favoritePath={isEdit ? `/manufacturing/work-orders/${workOrderId}/edit` : '/manufacturing/work-orders/new'}
+      backLink={{ to: '/manufacturing/work-orders', label: 'Back to Work Orders' }}
       commandBar={(
         <ErpCommandBar
           inline

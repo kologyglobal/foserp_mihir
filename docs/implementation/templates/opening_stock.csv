@@ -1,0 +1,2 @@
+itemCode,warehouseCode,onHandQty,reservedQty,movementDate,referenceNo,notes
+PILOT-RM-PLATE,WH-RM,1000,0,2026-07-21,OPEN-PILOT-001,Pilot opening stock

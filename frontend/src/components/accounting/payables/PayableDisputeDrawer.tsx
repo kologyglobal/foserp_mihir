@@ -10,6 +10,10 @@ import {
   type VendorDisputeType,
 } from '@/types/payables'
 import { getPayableInvoices, PayablesServiceError } from '@/services/accounting/payablesService'
+import { listVendorInvoices } from '@/services/bridges/payablesApiBridge'
+import { listVendorLookups } from '@/services/api/accountingLookupsApi'
+import { isApiMode } from '@/config/apiConfig'
+import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { cn } from '@/utils/cn'
 
 const inputCls =
@@ -27,6 +31,14 @@ const DISPUTE_STATUSES: VendorDisputeStatus[] = [
 ]
 
 const PRIORITIES: VendorDispute['priority'][] = ['Low', 'Medium', 'High', 'Critical']
+
+type InvoiceOption = {
+  id: string
+  invoiceNumber: string
+  outstandingBalance: number
+  purchaseOrders: Array<{ id: string; number: string }>
+  grns: Array<{ id: string; number: string }>
+}
 
 export function PayableDisputeDrawer({
   open,
@@ -48,6 +60,7 @@ export function PayableDisputeDrawer({
   const user = getSessionUser()
 
   const [invoiceId, setInvoiceId] = useState('')
+  const [vendorId, setVendorId] = useState('')
   const [disputeDate, setDisputeDate] = useState(today)
   const [disputeType, setDisputeType] = useState<VendorDisputeType>('Price Difference')
   const [disputedAmount, setDisputedAmount] = useState('')
@@ -60,15 +73,18 @@ export function PayableDisputeDrawer({
   const [resolution, setResolution] = useState('')
   const [debitNoteRequired, setDebitNoteRequired] = useState(false)
   const [paymentHold, setPaymentHold] = useState(false)
-  const [invoices, setInvoices] = useState<{ id: string; invoiceNumber: string; outstandingBalance: number }[]>([])
+  const [invoices, setInvoices] = useState<InvoiceOption[]>([])
+  const [vendors, setVendors] = useState<{ id: string; code: string; name: string }[]>([])
   const [busy, setBusy] = useState(false)
 
-  const effectiveVendorId = dispute?.vendorId ?? presetVendorId ?? ''
+  const effectiveVendorId = dispute?.vendorId ?? presetVendorId ?? vendorId
+  const selectedInvoice = invoices.find((invoice) => invoice.id === invoiceId)
 
   useEffect(() => {
     if (!open) return
     if (dispute) {
       setInvoiceId(dispute.invoiceId)
+      setVendorId(dispute.vendorId)
       setDisputeDate(dispute.disputeDate)
       setDisputeType(dispute.disputeType)
       setDisputedAmount(String(dispute.disputedAmount))
@@ -83,6 +99,7 @@ export function PayableDisputeDrawer({
       setPaymentHold(dispute.paymentHold)
     } else {
       setInvoiceId('')
+      setVendorId(presetVendorId ?? '')
       setDisputeDate(today)
       setDisputeType('Price Difference')
       setDisputedAmount('')
@@ -96,11 +113,63 @@ export function PayableDisputeDrawer({
       setDebitNoteRequired(false)
       setPaymentHold(false)
     }
-  }, [open, dispute, today, user.name])
+  }, [open, dispute, today, user.name, presetVendorId])
+
+  useEffect(() => {
+    if (!open || isEdit || presetVendorId) return
+    if (!isApiMode()) {
+      setVendors([])
+      return
+    }
+    void listVendorLookups({ page: 1, limit: 100, activeOnly: true })
+      .then((res) =>
+        setVendors(
+          (res.data ?? []).map((v) => ({
+            id: v.id,
+            code: v.code ?? '',
+            name: v.name,
+          })),
+        ),
+      )
+      .catch(() => setVendors([]))
+  }, [open, isEdit, presetVendorId])
 
   useEffect(() => {
     if (!open || !effectiveVendorId) {
       setInvoices([])
+      return
+    }
+    if (isApiMode()) {
+      void listVendorInvoices({ vendorId: effectiveVendorId, status: 'POSTED', page: 1, limit: 100 })
+        .then((page) =>
+          setInvoices(
+            page.items.map((i) => {
+              const purchaseOrders = (i.sourceLinks ?? [])
+                .filter((link) => link.sourceType === 'PURCHASE_ORDER')
+                .map((link) => ({
+                  id: link.sourceDocumentId,
+                  number: link.sourceDocumentNumberSnapshot ?? link.sourceDocumentId,
+                }))
+              const grns = (i.sourceLinks ?? [])
+                .filter((link) => link.sourceType === 'GOODS_RECEIPT' || link.sourceType === 'PURCHASE_RECEIPT')
+                .map((link) => ({
+                  id: link.sourceDocumentId,
+                  number: link.sourceDocumentNumberSnapshot ?? link.sourceDocumentId,
+                }))
+              return {
+                id: i.id,
+                invoiceNumber: i.vendorInvoiceNumber || i.supplierInvoiceNumber,
+                outstandingBalance: Number(i.vendorPayableAmount || i.invoiceGrandTotal || 0),
+                purchaseOrders,
+                grns,
+              }
+            }),
+          ),
+        )
+        .catch((e) => {
+          notify.error(e instanceof Error ? e.message : 'Failed to load vendor invoices')
+          setInvoices([])
+        })
       return
     }
     void getPayableInvoices({ vendorId: effectiveVendorId })
@@ -110,6 +179,8 @@ export function PayableDisputeDrawer({
             id: i.id,
             invoiceNumber: i.invoiceNumber,
             outstandingBalance: i.outstandingBalance,
+            purchaseOrders: i.poNumber ? [{ id: i.id, number: i.poNumber }] : [],
+            grns: i.grnNumber ? [{ id: i.id, number: i.grnNumber }] : [],
           })),
         ),
       )
@@ -138,13 +209,20 @@ export function PayableDisputeDrawer({
     }
 
     const inv = invoices.find((i) => i.id === invoiceId)
+    const vendorName =
+      dispute?.vendorName ||
+      presetVendorName ||
+      vendors.find((v) => v.id === effectiveVendorId)?.name ||
+      ''
     setBusy(true)
     try {
       const payload: Partial<VendorDispute> = {
         vendorId: effectiveVendorId,
-        vendorName: dispute?.vendorName ?? presetVendorName ?? '',
+        vendorName,
         invoiceId,
         invoiceNumber: inv?.invoiceNumber ?? dispute?.invoiceNumber ?? '',
+        purchaseOrders: inv?.purchaseOrders ?? dispute?.purchaseOrders,
+        grns: inv?.grns ?? dispute?.grns,
         disputeDate,
         disputeType,
         disputedAmount: Number(disputedAmount),
@@ -159,7 +237,7 @@ export function PayableDisputeDrawer({
         paymentHold,
       }
       onSaved?.(payload)
-      notify.success(isEdit ? 'Dispute updated (demo).' : 'Dispute created (demo).')
+      notify.success(isApiMode() ? (isEdit ? 'Dispute updated.' : 'Dispute created.') : isEdit ? 'Dispute updated (demo).' : 'Dispute created (demo).')
       onClose()
     } finally {
       setBusy(false)
@@ -197,7 +275,30 @@ export function PayableDisputeDrawer({
         ) : null
       }
     >
-      {!effectiveVendorId ? (
+      {!effectiveVendorId && !isEdit ? (
+        <div className="space-y-4">
+          <label className={labelCls}>
+            Vendor
+            <select
+              className={inputCls}
+              value={vendorId}
+              onChange={(e) => {
+                setVendorId(e.target.value)
+                setInvoiceId('')
+              }}
+              aria-required
+            >
+              <option value="">{SELECT_PLACEHOLDER}</option>
+              {vendors.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.code ? `${v.code} · ${v.name}` : v.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="text-[12px] text-erp-muted">Select a vendor to load posted invoices for the dispute.</p>
+        </div>
+      ) : !effectiveVendorId ? (
         <p className="py-8 text-center text-[13px] text-erp-muted">Select a vendor to manage disputes.</p>
       ) : (
         <div className="space-y-4">
@@ -218,13 +319,24 @@ export function PayableDisputeDrawer({
                 aria-required
                 disabled={isEdit}
               >
-                <option value="">Select invoice…</option>
+                <option value="">{SELECT_PLACEHOLDER}</option>
                 {invoices.map((i) => (
                   <option key={i.id} value={i.id}>
                     {i.invoiceNumber} · Bal ₹{i.outstandingBalance.toLocaleString('en-IN')}
                   </option>
                 ))}
               </select>
+              {selectedInvoice?.purchaseOrders.length || selectedInvoice?.grns.length ? (
+                <span className="mt-1 block text-[11px] font-normal text-erp-muted">
+                  {selectedInvoice.purchaseOrders.length
+                    ? `PO ${selectedInvoice.purchaseOrders.map((po) => po.number).join(', ')}`
+                    : ''}
+                  {selectedInvoice.purchaseOrders.length && selectedInvoice.grns.length ? ' · ' : ''}
+                  {selectedInvoice.grns.length
+                    ? `GRN ${selectedInvoice.grns.map((grn) => grn.number).join(', ')}`
+                    : ''}
+                </span>
+              ) : null}
             </label>
             <label className={labelCls}>
               Dispute date
@@ -318,8 +430,7 @@ export function PayableDisputeDrawer({
           <label className={labelCls}>
             Description
             <textarea
-              className="mt-1 w-full rounded-md border border-erp-border px-2.5 py-2 text-[13px] text-erp-text"
-              rows={3}
+              className="mt-1 min-h-[90px] w-full rounded-md border border-erp-border bg-white px-2.5 py-2 text-[13px] text-erp-text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               aria-required
@@ -328,41 +439,29 @@ export function PayableDisputeDrawer({
 
           {isEdit ? (
             <label className={labelCls}>
-              Resolution notes
+              Resolution
               <textarea
-                className="mt-1 w-full rounded-md border border-erp-border px-2.5 py-2 text-[13px] text-erp-text"
-                rows={2}
+                className="mt-1 min-h-[70px] w-full rounded-md border border-erp-border bg-white px-2.5 py-2 text-[13px] text-erp-text"
                 value={resolution}
                 onChange={(e) => setResolution(e.target.value)}
-                placeholder="Outcome, debit note reference, vendor confirmation…"
               />
             </label>
           ) : null}
 
-          <div className="flex flex-wrap gap-4 text-[12px]">
-            <label className="flex items-center gap-2">
+          <div className="flex flex-wrap gap-4 text-[13px]">
+            <label className="inline-flex items-center gap-2">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-erp-border"
                 checked={debitNoteRequired}
                 onChange={(e) => setDebitNoteRequired(e.target.checked)}
               />
               Debit note required
             </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-erp-border"
-                checked={paymentHold}
-                onChange={(e) => setPaymentHold(e.target.checked)}
-              />
+            <label className="inline-flex items-center gap-2">
+              <input type="checkbox" checked={paymentHold} onChange={(e) => setPaymentHold(e.target.checked)} />
               Payment hold
             </label>
           </div>
-
-          <p className="text-[11px] text-erp-muted">
-            Demo mode — disputes update local payables data only. No vendor notifications or GL postings occur.
-          </p>
         </div>
       )}
     </PayableDrawerShell>

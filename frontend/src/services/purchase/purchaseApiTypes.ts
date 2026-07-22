@@ -655,3 +655,192 @@ export interface ApiReceivableLinesResponse {
   lines: ApiReceivableLine[]
 }
 
+/* ─── Purchase Invoice (backend `/purchase/invoices`) ─── */
+
+export type ApiPurchaseInvoiceStatus =
+  | 'DRAFT'
+  | 'PENDING_APPROVAL'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'MATCHED'
+  | 'PARTIALLY_MATCHED'
+  | 'MISMATCH'
+  | 'POSTED'
+  | 'CANCELLED'
+  | 'CLOSED'
+
+export interface ApiPurchaseInvoiceAllowedActions {
+  canEdit: boolean
+  canSubmit: boolean
+  canApprove: boolean
+  canReject: boolean
+  canPost: boolean
+  canCancel: boolean
+}
+
+export interface ApiPurchaseInvoiceLine {
+  id: string
+  purchaseInvoiceId: string
+  lineNumber: number
+  purchaseOrderLineId: string | null
+  goodsReceiptLineId: string | null
+  itemId: string | null
+  itemCodeSnapshot: string | null
+  itemNameSnapshot: string | null
+  description: string | null
+  quantity: number
+  uomCodeSnapshot: string | null
+  rate: number
+  amount: number
+  taxRatePct: number
+  taxAmount: number
+  lineTotal: number
+  remarks: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface ApiPurchaseInvoice {
+  id: string
+  invoiceNumber: string
+  documentNumber: string
+  invoiceDate: string | null
+  documentDate: string | null
+  vendorInvoiceNumber: string | null
+  vendorInvoiceDate: string | null
+  vendorId: string
+  purchaseOrderId: string | null
+  goodsReceiptId: string | null
+  status: ApiPurchaseInvoiceStatus
+  isDirectInvoice: boolean
+  currencyCode: string
+  gstScheme: 'CGST_SGST' | 'IGST' | null
+  placeOfSupplyState: string | null
+  placeOfSupplyStateCode: string | null
+  reverseCharge: boolean
+  subtotalAmount: number
+  taxAmount: number
+  roundOffAmount: number
+  totalAmount: number
+  matchingStatus: string | null
+  matchingRemarks: string | null
+  overrideAuthorized: boolean
+  overrideRemarks: string | null
+  remarks: string | null
+  submittedAt: string | null
+  approvedAt: string | null
+  postedAt: string | null
+  cancelledAt: string | null
+  createdAt: string | null
+  updatedAt: string | null
+  allowedActions: ApiPurchaseInvoiceAllowedActions
+  lines: ApiPurchaseInvoiceLine[]
+}
+
+/* ─── Quality Inspection (backend `/purchase/quality-inspections`) ─── */
+
+export type ApiQualityInspectionStatus =
+  | 'DRAFT'
+  | 'PENDING'
+  | 'IN_PROGRESS'
+  | 'ACCEPTED'
+  | 'PARTIALLY_ACCEPTED'
+  | 'REJECTED'
+  | 'DEVIATION_PENDING'
+  | 'CLOSED'
+  | 'CANCELLED'
+
+export interface ApiQualityInspectionLine {
+  id: string
+  qualityInspectionId: string
+  lineNumber: number
+  goodsReceiptLineId: string | null
+  purchaseOrderLineId: string | null
+  itemId: string | null
+  itemCodeSnapshot: string | null
+  itemNameSnapshot: string | null
+  inspectedQuantity: number
+  acceptedQuantity: number
+  rejectedQuantity: number
+  deviationQuantity: number
+  remarks: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface ApiQualityInspection {
+  id: string
+  inspectionNumber: string
+  documentNumber: string
+  documentDate: string | null
+  inspectionDate: string | null
+  goodsReceiptId: string | null
+  purchaseOrderId: string | null
+  vendorId: string | null
+  warehouseId: string | null
+  status: ApiQualityInspectionStatus
+  remarks: string | null
+  deviationRemarks: string | null
+  inspectedById: string | null
+  inspectedByName: string | null
+  completedAt: string | null
+  createdAt: string | null
+  updatedAt: string | null
+  allowedActions: { canEdit: boolean; canComplete: boolean; canCancel: boolean }
+  totals: { inspected: number; accepted: number; rejected: number; deviation: number }
+  lines: ApiQualityInspectionLine[]
+}
+
+/* ─── Purchase Return (backend `/purchase/returns`) ─── */
+
+export type ApiPurchaseReturnStatus =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'APPROVED'
+  | 'SHIPPED'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'CLOSED'
+
+export interface ApiPurchaseReturnLine {
+  id: string
+  purchaseReturnId: string
+  lineNumber: number
+  goodsReceiptLineId: string | null
+  purchaseOrderLineId: string | null
+  itemId: string | null
+  itemCodeSnapshot: string | null
+  itemNameSnapshot: string | null
+  returnQuantity: number
+  rate: number
+  amount: number
+  remarks: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface ApiPurchaseReturn {
+  id: string
+  returnNumber: string
+  documentNumber: string
+  documentDate: string | null
+  returnDate: string | null
+  vendorId: string
+  purchaseOrderId: string | null
+  goodsReceiptId: string | null
+  qualityInspectionId: string | null
+  warehouseId: string | null
+  status: ApiPurchaseReturnStatus
+  reason: string | null
+  remarks: string | null
+  submittedAt: string | null
+  completedAt: string | null
+  cancelledAt: string | null
+  createdAt: string | null
+  updatedAt: string | null
+  allowedActions: { canEdit: boolean; canSubmit: boolean; canComplete: boolean; canCancel: boolean }
+  totalAmount: number
+  totalQuantity: number
+  lines: ApiPurchaseReturnLine[]
+}
+

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getAvailableBatches } from '@/services/inventory/traceabilityService'
+import { listInventoryLots } from '@/services/api/inventoryApi'
+import { isApiMode } from '@/config/apiConfig'
 import type { BatchSelectionMethod, BatchSelectionPreviewLine } from '@/types/inventoryDomain'
 import { BATCH_METHOD_LABELS } from '@/utils/inventoryMovementLabels'
 import { formatDate } from '@/utils/dates/format'
@@ -39,7 +41,19 @@ export function BatchSelector({
     }
     let cancelled = false
     setLoading(true)
-    getAvailableBatches(itemId, warehouseId, qty, method)
+    const request = isApiMode()
+      ? listInventoryLots({ itemId, warehouseId, status: 'ACTIVE', limit: 100 }).then((res) =>
+          res.data.map((lot) => ({
+            itemId: lot.itemId,
+            itemCode: '',
+            batchNo: lot.lotNumber,
+            expiryDate: lot.expiryDate,
+            availableQty: Number(lot.quantityOnHand),
+            selectedQty: Math.min(qty, Number(lot.quantityOnHand)),
+          })).filter((lot) => lot.availableQty > 0),
+        )
+      : getAvailableBatches(itemId, warehouseId, qty, method)
+    request
       .then((rows) => {
         if (!cancelled) {
           setPreview(rows)
@@ -66,7 +80,7 @@ export function BatchSelector({
         disabled={disabled}
         onChange={(e) => onChange(e.target.value || null)}
       >
-        <option value="">Select batch…</option>
+        <option value="">— Select —</option>
         {preview.map((b) => (
           <option key={b.batchNo} value={b.batchNo}>
             {b.batchNo}

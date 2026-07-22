@@ -1,0 +1,3 @@
+Transaction Date,Value Date,Description,Debit,Credit,Reference,Balance
+01/07/2026,01/07/2026,NEFT credit customer,0,40000,REF-C1,140000
+02/07/2026,02/07/2026,Vendor payment NEFT,25000,0,REF-D1,115000

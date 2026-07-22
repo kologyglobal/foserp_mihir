@@ -12,6 +12,7 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { mergeAllowedAction, useMoneyOutPermissions } from '@/utils/permissions/moneyOut'
 import { notify } from '@/store/toastStore'
 import { isApiMode } from '@/config/apiConfig'
+import { partyMasterRoute } from '@/modules/accounting/shared/invoices'
 import {
   MONEY_OUT_STATUS_LABELS,
   moneyOutStatusTone,
@@ -234,7 +235,13 @@ export function VendorInvoiceListPage() {
                       </td>
                       <td className="py-2 pr-3">{inv.supplierInvoiceNumber}</td>
                       <td className="py-2 pr-3 max-w-[180px] truncate" title={inv.vendorNameSnapshot}>
-                        {inv.vendorNameSnapshot}
+                        <Link
+                          to={partyMasterRoute('purchase', inv.vendorId)}
+                          className="hover:text-erp-accent hover:underline"
+                          title="Open Vendor Master"
+                        >
+                          {inv.vendorNameSnapshot}
+                        </Link>
                       </td>
                       <td className="py-2 pr-3 tabular-nums">{inv.supplierInvoiceDate}</td>
                       <td className="py-2 pr-3 tabular-nums">{inv.dueDate ?? '—'}</td>

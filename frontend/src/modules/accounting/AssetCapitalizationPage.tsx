@@ -13,6 +13,7 @@ import {
   FixedAssetsSummaryCards,
   FixedAssetsWorkspaceTabs,
 } from '@/components/accounting/fixedAssets'
+import { isApiMode } from '@/config/apiConfig'
 import { capitalizeAssetDemo, getCapitalizations, FixedAssetsServiceError } from '@/services/accounting/fixedAssetsService'
 import type { AssetCapitalization } from '@/types/fixedAssets'
 import { useFixedAssetsPermissions } from '@/utils/permissions/fixedAssets'
@@ -73,7 +74,11 @@ export function AssetCapitalizationPage() {
     setBusy(true)
     try {
       await capitalizeAssetDemo(target.id)
-      notify.success(`${target.assetNumber} capitalized in demo mode. No GL posting occurred.`)
+      notify.success(
+        isApiMode()
+          ? `${target.assetNumber || target.capitalizationNumber} capitalized — GL posting created.`
+          : `${target.assetNumber} capitalized in demo mode. No GL posting occurred.`,
+      )
       setTarget(null)
       await load()
     } catch (e) {
@@ -97,7 +102,11 @@ export function AssetCapitalizationPage() {
       layout="enterprise"
       badge="Accounting"
       title="Asset Capitalization"
-      description="Move acquisitions and CWIP into active fixed assets — demo capitalization, no GL posting."
+      description={
+        isApiMode()
+          ? 'Move pending acquisitions into active fixed assets — capitalization posts to the general ledger.'
+          : 'Move acquisitions and CWIP into active fixed assets — demo capitalization, no GL posting.'
+      }
       breadcrumbs={[{ label: 'Accounting', to: '/accounting' }, { label: 'Fixed Assets', to: '/accounting/fixed-assets' }, { label: 'Capitalization' }]}
       autoBreadcrumbs={false}
       favoritePath="/accounting/fixed-assets/capitalization"
@@ -150,7 +159,7 @@ export function AssetCapitalizationPage() {
                         <td className="px-3 py-2">
                           {r.status === 'Pending Approval' && perms.canCapitalize ? (
                             <button type="button" className="text-[12px] font-semibold text-erp-primary hover:underline" onClick={() => setTarget(r)}>
-                              Capitalize (demo)
+                              {isApiMode() ? 'Capitalize' : 'Capitalize (demo)'}
                             </button>
                           ) : (
                             <span className="text-erp-muted">—</span>
@@ -169,9 +178,13 @@ export function AssetCapitalizationPage() {
       <FixedAssetsConfirmModal
         open={!!target}
         onClose={() => setTarget(null)}
-        title="Capitalize asset in demo mode"
-        description={`This marks ${target?.assetNumber} as capitalized in frontend demo data only. No general ledger journals will be created.`}
-        confirmLabel={busy ? 'Capitalizing…' : 'Confirm demo capitalize'}
+        title={isApiMode() ? 'Capitalize asset' : 'Capitalize asset in demo mode'}
+        description={
+          isApiMode()
+            ? `This capitalizes ${target?.assetNumber || target?.capitalizationNumber} and posts the capitalization journal to the general ledger.`
+            : `This marks ${target?.assetNumber} as capitalized in frontend demo data only. No general ledger journals will be created.`
+        }
+        confirmLabel={busy ? 'Capitalizing…' : isApiMode() ? 'Confirm capitalize' : 'Confirm demo capitalize'}
         onConfirm={() => void confirmCapitalize()}
       />
     </OperationalPageShell>
