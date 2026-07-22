@@ -11195,11 +11195,37 @@ a.crm-companies-table__name:hover {
   min-width: 0;
 }
 
-/* Lead Quick Entry — Company full-width; Contact / Ownership in equal 4-col rows */
-.crm-lead-form-page .crm-lead-quick-entry .erp-form-grid--cols-4 {
+/* Lead Quick Entry — Company full-width; Contact / Ownership / Stage rows in equal 3-col grid.
+   Global factbox / tablet rules collapse cols-3 → 2; override so lead Quick Entry stays
+   3 columns on desktop even when Smart Context is open. */
+.crm-lead-form-page .crm-lead-quick-entry .erp-form-grid--cols-3 {
   column-gap: 16px;
   row-gap: 16px;
   align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .crm-lead-form-page .crm-lead-quick-entry .erp-form-grid--cols-3,
+  .crm-lead-form-page .erp-card-form-page__layout-wrap[data-factbox-open="true"] .crm-lead-quick-entry .erp-form-grid--cols-3,
+  .crm-lead-form-page .erp-card-form-page__layout-wrap[data-factbox-open="true"] .crm-lead-quick-entry .erp-card-section__grid--cols-3,
+  .enterprise-workspace.crm-lead-form-page .crm-lead-quick-entry .erp-form-grid--cols-3,
+  .enterprise-workspace--dynamics-form.crm-lead-form-page .crm-lead-quick-entry .erp-form-grid--cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1099px) {
+  .crm-lead-form-page .crm-lead-quick-entry .erp-form-grid--cols-3,
+  .crm-lead-form-page .erp-card-form-page__layout-wrap[data-factbox-open="true"] .crm-lead-quick-entry .erp-form-grid--cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .crm-lead-form-page .crm-lead-quick-entry .erp-form-grid--cols-3,
+  .crm-lead-form-page .erp-card-form-page__layout-wrap[data-factbox-open="true"] .crm-lead-quick-entry .erp-form-grid--cols-3 {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 .crm-lead-form-page .crm-lead-quick-entry .erp-field-row {

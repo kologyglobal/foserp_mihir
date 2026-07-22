@@ -184,6 +184,15 @@ export function CrmLeadFormPage() {
   const [savedLeadNo, setSavedLeadNo] = useState<string | null>(null)
   const [followUpOpen, setFollowUpOpen] = useState(false)
   const [logActivityOpen, setLogActivityOpen] = useState(false)
+  const companyCreateContactSnapshotRef = useRef<{
+    companyInfo: CompanyProspectMatch | null
+    contactId: string
+    contactPerson: string
+    mobile: string
+    email: string
+    industry: string
+    source: LeadSource
+  } | null>(null)
 
   const [company, setCompany] = useState({
     customerId: existing?.customerId ?? null,
@@ -806,7 +815,41 @@ export function CrmLeadFormPage() {
     setEmail(contact.email ?? '')
   }
 
+  function onCompanyCreateTyping() {
+    if (!companyCreateContactSnapshotRef.current) {
+      companyCreateContactSnapshotRef.current = {
+        companyInfo,
+        contactId,
+        contactPerson,
+        mobile,
+        email,
+        industry,
+        source,
+      }
+    }
+    setCompanyInfo(null)
+    setContactId('')
+    setContactPerson('')
+    setMobile('')
+    setEmail('')
+    setIndustry('')
+  }
+
+  function onCompanyCreateCancel() {
+    const snap = companyCreateContactSnapshotRef.current
+    companyCreateContactSnapshotRef.current = null
+    if (!snap) return
+    setCompanyInfo(snap.companyInfo)
+    setContactId(snap.contactId)
+    setContactPerson(snap.contactPerson)
+    setMobile(snap.mobile)
+    setEmail(snap.email)
+    setIndustry(snap.industry)
+    setSource(snap.source)
+  }
+
   function onCompanyLinked(match: CompanyProspectMatch) {
+    companyCreateContactSnapshotRef.current = null
     setCompanyInfo(match)
     setCompany({
       customerId: match.customerId,
@@ -1398,10 +1441,10 @@ export function CrmLeadFormPage() {
           id="lead-section-quick"
           title="Quick Entry"
           subtitle="Company, contact, and ownership — expand only when you need more."
-          columns={4}
+          columns={3}
           className="crm-lead-quick-entry"
         >
-          <ErpFieldGroup columns={4}>
+          <ErpFieldGroup columns={3}>
             <ErpFieldRow
               label="Company / Prospect"
               required
@@ -1430,6 +1473,8 @@ export function CrmLeadFormPage() {
                 }}
                 onBlur={() => inlineValidation.touch('prospectName')}
                 onCompanyLinked={onCompanyLinked}
+                onCompanyCreateTyping={onCompanyCreateTyping}
+                onCompanyCreateCancel={onCompanyCreateCancel}
                 error={Boolean(inlineValidation.fieldError('prospectName') ?? validationErrors.prospectName)}
                 autoFocus={!isEdit}
                 disabled={fieldLocked('customerId') || fieldLocked('prospectName')}
@@ -1437,7 +1482,7 @@ export function CrmLeadFormPage() {
             </ErpFieldRow>
           </ErpFieldGroup>
 
-          <ErpFieldGroup label="Contact" columns={4}>
+          <ErpFieldGroup label="Contact" columns={3}>
             {company.customerId ? (
               <ErpFieldRow
                 label="Contact Person"
@@ -1544,7 +1589,7 @@ export function CrmLeadFormPage() {
             </ErpFieldRow>
           </ErpFieldGroup>
 
-          <ErpFieldGroup label="Ownership & status" columns={4}>
+          <ErpFieldGroup label="Ownership & status" columns={3}>
             <ErpFieldRow
               label="Lead Owner"
               required
@@ -1601,6 +1646,9 @@ export function CrmLeadFormPage() {
                 disabled={fieldLocked('priority')}
               />
             </ErpFieldRow>
+          </ErpFieldGroup>
+
+          <ErpFieldGroup columns={3}>
             <ErpFieldRow label="Lead Stage" required horizontal={false}>
               <ErpSmartSelect
                 options={leadStageSelectOptions}
@@ -1611,9 +1659,6 @@ export function CrmLeadFormPage() {
                 disabled={!formPolicy.canChangeStage || fieldLocked('stage')}
               />
             </ErpFieldRow>
-          </ErpFieldGroup>
-
-          <ErpFieldGroup columns={4}>
             <ErpFieldRow
               label="Created Date"
               required
@@ -1632,6 +1677,23 @@ export function CrmLeadFormPage() {
                 className="erp-input"
                 error={Boolean(inlineValidation.fieldError('createdDate') ?? validationErrors.createdDate)}
                 disabled={fieldLocked('createdDate')}
+              />
+            </ErpFieldRow>
+            <ErpFieldRow
+              label="Next Follow-up Date"
+              horizontal={false}
+              dataField="nextFollowUpDate"
+              fieldState={validationErrors.nextFollowUpDate ? 'error' : 'idle'}
+              fieldError={validationErrors.nextFollowUpDate}
+            >
+              <Input
+                type="date"
+                data-field="nextFollowUpDate"
+                value={nextFollowUpDate}
+                min={getDateInputMin()}
+                max={getCrmDateInputMax()}
+                onChange={(e) => setNextFollowUpDate(e.target.value)}
+                className="erp-input"
               />
             </ErpFieldRow>
           </ErpFieldGroup>
@@ -1799,23 +1861,7 @@ export function CrmLeadFormPage() {
               accent="amber"
               columns={3}
             >
-              <ErpFieldRow
-                label="Next Follow-up Date"
-                dataField="nextFollowUpDate"
-                fieldState={validationErrors.nextFollowUpDate ? 'error' : 'idle'}
-                fieldError={validationErrors.nextFollowUpDate}
-              >
-                <Input
-                  type="date"
-                  data-field="nextFollowUpDate"
-                  value={nextFollowUpDate}
-                  min={getDateInputMin()}
-                  max={getCrmDateInputMax()}
-                  onChange={(e) => setNextFollowUpDate(e.target.value)}
-                  className="erp-input"
-                />
-              </ErpFieldRow>
-              <ErpFieldRow label="Follow-up Type">
+              <ErpFieldRow label="Follow-up Type" horizontal={false}>
                 <ErpSmartSelect
                   options={followUpSelectOptions}
                   value={followUpType}
@@ -1824,10 +1870,10 @@ export function CrmLeadFormPage() {
                   appearance="dropdown"
                 />
               </ErpFieldRow>
-              <ErpFieldRow label="Assigned To" readOnly>
+              <ErpFieldRow label="Assigned To" readOnly horizontal={false}>
                 <Input value={selectedOwner?.name ?? '—'} readOnly className="erp-input" />
               </ErpFieldRow>
-              <ErpFieldRow label="Remarks" colSpan={3}>
+              <ErpFieldRow label="Remarks" colSpan={3} horizontal={false}>
                 <Textarea rows={2} value={followUpNotes} onChange={(e) => setFollowUpNotes(e.target.value)} placeholder="Follow-up notes" className="erp-input" />
               </ErpFieldRow>
             </ErpCardSection>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { LeadSource } from '../../../types/sales'
 import { useSalesStore } from '../../../store/salesStore'
@@ -49,6 +49,11 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
   const [error, setError] = useState<string | null>(null)
   const [savedLeadId, setSavedLeadId] = useState<string | null>(null)
   const [savedLeadNo, setSavedLeadNo] = useState<string | null>(null)
+  const companyCreateContactSnapshotRef = useRef<{
+    contactPerson: string
+    mobile: string
+    email: string
+  } | null>(null)
 
   const phoneCountry =
     (customerId ? useMasterStore.getState().getCustomer(customerId)?.country : null)
@@ -96,6 +101,7 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
 
   /** Carry the company's contact person (and phone/email when empty) into the quick lead. */
   function handleCompanyLinked(match: CompanyProspectMatch) {
+    companyCreateContactSnapshotRef.current = null
     const contactPerson = match.contactPerson?.trim() ?? ''
     const contactPhone = match.contactPhone?.trim() ?? ''
     const contactEmail = match.contactEmail?.trim() ?? ''
@@ -113,6 +119,28 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
       if (contactEmail && !email.trim()) setEmail(contactEmail)
     }
     if (contactPhone || contactEmail) setError(null)
+  }
+
+  function handleCompanyCreateTyping() {
+    if (!companyCreateContactSnapshotRef.current) {
+      companyCreateContactSnapshotRef.current = {
+        contactPerson,
+        mobile,
+        email,
+      }
+    }
+    setContactPerson('')
+    setMobile('')
+    setEmail('')
+  }
+
+  function handleCompanyCreateCancel() {
+    const snap = companyCreateContactSnapshotRef.current
+    companyCreateContactSnapshotRef.current = null
+    if (!snap) return
+    setContactPerson(snap.contactPerson)
+    setMobile(snap.mobile)
+    setEmail(snap.email)
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -243,6 +271,8 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
                 inline.touch('prospectName')
               }}
               onCompanyLinked={handleCompanyLinked}
+              onCompanyCreateTyping={handleCompanyCreateTyping}
+              onCompanyCreateCancel={handleCompanyCreateCancel}
               error={Boolean(inline.fieldError('prospectName'))}
             />
           </FormField>
