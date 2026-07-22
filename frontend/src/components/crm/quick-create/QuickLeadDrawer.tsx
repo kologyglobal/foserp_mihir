@@ -7,6 +7,7 @@ import { notify } from '../../../store/toastStore'
 import { formatApiError } from '../../../services/api/apiErrors'
 import { useCrmOwnerOptions, useLeadSourceOptions } from '../../../hooks/useCrmMasters'
 import { getSessionUser } from '../../../utils/permissions'
+import type { CompanyProspectMatch } from '../../../utils/companyProspectSearch'
 import { CompanyProspectSelect } from '../CompanyProspectSelect'
 import { CrmDrawerShell } from '../CrmDrawerShell'
 import { FormField } from '../../forms/FormField'
@@ -26,6 +27,10 @@ interface QuickLeadDrawerProps {
   onCreated?: (leadId: string) => void
 }
 
+function sanitizeContactName(raw: string): string {
+  return raw.replace(/[^A-Za-z\s]/g, '')
+}
+
 export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerProps) {
   const navigate = useNavigate()
   const createLead = useSalesStore((s) => s.createLead)
@@ -35,6 +40,7 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
 
   const [customerId, setCustomerId] = useState<string | null>(null)
   const [prospectName, setProspectName] = useState('')
+  const [contactPerson, setContactPerson] = useState('')
   const [mobile, setMobile] = useState('')
   const [email, setEmail] = useState('')
   const [source, setSource] = useState<LeadSource>('other')
@@ -75,6 +81,7 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
     if (!open) return
     setCustomerId(null)
     setProspectName('')
+    setContactPerson('')
     setMobile('')
     setEmail('')
     setSource((sourceOptions[0]?.value as LeadSource) || 'other')
@@ -86,6 +93,27 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
     inline.resetTouched()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, ownerOptions, session.id, sourceOptions])
+
+  /** Carry the company's contact person (and phone/email when empty) into the quick lead. */
+  function handleCompanyLinked(match: CompanyProspectMatch) {
+    const contactPerson = match.contactPerson?.trim() ?? ''
+    const contactPhone = match.contactPhone?.trim() ?? ''
+    const contactEmail = match.contactEmail?.trim() ?? ''
+    const isNewCompany = match.sourceLabel === 'New'
+
+    if (isNewCompany) {
+      // Values entered in this company-create flow are intentional and should
+      // populate the quick lead; blank popup values leave lead state untouched.
+      if (contactPerson) setContactPerson(contactPerson)
+      if (contactPhone) setMobile(contactPhone)
+      if (contactEmail) setEmail(contactEmail)
+    } else {
+      setContactPerson(contactPerson)
+      if (contactPhone && !mobile.trim()) setMobile(contactPhone)
+      if (contactEmail && !email.trim()) setEmail(contactEmail)
+    }
+    if (contactPhone || contactEmail) setError(null)
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -125,7 +153,7 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
           createLead({
             prospectName: name,
             customerId,
-            contactPerson: name,
+            contactPerson: contactPerson.trim() || name,
             mobile: mobile.trim() || null,
             email: email.trim() ? normalizeEmail(email) : null,
             source,
@@ -211,9 +239,19 @@ export function QuickLeadDrawer({ open, onClose, onCreated }: QuickLeadDrawerPro
               onChange={(v) => {
                 setCustomerId(v.customerId)
                 setProspectName(v.prospectName)
+                if (!v.customerId) setContactPerson('')
                 inline.touch('prospectName')
               }}
+              onCompanyLinked={handleCompanyLinked}
               error={Boolean(inline.fieldError('prospectName'))}
+            />
+          </FormField>
+          <FormField label="Contact Person">
+            <Input
+              value={contactPerson}
+              onChange={(e) => setContactPerson(sanitizeContactName(e.target.value))}
+              placeholder="Primary contact"
+              autoComplete="name"
             />
           </FormField>
           <div className="grid grid-cols-2 gap-3">

@@ -57,6 +57,7 @@ export function validateLeadForm(input: LeadFormValidationInput): FieldErrorMap 
   })
   if (createdDateError) errors.createdDate = createdDateError
 
+  // Optional contact fields: validate format only when a value is entered.
   const emailError = validateEmail(input.email)
   if (emailError) errors.email = emailError
   if (input.mobile.trim()) {
@@ -68,28 +69,8 @@ export function validateLeadForm(input: LeadFormValidationInput): FieldErrorMap 
     errors.remarks = 'Notes are required'
   }
 
-  const reqStages: LeadStage[] = ['requirement_collected', 'qualified']
-  if (
-    reqStages.includes(input.leadStage)
-    && !input.requirementText
-    && !input.hasRequirementLines
-  ) {
-    errors.productRequirement = 'Add at least one product / requirement line for this stage'
-  }
-
-  // Early stages always need a reachable contact — linking a company alone is not enough.
-  if (input.leadStage === 'new' || input.leadStage === 'contacted') {
-    const hasReachableContact = Boolean(input.mobile.trim() || input.email.trim())
-    if (!hasReachableContact && !errors.mobile) {
-      errors.mobile = 'Provide a mobile number or email'
-    }
-    const hasPrimaryContact = Boolean(
-      String(input.contactPerson ?? '').trim() || String(input.contactId ?? '').trim(),
-    )
-    if (!hasPrimaryContact && !errors.contactPerson) {
-      errors.contactPerson = 'Primary Contact is required'
-    }
-  }
+  // Lead stage must never make optional / collapsed fields mandatory.
+  // Invalid entered optional dates still surface errors below.
 
   const expectedCloseError = validateCrmCalendarDate(input.expectedCloseDate, {
     label: 'Expected Closing Date',
@@ -113,25 +94,16 @@ export function validateLeadForm(input: LeadFormValidationInput): FieldErrorMap 
     }
   }
 
-  if (input.activityStatus === 'inactive' && !input.inactiveReason) {
-    errors.inactiveReason = 'Inactive Reason is required when lead is inactive.'
-  }
-  if (input.leadStage === 'not_qualified' && !input.notQualifiedReason) {
-    errors.notQualifiedReason = 'Not Qualified Reason is required.'
-  }
-  if (input.leadStage === 'closed') {
+  // Inactive / Not Qualified / Closed reasons are optional — empty is valid.
+  if (input.closedDate.trim()) {
     const closedDateError = validateCrmCalendarDate(input.closedDate, {
       label: 'Closed Date',
-      required: true,
       notAfter: today,
       notAfterMessage: 'Closed Date cannot be in the future',
       notBefore: input.createdDate.trim() || undefined,
       notBeforeMessage: 'Closed Date cannot be before Created Date',
     })
     if (closedDateError) errors.closedDate = closedDateError
-    if (!input.closedReason) {
-      errors.closedReason = 'Closed Reason is required when lead stage is Closed.'
-    }
   }
 
   return errors

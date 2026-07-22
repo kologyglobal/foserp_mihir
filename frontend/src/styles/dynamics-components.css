@@ -10551,13 +10551,17 @@ a.crm-companies-table__name:hover {
 
 /* When factbox is open, keep field grids to max 2 columns */
 .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-3,
-.erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-3 {
+.erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-3,
+.erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-4,
+.erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-4 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 @media (max-width: 767px) {
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-3,
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-3,
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-4,
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-4,
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-2 {
     grid-template-columns: 1fr;
   }
@@ -11188,6 +11192,31 @@ a.crm-companies-table__name:hover {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
+}
+
+/* Lead Quick Entry — Company full-width; Contact / Ownership in equal 4-col rows */
+.crm-lead-form-page .crm-lead-quick-entry .erp-form-grid--cols-4 {
+  column-gap: 16px;
+  row-gap: 16px;
+  align-items: start;
+}
+
+.crm-lead-form-page .crm-lead-quick-entry .erp-field-row {
+  width: 100%;
+  min-width: 0;
+}
+
+.crm-lead-form-page .crm-lead-quick-entry .erp-field-row:not(.erp-field-row--horizontal) .erp-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--erp-muted, #605e5c);
+}
+
+.crm-lead-form-page .crm-lead-quick-entry .erp-field-row__control-wrap,
+.crm-lead-form-page .crm-lead-quick-entry .erp-field-control,
+.crm-lead-form-page .crm-lead-quick-entry .crm-company-prospect {
+  width: 100%;
   min-width: 0;
 }
 

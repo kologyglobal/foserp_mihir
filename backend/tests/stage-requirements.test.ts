@@ -100,59 +100,39 @@ function oppRow(partial: Partial<CrmOpportunity> = {}): CrmOpportunity & { lines
 }
 
 describe('getMissingLeadStageFields', () => {
-  it('requires contact fields for contacted', () => {
+  it('allows contacted without contact fields', () => {
     const missing = getMissingLeadStageFields(
       leadEntityForStageGate(leadRow({ prospectName: 'Acme' })),
       'contacted',
     )
-    expect(missing.map((m) => m.field)).toEqual(['contactPerson', 'mobile'])
-    expect(missing[0]?.label).toBe('Contact Person')
-  })
-
-  it('allows contacted when contact + mobile present', () => {
-    const missing = getMissingLeadStageFields(
-      leadEntityForStageGate(
-        leadRow({ prospectName: 'Acme', contactPerson: 'Raj', mobile: '9876543210' }),
-      ),
-      'contacted',
-    )
     expect(missing).toEqual([])
   })
 
-  it('requires productRequirement for requirement_collected', () => {
+  it('allows requirement_collected without productRequirement', () => {
     const missing = getMissingLeadStageFields(leadEntityForStageGate(leadRow()), 'requirement_collected')
-    expect(missing).toEqual([{ field: 'productRequirement', label: 'Product Requirement' }])
-  })
-
-  it('requires productRequirement, customerId, expectedValue for qualified', () => {
-    const missing = getMissingLeadStageFields(leadEntityForStageGate(leadRow()), 'qualified')
-    expect(missing.map((m) => m.field)).toEqual(['productRequirement', 'customerId', 'expectedValue'])
-  })
-
-  it('maps companyId → customerId and Decimal expectedValue', () => {
-    const missing = getMissingLeadStageFields(
-      leadEntityForStageGate(
-        leadRow({
-          companyId: 'cust-1',
-          productRequirement: 'Tipper body',
-          expectedValue: { toNumber: () => 250000 } as unknown as CrmLead['expectedValue'],
-        }),
-      ),
-      'qualified',
-    )
     expect(missing).toEqual([])
   })
 
-  it('merges request-body reason for not_qualified / closed', () => {
+  it('allows qualified without product / company / value', () => {
+    const missing = getMissingLeadStageFields(leadEntityForStageGate(leadRow()), 'qualified')
+    expect(missing).toEqual([])
+  })
+
+  it('allows not_qualified and closed without reasons', () => {
+    expect(getMissingLeadStageFields(leadEntityForStageGate(leadRow()), 'not_qualified')).toEqual([])
+    expect(getMissingLeadStageFields(leadEntityForStageGate(leadRow()), 'closed')).toEqual([])
+  })
+
+  it('still requires customerId to convert', () => {
+    expect(
+      getMissingLeadStageFields(leadEntityForStageGate(leadRow()), 'converted_to_opportunity'),
+    ).toEqual([{ field: 'customerId', label: 'Linked Company' }])
     expect(
       getMissingLeadStageFields(
-        leadEntityForStageGate(leadRow(), { notQualifiedReason: 'no_budget' }),
-        'not_qualified',
+        leadEntityForStageGate(leadRow({ companyId: 'cust-1' })),
+        'converted_to_opportunity',
       ),
     ).toEqual([])
-    expect(
-      getMissingLeadStageFields(leadEntityForStageGate(leadRow()), 'closed'),
-    ).toEqual([{ field: 'closedReason', label: 'Closed Reason' }])
   })
 })
 
@@ -207,33 +187,25 @@ describe('getMissingOpportunityStageFields', () => {
 })
 
 describe('assert*StageRequirements', () => {
-  it('throws STAGE_REQUIREMENTS_INCOMPLETE with missingFields', () => {
+  it('throws STAGE_REQUIREMENTS_INCOMPLETE only for convert without company', () => {
     try {
-      assertLeadStageRequirements(leadEntityForStageGate(leadRow()), 'requirement_collected')
+      assertLeadStageRequirements(leadEntityForStageGate(leadRow()), 'converted_to_opportunity')
       expect.unreachable('should throw')
     } catch (err) {
       expect(err).toBeInstanceOf(StageRequirementsIncompleteError)
       const e = err as StageRequirementsIncompleteError
       expect(e.code).toBe(STAGE_REQUIREMENTS_INCOMPLETE)
       expect(e.statusCode).toBe(422)
-      expect(e.missingFields).toEqual([
-        { field: 'productRequirement', label: 'Product Requirement' },
-      ])
-      expect(e.details).toEqual({
-        missingFields: [{ field: 'productRequirement', label: 'Product Requirement' }],
-      })
-      expect(e.errors).toEqual([
-        { field: 'productRequirement', message: 'Product Requirement' },
-      ])
+      expect(e.missingFields).toEqual([{ field: 'customerId', label: 'Linked Company' }])
     }
   })
 
-  it('does not throw when complete', () => {
+  it('does not throw for qualified / requirement_collected with empty optionals', () => {
     expect(() =>
-      assertLeadStageRequirements(
-        leadEntityForStageGate(leadRow({ productRequirement: 'Tipper' })),
-        'requirement_collected',
-      ),
+      assertLeadStageRequirements(leadEntityForStageGate(leadRow()), 'requirement_collected'),
+    ).not.toThrow()
+    expect(() =>
+      assertLeadStageRequirements(leadEntityForStageGate(leadRow()), 'qualified'),
     ).not.toThrow()
     expect(() =>
       assertOpportunityStageRequirements(
@@ -251,11 +223,11 @@ describe('assert*StageRequirements', () => {
 })
 
 describe('getMissingStageFields disambiguation', () => {
-  it('treats qualified as lead when lead-shaped', () => {
+  it('treats qualified as lead when lead-shaped and does not gate products', () => {
     const missing = getMissingStageFields(
       { prospectName: 'X', leadOwnerId: 'u1', productRequirement: '', customerId: null, expectedValue: 0 },
       'qualified',
     )
-    expect(missing.map((m) => m.field)).toContain('productRequirement')
+    expect(missing).toEqual([])
   })
 })

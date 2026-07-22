@@ -31,33 +31,35 @@ function check(n: number, label: string, ok: boolean, detail = '') {
 
 console.log('\nCRM Stage Requirements\n')
 
-check(1, 'lead contacted requires contact identity', getLeadStageRequirements('contacted').includes('mobile'))
-check(2, 'lead requirement_collected requires productRequirement', getLeadStageRequirements('requirement_collected')[0] === 'productRequirement')
-check(3, 'legacy disqualified maps to not_qualified', getLeadStageRequirements('disqualified').includes('notQualifiedReason'))
-check(4, 'opp requirement_discussion matches funnel', getOpportunityStageRequirements('requirement_discussion').includes('expectedCloseDate'))
-check(5, 'all lead stages keyed', Object.keys(LEAD_STAGE_REQUIREMENTS).length === 7)
-check(6, 'all opp stages keyed', Object.keys(OPPORTUNITY_STAGE_REQUIREMENTS).length === 10)
+check(1, 'lead contacted has no mandatory fields', getLeadStageRequirements('contacted').length === 0)
+check(2, 'lead requirement_collected has no mandatory fields', getLeadStageRequirements('requirement_collected').length === 0)
+check(3, 'lead qualified has no mandatory fields', getLeadStageRequirements('qualified').length === 0)
+check(4, 'lead not_qualified has no mandatory reason', getLeadStageRequirements('not_qualified').length === 0)
+check(5, 'lead closed has no mandatory reason', getLeadStageRequirements('closed').length === 0)
+check(6, 'convert still requires linked company', getLeadStageRequirements('converted_to_opportunity').includes('customerId'))
+check(7, 'opp requirement_discussion matches funnel', getOpportunityStageRequirements('requirement_discussion').includes('expectedCloseDate'))
+check(8, 'all lead stages keyed', Object.keys(LEAD_STAGE_REQUIREMENTS).length === 7)
+check(9, 'all opp stages keyed', Object.keys(OPPORTUNITY_STAGE_REQUIREMENTS).length === 10)
 
-const incompleteLead = { leadNo: 'L-1', prospectName: '', contactPerson: '', mobile: '' }
-const missingContacted = getMissingLeadStageFields(incompleteLead, 'contacted')
-check(7, 'missing lead fields include labels', missingContacted.some((m) => m.field === 'mobile' && m.label === 'Mobile'))
-
-const completeLead = {
-  leadNo: 'L-2',
-  prospectName: 'Acme',
-  contactPerson: 'Riya',
-  mobile: '9876543210',
-  productRequirement: '40ft trailer',
-  customerId: 'cust-1',
-  expectedValue: 1_500_000,
-}
-check(8, 'complete lead can advance to qualified', canAdvanceToLeadStage(completeLead, 'qualified'))
-check(9, 'incomplete lead blocked from qualified', !canAdvanceToLeadStage(incompleteLead, 'qualified'))
+const thinLead = { leadNo: 'L-1', prospectName: 'Acme' }
+check(10, 'thin lead can advance to contacted', canAdvanceToLeadStage(thinLead, 'contacted'))
+check(11, 'thin lead can advance to qualified', canAdvanceToLeadStage(thinLead, 'qualified'))
+check(12, 'thin lead can advance to not_qualified', canAdvanceToLeadStage(thinLead, 'not_qualified'))
+check(
+  13,
+  'convert blocked without customerId',
+  getMissingLeadStageFields(thinLead, 'converted_to_opportunity').some((m) => m.field === 'customerId'),
+)
+check(
+  14,
+  'convert ok with customerId',
+  canAdvanceToLeadStage({ ...thinLead, customerId: 'cust-1' }, 'converted_to_opportunity'),
+)
 
 const thinOpp = { opportunityName: 'Deal', customerId: 'c1', ownerId: 'u1' }
-check(10, 'new_lead ok with identity', canAdvanceToOpportunityStage(thinOpp, 'new_lead'))
+check(15, 'new_lead ok with identity', canAdvanceToOpportunityStage(thinOpp, 'new_lead'))
 check(
-  11,
+  16,
   'technical_review needs lines',
   getMissingOpportunityStageFields(thinOpp, 'technical_review').some((m) => m.field === 'lines'),
 )
@@ -67,42 +69,38 @@ const withLines = {
   productRequirement: 'ISO tank',
   lines: [{ productOrItem: 'ISO Tank 26KL', itemCode: 'IT-1', productId: 'p1' }],
 }
-check(12, 'technical_review passes with scope + lines', canAdvanceToOpportunityStage(withLines, 'technical_review'))
+check(17, 'technical_review passes with scope + lines', canAdvanceToOpportunityStage(withLines, 'technical_review'))
 
 check(
-  13,
-  'getMissingStageFields disambiguates qualified via leadNo',
-  getMissingStageFields({ leadNo: 'L-3', productRequirement: '' }, 'qualified').some((m) => m.field === 'productRequirement'),
+  18,
+  'getMissingStageFields lead qualified has no product gate',
+  getMissingStageFields({ leadNo: 'L-3', productRequirement: '' }, 'qualified').length === 0,
 )
 check(
-  14,
+  19,
   'getMissingStageFields uses opp map for qualified without lead keys',
   getMissingStageFields({ opportunityName: 'X', productRequirement: '' }, 'qualified').some((m) => m.field === 'expectedCloseDate'),
 )
 
-
 const leadNewCompleteness = getLeadStageCompleteness({}, 'new')
-check(15, 'lead new stage 0 reqs → 100%', leadNewCompleteness.percent === 100 && leadNewCompleteness.isComplete)
+check(20, 'lead new stage 0 reqs → 100%', leadNewCompleteness.percent === 100 && leadNewCompleteness.isComplete)
 
-const contactedIncomplete = getLeadStageCompleteness(incompleteLead, 'contacted')
+const qualifiedCompleteness = getLeadStageCompleteness(thinLead, 'qualified')
 check(
-  16,
-  'lead contacted incomplete percent',
-  contactedIncomplete.requiredCount === 3
-    && contactedIncomplete.percent < 100
-    && !contactedIncomplete.isComplete,
-  `percent=${contactedIncomplete.percent}`,
+  21,
+  'lead qualified incomplete fields do not block',
+  qualifiedCompleteness.requiredCount === 0 && qualifiedCompleteness.isComplete,
 )
 
 const oppTechIncomplete = getOpportunityStageCompleteness(thinOpp, 'technical_review')
 check(
-  17,
+  22,
   'opp technical_review incomplete',
   !oppTechIncomplete.isComplete && oppTechIncomplete.percent < 100,
 )
 
 const oppTechComplete = getOpportunityStageCompleteness(withLines, 'technical_review')
-check(18, 'opp technical_review complete when lines ok', oppTechComplete.isComplete && oppTechComplete.percent === 100)
+check(23, 'opp technical_review complete when lines ok', oppTechComplete.isComplete && oppTechComplete.percent === 100)
 
 console.log(`\n${pass} passed, ${fail} failed\n`)
 process.exit(fail > 0 ? 1 : 0)

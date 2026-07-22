@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Building2, ChevronDown, X } from 'lucide-react'
-import { FormField, inputClassName } from '../forms/FormField'
+import { FormField } from '../forms/FormField'
 import { Input, Select, Checkbox, MobileInput } from '../forms/Inputs'
 import { StateSelect, CitySelect, CountrySelect, MasterEnumSelect } from '../masters/GeographySelects'
 import { ErpButton, ErpButtonGroup } from '../erp/ErpButton'
@@ -11,15 +11,20 @@ import { isApiMode } from '../../config/apiConfig'
 import { useMasterStore } from '../../store/masterStore'
 import { resolveStoreAction } from '../../store/storeAction'
 import { notify } from '../../store/toastStore'
-import { panFromGstin, validateGstin } from '../../utils/customerUtils'
+import { panFromGstin } from '../../utils/customerUtils'
 import { DEFAULT_CUSTOMER_COUNTRY } from '../../config/countries'
 import { useInlineFormValidation } from '../../hooks/useInlineFormValidation'
-import { validateEmail, normalizeEmail } from '../../utils/validation/email'
+import { normalizeEmail, validateEmail } from '../../utils/validation/email'
 import { validateMobileForCountry } from '../../utils/validation/mobilePhone'
 import { useIndustryOptions, useTerritoryOptions } from '../../hooks/useCrmMasters'
 import type { QuickCreateResult } from '../../types/quickCreate'
 import type { Customer, CustomerType, SalesTerritory } from '../../types/master'
 import { cn } from '../../utils/cn'
+
+/** Company names: text only — letters, spaces, and common name punctuation (no digits). */
+function sanitizeCompanyName(raw: string): string {
+  return raw.replace(/[^A-Za-z\s&.,'()\-]/g, '')
+}
 
 /** Contact person names: letters and spaces only (no digits / symbols). */
 function sanitizeAlphabeticName(raw: string): string {
@@ -111,7 +116,9 @@ function buildCustomerPayload(form: CompanyForm, name: string): Omit<Customer, '
     shippingState: shippingSame ? undefined : (form.shippingState.trim() || undefined),
     shippingPincode: shippingSame ? undefined : (form.shippingPincode.trim() || undefined),
     shippingCountry: shippingSame ? undefined : (form.shippingCountry.trim() || DEFAULT_CUSTOMER_COUNTRY),
-    gstin: gstin || '00AAAAA0000A1Z5',
+    // Keep GSTIN empty when not provided — a shared placeholder trips the
+    // duplicate-GST check on every quick create after the first one.
+    gstin,
     pan: form.pan.trim().toUpperCase() || panFromGstin(gstin) || undefined,
     contactPerson: form.contactPerson.trim(),
     contactPhone: form.mobile.trim(),
@@ -134,7 +141,6 @@ export function QuickCompanyCreateModal({
   const [form, setForm] = useState<CompanyForm>(() => emptyForm(defaultName))
   const [showAdditional, setShowAdditional] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [gstinError, setGstinError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -146,44 +152,35 @@ export function QuickCompanyCreateModal({
     })
   }, [open, territoryOptions])
 
-  const validationValues = useMemo(
-    () => ({
+  // Quick company creation requires only Company Name. Mobile and Email are
+  // optional but must be valid when entered (shared validators skip empty values),
+  // so collapsed account details still never block creation.
+  const inline = useInlineFormValidation(
+    {
       customerName: form.customerName,
-      contactPerson: form.contactPerson,
       mobile: form.mobile,
       email: form.email,
-      country: form.country,
-    }),
-    [form.customerName, form.contactPerson, form.mobile, form.email, form.country],
-  )
-
-  const inline = useInlineFormValidation(validationValues, {
-    customerName: {
-      required: true,
-      message: `${COMPANY_TERMINOLOGY.name} is required`,
     },
-    contactPerson: {
-      validate: (v) => {
-        const value = String(v ?? '')
-        if (!value.trim()) return null
-        if (/[^A-Za-z\s]/.test(value)) return 'Contact Person allows letters only'
-        return null
+    {
+      customerName: {
+        required: true,
+        message: `${COMPANY_TERMINOLOGY.name} is required`,
+      },
+      mobile: {
+        validate: (v) =>
+          validateMobileForCountry(String(v ?? ''), form.country || DEFAULT_CUSTOMER_COUNTRY),
+      },
+      email: {
+        validate: (v) => validateEmail(String(v ?? '')),
       },
     },
-    mobile: {
-      validate: (v) => validateMobileForCountry(String(v ?? ''), form.country || DEFAULT_CUSTOMER_COUNTRY),
-    },
-    email: {
-      validate: (v) => validateEmail(String(v ?? '')),
-    },
-  })
+  )
 
   useEffect(() => {
     if (!open) return
     setForm(emptyForm(defaultName.trim()))
     setShowAdditional(false)
     setError(null)
-    setGstinError(null)
     setSubmitting(false)
     inline.resetTouched()
     // Only reset when the modal opens / default name changes
@@ -212,45 +209,19 @@ export function QuickCompanyCreateModal({
       pan: panFromGstin(gst) || (gst.length < 12 ? '' : prev.pan),
     }))
     setError(null)
-    if (gstinError) setGstinError(gst.length === 0 || gst.length === 15 ? validateGstin(gst) : null)
-  }
-
-  function handleGstinBlur() {
-    setGstinError(validateGstin(form.gstin))
   }
 
   async function handleSubmit() {
+    if (submitting) return
     inline.touchAll()
 
+    // Company Name is the only required field; Mobile and Email block only
+    // when they hold an invalid entered value.
     const name = form.customerName.trim()
-    const mobileErr = validateMobileForCountry(form.mobile, form.country || DEFAULT_CUSTOMER_COUNTRY)
-    const emailErr = validateEmail(form.email)
-    const contactValue = form.contactPerson
-    const contactErr =
-      contactValue.trim() && /[^A-Za-z\s]/.test(contactValue)
-        ? 'Contact Person allows letters only'
-        : null
-
-    // Account-detail fields (GSTIN etc.) only gate submit when the accordion is open
-    // or the user has already entered a partial/full GSTIN.
-    const gstinRaw = form.gstin.trim()
-    const shouldValidateAccountDetails = showAdditional || gstinRaw.length > 0
-    const gstErr = shouldValidateAccountDetails
-      ? validateGstin(form.gstin, { required: false })
-      : null
-
-    if (gstErr) {
-      setGstinError(gstErr)
-      setShowAdditional(true)
-    } else {
-      setGstinError(null)
-    }
-
-    if (!name || mobileErr || emailErr || contactErr || gstErr) {
-      const msg =
-        !name
-          ? `${COMPANY_TERMINOLOGY.name} is required`
-          : contactErr || mobileErr || emailErr || gstErr || 'Please fix the highlighted fields'
+    const submitFieldOrder = ['customerName', 'mobile', 'email'] as const
+    const firstInvalid = submitFieldOrder.find((f) => inline.fieldErrors[f])
+    if (firstInvalid) {
+      const msg = inline.fieldErrors[firstInvalid] ?? `${COMPANY_TERMINOLOGY.name} is required`
       setError(msg)
       notify.warning(msg)
       // Defer focus until touched errors paint
@@ -265,7 +236,6 @@ export function QuickCompanyCreateModal({
       return
     }
 
-    setGstinError(null)
     setSubmitting(true)
     setError(null)
 
@@ -389,8 +359,7 @@ export function QuickCompanyCreateModal({
               >
                 <Input
                   value={form.customerName}
-                  onChange={(e) => setField('customerName', e.target.value)}
-                  onBlur={() => inline.touch('customerName')}
+                  onChange={(e) => setField('customerName', sanitizeCompanyName(e.target.value))}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
@@ -403,16 +372,13 @@ export function QuickCompanyCreateModal({
                   autoFocus
                 />
               </FormField>
-              <FormField label="Contact Person" error={inline.fieldError('contactPerson')}>
+              <FormField label="Contact Person">
                 <Input
                   value={form.contactPerson}
                   onChange={(e) => setField('contactPerson', sanitizeAlphabeticName(e.target.value))}
-                  onBlur={() => inline.touch('contactPerson')}
                   placeholder="Primary contact"
                   autoComplete="name"
                   inputMode="text"
-                  error={Boolean(inline.fieldError('contactPerson'))}
-                  aria-invalid={Boolean(inline.fieldError('contactPerson'))}
                 />
               </FormField>
               <FormField label="Mobile" error={inline.fieldError('mobile')}>
@@ -443,14 +409,7 @@ export function QuickCompanyCreateModal({
             <button
               type="button"
               className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-erp-border bg-erp-surface px-4 py-3 text-left text-[13px] font-semibold text-erp-primary hover:bg-erp-primary-soft/40"
-              onClick={() => {
-                setShowAdditional((v) => {
-                  const next = !v
-                  // Closing unused account details clears GSTIN gate errors
-                  if (!next && !form.gstin.trim()) setGstinError(null)
-                  return next
-                })
-              }}
+              onClick={() => setShowAdditional((v) => !v)}
               aria-expanded={showAdditional}
             >
               <span>{showAdditional ? 'Hide account details' : 'Add account details'}</span>
@@ -501,16 +460,13 @@ export function QuickCompanyCreateModal({
                   <FormField
                     label="GSTIN"
                     hint="15-character GST identification number"
-                    error={gstinError ?? undefined}
                   >
                     <Input
                       value={form.gstin}
                       onChange={(e) => handleGstinChange(e.target.value)}
-                      onBlur={handleGstinBlur}
                       maxLength={15}
-                      className={cn('font-mono uppercase', inputClassName(Boolean(gstinError)))}
+                      className="font-mono uppercase"
                       placeholder="27AABCU9603R1ZM"
-                      aria-invalid={Boolean(gstinError)}
                       autoComplete="off"
                       spellCheck={false}
                     />

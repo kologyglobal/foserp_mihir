@@ -546,7 +546,7 @@ export async function apiAdvanceLeadStage(
   }
   if (stage === 'qualified') return apiQualifyLead(id, stage, extras?.remarks)
   if (stage === 'not_qualified') {
-    return apiDisqualifyLead(id, extras?.notQualifiedReason?.trim() || 'other', extras?.remarks)
+    return apiDisqualifyLead(id, extras?.notQualifiedReason?.trim() ?? '', extras?.remarks)
   }
   return withSubmitLock(lockKey('lead:change-stage', id), async () => {
     try {

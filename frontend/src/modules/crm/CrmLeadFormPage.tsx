@@ -515,7 +515,6 @@ export function CrmLeadFormPage() {
       createdDate,
       mobile,
       email,
-      productRequirement: requirementText || (hasLeadRequirementLines(requirementLines) ? 'set' : ''),
       remarks,
       expectedValue,
     },
@@ -543,16 +542,6 @@ export function CrmLeadFormPage() {
       remarks: {
         required: true,
         message: 'Notes are required',
-      },
-      productRequirement: {
-        validate: (v) => {
-          // Minimum-first: product lines only when the deal is serious enough.
-          const reqStages: LeadStage[] = ['requirement_collected', 'qualified']
-          if (reqStages.includes(leadStage) && !String(v).trim()) {
-            return 'Add at least one product / requirement line for this stage'
-          }
-          return null
-        },
       },
     },
   )
@@ -834,14 +823,65 @@ export function CrmLeadFormPage() {
       )
       ?? companyContacts[0]
       ?? null
-    if (matched) {
+    const isNewCompany = match.sourceLabel === 'New'
+    let filledContactPerson = ''
+    let filledMobile = ''
+    let filledEmail = ''
+    if (matched && !isNewCompany) {
       applyContactToLead(matched)
+      filledContactPerson = matched.name
+      filledMobile = sanitizePhoneDigits(matched.phone ?? '')
+      filledEmail = matched.email?.trim() ?? ''
     } else {
-      setContactId('')
-      setContactPerson(match.contactPerson)
-      setMobile(sanitizePhoneDigits(match.contactPhone))
-      setEmail(match.contactEmail)
+      setContactId(matched?.id ?? '')
+      const nextContactPerson = (matched?.name ?? match.contactPerson)?.trim() ?? ''
+      const nextMobile = sanitizePhoneDigits((matched?.phone || match.contactPhone) ?? '')
+      const nextEmail = (matched?.email || match.contactEmail)?.trim() ?? ''
+      if (isNewCompany) {
+        // Quick-created company (Add New Company popup): copy only the fields that
+        // were actually entered — never blank values already typed on the lead.
+        if (nextContactPerson) setContactPerson(nextContactPerson)
+        if (nextMobile) setMobile(nextMobile)
+        if (nextEmail) setEmail(nextEmail)
+      } else {
+        setContactPerson(nextContactPerson)
+        setMobile(nextMobile)
+        setEmail(nextEmail)
+      }
+      filledContactPerson = nextContactPerson
+      filledMobile = nextMobile
+      filledEmail = nextEmail
+      if (isNewCompany && match.customerId && !matched) {
+        // The popup's Contact Person is synced into a CRM contact asynchronously
+        // (contactSync lazy imports). Poll briefly so the visible Contact Person
+        // select on the lead form shows the created contact once it lands.
+        let attempts = 0
+        const pickUpSyncedContact = () => {
+          attempts += 1
+          const synced = useCrmStore.getState().contacts.find(
+            (c) => c.customerId === match.customerId && (c.isActive ?? true),
+          )
+          if (synced) {
+            setContactId((prev) => prev || synced.id)
+            return
+          }
+          if (attempts < 5) window.setTimeout(pickUpSyncedContact, 200)
+        }
+        window.setTimeout(pickUpSyncedContact, 200)
+      }
     }
+    // Auto-filled values satisfy earlier save-attempt errors — drop them
+    setValidationErrors((prev) => {
+      const clearable = [
+        filledContactPerson ? 'contactPerson' : null,
+        filledMobile ? 'mobile' : null,
+        filledEmail ? 'email' : null,
+      ].filter((k): k is 'contactPerson' | 'mobile' | 'email' => Boolean(k && prev[k]))
+      if (clearable.length === 0) return prev
+      const next = { ...prev }
+      for (const k of clearable) delete next[k]
+      return next
+    })
     if (match.industry) setIndustry(match.industry)
     if (match.customerId) setSource('existing_customer')
     // Clear stale save-time errors once company is linked
@@ -1358,12 +1398,15 @@ export function CrmLeadFormPage() {
           id="lead-section-quick"
           title="Quick Entry"
           subtitle="Company, contact, and ownership — expand only when you need more."
+          columns={4}
+          className="crm-lead-quick-entry"
         >
-          <ErpFieldGroup>
+          <ErpFieldGroup columns={4}>
             <ErpFieldRow
               label="Company / Prospect"
               required
               colSpan={3}
+              horizontal={false}
               dataField="prospectName"
               fieldState={inlineValidation.fieldState('prospectName')}
               fieldError={inlineValidation.fieldError('prospectName') ?? validationErrors.prospectName}
@@ -1394,12 +1437,11 @@ export function CrmLeadFormPage() {
             </ErpFieldRow>
           </ErpFieldGroup>
 
-          <ErpFieldGroup label="Contact">
+          <ErpFieldGroup label="Contact" columns={4}>
             {company.customerId ? (
               <ErpFieldRow
                 label="Contact Person"
-                required
-                colSpan={3}
+                horizontal={false}
                 dataField="contactPerson"
                 fieldState={
                   (validationErrors.contactPerson) ? 'error' : undefined
@@ -1416,7 +1458,7 @@ export function CrmLeadFormPage() {
             ) : (
               <ErpFieldRow
                 label="Contact Person"
-                required
+                horizontal={false}
                 dataField="contactPerson"
                 fieldState={validationErrors.contactPerson ? 'error' : undefined}
                 fieldError={validationErrors.contactPerson}
@@ -1442,7 +1484,7 @@ export function CrmLeadFormPage() {
             )}
             <ErpFieldRow
               label="Mobile"
-              required
+              horizontal={false}
               dataField="mobile"
               fieldState={
                 (inlineValidation.fieldError('mobile') ?? validationErrors.mobile)
@@ -1472,6 +1514,7 @@ export function CrmLeadFormPage() {
             </ErpFieldRow>
             <ErpFieldRow
               label="Email"
+              horizontal={false}
               dataField="email"
               fieldState={
                 (inlineValidation.fieldError('email') ?? validationErrors.email)
@@ -1501,10 +1544,11 @@ export function CrmLeadFormPage() {
             </ErpFieldRow>
           </ErpFieldGroup>
 
-          <ErpFieldGroup label="Ownership & status">
+          <ErpFieldGroup label="Ownership & status" columns={4}>
             <ErpFieldRow
               label="Lead Owner"
               required
+              horizontal={false}
               dataField="leadOwnerId"
               fieldState={inlineValidation.fieldState('leadOwnerId')}
               fieldError={inlineValidation.fieldError('leadOwnerId') ?? validationErrors.leadOwnerId}
@@ -1522,6 +1566,7 @@ export function CrmLeadFormPage() {
             </ErpFieldRow>
             <ErpFieldRow
               label="Lead Source"
+              horizontal={false}
               hint={
                 company.customerId && source === 'existing_customer'
                   ? 'Linked to Company Master — set to Existing Customer'
@@ -1540,6 +1585,7 @@ export function CrmLeadFormPage() {
             <ErpFieldRow
               label="Priority"
               required
+              horizontal={false}
               dataField="priority"
               fieldState={inlineValidation.fieldState('priority')}
               fieldError={inlineValidation.fieldError('priority') ?? validationErrors.priority}
@@ -1555,7 +1601,7 @@ export function CrmLeadFormPage() {
                 disabled={fieldLocked('priority')}
               />
             </ErpFieldRow>
-            <ErpFieldRow label="Lead Stage" required>
+            <ErpFieldRow label="Lead Stage" required horizontal={false}>
               <ErpSmartSelect
                 options={leadStageSelectOptions}
                 value={leadStage}
@@ -1565,9 +1611,13 @@ export function CrmLeadFormPage() {
                 disabled={!formPolicy.canChangeStage || fieldLocked('stage')}
               />
             </ErpFieldRow>
+          </ErpFieldGroup>
+
+          <ErpFieldGroup columns={4}>
             <ErpFieldRow
               label="Created Date"
               required
+              horizontal={false}
               dataField="createdDate"
               fieldState={inlineValidation.fieldState('createdDate')}
               fieldError={inlineValidation.fieldError('createdDate') ?? validationErrors.createdDate}
@@ -1848,7 +1898,6 @@ export function CrmLeadFormPage() {
               {activityStatus === 'inactive' ? (
                 <ErpFieldRow
                   label="Inactive Reason"
-                  required
                   colSpan={3}
                   dataField="inactiveReason"
                   fieldState={validationErrors.inactiveReason ? 'error' : 'idle'}
@@ -1865,7 +1914,6 @@ export function CrmLeadFormPage() {
               {leadStage === 'not_qualified' ? (
                 <ErpFieldRow
                   label="Not Qualified Reason"
-                  required
                   colSpan={3}
                   dataField="notQualifiedReason"
                   fieldState={validationErrors.notQualifiedReason ? 'error' : 'idle'}
@@ -1883,7 +1931,6 @@ export function CrmLeadFormPage() {
                 <>
                   <ErpFieldRow
                     label="Closed Date"
-                    required
                     dataField="closedDate"
                     fieldState={validationErrors.closedDate ? 'error' : 'idle'}
                     fieldError={validationErrors.closedDate}
@@ -1899,7 +1946,6 @@ export function CrmLeadFormPage() {
                   </ErpFieldRow>
                   <ErpFieldRow
                     label="Closed Reason"
-                    required
                     colSpan={2}
                     dataField="closedReason"
                     fieldState={validationErrors.closedReason ? 'error' : 'idle'}
