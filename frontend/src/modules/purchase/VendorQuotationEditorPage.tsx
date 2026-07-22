@@ -689,7 +689,9 @@ export function VendorQuotationEditorPage() {
     VENDOR_QUOTATION_DOMAIN_STATUS_LABELS[status as keyof typeof VENDOR_QUOTATION_DOMAIN_STATUS_LABELS] ??
     status
 
-  const documentTitle = isNew ? 'New Vendor Quotation' : (documentNumber ?? 'Vendor Quotation')
+  const documentTitle = isNew
+    ? 'New Vendor Quotation'
+    : (selectedVendor?.vendorName || 'Vendor Quotation')
   const vendorFact = selectedVendor?.vendorName || 'Not selected'
 
   const recordHeaderFacts = useMemo(

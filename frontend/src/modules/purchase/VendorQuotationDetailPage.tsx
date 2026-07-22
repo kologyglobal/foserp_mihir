@@ -317,6 +317,7 @@ export function VendorQuotationDetailPage() {
       title={quote.documentNumber}
       description="Vendor quotation"
       recordNo={quote.documentNumber}
+      recordTitle={quote.vendor.name || 'Vendor Quotation'}
       status={statusLabel}
       statusTone={purchaseStatusTone(quote.status)}
       company={quote.vendor.name}

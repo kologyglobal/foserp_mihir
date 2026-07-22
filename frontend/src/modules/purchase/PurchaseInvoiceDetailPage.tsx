@@ -268,6 +268,7 @@ export function PurchaseInvoiceDetailPage() {
         title={inv.documentNumber}
         description={`${inv.vendor.name} · ${originLabel}`}
         recordNo={inv.documentNumber}
+        recordTitle={inv.vendor.name || 'Purchase Invoice'}
         status={statusLabel}
         statusTone={purchaseStatusTone(inv.status)}
         company={inv.vendor.name}
@@ -282,7 +283,7 @@ export function PurchaseInvoiceDetailPage() {
         modifiedDate={inv.updatedAt ? formatDate(inv.updatedAt.slice(0, 10)) : undefined}
         documentIdentity={{
           moduleLabel: 'PURCHASE INVOICE',
-          title: inv.documentNumber,
+          title: inv.vendor.name || inv.documentNumber,
           status: statusLabel,
           statusTone: purchaseStatusTone(inv.status),
         }}

@@ -238,7 +238,7 @@ export function PurchaseDocumentFactBox({
           <div className="min-w-0">
             <p className="purchase-ai-panel__title">Document Insights</p>
             <p className="purchase-ai-panel__subtitle">
-              AI suggested vendor, history, and linked documents for this record.
+              Vendor summary, purchase history, and linked documents for this record.
             </p>
           </div>
         </header>

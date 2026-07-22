@@ -436,7 +436,7 @@ export function PurchaseInvoiceEditorPage() {
 
   const documentTitle = isNew
     ? 'New Purchase Invoice'
-    : (invoice?.documentNumber ?? 'Purchase Invoice')
+    : (selectedVendor?.vendorName || invoice?.vendor.name || 'Purchase Invoice')
   const vendorFact = selectedVendor?.vendorName || 'Not selected'
 
   const recordHeaderFacts = useMemo(
