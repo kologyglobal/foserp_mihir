@@ -16,7 +16,7 @@ export const DEFAULT_QUOTATION_PRINT_LAYOUT: QuotationPrintLayout = {
 }
 
 /**
- * Word-like print layout for VF ISO tank / dry-bulk quotations.
+ * Letter-style print layout for VF ISO tank / dry-bulk quotations (sans-serif).
  * Customer & cover text come from template sections (not the ERP chrome blocks).
  */
 export const VF_WORD_PRINT_LAYOUT: QuotationPrintLayout = {

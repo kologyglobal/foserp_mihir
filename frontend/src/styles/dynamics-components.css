@@ -7851,14 +7851,14 @@ a.crm-companies-table__name:hover {
 }
 
 /*
- * VF Word print skin — mimics Vasant Fabricators Word quotation layout
- * (black serif body, dense borders, no orange ERP branding).
+ * VF Word print skin — Vasant Fabricators letter-style quotation layout
+ * (clean sans-serif body, dense borders, no orange ERP branding).
  */
 .quo-print-doc--skin-vf-word {
-  font-family: 'Times New Roman', Times, 'Liberation Serif', serif;
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   font-size: calc(11pt * var(--quo-print-font-scale, 1));
-  line-height: 1.35;
-  color: #000;
+  line-height: 1.4;
+  color: #1a1a1a;
   padding: var(--quo-print-margin, 18mm) calc(var(--quo-print-margin, 18mm) * 0.85);
 }
 
@@ -7871,7 +7871,7 @@ a.crm-companies-table__name:hover {
 .quo-print-doc--skin-vf-word .quo-print-header__company,
 .quo-print-doc--skin-vf-word .quo-print-header__title {
   color: #000;
-  font-family: 'Times New Roman', Times, serif;
+  font-family: inherit;
   letter-spacing: 0;
 }
 
@@ -7884,12 +7884,12 @@ a.crm-companies-table__name:hover {
 }
 
 .quo-print-doc--skin-vf-word .quo-print-section__title {
-  font-family: 'Times New Roman', Times, serif;
+  font-family: inherit;
   font-size: 11.5pt;
   font-weight: 700;
   margin: 0 0 6px;
   padding-bottom: 2px;
-  border-bottom: 1px solid #000;
+  border-bottom: 1px solid #c8c8c8;
   color: #000;
   text-transform: none;
   letter-spacing: 0;
@@ -7898,7 +7898,7 @@ a.crm-companies-table__name:hover {
 .quo-print-doc--skin-vf-word .quo-print-section__body {
   font-size: 11pt;
   white-space: pre-wrap;
-  color: #000;
+  color: #333;
 }
 
 .quo-print-doc--skin-vf-word .quo-print-section--cover {
@@ -7973,8 +7973,8 @@ a.crm-companies-table__name:hover {
 .quo-print-doc--skin-vf-word .quo-print-customer,
 .quo-print-doc--skin-vf-word .quo-print-signature,
 .quo-print-doc--skin-vf-word .quo-print-footer {
-  font-family: 'Times New Roman', Times, serif;
-  color: #000;
+  font-family: inherit;
+  color: #1a1a1a;
 }
 
 .quo-print-doc--skin-vf-word .quo-print-footer {

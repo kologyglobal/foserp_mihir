@@ -1091,6 +1091,10 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
       return
     }
     if (so.status === 'confirmed') {
+      if (crmMode) {
+        navigate(resolveSalesOrderDetailPath(so.id, true))
+        return
+      }
       const r = triggerProduction(so.id)
       setToast(r.ok ? `Production triggered for ${so.salesOrderNo}` : r.error ?? 'Convert failed')
       return

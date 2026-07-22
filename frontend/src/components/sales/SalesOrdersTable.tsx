@@ -293,12 +293,16 @@ export function SalesOrdersTable({
                     !onCreateProforma ||
                     (!activeProforma && (so.status === 'open' || so.status === 'closed')),
                 },
-                {
-                  id: 'convert',
-                  label: so.status === 'open' ? 'Confirm Order' : 'Convert to Production',
-                  icon: Send,
-                  onClick: () => onConvert?.(so),
-                },
+                ...(so.status === 'open' || !crmMode
+                  ? [
+                      {
+                        id: 'convert',
+                        label: so.status === 'open' ? 'Confirm Order' : 'Convert to Production',
+                        icon: Send,
+                        onClick: () => onConvert?.(so),
+                      },
+                    ]
+                  : []),
                 ...ai,
                 { id: 'more', label: 'More Actions', icon: MoreHorizontal, onClick: () => onPreview?.(so) },
               ]

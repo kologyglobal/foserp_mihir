@@ -457,7 +457,9 @@ export function SalesOrder360Page() {
         ...(so.status === 'open' && canConfirmSalesOrder
           ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }]
           : []),
-        ...(so.status === 'confirmed' ? [{ id: 'mrp', label: 'Trigger MRP', icon: Play, primary: true, onClick: handleMrp }] : []),
+        ...(!crmMode && so.status === 'confirmed'
+          ? [{ id: 'mrp', label: 'Trigger MRP', icon: Play, primary: true, onClick: handleMrp }]
+          : []),
         ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit', icon: Pencil, onClick: () => navigate(editPath) }] : []),
         ...(so.status !== 'open' && !activeProforma ? [{ id: 'proforma', label: 'Create Proforma', icon: Receipt, onClick: () => navigate(buildProformaNewUrl(so.id)) }] : []),
       ]}
@@ -479,8 +481,15 @@ export function SalesOrder360Page() {
         {
           id: 'next',
           label: 'Suggested Next',
-          value: so.status === 'open' ? 'Confirm order' : pendingMrp ? 'Trigger MRP' : overdue ? 'Expedite delivery' : 'Monitor production',
-          tone: so.status === 'open' || pendingMrp || overdue ? 'warning' as const : 'info' as const,
+          value:
+            so.status === 'open'
+              ? 'Confirm order'
+              : !crmMode && pendingMrp
+                ? 'Trigger MRP'
+                : overdue
+                  ? 'Expedite delivery'
+                  : 'Monitor production',
+          tone: so.status === 'open' || (!crmMode && pendingMrp) || overdue ? 'warning' as const : 'info' as const,
         },
       ]}
     >
@@ -502,7 +511,9 @@ export function SalesOrder360Page() {
           ...(so.status === 'open' && canConfirmSalesOrder
             ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }]
             : []),
-          ...(so.status === 'confirmed' ? [{ id: 'mrp', label: 'Trigger MRP', icon: Play, primary: true, onClick: handleMrp }] : []),
+          ...(!crmMode && so.status === 'confirmed'
+            ? [{ id: 'mrp', label: 'Trigger MRP', icon: Play, primary: true, onClick: handleMrp }]
+            : []),
           ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit Draft', icon: Pencil, onClick: () => navigate(editPath) }] : []),
         ]}
       />
@@ -576,7 +587,7 @@ export function SalesOrder360Page() {
               qcHold={qcHold}
               onOpenProduction={() => selectSection('production')}
               onOpenDispatch={() => selectSection('dispatch')}
-              onTriggerMrp={so.status === 'confirmed' ? handleMrp : undefined}
+              onTriggerMrp={!crmMode && so.status === 'confirmed' ? handleMrp : undefined}
             />
 
             <div className="so-360-overview-grid">
@@ -605,7 +616,7 @@ export function SalesOrder360Page() {
                       status={so.status}
                       overdue={overdue}
                       onConfirm={so.status === 'open' && canConfirmSalesOrder ? openConfirmDialog : undefined}
-                      onTriggerMrp={so.status === 'confirmed' ? handleMrp : undefined}
+                      onTriggerMrp={!crmMode && so.status === 'confirmed' ? handleMrp : undefined}
                     />
                   </div>
                 </Entity360Panel>
@@ -656,10 +667,12 @@ export function SalesOrder360Page() {
                   <p className="so-360-empty__title">No work orders yet</p>
                   <p className="so-360-empty__text">
                     {so.status === 'confirmed'
-                      ? 'Trigger MRP to explode BOM and create shop-floor work orders.'
+                      ? crmMode
+                        ? 'Work orders appear after MRP planning on the Sales / Manufacturing side.'
+                        : 'Trigger MRP to explode BOM and create shop-floor work orders.'
                       : 'Work orders appear after MRP planning for confirmed orders.'}
                   </p>
-                  {so.status === 'confirmed' ? (
+                  {!crmMode && so.status === 'confirmed' ? (
                     <button type="button" className="so-360-empty__action" onClick={handleMrp}>
                       Trigger MRP →
                     </button>

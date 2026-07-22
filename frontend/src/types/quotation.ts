@@ -190,7 +190,7 @@ export type QuotationPageSize = 'A4' | 'Letter'
 
 export type QuotationHeaderStyle = 'standard' | 'minimal' | 'cover'
 
-/** Visual print theme — `vf_word` mimics Vasant Fabricators Word quotation layout. */
+/** Visual print theme — `vf_word` is the Vasant Fabricators letter-style quotation layout (sans-serif). */
 export type QuotationPrintSkin = 'default' | 'vf_word'
 
 export interface QuotationPrintLayout {
