@@ -80,7 +80,7 @@ export function AssetRevaluationPage() {
     >
       <FixedAssetsWorkspaceTabs active="revaluation" />
       <div className="space-y-3 p-4">
-        <FixedAssetsDemoBanner message="Frontend demo data. Revaluation surplus does not post to the live ledger." />
+        <FixedAssetsDemoBanner variant="partial" />
         <FixedAssetsSummaryCards items={kpis} columns={3} />
 
         <div className="min-w-[220px]">

@@ -106,7 +106,7 @@ export function AssetCapitalizationPage() {
     >
       <FixedAssetsWorkspaceTabs active="capitalization" />
       <div className="space-y-3 p-4">
-        <FixedAssetsDemoBanner message="Frontend demo data. Capitalization does not post to the live ledger." />
+        <FixedAssetsDemoBanner variant="partial" />
         <FixedAssetsSummaryCards items={kpis} columns={4} />
 
         <div className="min-w-[220px]">

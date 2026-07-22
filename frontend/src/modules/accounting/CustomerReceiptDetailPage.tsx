@@ -191,7 +191,7 @@ export function CustomerReceiptDetailPage() {
         <ReceiptStatusBadge status={receipt.voucherStatus} />
         <AllocationStatusBadge status={receipt.allocationStatus} />
         {receipt.relatedVoucherId ? (
-          <Link to={`/accounting/vouchers/${receipt.relatedVoucherId}`} className="text-[12px] font-medium text-sky-700 hover:underline">
+          <Link to={`/accounting/ledger-entries/voucher/${receipt.relatedVoucherId}`} className="text-[12px] font-medium text-sky-700 hover:underline">
             Voucher {receipt.relatedVoucherNumber ?? receipt.relatedVoucherId}
           </Link>
         ) : null}

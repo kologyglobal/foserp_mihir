@@ -126,6 +126,7 @@ export type CashVarianceStatus = 'Matched' | 'Excess' | 'Shortage'
 
 export type BankCashWorkspaceTab =
   | 'overview'
+  | 'liquidity'
   | 'bank_accounts'
   | 'cash_accounts'
   | 'transactions'
@@ -133,8 +134,14 @@ export type BankCashWorkspaceTab =
   | 'statements'
   | 'reconciliation'
   | 'cheques'
+  | 'treasury_adjustments'
+  | 'standing_instructions'
+  | 'posting_rules'
+  | 'bank_connectors'
   | 'deposits'
   | 'cash_book'
+  | 'bank_book'
+  | 'cashbook'
   | 'cash_counts'
   | 'reports'
   | 'setup'
@@ -842,6 +849,7 @@ export const CASH_VARIANCE_STATUSES: CashVarianceStatus[] = ['Matched', 'Excess'
 
 export const BANK_CASH_WORKSPACE_TABS: Array<{ id: BankCashWorkspaceTab; label: string; path: string }> = [
   { id: 'overview', label: 'Overview', path: '/accounting/bank-cash' },
+  { id: 'liquidity', label: 'Liquidity', path: '/accounting/bank-cash/liquidity' },
   { id: 'bank_accounts', label: 'Bank Accounts', path: '/accounting/bank-cash/bank-accounts' },
   { id: 'cash_accounts', label: 'Cash Accounts', path: '/accounting/bank-cash/cash-accounts' },
   { id: 'transactions', label: 'Transactions', path: '/accounting/bank-cash/transactions' },
@@ -849,8 +857,14 @@ export const BANK_CASH_WORKSPACE_TABS: Array<{ id: BankCashWorkspaceTab; label: 
   { id: 'statements', label: 'Bank Statements', path: '/accounting/bank-cash/statements' },
   { id: 'reconciliation', label: 'Bank Reconciliation', path: '/accounting/bank-cash/reconciliation' },
   { id: 'cheques', label: 'Cheque Management', path: '/accounting/bank-cash/cheques' },
+  { id: 'treasury_adjustments', label: 'Bank Transactions', path: '/accounting/bank-cash/treasury-adjustments' },
+  { id: 'standing_instructions', label: 'Standing Instructions', path: '/accounting/bank-cash/standing-instructions' },
+  { id: 'posting_rules', label: 'Posting Rules', path: '/accounting/bank-cash/posting-rules' },
+  { id: 'bank_connectors', label: 'Bank connectors', path: '/accounting/bank-cash/connectors' },
   { id: 'deposits', label: 'Bank Deposits', path: '/accounting/bank-cash/deposits' },
   { id: 'cash_book', label: 'Cash Book', path: '/accounting/bank-cash/cash-book' },
+  { id: 'bank_book', label: 'Bankbook', path: '/accounting/bank-cash/bankbook' },
+  { id: 'cashbook', label: 'Cashbook', path: '/accounting/bank-cash/cashbook' },
   { id: 'cash_counts', label: 'Cash Counts', path: '/accounting/bank-cash/cash-counts' },
   { id: 'reports', label: 'Reports', path: '/accounting/bank-cash/reports' },
   { id: 'setup', label: 'Bank & Cash Setup', path: '/accounting/bank-cash/setup' },

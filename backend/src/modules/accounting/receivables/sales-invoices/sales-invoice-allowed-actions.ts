@@ -7,6 +7,8 @@ export interface SalesInvoiceAllowedActions {
   markReady: boolean
   cancel: boolean
   post: boolean
+  /** POSTED + no posted receipt/CN allocations + finance.ar.invoice.reverse. */
+  reverse?: boolean
   viewAccounting?: boolean
   viewAllocations?: boolean
 }
@@ -22,6 +24,7 @@ function hasPerm(req: Request, permission: string): boolean {
 export function resolveSalesInvoiceAllowedActions(
   req: Request,
   status: SalesInvoiceStatus,
+  options?: { hasPostedAllocations?: boolean },
 ): SalesInvoiceAllowedActions {
   const canView = hasPerm(req, 'finance.ar.invoice.view') || hasPerm(req, 'finance.ar.view')
   const canViewAlloc = hasPerm(req, 'finance.ar.allocation.view')
@@ -36,6 +39,20 @@ export function resolveSalesInvoiceAllowedActions(
       markReady: false,
       cancel: false,
       post: false,
+      reverse: hasPerm(req, 'finance.ar.invoice.reverse') && options?.hasPostedAllocations !== true,
+      viewAccounting: canView,
+      viewAllocations: canViewAlloc,
+    }
+  }
+
+  if (status === 'REVERSED') {
+    return {
+      edit: false,
+      validate: false,
+      markReady: false,
+      cancel: false,
+      post: false,
+      reverse: false,
       viewAccounting: canView,
       viewAllocations: canViewAlloc,
     }
@@ -47,6 +64,7 @@ export function resolveSalesInvoiceAllowedActions(
     markReady: status === 'DRAFT' && hasPerm(req, 'finance.ar.invoice.edit'),
     cancel: cancellable && hasPerm(req, 'finance.ar.invoice.cancel'),
     post: canPost,
+    reverse: false,
     viewAllocations: false,
   }
 }

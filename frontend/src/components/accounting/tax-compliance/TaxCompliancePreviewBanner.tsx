@@ -1,7 +1,45 @@
 import { AlertTriangle } from 'lucide-react'
+import { isApiMode } from '@/config/apiConfig'
 
-/** Always-visible honesty banner for compliance preview screens */
-export function TaxCompliancePreviewBanner({ dense }: { dense?: boolean }) {
+/** Always-visible honesty banner for compliance screens */
+export function TaxCompliancePreviewBanner({
+  dense,
+  variant = 'auto',
+}: {
+  dense?: boolean
+  /** Force demo / extract-live messaging */
+  variant?: 'auto' | 'demo' | 'extract-live' | 'filing-demo'
+}) {
+  const mode =
+    variant === 'auto'
+      ? isApiMode()
+        ? 'filing-demo'
+        : 'demo'
+      : variant
+
+  const copy =
+    mode === 'extract-live'
+      ? (
+          <>
+            <span className="font-semibold">Live GST extract from posted AR/AP invoices.</span> Outward and
+            inward registers use the accounting extract API. Portal filing, e-invoice generation, challans, and
+            GSTR auto-submit are not connected.
+          </>
+        )
+      : mode === 'filing-demo' ? (
+          <>
+            <span className="font-semibold">Extract live; filing preview demo.</span> Register totals may come
+            from posted invoices. Mark-filed / portal / e-invoice / challan actions are demo-only and do not
+            submit to GST Portal, Income Tax, or TRACES.
+          </>
+        ) : (
+          <>
+            <span className="font-semibold">Frontend compliance preview based on demo data.</span> Not connected
+            to GST Portal, Income Tax, or TRACES. Returns, challans, certificates, e-invoice, and e-way were not
+            filed or generated with government systems.
+          </>
+        )
+
   return (
     <div
       role="status"
@@ -12,11 +50,7 @@ export function TaxCompliancePreviewBanner({ dense }: { dense?: boolean }) {
       }
     >
       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700" aria-hidden />
-      <p>
-        <span className="font-semibold">Frontend compliance preview based on demo data.</span>{' '}
-        Not connected to GST Portal, Income Tax, or TRACES. Returns, challans, certificates, e-invoice, and e-way were
-        not filed or generated with government systems. Statutory figures are previews until a backend engine exists.
-      </p>
+      <p>{copy}</p>
     </div>
   )
 }

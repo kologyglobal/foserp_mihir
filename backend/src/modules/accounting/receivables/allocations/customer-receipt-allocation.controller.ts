@@ -11,10 +11,12 @@ import {
   listCustomerCredits,
 } from './customer-receipt-allocation-read.service.js'
 import { allocateCustomerReceipt } from './customer-receipt-allocation.service.js'
+import { reverseCustomerReceiptAllocation } from './customer-receipt-allocation-reverse.service.js'
 import type {
   AllocateCustomerReceiptBodyInput,
   ListCustomerCreditsQueryInput,
   ListReceiptAllocationsQueryInput,
+  ReverseAllocationBodyInput,
 } from './customer-receipt-allocation.schemas.js'
 
 function getIdempotencyKey(req: Request): string {
@@ -46,6 +48,24 @@ export const postReceiptAllocation = asyncHandler(async (req: Request, res: Resp
     },
   )
   return sendSuccess(res, 'receipt allocation posted', result)
+})
+
+export const reverseReceiptAllocation = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const receiptId = getRouteParam(req, 'receiptId')
+  const batchId = getRouteParam(req, 'batchId')
+  const body = req.body as ReverseAllocationBodyInput
+  const result = await reverseCustomerReceiptAllocation(
+    { receiptId, batchId, reason: body.reason },
+    {
+      tenantId,
+      userId: req.context!.userId,
+      idempotencyKey: getIdempotencyKey(req),
+      ipAddress: req.ip ?? null,
+      userAgent: (req.headers['user-agent'] as string | undefined) ?? null,
+    },
+  )
+  return sendSuccess(res, 'receipt allocation reversed', result)
 })
 
 export const getReceiptAllocations = asyncHandler(async (req: Request, res: Response) => {

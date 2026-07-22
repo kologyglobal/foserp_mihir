@@ -14,6 +14,7 @@
     "test:purchase-coverage-live": "vitest run tests/purchase-module-coverage.test.ts --hookTimeout=120000",
     "test:crm-live": "tsx scripts/run-crm-live-tests.ts",
     "test:backend-structure": "tsx scripts/test-backend-structure.ts",
+    "verify:finance-integrity": "tsx scripts/verify-finance-integrity.ts",
     "db:purge-business": "tsx scripts/purge-business-data.ts",
     "test:watch": "vitest",
     "db:generate": "tsx scripts/prisma-cli.ts generate",
@@ -28,19 +29,6 @@
   "dependencies": {
     "@prisma/adapter-mariadb": "^6.19.3",
     "@prisma/client": "^6.19.3",
-    "bcryptjs": "^3.0.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
-    "express": "^5.1.0",
-    "express-rate-limit": "^7.5.0",
-    "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "prisma": "^6.19.3",
-    "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1",
-    "typescript": "^5.8.3",
-    "uuid": "^11.1.0",
-    "zod": "^3.25.67",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -49,11 +37,32 @@
     "@types/supertest": "^6.0.3",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "csv-parse": "^7.0.1",
+    "dotenv": "^16.5.0",
+    "exceljs": "^4.4.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.2.0",
+    "prisma": "^6.19.3",
+    "ssh2-sftp-client": "^12.1.1",
     "supertest": "^7.1.1",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "tsx": "^4.19.4",
-    "vitest": "^3.2.3"
+    "typescript": "^5.8.3",
+    "uuid": "^11.1.0",
+    "vitest": "^3.2.3",
+    "zod": "^3.25.67"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
+  },
+  "devDependencies": {
+    "@types/multer": "^2.2.0",
+    "@types/ssh2-sftp-client": "^9.0.6"
   }
 }

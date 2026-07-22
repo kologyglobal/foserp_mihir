@@ -48,6 +48,12 @@ export async function serializeCustomerCreditNote(req: Request, note: CustomerCr
     } : null,
     allowedActions: resolveCustomerCreditNoteAllowedActions(req, note.status, note.approvalRequired, {
       unallocatedAmount: note.unallocatedAmount.toString(),
+      hasPostedAllocations:
+        note.status === 'POSTED'
+          ? (await prisma.customerCreditNoteAllocation.count({
+              where: { tenantId: note.tenantId, creditNoteId: note.id, status: 'POSTED' },
+            })) > 0
+          : false,
     }),
   }
 }

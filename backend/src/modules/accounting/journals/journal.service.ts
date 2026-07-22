@@ -9,6 +9,7 @@ import {
 } from '../approvals/approval-request.service.js'
 import { resolveJournalWorkflowActions } from '../approvals/approval.allowed-actions.js'
 import { canPostJournal, countLedgerEntries, findPostingEventIdForJournal } from './journal-posting.service.js'
+import { canReverseJournal } from './journal-reverse.service.js'
 import type {
   CreateJournalInput,
   CancelJournalInput,
@@ -73,19 +74,29 @@ async function buildAllowedActions(req: Request, journal: JournalWithLines): Pro
       !journal.voucherNumber &&
       hasPerm(req, 'finance.voucher.post') &&
       (await canPostJournal(req, journal)),
-    reverse: false,
+    reverse: await canReverseJournal(req, journal),
   }
 }
 
 async function serializeJournal(journal: JournalWithLines, req?: Request): Promise<JournalDetailDto> {
   const postedExtras =
-    journal.status === 'POSTED'
+    journal.status === 'POSTED' || journal.status === 'REVERSED'
       ? {
           postedAt: journal.postedAt?.toISOString() ?? null,
           postedBy: journal.postedBy,
           postingEventId: await findPostingEventIdForJournal(journal.tenantId, journal.id),
           ledgerEntryCount: await countLedgerEntries(journal.tenantId, journal.id),
           generalLedgerLink: `/accounting/entries/journals/${journal.id}#ledger`,
+        }
+      : {}
+
+  const reversalExtras =
+    journal.status === 'REVERSED' || journal.reversedByVoucherId
+      ? {
+          reversedByVoucherId: journal.reversedByVoucherId,
+          reversedAt: journal.reversedAt?.toISOString() ?? null,
+          reversedBy: journal.reversedBy,
+          reversalReason: journal.reversalReason,
         }
       : {}
 
@@ -121,6 +132,7 @@ async function serializeJournal(journal: JournalWithLines, req?: Request): Promi
     updatedAt: journal.updatedAt.toISOString(),
     lines: journal.lines.map(serializeLine),
     ...postedExtras,
+    ...reversalExtras,
     allowedActions: req
       ? await buildAllowedActions(req, journal)
       : {

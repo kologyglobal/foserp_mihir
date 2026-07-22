@@ -89,7 +89,7 @@ export function FixedAssetsSetupPage() {
     >
       <FixedAssetsWorkspaceTabs active="setup" />
       <div className="space-y-3 p-4">
-        <FixedAssetsDemoBanner />
+        <FixedAssetsDemoBanner variant="partial" />
         {loading ? <LoadingState variant="form" rows={8} /> : null}
         {setup ? (
           <div className="grid gap-4 lg:grid-cols-2">

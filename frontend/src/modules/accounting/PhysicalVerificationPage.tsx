@@ -83,7 +83,7 @@ export function PhysicalVerificationPage() {
     >
       <FixedAssetsWorkspaceTabs active="verification" />
       <div className="space-y-3 p-4">
-        <FixedAssetsDemoBanner />
+        <FixedAssetsDemoBanner variant="partial" />
         <FixedAssetsSummaryCards items={kpis} columns={4} />
 
         <div className="min-w-[220px]">

@@ -39,7 +39,7 @@ import type {
   AllocateCustomerReceiptResult,
 } from './customer-receipt-allocation.types.js'
 
-async function buildResult(
+export async function buildResult(
   tenantId: string,
   batchId: string,
   idempotentReplay: boolean,

@@ -122,6 +122,10 @@ export function mapCustomerReceiptToDto(
     cancelledAt: receipt.cancelledAt?.toISOString() ?? null,
     cancelledBy: receipt.cancelledBy,
     cancellationReason: receipt.cancellationReason,
+    reversalVoucherId: receipt.reversalVoucherId,
+    reversedAt: receipt.reversedAt?.toISOString() ?? null,
+    reversedBy: receipt.reversedBy,
+    reversalReason: receipt.reversalReason,
     createdBy: receipt.createdBy,
     updatedBy: receipt.updatedBy,
     createdAt: receipt.createdAt.toISOString(),
@@ -628,6 +632,44 @@ export async function updateReceiptAfterAllocation(
       unallocatedAmount: { decrement: input.allocationAmount },
       baseAllocatedAmount: { increment: input.baseAllocationAmount },
       baseUnallocatedAmount: { decrement: input.baseAllocationAmount },
+      updatedBy: input.updatedBy ?? null,
+    },
+  })
+  return result.count
+}
+
+/** Internal: conditional receipt allocated/unallocated revert after allocation reverse. Not HTTP-routable. */
+export async function updateReceiptAfterAllocationReverse(
+  tx: Prisma.TransactionClient,
+  input: {
+    tenantId: string
+    legalEntityId: string
+    receiptId: string
+    expectedAllocatedAmount: Prisma.Decimal | string
+    expectedUnallocatedAmount: Prisma.Decimal | string
+    expectedBaseAllocatedAmount: Prisma.Decimal | string
+    expectedBaseUnallocatedAmount: Prisma.Decimal | string
+    allocationAmount: Prisma.Decimal | string
+    baseAllocationAmount: Prisma.Decimal | string
+    updatedBy?: string | null
+  },
+): Promise<number> {
+  const result = await tx.customerReceipt.updateMany({
+    where: {
+      id: input.receiptId,
+      tenantId: input.tenantId,
+      legalEntityId: input.legalEntityId,
+      status: 'POSTED',
+      allocatedAmount: input.expectedAllocatedAmount,
+      unallocatedAmount: input.expectedUnallocatedAmount,
+      baseAllocatedAmount: input.expectedBaseAllocatedAmount,
+      baseUnallocatedAmount: input.expectedBaseUnallocatedAmount,
+    },
+    data: {
+      allocatedAmount: { decrement: input.allocationAmount },
+      unallocatedAmount: { increment: input.allocationAmount },
+      baseAllocatedAmount: { decrement: input.baseAllocationAmount },
+      baseUnallocatedAmount: { increment: input.baseAllocationAmount },
       updatedBy: input.updatedBy ?? null,
     },
   })

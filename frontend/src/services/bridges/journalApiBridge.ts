@@ -64,6 +64,11 @@ export async function postJournal(id: string) {
   return getJournalDemoState().postJournal(id)
 }
 
+export async function reverseJournal(id: string, reason: string) {
+  if (isApiMode()) return unwrap(await api.reverseJournal(id, reason))
+  return getJournalDemoState().reverseJournal(id, reason)
+}
+
 export async function getJournalLedger(id: string) {
   if (isApiMode()) return unwrap(await api.getJournalLedger(id))
   return getJournalDemoState().getJournalLedger(id)

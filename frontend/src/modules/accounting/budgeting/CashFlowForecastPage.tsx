@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { RefreshCw } from 'lucide-react'
-import { BudgetingShell } from '@/components/accounting/budgeting'
+import { BudgetingPhase1NaBanner, BudgetingShell } from '@/components/accounting/budgeting'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { getCashFlowForecast } from '@/services/accounting/budgetingService'
@@ -46,6 +46,7 @@ export function CashFlowForecastPage() {
         />
       }
     >
+      <BudgetingPhase1NaBanner />
       <div className="mb-3 flex flex-wrap gap-1">
         {VIEWS.map((v) => (
           <button

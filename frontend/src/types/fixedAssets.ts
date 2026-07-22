@@ -476,6 +476,10 @@ export interface DisposalGainLossPreview {
   proceeds: number
   gainLoss: number
   isGain: boolean
+  isPartial?: boolean
+  disposeCostAmount?: number | null
+  remainingCost?: number | null
+  remainingNbv?: number | null
 }
 
 export interface FixedAssetsExportRequest {

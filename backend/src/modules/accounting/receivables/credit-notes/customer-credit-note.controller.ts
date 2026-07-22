@@ -8,6 +8,7 @@ import * as draft from './customer-credit-note-draft.service.js'
 import * as read from './customer-credit-note-read.service.js'
 import * as approval from './customer-credit-note-approval.service.js'
 import { postCustomerCreditNoteFromRequest } from './posting/customer-credit-note-posting.service.js'
+import { reverseCustomerCreditNoteFromRequest } from './posting/customer-credit-note-reverse.service.js'
 
 export const listCustomerCreditNotes = asyncHandler(async (req: Request, res: Response) => {
   const result = await read.listCustomerCreditNotes(req, getTenantId(req), req.query as unknown as ListCustomerCreditNotesQuery)
@@ -33,3 +34,5 @@ export const cancelCustomerCreditNote = asyncHandler(async (req: Request, res: R
   sendSuccess(res, 'customer credit note cancelled', await draft.cancelCustomerCreditNote(req, getTenantId(req), getRouteParam(req, 'id'), req.body.cancellationReason)))
 export const postCustomerCreditNote = asyncHandler(async (req: Request, res: Response) =>
   sendSuccess(res, 'customer credit note posted', await postCustomerCreditNoteFromRequest(req, getTenantId(req), getRouteParam(req, 'id'))))
+export const reverseCustomerCreditNote = asyncHandler(async (req: Request, res: Response) =>
+  sendSuccess(res, 'customer credit note reversed', await reverseCustomerCreditNoteFromRequest(req, getTenantId(req), getRouteParam(req, 'id'), req.body.reason)))

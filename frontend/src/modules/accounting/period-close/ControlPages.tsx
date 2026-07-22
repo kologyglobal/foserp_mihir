@@ -8,15 +8,26 @@ import {
 } from '@/components/accounting/period-close'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { Modal } from '@/design-system/components/Modal'
+import { Button } from '@/design-system/components/Button'
+import { FormField } from '@/components/forms/FormField'
+import { Input } from '@/components/forms/Inputs'
+import { isApiMode } from '@/config/apiConfig'
 import {
+  closeAccountingPeriod,
   getModuleLocks,
   getReopenRequests,
   getYearEndPreview,
+  listPeriodClosePeriods,
   loadPeriodCloseFilter,
+  markAccountingPeriodUnderReview,
+  reopenAccountingPeriod,
+  savePeriodCloseFilter,
   submitReopenRequest,
   updateModuleLock,
   updateReopenStatus,
 } from '@/services/accounting/periodCloseService'
+import type { AccountingPeriod } from '@/types/financeSetup'
 import type {
   ModuleLockStatus,
   ModulePeriodLock,
@@ -32,12 +43,17 @@ import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { getSessionUser } from '@/utils/permissions'
 import { cn } from '@/utils/cn'
+import { appConfirm } from '@/store/confirmDialogStore'
 
 export function PeriodLockingPage() {
   const perms = usePeriodClosePermissions()
+  const api = isApiMode()
   const [filter, setFilter] = useState<PeriodFilterState>(() => loadPeriodCloseFilter())
   const [rows, setRows] = useState<ModulePeriodLock[]>([])
+  const [periods, setPeriods] = useState<AccountingPeriod[]>([])
   const [overrideReason, setOverrideReason] = useState('')
+  const [reopenTarget, setReopenTarget] = useState<AccountingPeriod | null>(null)
+  const [reopenReason, setReopenReason] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -49,19 +65,30 @@ export function PeriodLockingPage() {
     }
     setLoading(true)
     try {
-      setRows(await getModuleLocks())
+      if (api) {
+        savePeriodCloseFilter(filter)
+        setPeriods(await listPeriodClosePeriods())
+        setRows([])
+      } else {
+        setRows(await getModuleLocks())
+        setPeriods([])
+      }
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load locks')
     } finally {
       setLoading(false)
     }
-  }, [perms.canView])
+  }, [perms.canView, api, filter.fiscalYearId, filter.periodId])
 
   useEffect(() => {
     void load()
   }, [load])
 
+  const onPeriodChange = (next: PeriodFilterState) => {
+    setFilter(next)
+    savePeriodCloseFilter(next)
+  }
   const onLock = async (id: string, status: ModuleLockStatus) => {
     if (!perms.canLock) {
       notify.error('You do not have permission to change period locks.')
@@ -81,12 +108,67 @@ export function PeriodLockingPage() {
     }
   }
 
+  const onClose = async (p: AccountingPeriod) => {
+    if (!perms.canClosePeriod) {
+      notify.error('Missing finance.period.close permission.')
+      return
+    }
+    const ok = await appConfirm({
+      title: 'Close period?',
+      description: `Close ${p.name}? Journal posting into this period will be blocked.`,
+      confirmLabel: 'Close period',
+    })
+    if (!ok) return
+    try {
+      await closeAccountingPeriod(p.id)
+      notify.success(`${p.name} closed. Posting into this period is now blocked.`)
+      await load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Close failed')
+    }
+  }
+
+  const onUnderReview = async (p: AccountingPeriod) => {
+    if (!perms.canMarkUnderReview) {
+      notify.error('Missing finance.period.manage permission.')
+      return
+    }
+    try {
+      await markAccountingPeriodUnderReview(p.id)
+      notify.success(`${p.name} marked under review.`)
+      await load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Under review failed')
+    }
+  }
+
+  const onReopen = async () => {
+    if (!reopenTarget || !reopenReason.trim()) return
+    if (!perms.canReopenPeriod) {
+      notify.error('Missing finance.period.reopen permission.')
+      return
+    }
+    try {
+      await reopenAccountingPeriod(reopenTarget.id, reopenReason.trim())
+      notify.success(`${reopenTarget.name} reopened.`)
+      setReopenTarget(null)
+      setReopenReason('')
+      await load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Reopen failed')
+    }
+  }
+
   return (
     <PeriodCloseShell
       title="Period Locking"
-      description="Module-wise soft and hard locks. Hard lock requires an approved reopen request before posting."
+      description={
+        api
+          ? 'Close, mark under review, or reopen accounting periods. Closed periods block journal posting (finance.period.*).'
+          : 'Module-wise soft and hard locks. Hard lock requires an approved reopen request before posting.'
+      }
       periodFilter={filter}
-      onPeriodChange={setFilter}
+      onPeriodChange={onPeriodChange}
       commandBar={
         <ErpCommandBar
           inline
@@ -95,19 +177,100 @@ export function PeriodLockingPage() {
         />
       }
     >
-      <label className="mb-3 flex max-w-md flex-col gap-1 text-[11px] font-semibold text-erp-muted">
-        Soft lock / override reason
-        <input
-          className="h-8 rounded border border-erp-border px-2 text-[12px] text-erp-text"
-          value={overrideReason}
-          onChange={(e) => setOverrideReason(e.target.value)}
-          placeholder="Required for soft lock actions"
-          aria-label="Override reason"
-        />
-      </label>
+      {!api ? (
+        <label className="mb-3 flex max-w-md flex-col gap-1 text-[11px] font-semibold text-erp-muted">
+          Soft lock / override reason
+          <input
+            className="h-8 rounded border border-erp-border px-2 text-[12px] text-erp-text"
+            value={overrideReason}
+            onChange={(e) => setOverrideReason(e.target.value)}
+            placeholder="Required for soft lock actions"
+            aria-label="Override reason"
+          />
+        </label>
+      ) : (
+        <p className="mb-3 text-[12px] text-erp-muted">
+          Soft readiness warnings on the dashboard do not hard-block close. Backend closes any OPEN / UNDER_REVIEW /
+          REOPENED period; posting is blocked only after status is CLOSED.
+        </p>
+      )}
       {loading ? <LoadingState /> : null}
       {error ? <p className="text-[13px] text-rose-700">{error}</p> : null}
-      {!loading && !error ? (
+      {!loading && !error && api ? (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] border-collapse text-left text-[12px]">
+            <thead>
+              <tr className="border-b border-erp-border text-[10px] uppercase text-erp-muted">
+                <th className="py-1.5 pr-2 font-semibold">#</th>
+                <th className="py-1.5 pr-2 font-semibold">Period</th>
+                <th className="py-1.5 pr-2 font-semibold">Start</th>
+                <th className="py-1.5 pr-2 font-semibold">End</th>
+                <th className="py-1.5 pr-2 font-semibold">Status</th>
+                <th className="py-1.5 font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {periods.map((p) => (
+                <tr key={p.id} className="border-b border-erp-border/60">
+                  <td className="py-1.5 pr-2 text-erp-muted">{p.periodNumber}</td>
+                  <td className="py-1.5 pr-2 font-medium text-erp-text">{p.name}</td>
+                  <td className="py-1.5 pr-2 text-erp-muted">{formatDate(p.startDate)}</td>
+                  <td className="py-1.5 pr-2 text-erp-muted">{formatDate(p.endDate)}</td>
+                  <td className="py-1.5 pr-2">
+                    <LockStatusBadge
+                      status={
+                        p.status === 'CLOSED'
+                          ? 'hard_locked'
+                          : p.status === 'UNDER_REVIEW'
+                            ? 'soft_locked'
+                            : p.status === 'REOPENED'
+                              ? 'reopened_temporarily'
+                              : 'open'
+                      }
+                    />
+                    <span className="ml-1 text-[11px] text-erp-muted">{p.status}</span>
+                  </td>
+                  <td className="py-1.5">
+                    <div className="flex flex-wrap gap-1">
+                      {p.status !== 'CLOSED' && p.status !== 'UNDER_REVIEW' ? (
+                        <button
+                          type="button"
+                          className="rounded border border-erp-border px-1.5 py-0.5 text-[11px] font-semibold disabled:opacity-50"
+                          disabled={!perms.canMarkUnderReview}
+                          onClick={() => void onUnderReview(p)}
+                        >
+                          Under Review
+                        </button>
+                      ) : null}
+                      {p.status !== 'CLOSED' ? (
+                        <button
+                          type="button"
+                          className="rounded border border-erp-border px-1.5 py-0.5 text-[11px] font-semibold disabled:opacity-50"
+                          disabled={!perms.canClosePeriod}
+                          onClick={() => void onClose(p)}
+                        >
+                          Close
+                        </button>
+                      ) : null}
+                      {p.status === 'CLOSED' || p.status === 'UNDER_REVIEW' ? (
+                        <button
+                          type="button"
+                          className="rounded border border-erp-border px-1.5 py-0.5 text-[11px] font-semibold disabled:opacity-50"
+                          disabled={!perms.canReopenPeriod}
+                          onClick={() => setReopenTarget(p)}
+                        >
+                          Reopen
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      {!loading && !error && !api ? (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse text-left text-[12px]">
             <thead>
@@ -168,6 +331,31 @@ export function PeriodLockingPage() {
           </table>
         </div>
       ) : null}
+
+      <Modal
+        open={Boolean(reopenTarget)}
+        onClose={() => setReopenTarget(null)}
+        title="Reopen period"
+        description={`Provide a reason to reopen ${reopenTarget?.name ?? 'period'}.`}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setReopenTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={() => void onReopen()} disabled={!reopenReason.trim()}>
+              Reopen
+            </Button>
+          </div>
+        }
+      >
+        <FormField label="Reason" required>
+          <Input
+            value={reopenReason}
+            onChange={(e) => setReopenReason(e.target.value)}
+            placeholder="e.g. Correction for accrual entry"
+          />
+        </FormField>
+      </Modal>
     </PeriodCloseShell>
   )
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowRightLeft, Plus, RefreshCw, ShieldOff } from 'lucide-react'
+import { ArrowRightLeft, Check, Plus, RefreshCw, ShieldOff } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { SearchInput } from '@/components/ui/SearchInput'
@@ -14,7 +14,14 @@ import {
   FixedAssetsSummaryCards,
   FixedAssetsWorkspaceTabs,
 } from '@/components/accounting/fixedAssets'
-import { createTransferDemo, getAssets, getTransfers, FixedAssetsServiceError } from '@/services/accounting/fixedAssetsService'
+import { isApiMode } from '@/config/apiConfig'
+import {
+  completeTransfer,
+  createTransfer,
+  getAssets,
+  getTransfers,
+  FixedAssetsServiceError,
+} from '@/services/accounting/fixedAssetsService'
 import type { AssetTransfer, FixedAsset } from '@/types/fixedAssets'
 import { useFixedAssetsPermissions } from '@/utils/permissions/fixedAssets'
 import { formatDate } from '@/utils/dates/format'
@@ -37,6 +44,7 @@ function blankForm() {
 
 export function AssetTransfersPage() {
   const perms = useFixedAssetsPermissions()
+  const api = isApiMode()
   const [rows, setRows] = useState<AssetTransfer[]>([])
   const [assets, setAssets] = useState<FixedAsset[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
@@ -50,12 +58,18 @@ export function AssetTransfersPage() {
     try {
       const [list, assetList] = await Promise.all([getTransfers(), getAssets()])
       setRows(list)
-      setAssets(assetList)
+      setAssets(
+        assetList.filter((a) =>
+          api
+            ? ['Active', 'Idle', 'Fully Depreciated'].includes(a.status)
+            : !['Disposed', 'Written Off', 'Sold'].includes(a.status),
+        ),
+      )
       setLoadState(list.length === 0 ? 'empty' : 'ready')
     } catch {
       setLoadState('error')
     }
-  }, [])
+  }, [api])
 
   useEffect(() => {
     void load()
@@ -64,7 +78,11 @@ export function AssetTransfersPage() {
   const visible = useMemo(() => {
     if (!search) return rows
     const q = search.toLowerCase()
-    return rows.filter((r) => `${r.transferNumber} ${r.assetNumber} ${r.assetName} ${r.fromLocation} ${r.toLocation}`.toLowerCase().includes(q))
+    return rows.filter((r) =>
+      `${r.transferNumber} ${r.assetNumber} ${r.assetName} ${r.fromLocation} ${r.toLocation}`
+        .toLowerCase()
+        .includes(q),
+    )
   }, [rows, search])
 
   const kpis: EnterpriseKpiItem[] = useMemo(() => {
@@ -93,21 +111,50 @@ export function AssetTransfersPage() {
       notify.error('Reason is required.')
       return
     }
+    if (!form.toLocation && !form.toPlant && !form.toDepartment && !form.toCustodian) {
+      notify.error('Enter at least one destination field.')
+      return
+    }
     setBusy(true)
     try {
-      const created = await createTransferDemo({
+      const created = await createTransfer({
         assetId: form.assetId,
-        toLocation: form.toLocation || selectedAsset?.location,
-        toPlant: form.toPlant || selectedAsset?.plant,
-        toDepartment: form.toDepartment || selectedAsset?.department,
-        toCustodian: form.toCustodian || selectedAsset?.custodian,
+        toLocation: form.toLocation || undefined,
+        toPlant: form.toPlant || undefined,
+        toDepartment: form.toDepartment || undefined,
+        toCustodian: form.toCustodian || undefined,
         reason: form.reason,
       })
-      notify.success(`Transfer draft ${created.transferNumber} created (demo).`)
+      notify.success(
+        api
+          ? `Transfer draft ${created.transferNumber} created. Complete it to update the asset location.`
+          : `Transfer draft ${created.transferNumber} created (demo).`,
+      )
       setCreateOpen(false)
       await load()
     } catch (e) {
       notify.error(e instanceof FixedAssetsServiceError ? e.message : 'Create failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleComplete = async (id: string) => {
+    if (!perms.canTransfer) {
+      notify.error('Permission denied')
+      return
+    }
+    setBusy(true)
+    try {
+      const completed = await completeTransfer(id)
+      notify.success(
+        api
+          ? `Transfer ${completed.transferNumber} completed — asset location updated (no GL).`
+          : `Transfer ${completed.transferNumber} completed in demo.`,
+      )
+      await load()
+    } catch (e) {
+      notify.error(e instanceof FixedAssetsServiceError ? e.message : 'Complete failed')
     } finally {
       setBusy(false)
     }
@@ -127,7 +174,11 @@ export function AssetTransfersPage() {
       layout="enterprise"
       badge="Accounting"
       title="Asset Transfers"
-      description="Inter-plant / inter-department asset relocation and custodian changes — demo data only."
+      description={
+        api
+          ? 'Intra–legal-entity location / plant / department / custodian moves — no GL posting.'
+          : 'Inter-plant / inter-department asset relocation and custodian changes.'
+      }
       breadcrumbs={[{ label: 'Accounting', to: '/accounting' }, { label: 'Fixed Assets', to: '/accounting/fixed-assets' }, { label: 'Transfers' }]}
       autoBreadcrumbs={false}
       favoritePath="/accounting/fixed-assets/transfers"
@@ -143,7 +194,7 @@ export function AssetTransfersPage() {
     >
       <FixedAssetsWorkspaceTabs active="transfers" />
       <div className="space-y-3 p-4">
-        <FixedAssetsDemoBanner />
+        <FixedAssetsDemoBanner variant={api ? 'live' : 'partial'} />
         <FixedAssetsSummaryCards items={kpis} columns={3} />
 
         <div className="min-w-[220px]">
@@ -167,6 +218,7 @@ export function AssetTransfersPage() {
                       <th className="px-3 py-2 font-semibold">To</th>
                       <th className="px-3 py-2 font-semibold">Date</th>
                       <th className="px-3 py-2 font-semibold">Status</th>
+                      <th className="px-3 py-2 font-semibold">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -181,6 +233,20 @@ export function AssetTransfersPage() {
                         <td className="px-3 py-2">{r.toLocation}</td>
                         <td className="px-3 py-2">{formatDate(r.transferDate)}</td>
                         <td className="px-3 py-2"><FixedAssetsGenericStatusBadge status={r.status} /></td>
+                        <td className="px-3 py-2">
+                          {r.status === 'Draft' && perms.canTransfer ? (
+                            <button
+                              type="button"
+                              className="erp-btn erp-btn-secondary h-8 px-2 text-[11px]"
+                              disabled={busy}
+                              onClick={() => void handleComplete(r.id)}
+                            >
+                              <Check className="mr-1 inline h-3.5 w-3.5" />Complete
+                            </button>
+                          ) : (
+                            <span className="text-erp-muted">—</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -195,7 +261,7 @@ export function AssetTransfersPage() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         title="New Asset Transfer"
-        subtitle="Demo record — does not post to the live ledger"
+        subtitle={api ? 'Draft transfer — complete to update register location (no GL)' : 'Demo record — does not post to the live ledger'}
         footer={(
           <div className="flex justify-end gap-2">
             <button type="button" className="erp-btn erp-btn-ghost h-9 px-3 text-[13px]" onClick={() => setCreateOpen(false)}>Cancel</button>

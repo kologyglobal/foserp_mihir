@@ -3,10 +3,11 @@ import { getRouteParam, getTenantId } from '../../../../types/request-context.js
 import { asyncHandler } from '../../../../utils/asyncHandler.js'
 import { buildPaginationMeta } from '../../../../utils/pagination.js'
 import { sendCreated, sendPaginated, sendSuccess } from '../../../../utils/response.js'
-import type { ListCustomerReceiptsQueryInput } from './customer-receipt.schemas.js'
+import type { ListCustomerReceiptsQueryInput, ReverseCustomerReceiptInput } from './customer-receipt.schemas.js'
 import * as draftService from './customer-receipt-draft.service.js'
 import * as readService from './customer-receipt-read.service.js'
 import * as postingService from './posting/customer-receipt-posting.service.js'
+import * as reverseService from './posting/customer-receipt-reverse.service.js'
 
 export const listCustomerReceipts = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
@@ -64,4 +65,12 @@ export const postCustomerReceipt = asyncHandler(async (req: Request, res: Respon
   const id = getRouteParam(req, 'id')
   const result = await postingService.postCustomerReceiptFromRequest(req, tenantId, id)
   return sendSuccess(res, 'customer receipt posted', result)
+})
+
+export const reverseCustomerReceipt = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const body = req.body as ReverseCustomerReceiptInput
+  const result = await reverseService.reverseCustomerReceiptFromRequest(req, tenantId, id, body.reason)
+  return sendSuccess(res, 'customer receipt reversed', result)
 })

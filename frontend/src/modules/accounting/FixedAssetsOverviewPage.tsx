@@ -118,7 +118,7 @@ export function FixedAssetsOverviewPage() {
     >
       <FixedAssetsWorkspaceTabs active="overview" />
       <div className="space-y-4 p-4">
-        <FixedAssetsDemoBanner />
+        <FixedAssetsDemoBanner variant="auto" />
 
         {loadState === 'loading' ? <LoadingState variant="dashboard" rows={6} /> : null}
         {loadState === 'error' ? (

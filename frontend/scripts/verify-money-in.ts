@@ -45,6 +45,9 @@ async function main() {
   check('Error map STALE_UPDATE', mapMoneyInError('STALE_UPDATE').includes('changed'))
   check('Error map unknown falls back', mapMoneyInError('CUSTOM_CODE', 'fallback') === 'fallback')
   check('Error registry has PERIOD_CLOSED', Boolean(MONEY_IN_ERROR_MESSAGES.PERIOD_CLOSED))
+  check('Error map has receipt-allocations-must-be-reversed', Boolean(MONEY_IN_ERROR_MESSAGES.CUSTOMER_RECEIPT_ALLOCATIONS_MUST_BE_REVERSED))
+  check('Error map has credit-note reversal not allowed', Boolean(MONEY_IN_ERROR_MESSAGES.CUSTOMER_CREDIT_NOTE_REVERSAL_NOT_ALLOWED))
+  check('Error map has allocation batch not reversible', Boolean(MONEY_IN_ERROR_MESSAGES.RECEIPT_ALLOCATION_BATCH_NOT_REVERSIBLE))
 
   // Permissions module (static source checks — avoids tsx @/ alias chain)
   const permSrc = read('src/utils/permissions/moneyIn.ts')
@@ -53,25 +56,58 @@ async function main() {
   check('Permission finance.ar.credit_note.view', permSrc.includes("'finance.ar.credit_note.view'"))
   check('Permission finance.ar.credit_note.post', permSrc.includes("'finance.ar.credit_note.post'"))
   check('Permission finance.ar.allocation.create', permSrc.includes("'finance.ar.allocation.create'"))
+  check('Permission finance.ar.receipt.view', permSrc.includes("'finance.ar.receipt.view'"))
+  check('Permission finance.ar.receipt.create', permSrc.includes("'finance.ar.receipt.create'"))
+  check('Permission finance.ar.receipt.edit', permSrc.includes("'finance.ar.receipt.edit'"))
+  check('Permission finance.ar.receipt.post', permSrc.includes("'finance.ar.receipt.post'"))
+  check('Permission finance.ar.receipt.cancel', permSrc.includes("'finance.ar.receipt.cancel'"))
+  check('Permission finance.ar.allocation.reverse', permSrc.includes("'finance.ar.allocation.reverse'"))
+  check('Permission finance.ar.receipt.reverse', permSrc.includes("'finance.ar.receipt.reverse'"))
+  check('Permission finance.ar.credit_note.reverse', permSrc.includes("'finance.ar.credit_note.reverse'"))
   check('canAllocate exposed', permSrc.includes('canAllocate'))
+  check('canCreateReceipt exposed', permSrc.includes('canCreateReceipt'))
+  check('canPostReceipt exposed', permSrc.includes('canPostReceipt'))
+  check('canReverseAllocation exposed', permSrc.includes('canReverseAllocation'))
+  check('canReverseReceipt exposed', permSrc.includes('canReverseReceipt'))
+  check('canReverseCreditNote exposed', permSrc.includes('canReverseCreditNote'))
   check('mergeAllowedAction helper', permSrc.includes('mergeAllowedAction'))
   check('useMoneyInPermissions hook', permSrc.includes('useMoneyInPermissions'))
 
   // Workspace tabs
-  check('Seven workspace tabs', MONEY_IN_WORKSPACE_TABS.length === 7)
+  check('Eight workspace tabs', MONEY_IN_WORKSPACE_TABS.length === 8)
   check('Overview tab path', MONEY_IN_WORKSPACE_TABS[0].path === '/accounting/money-in')
+  check('Receipts tab present', MONEY_IN_WORKSPACE_TABS.some((t) => t.path === '/accounting/money-in/receipts'))
   check('Credit Notes tab present', MONEY_IN_WORKSPACE_TABS.some((t) => t.path === '/accounting/money-in/credit-notes'))
+  check(
+    'Receipts tab ordered after Invoices, before Credit Notes',
+    MONEY_IN_WORKSPACE_TABS.findIndex((t) => t.path === '/accounting/money-in/invoices') <
+      MONEY_IN_WORKSPACE_TABS.findIndex((t) => t.path === '/accounting/money-in/receipts') &&
+      MONEY_IN_WORKSPACE_TABS.findIndex((t) => t.path === '/accounting/money-in/receipts') <
+        MONEY_IN_WORKSPACE_TABS.findIndex((t) => t.path === '/accounting/money-in/credit-notes'),
+  )
 
   // Route registration smoke
   const routesSrc = read('src/routes/accountingRoutes.tsx')
   check('Money In overview route', routesSrc.includes("path: 'accounting/money-in'"))
   check('Money In invoices route', routesSrc.includes("path: 'accounting/money-in/invoices'"))
+  check('Money In receipts route', routesSrc.includes("path: 'accounting/money-in/receipts'"))
+  check('Money In receipts new route', routesSrc.includes("path: 'accounting/money-in/receipts/new'"))
+  check('Money In receipts detail route', routesSrc.includes("path: 'accounting/money-in/receipts/:id'"))
+  check('Money In receipts edit route', routesSrc.includes("path: 'accounting/money-in/receipts/:id/edit'"))
+  check('Money In receipts allocate route', routesSrc.includes("path: 'accounting/money-in/receipts/:id/allocate'"))
   check('Money In credit notes route', routesSrc.includes("path: 'accounting/money-in/credit-notes'"))
   check('Money In credit notes new route', routesSrc.includes("path: 'accounting/money-in/credit-notes/new'"))
   check('Money In credit notes detail route', routesSrc.includes("path: 'accounting/money-in/credit-notes/:id'"))
   check('Money In credit notes edit route', routesSrc.includes("path: 'accounting/money-in/credit-notes/:id/edit'"))
   check('Money In credit notes allocate route', routesSrc.includes("path: 'accounting/money-in/credit-notes/:id/allocate'"))
-  check('Legacy receivables redirects to Money In', routesSrc.includes('Navigate to="/accounting/money-in"'))
+  check(
+    'Legacy demo receivables credit-notes route preserved',
+    routesSrc.includes("path: 'accounting/receivables/credit-notes'"),
+  )
+  check(
+    'Legacy demo receivables receipts route preserved',
+    routesSrc.includes("path: 'accounting/receivables/receipts'"),
+  )
 
   // Demo store smoke
   seedReceivablesDemoIfEmpty(DEMO_LEGAL_ENTITY_ID)
@@ -146,11 +182,80 @@ async function main() {
         check('Allocate credit note demo', allocated.idempotentReplay === false, `invoices=${allocated.invoices.length}`)
         const history = store.listCreditNoteAllocationsDemo(postedNote.id)
         check('Allocation history recorded', history.length >= 1)
+        const cnBatchId = history[0]?.batchId
+        if (cnBatchId) {
+          const cnAllocRev = store.reverseCreditNoteAllocationDemo(postedNote.id, cnBatchId, 'smoke reverse')
+          check('Reverse credit note allocation demo', cnAllocRev.batch.status === 'REVERSED')
+        } else {
+          check('Credit note allocation batch id present for reverse', false)
+        }
+        const cnDocRev = store.reverseCreditNoteDemo(postedNote.id, 'smoke reverse')
+        check('Reverse credit note document demo', cnDocRev.creditNote.status === 'REVERSED')
       } catch (e) {
-        check('Allocate credit note demo', false, e instanceof Error ? e.message : String(e))
+        check('Allocate/reverse credit note demo', false, e instanceof Error ? e.message : String(e))
       }
     } else {
       check('Outstanding invoice available for allocation smoke', false)
+    }
+  }
+
+  // Customer receipts (Phase 3B6) demo store smoke
+  store.seedReceiptsIfEmpty(DEMO_LEGAL_ENTITY_ID)
+  const receipts = store.listReceipts({ legalEntityId: DEMO_LEGAL_ENTITY_ID })
+  check('Receipt list seeded', receipts.length >= 2, `count=${receipts.length}`)
+
+  const draftReceipt = receipts.find((r) => r.status === 'DRAFT')
+  check('Seed has DRAFT receipt', Boolean(draftReceipt))
+
+  const postedReceipt = receipts.find((r) => r.status === 'POSTED')
+  check('Seed has POSTED receipt with unallocated balance', Boolean(postedReceipt) && Number(postedReceipt?.unallocatedAmount) > 0)
+
+  const createdReceipt = store.createReceipt({
+    legalEntityId: DEMO_LEGAL_ENTITY_ID,
+    customerId: 'b2000001-0001-4001-8001-000000000001',
+    sourceType: 'DIRECT',
+    receiptDate: new Date().toISOString().slice(0, 10),
+    postingDate: new Date().toISOString().slice(0, 10),
+    paymentMethod: 'BANK_TRANSFER',
+    bankCashAmount: '5000.00',
+    bankCashAccountId: 'acc-bank',
+  })
+  check('Create draft receipt', createdReceipt.status === 'DRAFT', createdReceipt.draftReference ?? createdReceipt.id)
+  const fetchedReceipt = store.getReceipt(createdReceipt.id)
+  check('Get receipt round-trips', Boolean(fetchedReceipt) && fetchedReceipt?.allowedActions?.markReady === true)
+  const readyReceipt = store.markReceiptReady(createdReceipt.id)
+  check('Mark receipt ready', readyReceipt.status === 'READY_TO_POST')
+  const postResult = store.postReceipt(createdReceipt.id)
+  check('Post receipt', postResult.receipt.status === 'POSTED', postResult.posting.voucherNumber)
+  const postReplay = store.postReceipt(createdReceipt.id)
+  check('Idempotent receipt post replay', postReplay.idempotentReplay === true)
+
+  if (postedReceipt) {
+    const outstandingForReceipt = store.listOutstanding({ legalEntityId: DEMO_LEGAL_ENTITY_ID, customerId: postedReceipt.customerId })
+    const target = outstandingForReceipt.items[0]
+    if (target) {
+      try {
+        const allocated = store.allocateReceiptDemo(postedReceipt.id, {
+          allocationDate: new Date().toISOString().slice(0, 10),
+          allocations: [{ invoiceId: target.salesInvoiceId ?? '', invoiceOpenItemId: target.openItemId, amount: '1' }],
+        })
+        check('Allocate receipt demo', allocated.idempotentReplay === false, `invoices=${allocated.invoices.length}`)
+        const history = store.listReceiptAllocationsDemo(postedReceipt.id)
+        check('Receipt allocation history recorded', history.length >= 1)
+        const rcptBatchId = history[0]?.batchId
+        if (rcptBatchId) {
+          const rcptAllocRev = store.reverseReceiptAllocationDemo(postedReceipt.id, rcptBatchId, 'smoke reverse')
+          check('Reverse receipt allocation demo', rcptAllocRev.batch.status === 'REVERSED')
+        } else {
+          check('Receipt allocation batch id present for reverse', false)
+        }
+        const rcptDocRev = store.reverseReceiptDemo(postedReceipt.id, 'smoke reverse')
+        check('Reverse receipt document demo', rcptDocRev.receipt.status === 'REVERSED')
+      } catch (e) {
+        check('Allocate/reverse receipt demo', false, e instanceof Error ? e.message : String(e))
+      }
+    } else {
+      check('Outstanding invoice available for receipt allocation smoke', false)
     }
   }
 

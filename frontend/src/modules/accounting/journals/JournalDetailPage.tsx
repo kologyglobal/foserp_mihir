@@ -16,6 +16,7 @@ import {
   getJournalAudit,
   getJournalLedger,
   postJournal,
+  reverseJournal,
   submitJournal,
   validateJournal,
 } from '@/services/bridges/journalApiBridge'
@@ -37,6 +38,8 @@ function statusMessage(status: Journal['status']) {
       return 'Approved — Ready to Post'
     case 'POSTED':
       return 'Posted to the general ledger — read-only.'
+    case 'REVERSED':
+      return 'Reversed — a reversing voucher was posted; original number is retained.'
     default:
       return null
   }
@@ -56,6 +59,8 @@ export function JournalDetailPage() {
   const [decisionComments, setDecisionComments] = useState('')
   const [acting, setActing] = useState(false)
   const [showPostConfirm, setShowPostConfirm] = useState(false)
+  const [showReverse, setShowReverse] = useState(false)
+  const [reverseReason, setReverseReason] = useState('')
   const [ledgerRows, setLedgerRows] = useState<Array<{
     id: string
     lineNumber: number
@@ -72,7 +77,10 @@ export function JournalDetailPage() {
       const [j, a] = await Promise.all([getJournal(id), getJournalAudit(id)])
       setJournal(j)
       setAudit(a)
-      if (j.status === 'POSTED' && (perms.canViewGl || perms.canViewVouchers)) {
+      if (
+        (j.status === 'POSTED' || j.status === 'REVERSED') &&
+        (perms.canViewGl || perms.canViewVouchers)
+      ) {
         try {
           setLedgerRows(await getJournalLedger(id))
         } catch {
@@ -209,9 +217,34 @@ export function JournalDetailPage() {
     }
   }
 
+  const runReverse = async () => {
+    if (!id || !reverseReason.trim()) {
+      notify.error('Reason is required to reverse')
+      return
+    }
+    setActing(true)
+    try {
+      const result = await reverseJournal(id, reverseReason.trim())
+      setJournal(result.journal)
+      setShowReverse(false)
+      setReverseReason('')
+      notify.success(
+        result.idempotentReplay
+          ? `Already reversed (${result.posting.voucherNumber})`
+          : `Reversed — reversing voucher ${result.posting.voucherNumber}`,
+      )
+      void load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Reverse failed')
+    } finally {
+      setActing(false)
+    }
+  }
+
   const statusLabel = (status: Journal['status']) => {
     if (status === 'APPROVED') return 'Approved (Ready to Post)'
     if (status === 'POSTED') return 'Posted'
+    if (status === 'REVERSED') return 'Reversed'
     return status.replace(/_/g, ' ')
   }
 
@@ -280,6 +313,11 @@ export function JournalDetailPage() {
               Post to GL
             </ErpButton>
           ) : null}
+          {actions?.reverse && perms.canReverseVoucher ? (
+            <ErpButton variant="secondary" disabled={acting} onClick={() => setShowReverse(true)}>
+              Reverse
+            </ErpButton>
+          ) : null}
         </div>
       }
     >
@@ -294,10 +332,16 @@ export function JournalDetailPage() {
         <div><span className="text-erp-muted">Total debit</span><div className="font-medium tabular-nums">{journal.totalDebit}</div></div>
         <div><span className="text-erp-muted">Total credit</span><div className="font-medium tabular-nums">{journal.totalCredit}</div></div>
         <div><span className="text-erp-muted">Approval required</span><div className="font-medium">{journal.approvalRequired ? `Yes (level ${journal.currentApprovalLevel})` : 'No'}</div></div>
-        {journal.status === 'POSTED' ? (
+        {journal.status === 'POSTED' || journal.status === 'REVERSED' ? (
           <>
             <div><span className="text-erp-muted">Posted at</span><div className="font-medium">{journal.postedAt ? new Date(journal.postedAt).toLocaleString() : '—'}</div></div>
             <div><span className="text-erp-muted">Ledger entries</span><div className="font-medium">{journal.ledgerEntryCount ?? ledgerRows.length}</div></div>
+            {journal.status === 'REVERSED' ? (
+              <>
+                <div><span className="text-erp-muted">Reversed at</span><div className="font-medium">{journal.reversedAt ? new Date(journal.reversedAt).toLocaleString() : '—'}</div></div>
+                <div><span className="text-erp-muted">Reversal reason</span><div className="font-medium">{journal.reversalReason ?? '—'}</div></div>
+              </>
+            ) : null}
           </>
         ) : null}
       </div>
@@ -390,7 +434,7 @@ export function JournalDetailPage() {
           <p className="mb-2">
             This will assign a voucher number and create immutable general ledger entries for debit{' '}
             <span className="font-semibold tabular-nums">{journal.totalDebit}</span> and credit{' '}
-            <span className="font-semibold tabular-nums">{journal.totalCredit}</span>. Posted journals cannot be edited — only reversed in a later phase.
+            <span className="font-semibold tabular-nums">{journal.totalCredit}</span>. Posted journals cannot be edited — reverse via a reversing voucher if needed.
           </p>
           <div className="flex gap-2">
             <ErpButton variant="secondary" onClick={() => setShowPostConfirm(false)}>Cancel</ErpButton>
@@ -399,7 +443,8 @@ export function JournalDetailPage() {
         </div>
       ) : null}
 
-      {journal.status === 'POSTED' && ledgerRows.length > 0 ? (
+      {journal.status === 'POSTED' || journal.status === 'REVERSED' ? (
+        ledgerRows.length > 0 ? (
         <div id="ledger" className="mb-4 rounded border border-erp-border p-3 text-[12px]">
           <div className="mb-2 font-medium">Ledger entries</div>
           <div className="overflow-x-auto">
@@ -425,6 +470,30 @@ export function JournalDetailPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+        ) : null
+      ) : null}
+
+      {showReverse ? (
+        <div className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-[13px] text-amber-950">
+          <div className="mb-2 font-medium">Reverse journal?</div>
+          <p className="mb-2">
+            This posts a reversing voucher (Dr↔Cr swapped), links it to{' '}
+            <span className="font-semibold">{journal.voucherNumber ?? journal.referenceNumber}</span>, and marks
+            this journal REVERSED. The original voucher number is kept.
+          </p>
+          <Textarea
+            rows={2}
+            value={reverseReason}
+            onChange={(e) => setReverseReason(e.target.value)}
+            placeholder="Reason required"
+          />
+          <div className="mt-2 flex gap-2">
+            <ErpButton variant="secondary" onClick={() => setShowReverse(false)}>Close</ErpButton>
+            <ErpButton variant="primary" disabled={acting} onClick={() => void runReverse()}>
+              {acting ? 'Reversing…' : 'Confirm reverse'}
+            </ErpButton>
           </div>
         </div>
       ) : null}

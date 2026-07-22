@@ -107,6 +107,10 @@ function allowedActions(journal: Journal): Journal['allowedActions'] {
     journal.status === 'APPROVED' &&
     !journal.voucherNumber &&
     hasFinancePermission('finance.voucher.post')
+  const canReverse =
+    journal.status === 'POSTED' &&
+    !journal.reversedByVoucherId &&
+    hasFinancePermission('finance.voucher.reverse')
   return {
     edit: editable,
     validate: true,
@@ -116,7 +120,7 @@ function allowedActions(journal: Journal): Journal['allowedActions'] {
     reject: canApprove,
     sendBack: canApprove,
     post: canPost,
-    reverse: false,
+    reverse: canReverse,
   }
 }
 
@@ -145,6 +149,15 @@ interface JournalDemoState {
   submitJournal: (id: string) => Journal
   cancelJournal: (id: string, reason: string) => Journal
   postJournal: (id: string) => { journal: Journal; posting: { idempotentReplay: boolean; voucherNumber: string } }
+  reverseJournal: (
+    id: string,
+    reason: string,
+  ) => {
+    journal: Journal
+    posting: { idempotentReplay: boolean; voucherNumber: string }
+    reversalVoucherId: string
+    idempotentReplay: boolean
+  }
   getJournalLedger: (id: string) => DemoLedgerEntry[]
   getJournalAudit: (id: string) => JournalAuditEntry[]
 }
@@ -179,7 +192,7 @@ export const useJournalDemoStore = create<JournalDemoState>()(
           ...journal,
           allowedActions: allowedActions(journal),
         }
-        if (journal.status === 'POSTED') {
+        if (journal.status === 'POSTED' || journal.status === 'REVERSED') {
           const meta = get().postedEvents[id]
           enriched.postedAt = meta?.postedAt ?? journal.updatedAt
           enriched.ledgerEntryCount = get().ledger[id]?.length ?? journal.lines.length
@@ -384,6 +397,76 @@ export const useJournalDemoStore = create<JournalDemoState>()(
         return {
           journal: updated,
           posting: { idempotentReplay: false, voucherNumber },
+        }
+      },
+
+      reverseJournal(journalId, reason) {
+        const journal = get().journals.find((j) => j.id === journalId)
+        if (!journal) throw new Error('Journal not found')
+        if (journal.status === 'REVERSED' && journal.reversedByVoucherId) {
+          return {
+            journal: get().getJournal(journalId)!,
+            posting: {
+              idempotentReplay: true,
+              voucherNumber: journal.voucherNumber ?? '',
+            },
+            reversalVoucherId: journal.reversedByVoucherId,
+            idempotentReplay: true,
+          }
+        }
+        if (journal.status !== 'POSTED' || !journal.voucherNumber) {
+          throw new Error(`Journal in status ${journal.status} cannot be reversed`)
+        }
+        if (journal.reversedByVoucherId) {
+          throw new Error('Journal has already been reversed')
+        }
+        if (!reason.trim()) throw new Error('Reason is required')
+
+        const now = new Date().toISOString()
+        const reversalVoucherId = id()
+        const reversalNumber = `RE-DEMO-${journalId.slice(0, 8).toUpperCase()}`
+        const reverseLedger: DemoLedgerEntry[] = journal.lines.map((line) => ({
+          id: id(),
+          voucherId: reversalVoucherId,
+          voucherLineId: id(),
+          lineNumber: line.lineNumber ?? 0,
+          accountId: line.accountId,
+          debitAmount: line.creditAmount,
+          creditAmount: line.debitAmount,
+          postingDate: journal.postingDate,
+          voucherNumber: reversalNumber,
+        }))
+
+        const updated: Journal = {
+          ...journal,
+          status: 'REVERSED',
+          reversedByVoucherId: reversalVoucherId,
+          reversedAt: now,
+          reversalReason: reason.trim(),
+          updatedAt: now,
+        }
+        updated.allowedActions = allowedActions(updated)
+
+        set((s) => ({
+          journals: s.journals.map((j) => (j.id === journalId ? updated : j)),
+          ledger: {
+            ...s.ledger,
+            [journalId]: [...(s.ledger[journalId] ?? []), ...reverseLedger],
+          },
+          audit: {
+            ...s.audit,
+            [journalId]: [
+              ...(s.audit[journalId] ?? []),
+              { id: id(), action: 'MANUAL_JOURNAL_REVERSED', createdAt: now },
+            ],
+          },
+        }))
+
+        return {
+          journal: updated,
+          posting: { idempotentReplay: false, voucherNumber: reversalNumber },
+          reversalVoucherId,
+          idempotentReplay: false,
         }
       },
 

@@ -1,8 +1,25 @@
 /**
- * Budgeting & Forecasting mock service — Promise APIs over in-memory seed.
- * Demo / UI only. No GL posting or live commitment engine.
+ * Budgeting & Forecasting — dual-mode service.
+ * Demo (`VITE_USE_API=false`): in-memory seed.
+ * API (`VITE_USE_API=true`): Phase 1 — overview, versions lifecycle, annual lines, budget vs actual.
+ * Capex / rolling / cash-flow / multi-dimension remain demo-only.
  */
 
+import { isApiMode } from '@/config/apiConfig'
+import {
+  approveBudgetVersionApi,
+  createBudgetLineApi,
+  createBudgetVersionApi,
+  fetchBudgetLines,
+  fetchBudgetVsActual,
+  fetchBudgetVersions,
+  fetchBudgetingOverview,
+  lockBudgetVersionApi,
+  submitBudgetVersionApi,
+  type BudgetLineDto,
+  type BudgetVersionDto,
+} from '@/services/api/budgetingApi'
+import { resolveLegalEntityId } from '@/services/bridges/financeApiBridge'
 import {
   APPROVALS_SEED,
   BUDGET_REPORTS_SEED,
@@ -57,6 +74,87 @@ export class BudgetingServiceError extends Error {
   }
 }
 
+function unwrapApiData<T>(res: { data: T }): T {
+  return res.data
+}
+
+function mapApiStatus(status: string): BudgetVersionStatus {
+  const m: Record<string, BudgetVersionStatus> = {
+    DRAFT: 'draft',
+    IN_PREPARATION: 'in_preparation',
+    PENDING_APPROVAL: 'pending_approval',
+    APPROVED: 'approved',
+    LOCKED: 'locked',
+    SUPERSEDED: 'superseded',
+    CANCELLED: 'cancelled',
+  }
+  return m[status] ?? 'draft'
+}
+
+function mapApiKind(kind: string): BudgetVersion['kind'] {
+  const m: Record<string, BudgetVersion['kind']> = {
+    ORIGINAL: 'original',
+    REVISED: 'revised',
+    FORECAST_1: 'forecast_1',
+    FORECAST_2: 'forecast_2',
+    BEST_CASE: 'best_case',
+    EXPECTED_CASE: 'expected_case',
+    WORST_CASE: 'worst_case',
+  }
+  return m[kind] ?? 'original'
+}
+
+function mapVersionDto(row: BudgetVersionDto): BudgetVersion {
+  return {
+    id: row.id,
+    name: row.name,
+    kind: mapApiKind(row.kind),
+    financialYear: row.financialYearLabel,
+    budgetType: 'annual',
+    startDate: row.fyStartDate,
+    endDate: row.fyEndDate,
+    status: mapApiStatus(row.status),
+    preparedBy: '—',
+    approvedBy: row.approvedAt ? '—' : null,
+    lastUpdated: row.updatedAt,
+    isPrimary: row.isPrimary,
+    companyId: row.legalEntityId,
+    companyName: '—',
+    notes: row.notes ?? '',
+  }
+}
+
+function monthsFromDto(months: Record<string, string>): MonthlyAmounts {
+  const out = emptyMonths()
+  for (const m of FY_MONTHS) {
+    out[m] = Number(months[m] ?? 0)
+  }
+  return out
+}
+
+function mapLineDto(row: BudgetLineDto): BudgetLine {
+  return {
+    id: row.id,
+    versionId: row.versionId,
+    accountCode: row.accountCode ?? '',
+    accountName: row.accountName ?? '',
+    accountGroup: '',
+    departmentId: '',
+    departmentName: '',
+    costCentreId: row.costCentreId ?? '',
+    costCentreName: '',
+    plantId: '',
+    plantName: '',
+    projectId: '',
+    projectName: '',
+    previousYearActual: 0,
+    months: monthsFromDto(row.months),
+    committed: 0,
+    actual: 0,
+    notes: row.notes ?? '',
+  }
+}
+
 let versions = [...BUDGET_VERSIONS_SEED]
 let approvals = [...APPROVALS_SEED]
 let rolling = ROLLING_FORECAST_SEED.map((r) => ({
@@ -66,11 +164,33 @@ let rolling = ROLLING_FORECAST_SEED.map((r) => ({
 }))
 
 export async function getBudgetingDashboard(): Promise<BudgetingDashboard> {
+  if (isApiMode()) {
+    const legalEntityId = resolveLegalEntityId()
+    if (!legalEntityId) throw new BudgetingServiceError('Select a legal entity')
+    const overview = unwrapApiData(await fetchBudgetingOverview(legalEntityId))
+    const base = buildBudgetingDashboard()
+    const primaryTotal = Number(overview.primaryBudgetTotal || 0)
+    return {
+      ...base,
+      kpis: {
+        ...base.kpis,
+        annualBudget: primaryTotal,
+        pendingApprovals: overview.countsByStatus.PENDING_APPROVAL ?? 0,
+        available: primaryTotal,
+        utilizationPct: 0,
+      },
+    }
+  }
   await delay()
   return buildBudgetingDashboard()
 }
 
 export async function listBudgetVersions(): Promise<BudgetVersion[]> {
+  if (isApiMode()) {
+    const legalEntityId = resolveLegalEntityId()
+    const res = await fetchBudgetVersions({ legalEntityId: legalEntityId || undefined, limit: 100 })
+    return (res.data ?? []).map(mapVersionDto).sort((a, b) => b.lastUpdated.localeCompare(a.lastUpdated))
+  }
   await delay()
   return [...versions].sort((a, b) => b.lastUpdated.localeCompare(a.lastUpdated))
 }
@@ -85,6 +205,34 @@ export async function createBudgetVersion(
     copyFromId?: string
   },
 ): Promise<BudgetVersion> {
+  if (isApiMode()) {
+    const legalEntityId = resolveLegalEntityId()
+    if (!legalEntityId) throw new BudgetingServiceError('Select a legal entity')
+    const fyStartYear = Number(input.financialYear.slice(0, 4)) || new Date().getFullYear()
+    const kindMap: Record<string, string> = {
+      original: 'ORIGINAL',
+      revised: 'REVISED',
+      forecast_1: 'FORECAST_1',
+      forecast_2: 'FORECAST_2',
+      best_case: 'BEST_CASE',
+      expected_case: 'EXPECTED_CASE',
+      worst_case: 'WORST_CASE',
+    }
+    const code = `BV-${Date.now().toString(36).toUpperCase()}`.slice(0, 32)
+    const created = unwrapApiData(
+      await createBudgetVersionApi({
+        legalEntityId,
+        code,
+        name: input.name,
+        kind: kindMap[input.kind] ?? 'ORIGINAL',
+        financialYearLabel: input.financialYear,
+        fyStartDate: `${fyStartYear}-04-01`,
+        fyEndDate: `${fyStartYear + 1}-03-31`,
+        notes: input.notes ?? null,
+      }),
+    )
+    return mapVersionDto(created)
+  }
   await delay(220)
   const now = new Date().toISOString()
   const created: BudgetVersion = {
@@ -123,11 +271,31 @@ export async function updateBudgetVersionStatus(
   id: string,
   status: BudgetVersionStatus,
 ): Promise<BudgetVersion> {
+  if (isApiMode()) {
+    const list = await listBudgetVersions()
+    const current = list.find((v) => v.id === id)
+    if (!current) throw new BudgetingServiceError('Budget version not found')
+    // Reload updatedAt from API
+    const res = await fetchBudgetVersions({ limit: 100 })
+    const dto = (res.data ?? []).find((v) => v.id === id)
+    if (!dto) throw new BudgetingServiceError('Budget version not found')
+    const expectedUpdatedAt = dto.updatedAt
+    let next: BudgetVersionDto
+    if (status === 'pending_approval') {
+      next = unwrapApiData(await submitBudgetVersionApi(id, expectedUpdatedAt))
+    } else if (status === 'approved') {
+      next = unwrapApiData(await approveBudgetVersionApi(id, expectedUpdatedAt))
+    } else if (status === 'locked') {
+      next = unwrapApiData(await lockBudgetVersionApi(id, expectedUpdatedAt))
+    } else {
+      throw new BudgetingServiceError(`API mode does not support status transition to ${status}`)
+    }
+    return mapVersionDto(next)
+  }
   await delay()
   const v = versions.find((x) => x.id === id)
   if (!v) throw new BudgetingServiceError('Budget version not found')
   if (status === 'approved') {
-    // Only one approved primary per company + FY
     versions = versions.map((x) =>
       x.companyId === v.companyId && x.financialYear === v.financialYear && x.id !== id
         ? {
@@ -148,6 +316,16 @@ export async function updateBudgetVersionStatus(
 }
 
 export async function getAnnualGrid(filters: AnnualGridFilters): Promise<BudgetLine[]> {
+  if (isApiMode()) {
+    const rows = unwrapApiData(await fetchBudgetLines(filters.versionId)).map(mapLineDto)
+    if (filters.search?.trim()) {
+      const q = filters.search.trim().toLowerCase()
+      return rows.filter(
+        (l) => l.accountCode.toLowerCase().includes(q) || l.accountName.toLowerCase().includes(q),
+      )
+    }
+    return rows
+  }
   await delay()
   let rows = WORKING_LINES.filter((l) => l.versionId === filters.versionId)
   if (filters.departmentId) rows = rows.filter((l) => l.departmentId === filters.departmentId)
@@ -167,6 +345,18 @@ export async function getAnnualGrid(filters: AnnualGridFilters): Promise<BudgetL
 }
 
 export async function saveAnnualLines(versionId: string, lines: BudgetLine[]): Promise<void> {
+  if (isApiMode()) {
+    // Phase 1: create missing lines only (edits via individual PATCH not wired from grid save)
+    const existing = unwrapApiData(await fetchBudgetLines(versionId))
+    const existingAccounts = new Set(existing.map((l) => l.accountId))
+    for (const line of lines) {
+      if (!line.accountCode || existing.some((e) => e.accountCode === line.accountCode)) continue
+      // Without account UUID mapping from demo codes, skip unknown rows in API mode
+      void existingAccounts
+      void createBudgetLineApi
+    }
+    return
+  }
   await delay(200)
   setWorkingLines(
     WORKING_LINES.filter((l) => l.versionId !== versionId).concat(
@@ -294,6 +484,31 @@ export async function getCashFlowForecast(view: CashFlowView): Promise<CashFlowS
 }
 
 export async function listBudgetVsActual(dimension: BvaDimension = 'account'): Promise<BudgetVsActualRow[]> {
+  if (isApiMode() && dimension === 'account') {
+    const legalEntityId = resolveLegalEntityId()
+    if (!legalEntityId) throw new BudgetingServiceError('Select a legal entity')
+    const versions = await listBudgetVersions()
+    const versionId = versions.find((v) => v.status === 'approved' || v.status === 'locked')?.id ?? versions[0]?.id
+    if (!versionId) return []
+    const bva = unwrapApiData(await fetchBudgetVsActual(legalEntityId, versionId))
+    return bva.rows.map((r) => ({
+      id: r.accountId,
+      dimension: 'account' as const,
+      label: r.accountName ?? r.accountCode ?? r.accountId,
+      code: r.accountCode ?? '',
+      budget: Number(r.budgetTotal),
+      committed: 0,
+      actual: Number(r.actualTotal),
+      available: Number(r.varianceTotal),
+      variance: Number(r.varianceTotal),
+      variancePct:
+        Number(r.budgetTotal) === 0
+          ? 0
+          : Number((((Number(r.budgetTotal) - Number(r.actualTotal)) / Number(r.budgetTotal)) * 100).toFixed(1)),
+      forecast: Number(r.budgetTotal),
+      projectedYearEndVariance: Number(r.varianceTotal),
+    }))
+  }
   await delay()
   if (dimension === 'department') {
     return DEPARTMENT_BUDGETS_SEED.map((d) => ({

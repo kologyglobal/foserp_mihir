@@ -11,7 +11,7 @@ export interface CustomerReceiptAllowedActions {
   viewAllocations?: boolean
   viewAccounting?: boolean
   viewCreditOpenItem?: boolean
-  /** Always false — receipt reversal is deferred beyond Phase 3B5. */
+  /** POSTED + no posted allocations + finance.ar.receipt.reverse permission (Phase 3B6). */
   reverse?: boolean
 }
 
@@ -26,7 +26,7 @@ function hasPerm(req: Request, permission: string): boolean {
 export function resolveCustomerReceiptAllowedActions(
   req: Request,
   status: CustomerReceiptStatus,
-  options?: { creditOutstanding?: string | number | null },
+  options?: { creditOutstanding?: string | number | null; hasPostedAllocations?: boolean },
 ): CustomerReceiptAllowedActions {
   const canView = hasPerm(req, 'finance.ar.receipt.view')
   const canViewAlloc = hasPerm(req, 'finance.ar.allocation.view')
@@ -48,11 +48,11 @@ export function resolveCustomerReceiptAllowedActions(
       viewAllocations: canViewAlloc,
       viewAccounting: canView,
       viewCreditOpenItem: canView,
-      reverse: false,
+      reverse: hasPerm(req, 'finance.ar.receipt.reverse') && options?.hasPostedAllocations !== true,
     }
   }
 
-  if (status === 'CANCELLED') {
+  if (status === 'CANCELLED' || status === 'REVERSED') {
     return {
       edit: false,
       validate: false,

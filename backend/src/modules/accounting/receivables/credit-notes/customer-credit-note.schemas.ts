@@ -75,6 +75,7 @@ export const updateCustomerCreditNoteSchema = draftFields
 export type UpdateCustomerCreditNoteInput = z.infer<typeof updateCustomerCreditNoteSchema>
 
 export const cancelCustomerCreditNoteSchema = z.object({ cancellationReason: z.string().min(1).max(500) })
+export const reverseCustomerCreditNoteSchema = z.object({ reason: z.string().trim().min(1).max(500) })
 export const submitCustomerCreditNoteSchema = z.object({ comments: z.string().max(1000).optional() }).default({})
 export const creditNoteDecisionSchema = z.object({ comments: z.string().max(1000).optional() }).default({})
 

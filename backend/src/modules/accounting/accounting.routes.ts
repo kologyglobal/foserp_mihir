@@ -15,6 +15,11 @@ import postingEventRoutes from './posting/posting-event.routes.js'
 import journalRoutes from './journals/journal.routes.js'
 import approvalRoutes from './approvals/approval.routes.js'
 import receivablesRoutes from './receivables/receivables.routes.js'
+import payablesRoutes from './payables/payables.routes.js'
+import treasuryRoutes from './treasury/treasury.routes.js'
+import taxComplianceRoutes from './tax-compliance/tax-compliance.routes.js'
+import fixedAssetsRoutes from './fixed-assets/fixed-assets.routes.js'
+import budgetingRoutes from './budgeting/budgeting.routes.js'
 
 const router = Router({ mergeParams: true })
 
@@ -36,6 +41,11 @@ router.use('/vouchers', voucherRoutes)
 router.use('/journals', journalRoutes)
 router.use('/approvals', approvalRoutes)
 router.use('/receivables', receivablesRoutes)
+router.use('/payables', payablesRoutes)
+router.use('/treasury', treasuryRoutes)
+router.use('/tax-compliance', taxComplianceRoutes)
+router.use('/fixed-assets', fixedAssetsRoutes)
+router.use('/budgeting', budgetingRoutes)
 router.use('/posting-events', postingEventRoutes)
 
 export default router

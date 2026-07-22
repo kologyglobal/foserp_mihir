@@ -3,7 +3,7 @@
 import type { SalesInvoiceValidationPreview } from '../validation/invoice-validation.types.js'
 import type { SalesInvoiceAllowedActions } from './sales-invoice-allowed-actions.js'
 
-export type SalesInvoiceStatus = 'DRAFT' | 'READY_TO_POST' | 'POSTED' | 'CANCELLED'
+export type SalesInvoiceStatus = 'DRAFT' | 'READY_TO_POST' | 'POSTED' | 'CANCELLED' | 'REVERSED'
 export type SalesInvoiceSourceType = 'DIRECT' | 'SALES_ORDER'
 export type SalesInvoiceSupplyType = 'INTRA_STATE' | 'INTER_STATE' | 'EXPORT' | 'SEZ' | 'NON_GST'
 export type SalesInvoiceTaxTreatment =
@@ -108,6 +108,10 @@ export interface SalesInvoiceDto {
   cancelledAt: string | null
   cancelledBy: string | null
   cancellationReason: string | null
+  reversalVoucherId: string | null
+  reversedAt: string | null
+  reversedBy: string | null
+  reversalReason: string | null
   createdBy: string | null
   updatedBy: string | null
   createdAt: string

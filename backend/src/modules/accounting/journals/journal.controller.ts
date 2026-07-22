@@ -5,6 +5,7 @@ import { buildPaginationMeta } from '../../../utils/pagination.js'
 import { sendCreated, sendPaginated, sendSuccess } from '../../../utils/response.js'
 import * as service from './journal.service.js'
 import * as postingService from './journal-posting.service.js'
+import * as reverseService from './journal-reverse.service.js'
 
 export const listJournals = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
@@ -66,6 +67,19 @@ export const postJournal = asyncHandler(async (req: Request, res: Response) => {
   const posting = await postingService.postJournal(req, tenantId, id)
   const journal = await service.getJournal(req, tenantId, id)
   return sendSuccess(res, 'journal posted', { journal, posting })
+})
+
+export const reverseJournal = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const result = await reverseService.reverseJournalFromRequest(req, tenantId, id, req.body.reason)
+  const journal = await service.getJournal(req, tenantId, id)
+  return sendSuccess(res, 'journal reversed', {
+    journal,
+    posting: result.posting,
+    reversalVoucherId: result.reversalVoucherId,
+    idempotentReplay: result.idempotentReplay,
+  })
 })
 
 export const getJournalLedger = asyncHandler(async (req: Request, res: Response) => {

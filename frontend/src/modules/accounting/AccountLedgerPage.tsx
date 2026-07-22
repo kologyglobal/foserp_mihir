@@ -113,7 +113,7 @@ export function AccountLedgerPage() {
     if (action === 'openVoucher' && entry.voucherId) {
       navigate(`/accounting/ledger-entries/voucher/${entry.voucherId}`)
     }
-    if (action === 'openAccount') navigate(`/accounting/chart-of-accounts/${entry.account.accountId}`)
+    if (action === 'openAccount') navigate('/accounting/settings/chart-of-accounts')
     if (action === 'openParty' && entry.party) {
       navigate(`/accounting/ledger-entries/party/${entry.party.partyType.toLowerCase()}/${entry.party.partyId}`)
     }
@@ -167,7 +167,7 @@ export function AccountLedgerPage() {
               id: 'card',
               label: 'Open Account Card',
               icon: BookOpen,
-              onClick: () => navigate(`/accounting/chart-of-accounts/${accountId}`),
+              onClick: () => navigate('/accounting/settings/chart-of-accounts'),
             },
             {
               id: 'export',
@@ -325,7 +325,7 @@ export function AccountLedgerPage() {
         entry={detail}
         auditEvents={audit}
         onOpenVoucher={() => detail?.voucherId && navigate(`/accounting/ledger-entries/voucher/${detail.voucherId}`)}
-        onOpenAccount={() => detail && navigate(`/accounting/chart-of-accounts/${detail.account.accountId}`)}
+        onOpenAccount={() => navigate('/accounting/settings/chart-of-accounts')}
         onOpenSource={() => undefined}
         onPrint={() => undefined}
         onExport={() => undefined}

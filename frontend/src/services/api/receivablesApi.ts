@@ -15,12 +15,25 @@ import type {
   OutstandingOpenItemDto,
   PaginatedResult,
   PostCreditNoteResult,
+  PostCustomerReceiptResult,
   PostSalesInvoiceResult,
+  ReverseSalesInvoiceResult,
+  ReceiptAllocationHistoryRow,
+  ReceiptAllocationPreview,
+  ReceiptAllocationRequest,
+  ReceiptAllocationResult,
   ReceivableOverviewDto,
   ReceivableReconciliationDto,
+  CreateCustomerReceiptInput,
+  CustomerReceiptDto,
+  CustomerReceiptListItemDto,
+  CustomerReceiptValidationPreview,
+  ListCustomerReceiptsQuery,
+  ReceiptAllocationLineInput,
   SalesInvoiceDto,
   SalesInvoiceValidationPreview,
   UpdateCustomerCreditNoteInput,
+  UpdateCustomerReceiptInput,
   UpdateSalesInvoiceInput,
 } from '../../types/moneyIn'
 import { apiRequest, tenantPath } from './client'
@@ -78,6 +91,14 @@ export async function cancelSalesInvoice(id: string, cancellationReason: string)
 
 export async function postSalesInvoice(id: string) {
   return apiRequest<PostSalesInvoiceResult>(tenantPath(`${BASE}/invoices/${id}/post`), { method: 'POST', body: '{}' })
+}
+
+export async function reverseSalesInvoice(id: string, reason: string, idempotencyKey?: string) {
+  return apiRequest<ReverseSalesInvoiceResult>(tenantPath(`${BASE}/invoices/${id}/reverse`), {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+  })
 }
 
 // ─── Credit notes ───────────────────────────────────────────────────────────
@@ -167,6 +188,117 @@ export async function listCreditNoteAllocations(creditNoteId: string, params?: R
   return apiRequest<CreditNoteAllocationHistoryRow[]>(
     `${tenantPath(`${BASE}/credit-notes/${creditNoteId}/allocations`)}${buildQuery(params)}`,
   )
+}
+
+export async function reverseCreditNoteAllocation(
+  creditNoteId: string,
+  batchId: string,
+  reason: string,
+  idempotencyKey: string,
+) {
+  return apiRequest<CreditNoteAllocationResult>(
+    tenantPath(`${BASE}/credit-notes/${creditNoteId}/allocations/${batchId}/reverse`),
+    { method: 'POST', body: JSON.stringify({ reason }), headers: { 'Idempotency-Key': idempotencyKey } },
+  )
+}
+
+export async function reverseCustomerCreditNote(id: string, reason: string, idempotencyKey: string) {
+  return apiRequest<PostCreditNoteResult>(tenantPath(`${BASE}/credit-notes/${id}/reverse`), {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+    headers: { 'Idempotency-Key': idempotencyKey },
+  })
+}
+
+// ─── Receipts ───────────────────────────────────────────────────────────────
+
+export async function listCustomerReceipts(params: ListCustomerReceiptsQuery) {
+  return apiRequest<CustomerReceiptListItemDto[]>(
+    `${tenantPath(`${BASE}/receipts`)}${buildQuery(params as unknown as Record<string, string | number | boolean | undefined>)}`,
+  )
+}
+
+export async function getCustomerReceipt(id: string) {
+  return apiRequest<CustomerReceiptDto>(tenantPath(`${BASE}/receipts/${id}`))
+}
+
+export async function createCustomerReceipt(data: CreateCustomerReceiptInput) {
+  return apiRequest<CustomerReceiptDto>(tenantPath(`${BASE}/receipts`), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateCustomerReceipt(id: string, data: UpdateCustomerReceiptInput) {
+  return apiRequest<CustomerReceiptDto>(tenantPath(`${BASE}/receipts/${id}`), {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function validateCustomerReceipt(id: string, body?: { proposedAllocations?: ReceiptAllocationLineInput[] }) {
+  return apiRequest<CustomerReceiptValidationPreview>(tenantPath(`${BASE}/receipts/${id}/validate`), {
+    method: 'POST',
+    body: JSON.stringify(body ?? {}),
+  })
+}
+
+export async function markCustomerReceiptReady(id: string) {
+  return apiRequest<CustomerReceiptDto>(tenantPath(`${BASE}/receipts/${id}/mark-ready`), { method: 'POST' })
+}
+
+export async function cancelCustomerReceipt(id: string, cancellationReason: string) {
+  return apiRequest<CustomerReceiptDto>(tenantPath(`${BASE}/receipts/${id}/cancel`), {
+    method: 'POST',
+    body: JSON.stringify({ cancellationReason }),
+  })
+}
+
+export async function postCustomerReceipt(id: string) {
+  return apiRequest<PostCustomerReceiptResult>(tenantPath(`${BASE}/receipts/${id}/post`), { method: 'POST', body: '{}' })
+}
+
+// ─── Receipt allocations ────────────────────────────────────────────────────
+
+export async function previewReceiptAllocation(receiptId: string, body: ReceiptAllocationRequest) {
+  return apiRequest<ReceiptAllocationPreview>(tenantPath(`${BASE}/receipts/${receiptId}/allocations/preview`), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function allocateReceipt(receiptId: string, body: ReceiptAllocationRequest, idempotencyKey: string) {
+  return apiRequest<ReceiptAllocationResult>(tenantPath(`${BASE}/receipts/${receiptId}/allocations`), {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { 'Idempotency-Key': idempotencyKey },
+  })
+}
+
+export async function listReceiptAllocations(receiptId: string, params?: Record<string, string | number | boolean | undefined>) {
+  return apiRequest<ReceiptAllocationHistoryRow[]>(
+    `${tenantPath(`${BASE}/receipts/${receiptId}/allocations`)}${buildQuery(params)}`,
+  )
+}
+
+export async function reverseReceiptAllocation(
+  receiptId: string,
+  batchId: string,
+  reason: string,
+  idempotencyKey: string,
+) {
+  return apiRequest<ReceiptAllocationResult>(
+    tenantPath(`${BASE}/receipts/${receiptId}/allocations/${batchId}/reverse`),
+    { method: 'POST', body: JSON.stringify({ reason }), headers: { 'Idempotency-Key': idempotencyKey } },
+  )
+}
+
+export async function reverseCustomerReceipt(id: string, reason: string, idempotencyKey: string) {
+  return apiRequest<PostCustomerReceiptResult>(tenantPath(`${BASE}/receipts/${id}/reverse`), {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+    headers: { 'Idempotency-Key': idempotencyKey },
+  })
 }
 
 // ─── Reporting ──────────────────────────────────────────────────────────────

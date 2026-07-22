@@ -29,16 +29,13 @@ export async function serializeSalesInvoiceDetail(
   options?: { includeValidationSummary?: boolean },
 ): Promise<SalesInvoiceDto> {
   const base = repo.mapInvoiceRecord(invoice, invoice.lines)
-  const allowedActions = resolveSalesInvoiceAllowedActions(req, invoice.status)
-  const validationSummary =
-    options?.includeValidationSummary === false
-      ? undefined
-      : await getLastValidationSummary(invoice.tenantId, invoice.id)
 
   let receivableOpenItemId: string | null = null
   let outstandingAmount = base.outstandingAmount
   let amountPaid = base.amountPaid
-  if (invoice.status === 'POSTED') {
+  let hasPostedAllocations = false
+
+  if (invoice.status === 'POSTED' || invoice.status === 'REVERSED') {
     const openItem = await prisma.receivableOpenItem.findFirst({
       where: { tenantId: invoice.tenantId, salesInvoiceId: invoice.id, side: 'DEBIT' },
       select: { id: true, openAmount: true, allocatedAmount: true },
@@ -48,7 +45,25 @@ export async function serializeSalesInvoiceDetail(
       outstandingAmount = formatForPersistence(openItem.openAmount)
       amountPaid = formatForPersistence(openItem.allocatedAmount)
     }
+
+    if (invoice.status === 'POSTED') {
+      const [receiptAllocs, cnAllocs] = await Promise.all([
+        prisma.customerReceiptAllocation.count({
+          where: { tenantId: invoice.tenantId, invoiceId: invoice.id, status: 'POSTED' },
+        }),
+        prisma.customerCreditNoteAllocation.count({
+          where: { tenantId: invoice.tenantId, invoiceId: invoice.id, status: 'POSTED' },
+        }),
+      ])
+      hasPostedAllocations = receiptAllocs + cnAllocs > 0
+    }
   }
+
+  const allowedActions = resolveSalesInvoiceAllowedActions(req, invoice.status, { hasPostedAllocations })
+  const validationSummary =
+    options?.includeValidationSummary === false
+      ? undefined
+      : await getLastValidationSummary(invoice.tenantId, invoice.id)
 
   return {
     ...base,

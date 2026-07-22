@@ -29,6 +29,11 @@ export const uuidParamSchema = z.object({
   id: z.string().uuid(),
 })
 
+export const statementLineParamSchema = z.object({
+  id: z.string().uuid(),
+  lineId: z.string().uuid(),
+})
+
 export const tenantIdParamSchema = z.object({
   tenantId: z.string().uuid(),
 })

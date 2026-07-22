@@ -345,7 +345,7 @@ export function LedgerEntriesPage() {
         break
       case 'openVoucher':
         if (entry.voucherId) navigate(`/accounting/ledger-entries/voucher/${entry.voucherId}`)
-        else if (entry.voucherNumber) navigate(`/accounting/vouchers`)
+        else if (entry.voucherNumber) navigate(`/accounting/entries/journals`)
         break
       case 'openAccount':
         navigate(`/accounting/ledger-entries/account/${entry.account.accountId}`)

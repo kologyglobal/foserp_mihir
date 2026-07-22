@@ -131,6 +131,14 @@ export type PostingTransactionParticipant = (args: {
 
 export interface PostingOptions {
   beforeTransaction?: (event: PostingEvent) => Promise<PostingEvent | void>
+  /** Runs inside the posting DB transaction before voucher/GL create (Phase 4C1 cascade). */
+  beforeAccounting?: (args: {
+    tx: Prisma.TransactionClient
+    context: PostingContext
+    eventId: string
+    validated: ValidatedPostingData
+    voucherNumber: string
+  }) => Promise<void>
   afterAccounting?: PostingTransactionParticipant
 }
 

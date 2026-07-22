@@ -29,6 +29,7 @@ import { usePeriodClosePermissions } from '@/utils/permissions/periodClose'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
+import { isApiMode } from '@/config/apiConfig'
 
 export function CloseCalendarPage() {
   const perms = usePeriodClosePermissions()
@@ -122,6 +123,7 @@ export function CloseCalendarPage() {
 
 export function CloseChecklistPage() {
   const perms = usePeriodClosePermissions()
+  const api = isApiMode()
   const [filter, setFilter] = useState<PeriodFilterState>(() => loadPeriodCloseFilter())
   const [tasks, setTasks] = useState<CloseTask[]>([])
   const [moduleFilter, setModuleFilter] = useState<string>('all')
@@ -143,7 +145,7 @@ export function CloseChecklistPage() {
     } finally {
       setLoading(false)
     }
-  }, [filter.periodCode, perms.canView])
+  }, [filter.periodCode, filter.periodId, perms.canView])
 
   useEffect(() => {
     void load()
@@ -155,6 +157,10 @@ export function CloseChecklistPage() {
   )
 
   const onStatus = async (id: string, status: CloseTaskStatus) => {
+    if (api) {
+      notify.error('Readiness checklist is computed in API mode — resolve the underlying finance item instead.')
+      return
+    }
     if (!perms.canManageChecklist) {
       notify.error('You do not have permission to update close tasks.')
       return
@@ -171,7 +177,11 @@ export function CloseChecklistPage() {
   return (
     <PeriodCloseShell
       title="Close Checklist"
-      description="Configurable department close tasks with owners, dependencies and evidence."
+      description={
+        api
+          ? 'Phase 1 readiness checklist composed from period status, AP close gate, unposted journals, and bank recon.'
+          : 'Configurable department close tasks with owners, dependencies and evidence.'
+      }
       periodFilter={filter}
       onPeriodChange={setFilter}
       commandBar={
@@ -182,6 +192,11 @@ export function CloseChecklistPage() {
         />
       }
     >
+      {api ? (
+        <p className="mb-2 text-[12px] text-erp-muted">
+          Soft warnings only — closing a period is not hard-blocked by AP gate or unposted journals in Phase 1.
+        </p>
+      ) : (
       <div className="mb-2 flex flex-wrap gap-2">
         <label className="flex items-center gap-1.5 text-[11px] font-semibold text-erp-muted">
           Module
@@ -200,6 +215,7 @@ export function CloseChecklistPage() {
           </select>
         </label>
       </div>
+      )}
       {loading ? <LoadingState /> : null}
       {error ? <p className="text-[13px] text-rose-700">{error}</p> : null}
       {!loading && !error ? (
@@ -238,6 +254,9 @@ export function CloseChecklistPage() {
                     <td className="py-1.5 pr-2 tabular-nums text-erp-muted">{t.completionPct}%</td>
                     <td className="py-1.5 pr-2 text-erp-muted">{t.evidence ?? '—'}</td>
                     <td className="py-1.5">
+                      {api ? (
+                        <span className="text-[11px] text-erp-muted">Computed</span>
+                      ) : (
                       <select
                         className="h-8 max-w-[140px] rounded border border-erp-border px-1 text-[11px]"
                         value={t.status}
@@ -251,6 +270,7 @@ export function CloseChecklistPage() {
                           </option>
                         ))}
                       </select>
+                      )}
                     </td>
                   </tr>
                 ))}

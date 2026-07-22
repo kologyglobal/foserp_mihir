@@ -60,6 +60,10 @@ export const cancelJournalSchema = z.object({
   cancellationReason: z.string().trim().min(1, 'Cancellation reason is required').max(500),
 })
 
+export const reverseJournalSchema = z.object({
+  reason: z.string().trim().min(1, 'Reversal reason is required').max(500),
+})
+
 export const listJournalsQuerySchema = paginationSchema.extend({
   legalEntityId: z.string().uuid(),
   branchId: z.string().uuid().optional(),
@@ -82,4 +86,5 @@ export const listJournalsQuerySchema = paginationSchema.extend({
 export type CreateJournalInput = z.infer<typeof createJournalSchema>
 export type UpdateJournalInput = z.infer<typeof updateJournalSchema>
 export type CancelJournalInput = z.infer<typeof cancelJournalSchema>
+export type ReverseJournalInput = z.infer<typeof reverseJournalSchema>
 export type ListJournalsQuery = z.infer<typeof listJournalsQuerySchema>

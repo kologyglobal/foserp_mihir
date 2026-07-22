@@ -259,7 +259,7 @@ export function VendorPaymentDetailPage() {
         <VendorPaymentStatusBadge status={payment.status} />
         <PaymentAllocationStatusBadge status={payment.allocationStatus} />
         {payment.voucherId ? (
-          <Link to={`/accounting/vouchers/${payment.voucherId}`} className="text-[12px] font-medium text-sky-700 hover:underline">
+          <Link to={`/accounting/ledger-entries/voucher/${payment.voucherId}`} className="text-[12px] font-medium text-sky-700 hover:underline">
             Voucher {payment.voucherNumber ?? payment.voucherId}
           </Link>
         ) : null}

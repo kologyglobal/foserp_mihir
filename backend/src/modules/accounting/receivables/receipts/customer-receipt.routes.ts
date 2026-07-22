@@ -9,6 +9,7 @@ import {
   cancelCustomerReceiptSchema,
   createCustomerReceiptSchema,
   listCustomerReceiptsQuerySchema,
+  reverseCustomerReceiptSchema,
   updateCustomerReceiptSchema,
   validateCustomerReceiptSchema,
 } from './customer-receipt.schemas.js'
@@ -74,6 +75,13 @@ router.post(
   validateParams(uuidParamSchema),
   requirePermission('finance.ar.receipt.post'),
   controller.postCustomerReceipt,
+)
+router.post(
+  '/:id/reverse',
+  validateParams(uuidParamSchema),
+  requirePermission('finance.ar.receipt.reverse'),
+  validateBody(reverseCustomerReceiptSchema),
+  controller.reverseCustomerReceipt,
 )
 
 export default router

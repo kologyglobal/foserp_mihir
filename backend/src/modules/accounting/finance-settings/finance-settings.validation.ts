@@ -20,6 +20,18 @@ export const upsertFinanceSettingsSchema = z.object({
   writeOffTolerance: z.coerce.number().min(0).nullable().optional(),
   bankChargeTolerance: z.coerce.number().min(0).nullable().optional(),
   allowManualControlAccountPosting: z.boolean().optional(),
+  treasuryTransferBankBalancePolicy: z.enum(['ALLOW', 'WARN', 'BLOCK']).optional(),
+  treasuryTransferRequireInTransit: z.boolean().optional(),
+  treasuryTransferInTransitThreshold: z.coerce.number().min(0).nullable().optional(),
+  treasuryTransferApprovalLimit: z.coerce.number().min(0).nullable().optional(),
+  treasuryTransferPreventSelfApprove: z.boolean().optional(),
+  treasuryTransferPreventDispatcherReceive: z.boolean().optional(),
+  treasuryChequeApprovalLimit: z.coerce.number().min(0).nullable().optional(),
+  treasuryChequePreventSelfApprove: z.boolean().optional(),
+  treasuryChequeRequireCounterpartAccount: z.boolean().optional(),
+  useTreasuryAdjustmentsForStatementItems: z.boolean().optional(),
+  treasuryAdjustmentApprovalLimit: z.coerce.number().min(0).nullable().optional(),
+  treasuryAdjustmentPreventSelfApprove: z.boolean().optional(),
 })
 
 export const activateFinanceSchema = z.object({
