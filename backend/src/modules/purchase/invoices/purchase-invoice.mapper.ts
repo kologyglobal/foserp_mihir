@@ -4,13 +4,27 @@ import { invoiceAllowedActions, invoiceQty } from './purchase-invoice.workflow.j
 const date = (value?: Date | null) => value?.toISOString().slice(0, 10) ?? null
 const iso = (value?: Date | null) => value?.toISOString() ?? null
 
-export function mapPurchaseInvoice(invoice: PurchaseInvoice & { lines: PurchaseInvoiceLine[] }) {
+export type PurchaseInvoiceEnrichment = {
+  purchaseOrderNumber?: string | null
+  goodsReceiptNumber?: string | null
+  paymentTerms?: string | null
+  dueDate?: string | null
+}
+
+export function mapPurchaseInvoice(
+  invoice: PurchaseInvoice & { lines: PurchaseInvoiceLine[] },
+  enrichment?: PurchaseInvoiceEnrichment,
+) {
   return {
     ...invoice,
     invoiceDate: date(invoice.invoiceDate),
     documentDate: date(invoice.invoiceDate),
     documentNumber: invoice.invoiceNumber,
     vendorInvoiceDate: date(invoice.vendorInvoiceDate),
+    purchaseOrderNumber: enrichment?.purchaseOrderNumber ?? '',
+    goodsReceiptNumber: enrichment?.goodsReceiptNumber ?? '',
+    paymentTerms: enrichment?.paymentTerms ?? '',
+    dueDate: enrichment?.dueDate ?? null,
     subtotalAmount: invoiceQty(invoice.subtotalAmount),
     taxAmount: invoiceQty(invoice.taxAmount),
     roundOffAmount: invoiceQty(invoice.roundOffAmount),

@@ -49,8 +49,10 @@ import {
   getGRNs,
   getPurchaseInvoiceById,
   getPurchaseItems,
+  getPurchaseOrderById,
   getPurchaseOrders,
   getPurchaseSetup,
+  getGRNById,
   getVendors,
   previewNextPurchaseInvoiceNumber,
   PurchaseServiceError,
@@ -336,18 +338,55 @@ export function PurchaseInvoiceEditorPage() {
 
   const validate = () => {
     const errs: Record<string, string> = {}
-    if (!vendorId) errs.vendorId = 'Vendor is required'
-    if (!vendorInvoiceNumber.trim()) errs.vendorInvoiceNumber = 'Vendor invoice number is required'
-    if (!lines.some((l) => l.itemId && l.quantity > 0)) errs.lines = 'Add at least one line'
-    if (origin === 'direct' && !canDirect) errs.origin = 'Direct invoice not permitted'
+    if (!vendorId) errs.vendorId = 'Select a vendor'
+    if (!vendorInvoiceNumber.trim()) {
+      errs.vendorInvoiceNumber = 'Enter the vendor’s invoice number (from the supplier bill)'
+    }
+    if (!vendorInvoiceDate.trim()) {
+      errs.vendorInvoiceDate = 'Vendor invoice date is required'
+    }
+    if (!documentDate.trim()) {
+      errs.documentDate = 'Document date is required'
+    }
+
+    const usable = lines.filter((l) => l.itemId || l.itemCode.trim() || l.itemName.trim())
+    if (!usable.length) {
+      errs.lines = 'Add at least one invoice line with an item'
+    } else {
+      const badQty = usable.find((l) => !(Number(l.quantity) > 0))
+      if (badQty) {
+        errs.lines = `Line ${badQty.lineNo || usable.indexOf(badQty) + 1}: quantity must be greater than 0`
+      } else if (!usable.some((l) => l.itemId && Number(l.quantity) > 0)) {
+        errs.lines = 'Each line needs a catalog item (Item) and quantity greater than 0'
+      }
+    }
+
+    if (origin === 'direct' && !canDirect) {
+      errs.origin = 'Direct invoices are disabled in Purchase Setup'
+    }
+    if (setup?.invoiceMatchTolerances.requireGrnMatch && !goodsReceiptId) {
+      errs.goodsReceiptId = 'Purchase Setup requires a posted GRN — link a GRN on this invoice'
+    }
+    if (setup?.invoiceMatchTolerances.requirePoMatch && !purchaseOrderId) {
+      errs.purchaseOrderId = 'Purchase Setup requires a PO — link a purchase order on this invoice'
+    }
+
     setFieldErrors(errs)
-    return Object.keys(errs).length === 0
+    return errs
   }
 
   const saveDraft = async () => {
     if (saving) return
-    if (!validate()) {
-      notify.error('Fix validation errors')
+    const errs = validate()
+    const messages = Object.values(errs)
+    if (messages.length) {
+      notify.error(
+        messages.length === 1
+          ? messages[0]
+          : `Fix ${messages.length} issues: ${messages.slice(0, 2).join(' · ')}${
+              messages.length > 2 ? ` (+${messages.length - 2} more)` : ''
+            }`,
+      )
       return
     }
     setSaving(true)
@@ -530,6 +569,20 @@ export function PurchaseInvoiceEditorPage() {
       factBox={documentFactBox}
       collapsibleFactBox
       stickyFooter
+      validationErrors={Object.values(fieldErrors)}
+      validationItems={Object.entries(fieldErrors).map(([field, message], i) => {
+        const section =
+          field === 'lines'
+            ? 'Lines'
+            : field === 'origin' || field === 'goodsReceiptId' || field === 'purchaseOrderId'
+              ? 'Origin / matching'
+              : 'Document & Vendor'
+        return {
+          id: `inv-err-${field}-${i}`,
+          label: `${section} · ${message}`,
+          message: 'Required',
+        }
+      })}
       footer={
         <FormActionBar
           sticky
@@ -561,6 +614,9 @@ export function PurchaseInvoiceEditorPage() {
             <p className="mb-2 text-[12px] text-erp-muted">
               PO / GRN / Service PO create a draft from the selected source, then open the editor. Vendor Invoice and
               Direct let you enter lines manually.
+              {setup?.invoiceMatchTolerances.requireGrnMatch
+                ? ' Purchase Setup requires GRN match — prefer origin “Posted GRN”, or pick a PO that already has a posted GRN.'
+                : ''}
             </p>
             <div
               className="mb-3 flex flex-wrap gap-1.5"
@@ -609,9 +665,49 @@ export function PurchaseInvoiceEditorPage() {
                   setPurchaseOrderId(poId)
                   if (!poId) return
                   try {
+                    let po = orders.find((o) => o.id === poId)
+                    if (!po?.lines?.length) {
+                      po = (await getPurchaseOrderById(poId)) ?? po
+                    }
+                    if (po) {
+                      setVendorId(po.vendor.id)
+                      setPaymentTerms(po.paymentTerms || paymentTerms)
+                      setPlaceOfSupply(po.placeOfSupply || po.vendor.state || '')
+                      const nextLines = po.lines
+                        .filter((l) => l.lineStatus !== 'cancelled')
+                        .map((l) =>
+                          emptyLine({
+                            id: '',
+                            lineNo: l.lineNo,
+                            purchaseOrderLineId: l.id,
+                            goodsReceiptLineId: null,
+                            itemId: l.itemId,
+                            itemCode: l.itemCode,
+                            itemName: l.itemName,
+                            description: l.description || l.itemName,
+                            uom: l.uom,
+                            hsnCode: l.hsnCode,
+                            quantity: l.quantity,
+                            rate: l.rate,
+                            gstRatePct: l.gstRatePct,
+                            taxableAmount: Number((l.quantity * l.rate).toFixed(2)),
+                            lineTotal: Number(
+                              (
+                                l.quantity * l.rate +
+                                (l.quantity * l.rate * l.gstRatePct) / 100
+                              ).toFixed(2),
+                            ),
+                          }),
+                        )
+                      setLines(nextLines.length ? nextLines : [emptyLine()])
+                    }
                     const created = await createPurchaseInvoiceFromPo(poId)
+                    // Source create navigates to a new draft — don't treat hydrate as unsaved leave.
+                    setDirty(false)
+                    resetDirty()
                     navigate(`/purchase/invoices/${created.id}/edit`, { replace: true })
                   } catch (err) {
+                    setDirty(true)
                     notify.error(err instanceof PurchaseServiceError ? err.message : 'Failed')
                   }
                 }}
@@ -636,9 +732,44 @@ export function PurchaseInvoiceEditorPage() {
                   setGoodsReceiptId(grnId)
                   if (!grnId) return
                   try {
+                    let grn = grns.find((g) => g.id === grnId)
+                    if (!grn?.lines?.length) {
+                      grn = (await getGRNById(grnId)) ?? grn
+                    }
+                    if (grn) {
+                      setVendorId(grn.vendor.id)
+                      setPurchaseOrderId(grn.purchaseOrderId || '')
+                      setPaymentTerms(grn.paymentTerms || paymentTerms)
+                      const nextLines = grn.lines
+                        .filter((l) => (l.acceptedQty || l.receivedQty) > 0)
+                        .map((l) => {
+                          const qty = l.acceptedQty || l.receivedQty
+                          const taxable = Number((qty * l.rate).toFixed(2))
+                          return emptyLine({
+                            id: '',
+                            lineNo: l.lineNo,
+                            purchaseOrderLineId: l.purchaseOrderLineId,
+                            goodsReceiptLineId: l.id,
+                            itemId: l.itemId,
+                            itemCode: l.itemCode,
+                            itemName: l.itemName,
+                            description: l.description || l.itemName,
+                            uom: l.uom,
+                            hsnCode: l.hsnCode,
+                            quantity: qty,
+                            rate: l.rate,
+                            taxableAmount: taxable,
+                            lineTotal: taxable,
+                          })
+                        })
+                      setLines(nextLines.length ? nextLines : [emptyLine()])
+                    }
                     const created = await createPurchaseInvoiceFromGrn(grnId)
+                    setDirty(false)
+                    resetDirty()
                     navigate(`/purchase/invoices/${created.id}/edit`, { replace: true })
                   } catch (err) {
+                    setDirty(true)
                     notify.error(err instanceof PurchaseServiceError ? err.message : 'Failed')
                   }
                 }}
@@ -664,6 +795,8 @@ export function PurchaseInvoiceEditorPage() {
                   if (!poId) return
                   try {
                     const created = await createPurchaseInvoiceFromServicePo(poId)
+                    setDirty(false)
+                    resetDirty()
                     navigate(`/purchase/invoices/${created.id}/edit`, { replace: true })
                   } catch (err) {
                     notify.error(err instanceof PurchaseServiceError ? err.message : 'Failed')
@@ -719,7 +852,7 @@ export function PurchaseInvoiceEditorPage() {
             className="bg-erp-surface-alt"
           />
         </ErpFieldRow>
-        <ErpFieldRow label="Document Date">
+        <ErpFieldRow label="Document Date" fieldError={fieldErrors.documentDate}>
           <Input
             type="date"
             value={documentDate}
@@ -799,7 +932,7 @@ export function PurchaseInvoiceEditorPage() {
             }}
           />
         </ErpFieldRow>
-        <ErpFieldRow label="Vendor Invoice Date">
+        <ErpFieldRow label="Vendor Invoice Date" fieldError={fieldErrors.vendorInvoiceDate}>
           <Input
             type="date"
             value={vendorInvoiceDate}

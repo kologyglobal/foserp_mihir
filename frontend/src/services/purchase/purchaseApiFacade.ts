@@ -2444,13 +2444,45 @@ export async function createPurchaseInvoiceFromPo(purchaseOrderId: string): Prom
   if (!isApiMode()) return demo.createPurchaseInvoiceFromPo(purchaseOrderId)
   const po = await getPurchaseOrderById(purchaseOrderId)
   if (!po) throw new PurchaseServiceError('PO_NOT_FOUND', `PO not found: ${purchaseOrderId}`)
+
+  const setup = await getPurchaseSetup().catch(() => null)
+  let postedGrn: GoodsReceiptNote | undefined
+  try {
+    const res = await grnApi.listGoodsReceiptsApi({
+      page: 1,
+      pageSize: 20,
+      sortOrder: 'desc',
+      purchaseOrderId: po.id,
+    })
+    postedGrn = res.data
+      .map(mapApiGoodsReceiptToDomain)
+      .find((g) => g.status === 'posted')
+  } catch {
+    const grns = await getGRNs().catch(() => [] as GoodsReceiptNote[])
+    postedGrn = grns.find((g) => g.purchaseOrderId === po.id && g.status === 'posted')
+  }
+
+  // Setup requireGrnMatch: PO-only create is rejected by API — use posted GRN when present.
+  if (postedGrn) {
+    return createPurchaseInvoiceFromGrn(postedGrn.id)
+  }
+  if (setup?.invoiceMatchTolerances.requireGrnMatch) {
+    throw new PurchaseServiceError(
+      'GRN_REQUIRED',
+      'Purchase Setup requires a posted GRN match. Open origin “Posted GRN” and select the GRN for this PO (or post a GRN first).',
+    )
+  }
+
+  const today = new Date().toISOString().slice(0, 10)
   return createPurchaseInvoice({
     vendorId: po.vendor.id,
     vendorInvoiceNumber: '',
-    vendorInvoiceDate: new Date().toISOString().slice(0, 10),
+    vendorInvoiceDate: today,
+    documentDate: today,
     origin: 'purchase_order',
     purchaseOrderId: po.id,
     placeOfSupply: po.placeOfSupply || po.vendor.state || '',
+    paymentTerms: po.paymentTerms,
     lines: po.lines
       .filter((l) => l.lineStatus !== 'cancelled')
       .map((l) => ({
@@ -2468,22 +2500,33 @@ export async function createPurchaseInvoiceFromGrn(goodsReceiptId: string): Prom
   if (!isApiMode()) return demo.createPurchaseInvoiceFromGrn(goodsReceiptId)
   const grn = await getGRNById(goodsReceiptId)
   if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${goodsReceiptId}`)
-  return createPurchaseInvoice({
-    vendorId: grn.vendor.id,
-    vendorInvoiceNumber: '',
-    vendorInvoiceDate: new Date().toISOString().slice(0, 10),
-    origin: 'goods_receipt',
-    purchaseOrderId: grn.purchaseOrderId,
-    goodsReceiptId: grn.id,
-    paymentTerms: grn.paymentTerms,
-    lines: grn.lines.map((l) => ({
+  const today = new Date().toISOString().slice(0, 10)
+  const lines = grn.lines
+    .map((l) => ({
       itemId: l.itemId,
       quantity: l.acceptedQty || l.receivedQty,
       rate: l.rate,
       purchaseOrderLineId: l.purchaseOrderLineId,
       goodsReceiptLineId: l.id,
       description: l.description || l.itemName,
-    })),
+    }))
+    .filter((l) => l.quantity > 0)
+  if (!lines.length) {
+    throw new PurchaseServiceError(
+      'GRN_NO_QTY',
+      'This GRN has no accepted/received quantity to invoice.',
+    )
+  }
+  return createPurchaseInvoice({
+    vendorId: grn.vendor.id,
+    vendorInvoiceNumber: '',
+    vendorInvoiceDate: today,
+    documentDate: today,
+    origin: 'goods_receipt',
+    purchaseOrderId: grn.purchaseOrderId,
+    goodsReceiptId: grn.id,
+    paymentTerms: grn.paymentTerms,
+    lines,
   })
 }
 

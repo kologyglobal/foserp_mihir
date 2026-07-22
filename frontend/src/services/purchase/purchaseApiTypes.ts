@@ -713,6 +713,10 @@ export interface ApiPurchaseInvoice {
   vendorId: string
   purchaseOrderId: string | null
   goodsReceiptId: string | null
+  purchaseOrderNumber?: string | null
+  goodsReceiptNumber?: string | null
+  paymentTerms?: string | null
+  dueDate?: string | null
   status: ApiPurchaseInvoiceStatus
   isDirectInvoice: boolean
   currencyCode: string

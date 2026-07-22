@@ -764,9 +764,17 @@ export function PurchaseRequisitionEditorPage() {
     const line = lines.find((l) => l.key === key)
     const item = catalogItems.find((i) => i.id === itemId)
     if (!item || !line) return
-    const productType = item.productType ?? ''
+    // Prefer Item Master product type; if master has none, keep the filter the user already chose.
+    const productType =
+      item.productType ||
+      line.productType ||
+      mapPurchaseCategoryToEngineeringProductType(item.category) ||
+      ''
     const category =
-      item.category || mapEngineeringProductTypeToPurchaseCategory(productType) || ''
+      item.category ||
+      mapEngineeringProductTypeToPurchaseCategory(productType) ||
+      line.category ||
+      ''
     const vendor = item.preferredVendorId
       ? vendors.find((v) => v.id === item.preferredVendorId)
       : undefined
