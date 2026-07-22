@@ -172,15 +172,17 @@ export type CompanyCommercialPositionDto = {
 }
 
 export async function fetchSalesOrderCommercialPosition(id: string) {
-  return apiRequest<SalesOrderCommercialPositionDto>(
+  const res = await apiRequest<SalesOrderCommercialPositionDto>(
     tenantPath(`/crm/sales-orders/${id}/commercial-position`),
   )
+  return res.data
 }
 
 export async function fetchCompanyCommercialPosition(companyId: string) {
-  return apiRequest<CompanyCommercialPositionDto>(
+  const res = await apiRequest<CompanyCommercialPositionDto>(
     tenantPath(`/crm/companies/${companyId}/commercial-position`),
   )
+  return res.data
 }
 
 export type ConvertQuotationToSalesOrderResponse = {

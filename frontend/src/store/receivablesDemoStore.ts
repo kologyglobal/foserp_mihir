@@ -1217,6 +1217,17 @@ export const useReceivablesDemoStore = create<ReceivablesDemoState>()(
           ...customerMeta(input.customerId),
           lines,
           updatedAt: new Date().toISOString(),
+          sourceLinks: input.sourceLinks?.map((link) => ({
+            sourceType: link.sourceType,
+            sourceDocumentId: link.sourceDocumentId,
+            sourceLineId: link.sourceLineId ?? null,
+            salesOrderId: link.salesOrderId ?? null,
+            salesOrderLineId: link.salesOrderLineId ?? null,
+            deliveryChallanId: link.deliveryChallanId ?? null,
+            deliveryChallanLineId: link.deliveryChallanLineId ?? null,
+            quantity: link.quantity,
+            itemId: link.itemId ?? null,
+          })),
         }
         updated = recalcInvoice(updated, lines)
         set({ invoices: get().invoices.map((i) => (i.id === invoiceId ? updated : i)) })

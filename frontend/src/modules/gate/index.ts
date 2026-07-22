@@ -1,12 +1,9 @@
 /**
  * Gate & Security frontend module.
  *
- * Physical gate operations only — visitor/vehicle/material movement, passes,
- * contractors, couriers, approvals and operational reports. Uses `gateService`
- * (demo or API) via a single resolver; pages must not import implementation
- * services directly.
+ * Sidebar + workspace hub are live. Full operational pages (visitors, vehicles,
+ * material, passes, contractors, couriers, approvals, reports, settings) will
+ * be restored onto the Gate API when the wiped FE tree is rebuilt.
  */
 
-export { gateService, GateServiceError } from './api/gateService'
-export type { GateService } from './api/gateService'
-export { GATE_BREADCRUMB, GATE_DEPARTMENTS, GATE_HOSTS } from './gateUi'
+export { GateWorkspacePage } from './pages/GateWorkspacePage'

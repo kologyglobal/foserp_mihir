@@ -16,6 +16,7 @@ export type SalesOrderAccountingDemoMetrics = {
   collectedAmount: number
   outstandingAmount: number
   nextPaymentDueDate?: string | null
+  nextPaymentDueAmount?: number | null
   postedInvoiceCount: number
   draftInvoiceCount: number
 }

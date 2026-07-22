@@ -37,8 +37,8 @@ let savedViews: ManufacturingSavedView[] = [
 export async function getManufacturingSettings(): Promise<ManufacturingSettings> {
   if (isApiMode()) {
     const response = await getManufacturingSettingsApi()
-    apiVersion = response.version
-    apiSettings = structuredClone(response.payloadJson)
+    apiVersion = response.data.version
+    apiSettings = structuredClone(response.data.payloadJson)
     return structuredClone(apiSettings)
   }
   await delay()
@@ -68,8 +68,8 @@ export async function updateManufacturingSettings(
       advanced: { ...current.advanced, ...patch.advanced },
     }
     const response = await putManufacturingSettingsApi(next, apiVersion)
-    apiVersion = response.version
-    apiSettings = structuredClone(response.payloadJson)
+    apiVersion = response.data.version
+    apiSettings = structuredClone(response.data.payloadJson)
     return { ok: true, settings: structuredClone(apiSettings) }
   }
   await delay()

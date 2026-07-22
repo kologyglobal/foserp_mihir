@@ -28,8 +28,14 @@ function extractFailedName(text: string): string | null {
 }
 
 function isSafeAlreadyAppliedFailure(text: string): boolean {
-  // Only auto-resolve when the first statement failed (nothing from this migration applied).
-  // MySQL DDL is often auto-commit; query# > 1 needs manual review.
+  // Enum-shrink duplicate on incomplete code_series ENUM lists must NOT be
+  // auto-resolved for multi-statement migrations (later CREATE TABLEs never run).
+  if (/Duplicate entry '.*-' for key 'code_series_tenantId_entityType_key'/.test(text)) {
+    return false
+  }
+
+  // Only auto-resolve when the first statement failed (nothing from this migration applied),
+  // or table/column already-exists on query 1.
   const queryNo = text.match(/query number\s+(\d+)/i)
   if (queryNo && Number(queryNo[1]) !== 1) return false
 
@@ -37,11 +43,9 @@ function isSafeAlreadyAppliedFailure(text: string): boolean {
     /Database error code: 1050/.test(text) || // table already exists
     /Database error code: 1060/.test(text) || // duplicate column
     /Database error code: 1061/.test(text) || // duplicate key name
-    /Database error code: 1062/.test(text) || // duplicate entry (often enum shrink)
     /already exists/i.test(text) ||
     /Duplicate column name/i.test(text) ||
-    /Duplicate key name/i.test(text) ||
-    /Duplicate entry/i.test(text)
+    /Duplicate key name/i.test(text)
   )
 }
 
