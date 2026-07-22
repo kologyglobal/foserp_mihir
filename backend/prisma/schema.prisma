@@ -9919,6 +9919,7 @@ enum OutboundDispatchStatus {
   DRAFT
   CONFIRMED
   CANCELLED
+  REVERSED
 }
 
 /// Optional cancelled-qty ledger per SO JSON line. Dispatched qty is projected from dispatches.
@@ -9969,6 +9970,9 @@ model OutboundDispatch {
   cancelledAt            DateTime?
   cancelledBy            String?
   cancellationReason     String?                        @db.Text
+  reversedAt             DateTime?
+  reversedBy             String?
+  reverseReason          String?                        @db.Text
   idempotencyKey         String?                        @db.VarChar(150)
   createdBy              String?
   updatedBy              String?
@@ -10010,11 +10014,13 @@ model OutboundDispatchLine {
   salesOrderLineId      String?  @db.VarChar(64)
   dispatchRequirementId String?
   readyQuantitySnapshot Decimal? @db.Decimal(18, 4)
-  inventoryMovementId   String?
-  inventoryMovementNo   String?  @db.VarChar(64)
-  remarks               String?  @db.Text
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  inventoryMovementId          String?
+  inventoryMovementNo          String?  @db.VarChar(64)
+  reverseInventoryMovementId   String?
+  reverseInventoryMovementNo   String?  @db.VarChar(64)
+  remarks                      String?  @db.Text
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
 
   tenant                      Tenant                       @relation(fields: [tenantId], references: [id])
   outboundDispatch            OutboundDispatch             @relation(fields: [outboundDispatchId], references: [id], onDelete: Cascade)

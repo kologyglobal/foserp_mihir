@@ -18,6 +18,8 @@ export function mapOutboundDispatchLine(line: OutboundDispatchLine) {
     readyQuantitySnapshot: line.readyQuantitySnapshot != null ? n(line.readyQuantitySnapshot) : null,
     inventoryMovementId: line.inventoryMovementId,
     inventoryMovementNo: line.inventoryMovementNo,
+    reverseInventoryMovementId: line.reverseInventoryMovementId ?? null,
+    reverseInventoryMovementNo: line.reverseInventoryMovementNo ?? null,
     remarks: line.remarks,
   }
 }
@@ -44,6 +46,9 @@ export function mapOutboundDispatch(
     cancelledAt: row.cancelledAt?.toISOString() ?? null,
     cancelledBy: row.cancelledBy,
     cancellationReason: row.cancellationReason,
+    reversedAt: row.reversedAt?.toISOString() ?? null,
+    reversedBy: row.reversedBy ?? null,
+    reverseReason: row.reverseReason ?? null,
     idempotencyKey: row.idempotencyKey,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

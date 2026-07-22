@@ -110,7 +110,7 @@ export async function getSalesOrderFulfilmentPositions(
     },
     select: { id: true, productionOrderId: true, itemId: true },
   })
-  const inspections = await prisma.qualityInspection.findMany({
+  const inspections = await prisma.manufacturingQualityInspection.findMany({
     where: {
       tenantId,
       productionOrderId: { in: workOrders.map((w) => w.id) },

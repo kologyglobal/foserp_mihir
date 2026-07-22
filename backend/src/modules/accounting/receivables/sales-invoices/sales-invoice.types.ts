@@ -4,7 +4,13 @@ import type { SalesInvoiceValidationPreview } from '../validation/invoice-valida
 import type { SalesInvoiceAllowedActions } from './sales-invoice-allowed-actions.js'
 
 export type SalesInvoiceStatus = 'DRAFT' | 'READY_TO_POST' | 'POSTED' | 'CANCELLED' | 'REVERSED'
-export type SalesInvoiceSourceType = 'DIRECT' | 'SALES_ORDER'
+export type SalesInvoiceSourceType = 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH'
+export type SalesInvoiceSettlementStatus =
+  | 'NOT_APPLICABLE'
+  | 'UNPAID'
+  | 'PARTIALLY_PAID'
+  | 'PAID'
+  | 'OVERDUE'
 export type SalesInvoiceSupplyType = 'INTRA_STATE' | 'INTER_STATE' | 'EXPORT' | 'SEZ' | 'NON_GST'
 export type SalesInvoiceTaxTreatment =
   | 'REGISTERED'
@@ -149,6 +155,7 @@ export interface ListSalesInvoicesQuery {
 
 export type SalesInvoiceWithLines = import('@prisma/client').SalesInvoice & {
   lines: import('@prisma/client').SalesInvoiceLine[]
+  sourceLinks?: import('@prisma/client').SalesInvoiceSourceLink[]
 }
 
 export interface SalesInvoiceCalculationContext {
