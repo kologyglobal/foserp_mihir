@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const schemaPath = resolve(root, 'prisma/schema.prisma')
-let schema = readFileSync(schemaPath, 'utf8')
+let schema = readFileSync(schemaPath, 'utf8').replace(/\r\n/g, '\n')
 
 const MARKER = '// ─── Schema drift sync (migrations 2026-07-22+) ───────────────────────────'
 
@@ -21,15 +21,25 @@ if (schema.includes(MARKER)) {
 }
 
 function mustReplace(label, from, to) {
-  if (!schema.includes(from)) {
+  const fromN = from.replace(/\r\n/g, '\n')
+  const toN = to.replace(/\r\n/g, '\n')
+  if (!schema.includes(fromN)) {
     throw new Error(`Patch failed (${label}): expected text not found`)
   }
-  if (schema.includes(to.trim().slice(0, 40)) && to.length > 40 && schema.includes(to)) {
-    console.log(`Skip already applied: ${label}`)
-    return
-  }
-  schema = schema.replace(from, to)
+  schema = schema.replace(fromN, toN)
   console.log(`Applied: ${label}`)
+}
+
+function softReplace(label, from, to) {
+  const fromN = from.replace(/\r\n/g, '\n')
+  const toN = to.replace(/\r\n/g, '\n')
+  if (!schema.includes(fromN)) {
+    console.warn(`Soft skip (${label}): expected text not found`)
+    return false
+  }
+  schema = schema.replace(fromN, toN)
+  console.log(`Applied: ${label}`)
+  return true
 }
 
 // ── Enum patches ─────────────────────────────────────────────────────────────
@@ -199,7 +209,7 @@ if (!schema.includes('inventoryLotId') || !schema.match(/model ProductionFinishe
         )
         .replace(
           /(tenant\s+Tenant\s+@relation\([^\n]+\n)/,
-          `$1  splitFromOrder ProductionOrder?  @relation("ProductionOrderSplits", fields: [splitFromOrderId], references: [id])\n  splitChildren  ProductionOrder[] @relation("ProductionOrderSplits")\n  splitAsParent  ProductionOrderSplit? @relation("ProductionOrderSplitParent")\n  splitAsChild   ProductionOrderSplit? @relation("ProductionOrderSplitChild")\n`,
+          `$1  splitFromOrder ProductionOrder?  @relation("ProductionOrderSplits", fields: [splitFromOrderId], references: [id])\n  splitChildren  ProductionOrder[] @relation("ProductionOrderSplits")\n  splitAsParent  ProductionOrderSplit[] @relation("ProductionOrderSplitParent")\n  splitAsChild   ProductionOrderSplit?  @relation("ProductionOrderSplitChild")\n`,
         )
         .replace(
           /@@index\(\[tenantId, deletedAt\]\)\n/,
@@ -1428,43 +1438,49 @@ model GateMaterialOutward {
 }
 
 model GatePass {
-  id            String    @id @default(uuid())
-  tenantId      String
-  passNumber    String    @db.VarChar(40)
-  status        String    @db.VarChar(32)
-  passType      String    @db.VarChar(40)
-  holderName    String    @db.VarChar(200)
-  company       String?   @db.VarChar(200)
-  purpose       String    @db.VarChar(300)
-  validFrom     DateTime?
-  validTo       DateTime?
-  gate          String    @db.VarChar(120)
-  remarks       String?   @db.Text
-  approvedBy    String?   @db.VarChar(200)
-  approvedAt    DateTime?
-  createdBy     String    @db.VarChar(200)
-  updatedBy     String    @db.VarChar(200)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
+  id                  String    @id @default(uuid())
+  tenantId            String
+  entryNumber         String    @db.VarChar(40)
+  status              String    @db.VarChar(32)
+  passKind            String    @db.VarChar(32)
+  movementType        String    @db.VarChar(80)
+  department          String    @db.VarChar(120)
+  responsibleEmployee String    @db.VarChar(200)
+  carriedBy           String    @db.VarChar(200)
+  partyName           String?   @db.VarChar(200)
+  purpose             String    @db.VarChar(300)
+  outwardDate         DateTime
+  expectedReturnDate  DateTime?
+  approverName        String?   @db.VarChar(200)
+  approvalStatus      String    @default("pending") @db.VarChar(32)
+  approvalRemarks     String?   @db.Text
+  returnsJson         Json
+  gate                String    @db.VarChar(120)
+  createdBy           String    @db.VarChar(200)
+  updatedBy           String    @db.VarChar(200)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
 
   tenant Tenant         @relation(fields: [tenantId], references: [id])
   items  GatePassItem[]
 
-  @@unique([tenantId, passNumber])
+  @@unique([tenantId, entryNumber])
   @@index([tenantId, status])
   @@map("gate_passes")
 }
 
 model GatePassItem {
-  id          String   @id @default(uuid())
-  tenantId    String
-  gatePassId  String
-  description String   @db.VarChar(300)
-  quantity    Decimal  @default(1) @db.Decimal(18, 4)
-  uom         String?  @db.VarChar(32)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String  @id @default(uuid())
+  tenantId         String
+  gatePassId       String
+  itemDescription  String  @db.VarChar(500)
+  serialNumber     String? @db.VarChar(120)
+  quantity         Float
+  uom              String  @db.VarChar(32)
+  conditionOut     String? @db.VarChar(200)
+  returnedQuantity Float   @default(0)
+  remarks          String? @db.Text
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id])
   gatePass GatePass @relation(fields: [gatePassId], references: [id], onDelete: Cascade)
@@ -1474,24 +1490,33 @@ model GatePassItem {
 }
 
 model GateContractorEntry {
-  id            String    @id @default(uuid())
-  tenantId      String
-  entryNumber   String    @db.VarChar(40)
-  status        String    @db.VarChar(32)
-  contractorName String   @db.VarChar(200)
-  company       String?   @db.VarChar(200)
-  mobile        String?   @db.VarChar(30)
-  workOrderRef  String?   @db.VarChar(80)
-  purpose       String    @db.VarChar(300)
-  gate          String    @db.VarChar(120)
-  entryTime     DateTime?
-  exitTime      DateTime?
-  remarks       String?   @db.Text
-  createdBy     String    @db.VarChar(200)
-  updatedBy     String    @db.VarChar(200)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
+  id                  String    @id @default(uuid())
+  tenantId            String
+  entryNumber         String    @db.VarChar(40)
+  status              String    @db.VarChar(32)
+  workerName          String    @db.VarChar(200)
+  mobile              String    @db.VarChar(30)
+  contractorCompany   String    @db.VarChar(200)
+  workReference       String?   @db.VarChar(120)
+  department          String    @db.VarChar(120)
+  supervisor          String    @db.VarChar(200)
+  workLocation        String    @db.VarChar(200)
+  validFrom           String    @db.VarChar(10)
+  validUntil          String    @db.VarChar(10)
+  safetyInductionDone Boolean   @default(false)
+  ppeIssued           Boolean   @default(false)
+  toolsCarried        String?   @db.Text
+  photoUrl            String?   @db.VarChar(500)
+  purpose             String    @db.VarChar(300)
+  remarks             String?   @db.Text
+  gate                String    @db.VarChar(120)
+  entryTime           DateTime?
+  exitTime            DateTime?
+  createdBy           String    @db.VarChar(200)
+  updatedBy           String    @db.VarChar(200)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -1501,24 +1526,31 @@ model GateContractorEntry {
 }
 
 model GateCourierEntry {
-  id            String    @id @default(uuid())
-  tenantId      String
-  entryNumber   String    @db.VarChar(40)
-  status        String    @db.VarChar(32)
-  courierName   String    @db.VarChar(200)
-  trackingNumber String?  @db.VarChar(80)
-  recipientName String    @db.VarChar(200)
-  department    String?   @db.VarChar(120)
-  packageCount  Int       @default(1)
-  gate          String    @db.VarChar(120)
-  entryTime     DateTime?
-  exitTime      DateTime?
-  remarks       String?   @db.Text
-  createdBy     String    @db.VarChar(200)
-  updatedBy     String    @db.VarChar(200)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
+  id                String    @id @default(uuid())
+  tenantId          String
+  entryNumber       String    @db.VarChar(40)
+  status            String    @db.VarChar(32)
+  direction         String    @db.VarChar(16)
+  courierCompany    String    @db.VarChar(120)
+  trackingNumber    String?   @db.VarChar(80)
+  senderName        String?   @db.VarChar(200)
+  recipientEmployee String?   @db.VarChar(200)
+  department        String?   @db.VarChar(120)
+  parcelType        String?   @db.VarChar(80)
+  parcelDescription String?   @db.Text
+  receivedTime      DateTime?
+  receivedBy        String?   @db.VarChar(200)
+  handoverTime      DateTime?
+  handedOverTo      String?   @db.VarChar(200)
+  dispatchTime      DateTime?
+  charges           Float?
+  remarks           String?   @db.Text
+  gate              String    @db.VarChar(120)
+  createdBy         String    @db.VarChar(200)
+  updatedBy         String    @db.VarChar(200)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -1528,40 +1560,49 @@ model GateCourierEntry {
 }
 
 model GateApproval {
-  id           String    @id @default(uuid())
-  tenantId     String
-  entityType   String    @db.VarChar(64)
-  entityId     String
-  status       String    @db.VarChar(32)
-  requestedBy  String    @db.VarChar(200)
-  approvedBy   String?   @db.VarChar(200)
-  remarks      String?   @db.Text
-  requestedAt  DateTime  @default(now())
-  decidedAt    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id            String    @id @default(uuid())
+  tenantId      String
+  requestNumber String    @db.VarChar(40)
+  requestType   String    @db.VarChar(40)
+  requestedBy   String    @db.VarChar(200)
+  subject       String    @db.VarChar(500)
+  reason        String    @db.Text
+  requestedAt   DateTime  @default(now())
+  priority      String    @default("normal") @db.VarChar(16)
+  status        String    @db.VarChar(32)
+  sourceType    String    @db.VarChar(40)
+  sourceId      String
+  actionedBy    String?   @db.VarChar(200)
+  actionedAt    DateTime?
+  actionRemarks String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
-  @@index([tenantId, entityType, entityId])
+  @@unique([tenantId, requestNumber])
   @@index([tenantId, status])
+  @@index([tenantId, sourceType, sourceId])
   @@map("gate_approvals")
 }
 
 model GateActivity {
-  id         String   @id @default(uuid())
-  tenantId   String
-  entityType String   @db.VarChar(64)
-  entityId   String
-  action     String   @db.VarChar(64)
-  actorName  String   @db.VarChar(200)
-  details    String?  @db.Text
-  createdAt  DateTime @default(now())
+  id          String   @id @default(uuid())
+  tenantId    String
+  time        DateTime @default(now())
+  event       String   @db.VarChar(40)
+  recordType  String   @db.VarChar(40)
+  recordId    String
+  recordLabel String   @db.VarChar(500)
+  company     String?  @db.VarChar(200)
+  gate        String   @db.VarChar(120)
+  operator    String   @db.VarChar(200)
+  status      String   @db.VarChar(32)
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
-  @@index([tenantId, entityType, entityId])
-  @@index([tenantId, createdAt])
+  @@index([tenantId, time])
   @@map("gate_activities")
 }
 `
