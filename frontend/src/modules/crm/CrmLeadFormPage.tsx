@@ -1710,16 +1710,15 @@ export function CrmLeadFormPage() {
                   lines={requirementLines}
                   onChange={(next) => {
                     handleRequirementLinesChange(next)
-                    inlineValidation.touch('productRequirement')
                   }}
                   productOptions={productOptions}
                   productPickMap={pickMap}
                   probability={Number(probability) || 0}
                   variant="opportunity"
                 />
-                {(inlineValidation.fieldError('productRequirement') ?? validationErrors.productRequirement) ? (
+                {validationErrors.productRequirement ? (
                   <p className="erp-field-row__error mt-2">
-                    {inlineValidation.fieldError('productRequirement') ?? validationErrors.productRequirement}
+                    {validationErrors.productRequirement}
                   </p>
                 ) : null}
               </div>
