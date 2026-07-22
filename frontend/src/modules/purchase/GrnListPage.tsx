@@ -8,6 +8,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Send,
   Trash2,
 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
@@ -38,7 +39,8 @@ import {
   type GrnSortKey,
 } from '@/config/grnFilterConfig'
 import { useCrmFilterDrawer } from '@/hooks/useCrmFilterDrawer'
-import { getGrnList } from '@/services/purchase'
+import { getGrnList, submitGRN, PurchaseServiceError } from '@/services/purchase'
+import { notify } from '@/store/toastStore'
 import { usePurchasePermissions } from '@/utils/permissions'
 import type { GrnListRow } from '@/types/purchaseDomain'
 import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
@@ -105,6 +107,19 @@ export function GrnListPage() {
 
   const clearFilters = () => filterDrawer.clearAll()
   const activeFilters = hasActiveGrnFilters(filters)
+
+  const handleSubmit = useCallback(
+    async (row: GrnListRow) => {
+      try {
+        await submitGRN(row.id)
+        notify.success(`${row.documentNumber} submitted`)
+        await load()
+      } catch (err) {
+        notify.error(err instanceof PurchaseServiceError ? err.message : 'Submit failed')
+      }
+    },
+    [load],
+  )
 
   const columns = useMemo<ColumnDef<GrnListRow>[]>(
     () => [
@@ -184,6 +199,17 @@ export function GrnListPage() {
               onClick: () => navigate(`/purchase/grn/${r.id}`),
             },
             {
+              id: 'submit',
+              label: 'Submit',
+              icon: Send,
+              onClick: () => void handleSubmit(r),
+              disabled: r.status !== 'draft' || !perms.canCreateGrn,
+              disabledReason:
+                r.status !== 'draft'
+                  ? `${statusLabel} GRNs cannot be submitted`
+                  : 'You do not have permission to submit GRNs',
+            },
+            {
               id: 'edit',
               label: 'Edit',
               icon: Pencil,
@@ -217,7 +243,7 @@ export function GrnListPage() {
         },
       },
     ],
-    [navigate],
+    [navigate, handleSubmit, perms.canCreateGrn],
   )
 
   const shellProps = {

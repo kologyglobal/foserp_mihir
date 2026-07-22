@@ -1,5 +1,4 @@
 import { useRef, type ReactNode } from 'react'
-import { Save, X } from 'lucide-react'
 import { ErpButton, ErpButtonGroup } from './ErpButton'
 import { ErpFormFooter } from './ErpFormFooter'
 import { systemConfirm } from '@/utils/systemConfirm'
@@ -89,7 +88,6 @@ export function FormActionBar({
     <ErpButton
       type="button"
       variant="secondary"
-      icon={X}
       className="min-w-0 flex-1 sm:flex-none"
       disabled={busy}
       onClick={() => void handleCancel()}
@@ -102,7 +100,6 @@ export function FormActionBar({
     <ErpButton
       type="button"
       variant="primary"
-      icon={Save}
       className="min-w-0 flex-1 sm:flex-none"
       disabled={saveDisabled}
       disabledReason={disabledReason}
@@ -119,7 +116,6 @@ export function FormActionBar({
         <ErpButton
           type="button"
           variant="secondary"
-          icon={Save}
           disabled={saveDisabled}
           disabledReason={disabledReason}
           onClick={onSaveAndNew}
@@ -131,7 +127,6 @@ export function FormActionBar({
         <ErpButton
           type="button"
           variant="outline"
-          icon={X}
           disabled={saveDisabled}
           disabledReason={disabledReason}
           onClick={onSaveAndClose}

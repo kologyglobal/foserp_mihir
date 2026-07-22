@@ -318,76 +318,79 @@ export function PurchaseApprovalsPage() {
           />
         }
       >
-        <div className="space-y-3">
-          <PurchaseRegisterContextPanel
-            ariaLabel="Approval queue overview and suggestions"
-            title="Approval Insights"
-            subtitle="AI suggested bottlenecks and next actions for this queue."
-            storageKey="purchase.ai-insights.approvals"
-            overview={registerOverview}
-            suggestions={registerSuggestions}
-          />
-          <EnterpriseRegisterTableShell className="min-w-0">
-            <PurchaseApprovalsTable
-              rows={filtered}
-              busyId={busyId}
-              handlers={rowHandlers}
-              hasActiveFilters={activeFilters}
-              onClearFilters={clearFilters}
-              registerFilter={{
-                search: filters.search,
-                onSearchChange: (search) => setFilters((f) => ({ ...f, search })),
-                searchPlaceholder: 'Search document, requester, department…',
-                activeFilterCount: filterDrawer.activeCount,
-                onOpenFilters: filterDrawer.openDrawer,
-                chips: filterDrawer.chips,
-                onRemoveChip: filterDrawer.removeChip,
-                onClearAll: clearFilters,
-                showCommandPaletteHint: false,
-                sort: (
-                  <CrmListSortSelect
-                    value={sortBy}
-                    onChange={(v) => setSortBy(v as ApprovalSortKey)}
-                    aria-label="Sort approvals"
-                    options={APPROVAL_SORT_OPTIONS}
-                  />
-                ),
-              }}
-              emptyAction={
-                filtered.length === 0 ? (
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {activeFilters ? (
-                      <button
-                        type="button"
-                        className="erp-btn erp-btn--secondary text-[13px]"
-                        onClick={clearFilters}
-                      >
-                        Clear Filters
-                      </button>
-                    ) : null}
-                    {tab !== 'pending_mine' ? (
-                      <button
-                        type="button"
-                        className="erp-btn erp-btn--primary text-[13px]"
-                        onClick={() => setQueueTab('pending_mine', '')}
-                      >
-                        Go to Pending Queue
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="erp-btn erp-btn--secondary text-[13px]"
-                        onClick={() => navigate('/purchase/setup')}
-                      >
-                        Open Purchase Setup
-                      </button>
-                    )}
-                  </div>
-                ) : undefined
-              }
-            />
-          </EnterpriseRegisterTableShell>
-        </div>
+        <PurchaseRegisterContextPanel
+          ariaLabel="Approval queue overview and suggestions"
+          title="Approval Insights"
+          subtitle="AI suggested bottlenecks and next actions for this queue."
+          storageKey="purchase.ai-insights.approvals"
+          overview={registerOverview}
+          suggestions={registerSuggestions}
+          placement="filterBar"
+        >
+          {({ restoreButton }) => (
+            <EnterpriseRegisterTableShell className="min-w-0">
+              <PurchaseApprovalsTable
+                rows={filtered}
+                busyId={busyId}
+                handlers={rowHandlers}
+                hasActiveFilters={activeFilters}
+                onClearFilters={clearFilters}
+                registerFilter={{
+                  search: filters.search,
+                  onSearchChange: (search) => setFilters((f) => ({ ...f, search })),
+                  searchPlaceholder: 'Search document, requester, department…',
+                  activeFilterCount: filterDrawer.activeCount,
+                  onOpenFilters: filterDrawer.openDrawer,
+                  chips: filterDrawer.chips,
+                  onRemoveChip: filterDrawer.removeChip,
+                  onClearAll: clearFilters,
+                  showCommandPaletteHint: false,
+                  afterFilters: restoreButton,
+                  sort: (
+                    <CrmListSortSelect
+                      value={sortBy}
+                      onChange={(v) => setSortBy(v as ApprovalSortKey)}
+                      aria-label="Sort approvals"
+                      options={APPROVAL_SORT_OPTIONS}
+                    />
+                  ),
+                }}
+                emptyAction={
+                  filtered.length === 0 ? (
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {activeFilters ? (
+                        <button
+                          type="button"
+                          className="erp-btn erp-btn--secondary text-[13px]"
+                          onClick={clearFilters}
+                        >
+                          Clear Filters
+                        </button>
+                      ) : null}
+                      {tab !== 'pending_mine' ? (
+                        <button
+                          type="button"
+                          className="erp-btn erp-btn--primary text-[13px]"
+                          onClick={() => setQueueTab('pending_mine', '')}
+                        >
+                          Go to Pending Queue
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="erp-btn erp-btn--secondary text-[13px]"
+                          onClick={() => navigate('/purchase/setup')}
+                        >
+                          Open Purchase Setup
+                        </button>
+                      )}
+                    </div>
+                  ) : undefined
+                }
+              />
+            </EnterpriseRegisterTableShell>
+          )}
+        </PurchaseRegisterContextPanel>
       </OperationalPageShell>
 
       <CrmFilterDrawer

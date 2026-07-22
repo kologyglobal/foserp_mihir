@@ -69,6 +69,7 @@ import {
   type PurchaseRequisitionAttachmentKind,
   type PurchaseRequisitionAttachmentPlaceholder,
   type Vendor,
+  purchaseRequisitionApprovalStatusLabel,
 } from '@/types/purchaseDomain'
 import {
   summarizePrLines,
@@ -79,6 +80,10 @@ import {
   type PrEditorHeader,
   type PrEditorLine,
 } from '@/utils/purchaseRequisitionValidation'
+import {
+  mapEngineeringProductTypeToPurchaseCategory,
+  mapPurchaseCategoryToEngineeringProductType,
+} from '@/utils/purchaseProductType'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
@@ -164,6 +169,7 @@ function emptyLine(partial?: Partial<PrEditorLine>): PrEditorLine {
     itemCode: '',
     itemName: '',
     specification: '',
+    productType: '',
     category: '',
     uomId: null,
     uom: 'NOS',
@@ -265,11 +271,18 @@ function headerFromPr(pr: PurchaseRequisition): PrEditorHeader {
 }
 
 function linesFromPr(pr: PurchaseRequisition): PrEditorLine[] {
-  return pr.lines.map((l) => ({
-    ...l,
-    key: l.id || crypto.randomUUID(),
-    actionMessage: false,
-  }))
+  return pr.lines.map((l) => {
+    const productType =
+      (l as PrEditorLine).productType ||
+      mapPurchaseCategoryToEngineeringProductType(l.category)
+    return {
+      ...l,
+      key: l.id || crypto.randomUUID(),
+      productType,
+      category: l.category || mapEngineeringProductTypeToPurchaseCategory(productType),
+      actionMessage: false,
+    }
+  })
 }
 
 export function PurchaseRequisitionEditorPage() {
@@ -651,12 +664,14 @@ export function PurchaseRequisitionEditorPage() {
         .filter(
           (l) =>
             (l.itemName.trim() || l.itemCode.trim() || l.itemId) &&
-            l.category &&
+            (l.productType || l.category) &&
             Number(l.quantity) > 0,
         )
-        .map(({ key: _key, category, actionMessage: _actionMessage, ...rest }) => ({
+        .map(({ key: _key, productType, category, actionMessage: _actionMessage, ...rest }) => ({
           ...rest,
-          category: category as PurchaseItemCategory,
+          category: (category ||
+            mapEngineeringProductTypeToPurchaseCategory(productType) ||
+            'consumable') as PurchaseItemCategory,
         })),
     }
   }, [attachments, header, lines, session, summary.estimatedTaxPct])
@@ -749,7 +764,17 @@ export function PurchaseRequisitionEditorPage() {
     const line = lines.find((l) => l.key === key)
     const item = catalogItems.find((i) => i.id === itemId)
     if (!item || !line) return
-    if (line.category && item.category !== line.category) return
+    // Prefer Item Master product type; if master has none, keep the filter the user already chose.
+    const productType =
+      item.productType ||
+      line.productType ||
+      mapPurchaseCategoryToEngineeringProductType(item.category) ||
+      ''
+    const category =
+      item.category ||
+      mapEngineeringProductTypeToPurchaseCategory(productType) ||
+      line.category ||
+      ''
     const vendor = item.preferredVendorId
       ? vendors.find((v) => v.id === item.preferredVendorId)
       : undefined
@@ -757,14 +782,15 @@ export function PurchaseRequisitionEditorPage() {
       itemId: item.id,
       itemCode: item.itemCode,
       itemName: item.itemName,
-      category: item.category,
+      productType,
+      category,
       uomId: item.uomId,
       uom: item.uom,
       hsnCode: item.hsnCode,
       sacCode: item.sacCode,
       estimatedRate: item.standardRate,
       quantity: Number(line.quantity) > 0 ? line.quantity : 1,
-      itemType: item.category === 'job_work' ? 'service' : 'inventory',
+      itemType: category === 'job_work' || productType === 'service' ? 'service' : 'inventory',
       preferredVendorId: vendor?.id ?? null,
       preferredVendorName: vendor?.vendorName ?? null,
       vendorNumber: vendor?.vendorCode ?? '',
@@ -798,7 +824,8 @@ export function PurchaseRequisitionEditorPage() {
         quantity,
         estimatedRate: estimatedRate || matched?.standardRate || 0,
         hsnCode: matched?.hsnCode ?? '',
-        category: matched?.category ?? '',
+        category: matched?.category ?? mapEngineeringProductTypeToPurchaseCategory(matched?.productType) ?? '',
+        productType: matched?.productType ?? '',
         locationId: header.locationId,
         locationName: header.locationName,
       })
@@ -832,7 +859,7 @@ export function PurchaseRequisitionEditorPage() {
       description="Manual purchase requisition — demand capture before RFQ / PO"
       recordNo={documentNumber ?? (isNew ? 'New' : undefined)}
       recordTitle={documentTitle}
-      status={PURCHASE_REQUISITION_STATUS_LABELS[status]}
+      status={purchaseRequisitionApprovalStatusLabel(status)}
       statusTone={purchaseStatusTone(status)}
       statusKey={status}
       recordHeaderFacts={recordHeaderFacts}
@@ -877,7 +904,7 @@ export function PurchaseRequisitionEditorPage() {
           metrics={formMetrics}
           summary={[
             { label: 'PR No.', value: documentNumber ?? (isNew ? 'Loading…' : '—') },
-            { label: 'Status', value: PURCHASE_REQUISITION_STATUS_LABELS[status] },
+            { label: 'Status', value: purchaseRequisitionApprovalStatusLabel(status) },
             {
               label: 'Department',
               value: header.department ? prDepartmentLabel(header.department) : '—',
@@ -1288,8 +1315,8 @@ export function PurchaseRequisitionEditorPage() {
 
           <ErpCardSection
             id={purchaseSectionId('costing')}
-            title="Approval Information"
-            subtitle="Status and approver context for this requisition"
+            title="Status"
+            subtitle="Approval-stage status for this requisition"
             collapsedSummary={additionalSummaryText || undefined}
             icon={Layers}
             accent="blue"
@@ -1299,8 +1326,8 @@ export function PurchaseRequisitionEditorPage() {
             dense
           >
             <ErpViewField
-              label="Approval status"
-              value={PURCHASE_REQUISITION_STATUS_LABELS[status]}
+              label="Status"
+              value={purchaseRequisitionApprovalStatusLabel(status)}
             />
             <ErpViewField
               label="Current approver"

@@ -48,7 +48,7 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   PPS_ALREADY_CONVERTED: 'PO-created rows cannot be edited or converted again.',
   PPS_CANCELLED: 'Cancelled rows cannot be converted.',
   PPS_RFQ_REQUIRED: 'RFQ-required PR items cannot be processed from Planning.',
-  PPS_NOT_SELECTED: 'Tick Action Message on each row before creating a PO.',
+  PPS_NOT_SELECTED: 'Select at least one planning row that is ready for PO (vendor, quantity, rate, date).',
 
   PO_NO_ELIGIBLE_ROWS: 'Select at least one eligible Planning row.',
   PO_TENANT_MISMATCH: 'All rows must belong to the current tenant.',
@@ -65,6 +65,9 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   FORBIDDEN: 'You do not have permission for this action.',
   PERMISSION_DENIED: 'You do not have permission for this action.',
   VALIDATION_ERROR: 'Please correct the highlighted fields and try again.',
+  PURCHASE_RETURN_NOT_FOUND: 'Purchase return not found.',
+  PURCHASE_RETURN_INVALID_STATE: 'This action is not allowed for the current return status.',
+  SERVER_TYPE_ERROR: 'Server configuration error while saving. Please retry or contact support.',
 
   // Legacy aliases
   PURCHASE_REQUISITION_NOT_FOUND: 'Purchase requisition not found.',

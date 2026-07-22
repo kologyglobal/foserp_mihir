@@ -72,7 +72,6 @@ export function PurchasePlanningCreatePoModal({
     const ineligible = rows.filter((r) => !canSelectPlanningRowForPo(r))
     for (const r of ineligible) {
       const gaps: string[] = []
-      if (!r.actionMessage) gaps.push('Action Message')
       if (!['vendor_selected', 'approved', 'po_pending'].includes(r.status)) {
         gaps.push('ready status')
       }

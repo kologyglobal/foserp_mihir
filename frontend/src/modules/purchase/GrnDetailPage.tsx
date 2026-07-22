@@ -207,7 +207,18 @@ export function GrnDetailPage() {
                     id: 'submit',
                     label: 'Submit',
                     icon: Send,
-                    onClick: () => void run(() => submitGRN(grn.id), 'GRN submitted'),
+                    onClick: async () => {
+                      const updated = await run(() => submitGRN(grn.id), 'GRN submitted')
+                      if (
+                        updated &&
+                        updated.inspectionRequired &&
+                        !updated.qualityInspectionId
+                      ) {
+                        notify.info(
+                          'GRN submitted. Open Quality Inspection from the command bar to continue QC.',
+                        )
+                      }
+                    },
                     disabled: busy || createGate.disabled,
                     disabledReason: createGate.disabledReason,
                   }
@@ -267,7 +278,7 @@ export function GrnDetailPage() {
       }
       footer={null}
     >
-      <ErpCardSection title="Header" defaultOpen>
+      <ErpCardSection title="Header" defaultOpen columns={1}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <ErpViewField label="GRN Number" value={grn.documentNumber} />
           <ErpViewField label="GRN Date" value={formatDate(grn.documentDate)} />
@@ -299,19 +310,19 @@ export function GrnDetailPage() {
         </div>
       </ErpCardSection>
 
-      <ErpCardSection title="Lines" defaultOpen>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
+      <ErpCardSection title="Lines" defaultOpen columns={1}>
+        <div className="min-w-0 w-full overflow-x-auto">
+          <table className="erp-table w-full min-w-[960px] text-left text-sm">
             <thead className="border-b text-xs text-erp-muted">
               <tr>
                 <th className="px-2 py-2">#</th>
                 <th className="px-2 py-2">Item</th>
-                <th className="px-2 py-2">Ordered</th>
-                <th className="px-2 py-2">Prev</th>
-                <th className="px-2 py-2">Pending</th>
-                <th className="px-2 py-2">Received</th>
-                <th className="px-2 py-2">Accepted</th>
-                <th className="px-2 py-2">Rejected</th>
+                <th className="px-2 py-2 num">Ordered</th>
+                <th className="px-2 py-2 num">Prev</th>
+                <th className="px-2 py-2 num">Pending</th>
+                <th className="px-2 py-2 num">Received</th>
+                <th className="px-2 py-2 num">Accepted</th>
+                <th className="px-2 py-2 num">Rejected</th>
                 <th className="px-2 py-2">Batch</th>
                 <th className="px-2 py-2">Inspection</th>
                 <th className="px-2 py-2">Remarks</th>
@@ -321,18 +332,18 @@ export function GrnDetailPage() {
               {grn.lines.map((l) => (
                 <tr key={l.id} className="border-b">
                   <td className="px-2 py-2">{l.lineNo}</td>
-                  <td className="px-2 py-2">
-                    <div className="font-mono text-xs">{l.itemCode}</div>
-                    <div>{l.itemName}</div>
+                  <td className="min-w-[10rem] px-2 py-2">
+                    <div className="font-mono text-xs whitespace-nowrap">{l.itemCode}</div>
+                    <div className="text-erp-text">{l.itemName}</div>
                   </td>
-                  <td className="px-2 py-2">{formatNumber(l.orderedQty)}</td>
-                  <td className="px-2 py-2">{formatNumber(l.previouslyReceivedQty)}</td>
-                  <td className="px-2 py-2">{formatNumber(l.pendingQty)}</td>
-                  <td className="px-2 py-2">{formatNumber(l.receivedQty)}</td>
-                  <td className="px-2 py-2">{formatNumber(l.acceptedQty)}</td>
-                  <td className="px-2 py-2">{formatNumber(l.rejectedQty)}</td>
-                  <td className="px-2 py-2 font-mono text-xs">{l.batchNumber || '—'}</td>
-                  <td className="px-2 py-2">{GRN_LINE_INSPECTION_STATUS_LABELS[l.inspectionStatus]}</td>
+                  <td className="px-2 py-2 num">{formatNumber(l.orderedQty)}</td>
+                  <td className="px-2 py-2 num">{formatNumber(l.previouslyReceivedQty)}</td>
+                  <td className="px-2 py-2 num">{formatNumber(l.pendingQty)}</td>
+                  <td className="px-2 py-2 num">{formatNumber(l.receivedQty)}</td>
+                  <td className="px-2 py-2 num">{formatNumber(l.acceptedQty)}</td>
+                  <td className="px-2 py-2 num">{formatNumber(l.rejectedQty)}</td>
+                  <td className="px-2 py-2 font-mono text-xs whitespace-nowrap">{l.batchNumber || '—'}</td>
+                  <td className="px-2 py-2 whitespace-nowrap">{GRN_LINE_INSPECTION_STATUS_LABELS[l.inspectionStatus]}</td>
                   <td className="px-2 py-2">{l.remarks || '—'}</td>
                 </tr>
               ))}
@@ -365,8 +376,8 @@ export function GrnDetailPage() {
         }
       >
         <p className="text-sm text-erp-muted">
-          Post {grn.documentNumber}? PO receipt quantities will be updated. Inventory stock posting
-          remains deferred until the backend is connected.
+          Post {grn.documentNumber}? PO receipt quantities will be updated and stock will be posted
+          to the live inventory ledger when no open quality hold remains.
         </p>
       </Modal>
 
@@ -381,8 +392,8 @@ export function GrnDetailPage() {
         }
       >
         <p className="text-sm">
-          GRN posted successfully. <strong>Inventory will be updated when the backend is connected</strong>{' '}
-          (demo mock — stock quantities are not written live).
+          GRN posted. Inventory posting is waiting on quality inspection or warehouse setup —
+          check Stock after QI accept / Post inventory completes.
         </p>
       </Modal>
     </PurchaseCardFormShell>

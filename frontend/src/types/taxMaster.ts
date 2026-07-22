@@ -62,6 +62,16 @@ export const ENGINEERING_PRODUCT_TYPE_LABELS: Record<EngineeringProductType, str
   service: 'Service',
 }
 
+export const ENGINEERING_PRODUCT_TYPES: readonly EngineeringProductType[] = [
+  'boi',
+  'raw_material',
+  'sub_assembly',
+  'assembly_product',
+  'finish_product',
+  'scrap',
+  'service',
+] as const
+
 export const INVENTORY_POSTING_TYPE_LABELS: Record<InventoryPostingType, string> = {
   inventory: 'Inventory',
   non_inventory: 'Non-Inventory',

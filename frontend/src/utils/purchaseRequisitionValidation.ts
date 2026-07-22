@@ -5,6 +5,7 @@ import type {
   PurchaseRequisitionPriority,
   PurchaseRequisitionSource,
 } from '../types/purchaseDomain'
+import type { EngineeringProductType } from '../types/taxMaster'
 
 export type PrEditorHeader = {
   documentDate: string
@@ -66,7 +67,9 @@ export function normalizePrDepartmentCode(value: string): string {
 
 export type PrEditorLine = Omit<PurchaseRequisitionLine, 'category'> & {
   key: string
-  /** Empty until chosen on the row — gates the item catalog for that line. */
+  /** Item Master engineering product type — shown as Product Type on the grid. */
+  productType: EngineeringProductType | ''
+  /** Purchase category derived from productType — kept for domain/API payloads. */
   category: PurchaseItemCategory | ''
   /** Action Message accept checkbox (planning-sheet style). */
   actionMessage: boolean
@@ -132,9 +135,9 @@ export function validatePurchaseRequisitionForm(
 
   for (const line of usableLines) {
     const prefix = `Line ${line.lineNo}`
-    if (!line.category) {
+    if (!line.productType && !line.category) {
       errors.push(`${prefix}: Product type is mandatory.`)
-      lineErrors[`${line.key}:category`] = 'Required'
+      lineErrors[`${line.key}:productType`] = 'Required'
     }
     if (!line.itemName.trim() && !line.itemCode.trim() && !line.itemId) {
       errors.push(`${prefix}: Item is required.`)

@@ -68,7 +68,7 @@ function sortPrRows(rows: PurchaseRequisitionListRow[], sortBy: PrSortKey): Purc
     case 'requiredBy':
       return list.sort((a, b) => cmp(a.requiredBy ?? '9999', b.requiredBy ?? '9999'))
     case 'status':
-      return list.sort((a, b) => cmp(a.statusLabel, b.statusLabel))
+      return list.sort((a, b) => cmp(a.approvalStatusLabel, b.approvalStatusLabel))
     case 'priority':
       return list.sort((a, b) => cmp(a.priority, b.priority))
     case 'department':
@@ -209,6 +209,7 @@ export function PurchaseRequisitionListPage() {
           r.requester.name.toLowerCase().includes(q) ||
           r.department.toLowerCase().includes(q) ||
           r.location.name.toLowerCase().includes(q) ||
+          r.approvalStatusLabel.toLowerCase().includes(q) ||
           r.statusLabel.toLowerCase().includes(q) ||
           r.priorityLabel.toLowerCase().includes(q) ||
           r.sourceLabel.toLowerCase().includes(q) ||
@@ -357,7 +358,6 @@ export function PurchaseRequisitionListPage() {
         'Estimated Value',
         'Priority',
         'Source',
-        'Approval Status',
         'Status',
         'Linked RFQ',
         'Linked PO',
@@ -374,7 +374,6 @@ export function PurchaseRequisitionListPage() {
         r.priorityLabel,
         r.sourceLabel,
         r.approvalStatusLabel,
-        r.statusLabel,
         r.convertedRfqNumber,
         r.convertedPoNumber,
       ]),

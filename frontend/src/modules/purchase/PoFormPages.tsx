@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft,
   Banknote,
   ClipboardList,
   Package,
@@ -352,10 +351,10 @@ export function PoCreateDocumentPage() {
       )}
       actions={(
         <ErpButtonGroup>
-          <ErpButton type="button" variant="ghost" icon={ArrowLeft} onClick={() => navigate('/purchase/orders')}>
+          <ErpButton type="button" variant="ghost" onClick={() => navigate('/purchase/orders')}>
             Cancel
           </ErpButton>
-          <ErpButton type="button" variant="primary" icon={Truck} disabled={!canCreate} onClick={handleCreate}>
+          <ErpButton type="button" variant="primary" disabled={!canCreate} onClick={handleCreate}>
             {createLabel}
           </ErpButton>
         </ErpButtonGroup>

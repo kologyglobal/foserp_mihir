@@ -1054,7 +1054,10 @@ export async function submitGRN(id: string): Promise<GoodsReceiptNote> {
           grn = { ...grn, qualityInspectionId: qi.id }
         } catch (err) {
           grn = await enrichGrnWithQualityInspectionId(grn)
-          if (!grn.qualityInspectionId) throwApi(err)
+          if (!grn.qualityInspectionId) {
+            // GRN submit already succeeded — do not fail the whole action on QI bootstrap.
+            console.warn('[submitGRN] QI auto-create failed after submit', err)
+          }
         }
       }
     }
@@ -1064,18 +1067,20 @@ export async function submitGRN(id: string): Promise<GoodsReceiptNote> {
   }
 }
 
-/** Demo posts stock locally; API posting is driven by GRN submit / QI completion on the backend. */
+/** Demo posts stock locally; API mode calls GRN `post-inventory` (idempotent). */
 export async function postGRN(id: string): Promise<GoodsReceiptNote> {
   if (!isApiMode()) return demo.postGRN(id)
-  const grn = await getGRNById(id)
-  if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${id}`)
-  if (grn.status === 'draft') {
-    return submitGRN(id)
+  try {
+    const current = await getGRNById(id)
+    if (!current) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${id}`)
+    if (current.status === 'draft') {
+      return submitGRN(id)
+    }
+    const res = await grnApi.postInventoryGoodsReceiptApi(id, {})
+    return mapApiGoodsReceiptToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
   }
-  if (grn.status === 'posted') {
-    return { ...grn, inventoryPostDeferred: true }
-  }
-  return { ...grn, inventoryPostDeferred: true }
 }
 
 export async function cancelGRN(id: string, remarks = ''): Promise<GoodsReceiptNote> {
@@ -1858,16 +1863,38 @@ function mapItemTypeToCategory(itemType: MasterItem['itemType']): PurchaseItemCa
   }
 }
 
+/** Prefer engineering productType when present — aligns PR Product Type with Item Master. */
+function mapMasterItemToPurchaseCategory(item: MasterItem): PurchaseItemCategory {
+  switch (item.productType) {
+    case 'raw_material':
+    case 'scrap':
+      return 'raw_material'
+    case 'boi':
+      return 'component'
+    case 'sub_assembly':
+    case 'assembly_product':
+      return 'component'
+    case 'finish_product':
+      return 'component'
+    case 'service':
+      return 'job_work'
+    default:
+      return mapItemTypeToCategory(item.itemType)
+  }
+}
+
 function mapMasterItemToPurchaseItem(item: MasterItem): PurchaseItem {
   const uom =
     useMasterStore.getState().uoms.find((u) => u.id === item.baseUomId)?.uomCode ??
     useMasterStore.getState().uoms.find((u) => u.id === item.baseUomId)?.uomName ??
     'NOS'
+  const productType = item.productType ?? null
   return {
     id: item.id,
     itemCode: item.itemCode,
     itemName: item.itemName,
-    category: mapItemTypeToCategory(item.itemType),
+    category: mapMasterItemToPurchaseCategory(item),
+    productType,
     description: item.itemDescription ?? '',
     uomId: item.baseUomId || null,
     uom,
@@ -1930,6 +1957,8 @@ function mapMasterVendorToPurchaseVendor(v: MasterVendor): Vendor {
 export async function getPurchaseItems(): Promise<PurchaseItem[]> {
   if (!isApiMode()) return demo.getPurchaseItems()
   let items = useMasterStore.getState().items
+  // Always refresh when store is empty OR stale after master edits in another tab/session.
+  // Prefer live store (kept current by masterBatchApiBridge upserts after create/update).
   if (!items.length) {
     try {
       const { syncBatchMastersFromApi } = await import('../bridges/masterBatchApiBridge')
@@ -2415,13 +2444,45 @@ export async function createPurchaseInvoiceFromPo(purchaseOrderId: string): Prom
   if (!isApiMode()) return demo.createPurchaseInvoiceFromPo(purchaseOrderId)
   const po = await getPurchaseOrderById(purchaseOrderId)
   if (!po) throw new PurchaseServiceError('PO_NOT_FOUND', `PO not found: ${purchaseOrderId}`)
+
+  const setup = await getPurchaseSetup().catch(() => null)
+  let postedGrn: GoodsReceiptNote | undefined
+  try {
+    const res = await grnApi.listGoodsReceiptsApi({
+      page: 1,
+      pageSize: 20,
+      sortOrder: 'desc',
+      purchaseOrderId: po.id,
+    })
+    postedGrn = res.data
+      .map(mapApiGoodsReceiptToDomain)
+      .find((g) => g.status === 'posted')
+  } catch {
+    const grns = await getGRNs().catch(() => [] as GoodsReceiptNote[])
+    postedGrn = grns.find((g) => g.purchaseOrderId === po.id && g.status === 'posted')
+  }
+
+  // Setup requireGrnMatch: PO-only create is rejected by API — use posted GRN when present.
+  if (postedGrn) {
+    return createPurchaseInvoiceFromGrn(postedGrn.id)
+  }
+  if (setup?.invoiceMatchTolerances.requireGrnMatch) {
+    throw new PurchaseServiceError(
+      'GRN_REQUIRED',
+      'Purchase Setup requires a posted GRN match. Open origin “Posted GRN” and select the GRN for this PO (or post a GRN first).',
+    )
+  }
+
+  const today = new Date().toISOString().slice(0, 10)
   return createPurchaseInvoice({
     vendorId: po.vendor.id,
     vendorInvoiceNumber: '',
-    vendorInvoiceDate: new Date().toISOString().slice(0, 10),
+    vendorInvoiceDate: today,
+    documentDate: today,
     origin: 'purchase_order',
     purchaseOrderId: po.id,
     placeOfSupply: po.placeOfSupply || po.vendor.state || '',
+    paymentTerms: po.paymentTerms,
     lines: po.lines
       .filter((l) => l.lineStatus !== 'cancelled')
       .map((l) => ({
@@ -2439,22 +2500,33 @@ export async function createPurchaseInvoiceFromGrn(goodsReceiptId: string): Prom
   if (!isApiMode()) return demo.createPurchaseInvoiceFromGrn(goodsReceiptId)
   const grn = await getGRNById(goodsReceiptId)
   if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${goodsReceiptId}`)
-  return createPurchaseInvoice({
-    vendorId: grn.vendor.id,
-    vendorInvoiceNumber: '',
-    vendorInvoiceDate: new Date().toISOString().slice(0, 10),
-    origin: 'goods_receipt',
-    purchaseOrderId: grn.purchaseOrderId,
-    goodsReceiptId: grn.id,
-    paymentTerms: grn.paymentTerms,
-    lines: grn.lines.map((l) => ({
+  const today = new Date().toISOString().slice(0, 10)
+  const lines = grn.lines
+    .map((l) => ({
       itemId: l.itemId,
       quantity: l.acceptedQty || l.receivedQty,
       rate: l.rate,
       purchaseOrderLineId: l.purchaseOrderLineId,
       goodsReceiptLineId: l.id,
       description: l.description || l.itemName,
-    })),
+    }))
+    .filter((l) => l.quantity > 0)
+  if (!lines.length) {
+    throw new PurchaseServiceError(
+      'GRN_NO_QTY',
+      'This GRN has no accepted/received quantity to invoice.',
+    )
+  }
+  return createPurchaseInvoice({
+    vendorId: grn.vendor.id,
+    vendorInvoiceNumber: '',
+    vendorInvoiceDate: today,
+    documentDate: today,
+    origin: 'goods_receipt',
+    purchaseOrderId: grn.purchaseOrderId,
+    goodsReceiptId: grn.id,
+    paymentTerms: grn.paymentTerms,
+    lines,
   })
 }
 

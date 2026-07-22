@@ -66,6 +66,7 @@ import type {
   PurchaseReturn,
   PurchaseReturnDomainStatus,
   PurchaseReturnInput,
+  PurchaseReturnLineInput,
   PurchaseReturnListRow,
   PurchaseReturnOrigin,
   PurchaseReturnReason,
@@ -261,6 +262,26 @@ function resolveVendorFromMaster(vendorId: string | null | undefined): {
   }
 }
 
+/** Resolve warehouse display from master store (API PRs store warehouseId only). */
+function resolveWarehouseFromMaster(warehouseId: string | null | undefined): {
+  id: string
+  code: string
+  name: string
+  state: string
+  city: string
+} {
+  const id = (warehouseId ?? '').trim()
+  if (!id) return { ...EMPTY_LOCATION }
+  const warehouse = useMasterStore.getState().warehouses.find((w) => w.id === id)
+  return {
+    id,
+    code: warehouse?.warehouseCode?.trim() || '',
+    name: warehouse?.warehouseName?.trim() || warehouse?.warehouseCode?.trim() || '—',
+    state: '',
+    city: '',
+  }
+}
+
 function resolveUomId(line: { uomId?: string | null; uom?: string | null }): string | null {
   const direct = (line.uomId ?? '').trim()
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(direct)) {
@@ -303,7 +324,7 @@ export function mapApiLineToDomain(line: ApiPurchaseRequisitionLine): PurchaseRe
     orderDate: '',
     customerName: '',
     locationId: line.warehouseId ?? '',
-    locationName: '',
+    locationName: resolveWarehouseFromMaster(line.warehouseId).name,
     binCode: line.binId ?? '',
     purchaseOrderId: line.purchaseOrderId ?? null,
     purchaseOrderNumber: line.purchaseOrderNumber ?? '',
@@ -327,9 +348,7 @@ export function mapApiRequisitionToDomain(dto: ApiPurchaseRequisition): Purchase
     documentNumber: dto.requisitionNumber,
     documentDate: dto.requisitionDate,
     status: mapPrStatus(dto.status),
-    location: dto.warehouseId
-      ? { id: dto.warehouseId, code: '', name: '', state: '', city: '' }
-      : { ...EMPTY_LOCATION },
+    location: resolveWarehouseFromMaster(dto.warehouseId),
     department: dto.departmentId ?? '',
     requester: {
       id: dto.requestedById ?? '',
@@ -1175,6 +1194,28 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
           ? 'rejected'
           : 'approved'
 
+  const locationFromApi =
+    api.deliveryWarehouseId || api.deliveryWarehouseName
+      ? {
+          id: api.deliveryWarehouseId ?? '',
+          code: api.deliveryWarehouseCode ?? '',
+          name:
+            (api.deliveryWarehouseName ?? '').trim() ||
+            resolveWarehouseFromMaster(api.deliveryWarehouseId).name,
+          state: '',
+          city: '',
+        }
+      : resolveWarehouseFromMaster(api.deliveryWarehouseId)
+
+  const buyer =
+    api.createdById || api.createdByName
+      ? {
+          id: api.createdById ?? '',
+          code: '',
+          name: (api.createdByName ?? '').trim() || '—',
+        }
+      : { ...EMPTY_PARTY }
+
   return {
     id: api.id,
     documentNumber: api.orderNumber,
@@ -1183,18 +1224,10 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
     orderType: 'standard',
     origin: mapApiPoOrigin(String(api.origin), Boolean(api.purchaseRequisitionId)),
     revisionNo: 0,
-    buyer: { ...EMPTY_PARTY },
-    location: { ...EMPTY_LOCATION },
-    purchaseLocation: { ...EMPTY_LOCATION },
-    deliveryLocation: api.deliveryWarehouseId
-      ? {
-          id: api.deliveryWarehouseId,
-          code: api.deliveryWarehouseCode ?? '',
-          name: api.deliveryWarehouseName ?? '',
-          state: '',
-          city: '',
-        }
-      : { ...EMPTY_LOCATION },
+    buyer,
+    location: locationFromApi,
+    purchaseLocation: locationFromApi,
+    deliveryLocation: locationFromApi,
     department: '',
     requester: { ...EMPTY_PARTY },
     approver: null,
@@ -1259,7 +1292,7 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
     releasedAt: api.sentAt ?? null,
     closedAt: api.closedAt ?? null,
     cancelledAt: api.cancelledAt ?? null,
-    createdBy: '',
+    createdBy: api.createdByName ?? api.createdById ?? '',
     createdAt: api.createdAt ?? '',
     updatedBy: null,
     updatedAt: api.updatedAt ?? null,
@@ -1276,7 +1309,7 @@ export function mapApiPurchaseOrderToListRow(api: ApiPurchaseOrder): PurchaseOrd
     documentDate: domain.documentDate,
     vendorName: domain.vendor.name,
     vendorGstin: domain.vendor.gstin,
-    locationName: domain.purchaseLocation.name || '—',
+    locationName: domain.purchaseLocation.name || domain.deliveryLocation.name || '—',
     buyerName: domain.buyer.name || '—',
     currency: domain.currency,
     expectedDeliveryDate: domain.expectedDeliveryDate,
@@ -1593,18 +1626,18 @@ export function mapApiPurchaseInvoiceToDomain(api: ApiPurchaseInvoice): Purchase
       isInterstate: gstScheme === 'igst',
     },
     currency: 'INR',
-    paymentTerms: '',
+    paymentTerms: api.paymentTerms || '',
     deliveryTerms: '',
     expectedDeliveryDate: null,
-    dueDate: null,
+    dueDate: api.dueDate || null,
     placeOfSupply: api.placeOfSupplyState || '',
     reverseCharge: api.reverseCharge,
     eInvoiceReference: null,
     gstScheme,
     purchaseOrderId: api.purchaseOrderId,
-    purchaseOrderNumber: null,
+    purchaseOrderNumber: api.purchaseOrderNumber || null,
     goodsReceiptId: api.goodsReceiptId,
-    goodsReceiptNumber: null,
+    goodsReceiptNumber: api.goodsReceiptNumber || null,
     matchStatus,
     matchingResultStatus,
     matchingExceptionApproved: api.overrideAuthorized,
@@ -1687,14 +1720,14 @@ export function mapApiPurchaseInvoiceToListRow(api: ApiPurchaseInvoice): Purchas
     vendorName: vendor.name,
     vendorGstin: vendor.gstin,
     vendorInvoiceNumber: api.vendorInvoiceNumber || '',
-    purchaseOrderNumber: null,
-    goodsReceiptNumber: null,
+    purchaseOrderNumber: api.purchaseOrderNumber || null,
+    goodsReceiptNumber: api.goodsReceiptNumber || null,
     matchingResultStatus,
     matchingResultStatusLabel: INVOICE_MATCHING_RESULT_STATUS_LABELS[matchingResultStatus],
     matchStatus,
     totalAmount: Number(api.totalAmount) || 0,
     currency: 'INR',
-    dueDate: null,
+    dueDate: api.dueDate || null,
     postingDate: api.documentDate || api.invoiceDate || '',
   }
 }
@@ -1774,16 +1807,16 @@ export function mapApiQualityInspectionToDomain(api: ApiQualityInspection): Qual
     status,
     result: qiResultFromStatus(status),
     goodsReceiptId: api.goodsReceiptId || '',
-    goodsReceiptNumber: '',
+    goodsReceiptNumber: api.goodsReceiptNumber || '',
     goodsReceiptLineId: first?.goodsReceiptLineId || '',
     purchaseOrderId: api.purchaseOrderId || '',
-    purchaseOrderNumber: '',
+    purchaseOrderNumber: api.purchaseOrderNumber || '',
     vendor: { id: vendor.id, code: vendor.code, name: vendor.name },
     location: resolveWarehouseLocation(api.warehouseId),
     itemId: first?.itemId || '',
     itemCode: first?.itemCodeSnapshot || '',
     itemName: extraLines > 0 ? `${itemName} (+${extraLines} more)` : itemName,
-    batchLotNo: '',
+    batchLotNo: api.batchLotNo || '',
     receivedQty: Number(api.totals?.inspected) || 0,
     sampleQty: Number(api.totals?.inspected) || 0,
     acceptedQty: Number(api.totals?.accepted) || 0,
@@ -1816,17 +1849,17 @@ export function mapApiQualityInspectionToListRow(
     documentNumber: api.documentNumber || api.inspectionNumber,
     documentDate: api.documentDate || api.inspectionDate || '',
     goodsReceiptId: api.goodsReceiptId || '',
-    goodsReceiptNumber: '',
+    goodsReceiptNumber: api.goodsReceiptNumber || '',
     itemCode: first?.itemCodeSnapshot || '',
     itemName: extraLines > 0 ? `${itemName} (+${extraLines} more)` : itemName,
-    batchLotNo: '',
+    batchLotNo: api.batchLotNo || '',
     receivedQty: Number(api.totals?.inspected) || 0,
     sampleQty: Number(api.totals?.inspected) || 0,
     inspectorName: api.inspectedByName || '',
     status,
     statusLabel: QUALITY_INSPECTION_STATUS_LABELS[status],
     result,
-    resultLabel: result ? QUALITY_INSPECTION_RESULT_LABELS[result] : null,
+    resultLabel: result ? QUALITY_INSPECTION_RESULT_LABELS[result] : '—',
   }
 }
 
@@ -1930,13 +1963,13 @@ export function mapApiPurchaseReturnToDomain(api: ApiPurchaseReturn): PurchaseRe
     deliveryTerms: '',
     expectedDeliveryDate: null,
     purchaseOrderId: api.purchaseOrderId,
-    purchaseOrderNumber: null,
+    purchaseOrderNumber: api.purchaseOrderNumber || null,
     goodsReceiptId: api.goodsReceiptId,
-    goodsReceiptNumber: null,
+    goodsReceiptNumber: api.goodsReceiptNumber || null,
     purchaseInvoiceId: null,
     purchaseInvoiceNumber: null,
     qualityInspectionId: api.qualityInspectionId,
-    qualityInspectionNumber: null,
+    qualityInspectionNumber: api.qualityInspectionNumber || null,
     returnReason,
     transportDetails: '',
     debitNoteRequired: false,
@@ -2008,8 +2041,8 @@ export function mapApiPurchaseReturnToListRow(api: ApiPurchaseReturn): PurchaseR
     documentDate: api.documentDate || api.returnDate || '',
     vendorName: vendor.name,
     vendorCode: vendor.code,
-    purchaseOrderNumber: null,
-    goodsReceiptNumber: null,
+    purchaseOrderNumber: api.purchaseOrderNumber || null,
+    goodsReceiptNumber: api.goodsReceiptNumber || null,
     purchaseInvoiceNumber: null,
     warehouseName: resolveWarehouseLocation(api.warehouseId).name,
     origin,
@@ -2041,9 +2074,12 @@ export function mapDomainPurchaseReturnInputToApiPayload(
     warehouseId: uuidOrNull(input.warehouseId ?? null),
     reason: input.returnReason,
     remarks: input.remarks || null,
-    lines: input.lines.map((line) => ({
+    lines: input.lines.map((line: PurchaseReturnLineInput) => ({
       goodsReceiptLineId: uuidOrNull(line.goodsReceiptLineId ?? null),
+      purchaseOrderLineId: uuidOrNull(line.purchaseOrderLineId ?? null),
       itemId: uuidOrNull(line.itemId),
+      itemCode: line.itemCode || undefined,
+      itemName: line.itemName || line.description || undefined,
       returnQuantity: Number(line.returnQty) || 0,
       rate: Number(line.unitCost ?? line.rate) || 0,
       remarks: line.remarks || null,

@@ -124,7 +124,7 @@ async function derivePurchaseRows(tenantId: string, limit: number): Promise<Need
         updatedAt: true,
       },
     }),
-    prisma.purchaseQualityInspection.findMany({
+    prisma.qualityInspection.findMany({
       where: { tenantId, deletedAt: null, status: { in: [...QI_OPEN_STATUSES] } },
       orderBy: { updatedAt: 'desc' },
       take: limit,

@@ -41,12 +41,12 @@ import {
   getVendors,
   getPurchaseWarehouses,
   previewNextPurchaseReturnNumber,
-  PurchaseServiceError,
   PURCHASE_RETURN_DOMAIN_STATUS_LABELS,
   PURCHASE_RETURN_ORIGIN_LABELS,
   PURCHASE_RETURN_REASON_LABELS,
   updatePurchaseReturn,
 } from '@/services/purchase'
+import { purchaseUserMessage } from '@/utils/purchase/purchaseErrorMessages'
 import type {
   GoodsReceiptNote,
   PurchaseInvoice,
@@ -318,6 +318,8 @@ export function PurchaseReturnEditorPage() {
       .filter((l) => l.itemId)
       .map((l) => ({
         itemId: l.itemId,
+        itemCode: l.itemCode,
+        itemName: l.description,
         returnQty: l.returnQty,
         unitCost: l.unitCost,
         goodsReceiptLineId: l.goodsReceiptLineId,
@@ -427,7 +429,7 @@ export function PurchaseReturnEditorPage() {
             hydrate(created)
             navigate(`/purchase/returns/${created.id}/edit`, { replace: true })
           } catch (err) {
-            notify.error(err instanceof PurchaseServiceError ? err.message : 'Failed to create from QI')
+            notify.error(purchaseUserMessage(err, 'Failed to create from QI'))
           } finally {
             if (!cancelled) setLoading(false)
           }
@@ -440,7 +442,7 @@ export function PurchaseReturnEditorPage() {
             hydrate(created)
             navigate(`/purchase/returns/${created.id}/edit`, { replace: true })
           } catch (err) {
-            notify.error(err instanceof PurchaseServiceError ? err.message : 'Failed to create from GRN')
+            notify.error(purchaseUserMessage(err, 'Failed to create from GRN'))
           } finally {
             if (!cancelled) setLoading(false)
           }
@@ -464,7 +466,7 @@ export function PurchaseReturnEditorPage() {
         hydrate(created)
         navigate(`/purchase/returns/${created.id}/edit`, { replace: true })
       } catch (err) {
-        notify.error(err instanceof PurchaseServiceError ? err.message : 'Could not load QI lines')
+        notify.error(purchaseUserMessage(err, 'Could not load QI lines'))
       }
       return
     }
@@ -474,7 +476,7 @@ export function PurchaseReturnEditorPage() {
         hydrate(created)
         navigate(`/purchase/returns/${created.id}/edit`, { replace: true })
       } catch (err) {
-        notify.error(err instanceof PurchaseServiceError ? err.message : 'Could not load GRN lines')
+        notify.error(purchaseUserMessage(err, 'Could not load GRN lines'))
       }
     }
   }
@@ -485,13 +487,17 @@ export function PurchaseReturnEditorPage() {
       notify.error('Select a vendor')
       return
     }
-    if (!toInput().lines.length) {
+    const input = toInput()
+    if (!input.lines.length) {
       notify.error('Add at least one line with an item')
+      return
+    }
+    if (input.lines.some((l) => !(Number(l.returnQty) > 0))) {
+      notify.error('Return quantity must be greater than zero on every line')
       return
     }
     setSaving(true)
     try {
-      const input = toInput()
       let doc: PurchaseReturn
       if (recordId) {
         doc = await updatePurchaseReturn(recordId, input)
@@ -505,7 +511,7 @@ export function PurchaseReturnEditorPage() {
       notify.success(`Saved · ${doc.documentNumber}`)
       navigate(PURCHASE_FORM_ROUTES.purchaseReturn.list, { replace: true })
     } catch (err) {
-      notify.error(err instanceof PurchaseServiceError ? err.message : 'Save failed')
+      notify.error(purchaseUserMessage(err, 'Could not save purchase return'))
     } finally {
       setSaving(false)
     }

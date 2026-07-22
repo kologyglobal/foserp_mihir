@@ -98,6 +98,24 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
   }
 
   logger.error('Unhandled error', err)
+
+  // Dev/local: surface TypeErrors that usually mean a Prisma model/delegate mismatch
+  // (e.g. calling prisma.foo.findFirst when `foo` is undefined) instead of a blank 500.
+  if (
+    !env.isProd &&
+    err instanceof TypeError &&
+    /cannot read propert/i.test(err.message)
+  ) {
+    sendError(
+      res,
+      500,
+      `Server error: ${err.message}. This often means a Prisma model name mismatch — check API server logs.`,
+      undefined,
+      'SERVER_TYPE_ERROR',
+    )
+    return
+  }
+
   sendError(res, 500, safeClientMessage(err))
 }
 

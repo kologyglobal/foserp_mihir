@@ -12,11 +12,14 @@ import { useBinCodeOptions } from '@/hooks/usePurchaseMasters'
 import { cn } from '@/utils/cn'
 import type { PrEditorLine } from '@/utils/purchaseRequisitionValidation'
 import {
-  PURCHASE_ITEM_CATEGORIES,
-  PURCHASE_ITEM_CATEGORY_LABELS,
-  type PurchaseItemCategory,
-  type Vendor,
-} from '@/types/purchaseDomain'
+  mapEngineeringProductTypeToPurchaseCategory,
+} from '@/utils/purchaseProductType'
+import {
+  ENGINEERING_PRODUCT_TYPES,
+  ENGINEERING_PRODUCT_TYPE_LABELS,
+  type EngineeringProductType,
+} from '@/types/taxMaster'
+import type { Vendor } from '@/types/purchaseDomain'
 import { formatDate } from '@/utils/dates/format'
 
 export type PurchaseRequisitionLinesTableProps = {
@@ -43,7 +46,8 @@ export type PurchaseRequisitionLinesTableProps = {
 
 function missingMandatory(line: PrEditorLine) {
   const started = Boolean(
-    line.category ||
+    line.productType ||
+      line.category ||
       line.itemId ||
       line.itemCode.trim() ||
       line.itemName.trim() ||
@@ -117,14 +121,19 @@ export function PurchaseRequisitionLinesTable({
 
   const patch = (key: string, next: Partial<PrEditorLine>) => onPatchLine?.(key, next)
 
-  const catalogForLine = (category: PurchaseItemCategory | '') => {
-    if (!category) return []
-    return catalogItems.filter((item) => item.category === category)
+  const catalogForLine = (productType: EngineeringProductType | '') => {
+    // Prefer items matching the selected Item Master product type; still show the rest.
+    if (!productType) return catalogItems
+    const matched = catalogItems.filter((item) => item.productType === productType)
+    const rest = catalogItems.filter((item) => item.productType !== productType)
+    return matched.length ? [...matched, ...rest] : catalogItems
   }
 
-  const setRowProductType = (line: PrEditorLine, category: PurchaseItemCategory | '') => {
-    if (!category) {
+  const setRowProductType = (line: PrEditorLine, productType: EngineeringProductType | '') => {
+    const category = mapEngineeringProductTypeToPurchaseCategory(productType)
+    if (!productType) {
       patch(line.key, {
+        productType: '',
         category: '',
         itemId: '',
         itemCode: '',
@@ -143,13 +152,14 @@ export function PurchaseRequisitionLinesTable({
       return
     }
     const matched = line.itemId
-      ? catalogItems.find((i) => i.id === line.itemId && i.category === category)
+      ? catalogItems.find((i) => i.id === line.itemId && i.productType === productType)
       : undefined
     if (matched) {
-      patch(line.key, { category })
+      patch(line.key, { productType, category })
       return
     }
     patch(line.key, {
+      productType,
       category,
       itemId: '',
       itemCode: '',
@@ -268,9 +278,8 @@ export function PurchaseRequisitionLinesTable({
               {lines.map((line) => {
                 const miss = missingMandatory(line)
                 const qtyError = showErrors && lineErrors?.[`${line.key}:quantity`]
-                const typeError = showErrors && lineErrors?.[`${line.key}:category`]
-                const rowCatalog = catalogForLine(line.category)
-                const itemReady = Boolean(line.category)
+                const typeError = showErrors && lineErrors?.[`${line.key}:productType`]
+                const rowCatalog = catalogForLine(line.productType)
                 const lineLocked = Boolean(line.purchaseOrderId)
                 const rowEditable = canEdit && !lineLocked
                 return (
@@ -289,21 +298,21 @@ export function PurchaseRequisitionLinesTable({
                       {rowEditable ? (
                         <select
                           className="erp-input h-8 w-full min-w-0 text-[12px]"
-                          value={line.category}
+                          value={line.productType}
                           onChange={(e) =>
-                            setRowProductType(line, e.target.value as PurchaseItemCategory | '')
+                            setRowProductType(line, e.target.value as EngineeringProductType | '')
                           }
                         >
-                          <option value="">Select…</option>
-                          {PURCHASE_ITEM_CATEGORIES.map((cat) => (
-                            <option key={cat} value={cat}>
-                              {PURCHASE_ITEM_CATEGORY_LABELS[cat]}
+                          <option value="">— Select —</option>
+                          {ENGINEERING_PRODUCT_TYPES.map((pt) => (
+                            <option key={pt} value={pt}>
+                              {ENGINEERING_PRODUCT_TYPE_LABELS[pt]}
                             </option>
                           ))}
                         </select>
                       ) : (
                         displayOrDash(
-                          line.category ? PURCHASE_ITEM_CATEGORY_LABELS[line.category] : '',
+                          line.productType ? ENGINEERING_PRODUCT_TYPE_LABELS[line.productType] : '',
                         )
                       )}
                     </td>
@@ -312,7 +321,6 @@ export function PurchaseRequisitionLinesTable({
                         'purchase-doc-lines-grid__sticky-item',
                         miss.missingItem &&
                           rowEditable &&
-                          itemReady &&
                           'ring-1 ring-inset ring-amber-400/70',
                       )}
                       onKeyDown={rowEditable ? onCellKeyDown : undefined}
@@ -323,7 +331,6 @@ export function PurchaseRequisitionLinesTable({
                           itemCode={line.itemCode}
                           itemName={line.itemName}
                           catalogItems={rowCatalog}
-                          disabled={!itemReady}
                           labelMode="code"
                           allowManual={false}
                           onSelectItem={(id) => onSelectCatalogItem(line.key, id)}

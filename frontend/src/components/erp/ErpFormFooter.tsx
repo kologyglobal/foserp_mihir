@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Save, X } from 'lucide-react'
 import { ErpButton, ErpButtonGroup } from './ErpButton'
 import { cn } from '../../utils/cn'
 
@@ -52,23 +51,17 @@ export function ErpFormFooter({
             <ErpButton
               type="submit"
               variant="primary"
-              icon={Save}
               disabled={submitDisabled || isSubmitting}
               disabledReason={submitDisabledReason}
             >
               {isSubmitting ? 'Saving…' : submitLabel}
             </ErpButton>
             {cancelTo ? (
-              <ErpButton
-                type="button"
-                variant="secondary"
-                icon={X}
-                onClick={() => navigate(cancelTo)}
-              >
+              <ErpButton type="button" variant="secondary" onClick={() => navigate(cancelTo)}>
                 {cancelLabel}
               </ErpButton>
             ) : onCancel ? (
-              <ErpButton type="button" variant="secondary" icon={X} onClick={onCancel}>
+              <ErpButton type="button" variant="secondary" onClick={onCancel}>
                 {cancelLabel}
               </ErpButton>
             ) : null}
