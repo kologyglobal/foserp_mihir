@@ -140,7 +140,7 @@ export function resolveLeadNextBestAction(input: LeadSmartOverviewInput): LeadNe
     return {
       id: 'add_requirement',
       title: 'Add Requirement',
-      description: 'Capture what the customer needs before you qualify this lead.',
+      description: 'Optionally capture what the customer needs — not required to qualify.',
       ctaLabel: 'Add Requirement',
       sectionId: 'quick',
       focusField: 'productRequirement',
@@ -150,7 +150,7 @@ export function resolveLeadNextBestAction(input: LeadSmartOverviewInput): LeadNe
     return {
       id: 'add_commercial',
       title: 'Add Commercial Details',
-      description: 'Enter expected value so pipeline forecasting stays accurate.',
+      description: 'Optionally enter expected value for pipeline forecasting — not required to qualify.',
       ctaLabel: 'Add Commercial Details',
       sectionId: 'commercial',
       focusField: 'expectedValue',

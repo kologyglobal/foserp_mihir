@@ -94,7 +94,8 @@ export async function createLead(tenantId: string, userId: string, input: Create
   await assertUserInTenant(tenantId, leadOwnerId, 'Lead owner')
 
   const stage = input.stage ?? 'new'
-  if (stage !== 'new') {
+  // Qualify (and other empty-gate stages) — skip field assert for qualified explicitly.
+  if (stage !== 'new' && stage !== 'qualified') {
     assertLeadStageRequirements(
       {
         prospectName: input.prospectName,
@@ -152,8 +153,8 @@ export async function qualifyLead(tenantId: string, id: string, userId: string, 
   if (existing.lifecycleStatus === 'converted') {
     throw new InvalidStateError('Lead already converted')
   }
-  const targetStage = input.stage ?? 'qualified'
-  assertLeadStageRequirements(leadEntityForStageGate(existing), targetStage)
+  // Qualify has no field gates — product / value / company are optional.
+  // Convert-to-opportunity still requires a linked company elsewhere.
   const lead = await repo.qualifyLead(tenantId, id, userId, input)
   return (await mapLeadWithNames(tenantId, lead))!
 }
@@ -167,14 +168,16 @@ export async function changeLeadStage(tenantId: string, id: string, userId: stri
     throw new InvalidStateError('Use convert action to move a lead to opportunity')
   }
 
-  // Validate post-merge state (entity + request body reason fields) before persist.
-  assertLeadStageRequirements(
-    leadEntityForStageGate(existing, {
-      notQualifiedReason: input.notQualifiedReason ?? existing.notQualifiedReason,
-      closedReason: input.closedReason ?? existing.closedReason,
-    }),
-    input.stage,
-  )
+  // Qualify has no field gates; other stages use LEAD_STAGE_REQUIREMENTS (mostly empty).
+  if (input.stage !== 'qualified') {
+    assertLeadStageRequirements(
+      leadEntityForStageGate(existing, {
+        notQualifiedReason: input.notQualifiedReason ?? existing.notQualifiedReason,
+        closedReason: input.closedReason ?? existing.closedReason,
+      }),
+      input.stage,
+    )
+  }
 
   const lifecycleStatus = lifecycleFromStage(input.stage)
   const qualificationStatus = qualificationFromStage(input.stage)

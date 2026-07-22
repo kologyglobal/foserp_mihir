@@ -60,11 +60,14 @@ export const OPPORTUNITY_STAGE_FIELD_LABELS: Record<string, string> = {
   quotationId: 'Quotation',
 }
 
-/** Lead stage gates: empty = stage change does not mandate optional fields. Convert keeps company link. */
+/** Lead stage gates: empty = stage change does not mandate optional fields.
+ * Qualify (`qualified`) has no field requirements — product / value / company optional.
+ * Convert keeps company link. */
 export const LEAD_STAGE_REQUIREMENTS: Record<string, readonly string[]> = {
   new: [],
   contacted: [],
   requirement_collected: [],
+  /** No field gates — qualify with empty product / value / company. */
   qualified: [],
   not_qualified: [],
   converted_to_opportunity: ['customerId'],

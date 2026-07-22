@@ -382,7 +382,9 @@ export const useSalesStore = create<SalesState>()(
           ...(extras?.notQualifiedReason !== undefined ? { notQualifiedReason: extras.notQualifiedReason } : {}),
           ...(extras?.closedReason !== undefined ? { closedReason: extras.closedReason } : {}),
         }
-        const missing = getMissingLeadStageFields(gateLead, stage)
+        // Qualify has no mandatory fields (product / value / company optional).
+        const missing =
+          stage === 'qualified' ? [] : getMissingLeadStageFields(gateLead, stage)
         if (missing.length > 0) {
           return {
             ok: false,

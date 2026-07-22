@@ -112,15 +112,15 @@ export const CRM_MASTERS_SEED: CrmMasterEntry[] = [
   entry('owners', 'user-sneha', 'Sneha Patil', 5, { employeeCode: 'EMP-005', role: 'Sales Coordinator', department: 'Sales', email: 'sneha@vasant.com', mobile: '9000000005', territory: 'south_india', permissionGroup: 'Sales Coordinator' }),
   entry('owners', 'user-vikram', 'Vikram Joshi', 6, { employeeCode: 'EMP-006', role: 'Regional Manager', department: 'Sales', email: 'vikram@vasant.com', mobile: '9000000006', territory: 'west_india', permissionGroup: 'Sales Manager' }, { status: 'inactive' }),
 
-  // requiredFields: comma-separated Lead model keys — foreshadows DB-backed stage gates.
-  // Authoritative FE reader today: config/crmStageRequirements.ts
+  // Lead stage requiredFields kept empty — qualify does not mandate productRequirement
+  // or expectedValue. Convert company link is enforced in config/crmStageRequirements.ts.
   entry('lead-stages', 'new', 'New', 1, { stageType: 'open', color: '#0078D4', isDefault: true, isFinal: false, nextAction: 'Contact prospect' }),
-  entry('lead-stages', 'contacted', 'Contacted', 2, { stageType: 'open', color: '#00B7C3', isDefault: false, isFinal: false, nextAction: 'Collect requirement', requiredFields: 'prospectName,contactPerson,mobile' }),
-  entry('lead-stages', 'requirement_collected', 'Requirement Collected', 3, { stageType: 'open', color: '#8764B8', isDefault: false, isFinal: false, nextAction: 'Qualify lead', requiredFields: 'productRequirement' }),
-  entry('lead-stages', 'qualified', 'Qualified', 4, { stageType: 'qualified', color: '#107C10', isDefault: false, isFinal: false, nextAction: 'Create opportunity', requiredFields: 'productRequirement,customerId,expectedValue' }),
-  entry('lead-stages', 'not_qualified', 'Not Qualified', 5, { stageType: 'closed', color: '#D13438', isDefault: false, isFinal: false, nextAction: 'Capture reason', requiredFields: 'notQualifiedReason' }),
-  entry('lead-stages', 'converted_to_opportunity', 'Converted to Opportunity', 6, { stageType: 'converted', color: '#498205', isDefault: false, isFinal: true, nextAction: '—', requiredFields: 'customerId' }, { systemControlled: true }),
-  entry('lead-stages', 'closed', 'Closed', 7, { stageType: 'closed', color: '#605E5C', isDefault: false, isFinal: true, nextAction: 'Capture closed reason', requiredFields: 'closedReason' }),
+  entry('lead-stages', 'contacted', 'Contacted', 2, { stageType: 'open', color: '#00B7C3', isDefault: false, isFinal: false, nextAction: 'Collect requirement' }),
+  entry('lead-stages', 'requirement_collected', 'Requirement Collected', 3, { stageType: 'open', color: '#8764B8', isDefault: false, isFinal: false, nextAction: 'Qualify lead' }),
+  entry('lead-stages', 'qualified', 'Qualified', 4, { stageType: 'qualified', color: '#107C10', isDefault: false, isFinal: false, nextAction: 'Create opportunity' }),
+  entry('lead-stages', 'not_qualified', 'Not Qualified', 5, { stageType: 'closed', color: '#D13438', isDefault: false, isFinal: false, nextAction: 'Capture reason' }),
+  entry('lead-stages', 'converted_to_opportunity', 'Converted to Opportunity', 6, { stageType: 'converted', color: '#498205', isDefault: false, isFinal: true, nextAction: '—' }, { systemControlled: true }),
+  entry('lead-stages', 'closed', 'Closed', 7, { stageType: 'closed', color: '#605E5C', isDefault: false, isFinal: true, nextAction: 'Capture closed reason' }),
 
   entry('lead-priorities', 'low', 'Low', 1, { priorityLevel: 1, color: '#8A94A6', slaHours: 72 }),
   entry('lead-priorities', 'medium', 'Medium', 2, { priorityLevel: 2, color: '#0078D4', slaHours: 48, isDefault: true }),

@@ -528,7 +528,7 @@ export async function apiAdvanceLeadStage(
     return { ok: false, error: 'Use Convert to Opportunity to advance this lead' }
   }
   const lead = useSalesStore.getState().getLead(id) ?? useSalesStore.getState().leads.find(l => l.id === id)
-  if (lead) {
+  if (lead && stage !== 'qualified') {
     const gateLead = {
       ...lead,
       ...(extras?.notQualifiedReason !== undefined ? { notQualifiedReason: extras.notQualifiedReason } : {}),

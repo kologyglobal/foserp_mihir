@@ -69,7 +69,8 @@ export function LeadChangeStageControl({
 
   async function changeTo(stage: LeadStage) {
     const lead = getLead(leadId)
-    if (lead) {
+    // Qualify never blocks on product / value / other fields.
+    if (lead && stage !== 'qualified') {
       const missing = getMissingLeadStageFields(lead, stage)
       if (missing.length > 0) {
         onBlocked?.(missing, stage)
@@ -116,7 +117,10 @@ export function LeadChangeStageControl({
           <p className="lead-change-stage__menu-hint">Move to</p>
           {options.map((stage) => {
             const lead = getLead(leadId)
-            const incomplete = lead ? getMissingLeadStageFields(lead, stage).length > 0 : false
+            const incomplete =
+              stage !== 'qualified' && lead
+                ? getMissingLeadStageFields(lead, stage).length > 0
+                : false
             return (
               <button
                 key={stage}
