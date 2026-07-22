@@ -66,6 +66,10 @@ enum CodeSeriesEntity {
   DISPATCH_PACKING_SESSION
   DISPATCH_PACKAGE
   DELIVERY_CHALLAN
+  PURCHASE_QUALITY_INSPECTION
+  INVENTORY_TRANSFER
+  INVENTORY_STOCK_COUNT
+  INVENTORY_ADJUSTMENT
 }
 
 enum ActivityType {
@@ -1986,6 +1990,8 @@ enum DefaultAccountMappingKey {
   COLLECTION_FEE_EXPENSE
   /// Merchant/payment-gateway fee expense default mapping (Phase 5B3).
   MERCHANT_FEE_EXPENSE
+  /// COGS account for sales-invoice optional COGS posting (O2C).
+  COST_OF_GOODS_SOLD
 }
 
 enum FinanceFeatureKey {
@@ -1996,6 +2002,7 @@ enum FinanceFeatureKey {
   TDS
   FIXED_ASSETS
   MANUFACTURING_ACCOUNTING
+  INVENTORY_ACCOUNTING
   BUDGETING
   MULTI_CURRENCY
   COST_CENTRES
@@ -9667,6 +9674,13 @@ enum InventoryReferenceType {
   QUALITY_RELEASE
   QUALITY_HOLD
   QUALITY_REJECT
+  TRANSFER_DISPATCH
+  TRANSFER_RECEIPT
+  TRANSFER_REVERSAL
+  STOCK_COUNT
+  STOCK_COUNT_REVERSAL
+  CONTROLLED_ADJUSTMENT
+  ADJUSTMENT_REVERSAL
 }
 
 enum InventoryReservationDemandType {
@@ -9681,6 +9695,13 @@ enum InventoryReservationStatus {
   CANCELLED
 }
 
+enum InventoryStockStatus {
+  UNRESTRICTED
+  QC_HOLD
+  BLOCKED
+  REJECTED
+}
+
 /// Cached balance per item+warehouse. Ledger (InventoryStockMovement) is SoT;
 /// balance rows are maintained in the same transaction as movements/reservations.
 model InventoryStockBalance {
@@ -9690,6 +9711,11 @@ model InventoryStockBalance {
   warehouseId String
   onHandQty   Decimal  @default(0) @db.Decimal(18, 4)
   reservedQty Decimal  @default(0) @db.Decimal(18, 4)
+  qcHoldQty   Decimal  @default(0) @db.Decimal(18, 4)
+  blockedQty  Decimal  @default(0) @db.Decimal(18, 4)
+  rejectedQty Decimal  @default(0) @db.Decimal(18, 4)
+  avgRate     Decimal  @default(0) @db.Decimal(18, 4)
+  stockValue  Decimal  @default(0) @db.Decimal(18, 2)
   updatedAt   DateTime @updatedAt
   createdAt   DateTime @default(now())
 
@@ -9724,6 +9750,12 @@ model InventoryStockMovement {
   reservationId     String?
   referenceNo       String?                @db.VarChar(100)
   remarks           String?                @db.Text
+  stockStatus       InventoryStockStatus   @default(UNRESTRICTED)
+  fromStockStatus   InventoryStockStatus?
+  batchId           String?
+  serialId          String?
+  batchNumberSnapshot String?              @db.VarChar(64)
+  serialNumberSnapshot String?             @db.VarChar(100)
   idempotencyKey    String?                @db.VarChar(150)
   createdBy         String?
   createdAt         DateTime               @default(now())
@@ -12062,6 +12094,11 @@ enum ManufacturingPostingMode {
   NONE
 }
 
+enum ManufacturingInventoryValuationMethod {
+  MOVING_AVERAGE
+  FIFO
+}
+
 enum ManufacturingCostingPolicyStatus {
   DRAFT
   ACTIVE
@@ -12105,6 +12142,7 @@ model ManufacturingCostingPolicy {
   defaultMachineRate      Decimal                              @default(0) @db.Decimal(18, 2)
   fgPostingMode           ManufacturingPostingMode             @default(MANUAL)
   variancePostingMode     ManufacturingPostingMode             @default(MANUAL)
+  inventoryValuationMethod ManufacturingInventoryValuationMethod @default(MOVING_AVERAGE)
   status                  ManufacturingCostingPolicyStatus     @default(DRAFT)
   effectiveFrom           DateTime?                            @db.Date
   currencyCode            String                               @default("INR") @db.VarChar(8)
