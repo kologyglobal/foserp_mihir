@@ -295,12 +295,17 @@ const SALES_ORDER_STATUS_ORDER: SalesOrder['status'][] = [
 ]
 
 export type SalesOrderSortKey =
+  | 'lastModified'
   | 'orderDate'
   | 'requiredDate'
   | 'value'
   | 'customer'
   | 'status'
   | 'soNo'
+
+function salesOrderLastTouched(so: SalesOrder): string {
+  return so.modifiedAt || so.createdAt || so.orderDate || ''
+}
 
 export function sortSalesOrders(
   rows: SalesOrder[],
@@ -315,6 +320,9 @@ export function sortSalesOrders(
   }
 
   switch (sortBy) {
+    case 'lastModified':
+      sorted.sort((a, b) => salesOrderLastTouched(b).localeCompare(salesOrderLastTouched(a)))
+      break
     case 'requiredDate':
       sorted.sort((a, b) => (a.requiredDate || '9999-12-31').localeCompare(b.requiredDate || '9999-12-31'))
       break

@@ -197,6 +197,7 @@ export const useMrpStore = create<MrpState>()(
       status: 'open',
       remarks: input.remarks,
       createdAt: new Date().toISOString(),
+      modifiedAt: new Date().toISOString(),
       quotationId: input.quotationId || null,
       quotationNo: input.quotationNo || null,
       quotationRevisionNo: input.quotationRevisionNo ?? null,
@@ -245,7 +246,9 @@ export const useMrpStore = create<MrpState>()(
       return { ok: false, error: 'Only draft sales orders can be edited' }
     }
     set((s) => ({
-      salesOrders: s.salesOrders.map((o) => (o.id === salesOrderId ? { ...o, ...patch } : o)),
+      salesOrders: s.salesOrders.map((o) =>
+        o.id === salesOrderId ? { ...o, ...patch, modifiedAt: new Date().toISOString() } : o,
+      ),
     }))
     return { ok: true }
   },
@@ -292,7 +295,11 @@ export const useMrpStore = create<MrpState>()(
       return { ok: false, error: 'Grand total must be greater than zero before confirmation' }
     }
     set((s) => ({
-      salesOrders: s.salesOrders.map((o) => (o.id === salesOrderId ? { ...o, status: 'confirmed' } : o)),
+      salesOrders: s.salesOrders.map((o) =>
+        o.id === salesOrderId
+          ? { ...o, status: 'confirmed', modifiedAt: new Date().toISOString() }
+          : o,
+      ),
     }))
     try {
       useFreezeStore.getState().createFreezeForSo(salesOrderId)

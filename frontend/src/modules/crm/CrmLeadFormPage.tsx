@@ -1382,6 +1382,7 @@ export function CrmLeadFormPage() {
         commandBar={commandBar}
         factBox={factBox}
         suppressFactBoxRecord
+        hideRecordBar={!isEdit}
         onSubmit={handleSubmit}
         onSaveShortcut={() => saveLead('default')}
         onSaveCloseShortcut={() => saveLead('close')}

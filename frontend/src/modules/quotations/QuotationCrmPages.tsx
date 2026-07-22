@@ -95,7 +95,7 @@ export function CrmQuotationListPage() {
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<QuotationDocumentStatus | ''>('')
-  const [sortBy, setSortBy] = useState<'date' | 'value' | 'expiry' | 'status'>('date')
+  const [sortBy, setSortBy] = useState<'lastModified' | 'date' | 'value' | 'expiry' | 'status'>('lastModified')
   const [segment, setSegment] = useState<'all' | 'pending' | 'draft' | 'approved'>('all')
   const [ownerFilter, setOwnerFilter] = useState('')
   const [followUpQuotation, setFollowUpQuotation] = useState<QuotationListItem | null>(null)
@@ -147,7 +147,7 @@ export function CrmQuotationListPage() {
     setSegment((saved.segment || 'all') as typeof segment)
     setOwnerFilter(saved.owner ?? '')
     const sb = saved.sortBy
-    if (sb === 'date' || sb === 'value' || sb === 'expiry' || sb === 'status') {
+    if (sb === 'lastModified' || sb === 'date' || sb === 'value' || sb === 'expiry' || sb === 'status') {
       setSortBy(sb)
     }
   }, [])
@@ -216,7 +216,14 @@ export function CrmQuotationListPage() {
     if (sortBy === 'value') list.sort((a, b) => b.document.totalAmount - a.document.totalAmount)
     else if (sortBy === 'expiry') list.sort((a, b) => (b.expiryDate || '').localeCompare(a.expiryDate || ''))
     else if (sortBy === 'status') list.sort((a, b) => a.document.status.localeCompare(b.document.status))
-    else list.sort((a, b) => (b.quotationDate || '').localeCompare(a.quotationDate || ''))
+    else if (sortBy === 'date') list.sort((a, b) => (b.quotationDate || '').localeCompare(a.quotationDate || ''))
+    else {
+      list.sort((a, b) => {
+        const at = a.document.modifiedAt || a.document.createdAt || a.quotationDate || ''
+        const bt = b.document.modifiedAt || b.document.createdAt || b.quotationDate || ''
+        return bt.localeCompare(at)
+      })
+    }
     return list
   }, [filtered, sortBy])
 
@@ -272,7 +279,7 @@ export function CrmQuotationListPage() {
   const clearFilters = useCallback(() => {
     filterDrawer.clearAll()
     setSegment('all')
-    setSortBy('date')
+    setSortBy('lastModified')
   }, [filterDrawer])
 
   const hasActiveQuotationFilters = useMemo(
@@ -504,6 +511,7 @@ export function CrmQuotationListPage() {
                 onChange={(v) => setSortBy(v as typeof sortBy)}
                 aria-label="Sort quotations"
                 options={[
+                  { value: 'lastModified', label: 'Sort: Last Modified' },
                   { value: 'date', label: 'Sort: Date' },
                   { value: 'value', label: 'Sort: Amount' },
                   { value: 'expiry', label: 'Sort: Expiry' },

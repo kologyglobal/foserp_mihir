@@ -61,6 +61,7 @@ export function EnterpriseWorkspace({
   factBoxSubtitle,
   factBoxStorageKey,
   suppressFactBoxRecord = false,
+  hideRecordBar = false,
   tabs,
   activeTab,
   onTabChange,
@@ -189,7 +190,7 @@ export function EnterpriseWorkspace({
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={onTabChange}
-      actionRow={headerInFactbox || workspaceRecordHeader ? undefined : workspaceHeader}
+      actionRow={headerInFactbox || workspaceRecordHeader || hideRecordBar ? undefined : workspaceHeader}
       validationErrors={showLegacyValidation ? validationErrors : undefined}
       lockedReason={lockedReason}
       onSubmit={onSubmit}

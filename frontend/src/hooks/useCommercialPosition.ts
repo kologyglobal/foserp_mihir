@@ -22,7 +22,11 @@ export function useSalesOrderCommercialPosition(salesOrderId: string | undefined
 
   useEffect(() => {
     if (!salesOrderId || !isApiMode()) {
-      setState({ data: null, loading: false, error: null })
+      setState((prev) =>
+        prev.data == null && !prev.loading && prev.error == null
+          ? prev
+          : { data: null, loading: false, error: null },
+      )
       return
     }
     let cancelled = false
@@ -57,7 +61,11 @@ export function useCompanyCommercialPosition(companyId: string | undefined): Loa
 
   useEffect(() => {
     if (!companyId || !isApiMode()) {
-      setState({ data: null, loading: false, error: null })
+      setState((prev) =>
+        prev.data == null && !prev.loading && prev.error == null
+          ? prev
+          : { data: null, loading: false, error: null },
+      )
       return
     }
     let cancelled = false
