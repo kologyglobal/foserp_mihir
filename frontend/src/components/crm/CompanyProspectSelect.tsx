@@ -24,6 +24,16 @@ interface CompanyProspectSelectProps {
   value: CompanyProspectValue
   onChange: (value: CompanyProspectValue) => void
   onCompanyLinked?: (match: CompanyProspectMatch) => void
+  /**
+   * Fired once when the user starts editing in Add New Company.
+   * Parent should snapshot + clear prior company-derived contact fields.
+   */
+  onCompanyCreateTyping?: () => void
+  /**
+   * Fired when Add New Company is cancelled after the user typed
+   * (company value is restored by this control; parent restores contact fields).
+   */
+  onCompanyCreateCancel?: () => void
   /** Called when focus leaves the control (Tab / click away). Use for required-field validation. */
   onBlur?: () => void
   /** Border / aria invalid. Prefer parent `ErpFieldRow.fieldError` for the message text. */
@@ -36,6 +46,8 @@ export function CompanyProspectSelect({
   value,
   onChange,
   onCompanyLinked,
+  onCompanyCreateTyping,
+  onCompanyCreateCancel,
   onBlur,
   error,
   disabled,
@@ -50,10 +62,13 @@ export function CompanyProspectSelect({
   const [open, setOpen] = useState(false)
   const [highlightIndex, setHighlightIndex] = useState(0)
   const [companyModalOpen, setCompanyModalOpen] = useState(false)
+  const [companyModalDefaultName, setCompanyModalDefaultName] = useState('')
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const companyCreateSnapshotRef = useRef<CompanyProspectValue | null>(null)
+  const companyCreateClearedRef = useRef(false)
 
   const activeQuery = open ? (filterQuery !== '' ? filterQuery : query) : query
 
@@ -160,11 +175,44 @@ export function CompanyProspectSelect({
 
   function handleAddCompany() {
     if (!canCreate('customer')) return
+    companyCreateSnapshotRef.current = {
+      customerId: value.customerId,
+      prospectName: value.prospectName,
+    }
+    companyCreateClearedRef.current = false
+    setCompanyModalDefaultName(query.trim() || value.prospectName.trim())
     setOpen(false)
     setCompanyModalOpen(true)
   }
 
+  function handleCompanyCreateTyping() {
+    if (companyCreateClearedRef.current) return
+    companyCreateClearedRef.current = true
+    // Snapshot parent contact fields before unlinking company (parents may clear
+    // contact person when customerId becomes null).
+    onCompanyCreateTyping?.()
+    setQuery('')
+    setFilterQuery('')
+    setDuplicateWarning(null)
+    onChange({ customerId: null, prospectName: '' })
+  }
+
+  function handleCompanyCreateDismiss() {
+    if (companyCreateClearedRef.current && companyCreateSnapshotRef.current) {
+      const snap = companyCreateSnapshotRef.current
+      setQuery(snap.prospectName)
+      setFilterQuery('')
+      onCompanyCreateCancel?.()
+      onChange(snap)
+    }
+    companyCreateSnapshotRef.current = null
+    companyCreateClearedRef.current = false
+    setCompanyModalOpen(false)
+  }
+
   function handleCompanyCreated(result: QuickCreateResult) {
+    companyCreateSnapshotRef.current = null
+    companyCreateClearedRef.current = false
     const c = (useMasterStore.getState().getCustomer(result.id) ?? result.record) as Customer | undefined
     const name = c?.customerName ?? result.label
     if (!result.id || !name) return
@@ -371,8 +419,10 @@ export function CompanyProspectSelect({
 
       <QuickCompanyCreateModal
         open={companyModalOpen}
-        onClose={() => setCompanyModalOpen(false)}
+        defaultName={companyModalDefaultName}
+        onClose={handleCompanyCreateDismiss}
         onCreated={handleCompanyCreated}
+        onUserEdit={handleCompanyCreateTyping}
       />
     </div>
   )

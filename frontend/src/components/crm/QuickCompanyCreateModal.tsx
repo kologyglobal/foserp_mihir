@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Building2, ChevronDown, X } from 'lucide-react'
 import { FormField } from '../forms/FormField'
@@ -36,6 +36,8 @@ export interface QuickCompanyCreateModalProps {
   defaultName?: string
   onClose: () => void
   onCreated: (result: QuickCreateResult) => void
+  /** Fired once when the user starts editing after the modal opens (not on reset). */
+  onUserEdit?: () => void
 }
 
 type CompanyForm = {
@@ -135,6 +137,7 @@ export function QuickCompanyCreateModal({
   defaultName = '',
   onClose,
   onCreated,
+  onUserEdit,
 }: QuickCompanyCreateModalProps) {
   const industryOptions = useIndustryOptions()
   const territoryOptions = useTerritoryOptions()
@@ -142,6 +145,7 @@ export function QuickCompanyCreateModal({
   const [showAdditional, setShowAdditional] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const userEditedRef = useRef(false)
 
   useEffect(() => {
     if (!open) return
@@ -151,6 +155,12 @@ export function QuickCompanyCreateModal({
       return firstTerritory ? { ...prev, salesTerritory: firstTerritory } : prev
     })
   }, [open, territoryOptions])
+
+  function notifyUserEdit() {
+    if (userEditedRef.current) return
+    userEditedRef.current = true
+    onUserEdit?.()
+  }
 
   // Quick company creation requires only Company Name. Mobile and Email are
   // optional but must be valid when entered (shared validators skip empty values),
@@ -178,6 +188,7 @@ export function QuickCompanyCreateModal({
 
   useEffect(() => {
     if (!open) return
+    userEditedRef.current = false
     setForm(emptyForm(defaultName.trim()))
     setShowAdditional(false)
     setError(null)
@@ -197,11 +208,13 @@ export function QuickCompanyCreateModal({
   }, [open, submitting, onClose])
 
   function setField<K extends keyof CompanyForm>(key: K, value: CompanyForm[K]) {
+    notifyUserEdit()
     setForm((prev) => ({ ...prev, [key]: value }))
     setError(null)
   }
 
   function handleGstinChange(raw: string) {
+    notifyUserEdit()
     const gst = raw.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 15)
     setForm((prev) => ({
       ...prev,
