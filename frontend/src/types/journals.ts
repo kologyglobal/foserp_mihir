@@ -81,6 +81,10 @@ export interface Journal {
   postingEventId?: string | null
   ledgerEntryCount?: number
   generalLedgerLink?: string | null
+  reversedByVoucherId?: string | null
+  reversedAt?: string | null
+  reversedBy?: string | null
+  reversalReason?: string | null
 }
 
 export interface JournalValidationError {

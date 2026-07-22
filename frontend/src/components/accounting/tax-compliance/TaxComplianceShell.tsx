@@ -8,6 +8,32 @@ import { TaxComplianceSideNav, TaxComplianceWorkspaceTabs } from './TaxComplianc
 import type { PeriodFilterState } from '@/types/taxCompliance'
 import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
 
+export type TaxComplianceBannerVariant = 'auto' | 'extract-live' | 'filing-demo' | 'demo'
+
+const EXTRACT_LIVE_PATHS = new Set([
+  '/accounting/tax-compliance',
+  '/accounting/tax-compliance/gst',
+  '/accounting/tax-compliance/gst/outward-supplies',
+  '/accounting/tax-compliance/gst/inward-supplies',
+])
+
+const FILING_DEMO_PATHS = [
+  '/accounting/tax-compliance/gst/gstr-1',
+  '/accounting/tax-compliance/gst/gstr-3b',
+  '/accounting/tax-compliance/gst/gstr-2b',
+]
+
+function bannerVariantForPath(pathname: string): TaxComplianceBannerVariant {
+  const normalized = pathname.replace(/\/$/, '') || '/'
+  if (FILING_DEMO_PATHS.some((p) => normalized === p || normalized.startsWith(`${p}/`))) {
+    return 'filing-demo'
+  }
+  if (EXTRACT_LIVE_PATHS.has(normalized)) {
+    return 'extract-live'
+  }
+  return 'auto'
+}
+
 export function TaxComplianceShell({
   title,
   description,
@@ -18,6 +44,7 @@ export function TaxComplianceShell({
   periodFilter,
   onPeriodChange,
   denseBanner,
+  bannerVariant,
 }: {
   title?: string
   description?: string
@@ -28,10 +55,12 @@ export function TaxComplianceShell({
   periodFilter?: PeriodFilterState
   onPeriodChange?: (next: PeriodFilterState) => void
   denseBanner?: boolean
+  bannerVariant?: TaxComplianceBannerVariant
 }) {
   const { pathname } = useLocation()
   const active = findTaxComplianceNavItem(pathname)
   const pageTitle = title ?? active?.label ?? 'GST & TDS'
+  const resolvedBanner = bannerVariant ?? bannerVariantForPath(pathname)
 
   return (
     <OperationalPageShell
@@ -49,7 +78,7 @@ export function TaxComplianceShell({
     >
       <div className="flex flex-col gap-2">
         <TaxComplianceWorkspaceTabs />
-        <TaxCompliancePreviewBanner dense={denseBanner} />
+        <TaxCompliancePreviewBanner dense={denseBanner} variant={resolvedBanner} />
         {showPeriodBar ? <TaxCompliancePeriodBar value={periodFilter} onChange={onPeriodChange} /> : null}
         <div className="flex min-h-[420px] flex-col overflow-hidden rounded border border-erp-border bg-white md:flex-row">
           <div className="border-b border-erp-border md:border-b-0">

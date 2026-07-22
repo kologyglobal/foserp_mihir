@@ -61,7 +61,7 @@ export function NotificationPanel() {
   return (
     <>
       <div className="erp-detail-scrim fixed inset-0 z-40 bg-black/20" onClick={() => setOpen(false)} />
-      <aside className="erp-detail-panel fixed right-0 top-[var(--d365-suite-height)] z-50 flex h-[calc(100vh-var(--d365-suite-height))] w-full max-w-md flex-col border-l border-erp-border bg-erp-surface shadow-erp-lg">
+      <aside className="erp-detail-panel fixed right-0 top-0 z-50 flex h-screen w-full max-w-md flex-col border-l border-erp-border bg-erp-surface shadow-erp-lg">
         <div className="flex items-center justify-between border-b border-erp-border bg-gradient-to-r from-erp-surface-alt/80 to-erp-surface px-4 py-3">
           <div className="flex items-center gap-2">
             <Bell className="h-4 w-4 text-erp-primary" />

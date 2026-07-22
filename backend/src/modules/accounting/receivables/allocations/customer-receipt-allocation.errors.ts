@@ -20,6 +20,8 @@ export const RECEIPT_ALLOCATION_ERROR_CODES = {
   RECEIPT_ALLOCATION_IN_PROGRESS: 'RECEIPT_ALLOCATION_IN_PROGRESS',
   RECEIPT_ALLOCATION_NOT_ALLOWED: 'RECEIPT_ALLOCATION_NOT_ALLOWED',
   RECEIPT_ALLOCATION_FAILED: 'RECEIPT_ALLOCATION_FAILED',
+  RECEIPT_ALLOCATION_BATCH_NOT_FOUND: 'RECEIPT_ALLOCATION_BATCH_NOT_FOUND',
+  RECEIPT_ALLOCATION_BATCH_NOT_REVERSIBLE: 'RECEIPT_ALLOCATION_BATCH_NOT_REVERSIBLE',
 } as const
 
 export type ReceiptAllocationErrorCode =
@@ -134,5 +136,22 @@ export class ReceiptAllocationForexRequiredError extends ReceiptAllocationValida
       RECEIPT_ALLOCATION_ERROR_CODES.RECEIPT_ALLOCATION_FOREX_REQUIRED,
     )
     this.name = 'ReceiptAllocationForexRequiredError'
+  }
+}
+
+export class ReceiptAllocationBatchNotFoundError extends NotFoundError {
+  constructor() {
+    super('Receipt allocation batch not found')
+    Object.defineProperty(this, 'code', {
+      value: RECEIPT_ALLOCATION_ERROR_CODES.RECEIPT_ALLOCATION_BATCH_NOT_FOUND,
+    })
+    this.name = 'ReceiptAllocationBatchNotFoundError'
+  }
+}
+
+export class ReceiptAllocationBatchNotReversibleError extends ReceiptAllocationValidationError {
+  constructor(message = 'Only POSTED allocation batches can be reversed') {
+    super(message, RECEIPT_ALLOCATION_ERROR_CODES.RECEIPT_ALLOCATION_BATCH_NOT_REVERSIBLE)
+    this.name = 'ReceiptAllocationBatchNotReversibleError'
   }
 }

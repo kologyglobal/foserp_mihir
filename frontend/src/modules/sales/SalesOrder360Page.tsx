@@ -29,13 +29,17 @@ import { TableLink } from '../../components/ui/AppLink'
 import { Badge, formatStatus, statusColor } from '../../components/ui/Badge'
 import { salesOrderStatusLabel } from '../../utils/salesOrderStatus'
 import { Toast } from '../../components/ui/Toast'
+import { notify } from '../../store/toastStore'
 import { useMrpStore } from '../../store/mrpStore'
 import { useSalesStore } from '../../store/salesStore'
 import { useWorkOrderStore } from '../../store/workOrderStore'
 import { useDispatchStore } from '../../store/dispatchStore'
+import { isApiMode } from '../../config/apiConfig'
+import { SalesOrderDispatchFulfilmentPanel } from '../dispatch/SalesOrderDispatchFulfilmentPanel'
 import { useQualityStore } from '../../store/qualityStore'
 import { useMasterStore } from '../../store/masterStore'
 import { useCrmStore } from '../../store/crmStore'
+import { canCrmPermission } from '../../utils/permissions/crm'
 import { resolveCompany360Path } from '../../config/entity360Routes'
 import { crmQuotationPath } from '../../utils/crmQuotationNavigation'
 import {
@@ -72,7 +76,10 @@ import { ReservationsPanel } from '../../components/inventory/ReservationsPanel'
 import {
   ExpectedAccountingEntryDrawer,
   SalesOrderAccountingSummary,
+  type SalesOrderAccountingDemoMetrics,
 } from '../../components/accounting/commercial'
+import { useSalesOrderCommercialPosition } from '../../hooks/useCommercialPosition'
+import { useInvoiceStore } from '../../store/invoiceStore'
 import {
   SalesOrderConfirmDialog,
   type SalesOrderConfirmValues,
@@ -134,6 +141,7 @@ export function SalesOrder360Page() {
   const editPath = id ? buildSalesOrderEditUrl(id, { fromCrm: crmMode }) : listPath
   const so = useMrpStore((s) => (id ? s.salesOrders.find((o) => o.id === id) : undefined))
   const confirmSalesOrder = useSalesStore((s) => s.confirmSalesOrder)
+  const canConfirmSalesOrder = canCrmPermission('crm.sales_order.confirm')
   const triggerProductionForOrder = useSalesStore((s) => s.triggerProductionForOrder)
   const getQuotation = useSalesStore((s) => s.getQuotation)
   const getLatestQuotationDocument = useCrmStore((s) => s.getLatestQuotationDocument)
@@ -165,11 +173,15 @@ export function SalesOrder360Page() {
   useEffect(() => {
     if (!so || so.status !== 'open') return
     if (searchParams.get('confirm') !== '1') return
-    setConfirmOpen(true)
+    if (!canConfirmSalesOrder) {
+      notify.error('Requires crm.sales_order.confirm')
+    } else {
+      setConfirmOpen(true)
+    }
     const next = new URLSearchParams(searchParams)
     next.delete('confirm')
     setSearchParams(next, { replace: true })
-  }, [so, searchParams, setSearchParams])
+  }, [so, searchParams, setSearchParams, canConfirmSalesOrder])
 
   const orderWos = useMemo(
     () => (id ? workOrders.filter((w) => w.salesOrderId === id) : []),
@@ -189,6 +201,29 @@ export function SalesOrder360Page() {
   const pendingMrp = Boolean(so?.status === 'confirmed' && orderWos.length === 0)
   const score = so ? healthScore(so) : 0
   const displayValue = so ? resolveSalesOrderValue(so, product) : 0
+  const commercialPosition = useSalesOrderCommercialPosition(id)
+  const demoInvoices = useInvoiceStore((s) =>
+    id ? s.invoices.filter((inv) => inv.salesOrderId === id) : [],
+  )
+  const demoCommercialMoney = useMemo((): SalesOrderAccountingDemoMetrics | null => {
+    if (isApiMode() || !so) return null
+    const posted = demoInvoices.filter((inv) => inv.status === 'posted')
+    const drafts = demoInvoices.filter((inv) => inv.status === 'draft')
+    const dispatchedStatuses = ['dispatched', 'in_transit', 'delivered', 'pod_received', 'closed']
+    const dispatchedAmount = orderDispatches.some((d) => dispatchedStatuses.includes(d.status))
+      ? displayValue
+      : 0
+    return {
+      orderedAmount: displayValue,
+      dispatchedAmount,
+      invoicedAmount: posted.reduce((sum, inv) => sum + inv.gst.grandTotal, 0),
+      collectedAmount: posted.reduce((sum, inv) => sum + inv.amountPaid, 0),
+      outstandingAmount: posted.reduce((sum, inv) => sum + inv.balanceDue, 0),
+      nextPaymentDueDate: posted.find((inv) => inv.balanceDue > 0)?.dueDate ?? null,
+      postedInvoiceCount: posted.length,
+      draftInvoiceCount: drafts.length,
+    }
+  }, [demoInvoices, displayValue, orderDispatches, so])
 
   const overdue = Boolean(
     so &&
@@ -270,6 +305,10 @@ export function SalesOrder360Page() {
   const order = so
 
   function openConfirmDialog() {
+    if (!canConfirmSalesOrder) {
+      notify.error('Requires crm.sales_order.confirm')
+      return
+    }
     setConfirmOpen(true)
   }
 
@@ -293,7 +332,7 @@ export function SalesOrder360Page() {
         )
         const updated = await apiUpdateSalesOrder(order.id, patch)
         if (!updated.ok) {
-          setToast(updated.error ?? 'Could not save confirmation details')
+          notify.error(updated.error ?? 'Could not save confirmation details')
           return
         }
 
@@ -322,7 +361,7 @@ export function SalesOrder360Page() {
                 documentType: values.documentTypeCode.trim(),
               })
             } catch {
-              setToast('Order details saved, but document upload failed. Confirm aborted.')
+              notify.error('Order details saved, but document upload failed. Confirm aborted.')
               return
             }
           } else {
@@ -332,17 +371,17 @@ export function SalesOrder360Page() {
 
         const r = await apiConfirmSalesOrder(order.id)
         if (!r.ok) {
-          setToast(r.error ?? 'Failed to confirm order')
+          notify.error(r.error ?? 'Failed to confirm order')
           return
         }
         setConfirmOpen(false)
-        setToast('Order confirmed')
+        notify.success('Order confirmed')
         return
       }
 
       const saved = updateSalesOrderDraft(order.id, patch)
       if (!saved.ok) {
-        setToast(saved.error ?? 'Could not save confirmation details')
+        notify.error(saved.error ?? 'Could not save confirmation details')
         return
       }
 
@@ -352,11 +391,11 @@ export function SalesOrder360Page() {
 
       const r = confirmSalesOrder(order.id)
       if (!r.ok) {
-        setToast(r.error ?? 'Failed to confirm order')
+        notify.error(r.error ?? 'Failed to confirm order')
         return
       }
       setConfirmOpen(false)
-      setToast('Order confirmed')
+      notify.success('Order confirmed')
     } finally {
       setConfirmBusy(false)
     }
@@ -411,7 +450,9 @@ export function SalesOrder360Page() {
     <ErpCardCommandBar
       inline
       homeActions={[
-        ...(so.status === 'open' ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }] : []),
+        ...(so.status === 'open' && canConfirmSalesOrder
+          ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }]
+          : []),
         ...(so.status === 'confirmed' ? [{ id: 'mrp', label: 'Trigger MRP', icon: Play, primary: true, onClick: handleMrp }] : []),
         ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit', icon: Pencil, onClick: () => navigate(editPath) }] : []),
         ...(so.status !== 'open' && !activeProforma ? [{ id: 'proforma', label: 'Create Proforma', icon: Receipt, onClick: () => navigate(buildProformaNewUrl(so.id)) }] : []),
@@ -454,7 +495,9 @@ export function SalesOrder360Page() {
           { label: 'Quotation', value: so.quotationNo ? `${so.quotationNo} Rev ${so.quotationRevisionNo ?? 1}` : '—' },
         ]}
         actions={[
-          ...(so.status === 'open' ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }] : []),
+          ...(so.status === 'open' && canConfirmSalesOrder
+            ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }]
+            : []),
           ...(so.status === 'confirmed' ? [{ id: 'mrp', label: 'Trigger MRP', icon: Play, primary: true, onClick: handleMrp }] : []),
           ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit Draft', icon: Pencil, onClick: () => navigate(editPath) }] : []),
         ]}
@@ -539,6 +582,15 @@ export function SalesOrder360Page() {
                   salesOrderNo={so.salesOrderNo}
                   status={so.status}
                   value={displayValue}
+                  ops={commercialPosition.data?.ops ?? null}
+                  money={
+                    isApiMode()
+                      ? commercialPosition.data?.money ?? null
+                      : demoCommercialMoney
+                  }
+                  moneyVisible={isApiMode() ? commercialPosition.data?.moneyVisible ?? false : true}
+                  loading={isApiMode() ? commercialPosition.loading : false}
+                  error={isApiMode() ? commercialPosition.error : null}
                   onViewExpectedEntry={() => setExpectedEntryOpen(true)}
                 />
               ) : null}
@@ -548,7 +600,7 @@ export function SalesOrder360Page() {
                     <OrderNextActionPanel
                       status={so.status}
                       overdue={overdue}
-                      onConfirm={so.status === 'open' ? openConfirmDialog : undefined}
+                      onConfirm={so.status === 'open' && canConfirmSalesOrder ? openConfirmDialog : undefined}
                       onTriggerMrp={so.status === 'confirmed' ? handleMrp : undefined}
                     />
                   </div>
@@ -624,34 +676,45 @@ export function SalesOrder360Page() {
         )}
 
         {tab === 'dispatch' && (
-          <Entity360Panel title="Dispatch plans" subtitle="Trailers scheduled for delivery">
-            <div className="p-4">
-              {orderDispatches.length === 0 ? (
-                <div className="so-360-empty">
-                  <Truck className="so-360-empty__icon" aria-hidden />
-                  <p className="so-360-empty__title">No dispatch plans linked</p>
-                  <p className="so-360-empty__text">
-                    Create a dispatch plan when FG is ready and delivery is scheduled.
-                  </p>
-                  <button
-                    type="button"
-                    className="so-360-empty__action"
-                    onClick={() => navigate('/dispatch/plan')}
-                  >
-                    Open dispatch planning →
-                  </button>
-                </div>
-              ) : (
-                <DataGrid
-                  data={orderDispatches}
-                  columns={dispatchColumns}
-                  compact
-                  toolbar="compact"
-                  showToolbarExport
-                  exportFileName={`${so.salesOrderNo}-dispatch`}
-                />
-              )}
-            </div>
+          <Entity360Panel
+            title={isApiMode() ? 'Fulfilment & dispatch' : 'Dispatch plans'}
+            subtitle={
+              isApiMode()
+                ? 'Server-side readiness and outbound dispatch history'
+                : 'Trailers scheduled for delivery'
+            }
+          >
+            {isApiMode() && id ? (
+              <SalesOrderDispatchFulfilmentPanel salesOrderId={id} />
+            ) : (
+              <div className="p-4">
+                {orderDispatches.length === 0 ? (
+                  <div className="so-360-empty">
+                    <Truck className="so-360-empty__icon" aria-hidden />
+                    <p className="so-360-empty__title">No dispatch plans linked</p>
+                    <p className="so-360-empty__text">
+                      Create a dispatch plan when FG is ready and delivery is scheduled.
+                    </p>
+                    <button
+                      type="button"
+                      className="so-360-empty__action"
+                      onClick={() => navigate('/dispatch/plan')}
+                    >
+                      Open dispatch planning →
+                    </button>
+                  </div>
+                ) : (
+                  <DataGrid
+                    data={orderDispatches}
+                    columns={dispatchColumns}
+                    compact
+                    toolbar="compact"
+                    showToolbarExport
+                    exportFileName={`${so.salesOrderNo}-dispatch`}
+                  />
+                )}
+              </div>
+            )}
           </Entity360Panel>
         )}
 
@@ -664,6 +727,15 @@ export function SalesOrder360Page() {
                   salesOrderNo={so.salesOrderNo}
                   status={so.status}
                   value={displayValue}
+                  ops={commercialPosition.data?.ops ?? null}
+                  money={
+                    isApiMode()
+                      ? commercialPosition.data?.money ?? null
+                      : demoCommercialMoney
+                  }
+                  moneyVisible={isApiMode() ? commercialPosition.data?.moneyVisible ?? false : true}
+                  loading={isApiMode() ? commercialPosition.loading : false}
+                  error={isApiMode() ? commercialPosition.error : null}
                   onViewExpectedEntry={() => setExpectedEntryOpen(true)}
                 />
               ) : null}

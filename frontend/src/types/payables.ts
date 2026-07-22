@@ -665,6 +665,8 @@ export interface VendorDispute {
   vendorName: string
   invoiceId: string
   invoiceNumber: string
+  purchaseOrders?: Array<{ id: string; number: string }>
+  grns?: Array<{ id: string; number: string }>
   disputeDate: string
   disputeType: VendorDisputeType
   disputedAmount: number

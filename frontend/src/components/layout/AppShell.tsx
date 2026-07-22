@@ -118,6 +118,14 @@ export function AppShell() {
       <RecordDetailPanel />
       <RightDrawer />
       <CrmQuickCreateHost />
+      {!isApiMode() && (
+        <div
+          className="fixed bottom-3 left-3 z-[60] select-none rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-800 shadow-sm"
+          title="VITE_USE_API=false — all data on screen is local demo/sample data, nothing is saved to a server."
+        >
+          Demo mode — sample data
+        </div>
+      )}
     </div>
   )
 }

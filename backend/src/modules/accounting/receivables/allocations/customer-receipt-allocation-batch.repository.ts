@@ -32,6 +32,9 @@ export function mapAllocationBatchToDto(batch: CustomerReceiptAllocationBatch): 
     failedAt: batch.failedAt?.toISOString() ?? null,
     failureCode: batch.failureCode,
     failureMessage: batch.failureMessage,
+    reversedAt: batch.reversedAt?.toISOString() ?? null,
+    reversedBy: batch.reversedBy,
+    reversalReason: batch.reversalReason,
   }
 }
 
@@ -100,6 +103,41 @@ export async function markBatchPosted(
       failedAt: null,
       failureCode: null,
       failureMessage: null,
+    },
+  })
+}
+
+export async function findAllocationBatchById(
+  tenantId: string,
+  receiptId: string,
+  batchId: string,
+  tx: Prisma.TransactionClient | typeof prisma = prisma,
+): Promise<CustomerReceiptAllocationBatch | null> {
+  return tx.customerReceiptAllocationBatch.findFirst({
+    where: { id: batchId, tenantId, receiptId },
+  })
+}
+
+/** Internal: flips a POSTED batch to REVERSED and stamps reverse idempotency + audit. Not HTTP-routable. */
+export async function markBatchReversed(
+  batchId: string,
+  data: {
+    reverseIdempotencyKey: string
+    reversePayloadHash: string
+    reversalReason: string
+    reversedBy?: string | null
+  },
+  tx: Prisma.TransactionClient | typeof prisma = prisma,
+): Promise<CustomerReceiptAllocationBatch> {
+  return tx.customerReceiptAllocationBatch.update({
+    where: { id: batchId },
+    data: {
+      status: 'REVERSED',
+      reverseIdempotencyKey: data.reverseIdempotencyKey,
+      reversePayloadHash: data.reversePayloadHash,
+      reversalReason: data.reversalReason,
+      reversedAt: new Date(),
+      reversedBy: data.reversedBy ?? null,
     },
   })
 }

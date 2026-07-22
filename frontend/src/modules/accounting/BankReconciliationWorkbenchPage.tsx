@@ -82,7 +82,8 @@ function filterLines(lines: ReconciliationLine[], filter: PaneFilter) {
 }
 
 export function BankReconciliationWorkbenchPage() {
-  const { id = '' } = useParams()
+  const routeParams = useParams()
+  const id = routeParams.id ?? routeParams.statementId ?? ''
   const perms = useBankCashPermissions()
   const isMobile = useMediaQuery(MQ_MOBILE)
   const isTablet = useMediaQuery(MQ_BELOW_LG)

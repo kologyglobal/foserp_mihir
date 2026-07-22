@@ -9,6 +9,7 @@ import type { CustomerReceivableDetailDto, OutstandingOpenItemDto } from '@/type
 import { formatCurrency } from '@/utils/formatters/currency'
 import { useMoneyInPermissions } from '@/utils/permissions/moneyIn'
 import { notify } from '@/store/toastStore'
+import { partyMasterRoute } from '@/modules/accounting/shared/invoices'
 import { parseDecimal } from '../moneyInUi'
 import { MoneyInWorkspaceShell } from '../MoneyInWorkspaceShell'
 
@@ -53,9 +54,19 @@ export function CustomerDetailPage() {
     <MoneyInWorkspaceShell
       title={summary?.customerName ?? 'Customer'}
       commandBar={
-        <ErpButton variant="secondary" icon={RefreshCw} onClick={() => void load()}>
-          Refresh
-        </ErpButton>
+        <div className="flex flex-wrap items-center gap-2">
+          {customerId && (
+            <Link
+              to={partyMasterRoute('crm', customerId)}
+              className="text-[12px] font-medium text-erp-accent hover:underline"
+            >
+              Open CRM Company 360
+            </Link>
+          )}
+          <ErpButton variant="secondary" icon={RefreshCw} onClick={() => void load()}>
+            Refresh
+          </ErpButton>
+        </div>
       }
     >
       {loading ? (

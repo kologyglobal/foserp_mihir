@@ -41,7 +41,17 @@ export function CreditNoteAllocatePage() {
       setNote(data)
       if (data.status === 'POSTED') {
         const items = await listCustomerOpenItems(data.customerId, { pageSize: 100 })
-        setOpenItems(items.items)
+        // Outstanding reporting is DEBIT/invoice-only; still require invoice id for allocation lines.
+        setOpenItems(
+          items.items.filter(
+            (row) =>
+              Boolean(row.salesInvoiceId) &&
+              Number(row.outstandingAmount) > 0 &&
+              row.status !== 'SETTLED' &&
+              !row.isOnHold &&
+              !row.isDisputed,
+          ),
+        )
       }
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Failed to load credit note')

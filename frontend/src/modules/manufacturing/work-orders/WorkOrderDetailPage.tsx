@@ -347,7 +347,24 @@ export function WorkOrderDetailPage() {
     return buildWorkOrderAiInsights(wo, mats)
   }, [mats, wo])
 
-  if (loading || !wo) return <LoadingState variant="card" />
+  if (loading || !wo) {
+    return (
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Manufacturing"
+        title="Work Order"
+        breadcrumbs={[
+          { label: 'Manufacturing & Production', to: '/manufacturing' },
+          { label: 'Work Orders', to: '/manufacturing/work-orders' },
+        ]}
+        autoBreadcrumbs={false}
+        backLink={{ to: '/manufacturing/work-orders', label: 'Back to Work Orders' }}
+      >
+        <LoadingState variant="card" />
+      </OperationalPageShell>
+    )
+  }
 
   const canCheck = !readOnly && ['draft', 'in_progress', 'on_hold'].includes(wo.status) && perms.canViewMaterials
   const canReserve = !readOnly && wo.status === 'draft' && perms.canReserveMaterials
@@ -386,6 +403,7 @@ export function WorkOrderDetailPage() {
       ]}
       autoBreadcrumbs={false}
       favoritePath={`/manufacturing/work-orders/${wo.id}`}
+      backLink={{ to: '/manufacturing/work-orders', label: 'Back to Work Orders' }}
       commandBar={(
         <ErpCommandBar
           inline
@@ -410,7 +428,6 @@ export function WorkOrderDetailPage() {
             ...(canCancel
               ? [{ id: 'cancel', label: 'Cancel', icon: Ban, onClick: () => setDialog('cancel') }]
               : []),
-            { id: 'back', label: 'Back', onClick: () => navigate('/manufacturing/work-orders') },
           ]}
         />
       )}

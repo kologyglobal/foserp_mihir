@@ -1,3 +1,7 @@
+export {
+  ManufacturingAccountingApiGate,
+  withManufacturingAccountingApiGate,
+} from './ManufacturingAccountingApiGate'
 export { ManufacturingAccountingWorkspaceTabs } from './ManufacturingAccountingWorkspaceTabs'
 export {
   ProductionOrderStatusBadge,

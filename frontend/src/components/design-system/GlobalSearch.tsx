@@ -485,7 +485,7 @@ export function GlobalSearchTrigger({ className, variant = 'default' }: { classN
     >
       <Search className={cn('h-4 w-4 shrink-0', variant === 'suite' ? 'text-white/70' : 'text-erp-muted')} />
       <span className={cn('flex-1 truncate', variant === 'suite' ? 'text-white/85' : 'erp-type-caption')}>
-        Search masters, SO, WO, company, product, command…
+        {variant === 'suite' ? 'Search masters, SO, WO, company, product, command…' : 'Search anything…'}
       </span>
       <kbd className={cn(
         'rounded border px-1.5 py-0.5 text-[10px] font-medium',

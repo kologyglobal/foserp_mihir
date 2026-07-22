@@ -56,6 +56,16 @@ export const SALES_ORDER_REGISTER_PRESETS: Record<string, Record<string, string>
   'From Quotation': { search: '', status: '', source: 'quotation', sortBy: 'orderDate' },
 }
 
+export const WORK_ORDER_REGISTER_PRESETS: Record<string, Record<string, string>> = {
+  'My View': { search: '', view: '', productItemId: '' },
+  Draft: { search: '', view: 'DRAFT', productItemId: '' },
+  Ready: { search: '', view: 'READY', productItemId: '' },
+  'In Progress': { search: '', view: 'IN_PROGRESS', productItemId: '' },
+  'On Hold': { search: '', view: 'ON_HOLD', productItemId: '' },
+  Delayed: { search: '', view: 'DELAYED', productItemId: '' },
+  Completed: { search: '', view: 'COMPLETED', productItemId: '' },
+}
+
 export const PR_REGISTER_PRESETS: Record<string, Record<string, string>> = {
   'My View': {
     search: '',

@@ -1,8 +1,8 @@
-import type { QualityInspection, QualityInspectionLine } from '@prisma/client'
+import type { PurchaseQualityInspection, PurchaseQualityInspectionLine } from '@prisma/client'
 import { qiAllowedActions, qiQty } from './quality-inspection.workflow.js'
 const date = (value?: Date | null) => value?.toISOString().slice(0, 10) ?? null
 const iso = (value?: Date | null) => value?.toISOString() ?? null
-export function mapQualityInspection(qi: QualityInspection & { lines: QualityInspectionLine[] }) {
+export function mapQualityInspection(qi: PurchaseQualityInspection & { lines: PurchaseQualityInspectionLine[] }) {
   return {
     ...qi, documentNumber: qi.inspectionNumber, documentDate: date(qi.inspectionDate),
     inspectionDate: date(qi.inspectionDate), completedAt: iso(qi.completedAt),

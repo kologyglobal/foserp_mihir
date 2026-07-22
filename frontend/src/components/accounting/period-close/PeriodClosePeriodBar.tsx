@@ -17,7 +17,31 @@ export function PeriodClosePeriodBar({
   const [filter, setFilter] = useState<PeriodFilterState>(() => value ?? loadPeriodCloseFilter())
 
   useEffect(() => {
-    void getPeriodCloseSetup().then(setSetup)
+    void getPeriodCloseSetup().then((s) => {
+      setSetup(s)
+      const current = value ?? loadPeriodCloseFilter()
+      // Bootstrap API filter when first landing with demo defaults
+      if (s.companies[0] && (!current.periodId || current.companyId === 'co-vasant')) {
+        const fy = s.fiscalYears[0]
+        const periodsForFy = s.periods.filter((p) => p.fiscalYear === fy?.code)
+        const focus = periodsForFy.find((p) => p.code === current.periodCode) ?? periodsForFy[0]
+        if (fy && focus) {
+          const next: PeriodFilterState = {
+            companyId: s.companies[0].id,
+            companyName: s.companies[0].name,
+            fiscalYear: fy.label,
+            fiscalYearId: fy.code,
+            periodCode: focus.code,
+            periodLabel: focus.label,
+            periodId: focus.id,
+          }
+          setFilter(next)
+          savePeriodCloseFilter(next)
+          onChange?.(next)
+        }
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstrap once on mount
   }, [])
 
   useEffect(() => {
@@ -30,7 +54,7 @@ export function PeriodClosePeriodBar({
     onChange?.(next)
   }
 
-  const periods = setup?.periods.filter((p) => p.fiscalYear === filter.fiscalYear) ?? []
+  const periods = setup?.periods.filter((p) => p.fiscalYear === (filter.fiscalYearId ?? filter.fiscalYear)) ?? []
 
   return (
     <div className="flex flex-wrap items-end gap-3 rounded border border-erp-border bg-white px-3 py-2">
@@ -60,15 +84,18 @@ export function PeriodClosePeriodBar({
         Financial Year
         <select
           className="h-8 min-w-[120px] rounded border border-erp-border bg-white px-2 text-[12px] text-erp-text"
-          value={filter.fiscalYear}
+          value={filter.fiscalYearId ?? filter.fiscalYear}
           onChange={(e) => {
-            const fy = e.target.value
-            const first = setup?.periods.find((p) => p.fiscalYear === fy)
+            const fyCode = e.target.value
+            const fy = setup?.fiscalYears.find((y) => y.code === fyCode)
+            const first = setup?.periods.find((p) => p.fiscalYear === fyCode)
             apply({
               ...filter,
-              fiscalYear: fy,
+              fiscalYear: fy?.label ?? fyCode,
+              fiscalYearId: fyCode,
               periodCode: first?.code ?? filter.periodCode,
               periodLabel: first?.label ?? filter.periodLabel,
+              periodId: first?.id,
             })
           }}
           aria-label="Financial year"
@@ -91,12 +118,13 @@ export function PeriodClosePeriodBar({
               ...filter,
               periodCode: e.target.value,
               periodLabel: p?.label ?? e.target.value,
+              periodId: p?.id,
             })
           }}
           aria-label="Close period"
         >
           {periods.map((p) => (
-            <option key={p.code} value={p.code}>
+            <option key={p.id ?? p.code} value={p.code}>
               {p.label}
             </option>
           ))}

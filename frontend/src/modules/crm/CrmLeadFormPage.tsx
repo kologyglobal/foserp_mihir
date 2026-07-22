@@ -184,6 +184,15 @@ export function CrmLeadFormPage() {
   const [savedLeadNo, setSavedLeadNo] = useState<string | null>(null)
   const [followUpOpen, setFollowUpOpen] = useState(false)
   const [logActivityOpen, setLogActivityOpen] = useState(false)
+  const companyCreateContactSnapshotRef = useRef<{
+    companyInfo: CompanyProspectMatch | null
+    contactId: string
+    contactPerson: string
+    mobile: string
+    email: string
+    industry: string
+    source: LeadSource
+  } | null>(null)
 
   const [company, setCompany] = useState({
     customerId: existing?.customerId ?? null,
@@ -515,7 +524,6 @@ export function CrmLeadFormPage() {
       createdDate,
       mobile,
       email,
-      productRequirement: requirementText || (hasLeadRequirementLines(requirementLines) ? 'set' : ''),
       remarks,
       expectedValue,
     },
@@ -543,16 +551,6 @@ export function CrmLeadFormPage() {
       remarks: {
         required: true,
         message: 'Notes are required',
-      },
-      productRequirement: {
-        validate: (v) => {
-          // Minimum-first: product lines only when the deal is serious enough.
-          const reqStages: LeadStage[] = ['requirement_collected', 'qualified']
-          if (reqStages.includes(leadStage) && !String(v).trim()) {
-            return 'Add at least one product / requirement line for this stage'
-          }
-          return null
-        },
       },
     },
   )
@@ -817,7 +815,41 @@ export function CrmLeadFormPage() {
     setEmail(contact.email ?? '')
   }
 
+  function onCompanyCreateTyping() {
+    if (!companyCreateContactSnapshotRef.current) {
+      companyCreateContactSnapshotRef.current = {
+        companyInfo,
+        contactId,
+        contactPerson,
+        mobile,
+        email,
+        industry,
+        source,
+      }
+    }
+    setCompanyInfo(null)
+    setContactId('')
+    setContactPerson('')
+    setMobile('')
+    setEmail('')
+    setIndustry('')
+  }
+
+  function onCompanyCreateCancel() {
+    const snap = companyCreateContactSnapshotRef.current
+    companyCreateContactSnapshotRef.current = null
+    if (!snap) return
+    setCompanyInfo(snap.companyInfo)
+    setContactId(snap.contactId)
+    setContactPerson(snap.contactPerson)
+    setMobile(snap.mobile)
+    setEmail(snap.email)
+    setIndustry(snap.industry)
+    setSource(snap.source)
+  }
+
   function onCompanyLinked(match: CompanyProspectMatch) {
+    companyCreateContactSnapshotRef.current = null
     setCompanyInfo(match)
     setCompany({
       customerId: match.customerId,
@@ -834,14 +866,65 @@ export function CrmLeadFormPage() {
       )
       ?? companyContacts[0]
       ?? null
-    if (matched) {
+    const isNewCompany = match.sourceLabel === 'New'
+    let filledContactPerson = ''
+    let filledMobile = ''
+    let filledEmail = ''
+    if (matched && !isNewCompany) {
       applyContactToLead(matched)
+      filledContactPerson = matched.name
+      filledMobile = sanitizePhoneDigits(matched.phone ?? '')
+      filledEmail = matched.email?.trim() ?? ''
     } else {
-      setContactId('')
-      setContactPerson(match.contactPerson)
-      setMobile(sanitizePhoneDigits(match.contactPhone))
-      setEmail(match.contactEmail)
+      setContactId(matched?.id ?? '')
+      const nextContactPerson = (matched?.name ?? match.contactPerson)?.trim() ?? ''
+      const nextMobile = sanitizePhoneDigits((matched?.phone || match.contactPhone) ?? '')
+      const nextEmail = (matched?.email || match.contactEmail)?.trim() ?? ''
+      if (isNewCompany) {
+        // Quick-created company (Add New Company popup): copy only the fields that
+        // were actually entered — never blank values already typed on the lead.
+        if (nextContactPerson) setContactPerson(nextContactPerson)
+        if (nextMobile) setMobile(nextMobile)
+        if (nextEmail) setEmail(nextEmail)
+      } else {
+        setContactPerson(nextContactPerson)
+        setMobile(nextMobile)
+        setEmail(nextEmail)
+      }
+      filledContactPerson = nextContactPerson
+      filledMobile = nextMobile
+      filledEmail = nextEmail
+      if (isNewCompany && match.customerId && !matched) {
+        // The popup's Contact Person is synced into a CRM contact asynchronously
+        // (contactSync lazy imports). Poll briefly so the visible Contact Person
+        // select on the lead form shows the created contact once it lands.
+        let attempts = 0
+        const pickUpSyncedContact = () => {
+          attempts += 1
+          const synced = useCrmStore.getState().contacts.find(
+            (c) => c.customerId === match.customerId && (c.isActive ?? true),
+          )
+          if (synced) {
+            setContactId((prev) => prev || synced.id)
+            return
+          }
+          if (attempts < 5) window.setTimeout(pickUpSyncedContact, 200)
+        }
+        window.setTimeout(pickUpSyncedContact, 200)
+      }
     }
+    // Auto-filled values satisfy earlier save-attempt errors — drop them
+    setValidationErrors((prev) => {
+      const clearable = [
+        filledContactPerson ? 'contactPerson' : null,
+        filledMobile ? 'mobile' : null,
+        filledEmail ? 'email' : null,
+      ].filter((k): k is 'contactPerson' | 'mobile' | 'email' => Boolean(k && prev[k]))
+      if (clearable.length === 0) return prev
+      const next = { ...prev }
+      for (const k of clearable) delete next[k]
+      return next
+    })
     if (match.industry) setIndustry(match.industry)
     if (match.customerId) setSource('existing_customer')
     // Clear stale save-time errors once company is linked
@@ -1358,12 +1441,15 @@ export function CrmLeadFormPage() {
           id="lead-section-quick"
           title="Quick Entry"
           subtitle="Company, contact, and ownership — expand only when you need more."
+          columns={3}
+          className="crm-lead-quick-entry"
         >
-          <ErpFieldGroup>
+          <ErpFieldGroup columns={3}>
             <ErpFieldRow
               label="Company / Prospect"
               required
               colSpan={3}
+              horizontal={false}
               dataField="prospectName"
               fieldState={inlineValidation.fieldState('prospectName')}
               fieldError={inlineValidation.fieldError('prospectName') ?? validationErrors.prospectName}
@@ -1387,6 +1473,8 @@ export function CrmLeadFormPage() {
                 }}
                 onBlur={() => inlineValidation.touch('prospectName')}
                 onCompanyLinked={onCompanyLinked}
+                onCompanyCreateTyping={onCompanyCreateTyping}
+                onCompanyCreateCancel={onCompanyCreateCancel}
                 error={Boolean(inlineValidation.fieldError('prospectName') ?? validationErrors.prospectName)}
                 autoFocus={!isEdit}
                 disabled={fieldLocked('customerId') || fieldLocked('prospectName')}
@@ -1394,12 +1482,11 @@ export function CrmLeadFormPage() {
             </ErpFieldRow>
           </ErpFieldGroup>
 
-          <ErpFieldGroup label="Contact">
+          <ErpFieldGroup label="Contact" columns={3}>
             {company.customerId ? (
               <ErpFieldRow
                 label="Contact Person"
-                required
-                colSpan={3}
+                horizontal={false}
                 dataField="contactPerson"
                 fieldState={
                   (validationErrors.contactPerson) ? 'error' : undefined
@@ -1416,7 +1503,7 @@ export function CrmLeadFormPage() {
             ) : (
               <ErpFieldRow
                 label="Contact Person"
-                required
+                horizontal={false}
                 dataField="contactPerson"
                 fieldState={validationErrors.contactPerson ? 'error' : undefined}
                 fieldError={validationErrors.contactPerson}
@@ -1442,7 +1529,7 @@ export function CrmLeadFormPage() {
             )}
             <ErpFieldRow
               label="Mobile"
-              required
+              horizontal={false}
               dataField="mobile"
               fieldState={
                 (inlineValidation.fieldError('mobile') ?? validationErrors.mobile)
@@ -1472,6 +1559,7 @@ export function CrmLeadFormPage() {
             </ErpFieldRow>
             <ErpFieldRow
               label="Email"
+              horizontal={false}
               dataField="email"
               fieldState={
                 (inlineValidation.fieldError('email') ?? validationErrors.email)
@@ -1501,10 +1589,11 @@ export function CrmLeadFormPage() {
             </ErpFieldRow>
           </ErpFieldGroup>
 
-          <ErpFieldGroup label="Ownership & status">
+          <ErpFieldGroup label="Ownership & status" columns={3}>
             <ErpFieldRow
               label="Lead Owner"
               required
+              horizontal={false}
               dataField="leadOwnerId"
               fieldState={inlineValidation.fieldState('leadOwnerId')}
               fieldError={inlineValidation.fieldError('leadOwnerId') ?? validationErrors.leadOwnerId}
@@ -1522,6 +1611,7 @@ export function CrmLeadFormPage() {
             </ErpFieldRow>
             <ErpFieldRow
               label="Lead Source"
+              horizontal={false}
               hint={
                 company.customerId && source === 'existing_customer'
                   ? 'Linked to Company Master — set to Existing Customer'
@@ -1540,6 +1630,7 @@ export function CrmLeadFormPage() {
             <ErpFieldRow
               label="Priority"
               required
+              horizontal={false}
               dataField="priority"
               fieldState={inlineValidation.fieldState('priority')}
               fieldError={inlineValidation.fieldError('priority') ?? validationErrors.priority}
@@ -1555,7 +1646,10 @@ export function CrmLeadFormPage() {
                 disabled={fieldLocked('priority')}
               />
             </ErpFieldRow>
-            <ErpFieldRow label="Lead Stage" required>
+          </ErpFieldGroup>
+
+          <ErpFieldGroup columns={3}>
+            <ErpFieldRow label="Lead Stage" required horizontal={false}>
               <ErpSmartSelect
                 options={leadStageSelectOptions}
                 value={leadStage}
@@ -1568,6 +1662,7 @@ export function CrmLeadFormPage() {
             <ErpFieldRow
               label="Created Date"
               required
+              horizontal={false}
               dataField="createdDate"
               fieldState={inlineValidation.fieldState('createdDate')}
               fieldError={inlineValidation.fieldError('createdDate') ?? validationErrors.createdDate}
@@ -1582,6 +1677,23 @@ export function CrmLeadFormPage() {
                 className="erp-input"
                 error={Boolean(inlineValidation.fieldError('createdDate') ?? validationErrors.createdDate)}
                 disabled={fieldLocked('createdDate')}
+              />
+            </ErpFieldRow>
+            <ErpFieldRow
+              label="Next Follow-up Date"
+              horizontal={false}
+              dataField="nextFollowUpDate"
+              fieldState={validationErrors.nextFollowUpDate ? 'error' : 'idle'}
+              fieldError={validationErrors.nextFollowUpDate}
+            >
+              <Input
+                type="date"
+                data-field="nextFollowUpDate"
+                value={nextFollowUpDate}
+                min={getDateInputMin()}
+                max={getCrmDateInputMax()}
+                onChange={(e) => setNextFollowUpDate(e.target.value)}
+                className="erp-input"
               />
             </ErpFieldRow>
           </ErpFieldGroup>
@@ -1652,24 +1764,23 @@ export function CrmLeadFormPage() {
               subtitle="Search products, set qty and pricing — totals roll up to commercial value."
               icon={ClipboardList}
               accent="teal"
-              columns={3}
+              columns={4}
               forceOpenKey={sectionForceOpenKey}
             >
-              <div className="col-span-3" data-field="productRequirement">
+              <div className="col-span-full" data-field="productRequirement">
                 <ErpLineItemsGrid
                   lines={requirementLines}
                   onChange={(next) => {
                     handleRequirementLinesChange(next)
-                    inlineValidation.touch('productRequirement')
                   }}
                   productOptions={productOptions}
                   productPickMap={pickMap}
                   probability={Number(probability) || 0}
                   variant="opportunity"
                 />
-                {(inlineValidation.fieldError('productRequirement') ?? validationErrors.productRequirement) ? (
+                {validationErrors.productRequirement ? (
                   <p className="erp-field-row__error mt-2">
-                    {inlineValidation.fieldError('productRequirement') ?? validationErrors.productRequirement}
+                    {validationErrors.productRequirement}
                   </p>
                 ) : null}
               </div>
@@ -1690,7 +1801,7 @@ export function CrmLeadFormPage() {
               }
               icon={Banknote}
               accent="green"
-              columns={3}
+              columns={4}
             >
               <ErpFieldRow label="Expected Revenue (₹)" dataField="expectedValue" fieldState={inlineValidation.fieldState('expectedValue')}>
                 <Input
@@ -1748,25 +1859,9 @@ export function CrmLeadFormPage() {
               subtitle="Schedule next action on save."
               icon={Calendar}
               accent="amber"
-              columns={3}
+              columns={4}
             >
-              <ErpFieldRow
-                label="Next Follow-up Date"
-                dataField="nextFollowUpDate"
-                fieldState={validationErrors.nextFollowUpDate ? 'error' : 'idle'}
-                fieldError={validationErrors.nextFollowUpDate}
-              >
-                <Input
-                  type="date"
-                  data-field="nextFollowUpDate"
-                  value={nextFollowUpDate}
-                  min={getDateInputMin()}
-                  max={getCrmDateInputMax()}
-                  onChange={(e) => setNextFollowUpDate(e.target.value)}
-                  className="erp-input"
-                />
-              </ErpFieldRow>
-              <ErpFieldRow label="Follow-up Type">
+              <ErpFieldRow label="Follow-up Type" horizontal={false}>
                 <ErpSmartSelect
                   options={followUpSelectOptions}
                   value={followUpType}
@@ -1775,10 +1870,10 @@ export function CrmLeadFormPage() {
                   appearance="dropdown"
                 />
               </ErpFieldRow>
-              <ErpFieldRow label="Assigned To" readOnly>
+              <ErpFieldRow label="Assigned To" readOnly horizontal={false}>
                 <Input value={selectedOwner?.name ?? '—'} readOnly className="erp-input" />
               </ErpFieldRow>
-              <ErpFieldRow label="Remarks" colSpan={3}>
+              <ErpFieldRow label="Remarks" colSpan={3} horizontal={false}>
                 <Textarea rows={2} value={followUpNotes} onChange={(e) => setFollowUpNotes(e.target.value)} placeholder="Follow-up notes" className="erp-input" />
               </ErpFieldRow>
             </ErpCardSection>
@@ -1791,7 +1886,7 @@ export function CrmLeadFormPage() {
               subtitle="Internal notes and reference tags."
               icon={FileText}
               accent="slate"
-              columns={3}
+              columns={4}
             >
               <ErpFieldRow label="Internal Notes" colSpan={3} horizontal={false}>
                 <Textarea rows={5} value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} placeholder="Internal team notes" className="erp-input" />
@@ -1825,7 +1920,7 @@ export function CrmLeadFormPage() {
               subtitle="Territory, branch, and lifecycle."
               icon={Building2}
               accent="violet"
-              columns={3}
+              columns={4}
               forceOpenKey={sectionForceOpenKey}
             >
               <ErpFieldRow label="Territory" readOnly>
@@ -1848,7 +1943,6 @@ export function CrmLeadFormPage() {
               {activityStatus === 'inactive' ? (
                 <ErpFieldRow
                   label="Inactive Reason"
-                  required
                   colSpan={3}
                   dataField="inactiveReason"
                   fieldState={validationErrors.inactiveReason ? 'error' : 'idle'}
@@ -1865,7 +1959,6 @@ export function CrmLeadFormPage() {
               {leadStage === 'not_qualified' ? (
                 <ErpFieldRow
                   label="Not Qualified Reason"
-                  required
                   colSpan={3}
                   dataField="notQualifiedReason"
                   fieldState={validationErrors.notQualifiedReason ? 'error' : 'idle'}
@@ -1883,7 +1976,6 @@ export function CrmLeadFormPage() {
                 <>
                   <ErpFieldRow
                     label="Closed Date"
-                    required
                     dataField="closedDate"
                     fieldState={validationErrors.closedDate ? 'error' : 'idle'}
                     fieldError={validationErrors.closedDate}
@@ -1899,7 +1991,6 @@ export function CrmLeadFormPage() {
                   </ErpFieldRow>
                   <ErpFieldRow
                     label="Closed Reason"
-                    required
                     colSpan={2}
                     dataField="closedReason"
                     fieldState={validationErrors.closedReason ? 'error' : 'idle'}

@@ -9,12 +9,22 @@ import { dispatchStatusLabel } from '../../types/dispatch'
 import { useDispatchStore } from '../../store/dispatchStore'
 import { useDispatchReports } from '../../hooks/useStableStoreData'
 import { formatDate } from '../../utils/dates/format'
+import { isApiMode } from '@/config/apiConfig'
 export function DispatchReportsPage() {
   const { ready, pending, month, podPending } = useDispatchReports()
+  const apiMode = isApiMode()
 
   return (
     <div className="erp-page">
       <PageHeader title="Dispatch Reports" description="Ready · Pending · Dispatched · POD pending" breadcrumbs={[{ label: 'Dispatch', to: '/dispatch' }, { label: 'Reports' }]} />
+      {apiMode ? (
+        <div className="mb-4 flex items-start justify-between gap-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-[12px] text-sky-900">
+          <span>This is the demo dispatch report engine. Live ops reports for Dispatch run through the Manufacturing report runner.</span>
+          <Link to="/manufacturing/reports/dispatch-readiness" className="whitespace-nowrap font-semibold text-erp-primary hover:underline">
+            Open in Manufacturing Reports →
+          </Link>
+        </div>
+      ) : null}
       <div className="grid gap-4 lg:grid-cols-2">
         <SectionCard title="Dispatch Ready Trailers" noPadding>
           <table className="erp-table"><thead><tr><th>SO</th><th>Customer</th><th>Trailer</th><th>Chassis</th></tr></thead>

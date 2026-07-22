@@ -1,19 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, Printer, FileBarChart2, ArrowLeft } from 'lucide-react'
-import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, Download, FileBarChart2, Printer, ShieldAlert } from 'lucide-react'
+import { isApiMode } from '@/config/apiConfig'
 import { FormField } from '@/components/forms/FormField'
 import { Input, Select } from '@/components/forms/Inputs'
 import { DataTable } from '@/components/tables/DataTable'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { Button } from '@/design-system/components/Button'
-import { ManufacturingDemoBanner } from '@/components/manufacturing'
 import {
   exportManufacturingReport,
   getManufacturingPrintPreview,
   getManufacturingReports,
   listManufacturingReportDefinitions,
 } from '@/services/manufacturing'
+import {
+  getManufacturingReportCatalog,
+  type ManufacturingReportCatalogItem,
+} from '@/services/api/opsReportsApi'
 import type {
   ManufacturingReportFilter,
   ManufacturingReportId,
@@ -24,6 +27,7 @@ import { useManufacturingPermissions } from '@/utils/permissions/manufacturing'
 import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
 import { formatDateTime } from '@/utils/dates/format'
+import { ProductionEmptyState, ProductionPageHeader } from '../ui'
 
 const WAREHOUSES = ['RM Stores', 'FG Stores', 'WIP Stores', 'Scrap Yard']
 
@@ -70,7 +74,136 @@ function printHtml(title: string, html: string) {
   setTimeout(() => win.print(), 250)
 }
 
+function moduleLabel(module: string): string {
+  return module
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+/**
+ * Phase 7D — API-mode report catalog: loads `reports/manufacturing/catalog`, groups by
+ * module, and navigates into `ManufacturingReportRunnerPage` for AVAILABLE reports.
+ * UNAVAILABLE reports render disabled with their reason — never as clickable/live data.
+ */
+function ManufacturingReportsApiCatalog() {
+  const navigate = useNavigate()
+  const perms = useManufacturingPermissions()
+  const [items, setItems] = useState<ManufacturingReportCatalogItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    void getManufacturingReportCatalog()
+      .then((res) => {
+        if (!cancelled) setItems(res.data)
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setItems([])
+          notify.error(error instanceof Error ? error.message : 'Failed to load report catalog')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, ManufacturingReportCatalogItem[]>()
+    for (const item of items) {
+      const list = map.get(item.module) ?? []
+      list.push(item)
+      map.set(item.module, list)
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
+  }, [items])
+
+  if (!perms.canViewReports) {
+    return (
+      <ProductionPageHeader title="Manufacturing Reports" favoritePath="/manufacturing/reports">
+        <ProductionEmptyState
+          icon={ShieldAlert}
+          title="Access denied"
+          description="Missing manufacturing reports view permission."
+        />
+      </ProductionPageHeader>
+    )
+  }
+
+  return (
+    <ProductionPageHeader
+      title="Manufacturing Reports"
+      description="Live ops reports across manufacturing, shopfloor, quality, and dispatch."
+      breadcrumbs={[{ label: 'Manufacturing & Production', to: '/manufacturing' }, { label: 'Reports' }]}
+      favoritePath="/manufacturing/reports"
+    >
+      {loading ? (
+        <LoadingState variant="table" rows={8} />
+      ) : items.length === 0 ? (
+        <ProductionEmptyState
+          icon={FileBarChart2}
+          title="No reports available"
+          description="The report catalog is empty for this tenant, or the ops-reports API is not reachable yet."
+        />
+      ) : (
+        <div className="space-y-5">
+          {grouped.map(([module, reports]) => (
+            <section key={module} className="space-y-2">
+              <h2 className="text-[12px] font-semibold uppercase tracking-wide text-erp-muted">
+                {moduleLabel(module)}
+              </h2>
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {reports.map((report) => {
+                  const unavailable = report.status === 'UNAVAILABLE'
+                  return (
+                    <button
+                      key={report.key}
+                      type="button"
+                      disabled={unavailable}
+                      onClick={() => !unavailable && navigate(`/manufacturing/reports/${report.key}`)}
+                      className={cn(
+                        'rounded-lg border p-3 text-left transition',
+                        unavailable
+                          ? 'cursor-not-allowed border-erp-border bg-slate-50 opacity-70'
+                          : 'border-erp-border bg-white hover:border-erp-primary/40 hover:bg-erp-surface-alt/40',
+                      )}
+                    >
+                      <div className="mb-1.5 flex items-start justify-between gap-2">
+                        <FileBarChart2 className={cn('h-4 w-4', unavailable ? 'text-erp-muted' : 'text-erp-primary')} aria-hidden />
+                        {report.category ? (
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-erp-muted">
+                            {report.category.replace(/_/g, ' ')}
+                          </span>
+                        ) : null}
+                      </div>
+                      <h3 className="text-[13px] font-semibold text-erp-text">{report.label}</h3>
+                      {report.description ? <p className="mt-1 text-[12px] text-erp-muted">{report.description}</p> : null}
+                      {unavailable ? (
+                        <p className="mt-1.5 text-[11px] font-medium text-amber-700">
+                          Unavailable{report.reason ? ` — ${report.reason}` : ''}
+                        </p>
+                      ) : null}
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+    </ProductionPageHeader>
+  )
+}
+
 export function ManufacturingReportsPage() {
+  if (isApiMode()) return <ManufacturingReportsApiCatalog />
+  return <ManufacturingReportsDemoPage />
+}
+
+function ManufacturingReportsDemoPage() {
   const perms = useManufacturingPermissions()
   const catalog = useMemo(
     () =>
@@ -162,11 +295,20 @@ export function ManufacturingReportsPage() {
     [result],
   )
 
+  if (!perms.canViewReports) {
+    return (
+      <ProductionPageHeader title="Manufacturing Reports" favoritePath="/manufacturing/reports">
+        <ProductionEmptyState
+          icon={FileBarChart2}
+          title="Access denied"
+          description="Missing manufacturing reports view permission."
+        />
+      </ProductionPageHeader>
+    )
+  }
+
   return (
-    <OperationalPageShell
-      variant="dynamics"
-      layout="enterprise"
-      badge="Manufacturing"
+    <ProductionPageHeader
       title={selected ? selected.label : 'Manufacturing Reports'}
       description={
         selected
@@ -178,56 +320,75 @@ export function ManufacturingReportsPage() {
         { label: 'Reports', to: reportId ? '/manufacturing/reports' : undefined },
         ...(selected ? [{ label: selected.label }] : []),
       ]}
-      autoBreadcrumbs={false}
       favoritePath="/manufacturing/reports"
-      commandBar={
-        reportId ? (
-          <ErpCommandBar
-            inline
-            sticky={false}
-            primaryAction={{
+      primaryAction={
+        reportId
+          ? {
               id: 'run',
               label: loading ? 'Running…' : 'Run Report',
               disabled: loading,
               onClick: () => void runReport(reportId),
-            }}
-            secondaryActions={[
+            }
+          : undefined
+      }
+      secondaryActions={
+        reportId
+          ? [
               { id: 'back', label: 'All Reports', icon: ArrowLeft, onClick: backToCards },
               ...(perms.canExportReports
-                ? [{ id: 'export', label: 'Export', icon: Download, onClick: () => void onExport(), disabled: loading || !result }]
+                ? [
+                    {
+                      id: 'export',
+                      label: 'Export',
+                      icon: Download,
+                      onClick: () => void onExport(),
+                      disabled: loading || !result,
+                    },
+                  ]
                 : []),
-              { id: 'print', label: 'Print', icon: Printer, onClick: () => void onPrint(), disabled: loading || !result },
-            ]}
-          />
-        ) : undefined
+              {
+                id: 'print',
+                label: 'Print',
+                icon: Printer,
+                onClick: () => void onPrint(),
+                disabled: loading || !result,
+              },
+            ]
+          : undefined
       }
     >
       <div className="space-y-4">
-        <ManufacturingDemoBanner message="Reports show performance — they do not replace the Work Order as the place to execute." />
-
         {!reportId ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {catalog.map((report) => (
-              <button
-                key={report.id}
-                type="button"
-                onClick={() => openReport(report.id)}
-                className="rounded-xl border border-erp-border bg-white p-4 text-left shadow-sm transition hover:border-erp-primary/40 hover:shadow-md"
-              >
-                <div className="mb-2 flex items-start justify-between gap-2">
-                  <FileBarChart2 className="h-5 w-5 text-erp-primary" aria-hidden />
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-erp-muted">
-                    {report.category.replace(/_/g, ' ')}
-                  </span>
-                </div>
-                <h3 className="text-[14px] font-semibold text-erp-text">{report.label}</h3>
-                <p className="mt-1 text-[12px] text-erp-muted">{report.description}</p>
-              </button>
-            ))}
-          </div>
+          catalog.length === 0 ? (
+            <ProductionEmptyState
+              icon={FileBarChart2}
+              title="No reports available"
+              description="No report definitions match your permissions."
+            />
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {catalog.map((report) => (
+                <button
+                  key={report.id}
+                  type="button"
+                  onClick={() => openReport(report.id)}
+                  className="rounded-lg border border-erp-border bg-white p-3 text-left transition hover:border-erp-primary/40 hover:bg-erp-surface-alt/40"
+                >
+                  <div className="mb-1.5 flex items-start justify-between gap-2">
+                    <FileBarChart2 className="h-4 w-4 text-erp-primary" aria-hidden />
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-erp-muted">
+                      {report.category.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <h3 className="text-[13px] font-semibold text-erp-text">{report.label}</h3>
+                  <p className="mt-1 text-[12px] text-erp-muted">{report.description}</p>
+                </button>
+              ))}
+            </div>
+          )
         ) : (
           <>
-            <section className="rounded-xl border border-erp-border bg-white p-4 shadow-sm print:hidden">
+            <section className="rounded-lg border border-erp-border bg-white p-3 print:hidden">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <FormField label="Date from">
                   <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} aria-label="Date from" />
@@ -264,38 +425,40 @@ export function ManufacturingReportsPage() {
                   </Button>
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {perms.canExportReports ? (
-                  <Button size="sm" variant="secondary" disabled={loading || !result} onClick={() => void onExport()}>
-                    <Download className="mr-1.5 h-3.5 w-3.5" /> Export
-                  </Button>
-                ) : null}
-                <Button size="sm" variant="secondary" disabled={loading || !result} onClick={() => void onPrint()}>
-                  <Printer className="mr-1.5 h-3.5 w-3.5" /> Print
-                </Button>
-              </div>
             </section>
 
-            {loading ? (
-              <LoadingState variant="card" />
-            ) : result ? (
+            {loading ? <LoadingState variant="table" rows={8} /> : null}
+
+            {!loading && result ? (
               <section className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-erp-muted">
                   <span>{result.rows.length} row{result.rows.length === 1 ? '' : 's'}</span>
                   <span>Generated {formatDateTime(result.generatedAt)}</span>
                 </div>
-                <div className={cn('overflow-x-auto rounded-xl border border-erp-border bg-white', 'print:border-0')}>
+                <div className={cn('overflow-x-auto rounded-lg border border-erp-border bg-white', 'print:border-0')}>
                   {tableData.length === 0 ? (
-                    <p className="p-8 text-center text-[13px] text-erp-muted">No rows for the selected filters.</p>
+                    <ProductionEmptyState
+                      icon={FileBarChart2}
+                      title="No rows"
+                      description="No rows for the selected filters."
+                    />
                   ) : (
                     <DataTable columns={columns as never} data={tableData} />
                   )}
                 </div>
               </section>
             ) : null}
+
+            {!loading && !result ? (
+              <ProductionEmptyState
+                icon={FileBarChart2}
+                title="Could not load report"
+                description="Adjust filters and run the report again."
+              />
+            ) : null}
           </>
         )}
       </div>
-    </OperationalPageShell>
+    </ProductionPageHeader>
   )
 }

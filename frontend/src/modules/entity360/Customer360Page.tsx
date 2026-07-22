@@ -51,6 +51,7 @@ import { EntityAttachmentsPanel } from '../../components/crm/shared/EntityAttach
 import { buildUnifiedFeed } from '../../utils/crmUnifiedFeed'
 import type { CrmActivity, FollowUp } from '../../types/crm'
 import { isApiMode } from '../../config/apiConfig'
+import { useCompanyCommercialPosition } from '../../hooks/useCommercialPosition'
 import { resolveStoreAction } from '../../store/storeAction'
 import { notify } from '../../store/toastStore'
 import { canCrmPermission } from '../../utils/permissions/crm'
@@ -87,6 +88,7 @@ export function Customer360Page() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const data = useCustomer360(id)
+  const companyCommercial = useCompanyCommercialPosition(id)
   const fromSales = pathname.startsWith('/sales/customers')
   const fromCrm = pathname.startsWith('/entity360/customers')
   const hubPath = customer360HubPath(pathname)
@@ -162,20 +164,24 @@ export function Customer360Page() {
 
   const companyStatus = useMemo(() => {
     if (!id || !data || !crmSummary) return undefined
+    const outstandingAr =
+      isApiMode() && companyCommercial.data?.money
+        ? companyCommercial.data.money.outstandingAmount
+        : data.outstanding
     return resolveCrmCompanyStatus({
       customerId: id,
       opportunities: crmOpportunities,
       followUps: crmFollowUps,
       activities: crmActivities,
       quotationDocuments: crmQuotationDocs,
-      outstandingAr: data.outstanding,
+      outstandingAr,
       openOpportunities: crmSummary.openOpportunities,
       pipelineValue: crmSummary.pipelineValue,
       wonOpportunities: crmSummary.wonOpportunities,
       openSalesOrders: data.openSo.length,
       createdAt: data.customer.createdAt,
     })
-  }, [id, data, crmSummary, crmOpportunities, crmFollowUps, crmActivities, crmQuotationDocs])
+  }, [id, data, crmSummary, crmOpportunities, crmFollowUps, crmActivities, crmQuotationDocs, companyCommercial.data])
 
   const sectionNavItems = useMemo(
     () => [
@@ -309,6 +315,13 @@ export function Customer360Page() {
   }
 
   const { customer } = data
+  const apiFinance = isApiMode() ? companyCommercial.data?.money : null
+  const financeOutstanding = apiFinance?.outstandingAmount ?? data.outstanding
+  const financeInvoiced = apiFinance?.invoicedAmount ?? data.invoiceValue
+  const financeCollected = apiFinance?.collectedAmount ?? data.received
+  const financeOrdered = apiFinance?.orderedAmount ?? data.revenue
+  const financeDispatched = apiFinance?.dispatchedAmount ?? 0
+  const financeMoneyVisible = isApiMode() ? companyCommercial.data?.moneyVisible ?? false : true
 
   const breadcrumbs = fromCrm
     ? [
@@ -337,15 +350,19 @@ export function Customer360Page() {
     },
     {
       label: 'Order Value',
-      value: formatCurrency(data.revenue),
+      value: formatCurrency(financeOrdered),
       accent: 'green' as const,
       hint: 'Lifetime booked',
     },
     {
       label: 'Outstanding AR',
-      value: formatCurrency(data.outstanding),
-      accent: data.outstanding > 0 ? ('amber' as const) : ('green' as const),
-      hint: data.outstanding > 0 ? 'Receivables due' : 'Fully collected',
+      value: financeMoneyVisible ? formatCurrency(financeOutstanding) : '—',
+      accent: financeOutstanding > 0 ? ('amber' as const) : ('green' as const),
+      hint: financeMoneyVisible
+        ? financeOutstanding > 0
+          ? 'Receivables due'
+          : 'Fully collected'
+        : 'Requires finance AR view',
     },
     {
       label: 'Dispatch Pending',
@@ -378,8 +395,8 @@ export function Customer360Page() {
     },
     {
       label: 'Outstanding',
-      value: formatCurrency(data.outstanding),
-      tone: data.outstanding > 0 ? ('warning' as const) : ('success' as const),
+      value: financeMoneyVisible ? formatCurrency(financeOutstanding) : '—',
+      tone: financeOutstanding > 0 ? ('warning' as const) : ('success' as const),
     },
     {
       label: 'Contacts',
@@ -395,7 +412,7 @@ export function Customer360Page() {
     { label: 'Contact', value: customer.contactPerson ?? '—' },
     { label: 'Open SO', value: String(data.openSo.length) },
     { label: 'Pipeline', value: formatCrmCurrency(crmSummary?.pipelineValue ?? 0) },
-    { label: 'Outstanding', value: formatCurrency(data.outstanding), highlight: data.outstanding > 0 },
+    { label: 'Outstanding', value: financeMoneyVisible ? formatCurrency(financeOutstanding) : '—', highlight: financeOutstanding > 0 },
   ]
 
   const statusTone = (() => {
@@ -660,8 +677,30 @@ export function Customer360Page() {
               <div className="customer-360-field-grid">
                 <div className="customer-360-field">
                   <span className="customer-360-field__label">Outstanding</span>
-                  <span className="customer-360-field__value">{formatCurrency(data.outstanding)}</span>
+                  <span className="customer-360-field__value">
+                    {financeMoneyVisible ? formatCurrency(financeOutstanding) : '—'}
+                  </span>
                 </div>
+                {isApiMode() ? (
+                  <>
+                    <div className="customer-360-field">
+                      <span className="customer-360-field__label">Invoiced</span>
+                      <span className="customer-360-field__value">
+                        {financeMoneyVisible ? formatCurrency(financeInvoiced) : '—'}
+                      </span>
+                    </div>
+                    <div className="customer-360-field">
+                      <span className="customer-360-field__label">Collected</span>
+                      <span className="customer-360-field__value">
+                        {financeMoneyVisible ? formatCurrency(financeCollected) : '—'}
+                      </span>
+                    </div>
+                    <div className="customer-360-field">
+                      <span className="customer-360-field__label">Dispatched value</span>
+                      <span className="customer-360-field__value">{formatCurrency(financeDispatched)}</span>
+                    </div>
+                  </>
+                ) : null}
                 <div className="customer-360-field">
                   <span className="customer-360-field__label">Open orders</span>
                   <span className="customer-360-field__value">{data.openSo.length}</span>
@@ -954,14 +993,44 @@ export function Customer360Page() {
 
       {tab === 'financial' && (
         <Entity360Panel title="Invoices & Payments">
+          {isApiMode() && companyCommercial.loading ? (
+            <p className="p-4 text-[12px] text-erp-muted">Loading commercial position…</p>
+          ) : null}
+          {isApiMode() && companyCommercial.error ? (
+            <p className="p-4 text-[12px] text-red-700">{companyCommercial.error}</p>
+          ) : null}
           <DynamicsKpiRow columns={5}>
-            <DynamicsKpiTile label="Invoice Value" value={formatCurrency(data.invoiceValue)} tone="primary" />
-            <DynamicsKpiTile label="Paid Amount" value={formatCurrency(data.received)} tone="success" />
-            <DynamicsKpiTile label="Outstanding" value={formatCurrency(data.outstanding)} tone="warning" />
-            <DynamicsKpiTile label="Overdue Amount" value={formatCurrency(data.overdueAmount)} tone="critical" />
-            <DynamicsKpiTile label="Payment Pending" value={data.paymentPending.length} tone="warning" />
+            <DynamicsKpiTile label="Ordered" value={formatCurrency(financeOrdered)} tone="primary" />
+            <DynamicsKpiTile label="Dispatched" value={formatCurrency(financeDispatched)} tone="primary" />
+            <DynamicsKpiTile
+              label="Invoice Value"
+              value={financeMoneyVisible ? formatCurrency(financeInvoiced) : '—'}
+              tone="primary"
+            />
+            <DynamicsKpiTile
+              label="Paid Amount"
+              value={financeMoneyVisible ? formatCurrency(financeCollected) : '—'}
+              tone="success"
+            />
+            <DynamicsKpiTile
+              label="Outstanding"
+              value={financeMoneyVisible ? formatCurrency(financeOutstanding) : '—'}
+              tone="warning"
+            />
           </DynamicsKpiRow>
-          <DataGrid data={data.customerInvoices} columns={invoiceColumns} compact emptyMessage="No invoices for this customer." />
+          {!isApiMode() ? (
+            <DynamicsKpiRow columns={2}>
+              <DynamicsKpiTile label="Overdue Amount" value={formatCurrency(data.overdueAmount)} tone="critical" />
+              <DynamicsKpiTile label="Payment Pending" value={data.paymentPending.length} tone="warning" />
+            </DynamicsKpiRow>
+          ) : null}
+          {!isApiMode() ? (
+            <DataGrid data={data.customerInvoices} columns={invoiceColumns} compact emptyMessage="No invoices for this customer." />
+          ) : (
+            <p className="p-4 text-[12px] text-erp-muted">
+              Invoice register remains in demo mode. API finance tiles above are projected from sales orders and posted AR.
+            </p>
+          )}
         </Entity360Panel>
       )}
 

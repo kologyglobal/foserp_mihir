@@ -14,6 +14,7 @@ import {
   Star,
   Trash2,
   ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react'
 import { StatusBadge } from '@/design-system/list-page'
 import {
@@ -41,6 +42,7 @@ export interface Quotation360RecordHeaderProps {
   canApprove: boolean
   canRecall?: boolean
   canCustomerApprove: boolean
+  canCustomerReject?: boolean
   canRevise: boolean
   canDelete?: boolean
   showCreateSalesOrder: boolean
@@ -55,6 +57,7 @@ export interface Quotation360RecordHeaderProps {
   onApprove: () => void
   onRecall?: () => void
   onCustomerApprove: () => void
+  onCustomerReject?: () => void
   onNewRevision: () => void
   onCreateSalesOrder: () => void
   onViewSalesOrder?: () => void
@@ -89,6 +92,7 @@ export function Quotation360RecordHeader({
   canApprove,
   canRecall = false,
   canCustomerApprove,
+  canCustomerReject = false,
   canRevise,
   canDelete = false,
   showCreateSalesOrder,
@@ -103,6 +107,7 @@ export function Quotation360RecordHeader({
   onApprove,
   onRecall,
   onCustomerApprove,
+  onCustomerReject,
   onNewRevision,
   onCreateSalesOrder,
   onViewSalesOrder,
@@ -147,6 +152,9 @@ export function Quotation360RecordHeader({
           ...(canCustomerApprove
             ? [{ id: 'customer-approve', label: 'Customer Approve', icon: ThumbsUp, onClick: onCustomerApprove }]
             : []),
+          ...(canCustomerReject && onCustomerReject
+            ? [{ id: 'customer-reject', label: 'Customer Reject', icon: ThumbsDown, onClick: onCustomerReject }]
+            : []),
           ...(showCreateSalesOrder
             ? [{
                 id: 'so',
@@ -167,6 +175,9 @@ export function Quotation360RecordHeader({
       : []),
     ...(canRecall && onRecall
       ? [{ id: 'recall', label: 'Recall to Draft', icon: RotateCcw, onClick: onRecall }]
+      : []),
+    ...(canCustomerReject && onCustomerReject
+      ? [{ id: 'customer-reject', label: 'Customer Reject', icon: ThumbsDown, onClick: onCustomerReject, danger: true as const }]
       : []),
     ...(canRevise
       ? [{ id: 'revise', label: 'New Revision', icon: GitBranch, onClick: onNewRevision }]

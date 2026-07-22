@@ -350,7 +350,24 @@ export function BomFormPage() {
     )
   }
 
-  if (loading) return <LoadingState variant="form" />
+  if (loading) {
+    return (
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Manufacturing"
+        title={isEdit ? 'Edit BOM' : 'New BOM'}
+        breadcrumbs={[
+          { label: 'Manufacturing & Production', to: '/manufacturing' },
+          { label: 'BOM', to: '/manufacturing/bom' },
+        ]}
+        autoBreadcrumbs={false}
+        backLink={{ to: '/manufacturing/bom', label: 'Back to BOMs' }}
+      >
+        <LoadingState variant="form" />
+      </OperationalPageShell>
+    )
+  }
 
   return (
     <OperationalPageShell
@@ -366,6 +383,7 @@ export function BomFormPage() {
       ]}
       autoBreadcrumbs={false}
       favoritePath={isEdit ? `/manufacturing/bom/${bomId}/edit` : '/manufacturing/bom/new'}
+      backLink={{ to: isEdit && bomId ? `/manufacturing/bom/${bomId}` : '/manufacturing/bom', label: isEdit ? 'Back to BOM' : 'Back to BOMs' }}
       commandBar={(
         <ErpCommandBar
           inline

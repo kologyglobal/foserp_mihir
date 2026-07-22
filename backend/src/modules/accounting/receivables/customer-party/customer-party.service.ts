@@ -1,4 +1,5 @@
 import type { CrmCompany } from '@prisma/client'
+import { resolveGstStateCode } from '../validation/state-code.validator.js'
 import type { CustomerParty, CustomerPartyAddress, FindCustomerPartiesQuery } from './customer-party.types.js'
 import { CustomerPartyNotFoundError, InactiveCustomerPartyError } from './customer-party.errors.js'
 import * as repo from './customer-party.repository.js'
@@ -8,6 +9,15 @@ function mapCountryCode(country: string | null | undefined): string | null {
   const normalized = country.trim().toUpperCase()
   if (normalized === 'INDIA' || normalized === 'IN') return 'IN'
   return normalized.length === 2 ? normalized : null
+}
+
+/**
+ * Prefer GSTIN prefix (official 2-digit GST state) when present;
+ * else resolve CrmCompany.state from a 2-digit code or Indian state name.
+ * CrmCompany has no dedicated stateCode column today.
+ */
+export function resolveCustomerStateCode(company: Pick<CrmCompany, 'gstin' | 'state'>): string | null {
+  return resolveGstStateCode(company.gstin) ?? resolveGstStateCode(company.state)
 }
 
 function mapAddress(company: CrmCompany): CustomerPartyAddress {
@@ -33,7 +43,7 @@ export function mapCompanyToCustomerParty(company: CrmCompany): CustomerParty {
     pan: company.pan,
     billingAddress: address,
     shippingAddress: address,
-    stateCode: company.state,
+    stateCode: resolveCustomerStateCode(company),
     countryCode: mapCountryCode(company.country),
     creditDays: company.creditDays,
     currencyCode: 'INR',

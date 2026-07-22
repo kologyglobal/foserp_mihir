@@ -1,0 +1,3 @@
+-- intentionally empty / restored placeholder
+-- Phase 7C5 hardened posting is application-layer (post/reverse endpoints).
+-- OutboundDispatch schema columns are covered by 7C0-7C4 migrations; stash SQL was 0 bytes.

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClipboardList, Plus, Trash2 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
@@ -7,9 +7,10 @@ import { ErpCardSection } from '@/components/erp/card-form'
 import { FormField } from '@/components/forms/FormField'
 import { Input, Select } from '@/components/forms/Inputs'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { ManufacturingAiAssist, ManufacturingDemoBanner } from '@/components/manufacturing'
-import { buildProductionPlanAiInsights } from '@/utils/manufacturing/insights'
+import { ManufacturingDemoBanner } from '@/components/manufacturing'
 import { seedManufacturingBoms } from '@/data/manufacturing/seed'
+import { isApiMode } from '@/config/apiConfig'
+import { useSetupLookup } from '@/modules/manufacturing/setup/useSetupLookups'
 import { createProductionPlan } from '@/services/manufacturing'
 import type { BomReadinessStatus, MaterialAvailabilityStatus, ProductionMethod, ProductionPlanSource } from '@/types/manufacturing'
 import {
@@ -34,7 +35,15 @@ type DraftLine = {
   materialStatus: MaterialAvailabilityStatus
 }
 
-const FINISHED_ITEMS = Array.from(
+type FinishedItemOption = {
+  id: string
+  code: string
+  name: string
+  method: ProductionMethod
+  bomStatus: BomReadinessStatus
+}
+
+const DEMO_FINISHED_ITEMS: FinishedItemOption[] = Array.from(
   new Map(
     seedManufacturingBoms.map((b) => [
       b.finishedItemId,
@@ -49,11 +58,18 @@ const FINISHED_ITEMS = Array.from(
   ).values(),
 )
 
-const WAREHOUSES = [
+const DEMO_WAREHOUSES = [
   { id: 'wh-fg', name: 'FG Stores' },
   { id: 'wh-rm', name: 'RM Stores' },
   { id: 'wh-wip', name: 'WIP Stores' },
 ]
+
+/** Lookup labels come as "CODE — NAME"; split for the plan line snapshot. */
+function splitLookupLabel(label: string): { code: string; name: string } {
+  const idx = label.indexOf(' — ')
+  if (idx === -1) return { code: label, name: label }
+  return { code: label.slice(0, idx), name: label.slice(idx + 3) }
+}
 
 function emptyLine(): DraftLine {
   const today = new Date().toISOString().slice(0, 10)
@@ -74,12 +90,15 @@ function emptyLine(): DraftLine {
 export function ProductionPlanFormPage() {
   const navigate = useNavigate()
   const perms = useManufacturingPermissions()
+  const apiMode = isApiMode()
+  const { options: apiItems } = useSetupLookup('items')
+  const { options: apiWarehouses } = useSetupLookup('warehouses')
   const today = new Date().toISOString().slice(0, 10)
   const [saving, setSaving] = useState(false)
   const [planName, setPlanName] = useState('')
   const [planDate, setPlanDate] = useState(today)
   const [source, setSource] = useState<ProductionPlanSource>('sales_order')
-  const [warehouseId, setWarehouseId] = useState('wh-fg')
+  const [warehouseId, setWarehouseId] = useState(apiMode ? '' : 'wh-fg')
   const [periodFrom, setPeriodFrom] = useState(today)
   const [periodTo, setPeriodTo] = useState(() => {
     const d = new Date()
@@ -89,59 +108,25 @@ export function ProductionPlanFormPage() {
   const [owner, setOwner] = useState('Planning User')
   const [lines, setLines] = useState<DraftLine[]>([emptyLine()])
 
-  const warehouseName = WAREHOUSES.find((w) => w.id === warehouseId)?.name ?? 'FG Stores'
+  const finishedItems: FinishedItemOption[] = apiMode
+    ? apiItems.map((opt) => {
+        const { code, name } = splitLookupLabel(opt.label)
+        return { id: opt.id, code, name, method: 'in_house' as ProductionMethod, bomStatus: 'active' as BomReadinessStatus }
+      })
+    : DEMO_FINISHED_ITEMS
 
-  const aiSuggestions = useMemo(() => {
-    const draftPlan = {
-      id: 'draft',
-      planNumber: 'DRAFT',
-      planDate,
-      source,
-      warehouseId,
-      warehouseName,
-      planningPeriodFrom: periodFrom,
-      planningPeriodTo: periodTo,
-      status: 'draft' as const,
-      owner,
-      totalItems: lines.filter((l) => l.finishedItemId).length,
-      plannedQty: lines.reduce((s, l) => s + Math.max(0, l.demandQuantity - l.availableFinishedStock), 0),
-      wosCreated: 0,
-      createdBy: 'Demo User',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      lines: lines
-        .filter((l) => l.finishedItemId)
-        .map((l, i) => ({
-          id: l.key,
-          planId: 'draft',
-          finishedItemId: l.finishedItemId,
-          finishedItemCode: l.finishedItemCode,
-          finishedItemName: l.finishedItemName,
-          uom: 'NOS',
-          demandQuantity: l.demandQuantity,
-          safetyStock: 0,
-          availableFinishedStock: l.availableFinishedStock,
-          requiredProductionQuantity: Math.max(0, l.demandQuantity - l.availableFinishedStock),
-          shortageQty: Math.max(0, l.demandQuantity - l.availableFinishedStock),
-          requiredDate: l.requiredDate,
-          productionMethod: l.productionMethod,
-          bomStatus: l.bomStatus,
-          materialStatus: l.materialStatus,
-          ignored: false,
-          sortOrder: i,
-          woCreated: false,
-        })),
-    }
-    if (!draftPlan.lines.length) return ['Add finished items and due dates to see planning tips.']
-    return buildProductionPlanAiInsights(draftPlan as never)
-  }, [lines, owner, periodFrom, periodTo, planDate, source, warehouseId, warehouseName])
+  const warehouses = apiMode
+    ? apiWarehouses.map((opt) => ({ id: opt.id, name: opt.label }))
+    : DEMO_WAREHOUSES
+
+  const warehouseName = warehouses.find((w) => w.id === warehouseId)?.name ?? (apiMode ? '' : 'FG Stores')
 
   const updateLine = (key: string, patch: Partial<DraftLine>) => {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)))
   }
 
   const pickItem = (key: string, itemId: string) => {
-    const item = FINISHED_ITEMS.find((f) => f.id === itemId)
+    const item = finishedItems.find((f) => f.id === itemId)
     if (!item) {
       updateLine(key, { finishedItemId: itemId })
       return
@@ -152,8 +137,8 @@ export function ProductionPlanFormPage() {
       finishedItemName: item.name,
       productionMethod: item.method,
       bomStatus: item.bomStatus,
-      materialStatus: 'partial',
-      availableFinishedStock: item.code.includes('CHS') || item.code.includes('TANK') ? 0 : 3,
+      materialStatus: apiMode ? 'not_checked' : 'partial',
+      availableFinishedStock: apiMode ? 0 : item.code.includes('CHS') || item.code.includes('TANK') ? 0 : 3,
     })
   }
 
@@ -227,6 +212,7 @@ export function ProductionPlanFormPage() {
       ]}
       autoBreadcrumbs={false}
       favoritePath="/manufacturing/production-plan/new"
+      backLink={{ to: '/manufacturing/production-plan', label: 'Back to Production Plans' }}
       commandBar={(
         <ErpCommandBar
           inline
@@ -246,7 +232,7 @@ export function ProductionPlanFormPage() {
       <div className="space-y-4">
         <ManufacturingDemoBanner message="Keep this form for planning only. Execution happens on Work Orders / Shopfloor." />
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+        <div className="space-y-4">
           <div className="min-w-0 space-y-4">
             <ErpCardSection title="Plan Header" collapsible defaultOpen accent="blue">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -272,7 +258,8 @@ export function ProductionPlanFormPage() {
                 </FormField>
                 <FormField label="Warehouse">
                   <Select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
-                    {WAREHOUSES.map((w) => (
+                    {apiMode && <option value="">— Select —</option>}
+                    {warehouses.map((w) => (
                       <option key={w.id} value={w.id}>{w.name}</option>
                     ))}
                   </Select>
@@ -302,12 +289,12 @@ export function ProductionPlanFormPage() {
                     <tr>
                       <th>Finished Item</th>
                       <th>Required Qty</th>
-                      <th>Available Stock</th>
-                      <th>Shortage Qty</th>
-                      <th>Suggested Production Qty</th>
+                      {!apiMode && <th>Available Stock</th>}
+                      {!apiMode && <th>Shortage Qty</th>}
+                      {!apiMode && <th>Suggested Production Qty</th>}
                       <th>Due Date</th>
-                      <th>BOM Status</th>
-                      <th>Material Readiness</th>
+                      {!apiMode && <th>BOM Status</th>}
+                      {!apiMode && <th>Material Readiness</th>}
                       <th />
                     </tr>
                   </thead>
@@ -322,8 +309,8 @@ export function ProductionPlanFormPage() {
                               value={line.finishedItemId}
                               onChange={(e) => pickItem(line.key, e.target.value)}
                             >
-                              <option value="">Select…</option>
-                              {FINISHED_ITEMS.map((f) => (
+                              <option value="">— Select —</option>
+                              {finishedItems.map((f) => (
                                 <option key={f.id} value={f.id}>{f.code} — {f.name}</option>
                               ))}
                             </Select>
@@ -337,17 +324,19 @@ export function ProductionPlanFormPage() {
                               onChange={(e) => updateLine(line.key, { demandQuantity: Number(e.target.value) })}
                             />
                           </td>
-                          <td>
-                            <Input
-                              type="number"
-                              min={0}
-                              className="w-24"
-                              value={line.availableFinishedStock}
-                              onChange={(e) => updateLine(line.key, { availableFinishedStock: Number(e.target.value) })}
-                            />
-                          </td>
-                          <td className="tabular-nums font-semibold text-rose-700">{shortage}</td>
-                          <td className="tabular-nums font-semibold">{suggested}</td>
+                          {!apiMode && (
+                            <td>
+                              <Input
+                                type="number"
+                                min={0}
+                                className="w-24"
+                                value={line.availableFinishedStock}
+                                onChange={(e) => updateLine(line.key, { availableFinishedStock: Number(e.target.value) })}
+                              />
+                            </td>
+                          )}
+                          {!apiMode && <td className="tabular-nums font-semibold text-rose-700">{shortage}</td>}
+                          {!apiMode && <td className="tabular-nums font-semibold">{suggested}</td>}
                           <td>
                             <Input
                               type="date"
@@ -356,26 +345,30 @@ export function ProductionPlanFormPage() {
                               onChange={(e) => updateLine(line.key, { requiredDate: e.target.value })}
                             />
                           </td>
-                          <td>
-                            <Select
-                              value={line.bomStatus}
-                              onChange={(e) => updateLine(line.key, { bomStatus: e.target.value as BomReadinessStatus })}
-                            >
-                              {(Object.keys(BOM_READINESS_LABELS) as BomReadinessStatus[]).map((s) => (
-                                <option key={s} value={s}>{BOM_READINESS_LABELS[s]}</option>
-                              ))}
-                            </Select>
-                          </td>
-                          <td>
-                            <Select
-                              value={line.materialStatus}
-                              onChange={(e) => updateLine(line.key, { materialStatus: e.target.value as MaterialAvailabilityStatus })}
-                            >
-                              {(Object.keys(MATERIAL_STATUS_LABELS) as MaterialAvailabilityStatus[]).map((s) => (
-                                <option key={s} value={s}>{MATERIAL_STATUS_LABELS[s]}</option>
-                              ))}
-                            </Select>
-                          </td>
+                          {!apiMode && (
+                            <td>
+                              <Select
+                                value={line.bomStatus}
+                                onChange={(e) => updateLine(line.key, { bomStatus: e.target.value as BomReadinessStatus })}
+                              >
+                                {(Object.keys(BOM_READINESS_LABELS) as BomReadinessStatus[]).map((s) => (
+                                  <option key={s} value={s}>{BOM_READINESS_LABELS[s]}</option>
+                                ))}
+                              </Select>
+                            </td>
+                          )}
+                          {!apiMode && (
+                            <td>
+                              <Select
+                                value={line.materialStatus}
+                                onChange={(e) => updateLine(line.key, { materialStatus: e.target.value as MaterialAvailabilityStatus })}
+                              >
+                                {(Object.keys(MATERIAL_STATUS_LABELS) as MaterialAvailabilityStatus[]).map((s) => (
+                                  <option key={s} value={s}>{MATERIAL_STATUS_LABELS[s]}</option>
+                                ))}
+                              </Select>
+                            </td>
+                          )}
                           <td>
                             <button
                               type="button"
@@ -401,12 +394,12 @@ export function ProductionPlanFormPage() {
                 Add Line
               </button>
               <p className="mt-2 text-[11px] text-erp-muted">
-                Method default: {PRODUCTION_METHOD_LABELS.in_house}. Create WO actions are on the plan detail after save.
+                {apiMode
+                  ? 'Stock availability, shortage, and suggested production qty are computed by the server when the plan is netted (Mark Planned) on the plan detail.'
+                  : `Method default: ${PRODUCTION_METHOD_LABELS.in_house}. Create WO actions are on the plan detail after save.`}
               </p>
             </ErpCardSection>
           </div>
-
-          <ManufacturingAiAssist title="Planning AI Insights" suggestions={aiSuggestions} />
         </div>
       </div>
     </OperationalPageShell>

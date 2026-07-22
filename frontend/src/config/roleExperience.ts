@@ -120,6 +120,7 @@ const STORES: RoleExperienceDefinition = {
   kpiIds: ['grnPending', 'openReservations', 'negativeStock', 'pendingIssues', 'slowMoving', 'qcIncoming'],
   shortcuts: [
     { label: 'Inventory Workspace', path: '/inventory', icon: Warehouse },
+    { label: 'Store Workbench', path: '/manufacturing/store-workbench', icon: Package },
     { label: 'Material Inward', path: '/inventory/inward', icon: PackageCheck },
     { label: 'Material Issue', path: '/inventory/issue', icon: Package },
     { label: 'Stock Ledger', path: '/inventory/ledger', icon: ClipboardList },

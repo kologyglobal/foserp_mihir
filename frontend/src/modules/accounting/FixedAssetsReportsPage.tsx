@@ -125,7 +125,7 @@ export function FixedAssetsReportsPage() {
     >
       <FixedAssetsWorkspaceTabs active="reports" />
       <div className="space-y-3 p-4">
-        <FixedAssetsDemoBanner />
+        <FixedAssetsDemoBanner variant="partial" />
         <div className="flex flex-wrap items-end gap-2">
           <div className="min-w-[200px] flex-1"><SearchInput value={search} onChange={setSearch} placeholder="Search reports…" /></div>
           <nav className="flex gap-1">

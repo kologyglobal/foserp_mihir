@@ -1,0 +1,3 @@
+code,name,itemName2,itemDescription,categoryCode,baseUomCode,itemType,productType,inventoryType,materialGrade,hsnCode,reorderLevel,reorderQty,standardRate,isPurchasable,isStockable,isBlocked,qcRequired,status
+PILOT-RM-PLATE,Pilot Plate,,Pilot RM,CAT-RM,KG,RAW_MATERIAL,,inventory,IS2062,,,,0,true,true,false,false,ACTIVE
+PILOT-FG-SIMPLE,Pilot FG Simple,,Simple FG,CAT-FG,NOS,FINISHED_GOOD,,inventory,,,,,0,false,true,false,false,ACTIVE

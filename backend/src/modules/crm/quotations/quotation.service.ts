@@ -22,11 +22,12 @@ import {
   appendApprovalHistory,
   assertDocumentApprovable,
   assertDocumentCustomerApprovable,
-  assertDocumentEditable,
   assertDocumentRejectable,
   assertDocumentSendable,
   assertDocumentSubmittable,
   assertQuotationDeletable,
+  sanitizeQuotationDocumentUpdateInput,
+  sanitizeQuotationUpdateInput,
 } from './quotation.workflow.js'
 
 async function mapQuotationWithNames(
@@ -101,11 +102,13 @@ export async function updateQuotation(tenantId: string, id: string, userId: stri
   if (!existing) throw new NotFoundError('Quotation not found')
   if (existing.locked) throw new InvalidStateError('Quotation is locked')
 
-  if (input.customerId) await assertCompanyInTenant(tenantId, input.customerId)
-  if (input.contactId) await assertContactInTenant(tenantId, input.contactId)
-  if (input.salesOwnerId) await assertUserInTenant(tenantId, input.salesOwnerId)
+  const safeInput = sanitizeQuotationUpdateInput(existing, input)
 
-  const quotation = await repo.updateQuotation(tenantId, id, userId, input)
+  if (safeInput.customerId) await assertCompanyInTenant(tenantId, safeInput.customerId)
+  if (safeInput.contactId) await assertContactInTenant(tenantId, safeInput.contactId)
+  if (safeInput.salesOwnerId) await assertUserInTenant(tenantId, safeInput.salesOwnerId)
+
+  const quotation = await repo.updateQuotation(tenantId, id, userId, safeInput)
   return mapQuotationWithNames(tenantId, quotation)
 }
 
@@ -118,9 +121,10 @@ export async function updateQuotationDocument(
 ) {
   const doc = await repo.findQuotationDocumentById(tenantId, quotationId, docId)
   if (!doc) throw new NotFoundError('Quotation document not found')
-  assertDocumentEditable(doc)
 
-  const quotation = await repo.updateQuotationDocument(tenantId, quotationId, docId, userId, input)
+  const safeInput = sanitizeQuotationDocumentUpdateInput(doc, input)
+
+  const quotation = await repo.updateQuotationDocument(tenantId, quotationId, docId, userId, safeInput)
   return mapQuotationWithNames(tenantId, quotation)
 }
 

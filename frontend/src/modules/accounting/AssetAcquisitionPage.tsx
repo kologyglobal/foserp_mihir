@@ -20,6 +20,7 @@ import {
   getCategories,
   FixedAssetsServiceError,
 } from '@/services/accounting/fixedAssetsService'
+import { isApiMode } from '@/config/apiConfig'
 import type { AcquisitionType, AssetAcquisition, FixedAssetCategory } from '@/types/fixedAssets'
 import { ACQUISITION_TYPES } from '@/types/fixedAssets'
 import { useFixedAssetsPermissions } from '@/utils/permissions/fixedAssets'
@@ -127,7 +128,11 @@ export function AssetAcquisitionPage() {
         department: form.department,
         notes: form.notes || null,
       })
-      notify.success(`Acquisition draft ${created.acquisitionNumber} created (demo).`)
+      notify.success(
+        isApiMode()
+          ? `Acquisition ${created.acquisitionNumber} created — pending capitalization.`
+          : `Acquisition draft ${created.acquisitionNumber} created (demo).`,
+      )
       setCreateOpen(false)
       await load()
     } catch (e) {
@@ -167,7 +172,7 @@ export function AssetAcquisitionPage() {
     >
       <FixedAssetsWorkspaceTabs active="acquisition" />
       <div className="space-y-3 p-4">
-        <FixedAssetsDemoBanner />
+        <FixedAssetsDemoBanner variant="partial" />
         <FixedAssetsSummaryCards items={kpis} columns={3} />
 
         <div className="flex flex-wrap items-end gap-2">
@@ -230,7 +235,11 @@ export function AssetAcquisitionPage() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         title="New Asset Acquisition"
-        subtitle="Demo record — capitalize later from the Capitalization workspace"
+        subtitle={
+          isApiMode()
+            ? 'Creates a live asset pending capitalization — capitalize from the Capitalization workspace'
+            : 'Demo record — capitalize later from the Capitalization workspace'
+        }
         footer={(
           <div className="flex justify-end gap-2">
             <button type="button" className="erp-btn erp-btn-ghost h-9 px-3 text-[13px]" onClick={() => setCreateOpen(false)}>Cancel</button>
@@ -275,10 +284,12 @@ export function AssetAcquisitionPage() {
               <label className={labelCls}>Amount (₹, excl. GST)</label>
               <Input type="number" min={0} step="0.01" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
             </div>
-            <div>
-              <label className={labelCls}>GST amount (₹)</label>
-              <Input type="number" min={0} step="0.01" value={form.gstAmount} onChange={(e) => setForm((f) => ({ ...f, gstAmount: e.target.value }))} />
-            </div>
+            {!isApiMode() && (
+              <div>
+                <label className={labelCls}>GST amount (₹)</label>
+                <Input type="number" min={0} step="0.01" value={form.gstAmount} onChange={(e) => setForm((f) => ({ ...f, gstAmount: e.target.value }))} />
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>

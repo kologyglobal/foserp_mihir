@@ -11,6 +11,12 @@ const router = Router({ mergeParams: true })
 router.get('/', requirePermission('purchase.invoice.view'), validateQuery(listPurchaseInvoicesQuerySchema), controller.listPurchaseInvoices)
 router.post('/', requirePermission('purchase.invoice.create'), validateBody(createPurchaseInvoiceSchema), controller.createPurchaseInvoice)
 router.get('/:id', requirePermission('purchase.invoice.view'), validateParams(uuidParamSchema), controller.getPurchaseInvoice)
+router.get(
+  '/:id/ap-handoff-preview',
+  requirePermission('purchase.invoice.view'),
+  validateParams(uuidParamSchema),
+  controller.previewPurchaseInvoiceApHandoff,
+)
 router.patch('/:id', requirePermission('purchase.invoice.edit'), validateParams(uuidParamSchema), validateBody(updatePurchaseInvoiceSchema), controller.updatePurchaseInvoice)
 router.post('/:id/submit', requirePermission('purchase.invoice.submit'), validateParams(uuidParamSchema), validateBody(invoiceLifecycleSchema), controller.submitPurchaseInvoice)
 router.post('/:id/approve', requirePermission('purchase.invoice.approve'), validateParams(uuidParamSchema), validateBody(invoiceLifecycleSchema), controller.approvePurchaseInvoice)

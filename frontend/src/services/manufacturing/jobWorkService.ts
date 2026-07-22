@@ -14,8 +14,27 @@ import {
   seedJobWorkMaterials,
   seedJobWorkOrders,
 } from '../../data/manufacturing/jobWorkSeed'
+import { isApiMode } from '../../config/apiConfig'
+import * as jobWorkApi from '../api/manufacturingApi'
+import {
+  buildReconciliationFromApi,
+  mapApiDispatch,
+  mapApiJobWork,
+  mapApiMaterial,
+  mapApiReceipt,
+  type ApiJobWork,
+} from './jobWorkApiMapper'
 
 const delay = (ms = 80) => new Promise((r) => setTimeout(r, ms))
+
+function apiErr(e: unknown): string {
+  return e instanceof Error ? e.message : 'Request failed'
+}
+
+function tabToApiStatus(tab: JobWorkFilter['tab']): string | undefined {
+  if (!tab || tab === 'all' || tab === 'overdue') return undefined
+  return tab.toUpperCase()
+}
 
 let orders: JobWorkOrder[] = structuredClone(seedJobWorkOrders)
 let materials: JobWorkMaterial[] = structuredClone(seedJobWorkMaterials)
@@ -113,17 +132,56 @@ function matches(o: JobWorkOrder, filter?: JobWorkFilter) {
 }
 
 export async function getJobWorkOrders(filter?: JobWorkFilter): Promise<JobWorkOrder[]> {
+  if (isApiMode()) {
+    const res = await jobWorkApi.listJobWorkOrders({
+      status: filter?.status ? String(filter.status).toUpperCase() : tabToApiStatus(filter?.tab),
+      search: filter?.search,
+      limit: 100,
+    })
+    let list = (res.data as ApiJobWork[]).map(mapApiJobWork)
+    if (filter?.tab === 'overdue') list = list.filter(isOverdue)
+    if (filter?.vendor) {
+      const v = filter.vendor.toLowerCase()
+      list = list.filter((o) => o.vendorName.toLowerCase().includes(v))
+    }
+    return list
+  }
   await delay()
   return orders.filter((o) => matches(o, filter)).map((o) => ({ ...o, activity: [...o.activity] }))
 }
 
 export async function getJobWorkOrderById(id: string): Promise<JobWorkOrder | null> {
+  if (isApiMode()) {
+    try {
+      const res = await jobWorkApi.getJobWorkOrder(id)
+      return mapApiJobWork(res.data as ApiJobWork)
+    } catch {
+      return null
+    }
+  }
   await delay()
   const o = orders.find((x) => x.id === id)
   return o ? { ...o, activity: [...o.activity] } : null
 }
 
 export async function getJobWorkRegisterSummary(): Promise<JobWorkRegisterSummary> {
+  if (isApiMode()) {
+    const list = await getJobWorkOrders({ tab: 'all' })
+    const openStatuses: JobWorkStatus[] = ['draft', 'material_sent', 'partially_received', 'reconciliation_pending']
+    const weekEnd = new Date()
+    weekEnd.setDate(weekEnd.getDate() + 7)
+    const weekEndStr = weekEnd.toISOString().slice(0, 10)
+    return {
+      open: list.filter((o) => openStatuses.includes(o.status)).length,
+      materialWithVendors: list.filter((o) => o.materialBalance > 0 && o.status !== 'closed').length,
+      dueThisWeek: list.filter(
+        (o) => o.expectedReturnDate >= today() && o.expectedReturnDate <= weekEndStr && !['closed', 'cancelled'].includes(o.status),
+      ).length,
+      overdue: list.filter(isOverdue).length,
+      reconciliationDifference: list.filter((o) => o.status === 'reconciliation_pending' && !o.differenceApproved).length,
+      vendorInvoicePending: list.filter((o) => o.invoiceStatus === 'pending' || (o.invoiceStatus === 'none' && o.status === 'reconciliation_pending')).length,
+    }
+  }
   await delay()
   const openStatuses: JobWorkStatus[] = ['draft', 'material_sent', 'partially_received', 'reconciliation_pending']
   const weekEnd = new Date()
@@ -156,8 +214,46 @@ export async function createJobWorkOrder(
     itemName: string
     materialToSend?: string
     remarks?: string
+    materialItemId?: string
+    materialWarehouseId?: string
+    receiptWarehouseId?: string
+    qualityRequired?: boolean
+    rateBasis?: JobWorkOrder['rateBasis']
   },
 ): Promise<{ ok: boolean; jobWork?: JobWorkOrder; error?: string }> {
+  if (isApiMode()) {
+    try {
+      if (!input.materialItemId || !input.materialWarehouseId || !input.receiptWarehouseId) {
+        return { ok: false, error: 'Material item and warehouses are required in API mode' }
+      }
+      const rateBasisMap = {
+        per_piece: 'PER_PIECE',
+        per_kg: 'PER_KG',
+        per_hour: 'PER_HOUR',
+        per_batch: 'PER_BATCH',
+        fixed: 'FIXED',
+      } as const
+      const res = await jobWorkApi.createJobWorkOrder({
+        vendorId: input.vendorId,
+        productionOrderId: input.workOrderId || undefined,
+        processName: input.process,
+        itemId: input.itemId,
+        orderedQty: input.quantity,
+        rate: input.rate,
+        rateBasis: rateBasisMap[input.rateBasis ?? 'per_piece'],
+        expectedReturnDate: input.expectedReturnDate,
+        materialWarehouseId: input.materialWarehouseId,
+        receiptWarehouseId: input.receiptWarehouseId,
+        qualityRequired: input.qualityRequired ?? false,
+        materialToSend: input.materialToSend,
+        remarks: input.remarks,
+        materialLines: [{ itemId: input.materialItemId, requiredQty: input.quantity }],
+      })
+      return { ok: true, jobWork: mapApiJobWork(res.data as ApiJobWork) }
+    } catch (e) {
+      return { ok: false, error: apiErr(e) }
+    }
+  }
   await delay()
   jwSeq += 1
   const id = `mfg-jw-${crypto.randomUUID().slice(0, 8)}`
@@ -238,6 +334,22 @@ export async function updateJobWorkOrder(
   id: string,
   patch: Partial<JobWorkOrder>,
 ): Promise<{ ok: boolean; jobWork?: JobWorkOrder; error?: string }> {
+  if (isApiMode()) {
+    try {
+      const res = await jobWorkApi.updateJobWorkOrder(id, {
+        processName: patch.process,
+        orderedQty: patch.orderedQty,
+        rate: patch.rate,
+        expectedReturnDate: patch.expectedReturnDate,
+        materialToSend: patch.materialToSend,
+        remarks: patch.remarks,
+        qualityRequired: patch.qualityRequired,
+      })
+      return { ok: true, jobWork: mapApiJobWork(res.data as ApiJobWork) }
+    } catch (e) {
+      return { ok: false, error: apiErr(e) }
+    }
+  }
   await delay()
   const idx = orders.findIndex((o) => o.id === id)
   if (idx < 0) return { ok: false, error: 'Not found' }
@@ -249,16 +361,31 @@ export async function updateJobWorkOrder(
 }
 
 export async function getJobWorkMaterials(jobWorkId: string): Promise<JobWorkMaterial[]> {
+  if (isApiMode()) {
+    const res = await jobWorkApi.getJobWorkOrder(jobWorkId)
+    const row = res.data as ApiJobWork
+    return (row.materialLines ?? []).map(mapApiMaterial)
+  }
   await delay()
   return mats(jobWorkId).map((m) => ({ ...m }))
 }
 
 export async function getJobWorkDispatches(jobWorkId: string): Promise<JobWorkDispatch[]> {
+  if (isApiMode()) {
+    const res = await jobWorkApi.getJobWorkOrder(jobWorkId)
+    const row = res.data as ApiJobWork
+    return (row.dispatches ?? []).map(mapApiDispatch)
+  }
   await delay()
   return dispatches.filter((d) => d.jobWorkId === jobWorkId).map((d) => ({ ...d, lines: [...d.lines] }))
 }
 
 export async function getJobWorkReceipts(jobWorkId: string): Promise<JobWorkReceipt[]> {
+  if (isApiMode()) {
+    const res = await jobWorkApi.getJobWorkOrder(jobWorkId)
+    const row = res.data as ApiJobWork
+    return (row.receipts ?? []).map(mapApiReceipt)
+  }
   await delay()
   return receipts.filter((r) => r.jobWorkId === jobWorkId).map((r) => ({ ...r }))
 }
@@ -274,6 +401,25 @@ export async function dispatchJobWorkMaterialDemo(
     remarks?: string
   },
 ): Promise<{ ok: boolean; error?: string }> {
+  if (isApiMode()) {
+    try {
+      await jobWorkApi.dispatchJobWorkOrder(jobWorkId, {
+        dispatchedAt: input.dispatchAt,
+        vendorChallan: input.vendorChallan,
+        vehicle: input.vehicle,
+        transporter: input.transporter,
+        remarks: input.remarks,
+        lines: input.lines.map((l) => ({
+          materialLineId: l.materialId,
+          quantity: l.qty,
+          batchOrSerial: l.batchOrSerial,
+        })),
+      })
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: apiErr(e) }
+    }
+  }
   await delay()
   const idx = orders.findIndex((o) => o.id === jobWorkId)
   if (idx < 0) return { ok: false, error: 'Not found' }
@@ -343,6 +489,23 @@ export async function receiveJobWorkDemo(
     reconcileAfter?: boolean
   },
 ): Promise<{ ok: boolean; error?: string }> {
+  if (isApiMode()) {
+    try {
+      await jobWorkApi.receiveJobWorkOrder(jobWorkId, {
+        receivedQty: input.receivedQty,
+        acceptedQty: input.acceptedQty,
+        rejectedQty: input.rejectedQty ?? 0,
+        reworkQty: input.reworkQty ?? 0,
+        scrapReturned: input.scrapReturned ?? 0,
+        unusedReturned: input.unusedReturned ?? 0,
+        vendorChallan: input.vendorChallan,
+        batchOrSerial: input.batchOrSerial,
+      })
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: apiErr(e) }
+    }
+  }
   await delay()
   const idx = orders.findIndex((o) => o.id === jobWorkId)
   if (idx < 0) return { ok: false, error: 'Not found' }
@@ -401,6 +564,16 @@ export async function returnJobWorkMaterialDemo(
   jobWorkId: string,
   lines: Array<{ materialId: string; returnQty: number }>,
 ): Promise<{ ok: boolean; error?: string }> {
+  if (isApiMode()) {
+    try {
+      await jobWorkApi.returnJobWorkMaterial(jobWorkId, {
+        lines: lines.map((l) => ({ materialLineId: l.materialId, quantity: l.returnQty })),
+      })
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: apiErr(e) }
+    }
+  }
   await delay()
   materials = materials.map((m) => {
     const line = lines.find((l) => l.materialId === m.id)
@@ -414,6 +587,14 @@ export async function returnJobWorkMaterialDemo(
 }
 
 export async function getJobWorkReconciliation(jobWorkId: string): Promise<JobWorkReconciliation | null> {
+  if (isApiMode()) {
+    try {
+      const res = await jobWorkApi.getJobWorkOrder(jobWorkId)
+      return buildReconciliationFromApi(res.data as ApiJobWork)
+    } catch {
+      return null
+    }
+  }
   await delay()
   const jw = orders.find((o) => o.id === jobWorkId)
   if (!jw) return null
@@ -453,6 +634,14 @@ export async function approveJobWorkDifferenceDemo(
   jobWorkId: string,
   reason: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  if (isApiMode()) {
+    try {
+      await jobWorkApi.approveJobWorkDifference(jobWorkId, reason)
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: apiErr(e) }
+    }
+  }
   await delay()
   if (!reason.trim()) return { ok: false, error: 'Reason required' }
   const idx = orders.findIndex((o) => o.id === jobWorkId)
@@ -472,6 +661,35 @@ export async function linkJobWorkVendorInvoiceDemo(
   jobWorkId: string,
   invoice: { invoiceId: string; invoiceNo: string; invoiceAmount: number },
 ): Promise<{ ok: boolean; link?: JobWorkInvoiceLink; error?: string }> {
+  if (isApiMode()) {
+    try {
+      const res = await jobWorkApi.linkJobWorkInvoice(jobWorkId, invoice)
+      const jw = mapApiJobWork(res.data as ApiJobWork)
+      const expected = jw.rateBasis === 'fixed' ? jw.rate : jw.rate * jw.acceptedQty
+      return {
+        ok: true,
+        link: {
+          jobWorkId,
+          vendorId: jw.vendorId,
+          vendorName: jw.vendorName,
+          processQty: jw.acceptedQty,
+          agreedRate: jw.rate,
+          expectedServiceAmount: expected,
+          acceptedQty: jw.acceptedQty,
+          expectedJobWorkCost: expected,
+          invoiceId: invoice.invoiceId,
+          invoiceNo: invoice.invoiceNo,
+          invoiceAmount: invoice.invoiceAmount,
+          difference: invoice.invoiceAmount - expected,
+          gstPreview: Math.round(invoice.invoiceAmount * 0.18),
+          tdsPreview: Math.round(invoice.invoiceAmount * 0.01),
+          matchStatus: Math.abs(invoice.invoiceAmount - expected) < 1 ? 'matched' : 'variance',
+        },
+      }
+    } catch (e) {
+      return { ok: false, error: apiErr(e) }
+    }
+  }
   await delay()
   const idx = orders.findIndex((o) => o.id === jobWorkId)
   if (idx < 0) return { ok: false, error: 'Not found' }
@@ -554,6 +772,14 @@ export async function getJobWorkCostPreview(jobWorkId: string): Promise<JobWorkC
 }
 
 export async function closeJobWorkOrderDemo(jobWorkId: string): Promise<{ ok: boolean; error?: string }> {
+  if (isApiMode()) {
+    try {
+      await jobWorkApi.closeJobWorkOrder(jobWorkId)
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: apiErr(e) }
+    }
+  }
   await delay()
   const idx = orders.findIndex((o) => o.id === jobWorkId)
   if (idx < 0) return { ok: false, error: 'Not found' }
@@ -567,6 +793,14 @@ export async function closeJobWorkOrderDemo(jobWorkId: string): Promise<{ ok: bo
 }
 
 export async function cancelJobWorkOrderDemo(jobWorkId: string, reason?: string): Promise<{ ok: boolean; error?: string }> {
+  if (isApiMode()) {
+    try {
+      await jobWorkApi.cancelJobWorkOrder(jobWorkId, reason?.trim() || 'Cancelled')
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: apiErr(e) }
+    }
+  }
   await delay()
   const idx = orders.findIndex((o) => o.id === jobWorkId)
   if (idx < 0) return { ok: false, error: 'Not found' }

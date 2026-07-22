@@ -164,7 +164,7 @@ export function VendorDisputesPage() {
       layout="enterprise"
       badge="Accounting"
       title="Vendor Disputes"
-      description="Invoice disputes, holds, and resolution tracking — demo UI only."
+      description="Vendor invoice disputes linked to purchase orders/GRNs, holds, and resolution tracking."
       breadcrumbs={[
         { label: 'Accounting', to: '/accounting' },
         { label: 'Payables', to: '/accounting/payables' },
@@ -229,12 +229,13 @@ export function VendorDisputesPage() {
         ) : null}
         {!loading && !error && rows.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="erp-table w-full min-w-[1050px] text-[13px]">
+            <table className="erp-table w-full min-w-[1180px] text-[13px]">
               <thead>
                 <tr className="border-b bg-erp-surface-alt/60 text-[11px] uppercase text-erp-muted">
                   <th className="px-3 py-2 text-left">Dispute</th>
                   <th className="px-3 py-2 text-left">Vendor</th>
                   <th className="px-3 py-2 text-left">Invoice</th>
+                  <th className="px-3 py-2 text-left">Purchase order</th>
                   <th className="px-3 py-2 text-left">Type</th>
                   <th className="px-3 py-2 text-right">Amount</th>
                   <th className="px-3 py-2 text-left">Priority</th>
@@ -263,7 +264,17 @@ export function VendorDisputesPage() {
                       </button>
                     </td>
                     <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                      <TableLink to={`/accounting/payables/invoices/${r.invoiceId}`}>{r.invoiceNumber}</TableLink>
+                      <TableLink to={`/accounting/money-out/vendor-invoices/${r.invoiceId}`}>{r.invoiceNumber}</TableLink>
+                    </td>
+                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                      {r.purchaseOrders?.length
+                        ? r.purchaseOrders.map((po, index) => (
+                            <span key={po.id}>
+                              {index > 0 ? ', ' : null}
+                              <TableLink to={`/purchase/orders/${po.id}`}>{po.number}</TableLink>
+                            </span>
+                          ))
+                        : '—'}
                     </td>
                     <td className="px-3 py-2">{r.disputeType}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(r.disputedAmount)}</td>

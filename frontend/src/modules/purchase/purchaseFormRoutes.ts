@@ -37,7 +37,7 @@ export const PURCHASE_FORM_ROUTES = {
   },
   qualityInspection: {
     list: '/purchase/quality-inspections',
-    create: null,
+    create: '/purchase/quality-inspections/new',
     edit: null,
   },
   purchaseReturn: {

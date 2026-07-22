@@ -54,6 +54,29 @@ import type {
 } from '../../types/receivables'
 import { DEFAULT_RECEIVABLE_FILTER, ELECTRONIC_PAYMENT_MODES, RECEIVABLE_AGEING_BUCKETS } from '../../types/receivables'
 import { getSessionUser } from '../../utils/permissions'
+import { isApiMode } from '../../config/apiConfig'
+import {
+  allocateLiveReceipt,
+  createLiveDispute,
+  getLiveCreditNotes,
+  getLiveCustomerDisputes,
+  getLiveCustomerOutstanding,
+  getLiveCustomerReceiptById,
+  getLiveOpenInvoicesForAllocation,
+  getLiveCustomerReceipts,
+  getLiveCustomerReceivableCard,
+  getLiveCustomerStatementPreview,
+  getLiveReceiptPostingPreview,
+  getLiveReceivableAgeing,
+  getLiveReceivableCustomerById,
+  getLiveReceivableInvoices,
+  getLiveReceivableLookups,
+  getLiveReceivablesDashboard,
+  markLiveReceiptReady,
+  postLiveReceipt,
+  reverseLiveReceipt,
+  updateLiveDispute,
+} from './receivablesLiveService'
 
 export { DEFAULT_RECEIVABLE_FILTER }
 
@@ -299,6 +322,7 @@ function deriveAllocationStatus(receiptAmount: number, allocated: number): Alloc
 }
 
 export async function getReceivableLookups(): Promise<ReceivableLookups> {
+  if (isApiMode()) return getLiveReceivableLookups()
   await delay()
   return {
     customers: customersStore.map((c) => ({ id: c.id, code: c.customerCode, name: c.customerName })),
@@ -313,6 +337,7 @@ export async function getReceivableLookups(): Promise<ReceivableLookups> {
 }
 
 export async function getReceivablesDashboard(): Promise<ReceivablesDashboardData> {
+  if (isApiMode()) return getLiveReceivablesDashboard()
   await delay()
   refreshInvoiceAgeing()
   const outstanding = buildOutstandingSummaries()
@@ -466,11 +491,13 @@ export async function getReceivablesDashboard(): Promise<ReceivablesDashboardDat
 }
 
 export async function getCustomerOutstanding(filter: Partial<ReceivableFilter> = {}): Promise<CustomerOutstandingSummary[]> {
+  if (isApiMode()) return getLiveCustomerOutstanding(filter)
   await delay()
   return filterOutstanding(filter)
 }
 
 export async function getReceivableInvoices(filter: Partial<ReceivableFilter> = {}): Promise<ReceivableInvoice[]> {
+  if (isApiMode()) return getLiveReceivableInvoices(filter)
   await delay()
   return filterInvoices(filter)
 }
@@ -484,19 +511,27 @@ export async function getReceivableInvoiceById(invoiceId: string): Promise<Recei
 }
 
 export async function getReceivableAgeing(filter: Partial<ReceivableFilter> = {}): Promise<ReceivableAgeingResult> {
+  if (isApiMode()) return getLiveReceivableAgeing(filter)
   await delay()
   const asOf = filter.asOfDate || new Date().toISOString().slice(0, 10)
   const basis = filter.ageingBasis || 'Due Date'
   refreshInvoiceAgeing(asOf)
-  const openInvs = invoicesStore.filter((i) => i.outstandingBalance > 0 && i.invoiceStatus !== 'Cancelled')
+  const openInvs = invoicesStore
+    .filter((i) => i.outstandingBalance > 0 && i.invoiceStatus !== 'Cancelled')
+    .map((i) => {
+      const dateField = basis === 'Invoice Date' ? i.invoiceDate : basis === 'Posting Date' ? i.postingDate : i.dueDate
+      const { overdueDays, bucket } = computeBucket(dateField, asOf)
+      // Posting / Invoice Date: day 0–30 lands in 1–30 (no Not Due on document age).
+      if (basis !== 'Due Date' && bucket === 'Not Due') {
+        return { ...i, overdueDays: 0, ageingBucket: '1–30 Days' as ReceivableAgeingBucket }
+      }
+      return { ...i, overdueDays, ageingBucket: bucket }
+    })
   const customerWise = customersStore
     .map((c) => {
       const invs = openInvs.filter((i) => i.customerId === c.id)
       const bucketAmt = (b: ReceivableAgeingBucket) =>
-        invs.filter((i) => {
-          const dateField = basis === 'Invoice Date' ? i.invoiceDate : basis === 'Posting Date' ? i.postingDate : i.dueDate
-          return computeBucket(dateField, asOf).bucket === b
-        }).reduce((s, i) => s + i.outstandingBalance, 0)
+        invs.filter((i) => i.ageingBucket === b).reduce((s, i) => s + i.outstandingBalance, 0)
       const total = invs.reduce((s, i) => s + i.outstandingBalance, 0)
       if (total <= 0) return null
       return {
@@ -641,11 +676,13 @@ export async function updatePaymentPromise(id: string, patch: Partial<PaymentPro
 }
 
 export async function getCustomerReceipts(filter: Partial<ReceivableFilter> = {}): Promise<CustomerReceipt[]> {
+  if (isApiMode()) return getLiveCustomerReceipts(filter)
   await delay()
   return filterReceipts(filter)
 }
 
 export async function getCustomerReceiptById(receiptId: string): Promise<CustomerReceipt> {
+  if (isApiMode()) return getLiveCustomerReceiptById(receiptId)
   await delay()
   const r = receiptsStore.find((x) => x.id === receiptId)
   if (!r) throw new ReceivablesServiceError('Customer receipt not found.')
@@ -756,6 +793,13 @@ export async function createCustomerReceipt(input: ReceiptDraftInput): Promise<C
 }
 
 export async function updateCustomerReceipt(receiptId: string, input: Partial<ReceiptDraftInput> & { voucherStatus?: CustomerReceipt['voucherStatus'] }): Promise<CustomerReceipt> {
+  if (isApiMode()) {
+    // Live lifecycle: the only legacy status transition routed here is submit → ready-to-post.
+    if (input.voucherStatus === 'Pending Approval' || input.voucherStatus === 'Approved') {
+      return markLiveReceiptReady(receiptId)
+    }
+    throw new ReceivablesServiceError('Edit this receipt from its receipt form — field edits post through the live API.')
+  }
   await delay()
   const idx = receiptsStore.findIndex((r) => r.id === receiptId)
   if (idx < 0) throw new ReceivablesServiceError('Customer receipt not found.')
@@ -857,6 +901,7 @@ export async function getReceiptAllocationPreview(receiptId: string): Promise<Re
 }
 
 export async function getOpenInvoicesForAllocation(customerId: string): Promise<ReceivableInvoice[]> {
+  if (isApiMode()) return getLiveOpenInvoicesForAllocation(customerId)
   await delay()
   refreshInvoiceAgeing()
   return invoicesStore.filter(
@@ -917,11 +962,13 @@ export async function allocateReceiptDemo(
   receiptId: string,
   lines: { invoiceId: string; allocationAmount: number; tdsAmount?: number }[],
 ): Promise<CustomerReceipt> {
+  if (isApiMode()) return allocateLiveReceipt(receiptId, lines)
   await delay()
   return updateCustomerReceipt(receiptId, { allocationLines: lines })
 }
 
 export async function getReceiptPostingPreview(receiptId: string): Promise<ReceiptPostingPreview> {
+  if (isApiMode()) return getLiveReceiptPostingPreview(receiptId)
   await delay()
   const r = await getCustomerReceiptById(receiptId)
   const customer = customersStore.find((c) => c.id === r.customerId)
@@ -956,6 +1003,7 @@ export async function getReceiptPostingPreview(receiptId: string): Promise<Recei
 }
 
 export async function postReceiptDemo(receiptId: string): Promise<CustomerReceipt> {
+  if (isApiMode()) return postLiveReceipt(receiptId)
   await delay()
   const idx = receiptsStore.findIndex((r) => r.id === receiptId)
   if (idx < 0) throw new ReceivablesServiceError('Customer receipt not found.')
@@ -995,6 +1043,7 @@ export async function postReceiptDemo(receiptId: string): Promise<CustomerReceip
 }
 
 export async function reverseReceiptDemo(receiptId: string, reason: string): Promise<CustomerReceipt> {
+  if (isApiMode()) return reverseLiveReceipt(receiptId, reason)
   await delay()
   const idx = receiptsStore.findIndex((r) => r.id === receiptId)
   if (idx < 0) throw new ReceivablesServiceError('Customer receipt not found.')
@@ -1044,6 +1093,7 @@ export async function reverseReceiptDemo(receiptId: string, reason: string): Pro
 }
 
 export async function getCreditNotes(filter: Partial<ReceivableFilter> = {}): Promise<CreditNote[]> {
+  if (isApiMode()) return getLiveCreditNotes(filter)
   await delay()
   const f = { ...DEFAULT_RECEIVABLE_FILTER, ...filter }
   return creditNotesStore.filter((cn) => {
@@ -1070,6 +1120,7 @@ export async function getCreditNotes(filter: Partial<ReceivableFilter> = {}): Pr
 }
 
 export async function getCustomerDisputes(filter: Partial<ReceivableFilter> = {}): Promise<CustomerDispute[]> {
+  if (isApiMode()) return getLiveCustomerDisputes(filter)
   await delay()
   const f = { ...DEFAULT_RECEIVABLE_FILTER, ...filter }
   return disputesStore.filter((d) => {
@@ -1100,6 +1151,7 @@ export async function createDispute(
     supportingDocuments?: string[]
   },
 ): Promise<CustomerDispute> {
+  if (isApiMode()) return createLiveDispute(input)
   await delay()
   const customer = customersStore.find((c) => c.id === input.customerId)
   if (!customer) throw new ReceivablesServiceError('Customer not found.')
@@ -1122,6 +1174,7 @@ export async function createDispute(
 }
 
 export async function updateDispute(id: string, patch: Partial<CustomerDispute>): Promise<CustomerDispute> {
+  if (isApiMode()) return updateLiveDispute(id, patch)
   await delay()
   const idx = disputesStore.findIndex((d) => d.id === id)
   if (idx < 0) throw new ReceivablesServiceError('Dispute not found.')
@@ -1185,6 +1238,7 @@ export async function excludeReminderDemo(reminderId: string): Promise<PaymentRe
 }
 
 export async function getCustomerReceivableCard(customerId: string): Promise<CustomerReceivableCard> {
+  if (isApiMode()) return getLiveCustomerReceivableCard(customerId)
   await delay()
   const customer = customersStore.find((c) => c.id === customerId)
   if (!customer) throw new ReceivablesServiceError('Customer not found.')
@@ -1238,6 +1292,7 @@ export async function getCustomerStatementPreview(opts: {
   includeAgeingSummary?: boolean
   includeContactDetails?: boolean
 }): Promise<CustomerStatement> {
+  if (isApiMode()) return getLiveCustomerStatementPreview(opts)
   await delay()
   const customer = customersStore.find((c) => c.id === opts.customerId)
   if (!customer) throw new ReceivablesServiceError('Customer not found.')
@@ -1380,7 +1435,9 @@ export async function deleteReceivableView(id: string): Promise<void> {
 
 export async function exportReceivables(req: ReceivableExportRequest): Promise<{ filename: string; content: string; disclaimer: string }> {
   await delay()
-  const disclaimer = 'Export generated in demo mode. Backend export service is not connected.'
+  const disclaimer = isApiMode()
+    ? 'Export generated client-side from live API data.'
+    : 'Export generated in demo mode. Backend export service is not connected.'
   let rows: string[][] = [['Demo export', req.scope, req.format]]
   if (req.scope === 'customer_outstanding') {
     const data = await getCustomerOutstanding(req.filter)
@@ -1391,6 +1448,33 @@ export async function exportReceivables(req: ReceivableExportRequest): Promise<{
   } else if (req.scope === 'receipts') {
     const data = await getCustomerReceipts(req.filter)
     rows = [['Receipt', 'Customer', 'Amount'], ...data.map((d) => [d.receiptNumber, d.customerName, String(d.receiptAmount)])]
+  } else if (req.scope === 'ageing') {
+    const data = await getReceivableAgeing(req.filter)
+    rows = [
+      ['As of', data.asOfDate, 'Basis', data.ageingBasis],
+      [],
+      ['Customer', 'Not Due', '1-30', '31-60', '61-90', '91-180', 'Above 180', 'Total'],
+      ...data.customerWise.map((r) => [
+        r.customerName,
+        String(r.notDue),
+        String(r.d1to30),
+        String(r.d31to60),
+        String(r.d61to90),
+        String(r.d91to180),
+        String(r.above180),
+        String(r.totalOutstanding),
+      ]),
+      [],
+      ['Invoice', 'Customer', 'Due Date', 'Bucket', 'Balance', 'Overdue Days'],
+      ...data.invoiceWise.map((i) => [
+        i.invoiceNumber,
+        i.customerName,
+        i.dueDate,
+        i.ageingBucket,
+        String(i.outstandingBalance),
+        String(i.overdueDays),
+      ]),
+    ]
   }
   const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')
   return {
@@ -1430,6 +1514,7 @@ ${opts.htmlBody}
 }
 
 export async function getReceivableCustomerById(customerId: string): Promise<ReceivableCustomer> {
+  if (isApiMode()) return getLiveReceivableCustomerById(customerId)
   await delay()
   const c = customersStore.find((x) => x.id === customerId)
   if (!c) throw new ReceivablesServiceError('Customer not found.')

@@ -1,11 +1,39 @@
 /**
- * Fixed Assets Management mock service — Promise-based for future API swap.
- * Demo / UI only. Does NOT post real GL or run depreciation engine posting.
+ * Fixed Assets Management — dual-mode service.
+ * Demo (`VITE_USE_API=false`): in-memory seed.
+ * API (`VITE_USE_API=true`): live overview, categories, register, capitalize, depreciation,
+ * dispose (full + partial), and intra-LE location transfers.
+ * Maintenance, revaluation, impairment, verification, ledger remain demo.
  *
- * SECURITY: All reads/writes/exports must also be enforced by the future backend
- * (tenant isolation + accounting.fixed_assets.* permissions). UI gating alone is not security.
+ * SECURITY: Backend enforces tenant isolation + finance.fa.* permissions.
  */
 
+import { isApiMode } from '@/config/apiConfig'
+import {
+  capitalizeFixedAsset,
+  completeFixedAssetTransfer,
+  createDepreciationRun,
+  createFixedAsset,
+  createFixedAssetTransfer,
+  disposeFixedAsset,
+  fetchDepreciationRun,
+  fetchDepreciationRuns,
+  fetchFixedAsset,
+  fetchFixedAssetCategories,
+  fetchFixedAssetTransfers,
+  fetchFixedAssets,
+  fetchFixedAssetsOverview,
+  previewDepreciationRun,
+  previewFixedAssetDispose,
+  type FixedAssetCategoryDto,
+  type FixedAssetDepreciationLineDto,
+  type FixedAssetDepreciationPreviewDto,
+  type FixedAssetDepreciationRunDto,
+  type FixedAssetDto,
+  type FixedAssetOverviewDto,
+  type FixedAssetTransferDto,
+} from '@/services/api/fixedAssetsApi'
+import { resolveDefaultLegalEntity } from '@/services/accounting/fixedAssetsApiComposer'
 import {
   seedAssetAcquisitions,
   seedAssetCapitalizations,
@@ -32,6 +60,8 @@ import type {
   AssetMaintenance,
   AssetRevaluation,
   AssetTransfer,
+  DepreciationLine,
+  DepreciationMethod,
   DepreciationPreview,
   DepreciationRun,
   DisposalGainLossPreview,
@@ -62,6 +92,182 @@ export class FixedAssetsServiceError extends Error {
 
 const COMPANY_NAME = 'Vasant Trailers Pvt Ltd'
 const delay = () => new Promise((r) => setTimeout(r, 80 + Math.floor(Math.random() * 70)))
+
+function money(value: string | number | null | undefined): number {
+  if (value == null || value === '') return 0
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) ? n : 0
+}
+
+const STATUS_TO_API: Partial<Record<FixedAsset['status'], string>> = {
+  Draft: 'DRAFT',
+  'Pending Capitalization': 'PENDING_CAPITALIZATION',
+  Active: 'ACTIVE',
+  Idle: 'IDLE',
+  'Fully Depreciated': 'FULLY_DEPRECIATED',
+  Disposed: 'DISPOSED',
+}
+
+function legalEntityLabel(le: { displayName: string; legalName: string }): string {
+  return le.displayName || le.legalName
+}
+
+function mapCategoryDto(dto: FixedAssetCategoryDto): FixedAssetCategory {
+  return {
+    id: dto.id,
+    code: dto.code,
+    name: dto.name,
+    depreciationMethod: dto.depreciationMethod,
+    usefulLifeYears: dto.usefulLifeYears,
+    residualPercent: money(dto.residualPercent),
+    glAssetAccount: dto.assetAccountId,
+    glAccumDepAccount: dto.accumDepAccountId,
+    glDepExpenseAccount: dto.depExpenseAccountId,
+    active: dto.isActive,
+  }
+}
+
+function mapAssetDto(dto: FixedAssetDto, companyName = COMPANY_NAME): FixedAsset {
+  return {
+    id: dto.id,
+    assetNumber: dto.assetNumber,
+    name: dto.name,
+    categoryId: dto.categoryId,
+    categoryName: dto.categoryName,
+    status: dto.status as FixedAsset['status'],
+    location: dto.location ?? '',
+    plant: dto.plant ?? '',
+    department: dto.department ?? '',
+    custodian: dto.custodian ?? '',
+    acquisitionDate: dto.acquisitionDate,
+    capitalizationDate: dto.capitalizationDate,
+    acquisitionCost: money(dto.acquisitionCost),
+    residualValue: money(dto.residualValue),
+    usefulLifeYears: dto.usefulLifeYears,
+    depreciationMethod: dto.depreciationMethod,
+    accumulatedDepreciation: money(dto.accumulatedDepreciation),
+    netBookValue: money(dto.netBookValue),
+    salvageValue: money(dto.residualValue),
+    serialNumber: dto.serialNumber,
+    manufacturer: dto.manufacturer,
+    model: dto.model,
+    vendorName: dto.vendorName,
+    poNumber: null,
+    invoiceNumber: null,
+    insurancePolicy: null,
+    insuranceExpiry: null,
+    lastVerificationDate: null,
+    nextVerificationDate: null,
+    warrantyExpiry: null,
+    isComponent: false,
+    parentAssetId: null,
+    currency: dto.currencyCode,
+    company: companyName,
+    createdBy: '—',
+    createdAt: dto.createdAt,
+    modifiedAt: dto.updatedAt,
+    notes: dto.notes,
+  }
+}
+
+function mapDepreciationLineDto(
+  dto: FixedAssetDepreciationLineDto,
+  runId: string,
+  periodKey: string,
+  method: DepreciationMethod = 'Straight Line',
+): DepreciationLine {
+  return {
+    id: dto.id ?? `fadl-${runId}-${dto.lineNumber}`,
+    runId,
+    assetId: dto.assetId,
+    assetNumber: dto.assetNumber,
+    assetName: dto.assetName,
+    categoryName: dto.categoryName,
+    method,
+    period: periodKey,
+    openingWDV: money(dto.openingNbv),
+    depreciationAmount: money(dto.depreciationAmount),
+    closingWDV: money(dto.closingNbv),
+    accumulatedDepreciation: money(dto.accumulatedDepreciation),
+    netBookValue: money(dto.closingNbv),
+  }
+}
+
+function mapDepreciationRunDto(dto: FixedAssetDepreciationRunDto): DepreciationRun {
+  const status =
+    dto.status === 'Previewed' ? 'Preview' : (dto.status as DepreciationRun['status'])
+  const lines = (dto.lines ?? []).map((line) => mapDepreciationLineDto(line, dto.id, dto.periodKey))
+  return {
+    id: dto.id,
+    runNumber: dto.runNumber,
+    period: dto.periodKey,
+    periodFrom: dto.periodFrom,
+    periodTo: dto.periodTo,
+    runDate: dto.runDate,
+    status,
+    methodSummary: 'Straight Line',
+    totalDepreciation: money(dto.totalDepreciation),
+    assetCount: dto.assetCount,
+    postedBy: dto.postedAt ? 'System' : null,
+    postedAt: dto.postedAt,
+    lines,
+    createdBy: '—',
+    createdAt: dto.createdAt,
+  }
+}
+
+function mapOverviewToDashboard(
+  overview: FixedAssetOverviewDto,
+  companyName: string,
+): FixedAssetsDashboardData {
+  const statusSummary = overview.statusSummary.map((row) => ({
+    status: row.status as FixedAsset['status'],
+    count: row.count,
+    nbv: 0,
+  }))
+  const categorySummary = overview.categorySummary.map((row) => ({
+    categoryId: row.categoryId,
+    categoryName: row.categoryName,
+    count: row.count,
+    nbv: money(row.netBookValue),
+  }))
+
+  return {
+    asOfDate: new Date().toISOString().slice(0, 10),
+    companyName,
+    totalAssetValue: money(overview.totalAssetValue),
+    netBookValue: money(overview.netBookValue),
+    accumulatedDepreciation: money(overview.accumulatedDepreciation),
+    assetsUnderConstruction: overview.assetsUnderConstruction,
+    depreciationDue: money(overview.depreciationDue),
+    pendingCapitalization: overview.pendingCapitalization,
+    dueForVerification: overview.dueForVerification,
+    pendingDisposal: overview.pendingDisposal,
+    statusSummary,
+    categorySummary,
+    recentActivity: [],
+    alerts: [],
+    depreciationTrend: [],
+    nbvByCategory: categorySummary.map((c) => ({ category: c.categoryName, nbv: c.nbv })),
+  }
+}
+
+function mapPreviewDto(dto: FixedAssetDepreciationPreviewDto, message: string): DepreciationPreview {
+  return {
+    period: dto.periodKey,
+    periodFrom: dto.periodFrom,
+    periodTo: dto.periodTo,
+    assetCount: dto.assetCount,
+    totalDepreciation: money(dto.totalDepreciation),
+    lines: dto.lines.map((line) => mapDepreciationLineDto(line, 'preview', dto.periodKey)),
+    message,
+  }
+}
+
+async function unwrapApiData<T>(promise: Promise<{ data: T }>): Promise<T> {
+  const res = await promise
+  return res.data
+}
 
 let categoriesStore = seedFixedAssetCategories()
 let assetsStore = seedFixedAssets()
@@ -148,6 +354,12 @@ function nextNumber(prefix: string, existing: string[]): string {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export async function getFixedAssetsDashboard(): Promise<FixedAssetsDashboardData> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const overview = await unwrapApiData(fetchFixedAssetsOverview({ legalEntityId: le.id }))
+    return mapOverviewToDashboard(overview, legalEntityLabel(le))
+  }
+
   await delay()
   const activeAssets = assetsStore.filter((a) => !['Disposed', 'Written Off', 'Sold'].includes(a.status))
   const totalAssetValue = activeAssets.reduce((s, a) => s + a.acquisitionCost, 0)
@@ -282,17 +494,49 @@ export async function getFixedAssetsDashboard(): Promise<FixedAssetsDashboardDat
 // ─── Register / categories ────────────────────────────────────────────────────
 
 export async function getAssets(filter?: Partial<FixedAssetsFilter>): Promise<FixedAsset[]> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const f = { ...DEFAULT_FIXED_ASSETS_FILTER, ...filter }
+    const statusApi = f.status ? STATUS_TO_API[f.status] : undefined
+    const items = await unwrapApiData(
+      fetchFixedAssets({
+        legalEntityId: le.id,
+        categoryId: f.categoryId || undefined,
+        status: statusApi,
+        search: f.search || undefined,
+      }),
+    )
+    const mapped = items.map((dto) => mapAssetDto(dto, legalEntityLabel(le)))
+    return applyAssetFilter(mapped, f)
+  }
+
   await delay()
   return clone(applyAssetFilter(assetsStore, filter ?? {}))
 }
 
 export async function getAssetById(id: string): Promise<FixedAsset | null> {
+  if (isApiMode()) {
+    try {
+      const le = await resolveDefaultLegalEntity()
+      const dto = await unwrapApiData(fetchFixedAsset(id))
+      return mapAssetDto(dto, legalEntityLabel(le))
+    } catch {
+      return null
+    }
+  }
+
   await delay()
   const asset = assetsStore.find((a) => a.id === id)
   return asset ? clone(asset) : null
 }
 
 export async function getCategories(): Promise<FixedAssetCategory[]> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const items = await unwrapApiData(fetchFixedAssetCategories({ legalEntityId: le.id }))
+    return items.map(mapCategoryDto)
+  }
+
   await delay()
   return clone(categoriesStore)
 }
@@ -313,12 +557,76 @@ export async function getAssetComponents(parentAssetId?: string): Promise<FixedA
 
 // ─── Acquisition / capitalization ─────────────────────────────────────────────
 
+/** API mode: acquisitions are live draft / pending-capitalization assets. */
+function mapAssetDtoToAcquisition(dto: FixedAssetDto): AssetAcquisition {
+  return {
+    id: dto.id,
+    acquisitionNumber: dto.assetNumber || dto.draftReference || dto.id.slice(0, 8).toUpperCase(),
+    acquisitionDate: dto.acquisitionDate,
+    acquisitionType: 'Purchase',
+    assetName: dto.name,
+    categoryId: dto.categoryId,
+    categoryName: dto.categoryName,
+    vendorName: dto.vendorName,
+    poNumber: null,
+    invoiceNumber: null,
+    invoiceDate: null,
+    amount: money(dto.acquisitionCost),
+    gstAmount: 0,
+    totalAmount: money(dto.acquisitionCost),
+    currency: dto.currencyCode,
+    status: dto.status === 'Draft' ? 'Draft' : 'Pending Capitalization',
+    assetId: dto.id,
+    location: dto.location ?? '—',
+    plant: dto.plant ?? '—',
+    department: dto.department ?? '—',
+    notes: dto.notes,
+    createdBy: '—',
+    createdAt: dto.createdAt,
+  }
+}
+
 export async function getAcquisitions(): Promise<AssetAcquisition[]> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const [drafts, pending] = await Promise.all([
+      unwrapApiData(fetchFixedAssets({ legalEntityId: le.id, status: 'DRAFT' })),
+      unwrapApiData(fetchFixedAssets({ legalEntityId: le.id, status: 'PENDING_CAPITALIZATION' })),
+    ])
+    return [...pending, ...drafts]
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .map(mapAssetDtoToAcquisition)
+  }
+
   await delay()
   return clone(acquisitionsStore)
 }
 
 export async function createAcquisitionDemo(partial?: Partial<AssetAcquisition>): Promise<AssetAcquisition> {
+  if (isApiMode()) {
+    if (!partial?.assetName?.trim()) throw new FixedAssetsServiceError('Asset name is required')
+    if (!partial.categoryId) throw new FixedAssetsServiceError('Category is required')
+    const amount = partial.amount ?? 0
+    if (!(amount > 0)) throw new FixedAssetsServiceError('Amount must be greater than zero')
+    const le = await resolveDefaultLegalEntity()
+    const dto = await unwrapApiData(
+      createFixedAsset({
+        legalEntityId: le.id,
+        categoryId: partial.categoryId,
+        name: partial.assetName.trim(),
+        acquisitionDate: partial.acquisitionDate ?? new Date().toISOString().slice(0, 10),
+        acquisitionCost: String(amount),
+        vendorName: partial.vendorName || undefined,
+        location: partial.location || undefined,
+        plant: partial.plant || undefined,
+        department: partial.department || undefined,
+        notes: partial.notes || undefined,
+        status: 'PENDING_CAPITALIZATION',
+      }),
+    )
+    return mapAssetDtoToAcquisition(dto)
+  }
+
   await delay()
   const user = getSessionUser()
   const acq: AssetAcquisition = {
@@ -355,11 +663,69 @@ export async function createAcquisitionDemo(partial?: Partial<AssetAcquisition>)
 }
 
 export async function getCapitalizations(): Promise<AssetCapitalization[]> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const [pending, active] = await Promise.all([
+      unwrapApiData(fetchFixedAssets({ legalEntityId: le.id, status: 'PENDING_CAPITALIZATION' })),
+      unwrapApiData(fetchFixedAssets({ legalEntityId: le.id, status: 'ACTIVE' })),
+    ])
+    // Row id is the asset id so capitalizeAssetDemo(id) hits POST /assets/:id/capitalize.
+    const mapRow = (dto: FixedAssetDto, status: AssetCapitalization['status']): AssetCapitalization => ({
+      id: dto.id,
+      capitalizationNumber: dto.assetNumber || dto.draftReference || dto.id.slice(0, 8).toUpperCase(),
+      assetId: dto.id,
+      assetNumber: dto.assetNumber,
+      assetName: dto.name,
+      categoryName: dto.categoryName,
+      capitalizationDate: dto.capitalizationDate ?? dto.acquisitionDate,
+      totalCost: money(dto.acquisitionCost),
+      cwIpAmount: 0,
+      additionalCosts: 0,
+      status,
+      approvedBy: null,
+      approvedAt: dto.capitalizedAt,
+      glAssetAccount: '—',
+      notes: dto.notes,
+      createdBy: '—',
+      createdAt: dto.createdAt,
+    })
+    return [
+      ...pending.map((dto) => mapRow(dto, 'Pending Approval')),
+      ...active.map((dto) => mapRow(dto, 'Capitalized')),
+    ]
+  }
+
   await delay()
   return clone(capitalizationsStore)
 }
 
 export async function capitalizeAssetDemo(id: string): Promise<AssetCapitalization> {
+  if (isApiMode()) {
+    const result = await unwrapApiData(capitalizeFixedAsset(id))
+    const asset = result.asset
+    const le = await resolveDefaultLegalEntity()
+    const mapped = mapAssetDto(asset, legalEntityLabel(le))
+    return {
+      id: `cap-${asset.id}`,
+      capitalizationNumber: asset.assetNumber,
+      assetId: asset.id,
+      assetNumber: asset.assetNumber,
+      assetName: asset.name,
+      categoryName: asset.categoryName,
+      capitalizationDate: asset.capitalizationDate ?? new Date().toISOString().slice(0, 10),
+      totalCost: mapped.acquisitionCost,
+      cwIpAmount: 0,
+      additionalCosts: 0,
+      status: 'Capitalized',
+      approvedBy: 'System',
+      approvedAt: asset.capitalizedAt,
+      glAssetAccount: '—',
+      notes: result.idempotentReplay ? 'Capitalization replayed (idempotent).' : null,
+      createdBy: '—',
+      createdAt: asset.updatedAt,
+    }
+  }
+
   await delay()
   const cap = capitalizationsStore.find((c) => c.id === id || c.assetId === id)
   if (!cap) throw new FixedAssetsServiceError('Capitalization record not found')
@@ -391,17 +757,44 @@ export async function capitalizeAssetDemo(id: string): Promise<AssetCapitalizati
 // ─── Depreciation ─────────────────────────────────────────────────────────────
 
 export async function getDepreciationRuns(): Promise<DepreciationRun[]> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const items = await unwrapApiData(fetchDepreciationRuns({ legalEntityId: le.id }))
+    return items.map(mapDepreciationRunDto)
+  }
+
   await delay()
   return clone(depreciationRunsStore)
 }
 
 export async function getDepreciationRunById(id: string): Promise<DepreciationRun | null> {
+  if (isApiMode()) {
+    try {
+      const dto = await unwrapApiData(fetchDepreciationRun(id))
+      return mapDepreciationRunDto(dto)
+    } catch {
+      return null
+    }
+  }
+
   await delay()
   const run = depreciationRunsStore.find((r) => r.id === id)
   return run ? clone(run) : null
 }
 
 export async function previewDepreciationDemo(period: string): Promise<DepreciationPreview> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const periodKey = /^\d{4}-\d{2}$/.test(period) ? period : period.replace(/\s+/g, '-').slice(0, 7)
+    const dto = await unwrapApiData(
+      previewDepreciationRun({ legalEntityId: le.id, periodKey }),
+    )
+    return mapPreviewDto(
+      dto,
+      `Depreciation preview for ${dto.periodKey} — ${dto.assetCount} assets, total ${money(dto.totalDepreciation).toLocaleString('en-IN')}.`,
+    )
+  }
+
   await delay()
   const draftRun = depreciationRunsStore.find((r) => r.period === period || r.status === 'Draft')
   if (draftRun) {
@@ -444,7 +837,25 @@ export async function previewDepreciationDemo(period: string): Promise<Depreciat
   }
 }
 
-export async function postDepreciationDemo(runId: string): Promise<{ run: DepreciationRun; message: string }> {
+export async function postDepreciationDemo(runId: string, periodKey?: string): Promise<{ run: DepreciationRun; message: string }> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const pk = periodKey ?? runId
+    if (!/^\d{4}-\d{2}$/.test(pk)) {
+      throw new FixedAssetsServiceError('Period must be YYYY-MM for depreciation posting')
+    }
+    const result = await unwrapApiData(
+      createDepreciationRun({ legalEntityId: le.id, periodKey: pk }),
+    )
+    const run = mapDepreciationRunDto(result.run)
+    return {
+      run,
+      message: result.idempotentReplay
+        ? 'Depreciation run replayed (already posted for this period).'
+        : 'Depreciation posted to the general ledger.',
+    }
+  }
+
   await delay()
   const run = depreciationRunsStore.find((r) => r.id === runId)
   if (!run) throw new FixedAssetsServiceError('Depreciation run not found')
@@ -481,9 +892,63 @@ export async function postDepreciationDemo(runId: string): Promise<{ run: Deprec
 
 // ─── Transfers / maintenance / revaluation / impairment ───────────────────────
 
+function mapTransferDto(row: FixedAssetTransferDto): AssetTransfer {
+  return {
+    id: row.id,
+    transferNumber: row.transferNumber,
+    transferDate: row.transferDate,
+    assetId: row.assetId,
+    assetNumber: row.assetNumber,
+    assetName: row.assetName,
+    fromLocation: row.fromLocation ?? '',
+    fromPlant: row.fromPlant ?? '',
+    fromDepartment: row.fromDepartment ?? '',
+    fromCustodian: row.fromCustodian ?? '',
+    toLocation: row.toLocation ?? '',
+    toPlant: row.toPlant ?? '',
+    toDepartment: row.toDepartment ?? '',
+    toCustodian: row.toCustodian ?? '',
+    status: row.status,
+    reason: row.reason,
+    approvedBy: null,
+    approvedAt: row.completedAt,
+    createdBy: '—',
+    createdAt: row.createdAt,
+  }
+}
+
 export async function getTransfers(): Promise<AssetTransfer[]> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const rows = await unwrapApiData(
+      fetchFixedAssetTransfers({ legalEntityId: le.id, pageSize: 200 }),
+    )
+    return rows.map(mapTransferDto)
+  }
   await delay()
   return clone(transfersStore)
+}
+
+export async function createTransfer(partial?: Partial<AssetTransfer>): Promise<AssetTransfer> {
+  if (isApiMode()) {
+    if (!partial?.assetId) throw new FixedAssetsServiceError('Asset is required')
+    if (!partial.reason?.trim()) throw new FixedAssetsServiceError('Reason is required')
+    const le = await resolveDefaultLegalEntity()
+    const created = await unwrapApiData(
+      createFixedAssetTransfer({
+        legalEntityId: le.id,
+        assetId: partial.assetId,
+        transferDate: partial.transferDate,
+        toLocation: partial.toLocation || undefined,
+        toPlant: partial.toPlant || undefined,
+        toDepartment: partial.toDepartment || undefined,
+        toCustodian: partial.toCustodian || undefined,
+        reason: partial.reason.trim(),
+      }),
+    )
+    return mapTransferDto(created)
+  }
+  return createTransferDemo(partial)
 }
 
 export async function createTransferDemo(partial?: Partial<AssetTransfer>): Promise<AssetTransfer> {
@@ -522,6 +987,42 @@ export async function createTransferDemo(partial?: Partial<AssetTransfer>): Prom
   return clone(trf)
 }
 
+export async function completeTransfer(id: string): Promise<AssetTransfer> {
+  if (isApiMode()) {
+    const completed = await unwrapApiData(completeFixedAssetTransfer(id))
+    return mapTransferDto(completed)
+  }
+
+  await delay()
+  const trf = transfersStore.find((t) => t.id === id)
+  if (!trf) throw new FixedAssetsServiceError('Transfer not found')
+  if (trf.status === 'Completed') return clone(trf)
+  if (trf.status !== 'Draft') throw new FixedAssetsServiceError('Only draft transfers can be completed')
+
+  const user = getSessionUser()
+  const updated: AssetTransfer = {
+    ...trf,
+    status: 'Completed',
+    approvedBy: user.name,
+    approvedAt: new Date().toISOString(),
+  }
+  transfersStore = transfersStore.map((t) => (t.id === id ? updated : t))
+  assetsStore = assetsStore.map((a) =>
+    a.id === trf.assetId
+      ? {
+          ...a,
+          location: trf.toLocation || a.location,
+          plant: trf.toPlant || a.plant,
+          department: trf.toDepartment || a.department,
+          custodian: trf.toCustodian || a.custodian,
+          modifiedAt: new Date().toISOString(),
+        }
+      : a,
+  )
+  pushAudit('AssetTransfer', id, 'Complete', `Completed transfer ${trf.transferNumber} (demo — no GL)`)
+  return clone(updated)
+}
+
 export async function getMaintenance(): Promise<AssetMaintenance[]> {
   await delay()
   return clone(maintenanceStore)
@@ -540,11 +1041,40 @@ export async function getImpairments(): Promise<AssetImpairment[]> {
 // ─── Disposal ─────────────────────────────────────────────────────────────────
 
 export async function getDisposals(): Promise<AssetDisposal[]> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const disposed = await unwrapApiData(
+      fetchFixedAssets({ legalEntityId: le.id, status: 'DISPOSED', pageSize: 200 }),
+    )
+    return disposed.map((a) => ({
+      id: a.id,
+      disposalNumber: a.assetNumber,
+      assetId: a.id,
+      assetNumber: a.assetNumber,
+      assetName: a.name,
+      disposalType: (a.disposalType as DisposalType) ?? 'Write-off',
+      disposalDate: a.disposalDate ?? a.disposedAt?.slice(0, 10) ?? a.updatedAt.slice(0, 10),
+      proceeds: money(a.disposalProceeds),
+      nbv: money(a.disposalProceeds) - money(a.disposalGainLoss),
+      gainLoss: money(a.disposalGainLoss),
+      status: 'Completed' as const,
+      buyerName: a.disposalBuyerName ?? null,
+      reason: a.disposalReason ?? 'Disposed',
+      approvedBy: null,
+      approvedAt: a.disposedAt ?? null,
+      createdBy: '—',
+      createdAt: a.disposedAt ?? a.updatedAt,
+    }))
+  }
+
   await delay()
   return clone(disposalsStore)
 }
 
 export async function createDisposalDemo(partial?: Partial<AssetDisposal>): Promise<AssetDisposal> {
+  if (isApiMode()) {
+    throw new FixedAssetsServiceError('In API mode use postDisposal instead of draft create')
+  }
   await delay()
   const user = getSessionUser()
   const asset = partial?.assetId ? assetsStore.find((a) => a.id === partial.assetId) : assetsStore.find((a) => a.status === 'Held for Disposal')
@@ -582,16 +1112,53 @@ export async function createDisposalDemo(partial?: Partial<AssetDisposal>): Prom
   return clone(dsp)
 }
 
+const DISPOSAL_TYPE_TO_API: Record<DisposalType, 'SALE' | 'SCRAP' | 'WRITE_OFF'> = {
+  Sale: 'SALE',
+  Scrap: 'SCRAP',
+  'Write-off': 'WRITE_OFF',
+  'Theft or Loss': 'WRITE_OFF',
+  Exchange: 'SALE',
+}
+
 export async function previewDisposalGainLoss(
   assetId: string,
   type: DisposalType,
   proceeds: number,
+  disposeCostAmount?: number,
 ): Promise<DisposalGainLossPreview> {
+  if (isApiMode()) {
+    const preview = await unwrapApiData(
+      previewFixedAssetDispose(assetId, {
+        disposalType: DISPOSAL_TYPE_TO_API[type] ?? 'WRITE_OFF',
+        proceeds: String(proceeds),
+        disposeCostAmount:
+          disposeCostAmount != null && disposeCostAmount > 0 ? String(disposeCostAmount) : undefined,
+      }),
+    )
+    return {
+      assetId: preview.assetId,
+      assetNumber: preview.assetNumber,
+      assetName: preview.assetName,
+      disposalType: type,
+      nbv: money(preview.isPartial ? preview.disposedNbv ?? preview.netBookValue : preview.netBookValue),
+      proceeds: money(preview.proceeds),
+      gainLoss: money(preview.gainLoss),
+      isGain: preview.isGain,
+      isPartial: preview.isPartial,
+      disposeCostAmount: preview.disposeCostAmount != null ? money(preview.disposeCostAmount) : null,
+      remainingCost: preview.remainingCost != null ? money(preview.remainingCost) : null,
+      remainingNbv: preview.remainingNbv != null ? money(preview.remainingNbv) : null,
+    }
+  }
+
   await delay()
   const asset = assetsStore.find((a) => a.id === assetId)
   if (!asset) throw new FixedAssetsServiceError('Asset not found')
 
-  const nbv = asset.netBookValue
+  const isPartial =
+    disposeCostAmount != null && disposeCostAmount > 0 && disposeCostAmount < asset.acquisitionCost
+  const ratio = isPartial ? disposeCostAmount! / asset.acquisitionCost : 1
+  const nbv = isPartial ? Math.round(asset.netBookValue * ratio) : asset.netBookValue
   const gainLoss = proceeds - nbv
   return {
     assetId: asset.id,
@@ -602,10 +1169,54 @@ export async function previewDisposalGainLoss(
     proceeds,
     gainLoss,
     isGain: gainLoss >= 0,
+    isPartial,
+    disposeCostAmount: isPartial ? disposeCostAmount! : null,
+    remainingCost: isPartial ? asset.acquisitionCost - disposeCostAmount! : null,
+    remainingNbv: isPartial ? asset.netBookValue - nbv : null,
+  }
+}
+
+/** API-mode atomic dispose (posts GL). Demo mode uses create + complete. */
+export async function postDisposal(input: {
+  assetId: string
+  disposalType: DisposalType
+  proceeds: number
+  disposeCostAmount?: number
+  proceedsAccountId?: string
+  buyerName?: string
+  reason: string
+  disposalDate?: string
+}): Promise<{ asset: FixedAsset; gainLoss: number; idempotentReplay: boolean; isPartial: boolean }> {
+  if (!isApiMode()) {
+    throw new FixedAssetsServiceError('postDisposal is API-mode only')
+  }
+  const result = await unwrapApiData(
+    disposeFixedAsset(input.assetId, {
+      disposalType: DISPOSAL_TYPE_TO_API[input.disposalType] ?? 'WRITE_OFF',
+      proceeds: String(input.proceeds),
+      disposeCostAmount:
+        input.disposeCostAmount != null && input.disposeCostAmount > 0
+          ? String(input.disposeCostAmount)
+          : undefined,
+      proceedsAccountId: input.proceedsAccountId,
+      buyerName: input.buyerName,
+      reason: input.reason,
+      disposalDate: input.disposalDate,
+      postingDate: input.disposalDate,
+    }),
+  )
+  return {
+    asset: mapAssetDto(result.asset),
+    gainLoss: money(result.preview.gainLoss),
+    idempotentReplay: result.idempotentReplay,
+    isPartial: !!result.isPartial,
   }
 }
 
 export async function completeDisposalDemo(id: string): Promise<AssetDisposal> {
+  if (isApiMode()) {
+    throw new FixedAssetsServiceError('In API mode disposal posts immediately via postDisposal')
+  }
   await delay()
   const dsp = disposalsStore.find((d) => d.id === id)
   if (!dsp) throw new FixedAssetsServiceError('Disposal not found')

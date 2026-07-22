@@ -83,7 +83,7 @@ export function usedInRoutes(usedIn: CrmMasterUsedIn[] | undefined): { label: st
     quotations: { label: 'Quotations', route: '/crm/quotations' },
     'sales-orders': { label: 'Sales Orders', route: '/crm/sales-orders' },
     invoices: { label: 'Invoices', route: '/invoice' },
-    companies: { label: 'Companies', route: '/crm/customers' },
+    companies: { label: 'Companies', route: '/crm/companies' },
     contacts: { label: 'Contacts', route: '/crm/contacts' },
     customer360: { label: 'Customer 360', route: '/entity360/customers' },
     reports: { label: 'CRM Reports', route: '/crm/reports' },

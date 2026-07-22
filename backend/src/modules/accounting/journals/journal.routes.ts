@@ -9,6 +9,7 @@ import {
   cancelJournalSchema,
   createJournalSchema,
   listJournalsQuerySchema,
+  reverseJournalSchema,
   updateJournalSchema,
 } from './journal.schemas.js'
 import * as controller from './journal.controller.js'
@@ -96,6 +97,13 @@ router.post(
   validateParams(uuidParamSchema),
   requirePermission('finance.voucher.post'),
   controller.postJournal,
+)
+router.post(
+  '/:id/reverse',
+  validateParams(uuidParamSchema),
+  requirePermission('finance.voucher.reverse'),
+  validateBody(reverseJournalSchema),
+  controller.reverseJournal,
 )
 router.get(
   '/:id/ledger',

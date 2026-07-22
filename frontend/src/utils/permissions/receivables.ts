@@ -7,7 +7,10 @@
  */
 
 import { useMemo } from 'react'
+import { isApiMode } from '../../config/apiConfig'
+import { getStoredSession } from '../../services/api/client'
 import { getSessionUser, type ErpRole } from './index'
+import { hasWorkspaceAdminRole } from './workspaceAdmin'
 
 export const RECEIVABLES_PERMISSIONS = [
   'accounting.receivables.view',
@@ -130,14 +133,63 @@ function resolve(role: ErpRole): Set<ReceivablesPermission> {
   return new Set(ROLE_PACKS[role] ?? SENIOR)
 }
 
+/**
+ * Phase 8C Wave 1 (8B-R-011): in API mode, resolve the legacy `accounting.receivables.*`
+ * capability surface from the authoritative JWT `finance.ar.*` grants. Capabilities whose
+ * live backend lands in a later wave (dispute → W5, collection/promise/reminder/credit hold
+ * → W6) resolve to false until that wave ships. Never falls back to demo role packs.
+ */
+function resolveApiReceivablesPermissions(): Set<ReceivablesPermission> {
+  if (hasWorkspaceAdminRole()) return new Set(RECEIVABLES_PERMISSIONS)
+  const jwt = new Set(getStoredSession()?.user.permissions ?? [])
+  const ar = (key: string) => jwt.has(key)
+  const canView = ar('finance.ar.view') || ar('finance.ar.invoice.view')
+  const granted: ReceivablesPermission[] = []
+  const grant = (perm: ReceivablesPermission, ok: boolean) => {
+    if (ok) granted.push(perm)
+  }
+  grant('accounting.receivables.view', canView)
+  grant('accounting.receivables.view_customer', canView)
+  grant('accounting.receivables.view_invoice', ar('finance.ar.invoice.view') || canView)
+  grant('accounting.receivables.view_ageing', canView)
+  grant('accounting.receivables.view_collection', canView)
+  grant('accounting.receivables.view_statement', canView)
+  grant('accounting.receivables.export', canView)
+  grant('accounting.receivables.print', canView)
+  grant('accounting.receivables.view_audit', canView)
+  grant('accounting.receivables.save_view', canView)
+  grant('accounting.receivables.create_receipt', ar('finance.ar.receipt.create'))
+  grant('accounting.receivables.edit_receipt', ar('finance.ar.receipt.edit'))
+  grant('accounting.receivables.submit_receipt', ar('finance.ar.receipt.edit'))
+  grant('accounting.receivables.approve_receipt', ar('finance.ar.receipt.post'))
+  grant('accounting.receivables.post_receipt', ar('finance.ar.receipt.post'))
+  grant('accounting.receivables.reverse_receipt', ar('finance.ar.receipt.reverse'))
+  grant('accounting.receivables.allocate_receipt', ar('finance.ar.allocation.create'))
+  grant('accounting.receivables.reallocate_receipt', ar('finance.ar.allocation.reverse'))
+  grant(
+    'accounting.receivables.manage_credit_note',
+    ar('finance.ar.credit_note.create') || ar('finance.ar.credit_note.edit') || ar('finance.ar.credit_note.post'),
+  )
+  grant(
+    'accounting.receivables.manage_dispute',
+    ar('finance.ar.dispute.create') || ar('finance.ar.dispute.edit') || ar('finance.ar.dispute.view'),
+  )
+  // Not yet live in API mode (future waves): collection / promise / reminder / credit hold.
+  return new Set(granted)
+}
+
+function resolvePermissions(role: ErpRole): Set<ReceivablesPermission> {
+  return isApiMode() ? resolveApiReceivablesPermissions() : resolve(role)
+}
+
 export function hasReceivablesPermission(permission: ReceivablesPermission, role?: ErpRole): boolean {
-  return resolve(role ?? getSessionUser().role).has(permission)
+  return resolvePermissions(role ?? getSessionUser().role).has(permission)
 }
 
 export function useReceivablesPermissions() {
   const user = getSessionUser()
   return useMemo(() => {
-    const set = resolve(user.role)
+    const set = resolvePermissions(user.role)
     const can = (p: ReceivablesPermission) => set.has(p)
     return {
       role: user.role,

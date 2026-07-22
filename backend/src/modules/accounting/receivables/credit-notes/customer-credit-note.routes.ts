@@ -10,6 +10,7 @@ import {
   createCustomerCreditNoteSchema,
   creditNoteDecisionSchema,
   listCustomerCreditNotesQuerySchema,
+  reverseCustomerCreditNoteSchema,
   submitCustomerCreditNoteSchema,
   updateCustomerCreditNoteSchema,
 } from './customer-credit-note.schemas.js'
@@ -29,5 +30,6 @@ router.post('/:id/reject', validateParams(uuidParamSchema), requirePermission('f
 router.post('/:id/mark-ready', validateParams(uuidParamSchema), requirePermission('finance.ar.credit_note.mark_ready'), controller.markCustomerCreditNoteReady)
 router.post('/:id/cancel', validateParams(uuidParamSchema), requirePermission('finance.ar.credit_note.cancel'), validateBody(cancelCustomerCreditNoteSchema), controller.cancelCustomerCreditNote)
 router.post('/:id/post', validateParams(uuidParamSchema), requirePermission('finance.ar.credit_note.post'), controller.postCustomerCreditNote)
+router.post('/:id/reverse', validateParams(uuidParamSchema), requirePermission('finance.ar.credit_note.reverse'), validateBody(reverseCustomerCreditNoteSchema), controller.reverseCustomerCreditNote)
 
 export default router

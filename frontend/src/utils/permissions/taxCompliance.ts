@@ -1,12 +1,18 @@
 /**
  * GST & TDS Compliance fine-grained frontend permissions.
  *
- * SECURITY: Backend must enforce tenant isolation + RBAC on every tax read/write
- * when APIs exist. UI gating alone is not security.
+ * API mode: maps to `finance.tax.view` / `finance.tax.extract`.
+ * Demo mode: role packs for the mock workspace.
+ *
+ * SECURITY: Backend enforces tenant isolation + RBAC on GST extract reads.
  */
 
 import { useMemo } from 'react'
+import { isApiMode } from '../../config/apiConfig'
+import { getStoredSession } from '../../services/api/client'
+import { hasFinancePermission } from './finance'
 import { getSessionUser, type ErpRole } from './index'
+import { hasWorkspaceAdminRole } from './workspaceAdmin'
 
 export const TAX_COMPLIANCE_PERMISSIONS = [
   'accounting.tax.view',
@@ -98,14 +104,63 @@ function resolveTaxPermissions(role: ErpRole): Set<TaxCompliancePermission> {
   return new Set(ROLE_PACKS[role] ?? ACCOUNTANT)
 }
 
+function hasApiTaxView(): boolean {
+  return hasWorkspaceAdminRole() || hasFinancePermission('finance.tax.view')
+}
+
+function hasApiTaxExtract(): boolean {
+  return (
+    hasWorkspaceAdminRole() ||
+    hasFinancePermission('finance.tax.extract') ||
+    hasFinancePermission('finance.tax.view')
+  )
+}
+
 export function hasTaxCompliancePermission(permission: TaxCompliancePermission, role?: ErpRole): boolean {
+  if (isApiMode()) {
+    if (hasWorkspaceAdminRole()) return true
+    if (
+      permission === 'accounting.tax.view' ||
+      permission === 'accounting.tax.gst.view' ||
+      permission === 'accounting.tax.export' ||
+      permission === 'accounting.tax.print' ||
+      permission === 'accounting.tax.calendar.view' ||
+      permission === 'accounting.tax.audit.view'
+    ) {
+      return hasApiTaxView()
+    }
+    // Mutations / filing remain demo-gated off in API mode Phase 1
+    return false
+  }
   const effective = role ?? getSessionUser().role
   return resolveTaxPermissions(effective).has(permission)
 }
 
 export function useTaxCompliancePermissions() {
   const role = getSessionUser().role
+  const apiPermKey = isApiMode() ? (getStoredSession()?.user.permissions?.join(',') ?? '') : ''
+
   return useMemo(() => {
+    if (isApiMode()) {
+      const canView = hasApiTaxView()
+      const canExport = hasApiTaxExtract()
+      return {
+        role,
+        can: (p: TaxCompliancePermission) => hasTaxCompliancePermission(p, role),
+        canView,
+        canExport,
+        canSetup: false,
+        canGstView: canView,
+        canGstReconcile: false,
+        canGstMarkFiled: false,
+        canTdsView: false,
+        canTdsDeduct: false,
+        canTcsView: false,
+        canManageNotices: false,
+        isApiMode: true as const,
+      }
+    }
+
     const set = resolveTaxPermissions(role)
     const can = (p: TaxCompliancePermission) => set.has(p)
     return {
@@ -121,6 +176,7 @@ export function useTaxCompliancePermissions() {
       canTdsDeduct: can('accounting.tax.tds.deduct'),
       canTcsView: can('accounting.tax.tcs.view'),
       canManageNotices: can('accounting.tax.notices.manage'),
+      isApiMode: false as const,
     }
-  }, [role])
+  }, [role, apiPermKey])
 }

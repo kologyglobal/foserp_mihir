@@ -1,7 +1,7 @@
 import type { ReceivableOpenItemStatus } from '@prisma/client'
 
 export type CustomerCreditNoteAllocationStatus = 'DRAFT' | 'POSTED' | 'REVERSED'
-export type CustomerCreditNoteAllocationBatchStatus = 'PROCESSING' | 'POSTED' | 'FAILED'
+export type CustomerCreditNoteAllocationBatchStatus = 'PROCESSING' | 'POSTED' | 'FAILED' | 'REVERSED'
 
 export interface CreditNoteAllocationLineInput {
   invoiceId: string
@@ -16,6 +16,20 @@ export interface AllocateCustomerCreditNoteInput {
 }
 
 export interface AllocateCustomerCreditNoteContext {
+  tenantId: string
+  userId: string
+  idempotencyKey: string
+  ipAddress?: string | null
+  userAgent?: string | null
+}
+
+export interface ReverseCustomerCreditNoteAllocationInput {
+  creditNoteId: string
+  batchId: string
+  reason: string
+}
+
+export interface ReverseCustomerCreditNoteAllocationContext {
   tenantId: string
   userId: string
   idempotencyKey: string
@@ -75,6 +89,9 @@ export interface CustomerCreditNoteAllocationBatchDto {
   failedAt: string | null
   failureCode: string | null
   failureMessage: string | null
+  reversedAt: string | null
+  reversedBy: string | null
+  reversalReason: string | null
 }
 
 export interface CreditNoteAllocationPreviewIssue {

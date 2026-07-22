@@ -74,4 +74,12 @@ router.post(
   controller.reverseGoodsReceipt,
 )
 
+router.post(
+  '/:id/post-inventory',
+  requirePermission('purchase.grn.post'),
+  validateParams(uuidParamSchema),
+  validateBody(grnLifecycleRemarksSchema),
+  controller.postInventoryGoodsReceipt,
+)
+
 export default router

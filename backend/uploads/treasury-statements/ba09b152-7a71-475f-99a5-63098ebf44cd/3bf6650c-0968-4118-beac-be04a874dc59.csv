@@ -1,0 +1,3 @@
+Date,Description,Reference,Amount,Dr/Cr
+20/06/2026,UPI credit,UPI-1,1000.00,CR
+21/06/2026,NEFT debit,NEFT-1,400.00,DR

@@ -44,7 +44,28 @@ export function RouteDetailPage() {
     )
   }
 
-  if (loading || !route) return <LoadingState variant="card" />
+  if (loading || !route) {
+    return (
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Manufacturing"
+        title="Route"
+        breadcrumbs={[
+          { label: 'Manufacturing', to: '/manufacturing' },
+          { label: 'Routes', to: '/manufacturing/routes' },
+        ]}
+        autoBreadcrumbs={false}
+        backLink={{ to: '/manufacturing/routes', label: 'Back to Routes' }}
+      >
+        {loading ? (
+          <LoadingState variant="card" />
+        ) : (
+          <EmptyState icon={RouteIcon} title="Route not found" description="This route could not be loaded." />
+        )}
+      </OperationalPageShell>
+    )
+  }
 
   return (
     <OperationalPageShell
@@ -60,6 +81,7 @@ export function RouteDetailPage() {
       ]}
       autoBreadcrumbs={false}
       favoritePath={`/manufacturing/routes/${route.id}`}
+      backLink={{ to: '/manufacturing/routes', label: 'Back to Routes' }}
       commandBar={(
         <ErpCommandBar
           inline
@@ -87,7 +109,6 @@ export function RouteDetailPage() {
                   disabled: busy,
                 }]
               : []),
-            { id: 'back', label: 'Back', onClick: () => navigate('/manufacturing/routes') },
           ]}
         />
       )}

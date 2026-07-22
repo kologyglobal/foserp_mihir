@@ -465,6 +465,20 @@ export async function postJournal(id: string) {
   return apiRequest<JournalPostResponse>(tenantPath(`/accounting/journals/${id}/post`), { method: 'POST' })
 }
 
+export interface JournalReverseResponse {
+  journal: Journal
+  posting: JournalPostResponse['posting']
+  reversalVoucherId: string
+  idempotentReplay: boolean
+}
+
+export async function reverseJournal(id: string, reason: string) {
+  return apiRequest<JournalReverseResponse>(tenantPath(`/accounting/journals/${id}/reverse`), {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+}
+
 export async function getJournalLedger(id: string) {
   return apiRequest<JournalLedgerEntry[]>(tenantPath(`/accounting/journals/${id}/ledger`))
 }

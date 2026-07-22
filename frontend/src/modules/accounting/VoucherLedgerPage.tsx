@@ -106,7 +106,7 @@ export function VoucherLedgerPage() {
               id: 'voucher',
               label: 'Open Voucher',
               icon: ClipboardList,
-              onClick: () => navigate(header?.voucherId ? `/accounting/vouchers/${header.voucherId}` : '/accounting/vouchers'),
+              onClick: () => navigate(header?.voucherId ? `/accounting/ledger-entries/voucher/${header.voucherId}` : '/accounting/entries/journals'),
             },
             {
               id: 'export',
@@ -233,7 +233,7 @@ export function VoucherLedgerPage() {
         onClose={() => setDetail(null)}
         entry={detail}
         auditEvents={audit}
-        onOpenVoucher={() => navigate(voucherId ? `/accounting/vouchers/${voucherId}` : '/accounting/vouchers')}
+        onOpenVoucher={() => navigate(voucherId ? `/accounting/ledger-entries/voucher/${voucherId}` : '/accounting/entries/journals')}
         onOpenAccount={() => detail && navigate(`/accounting/ledger-entries/account/${detail.account.accountId}`)}
         onOpenSource={() => undefined}
         onPrint={() => undefined}

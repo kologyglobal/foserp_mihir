@@ -7,7 +7,7 @@ import { FormField } from '@/components/forms/FormField'
 import { Input, Select, Switch } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { ManufacturingDemoBanner } from '@/components/manufacturing'
-import { getManufacturingSettings, updateManufacturingSettingsDemo } from '@/services/manufacturing'
+import { getManufacturingSettings, updateManufacturingSettings } from '@/services/manufacturing'
 import type { ManufacturingSettings } from '@/types/manufacturingSettings'
 import { useManufacturingPermissions } from '@/utils/permissions/manufacturing'
 import { notify } from '@/store/toastStore'
@@ -55,7 +55,23 @@ export function ManufacturingSettingsPage() {
     void getManufacturingSettings().then(setSettings)
   }, [])
 
-  if (!settings) return <LoadingState variant="card" />
+  if (!settings) {
+    return (
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Manufacturing"
+        title="Manufacturing Settings"
+        breadcrumbs={[
+          { label: 'Manufacturing & Production', to: '/manufacturing' },
+          { label: 'Settings' },
+        ]}
+        autoBreadcrumbs={false}
+      >
+        <LoadingState variant="card" />
+      </OperationalPageShell>
+    )
+  }
 
   const patchGeneral = (partial: Partial<ManufacturingSettings['general']>) => {
     setSettings({ ...settings, general: { ...settings.general, ...partial } })
@@ -89,7 +105,7 @@ export function ManufacturingSettingsPage() {
     }
     setSaving(true)
     try {
-      const r = await updateManufacturingSettingsDemo(settings)
+      const r = await updateManufacturingSettings(settings)
       setSettings(r.settings)
       notify.success('Manufacturing settings saved')
     } finally {

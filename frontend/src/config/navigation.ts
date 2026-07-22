@@ -14,6 +14,7 @@ import {
   FileText,
   GitBranch,
   Handshake,
+  HardHat,
   Inbox,
   IndianRupee,
   Landmark,
@@ -128,7 +129,7 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Quotations', path: '/crm/quotations', icon: FileText },
       { label: 'Quotation Templates', path: '/crm/quotation-templates', icon: Bookmark },
       { label: 'Sales Orders', path: '/crm/sales-orders', icon: ShoppingCart },
-      { label: 'Companies', path: '/crm/customers', icon: Building2 },
+      { label: 'Companies', path: '/crm/companies', icon: Building2 },
       { label: 'Contacts', path: '/crm/contacts', icon: Users },
       { label: 'Reports', path: '/crm/reports', icon: BarChart3 },
       { label: 'Masters', path: '/crm/masters', icon: Settings2 },
@@ -247,6 +248,24 @@ export const moduleCategories: NavCategory[] = [
     ],
   },
   {
+    id: 'gate',
+    title: 'Gate & Security',
+    items: [
+      { label: 'Dashboard', path: '/gate', icon: LayoutDashboard, end: true, workspace: true },
+      { label: "Today's Register", path: '/gate/register', icon: ClipboardList },
+      { label: 'Visitors', path: '/gate/visitors', icon: Users },
+      { label: 'Vehicles', path: '/gate/vehicles', icon: Truck },
+      { label: 'Material Inward', path: '/gate/material-inward', icon: ArrowDownToLine },
+      { label: 'Material Outward', path: '/gate/material-outward', icon: ArrowUpFromLine },
+      { label: 'Gate Passes', path: '/gate/passes', icon: FileText },
+      { label: 'Contractors', path: '/gate/contractors', icon: HardHat },
+      { label: 'Courier Register', path: '/gate/couriers', icon: Package },
+      { label: 'Approvals', path: '/gate/approvals', icon: ShieldCheck },
+      { label: 'Reports', path: '/gate/reports', icon: BarChart3 },
+      { label: 'Settings', path: '/gate/settings', icon: Settings2 },
+    ],
+  },
+  {
     id: 'finance',
     title: 'Finance',
     items: [
@@ -259,9 +278,8 @@ export const moduleCategories: NavCategory[] = [
     title: 'Accounting',
     items: [
       { label: 'Dashboard', path: '/accounting', icon: LayoutDashboard, end: true, workspace: true },
-      { label: 'Chart of Accounts', path: '/accounting/chart-of-accounts', icon: BookOpen },
+      { label: 'Chart of Accounts', path: '/accounting/settings/chart-of-accounts', icon: BookOpen },
       { label: 'Journals', path: '/accounting/entries/journals', icon: FileText },
-      { label: 'Vouchers (demo)', path: '/accounting/vouchers', icon: FileText, subNav: false as const },
       /** Receivables workspace — DynamicsTabs dropdown group */
       ...RECEIVABLES_NAV.map((item) => ({
         label: item.label,
@@ -291,6 +309,8 @@ export const moduleCategories: NavCategory[] = [
       })),
       /** API-backed Money In (Phase 3A) — discover via deep link / search */
       { label: 'Money In (API)', path: '/accounting/money-in', icon: ArrowDownToLine, subNav: false as const },
+      /** API-backed Money Out (Phase 4A5) — vendor invoices; payments/ageing preview later */
+      { label: 'Money Out (API)', path: '/accounting/money-out', icon: ArrowUpFromLine, subNav: false as const },
       {
         label: 'Commercial Commitments',
         path: '/accounting/commercial-commitments',
@@ -326,8 +346,8 @@ export const moduleCategories: NavCategory[] = [
       })),
       { label: 'Ledger Entries', path: '/accounting/ledger-entries', icon: ClipboardList },
       { label: 'Financial Reports', path: '/accounting/reports', icon: IndianRupee },
-      /** Parent tab — children use subNav:false (in-page Budgeting tree) */
-      { label: 'Budgeting & Forecasting', path: '/accounting/budgeting', icon: TrendingUp },
+      /** Budgeting is demo-only — demoted from Accounting primary tabs (discover via search / deep link) */
+      { label: 'Budgeting & Forecasting', path: '/accounting/budgeting', icon: TrendingUp, subNav: false },
       ...BUDGETING_NAV.map((item) => ({
         label: item.label,
         path: item.path,

@@ -129,6 +129,62 @@ export async function closeSalesOrderApi(id: string) {
   })
 }
 
+export type SalesOrderCommercialOpsDto = {
+  orderedQty: number
+  cancelledQty: number
+  netOrderedQty: number
+  dispatchedQty: number
+  remainingQty: number
+  orderedAmount: number
+  dispatchedAmount: number
+}
+
+export type SalesOrderCommercialMoneyDto = {
+  orderedAmount: number
+  dispatchedAmount: number
+  invoicedAmount: number
+  collectedAmount: number
+  outstandingAmount: number
+  nextPaymentDueDate: string | null
+  nextPaymentDueAmount: number | null
+  postedInvoiceCount: number
+  draftInvoiceCount: number
+}
+
+export type SalesOrderCommercialPositionDto = {
+  salesOrderId: string
+  salesOrderNo: string
+  companyId: string
+  status: string
+  currencyCode: string
+  ops: SalesOrderCommercialOpsDto
+  money: SalesOrderCommercialMoneyDto | null
+  moneyVisible: boolean
+  fulfilment: import('./dispatchApi').SalesOrderFulfilment
+}
+
+export type CompanyCommercialPositionDto = {
+  companyId: string
+  salesOrderCount: number
+  ops: SalesOrderCommercialOpsDto
+  money: SalesOrderCommercialMoneyDto | null
+  moneyVisible: boolean
+}
+
+export async function fetchSalesOrderCommercialPosition(id: string) {
+  const res = await apiRequest<SalesOrderCommercialPositionDto>(
+    tenantPath(`/crm/sales-orders/${id}/commercial-position`),
+  )
+  return res.data
+}
+
+export async function fetchCompanyCommercialPosition(companyId: string) {
+  const res = await apiRequest<CompanyCommercialPositionDto>(
+    tenantPath(`/crm/companies/${companyId}/commercial-position`),
+  )
+  return res.data
+}
+
 export type ConvertQuotationToSalesOrderResponse = {
   salesOrderId: string
   salesOrderNo: string

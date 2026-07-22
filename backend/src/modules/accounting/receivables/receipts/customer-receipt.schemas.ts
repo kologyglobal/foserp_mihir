@@ -129,6 +129,12 @@ export const cancelCustomerReceiptSchema = z.object({
 
 export type CancelCustomerReceiptInput = z.infer<typeof cancelCustomerReceiptSchema>
 
+export const reverseCustomerReceiptSchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+})
+
+export type ReverseCustomerReceiptInput = z.infer<typeof reverseCustomerReceiptSchema>
+
 export const validateCustomerReceiptSchema = z
   .object({
     proposedAllocations: z.array(proposedReceiptAllocationInputSchema).optional(),

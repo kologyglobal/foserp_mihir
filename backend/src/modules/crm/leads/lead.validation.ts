@@ -58,28 +58,8 @@ export const createLeadSchema = createLeadBaseSchema.superRefine((data, ctx) => 
     ctx.addIssue({ code: 'custom', message: 'Notes are required', path: ['remarks'] })
   }
 
-  const stage = data.stage ?? 'new'
-  if (stage === 'new' || stage === 'contacted') {
-    const mobile = String(data.mobile ?? '').replace(/\D/g, '')
-    const email = String(data.email ?? '').trim()
-    if (!mobile && !email) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Provide a mobile number or email',
-        path: ['mobile'],
-      })
-    }
-    const hasPrimary = Boolean(
-      String(data.contactPerson ?? '').trim() || data.contactId,
-    )
-    if (!hasPrimary) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Primary Contact is required',
-        path: ['contactPerson'],
-      })
-    }
-  }
+  // Lead stage must not mandate contact / product / reason fields.
+  // Entered email/mobile are validated by optionalEmailSchema / optionalNullablePhoneSchema.
 
   if (!data.priority) {
     ctx.addIssue({ code: 'custom', message: 'Priority is required', path: ['priority'] })
@@ -99,7 +79,7 @@ export const qualifyLeadSchema = z.object({
 })
 
 export const disqualifyLeadSchema = z.object({
-  notQualifiedReason: z.string().trim().min(1).max(64),
+  notQualifiedReason: z.string().trim().max(64).optional().nullable().or(z.literal('')),
   remarks: z.string().trim().optional(),
 })
 

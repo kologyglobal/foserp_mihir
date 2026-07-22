@@ -8,6 +8,12 @@ import {
 } from '../shared/purchase-audit.js'
 import { resolveEffectivePurchaseDefaults } from '../shared/purchase-defaults.js'
 import {
+  postGrnStockInward,
+  reverseGrnStockInward,
+  reverseGrnQcHold,
+} from '../shared/purchase-inventory-posting.js'
+import { tryRecordInventoryAccountingEventsForMovements } from '../../inventory/accounting/inventory-accounting-event.service.js'
+import {
   nextPurchaseDocumentNumber,
   previewPurchaseDocumentNumber,
 } from '../shared/purchase-document-number.js'
@@ -32,6 +38,7 @@ import type {
 import {
   assertCancellable,
   assertEditable,
+  assertInventoryPostable,
   assertReversible,
   assertSubmittable,
   money,
@@ -247,6 +254,7 @@ function assertGrnPolicyFields(
   lines: Array<{
     lineNumber?: number
     batchNumber?: string | null
+    lotNumber?: string | null
     serialNumber?: string | null
     expiryDate?: Date | string | null
   }> = [],
@@ -272,10 +280,14 @@ function assertGrnPolicyFields(
   }
   lines.forEach((line, index) => {
     const lineNo = line.lineNumber ?? index + 1
-    if (settings.requireBatch && !line.batchNumber?.toString().trim()) {
+    if (
+      settings.requireBatch &&
+      !line.batchNumber?.toString().trim() &&
+      !line.lotNumber?.toString().trim()
+    ) {
       errors.push({
         field: `lines[${lineNo - 1}].batchNumber`,
-        message: 'Batch number is required by Purchase Setup.',
+        message: 'Batch or lot number is required by Purchase Setup.',
       })
     }
     if (settings.requireSerial && !line.serialNumber?.toString().trim()) {
@@ -713,7 +725,19 @@ export async function submitGoodsReceipt(
     rejectedDelta: qty(l.rejectedQuantity),
   }))
 
-  await prisma.$transaction(async (tx) => {
+  const qcHoldMovements = await prisma.$transaction(async (tx) => {
+    const movements = existing.inspectionRequired
+      ? await postGrnStockInward({
+          tenantId,
+          grnId: existing.id,
+          grnNumber: existing.grnNumber,
+          warehouseId: existing.warehouseId,
+          lines: existing.lines,
+          useAcceptedQuantity: true,
+          actorId,
+          tx,
+        })
+      : []
     const updated = await repo.updateGoodsReceipt(
       tenantId,
       id,
@@ -741,6 +765,14 @@ export async function submitGoodsReceipt(
       },
       tx,
     )
+    return movements
+  })
+
+  await tryRecordInventoryAccountingEventsForMovements(null, tenantId, qcHoldMovements, {
+    sourceDocumentType: 'GOODS_RECEIPT',
+    sourceDocumentId: existing.id,
+    narration: `GRN inward ${existing.grnNumber}`,
+    userId: actorId,
   })
 
   await writePurchaseAudit({
@@ -751,6 +783,87 @@ export async function submitGoodsReceipt(
     action: PURCHASE_AUDIT_ACTION.GRN_SUBMITTED,
     previousValue: { status: existing.status },
     newValue: { status: nextStatus },
+  })
+
+  // No QC required → post inventory immediately (idempotent).
+  if (!existing.inspectionRequired && nextStatus === 'SUBMITTED') {
+    return postInventoryGoodsReceipt(tenantId, id, actorId, body)
+  }
+
+  return mapGoodsReceiptToDto(await loadOrThrow(tenantId, id))
+}
+
+export async function postInventoryGoodsReceipt(
+  tenantId: string,
+  id: string,
+  actorId: string,
+  body: { remarks?: string } = {},
+) {
+  const existing = await loadOrThrow(tenantId, id)
+  assertInventoryPostable(existing)
+  if (existing.status === 'INVENTORY_POSTED') {
+    return mapGoodsReceiptToDto(existing)
+  }
+  if (!existing.warehouseId) {
+    throw new GoodsReceiptValidationError(
+      purchaseMessage(PURCHASE_ERROR_CODE.GRN_WAREHOUSE_REQUIRED),
+      PURCHASE_ERROR_CODE.GRN_WAREHOUSE_REQUIRED,
+    )
+  }
+
+  const useAcceptedQuantity = existing.inspectionRequired
+  const inwardMovements = await prisma.$transaction(async (tx) => {
+    const movements = await postGrnStockInward({
+      tenantId,
+      grnId: existing.id,
+      grnNumber: existing.grnNumber,
+      warehouseId: existing.warehouseId!,
+      lines: existing.lines,
+      useAcceptedQuantity,
+      actorId,
+      tx,
+    })
+    await repo.updateGoodsReceipt(
+      tenantId,
+      id,
+      {
+        status: 'INVENTORY_POSTED',
+        updatedById: actorId,
+        remarks: body.remarks?.trim() || existing.remarks,
+      },
+      tx,
+    )
+    await repo.createStatusHistory(
+      {
+        tenantId,
+        documentId: id,
+        documentNumber: existing.grnNumber,
+        action: PURCHASE_AUDIT_ACTION.GRN_INVENTORY_POSTED,
+        fromStatus: existing.status,
+        toStatus: 'INVENTORY_POSTED',
+        actorId,
+        remarks: body.remarks,
+      },
+      tx,
+    )
+    return movements
+  })
+
+  await tryRecordInventoryAccountingEventsForMovements(null, tenantId, inwardMovements, {
+    sourceDocumentType: 'GOODS_RECEIPT',
+    sourceDocumentId: existing.id,
+    narration: `GRN inward ${existing.grnNumber}`,
+    userId: actorId,
+  })
+
+  await writePurchaseAudit({
+    tenantId,
+    actorId,
+    entity: PURCHASE_AUDIT_ENTITY.GRN,
+    entityId: id,
+    action: PURCHASE_AUDIT_ACTION.GRN_INVENTORY_POSTED,
+    previousValue: { status: existing.status },
+    newValue: { status: 'INVENTORY_POSTED' },
   })
 
   return mapGoodsReceiptToDto(await loadOrThrow(tenantId, id))
@@ -775,7 +888,19 @@ export async function cancelGoodsReceipt(
       }))
     : []
 
-  await prisma.$transaction(async (tx) => {
+  const cancelMovements = await prisma.$transaction(async (tx) => {
+    const movements =
+      existing.inspectionRequired && existing.status === 'QC_PENDING'
+        ? await reverseGrnQcHold({
+            tenantId,
+            grnId: existing.id,
+            grnNumber: existing.grnNumber,
+            warehouseId: existing.warehouseId,
+            lines: existing.lines,
+            actorId,
+            tx,
+          })
+        : []
     await repo.updateGoodsReceipt(
       tenantId,
       id,
@@ -803,6 +928,14 @@ export async function cancelGoodsReceipt(
       },
       tx,
     )
+    return movements
+  })
+
+  await tryRecordInventoryAccountingEventsForMovements(null, tenantId, cancelMovements, {
+    sourceDocumentType: 'GOODS_RECEIPT',
+    sourceDocumentId: existing.id,
+    narration: `GRN QC hold cancel ${existing.grnNumber}`,
+    userId: actorId,
   })
 
   await writePurchaseAudit({
@@ -834,7 +967,20 @@ export async function reverseGoodsReceipt(
     rejectedDelta: -qty(l.rejectedQuantity),
   }))
 
-  await prisma.$transaction(async (tx) => {
+  const reversalMovements = await prisma.$transaction(async (tx) => {
+    const movements =
+      existing.status === 'INVENTORY_POSTED' && existing.warehouseId
+        ? await reverseGrnStockInward({
+            tenantId,
+            grnId: existing.id,
+            grnNumber: existing.grnNumber,
+            warehouseId: existing.warehouseId,
+            lines: existing.lines,
+            useAcceptedQuantity: existing.inspectionRequired,
+            actorId,
+            tx,
+          })
+        : []
     await repo.updateGoodsReceipt(
       tenantId,
       id,
@@ -860,6 +1006,14 @@ export async function reverseGoodsReceipt(
       },
       tx,
     )
+    return movements
+  })
+
+  await tryRecordInventoryAccountingEventsForMovements(null, tenantId, reversalMovements, {
+    sourceDocumentType: 'GOODS_RECEIPT',
+    sourceDocumentId: existing.id,
+    narration: `GRN reverse ${existing.grnNumber}`,
+    userId: actorId,
   })
 
   await writePurchaseAudit({

@@ -7,7 +7,10 @@
  */
 
 import { useMemo } from 'react'
+import { isApiMode } from '@/config/apiConfig'
+import { getStoredSession } from '@/services/api/client'
 import { getSessionUser, type ErpRole } from './index'
+import { hasWorkspaceAdminRole } from './workspaceAdmin'
 
 export const PAYABLES_PERMISSIONS = [
   'accounting.payables.view',
@@ -119,14 +122,42 @@ function resolve(role: ErpRole): Set<PayablesPermission> {
   return new Set(ROLE_PACKS[role] ?? ACCOUNTS_USER)
 }
 
+/** API mode: map JWT finance.ap.* → legacy accounting.payables.* (disputes live). */
+function resolveApiPayablesPermissions(): Set<PayablesPermission> {
+  if (hasWorkspaceAdminRole()) return new Set(PAYABLES_PERMISSIONS)
+  const jwt = new Set(getStoredSession()?.user.permissions ?? [])
+  const ap = (key: string) => jwt.has(key)
+  const canView = ap('finance.ap.view') || ap('finance.ap.vendor_invoice.view')
+  const granted: PayablesPermission[] = []
+  const grant = (perm: PayablesPermission, ok: boolean) => {
+    if (ok) granted.push(perm)
+  }
+  grant('accounting.payables.view', canView)
+  grant('accounting.payables.view_vendor', canView)
+  grant('accounting.payables.view_invoice', ap('finance.ap.vendor_invoice.view') || canView)
+  grant('accounting.payables.view_ageing', canView)
+  grant('accounting.payables.export', canView)
+  grant('accounting.payables.print', canView)
+  grant('accounting.payables.view_audit', canView)
+  grant(
+    'accounting.payables.manage_dispute',
+    ap('finance.ap.dispute.create') || ap('finance.ap.dispute.edit') || ap('finance.ap.dispute.view'),
+  )
+  return new Set(granted)
+}
+
+function resolvePermissions(role: ErpRole): Set<PayablesPermission> {
+  return isApiMode() ? resolveApiPayablesPermissions() : resolve(role)
+}
+
 export function hasPayablesPermission(permission: PayablesPermission, role?: ErpRole): boolean {
-  return resolve(role ?? getSessionUser().role).has(permission)
+  return resolvePermissions(role ?? getSessionUser().role).has(permission)
 }
 
 export function usePayablesPermissions() {
   const user = getSessionUser()
   return useMemo(() => {
-    const set = resolve(user.role)
+    const set = resolvePermissions(user.role)
     const can = (p: PayablesPermission) => set.has(p)
     return {
       role: user.role,

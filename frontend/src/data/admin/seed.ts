@@ -47,6 +47,11 @@ export const DEMO_PERMISSION_NAMES = [
   'purchase.reports.view',
   'purchase.setup.view',
   'purchase.setup.manage',
+  // FE route-matrix + deferred-module shells (mirrors backend catalog expansions)
+  'masters.view', 'engineering.view', 'inventory.view', 'inventory.post',
+  'production.view', 'manufacturing.view', 'quality.view', 'dispatch.view',
+  'sales.view', 'accounts.view', 'dms.view', 'approval.view', 'reports.view',
+  'traceability.view', 'settings.view',
 ] as const
 
 export const seedPermissionCatalog: AdminPermission[] = DEMO_PERMISSION_NAMES.map((name, i) => ({

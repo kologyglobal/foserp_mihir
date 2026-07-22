@@ -9,6 +9,9 @@ export const PURCHASE_AUDIT_ENTITY = {
   COMPARISON: 'VendorComparison',
   PO: 'PurchaseOrder',
   GRN: 'GoodsReceipt',
+  QI: 'PurchaseQualityInspection',
+  INVOICE: 'PurchaseInvoice',
+  RETURN: 'PurchaseReturn',
   SETUP: 'PurchaseSettings',
 } as const
 
@@ -73,6 +76,7 @@ export const PURCHASE_AUDIT_ACTION = {
   GRN_SUBMITTED: 'GRN_SUBMITTED',
   GRN_CANCELLED: 'GRN_CANCELLED',
   GRN_REVERSED: 'GRN_REVERSED',
+  GRN_INVENTORY_POSTED: 'GRN_INVENTORY_POSTED',
   // Setup
   SETUP_CREATED: 'SETUP_CREATED',
   SETUP_UPDATED: 'SETUP_UPDATED',
@@ -133,6 +137,7 @@ export const PURCHASE_AUDIT_ACTION_LABELS: Record<string, string> = {
   GRN_SUBMITTED: 'GRN submitted',
   GRN_CANCELLED: 'GRN cancelled',
   GRN_REVERSED: 'GRN reversed',
+  GRN_INVENTORY_POSTED: 'GRN inventory posted',
   SETUP_CREATED: 'Setup created',
   SETUP_UPDATED: 'Setup updated',
   SETUP_PLANT_UPDATED: 'Plant setup updated',
@@ -206,6 +211,26 @@ export const TIMELINE_ENTITY_MAP = {
     auditEntity: PURCHASE_AUDIT_ENTITY.PO,
     statusDocumentType: 'PURCHASE_ORDER' as const,
     viewPermission: 'purchase.po.view',
+  },
+  'goods-receipt': {
+    auditEntity: PURCHASE_AUDIT_ENTITY.GRN,
+    statusDocumentType: 'GOODS_RECEIPT' as const,
+    viewPermission: 'purchase.grn.view',
+  },
+  'quality-inspection': {
+    auditEntity: PURCHASE_AUDIT_ENTITY.QI,
+    statusDocumentType: 'QUALITY_INSPECTION' as const,
+    viewPermission: 'purchase.qi.view',
+  },
+  'purchase-invoice': {
+    auditEntity: PURCHASE_AUDIT_ENTITY.INVOICE,
+    statusDocumentType: 'PURCHASE_INVOICE' as const,
+    viewPermission: 'purchase.invoice.view',
+  },
+  'purchase-return': {
+    auditEntity: PURCHASE_AUDIT_ENTITY.RETURN,
+    statusDocumentType: 'PURCHASE_RETURN' as const,
+    viewPermission: 'purchase.return.view',
   },
 } as const
 

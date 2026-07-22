@@ -32,6 +32,7 @@ import {
   ReceivablesServiceError,
   saveReceivableView,
 } from '@/services/accounting/receivablesService'
+import { isApiMode } from '@/config/apiConfig'
 import { getCommercialCommitmentSummary } from '@/data/accounting/commercialCommitmentsSeed'
 import type { CommercialCommitmentSummary } from '@/types/commercialCommitments'
 import type {
@@ -150,6 +151,8 @@ export function CustomerOutstandingPage() {
   }, [load, refreshToken])
 
   useEffect(() => {
+    // Commercial commitments are a seed-backed panel — never surface seed data in API mode.
+    if (isApiMode()) return
     void getCommercialCommitmentSummary().then(setCommercialSummary)
   }, [refreshToken])
 

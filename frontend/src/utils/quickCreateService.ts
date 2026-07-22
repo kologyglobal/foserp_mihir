@@ -134,7 +134,7 @@ export function saveQuickCreateEntity(
         state: str(data.state) || 'Maharashtra',
         pincode: str(data.pincode) || '000000',
         country: str(data.country) || undefined,
-        gstin: gstin || '00AAAAA0000A1Z5',
+        gstin,
         pan: str(data.pan) || panFromGstin(gstin) || undefined,
         contactPerson: str(data.contactPerson),
         contactPhone: phone(data, 'mobile', 'contactPhone'),

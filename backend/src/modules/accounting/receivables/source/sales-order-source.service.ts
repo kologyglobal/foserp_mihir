@@ -1,10 +1,16 @@
-import type { CrmSalesOrder } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
 import type { SalesOrderLineDto } from '../../../crm/sales-orders/sales-order.types.js'
+import {
+  requireEligibleSalesOrder,
+  SourceDocumentIneligibleError,
+  SourceDocumentNotFoundError,
+  SourceDocumentPartyMismatchError,
+  type SourceEligibilityResult,
+} from '../../shared/master-resolvers/accounting-source-document-resolver.js'
 import {
   SalesOrderCancelledError,
   SalesOrderCustomerMismatchError,
   SalesOrderNotFoundError,
+  SalesInvoiceValidationFailedError,
 } from '../sales-invoices/sales-invoice.errors.js'
 
 export interface SalesOrderSourceSnapshot {
@@ -20,56 +26,51 @@ export interface SalesOrderSourceSnapshot {
 export interface SalesOrderSourceContext {
   snapshot: SalesOrderSourceSnapshot
   warnings: Array<{ code: string; message: string }>
+  eligibility: SourceEligibilityResult
 }
 
-function parseLines(value: unknown): SalesOrderLineDto[] {
-  return Array.isArray(value) ? (value as SalesOrderLineDto[]) : []
-}
-
-function isCancelledStatus(status: string): boolean {
-  const normalized = status.trim().toLowerCase()
-  return normalized === 'cancelled' || normalized === 'canceled'
-}
-
-function mapSnapshot(order: CrmSalesOrder): SalesOrderSourceSnapshot {
+function mapSnapshot(eligibility: SourceEligibilityResult): SalesOrderSourceSnapshot {
+  const snap = eligibility.snapshot
   return {
-    id: order.id,
-    orderNumber: order.salesOrderNo,
-    customerId: order.companyId,
-    status: order.status,
-    orderDate: order.orderDate ? order.orderDate.toISOString().slice(0, 10) : null,
-    customerPoNumber: order.customerPoNumber,
-    lines: parseLines(order.lines),
+    id: eligibility.documentId,
+    orderNumber: eligibility.documentNumber,
+    customerId: eligibility.partyId,
+    status: eligibility.status,
+    orderDate: eligibility.documentDate,
+    customerPoNumber: (snap.customerPoNumber as string | null | undefined) ?? null,
+    lines: Array.isArray(snap.lines) ? (snap.lines as SalesOrderLineDto[]) : [],
   }
 }
 
+/**
+ * Load + strengthen SO eligibility for Sales Invoice linking.
+ * Status whitelist, customer match, already-invoiced warning, remaining-qty warning.
+ */
 export async function loadSalesOrderSource(
   tenantId: string,
   salesOrderId: string,
   expectedCustomerId: string,
 ): Promise<SalesOrderSourceContext> {
-  const order = await prisma.crmSalesOrder.findFirst({
-    where: { id: salesOrderId, tenantId, deletedAt: null },
-  })
-  if (!order) throw new SalesOrderNotFoundError(salesOrderId)
-  if (isCancelledStatus(order.status)) throw new SalesOrderCancelledError()
-  if (order.companyId !== expectedCustomerId) throw new SalesOrderCustomerMismatchError()
-
-  const warnings: Array<{ code: string; message: string }> = []
-  const existingCount = await prisma.salesInvoice.count({
-    where: {
-      tenantId,
-      sourceType: 'SALES_ORDER',
-      sourceDocumentId: salesOrderId,
-      status: { not: 'CANCELLED' },
-    },
-  })
-  if (existingCount > 0) {
-    warnings.push({
-      code: 'SALES_ORDER_ALREADY_INVOICED',
-      message: 'Another sales invoice is already linked to this sales order',
-    })
+  try {
+    const eligibility = await requireEligibleSalesOrder(tenantId, salesOrderId, expectedCustomerId)
+    return {
+      snapshot: mapSnapshot(eligibility),
+      warnings: eligibility.warnings,
+      eligibility,
+    }
+  } catch (err) {
+    if (err instanceof SourceDocumentNotFoundError) {
+      throw new SalesOrderNotFoundError(salesOrderId)
+    }
+    if (err instanceof SourceDocumentPartyMismatchError) {
+      throw new SalesOrderCustomerMismatchError()
+    }
+    if (err instanceof SourceDocumentIneligibleError) {
+      if (err.code === 'SALES_ORDER_CANCELLED') throw new SalesOrderCancelledError()
+      throw new SalesInvoiceValidationFailedError(err.message, [
+        { field: 'sourceDocumentId', message: err.message },
+      ])
+    }
+    throw err
   }
-
-  return { snapshot: mapSnapshot(order), warnings }
 }

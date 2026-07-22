@@ -137,10 +137,10 @@ check('UAT-02.5', 'Create lead', 'API bridge maps create payload', bridgeSrc.inc
 
 check('UAT-02.6', 'Required-field validation', 'Form requires Company / Prospect', formPage.includes("prospectName: { required: true"))
 check('UAT-02.7', 'Required-field validation', 'Form requires Lead Owner', formPage.includes("leadOwnerId: { required: true"))
-check('UAT-02.8', 'Required-field validation', 'Not Qualified reason required', formPage.includes("leadStage === 'not_qualified'") && formPage.includes('Not Qualified Reason is required'))
-check('UAT-02.9', 'Required-field validation', 'Closed stage requires date + reason', formPage.includes("leadStage === 'closed'") && formPage.includes('Closed Date is required'))
+check('UAT-02.8', 'Required-field validation', 'Not Qualified reason is optional', formPage.includes("leadStage === 'not_qualified'") && !formPage.includes('Not Qualified Reason is required'))
+check('UAT-02.9', 'Required-field validation', 'Closed reason is optional', formPage.includes("leadStage === 'closed'") && !formPage.includes('Closed Reason is required when lead stage is Closed'))
 check('UAT-02.10', 'Required-field validation', 'Backend create schema requires prospectName', backendValidation.includes('prospectName: z.string().trim().min(1)'))
-check('UAT-02.11', 'Required-field validation', 'Product required for requirement_collected stage', formPage.includes('requirement_collected') && formPage.includes('Product / Requirement is required'))
+check('UAT-02.11', 'Required-field validation', 'Qualified stage does not mandate products', !formPage.includes('Add at least one product / requirement line for this stage'))
 
 const missingProspect = sales.createLead({
   prospectName: '',

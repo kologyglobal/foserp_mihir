@@ -7,7 +7,7 @@ import type {
 import type { Journal } from '../../types/journals'
 import * as api from '../api/financeApi'
 import { getApprovalDemoState } from '../../store/approvalDemoStore'
-import { resolveLegalEntityId } from './financeApiBridge'
+import { ensureLegalEntityId } from './financeApiBridge'
 
 function unwrap<T>(res: { data: T }): T {
   return res.data
@@ -16,7 +16,7 @@ function unwrap<T>(res: { data: T }): T {
 export async function listApprovalRequests(
   filters?: Partial<ApprovalListFilters>,
 ): Promise<ApprovalRequest[]> {
-  const legalEntityId = resolveLegalEntityId(filters?.legalEntityId)
+  const legalEntityId = await ensureLegalEntityId(filters?.legalEntityId)
   if (isApiMode()) return unwrap(await api.listApprovalRequests({ legalEntityId, ...filters }))
   return getApprovalDemoState().listApprovals({ legalEntityId, ...filters })
 }

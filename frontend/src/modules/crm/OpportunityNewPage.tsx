@@ -52,7 +52,8 @@ import {
 import { useInlineFormValidation } from '../../hooks/useInlineFormValidation'
 import { validateOpportunityForm } from '../../utils/validation/crmSchemas/opportunitySchema'
 import { decodeLeadRequirementLines, isEncodedLeadRequirementPayload, sanitizeOpportunityScopeNotes } from '../../utils/leadRequirementLines'
-import { resolveLeadConvertToOpportunityGate } from '../../utils/leadUtils'
+import { resolveLeadConvertActionGate } from '../../utils/leadUtils'
+import { canCrmPermission } from '../../utils/permissions/crm'
 import { useProductMasterOptionMap } from '../../utils/opportunityProductOptions'
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { useDocumentLocation } from '../../hooks/useDocumentLocation'
@@ -223,7 +224,7 @@ export function OpportunityNewPage() {
 
   useEffect(() => {
     if (!prefillLeadId || !lead) return
-    const gate = resolveLeadConvertToOpportunityGate(lead)
+    const gate = resolveLeadConvertActionGate(lead, canCrmPermission('crm.lead.convert'))
     if (!gate.ok) {
       setValidationErrors((prev) => (prev.includes(gate.reason) ? prev : [gate.reason, ...prev]))
     }
@@ -318,7 +319,7 @@ export function OpportunityNewPage() {
     ? ({ ok: true } as const)
     : !lead
       ? ({ ok: false, reason: 'Lead not found' } as const)
-      : resolveLeadConvertToOpportunityGate(lead)
+      : resolveLeadConvertActionGate(lead, canCrmPermission('crm.lead.convert'))
 
   function createDeal(mode: 'open' | 'close' | 'new' | 'quotation') {
     inline.touchAll()

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
-import { Sparkles, Info } from 'lucide-react'
+import { Info } from 'lucide-react'
 import { cn } from '@/utils/cn'
+import { isApiMode } from '@/config/apiConfig'
 import type { WorkOrderListStatus, WorkOrderStatus } from '@/types/manufacturingWorkOrder'
 import { WO_LIST_STATUS_LABELS, WO_STATUS_LABELS } from '@/types/manufacturingWorkOrder'
 import { ManufacturingRoleBar } from './ManufacturingRoleBar'
@@ -16,6 +17,9 @@ export function ManufacturingDemoBanner({
   /** Full command map (use on dashboard / hub). Other pages show a one-line screen role. */
   showCommandMap?: boolean
 }) {
+  // Never show demo chrome on API-capable surfaces (dual-mode parity).
+  if (isApiMode()) return null
+
   return (
     <div className="mb-3 space-y-2">
       <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
@@ -34,10 +38,10 @@ export function ManufacturingDemoBanner({
   )
 }
 
-/** Right-side insight box — short guides, not a chatbot. */
+/** Quiet tip list — no gradient / sparkles chrome (kit density). */
 export function ManufacturingAiAssist({
-  title = 'AI Insights',
-  subtitle = 'Guides for this screen — not a chatbot.',
+  title = 'Tips',
+  subtitle = 'Guides for this screen.',
   suggestions,
   className,
 }: {
@@ -46,6 +50,8 @@ export function ManufacturingAiAssist({
   suggestions: string[]
   className?: string
 }) {
+  if (isApiMode()) return null
+
   const items = suggestions.length
     ? suggestions
     : ['No special alerts right now. Continue with the next status action.']
@@ -53,24 +59,19 @@ export function ManufacturingAiAssist({
   return (
     <aside
       className={cn(
-        'h-fit rounded-xl border border-sky-200 bg-gradient-to-b from-sky-50 via-white to-white p-4 shadow-sm',
+        'h-fit rounded-lg border border-erp-border bg-white p-3',
         'lg:sticky lg:top-4',
         className,
       )}
       aria-label={title}
     >
-      <div className="mb-1 flex items-center gap-2 text-[13px] font-semibold text-sky-950">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-100 text-sky-700">
-          <Sparkles className="h-4 w-4" aria-hidden />
-        </span>
-        {title}
-      </div>
-      {subtitle ? <p className="mb-3 text-[11px] text-sky-800/70">{subtitle}</p> : null}
-      <ul className="space-y-2.5">
+      <div className="mb-1 text-[13px] font-semibold text-erp-text">{title}</div>
+      {subtitle ? <p className="mb-2 text-[11px] text-erp-muted">{subtitle}</p> : null}
+      <ul className="space-y-1.5">
         {items.map((s) => (
           <li
             key={s}
-            className="rounded-lg border border-sky-100 bg-white/80 px-2.5 py-2 text-[12px] leading-snug text-sky-950/90"
+            className="rounded-md border border-erp-border bg-erp-surface-alt/40 px-2.5 py-1.5 text-[12px] leading-snug text-erp-text"
           >
             {s}
           </li>
@@ -80,11 +81,11 @@ export function ManufacturingAiAssist({
   )
 }
 
-/** Main content + sticky right-side AI rail. */
+/** Main content + optional tip rail (demo only; omitted in API mode). */
 export function ManufacturingAiRail({
   children,
   suggestions,
-  title = 'AI Insights',
+  title = 'Tips',
   subtitle,
   className,
 }: {
@@ -94,8 +95,12 @@ export function ManufacturingAiRail({
   subtitle?: string
   className?: string
 }) {
+  if (isApiMode()) {
+    return <div className={cn('min-w-0 space-y-3', className)}>{children}</div>
+  }
+
   return (
-    <div className={cn('grid gap-4 lg:grid-cols-[minmax(0,1fr)_272px] lg:items-start', className)}>
+    <div className={cn('grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px] lg:items-start', className)}>
       <div className="min-w-0 space-y-3">{children}</div>
       <ManufacturingAiAssist title={title} subtitle={subtitle} suggestions={suggestions} />
     </div>
@@ -236,7 +241,9 @@ export function ShopfloorStatusChip({
           ? 'Material Shortage'
           : status in WO_LIST_STATUS_LABELS
             ? WO_LIST_STATUS_LABELS[status as WorkOrderListStatus]
-            : WO_STATUS_LABELS[status as WorkOrderStatus]
+            : status in WO_STATUS_LABELS
+              ? WO_STATUS_LABELS[status as WorkOrderStatus]
+              : String(status).replace(/_/g, ' ')
   return (
     <span className={cn('inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1', map[status] ?? map.draft)}>
       {label}

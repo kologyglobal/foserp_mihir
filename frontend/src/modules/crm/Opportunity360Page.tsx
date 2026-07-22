@@ -130,6 +130,7 @@ export function Opportunity360Page() {
   const [manualWon, setManualWon] = useState(false)
   const [templateId, setTemplateId] = useState(() => findFeaturedQuotationTemplate(templates)?.id ?? templates[0]?.id ?? '')
   const canDelete = canCrmPermission('crm.opportunity.delete')
+  const canClose = canCrmPermission('crm.opportunity.close')
   const canChangeOppStagePerm = canCrmPermission('crm.opportunity.update')
   const canAddActivity = canCrmPermission('crm.activity.create')
   const canEditActivity = canCrmPermission('crm.activity.update')
@@ -346,6 +347,10 @@ export function Opportunity360Page() {
 
   function confirmMove() {
     void (async () => {
+      if ((targetStage === 'won' || targetStage === 'lost') && !canClose) {
+        notify.error('Requires crm.opportunity.close')
+        return
+      }
       if (!targetCompleteness.isComplete) {
         notify.error(formatMissingStageFieldsMessage(targetCompleteness.missingFields, opportunityStageLabel(targetStage)))
         return
@@ -523,6 +528,7 @@ export function Opportunity360Page() {
       favoritePath={favoritePath}
       isOpen={isOpen}
       canDelete={canDelete}
+      canClose={canClose}
       showCreateSalesOrder={soGate.enabled || Boolean(soGate.salesOrderId)}
       canCreateSalesOrder={soGate.enabled}
       createSalesOrderDisabledReason={soGate.disabledReason}

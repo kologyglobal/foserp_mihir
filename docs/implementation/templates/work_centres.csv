@@ -1,0 +1,3 @@
+code,name,description,plantCode,departmentRef,capacityPerShift,capacityUomCode,defaultShiftRef,isActive
+WC-FAB,Fabrication WC,Pilot fabrication centre,PUNE,Production,,,SHIFT-A,true
+WC-ASSY,Assembly WC,Pilot assembly centre,PUNE,Production,,,SHIFT-A,true

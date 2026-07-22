@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type {
   AgeingReportDto,
   CreateCustomerCreditNoteInput,
+  CreateCustomerReceiptInput,
   CreateSalesInvoiceInput,
   CreditNoteAllocationHistoryRow,
   CreditNoteAllocationPreview,
@@ -14,13 +15,27 @@ import type {
   CustomerCreditNoteLineDto,
   CustomerCreditNoteListItemDto,
   CustomerCreditNoteStatus,
+  CustomerReceiptAllowedActions,
+  CustomerReceiptDeductionLineDto,
+  CustomerReceiptDto,
+  CustomerReceiptListItemDto,
+  CustomerReceiptStatus,
+  CustomerReceiptTdsInput,
+  CustomerReceiptValidationPreview,
   CustomerReceivableDetailDto,
   ListCustomerCreditNotesQuery,
+  ListCustomerReceiptsQuery,
   ListSalesInvoicesQuery,
   OutstandingOpenItemDto,
   PaginatedResult,
   PostCreditNoteResult,
+  PostCustomerReceiptResult,
   PostSalesInvoiceResult,
+  ReverseSalesInvoiceResult,
+  ReceiptAllocationHistoryRow,
+  ReceiptAllocationPreview,
+  ReceiptAllocationRequest,
+  ReceiptAllocationResult,
   ReceivableOverviewDto,
   ReceivableReconciliationDto,
   SalesInvoiceAllowedActions,
@@ -29,9 +44,11 @@ import type {
   SalesInvoiceStatus,
   SalesInvoiceValidationPreview,
   UpdateCustomerCreditNoteInput,
+  UpdateCustomerReceiptInput,
   UpdateSalesInvoiceInput,
 } from '../types/moneyIn'
 import { DEMO_BRANCH_ID, DEMO_FY_ID, DEMO_LEGAL_ENTITY_ID } from './financeSetupStore'
+import { getMasterStoreState } from './storeBridge'
 import { formatDecimal, previewInterLineTotal, previewLineTotal } from '../modules/accounting/money-in/moneyInUi'
 
 function id() {
@@ -67,6 +84,7 @@ const CUSTOMERS = [
 ]
 
 const RECEIVABLE_ACCOUNT_ID = 'acc-receivable'
+const DEMO_BANK_ACCOUNT_ID = 'acc-bank'
 
 interface OpenItemRecord extends OutstandingOpenItemDto {
   legalEntityId: string
@@ -74,6 +92,10 @@ interface OpenItemRecord extends OutstandingOpenItemDto {
 
 interface CreditNoteAllocationDemoRow extends CreditNoteAllocationHistoryRow {
   creditNoteId: string
+}
+
+interface ReceiptAllocationDemoRow extends ReceiptAllocationHistoryRow {
+  receiptId: string
 }
 
 interface ReceivablesDemoState {
@@ -92,6 +114,7 @@ interface ReceivablesDemoState {
   markReady: (id: string) => SalesInvoiceDto
   cancelInvoice: (id: string, reason: string) => SalesInvoiceDto
   postInvoice: (id: string) => PostSalesInvoiceResult
+  reverseInvoiceDemo: (id: string, reason: string) => ReverseSalesInvoiceResult
   getOverview: (legalEntityId: string) => ReceivableOverviewDto
   listOutstanding: (params: Record<string, string | number | boolean | undefined>) => PaginatedResult<OutstandingOpenItemDto>
   getAgeing: (params: Record<string, string | number | boolean | undefined>) => AgeingReportDto
@@ -122,9 +145,33 @@ interface ReceivablesDemoState {
   previewCreditNoteAllocationDemo: (creditNoteId: string, body: CreditNoteAllocationRequest) => CreditNoteAllocationPreview
   allocateCreditNoteDemo: (creditNoteId: string, body: CreditNoteAllocationRequest) => CreditNoteAllocationResult
   listCreditNoteAllocationsDemo: (creditNoteId: string) => CreditNoteAllocationHistoryRow[]
+  reverseCreditNoteAllocationDemo: (creditNoteId: string, batchId: string, reason: string) => CreditNoteAllocationResult
+  reverseCreditNoteDemo: (id: string, reason: string) => PostCreditNoteResult
+
+  // ─── Customer receipts (Phase 3B6 demo) ──────────────────────────────────
+  receipts: CustomerReceiptDto[]
+  receiptAllocations: ReceiptAllocationDemoRow[]
+  receiptSeq: number
+  receiptVoucherSeq: number
+  receiptAllocationSeq: number
+  receiptsSeeded: boolean
+  seedReceiptsIfEmpty: (legalEntityId: string) => void
+  listReceipts: (q: ListCustomerReceiptsQuery) => CustomerReceiptListItemDto[]
+  getReceipt: (id: string) => CustomerReceiptDto | undefined
+  createReceipt: (input: CreateCustomerReceiptInput) => CustomerReceiptDto
+  updateReceipt: (id: string, input: UpdateCustomerReceiptInput) => CustomerReceiptDto
+  validateReceipt: (id: string) => CustomerReceiptValidationPreview
+  markReceiptReady: (id: string) => CustomerReceiptDto
+  cancelReceipt: (id: string, reason: string) => CustomerReceiptDto
+  postReceipt: (id: string) => PostCustomerReceiptResult
+  previewReceiptAllocationDemo: (receiptId: string, body: ReceiptAllocationRequest) => ReceiptAllocationPreview
+  allocateReceiptDemo: (receiptId: string, body: ReceiptAllocationRequest) => ReceiptAllocationResult
+  listReceiptAllocationsDemo: (receiptId: string) => ReceiptAllocationHistoryRow[]
+  reverseReceiptAllocationDemo: (receiptId: string, batchId: string, reason: string) => ReceiptAllocationResult
+  reverseReceiptDemo: (id: string, reason: string) => PostCustomerReceiptResult
 }
 
-function allowedActions(status: SalesInvoiceStatus): SalesInvoiceAllowedActions {
+function allowedActions(status: SalesInvoiceStatus, hasPostedAllocations = false): SalesInvoiceAllowedActions {
   const editable = status === 'DRAFT' || status === 'READY_TO_POST'
   const cancellable = editable
   if (status === 'POSTED') {
@@ -134,6 +181,18 @@ function allowedActions(status: SalesInvoiceStatus): SalesInvoiceAllowedActions 
       markReady: false,
       cancel: false,
       post: false,
+      reverse: !hasPostedAllocations,
+      viewAccounting: true,
+    }
+  }
+  if (status === 'REVERSED') {
+    return {
+      edit: false,
+      validate: false,
+      markReady: false,
+      cancel: false,
+      post: false,
+      reverse: false,
       viewAccounting: true,
     }
   }
@@ -143,6 +202,7 @@ function allowedActions(status: SalesInvoiceStatus): SalesInvoiceAllowedActions 
     markReady: status === 'DRAFT',
     cancel: cancellable,
     post: status === 'READY_TO_POST',
+    reverse: false,
   }
 }
 
@@ -230,13 +290,35 @@ function recalcInvoice(inv: SalesInvoiceDto, lines: SalesInvoiceLineDto[]): Sale
 }
 
 function customerMeta(customerId: string) {
-  const c = CUSTOMERS.find((x) => x.id === customerId) ?? CUSTOMERS[0]
+  const c = CUSTOMERS.find((x) => x.id === customerId)
+  if (c) {
+    return {
+      customerCodeSnapshot: c.code,
+      customerNameSnapshot: c.name,
+      customerGstinSnapshot: c.gstin,
+      customerPanSnapshot: null,
+      customerStateCodeSnapshot: c.state,
+    }
+  }
+  // Documents created against master/CRM customers (CustomerMasterSelect) —
+  // resolve the snapshot from the customer master instead of demo fixtures.
+  const master = getMasterStoreState()?.customers.find((x) => x.id === customerId)
+  if (master) {
+    return {
+      customerCodeSnapshot: master.customerCode,
+      customerNameSnapshot: master.customerName,
+      customerGstinSnapshot: master.gstin || null,
+      customerPanSnapshot: master.pan ?? null,
+      customerStateCodeSnapshot: master.gstin ? master.gstin.slice(0, 2) : null,
+    }
+  }
+  const fallback = CUSTOMERS[0]
   return {
-    customerCodeSnapshot: c.code,
-    customerNameSnapshot: c.name,
-    customerGstinSnapshot: c.gstin,
+    customerCodeSnapshot: fallback.code,
+    customerNameSnapshot: fallback.name,
+    customerGstinSnapshot: fallback.gstin,
     customerPanSnapshot: null,
-    customerStateCodeSnapshot: c.state,
+    customerStateCodeSnapshot: fallback.state,
   }
 }
 
@@ -685,6 +767,280 @@ function seedCreditNotes(): CustomerCreditNoteDto[] {
   return [directCalc, postedFinal]
 }
 
+// ─── Customer receipts (Phase 3B6 demo) ────────────────────────────────────
+
+function receiptAllowedActions(status: CustomerReceiptStatus, unallocatedAmount: string): CustomerReceiptAllowedActions {
+  const unallocated = Number(unallocatedAmount || 0)
+  if (status === 'POSTED') {
+    return {
+      edit: false,
+      validate: false,
+      markReady: false,
+      cancel: false,
+      post: false,
+      allocate: unallocated > 0,
+      viewAllocations: true,
+      viewAccounting: true,
+      viewCreditOpenItem: true,
+      reverse: false,
+    }
+  }
+  if (status === 'CANCELLED') {
+    return {
+      edit: false,
+      validate: false,
+      markReady: false,
+      cancel: false,
+      post: false,
+      allocate: false,
+      viewAllocations: true,
+      viewAccounting: true,
+      viewCreditOpenItem: true,
+      reverse: false,
+    }
+  }
+  const editable = status === 'DRAFT' || status === 'READY_TO_POST'
+  return {
+    edit: editable,
+    validate: true,
+    markReady: status === 'DRAFT',
+    cancel: editable,
+    post: status === 'READY_TO_POST',
+    allocate: false,
+    viewAllocations: false,
+    viewAccounting: false,
+    viewCreditOpenItem: false,
+    reverse: false,
+  }
+}
+
+function buildReceiptDeductionLine(
+  lineNumber: number,
+  type: 'BANK_CHARGE' | 'OTHER_DEDUCTION',
+  description: string,
+  amount: number,
+  code: string | null,
+): CustomerReceiptDeductionLineDto {
+  return {
+    id: id(),
+    lineNumber,
+    type,
+    code,
+    description,
+    amount: formatDecimal(amount),
+    baseAmount: formatDecimal(amount),
+    accountId: null,
+  }
+}
+
+function computeReceiptTdsAmount(tds: CustomerReceiptTdsInput | null | undefined, bankCashAmount: number): number {
+  if (!tds || tds.mode === 'NONE') return 0
+  if (tds.mode === 'AMOUNT') return Number(tds.value || 0)
+  if (tds.mode === 'PERCENTAGE') {
+    const base = Number(tds.calculationBase || bankCashAmount)
+    return base * (Number(tds.value || 0) / 100)
+  }
+  return 0
+}
+
+function recalcReceipt(
+  receipt: CustomerReceiptDto,
+  bankCharges: CustomerReceiptDeductionLineDto[],
+  otherDeductions: CustomerReceiptDeductionLineDto[],
+): CustomerReceiptDto {
+  const bankCash = Number(receipt.bankCashAmount || 0)
+  const tdsAmount = Number(receipt.customerTds?.amount || 0)
+  const bankChargeTotal = bankCharges.reduce((s, l) => s + Number(l.amount || 0), 0)
+  const otherDeductionTotal = otherDeductions.reduce((s, l) => s + Number(l.amount || 0), 0)
+  const gross = bankCash + tdsAmount + bankChargeTotal + otherDeductionTotal
+  return {
+    ...receipt,
+    bankCharges,
+    otherDeductions,
+    bankCashAmount: formatDecimal(bankCash),
+    customerTdsAmount: formatDecimal(tdsAmount),
+    bankChargeAmount: formatDecimal(bankChargeTotal),
+    otherDeductionAmount: formatDecimal(otherDeductionTotal),
+    grossReceiptAmount: formatDecimal(gross),
+    allocatableAmount: formatDecimal(gross),
+    baseBankCashAmount: formatDecimal(bankCash),
+    baseCustomerTdsAmount: formatDecimal(tdsAmount),
+    baseBankChargeAmount: formatDecimal(bankChargeTotal),
+    baseOtherDeductionAmount: formatDecimal(otherDeductionTotal),
+    baseGrossReceiptAmount: formatDecimal(gross),
+    baseAllocatableAmount: formatDecimal(gross),
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+function validateReceiptDemo(r: CustomerReceiptDto): CustomerReceiptValidationPreview {
+  const errors: CustomerReceiptValidationPreview['errors'] = []
+  const warnings: CustomerReceiptValidationPreview['warnings'] = []
+  if (!r.customerId) errors.push({ code: 'CUSTOMER_REQUIRED', message: 'Customer is required', field: 'customerId' })
+  if (!r.bankCashAccountId) {
+    errors.push({ code: 'RECEIPT_BANK_CASH_ACCOUNT_MISSING', message: 'Bank/cash account is required', field: 'bankCashAccountId' })
+  }
+  if (Number(r.bankCashAmount) <= 0) {
+    errors.push({ code: 'CUSTOMER_RECEIPT_BANK_AMOUNT_INVALID', message: 'Bank/cash amount must be greater than zero', field: 'bankCashAmount' })
+  }
+  if (r.paymentMethod === 'CHEQUE' && (!r.chequeNumber || !r.chequeDate)) {
+    errors.push({ code: 'RECEIPT_INSTRUMENT_NUMBER_REQUIRED', message: 'Cheque number and date are required for cheque payments', field: 'instrumentNumber' })
+  }
+  return { valid: errors.length === 0, errors, warnings }
+}
+
+function buildReceiptFromInput(
+  receiptId: string,
+  draftReference: string,
+  input: CreateCustomerReceiptInput,
+  status: CustomerReceiptStatus,
+  now: string,
+): { receipt: CustomerReceiptDto; bankCharges: CustomerReceiptDeductionLineDto[]; otherDeductions: CustomerReceiptDeductionLineDto[] } {
+  const bankCharges = (input.bankCharges ?? []).map((c, idx) => buildReceiptDeductionLine(idx + 1, 'BANK_CHARGE', c.description, Number(c.amount), null))
+  const otherDeductions = (input.otherDeductions ?? []).map((d, idx) =>
+    buildReceiptDeductionLine(idx + 1, 'OTHER_DEDUCTION', d.description, Number(d.amount), d.code ?? null),
+  )
+  const tds =
+    input.customerTds && input.customerTds.mode !== 'NONE'
+      ? {
+          mode: input.customerTds.mode,
+          value: input.customerTds.value ?? null,
+          calculationBase: input.customerTds.calculationBase ?? null,
+          sectionCode: input.customerTds.sectionCode ?? null,
+          certificateReference: input.customerTds.certificateReference ?? null,
+          accountId: input.customerTds.accountId ?? null,
+          amount: formatDecimal(computeReceiptTdsAmount(input.customerTds, Number(input.bankCashAmount))),
+        }
+      : null
+  const receipt: CustomerReceiptDto = {
+    id: receiptId,
+    tenantId: 'demo',
+    legalEntityId: input.legalEntityId,
+    branchId: input.branchId ?? DEMO_BRANCH_ID,
+    financialYearId: DEMO_FY_ID,
+    receiptNumber: null,
+    draftReference,
+    status,
+    customerId: input.customerId,
+    ...customerMeta(input.customerId),
+    customerCountryCodeSnapshot: 'IN',
+    customerBillingAddressSnapshot: null,
+    sourceType: input.sourceType ?? 'DIRECT',
+    sourceDocumentId: input.sourceDocumentId ?? null,
+    sourceDocumentNumberSnapshot: input.sourceDocumentNumber ?? null,
+    paymentMethod: input.paymentMethod,
+    receiptDate: input.receiptDate,
+    postingDate: input.postingDate,
+    valueDate: input.valueDate ?? null,
+    referenceNumber: null,
+    transactionReference: input.transactionReference ?? null,
+    customerBankReference: input.bankReference ?? null,
+    chequeNumber: input.instrumentNumber ?? null,
+    chequeDate: input.instrumentDate ?? null,
+    bankName: null,
+    currencyCode: input.currencyCode ?? 'INR',
+    exchangeRate: input.exchangeRate ?? '1',
+    grossReceiptAmount: '0.00',
+    customerTdsAmount: '0.00',
+    bankChargeAmount: '0.00',
+    otherDeductionAmount: '0.00',
+    bankCashAmount: input.bankCashAmount,
+    allocatableAmount: '0.00',
+    allocatedAmount: '0.00',
+    unallocatedAmount: '0.00',
+    baseGrossReceiptAmount: '0.00',
+    baseCustomerTdsAmount: '0.00',
+    baseBankChargeAmount: '0.00',
+    baseOtherDeductionAmount: '0.00',
+    baseBankCashAmount: input.bankCashAmount,
+    baseAllocatableAmount: '0.00',
+    baseAllocatedAmount: '0.00',
+    baseUnallocatedAmount: '0.00',
+    bankCashAccountId: input.bankCashAccountId,
+    customerReceivableAccountId: input.customerReceivableAccountId ?? RECEIVABLE_ACCOUNT_ID,
+    bankChargeAccountId: null,
+    customerTdsReceivableAccountId: null,
+    otherDeductionAccountId: null,
+    customerTds: tds,
+    accountingVoucherId: null,
+    postingEventId: null,
+    creditOpenItemId: null,
+    narration: input.narration ?? null,
+    internalRemarks: input.notes ?? null,
+    postedAt: null,
+    postedBy: null,
+    cancelledAt: null,
+    cancelledBy: null,
+    cancellationReason: null,
+    createdBy: 'demo',
+    updatedBy: 'demo',
+    createdAt: now,
+    updatedAt: now,
+    bankCharges,
+    otherDeductions,
+  }
+  return { receipt, bankCharges, otherDeductions }
+}
+
+function seedReceipts(): CustomerReceiptDto[] {
+  const now = new Date().toISOString()
+
+  const { receipt: draft, bankCharges: draftCharges, otherDeductions: draftDeductions } = buildReceiptFromInput(
+    'e5000001-0001-4001-8001-000000000001',
+    'RCPT-D-000001',
+    {
+      legalEntityId: DEMO_LEGAL_ENTITY_ID,
+      customerId: DEMO_CUSTOMER_IDS.tata,
+      sourceType: 'DIRECT',
+      receiptDate: today(),
+      postingDate: today(),
+      paymentMethod: 'BANK_TRANSFER',
+      bankCashAmount: '250000.00',
+      bankCashAccountId: DEMO_BANK_ACCOUNT_ID,
+      transactionReference: 'TXN-DRAFT-0001',
+      narration: 'Advance against upcoming trailer order',
+    },
+    'DRAFT',
+    now,
+  )
+  const draftCalc = recalcReceipt(draft, draftCharges, draftDeductions)
+
+  const { receipt: postedSeed, bankCharges: postedCharges, otherDeductions: postedDeductions } = buildReceiptFromInput(
+    'e5000002-0002-4002-8002-000000000002',
+    'RCPT-D-000002',
+    {
+      legalEntityId: DEMO_LEGAL_ENTITY_ID,
+      customerId: DEMO_CUSTOMER_IDS.mahindra,
+      sourceType: 'DIRECT',
+      receiptDate: daysAgo(5),
+      postingDate: daysAgo(5),
+      paymentMethod: 'BANK_TRANSFER',
+      bankCashAmount: '620000.00',
+      bankCashAccountId: DEMO_BANK_ACCOUNT_ID,
+      transactionReference: 'TXN-0007',
+      narration: 'Payment against SINV-2026-00042',
+    },
+    'DRAFT',
+    now,
+  )
+  const postedCalc = recalcReceipt(postedSeed, postedCharges, postedDeductions)
+  const posted: CustomerReceiptDto = {
+    ...postedCalc,
+    status: 'POSTED',
+    receiptNumber: 'RCPT-2026-00007',
+    postedAt: daysAgo(5),
+    postedBy: 'demo',
+    accountingVoucherId: 'v-demo-rcpt-7',
+    creditOpenItemId: 'oi-rcpt-00007',
+    allocatableAmount: postedCalc.grossReceiptAmount,
+    unallocatedAmount: postedCalc.grossReceiptAmount,
+    baseAllocatableAmount: postedCalc.baseGrossReceiptAmount,
+    baseUnallocatedAmount: postedCalc.baseGrossReceiptAmount,
+  }
+
+  return [draftCalc, posted]
+}
+
 function seedOpenItems(invoices: SalesInvoiceDto[]): OpenItemRecord[] {
   const posted = invoices.filter((i) => i.status === 'POSTED')
   return posted.map((inv) =>
@@ -712,6 +1068,12 @@ export const useReceivablesDemoStore = create<ReceivablesDemoState>()(
       creditNoteVoucherSeq: 300,
       creditNoteAllocationSeq: 1,
       creditNotesSeeded: false,
+      receipts: [],
+      receiptAllocations: [],
+      receiptSeq: 100,
+      receiptVoucherSeq: 400,
+      receiptAllocationSeq: 1,
+      receiptsSeeded: false,
 
       seedIfEmpty(legalEntityId) {
         if (get().seeded && get().invoices.some((i) => i.legalEntityId === legalEntityId)) return
@@ -751,7 +1113,15 @@ export const useReceivablesDemoStore = create<ReceivablesDemoState>()(
       getInvoice(invoiceId) {
         const inv = get().invoices.find((i) => i.id === invoiceId)
         if (!inv) return undefined
-        return { ...inv, allowedActions: allowedActions(inv.status), validationSummary: validateDemo(inv) }
+        const hasPostedAllocations =
+          inv.status === 'POSTED' &&
+          (get().receiptAllocations.some((r) => r.invoiceId === invoiceId && r.status === 'POSTED') ||
+            get().creditNoteAllocations.some((r) => r.invoiceId === invoiceId && r.status === 'POSTED'))
+        return {
+          ...inv,
+          allowedActions: allowedActions(inv.status, hasPostedAllocations),
+          validationSummary: validateDemo(inv),
+        }
       },
 
       createInvoice(input) {
@@ -847,6 +1217,17 @@ export const useReceivablesDemoStore = create<ReceivablesDemoState>()(
           ...customerMeta(input.customerId),
           lines,
           updatedAt: new Date().toISOString(),
+          sourceLinks: input.sourceLinks?.map((link) => ({
+            sourceType: link.sourceType,
+            sourceDocumentId: link.sourceDocumentId,
+            sourceLineId: link.sourceLineId ?? null,
+            salesOrderId: link.salesOrderId ?? null,
+            salesOrderLineId: link.salesOrderLineId ?? null,
+            deliveryChallanId: link.deliveryChallanId ?? null,
+            deliveryChallanLineId: link.deliveryChallanLineId ?? null,
+            quantity: link.quantity,
+            itemId: link.itemId ?? null,
+          })),
         }
         updated = recalcInvoice(updated, lines)
         set({ invoices: get().invoices.map((i) => (i.id === invoiceId ? updated : i)) })
@@ -927,6 +1308,71 @@ export const useReceivablesDemoStore = create<ReceivablesDemoState>()(
           invoice: { ...posted, allowedActions: allowedActions(posted.status) },
           posting: { voucherId, voucherNumber, postingEventId: id() },
           receivableOpenItemId: openItemId,
+          idempotentReplay: false,
+        }
+      },
+
+      reverseInvoiceDemo(invoiceId, reason) {
+        const inv = get().invoices.find((i) => i.id === invoiceId)
+        if (!inv) throw new Error('Sales invoice not found')
+        if (inv.status === 'REVERSED') {
+          return {
+            invoice: { ...inv, allowedActions: allowedActions(inv.status) },
+            posting: {
+              voucherId: inv.reversalVoucherId ?? id(),
+              voucherNumber: 'REV-SINV',
+              postingEventId: id(),
+            },
+            reversalVoucherId: inv.reversalVoucherId ?? id(),
+            idempotentReplay: true,
+          }
+        }
+        if (inv.status !== 'POSTED') {
+          throw Object.assign(new Error('Only posted sales invoices can be reversed'), {
+            code: 'SALES_INVOICE_NOT_POSTED_FOR_REVERSAL',
+          })
+        }
+        const postedReceiptAllocs = get().receiptAllocations.filter(
+          (r) => r.invoiceId === invoiceId && r.status === 'POSTED',
+        )
+        const postedCnAllocs = get().creditNoteAllocations.filter(
+          (r) => r.invoiceId === invoiceId && r.status === 'POSTED',
+        )
+        if (postedReceiptAllocs.length > 0 || postedCnAllocs.length > 0) {
+          throw Object.assign(new Error('Reverse allocations before reversing the invoice'), {
+            code: 'SALES_INVOICE_ALLOCATIONS_MUST_BE_REVERSED',
+          })
+        }
+        const vSeq = get().voucherSeq + 1
+        const voucherId = id()
+        const voucherNumber = `REV-2026-${String(vSeq).padStart(5, '0')}`
+        const reversed: SalesInvoiceDto = {
+          ...inv,
+          status: 'REVERSED',
+          reversalVoucherId: voucherId,
+          reversedAt: new Date().toISOString(),
+          reversalReason: reason,
+          outstandingAmount: '0.0000',
+          updatedAt: new Date().toISOString(),
+        }
+        set({
+          voucherSeq: vSeq,
+          invoices: get().invoices.map((i) => (i.id === invoiceId ? reversed : i)),
+          openItems: get().openItems.map((o) =>
+            o.salesInvoiceId === invoiceId
+              ? {
+                  ...o,
+                  outstandingAmount: '0.0000',
+                  baseOutstandingAmount: '0.0000',
+                  status: 'SETTLED' as const,
+                }
+              : o,
+          ),
+        })
+        return {
+          invoice: { ...reversed, allowedActions: allowedActions(reversed.status) },
+          posting: { voucherId, voucherNumber, postingEventId: id() },
+          reversalVoucherId: voucherId,
           idempotentReplay: false,
         }
       },
@@ -1491,6 +1937,681 @@ export const useReceivablesDemoStore = create<ReceivablesDemoState>()(
         return get()
           .creditNoteAllocations.filter((r) => r.creditNoteId === creditNoteId)
           .sort((a, b) => b.allocationSequence - a.allocationSequence)
+      },
+
+      reverseCreditNoteAllocationDemo(creditNoteId, batchId, reason) {
+        const note = get().getCreditNote(creditNoteId)
+        if (!note) throw new Error('Credit note not found')
+        const batchRows = get().creditNoteAllocations.filter(
+          (r) => r.creditNoteId === creditNoteId && r.batchId === batchId && r.status === 'POSTED',
+        )
+        if (batchRows.length === 0) {
+          throw Object.assign(new Error('Allocation batch is not reversible'), {
+            code: 'CREDIT_NOTE_ALLOCATION_BATCH_NOT_REVERSIBLE',
+          })
+        }
+        const now = new Date().toISOString()
+        let openItems = [...get().openItems]
+        let invoices = [...get().invoices]
+        const invoiceRows: CreditNoteAllocationResult['invoices'] = []
+        let totalReversed = 0
+
+        for (const row of batchRows) {
+          const amount = Number(row.allocatedAmount)
+          totalReversed += amount
+          const openItem = openItems.find((o) => o.openItemId === row.invoiceOpenItemId)
+          if (openItem) {
+            const restored = Number(openItem.outstandingAmount) + amount
+            openItems = openItems.map((o) =>
+              o.openItemId === row.invoiceOpenItemId
+                ? {
+                    ...o,
+                    outstandingAmount: formatDecimal(restored),
+                    baseOutstandingAmount: formatDecimal(restored),
+                    status: restored >= Number(o.originalAmount ?? restored) - 0.001 ? 'OPEN' : 'PARTIALLY_SETTLED',
+                  }
+                : o,
+            )
+            invoices = invoices.map((i) =>
+              i.id === openItem.salesInvoiceId
+                ? { ...i, outstandingAmount: formatDecimal(restored), amountAdjusted: formatDecimal(Math.max(0, Number(i.amountAdjusted) - amount)) }
+                : i,
+            )
+            invoiceRows.push({
+              invoiceId: row.invoiceId ?? '',
+              openItemId: row.invoiceOpenItemId,
+              openAmount: formatDecimal(restored),
+              allocatedAmount: '0.00',
+              status: 'OPEN',
+              amountPaid: '0.00',
+              outstandingAmount: formatDecimal(restored),
+            })
+          }
+        }
+
+        const unallocatedAfter = Number(note.unallocatedAmount) + totalReversed
+        const updatedNote: CustomerCreditNoteDto = {
+          ...note,
+          allocatedAmount: formatDecimal(Math.max(0, Number(note.allocatedAmount) - totalReversed)),
+          unallocatedAmount: formatDecimal(unallocatedAfter),
+          baseAllocatedAmount: formatDecimal(Math.max(0, Number(note.baseAllocatedAmount) - totalReversed)),
+          baseUnallocatedAmount: formatDecimal(unallocatedAfter),
+          updatedAt: now,
+        }
+
+        set({
+          creditNotes: get().creditNotes.map((n) => (n.id === creditNoteId ? updatedNote : n)),
+          creditNoteAllocations: get().creditNoteAllocations.map((r) =>
+            r.batchId === batchId && r.creditNoteId === creditNoteId ? { ...r, status: 'REVERSED' } : r,
+          ),
+          openItems,
+          invoices,
+        })
+
+        return {
+          batch: {
+            id: batchId,
+            status: 'REVERSED',
+            allocationDate: batchRows[0].allocationDate,
+            currencyCode: note.currencyCode,
+            exchangeRate: note.exchangeRate,
+            totalAllocatedAmount: formatDecimal(totalReversed),
+            baseTotalAllocatedAmount: formatDecimal(totalReversed),
+            allocationCount: batchRows.length,
+            createdBy: 'demo',
+            createdAt: now,
+            completedAt: now,
+            reversedAt: now,
+            reversedBy: 'demo',
+            reversalReason: reason,
+          },
+          allocations: batchRows.map((r) => ({
+            id: r.allocationId,
+            batchId: r.batchId,
+            creditNoteId,
+            invoiceId: r.invoiceId,
+            invoiceOpenItemId: r.invoiceOpenItemId,
+            allocationDate: r.allocationDate,
+            allocatedAmount: r.allocatedAmount,
+            baseAllocatedAmount: r.baseAllocatedAmount,
+            invoiceOutstandingBefore: r.invoiceOutstandingBefore,
+            invoiceOutstandingAfter: r.invoiceOutstandingAfter,
+            status: 'REVERSED',
+            createdBy: r.createdBy,
+            createdAt: r.createdAt,
+          })),
+          creditNote: {
+            id: updatedNote.id,
+            allocatedAmount: updatedNote.allocatedAmount,
+            unallocatedAmount: updatedNote.unallocatedAmount,
+            baseAllocatedAmount: updatedNote.baseAllocatedAmount,
+            baseUnallocatedAmount: updatedNote.baseUnallocatedAmount,
+          },
+          creditOpenItem: {
+            id: updatedNote.creditOpenItemId ?? '',
+            openAmount: updatedNote.unallocatedAmount,
+            allocatedAmount: updatedNote.allocatedAmount,
+            status: Number(updatedNote.allocatedAmount) > 0 ? 'PARTIALLY_SETTLED' : 'OPEN',
+          },
+          invoices: invoiceRows,
+          customerAdvance: updatedNote.unallocatedAmount,
+          idempotentReplay: false,
+        }
+      },
+
+      reverseCreditNoteDemo(noteId, reason) {
+        const note = get().getCreditNote(noteId)
+        if (!note) throw new Error('Credit note not found')
+        if (note.status === 'REVERSED') {
+          return {
+            creditNote: { ...note, allowedActions: creditNoteAllowedActions(note.status, note.approvalRequired, note.unallocatedAmount) },
+            posting: { voucherId: note.reversalVoucherId ?? id(), voucherNumber: 'REV-CN', postingEventId: id() },
+            creditOpenItemId: note.creditOpenItemId ?? id(),
+            idempotentReplay: true,
+          }
+        }
+        if (note.status !== 'POSTED') {
+          throw Object.assign(new Error('Only posted credit notes can be reversed'), { code: 'CUSTOMER_CREDIT_NOTE_NOT_POSTED_FOR_REVERSAL' })
+        }
+        const postedAllocations = get().creditNoteAllocations.filter(
+          (r) => r.creditNoteId === noteId && r.status === 'POSTED',
+        )
+        if (postedAllocations.length > 0) {
+          throw Object.assign(new Error('Reverse allocations before reversing the credit note'), {
+            code: 'CUSTOMER_CREDIT_NOTE_ALLOCATIONS_MUST_BE_REVERSED',
+          })
+        }
+        const vSeq = get().creditNoteVoucherSeq + 1
+        const voucherNumber = `REV-CN-2026-${String(vSeq).padStart(5, '0')}`
+        const voucherId = id()
+        const reversed: CustomerCreditNoteDto = {
+          ...note,
+          status: 'REVERSED',
+          reversalVoucherId: voucherId,
+          reversedAt: new Date().toISOString(),
+          reversalReason: reason,
+          updatedAt: new Date().toISOString(),
+        }
+        set({
+          creditNoteVoucherSeq: vSeq,
+          creditNotes: get().creditNotes.map((n) => (n.id === noteId ? reversed : n)),
+        })
+        return {
+          creditNote: { ...reversed, allowedActions: creditNoteAllowedActions(reversed.status, reversed.approvalRequired, reversed.unallocatedAmount) },
+          posting: { voucherId, voucherNumber, postingEventId: id() },
+          creditOpenItemId: reversed.creditOpenItemId ?? id(),
+          idempotentReplay: false,
+        }
+      },
+
+      // ─── Customer receipts (Phase 3B6 demo) ────────────────────────────
+
+      seedReceiptsIfEmpty(legalEntityId) {
+        get().seedIfEmpty(legalEntityId)
+        if (get().receiptsSeeded && get().receipts.some((r) => r.legalEntityId === legalEntityId)) return
+        set({ receipts: seedReceipts(), receiptAllocations: [], receiptsSeeded: true, receiptSeq: 100, receiptVoucherSeq: 400, receiptAllocationSeq: 1 })
+      },
+
+      listReceipts(q) {
+        get().seedReceiptsIfEmpty(q.legalEntityId)
+        let rows = get().receipts.filter((r) => r.legalEntityId === q.legalEntityId)
+        if (q.status) rows = rows.filter((r) => r.status === q.status)
+        if (q.paymentMethod) rows = rows.filter((r) => r.paymentMethod === q.paymentMethod)
+        if (q.customerId) rows = rows.filter((r) => r.customerId === q.customerId)
+        if (q.search) {
+          const s = q.search.toLowerCase()
+          rows = rows.filter(
+            (r) =>
+              (r.receiptNumber ?? '').toLowerCase().includes(s) ||
+              (r.draftReference ?? '').toLowerCase().includes(s) ||
+              (r.customerNameSnapshot ?? '').toLowerCase().includes(s) ||
+              (r.transactionReference ?? '').toLowerCase().includes(s),
+          )
+        }
+        return rows
+          .map(({ bankCharges: _bc, otherDeductions: _od, ...rest }) => ({ ...rest, allowedActions: receiptAllowedActions(rest.status, rest.unallocatedAmount) }))
+          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      },
+
+      getReceipt(receiptId) {
+        const receipt = get().receipts.find((r) => r.id === receiptId)
+        if (!receipt) return undefined
+        const creditOpenItem = receipt.creditOpenItemId
+          ? {
+              id: receipt.creditOpenItemId,
+              status: Number(receipt.unallocatedAmount) > 0 ? 'OPEN' : 'SETTLED',
+              outstandingAmount: receipt.unallocatedAmount,
+              originalAmount: receipt.grossReceiptAmount,
+            }
+          : null
+        return {
+          ...receipt,
+          allowedActions: receiptAllowedActions(receipt.status, receipt.unallocatedAmount),
+          validationSummary: validateReceiptDemo(receipt),
+          creditOpenItem,
+        }
+      },
+
+      createReceipt(input) {
+        get().seedReceiptsIfEmpty(input.legalEntityId)
+        const receiptId = id()
+        const seq = get().receiptSeq + 1
+        set({ receiptSeq: seq })
+        const now = new Date().toISOString()
+        const { receipt: built, bankCharges, otherDeductions } = buildReceiptFromInput(
+          receiptId,
+          `RCPT-D-${String(seq).padStart(6, '0')}`,
+          input,
+          'DRAFT',
+          now,
+        )
+        const receipt = recalcReceipt(built, bankCharges, otherDeductions)
+        set({ receipts: [...get().receipts, receipt] })
+        return { ...receipt, allowedActions: receiptAllowedActions(receipt.status, receipt.unallocatedAmount) }
+      },
+
+      updateReceipt(receiptId, input) {
+        const existing = get().receipts.find((r) => r.id === receiptId)
+        if (!existing) throw Object.assign(new Error('Customer receipt not found'), { code: 'CUSTOMER_RECEIPT_NOT_FOUND' })
+        if (existing.updatedAt !== input.updatedAt) {
+          throw Object.assign(new Error('Receipt was updated elsewhere'), { code: 'CUSTOMER_RECEIPT_STALE_UPDATE' })
+        }
+        if (existing.status === 'POSTED' || existing.status === 'CANCELLED') {
+          throw Object.assign(new Error('Receipt is read-only'), { code: 'CUSTOMER_RECEIPT_NOT_EDITABLE' })
+        }
+        const revertDraft = existing.status === 'READY_TO_POST'
+        const { updatedAt: _updatedAt, ...editableFields } = input
+        const { receipt: rebuilt, bankCharges, otherDeductions } = buildReceiptFromInput(
+          receiptId,
+          existing.draftReference ?? `RCPT-D-${String(get().receiptSeq).padStart(6, '0')}`,
+          { ...editableFields, legalEntityId: existing.legalEntityId },
+          revertDraft ? 'DRAFT' : existing.status,
+          existing.createdAt,
+        )
+        const updated = recalcReceipt(
+          { ...rebuilt, createdBy: existing.createdBy, updatedAt: new Date().toISOString() },
+          bankCharges,
+          otherDeductions,
+        )
+        set({ receipts: get().receipts.map((r) => (r.id === receiptId ? updated : r)) })
+        return { ...updated, allowedActions: receiptAllowedActions(updated.status, updated.unallocatedAmount) }
+      },
+
+      validateReceipt(receiptId) {
+        const receipt = get().receipts.find((r) => r.id === receiptId)
+        if (!receipt) throw new Error('Customer receipt not found')
+        return validateReceiptDemo(receipt)
+      },
+
+      markReceiptReady(receiptId) {
+        const receipt = get().receipts.find((r) => r.id === receiptId)
+        if (!receipt) throw new Error('Customer receipt not found')
+        const report = validateReceiptDemo(receipt)
+        if (!report.valid) {
+          throw Object.assign(new Error(report.errors[0]?.message ?? 'Validation failed'), { code: 'CUSTOMER_RECEIPT_VALIDATION_FAILED' })
+        }
+        const updated = { ...receipt, status: 'READY_TO_POST' as const, updatedAt: new Date().toISOString() }
+        set({ receipts: get().receipts.map((r) => (r.id === receiptId ? updated : r)) })
+        return { ...updated, allowedActions: receiptAllowedActions(updated.status, updated.unallocatedAmount) }
+      },
+
+      cancelReceipt(receiptId, reason) {
+        const receipt = get().receipts.find((r) => r.id === receiptId)
+        if (!receipt) throw new Error('Customer receipt not found')
+        const updated: CustomerReceiptDto = {
+          ...receipt,
+          status: 'CANCELLED',
+          cancellationReason: reason,
+          cancelledAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+        set({ receipts: get().receipts.map((r) => (r.id === receiptId ? updated : r)) })
+        return { ...updated, allowedActions: receiptAllowedActions(updated.status, updated.unallocatedAmount) }
+      },
+
+      postReceipt(receiptId) {
+        const receipt = get().receipts.find((r) => r.id === receiptId)
+        if (!receipt) throw new Error('Customer receipt not found')
+        if (receipt.status === 'POSTED' && receipt.accountingVoucherId) {
+          return {
+            receipt: { ...receipt, allowedActions: receiptAllowedActions(receipt.status, receipt.unallocatedAmount) },
+            posting: { voucherId: receipt.accountingVoucherId, voucherNumber: receipt.receiptNumber ?? 'RCPT', postingEventId: id() },
+            creditOpenItemId: receipt.creditOpenItemId ?? id(),
+            idempotentReplay: true,
+          }
+        }
+        if (receipt.status !== 'READY_TO_POST') {
+          throw Object.assign(new Error('Only ready-to-post receipts can be posted'), { code: 'CUSTOMER_RECEIPT_NOT_READY' })
+        }
+        const vSeq = get().receiptVoucherSeq + 1
+        set({ receiptVoucherSeq: vSeq })
+        const voucherNumber = `RCPT-2026-${String(vSeq).padStart(5, '0')}`
+        const voucherId = id()
+        const openItemId = id()
+        const posted: CustomerReceiptDto = {
+          ...receipt,
+          status: 'POSTED',
+          receiptNumber: voucherNumber,
+          postingDate: today(),
+          postedAt: new Date().toISOString(),
+          accountingVoucherId: voucherId,
+          creditOpenItemId: openItemId,
+          allocatableAmount: receipt.grossReceiptAmount,
+          allocatedAmount: '0.00',
+          unallocatedAmount: receipt.grossReceiptAmount,
+          baseAllocatableAmount: receipt.baseGrossReceiptAmount,
+          baseAllocatedAmount: '0.00',
+          baseUnallocatedAmount: receipt.baseGrossReceiptAmount,
+          updatedAt: new Date().toISOString(),
+        }
+        set({ receipts: get().receipts.map((r) => (r.id === receiptId ? posted : r)) })
+        return {
+          receipt: { ...posted, allowedActions: receiptAllowedActions(posted.status, posted.unallocatedAmount) },
+          posting: { voucherId, voucherNumber, postingEventId: id() },
+          creditOpenItemId: openItemId,
+          idempotentReplay: false,
+        }
+      },
+
+      previewReceiptAllocationDemo(receiptId, body) {
+        const receipt = get().receipts.find((r) => r.id === receiptId)
+        if (!receipt) throw new Error('Customer receipt not found')
+        const unallocatedBefore = Number(receipt.unallocatedAmount)
+        let running = unallocatedBefore
+        const lines = body.allocations.map((line) => {
+          const openItem = get().openItems.find((o) => o.openItemId === line.invoiceOpenItemId)
+          const before = Number(openItem?.outstandingAmount ?? 0)
+          const amount = Number(line.amount)
+          running -= amount
+          return {
+            invoiceId: line.invoiceId,
+            invoiceOpenItemId: line.invoiceOpenItemId,
+            invoiceNumber: openItem?.invoiceNumber ?? null,
+            currencyCode: receipt.currencyCode,
+            invoiceOutstandingBefore: formatDecimal(before),
+            proposedAllocationAmount: formatDecimal(amount),
+            invoiceOutstandingAfter: formatDecimal(before - amount),
+            baseInvoiceOutstandingBefore: formatDecimal(before),
+            baseProposedAllocationAmount: formatDecimal(amount),
+            baseInvoiceOutstandingAfter: formatDecimal(before - amount),
+            status: 'VALID' as const,
+            issues: [],
+          }
+        })
+        const totalProposed = body.allocations.reduce((s, l) => s + Number(l.amount), 0)
+        return {
+          receiptId,
+          creditOpenItemId: receipt.creditOpenItemId ?? '',
+          currencyCode: receipt.currencyCode,
+          exchangeRate: receipt.exchangeRate,
+          receiptUnallocatedBefore: formatDecimal(unallocatedBefore),
+          totalProposedAllocation: formatDecimal(totalProposed),
+          receiptUnallocatedAfter: formatDecimal(running),
+          customerAdvanceAfter: formatDecimal(running),
+          valid: running >= 0,
+          lines,
+          errors: running < 0 ? [{ code: 'RECEIPT_ALLOCATION_EXCEEDS_RECEIPT', message: 'Allocation exceeds unallocated receipt amount' }] : [],
+          warnings: [],
+        }
+      },
+
+      allocateReceiptDemo(receiptId, body) {
+        const receipt = get().receipts.find((r) => r.id === receiptId)
+        if (!receipt) throw new Error('Customer receipt not found')
+        if (receipt.status !== 'POSTED') {
+          throw Object.assign(new Error('Only posted receipts can be allocated'), { code: 'RECEIPT_ALLOCATION_RECEIPT_NOT_POSTED' })
+        }
+        const totalAllocated = body.allocations.reduce((s, l) => s + Number(l.amount), 0)
+        const unallocatedBefore = Number(receipt.unallocatedAmount)
+        if (totalAllocated <= 0 || totalAllocated > unallocatedBefore) {
+          throw Object.assign(new Error('Allocation exceeds unallocated receipt amount'), { code: 'RECEIPT_ALLOCATION_EXCEEDS_RECEIPT' })
+        }
+        const now = new Date().toISOString()
+        const batchId = id()
+        let seq = get().receiptAllocationSeq
+        const newRows: ReceiptAllocationDemoRow[] = []
+        const invoiceRows: ReceiptAllocationResult['invoices'] = []
+        let openItems = [...get().openItems]
+        let invoices = [...get().invoices]
+
+        for (const line of body.allocations) {
+          const openItem = openItems.find((o) => o.openItemId === line.invoiceOpenItemId)
+          if (!openItem) throw Object.assign(new Error('Invoice open item not found'), { code: 'RECEIPT_ALLOCATION_OPEN_ITEM_INVALID' })
+          const before = Number(openItem.outstandingAmount)
+          const amount = Number(line.amount)
+          const after = before - amount
+          openItems = openItems.map((o) =>
+            o.openItemId === line.invoiceOpenItemId
+              ? { ...o, outstandingAmount: formatDecimal(after), baseOutstandingAmount: formatDecimal(after), status: after <= 0.001 ? 'SETTLED' : 'PARTIALLY_SETTLED' }
+              : o,
+          )
+          invoices = invoices.map((i) =>
+            i.id === openItem.salesInvoiceId ? { ...i, outstandingAmount: formatDecimal(after), amountAdjusted: formatDecimal(Number(i.amountAdjusted) + amount) } : i,
+          )
+          newRows.push({
+            receiptId,
+            batchId,
+            allocationId: id(),
+            allocationDate: body.allocationDate,
+            allocationSequence: seq,
+            invoiceId: line.invoiceId,
+            invoiceNumber: openItem.invoiceNumber,
+            invoiceOpenItemId: line.invoiceOpenItemId,
+            allocatedAmount: formatDecimal(amount),
+            baseAllocatedAmount: formatDecimal(amount),
+            invoiceOutstandingBefore: formatDecimal(before),
+            invoiceOutstandingAfter: formatDecimal(after),
+            status: 'POSTED',
+            createdBy: 'demo',
+            createdAt: now,
+          })
+          invoiceRows.push({
+            invoiceId: line.invoiceId,
+            openItemId: line.invoiceOpenItemId,
+            openAmount: formatDecimal(after),
+            allocatedAmount: formatDecimal(amount),
+            status: after <= 0.001 ? 'SETTLED' : 'PARTIALLY_SETTLED',
+            amountPaid: formatDecimal(amount),
+            outstandingAmount: formatDecimal(after),
+          })
+          seq += 1
+        }
+
+        const unallocatedAfter = unallocatedBefore - totalAllocated
+        const updatedReceipt: CustomerReceiptDto = {
+          ...receipt,
+          allocatedAmount: formatDecimal(Number(receipt.allocatedAmount) + totalAllocated),
+          unallocatedAmount: formatDecimal(unallocatedAfter),
+          baseAllocatedAmount: formatDecimal(Number(receipt.baseAllocatedAmount) + totalAllocated),
+          baseUnallocatedAmount: formatDecimal(unallocatedAfter),
+          updatedAt: now,
+        }
+
+        set({
+          receipts: get().receipts.map((r) => (r.id === receiptId ? updatedReceipt : r)),
+          receiptAllocations: [...get().receiptAllocations, ...newRows],
+          openItems,
+          invoices,
+          receiptAllocationSeq: seq,
+        })
+
+        return {
+          batch: {
+            id: batchId,
+            status: 'POSTED',
+            allocationDate: body.allocationDate,
+            currencyCode: receipt.currencyCode,
+            exchangeRate: receipt.exchangeRate,
+            totalAllocatedAmount: formatDecimal(totalAllocated),
+            baseTotalAllocatedAmount: formatDecimal(totalAllocated),
+            allocationCount: newRows.length,
+            createdBy: 'demo',
+            createdAt: now,
+            completedAt: now,
+          },
+          allocations: newRows.map((r) => ({
+            id: r.allocationId,
+            batchId: r.batchId,
+            receiptId,
+            invoiceId: r.invoiceId,
+            invoiceOpenItemId: r.invoiceOpenItemId,
+            allocationDate: r.allocationDate,
+            allocatedAmount: r.allocatedAmount,
+            baseAllocatedAmount: r.baseAllocatedAmount,
+            invoiceOutstandingBefore: r.invoiceOutstandingBefore,
+            invoiceOutstandingAfter: r.invoiceOutstandingAfter,
+            status: r.status,
+            createdBy: r.createdBy,
+            createdAt: r.createdAt,
+          })),
+          receipt: {
+            id: updatedReceipt.id,
+            allocatedAmount: updatedReceipt.allocatedAmount,
+            unallocatedAmount: updatedReceipt.unallocatedAmount,
+            baseAllocatedAmount: updatedReceipt.baseAllocatedAmount,
+            baseUnallocatedAmount: updatedReceipt.baseUnallocatedAmount,
+          },
+          creditOpenItem: {
+            id: updatedReceipt.creditOpenItemId ?? '',
+            openAmount: updatedReceipt.unallocatedAmount,
+            allocatedAmount: updatedReceipt.allocatedAmount,
+            status: Number(updatedReceipt.unallocatedAmount) > 0 ? 'OPEN' : 'SETTLED',
+          },
+          invoices: invoiceRows,
+          customerAdvance: updatedReceipt.unallocatedAmount,
+          idempotentReplay: false,
+        }
+      },
+
+      listReceiptAllocationsDemo(receiptId) {
+        return get()
+          .receiptAllocations.filter((r) => r.receiptId === receiptId)
+          .sort((a, b) => b.allocationSequence - a.allocationSequence)
+      },
+
+      reverseReceiptAllocationDemo(receiptId, batchId, reason) {
+        const receipt = get().receipts.find((r) => r.id === receiptId)
+        if (!receipt) throw new Error('Customer receipt not found')
+        const batchRows = get().receiptAllocations.filter(
+          (r) => r.receiptId === receiptId && r.batchId === batchId && r.status === 'POSTED',
+        )
+        if (batchRows.length === 0) {
+          throw Object.assign(new Error('Allocation batch is not reversible'), {
+            code: 'RECEIPT_ALLOCATION_BATCH_NOT_REVERSIBLE',
+          })
+        }
+        const now = new Date().toISOString()
+        let openItems = [...get().openItems]
+        let invoices = [...get().invoices]
+        const invoiceRows: ReceiptAllocationResult['invoices'] = []
+        let totalReversed = 0
+
+        for (const row of batchRows) {
+          const amount = Number(row.allocatedAmount)
+          totalReversed += amount
+          const openItem = openItems.find((o) => o.openItemId === row.invoiceOpenItemId)
+          if (openItem) {
+            const restored = Number(openItem.outstandingAmount) + amount
+            openItems = openItems.map((o) =>
+              o.openItemId === row.invoiceOpenItemId
+                ? {
+                    ...o,
+                    outstandingAmount: formatDecimal(restored),
+                    baseOutstandingAmount: formatDecimal(restored),
+                    status: restored >= Number(o.originalAmount ?? restored) - 0.001 ? 'OPEN' : 'PARTIALLY_SETTLED',
+                  }
+                : o,
+            )
+            invoices = invoices.map((i) =>
+              i.id === openItem.salesInvoiceId
+                ? { ...i, outstandingAmount: formatDecimal(restored), amountAdjusted: formatDecimal(Math.max(0, Number(i.amountAdjusted) - amount)) }
+                : i,
+            )
+            invoiceRows.push({
+              invoiceId: row.invoiceId ?? '',
+              openItemId: row.invoiceOpenItemId,
+              openAmount: formatDecimal(restored),
+              allocatedAmount: '0.00',
+              status: 'OPEN',
+              amountPaid: '0.00',
+              outstandingAmount: formatDecimal(restored),
+            })
+          }
+        }
+
+        const unallocatedAfter = Number(receipt.unallocatedAmount) + totalReversed
+        const updatedReceipt: CustomerReceiptDto = {
+          ...receipt,
+          allocatedAmount: formatDecimal(Math.max(0, Number(receipt.allocatedAmount) - totalReversed)),
+          unallocatedAmount: formatDecimal(unallocatedAfter),
+          baseAllocatedAmount: formatDecimal(Math.max(0, Number(receipt.baseAllocatedAmount) - totalReversed)),
+          baseUnallocatedAmount: formatDecimal(unallocatedAfter),
+          updatedAt: now,
+        }
+
+        set({
+          receipts: get().receipts.map((r) => (r.id === receiptId ? updatedReceipt : r)),
+          receiptAllocations: get().receiptAllocations.map((r) =>
+            r.batchId === batchId && r.receiptId === receiptId ? { ...r, status: 'REVERSED' } : r,
+          ),
+          openItems,
+          invoices,
+        })
+
+        return {
+          batch: {
+            id: batchId,
+            status: 'REVERSED',
+            allocationDate: batchRows[0].allocationDate,
+            currencyCode: receipt.currencyCode,
+            exchangeRate: receipt.exchangeRate,
+            totalAllocatedAmount: formatDecimal(totalReversed),
+            baseTotalAllocatedAmount: formatDecimal(totalReversed),
+            allocationCount: batchRows.length,
+            createdBy: 'demo',
+            createdAt: now,
+            completedAt: now,
+            reversedAt: now,
+            reversedBy: 'demo',
+            reversalReason: reason,
+          },
+          allocations: batchRows.map((r) => ({
+            id: r.allocationId,
+            batchId: r.batchId,
+            receiptId,
+            invoiceId: r.invoiceId,
+            invoiceOpenItemId: r.invoiceOpenItemId,
+            allocationDate: r.allocationDate,
+            allocatedAmount: r.allocatedAmount,
+            baseAllocatedAmount: r.baseAllocatedAmount,
+            invoiceOutstandingBefore: r.invoiceOutstandingBefore,
+            invoiceOutstandingAfter: r.invoiceOutstandingAfter,
+            status: 'REVERSED',
+            createdBy: r.createdBy,
+            createdAt: r.createdAt,
+          })),
+          receipt: {
+            id: updatedReceipt.id,
+            allocatedAmount: updatedReceipt.allocatedAmount,
+            unallocatedAmount: updatedReceipt.unallocatedAmount,
+            baseAllocatedAmount: updatedReceipt.baseAllocatedAmount,
+            baseUnallocatedAmount: updatedReceipt.baseUnallocatedAmount,
+          },
+          creditOpenItem: {
+            id: updatedReceipt.creditOpenItemId ?? '',
+            openAmount: updatedReceipt.unallocatedAmount,
+            allocatedAmount: updatedReceipt.allocatedAmount,
+            status: Number(updatedReceipt.allocatedAmount) > 0 ? 'PARTIALLY_SETTLED' : 'OPEN',
+          },
+          invoices: invoiceRows,
+          customerAdvance: updatedReceipt.unallocatedAmount,
+          idempotentReplay: false,
+        }
+      },
+
+      reverseReceiptDemo(receiptId, reason) {
+        const receipt = get().receipts.find((r) => r.id === receiptId)
+        if (!receipt) throw new Error('Customer receipt not found')
+        if (receipt.status === 'REVERSED') {
+          return {
+            receipt: { ...receipt, allowedActions: receiptAllowedActions(receipt.status, receipt.unallocatedAmount) },
+            posting: { voucherId: receipt.reversalVoucherId ?? id(), voucherNumber: 'REV-RCPT', postingEventId: id() },
+            creditOpenItemId: receipt.creditOpenItemId ?? id(),
+            idempotentReplay: true,
+          }
+        }
+        if (receipt.status !== 'POSTED') {
+          throw Object.assign(new Error('Only posted receipts can be reversed'), { code: 'CUSTOMER_RECEIPT_NOT_POSTED_FOR_REVERSAL' })
+        }
+        const postedAllocations = get().receiptAllocations.filter(
+          (r) => r.receiptId === receiptId && r.status === 'POSTED',
+        )
+        if (postedAllocations.length > 0) {
+          throw Object.assign(new Error('Reverse allocations before reversing the receipt'), {
+            code: 'CUSTOMER_RECEIPT_ALLOCATIONS_MUST_BE_REVERSED',
+          })
+        }
+        const vSeq = get().receiptVoucherSeq + 1
+        const voucherNumber = `REV-2026-${String(vSeq).padStart(5, '0')}`
+        const voucherId = id()
+        const reversed: CustomerReceiptDto = {
+          ...receipt,
+          status: 'REVERSED',
+          reversalVoucherId: voucherId,
+          reversedAt: new Date().toISOString(),
+          reversalReason: reason,
+          updatedAt: new Date().toISOString(),
+        }
+        set({
+          receiptVoucherSeq: vSeq,
+          receipts: get().receipts.map((r) => (r.id === receiptId ? reversed : r)),
+        })
+        return {
+          receipt: { ...reversed, allowedActions: receiptAllowedActions(reversed.status, reversed.unallocatedAmount) },
+          posting: { voucherId, voucherNumber, postingEventId: id() },
+          creditOpenItemId: reversed.creditOpenItemId ?? id(),
+          idempotentReplay: false,
+        }
       },
     }),
     { name: 'fos-receivables-demo' },

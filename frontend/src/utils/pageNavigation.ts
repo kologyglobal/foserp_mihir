@@ -56,6 +56,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/crm/opportunities': 'Opportunities',
   '/crm/contacts': 'Contacts',
   '/crm/forecast': 'Sales Forecast',
+  '/crm/companies': 'Companies',
   '/crm/customers': 'Companies',
   '/crm/sales-orders': 'CRM Sales Orders',
   '/crm/quotation-templates': 'Quotation Templates',

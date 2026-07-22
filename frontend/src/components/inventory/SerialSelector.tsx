@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getAvailableSerials } from '@/services/inventory/traceabilityService'
+import { listInventorySerials } from '@/services/api/inventoryApi'
+import { isApiMode } from '@/config/apiConfig'
 import type { InventorySerialRecord } from '@/types/inventoryDomain'
 import { SERIAL_STATUS_LABELS } from '@/utils/inventoryTraceabilityLabels'
 import { cn } from '@/utils/cn'
@@ -34,11 +36,32 @@ export function SerialSelector({
     }
     let cancelled = false
     setLoading(true)
-    getAvailableSerials(itemId, warehouseId, {
-      search: search || undefined,
-      sourceDocumentNo: sourceDocumentNo || undefined,
-      status: 'available',
-    })
+    const request = isApiMode()
+      ? listInventorySerials({
+          itemId,
+          warehouseId,
+          search: search || undefined,
+          status: 'AVAILABLE',
+          limit: 100,
+        }).then((res) => res.data.map((serial) => ({
+          id: serial.id,
+          serialNo: serial.serialNumber,
+          itemId: serial.itemId,
+          itemCode: '',
+          itemName: '',
+          warehouseId: serial.warehouseId ?? warehouseId,
+          warehouseName: '',
+          status: 'available' as const,
+          sourceDocumentType: null,
+          sourceDocumentNo: serial.sourceReferenceNo ?? null,
+          receiptDate: null,
+        })))
+      : getAvailableSerials(itemId, warehouseId, {
+          search: search || undefined,
+          sourceDocumentNo: sourceDocumentNo || undefined,
+          status: 'available',
+        })
+    request
       .then((rows) => {
         if (!cancelled) setSerials(rows)
       })

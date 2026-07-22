@@ -6,6 +6,7 @@
  * (tenant isolation + accounting.mfg_costing.* permissions). UI gating alone is not security.
  */
 
+import { isApiMode } from '../../config/apiConfig'
 import {
   seedCostCentres,
   seedFinishedGoodsValuation,
@@ -51,8 +52,20 @@ export class ManufacturingAccountingServiceError extends Error {
   }
 }
 
+/** Defense in depth — never serve seed data when API mode is on. */
+function assertDemoModeOnly(): void {
+  if (isApiMode()) {
+    throw new ManufacturingAccountingServiceError(
+      'Manufacturing Accounting is disabled (feature flag). Contact Finance.',
+    )
+  }
+}
+
 const COMPANY_NAME = 'Vasant Trailers Pvt Ltd'
-const delay = () => new Promise((r) => setTimeout(r, 80 + Math.floor(Math.random() * 70)))
+const delay = async () => {
+  assertDemoModeOnly()
+  await new Promise((r) => setTimeout(r, 80 + Math.floor(Math.random() * 70)))
+}
 
 let dashboardStore = seedManufacturingCostDashboard()
 let materialConsumptionStore = seedMaterialConsumption()
@@ -593,6 +606,7 @@ export async function getManufacturingCostPrintPreview(
 // ─── Reset ────────────────────────────────────────────────────────────────────
 
 export function resetManufacturingAccountingDemo(): void {
+  assertDemoModeOnly()
   dashboardStore = seedManufacturingCostDashboard()
   materialConsumptionStore = seedMaterialConsumption()
   wipStore = seedWorkInProgress()

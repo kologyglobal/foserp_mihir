@@ -12,9 +12,12 @@ import {
 import {
   createDispute,
   getReceivableInvoices,
+  getReceivableLookups,
   ReceivablesServiceError,
   updateDispute,
 } from '@/services/accounting/receivablesService'
+import { isApiMode } from '@/config/apiConfig'
+import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { cn } from '@/utils/cn'
 
 const inputCls =
@@ -53,6 +56,7 @@ export function DisputeDrawer({
   const user = getSessionUser()
 
   const [invoiceId, setInvoiceId] = useState('')
+  const [customerId, setCustomerId] = useState('')
   const [disputeDate, setDisputeDate] = useState(today)
   const [disputeType, setDisputeType] = useState<DisputeType>('Price Difference')
   const [disputedAmount, setDisputedAmount] = useState('')
@@ -65,10 +69,19 @@ export function DisputeDrawer({
   const [resolution, setResolution] = useState('')
   const [creditNoteRequired, setCreditNoteRequired] = useState(false)
   const [collectionHold, setCollectionHold] = useState(false)
-  const [invoices, setInvoices] = useState<{ id: string; invoiceNumber: string; outstandingBalance: number }[]>([])
+  const [invoices, setInvoices] = useState<
+    {
+      id: string
+      invoiceNumber: string
+      outstandingBalance: number
+      salesOrderNumber: string | null
+      deliveryNumber: string | null
+    }[]
+  >([])
+  const [customers, setCustomers] = useState<{ id: string; code: string; name: string }[]>([])
   const [busy, setBusy] = useState(false)
 
-  const effectiveCustomerId = dispute?.customerId ?? presetCustomerId ?? ''
+  const effectiveCustomerId = dispute?.customerId ?? presetCustomerId ?? customerId
 
   useEffect(() => {
     if (!open) return
@@ -88,6 +101,7 @@ export function DisputeDrawer({
       setCollectionHold(dispute.collectionHold)
     } else {
       setInvoiceId('')
+      setCustomerId(presetCustomerId ?? '')
       setDisputeDate(today)
       setDisputeType('Price Difference')
       setDisputedAmount('')
@@ -101,7 +115,14 @@ export function DisputeDrawer({
       setCreditNoteRequired(false)
       setCollectionHold(false)
     }
-  }, [open, dispute, today, user.name])
+  }, [open, dispute, today, user.name, presetCustomerId])
+
+  useEffect(() => {
+    if (!open || isEdit || presetCustomerId) return
+    void getReceivableLookups()
+      .then((l) => setCustomers(l.customers))
+      .catch(() => setCustomers([]))
+  }, [open, isEdit, presetCustomerId])
 
   useEffect(() => {
     if (!open || !effectiveCustomerId) {
@@ -115,6 +136,8 @@ export function DisputeDrawer({
             id: i.id,
             invoiceNumber: i.invoiceNumber,
             outstandingBalance: i.outstandingBalance,
+            salesOrderNumber: i.salesOrderNumber,
+            deliveryNumber: i.deliveryNumber,
           })),
         ),
       )
@@ -159,7 +182,7 @@ export function DisputeDrawer({
           creditNoteRequired,
           collectionHold,
         })
-        notify.success('Dispute updated (demo).')
+        notify.success(isApiMode() ? 'Dispute updated.' : 'Dispute updated (demo).')
       } else {
         await createDispute({
           customerId: effectiveCustomerId,
@@ -178,7 +201,7 @@ export function DisputeDrawer({
           creditNoteRequired,
           collectionHold,
         })
-        notify.success('Dispute created (demo).')
+        notify.success(isApiMode() ? 'Dispute created.' : 'Dispute created (demo).')
       }
       onSaved?.()
       onClose()
@@ -188,6 +211,8 @@ export function DisputeDrawer({
       setBusy(false)
     }
   }
+
+  const selectedInvoice = invoices.find((invoice) => invoice.id === invoiceId)
 
   return (
     <ReceivableDrawerShell
@@ -220,7 +245,30 @@ export function DisputeDrawer({
         ) : null
       }
     >
-      {!effectiveCustomerId ? (
+      {!effectiveCustomerId && !isEdit ? (
+        <div className="space-y-4">
+          <label className={labelCls}>
+            Customer
+            <select
+              className={inputCls}
+              value={customerId}
+              onChange={(e) => {
+                setCustomerId(e.target.value)
+                setInvoiceId('')
+              }}
+              aria-required
+            >
+              <option value="">{SELECT_PLACEHOLDER}</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code ? `${c.code} · ${c.name}` : c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="text-[12px] text-erp-muted">Select a customer to load open invoices for the dispute.</p>
+        </div>
+      ) : !effectiveCustomerId ? (
         <p className="py-8 text-center text-[13px] text-erp-muted">Select a customer to manage disputes.</p>
       ) : (
         <div className="space-y-4">
@@ -229,6 +277,27 @@ export function DisputeDrawer({
               <DisputeStatusBadge status={dispute.status} />
               <span className="font-mono text-[12px] text-erp-muted">{dispute.disputeNumber}</span>
             </div>
+          ) : null}
+
+          {!isEdit && !presetCustomerId ? (
+            <label className={labelCls}>
+              Customer
+              <select
+                className={inputCls}
+                value={customerId}
+                onChange={(e) => {
+                  setCustomerId(e.target.value)
+                  setInvoiceId('')
+                }}
+              >
+                <option value="">{SELECT_PLACEHOLDER}</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code ? `${c.code} · ${c.name}` : c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           ) : null}
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -241,13 +310,20 @@ export function DisputeDrawer({
                 aria-required
                 disabled={isEdit}
               >
-                <option value="">Select invoice…</option>
+                <option value="">{SELECT_PLACEHOLDER}</option>
                 {invoices.map((i) => (
                   <option key={i.id} value={i.id}>
                     {i.invoiceNumber} · Bal ₹{i.outstandingBalance.toLocaleString('en-IN')}
                   </option>
                 ))}
               </select>
+              {selectedInvoice?.salesOrderNumber || selectedInvoice?.deliveryNumber ? (
+                <span className="mt-1 block text-[11px] font-normal text-erp-muted">
+                  {selectedInvoice.salesOrderNumber ? `Sales order ${selectedInvoice.salesOrderNumber}` : ''}
+                  {selectedInvoice.salesOrderNumber && selectedInvoice.deliveryNumber ? ' · ' : ''}
+                  {selectedInvoice.deliveryNumber ? `Dispatch ${selectedInvoice.deliveryNumber}` : ''}
+                </span>
+              ) : null}
             </label>
             <label className={labelCls}>
               Dispute date

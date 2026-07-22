@@ -74,10 +74,10 @@ export function AccountingDashboardPage() {
 
   const pendingActions = [
     pendingApproval.length > 0
-      ? { id: 'approve', label: `Approve ${pendingApproval.length} pending voucher(s)`, href: '/accounting/vouchers?status=pending_approval', priority: 'primary' as const }
+      ? { id: 'approve', label: `Approve ${pendingApproval.length} pending voucher(s)`, href: '/accounting/entries/approvals', priority: 'primary' as const }
       : null,
     approvedNotPosted.length > 0
-      ? { id: 'post', label: `Post ${approvedNotPosted.length} approved voucher(s)`, href: '/accounting/vouchers?status=approved' }
+      ? { id: 'post', label: `Post ${approvedNotPosted.length} approved voucher(s)`, href: '/accounting/entries/journals' }
       : null,
     activeReconciliation
       ? { id: 'recon', label: 'Complete bank reconciliation', href: '/accounting/bank-cash/reconciliation' }
@@ -98,7 +98,7 @@ export function AccountingDashboardPage() {
         { id: 'ar', label: 'Receivables Outstanding', value: formatCurrency(totalReceivable), icon: ArrowDownToLine, accent: 'blue', href: '/accounting/receivables' },
         { id: 'ap', label: 'Payables Outstanding', value: formatCurrency(totalPayable), icon: ArrowUpFromLine, accent: 'amber', href: '/accounting/payables' },
         { id: 'cash', label: 'Cash & Bank Balance', value: formatCurrency(cashBankBalance), icon: Wallet, accent: 'green', href: '/accounting/bank-cash' },
-        { id: 'pending', label: 'Vouchers Pending Approval', value: pendingApproval.length, icon: FileText, accent: pendingApproval.length ? 'red' : 'green', href: '/accounting/vouchers' },
+        { id: 'pending', label: 'Vouchers Pending Approval', value: pendingApproval.length, icon: FileText, accent: pendingApproval.length ? 'red' : 'green', href: '/accounting/entries/approvals' },
       ]}
       liveSections={
         pendingActions.length > 0 ? (
@@ -131,10 +131,10 @@ export function AccountingDashboardPage() {
       }
       quickActions={
         <>
-          <DynamicsCommandButton primary icon={<Plus className="h-4 w-4" />} onClick={() => navigate('/accounting/vouchers/new')}>
-            New Voucher
+          <DynamicsCommandButton primary icon={<Plus className="h-4 w-4" />} onClick={() => navigate('/accounting/entries/journals/new')}>
+            New Journal
           </DynamicsCommandButton>
-          <DynamicsCommandButton icon={<BookOpen className="h-4 w-4" />} onClick={() => navigate('/accounting/chart-of-accounts')}>
+          <DynamicsCommandButton icon={<BookOpen className="h-4 w-4" />} onClick={() => navigate('/accounting/settings/chart-of-accounts')}>
             Chart of Accounts
           </DynamicsCommandButton>
           <DynamicsCommandButton icon={<Landmark className="h-4 w-4" />} onClick={() => navigate('/accounting/bank-cash')}>
@@ -146,9 +146,9 @@ export function AccountingDashboardPage() {
         </>
       }
       kpiStrip={[
-        { label: 'Draft Vouchers', value: draftVouchers.length, tone: 'neutral', href: '/accounting/vouchers?status=draft' },
-        { label: 'Pending Approval', value: pendingApproval.length, tone: pendingApproval.length ? 'warning' : 'success', href: '/accounting/vouchers?status=pending_approval' },
-        { label: 'Approved (awaiting post)', value: approvedNotPosted.length, tone: 'primary', href: '/accounting/vouchers?status=approved' },
+        { label: 'Draft Vouchers', value: draftVouchers.length, tone: 'neutral', href: '/accounting/entries/journals' },
+        { label: 'Pending Approval', value: pendingApproval.length, tone: pendingApproval.length ? 'warning' : 'success', href: '/accounting/entries/approvals' },
+        { label: 'Approved (awaiting post)', value: approvedNotPosted.length, tone: 'primary', href: '/accounting/entries/journals' },
         { label: 'Overdue Customers', value: overdueReceivables.length, tone: overdueReceivables.length ? 'critical' : 'success', href: '/accounting/receivables/ageing' },
         { label: 'Open Period Tasks', value: openTasks, tone: openTasks ? 'warning' : 'success', href: '/accounting/period-close' },
       ]}
@@ -230,7 +230,7 @@ export function AccountingDashboardPage() {
             <tbody>
               {recentVouchers.map((v) => (
                 <tr key={v.id}>
-                  <td><TableLink to={`/accounting/vouchers/${v.id}`}>{v.voucherNo}</TableLink></td>
+                  <td><TableLink to={`/accounting/ledger-entries/voucher/${v.id}`}>{v.voucherNo}</TableLink></td>
                   <td>{VOUCHER_TYPE_LABELS[v.voucherType]}</td>
                   <td>{formatDate(v.voucherDate)}</td>
                   <td><AccountingStatusBadge status={v.status} /></td>

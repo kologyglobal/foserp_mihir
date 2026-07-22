@@ -9,14 +9,14 @@ import type {
 } from '../../types/journals'
 import * as api from '../api/financeApi'
 import { getJournalDemoState, seedDemoJournalIfEmpty } from '../../store/journalDemoStore'
-import { resolveLegalEntityId } from './financeApiBridge'
+import { ensureLegalEntityId } from './financeApiBridge'
 
 function unwrap<T>(res: { data: T }): T {
   return res.data
 }
 
 export async function listJournals(filters?: Partial<JournalListFilters>): Promise<Journal[]> {
-  const legalEntityId = resolveLegalEntityId(filters?.legalEntityId)
+  const legalEntityId = await ensureLegalEntityId(filters?.legalEntityId)
   if (isApiMode()) return unwrap(await api.listJournals({ legalEntityId, ...filters }))
   seedDemoJournalIfEmpty(legalEntityId)
   return getJournalDemoState().listJournals({ legalEntityId, ...filters })
@@ -62,6 +62,11 @@ export async function getJournalAudit(id: string): Promise<JournalAuditEntry[]> 
 export async function postJournal(id: string) {
   if (isApiMode()) return unwrap(await api.postJournal(id))
   return getJournalDemoState().postJournal(id)
+}
+
+export async function reverseJournal(id: string, reason: string) {
+  if (isApiMode()) return unwrap(await api.reverseJournal(id, reason))
+  return getJournalDemoState().reverseJournal(id, reason)
 }
 
 export async function getJournalLedger(id: string) {

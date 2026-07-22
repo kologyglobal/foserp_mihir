@@ -1,0 +1,6 @@
+export { TransferListPage } from './pages/TransferListPage'
+export { TransferCreatePage } from './pages/TransferCreatePage'
+export { TransferEditPage } from './pages/TransferEditPage'
+export { TransferDetailPage } from './pages/TransferDetailPage'
+export { TransferInTransitPage } from './pages/TransferInTransitPage'
+export { TransferApprovalsPage } from './pages/TransferApprovalsPage'

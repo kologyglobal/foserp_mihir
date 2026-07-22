@@ -87,7 +87,7 @@ export function LedgerEntryDetailPage() {
         onOpenVoucher={() =>
           entry?.voucherId
             ? navigate(`/accounting/ledger-entries/voucher/${entry.voucherId}`)
-            : navigate('/accounting/vouchers')
+            : navigate('/accounting/entries/journals')
         }
         onOpenAccount={() =>
           entry && navigate(`/accounting/ledger-entries/account/${entry.account.accountId}`)

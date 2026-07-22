@@ -84,6 +84,41 @@ export class CustomerReceiptPostingNotAllowedError extends CustomerReceiptPostin
   }
 }
 
+export class CustomerReceiptReversalNotAllowedError extends CustomerReceiptPostingError {
+  constructor(message = 'Missing permission: finance.ar.receipt.reverse') {
+    super(403, message, 'CUSTOMER_RECEIPT_REVERSAL_NOT_ALLOWED')
+    this.name = 'CustomerReceiptReversalNotAllowedError'
+  }
+}
+
+export class CustomerReceiptNotPostedForReversalError extends CustomerReceiptPostingError {
+  constructor(message = 'Only POSTED receipts can be reversed') {
+    super(422, message, 'CUSTOMER_RECEIPT_NOT_POSTED_FOR_REVERSAL')
+    this.name = 'CustomerReceiptNotPostedForReversalError'
+  }
+}
+
+export class CustomerReceiptAllocationsMustBeReversedError extends CustomerReceiptPostingError {
+  constructor(message = 'All posted allocations must be reversed before reversing the receipt') {
+    super(422, message, 'CUSTOMER_RECEIPT_ALLOCATIONS_MUST_BE_REVERSED')
+    this.name = 'CustomerReceiptAllocationsMustBeReversedError'
+  }
+}
+
+export class CustomerReceiptReversalCreditNotClearError extends CustomerReceiptPostingError {
+  constructor(message = 'Receipt credit open item must be fully unallocated before reversal') {
+    super(422, message, 'CUSTOMER_RECEIPT_REVERSAL_CREDIT_NOT_CLEAR')
+    this.name = 'CustomerReceiptReversalCreditNotClearError'
+  }
+}
+
+export class CustomerReceiptReversalEligibilityError extends CustomerReceiptPostingError {
+  constructor(message: string, errors?: Array<{ field: string; message: string }>) {
+    super(422, message, 'CUSTOMER_RECEIPT_REVERSAL_NOT_ELIGIBLE', errors)
+    this.name = 'CustomerReceiptReversalEligibilityError'
+  }
+}
+
 export function mapPostingErrorToCustomerReceiptError(error: unknown): never {
   if (error instanceof CustomerReceiptPostingError || error instanceof CustomerReceiptConcurrentPostError) {
     throw error

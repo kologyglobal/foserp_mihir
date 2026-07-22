@@ -9,6 +9,7 @@ import {
   cancelSalesInvoiceSchema,
   createSalesInvoiceSchema,
   listSalesInvoicesQuerySchema,
+  reverseSalesInvoiceSchema,
   updateSalesInvoiceSchema,
 } from './sales-invoice.schemas.js'
 import * as controller from './sales-invoice.controller.js'
@@ -67,6 +68,13 @@ router.post(
   validateParams(uuidParamSchema),
   requirePermission('finance.ar.invoice.post'),
   controller.postSalesInvoice,
+)
+router.post(
+  '/:id/reverse',
+  validateParams(uuidParamSchema),
+  requirePermission('finance.ar.invoice.reverse'),
+  validateBody(reverseSalesInvoiceSchema),
+  controller.reverseSalesInvoice,
 )
 
 export default router

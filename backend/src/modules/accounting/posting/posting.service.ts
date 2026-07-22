@@ -179,6 +179,16 @@ export async function executePostingTransaction(
 
   return prisma.$transaction(
     async (tx) => {
+      if (options?.beforeAccounting) {
+        await options.beforeAccounting({
+          tx,
+          context,
+          eventId,
+          validated,
+          voucherNumber,
+        })
+      }
+
       const voucher = await tx.accountingVoucher.create({
         data: {
           tenantId: context.tenantId,

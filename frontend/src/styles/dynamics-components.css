@@ -3933,23 +3933,34 @@ a.crm-companies-table__name:hover {
 
 .crm-opp-view-toggle {
   display: inline-flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 10px;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border-radius: 8px;
   border: 1px solid var(--erp-border);
   background: var(--erp-surface-alt);
+  flex-shrink: 0;
 }
 
 .crm-opp-view-toggle button {
   display: inline-flex;
   align-items: center;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 12px;
+  gap: 4px;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
   font-weight: 600;
+  line-height: 1.2;
   color: var(--erp-muted);
   transition: background 0.15s, color 0.15s;
+}
+
+.crm-opp-view-toggle__icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
 }
 
 .crm-opp-view-toggle button:hover {
@@ -3960,6 +3971,16 @@ a.crm-companies-table__name:hover {
   background: var(--erp-primary);
   color: #fff;
   box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
+}
+
+@media (max-width: 1280px) {
+  .crm-opp-view-toggle__label {
+    display: none;
+  }
+
+  .crm-opp-view-toggle button {
+    padding: 5px 7px;
+  }
 }
 
 .crm-opp-workspace {
@@ -10551,13 +10572,17 @@ a.crm-companies-table__name:hover {
 
 /* When factbox is open, keep field grids to max 2 columns */
 .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-3,
-.erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-3 {
+.erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-3,
+.erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-4,
+.erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-4 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 @media (max-width: 767px) {
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-3,
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-3,
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-4,
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-4,
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-2 {
     grid-template-columns: 1fr;
   }
@@ -11188,6 +11213,57 @@ a.crm-companies-table__name:hover {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
+}
+
+/* Lead Quick Entry — Company full-width; Contact / Ownership / Stage rows in equal 3-col grid.
+   Global factbox / tablet rules collapse cols-3 → 2; override so lead Quick Entry stays
+   3 columns on desktop even when Smart Context is open. */
+.crm-lead-form-page .crm-lead-quick-entry .erp-form-grid--cols-3 {
+  column-gap: 16px;
+  row-gap: 16px;
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .crm-lead-form-page .crm-lead-quick-entry .erp-form-grid--cols-3,
+  .crm-lead-form-page .erp-card-form-page__layout-wrap[data-factbox-open="true"] .crm-lead-quick-entry .erp-form-grid--cols-3,
+  .crm-lead-form-page .erp-card-form-page__layout-wrap[data-factbox-open="true"] .crm-lead-quick-entry .erp-card-section__grid--cols-3,
+  .enterprise-workspace.crm-lead-form-page .crm-lead-quick-entry .erp-form-grid--cols-3,
+  .enterprise-workspace--dynamics-form.crm-lead-form-page .crm-lead-quick-entry .erp-form-grid--cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1099px) {
+  .crm-lead-form-page .crm-lead-quick-entry .erp-form-grid--cols-3,
+  .crm-lead-form-page .erp-card-form-page__layout-wrap[data-factbox-open="true"] .crm-lead-quick-entry .erp-form-grid--cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .crm-lead-form-page .crm-lead-quick-entry .erp-form-grid--cols-3,
+  .crm-lead-form-page .erp-card-form-page__layout-wrap[data-factbox-open="true"] .crm-lead-quick-entry .erp-form-grid--cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.crm-lead-form-page .crm-lead-quick-entry .erp-field-row {
+  width: 100%;
+  min-width: 0;
+}
+
+.crm-lead-form-page .crm-lead-quick-entry .erp-field-row:not(.erp-field-row--horizontal) .erp-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--erp-muted, #605e5c);
+}
+
+.crm-lead-form-page .crm-lead-quick-entry .erp-field-row__control-wrap,
+.crm-lead-form-page .crm-lead-quick-entry .erp-field-control,
+.crm-lead-form-page .crm-lead-quick-entry .crm-company-prospect {
+  width: 100%;
   min-width: 0;
 }
 
@@ -13522,7 +13598,7 @@ a.crm-companies-table__name:hover {
 .erp-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 320;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -16139,7 +16215,7 @@ a.crm-companies-table__name:hover {
 .erp-confirm-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 420;
   display: flex;
   align-items: center;
   justify-content: center;

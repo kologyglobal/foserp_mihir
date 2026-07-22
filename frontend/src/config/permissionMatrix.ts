@@ -78,6 +78,8 @@ export const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: Permissio
   { prefix: '/production', permission: 'production.view', pageName: 'Production' },
   { prefix: '/quality', permission: 'quality.view', pageName: 'Quality' },
   { prefix: '/dispatch', permission: 'dispatch.view', pageName: 'Dispatch' },
+  // Gate & Security — route-level shell; fine-grained gate.* checks live in utils/permissions/gate.ts
+  { prefix: '/gate', permission: 'dispatch.view', pageName: 'Gate & Security' },
   { prefix: '/sales', permission: 'sales.view', pageName: 'Sales' },
   // CRM shell: canRoute uses canAccessCrmShell / JWT crm.*.view — matrix key only for AccessDenied label in demo.
   { prefix: '/crm', permission: 'sales.view', pageName: 'CRM' },

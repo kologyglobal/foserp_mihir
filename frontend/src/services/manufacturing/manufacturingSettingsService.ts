@@ -12,10 +12,17 @@ import {
   type ManufacturingSavedView,
   type ManufacturingSettings,
 } from '../../types/manufacturingSettings'
+import { isApiMode } from '../../config/apiConfig'
+import {
+  getManufacturingSettingsApi,
+  putManufacturingSettingsApi,
+} from '../api/manufacturingSettingsApi'
 
 const delay = (ms = 50) => new Promise((r) => setTimeout(r, ms))
 
 let settings: ManufacturingSettings = structuredClone(DEFAULT_MANUFACTURING_SETTINGS)
+let apiVersion: number | undefined
+let apiSettings: ManufacturingSettings | undefined
 let savedViews: ManufacturingSavedView[] = [
   {
     id: 'view-wo-open',
@@ -28,6 +35,12 @@ let savedViews: ManufacturingSavedView[] = [
 ]
 
 export async function getManufacturingSettings(): Promise<ManufacturingSettings> {
+  if (isApiMode()) {
+    const response = await getManufacturingSettingsApi()
+    apiVersion = response.data.version
+    apiSettings = structuredClone(response.data.payloadJson)
+    return structuredClone(apiSettings)
+  }
   await delay()
   return structuredClone(settings)
 }
@@ -36,9 +49,29 @@ export function isManualMaterialIssueEnabled(): boolean {
   return settings.materialConsumption.manualMaterialIssue
 }
 
-export async function updateManufacturingSettingsDemo(
+export async function updateManufacturingSettings(
   patch: Partial<ManufacturingSettings>,
 ): Promise<{ ok: boolean; settings: ManufacturingSettings }> {
+  if (isApiMode()) {
+    const current = apiSettings ?? structuredClone(DEFAULT_MANUFACTURING_SETTINGS)
+    const next = {
+      ...current,
+      ...patch,
+      general: { ...current.general, ...patch.general },
+      numberSeries: { ...current.numberSeries, ...patch.numberSeries },
+      materialConsumption: { ...current.materialConsumption, ...patch.materialConsumption },
+      operations: { ...current.operations, ...patch.operations },
+      quality: { ...current.quality, ...patch.quality },
+      jobWork: { ...current.jobWork, ...patch.jobWork },
+      costing: { ...current.costing, ...patch.costing },
+      approvals: { ...current.approvals, ...patch.approvals },
+      advanced: { ...current.advanced, ...patch.advanced },
+    }
+    const response = await putManufacturingSettingsApi(next, apiVersion)
+    apiVersion = response.data.version
+    apiSettings = structuredClone(response.data.payloadJson)
+    return { ok: true, settings: structuredClone(apiSettings) }
+  }
   await delay()
   settings = {
     ...settings,
@@ -55,6 +88,9 @@ export async function updateManufacturingSettingsDemo(
   }
   return { ok: true, settings: structuredClone(settings) }
 }
+
+/** @deprecated Use updateManufacturingSettings. */
+export const updateManufacturingSettingsDemo = updateManufacturingSettings
 
 export async function getManufacturingSavedViews(
   scope?: ManufacturingSavedView['scope'],

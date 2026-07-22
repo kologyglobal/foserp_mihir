@@ -50,7 +50,7 @@ export type {
 export { QUOTATION_STATUS_FLOW } from './quotation'
 
 export const LEAD_STAGE_FLOW: Record<LeadStage, LeadStage[]> = {
-  new: ['contacted', 'requirement_collected', 'not_qualified', 'closed'],
+  new: ['contacted', 'requirement_collected', 'qualified', 'not_qualified', 'closed'],
   contacted: ['requirement_collected', 'qualified', 'not_qualified', 'closed'],
   requirement_collected: ['qualified', 'not_qualified', 'closed'],
   qualified: ['converted_to_opportunity', 'not_qualified', 'closed'],

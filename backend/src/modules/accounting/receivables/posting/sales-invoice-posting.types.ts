@@ -24,3 +24,23 @@ export interface SalesInvoicePostingValidationContext {
 export function buildSalesInvoicePostEventKey(invoiceId: string): string {
   return `SALES_INVOICE_POST:${invoiceId}:V1`
 }
+
+export function buildSalesInvoiceReverseEventKey(invoiceId: string): string {
+  return `SALES_INVOICE_REVERSE:${invoiceId}:V1`
+}
+
+export interface ReverseSalesInvoiceInput {
+  tenantId: string
+  invoiceId: string
+  reason: string
+  userId: string
+  ipAddress?: string | null
+  userAgent?: string | null
+}
+
+export interface ReverseSalesInvoiceResult {
+  invoice: SalesInvoiceDto
+  posting: PostingResult
+  reversalVoucherId: string
+  idempotentReplay: boolean
+}

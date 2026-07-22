@@ -1,6 +1,7 @@
 /**
  * Dual-mode purchase facade.
- * `VITE_USE_API=true` → backend is source of truth for PR + Planning.
+ * `VITE_USE_API=true` → backend is source of truth for PR, Planning, RFQ flow, PO, GRN,
+ * Purchase Invoice, Quality Inspection, and Purchase Return.
  * Demo mode keeps in-memory `purchaseService` behavior.
  * Approval / conversion / PO creation never use optimistic local updates in API mode.
  */
@@ -42,7 +43,21 @@ import type {
   GoodsReceiptNote,
   GrnInput,
   GrnListRow,
+  PurchaseInvoice,
+  PurchaseInvoiceInput,
+  PurchaseInvoiceListRow,
+  InvoiceMatchingResult,
+  QualityInspection,
+  QualityInspectionInput,
+  QualityInspectionListRow,
+  QualityInspectionParameter,
+  PurchaseReturn,
+  PurchaseReturnInput,
+  PurchaseReturnListRow,
+  PurchaseReturnOrigin,
+  PurchaseReturnReason,
 } from '../../types/purchaseDomain'
+import { INVOICE_MATCHING_RESULT_STATUS_LABELS } from '../../types/purchaseDomain'
 import { ApiError } from '../api/apiErrors'
 import * as demo from './purchaseService'
 import { PurchaseServiceError, type PurchaseOrderSeriesOption } from './purchaseService'
@@ -54,6 +69,9 @@ import * as vqApi from './vendorQuotationApi'
 import * as comparisonApi from './comparisonApi'
 import * as poApi from './purchaseOrderApi'
 import * as grnApi from './goodsReceiptApi'
+import * as invoiceApi from './purchaseInvoiceApi'
+import * as qiApi from './qualityInspectionApi'
+import * as returnApi from './purchaseReturnApi'
 import * as setupApi from '../api/purchaseSetupApi'
 import {
   formatPurchaseApiError,
@@ -76,6 +94,15 @@ import {
   mapDomainRfqInputToApiPayload,
   mapDomainVendorQuotationInputToApiPayload,
   mapPlanningPatchToApi,
+  mapApiPurchaseInvoiceToDomain,
+  mapApiPurchaseInvoiceToListRow,
+  mapDomainPurchaseInvoiceInputToApiPayload,
+  mapApiQualityInspectionToDomain,
+  mapApiQualityInspectionToListRow,
+  mapDomainQualityInspectionInputToApiPayload,
+  mapApiPurchaseReturnToDomain,
+  mapApiPurchaseReturnToListRow,
+  mapDomainPurchaseReturnInputToApiPayload,
 } from './purchaseMappers'
 import type { PlanningSheetSummary } from './purchaseApiTypes'
 
@@ -175,14 +202,22 @@ export async function previewNextGoodsReceiptNumber(): Promise<string> {
   }
 }
 
-/** Peek next invoice number (demo-only; no API series yet). */
+/** Peek next invoice number. No backend preview endpoint — number is allocated on save. */
 export async function previewNextPurchaseInvoiceNumber(): Promise<string> {
-  return demo.previewNextPurchaseInvoiceNumber()
+  if (!isApiMode()) return demo.previewNextPurchaseInvoiceNumber()
+  throw new PurchaseServiceError(
+    'PURCHASE_API_NOT_IMPLEMENTED',
+    'Invoice number is allocated on save.',
+  )
 }
 
-/** Peek next return number (demo-only; no API series yet). */
+/** Peek next return number. No backend preview endpoint — number is allocated on save. */
 export async function previewNextPurchaseReturnNumber(): Promise<string> {
-  return demo.previewNextPurchaseReturnNumber()
+  if (!isApiMode()) return demo.previewNextPurchaseReturnNumber()
+  throw new PurchaseServiceError(
+    'PURCHASE_API_NOT_IMPLEMENTED',
+    'Return number is allocated on save.',
+  )
 }
 
 export async function getPurchaseRequisitionListSummary(): Promise<{
@@ -936,11 +971,30 @@ export async function getGrnList(): Promise<GrnListRow[]> {
   }
 }
 
+async function enrichGrnWithQualityInspectionId(
+  grn: GoodsReceiptNote,
+): Promise<GoodsReceiptNote> {
+  if (!grn.inspectionRequired || grn.qualityInspectionId) return grn
+  try {
+    const res = await qiApi.listQualityInspectionsApi({
+      goodsReceiptId: grn.id,
+      page: 1,
+      limit: 1,
+      sortOrder: 'desc',
+    })
+    const linked = res.data[0]
+    if (linked) return { ...grn, qualityInspectionId: linked.id }
+  } catch {
+    // Non-fatal — GRN detail can still link via grnId filter on the QI register.
+  }
+  return grn
+}
+
 export async function getGRNById(id: string): Promise<GoodsReceiptNote | null> {
   if (!isApiMode()) return demo.getGRNById(id)
   try {
     const res = await grnApi.getGoodsReceiptApi(id)
-    return mapApiGoodsReceiptToDomain(res.data)
+    return enrichGrnWithQualityInspectionId(mapApiGoodsReceiptToDomain(res.data))
   } catch (err) {
     if (isBackendMissingError(err)) return null
     const { code } = formatPurchaseApiError(err)
@@ -985,10 +1039,43 @@ export async function submitGRN(id: string): Promise<GoodsReceiptNote> {
   if (!isApiMode()) return demo.submitGRN(id)
   try {
     const res = await grnApi.submitGoodsReceiptApi(id, {})
-    return mapApiGoodsReceiptToDomain(res.data)
+    let grn = mapApiGoodsReceiptToDomain(res.data)
+    if (grn.inspectionRequired && !grn.qualityInspectionId) {
+      const qcLine =
+        grn.lines.find((l) => l.inspectionStatus === 'pending' || l.pendingInspectionQty > 0)
+        ?? grn.lines[0]
+      if (qcLine) {
+        try {
+          const qi = await createQualityInspection({
+            goodsReceiptId: grn.id,
+            goodsReceiptLineId: qcLine.id,
+            sampleQty: Math.min(5, qcLine.receivedQty || qcLine.pendingInspectionQty || 1),
+          })
+          grn = { ...grn, qualityInspectionId: qi.id }
+        } catch (err) {
+          grn = await enrichGrnWithQualityInspectionId(grn)
+          if (!grn.qualityInspectionId) throwApi(err)
+        }
+      }
+    }
+    return grn
   } catch (err) {
     throwApi(err)
   }
+}
+
+/** Demo posts stock locally; API posting is driven by GRN submit / QI completion on the backend. */
+export async function postGRN(id: string): Promise<GoodsReceiptNote> {
+  if (!isApiMode()) return demo.postGRN(id)
+  const grn = await getGRNById(id)
+  if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${id}`)
+  if (grn.status === 'draft') {
+    return submitGRN(id)
+  }
+  if (grn.status === 'posted') {
+    return { ...grn, inventoryPostDeferred: true }
+  }
+  return { ...grn, inventoryPostDeferred: true }
 }
 
 export async function cancelGRN(id: string, remarks = ''): Promise<GoodsReceiptNote> {
@@ -1555,17 +1642,20 @@ export {
 
 /**
  * Dashboard in API mode uses live PR + RFQ only.
- * PO / GRN / invoice backends are not mounted yet — those KPIs stay at zero (no demo seed).
+ * API mode: PR/RFQ/PO/GRN/invoice KPIs from live lists (client-side aggregates; no dedicated BE dashboard API).
  */
 export async function getPurchaseDashboard(
   filters: PurchaseDashboardFilters = {},
 ): Promise<PurchaseDashboardData> {
   if (!isApiMode()) return demo.getPurchaseDashboard(filters)
 
-  const [requisitions, rfqs, warehouses] = await Promise.all([
+  const [requisitions, rfqs, warehouses, orders, grns, invoices] = await Promise.all([
     getPurchaseRequisitions(),
     getRFQs(),
     getPurchaseWarehouses(),
+    getPurchaseOrders().catch(() => [] as Awaited<ReturnType<typeof getPurchaseOrders>>),
+    getGRNs().catch(() => [] as Awaited<ReturnType<typeof getGRNs>>),
+    getPurchaseInvoices().catch(() => [] as Awaited<ReturnType<typeof getPurchaseInvoices>>),
   ])
 
   const dateFrom = filters.dateFrom
@@ -1591,33 +1681,66 @@ export async function getPurchaseDashboard(
   const pendingPrApprovals = prs.filter((r) => r.status === 'pending_approval').length
   const openRfqs = filteredRfqs.filter((r) => !['closed', 'cancelled'].includes(r.status)).length
 
+  const today = new Date().toISOString().slice(0, 10)
+  const monthPrefix = today.slice(0, 7)
+  const ordersInRange = orders.filter((o) => inDateRange(o.documentDate))
+  const purchaseOrdersThisMonth = ordersInRange.filter((o) => o.documentDate.startsWith(monthPrefix)).length
+  const pendingDeliveries = ordersInRange.filter((o) =>
+    ['released', 'partially_received', 'confirmed', 'sent'].includes(o.status),
+  ).length
+  const pendingGrns = grns.filter((g) =>
+    ['draft', 'submitted', 'qc_pending', 'receiving_completed'].includes(g.status),
+  ).length
+  const pendingPurchaseInvoices = invoices.filter((inv) =>
+    ['draft', 'pending_approval', 'approved', 'matched', 'partially_matched'].includes(inv.status),
+  ).length
+  const monthlyPurchaseValue = ordersInRange
+    .filter((o) => o.documentDate.startsWith(monthPrefix))
+    .reduce((sum, o) => sum + (Number(o.totalAmount ?? 0) || 0), 0)
+
   const emptyPoStatus = [
-    { key: 'released', label: 'Released', count: 0, href: '/purchase/orders?status=released' },
+    {
+      key: 'released',
+      label: 'Released',
+      count: ordersInRange.filter((o) => o.status === 'released').length,
+      href: '/purchase/orders?status=released',
+    },
     {
       key: 'partially_received',
       label: 'Partially Received',
-      count: 0,
+      count: ordersInRange.filter((o) => o.status === 'partially_received').length,
       href: '/purchase/orders?status=partially_received',
     },
     {
       key: 'fully_received',
       label: 'Fully Received',
-      count: 0,
+      count: ordersInRange.filter((o) => o.status === 'fully_received').length,
       href: '/purchase/orders?status=fully_received',
     },
-    { key: 'overdue', label: 'Overdue', count: 0, href: '/purchase/orders?status=overdue' },
+    {
+      key: 'overdue',
+      label: 'Overdue',
+      count: ordersInRange.filter((o) => {
+        if (['closed', 'cancelled', 'fully_received', 'invoiced'].includes(o.status)) return false
+        if (!['released', 'partially_received', 'approved'].includes(o.status)) return false
+        return Boolean(o.expectedDeliveryDate && o.expectedDeliveryDate < today)
+      }).length,
+      href: '/purchase/orders?status=overdue',
+    },
   ]
 
-  const today = new Date().toISOString().slice(0, 10)
   const monthlyTrend = []
   for (let i = 5; i >= 0; i -= 1) {
     const d = new Date(`${today}T00:00:00`)
     d.setMonth(d.getMonth() - i)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const value = orders
+      .filter((o) => o.documentDate.startsWith(key))
+      .reduce((sum, o) => sum + (Number(o.totalAmount ?? 0) || 0), 0)
     monthlyTrend.push({
       month: key,
       label: d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }),
-      value: 0,
+      value,
     })
   }
 
@@ -1626,11 +1749,11 @@ export async function getPurchaseDashboard(
       openRequisitions,
       pendingPrApprovals,
       openRfqs,
-      purchaseOrdersThisMonth: 0,
-      pendingDeliveries: 0,
-      pendingGrns: 0,
-      pendingPurchaseInvoices: 0,
-      monthlyPurchaseValue: 0,
+      purchaseOrdersThisMonth,
+      pendingDeliveries,
+      pendingGrns,
+      pendingPurchaseInvoices,
+      monthlyPurchaseValue,
     },
     kpiHrefs: {
       openRequisitions: '/purchase/requisitions',
@@ -2223,4 +2346,708 @@ export async function updatePurchasePlantSetup(
   } catch (err) {
     throwApi(err)
   }
+}
+
+function notSupportedInApiMode(feature: string): never {
+  throw new PurchaseServiceError(
+    'PURCHASE_API_NOT_IMPLEMENTED',
+    `${feature} is not available in API mode yet.`,
+  )
+}
+
+/* ─── Purchase Invoices ─── */
+
+export async function getPurchaseInvoices(): Promise<PurchaseInvoice[]> {
+  if (!isApiMode()) return demo.getPurchaseInvoices()
+  try {
+    const res = await invoiceApi.listPurchaseInvoicesApi({ page: 1, limit: 100, sortOrder: 'desc' })
+    return res.data.map(mapApiPurchaseInvoiceToDomain)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function getPurchaseInvoiceList(): Promise<PurchaseInvoiceListRow[]> {
+  if (!isApiMode()) return demo.getPurchaseInvoiceList()
+  try {
+    const res = await invoiceApi.listPurchaseInvoicesApi({ page: 1, limit: 100, sortOrder: 'desc' })
+    return res.data.map(mapApiPurchaseInvoiceToListRow)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function getPurchaseInvoiceById(id: string): Promise<PurchaseInvoice | null> {
+  if (!isApiMode()) return demo.getPurchaseInvoiceById(id)
+  try {
+    const res = await invoiceApi.getPurchaseInvoiceApi(id)
+    return mapApiPurchaseInvoiceToDomain(res.data)
+  } catch (err) {
+    if (isBackendMissingError(err)) return null
+    const { code } = formatPurchaseApiError(err)
+    if (code === 'PURCHASE_INVOICE_NOT_FOUND' || code === 'NOT_FOUND' || code === 'HTTP_404') {
+      return null
+    }
+    throwApi(err)
+  }
+}
+
+export async function createPurchaseInvoice(input: PurchaseInvoiceInput): Promise<PurchaseInvoice> {
+  if (!isApiMode()) return demo.createPurchaseInvoice(input)
+  try {
+    const res = await invoiceApi.createPurchaseInvoiceApi(
+      mapDomainPurchaseInvoiceInputToApiPayload(input),
+    )
+    return mapApiPurchaseInvoiceToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function createDirectPurchaseInvoice(
+  input: PurchaseInvoiceInput,
+): Promise<PurchaseInvoice> {
+  if (!isApiMode()) return demo.createDirectPurchaseInvoice(input)
+  return createPurchaseInvoice({ ...input, origin: 'direct' })
+}
+
+export async function createPurchaseInvoiceFromPo(purchaseOrderId: string): Promise<PurchaseInvoice> {
+  if (!isApiMode()) return demo.createPurchaseInvoiceFromPo(purchaseOrderId)
+  const po = await getPurchaseOrderById(purchaseOrderId)
+  if (!po) throw new PurchaseServiceError('PO_NOT_FOUND', `PO not found: ${purchaseOrderId}`)
+  return createPurchaseInvoice({
+    vendorId: po.vendor.id,
+    vendorInvoiceNumber: '',
+    vendorInvoiceDate: new Date().toISOString().slice(0, 10),
+    origin: 'purchase_order',
+    purchaseOrderId: po.id,
+    placeOfSupply: po.placeOfSupply || po.vendor.state || '',
+    lines: po.lines
+      .filter((l) => l.lineStatus !== 'cancelled')
+      .map((l) => ({
+        itemId: l.itemId,
+        quantity: l.quantity,
+        rate: l.rate,
+        purchaseOrderLineId: l.id,
+        description: l.description || l.itemName,
+        gstRatePct: l.gstRatePct,
+      })),
+  })
+}
+
+export async function createPurchaseInvoiceFromGrn(goodsReceiptId: string): Promise<PurchaseInvoice> {
+  if (!isApiMode()) return demo.createPurchaseInvoiceFromGrn(goodsReceiptId)
+  const grn = await getGRNById(goodsReceiptId)
+  if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${goodsReceiptId}`)
+  return createPurchaseInvoice({
+    vendorId: grn.vendor.id,
+    vendorInvoiceNumber: '',
+    vendorInvoiceDate: new Date().toISOString().slice(0, 10),
+    origin: 'goods_receipt',
+    purchaseOrderId: grn.purchaseOrderId,
+    goodsReceiptId: grn.id,
+    paymentTerms: grn.paymentTerms,
+    lines: grn.lines.map((l) => ({
+      itemId: l.itemId,
+      quantity: l.acceptedQty || l.receivedQty,
+      rate: l.rate,
+      purchaseOrderLineId: l.purchaseOrderLineId,
+      goodsReceiptLineId: l.id,
+      description: l.description || l.itemName,
+    })),
+  })
+}
+
+export async function createPurchaseInvoiceFromServicePo(
+  purchaseOrderId: string,
+): Promise<PurchaseInvoice> {
+  if (!isApiMode()) return demo.createPurchaseInvoiceFromServicePo(purchaseOrderId)
+  return createPurchaseInvoiceFromPo(purchaseOrderId)
+}
+
+export async function updatePurchaseInvoice(
+  id: string,
+  input: PurchaseInvoiceInput,
+): Promise<PurchaseInvoice> {
+  if (!isApiMode()) return demo.updatePurchaseInvoice(id, input)
+  try {
+    const res = await invoiceApi.updatePurchaseInvoiceApi(
+      id,
+      mapDomainPurchaseInvoiceInputToApiPayload(input),
+    )
+    return mapApiPurchaseInvoiceToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+/**
+ * API mode has no standalone matching computation — matching happens on submit.
+ * Synthesise a result from the persisted header so the detail page can render.
+ */
+export async function computeInvoiceMatching(id: string): Promise<InvoiceMatchingResult> {
+  if (!isApiMode()) return demo.computeInvoiceMatching(id)
+  const inv = await getPurchaseInvoiceById(id)
+  if (!inv) throw new PurchaseServiceError('INV_NOT_FOUND', `Invoice not found: ${id}`)
+  const overallStatus = inv.matchingResultStatus
+  return {
+    overallStatus,
+    overallStatusLabel: INVOICE_MATCHING_RESULT_STATUS_LABELS[overallStatus],
+    exceedsTolerance: false,
+    isDuplicateVendorInvoice: false,
+    missingGrn: !inv.goodsReceiptId,
+    lines: inv.lines.map((l) => ({
+      lineNo: l.lineNo,
+      itemCode: l.itemCode,
+      itemName: l.itemName,
+      poQty: null,
+      grnReceivedQty: null,
+      invoiceQty: l.quantity,
+      poRate: null,
+      invoiceRate: l.rate,
+      poTaxPct: null,
+      invoiceTaxPct: l.gstRatePct,
+      poLineTotal: null,
+      invoiceLineTotal: l.lineTotal,
+      flags: [],
+      withinTolerance: true,
+    })),
+    summary: {
+      poQty: 0,
+      grnQty: 0,
+      invoiceQty: inv.lines.reduce((s, l) => s + l.quantity, 0),
+      poTotal: 0,
+      invoiceTotal: inv.totalAmount,
+      poTax: 0,
+      invoiceTax: inv.cgst + inv.sgst + inv.igst,
+    },
+    tolerancesApplied: {
+      requirePoMatch: false,
+      requireGrnMatch: false,
+      quantityTolerancePct: 0,
+      rateTolerancePct: 0,
+      amountToleranceInr: 0,
+      amountTolerancePct: 0,
+      taxToleranceInr: 0,
+      taxTolerancePct: 0,
+      allowAuthorizedOverride: true,
+    },
+  }
+}
+
+/** API mode: verification is part of submit — moves the draft into approval with matching applied. */
+export async function verifyPurchaseInvoice(id: string): Promise<PurchaseInvoice> {
+  if (!isApiMode()) return demo.verifyPurchaseInvoice(id)
+  try {
+    const res = await invoiceApi.submitPurchaseInvoiceApi(id, {})
+    return mapApiPurchaseInvoiceToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function submitPurchaseInvoiceForApproval(id: string): Promise<PurchaseInvoice> {
+  if (!isApiMode()) return demo.submitPurchaseInvoiceForApproval(id)
+  try {
+    const res = await invoiceApi.submitPurchaseInvoiceApi(id, {})
+    return mapApiPurchaseInvoiceToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function approvePurchaseInvoice(id: string, remarks?: string): Promise<PurchaseInvoice> {
+  if (!isApiMode()) return demo.approvePurchaseInvoice(id, remarks)
+  try {
+    const res = await invoiceApi.approvePurchaseInvoiceApi(id, remarks ? { remarks } : {})
+    return mapApiPurchaseInvoiceToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function rejectPurchaseInvoice(id: string, remarks: string): Promise<PurchaseInvoice> {
+  if (!isApiMode()) return demo.rejectPurchaseInvoice(id, remarks)
+  try {
+    const res = await invoiceApi.rejectPurchaseInvoiceApi(id, remarks ? { remarks } : {})
+    return mapApiPurchaseInvoiceToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function holdPurchaseInvoice(id: string, reason: string): Promise<PurchaseInvoice> {
+  if (!isApiMode()) return demo.holdPurchaseInvoice(id, reason)
+  notSupportedInApiMode('Invoice hold')
+}
+
+export async function approveInvoiceMatchingException(
+  id: string,
+  remarks?: string,
+): Promise<PurchaseInvoice> {
+  if (!isApiMode()) return demo.approveInvoiceMatchingException(id, remarks)
+  notSupportedInApiMode('Matching exception approval (use authorized override on submit)')
+}
+
+export async function postPurchaseInvoice(id: string): Promise<PurchaseInvoice> {
+  if (!isApiMode()) return demo.postPurchaseInvoice(id)
+  try {
+    const res = await invoiceApi.postPurchaseInvoiceApi(id, {})
+    return mapApiPurchaseInvoiceToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function cancelPurchaseInvoice(
+  id: string,
+  remarks = 'Cancelled',
+): Promise<PurchaseInvoice> {
+  if (!isApiMode()) {
+    throw new PurchaseServiceError('NOT_SUPPORTED', 'Cancel invoice is only available in API mode.')
+  }
+  try {
+    const res = await invoiceApi.cancelPurchaseInvoiceApi(id, remarks ? { remarks } : {})
+    return mapApiPurchaseInvoiceToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function createDebitNoteFromInvoice(
+  id: string,
+  reason?: string,
+): Promise<{ invoice: PurchaseInvoice; debitNoteNumber: string; debitNoteId: string }> {
+  if (!isApiMode()) return demo.createDebitNoteFromInvoice(id, reason)
+  notSupportedInApiMode('Debit note from invoice')
+}
+
+/* ─── Quality Inspections ─── */
+
+export async function getQualityInspections(goodsReceiptId?: string): Promise<QualityInspection[]> {
+  if (!isApiMode()) return demo.getQualityInspections(goodsReceiptId)
+  try {
+    const res = await qiApi.listQualityInspectionsApi({
+      page: 1,
+      limit: 100,
+      sortOrder: 'desc',
+      goodsReceiptId,
+    })
+    return res.data.map(mapApiQualityInspectionToDomain)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function getQualityInspectionList(
+  goodsReceiptId?: string,
+): Promise<QualityInspectionListRow[]> {
+  if (!isApiMode()) return demo.getQualityInspectionList(goodsReceiptId)
+  try {
+    const res = await qiApi.listQualityInspectionsApi({
+      page: 1,
+      limit: 100,
+      sortOrder: 'desc',
+      goodsReceiptId,
+    })
+    return res.data.map(mapApiQualityInspectionToListRow)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function getQualityInspectionById(id: string): Promise<QualityInspection | null> {
+  if (!isApiMode()) return demo.getQualityInspectionById(id)
+  try {
+    const res = await qiApi.getQualityInspectionApi(id)
+    return mapApiQualityInspectionToDomain(res.data)
+  } catch (err) {
+    if (isBackendMissingError(err)) return null
+    const { code } = formatPurchaseApiError(err)
+    if (code === 'QUALITY_INSPECTION_NOT_FOUND' || code === 'NOT_FOUND' || code === 'HTTP_404') {
+      return null
+    }
+    throwApi(err)
+  }
+}
+
+export async function createQualityInspection(
+  input: QualityInspectionInput,
+): Promise<QualityInspection> {
+  if (!isApiMode()) return demo.createQualityInspection(input)
+  try {
+    const res = await qiApi.createQualityInspectionApi(
+      mapDomainQualityInspectionInputToApiPayload(input),
+    )
+    return mapApiQualityInspectionToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+type QualityInspectionUpdatePatch = Partial<QualityInspectionInput> & {
+  parameters?: QualityInspectionParameter[]
+  acceptedQty?: number
+  rejectedQty?: number
+  sampleQty?: number
+  inspectionPlan?: string
+  remarks?: string
+}
+
+/** Sync header + first-line quantities. Backend replaces lines wholesale, so preserve the rest. */
+async function patchQualityInspectionApi(
+  id: string,
+  patch: QualityInspectionUpdatePatch,
+): Promise<QualityInspection> {
+  const current = (await qiApi.getQualityInspectionApi(id)).data
+  const payload: Record<string, unknown> = {}
+  if (patch.inspectorName !== undefined || patch.inspectorId !== undefined) {
+    payload.inspectedByName = patch.inspectorName ?? null
+    payload.inspectedById = patch.inspectorId ?? null
+  }
+  if (patch.remarks !== undefined) payload.remarks = patch.remarks || null
+  const hasQtyPatch =
+    patch.sampleQty !== undefined
+    || patch.acceptedQty !== undefined
+    || patch.rejectedQty !== undefined
+  if (hasQtyPatch && current.lines.length) {
+    payload.lines = current.lines.map((l, index) =>
+      index === 0
+        ? {
+            goodsReceiptLineId: l.goodsReceiptLineId,
+            purchaseOrderLineId: l.purchaseOrderLineId,
+            itemId: l.itemId,
+            inspectedQuantity: Number(patch.sampleQty ?? l.inspectedQuantity) || 1,
+            acceptedQuantity: Number(patch.acceptedQty ?? l.acceptedQuantity) || 0,
+            rejectedQuantity: Number(patch.rejectedQty ?? l.rejectedQuantity) || 0,
+            deviationQuantity: Number(l.deviationQuantity) || 0,
+            remarks: l.remarks,
+          }
+        : {
+            goodsReceiptLineId: l.goodsReceiptLineId,
+            purchaseOrderLineId: l.purchaseOrderLineId,
+            itemId: l.itemId,
+            inspectedQuantity: Number(l.inspectedQuantity) || 1,
+            acceptedQuantity: Number(l.acceptedQuantity) || 0,
+            rejectedQuantity: Number(l.rejectedQuantity) || 0,
+            deviationQuantity: Number(l.deviationQuantity) || 0,
+            remarks: l.remarks,
+          },
+    )
+  }
+  const res = await qiApi.updateQualityInspectionApi(id, payload)
+  return mapApiQualityInspectionToDomain(res.data)
+}
+
+export async function updateQualityInspection(
+  id: string,
+  input: QualityInspectionUpdatePatch,
+): Promise<QualityInspection> {
+  if (!isApiMode()) return demo.updateQualityInspection(id, input)
+  try {
+    return await patchQualityInspectionApi(id, input)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function acceptQualityInspection(
+  id: string,
+  acceptedQty?: number,
+  rejectedQty = 0,
+): Promise<QualityInspection> {
+  if (!isApiMode()) return demo.acceptQualityInspection(id, acceptedQty, rejectedQty)
+  try {
+    if (rejectedQty > 0) {
+      // Partial acceptance: persist split quantities, then complete with outcome derived per line.
+      await patchQualityInspectionApi(id, { acceptedQty, rejectedQty })
+      const res = await qiApi.completeQualityInspectionApi(id, { outcome: 'AUTO' })
+      return mapApiQualityInspectionToDomain(res.data)
+    }
+    const res = await qiApi.acceptQualityInspectionApi(id, {})
+    return mapApiQualityInspectionToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function rejectQualityInspection(
+  id: string,
+  rejectedQty?: number,
+): Promise<QualityInspection> {
+  if (!isApiMode()) return demo.rejectQualityInspection(id, rejectedQty)
+  try {
+    const res = await qiApi.rejectQualityInspectionApi(id, {})
+    return mapApiQualityInspectionToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function holdQualityInspection(id: string, remarks = ''): Promise<QualityInspection> {
+  if (!isApiMode()) return demo.holdQualityInspection(id, remarks)
+  notSupportedInApiMode('Quality inspection hold')
+}
+
+export async function requestDeviationApproval(
+  id: string,
+  remarks: string,
+): Promise<QualityInspection> {
+  if (!isApiMode()) return demo.requestDeviationApproval(id, remarks)
+  try {
+    const res = await qiApi.completeQualityInspectionApi(id, {
+      outcome: 'AUTO',
+      deviationRemarks: remarks,
+    })
+    return mapApiQualityInspectionToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+/* ─── Purchase Returns ─── */
+
+export async function getPurchaseReturns(): Promise<PurchaseReturn[]> {
+  if (!isApiMode()) return demo.getPurchaseReturns()
+  try {
+    const res = await returnApi.listPurchaseReturnsApi({ page: 1, limit: 100, sortOrder: 'desc' })
+    return res.data.map(mapApiPurchaseReturnToDomain)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function getPurchaseReturnList(): Promise<PurchaseReturnListRow[]> {
+  if (!isApiMode()) return demo.getPurchaseReturnList()
+  try {
+    const res = await returnApi.listPurchaseReturnsApi({ page: 1, limit: 100, sortOrder: 'desc' })
+    return res.data.map(mapApiPurchaseReturnToListRow)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function getPurchaseReturnById(id: string): Promise<PurchaseReturn | null> {
+  if (!isApiMode()) return demo.getPurchaseReturnById(id)
+  try {
+    const res = await returnApi.getPurchaseReturnApi(id)
+    return mapApiPurchaseReturnToDomain(res.data)
+  } catch (err) {
+    if (isBackendMissingError(err)) return null
+    const { code } = formatPurchaseApiError(err)
+    if (code === 'PURCHASE_RETURN_NOT_FOUND' || code === 'NOT_FOUND' || code === 'HTTP_404') {
+      return null
+    }
+    throwApi(err)
+  }
+}
+
+export async function createPurchaseReturn(input: PurchaseReturnInput): Promise<PurchaseReturn> {
+  if (!isApiMode()) return demo.createPurchaseReturn(input)
+  try {
+    const res = await returnApi.createPurchaseReturnApi(
+      mapDomainPurchaseReturnInputToApiPayload(input),
+    )
+    return mapApiPurchaseReturnToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function updatePurchaseReturn(
+  id: string,
+  input: PurchaseReturnInput,
+): Promise<PurchaseReturn> {
+  if (!isApiMode()) return demo.updatePurchaseReturn(id, input)
+  try {
+    const res = await returnApi.updatePurchaseReturnApi(
+      id,
+      mapDomainPurchaseReturnInputToApiPayload(input),
+    )
+    return mapApiPurchaseReturnToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function createPurchaseReturnFromGrn(
+  grnId: string,
+  options?: { origin?: PurchaseReturnOrigin; returnReason?: PurchaseReturnReason },
+): Promise<PurchaseReturn> {
+  if (!isApiMode()) return demo.createPurchaseReturnFromGrn(grnId, options)
+  const grn = await getGRNById(grnId)
+  if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${grnId}`)
+  const origin = options?.origin ?? 'grn_rejected_quantity'
+  const returnReason =
+    options?.returnReason
+    ?? (origin === 'quality_rejection'
+      ? 'quality_rejection'
+      : origin === 'damaged_material'
+        ? 'damaged'
+        : origin === 'excess_receipt'
+          ? 'excess_quantity'
+          : origin === 'wrong_material'
+            ? 'wrong_item'
+            : 'quality_rejection')
+  const lines = grn.lines
+    .map((l) => {
+      const qty =
+        origin === 'excess_receipt'
+          ? l.excessQty
+          : origin === 'damaged_material'
+            ? l.damagedQty || l.rejectedQty
+            : l.rejectedQty
+      return {
+        itemId: l.itemId,
+        returnQty: Math.max(0, qty),
+        unitCost: l.rate,
+        goodsReceiptLineId: l.id,
+        description: l.description || l.itemName,
+        reason: returnReason,
+      }
+    })
+    .filter((l) => l.returnQty > 0)
+  if (!lines.length) {
+    throw new PurchaseServiceError('RETURN_NO_QTY', 'No returnable quantity on this GRN')
+  }
+  return createPurchaseReturn({
+    vendorId: grn.vendor.id,
+    origin,
+    goodsReceiptId: grn.id,
+    purchaseOrderId: grn.purchaseOrderId,
+    returnReason,
+    warehouseId: grn.warehouseId,
+    remarks: `Created from ${grn.documentNumber}`,
+    lines,
+  })
+}
+
+export async function createPurchaseReturnFromQualityInspection(
+  qualityInspectionId: string,
+): Promise<PurchaseReturn> {
+  if (!isApiMode()) return demo.createPurchaseReturnFromQualityInspection(qualityInspectionId)
+  let api
+  try {
+    api = (await qiApi.getQualityInspectionApi(qualityInspectionId)).data
+  } catch (err) {
+    throwApi(err)
+  }
+  const rejectedLines = api.lines.filter((l) => Number(l.rejectedQuantity) > 0)
+  if (!rejectedLines.length) {
+    throw new PurchaseServiceError('RETURN_NO_QTY', 'Quality inspection has no rejected quantity')
+  }
+  if (!api.vendorId) {
+    throw new PurchaseServiceError('RETURN_NO_VENDOR', 'Quality inspection has no vendor linked')
+  }
+  return createPurchaseReturn({
+    vendorId: api.vendorId,
+    origin: 'quality_rejection',
+    goodsReceiptId: api.goodsReceiptId,
+    purchaseOrderId: api.purchaseOrderId,
+    qualityInspectionId: api.id,
+    returnReason: 'quality_rejection',
+    warehouseId: api.warehouseId ?? undefined,
+    remarks: `Created from ${api.documentNumber || api.inspectionNumber}`,
+    lines: rejectedLines.map((l) => ({
+      itemId: l.itemId || '',
+      returnQty: Number(l.rejectedQuantity) || 0,
+      goodsReceiptLineId: l.goodsReceiptLineId,
+      description: l.itemNameSnapshot || '',
+      reason: 'quality_rejection',
+      remarks: l.remarks || 'QC rejection',
+    })),
+  })
+}
+
+export async function createPurchaseReturnFromReason(
+  origin: PurchaseReturnOrigin,
+  options: {
+    vendorId: string
+    goodsReceiptId?: string | null
+    purchaseOrderId?: string | null
+    returnReason?: PurchaseReturnReason
+    lines?: PurchaseReturnInput['lines']
+  },
+): Promise<PurchaseReturn> {
+  if (!isApiMode()) return demo.createPurchaseReturnFromReason(origin, options)
+  if (options.goodsReceiptId) {
+    return createPurchaseReturnFromGrn(options.goodsReceiptId, {
+      origin,
+      returnReason: options.returnReason,
+    })
+  }
+  if (!options.lines?.length) {
+    throw new PurchaseServiceError(
+      'RETURN_NO_LINES',
+      'Provide GRN or lines when creating from reason preset',
+    )
+  }
+  return createPurchaseReturn({
+    vendorId: options.vendorId,
+    origin,
+    purchaseOrderId: options.purchaseOrderId ?? null,
+    returnReason: options.returnReason ?? 'other',
+    lines: options.lines,
+  })
+}
+
+export async function submitPurchaseReturn(id: string): Promise<PurchaseReturn> {
+  if (!isApiMode()) return demo.submitPurchaseReturn(id)
+  try {
+    const res = await returnApi.submitPurchaseReturnApi(id, {})
+    return mapApiPurchaseReturnToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+/**
+ * API mode has no separate approval step — submit moves the return straight to
+ * the approved/actionable state, so Approve performs submit for drafts.
+ */
+export async function approvePurchaseReturn(id: string, remarks = ''): Promise<PurchaseReturn> {
+  if (!isApiMode()) return demo.approvePurchaseReturn(id, remarks)
+  try {
+    const res = await returnApi.submitPurchaseReturnApi(id, remarks ? { remarks } : {})
+    return mapApiPurchaseReturnToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function postPurchaseReturn(id: string): Promise<PurchaseReturn> {
+  if (!isApiMode()) return demo.postPurchaseReturn(id)
+  try {
+    const res = await returnApi.completePurchaseReturnApi(id, {})
+    return mapApiPurchaseReturnToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function cancelPurchaseReturn(id: string, remarks = 'Cancelled'): Promise<PurchaseReturn> {
+  if (!isApiMode()) return demo.cancelPurchaseReturn(id, remarks)
+  try {
+    const res = await returnApi.cancelPurchaseReturnApi(id, remarks ? { remarks } : {})
+    return mapApiPurchaseReturnToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function createDebitNoteFromReturn(id: string): Promise<PurchaseReturn> {
+  if (!isApiMode()) return demo.createDebitNoteFromReturn(id)
+  notSupportedInApiMode('Debit note from return')
+}
+
+export async function createReplacementPoFromReturn(id: string): Promise<PurchaseReturn> {
+  if (!isApiMode()) return demo.createReplacementPoFromReturn(id)
+  notSupportedInApiMode('Replacement PO from return')
+}
+
+/* ─── Shared helpers (approval history remains demo-only until timeline covers returns/invoices) ─── */
+
+export async function getApprovalHistory(documentId?: string) {
+  if (!isApiMode()) return demo.getApprovalHistory(documentId)
+  return []
 }

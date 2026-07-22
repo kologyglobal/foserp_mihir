@@ -40,4 +40,5 @@ Routes under `/m/crm/*` (see `src/routes/mobileRoutes.tsx`).
 - [x] Quick create drawers work in demo mode
 - [x] Quick create uses API bridge when `VITE_USE_API=true`
 - [x] Call / WhatsApp / email actions present on lead rows
+- [x] **API-mode E2E** (`npm run test:crm-mobile-api-e2e`) — live login, list APIs, follow-up create + complete (mobile Mark done), `/m/crm/leads` served — **26/26** (2026-07-18)
 - [ ] Dedicated mobile 360 layouts (out of scope — uses responsive desktop 360)

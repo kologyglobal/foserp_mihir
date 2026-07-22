@@ -62,9 +62,16 @@ export async function serializeCustomerReceiptDetail(
 ): Promise<CustomerReceiptDto> {
   const base = repo.mapCustomerReceiptToDto(receipt, receipt.deductionLines)
   const postingSummary = await getPostingSummary(receipt.tenantId, receipt)
+  const postedAllocations =
+    receipt.status === 'POSTED'
+      ? await prisma.customerReceiptAllocation.count({
+          where: { tenantId: receipt.tenantId, receiptId: receipt.id, status: 'POSTED' },
+        })
+      : 0
   const allowedActions = resolveCustomerReceiptAllowedActions(req, receipt.status, {
     creditOutstanding:
       postingSummary.creditOpenItem?.outstandingAmount ?? formatForPersistence(receipt.unallocatedAmount),
+    hasPostedAllocations: postedAllocations > 0,
   })
   const validationSummary =
     options?.includeValidationSummary === false

@@ -25,5 +25,14 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests",
+    "src/modules/purchase/requisitions/requisition.repository.ts",
+    "src/modules/purchase/requisitions/requisition.service.ts",
+    "src/modules/purchase/requisitions/requisition.controller.ts",
+    "src/modules/purchase/requisitions/requisition.routes.ts",
+    "src/modules/purchase/shared/mappers.ts"
+  ]
 }

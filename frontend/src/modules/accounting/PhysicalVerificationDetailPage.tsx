@@ -93,7 +93,7 @@ export function PhysicalVerificationDetailPage() {
       )}
     >
       <div className="mb-4">
-        <FixedAssetsDemoBanner />
+        <FixedAssetsDemoBanner variant="partial" />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-erp-border bg-white px-4 py-3">

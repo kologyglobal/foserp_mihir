@@ -2,13 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Eye, Pencil, Plus, Power, PowerOff, RefreshCw, Route } from 'lucide-react'
-import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { Select } from '@/components/forms/Inputs'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { TableLink } from '@/components/ui/AppLink'
-import { EmptyState } from '@/components/ui/EmptyState'
 import { DataTable } from '@/components/tables/DataTable'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import {
@@ -16,6 +13,7 @@ import {
   type RowActionItem,
 } from '@/design-system/enterprise/EnterpriseTablePrimitives'
 import { ManufacturingDemoBanner } from '@/components/manufacturing'
+import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
 import {
   activateManufacturingRoute,
   deactivateManufacturingRoute,
@@ -25,6 +23,7 @@ import type { ManufacturingRoute, ManufacturingRouteStatus } from '@/types/manuf
 import { ROUTE_STATUS_LABELS } from '@/types/manufacturingRoute'
 import { notify } from '@/store/toastStore'
 import { useManufacturingPermissions } from '@/utils/permissions/manufacturing'
+import { ProductionEmptyState, ProductionPageHeader } from '../ui'
 
 export function RouteRegisterPage() {
   const navigate = useNavigate()
@@ -45,6 +44,18 @@ export function RouteRegisterPage() {
   }, [search, status])
 
   useEffect(() => { void load() }, [load])
+
+  const kpiStrip = useMemo<EnterpriseKpiItem[]>(() => {
+    const active = rows.filter((r) => r.status === 'active').length
+    const draft = rows.filter((r) => r.status === 'draft').length
+    const items = new Set(rows.map((r) => r.finishedItemCode)).size
+    return [
+      { id: 'total', label: 'Routes', value: rows.length, accent: 'blue' },
+      { id: 'active', label: 'Active', value: active, accent: 'green' },
+      { id: 'draft', label: 'Draft', value: draft, accent: 'amber' },
+      { id: 'items', label: 'Finished Items', value: items, accent: 'slate' },
+    ]
+  }, [rows])
 
   const columns = useMemo<ColumnDef<ManufacturingRoute>[]>(() => [
     {
@@ -80,7 +91,7 @@ export function RouteRegisterPage() {
     },
     {
       id: 'actions',
-      header: '',
+      header: 'Actions',
       cell: ({ row }) => {
         const r = row.original
         const actions: RowActionItem[] = [
@@ -109,57 +120,79 @@ export function RouteRegisterPage() {
 
   if (!perms.canViewRoute) {
     return (
-      <OperationalPageShell variant="dynamics" layout="enterprise" badge="Manufacturing" title="Routes">
-        <EmptyState icon={Route} title="Access denied" description="Missing route view permission." />
-      </OperationalPageShell>
+      <ProductionPageHeader title="Routes" favoritePath="/manufacturing/routes">
+        <ProductionEmptyState icon={Route} title="Access denied" description="Missing route view permission." />
+      </ProductionPageHeader>
     )
   }
 
   return (
-    <OperationalPageShell
-      variant="dynamics"
-      layout="enterprise"
-      badge="Manufacturing"
+    <ProductionPageHeader
       title="Route Master"
       description="Reusable production process templates attached to Finished Item / BOM. Create once — Work Orders snapshot the active route automatically."
       breadcrumbs={[
-        { label: 'Manufacturing', to: '/manufacturing' },
+        { label: 'Manufacturing & Production', to: '/manufacturing' },
         { label: 'Routes' },
       ]}
-      autoBreadcrumbs={false}
       favoritePath="/manufacturing/routes"
-      showDescription
-      commandBar={(
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={
-            perms.canCreateRoute
-              ? { id: 'new', label: 'New Route', icon: Plus, onClick: () => navigate('/manufacturing/routes/new') }
-              : undefined
-          }
-          secondaryActions={[
-            { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load() },
-            { id: 'wo', label: 'Work Orders', onClick: () => navigate('/manufacturing/work-orders') },
-          ]}
-        />
-      )}
+      kpiStrip={kpiStrip}
+      primaryAction={
+        perms.canCreateRoute
+          ? { id: 'new', label: 'New Route', icon: Plus, onClick: () => navigate('/manufacturing/routes/new') }
+          : undefined
+      }
+      secondaryActions={[
+        { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load() },
+        { id: 'wo', label: 'Work Orders', onClick: () => navigate('/manufacturing/work-orders') },
+      ]}
+      filterBar={
+        <div className="flex flex-wrap items-end gap-2">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search route / item…"
+            className="min-w-[180px] max-w-xs"
+            aria-label="Search routes"
+          />
+          <Select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as ManufacturingRouteStatus | '')}
+            className="w-40"
+            aria-label="Filter by status"
+          >
+            <option value="">All statuses</option>
+            <option value="draft">Draft</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+        </div>
+      }
     >
       <ManufacturingDemoBanner message="Create a Route once per Finished Item. Activate it (Draft → Active). New Work Orders copy those stages as a snapshot — you never rebuild Cutting → Welding → … on every WO. Editing a WO does not change this master." />
-      <div className="mb-3 flex flex-wrap gap-2">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search route / item…" className="max-w-xs" />
-        <Select value={status} onChange={(e) => setStatus(e.target.value as ManufacturingRouteStatus | '')} className="w-40">
-          <option value="">All statuses</option>
-          <option value="draft">Draft</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </Select>
-      </div>
-      {loading ? <LoadingState variant="table" rows={5} /> : (
-        rows.length === 0
-          ? <EmptyState icon={Route} title="No routes" description="Create a route for a finished item, then activate it." />
-          : <DataTable columns={columns} data={rows} />
-      )}
-    </OperationalPageShell>
+      {loading ? <LoadingState variant="table" rows={5} /> : null}
+      {!loading && rows.length === 0 ? (
+        <ProductionEmptyState
+          icon={Route}
+          title="No routes"
+          description="Create a route for a finished item, then activate it."
+          action={
+            perms.canCreateRoute ? (
+              <button
+                type="button"
+                className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"
+                onClick={() => navigate('/manufacturing/routes/new')}
+              >
+                New Route
+              </button>
+            ) : undefined
+          }
+        />
+      ) : null}
+      {!loading && rows.length > 0 ? (
+        <div className="overflow-x-auto rounded-lg border border-erp-border bg-white">
+          <DataTable columns={columns} data={rows} />
+        </div>
+      ) : null}
+    </ProductionPageHeader>
   )
 }

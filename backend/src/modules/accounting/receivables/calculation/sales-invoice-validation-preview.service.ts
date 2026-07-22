@@ -23,7 +23,7 @@ import { checkInvoiceAccountReadiness } from '../validation/invoice-account-read
 import { validateLineCostCentres } from '../validation/invoice-cost-centre.validator.js'
 import { validateGstin } from '../validation/gstin.validator.js'
 import { validatePan } from '../validation/pan.validator.js'
-import { validateStateCode } from '../validation/state-code.validator.js'
+import { validateStateCode, resolveLegalEntityStateCode, resolveGstStateCode } from '../validation/state-code.validator.js'
 
 export async function validateSalesInvoiceDraft(
   input: SalesInvoiceCalculationInput,
@@ -36,8 +36,8 @@ export async function validateSalesInvoiceDraft(
   const legalEntity = await getLegalEntityOrThrow(tenantId, input.legalEntityId)
   const enrichedInput: SalesInvoiceCalculationInput = {
     ...input,
-    legalEntityStateCode: input.legalEntityStateCode ?? legalEntity.stateCode,
-    placeOfSupply: input.placeOfSupply ?? null,
+    legalEntityStateCode: input.legalEntityStateCode ?? resolveLegalEntityStateCode(legalEntity),
+    placeOfSupply: resolveGstStateCode(input.placeOfSupply) ?? input.placeOfSupply ?? null,
     postingDate: input.postingDate ?? input.invoiceDate,
   }
 

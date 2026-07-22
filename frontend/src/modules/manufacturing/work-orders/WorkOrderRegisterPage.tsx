@@ -29,6 +29,7 @@ import {
   type RowActionItem,
 } from '@/design-system/enterprise/EnterpriseTablePrimitives'
 import { ManufacturingDemoBanner, ShopfloorStatusChip } from '@/components/manufacturing'
+import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
 import {
   getWorkOrderRegisterSummary,
   getWorkOrders,
@@ -59,7 +60,7 @@ const STATUS_TABS: { id: NonNullable<WorkOrderFilter['tab']>; label: string }[] 
   { id: 'all', label: 'All' },
   { id: 'draft', label: 'Draft' },
   { id: 'ready', label: 'Ready' },
-  { id: 'in_progress', label: 'In Progress' },
+  { id: 'in_progress', label: 'Running' },
   { id: 'on_hold', label: 'On Hold' },
   { id: 'qc_pending', label: 'QC Pending' },
   { id: 'qc_hold', label: 'QC Hold' },
@@ -212,6 +213,19 @@ export function WorkOrderRegisterPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const kpiStrip = useMemo<EnterpriseKpiItem[]>(
+    () => [
+      { id: 'open', label: 'Open', value: summary.open, accent: 'blue' },
+      { id: 'running', label: 'Running', value: summary.inProgress, accent: 'green' },
+      { id: 'due-today', label: 'Due Today', value: summary.dueToday, accent: 'amber' },
+      { id: 'delayed', label: 'Delayed', value: summary.delayed, accent: 'red' },
+      { id: 'shortage', label: 'Material Shortage', value: summary.materialShortage, accent: 'red' },
+      { id: 'planned', label: 'Planned Qty', value: summary.plannedQty, accent: 'slate' },
+      { id: 'good', label: 'Good Qty', value: summary.producedQty, accent: 'slate' },
+    ],
+    [summary],
+  )
 
   const columns = useMemo<ColumnDef<WorkOrder>[]>(() => [
     {
@@ -426,13 +440,15 @@ export function WorkOrderRegisterPage() {
       layout="enterprise"
       badge="Manufacturing"
       title="Work Orders"
-      description="The center of production — create, start, complete, QC, and close inside the Work Order. Not separate material/FG documents."
+      description="Release, run, and complete production work orders (demo data)."
       breadcrumbs={[
         { label: 'Manufacturing & Production', to: '/manufacturing' },
         { label: 'Work Orders' },
       ]}
       autoBreadcrumbs={false}
       favoritePath="/manufacturing/work-orders"
+      showDescription
+      kpiStrip={kpiStrip}
       commandBar={(
         <ErpCommandBar
           inline
@@ -441,7 +457,7 @@ export function WorkOrderRegisterPage() {
             perms.canCreateWo
               ? {
                   id: 'new',
-                  label: 'Create Work Order',
+                  label: 'New Work Order',
                   icon: Plus,
                   onClick: () => navigate('/manufacturing/work-orders/new'),
                 }
@@ -474,27 +490,7 @@ export function WorkOrderRegisterPage() {
       <div className="space-y-3">
         <ManufacturingDemoBanner message="Work Orders are the center of this command center. Shopfloor and Job Work hang off this register." />
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
-          {[
-            { label: 'Open', value: summary.open },
-            { label: 'In Progress', value: summary.inProgress },
-            { label: 'Due Today', value: summary.dueToday },
-            { label: 'Delayed', value: summary.delayed },
-            { label: 'Material Shortage', value: summary.materialShortage },
-            { label: 'Planned Qty', value: summary.plannedQty },
-            { label: 'Good Qty', value: summary.producedQty },
-          ].map((card) => (
-            <div
-              key={card.label}
-              className="rounded-xl border border-erp-border bg-white px-3 py-2.5 shadow-sm"
-            >
-              <div className="text-[11px] font-medium uppercase tracking-wide text-erp-muted">{card.label}</div>
-              <div className="mt-1 text-lg font-semibold tabular-nums text-erp-text">{card.value}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap gap-1 rounded-xl border border-erp-border bg-white p-1" role="tablist" aria-label="Work order status">
+        <div className="flex flex-wrap gap-1 rounded-lg border border-erp-border bg-white p-1" role="tablist" aria-label="Work order status">
           {STATUS_TABS.map((t) => (
             <button
               key={t.id}
@@ -515,7 +511,7 @@ export function WorkOrderRegisterPage() {
           ))}
         </div>
 
-        <div className="flex flex-wrap items-end gap-2 rounded-xl border border-erp-border bg-white p-3">
+        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-erp-border bg-white p-3">
           <SearchInput
             value={search}
             onChange={setSearch}
@@ -643,7 +639,7 @@ export function WorkOrderRegisterPage() {
           />
         ) : null}
         {!loading && rows.length > 0 ? (
-          <div className="overflow-x-auto rounded-xl border border-erp-border bg-white">
+          <div className="overflow-x-auto rounded-lg border border-erp-border bg-white">
             <DataTable columns={columns} data={rows} />
           </div>
         ) : null}

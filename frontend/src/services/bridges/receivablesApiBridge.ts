@@ -3,6 +3,9 @@ import type {
   AgeingReportDto,
   CreateCustomerCreditNoteInput,
   CreateSalesInvoiceInput,
+  DispatchLineInvoiceReadyDto,
+  InvoicePrefillFromDispatchDto,
+  ListInvoiceReadyQuery,
   CreditNoteAllocationHistoryRow,
   CreditNoteAllocationPreview,
   CreditNoteAllocationRequest,
@@ -15,17 +18,29 @@ import type {
   ListSalesInvoicesQuery,
   PaginatedResult,
   PostCreditNoteResult,
+  PostCustomerReceiptResult,
   PostSalesInvoiceResult,
+  ReverseSalesInvoiceResult,
+  ReceiptAllocationHistoryRow,
+  ReceiptAllocationPreview,
+  ReceiptAllocationRequest,
+  ReceiptAllocationResult,
   ReceivableOverviewDto,
   ReceivableReconciliationDto,
+  CreateCustomerReceiptInput,
+  CustomerReceiptDto,
+  CustomerReceiptListItemDto,
+  CustomerReceiptValidationPreview,
+  ListCustomerReceiptsQuery,
   SalesInvoiceDto,
   SalesInvoiceValidationPreview,
   UpdateCustomerCreditNoteInput,
+  UpdateCustomerReceiptInput,
   UpdateSalesInvoiceInput,
 } from '../../types/moneyIn'
 import * as api from '../api/receivablesApi'
 import { getReceivablesDemoState, seedReceivablesDemoIfEmpty } from '../../store/receivablesDemoStore'
-import { resolveLegalEntityId } from './financeApiBridge'
+import { ensureLegalEntityId } from './financeApiBridge'
 import { formatApiError } from '../api/apiErrors'
 import { mapMoneyInError } from '../../modules/accounting/money-in/moneyInUi'
 
@@ -40,7 +55,7 @@ function rethrowMapped(err: unknown): never {
 }
 
 export async function listSalesInvoices(filters?: Partial<ListSalesInvoicesQuery>): Promise<SalesInvoiceDto[]> {
-  const legalEntityId = resolveLegalEntityId(filters?.legalEntityId)
+  const legalEntityId = await ensureLegalEntityId(filters?.legalEntityId)
   if (isApiMode()) {
     try {
       return unwrap(await api.listSalesInvoices({ legalEntityId, ...filters }))
@@ -143,8 +158,27 @@ export async function postSalesInvoice(id: string): Promise<PostSalesInvoiceResu
   }
 }
 
+export async function reverseSalesInvoice(
+  id: string,
+  reason: string,
+  idempotencyKey?: string,
+): Promise<ReverseSalesInvoiceResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.reverseSalesInvoice(id, reason, idempotencyKey))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().reverseInvoiceDemo(id, reason)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
 export async function getReceivableOverview(legalEntityId?: string): Promise<ReceivableOverviewDto> {
-  const leId = resolveLegalEntityId(legalEntityId)
+  const leId = await ensureLegalEntityId(legalEntityId)
   if (isApiMode()) {
     try {
       return unwrap(await api.getReceivableOverview({ legalEntityId: leId }))
@@ -157,7 +191,7 @@ export async function getReceivableOverview(legalEntityId?: string): Promise<Rec
 }
 
 export async function listOutstanding(params?: Record<string, string | number | boolean | undefined>) {
-  const legalEntityId = resolveLegalEntityId(params?.legalEntityId as string | undefined)
+  const legalEntityId = await ensureLegalEntityId(params?.legalEntityId as string | undefined)
   if (isApiMode()) {
     try {
       return unwrap(await api.listOutstanding({ legalEntityId, ...params }))
@@ -170,7 +204,7 @@ export async function listOutstanding(params?: Record<string, string | number | 
 }
 
 export async function getAgeingReport(params?: Record<string, string | number | boolean | undefined>): Promise<AgeingReportDto> {
-  const legalEntityId = resolveLegalEntityId(params?.legalEntityId as string | undefined)
+  const legalEntityId = await ensureLegalEntityId(params?.legalEntityId as string | undefined)
   if (isApiMode()) {
     try {
       return unwrap(await api.getAgeingReport({ legalEntityId, ...params }))
@@ -183,7 +217,7 @@ export async function getAgeingReport(params?: Record<string, string | number | 
 }
 
 export async function listCustomerSummaries(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResult<CustomerReceivableDetailDto>> {
-  const legalEntityId = resolveLegalEntityId(params?.legalEntityId as string | undefined)
+  const legalEntityId = await ensureLegalEntityId(params?.legalEntityId as string | undefined)
   if (isApiMode()) {
     try {
       return unwrap(await api.listCustomerSummaries({ legalEntityId, ...params }))
@@ -196,7 +230,7 @@ export async function listCustomerSummaries(params?: Record<string, string | num
 }
 
 export async function getCustomerSummary(customerId: string, legalEntityId?: string): Promise<CustomerReceivableDetailDto> {
-  const leId = resolveLegalEntityId(legalEntityId)
+  const leId = await ensureLegalEntityId(legalEntityId)
   if (isApiMode()) {
     try {
       return unwrap(await api.getCustomerSummary(customerId, { legalEntityId: leId }))
@@ -211,7 +245,7 @@ export async function getCustomerSummary(customerId: string, legalEntityId?: str
 }
 
 export async function listCustomerOpenItems(customerId: string, params?: Record<string, string | number | boolean | undefined>) {
-  const legalEntityId = resolveLegalEntityId(params?.legalEntityId as string | undefined)
+  const legalEntityId = await ensureLegalEntityId(params?.legalEntityId as string | undefined)
   if (isApiMode()) {
     try {
       return unwrap(await api.listCustomerOpenItems(customerId, { legalEntityId, ...params }))
@@ -224,7 +258,7 @@ export async function listCustomerOpenItems(customerId: string, params?: Record<
 }
 
 export async function getReconciliation(legalEntityId?: string): Promise<ReceivableReconciliationDto> {
-  const leId = resolveLegalEntityId(legalEntityId)
+  const leId = await ensureLegalEntityId(legalEntityId)
   if (isApiMode()) {
     try {
       return unwrap(await api.getReconciliation({ legalEntityId: leId }))
@@ -239,7 +273,7 @@ export async function getReconciliation(legalEntityId?: string): Promise<Receiva
 // ─── Customer credit notes (Phase 3C6) ─────────────────────────────────────
 
 export async function listCustomerCreditNotes(filters?: Partial<ListCustomerCreditNotesQuery>): Promise<CustomerCreditNoteListItemDto[]> {
-  const legalEntityId = resolveLegalEntityId(filters?.legalEntityId)
+  const legalEntityId = await ensureLegalEntityId(filters?.legalEntityId)
   if (isApiMode()) {
     try {
       return unwrap(await api.listCustomerCreditNotes({ legalEntityId, ...filters }))
@@ -445,11 +479,327 @@ export async function listCreditNoteAllocations(creditNoteId: string): Promise<C
   return getReceivablesDemoState().listCreditNoteAllocationsDemo(creditNoteId)
 }
 
-/** Demo customer options for invoice form */
-export function listDemoCustomers() {
-  return [
-    { id: 'b2000001-0001-4001-8001-000000000001', label: 'CUST-MHL — Mahindra Logistics Ltd' },
-    { id: 'b2000002-0002-4002-8002-000000000002', label: 'CUST-TML — Tata Motors — Pune Plant' },
-    { id: 'b2000003-0003-4003-8003-000000000003', label: 'CUST-AL — Ashok Leyland — Chennai' },
-  ]
+export async function reverseCreditNoteAllocation(
+  creditNoteId: string,
+  batchId: string,
+  reason: string,
+  idempotencyKey: string,
+): Promise<CreditNoteAllocationResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.reverseCreditNoteAllocation(creditNoteId, batchId, reason, idempotencyKey))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().reverseCreditNoteAllocationDemo(creditNoteId, batchId, reason)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function reverseCustomerCreditNote(
+  id: string,
+  reason: string,
+  idempotencyKey: string,
+): Promise<PostCreditNoteResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.reverseCustomerCreditNote(id, reason, idempotencyKey))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().reverseCreditNoteDemo(id, reason)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+// ─── Customer receipts (Phase 3B6) ─────────────────────────────────────────
+
+export async function listCustomerReceipts(filters?: Partial<ListCustomerReceiptsQuery>): Promise<CustomerReceiptListItemDto[]> {
+  const legalEntityId = await ensureLegalEntityId(filters?.legalEntityId)
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.listCustomerReceipts({ legalEntityId, ...filters }))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  seedReceivablesDemoIfEmpty(legalEntityId)
+  return getReceivablesDemoState().listReceipts({ legalEntityId, ...filters })
+}
+
+export async function getCustomerReceipt(id: string): Promise<CustomerReceiptDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.getCustomerReceipt(id))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  const receipt = getReceivablesDemoState().getReceipt(id)
+  if (!receipt) throw new Error('Customer receipt not found')
+  return receipt
+}
+
+export async function createCustomerReceipt(input: CreateCustomerReceiptInput): Promise<CustomerReceiptDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.createCustomerReceipt(input))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  return getReceivablesDemoState().createReceipt(input)
+}
+
+export async function updateCustomerReceipt(id: string, input: UpdateCustomerReceiptInput): Promise<CustomerReceiptDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.updateCustomerReceipt(id, input))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().updateReceipt(id, input)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function validateCustomerReceipt(id: string): Promise<CustomerReceiptValidationPreview> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.validateCustomerReceipt(id))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().validateReceipt(id)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function markCustomerReceiptReady(id: string): Promise<CustomerReceiptDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.markCustomerReceiptReady(id))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().markReceiptReady(id)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function cancelCustomerReceipt(id: string, cancellationReason: string): Promise<CustomerReceiptDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.cancelCustomerReceipt(id, cancellationReason))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().cancelReceipt(id, cancellationReason)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function postCustomerReceipt(id: string): Promise<PostCustomerReceiptResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.postCustomerReceipt(id))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().postReceipt(id)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+// ─── Receipt allocations ────────────────────────────────────────────────────
+
+export async function previewReceiptAllocation(receiptId: string, body: ReceiptAllocationRequest): Promise<ReceiptAllocationPreview> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.previewReceiptAllocation(receiptId, body))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().previewReceiptAllocationDemo(receiptId, body)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function allocateReceipt(
+  receiptId: string,
+  body: ReceiptAllocationRequest,
+  idempotencyKey: string,
+): Promise<ReceiptAllocationResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.allocateReceipt(receiptId, body, idempotencyKey))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().allocateReceiptDemo(receiptId, body)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function listReceiptAllocations(receiptId: string): Promise<ReceiptAllocationHistoryRow[]> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.listReceiptAllocations(receiptId))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  return getReceivablesDemoState().listReceiptAllocationsDemo(receiptId)
+}
+
+export async function reverseReceiptAllocation(
+  receiptId: string,
+  batchId: string,
+  reason: string,
+  idempotencyKey: string,
+): Promise<ReceiptAllocationResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.reverseReceiptAllocation(receiptId, batchId, reason, idempotencyKey))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().reverseReceiptAllocationDemo(receiptId, batchId, reason)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function reverseCustomerReceipt(
+  id: string,
+  reason: string,
+  idempotencyKey: string,
+): Promise<PostCustomerReceiptResult> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.reverseCustomerReceipt(id, reason, idempotencyKey))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  try {
+    return getReceivablesDemoState().reverseReceiptDemo(id, reason)
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+// ─── Invoice-ready dispatch lines (O2C Wave 2) ─────────────────────────────
+
+export async function listInvoiceReadyDispatchLines(
+  params?: Partial<ListInvoiceReadyQuery>,
+): Promise<DispatchLineInvoiceReadyDto[]> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.listInvoiceReadyDispatchLines(params))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  return []
+}
+
+export async function prefillInvoiceFromDispatch(
+  outboundDispatchLineIds: string[],
+): Promise<InvoicePrefillFromDispatchDto> {
+  if (isApiMode()) {
+    try {
+      return unwrap(await api.prefillInvoiceFromDispatch(outboundDispatchLineIds))
+    } catch (e) {
+      rethrowMapped(e)
+    }
+  }
+  throw new Error('Invoice prefill from dispatch requires API mode')
+}
+
+// ─── AR disputes (Wave 5) ───────────────────────────────────────────────────
+
+export async function listArDisputes(
+  filters?: Partial<api.ListArDisputesQuery>,
+): Promise<api.ArDisputeDto[]> {
+  if (!isApiMode()) throw new Error('AR disputes list requires API mode')
+  try {
+    const legalEntityId = await ensureLegalEntityId(filters?.legalEntityId)
+    return unwrap(await api.listArDisputes({ legalEntityId, ...filters }))
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function getArDispute(id: string): Promise<api.ArDisputeDto> {
+  if (!isApiMode()) throw new Error('AR dispute detail requires API mode')
+  try {
+    return unwrap(await api.getArDispute(id))
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function createArDispute(input: api.CreateArDisputeInput): Promise<api.ArDisputeDto> {
+  if (!isApiMode()) throw new Error('AR dispute create requires API mode')
+  try {
+    return unwrap(
+      await api.createArDispute({
+        ...input,
+        legalEntityId: await ensureLegalEntityId(input.legalEntityId),
+      }),
+    )
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function updateArDispute(id: string, input: api.UpdateArDisputeInput): Promise<api.ArDisputeDto> {
+  if (!isApiMode()) throw new Error('AR dispute update requires API mode')
+  try {
+    return unwrap(await api.updateArDispute(id, input))
+  } catch (e) {
+    rethrowMapped(e)
+  }
+}
+
+export async function transitionArDispute(
+  id: string,
+  body: { status: api.ArDisputeStatus; resolution?: string | null },
+): Promise<api.ArDisputeDto> {
+  if (!isApiMode()) throw new Error('AR dispute transition requires API mode')
+  try {
+    return unwrap(await api.transitionArDispute(id, body))
+  } catch (e) {
+    rethrowMapped(e)
+  }
 }

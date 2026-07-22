@@ -36,6 +36,13 @@ import { notify } from '@/store/toastStore'
 import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
 import { exportBankCashReport } from './bankCashUi'
 import { cn } from '@/utils/cn'
+import { isApiMode } from '@/config/apiConfig'
+import {
+  BANK_STATEMENT_LIVE_LINKS,
+  BANK_STATEMENT_PREVIEW_LINKS,
+} from '@/modules/accounting/treasury/bank-statements/utils/bankStatementUi'
+import { useTransferOverviewCounts } from '@/modules/accounting/treasury/transfers/hooks/useTransferOverviewCounts'
+import { TRANSFER_STATUS_LABELS } from '@/modules/accounting/treasury/transfers/utils/treasuryTransferUi'
 
 type LoadState = 'loading' | 'ready' | 'error'
 
@@ -48,6 +55,7 @@ const SEVERITY_STYLES = {
 export function BankCashOverviewPage() {
   const navigate = useNavigate()
   const perms = useBankCashPermissions()
+  const { counts: transferCounts } = useTransferOverviewCounts(isApiMode())
   const [data, setData] = useState<BankCashDashboardData | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -207,6 +215,22 @@ export function BankCashOverviewPage() {
               disabled: !perms.canImportStatement,
               onClick: () => navigate('/accounting/bank-cash/statements/import'),
             },
+            ...(isApiMode()
+              ? [
+                  {
+                    id: 'manual-statement',
+                    label: 'Manual Statement',
+                    icon: ClipboardList,
+                    onClick: () => navigate('/accounting/bank-cash/statements/manual'),
+                  },
+                  {
+                    id: 'mapping-templates',
+                    label: 'Mapping Templates',
+                    icon: ScrollText,
+                    onClick: () => navigate('/accounting/bank-cash/mapping-templates'),
+                  },
+                ]
+              : []),
             {
               id: 'cash-count',
               label: 'Record Cash Count',
@@ -235,14 +259,81 @@ export function BankCashOverviewPage() {
 
       <div className="mt-4 space-y-3">
         <BankCashDemoBanner />
+        {isApiMode() ? (
+          <div className="rounded-md border border-erp-border bg-white p-3">
+            <h2 className="mb-2 text-[13px] font-semibold text-erp-text">Bank statement import (API)</h2>
+            <div className="flex flex-wrap gap-2">
+              {BANK_STATEMENT_LIVE_LINKS.map((link) => (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className="erp-btn erp-btn-secondary h-8 px-3 text-[12px]"
+                >
+                  {link.label}
+                </Link>
+              ))}
+              {BANK_STATEMENT_PREVIEW_LINKS.map((link) => (
+                <span
+                  key={link.label}
+                  className="inline-flex h-8 cursor-not-allowed items-center rounded-md border border-dashed border-erp-border px-3 text-[12px] text-erp-muted"
+                  title="Preview — not yet available in API mode"
+                >
+                  {link.label} (preview)
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {isApiMode() ? (
+          <div className="rounded-md border border-erp-border bg-white p-3">
+            <h2 className="mb-2 text-[13px] font-semibold text-erp-text">Fund transfers (API)</h2>
+            <div className="grid grid-cols-2 gap-2 text-[12px] sm:grid-cols-4">
+              <button
+                type="button"
+                className="rounded-md bg-slate-50 px-2 py-1.5 text-left hover:bg-slate-100"
+                onClick={() => navigate('/accounting/bank-cash/transfers?status=DRAFT')}
+              >
+                <dt className="text-erp-muted">{TRANSFER_STATUS_LABELS.DRAFT}</dt>
+                <dd className="font-semibold text-erp-text">{transferCounts.draft}</dd>
+              </button>
+              <button
+                type="button"
+                className="rounded-md bg-amber-50 px-2 py-1.5 text-left hover:bg-amber-100"
+                onClick={() => navigate('/accounting/bank-cash/transfers?status=PENDING_APPROVAL')}
+              >
+                <dt className="text-amber-800">{TRANSFER_STATUS_LABELS.PENDING_APPROVAL}</dt>
+                <dd className="font-semibold text-amber-900">{transferCounts.pendingApproval}</dd>
+              </button>
+              <button
+                type="button"
+                className="rounded-md bg-sky-50 px-2 py-1.5 text-left hover:bg-sky-100"
+                onClick={() => navigate('/accounting/bank-cash/transfers?status=READY_TO_POST')}
+              >
+                <dt className="text-sky-800">{TRANSFER_STATUS_LABELS.READY_TO_POST}</dt>
+                <dd className="font-semibold text-sky-900">{transferCounts.readyToPost}</dd>
+              </button>
+              <button
+                type="button"
+                className="rounded-md bg-indigo-50 px-2 py-1.5 text-left hover:bg-indigo-100"
+                onClick={() => navigate('/accounting/bank-cash/transfers/in-transit')}
+              >
+                <dt className="text-indigo-800">{TRANSFER_STATUS_LABELS.IN_TRANSIT}</dt>
+                <dd className="font-semibold text-indigo-900">{transferCounts.inTransit}</dd>
+              </button>
+            </div>
+          </div>
+        ) : null}
         <div className="rounded-md border border-erp-border bg-white p-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-[13px] font-semibold text-erp-text">Recommended bank reconciliation flow</h2>
               <p className="text-[12px] text-erp-muted">
-                The Reconciliation Workbench is the primary screen after statements are imported and validated.
+                {isApiMode()
+                  ? 'Matching and reconciliation workbench remain preview until Phase 5B. Import and validate statements first.'
+                  : 'The Reconciliation Workbench is the primary screen after statements are imported and validated.'}
               </p>
             </div>
+            {!isApiMode() ? (
             <button
               type="button"
               className="erp-btn erp-btn-secondary h-8 px-3 text-[12px]"
@@ -250,6 +341,9 @@ export function BankCashOverviewPage() {
             >
               Open reconciliation
             </button>
+            ) : (
+              <span className="text-[12px] font-semibold text-erp-muted">Reconciliation — preview</span>
+            )}
           </div>
           <ReconciliationFlowStrip active="automatch" completedThrough="transactions" compact />
         </div>

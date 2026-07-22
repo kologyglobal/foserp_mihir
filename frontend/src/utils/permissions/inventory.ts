@@ -4,7 +4,10 @@
  */
 
 import { useMemo } from 'react'
+import { isApiMode } from '../../config/apiConfig'
+import { getStoredSession } from '../../services/api/client'
 import { getSessionUser, type ErpRole } from './index'
+import { hasWorkspaceAdminRole } from './workspaceAdmin'
 
 export const INVENTORY_PERMISSIONS = [
   'inventory.view',
@@ -189,6 +192,11 @@ function rolePermissions(role: ErpRole): InventoryPermission[] {
 }
 
 export function canInventoryPermission(permission: InventoryPermission, role?: ErpRole): boolean {
+  if (isApiMode() && hasWorkspaceAdminRole()) return true
+  if (isApiMode()) {
+    const perms = getStoredSession()?.user.permissions ?? []
+    if (perms.includes(permission)) return true
+  }
   const r = role ?? getSessionUser().role
   if (r === 'admin' || r === 'ceo' || r === 'director') return true
   return rolePermissions(r).includes(permission)

@@ -544,6 +544,8 @@ export interface CustomerDispute {
   customerName: string
   invoiceId: string
   invoiceNumber: string
+  salesOrders?: Array<{ id: string; number: string }>
+  dispatches?: Array<{ id: string; number: string | null }>
   disputeDate: string
   disputeType: DisputeType
   disputedAmount: number
@@ -775,6 +777,8 @@ export interface CustomerAgeingRow {
 export interface ReceivableAgeingResult {
   asOfDate: string
   ageingBasis: AgeingBasis
+  /** Live backend limitations (e.g. AGEING_USES_CURRENT_BALANCES). Demo omits. */
+  limitations?: string[]
   summary: {
     totalOutstanding: number
     notDue: number

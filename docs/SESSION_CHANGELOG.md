@@ -1,3 +1,4 @@
+﻿<<<<<<< Updated upstream
 ## 2026-07-21 — Purchase Setup full persistence
 
 ### Shipped
@@ -495,6 +496,123 @@ cd frontend && npm run test:purchase-phase15-all
 
 - Purchase Planning Sheet list/update + Create PO from planning
 - Optional: dual-mode FE bridge for PR when `VITE_USE_API=true`
+=======
+## 2026-07-21 - CRM route source audit (old UI string trace)
+
+### Verdict
+
+Production `/crm/leads` already rendered the **canonical** CRM stack. Visible
+strings map to current enterprise components — not a stale duplicate page:
+
+| String | Source file | Component | On `/crm/leads`? |
+|--------|-------------|-----------|------------------|
+| Quick Entry | `ErpQuickEntrySection.tsx` / `CrmLeadFormPage.tsx` | form FastTab | No (form/360 only) |
+| Smart Context | `ErpCardFormPage` / 360 pages | fact box | No (form/360 only) |
+| Create Lead | **not in source** | — | — |
+| Lead Information | **not in source** | — | — |
+| Change Stage | `LeadChangeStageControl.tsx` | Lead 360 | No (detail only) |
+| Notes | `CrmStageNotes` / form sections | 360 + form | No (detail/form) |
+
+List route chain: `crmRoutes` → `LeadListPage` → `CrmLeadListPage` →
+`CrmLeadsTable`. Detail: `Lead360Workspace`. Form: `CrmLeadFormPage`.
+
+### Fixes (indirection / alias only)
+
+- `crmRoutes` imports Lead list/form/360 from CRM modules (no `SalesPages`
+  lead wrappers).
+- Removed `LeadDetailPage` / `LeadListPage` re-exports from `SalesPages`.
+- `/crm/companies` mounts `CrmCustomersPage`; `/crm/customers` redirects.
+- CRM barrel exports `LeadListPage` / `LeadFormPage`.
+
+No business-rule, permission, or API contract changes.
+
+---
+
+### Follow-up from audits
+
+- Overlay hardening: `erp-modal` z-index 320 above drawers (200); confirm 420;
+  `CrmDeleteConfirmModal` + `SaveViewDialog` Escape / body lock / backdrop /
+  labelled dialog; `CrmDrawerShell` `closeDisabled` + unique title id.
+- Contact Save chrome: footer-only (`ErpStickySaveBar`); removed duplicate
+  header `formSaveActions`.
+- Lifecycle RBAC AND’d with status: quotation update/approve perms; Opp Won/Lost
+  + move-to-won/lost → `crm.opportunity.close`; SO Confirm →
+  `crm.sales_order.confirm`; Complete Activity on Lead360 + Quotation360 feeds.
+- QA: wired orphan scripts + `test:crm-a11y` / `test:crm-form-alignment` into
+  package.json and CRM freeze ([Audit CRM QA coverage](aa63249d-73d7-4b2e-a7cf-e2913677596c)).
+
+### Still deferred
+
+- Full Opp Edit → Quick Entry mirror; native Select → ErpSmartSelect sweep;
+  DocumentTypeSelect extract; full focus-trap / arrow-key menus.
+
+---
+
+## 2026-07-21 - CRM form / overlay / workflow alignment pass
+
+### Audit (keep working)
+
+- Shared form stack already correct for responsive grids: `ErpFormGrid`
+  desktop 3 → tablet 2 → mobile 1; CRM page forms use `CrmCardFormShell` +
+  `erp-input` heights. No redesign of working Lead/Opp/Quote/SO shells.
+- Masters catalog is centralized via `useCrmMasters` / `CrmMasterPages`
+  ([Audit CRM masters reuse](4a1d7172-0830-49e6-b54f-ff95cf696a0e)).
+
+### Minimum safe fixes shipped
+
+- **Lead RBAC:** qualify stages need `crm.lead.qualify`; convert needs
+  `crm.lead.convert` (`resolveLeadConvertActionGate`, Lead360, list row
+  actions, OpportunityNew lead-path, `LeadChangeStageControl`).
+- **Companies / Contacts registers:** pass `canEdit` permissions; contacts
+  New/Duplicate → `/crm/contacts/new`; company Edit → masters edit; remove
+  miswired Assign/Duplicate row actions.
+- **CRM masters:** New / Import / Edit / Duplicate / Delete / bulk gated on
+  `crm.master.*`.
+- **Quick create parity:** `NewContactDrawer` uses `buildContactSchema`;
+  `QuickCompanyCreateModal` industry/territory from CRM masters.
+- **Quotation lifecycle UX:** ApprovalPanel await + toasts + approve perm;
+  Customer Reject on Quote 360; hide Recall in API mode; Convert card
+  fallback navigates to SO create when no dialog host.
+- **Overlay a11y:** drawer initial focus; Modal `aria-modal` + labelled title.
+
+### Verification
+
+- Frontend `npm run typecheck` — pass after alignment edits.
+
+---
+
+## 2026-07-21 - CRM Lead→SO funnel hardening
+
+### Shipped
+
+- Quotation generic PATCH can no longer set lifecycle fields (`status`,
+  `customerApproval` on header; `status` on document). Sanitizers in
+  `quotation.workflow.ts` throw `ValidationError` (400); wired from
+  `updateQuotation` / `updateQuotationDocument`.
+- Live E2E: PATCH lifecycle rejection; confirm after convert-created SO;
+  continuous Lead→Opp→Quote→mark-sent→customer-approve→convert→confirm +
+  duplicate convert **409**. Draft-delete case no longer reuses an opportunity
+  that already has a quotation.
+- UAT-06 live path: mark-sent + customer-approve before convert; duplicate
+  convert expectation **422 → 409**.
+- Funnel toasts: Lead 360 convert gates use `notify.warning`; SO 360 confirm
+  success/errors use `notify.success` / `notify.error`.
+
+### Verification
+
+- Backend `npm run typecheck` — pass.
+- Frontend `npm run typecheck` — pass.
+- `npm run test:crm-live` — **55 passed / 3 failed**. New funnel cases all
+  passed (`rejects lifecycle fields on quotation PATCH`,
+  `confirms convert-created sales order…`, continuous Lead→…→confirm funnel,
+  duplicate 409, draft delete). Remaining failures are **local DB env**, not
+  this change: missing `crm_notes.stageCode` column (migration not applied),
+  empty locations seed.
+- `npm run test:uat-06-sales-order` — demo path hits pre-existing `@/utils`
+  resolution under `tsx`; live 409/sent/customer-approve code path updated in
+  script. Static UAT-06.3 string check also pre-existing vs current convert
+  action copy.
+>>>>>>> Stashed changes
 
 ---
 

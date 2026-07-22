@@ -91,6 +91,7 @@ Applied in order under `backend/prisma/migrations/`:
 | `20260710230000_vendor_geography_fks` | vendors + geography FKs |
 | `20260710240000_crm_masters_notes_attachments_histories` | crm_masters, crm_notes, crm_attachments, opportunity history tables |
 | `20260710212426_add_crm_quotations` | crm_quotations, crm_quotation_documents |
+| `20260718150000_add_vendor_invoice_and_ap_open_item_foundation` | vendor_invoices, vendor_invoice_lines, vendor_invoice_source_links, payable_open_items; extends finance number series + approval enums with VENDOR_INVOICE |
 
 Apply migrations non-interactively in CI/automation:
 
@@ -185,9 +186,24 @@ Re-run seed after adding new permissions: `npm run db:seed`.
 | master_items | MasterItem |
 | master_vendors | MasterVendor |
 
+### Accounting — Accounts Payable (Phases 4A1 + 4B1 foundation)
+
+| Table | Model | Notes |
+|-------|-------|-------|
+| vendor_invoices | VendorInvoice | Financial supplier bill; soft `vendorId` → `MasterVendor` (no FK); UUID id; `createdBy`/`updatedBy` audit; **no `deletedAt`** |
+| vendor_invoice_lines | VendorInvoiceLine | Cascade delete with invoice |
+| vendor_invoice_source_links | VendorInvoiceSourceLink | Optional soft links to PO/GRN/etc.; Cascade delete with invoice |
+| payable_open_items | PayableOpenItem | AP subledger; `sourceVendorInvoiceId` / `sourceVendorPaymentId` unique; Restrict on source deletes |
+| vendor_payments | VendorPayment | Settlement / advance / mixed; soft `vendorId`; `vendorPaymentNumber` null until post (4B3) |
+| vendor_payment_adjustment_lines | VendorPaymentAdjustmentLine | TDS/discount/charges; unique `(vendorPaymentId, lineNumber)` |
+| payable_allocation_batches | PayableAllocationBatch | Subledger-only; one DEBIT source open item; no GL |
+| payable_allocation_lines | PayableAllocationLine | Unique `(allocationBatchId, targetCreditOpenItemId)` |
+
+Money fields on AP tables use `@db.Decimal(18, 4)`; exchange rates `@db.Decimal(18, 8)`. Line quantities `@db.Decimal(18, 6)`.
+
 ### Not in database (frontend demo only)
 
-Purchase orders, GRN, inventory transactions, work orders, BOM, routing, quality inspections, dispatch, invoices, sales orders, finance ledger — all live in Zustand stores only.
+Purchase orders, GRN, inventory transactions, work orders, BOM, routing, quality inspections, dispatch, sales orders — live in Zustand stores only. **Finance ledger operational screens** beyond shipped AR/Money In and AP vendor-invoice Money Out remain demo/mock where noted. AP **payment HTTP** and allocation execution are not shipped (4B2+).
 
 ## Indexing conventions
 
@@ -197,4 +213,4 @@ Purchase orders, GRN, inventory transactions, work orders, BOM, routing, quality
 
 ## Decimal / money
 
-Financial amounts use `@db.Decimal(18, 2)` or `(18, 4)` for quantities. Services use `decimalToNumber()` when returning JSON.
+Financial amounts use `@db.Decimal(18, 2)` or `(18, 4)` for quantities and AP/AR money fields. Services use `decimalToNumber()` when returning JSON.

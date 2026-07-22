@@ -118,7 +118,7 @@ export function CrmQuickCreateMenu({ className, variant = 'suite' }: CrmQuickCre
   const triggerClass =
     variant === 'suite'
       ? 'd365-suite-quick-action hidden sm:inline-flex'
-      : 'erp-type-caption-strong hidden h-8 items-center gap-1.5 rounded-[4px] bg-erp-primary px-2.5 !text-white transition-colors hover:bg-erp-primary-hover sm:inline-flex'
+      : 'erp-type-caption-strong hidden h-8 items-center gap-1.5 rounded-md border border-erp-border bg-white px-2.5 text-erp-text shadow-none transition-colors hover:border-erp-primary/30 hover:bg-erp-primary-soft hover:text-erp-primary sm:inline-flex'
 
   return (
     <div ref={rootRef} className={cn('relative', className)}>

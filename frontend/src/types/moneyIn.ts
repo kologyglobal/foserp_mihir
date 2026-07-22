@@ -1,7 +1,13 @@
 /** Money In (AR) DTOs — amounts as decimal strings matching backend Phase 3A. */
 
-export type SalesInvoiceStatus = 'DRAFT' | 'READY_TO_POST' | 'POSTED' | 'CANCELLED'
-export type SalesInvoiceSourceType = 'DIRECT' | 'SALES_ORDER'
+export type SalesInvoiceStatus = 'DRAFT' | 'READY_TO_POST' | 'POSTED' | 'CANCELLED' | 'REVERSED'
+export type SalesInvoiceSourceType = 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH'
+export type SalesInvoiceSettlementStatus =
+  | 'UNPAID'
+  | 'PARTIALLY_PAID'
+  | 'PAID'
+  | 'OVERDUE'
+  | 'NOT_APPLICABLE'
 export type SalesInvoiceSupplyType = 'INTRA_STATE' | 'INTER_STATE' | 'EXPORT' | 'SEZ' | 'NON_GST'
 export type SalesInvoiceTaxTreatment =
   | 'REGISTERED'
@@ -32,6 +38,8 @@ export interface SalesInvoiceAllowedActions {
   markReady: boolean
   cancel: boolean
   post: boolean
+  /** POSTED + no posted allocations + finance.ar.invoice.reverse. */
+  reverse?: boolean
   viewAccounting?: boolean
 }
 
@@ -141,6 +149,10 @@ export interface SalesInvoiceDto {
   cancelledAt: string | null
   cancelledBy: string | null
   cancellationReason: string | null
+  reversalVoucherId?: string | null
+  reversedAt?: string | null
+  reversedBy?: string | null
+  reversalReason?: string | null
   createdBy: string | null
   updatedBy: string | null
   createdAt: string
@@ -150,6 +162,109 @@ export interface SalesInvoiceDto {
   validationSummary?: SalesInvoiceValidationPreview | null
   metaWarnings?: Array<{ code: string; message: string }>
   receivableOpenItemId?: string | null
+  settlementStatus?: SalesInvoiceSettlementStatus
+  projectRef?: string | null
+  projectNameSnapshot?: string | null
+  sourceLinks?: SalesInvoiceSourceLinkDto[]
+}
+
+export interface SalesInvoiceSourceLinkDto {
+  id?: string
+  sourceType: 'SALES_ORDER' | 'OUTBOUND_DISPATCH' | 'DELIVERY_CHALLAN'
+  sourceDocumentId: string
+  sourceLineId: string | null
+  salesOrderId: string | null
+  salesOrderLineId: string | null
+  deliveryChallanId: string | null
+  deliveryChallanLineId: string | null
+  quantity: string
+  status?: 'ACTIVE' | 'RELEASED'
+  sourceDocumentNumberSnapshot?: string | null
+  itemId?: string | null
+  itemCodeSnapshot?: string | null
+  itemNameSnapshot?: string | null
+}
+
+export interface SalesInvoiceSourceLinkInput {
+  sourceType: 'SALES_ORDER' | 'OUTBOUND_DISPATCH' | 'DELIVERY_CHALLAN'
+  sourceDocumentId: string
+  sourceLineId?: string | null
+  salesOrderId?: string | null
+  salesOrderLineId?: string | null
+  deliveryChallanId?: string | null
+  deliveryChallanLineId?: string | null
+  quantity: string
+  itemId?: string | null
+}
+
+/** Confirmed dispatch line with remaining invoice-ready quantity (O2C Wave 2). */
+export interface DispatchLineInvoiceReadyDto {
+  outboundDispatchId: string
+  outboundDispatchLineId: string
+  dispatchNo: string
+  salesOrderId: string | null
+  salesOrderNo: string | null
+  salesOrderLineId: string | null
+  customerId: string | null
+  customerName: string | null
+  itemId: string
+  itemCode: string | null
+  itemName: string | null
+  warehouseId: string
+  dispatchedQty: string
+  invoicedQty: string
+  invoiceReadyQty: string
+  confirmedAt: string | null
+  deliveryChallanId: string | null
+  deliveryChallanNumber: string | null
+  deliveryChallanLineId: string | null
+}
+
+export interface InvoicePrefillFromDispatchDto {
+  customerId: string
+  sourceType: 'OUTBOUND_DISPATCH'
+  sourceDocumentId: string
+  salesOrderId: string | null
+  projectRef: string | null
+  projectNameSnapshot: string | null
+  billingAddress: unknown
+  shippingAddress: unknown
+  customerPoNumber: string | null
+  paymentTermsDays: number | null
+  freightAmount: string
+  lines: Array<{
+    lineNumber: number
+    itemId: string
+    itemCode: string | null
+    itemName: string | null
+    description: string
+    quantity: string
+    unitPrice: string
+    discountPct: number
+    taxPct: number
+    sourceLineId: string
+    outboundDispatchLineId: string
+    outboundDispatchId: string
+    salesOrderId: string | null
+    salesOrderLineId: string | null
+    deliveryChallanId: string | null
+    deliveryChallanLineId: string | null
+    projectRef: string | null
+    projectNameSnapshot: string | null
+    uom: string | null
+    hsnCode: string | null
+  }>
+  sourceLinks: SalesInvoiceSourceLinkInput[]
+}
+
+export interface ListInvoiceReadyQuery {
+  customerId?: string
+  salesOrderId?: string
+  outboundDispatchId?: string
+  search?: string
+  page?: number
+  limit?: number
+  readyOnly?: boolean
 }
 
 export type SalesInvoiceListItemDto = Omit<SalesInvoiceDto, 'lines' | 'validationSummary'>
@@ -194,6 +309,9 @@ export interface CreateSalesInvoiceInput {
   referenceNumber?: string | null
   customerPoNumber?: string | null
   narration?: string | null
+  projectRef?: string | null
+  projectNameSnapshot?: string | null
+  sourceLinks?: SalesInvoiceSourceLinkInput[]
   invoiceDiscountType?: 'PERCENTAGE' | 'AMOUNT'
   invoiceDiscountValue?: string
   lines: SalesInvoiceLineInput[]
@@ -221,6 +339,13 @@ export interface PostSalesInvoiceResult {
   invoice: SalesInvoiceDto
   posting: { voucherId: string; voucherNumber: string; postingEventId: string }
   receivableOpenItemId: string
+  idempotentReplay: boolean
+}
+
+export interface ReverseSalesInvoiceResult {
+  invoice: SalesInvoiceDto
+  posting: { voucherId: string; voucherNumber: string; postingEventId: string }
+  reversalVoucherId: string
   idempotentReplay: boolean
 }
 
@@ -369,6 +494,7 @@ export type CustomerCreditNoteStatus =
   | 'POSTED'
   | 'REJECTED'
   | 'CANCELLED'
+  | 'REVERSED'
 
 export type CreditNotePurpose =
   | 'SALES_RETURN'
@@ -506,6 +632,10 @@ export interface CustomerCreditNoteDto {
   cancelledAt: string | null
   cancelledBy: string | null
   cancellationReason: string | null
+  reversalVoucherId?: string | null
+  reversedAt?: string | null
+  reversedBy?: string | null
+  reversalReason?: string | null
   createdBy: string | null
   updatedBy: string | null
   createdAt: string
@@ -644,6 +774,9 @@ export interface CreditNoteAllocationBatchDto {
   createdBy: string | null
   createdAt: string
   completedAt: string | null
+  reversedAt?: string | null
+  reversedBy?: string | null
+  reversalReason?: string | null
 }
 
 export interface CustomerCreditNoteAllocationDto {
@@ -694,6 +827,343 @@ export interface CreditNoteAllocationResult {
 }
 
 export interface CreditNoteAllocationHistoryRow {
+  batchId: string | null
+  allocationId: string
+  allocationDate: string
+  allocationSequence: number
+  invoiceId: string | null
+  invoiceNumber: string | null
+  invoiceOpenItemId: string
+  allocatedAmount: string
+  baseAllocatedAmount: string
+  invoiceOutstandingBefore: string | null
+  invoiceOutstandingAfter: string | null
+  status: string
+  createdBy: string | null
+  createdAt: string
+}
+
+// ─── Customer receipts (Phase 3B6) ─────────────────────────────────────────
+
+export type CustomerReceiptStatus = 'DRAFT' | 'READY_TO_POST' | 'POSTED' | 'CANCELLED' | 'REVERSED'
+export type CustomerReceiptPaymentMethod = 'BANK_TRANSFER' | 'CASH' | 'CHEQUE' | 'UPI' | 'CARD' | 'OTHER'
+export type CustomerReceiptSourceType = 'DIRECT' | 'BANK_IMPORT'
+export type CustomerTdsMode = 'NONE' | 'AMOUNT' | 'PERCENTAGE'
+export type CustomerReceiptDeductionType = 'BANK_CHARGE' | 'OTHER_DEDUCTION'
+
+export interface CustomerReceiptAllowedActions {
+  edit: boolean
+  validate: boolean
+  markReady: boolean
+  cancel: boolean
+  post: boolean
+  allocate: boolean
+  viewAllocations?: boolean
+  viewAccounting?: boolean
+  viewCreditOpenItem?: boolean
+  /** POSTED + no posted allocations + finance.ar.receipt.reverse permission. */
+  reverse?: boolean
+}
+
+export interface CustomerReceiptTdsDto {
+  mode: CustomerTdsMode
+  value: string | null
+  calculationBase: string | null
+  sectionCode: string | null
+  certificateReference: string | null
+  accountId: string | null
+  amount: string
+}
+
+export interface CustomerReceiptDeductionLineDto {
+  id: string
+  lineNumber: number
+  type: CustomerReceiptDeductionType
+  code: string | null
+  description: string
+  amount: string
+  baseAmount: string
+  accountId: string | null
+}
+
+export interface CustomerReceiptCreditOpenItemSummary {
+  id: string
+  status: string
+  outstandingAmount: string
+  originalAmount: string
+}
+
+export interface CustomerReceiptDto {
+  id: string
+  tenantId: string
+  legalEntityId: string
+  branchId: string | null
+  financialYearId: string | null
+  receiptNumber: string | null
+  draftReference: string | null
+  status: CustomerReceiptStatus
+  customerId: string
+  customerCodeSnapshot: string | null
+  customerNameSnapshot: string
+  customerGstinSnapshot: string | null
+  customerPanSnapshot: string | null
+  customerStateCodeSnapshot: string | null
+  customerCountryCodeSnapshot?: string | null
+  customerBillingAddressSnapshot: Record<string, unknown> | null
+  sourceType: CustomerReceiptSourceType
+  sourceDocumentId: string | null
+  sourceDocumentNumberSnapshot: string | null
+  paymentMethod: CustomerReceiptPaymentMethod
+  receiptDate: string
+  postingDate: string | null
+  valueDate: string | null
+  referenceNumber: string | null
+  transactionReference: string | null
+  customerBankReference: string | null
+  chequeNumber: string | null
+  chequeDate: string | null
+  bankName: string | null
+  currencyCode: string
+  exchangeRate: string
+  grossReceiptAmount: string
+  customerTdsAmount: string
+  bankChargeAmount: string
+  otherDeductionAmount: string
+  bankCashAmount: string
+  allocatableAmount: string
+  allocatedAmount: string
+  unallocatedAmount: string
+  baseGrossReceiptAmount: string
+  baseCustomerTdsAmount: string
+  baseBankChargeAmount: string
+  baseOtherDeductionAmount: string
+  baseBankCashAmount: string
+  baseAllocatableAmount: string
+  baseAllocatedAmount: string
+  baseUnallocatedAmount: string
+  bankCashAccountId: string | null
+  customerReceivableAccountId: string | null
+  bankChargeAccountId: string | null
+  customerTdsReceivableAccountId: string | null
+  otherDeductionAccountId: string | null
+  customerTds: CustomerReceiptTdsDto | null
+  accountingVoucherId: string | null
+  postingEventId: string | null
+  creditOpenItemId: string | null
+  narration: string | null
+  internalRemarks: string | null
+  postedAt: string | null
+  postedBy: string | null
+  cancelledAt: string | null
+  cancelledBy: string | null
+  cancellationReason: string | null
+  reversalVoucherId?: string | null
+  reversedAt?: string | null
+  reversedBy?: string | null
+  reversalReason?: string | null
+  createdBy: string | null
+  updatedBy: string | null
+  createdAt: string
+  updatedAt: string
+  bankCharges?: CustomerReceiptDeductionLineDto[]
+  otherDeductions?: CustomerReceiptDeductionLineDto[]
+  allowedActions?: CustomerReceiptAllowedActions
+  validationSummary?: { valid: boolean; errors: CalculationIssue[]; warnings: CalculationIssue[] } | null
+  metaWarnings?: Array<{ code: string; message: string }>
+  /** Populated only when status=POSTED. */
+  creditOpenItem?: CustomerReceiptCreditOpenItemSummary | null
+  ledgerEntryCount?: number
+}
+
+export type CustomerReceiptListItemDto = Omit<CustomerReceiptDto, 'bankCharges' | 'otherDeductions' | 'validationSummary'>
+
+export interface CustomerReceiptBankChargeInput {
+  description: string
+  amount: string
+  accountId?: string | null
+}
+
+export interface CustomerReceiptOtherDeductionInput {
+  code: string
+  description: string
+  amount: string
+  accountId?: string | null
+}
+
+export interface CustomerReceiptTdsInput {
+  mode: CustomerTdsMode
+  value?: string | null
+  calculationBase?: string | null
+  sectionCode?: string | null
+  certificateReference?: string | null
+  accountId?: string | null
+}
+
+export interface CreateCustomerReceiptInput {
+  legalEntityId: string
+  branchId?: string | null
+  customerId: string
+  sourceType?: CustomerReceiptSourceType
+  sourceDocumentId?: string | null
+  sourceDocumentNumber?: string | null
+  receiptDate: string
+  postingDate: string
+  valueDate?: string | null
+  paymentMethod: CustomerReceiptPaymentMethod
+  currencyCode?: string
+  exchangeRate?: string
+  bankCashAmount: string
+  bankCashAccountId: string
+  customerReceivableAccountId?: string | null
+  customerTds?: CustomerReceiptTdsInput | null
+  bankCharges?: CustomerReceiptBankChargeInput[] | null
+  otherDeductions?: CustomerReceiptOtherDeductionInput[] | null
+  instrumentNumber?: string | null
+  instrumentDate?: string | null
+  bankReference?: string | null
+  transactionReference?: string | null
+  narration?: string | null
+  notes?: string | null
+}
+
+export interface UpdateCustomerReceiptInput extends Omit<CreateCustomerReceiptInput, 'legalEntityId'> {
+  updatedAt: string
+}
+
+export interface ListCustomerReceiptsQuery {
+  legalEntityId: string
+  branchId?: string
+  customerId?: string
+  status?: CustomerReceiptStatus
+  paymentMethod?: CustomerReceiptPaymentMethod
+  sourceType?: CustomerReceiptSourceType
+  search?: string
+  page?: number
+  limit?: number
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface CustomerReceiptValidationPreview {
+  valid: boolean
+  errors: CalculationIssue[]
+  warnings: CalculationIssue[]
+}
+
+export interface PostCustomerReceiptResult {
+  receipt: CustomerReceiptDto
+  posting: { voucherId: string; voucherNumber: string; postingEventId: string }
+  creditOpenItemId: string
+  idempotentReplay: boolean
+}
+
+// ─── Receipt allocations (Phase 3B5 backend / 3B6 frontend) ────────────────
+
+export interface ReceiptAllocationLineInput {
+  invoiceId: string
+  invoiceOpenItemId: string
+  amount: string
+}
+
+export interface ReceiptAllocationRequest {
+  allocationDate: string
+  allocations: ReceiptAllocationLineInput[]
+}
+
+export interface ReceiptAllocationPreviewLine {
+  invoiceId: string
+  invoiceOpenItemId: string
+  invoiceNumber: string | null
+  currencyCode: string
+  invoiceOutstandingBefore: string
+  proposedAllocationAmount: string
+  invoiceOutstandingAfter: string
+  baseInvoiceOutstandingBefore: string
+  baseProposedAllocationAmount: string
+  baseInvoiceOutstandingAfter: string
+  status: 'VALID' | 'INVALID'
+  issues: CalculationIssue[]
+}
+
+export interface ReceiptAllocationPreview {
+  receiptId: string
+  creditOpenItemId: string
+  currencyCode: string
+  exchangeRate: string
+  receiptUnallocatedBefore: string
+  totalProposedAllocation: string
+  receiptUnallocatedAfter: string
+  customerAdvanceAfter: string
+  valid: boolean
+  lines: ReceiptAllocationPreviewLine[]
+  errors: CalculationIssue[]
+  warnings: CalculationIssue[]
+}
+
+export interface ReceiptAllocationBatchDto {
+  id: string
+  status: string
+  allocationDate: string
+  currencyCode: string
+  exchangeRate: string
+  totalAllocatedAmount: string
+  baseTotalAllocatedAmount: string
+  allocationCount: number
+  createdBy: string | null
+  createdAt: string
+  completedAt: string | null
+  reversedAt?: string | null
+  reversedBy?: string | null
+  reversalReason?: string | null
+}
+
+export interface CustomerReceiptAllocationDto {
+  id: string
+  batchId: string | null
+  receiptId: string
+  invoiceId: string | null
+  invoiceOpenItemId: string
+  allocationDate: string
+  allocatedAmount: string
+  baseAllocatedAmount: string
+  invoiceOutstandingBefore: string | null
+  invoiceOutstandingAfter: string | null
+  status: string
+  createdBy: string | null
+  createdAt: string
+}
+
+export interface ReceiptAllocationResultInvoiceRow {
+  invoiceId: string
+  openItemId: string
+  openAmount: string
+  allocatedAmount: string
+  status: string
+  amountPaid: string
+  outstandingAmount: string
+}
+
+export interface ReceiptAllocationResult {
+  batch: ReceiptAllocationBatchDto
+  allocations: CustomerReceiptAllocationDto[]
+  receipt: {
+    id: string
+    allocatedAmount: string
+    unallocatedAmount: string
+    baseAllocatedAmount: string
+    baseUnallocatedAmount: string
+  }
+  creditOpenItem: {
+    id: string
+    openAmount: string
+    allocatedAmount: string
+    status: string
+  }
+  invoices: ReceiptAllocationResultInvoiceRow[]
+  customerAdvance: string
+  idempotentReplay: boolean
+}
+
+export interface ReceiptAllocationHistoryRow {
   batchId: string | null
   allocationId: string
   allocationDate: string

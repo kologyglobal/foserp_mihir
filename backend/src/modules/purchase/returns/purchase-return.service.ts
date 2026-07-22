@@ -3,6 +3,8 @@ import { prisma } from '../../../config/database.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
 import { resolveEffectivePurchaseDefaults } from '../shared/purchase-defaults.js'
+import { postPurchaseReturnStockIssue } from '../shared/purchase-inventory-posting.js'
+import { tryRecordInventoryAccountingEventsForMovements } from '../../inventory/accounting/inventory-accounting-event.service.js'
 import { PurchaseReturnNotFoundError, PurchaseReturnValidationError } from './purchase-return.errors.js'
 import { mapPurchaseReturn } from './purchase-return.mapper.js'
 import * as repo from './purchase-return.repository.js'
@@ -20,7 +22,7 @@ async function resolveReturnRefs(tenantId: string, input: Pick<CreatePurchaseRet
   if (!vendor) throw new PurchaseReturnValidationError('Vendor not found or inactive.')
   const po = input.purchaseOrderId ? await prisma.purchaseOrder.findFirst({ where: { id: input.purchaseOrderId, ...tenantActiveFilter(tenantId), vendorId: input.vendorId }, include: { lines: true } }) : null
   const grn = input.goodsReceiptId ? await prisma.goodsReceipt.findFirst({ where: { id: input.goodsReceiptId, ...tenantActiveFilter(tenantId), vendorId: input.vendorId }, include: { lines: true } }) : null
-  const qi = input.qualityInspectionId ? await prisma.qualityInspection.findFirst({ where: { id: input.qualityInspectionId, ...tenantActiveFilter(tenantId), vendorId: input.vendorId }, include: { lines: true } }) : null
+  const qi = input.qualityInspectionId ? await prisma.purchaseQualityInspection.findFirst({ where: { id: input.qualityInspectionId, ...tenantActiveFilter(tenantId), vendorId: input.vendorId }, include: { lines: true } }) : null
   if (input.purchaseOrderId && !po) throw new PurchaseReturnValidationError('Invalid purchase order.')
   if (input.goodsReceiptId && !grn) throw new PurchaseReturnValidationError('Invalid goods receipt.')
   if (input.qualityInspectionId && !qi) throw new PurchaseReturnValidationError('Invalid quality inspection.')
@@ -122,12 +124,32 @@ export async function submitPurchaseReturn(tenantId: string, id: string, actorId
 }
 export async function completePurchaseReturn(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
   const existing = await loadOrThrow(tenantId, id); assertReturnStatus(existing.status, ['SUBMITTED', 'APPROVED', 'SHIPPED'], 'completed')
-  await prisma.$transaction(async (tx) => {
+  const warehouseId = existing.warehouseId
+  if (!warehouseId) throw new PurchaseReturnValidationError('Warehouse is required to complete a purchase return.')
+  const returnMovements = await prisma.$transaction(async (tx) => {
     for (const line of existing.lines.filter((item) => item.purchaseOrderLineId)) await tx.purchaseOrderLine.updateMany({
       where: { id: line.purchaseOrderLineId!, tenantId }, data: { returnedQuantity: { increment: returnQty(line.returnQuantity) } },
     })
+    const movements = await postPurchaseReturnStockIssue({
+      tenantId,
+      returnId: existing.id,
+      returnNumber: existing.returnNumber,
+      warehouseId,
+      lines: existing.lines,
+      actorId,
+      tx,
+    })
     await repo.updatePurchaseReturn(tenantId, id, { status: 'COMPLETED', completedAt: new Date(), updatedById: actorId, remarks: body.remarks?.trim() || existing.remarks }, tx)
     await repo.addReturnHistory(tenantId, id, existing.returnNumber, 'RETURN_COMPLETED', existing.status, 'COMPLETED', actorId, body.remarks, tx)
+    return movements
+  })
+  // Return issues post with generic ISS reference — pass the explicit event type.
+  await tryRecordInventoryAccountingEventsForMovements(null, tenantId, returnMovements, {
+    eventType: 'PURCHASE_RETURN',
+    sourceDocumentType: 'PURCHASE_RETURN',
+    sourceDocumentId: existing.id,
+    narration: `Purchase return ${existing.returnNumber}`,
+    userId: actorId,
   })
   return mapPurchaseReturn(await loadOrThrow(tenantId, id))
 }

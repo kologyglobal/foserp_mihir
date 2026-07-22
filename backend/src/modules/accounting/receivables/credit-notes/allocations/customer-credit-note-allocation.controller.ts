@@ -7,9 +7,11 @@ import { CreditNoteAllocationIdempotencyKeyRequiredError } from './customer-cred
 import { previewAllocateCustomerCreditNote } from './customer-credit-note-allocation-preview.service.js'
 import { listAllocationsForCreditNote } from './customer-credit-note-allocation-read.service.js'
 import { allocateCustomerCreditNote } from './customer-credit-note-allocation.service.js'
+import { reverseCustomerCreditNoteAllocation } from './customer-credit-note-allocation-reverse.service.js'
 import type {
   AllocateCustomerCreditNoteBodyInput,
   ListCreditNoteAllocationsQueryInput,
+  ReverseCreditNoteAllocationBodyInput,
 } from './customer-credit-note-allocation.schemas.js'
 
 function getIdempotencyKey(req: Request): string {
@@ -41,6 +43,24 @@ export const postCreditNoteAllocation = asyncHandler(async (req: Request, res: R
     },
   )
   return sendSuccess(res, 'credit note allocation posted', result)
+})
+
+export const reverseCreditNoteAllocation = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const creditNoteId = getRouteParam(req, 'creditNoteId')
+  const batchId = getRouteParam(req, 'batchId')
+  const body = req.body as ReverseCreditNoteAllocationBodyInput
+  const result = await reverseCustomerCreditNoteAllocation(
+    { creditNoteId, batchId, reason: body.reason },
+    {
+      tenantId,
+      userId: req.context!.userId,
+      idempotencyKey: getIdempotencyKey(req),
+      ipAddress: req.ip ?? null,
+      userAgent: (req.headers['user-agent'] as string | undefined) ?? null,
+    },
+  )
+  return sendSuccess(res, 'credit note allocation reversed', result)
 })
 
 export const getCreditNoteAllocations = asyncHandler(async (req: Request, res: Response) => {

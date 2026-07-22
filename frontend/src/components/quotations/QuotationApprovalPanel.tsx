@@ -1,10 +1,15 @@
 import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { useState } from 'react'
 import { useCrmStore } from '../../store/crmStore'
+import { resolveStoreAction } from '../../store/storeAction'
+import { notify } from '../../store/toastStore'
 import { APPROVAL_AMOUNT_THRESHOLD, DISCOUNT_APPROVAL_THRESHOLD } from '../../types/crm'
 import { LiveStatusBadge } from '../premium/LiveStatusBadge'
 import { quotationStatusLabel, quotationStatusTone } from './QuotationCrmCard'
 import { cn } from '../../utils/cn'
 import { systemConfirm, systemPrompt } from '../../utils/systemConfirm'
+import { canCrmPermission } from '../../utils/permissions/crm'
+import { ErpButton } from '../erp/ErpButton'
 
 interface QuotationApprovalPanelProps {
   documentId: string
@@ -14,12 +19,61 @@ export function QuotationApprovalPanel({ documentId }: QuotationApprovalPanelPro
   const doc = useCrmStore((s) => s.getQuotationDocument(documentId))
   const approve = useCrmStore((s) => s.approveQuotationDocument)
   const reject = useCrmStore((s) => s.rejectQuotationDocument)
+  const [busy, setBusy] = useState(false)
+  const canApprovePerm = canCrmPermission('crm.quotation.approve')
 
   if (!doc) return null
 
   const maxDiscount = doc.priceLines.reduce((m, l) => Math.max(m, l.discountPct), 0)
   const needsDirector = doc.totalAmount > APPROVAL_AMOUNT_THRESHOLD
   const needsDiscountApproval = maxDiscount > DISCOUNT_APPROVAL_THRESHOLD
+
+  async function handleApprove() {
+    if (!canApprovePerm || busy) return
+    setBusy(true)
+    try {
+      const r = await resolveStoreAction(approve(documentId, 'Approved by manager'))
+      if (!r.ok) {
+        notify.error(r.error ?? 'Could not approve quotation')
+        return
+      }
+      notify.success('Quotation approved')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleReject() {
+    if (!canApprovePerm || busy) return
+    const ok = await systemConfirm({
+      title: 'Reject quotation?',
+      description: 'This quotation will be marked rejected. You can create a revision afterward.',
+      confirmLabel: 'Continue',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    })
+    if (!ok) return
+    const remarks = await systemPrompt({
+      title: 'Rejection remarks',
+      fieldLabel: 'Remarks',
+      placeholder: 'Why is this quotation being rejected?',
+      confirmLabel: 'Reject',
+      variant: 'danger',
+      required: true,
+    })
+    if (!remarks) return
+    setBusy(true)
+    try {
+      const r = await resolveStoreAction(reject(documentId, remarks))
+      if (!r.ok) {
+        notify.error(r.error ?? 'Could not reject quotation')
+        return
+      }
+      notify.success('Quotation rejected')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -48,43 +102,28 @@ export function QuotationApprovalPanel({ documentId }: QuotationApprovalPanelPro
 
         {doc.status === 'pending_approval' ? (
           <div className="mt-4 flex flex-wrap gap-2">
-            <button
+            <ErpButton
               type="button"
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-erp-success px-4 py-2.5 text-[13px] font-semibold text-white hover:opacity-90 sm:flex-none"
-              onClick={() => approve(documentId, 'Approved by manager')}
+              variant="primary"
+              icon={CheckCircle}
+              className="flex-1 sm:flex-none"
+              disabled={!canApprovePerm || busy}
+              disabledReason={!canApprovePerm ? 'Requires crm.quotation.approve' : undefined}
+              onClick={() => void handleApprove()}
             >
-              <CheckCircle className="h-4 w-4" />
-              Approve
-            </button>
-            <button
+              {busy ? 'Working…' : 'Approve'}
+            </ErpButton>
+            <ErpButton
               type="button"
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-erp-danger/40 bg-erp-danger-soft/20 px-4 py-2.5 text-[13px] font-semibold text-erp-danger hover:bg-erp-danger-soft/40 sm:flex-none"
-              onClick={() => {
-                void (async () => {
-                  const ok = await systemConfirm({
-                    title: 'Reject quotation?',
-                    description: 'This quotation will be marked rejected. You can create a revision afterward.',
-                    confirmLabel: 'Continue',
-                    cancelLabel: 'Cancel',
-                    variant: 'danger',
-                  })
-                  if (!ok) return
-                  const remarks = await systemPrompt({
-                    title: 'Rejection remarks',
-                    fieldLabel: 'Remarks',
-                    placeholder: 'Why is this quotation being rejected?',
-                    confirmLabel: 'Reject',
-                    variant: 'danger',
-                    required: true,
-                  })
-                  if (!remarks) return
-                  reject(documentId, remarks)
-                })()
-              }}
+              variant="danger"
+              icon={XCircle}
+              className="flex-1 sm:flex-none"
+              disabled={!canApprovePerm || busy}
+              disabledReason={!canApprovePerm ? 'Requires crm.quotation.approve' : undefined}
+              onClick={() => void handleReject()}
             >
-              <XCircle className="h-4 w-4" />
               Reject
-            </button>
+            </ErpButton>
           </div>
         ) : null}
 

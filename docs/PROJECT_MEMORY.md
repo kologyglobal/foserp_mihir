@@ -1,6 +1,6 @@
 # FOS ERP — Project Memory
 
-> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-20** (PR line PO track: id + number snapshot + CONVERTED on Planning/RFQ→PO; UI PO No. read-only; GRN still next; finance Phase 3C5 credit-note allocation backend verified 2026-07-18).
+> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-21** (Purchase Setup full persistence + Invoice/QI/Return; **Dispatch 7C0–7C4**; manufacturing through forms/7A; finance Bank & Cash 5A–5D + Budgeting + FA). Next Manufacturing (approval): **7C5 hardened posting** — do not auto-start. Migrations through `20260721210000_dispatch_phase7c4_delivery_challan` / purchase setup migrations deployed.
 
 ---
 
@@ -14,8 +14,8 @@
 | **Architecture** | React SPA + Node.js/Express API + MySQL 8 |
 | **Tenancy** | Multi-tenant SaaS — shared database, shared schema |
 | **Tenant scope** | Every tenant-owned record scoped by `tenantId` |
-| **Current backend scope** | Auth, RBAC, CRM, masters; finance Phase 1 setup; Phase 2A ledger foundation; Phase 2B internal posting engine; Phase 2C1 manual journal drafts; Phase 2C2A approvals; Phase 2C2B post approved journals to GL; Phase 3A1–3A6 AR sales invoice + Money In FE; Phase 3B1–3B5 customer receipt/allocation; Phase 3C1–3C4 customer credit-note foundation through atomic posting; **Phase 3C5 credit-note allocation (subledger-only, applies posted CN credit to invoice DEBIT open items, unified with receipt allocation read APIs)**; **Purchase** PR + Planning (+ create-po) + RFQ/VQ/comparison/award→draft PO; Phase 14–16 (validation, tests, final QA); FE dual-mode for that slice only |
-| **Deferred backend** | Finance **Phase 3B6** receipt workspace UI; **Phase 3C6** credit-note frontend; receipt/allocation/credit-note reversal; **Phase 2C3** journal reversal; purchase full PO lifecycle/GRN; inventory/production; SO MRP/dispatch/invoice beyond CRM Phase 1 |
+| **Current backend scope** | Auth, RBAC, CRM, masters; finance (Phase 1–5D Bank & Cash, Budgeting Phase 1, Fixed Assets 1–3, AR/AP through credit-note allocation); manufacturing 1–2B + **materials 3C** + **7A** + planning/costing + **live multilevel BOM combined-CSV import**; inventory 3A; **Purchase** PR + Planning + RFQ/VQ/comparison/award→PO + GRN + Setup full persistence + Invoice/QI/Return; **quality 4A/4B**; **Dispatch 7C0–7C4** (fulfilment + workbench + reservation/pick + packing + Delivery Challan document-only) |
+| **Deferred backend** | Sales invoice document reverse; **7C5 hardened posting**; incoming GRN QC; **AIS / cron (5D4)**; FX treasury, intercompany, cheque print; FA/GST returns; Budgeting Phase 2+; finance receipt/allocation/credit-note reversal; SO MRP beyond Phase 1 |
 
 ---
 
@@ -165,6 +165,20 @@ Seeded in `backend/prisma/seed.ts`: Super Admin, Tenant Admin, CRM Admin, Master
 | Server exports | `utils/crmServerExport.ts` → `runCrmExport()` |
 | Notes panel | `components/crm/shared/EntityNotesPanel.tsx` |
 | Notes drawer | `components/crm/shared/CrmEntityDetailDrawer.tsx` |
+| Accounting master lookups (FE) | `services/api/accountingLookupsApi.ts` → `/accounting/lookups/*` |
+| Accounting master resolvers (BE) | `backend/src/modules/accounting/shared/master-resolvers/` |
+
+---
+
+## Accounting master reuse (architecture invariant)
+
+AR/AP invoices reuse the **real** masters — never parallel finance copies:
+
+- `SalesInvoice.customerId` soft-links `CrmCompany`; `VendorInvoice.vendorId` soft-links `MasterVendor`. **No `FinanceCustomer` / `FinanceVendor` tables — ever** (guardrail test in `tests/finance/finance-ar-master-reuse.test.ts`).
+- SO / PO / GRN are soft references, application-validated (existence, tenant, party match, status eligibility) via `accounting-source-document-resolver`. No Prisma FKs from invoices to masters or source docs.
+- Party/item snapshots persist on the invoice at draft write and are the historical SoT once posted. **Refresh-from-master is DRAFT-only** (`POST …/refresh-from-master[/preview]` on SI and VI).
+- FE pickers use `/accounting/lookups/*` in API mode (`accountingLookupsApi.ts`, `source="accounting"` on `CustomerMasterSelect`/`VendorMasterSelect`); demo mode keeps store data. Never mock-fallback in API mode.
+- Details: `docs/accounting/ACCOUNTING_MASTER_REUSE.md`, `docs/accounting/INVOICE_UX_STANDARD.md`.
 
 ---
 
@@ -192,4 +206,15 @@ Seeded in `backend/prisma/seed.ts`: Super Admin, Tenant Admin, CRM Admin, Master
 | `docs/TESTING_STATUS.md` | Verified test results |
 | `docs/REMAINING_WORK.md` | Prioritized backlog |
 | `docs/MASTER_REGISTRY.md` | Canonical master routes, aliases, dual-source warnings |
+| `docs/ui/production/MANUFACTURING_FORM_DESIGN_STANDARD.md` | Manufacturing form UX standard (CRM-aligned shell, readiness, posting drawers) |
+| `docs/ui/production/MANUFACTURING_FORM_INFORMATION_MATRIX.md` | Per-form 10-point information scores (before/after) |
+| `docs/accounting/AP_ARCHITECTURE.md` | AP vendor invoice / payable open-item design |
+| `docs/accounting/AP_STATUS.md` | AP phase checklist and status |
+| `docs/accounting/AP_FRONTEND.md` | Money Out AP frontend overview (Phase 4A5 + 4B5) |
+| `docs/accounting/AP_PAYMENT_FRONTEND.md` | Money Out vendor payment / advance frontend (Phase 4B5) |
+| `docs/accounting/AP_ALLOCATION_FRONTEND.md` | Money Out payment allocation frontend — no-GL, idempotent (Phase 4B5) |
+| `docs/accounting/AP_PAYMENT_ARCHITECTURE.md` | Vendor payment / advance design (Phase 4B1–4B3) |
+| `docs/accounting/AP_PAYMENT_WORKFLOW.md` | Vendor payment draft workflow + approval + atomic posting (Phase 4B3) |
+| `docs/accounting/AP_PAYMENT_CALCULATION_RULES.md` | Vendor payment calculation rules (Phase 4B2) |
+| `docs/accounting/AP_ALLOCATION_ARCHITECTURE.md` | AP allocation execution design — DEBIT→CREDIT, subledger-only (Phase 4B4) |
 | `docs/master-module-audit.md` | Master UI / API coverage audit |

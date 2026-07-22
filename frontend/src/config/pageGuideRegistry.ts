@@ -21,6 +21,7 @@ const GUIDES: { prefix: string; guide: PageGuideEntry }[] = [
   { prefix: '/crm/quotations', guide: { purpose: 'Prepare editable customer quotations with revisions.', nextStep: 'Create or open a quotation, edit sections, then submit for approval.' } },
   { prefix: '/crm/sales-orders', guide: { purpose: 'CRM sales orders — create from quotation or directly when customer and items exist. Fulfilment, MRP, and dispatch live under Sales → Sales Orders.', nextStep: 'Use New Sales Order for a direct draft, or Create from Quotation for pipeline handover.' } },
   { prefix: '/crm/contacts', guide: { purpose: 'Maintain customer contact directory.', nextStep: 'Create contacts directly, or open Company 360 to manage related records.' } },
+  { prefix: '/crm/companies', guide: { purpose: 'CRM companies — account relationships, pipeline, quotations, and activity. Operational receivables and order fulfilment use Sales → Companies.', nextStep: 'Create Company, Opportunity, Quotation, Follow-up, or Sales Order directly — funnel links are optional.' } },
   { prefix: '/crm/customers', guide: { purpose: 'CRM companies — account relationships, pipeline, quotations, and activity. Operational receivables and order fulfilment use Sales → Companies.', nextStep: 'Create Company, Opportunity, Quotation, Follow-up, or Sales Order directly — funnel links are optional.' } },
   { prefix: '/crm/forecast', guide: { purpose: 'Sales forecast by territory and period.', nextStep: 'Review pipeline coverage, then adjust opportunity stages or owners.' } },
   { prefix: '/crm/reports', guide: { purpose: 'CRM operational reports — pipeline, conversion, and activity.', nextStep: 'Pick a report, set filters, then export if needed.' } },
@@ -131,8 +132,8 @@ const GUIDES: { prefix: string; guide: PageGuideEntry }[] = [
 
   // —— Accounting / Finance ——
   { prefix: '/accounting/settings', guide: { purpose: 'Finance setup — legal entities, years, periods, CoA, mappings, and approval rules.', nextStep: 'Complete the setup wizard, then open Chart of Accounts or periods.' } },
-  { prefix: '/accounting/chart-of-accounts', guide: { purpose: 'Chart of Accounts for the active legal entity.', nextStep: 'Create or open an account; keep postable leaves for vouchers.' } },
-  { prefix: '/accounting/vouchers', guide: { purpose: 'Journal and accounting vouchers register.', nextStep: 'Create a voucher, balance lines, then post when ready.' } },
+  { prefix: '/accounting/settings/chart-of-accounts', guide: { purpose: 'Chart of Accounts for the active legal entity.', nextStep: 'Create or open an account; keep postable leaves for journals.' } },
+  { prefix: '/accounting/entries/journals', guide: { purpose: 'Manual journals and accounting entries register.', nextStep: 'Create a journal, balance lines, then post when ready.' } },
   { prefix: '/accounting/money-in', guide: { purpose: 'Money In — sales invoices, outstanding, ageing, and AR-to-GL reconciliation.', nextStep: 'Create a draft invoice or review ready-to-post items.' } },
   { prefix: '/accounting/receivables', guide: { purpose: 'Legacy receivables demo — receipts and collections stubs.', nextStep: 'Use Money In for sales invoices and reporting.' } },
   { prefix: '/accounting/payables', guide: { purpose: 'Accounts payable — vendor invoices, payments, and ageing.', nextStep: 'Review payment planning, then create a vendor payment.' } },

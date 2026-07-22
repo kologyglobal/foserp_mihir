@@ -1,8 +1,11 @@
 /**
- * GST & TDS Compliance mock service — Promise APIs over in-memory seed.
- * Demo / UI only. Does not file returns, pay challans, or call government portals.
+ * GST & TDS Compliance service — dual-mode.
+ * Demo (`VITE_USE_API=false`): in-memory seed.
+ * API (`VITE_USE_API=true`): live GST extract for overview KPIs + outward/inward registers.
+ * Filing / e-invoice / challans / portal remain demo preview only.
  */
 
+import { isApiMode } from '@/config/apiConfig'
 import {
   CALENDAR_SEED,
   EINVOICE_SEED,
@@ -26,6 +29,17 @@ import {
   buildComplianceDashboard,
   buildGstDashboard,
 } from '@/data/accounting/taxComplianceSeed'
+import {
+  fetchGstComplianceSummary,
+  fetchInwardSupplies,
+  fetchOutwardSupplies,
+  type GstSupplyExtractDto,
+} from '@/services/api/taxComplianceApi'
+import {
+  filterDatesFromPeriod,
+  resolveDefaultLegalEntity,
+  resolvePeriod,
+} from '@/services/accounting/taxComplianceApiComposer'
 import type {
   ComplianceCalendarItem,
   ComplianceNotice,
@@ -67,6 +81,51 @@ let tdsTxnState: TdsTransaction[] = structuredClone(TDS_TXNS_SEED)
 let noticesState: ComplianceNotice[] = structuredClone(NOTICES_SEED)
 let gstr2bImported = false
 
+function money(value: string | number | null | undefined): number {
+  if (value == null || value === '') return 0
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) ? n : 0
+}
+
+function mapSupplyType(raw: string | null): GstSupplyRow['supplyType'] {
+  switch (raw) {
+    case 'EXPORT':
+      return 'Export'
+    case 'SEZ':
+      return 'SEZ'
+    case 'NON_GST':
+      return 'Exempt'
+    case 'INTRA_STATE':
+    case 'INTER_STATE':
+    default:
+      return 'B2B'
+  }
+}
+
+function mapExtractRow(row: GstSupplyExtractDto, docType: string): GstSupplyRow {
+  return {
+    id: row.id,
+    docType,
+    docNo: row.documentNumber || row.id.slice(0, 8),
+    docDate: row.documentDate,
+    partyName: row.partyName,
+    partyGstin: row.partyGstin ?? '',
+    placeOfSupply: row.placeOfSupply ?? row.stateCode ?? '—',
+    taxableValue: money(row.taxableAmount),
+    cgst: money(row.cgstAmount),
+    sgst: money(row.sgstAmount),
+    igst: money(row.igstAmount),
+    cess: money(row.cessAmount),
+    totalTax: money(row.totalTaxAmount),
+    invoiceTotal: money(row.totalAmount),
+    hsnSac: '—',
+    supplyType: mapSupplyType(row.supplyType),
+    reverseCharge: row.reverseCharge,
+    status: 'Open',
+    notes: row.taxTreatment ?? undefined,
+  }
+}
+
 export const DEFAULT_TAX_PERIOD_FILTER: PeriodFilterState = {
   periodKey: TAX_PERIODS[0].periodKey,
   gstinId: GSTIN_PROFILES.find((g) => g.isDefault)?.id ?? GSTIN_PROFILES[0].id,
@@ -103,25 +162,110 @@ export async function listGstins(): Promise<GstinProfile[]> {
 }
 
 export async function getTaxComplianceDashboard(filter?: PeriodFilterState): Promise<TaxComplianceDashboard> {
-  await delay()
   const f = filter ?? loadPeriodFilter()
-  return buildComplianceDashboard(f.periodKey, f.gstinId)
+  if (!isApiMode()) {
+    await delay()
+    return buildComplianceDashboard(f.periodKey, f.gstinId)
+  }
+
+  const legalEntity = await resolveDefaultLegalEntity()
+  const { fromDate, toDate } = filterDatesFromPeriod(f)
+  const summaryRes = await fetchGstComplianceSummary({
+    legalEntityId: legalEntity.id,
+    fromDate,
+    toDate,
+  })
+  const summary = summaryRes.data
+  const demo = buildComplianceDashboard(f.periodKey, f.gstinId)
+  const period = resolvePeriod(f.periodKey)
+  const gstin: GstinProfile = {
+    id: legalEntity.id,
+    gstin: legalEntity.gstin ?? '—',
+    legalName: legalEntity.legalName,
+    tradeName: legalEntity.displayName,
+    stateCode: legalEntity.stateCode ?? '',
+    stateName: legalEntity.stateCode ?? '',
+    isDefault: legalEntity.isDefault,
+  }
+
+  return {
+    ...demo,
+    period,
+    gstin,
+    kpis: {
+      ...demo.kpis,
+      outwardTaxable: money(summary.outward.taxableAmount),
+      inwardTaxable: money(summary.inward.taxableAmount),
+      gstPayablePreview: money(summary.outward.totalTaxAmount),
+      // ITC / TDS / exceptions remain demo until those extracts ship
+    },
+    recentActivity: [
+      {
+        id: 'live-extract',
+        when: new Date().toISOString(),
+        text: `Live GST extract ${fromDate} → ${toDate} (${summary.outward.documentCount} outward, ${summary.inward.documentCount} inward). Filing / ITC remain preview.`,
+      },
+      ...demo.recentActivity.slice(0, 2),
+    ],
+  }
 }
 
 export async function getGstDashboard(filter?: PeriodFilterState): Promise<GstDashboardData> {
-  await delay()
   const f = filter ?? loadPeriodFilter()
-  return buildGstDashboard(f.periodKey, f.gstinId)
+  if (!isApiMode()) {
+    await delay()
+    return buildGstDashboard(f.periodKey, f.gstinId)
+  }
+
+  const overview = await getTaxComplianceDashboard(f)
+  const demo = buildGstDashboard(f.periodKey, f.gstinId)
+  return {
+    ...demo,
+    period: overview.period,
+    gstin: overview.gstin,
+    kpis: {
+      ...demo.kpis,
+      outwardSupplies: overview.kpis.outwardTaxable,
+      inwardSupplies: overview.kpis.inwardTaxable,
+      outputTax: overview.kpis.gstPayablePreview,
+    },
+  }
 }
 
-export async function getOutwardSupplies(_filter?: PeriodFilterState): Promise<GstSupplyRow[]> {
-  await delay()
-  return structuredClone(OUTWARD_SUPPLIES_SEED)
+export async function getOutwardSupplies(filter?: PeriodFilterState): Promise<GstSupplyRow[]> {
+  if (!isApiMode()) {
+    await delay()
+    return structuredClone(OUTWARD_SUPPLIES_SEED)
+  }
+  const f = filter ?? loadPeriodFilter()
+  const legalEntity = await resolveDefaultLegalEntity()
+  const { fromDate, toDate } = filterDatesFromPeriod(f)
+  const res = await fetchOutwardSupplies({
+    legalEntityId: legalEntity.id,
+    fromDate,
+    toDate,
+    page: 1,
+    pageSize: 200,
+  })
+  return res.data.items.map((row) => mapExtractRow(row, 'Sales Invoice'))
 }
 
-export async function getInwardSupplies(_filter?: PeriodFilterState): Promise<GstSupplyRow[]> {
-  await delay()
-  return structuredClone(INWARD_SUPPLIES_SEED)
+export async function getInwardSupplies(filter?: PeriodFilterState): Promise<GstSupplyRow[]> {
+  if (!isApiMode()) {
+    await delay()
+    return structuredClone(INWARD_SUPPLIES_SEED)
+  }
+  const f = filter ?? loadPeriodFilter()
+  const legalEntity = await resolveDefaultLegalEntity()
+  const { fromDate, toDate } = filterDatesFromPeriod(f)
+  const res = await fetchInwardSupplies({
+    legalEntityId: legalEntity.id,
+    fromDate,
+    toDate,
+    page: 1,
+    pageSize: 200,
+  })
+  return res.data.items.map((row) => mapExtractRow(row, 'Vendor Invoice'))
 }
 
 export async function getReverseChargeSupplies(filter?: PeriodFilterState): Promise<GstSupplyRow[]> {

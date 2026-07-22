@@ -20,10 +20,12 @@ export function OutwardSuppliesPage() {
   return (
     <TaxRegisterPage
       title="Outward Supplies"
-      description="Sales / outward GST register from demo invoices."
+      description="Sales / outward GST register from posted sales invoices (API) or demo seed."
       exportKind="outward-supplies"
       loadRows={getOutwardSupplies}
       searchKeys={(r) => `${r.docNo} ${r.partyName} ${r.partyGstin} ${r.hsnSac}`}
+      emptyTitle="No outward supplies"
+      emptyHint="Posted sales invoices in the selected period will appear here."
       columns={[
         { key: 'doc', header: 'Document', render: (r) => `${r.docType} ${r.docNo}` },
         { key: 'date', header: 'Date', render: (r) => formatDate(r.docDate) },
@@ -31,6 +33,9 @@ export function OutwardSuppliesPage() {
         { key: 'gstin', header: 'GSTIN', render: (r) => r.partyGstin || '—' },
         { key: 'pos', header: 'PoS', render: (r) => r.placeOfSupply },
         { key: 'taxable', header: 'Taxable', className: 'text-right', render: (r) => inr(r.taxableValue) },
+        { key: 'cgst', header: 'CGST', className: 'text-right', render: (r) => inr(r.cgst) },
+        { key: 'sgst', header: 'SGST', className: 'text-right', render: (r) => inr(r.sgst) },
+        { key: 'igst', header: 'IGST', className: 'text-right', render: (r) => inr(r.igst) },
         { key: 'tax', header: 'Tax', className: 'text-right', render: (r) => inr(r.totalTax) },
         { key: 'type', header: 'Type', render: (r) => r.supplyType },
         { key: 'status', header: 'Status', render: (r) => statusCell(r.status) },
@@ -43,16 +48,21 @@ export function InwardSuppliesPage() {
   return (
     <TaxRegisterPage
       title="Inward Supplies"
-      description="Purchase / inward GST register from demo purchase invoices."
+      description="Purchase / inward GST register from posted vendor invoices (API) or demo seed."
       exportKind="inward-supplies"
       loadRows={getInwardSupplies}
       searchKeys={(r) => `${r.docNo} ${r.partyName} ${r.partyGstin}`}
+      emptyTitle="No inward supplies"
+      emptyHint="Posted vendor invoices in the selected period will appear here."
       columns={[
         { key: 'doc', header: 'Document', render: (r) => `${r.docType} ${r.docNo}` },
         { key: 'date', header: 'Date', render: (r) => formatDate(r.docDate) },
         { key: 'party', header: 'Vendor', render: (r) => r.partyName },
         { key: 'gstin', header: 'GSTIN', render: (r) => r.partyGstin || '—' },
         { key: 'taxable', header: 'Taxable', className: 'text-right', render: (r) => inr(r.taxableValue) },
+        { key: 'cgst', header: 'CGST', className: 'text-right', render: (r) => inr(r.cgst) },
+        { key: 'sgst', header: 'SGST', className: 'text-right', render: (r) => inr(r.sgst) },
+        { key: 'igst', header: 'IGST', className: 'text-right', render: (r) => inr(r.igst) },
         { key: 'tax', header: 'Tax', className: 'text-right', render: (r) => inr(r.totalTax) },
         { key: 'rcm', header: 'RCM', render: (r) => (r.reverseCharge ? 'Yes' : 'No') },
         { key: 'status', header: 'Status', render: (r) => statusCell(r.status) },

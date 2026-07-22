@@ -86,8 +86,20 @@ async function main(): Promise<void> {
   await seedRole('Inventory Manager', permissionMap, tenant.id, true)
   await seedRole('Sales Manager', permissionMap, tenant.id, true)
   await seedRole('Production Manager', permissionMap, tenant.id, true)
+  await seedRole('Production Supervisor', permissionMap, tenant.id, true)
+  await seedRole('Production Engineer', permissionMap, tenant.id, true)
   await seedRole('Sales Executive', permissionMap, tenant.id, true)
   await seedRole('Viewer', permissionMap, tenant.id, true)
+
+  // Rebuild Tenant Admin / Admin / Administrator grants on every tenant so catalog
+  // expansions (e.g. production.view) land without a one-off migration script.
+  const allTenants = await prisma.tenant.findMany({ select: { id: true, slug: true } })
+  for (const t of allTenants) {
+    await seedRole('Tenant Admin', permissionMap, t.id, true)
+    await seedRole('Admin', permissionMap, t.id, true)
+    await seedRole('Administrator', permissionMap, t.id, true)
+    console.log(`  Synced workspace-admin role packs for tenant ${t.slug}`)
+  }
 
   await initTenantCodeSeries(tenant.id)
 
@@ -511,6 +523,104 @@ async function main(): Promise<void> {
     locationCount += 1
   }
 
+  // Quality Phase 4B — sample parameters + active IN_PROCESS plan
+  const qpVisual = await prisma.qualityParameter.upsert({
+    where: { tenantId_parameterCode: { tenantId: tenant.id, parameterCode: 'QP-VISUAL' } },
+    create: {
+      tenantId: tenant.id,
+      parameterCode: 'QP-VISUAL',
+      parameterName: 'Visual appearance',
+      parameterType: 'BOOLEAN',
+      mandatory: true,
+      severity: 'MAJOR',
+      passFailRule: 'BOOLEAN_TRUE',
+      active: true,
+      createdBy: tenantAdmin.id,
+    },
+    update: { active: true, deletedAt: null, updatedBy: tenantAdmin.id },
+  })
+  const qpDim = await prisma.qualityParameter.upsert({
+    where: { tenantId_parameterCode: { tenantId: tenant.id, parameterCode: 'QP-DIM-LEN' } },
+    create: {
+      tenantId: tenant.id,
+      parameterCode: 'QP-DIM-LEN',
+      parameterName: 'Overall length',
+      parameterType: 'NUMERIC',
+      uomCode: 'mm',
+      minValue: 100,
+      maxValue: 12000,
+      targetValue: 6000,
+      mandatory: true,
+      severity: 'CRITICAL',
+      passFailRule: 'NUMERIC_TOLERANCE',
+      active: true,
+      createdBy: tenantAdmin.id,
+    },
+    update: { active: true, deletedAt: null, updatedBy: tenantAdmin.id },
+  })
+  const qpNotes = await prisma.qualityParameter.upsert({
+    where: { tenantId_parameterCode: { tenantId: tenant.id, parameterCode: 'QP-NOTES' } },
+    create: {
+      tenantId: tenant.id,
+      parameterCode: 'QP-NOTES',
+      parameterName: 'Inspector notes',
+      parameterType: 'TEXT',
+      mandatory: false,
+      severity: 'MINOR',
+      passFailRule: 'MANUAL',
+      active: true,
+      createdBy: tenantAdmin.id,
+    },
+    update: { active: true, deletedAt: null, updatedBy: tenantAdmin.id },
+  })
+
+  const inProcessPlan = await prisma.qualityInspectionPlan.upsert({
+    where: { tenantId_planCode: { tenantId: tenant.id, planCode: 'IP-INPROC-STD' } },
+    create: {
+      tenantId: tenant.id,
+      planCode: 'IP-INPROC-STD',
+      planName: 'Standard in-process QC',
+      category: 'IN_PROCESS',
+      status: 'ACTIVE',
+      revision: 'A',
+      createdBy: tenantAdmin.id,
+      lines: {
+        create: [
+          { tenantId: tenant.id, parameterId: qpVisual.id, sortOrder: 0 },
+          { tenantId: tenant.id, parameterId: qpDim.id, sortOrder: 1 },
+          { tenantId: tenant.id, parameterId: qpNotes.id, sortOrder: 2, mandatoryOverride: false },
+        ],
+      },
+    },
+    update: { status: 'ACTIVE', deletedAt: null, updatedBy: tenantAdmin.id },
+  })
+
+  const finalPlan = await prisma.qualityInspectionPlan.upsert({
+    where: { tenantId_planCode: { tenantId: tenant.id, planCode: 'IP-FINAL-STD' } },
+    create: {
+      tenantId: tenant.id,
+      planCode: 'IP-FINAL-STD',
+      planName: 'Standard final QC',
+      category: 'FINAL',
+      status: 'ACTIVE',
+      revision: 'A',
+      createdBy: tenantAdmin.id,
+      lines: {
+        create: [
+          { tenantId: tenant.id, parameterId: qpVisual.id, sortOrder: 0 },
+          { tenantId: tenant.id, parameterId: qpDim.id, sortOrder: 1 },
+        ],
+      },
+    },
+    update: { status: 'ACTIVE', deletedAt: null, updatedBy: tenantAdmin.id },
+  })
+
+  // Ensure default profile ref points at in-process plan code when profile exists
+  await prisma.manufacturingProfile.updateMany({
+    where: { tenantId: tenant.id, defaultQualityPlanRef: null },
+    data: { defaultQualityPlanRef: inProcessPlan.planCode },
+  })
+
   console.log('\n=== Seed complete ===')
   console.log(`Tenant: ${tenant.name} (slug: ${tenant.slug})`)
   console.log(`Geography: ${GEO_COUNTRY_SEED.length} countries, ${GEO_STATE_SEED.length} states, ${cityCount} cities`)
@@ -519,6 +629,7 @@ async function main(): Promise<void> {
   console.log(`Products: ${PRODUCT_SEED_ROWS.length}`)
   console.log(`FG items: ${fgItemIdByCode.size}`)
   console.log(`Quotation templates: ${QUOTATION_TEMPLATE_SEED_ROWS.length}`)
+  console.log(`QC parameters: 3 · plans: ${inProcessPlan.planCode}, ${finalPlan.planCode}`)
   console.log('\nDevelopment credentials:')
   console.log('  Super Admin: super@fos-erp.com / Super@123')
   console.log('  Tenant Admin: admin@vasant-trailers.com / Admin@123')

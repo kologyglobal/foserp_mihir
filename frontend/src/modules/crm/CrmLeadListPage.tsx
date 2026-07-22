@@ -39,7 +39,7 @@ import {
 } from '../../utils/leadEngagement'
 import {
   leadStageLabel,
-  resolveLeadConvertToOpportunityGate,
+  resolveLeadConvertActionGate,
 } from '../../utils/leadUtils'
 import { canOpenLeadEditor, resolveLeadEditPolicy } from '../../utils/leadEditPolicy'
 import {
@@ -92,6 +92,10 @@ export function CrmLeadListPage() {
 
   const canEdit = canCrmPermission('crm.lead.update')
   const canDelete = canCrmPermission('crm.lead.delete')
+  const canAssign = canCrmPermission('crm.lead.assign')
+  const canConvert = canCrmPermission('crm.lead.convert')
+  const canCreateLead = canCrmPermission('crm.lead.create')
+  const canScheduleActivity = canCrmPermission('crm.activity.create')
 
   // API mode: soft-refresh leads when opening the register (Zustand stand-in for
   // invalidateQueries). Bridge upserts already update the store after create/edit;
@@ -426,12 +430,16 @@ export function CrmLeadListPage() {
           <ErpCommandBar
             inline
             sticky={false}
-            primaryAction={{
-              id: 'new-lead',
-              label: 'New Lead',
-              icon: Plus,
-              onClick: () => navigate(routes.new),
-            }}
+            primaryAction={
+              canCreateLead
+                ? {
+                    id: 'new-lead',
+                    label: 'New Lead',
+                    icon: Plus,
+                    onClick: () => navigate(routes.new),
+                  }
+                : undefined
+            }
             secondaryActions={[
               { id: 'import', label: 'Import', icon: Upload, onClick: openLeadImport },
               { id: 'export', label: 'Export', icon: Download, onClick: exportLeads },
@@ -449,6 +457,9 @@ export function CrmLeadListPage() {
             routes={routes}
             canEdit={canEdit}
             canDelete={canDelete}
+            canAssign={canAssign}
+            canConvert={canConvert}
+            canScheduleActivity={canScheduleActivity}
             search={filters.search}
             onSearchChange={(search) => setFilters((f) => ({ ...f, search }))}
             showCompactSearch={false}
@@ -487,9 +498,11 @@ export function CrmLeadListPage() {
             emptyAction={
               enrichedRows.length === 0 ? (
                 <div className="flex flex-wrap justify-center gap-2">
-                  <button type="button" className="erp-btn erp-btn--primary text-[13px]" onClick={() => navigate(routes.new)}>
-                    New Lead
-                  </button>
+                  {canCreateLead ? (
+                    <button type="button" className="erp-btn erp-btn--primary text-[13px]" onClick={() => navigate(routes.new)}>
+                      New Lead
+                    </button>
+                  ) : null}
                   <button type="button" className="erp-btn erp-btn--secondary text-[13px]" onClick={openLeadImport}>
                     Import Leads
                   </button>
@@ -507,7 +520,7 @@ export function CrmLeadListPage() {
             }}
             onDelete={openDeleteModal}
             onCreateOpportunity={(row) => {
-              const gate = resolveLeadConvertToOpportunityGate(row.lead)
+              const gate = resolveLeadConvertActionGate(row.lead, canConvert)
               if (!gate.ok) {
                 showToast(gate.reason, 'warning')
                 return

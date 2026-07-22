@@ -10,10 +10,11 @@ import { LoadingState } from '@/design-system/components/LoadingState'
 import {
   createCustomerCreditNote,
   getCustomerCreditNote,
-  listDemoCustomers,
   listSalesInvoices,
   updateCustomerCreditNote,
 } from '@/services/bridges/receivablesApiBridge'
+import { CustomerMasterSelect } from '@/components/masters/CustomerMasterSelect'
+import { PartyMasterCard } from '@/modules/accounting/shared/invoices'
 import { resolveLegalEntityId } from '@/services/bridges/financeApiBridge'
 import type { CreditNotePurpose, SalesInvoiceListItemDto } from '@/types/moneyIn'
 import { useMoneyInPermissions } from '@/utils/permissions/moneyIn'
@@ -71,7 +72,6 @@ export function CreditNoteFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const perms = useMoneyInPermissions()
-  const customers = listDemoCustomers()
   const [loading, setLoading] = useState(mode === 'edit')
   const [saving, setSaving] = useState(false)
   const [updatedAt, setUpdatedAt] = useState<string>()
@@ -81,7 +81,7 @@ export function CreditNoteFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      customerId: customers[0]?.id ?? '',
+      customerId: '',
       purpose: 'SALES_RETURN',
       sourceType: 'DIRECT',
       originalInvoiceId: '',
@@ -256,13 +256,11 @@ export function CreditNoteFormPage({ mode }: { mode: 'create' | 'edit' }) {
           <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-erp-muted">Customer &amp; source</h3>
           <div className="grid gap-3 md:grid-cols-2">
             <FormField label="Customer" error={form.formState.errors.customerId?.message}>
-              <Select {...form.register('customerId')}>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </Select>
+              <CustomerMasterSelect
+                value={watched.customerId}
+                onChange={(customerId) => form.setValue('customerId', customerId, { shouldDirty: true, shouldValidate: true })}
+                allowEmpty
+              />
             </FormField>
             <FormField label="Purpose">
               <Select {...form.register('purpose')}>
@@ -308,6 +306,7 @@ export function CreditNoteFormPage({ mode }: { mode: 'create' | 'edit' }) {
             <input type="checkbox" className="h-4 w-4 rounded border-erp-border" {...form.register('approvalRequired')} />
             Requires approval before posting (routes through Submit / Approve instead of Mark Ready)
           </label>
+          <PartyMasterCard variant="crm" partyId={watched.customerId} showQuickCreate />
         </section>
 
         <section>

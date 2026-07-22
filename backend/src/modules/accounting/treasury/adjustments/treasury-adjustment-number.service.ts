@@ -1,0 +1,42 @@
+import type { PostingEvent } from '@prisma/client'
+import { prisma } from '../../../../config/database.js'
+import { reserveSourceDocumentNumber, type ReservedSourceDocumentNumber } from '../../posting/posting-number.service.js'
+
+const DOCUMENT_TYPE = 'TREASURY_ADJUSTMENT' as const
+const DEFAULT_PREFIX = 'TADJ/'
+const DEFAULT_PAD_LENGTH = 6
+
+/** Auto-creates the `TREASURY_ADJUSTMENT` number series (prefix `TADJ/`) the first time it is needed. */
+async function ensureTreasuryAdjustmentNumberSeries(tenantId: string, legalEntityId: string): Promise<void> {
+  const existing = await prisma.financeNumberSeries.findFirst({
+    where: { tenantId, legalEntityId, documentType: DOCUMENT_TYPE },
+  })
+  if (existing) return
+  try {
+    await prisma.financeNumberSeries.create({
+      data: {
+        tenantId,
+        legalEntityId,
+        documentType: DOCUMENT_TYPE,
+        prefix: DEFAULT_PREFIX,
+        currentValue: 0,
+        padLength: DEFAULT_PAD_LENGTH,
+        resetEachYear: false,
+        isActive: true,
+      },
+    })
+  } catch {
+    // Concurrent auto-create race — another request already created it.
+  }
+}
+
+/** Reserves the TADJ/ number via the posting engine's PostingEvent. */
+export async function reserveTreasuryAdjustmentNumberForPosting(
+  tenantId: string,
+  legalEntityId: string,
+  financialYearId: string,
+  event: PostingEvent,
+): Promise<ReservedSourceDocumentNumber> {
+  await ensureTreasuryAdjustmentNumberSeries(tenantId, legalEntityId)
+  return reserveSourceDocumentNumber(tenantId, legalEntityId, financialYearId, DOCUMENT_TYPE, event)
+}
