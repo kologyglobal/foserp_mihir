@@ -26,7 +26,7 @@ async function countGrnQcPending(tenantId: string): Promise<number> {
 
 async function countOpenPurchaseQi(tenantId: string): Promise<number> {
   try {
-    return await prisma.purchaseQualityInspection.count({
+    return await prisma.qualityInspection.count({
       where: {
         tenantId,
         deletedAt: null,
@@ -169,7 +169,7 @@ export async function getIncomingQueue(tenantId: string): Promise<{
   }
 
   try {
-    qis = await prisma.purchaseQualityInspection.findMany({
+    qis = await prisma.qualityInspection.findMany({
       where: {
         tenantId,
         deletedAt: null,

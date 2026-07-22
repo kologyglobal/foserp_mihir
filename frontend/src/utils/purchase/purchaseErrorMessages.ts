@@ -65,6 +65,9 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   FORBIDDEN: 'You do not have permission for this action.',
   PERMISSION_DENIED: 'You do not have permission for this action.',
   VALIDATION_ERROR: 'Please correct the highlighted fields and try again.',
+  PURCHASE_RETURN_NOT_FOUND: 'Purchase return not found.',
+  PURCHASE_RETURN_INVALID_STATE: 'This action is not allowed for the current return status.',
+  SERVER_TYPE_ERROR: 'Server configuration error while saving. Please retry or contact support.',
 
   // Legacy aliases
   PURCHASE_REQUISITION_NOT_FOUND: 'Purchase requisition not found.',

@@ -2668,6 +2668,26 @@ export type PurchaseInvoiceInput = {
   }>
 }
 
+export type PurchaseReturnLineInput = {
+  itemId: string
+  returnQty: number
+  unitCost?: number
+  /** @deprecated use unitCost */
+  rate?: number
+  goodsReceiptLineId?: string | null
+  purchaseOrderLineId?: string | null
+  itemCode?: string
+  itemName?: string
+  description?: string
+  batchLotNo?: string
+  serialNumber?: string
+  receivedQty?: number
+  availableReturnQty?: number
+  reason?: PurchaseReturnReason
+  replacementQty?: number
+  remarks?: string
+}
+
 export type PurchaseReturnInput = {
   vendorId: string
   origin?: PurchaseReturnOrigin
@@ -2683,20 +2703,5 @@ export type PurchaseReturnInput = {
   debitNoteRequired?: boolean
   replacementRequired?: boolean
   remarks?: string
-  lines: Array<{
-    itemId: string
-    returnQty: number
-    unitCost?: number
-    /** @deprecated use unitCost */
-    rate?: number
-    goodsReceiptLineId?: string | null
-    description?: string
-    batchLotNo?: string
-    serialNumber?: string
-    receivedQty?: number
-    availableReturnQty?: number
-    reason?: PurchaseReturnReason
-    replacementQty?: number
-    remarks?: string
-  }>
+  lines: PurchaseReturnLineInput[]
 }

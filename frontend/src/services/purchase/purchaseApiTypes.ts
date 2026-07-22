@@ -836,8 +836,11 @@ export interface ApiPurchaseReturn {
   returnDate: string | null
   vendorId: string
   purchaseOrderId: string | null
+  purchaseOrderNumber?: string | null
   goodsReceiptId: string | null
+  goodsReceiptNumber?: string | null
   qualityInspectionId: string | null
+  qualityInspectionNumber?: string | null
   warehouseId: string | null
   status: ApiPurchaseReturnStatus
   reason: string | null
