@@ -1054,7 +1054,10 @@ export async function submitGRN(id: string): Promise<GoodsReceiptNote> {
           grn = { ...grn, qualityInspectionId: qi.id }
         } catch (err) {
           grn = await enrichGrnWithQualityInspectionId(grn)
-          if (!grn.qualityInspectionId) throwApi(err)
+          if (!grn.qualityInspectionId) {
+            // GRN submit already succeeded — do not fail the whole action on QI bootstrap.
+            console.warn('[submitGRN] QI auto-create failed after submit', err)
+          }
         }
       }
     }
@@ -1064,18 +1067,20 @@ export async function submitGRN(id: string): Promise<GoodsReceiptNote> {
   }
 }
 
-/** Demo posts stock locally; API posting is driven by GRN submit / QI completion on the backend. */
+/** Demo posts stock locally; API mode calls GRN `post-inventory` (idempotent). */
 export async function postGRN(id: string): Promise<GoodsReceiptNote> {
   if (!isApiMode()) return demo.postGRN(id)
-  const grn = await getGRNById(id)
-  if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${id}`)
-  if (grn.status === 'draft') {
-    return submitGRN(id)
+  try {
+    const current = await getGRNById(id)
+    if (!current) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${id}`)
+    if (current.status === 'draft') {
+      return submitGRN(id)
+    }
+    const res = await grnApi.postInventoryGoodsReceiptApi(id, {})
+    return mapApiGoodsReceiptToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
   }
-  if (grn.status === 'posted') {
-    return { ...grn, inventoryPostDeferred: true }
-  }
-  return { ...grn, inventoryPostDeferred: true }
 }
 
 export async function cancelGRN(id: string, remarks = ''): Promise<GoodsReceiptNote> {
@@ -1858,16 +1863,38 @@ function mapItemTypeToCategory(itemType: MasterItem['itemType']): PurchaseItemCa
   }
 }
 
+/** Prefer engineering productType when present — aligns PR Product Type with Item Master. */
+function mapMasterItemToPurchaseCategory(item: MasterItem): PurchaseItemCategory {
+  switch (item.productType) {
+    case 'raw_material':
+    case 'scrap':
+      return 'raw_material'
+    case 'boi':
+      return 'component'
+    case 'sub_assembly':
+    case 'assembly_product':
+      return 'component'
+    case 'finish_product':
+      return 'component'
+    case 'service':
+      return 'job_work'
+    default:
+      return mapItemTypeToCategory(item.itemType)
+  }
+}
+
 function mapMasterItemToPurchaseItem(item: MasterItem): PurchaseItem {
   const uom =
     useMasterStore.getState().uoms.find((u) => u.id === item.baseUomId)?.uomCode ??
     useMasterStore.getState().uoms.find((u) => u.id === item.baseUomId)?.uomName ??
     'NOS'
+  const productType = item.productType ?? null
   return {
     id: item.id,
     itemCode: item.itemCode,
     itemName: item.itemName,
-    category: mapItemTypeToCategory(item.itemType),
+    category: mapMasterItemToPurchaseCategory(item),
+    productType,
     description: item.itemDescription ?? '',
     uomId: item.baseUomId || null,
     uom,
@@ -1930,6 +1957,8 @@ function mapMasterVendorToPurchaseVendor(v: MasterVendor): Vendor {
 export async function getPurchaseItems(): Promise<PurchaseItem[]> {
   if (!isApiMode()) return demo.getPurchaseItems()
   let items = useMasterStore.getState().items
+  // Always refresh when store is empty OR stale after master edits in another tab/session.
+  // Prefer live store (kept current by masterBatchApiBridge upserts after create/update).
   if (!items.length) {
     try {
       const { syncBatchMastersFromApi } = await import('../bridges/masterBatchApiBridge')

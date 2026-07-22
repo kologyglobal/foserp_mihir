@@ -48,7 +48,7 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   PPS_ALREADY_CONVERTED: 'PO-created rows cannot be edited or converted again.',
   PPS_CANCELLED: 'Cancelled rows cannot be converted.',
   PPS_RFQ_REQUIRED: 'RFQ-required PR items cannot be processed from Planning.',
-  PPS_NOT_SELECTED: 'Tick Action Message on each row before creating a PO.',
+  PPS_NOT_SELECTED: 'Select at least one planning row that is ready for PO (vendor, quantity, rate, date).',
 
   PO_NO_ELIGIBLE_ROWS: 'Select at least one eligible Planning row.',
   PO_TENANT_MISMATCH: 'All rows must belong to the current tenant.',

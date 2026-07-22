@@ -126,8 +126,7 @@ function planningRowPoGaps(row: PurchasePlanningSheetRow): string[] {
       `status is ${PURCHASE_PLANNING_STATUS_LABELS[row.status] ?? row.status} (needs Vendor Selected / Approved / PO Pending)`,
     )
   }
-  if (!row.actionMessage) gaps.push('Action Message off')
-  if (!row.preferredVendorId) gaps.push('no vendor')
+  if (!row.preferredVendorId) gaps.push('no vendor selected')
   const qty = row.netPurchaseQuantity > 0 ? row.netPurchaseQuantity : row.requiredQuantity
   if (!(qty > 0)) gaps.push('quantity is 0')
   if (!(row.expectedRate > 0)) gaps.push('rate is 0')
@@ -486,7 +485,7 @@ export function PurchasePlanningSheetPage() {
     if (!eligible) {
       notify.error(
         createPoDisabledReason(target) ??
-          'All selected rows need Action Message, vendor, quantity, rate, and a ready status before Create PO',
+          'All selected rows need vendor, quantity, rate, required date, and a ready status before Create PO',
       )
       return
     }
@@ -938,7 +937,7 @@ export function PurchasePlanningSheetPage() {
                   : selectedRows.length === 0
                     ? 'Select at least one planning row first'
                     : createPoDisabledReason(selectedRows) ??
-                      'Selected rows are not ready for PO (need Action Message, vendor, quantity, rate, and required date)',
+                      'Selected rows are not ready for PO (need vendor, quantity, rate, and required date)',
             }}
             secondaryActions={[
               {

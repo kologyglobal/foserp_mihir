@@ -28,6 +28,7 @@ import {
   PurchaseServiceError,
 } from '../../services/purchase'
 import type { PurchaseRequisition, Vendor } from '../../types/purchaseDomain'
+import { purchaseRequisitionApprovalStatusLabel } from '../../types/purchaseDomain'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { notify } from '../../store/toastStore'
@@ -38,6 +39,8 @@ import {
   prProcurementPathLabel,
   purchasePlanningSheetHrefForPr,
 } from '../../utils/purchaseRequisitionNextStep'
+import { mapPurchaseCategoryToEngineeringProductType } from '../../utils/purchaseProductType'
+import type { PrEditorLine } from '../../utils/purchaseRequisitionValidation'
 import { PurchaseRequisitionDocumentPage } from './PurchaseFormPages'
 
 export function PurchaseRequisitionDomainDetailPage({
@@ -69,11 +72,15 @@ export function PurchaseRequisitionDomainDetailPage({
 
   const worksheetLines = useMemo(
     () =>
-      (pr?.lines ?? []).map((l) => ({
-        ...l,
-        key: l.id || crypto.randomUUID(),
-        actionMessage: false,
-      })),
+      (pr?.lines ?? []).map(
+        (l): PrEditorLine => ({
+          ...l,
+          key: l.id || crypto.randomUUID(),
+          actionMessage: false,
+          productType: mapPurchaseCategoryToEngineeringProductType(l.category),
+          category: l.category || '',
+        }),
+      ),
     [pr?.lines],
   )
 
@@ -208,7 +215,7 @@ export function PurchaseRequisitionDomainDetailPage({
   return (
     <OperationalPageShell
       title={pr.documentNumber}
-      description={`${PURCHASE_REQUISITION_STATUS_LABELS[pr.status]} · ${PURCHASE_REQUISITION_SOURCE_LABELS[pr.source]}`}
+      description={`${purchaseRequisitionApprovalStatusLabel(pr.status)} · ${PURCHASE_REQUISITION_SOURCE_LABELS[pr.source]}`}
       badge="Purchase"
       variant="dynamics"
       favoritePath={`/purchase/requisitions/${pr.id}`}
@@ -291,7 +298,7 @@ export function PurchaseRequisitionDomainDetailPage({
         <div className="erp-page-panel grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
           <ErpViewField label="PR Number" value={pr.documentNumber} />
           <ErpViewField label="Requisition Date" value={formatDate(pr.documentDate)} />
-          <ErpViewField label="Status" value={PURCHASE_REQUISITION_STATUS_LABELS[pr.status]} />
+          <ErpViewField label="Status" value={purchaseRequisitionApprovalStatusLabel(pr.status)} />
           <ErpViewField
             label="Department"
             value={

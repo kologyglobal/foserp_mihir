@@ -257,6 +257,15 @@ export function GrnEditorPage() {
     [orders],
   )
 
+  /** Approved (not yet sent) — visible for guidance, not selectable for GRN. */
+  const approvedNotReleasedOrders = useMemo(
+    () =>
+      orders.filter(
+        (o) => o.status === 'approved' && o.lines.some((l) => l.pendingQty > 0),
+      ),
+    [orders],
+  )
+
   const selectedPo = useMemo(() => orders.find((o) => o.id === poId), [orders, poId])
 
   const lineTotals = useMemo(() => {
@@ -659,16 +668,29 @@ export function GrnEditorPage() {
         >
           <ErpFormSpan span={1}>
             <p className="mb-2 text-[12px] text-erp-muted">
-              GRN lines load from the selected PO’s open quantity. Header warehouse defaults from the PO delivery
-              location.
+              GRN is only allowed for POs that are <strong>Sent to Vendor / Released</strong> (or
+              partially received) with open quantity. An <strong>Approved</strong> PO must be sent to
+              the vendor first. Header warehouse defaults from the PO delivery location.
             </p>
             {receivableOrders.length === 0 ? (
-              <p className="text-[13px] text-erp-muted">
-                No receivable purchase orders.{' '}
-                <Link to="/purchase/orders" className="text-erp-primary underline">
-                  Open Purchase Orders
-                </Link>
-              </p>
+              <div className="space-y-2 text-[13px] text-erp-muted">
+                <p>
+                  No receivable purchase orders.{' '}
+                  <Link to="/purchase/orders" className="text-erp-primary underline">
+                    Open Purchase Orders
+                  </Link>
+                </p>
+                {approvedNotReleasedOrders.length > 0 ? (
+                  <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
+                    {approvedNotReleasedOrders.length} approved PO
+                    {approvedNotReleasedOrders.length === 1 ? '' : 's'} with open qty
+                    {approvedNotReleasedOrders.length <= 3
+                      ? ` (${approvedNotReleasedOrders.map((o) => o.documentNumber).join(', ')})`
+                      : ''}{' '}
+                    — open the PO and use <strong>Send to Vendor</strong>, then create the GRN.
+                  </p>
+                ) : null}
+              </div>
             ) : (
               <>
                 <div
@@ -709,6 +731,23 @@ export function GrnEditorPage() {
                     )
                   })}
                 </div>
+                {approvedNotReleasedOrders.length > 0 ? (
+                  <p className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
+                    Approved but not released:{' '}
+                    {approvedNotReleasedOrders.map((o, i) => (
+                      <span key={o.id}>
+                        {i > 0 ? ', ' : null}
+                        <Link
+                          className="font-medium underline"
+                          to={`/purchase/orders/${o.id}`}
+                        >
+                          {o.documentNumber}
+                        </Link>
+                      </span>
+                    ))}
+                    . Use <strong>Send to Vendor</strong> on the PO before creating a GRN.
+                  </p>
+                ) : null}
                 <ErpFieldRow
                   label="Purchase Order"
                   required

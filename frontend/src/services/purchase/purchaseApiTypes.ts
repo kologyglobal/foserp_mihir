@@ -466,6 +466,8 @@ export interface ApiPurchaseOrder {
   deliveryWarehouseCode?: string
   deliveryWarehouseName?: string
   deliveryWarehousePlantId?: string | null
+  createdById?: string | null
+  createdByName?: string | null
   subtotalAmount?: number
   taxAmount?: number
   freightAmount?: number
@@ -775,7 +777,9 @@ export interface ApiQualityInspection {
   documentDate: string | null
   inspectionDate: string | null
   goodsReceiptId: string | null
+  goodsReceiptNumber?: string | null
   purchaseOrderId: string | null
+  purchaseOrderNumber?: string | null
   vendorId: string | null
   warehouseId: string | null
   status: ApiQualityInspectionStatus
@@ -783,6 +787,7 @@ export interface ApiQualityInspection {
   deviationRemarks: string | null
   inspectedById: string | null
   inspectedByName: string | null
+  batchLotNo?: string | null
   completedAt: string | null
   createdAt: string | null
   updatedAt: string | null

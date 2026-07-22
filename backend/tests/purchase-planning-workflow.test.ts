@@ -75,14 +75,7 @@ describe('purchase planning workflow', () => {
 
   it('enforces PO-ready validations with stable codes', () => {
     expect(() => assertPlanningRowReadyForPo(readyRow())).not.toThrow()
-
-    try {
-      assertPlanningRowReadyForPo(readyRow({ actionMessage: false }))
-      expect.fail('expected throw')
-    } catch (e) {
-      expect(e).toBeInstanceOf(PlanningPoNotReadyError)
-      expect((e as PlanningPoNotReadyError).code).toBe(PURCHASE_ERROR_CODE.PPS_NOT_SELECTED)
-    }
+    expect(() => assertPlanningRowReadyForPo(readyRow({ actionMessage: false }))).not.toThrow()
 
     try {
       assertPlanningRowReadyForPo(readyRow({ selectedVendorId: null }))

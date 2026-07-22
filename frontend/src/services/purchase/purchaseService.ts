@@ -1142,14 +1142,13 @@ export function canCreatePoFromPlanningRow(row: PurchasePlanningSheetRow): boole
   )
 }
 
-/** Selected planning rows ready for header Create PO (Action Message). */
+/** Selected planning rows ready for header Create PO. */
 export function canSelectPlanningRowForPo(row: PurchasePlanningSheetRow): boolean {
   if (['completed', 'cancelled', 'po_created', 'partially_ordered'].includes(row.status)) {
     return false
   }
   // Match backend PO-eligible statuses (vendor_selected / approved / po_pending).
   if (!['vendor_selected', 'approved', 'po_pending'].includes(row.status)) return false
-  if (!row.actionMessage) return false
   if (!row.preferredVendorId) return false
   const qty = row.netPurchaseQuantity > 0 ? row.netPurchaseQuantity : row.requiredQuantity
   return qty > 0 && row.expectedRate > 0 && Boolean(row.requiredByDate)
@@ -1178,7 +1177,7 @@ export async function getPurchaseOrderSeriesOptions(): Promise<PurchaseOrderSeri
 }
 
 /**
- * Create one PO per vendor from Action Message–selected planning rows.
+ * Create one PO per vendor from selected planning rows.
  * Uses Purchase Setup PO number series (master) for document numbers.
  */
 function stampPrLinesWithPurchaseOrder(
@@ -1224,12 +1223,6 @@ export async function createPurchaseOrdersFromPlanningSelection(
       throw new PurchaseServiceError(
         'PO_ALREADY_CONVERTED',
         'Converted rows must not be selected again.',
-      )
-    }
-    if (!row.actionMessage) {
-      throw new PurchaseServiceError(
-        'PPS_NOT_SELECTED',
-        `${row.planningNumber}: tick Action Message before creating PO`,
       )
     }
     if (!row.preferredVendorId) {

@@ -5,18 +5,32 @@ const num = (value: unknown) => Number(value ?? 0)
 const date = (value: Date | null | undefined) => value?.toISOString().slice(0, 10) ?? null
 const iso = (value: Date | null | undefined) => value?.toISOString() ?? null
 
+type WarehousePick = Pick<MasterWarehouse, 'id' | 'code' | 'name' | 'plantId'>
+
 type OrderWithRelations = PurchaseOrder & {
   lines: PurchaseOrderLine[]
   vendor?: Pick<
     MasterVendor,
     'id' | 'code' | 'name' | 'gstin' | 'state' | 'address' | 'city'
   > | null
-  purchaseRequisition?: { id: string; requisitionNumber: string } | null
+  purchaseRequisition?: {
+    id: string
+    requisitionNumber: string
+    warehouseId?: string | null
+    warehouse?: WarehousePick | null
+  } | null
   requestForQuotation?: { id: string; rfqNumber: string } | null
-  deliveryWarehouse?: Pick<MasterWarehouse, 'id' | 'code' | 'name' | 'plantId'> | null
+  deliveryWarehouse?: WarehousePick | null
 }
 
-export function mapPurchaseOrderToDto(order: OrderWithRelations) {
+export function mapPurchaseOrderToDto(
+  order: OrderWithRelations,
+  userNames?: Map<string, string>,
+) {
+  const warehouse = order.deliveryWarehouse ?? order.purchaseRequisition?.warehouse ?? null
+  const warehouseId =
+    order.deliveryWarehouseId ?? order.purchaseRequisition?.warehouseId ?? warehouse?.id ?? null
+
   return {
     id: order.id,
     orderNumber: order.orderNumber,
@@ -40,10 +54,10 @@ export function mapPurchaseOrderToDto(order: OrderWithRelations) {
     expectedDeliveryDate: date(order.expectedDeliveryDate),
     paymentTerms: order.paymentTerms,
     deliveryTerms: order.deliveryTerms,
-    deliveryWarehouseId: order.deliveryWarehouseId,
-    deliveryWarehouseCode: order.deliveryWarehouse?.code ?? '',
-    deliveryWarehouseName: order.deliveryWarehouse?.name ?? '',
-    deliveryWarehousePlantId: order.deliveryWarehouse?.plantId ?? null,
+    deliveryWarehouseId: warehouseId,
+    deliveryWarehouseCode: warehouse?.code ?? '',
+    deliveryWarehouseName: warehouse?.name ?? '',
+    deliveryWarehousePlantId: warehouse?.plantId ?? null,
     subtotalAmount: num(order.subtotalAmount),
     taxAmount: num(order.taxAmount),
     freightAmount: num(order.freightAmount),
@@ -58,6 +72,8 @@ export function mapPurchaseOrderToDto(order: OrderWithRelations) {
     sentAt: iso(order.sentAt),
     closedAt: iso(order.closedAt),
     cancelledAt: iso(order.cancelledAt),
+    createdById: order.createdById ?? null,
+    createdByName: (order.createdById && userNames?.get(order.createdById)) || null,
     createdAt: iso(order.createdAt),
     updatedAt: iso(order.updatedAt),
     allowedActions: allowedActions(order),

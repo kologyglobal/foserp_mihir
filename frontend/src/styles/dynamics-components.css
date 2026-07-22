@@ -10259,6 +10259,10 @@ a.crm-companies-table__name:hover {
   padding: 28px 28px 20px;
 }
 
+.so-create-chooser__panel--wide {
+  width: min(1100px, 100%);
+}
+
 .so-create-chooser__header {
   max-width: 560px;
   margin-bottom: 22px;
@@ -10293,6 +10297,10 @@ a.crm-companies-table__name:hover {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.so-create-chooser__grid--po {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .so-create-chooser__card {
@@ -10362,6 +10370,37 @@ a.crm-companies-table__name:hover {
   text-transform: uppercase;
   color: var(--erp-primary);
   background: color-mix(in srgb, var(--erp-primary) 12%, transparent);
+}
+
+.so-create-chooser__pill--muted {
+  color: var(--erp-muted);
+  background: color-mix(in srgb, var(--erp-muted) 14%, transparent);
+}
+
+.so-create-chooser__count {
+  margin-left: auto;
+  border-radius: 999px;
+  min-width: 1.5rem;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  color: #fff;
+  background: var(--erp-primary);
+}
+
+.so-create-chooser__card--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.so-create-chooser__card--disabled:hover {
+  border-color: var(--erp-border);
+  background: color-mix(in srgb, var(--erp-surface-alt, #f8fafc) 70%, var(--erp-surface));
+  box-shadow: none;
+  transform: none;
 }
 
 .so-create-chooser__card-title {
@@ -10493,12 +10532,19 @@ a.crm-companies-table__name:hover {
 }
 
 @media (max-width: 720px) {
-  .so-create-chooser__grid {
+  .so-create-chooser__grid,
+  .so-create-chooser__grid--po {
     grid-template-columns: 1fr;
   }
 
   .so-create-chooser__panel {
     padding: 20px 16px 16px;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 1024px) {
+  .so-create-chooser__grid--po {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

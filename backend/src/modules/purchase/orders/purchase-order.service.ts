@@ -191,10 +191,22 @@ function computeTotals(
   }
 }
 
+async function toPurchaseOrderDto(
+  tenantId: string,
+  order: Parameters<typeof mapPurchaseOrderToDto>[0],
+) {
+  const userNames = await repo.resolveUserNames(tenantId, [order.createdById])
+  return mapPurchaseOrderToDto(order, userNames)
+}
+
 export async function listPurchaseOrders(tenantId: string, query: ListPurchaseOrdersQuery) {
   const result = await repo.findPurchaseOrders(tenantId, query)
+  const userNames = await repo.resolveUserNames(
+    tenantId,
+    result.items.map((o) => o.createdById),
+  )
   return {
-    items: result.items.map(mapPurchaseOrderToDto),
+    items: result.items.map((o) => mapPurchaseOrderToDto(o, userNames)),
     total: result.total,
     page: result.page,
     limit: result.limit,
@@ -203,7 +215,7 @@ export async function listPurchaseOrders(tenantId: string, query: ListPurchaseOr
 
 export async function getPurchaseOrder(tenantId: string, id: string) {
   const order = await loadOrThrow(tenantId, id)
-  return mapPurchaseOrderToDto(order)
+  return toPurchaseOrderDto(tenantId, order)
 }
 
 export async function previewNextPurchaseOrderNumber(tenantId: string) {
@@ -307,7 +319,7 @@ export async function createPurchaseOrder(
   })
 
   const fresh = await loadOrThrow(tenantId, created.id)
-  return mapPurchaseOrderToDto(fresh)
+  return toPurchaseOrderDto(tenantId, fresh)
 }
 
 export async function updatePurchaseOrder(
@@ -421,7 +433,7 @@ export async function updatePurchaseOrder(
     },
   })
 
-  return mapPurchaseOrderToDto(updated)
+  return toPurchaseOrderDto(tenantId, updated)
 }
 
 type LifecycleTransition = {
@@ -575,7 +587,7 @@ async function applyLifecycleTransition(
     },
   })
 
-  return mapPurchaseOrderToDto(updated)
+  return toPurchaseOrderDto(tenantId, updated)
 }
 
 export async function submitPurchaseOrder(
