@@ -6,7 +6,7 @@ import { QuickCreateDrawerForm } from '../quick-create/QuickCreateDrawerForm'
 
 const legacyDrawerLinks: Record<string, { href: string; label: string }> = {
   po: { href: '/purchase/orders', label: 'Go to purchase orders →' },
-  wo: { href: '/work-orders', label: 'Go to work orders →' },
+  wo: { href: '/manufacturing/work-orders', label: 'Go to work orders →' },
 }
 
 export function RightDrawer() {

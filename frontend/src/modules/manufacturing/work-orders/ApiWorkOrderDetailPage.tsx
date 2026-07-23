@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Scissors,
   ShieldAlert,
+  ShoppingCart,
   Truck,
   UserPlus,
   AlertTriangle,
@@ -44,7 +45,6 @@ import {
   listIssues,
   listWorkOrderAssignments,
   listWorkOrderMaterials,
-  createWorkOrderShortageRequisition,
   recordProgress,
   releaseWorkOrder,
   reserveWorkOrderMaterials,
@@ -108,7 +108,6 @@ import { cn } from '@/utils/cn'
 import {
   DocumentFormSection,
   DocumentInfoPanel,
-  DocumentSummaryStrip,
   FulfilmentJourneyStrip,
   NextBestActionBanner,
   WorkOrderHealthBadge,
@@ -116,6 +115,7 @@ import {
   assignmentStatusMeta,
   deriveWoFulfilmentJourney,
   getFulfilmentAutoMode,
+  useFulfilmentJourneyStep,
   materialControlMeta,
   materialLineMeta,
   qualityStatusMeta,
@@ -146,6 +146,11 @@ import { WIP_MOVEMENT_STATUS_LABELS, WIP_MOVEMENT_TYPE_LABELS } from '@/types/ma
 import { appConfirm, appPromptNote } from '@/store/confirmDialogStore'
 import { fetchAdminUsersApi } from '@/services/api/adminApi'
 import { ManufacturingActionDrawer } from '@/components/manufacturing/ManufacturingActionDrawer'
+import {
+  countWorkOrderShortageLines,
+  createWorkOrderShortagePr,
+  getWorkOrderShortagePrGate,
+} from './workOrderShortagePr'
 
 type DetailTab =
   | 'overview'
@@ -1019,6 +1024,7 @@ export function ApiWorkOrderDetailPage() {
   const [assignmentHistory, setAssignmentHistory] = useState<ProductionAssignment[]>([])
   const [materials, setMaterials] = useState<ProductionOrderMaterial[]>([])
   const [materialsLoading, setMaterialsLoading] = useState(false)
+  const [materialsLoaded, setMaterialsLoaded] = useState(false)
   const [issueMaterial, setIssueMaterial] = useState<ProductionOrderMaterial | null>(null)
   const [returnMaterial, setReturnMaterial] = useState<ProductionOrderMaterial | null>(null)
   const [materialEditorOpen, setMaterialEditorOpen] = useState(false)
@@ -1142,6 +1148,8 @@ export function ApiWorkOrderDetailPage() {
 
   useEffect(() => {
     materialConnectAttempted.current = false
+    setMaterialsLoaded(false)
+    setMaterials([])
   }, [workOrderId])
 
   useEffect(() => {
@@ -1171,16 +1179,35 @@ export function ApiWorkOrderDetailPage() {
       }
       const detail = await getWorkOrderDetail(workOrderId)
       setWo((prev) => (prev ? { ...prev, materialControlStatus: detail.data.materialControlStatus } : prev))
+      setMaterialsLoaded(true)
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Failed to load materials')
+      setMaterialsLoaded(true)
     } finally {
       setMaterialsLoading(false)
     }
   }, [perms.canViewMaterials, workOrderId])
 
+  // Load materials on mount so header Create PR enablement has shortage data without opening Materials tab.
   useEffect(() => {
-    if (tab === 'materials' || tab === 'bom') void loadMaterials()
-  }, [tab, loadMaterials])
+    if (workOrderId && perms.canViewMaterials) void loadMaterials()
+  }, [workOrderId, perms.canViewMaterials, loadMaterials])
+
+  const createShortagePr = useCallback(async () => {
+    if (!workOrderId) return
+    setBusy(true)
+    try {
+      const result = await createWorkOrderShortagePr(workOrderId)
+      notify.success(result.message)
+      setMaterials(result.materials)
+      setMaterialsLoaded(true)
+      navigate(`/purchase/requisitions/${result.prId}`)
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Could not create shortage purchase requisition')
+    } finally {
+      setBusy(false)
+    }
+  }, [navigate, workOrderId])
 
   const run = useCallback(
     async (fn: () => Promise<unknown>, okMsg: string) => {
@@ -1221,6 +1248,7 @@ export function ApiWorkOrderDetailPage() {
         hasShortage: row.hasShortage ?? false,
       })),
     )
+    setMaterialsLoaded(true)
   }, [])
 
   const syncMaterials = useCallback(async () => {
@@ -1270,6 +1298,15 @@ export function ApiWorkOrderDetailPage() {
   const canReceiveFg = wo.status === 'COMPLETED' && perms.canPostFgReceipt
   const canSplit = ['READY', 'IN_PROGRESS'].includes(wo.status) && perms.canSplitWo
   const readOnly = ['COMPLETED', 'CLOSED', 'CANCELLED'].includes(wo.status)
+  const shortageCount = countWorkOrderShortageLines(materials)
+  const shortagePrGate = getWorkOrderShortagePrGate({
+    canCreate: perms.canCreateMaterialRequirement,
+    readOnly,
+    materialsLoading,
+    materialsLoaded,
+    shortageCount,
+    materialControlStatus: wo.materialControlStatus,
+  })
   const openIssueCount = issues.filter((i) => ['OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS'].includes(i.status)).length
   const activeAssignmentCount = assignments.filter((a) => !['COMPLETED', 'CANCELLED'].includes(a.status)).length
   const completionPct = liveProgress?.pipelinePct ?? Math.min(100, Math.max(0, Math.round(Number(wo.completionPercent) || 0)))
@@ -1299,9 +1336,18 @@ export function ApiWorkOrderDetailPage() {
     salesOrderId: relatedSo?.id ?? wo.salesOrderId ?? null,
     salesOrderNo: relatedSo?.salesOrderNo ?? null,
   })
+  const { step: journeyStep, urlStep: journeyUrlStep, setStep: setJourneyStep } =
+    useFulfilmentJourneyStep(journey.activeStep)
+
+  useEffect(() => {
+    if (journeyUrlStep) return
+    setJourneyStep(journey.activeStep, { replace: true })
+    // Seed once per WO open so refresh resumes; do not chase later derived changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wo.id])
 
   const openDispatchHandoff = () => {
-    if (soFulfilmentPath) navigate(soFulfilmentPath)
+    if (soFulfilmentPath) navigate(`${soFulfilmentPath}?step=dispatch`)
     else navigate(dispatchWorkbenchPath)
   }
 
@@ -1485,6 +1531,20 @@ export function ApiWorkOrderDetailPage() {
           inline
           sticky
           primaryAction={primaryAction}
+          secondaryActions={
+            perms.canCreateMaterialRequirement && perms.canViewMaterials
+              ? [
+                  {
+                    id: 'shortage-pr',
+                    label: 'Create PR',
+                    icon: ShoppingCart,
+                    onClick: () => void createShortagePr(),
+                    disabled: busy || !shortagePrGate.enabled,
+                    disabledReason: shortagePrGate.disabledReason,
+                  },
+                ]
+              : []
+          }
           moreActions={moreActions}
           moreActionsLabel="More"
         />
@@ -1492,60 +1552,35 @@ export function ApiWorkOrderDetailPage() {
     >
       <div className="space-y-4">
         <FulfilmentJourneyStrip
-          activeStep={journey.activeStep}
+          activeStep={journeyStep}
           steps={journey.steps.map((step) => ({
             ...step,
             onSelect:
               step.id === 'produce'
-                ? () => setTab('stages')
+                ? () => {
+                    setJourneyStep('produce')
+                    setTab('stages')
+                  }
                 : step.id === 'quality'
-                  ? () => setTab('issues')
+                  ? () => {
+                      setJourneyStep('quality')
+                      setTab('issues')
+                    }
                   : step.id === 'stock'
                     ? () => {
+                        setJourneyStep('stock')
                         if (canReceiveFg && fgRemaining) setFgReceiptOpen(true)
                         else setTab('overview')
                       }
-                    : () => openDispatchHandoff(),
+                    : () => {
+                        setJourneyStep('dispatch')
+                        openDispatchHandoff()
+                      },
           }))}
-          compactTip="Flexible execution: inventory, purchase, and QC warn instead of hard-blocking production on this Work Order."
+          compactTip="Flexible execution: inventory, purchase, and QC warn instead of hard-blocking production on this Work Order. Progress resumes via ?step= in the URL."
         />
 
         {nextBestAction ? <NextBestActionBanner nba={nextBestAction} /> : null}
-
-        <div className="grid gap-2 rounded-lg border border-erp-border bg-white px-4 py-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-          <Field label="Status" value={<WorkOrderStatusBadge status={wo.status} />} />
-          <Field label="Current Stage" value={currentStageLabel(wo)} />
-          <Field
-            label="Progress"
-            value={
-              <span className="tabular-nums font-semibold">
-                {completionPct}%
-                {liveProgress && liveProgress.stagesTotal > 0
-                  ? ` · ${liveProgress.stagesDone}/${liveProgress.stagesTotal} stages`
-                  : ` · ${wo.completedGoodQuantity}/${wo.plannedQuantity} FG`}
-              </span>
-            }
-          />
-          <Field label="Health" value={<WorkOrderHealthBadge health={wo.healthStatus} />} />
-          <Field
-            label="Started"
-            value={wo.actualStartAt ? formatDateTime(wo.actualStartAt) : '—'}
-          />
-          <Field
-            label="Duration"
-            value={
-              wo.actualStartAt
-                ? (() => {
-                    const end = wo.actualCompletedAt ? new Date(wo.actualCompletedAt).getTime() : Date.now()
-                    const mins = Math.max(0, Math.round((end - new Date(wo.actualStartAt).getTime()) / 60_000))
-                    if (mins < 60) return `${mins} min`
-                    const h = Math.floor(mins / 60)
-                    return `${h}h ${mins % 60}m`
-                  })()
-                : '—'
-            }
-          />
-        </div>
 
         {/* Status + control strip */}
         <div className="overflow-hidden rounded-lg border border-erp-border bg-white">
@@ -1748,46 +1783,6 @@ export function ApiWorkOrderDetailPage() {
             </p>
           </div>
         )}
-
-        <DocumentSummaryStrip
-          items={[
-            {
-              id: 'planned',
-              label: liveProgress?.qtyScope === 'stage' ? 'Stage planned' : 'Planned',
-              value: liveProgress?.planned ?? wo.plannedQuantity,
-            },
-            {
-              id: 'good',
-              label: liveProgress?.qtyScope === 'stage' ? 'Stage good' : 'Good',
-              value: liveProgress?.good ?? wo.completedGoodQuantity,
-              tone: 'success',
-            },
-            {
-              id: 'rework',
-              label: 'Rework',
-              value: liveProgress?.rework ?? wo.reworkQuantity,
-              tone: Number(liveProgress?.rework ?? wo.reworkQuantity) > 0 ? 'warning' : 'default',
-            },
-            {
-              id: 'rejected',
-              label: 'Rejected',
-              value: liveProgress?.rejected ?? wo.rejectedQuantity,
-              tone: Number(liveProgress?.rejected ?? wo.rejectedQuantity) > 0 ? 'danger' : 'default',
-            },
-            {
-              id: 'scrap',
-              label: 'Scrap',
-              value: liveProgress?.scrap ?? wo.scrapQuantity,
-              tone: Number(liveProgress?.scrap ?? wo.scrapQuantity) > 0 ? 'danger' : 'default',
-            },
-            {
-              id: 'completion',
-              label: 'Pipeline',
-              value: `${completionPct}%`,
-              helper: currentStageLabel(wo),
-            },
-          ]}
-        />
 
         {/* Underline tabs */}
         <div className="border-b border-erp-border" role="tablist" aria-label="Work order tabs">
@@ -2588,12 +2583,19 @@ export function ApiWorkOrderDetailPage() {
                 action={
                   wo.status !== 'DRAFT' && perms.canCreateMaterialRequirement ? (
                     <div className="flex flex-wrap justify-center gap-2">
-                      <Button size="sm" variant="secondary" disabled={busy} onClick={() => void syncMaterials()}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy}
+                        title="Refresh material requirements from the work order BOM snapshot. Master BOM is unchanged."
+                        onClick={() => void syncMaterials()}
+                      >
                         Sync from BOM
                       </Button>
                       <Button
                         size="sm"
                         disabled={busy}
+                        title="Add a material line for this work order only (does not change the master BOM)."
                         onClick={() => {
                           setEditingMaterial(null)
                           setMaterialEditorOpen(true)
@@ -2616,6 +2618,7 @@ export function ApiWorkOrderDetailPage() {
                       <Button
                         size="sm"
                         disabled={busy}
+                        title="Add a material line for this work order only (does not change the master BOM)."
                         onClick={() => {
                           setEditingMaterial(null)
                           setMaterialEditorOpen(true)
@@ -2625,7 +2628,13 @@ export function ApiWorkOrderDetailPage() {
                       </Button>
                     ) : null}
                     {perms.canCreateMaterialRequirement ? (
-                      <Button size="sm" variant="secondary" disabled={busy} onClick={() => void syncMaterials()}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy}
+                        title="Refresh material requirements from the work order BOM snapshot. Master BOM is unchanged."
+                        onClick={() => void syncMaterials()}
+                      >
                         Sync from BOM
                       </Button>
                     ) : null}
@@ -2634,6 +2643,7 @@ export function ApiWorkOrderDetailPage() {
                         size="sm"
                         variant="secondary"
                         disabled={busy}
+                        title="Reserve free stock against all short material lines on this work order."
                         onClick={() =>
                           void run(
                             () => reserveWorkOrderMaterials(workOrderId!),
@@ -2648,13 +2658,12 @@ export function ApiWorkOrderDetailPage() {
                       <Button
                         size="sm"
                         variant="secondary"
-                        disabled={busy}
-                        onClick={() =>
-                          void run(
-                            () => createWorkOrderShortageRequisition(workOrderId!),
-                            'Shortage requisition created',
-                          ).then(() => loadMaterials())
+                        disabled={busy || !shortagePrGate.enabled}
+                        title={
+                          shortagePrGate.disabledReason ??
+                          'Create a purchase requisition for remaining shortage quantities on this work order.'
                         }
+                        onClick={() => void createShortagePr()}
                       >
                         Shortage PR
                       </Button>
@@ -2705,6 +2714,7 @@ export function ApiWorkOrderDetailPage() {
                                     size="sm"
                                     variant="ghost"
                                     disabled={busy}
+                                    title="Edit required qty / remarks for this work order line only."
                                     onClick={() => {
                                       setEditingMaterial(line)
                                       setMaterialEditorOpen(true)
@@ -2721,6 +2731,7 @@ export function ApiWorkOrderDetailPage() {
                                     size="sm"
                                     variant="ghost"
                                     disabled={busy}
+                                    title="Remove this line from the work order. Only allowed when nothing is reserved or issued."
                                     onClick={() =>
                                       void run(
                                         () => removeWorkOrderMaterialRequirement(wo.id, line.id),
@@ -2736,6 +2747,7 @@ export function ApiWorkOrderDetailPage() {
                                     size="sm"
                                     variant="ghost"
                                     disabled={busy}
+                                    title="Reserve free warehouse stock against this material line."
                                     onClick={() =>
                                       void run(
                                         () => reserveWorkOrderMaterials(workOrderId!, { materialIds: [line.id] }),
@@ -2751,6 +2763,11 @@ export function ApiWorkOrderDetailPage() {
                                     size="sm"
                                     variant="ghost"
                                     disabled={busy || remaining <= 0}
+                                    title={
+                                      remaining <= 0
+                                        ? 'Nothing left to issue — required quantity is already fully issued.'
+                                        : 'Post a material issue to the shop floor for this line.'
+                                    }
                                     onClick={() => setIssueMaterial(line)}
                                   >
                                     Issue…
@@ -2761,6 +2778,7 @@ export function ApiWorkOrderDetailPage() {
                                     size="sm"
                                     variant="ghost"
                                     disabled={busy}
+                                    title="Return unused issued material from the shop floor back to inventory."
                                     onClick={() => setReturnMaterial(line)}
                                   >
                                     Return…

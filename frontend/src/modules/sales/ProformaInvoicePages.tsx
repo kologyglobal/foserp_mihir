@@ -32,6 +32,7 @@ import { ProformaInvoiceDocument } from '../../components/sales/ProformaInvoiceD
 import { buildProformaNewUrl } from '../../utils/proformaInvoicePrefill'
 import { downloadProformaExcel, downloadProformaPdf } from '../../utils/proformaInvoiceExport'
 import type { StatusDotTone } from '../../components/design-system/StatusDot'
+import { DocumentPrintShell } from '@/components/print/DocumentPrintShell'
 
 import { salesModuleBreadcrumbs, salesChildBreadcrumbs } from '../../utils/salesNavigation'
 
@@ -499,29 +500,19 @@ export function ProformaInvoicePrintPage() {
   }
 
   return (
-    <div className="po-print-page erp-page">
-      <div className="po-print-toolbar no-print mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-erp-border bg-erp-surface px-4 py-3">
-        <div>
-          <p className="text-[15px] font-semibold text-erp-text">{proforma.proformaNo}</p>
-          <p className="text-[12px] text-erp-muted">Proforma invoice — print-ready preview</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <ErpButton type="button" variant="secondary" icon={Printer} onClick={() => window.print()}>
-            Print
-          </ErpButton>
-          <ErpButton type="button" variant="secondary" icon={Download} onClick={() => downloadProformaPdf(proforma)}>
-            Download PDF
-          </ErpButton>
-          <ErpButton type="button" variant="secondary" icon={FileSpreadsheet} onClick={() => downloadProformaExcel(proforma)}>
-            Export Excel
-          </ErpButton>
-          <ErpButton type="button" variant="ghost" icon={FileText} onClick={() => navigate(`/sales/proforma-invoices/${proforma.id}`)}>
-            Back to Proforma
-          </ErpButton>
-        </div>
-      </div>
+    <DocumentPrintShell
+      title={proforma.proformaNo}
+      subtitle="Proforma invoice — print-ready / Save as PDF"
+      backLabel="Back to Proforma"
+      onBack={() => navigate(`/sales/proforma-invoices/${proforma.id}`)}
+      extraActions={
+        <ErpButton type="button" variant="secondary" icon={FileSpreadsheet} onClick={() => downloadProformaExcel(proforma)}>
+          Export Excel
+        </ErpButton>
+      }
+    >
       <ProformaInvoiceDocument proforma={proforma} className="print:mx-auto print:max-w-[210mm]" />
-    </div>
+    </DocumentPrintShell>
   )
 }
 

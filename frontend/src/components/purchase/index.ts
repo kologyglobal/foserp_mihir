@@ -110,14 +110,28 @@ export { PurchaseOrderPrintDocument } from './PurchaseOrderPrintDocument'
 export { PurchaseProcessMap, PurchaseProcessStagePanel } from './PurchaseProcessMap'
 export {
   PurchaseDocumentWorkflowStrip,
+  PurchaseRequisitionWorkflowStrip,
+  RfqWorkflowStrip,
   PURCHASE_ORDER_WORKFLOW_STRIP_STEPS,
+  PURCHASE_REQUISITION_RFQ_WORKFLOW_STEPS,
+  PURCHASE_REQUISITION_DIRECT_WORKFLOW_STEPS,
+  RFQ_WORKFLOW_STRIP_STEPS,
   purchaseOrderWorkflowNextAction,
   purchaseOrderWorkflowStripIndex,
+  purchaseRequisitionWorkflowNextAction,
+  purchaseRequisitionWorkflowStripIndex,
+  purchaseRequisitionWorkflowSteps,
+  rfqWorkflowNextAction,
+  rfqWorkflowStripIndex,
 } from './PurchaseDocumentWorkflowStrip'
 export type {
   PurchaseDocumentWorkflowStripProps,
   PurchaseOrderWorkflowNextActionContext,
   PurchaseOrderWorkflowStripStep,
+  PurchaseRequisitionWorkflowStripProps,
+  PurchaseRequisitionWorkflowNextActionContext,
+  RfqWorkflowStripProps,
+  RfqWorkflowNextActionContext,
 } from './PurchaseDocumentWorkflowStrip'
 export {
   PurchaseMonthlyTrendChart,

@@ -389,7 +389,7 @@ export function BomDetailPage() {
         subtitle={bom.description}
         recordNo={bom.bomNo}
         editTo={editable ? bomEditPath(pathname, id) : undefined}
-        favoritePath={`/masters/bom/${id}/manage`}
+        favoritePath={`/manufacturing/setup/boms`}
         badges={
           <>
             <StatusBadge status={bom.status} />

@@ -8,8 +8,6 @@ import {
   SalesCustomersRouteLayout,
 } from '@/modules/sales/SalesPages'
 import {
-  SalesOrderStatusPage,
-  SalesReportsHubPage,
   SalesPipelineLegacyRedirect,
   SalesLeadsLegacyRedirect,
   SalesLeadNewLegacyRedirect,
@@ -24,15 +22,16 @@ import {
   SalesOrder360LegacyRedirect,
 } from '@/modules/sales/SalesNavigationPages'
 import { SalesOrderNewPage, SalesOrderEditPage } from '@/modules/sales/SalesOrderFormPage'
+import { Customer360Page } from '@/modules/entity360'
+import { SalesOrderPrintPage } from '@/components/sales/SalesOrderPrintPage'
 import {
   ProformaInvoiceListPage,
   ProformaInvoiceDetailPage,
   ProformaInvoicePrintPage,
 } from '@/modules/sales/ProformaInvoicePages'
 import { ProformaInvoiceFormPage } from '@/modules/sales/ProformaInvoiceFormPage'
-import { Customer360Page } from '@/modules/entity360'
-import { SalesOrderPrintPage } from '@/components/sales/SalesOrderPrintPage'
 
+/** Sales Phase 1 (SO) + CRM redirects + demo proforma print/PDF. */
 export const salesRouteChildren: RouteObject[] = [
   { path: 'sales-pipeline', element: <SalesPipelineLegacyRedirect /> },
   { path: 'sales', element: <SalesWorkspacePage /> },
@@ -44,8 +43,6 @@ export const salesRouteChildren: RouteObject[] = [
       { path: ':id/360', element: <Customer360Page /> },
     ],
   },
-  { path: 'sales/order-status', element: <SalesOrderStatusPage /> },
-  { path: 'sales/reports', element: <SalesReportsHubPage /> },
   { path: 'sales/orders/:id/360', element: <SalesOrder360LegacyRedirect /> },
   { path: 'sales/leads', element: <SalesLeadsLegacyRedirect /> },
   { path: 'sales/leads/new', element: <SalesLeadNewLegacyRedirect /> },

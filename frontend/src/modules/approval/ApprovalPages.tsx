@@ -26,11 +26,11 @@ function entityLink(request: ApprovalRequest): string {
     case 'purchase_order':
       return `/purchase/po/${request.entityId}`
     case 'bom_revision':
-      return `/masters/bom/${request.entityId}/manage`
+      return `/manufacturing/setup/boms`
     case 'routing_revision':
       return `/masters/routing/${request.entityId}`
     case 'engineering_change':
-      return `/engineering/eco/${request.entityId}`
+      return `/manufacturing/setup/boms`
     case 'cost_override':
       return `/masters/products/${request.entityId}`
     case 'dispatch_override':
@@ -39,9 +39,9 @@ function entityLink(request: ApprovalRequest): string {
     case 'qc_reject_closure':
       return `/quality/ncr/${request.entityId}`
     case 'invoice_cancellation':
-      return `/invoice/${request.entityId}`
+      return `/accounting/money-in/invoices/${request.entityId}`
     default:
-      return '/approvals'
+      return '/purchase/approvals'
   }
 }
 
@@ -65,7 +65,7 @@ export function MyApprovalsPage() {
               accessorKey: 'entityLabel',
               header: 'Document',
               cell: ({ row }) => (
-                <Link to={`/approvals/${row.original.id}`} className="font-medium text-blue-600">
+                <Link to={`/purchase/approvals`} className="font-medium text-blue-600">
                   {row.original.entityLabel}
                 </Link>
               ),
@@ -99,7 +99,7 @@ export function MyApprovalsPage() {
               accessorKey: 'entityLabel',
               header: 'Document',
               cell: ({ row }) => (
-                <Link to={`/approvals/${row.original.id}`} className="text-blue-600">
+                <Link to={`/purchase/approvals`} className="text-blue-600">
                   {row.original.entityLabel}
                 </Link>
               ),

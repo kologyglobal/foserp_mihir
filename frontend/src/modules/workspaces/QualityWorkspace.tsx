@@ -24,7 +24,7 @@ export function QualityWorkspacePage() {
       { id: 'inspect', label: 'Complete Inspection', href: '/quality/queue', priority: 'primary' as const },
       { id: 'rework', label: 'Raise Rework', href: '/quality/rework' },
       { id: 'ncr', label: 'Raise NCR', href: '/quality/ncr' },
-      { id: 'release', label: 'Release Operation', href: '/work-orders' },
+      { id: 'release', label: 'Release Operation', href: '/manufacturing/work-orders' },
     ],
     [],
   )

@@ -36,6 +36,7 @@ const WAREHOUSE_TYPE_OPTIONS: Array<{ value: WarehouseType; label: string }> = [
   { value: 'scrap', label: 'Scrap' },
   { value: 'transit', label: 'Transit' },
   { value: 'dispatch', label: 'Dispatch' },
+  { value: 'job_work', label: 'Job Work' },
 ]
 
 const schema = z.object({

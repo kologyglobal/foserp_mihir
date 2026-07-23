@@ -69,20 +69,20 @@ export function EntityQrToolbar({
       {qrId && (
         <>
           <Link
-            to={`/qr/print/${qrId}`}
+            to="/manufacturing/traceability"
             className="inline-flex items-center gap-1 rounded border border-erp-border px-2 py-1 text-xs hover:border-erp-accent"
           >
-            <Printer className="h-3.5 w-3.5" /> Print QR
+            <Printer className="h-3.5 w-3.5" /> Traceability
           </Link>
           <button
             type="button"
-            onClick={() => navigate(`/scan?qr=${encodeURIComponent(existing.qrCode)}`)}
+            onClick={() => navigate('/inventory/scan/receive')}
             className="inline-flex items-center gap-1 rounded border border-erp-border px-2 py-1 text-xs hover:border-erp-accent"
           >
-            <ScanLine className="h-3.5 w-3.5" /> Scan QR
+            <ScanLine className="h-3.5 w-3.5" /> Scan
           </button>
           <Link
-            to={`/traceability?qr=${encodeURIComponent(existing.displayCode)}`}
+            to="/manufacturing/traceability"
             className="inline-flex items-center gap-1 rounded border border-erp-border px-2 py-1 text-xs hover:border-erp-accent"
           >
             <GitBranch className="h-3.5 w-3.5" /> View Traceability

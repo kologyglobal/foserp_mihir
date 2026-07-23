@@ -44,7 +44,7 @@ export function BookWorkspaceShell({
       mergeHeaderWithWorkspace
     >
       <div className="flex flex-col gap-2">
-        <BankCashWorkspaceTabs active={kind === 'bank' ? 'bank_book' : 'cash_book'} />
+        <BankCashWorkspaceTabs active={kind === 'bank' ? 'bank_book' : 'cashbook'} />
         {children}
       </div>
     </OperationalPageShell>

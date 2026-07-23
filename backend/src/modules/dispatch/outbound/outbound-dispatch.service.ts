@@ -1,15 +1,11 @@
-import type { InventoryStockMovement } from '@prisma/client'
 import type { Request } from 'express'
 import { prisma } from '../../../config/database.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
 import { ConflictError, InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
+import {
+  assertSalesOrderAllowsDispatch,
+} from '../../crm/sales-orders/fulfilment/sales-order-dispatch-guard.service.js'
 import { assertDispatchQtyAllowed } from '../../crm/sales-orders/fulfilment/sales-order-fulfilment.service.js'
-import { assertSalesOrderAllowsDispatch } from '../../crm/sales-orders/fulfilment/sales-order-dispatch-guard.service.js'
-import { InventoryPostingService } from '../../inventory/shared/stock-posting.service.js'
-import { tryRecordInventoryAccountingEventsForMovements } from '../../inventory/accounting/inventory-accounting-event.service.js'
-import { assertPickListsAllowConfirm } from '../picking/dispatch-pick-list.service.js'
-import { assertPackingAllowsConfirm } from '../packing/dispatch-packing-reconciliation.service.js'
-import { assertChallanAllowsConfirm } from '../challan/delivery-challan-reconciliation.service.js'
 import { synchroniseDispatchRequirements } from '../requirements/dispatch-requirement-sync.service.js'
 import { mapOutboundDispatch } from './outbound-dispatch.mappers.js'
 import * as repo from './outbound-dispatch.repository.js'
@@ -37,14 +33,6 @@ async function refreshRequirementsForDispatch(
 
 function userId(req: Request): string {
   return req.context?.userId ?? ''
-}
-
-function canOverrideNegativeStock(req: Request): boolean {
-  return (
-    req.context?.permissions.includes('inventory.issues.override_negative_stock') === true ||
-    req.context?.permissions.includes('tenant.manage') === true ||
-    req.context?.permissions.includes('dispatch.override') === true
-  )
 }
 
 async function resolveSalesOrder(
@@ -195,190 +183,86 @@ export async function updateOutboundDispatch(
   return mapOutboundDispatch(row)
 }
 
-async function postConfirmedFgDispatch(
+/** Phase 7C0 compatibility confirm — soft policy unless hardened workbench applies. */
+export async function confirmOutboundDispatch(
   req: Request,
   tenantId: string,
   id: string,
-  options: { requireIssuedChallan: boolean },
+  input?: { idempotencyKey?: string },
 ) {
-  const existing = await repo.findById(tenantId, id)
-  if (!existing) throw new NotFoundError('Outbound dispatch not found')
-  if (existing.status === 'CONFIRMED') return mapOutboundDispatch(existing)
-  if (existing.status === 'REVERSED') {
-    throw new InvalidStateError('Reversed outbound dispatches cannot be re-posted; create a new draft')
-  }
-  if (existing.status !== 'DRAFT') {
-    throw new InvalidStateError('Only DRAFT outbound dispatches can be posted')
-  }
-  if (!existing.lines.length) throw new ValidationError('Outbound dispatch has no lines')
-
-  await assertPickListsAllowConfirm(tenantId, id)
-  await assertPackingAllowsConfirm(tenantId, id)
-  await assertChallanAllowsConfirm(tenantId, id, {
-    requireIssuedChallan: options.requireIssuedChallan,
+  const { postFgDispatch } = await import('../posting/dispatch-posting.service.js')
+  return postFgDispatch(req, tenantId, id, {
+    mode: 'confirm',
+    idempotencyKey: input?.idempotencyKey,
   })
-
-  const confirmSalesOrders = new Set<string>()
-  if (existing.salesOrderId) confirmSalesOrders.add(existing.salesOrderId)
-  for (const line of existing.lines) {
-    if (line.salesOrderId) confirmSalesOrders.add(line.salesOrderId)
-  }
-  for (const salesOrderId of confirmSalesOrders) {
-    await assertSalesOrderAllowsDispatch(tenantId, salesOrderId)
-  }
-
-  for (const line of existing.lines) {
-    if (line.salesOrderLineId && line.salesOrderId) {
-      await assertDispatchQtyAllowed(
-        tenantId,
-        line.salesOrderId,
-        line.salesOrderLineId,
-        Number(line.quantity),
-      )
-    }
-  }
-
-  const issueMovements: InventoryStockMovement[] = []
-  const row = await prisma.$transaction(async (tx) => {
-    for (const line of existing.lines) {
-      const movement = await InventoryPostingService.postFgDispatchIssue(
-        {
-          tenantId,
-          itemId: line.itemId,
-          warehouseId: line.warehouseId,
-          quantity: line.quantity,
-          salesOrderId: line.salesOrderId ?? undefined,
-          outboundDispatchLineId: line.id,
-          referenceNo: existing.dispatchNo,
-          remarks: line.remarks ?? `FG dispatch ${existing.dispatchNo}`,
-          idempotencyKey: `fg-dispatch:${id}:${line.id}`,
-          createdBy: userId(req) || undefined,
-          allowNegativeStock: canOverrideNegativeStock(req),
-          consumeSoReservation: true,
-        },
-        tx,
-      )
-      await tx.outboundDispatchLine.update({
-        where: { id: line.id },
-        data: {
-          inventoryMovementId: movement.id,
-          inventoryMovementNo: movement.movementNumber,
-        },
-      })
-      issueMovements.push(movement)
-    }
-
-    return tx.outboundDispatch.update({
-      where: { id },
-      data: {
-        status: 'CONFIRMED',
-        confirmedAt: new Date(),
-        confirmedBy: userId(req) || null,
-        updatedBy: userId(req) || null,
-      },
-      include: { lines: { orderBy: { lineNo: 'asc' } } },
-    })
-  })
-
-  await tryRecordInventoryAccountingEventsForMovements(req, tenantId, issueMovements, {
-    sourceDocumentType: 'OUTBOUND_DISPATCH',
-    sourceDocumentId: id,
-    narration: `FG dispatch ${existing.dispatchNo}`,
-  })
-
-  await refreshRequirementsForDispatch(tenantId, row, userId(req) || undefined)
-  return mapOutboundDispatch(row)
-}
-
-/** Phase 7C0 compatibility confirm — soft challan gate (issued only when challans exist). */
-export async function confirmOutboundDispatch(req: Request, tenantId: string, id: string) {
-  return postConfirmedFgDispatch(req, tenantId, id, { requireIssuedChallan: false })
 }
 
 /**
- * Phase 7C5 hardened post — same FG_DISPATCH posting as confirm, but workbench
- * dispatches (`WORKBENCH_7C1`) require an ISSUED Delivery Challan qty match.
- * Basic 7C0 drafts keep the soft challan gate.
+ * Phase 7C5 hardened post — same FG_DISPATCH posting via DispatchPostingService.
+ * WORKBENCH_7C1 uses hardened policy when DISPATCH_HARDENED_POSTING_ENABLED.
  */
-export async function postOutboundDispatch(req: Request, tenantId: string, id: string) {
+export async function postOutboundDispatch(
+  req: Request,
+  tenantId: string,
+  id: string,
+  input?: {
+    idempotencyKey?: string
+    emergency?: boolean
+    overrideReason?: string
+    emergencyOverride?: {
+      businessReason: string
+      urgency?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+      riskAcknowledged: boolean
+      approvedByName?: string
+      approvalReference?: string
+      expiresAt?: string
+      scope?: string
+      remarks?: string
+      overrideId?: string
+    }
+  },
+) {
+  const { postFgDispatch, resolvePostingPolicyForOutbound } = await import(
+    '../posting/dispatch-posting.service.js'
+  )
   const existing = await repo.findById(tenantId, id)
   if (!existing) throw new NotFoundError('Outbound dispatch not found')
-  const requireIssuedChallan = existing.planningSource === 'WORKBENCH_7C1'
-  return postConfirmedFgDispatch(req, tenantId, id, { requireIssuedChallan })
+  const policy = resolvePostingPolicyForOutbound(existing, 'post')
+  return postFgDispatch(req, tenantId, id, {
+    mode: 'post',
+    policy,
+    idempotencyKey: input?.idempotencyKey,
+    emergency: input?.emergency === true,
+    overrideReason: input?.overrideReason,
+    emergencyOverride: input?.emergencyOverride,
+  })
 }
 
 /**
- * Phase 7C5 reverse — compensating FG_DISPATCH inward per line, status → REVERSED.
- * Fulfilment net dispatched qty drops; remaining-to-dispatch opens again.
+ * Phase 7C5 reverse — delegates to DispatchReversalService (partial + approval + apply).
  */
 export async function reverseOutboundDispatch(
   req: Request,
   tenantId: string,
   id: string,
-  input: { reason?: string },
+  input: {
+    reason?: string
+    reasonCode?: string
+    force?: boolean
+    skipApproval?: boolean
+    applyImmediately?: boolean
+    requestOnly?: boolean
+    lines?: Array<{ outboundDispatchLineId?: string; postingLineId?: string; quantity: number }>
+    idempotencyKey?: string
+  },
 ) {
-  const existing = await repo.findById(tenantId, id)
-  if (!existing) throw new NotFoundError('Outbound dispatch not found')
-  if (existing.status === 'REVERSED') return mapOutboundDispatch(existing)
-  if (existing.status !== 'CONFIRMED') {
-    throw new InvalidStateError('Only CONFIRMED outbound dispatches can be reversed')
+  const { reverseOutboundDispatchCanonical } = await import('../posting/dispatch-reversal.service.js')
+  const result = await reverseOutboundDispatchCanonical(req, tenantId, id, input)
+  if (!result.awaitingApproval) {
+    const row = await repo.findById(tenantId, id)
+    if (row) await refreshRequirementsForDispatch(tenantId, row, userId(req) || undefined)
   }
-  if (!existing.lines.length) throw new ValidationError('Outbound dispatch has no lines')
-
-  const reversalMovements: InventoryStockMovement[] = []
-  const row = await prisma.$transaction(async (tx) => {
-    for (const line of existing.lines) {
-      const movement = await InventoryPostingService.post(
-        {
-          tenantId,
-          itemId: line.itemId,
-          warehouseId: line.warehouseId,
-          movementType: 'INWARD',
-          referenceType: 'FG_DISPATCH',
-          quantity: line.quantity,
-          salesOrderId: line.salesOrderId ?? undefined,
-          outboundDispatchLineId: line.id,
-          referenceNo: existing.dispatchNo,
-          remarks: input.reason?.trim()
-            ? `FG dispatch reverse ${existing.dispatchNo}: ${input.reason.trim()}`
-            : `FG dispatch reverse ${existing.dispatchNo}`,
-          idempotencyKey: `fg-dispatch-rev:${id}:${line.id}`,
-          createdBy: userId(req) || undefined,
-          allowNegativeStock: true,
-        },
-        tx,
-      )
-      await tx.outboundDispatchLine.update({
-        where: { id: line.id },
-        data: {
-          reverseInventoryMovementId: movement.id,
-          reverseInventoryMovementNo: movement.movementNumber,
-        },
-      })
-      reversalMovements.push(movement)
-    }
-
-    return tx.outboundDispatch.update({
-      where: { id },
-      data: {
-        status: 'REVERSED',
-        reversedAt: new Date(),
-        reversedBy: userId(req) || null,
-        reverseReason: input.reason?.trim() || null,
-        updatedBy: userId(req) || null,
-      },
-      include: { lines: { orderBy: { lineNo: 'asc' } } },
-    })
-  })
-
-  await tryRecordInventoryAccountingEventsForMovements(req, tenantId, reversalMovements, {
-    sourceDocumentType: 'OUTBOUND_DISPATCH',
-    sourceDocumentId: id,
-    narration: `FG dispatch reverse ${existing.dispatchNo}`,
-  })
-
-  await refreshRequirementsForDispatch(tenantId, row, userId(req) || undefined)
-  return mapOutboundDispatch(row)
+  return result
 }
 
 export async function cancelOutboundDispatch(

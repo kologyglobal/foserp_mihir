@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { CheckCircle2, XCircle, Percent, ClipboardList } from 'lucide-react'
 import {
   DynamicsModuleDashboard,
@@ -133,7 +132,7 @@ export function UatDashboardPage() {
             ERP_UAT_SIGNOFF_CHECKLIST.md, UAT_AUTOMATION_SUMMARY.md, ERP_UAT_FINAL_EXECUTION_SUMMARY.md
           </p>
           <p className="mt-3 text-xs text-erp-muted">
-            Load sample data from <Link to="/settings/demo-data" className="text-erp-primary underline">Settings → Demo Data</Link>.
+            Load sample data from Settings (demo seed load is no longer a separate screen).
             Run <code className="rounded bg-erp-surface-alt px-1">npm run test:uat</code> to refresh automation summary.
           </p>
         </div>

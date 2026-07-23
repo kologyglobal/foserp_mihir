@@ -74,6 +74,14 @@ export async function updateRouting(req: Request, tenantId: string, routingId: s
   return record
 }
 
+export async function softDeleteRouting(req: Request, tenantId: string, routingId: string) {
+  const userId = req.context?.userId ?? ''
+  const before = await repo.getRouting(tenantId, routingId)
+  const record = await repo.softDeleteRouting(tenantId, userId, routingId)
+  await audit(req, tenantId, 'manufacturingRouting', routingId, 'DELETE', before, record)
+  return record
+}
+
 export async function listRoutingVersions(tenantId: string, routingId: string, query: ListRoutingVersionsQuery) {
   return repo.listRoutingVersions(tenantId, routingId, query)
 }

@@ -1,4 +1,11 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import {
+  cloneElement,
+  isValidElement,
+  useMemo,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react'
 import { Eye, Pencil, Power, PowerOff, Trash2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { OperationalPageShell } from '../design-system/OperationalPageShell'
@@ -29,6 +36,7 @@ interface MasterListShellProps {
   description: string
   createLabel: string
   createTo: string
+  badge?: string
   masterGroupId?: MasterCatalogGroupId
   breadcrumbs?: { label: string; to?: string }[]
   favoritePath?: string
@@ -89,6 +97,7 @@ export function MasterListShell({
   description,
   createLabel,
   createTo,
+  badge = 'Master Data',
   masterGroupId,
   breadcrumbs,
   favoritePath,
@@ -157,25 +166,33 @@ export function MasterListShell({
 
   const GroupIcon = group?.icon
 
+  const registerBar = (
+    <MasterRegisterFilterBar
+      search={search}
+      onSearchChange={onSearchChange}
+      searchPlaceholder={searchPlaceholder}
+      statusFilter={statusFilter}
+      onStatusFilterChange={onStatusFilterChange}
+      statusOptions={statusOptions}
+      chips={filterChips}
+      onRemoveChip={removeChip}
+      onClearAll={filterChips.length > 0 ? clearFilters : undefined}
+      resultCount={resultCount}
+      savedView={savedView}
+      onSavedViewChange={setSavedView}
+      trailing={extraFilters}
+    />
+  )
+
+  const tableChild =
+    isValidElement(children)
+      ? cloneElement(children as ReactElement<{ registerBar?: ReactNode }>, { registerBar })
+      : children
+
   const tablePanel = (
     <EnterpriseRegisterTableShell>
-      <MasterRegisterFilterBar
-        search={search}
-        onSearchChange={onSearchChange}
-        searchPlaceholder={searchPlaceholder}
-        statusFilter={statusFilter}
-        onStatusFilterChange={onStatusFilterChange}
-        statusOptions={statusOptions}
-        chips={filterChips}
-        onRemoveChip={removeChip}
-        onClearAll={filterChips.length > 0 ? clearFilters : undefined}
-        resultCount={resultCount}
-        savedView={savedView}
-        onSavedViewChange={setSavedView}
-        trailing={extraFilters}
-      />
-      <div className="ent-data-grid ent-data-grid--register masters-register-grid">
-        {children}
+      <div className="masters-register-grid">
+        {tableChild}
       </div>
     </EnterpriseRegisterTableShell>
   )
@@ -184,7 +201,7 @@ export function MasterListShell({
     <OperationalPageShell
       variant="dynamics"
       layout="enterprise"
-      badge="Master Data"
+      badge={badge}
       title={title}
       description={description}
       breadcrumbs={resolvedBreadcrumbs}

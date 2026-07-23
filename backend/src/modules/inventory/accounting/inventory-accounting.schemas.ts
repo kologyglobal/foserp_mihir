@@ -32,3 +32,13 @@ export const listInventoryAccountingEventsQuerySchema = paginationSchema.extend(
 export type ListInventoryAccountingEventsQuery = z.infer<
   typeof listInventoryAccountingEventsQuerySchema
 >
+
+export const putInventoryAccountingFeatureSchema = z
+  .object({
+    isEnabled: z.boolean(),
+    note: z.string().trim().max(500).optional().nullable(),
+  })
+  .strict()
+
+export type PutInventoryAccountingFeatureInput = z.infer<typeof putInventoryAccountingFeatureSchema>
+

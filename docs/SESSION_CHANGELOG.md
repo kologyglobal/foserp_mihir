@@ -1,4 +1,775 @@
-﻿## 2026-07-23 — Period Close Control Hardening
+﻿## 2026-07-23 — Manufacturing Accounting permission sync + UAT checklist
+
+### Shipped
+
+- Ran `sync-permissions.ts` on live DB — **84** role-permission links (enablement keys for Tenant Admin / Finance Manager / Inventory Manager / etc.).
+- Production Manager limited to `manufacturing.accounting.view` + `.readiness` (Finance owns enable/sign-off); over-grants revoked.
+- UAT checklist: `docs/manufacturing/accounting/MANUFACTURING_ACCOUNTING_UAT_CHECKLIST.md`
+- Smoke: `backend/scripts/uat-mfg-accounting-enablement.ts` (does not enable flag)
+
+### Evidence
+
+- UAT smoke PASS on `vasant-trailers`: flag OFF, nextAction=`CONFIGURE_ACCOUNT_MAPPINGS` (LABOUR/MACHINE/JOB_WORK), period OPEN
+- `test-mfg-accounting-enablement-gate.ts` PASS
+- Re-login required for session permissions
+
+---
+
+## 2026-07-23 — Emergency Override drawers (Dispatch)
+
+### Shipped
+
+- Shared never-overridable vs operational blocker catalog; fail-closed on unknown codes.
+- `emergency_overrides` audit register (GRANTED → CONSUMED, time-bound, document-scoped).
+- Dispatch post accepts `emergencyOverride{…}`; readiness exposes `emergencyOverride.canRequest`.
+- FE `EmergencyOverrideDrawer` on workbench outbound when Post is blocked.
+- Docs: `docs/EMERGENCY_OVERRIDE.md`, updated `DISPATCH_EMERGENCY_OVERRIDE.md`.
+
+### Evidence
+
+- Migrate `20260723120000_emergency_overrides` applied
+- `npx vitest run tests/emergency-override-catalog.test.ts` → **4/4 PASS**
+- `dispatch-phase7c5` emergency case → **PASS** (GRANTED→CONSUMED path)
+
+---
+
+### Shipped
+
+- POD register after posted Dispatch: `IN_TRANSIT` → capture DELIVERED / partial / exception / rejected / return.
+- **No stock movements** on POD — FG already issued at Dispatch post.
+- Auto-create IN_TRANSIT shell on post; APIs under `/dispatch/outbound/:id/pod/*`.
+- Policy `REQUIRE_POD_BEFORE_INVOICE` (default OFF) gates auto draft SI.
+- FE `DispatchPodPanel` on outbound detail; docs `docs/dispatch/DISPATCH_POD.md`.
+
+### Evidence
+
+- Migrate `20260723110000_dispatch_proof_of_delivery` + `20260723111000_dispatch_pod_ob_unique`
+- `npx vitest run tests/dispatch-pod.test.ts` → **2/2 PASS** (IN_TRANSIT + capture DELIVERED; stock-neutral)
+
+---
+
+## 2026-07-23 — Dispatch e-Way Bill (statutory NIC panel)
+
+### Shipped
+
+- e-Way is **not** a manual number field: removed editable DC transport input; system snapshot only on generate.
+- `GstEWayBill` enriched: generatedAt, transporterId, requiredReason, request/response JSON, outboundDispatchId.
+- NIC adapter: generate / cancel / **update vehicle** + request/response snapshots (SIMULATED; LIVE blocked until certified).
+- Dispatch panel API `GET …/e-way-bills/panel` + actions; FE `DispatchEWayBillPanel` on Delivery Challan detail.
+- Docs: `docs/dispatch/DISPATCH_EWAY_BILL.md`.
+
+### Evidence
+
+- Prisma migrate `20260723103000_eway_bill_statutory_fields` applied
+- `cd backend && npx vitest run tests/finance/finance-gst-einvoice-eway.test.ts` → **4/4 PASS**
+
+---
+
+### Shipped
+
+- Policy locked: Post Dispatch → reduce FG → `InventoryAccountingEvent` → central `post()` **only** when `INVENTORY_ACCOUNTING` is enabled for the Legal Entity.
+- Dispatch/frontend do **not** create COGS vouchers; Dispatch only calls `tryRecordInventoryAccountingEventsForMovements` with resolved `legalEntityId`.
+- Docs ownership table in `docs/dispatch/DISPATCH_COGS.md`; live test covers POSTED + `SKIPPED_FLAG_OFF`.
+
+### Evidence
+
+- `cd backend && npx vitest run tests/dispatch-cogs-gl.test.ts` → PASS
+
+---
+
+### Shipped
+
+- **FOS rule:** Posted Dispatch → `FG_DISPATCH` inventory accounting → Dr `COST_OF_GOODS_SOLD` / Cr `FINISHED_GOODS_INVENTORY` (not on Sales Invoice; `ENABLE_SI_COGS_POSTING` stays OFF).
+- CoA template leaf **5600 Cost of Goods Sold**; Veer seed maps `COST_OF_GOODS_SOLD` (+ additive create if CoA pre-existed).
+- Enable API: `GET/PUT /inventory/accounting/feature-controls/:legalEntityId` (requires COGS + FG mappings).
+- Docs: `docs/dispatch/DISPATCH_COGS.md`.
+
+### Evidence
+
+- `cd backend && npx vitest run tests/dispatch-cogs-gl.test.ts` → **2/2 PASS** (₹4,00,000 Dr COGS / Cr FG + idempotent)
+- `tests/inventory-accounting-events.test.ts` → builder COGS pair still green
+
+---
+
+### Shipped
+
+- Posted dispatch → **DRAFT** Sales Invoice only (never auto-post). Idempotent per `DispatchPosting` via `sourceDocumentSnapshot.autoFromDispatchPostingId`.
+- Outbox: `DISPATCH_POSTED` / `SALES_ORDER_INVOICE_READY` → `createDraftSalesInvoiceFromDispatchPosting`.
+- Qty = invoice-ready (net posted − ACTIVE links − reversed). Partial dispatch invoices dispatched qty only.
+- Reverse: only **POSTED** SI hard-blocks; DRAFT/READY linked SIs cancelled on reverse apply.
+- Flag `ENABLE_AUTO_SALES_INVOICE_FROM_DISPATCH`: ON outside production by default; OFF in production until set.
+- Docs: `docs/dispatch/DISPATCH_AUTO_SALES_INVOICE.md`.
+
+### Evidence
+
+- `cd backend && npx vitest run tests/dispatch-phase7c5.test.ts` → **17/17 PASS**
+
+---
+
+## 2026-07-23 — Admin UI Dynamics chrome (CRM/Accounting parity)
+
+### Shipped
+
+- `AdminWorkspaceShell` — `variant="dynamics"` + `layout="enterprise"` + badge **Admin** + `DynamicsTabs` + `ErpCommandBar`
+- Overview + People / Organisation / Security hubs restyled; Users/Roles/Tenants lists use `badge="Admin"`
+
+---
+
+## 2026-07-23 — Dispatch 7C5 emergency / serial-lot / concurrency tests
+
+### Shipped
+
+- Live suite covers emergency override post (`dispatch.override`), serial/lot incomplete→409 / seeded serial→200 / duplicate active serial unique reject, and N-way post + concurrent reverse apply-once stress.
+- Happy-path asserts auto DRAFT SI (created or already existing from outbox) + idempotent re-call.
+
+### Evidence
+
+- `cd backend && npx vitest run tests/dispatch-phase7c5.test.ts` → **17/17 PASS**
+
+---
+
+## 2026-07-23 — Admin users blank in API mode
+
+### Shipped
+
+- `useAdminApiSync` hydrates users/roles/tenants on AppShell mount (same pattern as CRM/master sync).
+- `/admin/users` reads `useAdminStore.users`, which stayed empty when `VITE_USE_API=true` because only CRM + masters were synced.
+
+### Evidence
+
+- Live `GET /api/v1/t/vasant-trailers/users` as `admin@vasant-trailers.com` → **8** ACTIVE users.
+
+---
+
+## 2026-07-23 — Bank & Cash UAT readiness fix
+
+### Shipped
+
+- Status locked: **live API for internal UAT / controlled pilot**; **AIS / FX / intercompany** still deferred (`BANK_CASH_STATUS.md`, PROJECT_MEMORY)
+- Workspace tabs trimmed to live routes only (no seed bank-accounts / deposits / cash-counts / setup links)
+- Seed deep links redirect to `/accounting/bank-cash` (cash-book → cashbook)
+
+---
+
+## 2026-07-23 — Inventory + Pilot Finance sign-off (server-stored)
+
+### Shipped
+
+- Enable PUT requires explicit `inventoryReconcileConfirmed: true` and `pilotSignOff: true` (HTTP **422** codes `INVENTORY_RECONCILE_NOT_SIGNED_OFF` / `PILOT_FINANCE_SIGNOFF_REQUIRED`).
+- Captures by/at/remarks/scope/reportRef on `FinanceFeatureControl.configurationJson` plus additive `signOffHistory[]`.
+- Inventory: reconcile permission + reconciliation workspace available; Pilot: Finance permission, finance activated, mappings/period/failed pre-checks.
+- FE checkboxes never preselected; all sign-off state is API-persisted only.
+
+### Evidence
+
+- `npx tsx scripts/test-mfg-accounting-enablement-gate.ts` → PASS
+
+---
+
+## 2026-07-23 — Manufacturing Accounting readiness / enablement APIs (§9–30 core)
+
+### Shipped
+
+- Consolidated `getReadiness()` (`checks`, `blockingCodes`, `nextAction`, `allowedActions`, feature-flag metadata, sign-off history).
+- `GET /manufacturing/accounting/readiness`
+- `POST …/sign-offs/inventory-reconciliation` + `…/finance-pilot` (additive `ManufacturingAccountingSignOff` + config snapshot).
+- `POST …/enable` (re-validates readiness; stores enabledBy/At/note) + `POST …/disable` (reason; preserves events/GL).
+- Permissions: readiness, reconcile_signoff, finance_signoff, enable, disable, failed_events.view/retry.
+- FE: next-action strip; enable via new APIs; route alias `/manufacturing/costing/accounting-readiness`.
+- Docs under `docs/manufacturing/accounting/`.
+
+### Evidence
+
+- Migration applied; gate script PASS; flag remains OFF by default.
+
+---
+
+## 2026-07-23 — Bank & Cash UAT readiness fix
+
+### Shipped
+
+- Status locked: **live API for internal UAT / controlled pilot**; **AIS / FX / intercompany** still deferred (`BANK_CASH_STATUS.md`, PROJECT_MEMORY)
+- Workspace tabs trimmed to live routes only (no seed bank-accounts / deposits / cash-counts / setup links)
+- Seed deep links redirect to `/accounting/bank-cash` (cash-book → cashbook)
+
+---
+
+## 2026-07-23 — Guided Fulfilment URL + Control Room shortcut
+
+### Shipped
+
+- `?step=` persistence on WO detail, SO fulfilment panel, and hub (`/manufacturing/guided-fulfilment`) — same pattern as Guided Deal
+- **Fulfilment** shortcut on Control Room + Store workbench → shared journey strip
+- Smoke checklist: `docs/dispatch/GUIDED_FULFILMENT_SMOKE.md`
+
+---
+
+## 2026-07-23 — Inventory + Pilot Finance sign-off (server-stored)
+
+### Shipped
+
+- Enable PUT requires explicit `inventoryReconcileConfirmed: true` and `pilotSignOff: true` every time (422 product codes).
+- Captures by/at/remarks/scope/reportRef into `FinanceFeatureControl.configurationJson` + additive `signOffHistory[]`.
+- Inventory sign-off needs reconcile (or settings) permission + reconciliation workspace available; pilot needs Finance permission, finance activated, mappings/period/failed pre-checks.
+- FE checkboxes never preselected; remarks fields sent to API — no frontend-only storage.
+
+### Evidence
+
+- `npx tsx scripts/test-mfg-accounting-enablement-gate.ts`
+
+---
+
+## 2026-07-23 — Inventory + Pilot Finance sign-off (server-stored)
+
+### Shipped
+
+- Enable PUT requires explicit `inventoryReconcileConfirmed: true` and `pilotSignOff: true` every time (422 product codes).
+- Captures by/at/remarks/scope/reportRef into `FinanceFeatureControl.configurationJson` + additive `signOffHistory[]`.
+- Inventory sign-off needs reconcile (or settings) permission + reconciliation workspace available; pilot needs Finance permission, finance activated, mappings/period/failed pre-checks.
+- FE checkboxes never preselected; remarks fields sent to API — no frontend-only storage.
+
+### Evidence
+
+- `npx tsx scripts/test-mfg-accounting-enablement-gate.ts`
+
+---
+
+## 2026-07-23 — Failed / unreconciled ProductionAccountingEvent integrity gate
+
+### Shipped
+
+- `manufacturing-accounting-event-integrity.service.ts` classifies FAILED, RECORDED, retry exhausted, inventory↔accounting gaps, reversal chain issues, duplicate pending.
+- Enablement blockers: `FAILED_ACCOUNTING_EVENTS`, `INVENTORY_POSTINGS_UNRECONCILED` (replaces `UNRECONCILED_ACCOUNTING_EVENTS` for the product code).
+- Readiness returns counts + UI-safe exception rows; `technicalDetails` only for settings/post roles (no stack traces).
+- Enable 409 includes exception summary in `details`.
+
+### Evidence
+
+- `npx tsx scripts/test-mfg-accounting-enablement-gate.ts`
+
+---
+
+## 2026-07-23 — Manufacturing OPEN accounting period readiness check
+
+### Shipped
+
+- `checkOpenAccountingPeriod` on Accounting Period service (uses `resolvePeriodByDate`): `start ≤ postingDate ≤ end` and status `OPEN`/`REOPENED`.
+- Default posting date = tenant timezone calendar day; optional `?postingDate=YYYY-MM-DD` on readiness APIs.
+- Readiness returns `openPeriod` (id, code, start, end, status) + `postingDateChecked`; blocker `NO_OPEN_ACCOUNTING_PERIOD`.
+- Enablement does **not** bypass posting — `post()` still calls `resolvePostingPeriod`.
+
+### Evidence
+
+- `npx tsx scripts/test-mfg-accounting-enablement-gate.ts` (period payload asserted).
+
+---
+
+## 2026-07-23 — Dispatch domain outbox (DISPATCH_POSTED / INVOICE_READY)
+
+### Shipped
+
+- Enqueue in post TX: `DISPATCH_POSTED`, `SALES_ORDER_DISPATCH_FULFILMENT_CHANGED`, `SALES_ORDER_INVOICE_READY`
+- Enqueue on reverse apply: `DISPATCH_REVERSED` + fulfilment changed
+- Post-commit drain → in-process handlers → `PUBLISHED` (retry / FAILED support)
+- HTTP: `GET/POST /dispatch/domain-events` (+ process, retry)
+- Doc: `docs/dispatch/DISPATCH_DOMAIN_EVENTS.md`
+
+### Evidence
+
+- `npx vitest run tests/dispatch-phase7c5.test.ts` → **14/14 passed**
+
+---
+
+## 2026-07-23 — Dispatch Invoice/COGS reverse blockers
+
+### Shipped
+
+- Hard deps: `SALES_INVOICE_POSTED` / `SALES_INVOICE_OPEN` (source links + header) + `COGS_OR_INV_ACCT_POSTED` (POSTED inv-acct only)
+- `force` requires `dispatch.override`; re-check at apply
+- FE reverse preflight via `getOutboundReversalDependencies`
+- Docs: `DISPATCH_REVERSAL_DEPENDENCIES.md` — auto Dispatch→Invoice creation still deferred
+
+### Evidence
+
+- `npx vitest run tests/dispatch-phase7c5.test.ts` → **14/14 passed**
+
+---
+
+## 2026-07-23 — Dispatch partial reverse + approval workflow
+
+### Shipped
+
+- `DispatchReversalService`: create / submit / approve / reject / cancel / apply; partial line qty vs `reversedQuantity`
+- Compat `POST /outbound/:id/reverse` returns `{ awaitingApproval, reversal, outbound? }`; `requestOnly` / `skipApproval` / self-complete for approve+apply users
+- Routes: `/outbound/:id/reversals`, `/reversals/:id/{submit,approve,reject,cancel,apply}`
+- Hard deps: `SALES_INVOICE_POSTED`, `COGS_POSTED`
+- Permissions: `dispatch.reverse.request|approve|apply`
+- Docs: `DISPATCH_REVERSAL.md`; FE reverse toast handles awaiting approval
+
+### Evidence
+
+- `npx vitest run tests/dispatch-phase7c5.test.ts` → **13/13 passed**
+
+---
+
+## 2026-07-23 — Manufacturing required account mappings readiness
+
+### Shipped
+
+- `manufacturing-account-mapping-readiness.service.ts`: validates **core** (`WIP_INVENTORY`, `FINISHED_GOODS_INVENTORY`, `PRODUCTION_VARIANCE`) + **conditional** MappingReady keys via existing `DefaultAccountMapping` (ADR-039; no mfg mapping table).
+- Product aliases (`DIRECT_LABOUR_ABSORPTION` → `LABOUR_ABSORPTION`, `SCRAP_EXPENSE` → `SCRAP_LOSS`, etc.) resolve to enum keys; `REWORK_COST` / `PRODUCTION_CLEARING` have no enum key and are not validated separately.
+- Account checks: exists, active, tenant/LE scope, postable (`!isGroup`), duplicate key conflict.
+- Readiness returns `mappingKeys.missing` (+ `invalid`, `conditionalEnabled`) and specific blockers (`WIP_ACCOUNT_NOT_CONFIGURED`, `FINISHED_GOODS_ACCOUNT_NOT_CONFIGURED`, …, `MISSING_ACCOUNT_MAPPINGS`).
+- Docs: `MANUFACTURING_ACCOUNT_MAPPING.md`, feature-flag rollout; FE enable panel shows missing keys.
+
+### Evidence
+
+- `npx tsx scripts/test-mfg-accounting-enablement-gate.ts` → PASS (flag stays OFF; missing keys + blockers returned).
+
+---
+
+
+
+### Shipped
+
+- Shared `fulfilmentAutoAdvance.ts` (same `getFulfilmentAutoMode` preference as WO)
+- After **Reserve** → open/create pick; **Pick complete** → packing; **Pack complete/verify** → challan; **Issue challan** → outbound `?focus=post`
+- Tablet pick/pack: auto-complete session when lines are fully done (Auto Mode on)
+- 7C5 coach strip: Auto Mode toggle + tip
+
+---
+
+## 2026-07-23 — start7C5 operator coach (outbound detail)
+
+### Context
+
+Phase 7C5 backend (canonical `postFgDispatch`, readiness gates, reverse) was already shipped. `start7C5` closed the operator gap: guided Reserve → Pick → Pack → Issue Challan → Post on outbound detail.
+
+### Shipped
+
+- `HardenedPostingCoach` on workbench drafts in `ApiOutboundDispatchPages.tsx`
+- Command-bar **Create pick list** / **Create challan** (open existing when present)
+- Tests: `npx vitest run tests/dispatch-phase7c5.test.ts` → **8/8 passed**
+
+### Still pending (manual)
+
+- Live UAT on `DSP-*` through full hardened post (scenarios in `PHASE7C5_UAT_RESULTS.md`)
+
+---
+
+## 2026-07-23 — DispatchPosting / Reversal ledger tables
+
+### Shipped
+
+- Prisma models + migration `20260723220000_dispatch_posting_reversal_ledger` (legacy backfill).
+- `postFgDispatch` creates immutable `DispatchPosting` + lines with Inventory ISSUE.
+- Reverse creates `DispatchReversal` (`APPLIED`) + lines; posting → `REVERSED`.
+- Doc: `docs/dispatch/DISPATCH_POSTING_LEDGER.md`.
+
+---
+
+## 2026-07-23 — ISO tank child MAKE SA WO depth (live)
+
+### Shipped
+
+- Harness `backend/scripts/test-iso-tank-child-sa-wo.ts` — parent FG create → generate-child-orders → full child `SA-LADDER` WO (release/issue/stages/SA receipt/complete) → parent reserve+issue of that SA.
+- Pointer from `test-iso-tank-wo-execution.ts` header to the child depth script.
+
+### Evidence (`vasant-trailers`)
+
+- `npx tsx scripts/test-iso-tank-child-sa-wo.ts` → **exit 0**
+- Parent **WO-000037**; child **WO-000042**; SA movement `0cc64e0c-…` @ `WIP_FABRICATION`; parent consumed SA (onHand 1→0).
+
+---
+## 2026-07-23 — Dispatch 7C5 deferred gaps closed
+
+### Shipped
+
+- Immutable `DispatchPosting` / line `reversedQuantity` + `DispatchDomainEvent` outbox
+- Partial reverse + approval lifecycle (`request` / `submit` / `approve` / `apply`)
+- Hard reverse blockers: posted SI source-links + posted inventory accounting (COGS proxy)
+- Post emits `DISPATCH_POSTED`, `SALES_ORDER_DISPATCH_FULFILMENT_CHANGED`, `SALES_ORDER_INVOICE_READY`
+- Soft BASIC confirm classified as `LEGACY_POSTED`
+- Serial/lot policy gates; concurrent double-post coverage
+- Live suite **14/14 PASS** (`dispatch-phase7c5.test.ts`)
+
+### Status
+
+**READY FOR INTERNAL UAT** — not client production without UAT/reconciliation sign-off.
+
+---
+
+## 2026-07-23 — Dispatch 7C5 gap-close (audit refresh + reverse/post UX)
+
+### Context
+
+Phase 7C5 canonical posting already existed; audit doc was stale and reverse HTTP bypassed the canonical facade. FE Post stayed enabled when readiness failed to load.
+
+### Shipped
+
+- Refreshed `docs/dispatch/PHASE7C5_REPOSITORY_AUDIT.md` to match code (canonical service, gates, conditions).
+- `POST …/outbound/:id/reverse` → `DispatchReversalService.reverseOutboundDispatchCanonical`.
+- Confirm/post controllers pass body `idempotencyKey`.
+- Direct `POST /inventory/movements/fg-dispatch` blocked when `DISPATCH_HARDENED_POSTING_ENABLED`.
+- Outbound detail: Post only when readiness loads and `allowedActions` includes `POST`; richer post confirm copy; reverse immutable warning.
+
+### Evidence
+
+`npx vitest run tests/dispatch-phase7c5.test.ts` → **8/8 PASS**.
+
+### Status
+
+**READY FOR INTERNAL UAT — WITH CONDITIONS** (partial reverse, invoice/COGS blockers, outbox events deferred).
+
+---
+
+## 2026-07-23 — Shortage → RFQ → award → PO live loop
+
+### Context
+
+Production-shortage PRs default `rfqRequired: false` (planning-sheet → PO). The alternate RFQ path was not covered by `test-shortage-to-purchase-loop.ts`.
+
+### Shipped
+
+- Manufacturing shortage / bulk shortage schemas + services accept optional `rfqRequired: true` and pass through to `createFromProductionShortage` (default remains planning/PO).
+- Live harness `backend/scripts/test-shortage-rfq-to-po-loop.ts`: WO shortage → PR (`rfqRequired: true`) → submit/approve → convert-to-rfq → send → 2 VQs → comparison → award → PO → GRN + re-reserve.
+- Live result (vasant-trailers): **PASS** — WO-000030, PR-000011, RFQ-000001, CMP-000001, PO-000007, GRN-000006.
+
+### Gaps
+
+- WO / store-workbench shortage UI still does not expose an RFQ-required toggle (API override only).
+- FE `createWorkOrderShortageRequisition` typings omit `rfqRequired` until UI is wired.
+
+---
+
+## 2026-07-23 — WO complete honours hard close-readiness blockers
+
+### Root cause
+
+`GET …/close-readiness` was advisory only; `POST …/complete` never called it. Harness called readiness without `allowInProgress=true`, so `OPERATIONAL_STATUS` counted as a blocker while complete still succeeded. Also `allowInProgress` incorrectly soft-gated all inventory/QC checks.
+
+### Shipped
+
+- Severity split: `allowInProgress` only relaxes status (purpose `COMPLETE`); quality softens via `allowCloseWithoutQc`/`flexibleExecution`; material/reservations soft only under flexible; FG never hard-blocks Complete.
+- `assertCompleteAllowed` → complete returns **409 `WO_COMPLETE_BLOCKED`** with `blockers`/`warnings`.
+- Response adds `purpose`, `blockers`, `warnings`.
+- Focused live test `manufacturing-wo-complete-readiness.test.ts`; ISO harness asserts forced hard blocker then success.
+
+---
+
+
+
+### Root cause
+
+`POST …/work-orders/:id/materials/issue` never accepted `batchId`/`batchNumber`/`serialId`/`serialNumber`, while `postIssueToWorkOrder` → `postStockMovement` already required them for tracked items. FE `MaterialIssueDrawer` had no batch/serial pickers. Live E2Es cleared tracking flags as a workaround.
+
+### Shipped
+
+- Backend: issue schema + service validate and pass tracking into inventory ISSUE_TO_WO; material item payload includes `batchTracked`/`serialTracked`.
+- Frontend: issue drawer BatchSelector + SerialSelector (qty=1 for serial); BatchSelector API mode falls back to InventoryBatch balances via item lineage.
+- Live: `scripts/test-wo-batch-material-issue.ts` (pass — reject without batch, issue with batch, balance −1). ISO/Fuel tank E2Es keep batch tracking and pass `batchNumber` on issue; serial still cleared for multi-qty full-flow.
+
+### Remaining
+
+- Multi-serial issue (qty > 1) in one request / loop UX.
+- Material return with batch/serial re-allocation.
+- Mixed reservation-at-batch (reservations remain item+warehouse).
+
+---
+
+
+### Shipped
+
+- Prisma: sales fields + `ItemSalesFulfilmentMethod`; migration `20260723210000_master_item_sales_fields`.
+- API: Zod + repository defaults/filter `salesAllowed`; lookup returns sales rate/fulfilment.
+- FE: Item Master Sales section; DTO mapping.
+- Metrics: `scripts/crm-item-migration-metrics.ts`.
+- Docs: `CRM_ITEM_PHASE2_SALES_FIELDS.md`; migration map Phase 2 marked done.
+
+### Next
+
+Phase 3 — nullable `itemId` / JSON shapes (no CRM picker switch yet).
+
+---
+
+## 2026-07-23 — Admin Panel Phase 10 (polish close-out)
+
+### Shipped
+
+- `/admin/org-structure` — read-only LE → Branch; department/warehouse sibling links.
+- Admin Audit: `GET /security/audit-logs` + `/admin/security/audit`.
+- Read-only security policy (`GET /security/policy`) on Locked Accounts; Overview quick cards.
+- Module Access on organization workspace + Roles deep-link; `requireModule` on purchase/manufacturing.
+- Test: `admin-polish-phase10.test.ts`.
+
+### Holds
+
+Editable password/MFA settings; ModuleAdmin tables; blanket domain API module gates.
+
+---
+
+## 2026-07-23 — Admin Panel Phase 9 (module enablement + platform tree)
+
+### Shipped
+
+- `TenantModuleFlag` + catalog/deps; fail-open missing rows; `module.view|manage`.
+- Admin UI `/admin/modules`; sidebar soft-gates via `tenantModulesStore` hydrate.
+- Platform Admin `/platform` + tenants under `/platform/tenants` (redirects from `/admin/tenants`).
+- Test: `admin-modules-phase9.test.ts`.
+
+### Holds
+
+Hard API module middleware / Module Admins → Phase 10; password-policy/MFA settings → later.
+
+---
+
+## 2026-07-23 — Admin Panel Phase 8 (security)
+
+### Shipped
+
+- `LoginActivity` + `failedLoginCount`/`lockedAt`; auto-lock after 5 failed logins.
+- Security APIs under `/security/*` + user lock/unlock; perms `security.view|manage`.
+- Admin UI: Login Activity, Active Sessions, Locked Accounts; user detail Lock/Unlock.
+- Test: `admin-security-phase8.test.ts`.
+
+### Holds
+
+Password-policy Admin settings / MFA → later; module enablement → Phase 9.
+
+---
+
+## 2026-07-23 — Admin Panel Phase 7 (Effective Access + Access Review)
+
+### Shipped
+
+- `EffectiveAccessService` — roles → permissions (with sources) + scopes + responsibilities + explain notes.
+- APIs: `GET /users/:id/effective-access`, `GET /access-review`.
+- Admin UI: user detail Effective Access panel; `/admin/access-review` attention register.
+- Perms `access.view` / `access.review` + Tenant Admin grants.
+- Test: `admin-effective-access-phase7.test.ts`.
+
+### Holds
+
+Access overrides / review campaigns → later; login activity & security pages → Phase 8.
+
+---
+
+## 2026-07-23 — Admin Panel Phase 6 (scopes + responsibilities)
+
+### Shipped
+
+- Scope tables + `GET/PUT /users/:id/scopes`; fail-open empty grants; `scopeAllows` helper.
+- Responsibility catalog (system seed + tenant CRUD) + user assignments.
+- Admin UI `/admin/responsibilities` + user detail access panels.
+- Migration `20260723220000_admin_scopes_responsibilities`; test `admin-scopes-responsibilities-phase6.test.ts`.
+
+### Holds
+
+Effective Access / Access Review → Phase 7; login activity / security pages → Phase 8.
+
+---
+
+## 2026-07-23 — Admin Panel Phase 5 (Role Builder + Departments)
+
+### Shipped
+
+- `Department` Prisma model + `User.departmentId` FK; migration `20260723200000_admin_departments`.
+- Department CRUD API (`department.*` permissions) mounted under tenant + slug routes.
+- Admin UI `/admin/departments`; user create/edit Department Select; Role Builder wizard (4 steps).
+- Nav, page guides, demo catalog perms; grant SQL for Tenant Admin roles.
+- Test: `admin-departments-phase5.test.ts`.
+
+### Holds
+
+Scopes / responsibilities / Effective Access / login activity → Phase 6+.
+
+---
+
+## 2026-07-23 — Dispatch Phase 7C5 hardened posting
+
+### Shipped
+
+- Canonical `DispatchPostingService` — `/confirm` and `/post` route through it.
+- Policy + flag `DISPATCH_HARDENED_POSTING_ENABLED` (ON non-prod by default).
+- Posting readiness API, reconciliation report/CSV, reversal dependency inspect.
+- Fulfilment `reversedDispatchQty` from REVERSED headers.
+- Live tests: `dispatch-phase7c5.test.ts` (8/8 pass).
+- Docs under `docs/dispatch/PHASE7C5_*` and related rule sheets.
+
+### Verdict
+
+**READY FOR INTERNAL UAT** (not client production). See final delivery report in chat / `PHASE7C5_TEST_RESULTS.md`.
+
+---
+
+## 2026-07-23 — Finance foundation after ops (Manufacturing Accounting gated)
+
+### Shipped
+
+- Extended `seed-veer-organisation-setup.ts`: Cost Centres, AP/AR number series, WIP/FG/variance mappings, **Manufacturing Accounting forced OFF**.
+- Enable gate requires inventory reconcile + pilot Finance sign-off (`pilotSignOff` / `inventoryReconcileConfirmed`) plus mappings/open period.
+- UI gate no longer opens on view-permission alone; checklist copy updated.
+- Live smoke: `scripts/test-finance-core-e2e.ts` — Journal/GL, Purchase Invoice, Vendor Payment, Sales Invoice, Customer Receipt.
+
+### Evidence (`vasant-trailers`)
+
+- Seed exit 0 — Finance activated; mfg accounting disabled.
+- `npx tsx scripts/test-finance-core-e2e.ts` → exit 0 (GL entries populated; PI/VP/SI/CR posted).
+
+### Re-run
+
+```bash
+npx tsx scripts/seed-veer-organisation-setup.ts
+npx tsx scripts/test-finance-core-e2e.ts
+```
+
+---
+
+## 2026-07-23 — Manufacturing Accounting enablement readiness gate
+
+### Shipped
+
+- Audit: `docs/manufacturing/accounting/MANUFACTURING_ACCOUNTING_ENABLEMENT_AUDIT.md`
+- Readiness SoT: explicit `enablementChecks` / `canEnable`; `UNRECONCILED_ACCOUNTING_EVENTS` for `RECORDED` backlog; LE-scoped event counts; optional posting date
+- FE: enable panel with checklist + inventory reconcile + pilot Finance sign-off; API sends required PUT body
+- Docs: FEATURE_FLAG_ROLLOUT, ACCOUNT_MAPPING updated
+- Tests: sign-off 400 + unreconciled 409 in `manufacturing-phase8-auto-gl.test.ts`
+
+### Rule
+
+Flag stays OFF until mappings + open period + zero failed + zero RECORDED + both sign-offs.
+
+---
+
+## 2026-07-23 — Fuel Tank manufacturing master setup (UAT example)
+
+### Shipped
+
+- Live API seeds for **5000 L MS Fuel Tank** (`FG-FUEL-TANK-5000L`): items, WC/machines, warehouses, 12 QC plans, multilevel BOM, PARALLEL route (`RT-000001`), profile `MP-FUEL-TANK-5000L`.
+- LOGICAL SFG: Job Cards = route stage groups on FG WO; **no** child SFG WOs.
+- Docs: `docs/manufacturing/examples/FUEL_TANK_*.md`
+- Scripts: `seed-fuel-tank-pilot-items.ts`, `seed-fuel-tank-mfg-setup.ts`, `test-fuel-tank-wo-execution.ts`
+
+### Evidence (`vasant-trailers`)
+
+- Seeds exit 0; E2E exit 0 — WO **WO-000027** release → 6 JC stages / 15 ops; SFG WO blocked; childCount=0; materials issued; parallel JCs → QC_PENDING.
+
+---
+
+## 2026-07-23 — Production-shortage PR submit fields
+
+### Shipped
+
+- `production-shortage-pr.service.ts` now sets `departmentId`, `requestedById`, `requiredDate`, and defaults `rfqRequired=false` (opt-in RFQ) so shortage PRs submit → planning → PO without a DRAFT patch.
+- Schema accepts optional `departmentId` / `requestedById` / `rfqRequired`.
+- `test-shortage-to-purchase-loop.ts` removes PATCH workaround; asserts submit-ready fields on create.
+
+### Evidence (`vasant-trailers`)
+
+- `npx tsx scripts/test-shortage-to-purchase-loop.ts` → **exit 0**
+- WO **WO-000026** → PR **PR-000009** (`rfqRequired=false`) → PO **PO-000005** → GRN **GRN-000004**
+
+---
+
+## 2026-07-23 — Admin Panel Phase 4 (invitations + session revoke)
+
+### Shipped
+
+- Prisma `UserInvitation` + migration; invite/resend/list APIs; accept via `/auth/accept-invitation`.
+- User activate/deactivate + revoke-sessions (RefreshToken SoT); session list on user detail.
+- FE: `/admin/invitations`, login accept-invite (`?invite=`), nav/docs updated.
+
+### Hold
+
+- Email delivery of invites (dev returns token); login activity register; Department.
+
+---
+
+## 2026-07-23 — Admin Panel Phase 3 (Tenant Profile + Companies/Branches)
+
+### Shipped
+
+- `/admin/tenant-profile` — workspace Tenant identity/locale via existing Tenant GET/PATCH (demo store + API).
+- `/admin/companies` — Legal Entity hub over organisation/finance APIs; readiness + deep-links to Organisation Setup.
+- `/admin/branches` — Branch hub over finance Branch API; deep-links to Accounting → Branches.
+- Nav/routes/page guides updated; Admin Overview CTA to Companies.
+- Product rule: Admin = entry; Organisation/Accounting = full editors; no second company SoT; Department deferred.
+
+### Hold
+
+- No new Prisma models; invitations / Department / scopes remain Phase 4+.
+
+---
+
+## 2026-07-23 — ISO tank SA child WO readiness
+
+### Shipped
+
+- Extended `seed-iso-tank-mfg-setup.ts`: each MAKE SA (`SA-TANK-SHELL`, `SA-FRAME`, `SA-VALVE-PIPING`, `SA-WALKWAY`, `SA-LADDER`) gets minimal ACTIVE BOM + DETAILED route + profile (WIP warehouses).
+- FG BOM L1 SA lines kept `childProductionOrderRequired=true` + `stockedSemiFinished=true` (stocked SFG does **not** skip children in this engine).
+- `test-iso-tank-wo-execution.ts` asserts child count ≥ 5 and route snapshot on each released child (stages/ops = job-card execution units).
+
+### Evidence (`vasant-trailers`)
+
+- Parent **WO-000010** → children **WO-000011…WO-000015** (`created=5 skipped=0`)
+- Each child: route snapshot `ST-FAB` + 1 op; parent FG flow completed
+
+---
+
+## 2026-07-23 — Admin Panel Phase 2 (shared DS + Overview)
+
+### Shipped
+
+- Shared Admin kit under `frontend/src/components/admin/` (nav IA, badges, summary cards, needs-attention, states, permission matrix, Role Builder shell, Effective Access placeholder).
+- `/admin` Overview page (`AdminOverviewPage`) — summary strip, attention list, planned Admin areas (Soon).
+- Routes/nav: Overview is workspace landing (no redirect to Users); Users/Roles/Tenants remain.
+- Roles form/detail use `AdminRoleBuilder` / `AdminPermissionMatrix` with View Only / No Access presets; Users/Tenants use shared status badges; User detail shows Effective Access placeholder.
+- Docs: `ADMIN_PANEL_PHASE1_AUDIT.md` §14; `REMAINING_WORK` P0-ADMIN next = Phase 3.
+
+### Hold
+
+- No new IAM Prisma models; invitations / scopes / EffectiveAccessService remain Phase 3+.
+
+---
+
+## 2026-07-23 — Organisation & Finance Foundation Setup
+
+### Shipped
+
+- Extended existing accounting SoT (no parallel CoA/LE tables): `LegalEntity.tradeName` + new `OrganisationRegistration`.
+- Tenant APIs: `/api/v1/t/:tenantSlug/organisation/*` (LE, registrations, CoA, mappings, FY, periods).
+- Permissions: `organisation.*` + finance aliases (`finance.chart_accounts.*`, `finance.account_mapping.manage`, `finance.fiscal_year.manage`, `finance.posting_period.manage`); Finance Manager pack includes org perms.
+- FE: Settings → Organisation Setup (`/settings/organisation/...`) shell + 6 pages.
+- Veer seed: full Chhapi address + GST registration row; FY/periods/CoA/mappings unchanged.
+- Migration `20260723170000_organisation_foundation` (short unique index `org_reg_tenant_type_number_key`).
+- Tests: `tests/organisation-foundation.test.ts` (6).
+
+### Verification
+
+- `npx vitest run tests/organisation-foundation.test.ts` — 6/6 PASS
+- `npx tsx scripts/seed-veer-organisation-setup.ts` — ready
+- Backend + frontend `tsc --noEmit` — pass
+
+---
+
+## 2026-07-23 — Admin Panel Phase 1 audit
+
+- Added `docs/admin/ADMIN_PANEL_PHASE1_AUDIT.md`.
+- Confirmed reuse of Tenant/User/Role/Permission/RefreshToken/LegalEntity/Branch/Organisation APIs; no duplicate company model.
+- Gaps: Admin Overview, invitations, departments, data scope, responsibilities, effective access, login activity, module enablement.
+- Hold: no new Admin IAM models until Phase 2–3 sign-off.
+
+---
+
+## 2026-07-23 — CRM Product→Item migration Phase 1 audit
+
+- Added `docs/crm/CRM_PRODUCT_TO_ITEM_MIGRATION_MAP.md` (dependency map, DB/API/FE impact, backfill rules, phased plan).
+- Key findings: Opp lines already have nullable `itemId`; Quotation/SO lines still Product-centric JSON; Leads encode product lines in `productRequirement` TEXT; MFG resolver already accepts Item id with Product→`fgItemId` fallback; AR invoices already Item-native.
+- Hold: no frontend Product-picker replacement until Phases 2–5.
+
+---
+
+## 2026-07-23 — Period Close Control Hardening
 
 ### Shipped
 
@@ -5085,3 +5856,4 @@ FE show requires `crm.quotation.convert` **and** `crm.sales_order.create`. Never
 | `npm run test:route-integrity` | 438 paths |
 | `npm run test:masters` | 21/26 (5 nav/catalog failures ? pre-existing) |
 | `npm run test:code-series` | 20/20 |
+

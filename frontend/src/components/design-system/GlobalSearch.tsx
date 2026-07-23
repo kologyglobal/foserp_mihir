@@ -484,13 +484,13 @@ export function GlobalSearchTrigger({ className, variant = 'default' }: { classN
       )}
     >
       <Search className={cn('h-3.5 w-3.5 shrink-0', variant === 'suite' ? 'text-white/70' : 'h-4 w-4 text-erp-muted')} />
-      <span className={cn('flex-1 truncate', variant === 'suite' ? 'text-[12px] text-white/85' : 'erp-type-caption')}>
+      <span className={cn('min-w-0 flex-1 truncate', variant === 'suite' ? 'text-[12px] text-white/85' : 'erp-type-caption')}>
         {variant === 'suite' ? 'Search masters, SO, WO, company, product, command…' : 'Search anything…'}
       </span>
       <kbd className={cn(
-        'rounded border px-1.5 py-0.5 text-[10px] font-medium',
+        'shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium leading-none',
         variant === 'suite'
-          ? 'hidden border-white/20 bg-white/10 text-white/70 xl:inline'
+          ? 'hidden items-center border-white/20 bg-white/10 text-white/70 xl:inline-flex'
           : 'erp-type-micro hidden border-erp-border bg-erp-surface sm:inline',
       )}>⌘K</kbd>
     </button>

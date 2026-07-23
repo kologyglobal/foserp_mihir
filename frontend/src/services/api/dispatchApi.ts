@@ -4,7 +4,7 @@
  * Base: /api/v1/t/:tenantSlug/dispatch/... and CRM sales-order fulfilment routes.
  */
 import { API_CONFIG } from '../../config/apiConfig'
-import { apiRequest, tenantPath } from './client'
+import { apiDownloadBlob, apiRequest, tenantPath } from './client'
 
 function buildQuery(params?: Record<string, string | number | boolean | undefined | null>): string {
   if (!params) return ''
@@ -56,6 +56,14 @@ async function fetchPaginated<T>(
 // ─── Shared types ─────────────────────────────────────────────────────────────
 
 export type OutboundDispatchStatus = 'DRAFT' | 'CONFIRMED' | 'CANCELLED' | 'REVERSED'
+
+export type DispatchPodStatus =
+  | 'IN_TRANSIT'
+  | 'DELIVERED'
+  | 'PARTIALLY_DELIVERED'
+  | 'DELIVERY_EXCEPTION'
+  | 'REJECTED_BY_CUSTOMER'
+  | 'RETURN_INITIATED'
 
 export type DispatchReadinessStatus =
   | 'NOT_READY'
@@ -157,6 +165,7 @@ export interface OutboundDispatch {
   id: string
   dispatchNo: string
   status: OutboundDispatchStatus
+  deliveryStatus?: DispatchPodStatus | null
   salesOrderId: string | null
   salesOrderNo: string | null
   customerId: string | null
@@ -499,6 +508,113 @@ export async function getOutboundDispatch(id: string) {
   return fetchData<OutboundDispatch>(tenantPath(`${OUTBOUND}/${id}`))
 }
 
+export interface DispatchPodDto {
+  id: string
+  outboundDispatchId: string
+  dispatchNo: string | null
+  outboundStatus: string | null
+  deliveryChallanId: string | null
+  salesOrderId: string | null
+  salesOrderNo: string | null
+  customerId: string | null
+  status: DispatchPodStatus
+  deliveryAddress: string | null
+  deliveredAt: string | null
+  receiverName: string | null
+  receiverContact: string | null
+  hasSignature: boolean
+  quantityDelivered: number
+  quantityDamaged: number
+  quantityShort: number
+  deliveryRemarks: string | null
+  transporterRemarks: string | null
+  exceptionCode: string | null
+  exceptionNotes: string | null
+  gpsLatitude: number | null
+  gpsLongitude: number | null
+  inTransitAt: string | null
+  capturedAt: string | null
+  lines: Array<{
+    id: string
+    outboundDispatchLineId: string
+    itemId: string
+    dispatchedQty: number
+    deliveredQty: number
+    damagedQty: number
+    shortQty: number
+    remarks: string | null
+  }>
+  attachments: Array<{
+    id: string
+    kind: string
+    fileName: string
+    mimeType: string
+    byteSize: number
+    createdAt: string
+  }>
+}
+
+export async function getOutboundPod(outboundId: string) {
+  return fetchData<{
+    pod: DispatchPodDto | null
+    outbound: {
+      id: string
+      dispatchNo: string | null
+      status: string | null
+      deliveryStatus: DispatchPodStatus | null
+      salesOrderId: string | null
+      salesOrderNo: string | null
+      customerId: string | null
+      shipToAddress: string | null
+    }
+    stockNote: string
+  }>(tenantPath(`${OUTBOUND}/${outboundId}/pod`))
+}
+
+export async function markOutboundPodInTransit(outboundId: string) {
+  return fetchData<DispatchPodDto>(tenantPath(`${OUTBOUND}/${outboundId}/pod/in-transit`), {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+}
+
+export async function captureOutboundPod(
+  outboundId: string,
+  body: {
+    status?: DispatchPodStatus
+    deliveredAt?: string
+    receiverName?: string
+    receiverContact?: string
+    deliveryAddress?: string
+    quantityDelivered?: number
+    quantityDamaged?: number
+    quantityShort?: number
+    deliveryRemarks?: string
+    transporterRemarks?: string
+    lines?: Array<{
+      outboundDispatchLineId: string
+      deliveredQty: number
+      damagedQty?: number
+      shortQty?: number
+    }>
+  },
+) {
+  return fetchData<DispatchPodDto>(tenantPath(`${OUTBOUND}/${outboundId}/pod/capture`), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function addOutboundPodAttachment(
+  outboundId: string,
+  body: { kind: string; fileName: string; mimeType: string; contentBase64: string },
+) {
+  return fetchData<{ id: string; kind: string; fileName: string }>(
+    tenantPath(`${OUTBOUND}/${outboundId}/pod/attachments`),
+    { method: 'POST', body: JSON.stringify(body) },
+  )
+}
+
 export async function confirmOutboundDispatch(id: string, body?: { idempotencyKey?: string }) {
   return fetchData<OutboundDispatch>(tenantPath(`${OUTBOUND}/${id}/confirm`), {
     method: 'POST',
@@ -513,20 +629,124 @@ export async function cancelOutboundDispatch(id: string, reason?: string) {
   })
 }
 
-/** Phase 7C5 hardened post — requires ISSUED Delivery Challan on workbench path. */
-export async function postOutboundDispatch(id: string, body?: { idempotencyKey?: string }) {
+/** Phase 7C5 hardened post — requires ISSUED Delivery Challan on workbench path (unless emergency). */
+export async function postOutboundDispatch(
+  id: string,
+  body?: {
+    idempotencyKey?: string
+    emergency?: boolean
+    overrideReason?: string
+    emergencyOverride?: {
+      businessReason: string
+      urgency?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+      riskAcknowledged: boolean
+      approvedByName?: string
+      approvalReference?: string
+      expiresAt?: string
+      scope?: string
+      remarks?: string
+      overrideId?: string
+    }
+  },
+) {
   return fetchData<OutboundDispatch>(tenantPath(`${OUTBOUND}/${id}/post`), {
     method: 'POST',
     body: JSON.stringify(body ?? {}),
   })
 }
 
-/** Phase 7C5 reverse — compensating FG_DISPATCH inward, status → REVERSED. */
-export async function reverseOutboundDispatch(id: string, body?: { reason?: string; idempotencyKey?: string }) {
-  return fetchData<OutboundDispatch>(tenantPath(`${OUTBOUND}/${id}/reverse`), {
+/** Phase 7C5 — backend posting readiness checklist. */
+export async function getOutboundPostingReadiness(id: string, mode: 'post' | 'confirm' = 'post') {
+  return fetchData<Record<string, unknown>>(
+    `${tenantPath(`${OUTBOUND}/${id}/posting-readiness`)}${buildQuery({ mode })}`,
+  )
+}
+
+/** Phase 7C5 — reverse dependency preflight (invoice / COGS blockers). */
+export type DispatchReversalDependency = {
+  code: string
+  module: string
+  message: string
+  documentId?: string
+}
+
+export async function getOutboundReversalDependencies(id: string) {
+  return fetchData<{ dependencies: DispatchReversalDependency[] }>(
+    tenantPath(`${DISPATCH}/outbound/${id}/reversal-dependencies`),
+  )
+}
+
+/** Phase 7C5 reverse — partial lines + approval workflow; may return awaitingApproval. */
+export type DispatchReversalResult = {
+  awaitingApproval: boolean
+  reversal: {
+    id: string
+    reversalNumber: string
+    status: string
+    lines: Array<{ id: string; quantity: number; originalPostingLineId: string }>
+  }
+  outbound?: OutboundDispatch | null
+}
+
+export async function reverseOutboundDispatch(
+  id: string,
+  body?: {
+    reason?: string
+    reasonCode?: string
+    force?: boolean
+    skipApproval?: boolean
+    applyImmediately?: boolean
+    requestOnly?: boolean
+    idempotencyKey?: string
+    lines?: Array<{ outboundDispatchLineId?: string; postingLineId?: string; quantity: number }>
+  },
+) {
+  return fetchData<DispatchReversalResult>(tenantPath(`${OUTBOUND}/${id}/reverse`), {
     method: 'POST',
     body: JSON.stringify(body ?? {}),
   })
+}
+
+export async function listOutboundReversals(outboundId: string) {
+  return fetchData<DispatchReversalResult['reversal'][]>(
+    tenantPath(`${DISPATCH}/outbound/${outboundId}/reversals`),
+  )
+}
+
+export async function createOutboundReversal(
+  outboundId: string,
+  body?: {
+    reason?: string
+    reasonCode?: string
+    lines?: Array<{ outboundDispatchLineId?: string; postingLineId?: string; quantity: number }>
+    idempotencyKey?: string
+  },
+) {
+  return fetchData<DispatchReversalResult['reversal']>(
+    tenantPath(`${DISPATCH}/outbound/${outboundId}/reversals`),
+    { method: 'POST', body: JSON.stringify(body ?? {}) },
+  )
+}
+
+export async function submitDispatchReversal(reversalId: string) {
+  return fetchData<DispatchReversalResult['reversal']>(
+    tenantPath(`${DISPATCH}/reversals/${reversalId}/submit`),
+    { method: 'POST', body: '{}' },
+  )
+}
+
+export async function approveDispatchReversal(reversalId: string) {
+  return fetchData<DispatchReversalResult['reversal']>(
+    tenantPath(`${DISPATCH}/reversals/${reversalId}/approve`),
+    { method: 'POST', body: '{}' },
+  )
+}
+
+export async function applyDispatchReversal(reversalId: string) {
+  return fetchData<DispatchReversalResult['reversal']>(
+    tenantPath(`${DISPATCH}/reversals/${reversalId}/apply`),
+    { method: 'POST', body: '{}' },
+  )
 }
 
 export async function getSalesOrderFulfilment(salesOrderId: string) {
@@ -959,6 +1179,22 @@ export async function cancelDeliveryChallan(id: string, reason: string) {
 
 export function deliveryChallanPreviewUrl(challanId: string): string {
   return `${API_CONFIG.baseUrl}${tenantPath(`${DISPATCH}/delivery-challans/${challanId}/preview`)}`
+}
+
+export function deliveryChallanPdfUrl(challanId: string): string {
+  return `${API_CONFIG.baseUrl}${tenantPath(`${DISPATCH}/delivery-challans/${challanId}/pdf`)}`
+}
+
+/** Fetch printable challan HTML with auth (Bearer) — use for Print / Save as PDF. */
+export async function fetchDeliveryChallanPrintHtml(
+  challanId: string,
+  mode: 'preview' | 'pdf' = 'preview',
+): Promise<{ html: string; filename?: string }> {
+  const path = tenantPath(
+    `${DISPATCH}/delivery-challans/${challanId}/${mode === 'pdf' ? 'pdf' : 'preview'}`,
+  )
+  const { blob, filename } = await apiDownloadBlob(path)
+  return { html: await blob.text(), filename }
 }
 
 export async function listWorkbenchChallanDrafts() {

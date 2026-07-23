@@ -69,7 +69,7 @@ export interface DataGridProps<T> {
   /** Extra filters rendered left of Columns (e.g. stage select) */
   filterSlot?: React.ReactNode
   onExport?: () => void
-  /** Show search in compact toolbar (default: true) */
+  /** Show search in compact toolbar (default: false — use page/registerBar search) */
   showCompactSearch?: boolean
   /** Saved-view picker in grid toolbar — off by default when view lives in page filter bar */
   showToolbarView?: boolean
@@ -127,7 +127,7 @@ export function DataGrid<T>({
   onViewChange,
   filterSlot,
   onExport,
-  showCompactSearch = true,
+  showCompactSearch = false,
   showToolbarView = false,
   showToolbarExport = false,
   stickyFirstColumn = false,
@@ -321,7 +321,8 @@ export function DataGrid<T>({
 
   const showGridToolbar = toolbarMode !== 'none' && !registerBar
 
-  const reorderableColumns = table.getAllLeafColumns().filter((col) => col.getCanHide())
+  /** Hideable columns + locked (required) columns — select checkbox column excluded */
+  const chooserColumns = table.getAllLeafColumns().filter((col) => col.id !== 'select')
 
   const columnChooser = toolbarMode !== 'none' ? (
     <div className="relative shrink-0" ref={columnMenuRef}>
@@ -345,22 +346,29 @@ export function DataGrid<T>({
           <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-erp-muted">
             Drag to reorder · toggle to show/hide
           </p>
-          {reorderableColumns.map((col) => {
+          {chooserColumns.map((col) => {
             const label = columnChooserLabel(col.id, col.columnDef.header, col.columnDef.meta)
+            const canHide = col.getCanHide()
             return (
               <div
                 key={col.id}
-                draggable
+                draggable={canHide}
                 onDragStart={(e) => {
+                  if (!canHide) {
+                    e.preventDefault()
+                    return
+                  }
                   setDragColumnId(col.id)
                   e.dataTransfer.effectAllowed = 'move'
                   e.dataTransfer.setData('text/plain', col.id)
                 }}
                 onDragOver={(e) => {
+                  if (!canHide) return
                   e.preventDefault()
                   e.dataTransfer.dropEffect = 'move'
                 }}
                 onDrop={(e) => {
+                  if (!canHide) return
                   e.preventDefault()
                   const from = e.dataTransfer.getData('text/plain') || dragColumnId
                   if (from) reorderColumn(from, col.id)
@@ -370,11 +378,15 @@ export function DataGrid<T>({
                 className={cn(
                   'ent-data-grid__column-chooser-row flex items-center gap-1 rounded-md px-1 py-1 hover:bg-erp-surface-alt',
                   dragColumnId === col.id && 'ent-data-grid__column-chooser-row--dragging',
+                  !canHide && 'ent-data-grid__column-chooser-row--required',
                 )}
               >
                 <span
-                  className="ent-data-grid__column-drag cursor-grab text-erp-muted active:cursor-grabbing"
-                  title="Drag to reorder"
+                  className={cn(
+                    'ent-data-grid__column-drag text-erp-muted',
+                    canHide ? 'cursor-grab active:cursor-grabbing' : 'cursor-default opacity-40',
+                  )}
+                  title={canHide ? 'Drag to reorder' : 'Required column'}
                   aria-hidden
                 >
                   <GripVertical className="h-4 w-4" />
@@ -382,9 +394,15 @@ export function DataGrid<T>({
                 <Checkbox
                   label={label}
                   checked={col.getIsVisible()}
-                  onChange={col.getToggleVisibilityHandler()}
+                  onChange={canHide ? col.getToggleVisibilityHandler() : undefined}
+                  disabled={!canHide}
                   className="min-w-0 flex-1"
                 />
+                {!canHide ? (
+                  <span className="shrink-0 rounded bg-erp-surface-alt px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-erp-muted">
+                    Required
+                  </span>
+                ) : null}
               </div>
             )
           })}

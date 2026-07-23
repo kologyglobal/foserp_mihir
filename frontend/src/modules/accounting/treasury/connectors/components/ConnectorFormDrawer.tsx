@@ -80,7 +80,7 @@ export function ConnectorFormDrawer({
       open={open}
       onClose={onClose}
       title={title}
-      subtitle="Non-secret config only. Put API secrets in env vars and reference them via credentialEnvKey. PSD2 OAuth still deferred."
+      subtitle="Non-secret config only. Put API secrets in env vars and reference them via credentialEnvKey. AIS pull, FX, and intercompany remain deferred."
       widthClassName="max-w-xl"
       footer={
         <div className="flex justify-end gap-2">

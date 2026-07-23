@@ -58,29 +58,61 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
 export const confirm = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const id = getRouteParam(req, 'id')
-  const row = await service.confirmOutboundDispatch(req, tenantId, id)
+  const body = (req.body ?? {}) as { idempotencyKey?: string }
+  const row = await service.confirmOutboundDispatch(req, tenantId, id, {
+    idempotencyKey: body.idempotencyKey,
+  })
   return sendSuccess(res, 'Outbound dispatch confirmed', row)
 })
 
-/** Phase 7C5 hardened post — workbench requires ISSUED Delivery Challan. */
+/** Phase 7C5 hardened post — workbench requires ISSUED Delivery Challan when policy requires it. */
 export const post = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const id = getRouteParam(req, 'id')
-  const row = await service.postOutboundDispatch(req, tenantId, id)
-  return sendSuccess(res, 'Outbound dispatch posted', row)
+  const body = (req.body ?? {}) as {
+    idempotencyKey?: string
+    emergency?: boolean
+    overrideReason?: string
+    emergencyOverride?: {
+      businessReason: string
+      urgency?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+      riskAcknowledged: boolean
+      approvedByName?: string
+      approvalReference?: string
+      expiresAt?: string
+      scope?: string
+      remarks?: string
+      overrideId?: string
+    }
+  }
+  const row = await service.postOutboundDispatch(req, tenantId, id, {
+    idempotencyKey: body.idempotencyKey,
+    emergency: body.emergency,
+    overrideReason: body.overrideReason,
+    emergencyOverride: body.emergencyOverride,
+  })
+  return sendSuccess(
+    res,
+    body.emergency ? 'Outbound dispatch posted (emergency override)' : 'Outbound dispatch posted',
+    row,
+  )
 })
 
-/** Phase 7C5 reverse — compensating FG_DISPATCH inward, status → REVERSED. */
+/** Phase 7C5 reverse — workflow + partial lines via DispatchReversalService. */
 export const reverse = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const id = getRouteParam(req, 'id')
-  const row = await service.reverseOutboundDispatch(
+  const { DispatchReversalService } = await import('../posting/dispatch-reversal.service.js')
+  const result = await DispatchReversalService.reverseOutboundDispatchCanonical(
     req,
     tenantId,
     id,
     req.body as ReverseOutboundDispatchInput,
   )
-  return sendSuccess(res, 'Outbound dispatch reversed', row)
+  if (result && typeof result === 'object' && 'awaitingApproval' in result && result.awaitingApproval) {
+    return sendSuccess(res, 'Dispatch reversal submitted for approval', result)
+  }
+  return sendSuccess(res, 'Outbound dispatch reversed', result)
 })
 
 export const cancel = asyncHandler(async (req: Request, res: Response) => {

@@ -20,7 +20,7 @@ export function GrnLineQrCell({ grnId, lineId, acceptedQty }: { grnId: string; l
   }
 
   return (
-    <Link to={`/qr/print/${lotQr.qrId}`} className="text-xs font-medium text-erp-accent hover:underline">
+    <Link to="/manufacturing/traceability" className="text-xs font-medium text-erp-accent hover:underline">
       QR Generated · Print
     </Link>
   )

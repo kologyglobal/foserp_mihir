@@ -27,7 +27,7 @@ export function ConnectorWorkspaceShell({
       title={title}
       description={
         description ??
-        'Bank API / SFTP sandbox / allow-listed REST connectors. Sync imports MT940/CAMT as BANK_API statements. PSD2 OAuth deferred.'
+        'Bank connectors: sandbox FS, allow-listed REST, and live SFTP import MT940/CAMT as BANK_API. Open Banking consent only — AIS pull, FX, and intercompany remain deferred.'
       }
       breadcrumbs={[
         { label: 'Accounting', to: '/accounting' },

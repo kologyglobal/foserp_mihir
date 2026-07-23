@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
+  CalendarDays,
   ClipboardList,
   LayoutGrid,
   List,
   RefreshCw,
+  Route,
   UserPlus,
   Wrench,
 } from 'lucide-react'
@@ -474,6 +476,18 @@ export function ApiProductionControlRoomView() {
         onClick: () => navigate('/manufacturing/work-orders'),
       }}
       secondaryActions={[
+        {
+          id: 'today',
+          label: 'Today',
+          icon: CalendarDays,
+          onClick: () => navigate('/manufacturing/today'),
+        },
+        {
+          id: 'fulfilment',
+          label: 'Fulfilment',
+          icon: Route,
+          onClick: () => navigate('/manufacturing/guided-fulfilment?step=produce'),
+        },
         {
           id: 'shopfloor',
           label: 'Shopfloor',

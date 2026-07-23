@@ -1,50 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Wrench } from 'lucide-react'
 import { ErpButton } from '@/components/erp/ErpButton'
-import { Input, Select } from '@/components/forms/Inputs'
-import { FormField } from '@/components/forms/FormField'
+import { Select } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { AccountDrawerShell } from '@/components/accounting/coa/AccountDrawerShell'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
 import {
   activateMachine,
-  createMachine,
   deactivateMachine,
+  deleteMachine,
   listMachines,
   listWorkCentres,
-  setMachineStatus,
-  updateMachine,
 } from '@/services/api/manufacturingApi'
-import { MACHINE_STATUSES, MACHINE_STATUS_LABELS, type Machine, type MachineStatus, type WorkCentre } from '@/types/manufacturingSetup'
+import { MACHINE_STATUS_LABELS, type Machine, type WorkCentre } from '@/types/manufacturingSetup'
 import { isApiMode } from '@/config/apiConfig'
 import { useManufacturingSetupPermissions } from '@/utils/permissions/manufacturing'
 import { notify } from '@/store/toastStore'
+import { appConfirm } from '@/store/confirmDialogStore'
 import { ManufacturingSetupShell } from './ManufacturingSetupShell'
-import { SetupViewPopup } from './SetupViewPopup'
-
-interface MachineFormState {
-  code: string
-  name: string
-  workCentreId: string
-  status: MachineStatus
-  manufacturer: string
-  model: string
-  isActive: boolean
-}
-
-const EMPTY_FORM: MachineFormState = {
-  code: '',
-  name: '',
-  workCentreId: '',
-  status: 'AVAILABLE',
-  manufacturer: '',
-  model: '',
-  isActive: true,
-}
 
 export function MachinesSetupPage() {
+  const navigate = useNavigate()
   const perms = useManufacturingSetupPermissions()
   const apiMode = isApiMode()
   const [rows, setRows] = useState<Machine[]>([])
@@ -52,12 +30,7 @@ export function MachinesSetupPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [workCentreFilter, setWorkCentreFilter] = useState('')
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [editing, setEditing] = useState<Machine | null>(null)
-  const [viewing, setViewing] = useState<Machine | null>(null)
-  const [form, setForm] = useState<MachineFormState>(EMPTY_FORM)
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
 
   const workCentreLabel = useCallback(
     (id: string) => {
@@ -97,59 +70,6 @@ export function MachinesSetupPage() {
     else setLoading(false)
   }, [load, perms.canViewSetup])
 
-  const openNew = () => {
-    setEditing(null)
-    setForm({ ...EMPTY_FORM, workCentreId: workCentres[0]?.id ?? '' })
-    setDrawerOpen(true)
-  }
-
-  const openEdit = (row: Machine) => {
-    setViewing(null)
-    setEditing(row)
-    setForm({
-      code: row.code,
-      name: row.name,
-      workCentreId: row.workCentreId,
-      status: row.status,
-      manufacturer: row.manufacturer ?? '',
-      model: row.model ?? '',
-      isActive: row.isActive,
-    })
-    setDrawerOpen(true)
-  }
-
-  const openView = (row: Machine) => {
-    setViewing(row)
-  }
-
-  const save = async () => {
-    setSaving(true)
-    try {
-      const payload = {
-        code: form.code.trim(),
-        name: form.name.trim(),
-        workCentreId: form.workCentreId,
-        status: form.status,
-        manufacturer: form.manufacturer.trim() || undefined,
-        model: form.model.trim() || undefined,
-        isActive: form.isActive,
-      }
-      if (editing) {
-        await updateMachine(editing.id, payload)
-        notify.success('Machine updated.')
-      } else {
-        await createMachine(payload)
-        notify.success('Machine created.')
-      }
-      setDrawerOpen(false)
-      await load()
-    } catch (e) {
-      notify.error(e instanceof Error ? e.message : 'Save failed')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const toggleActive = async (row: Machine) => {
     setBusyId(row.id)
     try {
@@ -168,15 +88,21 @@ export function MachinesSetupPage() {
     }
   }
 
-  const changeStatus = async (row: Machine, status: MachineStatus) => {
-    if (status === row.status) return
+  const remove = async (row: Machine) => {
+    const ok = await appConfirm({
+      title: 'Delete machine?',
+      description: `Delete ${row.code}? This soft-deletes the record.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })
+    if (!ok) return
     setBusyId(row.id)
     try {
-      await setMachineStatus(row.id, status)
-      notify.success('Machine status updated.')
+      await deleteMachine(row.id)
+      notify.success('Machine deleted.')
       await load()
     } catch (e) {
-      notify.error(e instanceof Error ? e.message : 'Status change failed')
+      notify.error(e instanceof Error ? e.message : 'Delete failed')
     } finally {
       setBusyId(null)
     }
@@ -193,7 +119,12 @@ export function MachinesSetupPage() {
       title="Machines"
       actions={
         apiMode && perms.canManageMachine ? (
-          <ErpButton size="sm" onClick={openNew} disabled={workCentres.length === 0} disabledReason="Create a work centre first">
+          <ErpButton
+            size="sm"
+            onClick={() => navigate('/manufacturing/machines/new')}
+            disabled={workCentres.length === 0}
+            disabledReason="Create a work centre first"
+          >
             <Plus className="mr-1 h-3.5 w-3.5" />
             New Machine
           </ErpButton>
@@ -246,22 +177,7 @@ export function MachinesSetupPage() {
                       <td className="font-medium">{row.name}</td>
                       <td>{workCentreLabel(row.workCentreId)}</td>
                       <td>
-                        {perms.canManageMachine ? (
-                          <Select
-                            value={row.status}
-                            onChange={(e) => void changeStatus(row, e.target.value as MachineStatus)}
-                            className="w-40"
-                            disabled={busyId === row.id}
-                          >
-                            {MACHINE_STATUSES.map((s) => (
-                              <option key={s} value={s}>
-                                {MACHINE_STATUS_LABELS[s]}
-                              </option>
-                            ))}
-                          </Select>
-                        ) : (
-                          <DynamicsStatusChip label={MACHINE_STATUS_LABELS[row.status]} tone="info" />
-                        )}
+                        <DynamicsStatusChip label={MACHINE_STATUS_LABELS[row.status]} tone="info" />
                       </td>
                       <td>
                         <DynamicsStatusChip
@@ -271,12 +187,12 @@ export function MachinesSetupPage() {
                       </td>
                       <td>
                         <div className="flex flex-wrap gap-1">
-                          <ErpButton size="sm" variant="outline" onClick={() => openView(row)}>
+                          <ErpButton size="sm" variant="outline" onClick={() => navigate(`/manufacturing/machines/${row.id}`)}>
                             View
                           </ErpButton>
                           {perms.canManageMachine ? (
                             <>
-                              <ErpButton size="sm" variant="outline" onClick={() => openEdit(row)}>
+                              <ErpButton size="sm" variant="outline" onClick={() => navigate(`/manufacturing/machines/${row.id}/edit`)}>
                                 Edit
                               </ErpButton>
                               <ErpButton
@@ -286,6 +202,14 @@ export function MachinesSetupPage() {
                                 onClick={() => void toggleActive(row)}
                               >
                                 {row.isActive ? 'Deactivate' : 'Activate'}
+                              </ErpButton>
+                              <ErpButton
+                                size="sm"
+                                variant="outline"
+                                loading={busyId === row.id}
+                                onClick={() => void remove(row)}
+                              >
+                                Delete
                               </ErpButton>
                             </>
                           ) : null}
@@ -299,107 +223,6 @@ export function MachinesSetupPage() {
           ) : null}
         </>
       )}
-
-      <SetupViewPopup
-        open={Boolean(viewing)}
-        onClose={() => setViewing(null)}
-        title={viewing?.name ?? 'Machine'}
-        subtitle={viewing?.code}
-        fields={
-          viewing
-            ? [
-                { label: 'Code', value: viewing.code, mono: true },
-                {
-                  label: 'Active',
-                  value: (
-                    <DynamicsStatusChip
-                      label={viewing.isActive ? 'Active' : 'Inactive'}
-                      tone={viewing.isActive ? 'success' : 'neutral'}
-                    />
-                  ),
-                },
-                { label: 'Name', value: viewing.name, fullWidth: true },
-                { label: 'Work Centre', value: workCentreLabel(viewing.workCentreId), fullWidth: true },
-                { label: 'Status', value: MACHINE_STATUS_LABELS[viewing.status] },
-                { label: 'Manufacturer', value: viewing.manufacturer ?? '—' },
-                { label: 'Model', value: viewing.model ?? '—' },
-                { label: 'Updated', value: viewing.updatedAt.slice(0, 10) },
-              ]
-            : []
-        }
-        footerExtra={
-          viewing && perms.canManageMachine ? (
-            <ErpButton
-              onClick={() => {
-                const row = viewing
-                setViewing(null)
-                openEdit(row)
-              }}
-            >
-              Edit
-            </ErpButton>
-          ) : null
-        }
-      />
-
-      <AccountDrawerShell
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        title={editing ? 'Edit Machine' : 'New Machine'}
-        eyebrow="Manufacturing Setup"
-        footer={
-          <div className="flex justify-end gap-2">
-            <ErpButton variant="outline" onClick={() => setDrawerOpen(false)}>
-              Cancel
-            </ErpButton>
-            <ErpButton
-              loading={saving}
-              disabled={!form.code.trim() || !form.name.trim() || !form.workCentreId}
-              onClick={() => void save()}
-            >
-              Save
-            </ErpButton>
-          </div>
-        }
-      >
-        <div className="space-y-3">
-          <FormField label="Code" required>
-            <Input
-              value={form.code}
-              onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
-              disabled={Boolean(editing)}
-            />
-          </FormField>
-          <FormField label="Name" required>
-            <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-          </FormField>
-          <FormField label="Work Centre" required>
-            <Select value={form.workCentreId} onChange={(e) => setForm((f) => ({ ...f, workCentreId: e.target.value }))}>
-              <option value="">Select work centre…</option>
-              {workCentres.map((wc) => (
-                <option key={wc.id} value={wc.id}>
-                  {wc.code} — {wc.name}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-          <FormField label="Status">
-            <Select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as MachineStatus }))}>
-              {MACHINE_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {MACHINE_STATUS_LABELS[s]}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-          <FormField label="Manufacturer">
-            <Input value={form.manufacturer} onChange={(e) => setForm((f) => ({ ...f, manufacturer: e.target.value }))} />
-          </FormField>
-          <FormField label="Model">
-            <Input value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} />
-          </FormField>
-        </div>
-      </AccountDrawerShell>
     </ManufacturingSetupShell>
   )
 }

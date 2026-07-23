@@ -4,7 +4,6 @@ import {
   CreditCard,
   Factory,
   FileText,
-  FolderOpen,
   FolderTree,
   GitBranch,
   Globe,
@@ -14,10 +13,8 @@ import {
   LayoutDashboard,
   MapPin,
   Package,
-  PackageCheck,
   Percent,
   Ruler,
-  ScanLine,
   Settings2,
   ShieldCheck,
   SlidersHorizontal,
@@ -238,10 +235,10 @@ export const MASTER_MODULE_GROUPS: MasterModuleGroup[] = [
     icon: Factory,
     accent: 'indigo',
     masters: [
-      def('bom', 'BOM Master', '/masters/bom', 'manufacturing', Layers, {
-        description: 'Bill of materials and costing',
+      def('bom', 'BOMs', '/manufacturing/setup/boms', 'manufacturing', Layers, {
+        description: 'Manufacturing BOM versions used on work orders',
         countKey: 'boms',
-        permissionKey: 'masters.bom',
+        permissionKey: 'manufacturing.bom.view',
       }),
       def('routing', 'Routing Master', '/masters/routing', 'manufacturing', GitBranch, {
         description: 'Operation sequences and standard times',
@@ -257,12 +254,6 @@ export const MASTER_MODULE_GROUPS: MasterModuleGroup[] = [
         description: 'Finished goods and trailer variants',
         countKey: 'products',
         permissionKey: 'masters.products',
-      }),
-      def('serial-numbers', 'Serial Numbers', '/masters/serial-numbers', 'manufacturing', PackageCheck, {
-        description: 'Serial and batch genealogy register',
-        countKey: 'serials',
-        permissionKey: 'masters.serial-numbers',
-        legacyPaths: ['/serials'],
       }),
       def('quality-test-groups', 'Quality Test Group Master', '/masters/quality-test-groups', 'manufacturing', ShieldCheck, {
         description: 'QC test groups for incoming, WIP, and FG inspection',
@@ -321,19 +312,6 @@ export const MASTER_MODULE_GROUPS: MasterModuleGroup[] = [
         description: 'Customer and item price list registers',
         status: 'placeholder',
         permissionKey: 'masters.price-lists',
-      }),
-      def('approval-workflows', 'Approval Workflow', '/masters/approval-workflows', 'configuration', ShieldCheck, {
-        description: 'Document approval rules and sign-off limits',
-        permissionKey: 'masters.approval-workflows',
-        legacyPaths: ['/masters/approval-matrix', '/settings/approval-matrix'],
-      }),
-      def('documents', 'Document Register', '/documents', 'configuration', FolderOpen, {
-        description: 'Drawings, specs, and controlled files',
-        permissionKey: 'masters.documents',
-      }),
-      def('barcode', 'Barcode Master', '/barcode/master', 'configuration', ScanLine, {
-        description: 'Barcode format definitions',
-        permissionKey: 'masters.barcode',
       }),
     ],
   },

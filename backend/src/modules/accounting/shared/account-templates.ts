@@ -241,6 +241,14 @@ const BASE_TREE: DraftAccountNode[] = [
         isGroup: false,
         normalBalance: 'DEBIT',
       },
+      {
+        accountCode: '5600',
+        accountName: 'Cost of Goods Sold',
+        category: 'EXPENSE',
+        accountType: 'EXPENSE',
+        isGroup: false,
+        normalBalance: 'DEBIT',
+      },
     ],
   },
 ]

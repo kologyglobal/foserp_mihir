@@ -7,9 +7,8 @@ import {
   HardHat,
   Landmark,
   LayoutGrid,
-  // QrCode, // Trace — restore with sidebar entry below
-  ScanLine,
   Settings2,
+  Shield,
   ShieldCheck,
   ShoppingCart,
   Tag,
@@ -35,9 +34,8 @@ export const SIDEBAR_ICON_MENU: {
   { categoryId: 'gate', label: 'Gate & Security', icon: HardHat },
   // { categoryId: 'engineering', label: 'Eng', icon: GitBranch },
   { categoryId: 'masters', label: 'Masters', icon: Database },
-  // { categoryId: 'traceability', label: 'Trace', icon: QrCode },
-  { categoryId: 'traceability-barcode', label: 'Barcode', icon: ScanLine },
   { categoryId: 'admin', label: 'Admin', icon: Settings2 },
+  { categoryId: 'platform', label: 'Platform', icon: Shield },
 ]
 
 /** Logical sidebar groupings — Dynamics enterprise navigation */
@@ -59,20 +57,13 @@ export const SIDEBAR_GROUPS = [
   },
   {
     id: 'engineering',
-    // label: 'Engineering & Masters',
-    // categoryIds: ['engineering', 'masters', 'traceability', 'traceability-barcode'],
-    label: 'Masters & Barcode',
-    categoryIds: ['masters', 'traceability-barcode'],
-  },
-  {
-    id: 'analytics',
-    label: 'Reports & Analytics',
-    categoryIds: ['reports'],
+    label: 'Masters',
+    categoryIds: ['masters'],
   },
   {
     id: 'administration',
     label: 'Administration',
-    categoryIds: ['admin'],
+    categoryIds: ['admin', 'platform'],
   },
 ] as const
 

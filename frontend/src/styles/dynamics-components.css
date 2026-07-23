@@ -10624,6 +10624,26 @@ a.crm-companies-table__name:hover {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* Wide detail layouts: keep dense 4-col / 3-col grids usable beside Smart Context */
+@media (min-width: 1280px) {
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-3,
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-4,
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-4 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1600px) {
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-4,
+  .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 767px) {
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-form-grid--cols-3,
   .erp-card-form-page__layout-wrap[data-factbox-open="true"] .erp-card-section__grid--cols-3,

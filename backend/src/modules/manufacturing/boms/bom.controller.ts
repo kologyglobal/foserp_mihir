@@ -16,6 +16,7 @@ import type {
   ListBomVersionsQuery,
   ListBomsQuery,
   PreviewBomImportInput,
+  UpdateBomInput,
   UpdateBomLineInput,
   UpdateBomVersionInput,
 } from './bom.schemas.js'
@@ -23,7 +24,14 @@ import type {
 type ItemSnap = { id: string; code: string; name: string }
 type UomSnap = { id: string; code: string; name: string }
 type BomLineWithMasters = ManufacturingBomLine & { item?: ItemSnap | null; uom?: UomSnap | null }
-type BomWithProduct = ManufacturingBom & { productItem?: ItemSnap | null }
+type BomVersionListSnap = Pick<
+  ManufacturingBomVersion,
+  'id' | 'versionNumber' | 'revisionCode' | 'status' | 'effectiveFrom'
+> & { _count?: { lines: number } }
+type BomWithProduct = ManufacturingBom & {
+  productItem?: ItemSnap | null
+  versions?: BomVersionListSnap[]
+}
 
 export const getBomImportTemplate = asyncHandler(async (_req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')
@@ -44,11 +52,23 @@ export const confirmBomImport = asyncHandler(async (req: Request, res: Response)
 })
 
 export function mapBom(bom: BomWithProduct) {
-  const { productItem, ...rest } = bom
+  const { productItem, versions, ...rest } = bom
   return {
     ...rest,
     productItemCode: productItem?.code ?? null,
     productItemName: productItem?.name ?? null,
+    ...(versions
+      ? {
+          versions: versions.map((version) => ({
+            id: version.id,
+            versionNumber: version.versionNumber,
+            revisionCode: version.revisionCode,
+            status: version.status,
+            effectiveFrom: version.effectiveFrom,
+            lineCount: version._count?.lines ?? 0,
+          })),
+        }
+      : {}),
   }
 }
 
@@ -94,6 +114,34 @@ export const createBom = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const item = await service.createBom(req, tenantId, req.body as CreateBomInput)
   return sendCreated(res, 'BOM created', item)
+})
+
+export const updateBom = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const bomId = getRouteParam(req, 'bomId')
+  const item = await service.updateBom(req, tenantId, bomId, req.body as UpdateBomInput)
+  return sendSuccess(res, 'BOM updated', mapBom(item as BomWithProduct))
+})
+
+export const deleteBom = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const bomId = getRouteParam(req, 'bomId')
+  await service.softDeleteBom(req, tenantId, bomId)
+  return sendSuccess(res, 'BOM deleted', null)
+})
+
+export const activateBom = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const bomId = getRouteParam(req, 'bomId')
+  const item = await service.setBomActive(req, tenantId, bomId, true)
+  return sendSuccess(res, 'BOM activated', mapBom(item as BomWithProduct))
+})
+
+export const deactivateBom = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const bomId = getRouteParam(req, 'bomId')
+  const item = await service.setBomActive(req, tenantId, bomId, false)
+  return sendSuccess(res, 'BOM deactivated', mapBom(item as BomWithProduct))
 })
 
 export const getBom = asyncHandler(async (req: Request, res: Response) => {

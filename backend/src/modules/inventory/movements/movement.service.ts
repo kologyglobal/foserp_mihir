@@ -239,6 +239,15 @@ export async function postSaReceipt(req: Request, tenantId: string, input: FgRec
 }
 
 export async function postFgDispatchIssue(req: Request, tenantId: string, input: FgDispatchIssueInput) {
+  const { isDispatchHardenedPostingEnabled } = await import(
+    '../../dispatch/posting/dispatch-policy.js'
+  )
+  if (isDispatchHardenedPostingEnabled()) {
+    const { AuthorizationError } = await import('../../../utils/errors.js')
+    throw new AuthorizationError(
+      'FG_DISPATCH inventory issues must be posted through Dispatch outbound confirm/post (DispatchPostingService). Direct /inventory/movements/fg-dispatch is blocked while hardened posting is enabled.',
+    )
+  }
   const movement = await postStockMovement({
     tenantId,
     itemId: input.itemId,

@@ -1,0 +1,90 @@
+{
+  "env": {
+    "backend": "up :5000",
+    "frontend": "up :5173",
+    "viteUseApi": true,
+    "tenant": "vasant-trailers",
+    "browserTool": "playwright-core + system Chrome (cursor-ide-browser MCP could not retain tabs in this session)",
+    "loginRole": "admin@vasant-trailers.com",
+    "purchaseLogin": "purchase@vasant-trailers.com"
+  },
+  "steps": [
+    {
+      "step": "API precondition loaded",
+      "ok": true,
+      "detail": "WO-000043 mat=e36060b0-6984-4e66-9863-a81e489a6a4c shortageQty=20"
+    },
+    {
+      "step": "UI login",
+      "ok": true,
+      "detail": "http://127.0.0.1:5173/crm"
+    },
+    {
+      "step": "1. UI create shortage PR",
+      "ok": false,
+      "detail": "No assign row for WO-000043"
+    },
+    {
+      "step": "1b. API fallback shortage PR",
+      "ok": true,
+      "detail": "PR-000012 http=201 body={\"success\":true,\"message\":\"Shortage requisition created\",\"data\":{\"requisition\":{\"id\":\"83793e89-896b-4ffc-a45e-4f827b9780f4\",\"requisitionNumber\":\"PR-000012\",\"requisitionDate\":\"2026-07-23\",\"departmentId"
+    },
+    {
+      "step": "2. UI approve PR",
+      "ok": false,
+      "detail": "pr=PR-000012 status=draft url=http://127.0.0.1:5173/purchase/requisitions/83793e89-896b-4ffc-a45e-4f827b9780f4"
+    },
+    {
+      "step": "2b. API fallback approve PR",
+      "ok": true,
+      "detail": "http=200 status=approved"
+    },
+    {
+      "step": "3. UI create PO from planning",
+      "ok": false,
+      "detail": "Planning row not found in UI"
+    },
+    {
+      "step": "3b. API fallback create PO",
+      "ok": true,
+      "detail": "po=PO-000008 http=201"
+    },
+    {
+      "step": "4. UI GRN list/editor",
+      "ok": false,
+      "detail": "New GRN control not found"
+    },
+    {
+      "step": "4b. API GRN + submit",
+      "ok": true,
+      "detail": "GRN-000007 http=201"
+    },
+    {
+      "step": "5. Stock/reserve check",
+      "ok": true,
+      "detail": "status=RESERVED reserved=20 shortage=0"
+    }
+  ],
+  "blockers": [
+    "Assign queue missing shortage row",
+    "Planning sheet row not visible",
+    "GRN new button not found"
+  ],
+  "apiFallback": [
+    "Created shortage PR via store-workbench API",
+    "PR submit/approve via API",
+    "PO created via planning-sheet API",
+    "PO submit/approve/send via API (lifecycle to enable GRN)",
+    "GRN create/submit via API",
+    "Re-reserve verified via API"
+  ],
+  "consoleErrors": [],
+  "docs": {
+    "prNumber": "PR-000012",
+    "prId": "83793e89-896b-4ffc-a45e-4f827b9780f4",
+    "poNumber": "PO-000008",
+    "poId": "dd624180-b3b3-40dd-bdc5-9e5daaec60a2",
+    "grnNumber": "GRN-000007",
+    "woNo": "WO-000043"
+  }
+}

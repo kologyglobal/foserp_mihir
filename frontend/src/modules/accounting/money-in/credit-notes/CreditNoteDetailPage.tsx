@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Pencil } from 'lucide-react'
+import { Download, Pencil, Printer } from 'lucide-react'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { ErpStatusChip } from '@/components/erp/ErpStatusChip'
 import { Textarea } from '@/components/forms/Inputs'
@@ -251,6 +251,20 @@ export function CreditNoteDetailPage() {
       title={creditNoteDisplayNumber(note)}
       actions={
         <div className="flex flex-wrap gap-2">
+          <ErpButton
+            variant="secondary"
+            icon={Printer}
+            onClick={() => navigate(`/accounting/money-in/credit-notes/${id}/print`)}
+          >
+            Print
+          </ErpButton>
+          <ErpButton
+            variant="secondary"
+            icon={Download}
+            onClick={() => navigate(`/accounting/money-in/credit-notes/${id}/print`)}
+          >
+            Download PDF
+          </ErpButton>
           {mergeAllowedAction(perms.canEditCreditNote, actions?.edit) && (
             <ErpButton variant="secondary" icon={Pencil} onClick={() => navigate(`/accounting/money-in/credit-notes/${id}/edit`)}>
               Edit

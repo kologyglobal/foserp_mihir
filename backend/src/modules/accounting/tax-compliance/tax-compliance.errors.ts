@@ -41,3 +41,9 @@ export class GstEWayBillCancelError extends AppError {
     super(422, message, 'GST_EWAY_CANCEL')
   }
 }
+
+export class GstEWayBillVehicleUpdateError extends AppError {
+  constructor(message: string) {
+    super(422, message, 'GST_EWAY_VEHICLE_UPDATE')
+  }
+}

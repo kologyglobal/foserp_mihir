@@ -126,7 +126,14 @@ export interface ProductionOrderMaterial {
   productionOrderId: string
   bomLineId: string
   itemId: string
-  item: { id: string; code: string; name: string; isStockable: boolean }
+  item: {
+    id: string
+    code: string
+    name: string
+    isStockable: boolean
+    batchTracked?: boolean
+    serialTracked?: boolean
+  }
   uomId: string
   uom: { id: string; code: string; name: string }
   warehouseId: string | null

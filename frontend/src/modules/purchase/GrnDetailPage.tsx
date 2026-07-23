@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ClipboardCheck,
@@ -17,6 +17,7 @@ import {
 } from '@/components/purchase/PurchaseDocumentFactBox'
 import { ErpCardSection, ErpViewField } from '@/components/erp/card-form'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Modal } from '@/design-system/components/Modal'
@@ -92,6 +93,16 @@ export function GrnDetailPage() {
     }
   }
 
+  const headerFacts = useMemo(() => {
+    if (!grn) return []
+    return [
+      { label: 'Vendor', value: grn.vendor.name },
+      { label: 'PO', value: grn.purchaseOrderNumber },
+      { label: 'GRN Date', value: formatDate(grn.documentDate) },
+      { label: 'Warehouse', value: grn.warehouseName || '—' },
+    ]
+  }, [grn])
+
   if (loading || !grn) {
     return (
       <PurchaseCardFormShell
@@ -100,10 +111,13 @@ export function GrnDetailPage() {
         status="—"
         favoritePath="/purchase/grn"
         breadcrumbs={[
+          { label: 'Purchase', to: '/purchase' },
           { label: 'GRN / Receipts', to: '/purchase/grn' },
           { label: 'Loading' },
         ]}
+        backLink={{ to: '/purchase/grn', label: 'Back to GRN / Receipts' }}
         footer={null}
+        stickyFooter={false}
         detailMode
       >
         {loading ? (
@@ -163,35 +177,28 @@ export function GrnDetailPage() {
       recordNo={grn.documentNumber}
       status={statusLabel}
       statusTone={purchaseStatusTone(grn.status)}
+      statusKey={grn.status}
+      company={grn.vendor.name}
       favoritePath={`/purchase/grn/${grn.id}`}
       breadcrumbs={[
+        { label: 'Purchase', to: '/purchase' },
         { label: 'GRN / Receipts', to: '/purchase/grn' },
         { label: grn.documentNumber },
       ]}
-      documentIdentity={{
-        moduleLabel: 'GOODS RECEIPT NOTE',
-        title: grn.documentNumber,
-        status: statusLabel,
-        statusTone: purchaseStatusTone(grn.status),
-      }}
-      documentFacts={[
-        { label: 'GRN No', value: grn.documentNumber, emphasize: true },
-        { label: 'Vendor', value: grn.vendor.name, emphasize: true },
-        { label: 'PO Source', value: grn.purchaseOrderNumber, emphasize: true },
-        { label: 'GRN Date', value: formatDate(grn.documentDate) },
-        { label: 'Warehouse', value: grn.warehouseName || '—' },
-      ]}
-      documentMetaChips={[
-        'From PO',
-        grn.inspectionRequired ? 'QC Required' : 'QC Not required',
-        grn.warehouseName || 'Warehouse',
-      ]}
+      backLink={{ to: '/purchase/grn', label: 'Back to GRN / Receipts' }}
+      createdBy={grn.createdBy}
+      createdDate={formatDate(grn.createdAt.slice(0, 10))}
+      modifiedBy={grn.updatedBy ?? undefined}
+      modifiedDate={grn.updatedAt ? formatDate(grn.updatedAt.slice(0, 10)) : undefined}
+      recordHeaderFacts={headerFacts}
       detailMode
       factBox={documentFactBox}
+      collapsibleFactBox
       commandBar={
         <ErpCommandBar
           inline
           sticky={false}
+          collapseSecondaryOnNarrow={false}
           primaryAction={
             canPost && !postGate.hidden
               ? {
@@ -229,6 +236,7 @@ export function GrnDetailPage() {
               id: 'edit',
               label: 'Edit',
               icon: Pencil,
+              pin: true,
               onClick: () => navigate(`/purchase/grn/${grn.id}/edit`),
               hidden: createGate.hidden,
               disabled: !canEdit || createGate.disabled,
@@ -251,6 +259,7 @@ export function GrnDetailPage() {
               id: 'print',
               label: 'Print',
               icon: Printer,
+              pin: true,
               onClick: () => navigate(`/purchase/grn/${grn.id}/print`),
             },
             {
@@ -277,20 +286,32 @@ export function GrnDetailPage() {
         />
       }
       footer={null}
+      stickyFooter={false}
     >
-      <ErpCardSection title="Header" defaultOpen columns={1}>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="space-y-3">
+        <ErpCardSection
+          title="General"
+          subtitle="Identity, vendor, and receipt details"
+          collapsible
+          defaultOpen
+          columns={4}
+        >
           <ErpViewField label="GRN Number" value={grn.documentNumber} />
           <ErpViewField label="GRN Date" value={formatDate(grn.documentDate)} />
           <ErpViewField
+            label="Status"
+            value={<StatusDot label={statusLabel} tone={statusToneFromLabel(grn.status)} />}
+          />
+          <ErpViewField label="Amount" value={formatCurrency(grn.totalAmount)} />
+          <ErpViewField
             label="PO Number"
             value={
-              <Link to={`/purchase/orders/${grn.purchaseOrderId}`} className="text-erp-primary">
+              <Link to={`/purchase/orders/${grn.purchaseOrderId}`} className="text-erp-primary font-mono">
                 {grn.purchaseOrderNumber}
               </Link>
             }
           />
-          <ErpViewField label="Vendor" value={grn.vendor.name} />
+          <ErpViewField label="Vendor" value={`${grn.vendor.code} — ${grn.vendor.name}`} />
           <ErpViewField label="Vendor Challan" value={grn.vendorChallanNumber || '—'} />
           <ErpViewField
             label="Challan Date"
@@ -300,57 +321,65 @@ export function GrnDetailPage() {
           <ErpViewField label="Transporter" value={grn.transporterName || '—'} />
           <ErpViewField label="LR Number" value={grn.lrNumber || '—'} />
           <ErpViewField label="Gate Entry" value={grn.gateEntryNo || '—'} />
-          <ErpViewField label="Warehouse" value={grn.warehouseName} />
+          <ErpViewField label="Warehouse" value={grn.warehouseName || '—'} />
           <ErpViewField label="Receiving Location" value={grn.receivingLocation || '—'} />
           <ErpViewField label="Received By" value={grn.receivedBy.name} />
           <ErpViewField label="Inspection Required" value={grn.inspectionRequired ? 'Yes' : 'No'} />
-          <ErpViewField label="Status" value={statusLabel} />
-          <ErpViewField label="Amount" value={formatCurrency(grn.totalAmount)} />
-          <ErpViewField label="Remarks" value={grn.remarks || '—'} />
-        </div>
-      </ErpCardSection>
+          <ErpViewField label="Remarks" value={grn.remarks || '—'} colSpan={3} />
+        </ErpCardSection>
 
-      <ErpCardSection title="Lines" defaultOpen columns={1}>
-        <div className="min-w-0 w-full overflow-x-auto">
-          <table className="erp-table w-full min-w-[960px] text-left text-sm">
-            <thead className="border-b text-xs text-erp-muted">
-              <tr>
-                <th className="px-2 py-2">#</th>
-                <th className="px-2 py-2">Item</th>
-                <th className="px-2 py-2 num">Ordered</th>
-                <th className="px-2 py-2 num">Prev</th>
-                <th className="px-2 py-2 num">Pending</th>
-                <th className="px-2 py-2 num">Received</th>
-                <th className="px-2 py-2 num">Accepted</th>
-                <th className="px-2 py-2 num">Rejected</th>
-                <th className="px-2 py-2">Batch</th>
-                <th className="px-2 py-2">Inspection</th>
-                <th className="px-2 py-2">Remarks</th>
-              </tr>
-            </thead>
-            <tbody>
-              {grn.lines.map((l) => (
-                <tr key={l.id} className="border-b">
-                  <td className="px-2 py-2">{l.lineNo}</td>
-                  <td className="min-w-[10rem] px-2 py-2">
-                    <div className="font-mono text-xs whitespace-nowrap">{l.itemCode}</div>
-                    <div className="text-erp-text">{l.itemName}</div>
-                  </td>
-                  <td className="px-2 py-2 num">{formatNumber(l.orderedQty)}</td>
-                  <td className="px-2 py-2 num">{formatNumber(l.previouslyReceivedQty)}</td>
-                  <td className="px-2 py-2 num">{formatNumber(l.pendingQty)}</td>
-                  <td className="px-2 py-2 num">{formatNumber(l.receivedQty)}</td>
-                  <td className="px-2 py-2 num">{formatNumber(l.acceptedQty)}</td>
-                  <td className="px-2 py-2 num">{formatNumber(l.rejectedQty)}</td>
-                  <td className="px-2 py-2 font-mono text-xs whitespace-nowrap">{l.batchNumber || '—'}</td>
-                  <td className="px-2 py-2 whitespace-nowrap">{GRN_LINE_INSPECTION_STATUS_LABELS[l.inspectionStatus]}</td>
-                  <td className="px-2 py-2">{l.remarks || '—'}</td>
+        <ErpCardSection
+          title="Item Lines"
+          subtitle={`${grn.lines.length} line${grn.lines.length === 1 ? '' : 's'}`}
+          collapsible
+          defaultOpen
+          columns={1}
+        >
+          <div className="min-w-0 w-full overflow-x-auto rounded-md border border-erp-border">
+            <table className="erp-table w-full min-w-[960px] text-left text-[12px]">
+              <thead>
+                <tr>
+                  <th className="w-10">#</th>
+                  <th>Item</th>
+                  <th className="num">Ordered</th>
+                  <th className="num">Prev</th>
+                  <th className="num">Pending</th>
+                  <th className="num">Received</th>
+                  <th className="num">Accepted</th>
+                  <th className="num">Rejected</th>
+                  <th>Batch</th>
+                  <th>Inspection</th>
+                  <th>Remarks</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </ErpCardSection>
+              </thead>
+              <tbody>
+                {grn.lines.map((l) => (
+                  <tr key={l.id}>
+                    <td className="tabular-nums text-erp-muted">{l.lineNo}</td>
+                    <td className="min-w-[10rem]">
+                      <div className="font-mono text-[11px] text-erp-muted whitespace-nowrap">
+                        {l.itemCode}
+                      </div>
+                      <div className="font-medium text-erp-text">{l.itemName}</div>
+                    </td>
+                    <td className="num tabular-nums">{formatNumber(l.orderedQty)}</td>
+                    <td className="num tabular-nums">{formatNumber(l.previouslyReceivedQty)}</td>
+                    <td className="num tabular-nums">{formatNumber(l.pendingQty)}</td>
+                    <td className="num tabular-nums">{formatNumber(l.receivedQty)}</td>
+                    <td className="num tabular-nums">{formatNumber(l.acceptedQty)}</td>
+                    <td className="num tabular-nums">{formatNumber(l.rejectedQty)}</td>
+                    <td className="font-mono text-[11px] whitespace-nowrap">{l.batchNumber || '—'}</td>
+                    <td className="whitespace-nowrap">
+                      {GRN_LINE_INSPECTION_STATUS_LABELS[l.inspectionStatus]}
+                    </td>
+                    <td className="text-erp-muted">{l.remarks || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ErpCardSection>
+      </div>
 
       <Modal
         open={postConfirmOpen}

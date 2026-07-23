@@ -138,6 +138,7 @@ export async function buildProductionReadySetup(app: Express, fx: ManufacturingF
       .post(`${b}/routing-versions/${routingVersionId}/stage-groups`)
       .send({ code: 'ST-01', name: 'Cutting', displayOrder: 1 }),
   )
+  if (stage1.status !== 201) throw new Error(`Failed to create stage 1: ${JSON.stringify(stage1.body)}`)
   const stage1Id = stage1.body.data.id as string
 
   const stage2 = await auth(
@@ -145,6 +146,7 @@ export async function buildProductionReadySetup(app: Express, fx: ManufacturingF
       .post(`${b}/routing-versions/${routingVersionId}/stage-groups`)
       .send({ code: 'ST-02', name: 'Welding', displayOrder: 2 }),
   )
+  if (stage2.status !== 201) throw new Error(`Failed to create stage 2: ${JSON.stringify(stage2.body)}`)
   const stage2Id = stage2.body.data.id as string
 
   const stage3 = await auth(
@@ -152,27 +154,60 @@ export async function buildProductionReadySetup(app: Express, fx: ManufacturingF
       .post(`${b}/routing-versions/${routingVersionId}/stage-groups`)
       .send({ code: 'ST-03', name: 'Assembly', displayOrder: 3 }),
   )
+  if (stage3.status !== 201) throw new Error(`Failed to create stage 3: ${JSON.stringify(stage3.body)}`)
   const stage3Id = stage3.body.data.id as string
+
+  // Routing operations require workCentreId (Zod createOperationSchema).
+  const workCentre = await auth(
+    request(app)
+      .post(`${b}/work-centres`)
+      .send({ code: `WC-${suffix}`.slice(0, 32), name: 'Production Fixture WC' }),
+  )
+  if (workCentre.status !== 201) {
+    throw new Error(`Failed to create work centre: ${JSON.stringify(workCentre.body)}`)
+  }
+  const workCentreId = workCentre.body.data.id as string
 
   const op1 = await auth(
     request(app)
       .post(`${b}/routing-versions/${routingVersionId}/operations`)
-      .send({ stageGroupId: stage1Id, code: 'OP-10', name: 'Cut Steel Sheet', sequence: 10 }),
+      .send({
+        stageGroupId: stage1Id,
+        code: 'OP-10',
+        name: 'Cut Steel Sheet',
+        sequence: 10,
+        workCentreId,
+      }),
   )
+  if (op1.status !== 201) throw new Error(`Failed to create operation 1: ${JSON.stringify(op1.body)}`)
   const op1Id = op1.body.data.id as string
 
   const op2 = await auth(
     request(app)
       .post(`${b}/routing-versions/${routingVersionId}/operations`)
-      .send({ stageGroupId: stage2Id, code: 'OP-20', name: 'Weld Frame', sequence: 20 }),
+      .send({
+        stageGroupId: stage2Id,
+        code: 'OP-20',
+        name: 'Weld Frame',
+        sequence: 20,
+        workCentreId,
+      }),
   )
+  if (op2.status !== 201) throw new Error(`Failed to create operation 2: ${JSON.stringify(op2.body)}`)
   const op2Id = op2.body.data.id as string
 
   const op3 = await auth(
     request(app)
       .post(`${b}/routing-versions/${routingVersionId}/operations`)
-      .send({ stageGroupId: stage3Id, code: 'OP-30', name: 'Final Assembly', sequence: 30 }),
+      .send({
+        stageGroupId: stage3Id,
+        code: 'OP-30',
+        name: 'Final Assembly',
+        sequence: 30,
+        workCentreId,
+      }),
   )
+  if (op3.status !== 201) throw new Error(`Failed to create operation 3: ${JSON.stringify(op3.body)}`)
   const op3Id = op3.body.data.id as string
 
   const dep1 = await auth(

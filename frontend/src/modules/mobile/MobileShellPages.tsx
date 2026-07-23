@@ -64,6 +64,7 @@ export function MobileModulesPage() {
     { label: 'Shopfloor Kiosk', path: '/m/kiosk' },
     { label: 'Shop Floor', path: '/m/shop-floor' },
     { label: 'Quality / QC', path: '/m/qc' },
+    { label: 'Approvals', path: '/m/approvals' },
     { label: 'Gate Keeper', path: '/m/gate' },
     { label: 'GRN Receiving', path: '/m/grn' },
     { label: 'Stock Count', path: '/m/stock-count' },
@@ -72,7 +73,6 @@ export function MobileModulesPage() {
     { label: 'Warehouse Transfer', path: '/m/warehouse-transfer' },
     { label: 'Job Work', path: '/m/job-work' },
     { label: 'Dispatch Loading', path: '/m/dispatch' },
-    { label: 'Approvals', path: '/m/approvals' },
     ...(mobileCrmEnabled()
       ? [
           { label: 'CRM Pipeline', path: '/m/crm' },
@@ -85,7 +85,6 @@ export function MobileModulesPage() {
           { label: 'CRM Companies', path: '/m/crm/customers' },
         ]
       : []),
-    { label: 'Global Scan', path: '/m/scan' },
   ]
 
   return (

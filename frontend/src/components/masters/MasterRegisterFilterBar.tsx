@@ -23,6 +23,8 @@ export interface MasterRegisterFilterBarProps {
   savedView?: string
   onSavedViewChange?: (view: string) => void
   trailing?: ReactNode
+  /** Injected by DataGrid when this bar is used as `registerBar` */
+  columnsControl?: ReactNode
   className?: string
 }
 
@@ -41,11 +43,15 @@ export function MasterRegisterFilterBar({
   savedView,
   onSavedViewChange,
   trailing,
+  columnsControl,
   className,
 }: MasterRegisterFilterBarProps) {
   return (
     <SmartFilterBar
-      className={cn('crm-list-filter-bar masters-list-filter-bar masters-list-filter-bar--embedded', className)}
+      className={cn(
+        'crm-list-filter-bar masters-list-filter-bar masters-list-filter-bar--embedded',
+        className,
+      )}
       chips={chips}
       onRemoveChip={onRemoveChip}
       onClearAll={chips.length > 0 ? onClearAll : undefined}
@@ -54,6 +60,7 @@ export function MasterRegisterFilterBar({
       onSavedViewChange={onSavedViewChange}
       savedViews={['All Records', 'Active Only', 'My View']}
       trailing={trailing}
+      columnsControl={columnsControl}
     >
       <div className="ent-search-wrap">
         <SearchInput

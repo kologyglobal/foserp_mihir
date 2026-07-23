@@ -47,7 +47,6 @@ const CANONICAL_MASTER_PATHS = new Set([
   '/masters/payment-terms',
   '/crm/masters/delivery-terms',
   '/crm/masters/warranty-terms',
-  '/masters/approval-workflows',
   '/quality/parameters',
   '/quality/inspection-plans',
 ])

@@ -18,8 +18,10 @@ import { useUIStore } from '../../store/uiStore'
 import { DensityProvider } from '../../design-system/enterprise/DensityProvider'
 import { useCrmApiSync } from '../../hooks/useCrmApiSync'
 import { useMasterApiSync } from '../../hooks/useMasterApiSync'
+import { useAdminApiSync } from '../../hooks/useAdminApiSync'
 import { isApiMode } from '@/config/apiConfig'
 import { runDemoCrmBootstrap } from '@/bootstrap/demoBootstrap'
+import { useTenantModulesStore } from '../../store/tenantModulesStore'
 import { Loader } from '../ui/Loader'
 import { cn } from '../../utils/cn'
 
@@ -29,6 +31,7 @@ export function AppShell() {
   const closeMobileNav = useUIStore((s) => s.closeMobileNav)
   const { status: apiSyncStatus, error: apiSyncError } = useCrmApiSync()
   const { status: masterSyncStatus, error: masterSyncError } = useMasterApiSync()
+  const { status: adminSyncStatus, error: adminSyncError } = useAdminApiSync()
 
   useEffect(() => {
     if (!mobileNavOpen) return
@@ -43,12 +46,16 @@ export function AppShell() {
     runDemoCrmBootstrap()
   }, [])
 
-  if (isApiMode() && (apiSyncStatus === 'loading' || masterSyncStatus === 'loading')) {
+  useEffect(() => {
+    void useTenantModulesStore.getState().hydrate()
+  }, [])
+
+  if (isApiMode() && (apiSyncStatus === 'loading' || masterSyncStatus === 'loading' || adminSyncStatus === 'loading')) {
     return <Loader fullScreen size="lg" label="Loading data from server" />
   }
 
-  if (isApiMode() && (apiSyncStatus === 'error' || masterSyncStatus === 'error')) {
-    const detail = apiSyncError ?? masterSyncError ?? 'Unknown error'
+  if (isApiMode() && (apiSyncStatus === 'error' || masterSyncStatus === 'error' || adminSyncStatus === 'error')) {
+    const detail = apiSyncError ?? masterSyncError ?? adminSyncError ?? 'Unknown error'
     const looksLikeOffline =
       /failed to fetch|networkerror|load failed/i.test(detail) ||
       /not routing \/api|backend running|expected json/i.test(detail)

@@ -98,6 +98,10 @@ async function seedMappings(tenantId: string, legalEntityId: string) {
     'SCRAP_LOSS',
   ] as const
   for (const [index, key] of keys.entries()) {
+    const existing = await prisma.defaultAccountMapping.findFirst({
+      where: { tenantId, legalEntityId, mappingKey: key },
+    })
+    if (existing) continue
     const inventory = key.includes('INVENTORY')
     const account = await prisma.account.create({
       data: {
@@ -190,27 +194,86 @@ describe.skipIf(!dbAvailable)('Manufacturing Phase 8 — Auto mfg-GL (Wave 3)', 
     expect(status.body.data.enablement.blockers).toContain('MISSING_ACCOUNT_MAPPINGS')
   })
 
-  it('blocks enabling with 409 + blockers while readiness is incomplete', async () => {
-    const response = await auth(request(app).put(featurePath())).send({ isEnabled: true })
-    expect(response.status).toBe(409)
-    expect(response.body.message).toContain('MISSING_ACCOUNT_MAPPINGS')
+  it('blocks enabling with 422 + blockers while readiness is incomplete', async () => {
+    const response = await auth(request(app).put(featurePath())).send({
+      isEnabled: true,
+      pilotSignOff: true,
+      inventoryReconcileConfirmed: true,
+      signOffNote: 'Phase 8 test attempt before mappings',
+    })
+    // Pilot pre-accept rejects missing mappings as 422 (not a readiness race 409).
+    expect(response.status).toBe(422)
+    expect(String(response.body.code ?? '')).toBe('PILOT_FINANCE_SIGNOFF_REQUIRED')
     expect(
       (response.body.errors as Array<{ message: string }>).map((error) => error.message),
     ).toContain('MISSING_ACCOUNT_MAPPINGS')
     const control = await prisma.financeFeatureControl.findFirst({
       where: { tenantId: fx.tenantId, legalEntityId, featureKey: 'MANUFACTURING_ACCOUNTING' },
     })
-    expect(control).toBeNull()
+    expect(control?.isEnabled ?? false).toBe(false)
   })
 
   it('rejects enable/disable without finance.settings.manage', async () => {
-    const response = await auth(request(app).put(featurePath()), noManageToken).send({ isEnabled: true })
+    const response = await auth(request(app).put(featurePath()), noManageToken).send({
+      isEnabled: true,
+      pilotSignOff: true,
+      inventoryReconcileConfirmed: true,
+    })
     expect(response.status).toBe(403)
+  })
+
+  it('rejects enable without pilot / inventory sign-off', async () => {
+    const response = await auth(request(app).put(featurePath())).send({ isEnabled: true })
+    expect(response.status).toBe(422)
+    expect(String(response.body.code ?? '')).toMatch(/INVENTORY_RECONCILE_NOT_SIGNED_OFF|PILOT_FINANCE_SIGNOFF_REQUIRED/)
+    expect(String(response.body.message ?? '')).toMatch(/inventoryReconcileConfirmed|pilotSignOff/i)
+  })
+
+  it('blocks enabling when unreconciled RECORDED events exist', async () => {
+    await seedMappings(fx.tenantId, legalEntityId)
+    const idempotencyKey = `P8GL_UNREC:${workOrderId}:V1`
+    await prisma.productionAccountingEvent.create({
+      data: {
+        tenantId: fx.tenantId,
+        legalEntityId,
+        eventType: 'MATERIAL_ISSUED',
+        status: 'RECORDED',
+        productionOrderId: workOrderId,
+        idempotencyKey,
+        sourceDocumentType: 'PRODUCTION_MATERIAL_ISSUE',
+        sourceDocumentId: workOrderId,
+        quantity: 1,
+        amount: 10,
+        currencyCode: 'INR',
+      },
+    })
+    try {
+      const response = await auth(request(app).put(featurePath())).send({
+        isEnabled: true,
+        pilotSignOff: true,
+        inventoryReconcileConfirmed: true,
+        signOffNote: 'Should block on unreconciled',
+      })
+      expect(response.status).toBe(409)
+      expect(
+        (response.body.errors as Array<{ message: string }>).map((error) => error.message),
+      ).toContain('INVENTORY_POSTINGS_UNRECONCILED')
+    } finally {
+      await prisma.productionAccountingEvent.deleteMany({
+        where: { tenantId: fx.tenantId, idempotencyKey },
+      })
+    }
   })
 
   it('enables the flag once mappings and open period are ready', async () => {
     await seedMappings(fx.tenantId, legalEntityId)
-    const response = await auth(request(app).put(featurePath())).send({ isEnabled: true })
+    await prisma.productionAccountingEvent.deleteMany({ where: { tenantId: fx.tenantId } })
+    const response = await auth(request(app).put(featurePath())).send({
+      isEnabled: true,
+      pilotSignOff: true,
+      inventoryReconcileConfirmed: true,
+      signOffNote: 'Phase 8 pilot Finance sign-off',
+    })
     expect(response.status).toBe(200)
     expect(response.body.data.isEnabled).toBe(true)
     expect(response.body.data.readiness.ready).toBe(true)

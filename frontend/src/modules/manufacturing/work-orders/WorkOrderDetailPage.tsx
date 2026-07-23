@@ -8,6 +8,7 @@ import {
   Play,
   Package,
   ShieldCheck,
+  ShoppingCart,
   XCircle,
 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
@@ -376,6 +377,8 @@ export function WorkOrderDetailPage() {
   const canQcAction = !readOnly && Boolean(quality?.result === 'pending') && perms.canInspectQuality
   const canClose = !readOnly && wo.status === 'completed' && !wo.qualityHold && perms.canCloseWo
   const canCancel = !readOnly && perms.canCancelWo
+  const shortageCount = mats.filter((m) => m.shortageQty > 0).length
+  const canCreateShortagePr = perms.canCreateRequirement && !readOnly && shortageCount > 0
 
   const primaryAction = canStart
     ? { id: 'start', label: 'Start', icon: Play, onClick: () => setDialog('start') }
@@ -415,6 +418,26 @@ export function WorkOrderDetailPage() {
               : []),
             ...(canReserve
               ? [{ id: 'reserve', label: 'Reserve Materials', icon: Package, onClick: () => void run(async () => { const r = await reserveWorkOrderMaterialsDemo(wo.id); return { ok: r.ok, error: r.error } }, 'Materials reserved'), disabled: busy }]
+              : []),
+            ...(perms.canCreateRequirement
+              ? [
+                  {
+                    id: 'create-pr',
+                    label: 'Create PR',
+                    icon: ShoppingCart,
+                    disabled: busy || !canCreateShortagePr,
+                    disabledReason: readOnly
+                      ? 'Work order is completed, closed, or cancelled'
+                      : shortageCount <= 0
+                        ? 'No material shortages on this work order'
+                        : undefined,
+                    onClick: () =>
+                      void run(
+                        async () => createPurchaseRequisitionFromShortageDemo(wo.id),
+                        'PR draft created',
+                      ),
+                  },
+                ]
               : []),
             ...(canHold
               ? [{ id: 'hold', label: 'Hold', icon: Pause, onClick: () => setDialog('hold') }]
@@ -675,7 +698,7 @@ export function WorkOrderDetailPage() {
               <Button size="sm" variant="secondary" disabled={!perms.canViewMaterials || readOnly || busy} onClick={() => setDialog('check')}>Check Availability</Button>
               <Button size="sm" variant="secondary" disabled={!perms.canReserveMaterials || readOnly || busy} onClick={() => void run(async () => { const r = await reserveWorkOrderMaterialsDemo(wo.id); return { ok: r.ok, error: r.error } }, 'Materials reserved')}>Reserve</Button>
               <Button size="sm" variant="secondary" disabled={!perms.canReserveMaterials || readOnly || busy} onClick={() => void run(() => releaseWorkOrderReservationsDemo(wo.id), 'Reservation released')}>Release</Button>
-              <Button size="sm" variant="secondary" disabled={!perms.canCreateRequirement || readOnly || busy} onClick={() => void run(async () => createPurchaseRequisitionFromShortageDemo(wo.id), 'PR draft created')}>Create PR</Button>
+              <Button size="sm" variant="secondary" disabled={!perms.canCreateRequirement || readOnly || busy || shortageCount <= 0} title={shortageCount <= 0 ? 'No material shortages on this work order' : undefined} onClick={() => void run(async () => createPurchaseRequisitionFromShortageDemo(wo.id), 'PR draft created')}>Create PR</Button>
               <Button size="sm" variant="secondary" disabled={!perms.canCreateRequirement || readOnly || busy} onClick={() => void run(async () => createTransferFromShortageDemo(wo.id), 'Transfer draft created')}>Transfer Draft</Button>
               {settings?.materialConsumption.manualMaterialIssue ? (
                 <Button size="sm" variant="secondary" disabled={!perms.canIssueMaterials || readOnly} onClick={() => setDialog('issue')}>Issue Material</Button>

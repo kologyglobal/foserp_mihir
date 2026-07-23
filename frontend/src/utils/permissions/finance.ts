@@ -136,7 +136,7 @@ export function useFinancePermissions() {
     const can = (p: FinancePermission) => set.has(p)
     return {
       role: user.role,
-      canView: can('finance.settings.view') || can('finance.view'),
+      canView: can('finance.settings.view') || can('finance.view') || can('finance.branch.view'),
       canManage: can('finance.settings.manage'),
       canManageLegalEntity: can('finance.legal_entity.manage'),
       canManageBranch: can('finance.branch.manage'),

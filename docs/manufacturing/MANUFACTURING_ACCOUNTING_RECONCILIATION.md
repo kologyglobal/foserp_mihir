@@ -46,6 +46,23 @@ All require `manufacturing.accounting.view` (reconciliation requires `manufactur
 
 ---
 
+## Event integrity (failed / unreconciled)
+
+Source: `manufacturing-accounting-event-integrity.service.ts`.
+
+Enablement blocks on:
+
+| Blocker | Includes |
+|---------|----------|
+| `FAILED_ACCOUNTING_EVENTS` | `status=FAILED`, including retry-exhausted |
+| `INVENTORY_POSTINGS_UNRECONCILED` | `RECORDED` pending; inventory movement without accounting event; posted/pending accounting missing inventory ref; duplicate pending; inconsistent reversal chain |
+
+Readiness returns `eventIntegrity.counts` + UI-safe `exceptions` (no stack traces). `technicalDetails` is included only for `finance.settings.manage` / `manufacturing.accounting.post` (or readiness `?includeTechnicalDetails=1` with those perms).
+
+`SKIPPED_FLAG_OFF` / `SKIPPED_ZERO` are **not** treated as unreconciled.
+
+---
+
 ## How to work the queues
 
 1. **Unposted** — recorded events awaiting a manual post (Stage 2). Validate then post.

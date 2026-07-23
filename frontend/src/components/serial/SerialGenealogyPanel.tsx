@@ -37,7 +37,7 @@ export function SerialGenealogyPanel({ workOrderId, customerId, grnId, itemId, v
     <div className="rounded-lg border border-erp-border bg-white p-4">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-erp-text">Serial Numbers</h3>
-        <Link to="/serials" className="text-xs text-blue-600 hover:underline">
+        <Link to="/manufacturing/traceability" className="text-xs text-blue-600 hover:underline">
           Open register
         </Link>
       </div>
@@ -45,7 +45,7 @@ export function SerialGenealogyPanel({ workOrderId, customerId, grnId, itemId, v
         {serials.slice(0, compact ? 5 : 20).map((s) => (
           <li key={s.id} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
             <div>
-              <Link to={`/serials/${s.id}`} className="font-medium text-blue-600">
+              <Link to="/manufacturing/traceability" className="font-medium text-blue-600">
                 {s.serialNo}
               </Link>
               <p className="text-xs text-erp-muted">

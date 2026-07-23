@@ -4,7 +4,7 @@ export const CONTROL_TOWER_ROUTES = {
   executive: '/executive',
   /** Simple Manufacturing dashboard (legacy Control Tower redirects here). */
   production: '/manufacturing',
-  mrpPlanner: '/mrp/planner',
+  mrpPlanner: '/manufacturing/production-plan',
   inbox: '/inbox',
 } as const
 

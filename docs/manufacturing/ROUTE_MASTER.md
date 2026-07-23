@@ -28,6 +28,10 @@ Route Header
 
 API responses include `lifecycleLabel` (`UNDER_DEVELOPMENT` / `CERTIFIED` / `CLOSED` / …).
 
+## Worked example
+
+**5000 L Fuel Tank** PARALLEL route (`RT-000001`) with Job Card stage groups — see [`examples/FUEL_TANK_ROUTING.md`](./examples/FUEL_TANK_ROUTING.md).
+
 ### Header fields
 
 | Field | Behaviour |

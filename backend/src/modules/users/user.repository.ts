@@ -1,5 +1,6 @@
 import type { Prisma, User, UserStatus } from '@prisma/client'
 import { prisma } from '../../config/database.js'
+import { NotFoundError } from '../../utils/errors.js'
 import type { PaginationInput } from '../../utils/pagination.js'
 import { getPagination } from '../../utils/pagination.js'
 import type { CreateUserInput, UpdateUserInput } from './user.validation.js'
@@ -70,6 +71,15 @@ export async function createUser(
   passwordHash: string,
   createdBy?: string,
 ): Promise<UserWithRoles> {
+  let departmentName = input.department ?? null
+  if (input.departmentId) {
+    const dept = await prisma.department.findFirst({
+      where: { id: input.departmentId, tenantId, deletedAt: null, isActive: true },
+    })
+    if (!dept) throw new NotFoundError('Department not found')
+    departmentName = dept.name
+  }
+
   return prisma.user.create({
     data: {
       tenantId,
@@ -78,7 +88,8 @@ export async function createUser(
       email: input.email,
       mobile: input.mobile,
       designation: input.designation,
-      department: input.department,
+      department: departmentName,
+      departmentId: input.departmentId ?? null,
       status: input.status,
       passwordHash,
       createdBy,
@@ -104,9 +115,35 @@ export async function updateUser(
   input: UpdateUserInput,
   updatedBy?: string,
 ): Promise<UserWithRoles> {
+  const data: Prisma.UserUpdateInput = { updatedBy }
+
+  if (input.firstName !== undefined) data.firstName = input.firstName
+  if (input.lastName !== undefined) data.lastName = input.lastName
+  if (input.email !== undefined) data.email = input.email
+  if (input.mobile !== undefined) data.mobile = input.mobile
+  if (input.designation !== undefined) data.designation = input.designation
+  if (input.status !== undefined) data.status = input.status
+
+  if (input.departmentId !== undefined) {
+    if (input.departmentId === null) {
+      data.departmentId = null
+      if (input.department !== undefined) data.department = input.department
+      else data.department = null
+    } else {
+      const dept = await prisma.department.findFirst({
+        where: { id: input.departmentId, tenantId, deletedAt: null },
+      })
+      if (!dept) throw new NotFoundError('Department not found')
+      data.departmentId = input.departmentId
+      data.department = dept.name
+    }
+  } else if (input.department !== undefined) {
+    data.department = input.department
+  }
+
   return prisma.user.update({
     where: { id: userId, tenantId },
-    data: { ...input, updatedBy },
+    data,
     include: userInclude,
   })
 }

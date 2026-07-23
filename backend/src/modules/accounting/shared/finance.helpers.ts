@@ -106,6 +106,16 @@ export function toDateOnlyString(value: Date): string {
   return value.toISOString().slice(0, 10)
 }
 
+/** Calendar date YYYY-MM-DD in a tenant / legal-entity timezone (default Asia/Kolkata). */
+export function getTodayInTimezone(timezone: string, now = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone || 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now)
+}
+
 export function datesOverlap(
   aStart: Date,
   aEnd: Date,

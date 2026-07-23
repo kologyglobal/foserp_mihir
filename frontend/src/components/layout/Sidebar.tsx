@@ -1,14 +1,15 @@
 import { useEffect, useMemo, type ComponentType } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { X } from 'lucide-react'
-import { moduleCategories } from '../../config/navigation'
+import { getNavCategoryById } from '../../config/navigation'
 import { getCategoryWorkspacePath, moduleHeaderIsActive } from '../../config/moduleWorkspaceNav'
 import { SIDEBAR_ICON_MENU } from '../../config/sidebarGroups'
 import { cn } from '../../utils/cn'
 import { useUIStore } from '../../store/uiStore'
+import { useTenantModulesStore } from '../../store/tenantModulesStore'
 import { ModuleNavigationBadge } from '../premium/ModuleNavigationBadge'
 import { useSidebarLiveCounts } from '../../hooks/useSidebarLiveCounts'
-import { canAccessAdminShell, canAccessPurchaseShell } from '../../utils/permissions'
+import { canAccessAdminShell, canAccessPurchaseShell, isSuperAdminUser } from '../../utils/permissions'
 
 function IconMenuItem({
   categoryId,
@@ -26,7 +27,7 @@ function IconMenuItem({
   liveCount: number
 }) {
   const { pathname } = useLocation()
-  const category = moduleCategories.find((c) => c.id === categoryId)
+  const category = getNavCategoryById(categoryId)
   if (!category) return null
 
   const path = getCategoryWorkspacePath(category)
@@ -61,6 +62,7 @@ export function Sidebar() {
   const mobileNavOpen = useUIStore((s) => s.mobileNavOpen)
   const closeMobileNav = useUIStore((s) => s.closeMobileNav)
   const { pathname } = useLocation()
+  const isModuleEnabled = useTenantModulesStore((s) => s.isModuleEnabled)
 
   const sidebarCounts = useSidebarLiveCounts()
 
@@ -75,15 +77,16 @@ export function Sidebar() {
       SIDEBAR_ICON_MENU
         .filter((item) => {
           if (item.categoryId === 'admin') return canAccessAdminShell()
+          if (item.categoryId === 'platform') return isSuperAdminUser()
           // Soft UI gate only — purchase API must re-enforce when it ships
-          if (item.categoryId === 'purchase') return canAccessPurchaseShell()
-          return true
+          if (item.categoryId === 'purchase') return canAccessPurchaseShell() && isModuleEnabled(item.categoryId)
+          return isModuleEnabled(item.categoryId)
         })
         .map((item) => ({
           ...item,
           liveCount: sidebarCounts[item.categoryId] ?? 0,
         })),
-    [sidebarCounts],
+    [sidebarCounts, isModuleEnabled],
   )
 
   const showLabels = !sidebarCollapsed || mobileNavOpen

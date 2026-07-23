@@ -71,6 +71,8 @@ enum CodeSeriesEntity {
   INVENTORY_STOCK_COUNT
   INVENTORY_ADJUSTMENT
   MANUFACTURING_ROUTING
+  DISPATCH_POSTING
+  DISPATCH_REVERSAL
 }
 
 enum ActivityType {
@@ -131,6 +133,15 @@ model Tenant {
   deletedAt          DateTime?
 
   users                                  User[]
+  userInvitations                        UserInvitation[]
+  departments                            Department[]
+  userLegalEntityAccess                  UserLegalEntityAccess[]
+  userBranchAccess                       UserBranchAccess[]
+  userWarehouseAccess                    UserWarehouseAccess[]
+  responsibilities                       Responsibility[]
+  userResponsibilities                   UserResponsibility[]
+  loginActivities                        LoginActivity[]
+  moduleFlags                            TenantModuleFlag[]
   roles                                  Role[]
   codeSeries                             CodeSeries[]
   auditLogs                              AuditLog[]
@@ -172,8 +183,10 @@ model Tenant {
   accounts                               Account[]
   defaultAccountMappings                 DefaultAccountMapping[]
   financeSettings                        FinanceSettings[]
+  organisationRegistrations              OrganisationRegistration[]
   costCentres                            CostCentre[]
   financeFeatureControls                 FinanceFeatureControl[]
+  manufacturingAccountingSignOffs        ManufacturingAccountingSignOff[]
   financeApprovalRules                   FinanceApprovalRule[]
   financeNumberSeries                    FinanceNumberSeries[]
   accountingVouchers                     AccountingVoucher[]
@@ -364,6 +377,18 @@ model Tenant {
   deliveryChallanLines               DeliveryChallanLine[]
   deliveryChallanPackages            DeliveryChallanPackage[]
   deliveryChallanTrackingAllocations DeliveryChallanTrackingAllocation[]
+  // Dispatch POD — logistics confirmation (no stock movement)
+  dispatchProofsOfDelivery           DispatchProofOfDelivery[]
+  dispatchPodLines                   DispatchPodLine[]
+  dispatchPodAttachments             DispatchPodAttachment[]
+  // Dispatch Phase 7C5 — immutable posting / reversal ledger
+  dispatchPostings                   DispatchPosting[]
+  dispatchPostingLines               DispatchPostingLine[]
+  dispatchReversals                  DispatchReversal[]
+  dispatchReversalLines              DispatchReversalLine[]
+  dispatchDomainEvents               DispatchDomainEvent[]
+  // Controlled emergency overrides (audit; do not alter posted txns)
+  emergencyOverrides                 EmergencyOverride[]
 
   purchaseRequisitions            PurchaseRequisition[]
   purchaseRequisitionLines        PurchaseRequisitionLine[]
@@ -428,9 +453,14 @@ model User {
   passwordHash  String     @db.VarChar(255)
   designation   String?    @db.VarChar(100)
   department    String?    @db.VarChar(100)
+  departmentId  String?
   status        UserStatus @default(INVITED)
   emailVerified Boolean    @default(false)
   lastLoginAt   DateTime?
+  /// Consecutive failed password attempts; reset on successful login / unlock.
+  failedLoginCount Int       @default(0)
+  /// When auto-lockout or admin lock set status to BLOCKED (informational).
+  lockedAt      DateTime?
   createdBy     String?
   updatedBy     String?
   createdAt     DateTime   @default(now())
@@ -438,15 +468,166 @@ model User {
   deletedAt     DateTime?
 
   tenant              Tenant               @relation(fields: [tenantId], references: [id])
+  departmentRef       Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   userRoles           UserRole[]
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  invitations         UserInvitation[]
+  loginActivities     LoginActivity[]
+  legalEntityAccess   UserLegalEntityAccess[]
+  branchAccess        UserBranchAccess[]
+  warehouseAccess     UserWarehouseAccess[]
+  responsibilities    UserResponsibility[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, deletedAt])
+  @@index([departmentId])
   @@map("users")
+}
+
+/// Tenant org unit for people admin (not CRM departments).
+model Department {
+  id          String    @id @default(uuid())
+  tenantId    String
+  code        String    @db.VarChar(32)
+  name        String    @db.VarChar(120)
+  description String?   @db.Text
+  isActive    Boolean   @default(true)
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users  User[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@map("departments")
+}
+
+/// IAM data scope: companies (LegalEntity) a user may see/transact. Empty set = unrestricted (fail-open).
+model UserLegalEntityAccess {
+  id            String    @id @default(uuid())
+  tenantId      String
+  userId        String
+  legalEntityId String
+  accessLevel   String    @default("TRANSACT") @db.VarChar(32)
+  isDefault     Boolean   @default(false)
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, legalEntityId])
+  @@index([tenantId, userId])
+  @@index([tenantId, deletedAt])
+  @@map("user_legal_entity_access")
+}
+
+/// IAM data scope: finance branches. Empty set = unrestricted (fail-open).
+model UserBranchAccess {
+  id        String    @id @default(uuid())
+  tenantId  String
+  userId    String
+  branchId  String
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, branchId])
+  @@index([tenantId, userId])
+  @@index([tenantId, deletedAt])
+  @@map("user_branch_access")
+}
+
+/// IAM data scope: warehouses (MasterWarehouse). Empty set = unrestricted (fail-open).
+model UserWarehouseAccess {
+  id          String    @id @default(uuid())
+  tenantId    String
+  userId      String
+  warehouseId String
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  warehouse MasterWarehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, warehouseId])
+  @@index([tenantId, userId])
+  @@index([tenantId, deletedAt])
+  @@map("user_warehouse_access")
+}
+
+/// Cross-module responsibility catalog (does not replace finance/purchase approval engines).
+model Responsibility {
+  id          String    @id @default(uuid())
+  tenantId    String?
+  code        String    @db.VarChar(64)
+  name        String    @db.VarChar(120)
+  module      String    @db.VarChar(64)
+  description String?   @db.Text
+  isSystem    Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  tenant      Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignments UserResponsibility[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@map("responsibilities")
+}
+
+model UserResponsibility {
+  id               String    @id @default(uuid())
+  tenantId         String
+  userId           String
+  responsibilityId String
+  legalEntityId    String?
+  branchId         String?
+  departmentId     String?
+  warehouseId      String?
+  externalRefType  String?   @db.VarChar(64)
+  externalRefId    String?
+  createdBy        String?
+  updatedBy        String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  responsibility Responsibility @relation(fields: [responsibilityId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId])
+  @@index([tenantId, responsibilityId])
+  @@index([tenantId, deletedAt])
+  @@map("user_responsibilities")
 }
 
 model Role {
@@ -543,6 +724,67 @@ model PasswordResetToken {
   @@index([userId])
   @@index([tokenHash])
   @@map("password_reset_tokens")
+}
+
+/// Auth login attempts (success + failure) for Admin Login Activity.
+model LoginActivity {
+  id        String   @id @default(uuid())
+  tenantId  String?
+  userId    String?
+  email     String   @db.VarChar(255)
+  success   Boolean
+  reason    String   @db.VarChar(64)
+  ipAddress String?  @db.VarChar(64)
+  userAgent String?  @db.VarChar(512)
+  createdAt DateTime @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@index([email, createdAt])
+  @@map("login_activities")
+}
+
+/// Tenant-level module enablement (fail-open: missing row = enabled).
+model TenantModuleFlag {
+  id        String   @id @default(uuid())
+  tenantId  String
+  moduleKey String   @db.VarChar(64)
+  isEnabled Boolean  @default(true)
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, moduleKey])
+  @@index([tenantId])
+  @@map("tenant_module_flags")
+}
+
+/// Single-use workspace invitation (hashed token). Accept sets password + ACTIVE.
+model UserInvitation {
+  id         String    @id @default(uuid())
+  tenantId   String
+  userId     String
+  email      String    @db.VarChar(255)
+  tokenHash  String    @db.VarChar(255)
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  revokedAt  DateTime?
+  invitedBy  String?
+  createdAt  DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([tenantId, email])
+  @@map("user_invitations")
 }
 
 model AuditLog {
@@ -1315,6 +1557,23 @@ enum MasterRecordStatus {
   INACTIVE
 }
 
+/// CRM Item Phase 2 — default fulfilment method for sales lines (interim until price lists).
+enum ItemSalesFulfilmentMethod {
+  STOCK
+  PURCHASE
+  PRODUCTION
+  SUBCONTRACT
+  SERVICE
+  MANUAL
+}
+
+/// GST rate / HSN applicability for sales vs purchase documents.
+enum GstTaxApplicability {
+  SALES
+  PURCHASE
+  BOTH
+}
+
 model MasterCountry {
   id        String             @id @default(uuid())
   tenantId  String
@@ -1437,6 +1696,7 @@ model MasterUom {
   tenant                   Tenant                    @relation(fields: [tenantId], references: [id])
   itemsBaseUom             MasterItem[]              @relation("ItemBaseUom")
   itemsPurchaseUom         MasterItem[]              @relation("ItemPurchaseUom")
+  itemsSalesUom            MasterItem[]              @relation("ItemSalesUom")
   purchaseRequisitionLines PurchaseRequisitionLine[]
   purchasePlanningRows     PurchasePlanningRow[]
   requestForQuotationLines RequestForQuotationLine[]
@@ -1516,6 +1776,7 @@ model MasterWarehouse {
 
   tenant                             Tenant                    @relation(fields: [tenantId], references: [id])
   plant                              MasterPlant?              @relation(fields: [plantId], references: [id])
+  userWarehouseAccess                UserWarehouseAccess[]
   locations                          MasterLocation[]
   bins                               MasterBin[]
   categories                         MasterItemCategory[]
@@ -1659,19 +1920,23 @@ model MasterBin {
 }
 
 model MasterItemCategory {
-  id                 String             @id @default(uuid())
-  tenantId           String
-  code               String             @db.VarChar(32)
-  name               String             @db.VarChar(200)
-  parentId           String?
-  level              Int                @default(1)
-  defaultWarehouseId String?
-  status             MasterRecordStatus @default(ACTIVE)
-  createdBy          String?
-  updatedBy          String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  deletedAt          DateTime?
+  id                    String             @id @default(uuid())
+  tenantId              String
+  code                  String             @db.VarChar(32)
+  name                  String             @db.VarChar(200)
+  parentId              String?
+  level                 Int                @default(1)
+  defaultWarehouseId    String?
+  /// REQUIRED = always stockable; OPTIONAL = SFG logical or stockable; FORBIDDEN = service (no stock).
+  stockPolicy           String             @default("REQUIRED") @db.VarChar(16)
+  defaultIsStockable    Boolean            @default(true)
+  defaultInventoryType  String             @default("inventory") @db.VarChar(32)
+  status                MasterRecordStatus @default(ACTIVE)
+  createdBy             String?
+  updatedBy             String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  deletedAt             DateTime?
 
   tenant           Tenant               @relation(fields: [tenantId], references: [id])
   parent           MasterItemCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
@@ -1738,22 +2003,24 @@ model MasterHsnCode {
 }
 
 model MasterGstRate {
-  id                String             @id @default(uuid())
+  id                String               @id @default(uuid())
   tenantId          String
-  code              String             @db.VarChar(32)
+  code              String               @db.VarChar(32)
   gstGroupId        String
-  fromState         String             @db.VarChar(100)
-  locationStateCode String             @db.VarChar(100)
-  dateFrom          DateTime           @db.Date
-  dateTo            DateTime?          @db.Date
-  sgst              Decimal            @default(0) @db.Decimal(5, 2)
-  cgst              Decimal            @default(0) @db.Decimal(5, 2)
-  igst              Decimal            @default(0) @db.Decimal(5, 2)
-  status            MasterRecordStatus @default(ACTIVE)
+  fromState         String               @db.VarChar(100)
+  locationStateCode String               @db.VarChar(100)
+  dateFrom          DateTime             @db.Date
+  dateTo            DateTime?            @db.Date
+  sgst              Decimal              @default(0) @db.Decimal(5, 2)
+  cgst              Decimal              @default(0) @db.Decimal(5, 2)
+  igst              Decimal              @default(0) @db.Decimal(5, 2)
+  /// Sales / purchase / both — finance engine filters by document context.
+  applicableFor     GstTaxApplicability  @default(BOTH)
+  status            MasterRecordStatus   @default(ACTIVE)
   createdBy         String?
   updatedBy         String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
   deletedAt         DateTime?
 
   tenant   Tenant         @relation(fields: [tenantId], references: [id])
@@ -1764,6 +2031,7 @@ model MasterGstRate {
   @@index([tenantId, gstGroupId])
   @@index([tenantId, status])
   @@index([tenantId, deletedAt])
+  @@index([tenantId, gstGroupId, applicableFor, dateFrom], map: "master_gst_rates_resolve_idx")
   @@map("master_gst_rates")
 }
 
@@ -1795,6 +2063,17 @@ model MasterItem {
   quantityPerUom       Decimal            @default(1) @db.Decimal(18, 4)
   purchaseUomId        String?
   purchaseQtyPerUom    Decimal            @default(1) @db.Decimal(18, 4)
+  /// CRM / Sales commercial description (distinct from engineering itemDescription).
+  salesDescription           String?                     @db.Text
+  /// Optional sales UOM; falls back to baseUom when null.
+  salesUomId                 String?
+  /// Interim sales price SoT for CRM (do not use standardRate as sales price).
+  defaultSalesRate           Decimal                     @default(0) @db.Decimal(18, 2)
+  salesLeadDays              Int                         @default(0)
+  /// When false, item is excluded from CRM/Sales pickers (filter salesAllowed=true).
+  salesAllowed               Boolean                     @default(false)
+  defaultFulfilmentMethod    ItemSalesFulfilmentMethod   @default(MANUAL)
+  productionAllowed          Boolean                     @default(false)
   qcRequired           Boolean            @default(false)
   qualityTestGroupCode String?            @db.VarChar(32)
   productionBomId      String?            @db.VarChar(36)
@@ -1812,6 +2091,7 @@ model MasterItem {
   category                 MasterItemCategory        @relation(fields: [categoryId], references: [id])
   baseUom                  MasterUom                 @relation("ItemBaseUom", fields: [baseUomId], references: [id])
   purchaseUom              MasterUom?                @relation("ItemPurchaseUom", fields: [purchaseUomId], references: [id])
+  salesUom                 MasterUom?                @relation("ItemSalesUom", fields: [salesUomId], references: [id], onDelete: SetNull)
   hsn                      MasterHsnCode?            @relation(fields: [hsnId], references: [id])
   gstGroup                 MasterGstGroup?           @relation(fields: [gstGroupId], references: [id])
   purchaseRequisitionLines PurchaseRequisitionLine[]
@@ -1863,6 +2143,7 @@ model MasterItem {
   @@index([tenantId, itemType])
   @@index([tenantId, status])
   @@index([tenantId, deletedAt])
+  @@index([tenantId, salesAllowed])
   @@map("master_items")
 }
 
@@ -2062,7 +2343,7 @@ enum DefaultAccountMappingKey {
   COLLECTION_FEE_EXPENSE
   /// Merchant/payment-gateway fee expense default mapping (Phase 5B3).
   MERCHANT_FEE_EXPENSE
-  /// COGS account for sales-invoice optional COGS posting (O2C).
+  /// COGS account — Dispatch FG_DISPATCH inventory accounting (primary) + optional SI COGS (OFF).
   COST_OF_GOODS_SOLD
 }
 
@@ -2151,8 +2432,11 @@ model LegalEntity {
   updatedBy             String?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
+  /// Trade / display name for organisation setup (falls back to displayName in APIs).
+  tradeName             String?         @db.VarChar(300)
 
   tenant                                 Tenant                                  @relation(fields: [tenantId], references: [id])
+  userLegalEntityAccess                  UserLegalEntityAccess[]
   apDisputes                             ApDispute[]
   arDisputes                             ArDispute[]
   salesInvoiceSourceLinks                SalesInvoiceSourceLink[]
@@ -2163,8 +2447,10 @@ model LegalEntity {
   accounts                               Account[]
   defaultAccountMappings                 DefaultAccountMapping[]
   financeSettings                        FinanceSettings?
+  organisationRegistrations              OrganisationRegistration[]
   costCentres                            CostCentre[]
   financeFeatureControls                 FinanceFeatureControl[]
+  manufacturingAccountingSignOffs        ManufacturingAccountingSignOff[]
   financeApprovalRules                   FinanceApprovalRule[]
   financeNumberSeries                    FinanceNumberSeries[]
   accountingVouchers                     AccountingVoucher[]
@@ -2250,6 +2536,46 @@ model LegalEntity {
   @@map("legal_entities")
 }
 
+enum OrganisationRegistrationType {
+  GST
+  PAN
+  CIN
+  OTHER
+}
+
+enum OrganisationRegistrationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// Tax / statutory registrations linked to a legal entity (organisation foundation).
+model OrganisationRegistration {
+  id                 String                         @id @default(uuid())
+  tenantId           String
+  legalEntityId      String
+  registrationType   OrganisationRegistrationType
+  registrationNumber String                         @db.VarChar(64)
+  country            String                         @db.VarChar(100)
+  state              String?                        @db.VarChar(100)
+  validFrom          DateTime?                      @db.Date
+  validTo            DateTime?                      @db.Date
+  status             OrganisationRegistrationStatus @default(ACTIVE)
+  createdBy          String?
+  updatedBy          String?
+  createdAt          DateTime                       @default(now())
+  updatedAt          DateTime                       @updatedAt
+  deletedAt          DateTime?
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+
+  @@unique([tenantId, registrationType, registrationNumber], map: "org_reg_tenant_type_number_key")
+  @@index([tenantId])
+  @@index([legalEntityId])
+  @@index([tenantId, deletedAt])
+  @@map("organisation_registrations")
+}
+
 model Branch {
   id            String     @id @default(uuid())
   tenantId      String
@@ -2272,6 +2598,7 @@ model Branch {
 
   tenant                           Tenant                           @relation(fields: [tenantId], references: [id])
   legalEntity                      LegalEntity                      @relation(fields: [legalEntityId], references: [id])
+  userBranchAccess                 UserBranchAccess[]
   accountingVouchers               AccountingVoucher[]
   generalLedgerEntries             GeneralLedgerEntry[]
   salesInvoices                    SalesInvoice[]
@@ -10726,6 +11053,8 @@ model OutboundDispatch {
   tenantId               String
   dispatchNo             String                         @db.VarChar(64)
   status                 OutboundDispatchStatus         @default(DRAFT)
+  /// Logistics POD status — independent of stock status (CONFIRMED = stock issued).
+  deliveryStatus         DispatchPodStatus?
   /// Soft SO link for fulfilment; FK when present for integrity.
   salesOrderId           String?
   salesOrderNo           String?                        @db.VarChar(64)
@@ -10762,6 +11091,8 @@ model OutboundDispatch {
   deliveryChallans            DeliveryChallan[]
   inventoryStockReservations  InventoryStockReservation[]
   dispatchTrackingAllocations DispatchTrackingAllocation[]
+  postings                    DispatchPosting[]
+  proofOfDelivery             DispatchProofOfDelivery?
 
   @@unique([tenantId, dispatchNo])
   @@unique([tenantId, idempotencyKey])
@@ -10771,6 +11102,7 @@ model OutboundDispatch {
   @@index([tenantId, customerId])
   @@index([tenantId, plannedDispatchDate])
   @@index([tenantId, deletedAt])
+  @@index([tenantId, deliveryStatus])
   @@map("outbound_dispatches")
 }
 
@@ -10811,6 +11143,365 @@ model OutboundDispatchLine {
   @@index([tenantId, outboundDispatchId])
   @@index([tenantId, dispatchRequirementId], map: "ob_dispatch_line_req_idx")
   @@map("outbound_dispatch_lines")
+}
+
+// ─── Dispatch POD — Proof of Delivery (logistics only; no stock movement) ─────
+
+enum DispatchPodStatus {
+  IN_TRANSIT
+  DELIVERED
+  PARTIALLY_DELIVERED
+  DELIVERY_EXCEPTION
+  REJECTED_BY_CUSTOMER
+  RETURN_INITIATED
+}
+
+enum DispatchPodAttachmentKind {
+  SIGNATURE
+  PHOTO
+  STAMPED_INVOICE
+  SIGNED_CHALLAN
+  TRANSPORTER_CONFIRMATION
+  OTHER
+}
+
+/// Confirms customer receipt after posted dispatch. Never posts inventory.
+model DispatchProofOfDelivery {
+  id                   String            @id @default(uuid())
+  tenantId             String
+  /// One POD register per outbound (1:1). UUID unique is enough; tenant scoped in queries.
+  outboundDispatchId   String            @unique(map: "dsp_pod_ob_uidx")
+  deliveryChallanId    String?
+  salesOrderId         String?
+  customerId           String?
+  status               DispatchPodStatus @default(IN_TRANSIT)
+  deliveryAddress      String?           @db.Text
+  deliveredAt          DateTime?
+  receiverName         String?           @db.VarChar(200)
+  receiverContact      String?           @db.VarChar(64)
+  signatureStorageKey  String?           @db.VarChar(500)
+  quantityDelivered    Decimal           @default(0) @db.Decimal(18, 4)
+  quantityDamaged      Decimal           @default(0) @db.Decimal(18, 4)
+  quantityShort        Decimal           @default(0) @db.Decimal(18, 4)
+  deliveryRemarks      String?           @db.Text
+  transporterRemarks   String?           @db.Text
+  exceptionCode        String?           @db.VarChar(64)
+  exceptionNotes       String?           @db.Text
+  gpsLatitude          Decimal?          @db.Decimal(10, 7)
+  gpsLongitude         Decimal?          @db.Decimal(10, 7)
+  inTransitAt          DateTime?
+  inTransitBy          String?
+  capturedAt           DateTime?
+  capturedBy           String?
+  createdBy            String?
+  updatedBy            String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id])
+  outboundDispatch OutboundDispatch       @relation(fields: [outboundDispatchId], references: [id], onDelete: Cascade)
+  lines            DispatchPodLine[]
+  attachments      DispatchPodAttachment[]
+
+  @@unique([tenantId, outboundDispatchId], map: "dsp_pod_tenant_ob_uidx")
+  @@index([tenantId, status], map: "dsp_pod_tenant_status_idx")
+  @@index([tenantId, salesOrderId], map: "dsp_pod_tenant_so_idx")
+  @@map("dispatch_proofs_of_delivery")
+}
+
+model DispatchPodLine {
+  id                     String   @id @default(uuid())
+  tenantId               String
+  proofOfDeliveryId      String
+  outboundDispatchLineId String
+  itemId                 String
+  dispatchedQty          Decimal  @default(0) @db.Decimal(18, 4)
+  deliveredQty           Decimal  @default(0) @db.Decimal(18, 4)
+  damagedQty             Decimal  @default(0) @db.Decimal(18, 4)
+  shortQty               Decimal  @default(0) @db.Decimal(18, 4)
+  remarks                String?  @db.VarChar(500)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id])
+  proofOfDelivery DispatchProofOfDelivery @relation(fields: [proofOfDeliveryId], references: [id], onDelete: Cascade)
+
+  @@unique([proofOfDeliveryId, outboundDispatchLineId], map: "dsp_pod_line_pod_obline_uidx")
+  @@index([tenantId], map: "dsp_pod_line_tenant_idx")
+  @@map("dispatch_pod_lines")
+}
+
+model DispatchPodAttachment {
+  id                String                    @id @default(uuid())
+  tenantId          String
+  proofOfDeliveryId String
+  kind              DispatchPodAttachmentKind @default(OTHER)
+  fileName          String                    @db.VarChar(255)
+  storageKey        String                    @db.VarChar(500)
+  mimeType          String                    @db.VarChar(120)
+  byteSize          Int                       @default(0)
+  createdBy         String?
+  createdAt         DateTime                  @default(now())
+
+  tenant          Tenant                  @relation(fields: [tenantId], references: [id])
+  proofOfDelivery DispatchProofOfDelivery @relation(fields: [proofOfDeliveryId], references: [id], onDelete: Cascade)
+
+  @@index([proofOfDeliveryId], map: "dsp_pod_att_pod_idx")
+  @@index([tenantId], map: "dsp_pod_att_tenant_idx")
+  @@map("dispatch_pod_attachments")
+}
+
+// ─── Emergency Override (controlled bypass; audit only — never mutates posted txns) ─
+
+enum EmergencyOverrideStatus {
+  REQUESTED
+  GRANTED
+  CONSUMED
+  EXPIRED
+  REJECTED
+  CANCELLED
+}
+
+enum EmergencyOverrideUrgency {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+/// Time-bound, document-scoped override grant. Single-use when consumed by the blocked action.
+model EmergencyOverride {
+  id                      String                    @id @default(uuid())
+  tenantId                String
+  overrideNo              String                    @db.VarChar(64)
+  module                  String                    @db.VarChar(64)
+  documentType            String                    @db.VarChar(64)
+  documentId              String
+  documentNo              String?                   @db.VarChar(64)
+  blockedAction           String                    @db.VarChar(64)
+  primaryBlockerCode      String?                   @db.VarChar(64)
+  /// JSON string[] of original blocker codes preserved for audit.
+  blockerCodesJson        Json
+  originalBlockersSnapshot Json?
+  businessReason          String                    @db.Text
+  urgency                 EmergencyOverrideUrgency  @default(HIGH)
+  riskAcknowledged        Boolean                   @default(false)
+  supportingAttachmentKey String?                   @db.VarChar(500)
+  requestedByUserId       String?
+  requestedByName         String?                   @db.VarChar(200)
+  approvedByUserId        String?
+  approvedByName          String?                   @db.VarChar(200)
+  approvalReference       String?                   @db.VarChar(64)
+  expiresAt               DateTime
+  scope                   String?                   @db.VarChar(500)
+  remarks                 String?                   @db.Text
+  status                  EmergencyOverrideStatus   @default(REQUESTED)
+  grantedAt               DateTime?
+  consumedAt              DateTime?
+  consumedByAction        String?                   @db.VarChar(64)
+  consumedDocumentId      String?
+  createdBy               String?
+  updatedBy               String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, overrideNo], map: "eo_tenant_no_uidx")
+  @@index([tenantId, documentType, documentId], map: "eo_tenant_doc_idx")
+  @@index([tenantId, status], map: "eo_tenant_status_idx")
+  @@index([tenantId, expiresAt], map: "eo_tenant_expires_idx")
+  @@map("emergency_overrides")
+}
+
+// ─── Dispatch Phase 7C5 — immutable Dispatch posting + reversal ledger ───────
+// Inventory FG_DISPATCH remains SoT for stock. These tables are the immutable
+// posting/reversal transaction references (not a second stock ledger).
+
+enum DispatchPostingStatus {
+  POSTED
+  PARTIALLY_REVERSED
+  REVERSED
+  LEGACY_POSTED
+}
+
+enum DispatchReversalStatus {
+  DRAFT_REQUEST
+  SUBMITTED
+  APPROVED
+  APPLIED
+  REJECTED
+  CANCELLED
+}
+
+model DispatchPosting {
+  id                 String                @id @default(uuid())
+  tenantId           String
+  postingNumber      String                @db.VarChar(64)
+  outboundDispatchId String
+  salesOrderId       String?
+  status             DispatchPostingStatus @default(POSTED)
+  postingDate        DateTime              @db.Date
+  mode               String                @default("post") @db.VarChar(16)
+  policySnapshot     Json?
+  idempotencyKey     String?               @db.VarChar(150)
+  requestFingerprint String?               @db.VarChar(128)
+  postedBy           String?
+  postedAt           DateTime              @default(now())
+  reversedQuantity   Decimal               @default(0) @db.Decimal(18, 4)
+  deliveryChallanId  String?
+  pickListId         String?
+  packingSessionId   String?
+  remarks            String?               @db.Text
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  tenant           Tenant                @relation(fields: [tenantId], references: [id])
+  outboundDispatch OutboundDispatch      @relation(fields: [outboundDispatchId], references: [id])
+  lines            DispatchPostingLine[]
+  reversals        DispatchReversal[]
+
+  @@unique([tenantId, postingNumber], map: "dispatch_posting_tenant_number_uidx")
+  @@unique([tenantId, idempotencyKey], map: "dispatch_posting_tenant_idem_uidx")
+  @@unique([tenantId, outboundDispatchId], map: "dispatch_posting_tenant_outbound_uidx")
+  @@index([tenantId, status], map: "dispatch_posting_tenant_status_idx")
+  @@index([tenantId, salesOrderId], map: "dispatch_posting_tenant_so_idx")
+  @@index([tenantId, requestFingerprint], map: "dispatch_posting_tenant_fp_idx")
+  @@map("dispatch_postings")
+}
+
+model DispatchPostingLine {
+  id                     String   @id @default(uuid())
+  tenantId               String
+  postingId              String
+  lineNo                 Int
+  outboundDispatchLineId String
+  salesOrderId           String?
+  salesOrderLineId       String?  @db.VarChar(64)
+  itemId                 String
+  warehouseId            String
+  quantity               Decimal  @db.Decimal(18, 4)
+  /// Cumulative applied reverse qty (compensating movements). Net posted = quantity − reversedQuantity.
+  reversedQuantity       Decimal  @default(0) @db.Decimal(18, 4)
+  uomId                  String?
+  inventoryMovementId    String?
+  inventoryMovementNo    String?  @db.VarChar(64)
+  reservationConsumedQty Decimal  @default(0) @db.Decimal(18, 4)
+  pickListId             String?
+  pickLineId             String?
+  packingSessionId       String?
+  packageLineId          String?
+  challanId              String?
+  challanLineId          String?
+  serialLotSnapshotJson  Json?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id])
+  posting   DispatchPosting @relation(fields: [postingId], references: [id], onDelete: Cascade)
+  reversals DispatchReversalLine[]
+
+  @@unique([postingId, lineNo], map: "dispatch_posting_line_no_uidx")
+  @@unique([tenantId, inventoryMovementId], map: "dispatch_posting_line_mov_uidx")
+  @@index([tenantId, postingId], map: "dispatch_posting_line_tenant_post_idx")
+  @@index([tenantId, outboundDispatchLineId], map: "dispatch_posting_line_ob_line_idx")
+  @@index([tenantId, salesOrderId, salesOrderLineId], map: "dispatch_posting_line_so_line_idx")
+  @@map("dispatch_posting_lines")
+}
+
+model DispatchReversal {
+  id                String                  @id @default(uuid())
+  tenantId          String
+  reversalNumber    String                  @db.VarChar(64)
+  originalPostingId String
+  outboundDispatchId String
+  status            DispatchReversalStatus  @default(DRAFT_REQUEST)
+  reasonCode        String?                 @db.VarChar(64)
+  reason            String?                 @db.Text
+  requestedBy       String?
+  requestedAt       DateTime?
+  approvedBy        String?
+  approvedAt        DateTime?
+  appliedBy         String?
+  appliedAt         DateTime?
+  effectiveDate     DateTime                @db.Date
+  rejectedBy        String?
+  rejectedAt        DateTime?
+  rejectionReason   String?                 @db.Text
+  idempotencyKey    String?                 @db.VarChar(150)
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id])
+  originalPosting DispatchPosting        @relation(fields: [originalPostingId], references: [id])
+  lines           DispatchReversalLine[]
+
+  @@unique([tenantId, reversalNumber], map: "dispatch_reversal_tenant_number_uidx")
+  @@unique([tenantId, idempotencyKey], map: "dispatch_reversal_tenant_idem_uidx")
+  @@index([tenantId, originalPostingId], map: "dispatch_reversal_tenant_post_idx")
+  @@index([tenantId, outboundDispatchId], map: "dispatch_reversal_tenant_ob_idx")
+  @@index([tenantId, status], map: "dispatch_reversal_tenant_status_idx")
+  @@map("dispatch_reversals")
+}
+
+model DispatchReversalLine {
+  id                      String   @id @default(uuid())
+  tenantId                String
+  reversalId              String
+  originalPostingLineId   String
+  quantity                Decimal  @db.Decimal(18, 4)
+  inventoryMovementId     String?
+  inventoryMovementNo     String?  @db.VarChar(64)
+  serialLotSnapshotJson   Json?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id])
+  reversal            DispatchReversal    @relation(fields: [reversalId], references: [id], onDelete: Cascade)
+  originalPostingLine DispatchPostingLine @relation(fields: [originalPostingLineId], references: [id])
+
+  @@index([tenantId, reversalId], map: "dispatch_reversal_line_tenant_rev_idx")
+  @@index([tenantId, originalPostingLineId], map: "dispatch_reversal_line_post_line_idx")
+  @@unique([tenantId, inventoryMovementId], map: "dispatch_reversal_line_mov_uidx")
+  @@map("dispatch_reversal_lines")
+}
+
+/// Outbox for Dispatch domain events (retry-safe; consumers poll / mark PUBLISHED).
+enum DispatchDomainEventStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
+enum DispatchDomainEventType {
+  DISPATCH_POSTED
+  SALES_ORDER_DISPATCH_FULFILMENT_CHANGED
+  SALES_ORDER_INVOICE_READY
+  DISPATCH_REVERSED
+}
+
+model DispatchDomainEvent {
+  id             String                    @id @default(uuid())
+  tenantId       String
+  eventType      DispatchDomainEventType
+  status         DispatchDomainEventStatus @default(PENDING)
+  aggregateType  String                    @db.VarChar(64)
+  aggregateId    String
+  payloadJson    Json
+  idempotencyKey String                    @db.VarChar(150)
+  availableAt    DateTime                  @default(now())
+  publishedAt    DateTime?
+  failureReason  String?                   @db.Text
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, idempotencyKey], map: "dispatch_domain_evt_tenant_idem_uidx")
+  @@index([tenantId, status, availableAt], map: "dispatch_domain_evt_poll_idx")
+  @@index([tenantId, eventType], map: "dispatch_domain_evt_type_idx")
+  @@index([tenantId, aggregateType, aggregateId], map: "dispatch_domain_evt_agg_idx")
+  @@map("dispatch_domain_events")
 }
 
 // ─── Dispatch Phase 7C1 — Dispatch Requirement + readiness workbench ─────────
@@ -11389,7 +12080,8 @@ model DeliveryChallan {
   driverPhone             String?                          @db.VarChar(32)
   lrGrNumber              String?                          @db.VarChar(100)
   lrGrDate                DateTime?                        @db.Date
-  /// Manual reference only — never claim external e-Way verification.
+  /// System snapshot of generated EWB number only — never a user-editable statutory field.
+  /// Authoritative register: `GstEWayBill` via NIC adapter.
   eWayBillReference       String?                          @db.VarChar(100)
   eWayBillDate            DateTime?                        @db.Date
   destination             String?                          @db.VarChar(300)
@@ -12930,6 +13622,8 @@ model GstEWayBill {
   sourceType        GstEWayBillSourceType
   salesInvoiceId    String?
   deliveryChallanId String?
+  /// Soft link for Dispatch workspace panel (DC / SI remain the statutory source docs).
+  outboundDispatchId String?
   documentNumber    String                @db.VarChar(64)
   documentDate      DateTime              @db.Date
   partyName         String                @db.VarChar(300)
@@ -12939,16 +13633,27 @@ model GstEWayBill {
   distanceKm        Int                   @default(0)
   vehicleNumber     String?               @db.VarChar(64)
   transporterName   String?               @db.VarChar(200)
+  /// Transporter GSTIN / ID when provided to NIC.
+  transporterId     String?               @db.VarChar(20)
   taxableAmount     Decimal               @default(0) @db.Decimal(18, 4)
   status            GstEWayBillStatus     @default(REQUIRED)
   ewbNumber         String?               @db.VarChar(64)
+  /// When NIC (or simulated adapter) returned the EWB.
+  generatedAt       DateTime?
   validUpto         DateTime?
+  /// Human-readable requirement reason (e.g. threshold exceeded).
+  requiredReason    String?               @db.VarChar(500)
+  movementReason    String?               @db.VarChar(200)
   cancelReason      String?               @db.VarChar(500)
   cancelledAt       DateTime?
   cancelledBy       String?
   exceptionMessage  String?               @db.VarChar(1000)
   providerMode      String                @default("SIMULATED") @db.VarChar(32)
   providerRef       String?               @db.VarChar(150)
+  /// Last outbound NIC request payload (redact secrets at write time).
+  lastRequestJson   Json?
+  /// Last NIC / government response payload (exact errors preserved).
+  lastResponseJson  Json?
   createdBy         String?
   updatedBy         String?
   createdAt         DateTime              @default(now())
@@ -12965,6 +13670,7 @@ model GstEWayBill {
   @@index([tenantId], map: "gst_ewb_tenant_idx")
   @@index([tenantId, legalEntityId, status], map: "gst_ewb_le_status_idx")
   @@index([tenantId, legalEntityId, documentDate], map: "gst_ewb_le_date_idx")
+  @@index([tenantId, outboundDispatchId], map: "gst_ewb_tenant_ob_idx")
   @@map("gst_e_way_bills")
 }
 
@@ -13096,6 +13802,49 @@ model ProductionAccountingEvent {
   @@index([tenantId, status], map: "mfg_acct_evt_tenant_status_idx")
   @@index([tenantId, legalEntityId], map: "mfg_acct_evt_tenant_le_idx")
   @@map("production_accounting_events")
+}
+
+enum ManufacturingAccountingSignOffType {
+  INVENTORY_RECONCILIATION
+  FINANCE_PILOT_APPROVAL
+}
+
+enum ManufacturingAccountingSignOffStatus {
+  ACTIVE
+  SUPERSEDED
+  REVOKED
+}
+
+/// Additive audit trail for Manufacturing Accounting enablement sign-offs (ADR — does not replace FinanceFeatureControl.configurationJson snapshot).
+model ManufacturingAccountingSignOff {
+  id                     String                               @id @default(uuid())
+  tenantId               String
+  legalEntityId          String
+  signOffType            ManufacturingAccountingSignOffType
+  status                 ManufacturingAccountingSignOffStatus @default(ACTIVE)
+  confirmedById          String
+  confirmedAt            DateTime
+  remarks                String?                              @db.Text
+  scopeJson              Json?
+  readinessSnapshotJson  Json?
+  idempotencyKey         String?                              @db.VarChar(150)
+  supersedesId           String?
+  createdAt              DateTime                             @default(now())
+  updatedAt              DateTime                             @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+  supersedes  ManufacturingAccountingSignOff?  @relation("MfgAcctSignOffSupersede", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy ManufacturingAccountingSignOff[] @relation("MfgAcctSignOffSupersede")
+
+  @@unique([tenantId, idempotencyKey], map: "mfg_acct_signoff_tenant_idem_key")
+  @@index([tenantId], map: "mfg_acct_signoff_tenant_idx")
+  @@index([legalEntityId], map: "mfg_acct_signoff_le_idx")
+  @@index([signOffType], map: "mfg_acct_signoff_type_idx")
+  @@index([status], map: "mfg_acct_signoff_status_idx")
+  @@index([confirmedAt], map: "mfg_acct_signoff_confirmed_idx")
+  @@index([tenantId, legalEntityId, signOffType, status], map: "mfg_acct_signoff_active_idx")
+  @@map("manufacturing_accounting_sign_offs")
 }
 
 enum ManufacturingCostingMethod {

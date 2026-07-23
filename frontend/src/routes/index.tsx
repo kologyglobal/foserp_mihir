@@ -6,10 +6,9 @@ import { ApiAuthGate } from '@/modules/auth/ApiAuthGate'
 import { authRoute } from './authRoutes'
 import { homeRouteChildren } from './homeRoutes'
 import { masterRouteChildren } from './masterRoutes'
-import { engineeringRouteChildren } from './engineeringRoutes'
 import { platformRouteChildren } from './platformRoutes'
 import { inventoryRouteChildren } from './inventoryRoutes'
-import { mrpRouteChildren, productionRouteChildren } from './productionRoutes'
+import { productionRouteChildren } from './productionRoutes'
 import { manufacturingRouteChildren } from './manufacturingRoutes'
 import { salesRouteChildren } from './salesRoutes'
 import { qualityRouteChildren } from './qualityRoutes'
@@ -23,6 +22,7 @@ import { crmRouteTree } from './crmRoutes'
 import { purchaseRouteTree } from './purchaseRoutes'
 import { accountingRouteChildren } from './accountingRoutes'
 import { adminRouteChildren } from './adminRoutes'
+import { organisationRouteChildren } from './organisationRoutes'
 
 export const router = createBrowserRouter([
   authRoute,
@@ -39,10 +39,8 @@ export const router = createBrowserRouter([
     children: [
       ...homeRouteChildren,
       ...masterRouteChildren,
-      ...engineeringRouteChildren,
       ...platformRouteChildren,
       ...inventoryRouteChildren,
-      ...mrpRouteChildren,
       ...salesRouteChildren,
       crmRouteTree,
       purchaseRouteTree,
@@ -54,6 +52,7 @@ export const router = createBrowserRouter([
       ...gateRouteChildren,
       ...reportsRouteChildren,
       ...accountingRouteChildren,
+      ...organisationRouteChildren,
       ...adminRouteChildren,
       { path: '*', element: <PageNotFoundPage /> },
     ],

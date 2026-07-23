@@ -1,4 +1,43 @@
-﻿# 2026-07-22 — Inventory Store Workbench backend + DB APIs
+﻿# 2026-07-23 — ISO tank child MAKE SA WO depth
+
+- `npx tsx scripts/test-iso-tank-child-sa-wo.ts` (vasant-trailers) — **PASS** (exit 0)
+  - Parent **WO-000037** → 5 child WOs; executed **WO-000042** (`SA-LADDER`)
+  - Child: release → reserve/issue `BO-DOC-HOLDER` → ST-FAB → SA receipt → COMPLETED
+  - SA receipt movement `0cc64e0c-1bbd-46f8-9623-0e5da0a79826` → `WIP_FABRICATION` (onHand 0→1)
+  - Parent reserved + issued `SA-LADDER` (onHand 1→0); demand satisfied from child output
+- No product blockers fixed this run. Gap: only one SA exercised (ladder); heavier SAs / QC-gated child routes not covered.
+
+---
+
+# 2026-07-23 — Shortage → RFQ → award → PO live loop
+
+- `npx tsx scripts/test-shortage-rfq-to-po-loop.ts` (vasant-trailers) — **PASS**
+  - WO-000030 → PR-000011 (`rfqRequired=true`) → RFQ-000001 → VQ-000001/0002 → CMP-000001 → PO-000007 → GRN-000006
+  - Asserts no planning rows on RFQ path; planning/PO default (`rfqRequired=false`) unchanged
+- Minimal API fix: manufacturing shortage / bulk shortage accept optional `rfqRequired` override
+
+---
+
+# 2026-07-23 — Manufacturing Accounting enablement readiness gate
+
+- Audit: `docs/manufacturing/accounting/MANUFACTURING_ACCOUNTING_ENABLEMENT_AUDIT.md`
+- Backend readiness: `enablementChecks` + `UNRECONCILED_ACCOUNTING_EVENTS` (RECORDED) + LE scope
+- FE workspace enable panel with dual sign-off → PUT feature-control
+- Focused script: `npx tsx scripts/test-mfg-accounting-enablement-gate.ts` (vasant-trailers)
+- Full `manufacturing-phase8-auto-gl.test.ts` — **blocked in beforeAll** by production-fixture op create (pre-existing env/fixture); new cases added for sign-off 400 + unreconciled 409
+
+---
+
+# 2026-07-23 — Fuel Tank manufacturing master setup (live UAT example)
+
+- `npx tsx scripts/seed-fuel-tank-pilot-items.ts` — **PASS** (25 items)
+- `npx tsx scripts/seed-fuel-tank-mfg-setup.ts` — **PASS** (BOM ACTIVE, RT-000001 PARALLEL, MP-FUEL-TANK-5000L, 12 QC plans)
+- `npx tsx scripts/test-fuel-tank-wo-execution.ts` — **PASS** (WO-000027; 6 JC stages / 15 ops; no child WOs; SFG WO blocked; issue + parallel JC progress)
+- Docs: `docs/manufacturing/examples/FUEL_TANK_*.md`
+
+---
+
+# 2026-07-22 — Inventory Store Workbench backend + DB APIs
 
 - Prisma validate + generate — **PASS**.
 - Backend `npm run typecheck` — **PASS**.
@@ -98,6 +137,13 @@ See [`PURCHASE_FORM_FOOTER_AUDIT.md`](PURCHASE_FORM_FOOTER_AUDIT.md).
 - Frontend `npm run typecheck` — **exit 0**; `npm run build` — **exit 0**.
 - No backend behaviour changed (additive query param on close-readiness client only); backend suites not re-run.
 - Live browser/tablet UAT + accessibility audit deferred to FORM-F certification.
+
+# 2026-07-23 — Dispatch Phase 7C5 hardened posting
+
+- Suite: `backend/tests/dispatch-phase7c5.test.ts` — **17/17 PASS** (gates, happy path, reverse/partial/approval, Invoice/COGS blockers, outbox, emergency override, serial/lot matrix, concurrency stress).
+- Canonical: `DispatchPostingService.postFgDispatch`; flag `DISPATCH_HARDENED_POSTING_ENABLED`.
+- Docs: `docs/dispatch/PHASE7C5_*.md`, readiness/policy/reversal/legacy/permission matrices.
+- Manual UAT sign-off still pending (`PHASE7C5_UAT_RESULTS.md`).
 
 # 2026-07-21 — Dispatch Phase 7C4 Delivery Challan
 

@@ -4,10 +4,26 @@ import { paginationSchema } from '../../utils/pagination.js'
 export const listItemsQuerySchema = paginationSchema.extend({
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
   categoryId: z.string().uuid().optional(),
-  itemType: z.enum(['raw', 'bought_out', 'consumable', 'sub_assembly', 'finished_good']).optional(),
+  itemType: z.enum(['raw', 'bought_out', 'consumable', 'sub_assembly', 'finished_good', 'scrap', 'service']).optional(),
+  salesAllowed: z
+    .union([z.boolean(), z.enum(['true', 'false', '1', '0'])])
+    .optional()
+    .transform((value) => {
+      if (value === undefined) return undefined
+      if (typeof value === 'boolean') return value
+      return value === 'true' || value === '1'
+    }),
 })
 
-const ITEM_TYPE_ENUM = z.enum(['raw', 'bought_out', 'consumable', 'sub_assembly', 'finished_good'])
+const ITEM_TYPE_ENUM = z.enum(['raw', 'bought_out', 'consumable', 'sub_assembly', 'finished_good', 'scrap', 'service'])
+const FULFILMENT_METHOD_ENUM = z.enum([
+  'STOCK',
+  'PURCHASE',
+  'PRODUCTION',
+  'SUBCONTRACT',
+  'SERVICE',
+  'MANUAL',
+])
 
 export const itemLookupQuerySchema = paginationSchema.extend({
   itemType: ITEM_TYPE_ENUM.optional(),
@@ -27,6 +43,14 @@ export const itemLookupQuerySchema = paginationSchema.extend({
       const unique = [...new Set(list)].filter((v): v is z.infer<typeof ITEM_TYPE_ENUM> => allowed.has(v as z.infer<typeof ITEM_TYPE_ENUM>))
       return unique.length > 0 ? unique : undefined
     }),
+  salesAllowed: z
+    .union([z.boolean(), z.enum(['true', 'false', '1', '0'])])
+    .optional()
+    .transform((value) => {
+      if (value === undefined) return undefined
+      if (typeof value === 'boolean') return value
+      return value === 'true' || value === '1'
+    }),
   activeOnly: z
     .union([z.boolean(), z.enum(['true', 'false', '1', '0'])])
     .optional()
@@ -44,7 +68,7 @@ const itemBaseSchema = z.object({
   itemDescription: z.string().trim().max(5000).default(''),
   categoryId: z.string().uuid(),
   baseUomId: z.string().uuid(),
-  itemType: z.enum(['raw', 'bought_out', 'consumable', 'sub_assembly', 'finished_good']),
+  itemType: z.enum(['raw', 'bought_out', 'consumable', 'sub_assembly', 'finished_good', 'scrap', 'service']),
   productType: z
     .enum(['boi', 'raw_material', 'sub_assembly', 'assembly_product', 'finish_product', 'scrap', 'service'])
     .optional(),
@@ -63,6 +87,13 @@ const itemBaseSchema = z.object({
   quantityPerUom: z.coerce.number().min(0).default(1),
   purchaseUomId: z.string().uuid().nullable().optional(),
   purchaseQtyPerUom: z.coerce.number().min(0).default(1),
+  salesDescription: z.string().trim().max(5000).nullable().optional(),
+  salesUomId: z.string().uuid().nullable().optional(),
+  defaultSalesRate: z.coerce.number().min(0).optional(),
+  salesLeadDays: z.coerce.number().int().min(0).optional(),
+  salesAllowed: z.boolean().optional(),
+  defaultFulfilmentMethod: FULFILMENT_METHOD_ENUM.optional(),
+  productionAllowed: z.boolean().optional(),
   qcRequired: z.boolean().optional(),
   batchTracked: z.boolean().optional(),
   serialTracked: z.boolean().optional(),

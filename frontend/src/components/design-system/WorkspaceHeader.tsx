@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
-import { Breadcrumbs } from '../ui/Breadcrumbs'
+import { useEffect, useMemo } from 'react'
+import { useLocation } from 'react-router-dom'
+import { useWorkspacePageHeaderSetters } from '../../context/WorkspacePageHeaderContext'
 import { cn } from '../../utils/cn'
 
 interface WorkspaceHeaderProps {
@@ -13,53 +15,59 @@ interface WorkspaceHeaderProps {
   badge?: string
 }
 
+/**
+ * Legacy workspace header — publishes into sticky chrome; no in-page title band.
+ */
 export function WorkspaceHeader({
   title,
-  subtitle,
+  subtitle: _subtitle,
   breadcrumbs,
-  traffic,
+  traffic: _traffic,
   actions,
   commandBar,
   className,
   badge,
 }: WorkspaceHeaderProps) {
+  const { pathname } = useLocation()
+  const setHeader = useWorkspacePageHeaderSetters()?.setHeader
+
+  const headerMeta = useMemo(
+    () => ({
+      breadcrumbs,
+      title,
+      badge,
+      favoritePath: pathname,
+    }),
+    [breadcrumbs, title, badge, pathname],
+  )
+
+  useEffect(() => {
+    if (!setHeader) return
+    setHeader({
+      meta: headerMeta,
+      commandBar: commandBar ?? null,
+      actions: actions ?? null,
+    })
+  }, [setHeader, headerMeta, commandBar, actions])
+
+  useEffect(() => {
+    if (!setHeader) return
+    return () => setHeader({ meta: null, commandBar: null, actions: null })
+  }, [setHeader])
+
+  if (!commandBar || setHeader) {
+    // Actions/title live in WorkspaceUnifiedHeader; nothing local unless no provider
+    if (setHeader) return null
+  }
+
   return (
-    <div className={cn('erp-page-hero', className)}>
-      <div className="erp-page-hero-band">
-        {breadcrumbs && breadcrumbs.length > 0 && (
-          <Breadcrumbs items={breadcrumbs} className="mb-1" />
-        )}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="erp-page-title">{title}</h1>
-              {badge && (
-                <span className="rounded-full border border-erp-primary/20 bg-erp-primary-soft px-2 py-0.5 text-[10px] font-semibold text-erp-primary">
-                  {badge}
-                </span>
-              )}
-              {traffic && (
-                <span
-                  className={cn(
-                    'inline-flex h-2 w-2 rounded-full ring-2 ring-white',
-                    traffic === 'green' && 'bg-emerald-500',
-                    traffic === 'amber' && 'bg-amber-500',
-                    traffic === 'red' && 'bg-red-500',
-                  )}
-                  title={`Status: ${traffic}`}
-                />
-              )}
-            </div>
-            {subtitle && <p className="erp-page-subtitle mt-0.5 max-w-2xl">{subtitle}</p>}
-          </div>
-          {actions && <div className="flex flex-wrap items-center gap-1.5">{actions}</div>}
-        </div>
-      </div>
-      {commandBar && (
-        <div className="border-b border-erp-border px-2.5 py-1">
-          {commandBar}
-        </div>
-      )}
+    <div className={cn('erp-page-hero erp-page-hero--workspace-merged', className)}>
+      {commandBar ? (
+        <div className="border-b border-erp-border px-2.5 py-1">{commandBar}</div>
+      ) : null}
+      {actions && !setHeader ? (
+        <div className="flex flex-wrap items-center justify-end gap-1.5 px-2.5 py-1">{actions}</div>
+      ) : null}
     </div>
   )
 }

@@ -1,8 +1,9 @@
 import { useDmsStore } from '../../store/dmsStore'
+import { triggerPrintPdf } from '../documentPrint'
 
 /** Browser print → PDF (customer-facing layout uses @media print styles) */
 export function printQuotationDocument(): void {
-  window.print()
+  triggerPrintPdf()
 }
 
 export function saveQuotationPdfToDms(input: {

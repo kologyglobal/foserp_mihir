@@ -50,13 +50,34 @@ async function loadDispatchedByLine(
       salesOrderLineId: { not: null },
       outboundDispatch: { tenantId, status: 'CONFIRMED', deletedAt: null },
     },
-    select: { salesOrderLineId: true, quantity: true },
+    select: { salesOrderLineId: true, quantity: true, id: true },
   })
   const map = new Map<string, number>()
   for (const row of rows) {
     if (!row.salesOrderLineId) continue
     map.set(row.salesOrderLineId, (map.get(row.salesOrderLineId) ?? 0) + d(row.quantity))
   }
+
+  // Net out applied partial reversals (posting line reversedQuantity).
+  const postingLines = await prisma.dispatchPostingLine.findMany({
+    where: {
+      tenantId,
+      salesOrderId,
+      salesOrderLineId: { not: null },
+      reversedQuantity: { gt: 0 },
+      posting: {
+        tenantId,
+        status: { in: ['POSTED', 'PARTIALLY_REVERSED', 'LEGACY_POSTED'] },
+      },
+    },
+    select: { salesOrderLineId: true, reversedQuantity: true },
+  })
+  for (const pl of postingLines) {
+    if (!pl.salesOrderLineId) continue
+    const prev = map.get(pl.salesOrderLineId) ?? 0
+    map.set(pl.salesOrderLineId, Math.max(0, prev - d(pl.reversedQuantity)))
+  }
+
   return map
 }
 

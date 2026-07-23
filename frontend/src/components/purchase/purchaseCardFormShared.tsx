@@ -11,10 +11,40 @@ export function purchaseBreadcrumbs(...trail: { label: string; to?: string }[]) 
 
 export function purchaseStatusTone(status: string): 'success' | 'warning' | 'critical' | 'info' | 'neutral' {
   if (status === 'draft') return 'neutral'
-  if (status === 'submitted' || status === 'sent' || status === 'pending_qc' || status === 'sent_back') return 'warning'
-  if (status === 'approved' || status === 'quoted' || status === 'posted' || status === 'released') return 'success'
+  if (
+    status === 'submitted' ||
+    status === 'sent' ||
+    status === 'pending_approval' ||
+    status === 'pending_inspection' ||
+    status === 'pending_qc' ||
+    status === 'sent_back' ||
+    status === 'partially_quoted' ||
+    status === 'under_evaluation'
+  ) {
+    return 'warning'
+  }
+  if (
+    status === 'approved' ||
+    status === 'quoted' ||
+    status === 'quotation_received' ||
+    status === 'posted' ||
+    status === 'accepted' ||
+    status === 'released'
+  ) {
+    return 'success'
+  }
   if (status === 'cancelled' || status === 'rejected') return 'critical'
-  if (status === 'converted' || status === 'closed' || status === 'received' || status === 'partial') return 'info'
+  if (
+    status === 'converted' ||
+    status === 'converted_to_rfq' ||
+    status === 'converted_to_po' ||
+    status === 'closed' ||
+    status === 'received' ||
+    status === 'partial' ||
+    status === 'partially_accepted'
+  ) {
+    return 'info'
+  }
   return 'neutral'
 }
 

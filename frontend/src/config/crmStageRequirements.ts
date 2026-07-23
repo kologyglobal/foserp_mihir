@@ -41,7 +41,7 @@ export const LEAD_STAGE_FIELD_LABELS: Record<string, string> = {
   leadOwnerId: 'Lead Owner',
   source: 'Lead Source',
   industry: 'Industry',
-  productRequirement: 'Product Requirement',
+  productRequirement: 'Requirement',
   expectedValue: 'Expected Value',
   expectedQty: 'Expected Qty',
   expectedCloseDate: 'Expected Close Date',
@@ -60,7 +60,7 @@ export const OPPORTUNITY_STAGE_FIELD_LABELS: Record<string, string> = {
   contactId: 'Contact',
   ownerId: 'Owner',
   productId: 'Product',
-  productRequirement: 'Product Requirement',
+  productRequirement: 'Requirement',
   lines: 'Item Lines',
   value: 'Deal Value',
   probability: 'Probability',
@@ -92,10 +92,13 @@ export const LEAD_STAGE_REQUIREMENTS: Record<LeadStage, readonly string[]> = {
  * Mandatory fields to enter / occupy each opportunity stage.
  * Terminal won/lost keep commercial gates elsewhere (approved quotation / lost reason UI);
  * lost still lists `lostReason` here so config consumers can surface it uniformly.
+ *
+ * Qualified does not require scope text — capture requirement at Requirement Discussion.
+ * Item/product lines remain optional until Technical Review / Quotation.
  */
 export const OPPORTUNITY_STAGE_REQUIREMENTS: Record<OpportunityStage, readonly string[]> = {
   new_lead: ['opportunityName', 'customerId', 'ownerId'],
-  qualified: ['productRequirement', 'expectedCloseDate', 'priority'],
+  qualified: ['expectedCloseDate', 'priority'],
   requirement_discussion: ['productRequirement', 'contactId', 'value', 'expectedCloseDate'],
   technical_review: ['productRequirement', 'lines'],
   quotation_prepared: ['lines', 'value'],
@@ -131,14 +134,20 @@ export function isStageFieldFilled(value: unknown): boolean {
   if (typeof value === 'boolean') return value
   if (Array.isArray(value)) {
     if (value.length === 0) return false
-    // Opportunity lines: at least one row with a product/item name
+    // Opportunity lines: at least one row with a product/item reference or name
     return value.some((row) => {
       if (row == null || typeof row !== 'object') return true
-      const line = row as { productOrItem?: string; itemCode?: string; productId?: string | null }
+      const line = row as {
+        productOrItem?: string
+        itemCode?: string
+        productId?: string | null
+        itemId?: string | null
+      }
       return Boolean(
         line.productOrItem?.trim()
         || line.itemCode?.trim()
-        || line.productId?.trim(),
+        || line.productId?.trim()
+        || line.itemId?.trim(),
       )
     })
   }
@@ -152,6 +161,14 @@ function missingFieldsFor(
 ): StageRequirementField[] {
   const missing: StageRequirementField[] = []
   for (const field of fields) {
+    if (field === 'productRequirement') {
+      // Scope notes OR item lines count as commercial requirement.
+      if (isStageFieldFilled(entity.productRequirement) || isStageFieldFilled(entity.lines)) {
+        continue
+      }
+      missing.push({ field, label: labelOf(field) })
+      continue
+    }
     if (!isStageFieldFilled(entity[field])) {
       missing.push({ field, label: labelOf(field) })
     }

@@ -11,7 +11,7 @@ import { DetailLayout, DetailSection, DetailGrid, DetailField, MasterNotFound } 
 import { GstGroupSelect, GeoStateSelect } from '../../../components/masters/TaxMasterSelects'
 import { ActiveBadge } from '../../../components/ui/StatusBadge'
 import { FormField } from '../../../components/forms/FormField'
-import { Input, Checkbox } from '../../../components/forms/Inputs'
+import { Input, Checkbox, Select } from '../../../components/forms/Inputs'
 import { ErpCardSection } from '../../../components/erp/card-form'
 import { useMasterStore } from '../../../store/masterStore'
 import { resolveMaybeId, resolveMaybeVoid } from '../../../store/storeAction'
@@ -34,6 +34,7 @@ const schema = z.object({
   sgst: z.coerce.number().min(0).max(100),
   cgst: z.coerce.number().min(0).max(100),
   igst: z.coerce.number().min(0).max(100),
+  applicableFor: z.enum(['SALES', 'PURCHASE', 'BOTH']),
   isActive: z.boolean(),
 }).superRefine((data, ctx) => {
   if (data.dateTo && data.dateFrom && data.dateTo < data.dateFrom) {
@@ -80,6 +81,11 @@ export function GstRateListPage() {
     { accessorKey: 'sgst', header: 'SGST', cell: ({ row }) => `${row.original.sgst}%` },
     { accessorKey: 'cgst', header: 'CGST', cell: ({ row }) => `${row.original.cgst}%` },
     { accessorKey: 'igst', header: 'IGST', cell: ({ row }) => `${row.original.igst}%` },
+    {
+      accessorKey: 'applicableFor',
+      header: 'Applies To',
+      cell: ({ row }) => row.original.applicableFor ?? 'BOTH',
+    },
     { accessorKey: 'isActive', header: 'Status', cell: ({ row }) => <ActiveBadge isActive={row.original.isActive} /> },
     { id: 'actions', header: 'Actions', enableSorting: false, cell: ({ row }) => (
       <CoreMasterRowActions
@@ -131,8 +137,20 @@ export function GstRateFormPage() {
   const { register, handleSubmit, control, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema) as Resolver<FormData>,
     defaultValues: existing
-      ? { ...existing, dateTo: existing.dateTo ?? '' }
-      : { code: '', gstGroupId: '', fromState: 'Maharashtra', locationStateCode: 'Maharashtra', dateFrom: new Date().toISOString().slice(0, 10), dateTo: '', sgst: 9, cgst: 9, igst: 18, isActive: true },
+      ? { ...existing, dateTo: existing.dateTo ?? '', applicableFor: existing.applicableFor ?? 'BOTH' }
+      : {
+          code: '',
+          gstGroupId: '',
+          fromState: 'Gujarat',
+          locationStateCode: 'Gujarat',
+          dateFrom: new Date().toISOString().slice(0, 10),
+          dateTo: '',
+          sgst: 9,
+          cgst: 9,
+          igst: 18,
+          applicableFor: 'BOTH' as const,
+          isActive: true,
+        },
   })
   const watched = useWatch({ control })
   const gstGroupId = watch('gstGroupId')
@@ -238,6 +256,13 @@ export function GstRateFormPage() {
             <FormField label="IGST %" required error={errors.igst?.message}>
               <Input type="number" step="0.01" {...register('igst')} />
             </FormField>
+            <FormField label="Sales / Purchase applicability" required error={errors.applicableFor?.message}>
+              <Select {...register('applicableFor')}>
+                <option value="BOTH">Both (Sales &amp; Purchase)</option>
+                <option value="SALES">Sales only</option>
+                <option value="PURCHASE">Purchase only</option>
+              </Select>
+            </FormField>
             <FormField label="Status">
               <Checkbox {...register('isActive')} label="Active" />
             </FormField>
@@ -266,6 +291,7 @@ export function GstRateDetailPage() {
           <DetailField label="SGST" value={`${record.sgst}%`} />
           <DetailField label="CGST" value={`${record.cgst}%`} />
           <DetailField label="IGST" value={`${record.igst}%`} />
+          <DetailField label="Applies To" value={record.applicableFor ?? 'BOTH'} />
           <DetailField label="Status" value={record.isActive ? 'Active' : 'Inactive'} />
         </DetailGrid>
       </DetailSection>

@@ -40,6 +40,7 @@ export type ApiVendorComparison = {
   awardedVendorQuotationId: string | null
   selectionReason: string | null
   awardedById: string | null
+  awardedByName?: string | null
   selectedAt: string | null
   remarks: string | null
   vendors?: ApiComparisonVendorMatrixRow[]

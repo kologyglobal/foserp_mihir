@@ -246,6 +246,20 @@ export function VendorAdjustmentDetailPage() {
       title={vendorAdjustmentDisplayNumber(adjustment)}
       actions={
         <div className="flex flex-wrap gap-2">
+          <ErpButton
+            variant="secondary"
+            icon={Printer}
+            onClick={() => navigate(`/accounting/money-out/vendor-adjustments/${id}/print`)}
+          >
+            Print
+          </ErpButton>
+          <ErpButton
+            variant="secondary"
+            icon={Download}
+            onClick={() => navigate(`/accounting/money-out/vendor-adjustments/${id}/print`)}
+          >
+            Download PDF
+          </ErpButton>
           {mergeAllowedAction(perms.canEditAdjustment, actions?.edit) && (
             <ErpButton variant="secondary" icon={Pencil} onClick={() => navigate(`/accounting/money-out/vendor-adjustments/${id}/edit`)}>
               Edit

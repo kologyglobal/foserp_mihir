@@ -52,10 +52,43 @@ const envSchema = z.object({
   /** Comma-separated hostnames allowed for live SFTP (default localhost in non-prod). */
   BANK_CONNECTOR_SFTP_ALLOWED_HOSTS: z.string().optional(),
   /**
+   * After Dispatch post, automatically create a DRAFT Sales Invoice (not posted).
+   * Default ON outside production; set true/false to override.
+   */
+  ENABLE_AUTO_SALES_INVOICE_FROM_DISPATCH: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => {
+      if (v === 'true') return true
+      if (v === 'false') return false
+      return process.env.NODE_ENV !== 'production'
+    }),
+  /**
    * O2C Wave 3 — post Dr COGS / Cr FINISHED_GOODS_INVENTORY on sales invoice post when FG cost
    * is available from dispatch inventory movements. Default OFF.
    */
   ENABLE_SI_COGS_POSTING: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
+  /**
+   * Phase 7C5 — hardened Dispatch posting gates (reservation/pick/pack/issued challan).
+   * Default OFF in production until UAT; ON when explicitly set true (test/UAT).
+   */
+  DISPATCH_HARDENED_POSTING_ENABLED: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => {
+      if (v === 'true') return true
+      if (v === 'false') return false
+      // Non-production defaults ON for local/UAT; production stays OFF until rolled out.
+      return process.env.NODE_ENV !== 'production'
+    }),
+  /**
+   * When true, draft SI / invoice-ready waits until POD is DELIVERED or PARTIALLY_DELIVERED.
+   * Default OFF — stock already posted at dispatch; POD is logistics confirmation.
+   */
+  REQUIRE_POD_BEFORE_INVOICE: z
     .enum(['true', 'false'])
     .optional()
     .transform((v) => v === 'true'),

@@ -36,6 +36,9 @@ const schema = z.object({
   parentId: z.string().nullable(),
   level: z.coerce.number().min(1).max(3),
   defaultWarehouseId: z.string().nullable(),
+  stockPolicy: z.enum(['REQUIRED', 'OPTIONAL', 'FORBIDDEN']),
+  defaultIsStockable: z.boolean(),
+  defaultInventoryType: z.enum(['inventory', 'non_inventory', 'service']),
   isActive: z.boolean(),
 })
 
@@ -79,6 +82,11 @@ export function ItemCategoryListPage() {
         row.original.parentId ? getCategoryName(row.original.parentId) : '—',
     },
     { accessorKey: 'level', header: 'Level' },
+    {
+      accessorKey: 'stockPolicy',
+      header: 'Stock',
+      cell: ({ row }) => row.original.stockPolicy ?? 'REQUIRED',
+    },
     {
       id: 'warehouse',
       header: 'Default Warehouse',
@@ -153,7 +161,24 @@ export function ItemCategoryFormPage() {
 
   const { register, handleSubmit, control, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema) as Resolver<FormData>,
-    defaultValues: existing ?? { categoryCode: '', categoryName: '', level: 2, isActive: true, parentId: null, defaultWarehouseId: null },
+    defaultValues: existing
+      ? {
+          ...existing,
+          stockPolicy: existing.stockPolicy ?? 'REQUIRED',
+          defaultIsStockable: existing.defaultIsStockable ?? true,
+          defaultInventoryType: existing.defaultInventoryType ?? 'inventory',
+        }
+      : {
+          categoryCode: '',
+          categoryName: '',
+          level: 1,
+          isActive: true,
+          parentId: null,
+          defaultWarehouseId: null,
+          stockPolicy: 'REQUIRED',
+          defaultIsStockable: true,
+          defaultInventoryType: 'inventory',
+        },
   })
   const watched = useWatch({ control })
 
@@ -240,7 +265,22 @@ export function ItemCategoryFormPage() {
           ))}
         </Select>
       </FormField>
-      <div className="flex items-end">
+      <FormField label="Stock policy" required error={errors.stockPolicy?.message}>
+        <Select {...register('stockPolicy')}>
+          <option value="REQUIRED">Required (always stockable)</option>
+          <option value="OPTIONAL">Optional (SFG — logical or stockable)</option>
+          <option value="FORBIDDEN">Forbidden (service — no stock)</option>
+        </Select>
+      </FormField>
+      <FormField label="Default inventory type" required error={errors.defaultInventoryType?.message}>
+        <Select {...register('defaultInventoryType')}>
+          <option value="inventory">Inventory</option>
+          <option value="non_inventory">Non-inventory</option>
+          <option value="service">Service</option>
+        </Select>
+      </FormField>
+      <div className="flex items-end gap-4">
+        <Checkbox label="Default stockable" {...register('defaultIsStockable')} />
         <Checkbox label="Active" {...register('isActive')} />
       </div>
     </FormLayout>
@@ -275,6 +315,9 @@ export function ItemCategoryDetailPage() {
             <DetailField label="Parent" value={category.parentId ? getCategoryName(category.parentId) : 'Root'} />
             <DetailField label="Level" value={category.level} />
             <DetailField label="Default Warehouse" value={category.defaultWarehouseId ? getWarehouseName(category.defaultWarehouseId) : '—'} />
+            <DetailField label="Stock policy" value={category.stockPolicy ?? 'REQUIRED'} />
+            <DetailField label="Default stockable" value={category.defaultIsStockable === false ? 'No' : 'Yes'} />
+            <DetailField label="Default inventory type" value={category.defaultInventoryType ?? 'inventory'} />
             <DetailField label="Linked Items" value={getItemCountByCategory(category.id)} />
           </DetailGrid>
         </DetailSection>

@@ -276,6 +276,25 @@ export async function listInventoryLots(params?: Record<string, string | number 
   return apiRequest<InventoryLotMaster[]>(`${tenantPath('/inventory/lots')}${buildQuery(params)}`)
 }
 
+/** Item-level batch/serial positions used by stock posting (InventoryBatch). */
+export async function getInventoryItemLineage(itemId: string) {
+  return apiRequest<{
+    item: { id: string; code: string; name: string; batchTracked: boolean; serialTracked: boolean }
+    batches: Array<{
+      id: string
+      batchNumber: string
+      expiryDate: string | null
+      balances: Array<{ warehouseId: string; stockStatus: string; quantity: string | number }>
+    }>
+    serials: Array<{
+      id: string
+      serialNumber: string
+      warehouseId: string | null
+      status: string
+    }>
+  }>(tenantPath(`/inventory/traceability/items/${itemId}`))
+}
+
 export async function listInventorySerials(params?: Record<string, string | number | boolean | undefined>) {
   return apiRequest<InventorySerialMaster[]>(`${tenantPath('/inventory/serials')}${buildQuery(params)}`)
 }

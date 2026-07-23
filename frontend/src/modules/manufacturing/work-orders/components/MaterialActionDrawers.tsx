@@ -8,6 +8,8 @@ import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
 import { FormField } from '@/components/forms/FormField'
 import { Input, Textarea } from '@/components/forms/Inputs'
+import { BatchSelector } from '@/components/inventory/BatchSelector'
+import { SerialSelector } from '@/components/inventory/SerialSelector'
 import { PostingImpactPanel } from '../../ui'
 import type { ProductionOrderMaterial } from '@/types/manufacturingProduction'
 
@@ -23,13 +25,25 @@ interface IssueDrawerProps {
   material: ProductionOrderMaterial | null
   workOrderNo: string
   busy?: boolean
-  onSubmit: (payload: { materialId: string; quantity: number; remarks?: string; idempotencyKey: string }) => Promise<void> | void
+  onSubmit: (payload: {
+    materialId: string
+    quantity: number
+    remarks?: string
+    idempotencyKey: string
+    batchId?: string
+    batchNumber?: string
+    serialId?: string
+    serialNumber?: string
+  }) => Promise<void> | void
 }
 
 /** FORM 9 — Material Issue posting preview. */
 export function MaterialIssueDrawer({ open, onClose, material, workOrderNo, busy, onSubmit }: IssueDrawerProps) {
   const [qty, setQty] = useState('')
   const [remarks, setRemarks] = useState('')
+  const [batchNo, setBatchNo] = useState<string | null>(null)
+  const [batchId, setBatchId] = useState<string | undefined>()
+  const [serialNos, setSerialNos] = useState<string[]>([])
 
   const position = useMemo(() => {
     if (!material) return null
@@ -42,10 +56,18 @@ export function MaterialIssueDrawer({ open, onClose, material, workOrderNo, busy
     return { required, issued, returned, reserved, remaining, free }
   }, [material])
 
+  const batchTracked = Boolean(material?.item.batchTracked)
+  const serialTracked = Boolean(material?.item.serialTracked)
+  const warehouseId = material?.warehouseId ?? material?.warehouse?.id ?? ''
+
   useEffect(() => {
     if (!open || !position) return
-    setQty(position.remaining > 0 ? fmt(position.remaining) : '')
+    const defaultQty = serialTracked ? Math.min(1, position.remaining) : position.remaining
+    setQty(defaultQty > 0 ? fmt(defaultQty) : '')
     setRemarks('')
+    setBatchNo(null)
+    setBatchId(undefined)
+    setSerialNos([])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, material?.id])
 
@@ -55,7 +77,17 @@ export function MaterialIssueDrawer({ open, onClose, material, workOrderNo, busy
   const overRemaining = quantity > position.remaining
   const overStock = position.free != null && quantity > position.free
   const noStock = position.free != null && position.free <= 0
-  const canPost = quantity > 0 && !overRemaining && !noStock && !busy
+  const missingBatch = batchTracked && !batchNo && !batchId
+  const missingSerial = serialTracked && serialNos.length !== 1
+  const serialQtyMismatch = serialTracked && quantity !== 1
+  const canPost =
+    quantity > 0 &&
+    !overRemaining &&
+    !noStock &&
+    !missingBatch &&
+    !missingSerial &&
+    !serialQtyMismatch &&
+    !busy
 
   return (
     <Modal
@@ -76,6 +108,9 @@ export function MaterialIssueDrawer({ open, onClose, material, workOrderNo, busy
                 quantity,
                 remarks: remarks.trim() || undefined,
                 idempotencyKey: crypto.randomUUID(),
+                batchId: batchId || undefined,
+                batchNumber: batchNo || undefined,
+                serialNumber: serialTracked ? serialNos[0] : undefined,
               })
             }
             disabled={!canPost}
@@ -115,18 +150,27 @@ export function MaterialIssueDrawer({ open, onClose, material, workOrderNo, busy
           error={
             overRemaining
               ? `Cannot exceed remaining requirement (${fmt(position.remaining)})`
-              : undefined
+              : serialQtyMismatch
+                ? 'Serial-tracked items must be issued one unit at a time'
+                : undefined
           }
-          hint={material.warehouse ? `From ${material.warehouse.code} — ${material.warehouse.name}` : undefined}
+          hint={
+            material.warehouse
+              ? `From ${material.warehouse.code} — ${material.warehouse.name}`
+              : serialTracked
+                ? 'Serial-tracked: post one serial per issue'
+                : undefined
+          }
         >
           <Input
             type="number"
             min={0}
-            step="any"
+            step={serialTracked ? 1 : 'any'}
             value={qty}
             onChange={(e) => setQty(e.target.value)}
             className="text-right text-[15px] font-semibold"
-            error={overRemaining}
+            error={overRemaining || serialQtyMismatch}
+            disabled={serialTracked}
           />
         </FormField>
         {noStock ? (
@@ -139,6 +183,38 @@ export function MaterialIssueDrawer({ open, onClose, material, workOrderNo, busy
             Requested quantity exceeds unrestricted available stock ({fmt(position.free!)}). The server will reject the
             posting if stock is insufficient.
           </p>
+        ) : null}
+
+        {batchTracked && warehouseId && quantity > 0 ? (
+          <FormField label="Batch" required error={missingBatch ? 'Select a batch to issue from' : undefined}>
+            <BatchSelector
+              itemId={material.itemId}
+              warehouseId={warehouseId}
+              qty={quantity}
+              value={batchNo}
+              method="manual"
+              onChange={(next, meta) => {
+                setBatchNo(next)
+                setBatchId(meta?.batchId)
+              }}
+            />
+          </FormField>
+        ) : null}
+
+        {serialTracked && warehouseId ? (
+          <FormField
+            label="Serial"
+            required
+            error={missingSerial ? 'Select exactly one available serial' : undefined}
+          >
+            <SerialSelector
+              itemId={material.itemId}
+              warehouseId={warehouseId}
+              requiredQty={1}
+              value={serialNos}
+              onChange={setSerialNos}
+            />
+          </FormField>
         ) : null}
 
         <FormField label="Remarks">

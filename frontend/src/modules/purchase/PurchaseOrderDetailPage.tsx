@@ -367,6 +367,7 @@ export function PurchaseOrderDetailPage() {
           { label: 'Purchase Orders', to: '/purchase/orders' },
           { label: po.documentNumber },
         ]}
+        backLink={{ to: '/purchase/orders', label: 'Back to Purchase Orders' }}
         createdBy={po.createdBy}
         createdDate={formatDate(po.createdAt.slice(0, 10))}
         modifiedBy={po.updatedBy ?? undefined}
@@ -543,7 +544,13 @@ export function PurchaseOrderDetailPage() {
           }}
         />
 
-        <ErpCardSection title="General" subtitle="Identity, vendor, and locations" collapsible defaultOpen>
+        <ErpCardSection
+          title="General"
+          subtitle="Identity, vendor, and locations"
+          collapsible
+          defaultOpen
+          columns={4}
+        >
           <ErpViewField label="PO Number" value={po.documentNumber} />
           <ErpViewField label="PO Date" value={formatDate(po.documentDate)} />
           <ErpViewField label="Order Type" value={orderTypeLabel} />
@@ -556,10 +563,10 @@ export function PurchaseOrderDetailPage() {
           <ErpViewField label="Vendor" value={`${po.vendor.code} — ${po.vendor.name}`} />
           <ErpViewField label="Vendor GST Number" value={po.vendor.gstin} />
           <ErpViewField label="Place of Supply" value={po.placeOfSupply || '—'} />
-          <ErpViewField label="Vendor Address" value={po.vendor.address || '—'} colSpan={3} />
           <ErpViewField label="Buyer" value={po.buyer.name} />
           <ErpViewField label="Purchase Location" value={po.purchaseLocation.name} />
           <ErpViewField label="Delivery Location" value={po.deliveryLocation.name} />
+          <ErpViewField label="Vendor Address" value={po.vendor.address || '—'} colSpan={3} />
           <ErpViewField label="Source PR" hideIfEmpty>
             {po.purchaseRequisitionId ? (
               <Link className="text-erp-primary font-mono" to={`/purchase/requisitions/${po.purchaseRequisitionId}`}>
@@ -600,6 +607,7 @@ export function PurchaseOrderDetailPage() {
           collapsedSummary={commercialPeek || undefined}
           collapsible
           defaultOpen={false}
+          columns={4}
         >
           <ErpViewField label="Expected Delivery Date" value={formatDate(po.expectedDeliveryDate)} />
           <ErpViewField label="Validity Date" value={po.validityDate ? formatDate(po.validityDate) : '—'} />

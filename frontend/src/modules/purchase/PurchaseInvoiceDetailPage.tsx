@@ -10,6 +10,7 @@ import {
   PauseCircle,
   Pencil,
   Printer,
+  Download,
   Send,
   ShieldAlert,
   Stamp,
@@ -410,6 +411,12 @@ export function PurchaseInvoiceDetailPage() {
                 id: 'print',
                 label: 'Print',
                 icon: Printer,
+                onClick: () => navigate(`/purchase/invoices/${inv.id}/print`),
+              },
+              {
+                id: 'pdf',
+                label: 'Download PDF',
+                icon: Download,
                 onClick: () => navigate(`/purchase/invoices/${inv.id}/print`),
               },
             ]}

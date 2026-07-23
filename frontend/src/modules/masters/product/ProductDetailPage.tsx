@@ -212,13 +212,13 @@ export function ProductDetailPage() {
       {tab === 'bom' && (
         <DetailSection title="Bill of Materials">
           <DetailField label="Released BOM" value={
-            releasedBom ? <Link to={`/masters/bom/${releasedBom.id}`} className="font-mono text-erp-primary hover:underline">{releasedBom.bomNo} · {releasedBom.revision}</Link> : <span className="text-erp-warning">None — release blocked</span>
+            releasedBom ? <Link to={`/manufacturing/setup/boms`} className="font-mono text-erp-primary hover:underline">{releasedBom.bomNo} · {releasedBom.revision}</Link> : <span className="text-erp-warning">None — release blocked</span>
           } />
           <table className="erp-table mt-4 w-full">
             <thead><tr><th>BOM No</th><th>Revision</th><th>Status</th><th>Effective</th></tr></thead>
             <tbody>
               {allBoms.map((b) => (
-                <tr key={b.id}><td><Link to={`/masters/bom/${b.id}`} className="text-erp-primary hover:underline">{b.bomNo}</Link></td><td>{b.revision}</td><td>{b.status}</td><td>{formatDate(b.effectiveFrom)}</td></tr>
+                <tr key={b.id}><td><Link to={`/manufacturing/setup/boms`} className="text-erp-primary hover:underline">{b.bomNo}</Link></td><td>{b.revision}</td><td>{b.status}</td><td>{formatDate(b.effectiveFrom)}</td></tr>
               ))}
             </tbody>
           </table>

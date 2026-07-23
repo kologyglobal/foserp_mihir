@@ -58,8 +58,7 @@ export const updateChallanSchema = z.object({
   driverPhone: z.string().max(32).nullable().optional(),
   lrGrNumber: z.string().max(100).nullable().optional(),
   lrGrDate: z.string().nullable().optional(),
-  eWayBillReference: z.string().max(100).nullable().optional(),
-  eWayBillDate: z.string().nullable().optional(),
+  // e-Way Bill number is statutory / NIC-driven — not editable on challan transport patch.
   destination: z.string().max(300).nullable().optional(),
   remarks: z.string().max(4000).nullable().optional(),
   termsText: z.string().max(4000).nullable().optional(),

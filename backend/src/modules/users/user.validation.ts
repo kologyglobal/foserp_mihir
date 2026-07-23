@@ -11,7 +11,20 @@ export const createUserSchema = z.object({
   mobile: optionalPhoneSchema,
   designation: z.string().trim().max(100).optional(),
   department: z.string().trim().max(100).optional(),
+  departmentId: z.string().uuid().nullable().optional(),
   status: z.nativeEnum(UserStatus).default('INVITED'),
+  roleIds: z.array(z.string().uuid()).optional(),
+})
+
+/** Invite creates INVITED user without a known password (placeholder hash). */
+export const inviteUserSchema = z.object({
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().min(1).max(100),
+  email: z.string().trim().email().max(255),
+  mobile: optionalPhoneSchema,
+  designation: z.string().trim().max(100).optional(),
+  department: z.string().trim().max(100).optional(),
+  departmentId: z.string().uuid().nullable().optional(),
   roleIds: z.array(z.string().uuid()).optional(),
 })
 
@@ -23,6 +36,7 @@ export const updateUserSchema = z
     mobile: optionalNullablePhoneSchema,
     designation: z.string().trim().max(100).nullable().optional(),
     department: z.string().trim().max(100).nullable().optional(),
+    departmentId: z.string().uuid().nullable().optional(),
     status: z.nativeEnum(UserStatus).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: 'At least one field is required' })
@@ -33,6 +47,11 @@ export const assignRoleSchema = z.object({
 
 export const listUsersQuerySchema = paginationSchema.extend({
   status: z.nativeEnum(UserStatus).optional(),
+})
+
+export const listInvitationsQuerySchema = paginationSchema.extend({
+  /** pending = not accepted/revoked (includes expired); open = pending and not expired */
+  status: z.enum(['pending', 'open', 'accepted', 'revoked', 'expired', 'all']).default('open'),
 })
 
 // tenantId/tenantSlug are both optional here because these schemas validate the
@@ -54,6 +73,8 @@ export const userRoleParamSchema = z.object({
 })
 
 export type CreateUserInput = z.infer<typeof createUserSchema>
+export type InviteUserInput = z.infer<typeof inviteUserSchema>
 export type UpdateUserInput = z.infer<typeof updateUserSchema>
 export type AssignRoleInput = z.infer<typeof assignRoleSchema>
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>
+export type ListInvitationsQuery = z.infer<typeof listInvitationsQuerySchema>

@@ -44,7 +44,22 @@ export async function saveTreasuryStatementFile(
   return path.join(tenantId, filename).replace(/\\/g, '/')
 }
 
-export async function readTreasuryStatementFile(storageKey: string): Promise<Buffer> {
-  const fullPath = path.join(TREASURY_STATEMENT_BASE_DIR, storageKey)
-  return readFile(fullPath)
+export async function saveDispatchPodFile(
+  tenantId: string,
+  attachmentId: string,
+  buffer: Buffer,
+  ext: string,
+): Promise<string> {
+  const base = path.join(process.cwd(), 'uploads', 'dispatch-pod')
+  const dir = path.join(base, tenantId)
+  await mkdir(dir, { recursive: true })
+  const filename = `${attachmentId}${ext}`
+  const fullPath = path.join(dir, filename)
+  await writeFile(fullPath, buffer)
+  return path.join(tenantId, filename).replace(/\\/g, '/')
+}
+
+export async function readDispatchPodFile(storageKey: string): Promise<Buffer> {
+  const base = path.join(process.cwd(), 'uploads', 'dispatch-pod')
+  return readFile(path.join(base, storageKey))
 }

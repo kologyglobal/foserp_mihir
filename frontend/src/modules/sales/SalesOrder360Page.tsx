@@ -13,6 +13,7 @@ import {
   LayoutGrid,
   Banknote,
   Printer,
+  Download,
 } from 'lucide-react'
 import { Entity360Panel } from '../../components/design-system/Entity360Shell'
 import { ErpCardCommandBar } from '../../components/erp/card-form/ErpCardCommandBar'
@@ -70,8 +71,6 @@ import {
 } from '../../components/sales/SalesOrder360Sections'
 import type { WorkOrder } from '../../types/workorder'
 import type { DispatchPlan } from '../../types/dispatch'
-import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
-import { buildProformaNewUrl } from '../../utils/proformaInvoicePrefill'
 import { ReservationsPanel } from '../../components/inventory/ReservationsPanel'
 import {
   ExpectedAccountingEntryDrawer,
@@ -142,7 +141,6 @@ export function SalesOrder360Page() {
   const so = useMrpStore((s) => (id ? s.salesOrders.find((o) => o.id === id) : undefined))
   const confirmSalesOrder = useSalesStore((s) => s.confirmSalesOrder)
   const canConfirmSalesOrder = canCrmPermission('crm.sales_order.confirm')
-  const triggerProductionForOrder = useSalesStore((s) => s.triggerProductionForOrder)
   const getQuotation = useSalesStore((s) => s.getQuotation)
   const getLatestQuotationDocument = useCrmStore((s) => s.getLatestQuotationDocument)
   const workOrders = useWorkOrderStore((s) => s.workOrders)
@@ -150,12 +148,6 @@ export function SalesOrder360Page() {
   const dispatches = useDispatchStore((s) => s.dispatches)
   const customers = useMasterStore((s) => s.customers)
   const products = useMasterStore((s) => s.products)
-  const proformaInvoices = useProformaInvoiceStore((s) => s.proformaInvoices)
-  const linkedProformas = useMemo(
-    () => (id ? proformaInvoices.filter((p) => p.salesOrderId === id) : []),
-    [proformaInvoices, id],
-  )
-  const activeProforma = linkedProformas.find((p) => p.status !== 'cancelled')
 
   const [tab, setTab] = useState<SoTab>('overview')
   const [activeSection, setActiveSection] = useState<SoTab>('overview')
@@ -405,10 +397,8 @@ export function SalesOrder360Page() {
     }
   }
 
-  function handleMrp() {
-    const r = triggerProductionForOrder(order.id)
-    if (r.ok) setToast(`MRP run ${r.runId} started`)
-    else setToast(r.error ?? 'MRP failed')
+  function openProductionPlan() {
+    navigate('/manufacturing/production-plan')
   }
 
   function selectSection(sectionId: SoTab) {
@@ -457,15 +447,14 @@ export function SalesOrder360Page() {
         ...(so.status === 'open' && canConfirmSalesOrder
           ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }]
           : []),
-        ...(!crmMode && so.status === 'confirmed'
-          ? [{ id: 'mrp', label: 'Trigger MRP', icon: Play, primary: true, onClick: handleMrp }]
-          : []),
         ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit', icon: Pencil, onClick: () => navigate(editPath) }] : []),
-        ...(so.status !== 'open' && !activeProforma ? [{ id: 'proforma', label: 'Create Proforma', icon: Receipt, onClick: () => navigate(buildProformaNewUrl(so.id)) }] : []),
+        ...(!crmMode && so.status === 'confirmed'
+          ? [{ id: 'plan', label: 'Production Plan', icon: Play, onClick: () => navigate('/manufacturing/production-plan') }]
+          : []),
       ]}
       moreActions={[
         { id: 'print', label: 'Print', icon: Printer, onClick: () => navigate(resolveSalesOrderPrintPath(so.id, pathname)) },
-        ...(activeProforma ? [{ id: 'view-proforma', label: `Proforma ${activeProforma.proformaNo}`, icon: Receipt, onClick: () => navigate(`/sales/proforma-invoices/${activeProforma.id}`) }] : []),
+        { id: 'pdf', label: 'Download PDF', icon: Download, onClick: () => navigate(resolveSalesOrderPrintPath(so.id, pathname)) },
         ...(quo ? [{ id: 'quotation', label: 'Quotation', icon: FileText, onClick: () => navigate(crmQuotationPath(quo.id)) }] : []),
         ...(crmDoc ? [{ id: 'quote-360', label: 'CRM Quote 360', icon: ExternalLink, onClick: () => navigate(`/crm/quotations/${so.quotationId}`) }] : []),
         { id: 'production', label: 'Work Orders', icon: Factory, onClick: () => selectSection('production') },
@@ -485,7 +474,7 @@ export function SalesOrder360Page() {
             so.status === 'open'
               ? 'Confirm order'
               : !crmMode && pendingMrp
-                ? 'Trigger MRP'
+                ? 'Open production plan'
                 : overdue
                   ? 'Expedite delivery'
                   : 'Monitor production',
@@ -512,7 +501,7 @@ export function SalesOrder360Page() {
             ? [{ id: 'confirm', label: 'Confirm Order', icon: CheckCircle, primary: true, onClick: openConfirmDialog }]
             : []),
           ...(!crmMode && so.status === 'confirmed'
-            ? [{ id: 'mrp', label: 'Trigger MRP', icon: Play, primary: true, onClick: handleMrp }]
+            ? [{ id: 'plan', label: 'Production Plan', icon: Play, primary: true, onClick: openProductionPlan }]
             : []),
           ...(so.status === 'open' ? [{ id: 'edit', label: 'Edit Draft', icon: Pencil, onClick: () => navigate(editPath) }] : []),
         ]}
@@ -587,7 +576,7 @@ export function SalesOrder360Page() {
               qcHold={qcHold}
               onOpenProduction={() => selectSection('production')}
               onOpenDispatch={() => selectSection('dispatch')}
-              onTriggerMrp={!crmMode && so.status === 'confirmed' ? handleMrp : undefined}
+              onTriggerMrp={!crmMode && so.status === 'confirmed' ? openProductionPlan : undefined}
             />
 
             <div className="so-360-overview-grid">
@@ -616,7 +605,7 @@ export function SalesOrder360Page() {
                       status={so.status}
                       overdue={overdue}
                       onConfirm={so.status === 'open' && canConfirmSalesOrder ? openConfirmDialog : undefined}
-                      onTriggerMrp={!crmMode && so.status === 'confirmed' ? handleMrp : undefined}
+                      onTriggerMrp={!crmMode && so.status === 'confirmed' ? openProductionPlan : undefined}
                     />
                   </div>
                 </Entity360Panel>
@@ -668,13 +657,13 @@ export function SalesOrder360Page() {
                   <p className="so-360-empty__text">
                     {so.status === 'confirmed'
                       ? crmMode
-                        ? 'Work orders appear after MRP planning on the Sales / Manufacturing side.'
-                        : 'Trigger MRP to explode BOM and create shop-floor work orders.'
-                      : 'Work orders appear after MRP planning for confirmed orders.'}
+                        ? 'Work orders appear after production planning on the Manufacturing side.'
+                        : 'Open Production Plan to create manufacturing work orders.'
+                      : 'Work orders appear after production planning for confirmed orders.'}
                   </p>
                   {!crmMode && so.status === 'confirmed' ? (
-                    <button type="button" className="so-360-empty__action" onClick={handleMrp}>
-                      Trigger MRP →
+                    <button type="button" className="so-360-empty__action" onClick={openProductionPlan}>
+                      Open Production Plan →
                     </button>
                   ) : null}
                 </div>

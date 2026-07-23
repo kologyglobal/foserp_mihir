@@ -7,7 +7,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowDownToLine, PackagePlus, RefreshCw, Lock } from 'lucide-react'
-import { PageHeader } from '@/components/ui/PageHeader'
+import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { SectionCard } from '@/components/ui/SectionCard'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -27,6 +28,7 @@ import {
 } from '@/services/api/inventoryApi'
 import { useInventoryPermissions } from '@/utils/permissions/inventory'
 import { formatDate } from '@/utils/dates/format'
+import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
 
 interface LookupOption {
   id: string
@@ -70,10 +72,16 @@ function refLabel(ref: { code: string; name: string } | undefined, id: string): 
 
 function AccessDenied({ title }: { title: string }) {
   return (
-    <div className="erp-page">
-      <PageHeader title={title} breadcrumbs={[{ label: 'Inventory', to: '/inventory/stock' }]} />
+    <OperationalPageShell
+      variant="dynamics"
+      layout="enterprise"
+      badge="Inventory & Warehouse"
+      title={title}
+      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: title }]}
+      autoBreadcrumbs={false}
+    >
       <EmptyState icon={Lock} title="Access denied" description="You do not hold the required inventory permission." />
-    </div>
+    </OperationalPageShell>
   )
 }
 
@@ -153,28 +161,36 @@ export function ApiReceiptsRegisterPage() {
   }
 
   return (
-    <div className="erp-page">
-      <PageHeader
-        title="Receipts"
-        description="Live inward stock movements posted to the inventory ledger. Purchase-order receipts are posted via Purchase GRN."
-        breadcrumbs={[{ label: 'Inventory', to: '/inventory/stock' }, { label: 'Receipts' }]}
-        actions={(
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" onClick={() => void load()}>
-              <RefreshCw className="h-4 w-4" /> Refresh
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => navigate('/purchase/grn')}>
-              Open GRN
-            </Button>
-            {perms.canPostReceipt ? (
-              <Button size="sm" onClick={() => navigate('/inventory/movements/receipts/new')}>
-                <PackagePlus className="h-4 w-4" /> New Receipt
-              </Button>
-            ) : null}
-          </div>
-        )}
-      />
-
+    <OperationalPageShell
+      variant="dynamics"
+      layout="enterprise"
+      badge="Inventory & Warehouse"
+      title="Receipts"
+      description="Live inward stock movements. Purchase-order receipts post via Purchase GRN."
+      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Receipts' }]}
+      autoBreadcrumbs={false}
+      favoritePath="/inventory/movements/receipts"
+      commandBar={(
+        <ErpCommandBar
+          inline
+          sticky={false}
+          primaryAction={
+            perms.canPostReceipt
+              ? {
+                  id: 'new',
+                  label: 'Direct Receive',
+                  icon: PackagePlus,
+                  onClick: () => navigate('/inventory/movements/receipts/new'),
+                }
+              : undefined
+          }
+          secondaryActions={[
+            { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load() },
+            { id: 'grn', label: 'Open GRN', onClick: () => navigate('/purchase/grn') },
+          ]}
+        />
+      )}
+    >
       <div className="mb-3 flex flex-wrap items-end gap-2">
         <label className="text-[11px] text-erp-muted">
           Item
@@ -204,76 +220,72 @@ export function ApiReceiptsRegisterPage() {
         </label>
       </div>
 
-      <SectionCard title="Inward movements" noPadding>
-        {loading ? (
-          <div className="p-6"><LoadingState variant="table" rows={8} /></div>
-        ) : rows.length === 0 ? (
-          <div className="p-6">
-            <EmptyState
-              icon={ArrowDownToLine}
-              title="No stock received yet"
-              description="For purchase orders use Purchase → GRN (stock updates automatically). Use Direct Receive only for non-PO inward."
-              action={
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => navigate('/purchase/grn')}>
-                    Open Purchase GRN
-                  </Button>
-                  {perms.canPostReceipt ? (
-                    <Button size="sm" onClick={() => navigate('/inventory/movements/receipts/new')}>
-                      <PackagePlus className="h-4 w-4" /> Direct Receive
-                    </Button>
-                  ) : null}
-                </div>
-              }
-            />
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="erp-table w-full min-w-[980px] text-[13px]">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Movement #</th>
-                    <th>Reference</th>
-                    <th>Item</th>
-                    <th>Warehouse</th>
-                    <th className="text-right">Qty</th>
-                    <th className="text-right">Value</th>
-                    <th className="text-right">Balance After</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((m) => (
-                    <tr key={m.id}>
-                      <td>{formatDate(m.movementDate)}</td>
-                      <td>
-                        <Link
-                          to={`/inventory/movements/receipts/${m.id}`}
-                          className="font-mono font-semibold text-erp-primary hover:underline"
-                        >
-                          {m.movementNumber}
-                        </Link>
-                      </td>
-                      <td>
-                        {m.referenceType}
-                        {m.referenceNo ? <span className="text-erp-muted"> · {m.referenceNo}</span> : null}
-                      </td>
-                      <td>{refLabel(m.item, m.itemId)}</td>
-                      <td>{refLabel(m.warehouse, m.warehouseId)}</td>
-                      <td className="text-right tabular-nums font-semibold text-emerald-700">{fmtQty(m.quantity)}</td>
-                      <td className="text-right tabular-nums">{fmtQty(m.value)}</td>
-                      <td className="text-right tabular-nums">{fmtQty(m.balanceAfter)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {loading ? <LoadingState variant="table" rows={8} /> : null}
+      {!loading && rows.length === 0 ? (
+        <EmptyState
+          icon={ArrowDownToLine}
+          title="No stock received yet"
+          description="For purchase orders use Purchase → GRN (stock updates automatically). Use Direct Receive only for non-PO inward."
+          action={(
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" onClick={() => navigate('/purchase/grn')}>
+                Open Purchase GRN
+              </Button>
+              {perms.canPostReceipt ? (
+                <Button size="sm" onClick={() => navigate('/inventory/movements/receipts/new')}>
+                  <PackagePlus className="h-4 w-4" /> Direct Receive
+                </Button>
+              ) : null}
             </div>
-            <Pager meta={meta} onPage={setPage} />
-          </>
-        )}
-      </SectionCard>
-    </div>
+          )}
+        />
+      ) : null}
+      {!loading && rows.length > 0 ? (
+        <EnterpriseRegisterTableShell>
+          <div className="overflow-x-auto">
+            <table className="erp-table w-full min-w-[980px] text-[13px]">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Movement #</th>
+                  <th>Reference</th>
+                  <th>Item</th>
+                  <th>Warehouse</th>
+                  <th className="text-right">Qty</th>
+                  <th className="text-right">Value</th>
+                  <th className="text-right">Balance After</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((m) => (
+                  <tr key={m.id}>
+                    <td>{formatDate(m.movementDate)}</td>
+                    <td>
+                      <Link
+                        to={`/inventory/movements/receipts/${m.id}`}
+                        className="font-mono font-semibold text-erp-primary hover:underline"
+                      >
+                        {m.movementNumber}
+                      </Link>
+                    </td>
+                    <td>
+                      {m.referenceType}
+                      {m.referenceNo ? <span className="text-erp-muted"> · {m.referenceNo}</span> : null}
+                    </td>
+                    <td>{refLabel(m.item, m.itemId)}</td>
+                    <td>{refLabel(m.warehouse, m.warehouseId)}</td>
+                    <td className="text-right tabular-nums font-semibold text-emerald-700">{fmtQty(m.quantity)}</td>
+                    <td className="text-right tabular-nums">{fmtQty(m.value)}</td>
+                    <td className="text-right tabular-nums">{fmtQty(m.balanceAfter)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pager meta={meta} onPage={setPage} />
+        </EnterpriseRegisterTableShell>
+      ) : null}
+    </OperationalPageShell>
   )
 }
 
@@ -343,20 +355,39 @@ export function ApiReceiptPostPage() {
     }
   }
 
-  if (!perms.canPostReceipt) return <AccessDenied title="New Receipt" />
+  if (!perms.canPostReceipt) return <AccessDenied title="Direct Receive" />
 
   return (
-    <div className="erp-page">
-      <PageHeader
-        title="New Receipt"
-        description="Posts an inward movement to live stock. For purchase-order receipts use Purchase GRN."
-        breadcrumbs={[
-          { label: 'Inventory', to: '/inventory/stock' },
-          { label: 'Receipts', to: '/inventory/movements/receipts' },
-          { label: 'New' },
-        ]}
-      />
-
+    <OperationalPageShell
+      variant="dynamics"
+      layout="enterprise"
+      badge="Inventory & Warehouse"
+      title="Direct Receive"
+      description="Posts an inward movement to live stock. For purchase-order receipts use Purchase GRN."
+      breadcrumbs={[
+        { label: 'Inventory & Warehouse', to: '/inventory' },
+        { label: 'Receipts', to: '/inventory/movements/receipts' },
+        { label: 'Direct Receive' },
+      ]}
+      autoBreadcrumbs={false}
+      favoritePath="/inventory/movements/receipts/new"
+      commandBar={(
+        <ErpCommandBar
+          inline
+          sticky={false}
+          primaryAction={{
+            id: 'post',
+            label: busy ? 'Posting…' : 'Post Receipt',
+            onClick: () => void submit(),
+            disabled: busy,
+          }}
+          secondaryActions={[
+            { id: 'cancel', label: 'Cancel', onClick: () => navigate('/inventory/movements/receipts') },
+            { id: 'grn', label: 'Open GRN', onClick: () => navigate('/purchase/grn') },
+          ]}
+        />
+      )}
+    >
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <SectionCard title="Receipt">
@@ -409,14 +440,6 @@ export function ApiReceiptPostPage() {
                 <Textarea rows={2} value={form.remarks} onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))} />
               </FormField>
             </div>
-            <div className="mt-3 flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => navigate('/inventory/movements/receipts')}>
-                Cancel
-              </Button>
-              <Button disabled={busy} onClick={() => void submit()}>
-                {busy ? 'Posting…' : 'Post Receipt'}
-              </Button>
-            </div>
           </SectionCard>
         </div>
 
@@ -446,7 +469,7 @@ export function ApiReceiptPostPage() {
           </SectionCard>
         </div>
       </div>
-    </div>
+    </OperationalPageShell>
   )
 }
 
@@ -495,17 +518,37 @@ export function ApiReceiptDetailPage() {
 
   if (loading) {
     return (
-      <div className="erp-page">
-        <PageHeader title="Receipt" breadcrumbs={[{ label: 'Inventory' }, { label: 'Receipts', to: '/inventory/movements/receipts' }]} />
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Inventory & Warehouse"
+        title="Receipt"
+        breadcrumbs={[
+          { label: 'Inventory & Warehouse', to: '/inventory' },
+          { label: 'Receipts', to: '/inventory/movements/receipts' },
+          { label: 'Receipt' },
+        ]}
+        autoBreadcrumbs={false}
+      >
         <LoadingState variant="table" />
-      </div>
+      </OperationalPageShell>
     )
   }
 
   if (missing || !row) {
     return (
-      <div className="erp-page">
-        <PageHeader title="Receipt" breadcrumbs={[{ label: 'Inventory' }, { label: 'Receipts', to: '/inventory/movements/receipts' }]} />
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Inventory & Warehouse"
+        title="Receipt"
+        breadcrumbs={[
+          { label: 'Inventory & Warehouse', to: '/inventory' },
+          { label: 'Receipts', to: '/inventory/movements/receipts' },
+          { label: 'Receipt' },
+        ]}
+        autoBreadcrumbs={false}
+      >
         <EmptyState
           icon={ArrowDownToLine}
           title="Receipt not found"
@@ -516,27 +559,39 @@ export function ApiReceiptDetailPage() {
             </Button>
           )}
         />
-      </div>
+      </OperationalPageShell>
     )
   }
 
   return (
-    <div className="erp-page">
-      <PageHeader
-        title={row.movementNumber}
-        description={`Inward receipt · ${formatDate(row.movementDate)}`}
-        breadcrumbs={[
-          { label: 'Inventory', to: '/inventory/stock' },
-          { label: 'Receipts', to: '/inventory/movements/receipts' },
-          { label: row.movementNumber },
-        ]}
-        actions={(
-          <Button size="sm" variant="secondary" onClick={() => navigate('/inventory/movements/receipts')}>
-            Back to list
-          </Button>
-        )}
-      />
-
+    <OperationalPageShell
+      variant="dynamics"
+      layout="enterprise"
+      badge="Inventory & Warehouse"
+      title={row.movementNumber}
+      description={`Inward receipt · ${formatDate(row.movementDate)}`}
+      breadcrumbs={[
+        { label: 'Inventory & Warehouse', to: '/inventory' },
+        { label: 'Receipts', to: '/inventory/movements/receipts' },
+        { label: row.movementNumber },
+      ]}
+      autoBreadcrumbs={false}
+      favoritePath={`/inventory/movements/receipts/${row.id}`}
+      commandBar={(
+        <ErpCommandBar
+          inline
+          sticky={false}
+          secondaryActions={[
+            { id: 'back', label: 'Back to list', onClick: () => navigate('/inventory/movements/receipts') },
+            {
+              id: 'ledger',
+              label: 'Stock Ledger',
+              onClick: () => navigate(`/inventory/ledger?itemId=${row.itemId}&warehouseId=${row.warehouseId}`),
+            },
+          ]}
+        />
+      )}
+    >
       <div className="grid gap-4 lg:grid-cols-2">
         <SectionCard title="Movement">
           <dl className="grid gap-3 sm:grid-cols-2 text-[13px]">
@@ -572,7 +627,7 @@ export function ApiReceiptDetailPage() {
           </ul>
         </SectionCard>
       </div>
-    </div>
+    </OperationalPageShell>
   )
 }
 

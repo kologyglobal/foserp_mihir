@@ -21,12 +21,13 @@ export function isSuperAdminUser(): boolean {
   return canPermission('settings', 'edit')
 }
 
-/** Administration shell visibility — any user/role/tenant admin permission. */
+/** Administration shell visibility — any user/role/tenant/module admin permission. */
 export function canAccessAdminShell(): boolean {
   return (
     canAdminPermission('user.view')
     || canAdminPermission('role.view')
     || canAdminPermission('tenant.view')
+    || canAdminPermission('module.view')
     || isSuperAdminUser()
   )
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 export const salesInvoiceStatusSchema = z.enum(['DRAFT', 'READY_TO_POST', 'POSTED', 'CANCELLED', 'REVERSED'])
-export const salesInvoiceSourceTypeSchema = z.enum(['DIRECT', 'SALES_ORDER'])
+export const salesInvoiceSourceTypeSchema = z.enum(['DIRECT', 'SALES_ORDER', 'OUTBOUND_DISPATCH'])
 export const salesInvoiceSupplyTypeSchema = z.enum(['INTRA_STATE', 'INTER_STATE', 'EXPORT', 'SEZ', 'NON_GST'])
 export const salesInvoiceTaxTreatmentSchema = z.enum([
   'REGISTERED',

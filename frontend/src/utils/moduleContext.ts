@@ -29,7 +29,6 @@ export function getModuleFromPath(pathname: string): { module: string; area: str
 
   if (pathname.startsWith('/settings')) return { module: 'Administration', area: 'Settings' }
   if (pathname.startsWith('/reports')) return { module: 'Reports', area: 'Analytics' }
-  if (pathname.startsWith('/documents')) return { module: 'Documents', area: 'DMS' }
   if (pathname.startsWith('/inbox')) return { module: 'Executive', area: 'Inbox' }
 
   return { module: 'Home', area: 'FOS ERP' }
@@ -64,10 +63,7 @@ export function getPageTitle(pathname: string): string {
   if (pathname === '/home' || pathname === '/') return 'Home Dashboard'
   if (pathname === '/executive') return 'Executive Control Tower'
   if (pathname === '/home/inbox') return 'Role Inbox'
-  if (pathname === '/home/approvals') return 'Role Approvals'
   if (pathname === '/settings') return 'System Settings'
-  if (pathname.match(/\/mrp\/runs\//)) return 'Planning Result'
-  if (pathname.includes('/work-orders/create-from-mrp')) return 'Create Work Orders'
 
   const segments = pathname.split('/').filter(Boolean)
   if (segments.length >= 2) {

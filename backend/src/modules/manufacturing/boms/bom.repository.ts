@@ -46,11 +46,18 @@ export async function listBoms(tenantId: string, query: ListBomsQuery) {
       include: {
         productItem: { select: { id: true, code: true, name: true } },
         // Lightweight revision summary so list pages can show revision/status
-        // chips without N+1 detail calls.
+        // chips and component counts without N+1 detail calls.
         versions: {
           where: { deletedAt: null },
           orderBy: { versionNumber: 'desc' },
-          select: { id: true, versionNumber: true, revisionCode: true, status: true, effectiveFrom: true },
+          select: {
+            id: true,
+            versionNumber: true,
+            revisionCode: true,
+            status: true,
+            effectiveFrom: true,
+            _count: { select: { lines: { where: { deletedAt: null } } } },
+          },
         },
       },
     }),
@@ -91,6 +98,41 @@ export async function createBom(tenantId: string, userId: string, input: CreateB
     }
     throw err
   }
+}
+
+export async function updateBom(
+  tenantId: string,
+  userId: string,
+  bomId: string,
+  input: { name?: string; description?: string | null; isActive?: boolean },
+) {
+  await getBom(tenantId, bomId)
+  return prisma.manufacturingBom.update({
+    where: { id: bomId, tenantId },
+    data: { ...input, updatedBy: userId },
+    include: {
+      productItem: { select: { id: true, code: true, name: true } },
+    },
+  })
+}
+
+export async function softDeleteBom(tenantId: string, userId: string, bomId: string) {
+  await getBom(tenantId, bomId)
+  return prisma.manufacturingBom.update({
+    where: { id: bomId, tenantId },
+    data: { deletedAt: new Date(), isActive: false, updatedBy: userId },
+  })
+}
+
+export async function setBomActive(tenantId: string, userId: string, bomId: string, isActive: boolean) {
+  await getBom(tenantId, bomId)
+  return prisma.manufacturingBom.update({
+    where: { id: bomId, tenantId },
+    data: { isActive, updatedBy: userId },
+    include: {
+      productItem: { select: { id: true, code: true, name: true } },
+    },
+  })
 }
 
 // ─── BOM versions ──────────────────────────────────────────────────────────

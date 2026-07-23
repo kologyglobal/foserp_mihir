@@ -33,16 +33,12 @@ import { Enterprise360Documents,
   useEnterprise360Keyboard,
 } from '@/design-system/workspace360'
 import { EntityAttachmentsPanel } from '@/components/crm/shared/EntityAttachmentsPanel'
-import { demoNotesFromTexts, entityNotesToFeedNotes } from '@/utils/crmEntityNotes'
-import type { CrmEntityNoteDto } from '@/services/api/crmApi'
-import type { LeadStage } from '@/types/sales'
+import { demoNotesFromTexts } from '@/utils/crmEntityNotes'
 import { useApiMode } from '@/hooks/useApiMode'
 import type { CrmActivity, FollowUp } from '@/types/crm'
 import { Lead360RecordHeader } from '@/components/crm/Lead360RecordHeader'
 import { LeadChangeStageControl } from '@/components/crm/LeadChangeStageControl'
 import { LeadSummaryCard, resolveLeadContactDesignation } from '@/components/crm/LeadSummaryCard'
-import { CrmStageNotes } from '@/components/crm/shared/CrmStageNotes'
-import { LEAD_NOTE_STAGE_OPTIONS } from '@/utils/crmNoteStageOptions'
 import { LeadSmartOverviewPanel } from '@/components/crm/LeadSmartOverviewPanel'
 import { ErpLineItemsGrid } from '@/components/erp/ErpLineItemsGrid'
 import { CrmCardFormShell, ENTERPRISE_FORM_CLASS } from '@/components/crm/CrmCardFormShell'
@@ -122,7 +118,6 @@ export function Lead360Workspace() {
   const [pendingFollowUpId, setPendingFollowUpId] = useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [activeAdditionalSection, setActiveAdditionalSection] = useState<string | null>('requirement')
-  const [notesComposerOpen, setNotesComposerOpen] = useState(false)
   const deleteActivity = useCrmStore((s) => s.deleteActivity)
   const deleteFollowUp = useCrmStore((s) => s.deleteFollowUp)
   const completeActivity = useCrmStore((s) => s.completeActivity)
@@ -133,7 +128,8 @@ export function Lead360Workspace() {
     [attachmentItems, id],
   )
 
-  const leadDemoNotes = useMemo(
+  /** Remarks / follow-up text on the lead record — shown in the activity timeline only (no Notes card). */
+  const feedNotes = useMemo(
     () => demoNotesFromTexts([
       {
         label: 'Remarks',
@@ -144,15 +140,6 @@ export function Lead360Workspace() {
       { label: 'Follow-up notes', text: lead?.followUpNotes, authorName: lead?.leadOwnerName },
     ]),
     [lead],
-  )
-  /** API entity notes reported by the Notes card — merged into the unified feed. */
-  const [entityNotes, setEntityNotes] = useState<CrmEntityNoteDto[]>([])
-  const feedNotes = useMemo(
-    () => [
-      ...leadDemoNotes,
-      ...entityNotesToFeedNotes(entityNotes, (code) => leadStageLabel(code as LeadStage)),
-    ],
-    [leadDemoNotes, entityNotes],
   )
 
   const customerName = useCallback(
@@ -238,7 +225,7 @@ export function Lead360Workspace() {
     || lead?.expectedCloseDate
     || lead?.nextFollowUpDate
     || nextFollowUpPreview
-    || leadDemoNotes.length > 0
+    || feedNotes.length > 0
     || leadAttachments.length > 0
     || leadActivities.length > 0
     || leadFollowUps.length > 0
@@ -468,7 +455,7 @@ export function Lead360Workspace() {
         }
       : null,
     customerInvoices[0]
-      ? { id: customerInvoices[0].id, label: customerInvoices[0].invoiceNo, href: `/invoices/${customerInvoices[0].id}`, meta: formatCurrency(customerInvoices[0].gst.grandTotal) }
+      ? { id: customerInvoices[0].id, label: customerInvoices[0].invoiceNo, href: `/accounting/money-in/invoices/${customerInvoices[0].id}`, meta: formatCurrency(customerInvoices[0].gst.grandTotal) }
       : null,
   ].filter(Boolean) as { id: string; label: string; href: string; meta?: string }[]
 
@@ -647,20 +634,6 @@ export function Lead360Workspace() {
           lastActivityLabel={lastActivity?.subject ?? null}
         />
 
-        <CrmStageNotes
-          entityType="LEAD"
-          entityId={currentLead.id}
-          sectionId="lead-section-notes"
-          stageOptions={LEAD_NOTE_STAGE_OPTIONS}
-          historyLabel="Lead notes history"
-          currentStage={currentLead.stage}
-          demoNotes={leadDemoNotes}
-          editPath={routes.edit(currentLead.id)}
-          composerOpen={notesComposerOpen}
-          onComposerOpenChange={setNotesComposerOpen}
-          onNotesChange={setEntityNotes}
-        />
-
         <ErpAdditionalInfoToggle
           open={showAdditionalDetails}
           onToggle={() => {
@@ -702,7 +675,7 @@ export function Lead360Workspace() {
                   leadNextFollowUpDate={lead.nextFollowUpDate}
                   canAddActivity={canAddActivity}
                   canAddFollowUp={canAddFollowUp}
-                  canAddNote
+                  canAddNote={false}
                   onLogActivity={() => {
                     setEditingActivity(null)
                     setLogActivityOpen(true)
@@ -710,12 +683,6 @@ export function Lead360Workspace() {
                   onScheduleFollowUp={() => {
                     setEditingFollowUp(null)
                     setFollowUpOpen(true)
-                  }}
-                  onAddNote={() => {
-                    setNotesComposerOpen(true)
-                    window.requestAnimationFrame(() => {
-                      document.getElementById('lead-section-notes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    })
                   }}
                   onEditActivity={canEditActivity ? (activity) => {
                     setEditingActivity(activity)

@@ -6,6 +6,7 @@ import { useForm, useWatch, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Box,
+  CircleDollarSign,
   Factory,
   Package,
   Percent,
@@ -41,11 +42,20 @@ import {
   type EngineeringProductType,
   type InventoryPostingType,
 } from '../../../types/taxMaster'
-import type { Item, ItemType, SubAssemblyRule } from '../../../types/master'
+import type { Item, ItemSalesFulfilmentMethod, ItemType, SubAssemblyRule } from '../../../types/master'
 import { SUB_ASSEMBLY_RULE_LABELS } from '../../../types/bom'
 import { EnterpriseMasterWorkspace, MasterForm, MasterStickyFooter } from '../shared/EnterpriseMasterShell'
 import { MasterCodeField } from '../../../components/masters/MasterCodeField'
 import type { MasterCodeSeriesHandle } from '../../../hooks/useMasterCodeSeries'
+
+const FULFILMENT_OPTIONS: { value: ItemSalesFulfilmentMethod; label: string }[] = [
+  { value: 'STOCK', label: 'Stock' },
+  { value: 'PURCHASE', label: 'Purchase' },
+  { value: 'PRODUCTION', label: 'Production' },
+  { value: 'SUBCONTRACT', label: 'Subcontract' },
+  { value: 'SERVICE', label: 'Service' },
+  { value: 'MANUAL', label: 'Manual' },
+]
 
 const schema = z.object({
   productType: z.enum(['boi', 'raw_material', 'sub_assembly', 'assembly_product', 'finish_product', 'scrap', 'service']),
@@ -55,7 +65,7 @@ const schema = z.object({
   itemDescription: z.string(),
   categoryId: z.string().min(1),
   inventoryType: z.enum(['inventory', 'non_inventory', 'service']),
-  itemType: z.enum(['raw', 'bought_out', 'consumable', 'sub_assembly', 'finished_good']),
+  itemType: z.enum(['raw', 'bought_out', 'consumable', 'sub_assembly', 'finished_good', 'scrap', 'service']),
   isBlocked: z.boolean(),
   baseUomId: z.string().min(1),
   quantityPerUom: z.coerce.number().min(0),
@@ -68,6 +78,13 @@ const schema = z.object({
   reorderLevel: z.coerce.number().min(0),
   reorderQty: z.coerce.number().min(0),
   standardRate: z.coerce.number().min(0),
+  salesDescription: z.string().optional(),
+  salesUomId: z.string().nullable().optional(),
+  defaultSalesRate: z.coerce.number().min(0),
+  salesLeadDays: z.coerce.number().int().min(0),
+  salesAllowed: z.boolean(),
+  defaultFulfilmentMethod: z.enum(['STOCK', 'PURCHASE', 'PRODUCTION', 'SUBCONTRACT', 'SERVICE', 'MANUAL']),
+  productionAllowed: z.boolean(),
   isPurchasable: z.boolean(),
   isStockable: z.boolean(),
   isActive: z.boolean(),
@@ -91,8 +108,23 @@ function mapProductTypeToItemType(pt: EngineeringProductType): ItemType {
   if (pt === 'boi') return 'bought_out'
   if (pt === 'sub_assembly' || pt === 'assembly_product') return 'sub_assembly'
   if (pt === 'finish_product') return 'finished_good'
-  if (pt === 'service') return 'consumable'
+  if (pt === 'service') return 'service'
   return 'bought_out'
+}
+
+function defaultSalesAllowedForProductType(pt: EngineeringProductType): boolean {
+  return pt === 'finish_product' || pt === 'service' || pt === 'boi'
+}
+
+function defaultFulfilmentForProductType(pt: EngineeringProductType): ItemSalesFulfilmentMethod {
+  if (pt === 'finish_product' || pt === 'sub_assembly' || pt === 'assembly_product') return 'PRODUCTION'
+  if (pt === 'service') return 'SERVICE'
+  if (pt === 'boi' || pt === 'raw_material') return 'PURCHASE'
+  return 'MANUAL'
+}
+
+function defaultProductionAllowedForProductType(pt: EngineeringProductType): boolean {
+  return pt === 'finish_product' || pt === 'sub_assembly' || pt === 'assembly_product'
 }
 
 export function ItemListPage() {
@@ -232,6 +264,17 @@ export function ItemFormPage() {
           qcRequired: existing.qcRequired ?? false,
           quantityPerUom: existing.quantityPerUom ?? 1,
           purchaseQtyPerUom: existing.purchaseQtyPerUom ?? 1,
+          salesDescription: existing.salesDescription ?? '',
+          salesUomId: existing.salesUomId ?? existing.baseUomId,
+          defaultSalesRate: existing.defaultSalesRate ?? 0,
+          salesLeadDays: existing.salesLeadDays ?? 0,
+          salesAllowed: existing.salesAllowed ?? defaultSalesAllowedForProductType(existing.productType ?? 'raw_material'),
+          defaultFulfilmentMethod:
+            existing.defaultFulfilmentMethod ??
+            defaultFulfilmentForProductType(existing.productType ?? 'raw_material'),
+          productionAllowed:
+            existing.productionAllowed ??
+            defaultProductionAllowedForProductType(existing.productType ?? 'raw_material'),
         }
       : {
           productType: 'raw_material' as EngineeringProductType,
@@ -249,9 +292,16 @@ export function ItemFormPage() {
           reorderLevel: 0,
           reorderQty: 0,
           standardRate: 0,
+          salesDescription: '',
+          defaultSalesRate: 0,
+          salesLeadDays: 0,
+          salesAllowed: false,
+          defaultFulfilmentMethod: 'PURCHASE' as ItemSalesFulfilmentMethod,
+          productionAllowed: false,
           subAssemblyRule: null,
           baseUomId: uoms[0]?.id ?? '',
           purchaseUomId: uoms[0]?.id ?? '',
+          salesUomId: uoms[0]?.id ?? '',
           categoryId: leafCategories[0]?.id ?? '',
         },
   })
@@ -471,6 +521,49 @@ export function ItemFormPage() {
         </ErpCardSection>
 
         <ErpCardSection
+          id="item-section-sales"
+          title="Sales"
+          subtitle="CRM commercial fields. Default sales rate is the interim sales price (not inventory standard rate)."
+          icon={CircleDollarSign}
+          accent="blue"
+          columns={3}
+          collapsible
+          defaultOpen
+        >
+          <FormField label="Sales allowed">
+            <Checkbox {...register('salesAllowed')} label="Allow on CRM / sales documents" />
+          </FormField>
+          <FormField label="Production allowed">
+            <Checkbox {...register('productionAllowed')} label="Allow manufacturing use" />
+          </FormField>
+          <FormField label="Default fulfilment">
+            <Select {...register('defaultFulfilmentMethod')}>
+              <option value="">— Select —</option>
+              {FULFILMENT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label="Default sales rate">
+            <Input type="number" step="0.01" {...register('defaultSalesRate')} />
+          </FormField>
+          <FormField label="Sales lead days">
+            <Input type="number" step="1" {...register('salesLeadDays')} />
+          </FormField>
+          <FormField label="Sales UOM">
+            <UomMasterSelect
+              value={watch('salesUomId') ?? ''}
+              onChange={(v) => setValue('salesUomId', v || null)}
+            />
+          </FormField>
+          <FormField label="Sales description" className="col-span-full md:col-span-2 xl:col-span-3">
+            <Textarea rows={2} {...register('salesDescription')} />
+          </FormField>
+        </ErpCardSection>
+
+        <ErpCardSection
           id="item-section-tax"
           title="Tax"
           subtitle="HSN and GST group for statutory reporting."
@@ -604,6 +697,10 @@ export function ItemDetailPage() {
           <DetailField label="UOM" value={getUomName(item.baseUomId)} />
           <DetailField label="Blocked" value={item.isBlocked ? 'Yes' : 'No'} />
           <DetailField label="Std Rate" value={formatCurrency(item.standardRate)} />
+          <DetailField label="Sales allowed" value={item.salesAllowed ? 'Yes' : 'No'} />
+          <DetailField label="Default sales rate" value={formatCurrency(item.defaultSalesRate ?? 0)} />
+          <DetailField label="Fulfilment" value={item.defaultFulfilmentMethod ?? '—'} />
+          <DetailField label="Sales lead days" value={String(item.salesLeadDays ?? 0)} />
         </DetailGrid>
       </DetailSection>
       <DetailSection title="Tax">

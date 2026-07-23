@@ -36,6 +36,8 @@ export interface GstGroupCode extends MasterRecordAudit {
   updatedAt: string
 }
 
+export type GstTaxApplicability = 'SALES' | 'PURCHASE' | 'BOTH'
+
 export interface GstRate extends MasterRecordAudit {
   id: string
   code: string
@@ -47,6 +49,8 @@ export interface GstRate extends MasterRecordAudit {
   sgst: number
   cgst: number
   igst: number
+  /** Sales / purchase / both — finance engine filters by document context. */
+  applicableFor: GstTaxApplicability
   isActive: boolean
   createdAt: string
   updatedAt: string

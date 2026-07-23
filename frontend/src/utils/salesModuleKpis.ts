@@ -182,7 +182,7 @@ export function buildOrderStatusKpis(
       icon: Factory,
       accent: metrics.pendingMrp ? 'amber' : 'green',
       context: 'Awaiting planning run',
-      href: '/mrp/run',
+      href: '/manufacturing/production-plan',
       updatedAt: now(),
     },
     {
@@ -192,7 +192,7 @@ export function buildOrderStatusKpis(
       icon: KPI_ICON_PRESETS.pipeline,
       accent: 'blue',
       context: 'On shop floor',
-      href: '/work-orders',
+      href: '/manufacturing/work-orders',
       updatedAt: now(),
     },
     {

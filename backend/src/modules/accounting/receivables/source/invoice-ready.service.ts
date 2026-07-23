@@ -118,15 +118,24 @@ export async function assertDispatchLineInvoiceReadyQty(
     )
   }
   const dispatchedQty = d(line.quantity)
+  const postingLine = await db.dispatchPostingLine.findFirst({
+    where: { tenantId, outboundDispatchLineId },
+    select: { reversedQuantity: true },
+  })
+  const reversedQty = d(postingLine?.reversedQuantity ?? 0)
+  const netDispatchedQty = sub(dispatchedQty, reversedQty)
+  if (compare(netDispatchedQty, 0) < 0) {
+    throw new AppError(422, `Dispatch line ${outboundDispatchLineId} has invalid reverse qty`, 'DISPATCH_REVERSE_QTY_INVALID')
+  }
   const invoicedQty = await sumActiveInvoicedQtyForDispatchLine(tenantId, outboundDispatchLineId, options)
-  const invoiceReadyQty = sub(dispatchedQty, invoicedQty)
+  const invoiceReadyQty = sub(netDispatchedQty, invoicedQty)
   if (compare(toDecimal(requestedQty), invoiceReadyQty) > 0) {
     throw new InvoiceReadyQuantityExceededError(
-      `Invoice qty ${formatForPersistence(requestedQty)} exceeds invoice-ready qty ${formatForPersistence(invoiceReadyQty)} on dispatch line ${outboundDispatchLineId} (dispatched ${formatForPersistence(dispatchedQty)}, already invoiced ${formatForPersistence(invoicedQty)})`,
+      `Invoice qty ${formatForPersistence(requestedQty)} exceeds invoice-ready qty ${formatForPersistence(invoiceReadyQty)} on dispatch line ${outboundDispatchLineId} (dispatched ${formatForPersistence(netDispatchedQty)}, already invoiced ${formatForPersistence(invoicedQty)})`,
     )
   }
   return {
-    dispatchedQty: formatForPersistence(dispatchedQty),
+    dispatchedQty: formatForPersistence(netDispatchedQty),
     invoicedQty: formatForPersistence(invoicedQty),
     invoiceReadyQty: formatForPersistence(invoiceReadyQty),
   }
@@ -204,10 +213,10 @@ export async function listInvoiceReadyDispatchLines(
   ])
 
   const lineIds = lines.map((l) => l.id)
-  const consumed =
+  const [consumed, postingLines] = await Promise.all([
     lineIds.length === 0
-      ? []
-      : await prisma.salesInvoiceSourceLink.groupBy({
+      ? Promise.resolve([])
+      : prisma.salesInvoiceSourceLink.groupBy({
           by: ['sourceLineId'],
           where: {
             tenantId,
@@ -216,14 +225,24 @@ export async function listInvoiceReadyDispatchLines(
             sourceLineId: { in: lineIds },
           },
           _sum: { quantity: true },
-        })
+        }),
+    lineIds.length === 0
+      ? Promise.resolve([])
+      : prisma.dispatchPostingLine.findMany({
+          where: { tenantId, outboundDispatchLineId: { in: lineIds } },
+          select: { outboundDispatchLineId: true, reversedQuantity: true },
+        }),
+  ])
   const consumedMap = new Map(
     consumed.map((c) => [c.sourceLineId ?? '', d(c._sum.quantity ?? 0)]),
+  )
+  const reversedMap = new Map(
+    postingLines.map((p) => [p.outboundDispatchLineId, d(p.reversedQuantity)]),
   )
 
   const mapped: DispatchLineInvoiceReady[] = []
   for (const line of lines) {
-    const dispatchedQty = d(line.quantity)
+    const dispatchedQty = sub(d(line.quantity), reversedMap.get(line.id) ?? toDecimal(0))
     const invoicedQty = consumedMap.get(line.id) ?? toDecimal(0)
     const invoiceReadyQty = sub(dispatchedQty, invoicedQty)
     if (query.readyOnly !== false && compare(invoiceReadyQty, 0) <= 0) continue

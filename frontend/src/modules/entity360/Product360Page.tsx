@@ -45,7 +45,7 @@ export function Product360Page() {
         <CommandBar>
           <CommandBarGroup label="Product">
             <CommandBarButton icon={Box} label="Released BOM" onClick={() => data.releasedBom && navigate(bom360Path(data.releasedBom.id))} primary />
-            <CommandBarButton icon={Factory} label="Work Orders" onClick={() => navigate('/work-orders')} />
+            <CommandBarButton icon={Factory} label="Work Orders" onClick={() => navigate('/manufacturing/work-orders')} />
             <CommandBarButton icon={Truck} label="Dispatch" onClick={() => navigate('/dispatch/register')} />
           </CommandBarGroup>
         </CommandBar>
@@ -68,8 +68,8 @@ export function Product360Page() {
       activity={data.activity}
       quickActions={
         <QuickActions actions={[
-          { label: 'Run MRP', onClick: () => navigate('/mrp/run') },
-          { label: 'Create WO', onClick: () => navigate('/work-orders/create-from-mrp') },
+          { label: 'Production Plan', onClick: () => navigate('/manufacturing/production-plan') },
+          { label: 'Create WO', onClick: () => navigate('/manufacturing/work-orders/new') },
           { label: 'Sales Orders', onClick: () => navigate('/sales/orders') },
         ]} />
       }

@@ -9,11 +9,13 @@ import * as ewayBillService from './eway-bill.service.js'
 import * as gstExtractService from './gst-extract.service.js'
 import type {
   CancelGstDocumentInput,
+  EWayPanelQueryInput,
   GenerateEInvoiceInput,
   GenerateEWayBillInput,
   GstExtractQueryInput,
   GstSummaryQueryInput,
   ListGstDocumentQueryInput,
+  UpdateEWayVehicleInput,
 } from './tax-compliance.schemas.js'
 
 export const listOutwardSupplies = asyncHandler(async (req: Request, res: Response) => {
@@ -163,4 +165,18 @@ export const cancelEWayBill = asyncHandler(async (req: Request, res: Response) =
   const body = req.body as CancelGstDocumentInput
   const item = await ewayBillService.cancelEWayBill(req, tenantId, String(req.params.id), body)
   return sendSuccess(res, 'e-way bill cancelled', item)
+})
+
+export const getEWayPanel = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const query = req.query as unknown as EWayPanelQueryInput
+  const panel = await ewayBillService.getEWayPanel(req, tenantId, query)
+  return sendSuccess(res, 'e-way bill panel', panel)
+})
+
+export const updateEWayVehicle = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const body = req.body as UpdateEWayVehicleInput
+  const item = await ewayBillService.updateEWayVehicle(req, tenantId, String(req.params.id), body)
+  return sendSuccess(res, 'e-way bill vehicle updated', item)
 })

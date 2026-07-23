@@ -29,16 +29,24 @@ import {
   listCostingPolicies,
   postManufacturingAccountingEvent,
   retryManufacturingAccountingEvent,
+  getManufacturingAccountingFeatureControl,
   setManufacturingAccountingFeatureControl,
+  postEnableManufacturingAccounting,
+  postDisableManufacturingAccounting,
+  postInventoryReconciliationSignOff,
+  postFinancePilotSignOff,
+  getManufacturingAccountingReadinessConsolidated,
   validateManufacturingAccountingEvent,
   type CloseReadyRow,
   type ManufacturingAccountingEvent,
+  type ManufacturingAccountingFeatureStatus,
   type ManufacturingAccountingGateStatus,
   type ManufacturingAccountingWorkspaceSummary,
   type ManufacturingCostingPolicy,
   type ProvisionalCostRow,
   type ReconciliationRow,
 } from '@/services/api/manufacturingCostingApi'
+import { listLegalEntities } from '@/services/api/financeApi'
 import {
   canManageCostingPolicy,
   canPostAccounting,
@@ -170,6 +178,17 @@ export function ManufacturingAccountingWorkspacePage() {
   const [tabLoading, setTabLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [featureBusy, setFeatureBusy] = useState(false)
+  const [enablePanel, setEnablePanel] = useState<ManufacturingAccountingFeatureStatus | null>(null)
+  const [inventoryReconcileConfirmed, setInventoryReconcileConfirmed] = useState(false)
+  const [pilotSignOff, setPilotSignOff] = useState(false)
+  const [inventoryReconcileRemarks, setInventoryReconcileRemarks] = useState('')
+  const [pilotSignOffRemarks, setPilotSignOffRemarks] = useState('')
+  const [inventoryReportRef, setInventoryReportRef] = useState('')
+  const [consolidated, setConsolidated] = useState<{
+    nextAction: { code: string; label: string }
+    canEnable: boolean
+    blockingCodes: string[]
+  } | null>(null)
 
   const [unposted, setUnposted] = useState<ManufacturingAccountingEvent[]>([])
   const [failed, setFailed] = useState<ManufacturingAccountingEvent[]>([])
@@ -187,10 +206,32 @@ export function ManufacturingAccountingWorkspacePage() {
     try {
       const [gateRes, summaryRes] = await Promise.all([
         getManufacturingAccountingGateStatus().catch(() => null),
-        getAccountingWorkspaceSummary(),
+        getAccountingWorkspaceSummary().catch(() => null),
       ])
-      setGate(gateRes?.data ?? null)
-      setSummary(summaryRes.data)
+      let nextGate = gateRes?.data ?? null
+      // Finance admins may lack manufacturing.cost.view; still resolve LE so Enable is reachable.
+      if ((!nextGate || !nextGate.legalEntityId) && canManageAccountingFeatureFlag()) {
+        try {
+          const les = await listLegalEntities({ limit: 50 })
+          const rows = Array.isArray(les.data) ? les.data : []
+          const preferred =
+            rows.find((le) => le.isDefault && le.isActive) ?? rows.find((le) => le.isActive) ?? rows[0]
+          if (preferred) {
+            nextGate = {
+              legalEntityId: preferred.id,
+              enabled: nextGate?.enabled ?? false,
+              reason: nextGate?.reason ?? 'FLAG_OFF',
+            }
+          }
+        } catch {
+          /* leave gate as-is */
+        }
+      }
+      setGate(nextGate)
+      setSummary(summaryRes?.data ?? null)
+      if (!summaryRes && !nextGate) {
+        notify.error('Failed to load manufacturing accounting workspace')
+      }
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Failed to load manufacturing accounting workspace')
     } finally {
@@ -274,22 +315,127 @@ export function ManufacturingAccountingWorkspacePage() {
     [refresh],
   )
 
+  const handleOpenEnablePanel = useCallback(async () => {
+    if (!gate?.legalEntityId) return
+    setFeatureBusy(true)
+    try {
+      const res = await getManufacturingAccountingFeatureControl(gate.legalEntityId)
+      setEnablePanel(res.data)
+      // Explicit confirmations only — never preselect from prior server sign-offs.
+      setInventoryReconcileConfirmed(false)
+      setPilotSignOff(false)
+      setInventoryReconcileRemarks('')
+      setPilotSignOffRemarks('')
+      setInventoryReportRef('')
+      try {
+        const ready = await getManufacturingAccountingReadinessConsolidated({
+          legalEntityId: gate.legalEntityId,
+        })
+        setConsolidated({
+          nextAction: ready.data.nextAction,
+          canEnable: ready.data.canEnable,
+          blockingCodes: ready.data.blockingCodes,
+        })
+      } catch {
+        setConsolidated(null)
+      }
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Failed to load enablement readiness')
+    } finally {
+      setFeatureBusy(false)
+    }
+  }, [gate])
+
+  const handleConfirmEnable = useCallback(async () => {
+    if (!gate?.legalEntityId) return
+    if (!inventoryReconcileConfirmed || !pilotSignOff) {
+      notify.warning('Both inventory reconcile and pilot Finance sign-off are required')
+      return
+    }
+    const checks = enablePanel?.readiness.enablementChecks
+    const hardReady =
+      checks?.accountMappingsReady &&
+      checks?.openFinancialPeriodExists &&
+      checks.failedAccountingEventCount === 0 &&
+      (checks.inventoryPostingsUnreconciledCount ?? checks.unreconciledAccountingEventCount) === 0
+    if (!hardReady) {
+      notify.error(
+        `Cannot enable — resolve blockers: ${(enablePanel?.enablement.blockers ?? []).filter((b) => b !== 'INVENTORY_RECONCILE_NOT_SIGNED_OFF' && b !== 'PILOT_FINANCE_SIGNOFF_REQUIRED').join(', ') || 'readiness incomplete'}`,
+      )
+      return
+    }
+    const confirmed = await appConfirm({
+      title: 'Enable Manufacturing Accounting?',
+      description:
+        'Recorded manufacturing events will start posting journal vouchers to the general ledger via the central posting engine. Already-posted vouchers are unaffected. This action requires Finance settings permission.',
+      confirmLabel: 'Enable Manufacturing GL',
+      tone: 'danger',
+    })
+    if (!confirmed) return
+    setFeatureBusy(true)
+    try {
+      const idem = `enable-${gate.legalEntityId}-${Date.now()}`
+      await postInventoryReconciliationSignOff({
+        legalEntityId: gate.legalEntityId,
+        inventoryReconcileConfirmed: true,
+        remarks: inventoryReconcileRemarks.trim() || undefined,
+        reportRef: inventoryReportRef.trim() || undefined,
+        scope: { workOrderIds: [], warehouseIds: [] },
+        idempotencyKey: `${idem}-inv`,
+      })
+      await postFinancePilotSignOff({
+        legalEntityId: gate.legalEntityId,
+        pilotSignOff: true,
+        remarks: pilotSignOffRemarks.trim() || undefined,
+        scope: { samplePostingPreviewReviewed: true },
+        idempotencyKey: `${idem}-fin`,
+      })
+      await postEnableManufacturingAccounting({
+        legalEntityId: gate.legalEntityId,
+        inventoryReconcileConfirmed: true,
+        pilotSignOff: true,
+        confirmationNote: pilotSignOffRemarks.trim() || inventoryReconcileRemarks.trim() || undefined,
+        idempotencyKey: `${idem}-en`,
+      })
+      notify.success('Manufacturing Accounting enabled')
+      setEnablePanel(null)
+      await loadSummary()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Failed to enable Manufacturing Accounting')
+      try {
+        const res = await getManufacturingAccountingFeatureControl(gate.legalEntityId)
+        setEnablePanel(res.data)
+      } catch {
+        /* ignore refresh error */
+      }
+    } finally {
+      setFeatureBusy(false)
+    }
+  }, [gate, inventoryReconcileConfirmed, pilotSignOff, inventoryReconcileRemarks, pilotSignOffRemarks, inventoryReportRef, enablePanel, loadSummary])
+
   const handleToggleFeature = useCallback(
     async (enable: boolean) => {
       if (!gate?.legalEntityId) return
+      if (enable) {
+        await handleOpenEnablePanel()
+        return
+      }
       const confirmed = await appConfirm({
-        title: enable ? 'Enable Manufacturing Accounting?' : 'Disable Manufacturing Accounting?',
-        description: enable
-          ? 'Recorded manufacturing events (material issues, FG receipts, absorption) will start posting journal vouchers to the general ledger. Enabling requires account mappings and an open accounting period.'
-          : 'New manufacturing events will be recorded but no longer posted to the general ledger. Already-posted vouchers are not affected.',
-        confirmLabel: enable ? 'Enable' : 'Disable',
+        title: 'Disable Manufacturing Accounting?',
+        description:
+          'New manufacturing events will be recorded but no longer posted to the general ledger. Already-posted vouchers, events, and cost snapshots are preserved. Future auto-posting is turned off.',
+        confirmLabel: 'Disable',
         tone: 'danger',
       })
       if (!confirmed) return
       setFeatureBusy(true)
       try {
-        await setManufacturingAccountingFeatureControl(gate.legalEntityId, enable)
-        notify.success(enable ? 'Manufacturing Accounting enabled' : 'Manufacturing Accounting disabled')
+        await postDisableManufacturingAccounting({
+          legalEntityId: gate.legalEntityId,
+          reason: 'Pilot paused from Manufacturing Accounting workspace',
+        })
+        notify.success('Manufacturing Accounting disabled')
+        setEnablePanel(null)
         await loadSummary()
       } catch (e) {
         notify.error(e instanceof Error ? e.message : 'Failed to update the Manufacturing Accounting flag')
@@ -297,7 +443,7 @@ export function ManufacturingAccountingWorkspacePage() {
         setFeatureBusy(false)
       }
     },
-    [gate, loadSummary],
+    [gate, loadSummary, handleOpenEnablePanel],
   )
 
   const handleActivatePolicy = useCallback(
@@ -378,10 +524,251 @@ export function ManufacturingAccountingWorkspacePage() {
               </span>
               {gate.legalEntityId && canManageAccountingFeatureFlag() ? (
                 <Button size="sm" disabled={featureBusy} onClick={() => void handleToggleFeature(true)}>
-                  Enable
+                  Enable…
                 </Button>
               ) : null}
             </div>
+          ) : null}
+
+          {!gate && canManageAccountingFeatureFlag() ? (
+            <div className="flex flex-wrap items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span className="min-w-0 flex-1">
+                Could not resolve Manufacturing Accounting gate status. Confirm an active legal entity exists, then retry
+                Enable from Finance settings permissions.
+              </span>
+            </div>
+          ) : null}
+
+          {enablePanel && !gate?.enabled ? (
+            <section className="rounded-lg border border-erp-border bg-white p-4 space-y-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold">Enablement readiness</h3>
+                  <p className="text-[12px] text-erp-muted">
+                    Legal entity {enablePanel.legalEntity.code}
+                    {enablePanel.legalEntity.displayName ? ` · ${enablePanel.legalEntity.displayName}` : ''}. Manufacturing
+                    GL stays off until every hard check passes and Finance signs off.
+                  </p>
+                </div>
+                <Button size="sm" variant="ghost" disabled={featureBusy} onClick={() => setEnablePanel(null)}>
+                  Cancel
+                </Button>
+              </div>
+              {consolidated ? (
+                <div
+                  className={cn(
+                    'rounded-md border px-3 py-2 text-[12px]',
+                    consolidated.canEnable
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-950'
+                      : 'border-amber-200 bg-amber-50 text-amber-950',
+                  )}
+                >
+                  <p className="font-semibold">
+                    {consolidated.canEnable
+                      ? 'All readiness checks passed. Manufacturing Accounting can now be enabled for the approved pilot scope.'
+                      : 'Manufacturing Accounting cannot be enabled yet.'}
+                  </p>
+                  <p className="mt-0.5 opacity-90">Primary next action: {consolidated.nextAction.label}</p>
+                  {consolidated.nextAction.code === 'CONFIGURE_ACCOUNT_MAPPINGS' ? (
+                    <Link
+                      to="/accounting/settings/default-mappings"
+                      className="mt-1 inline-block font-semibold underline"
+                    >
+                      Configure Missing Accounts
+                    </Link>
+                  ) : null}
+                </div>
+              ) : null}
+              <ul className="grid gap-1.5 text-[12px] sm:grid-cols-2">
+                {[
+                  {
+                    ok: enablePanel.readiness.enablementChecks?.accountMappingsReady ?? false,
+                    label: 'Required account mappings',
+                    detail: enablePanel.readiness.mappingKeys.missing.length
+                      ? `Missing: ${enablePanel.readiness.mappingKeys.missing.join(', ')}`
+                      : enablePanel.readiness.mappingKeys.invalid?.length
+                        ? `Invalid: ${enablePanel.readiness.mappingKeys.invalid.map((i) => i.mappingKey).join(', ')}`
+                        : `Core + conditional OK (${enablePanel.readiness.mappingKeys.present.length} present)`,
+                  },
+                  {
+                    ok: enablePanel.readiness.enablementChecks?.openFinancialPeriodExists ?? false,
+                    label: 'Open accounting period',
+                    detail: enablePanel.readiness.openPeriod
+                      ? `${enablePanel.readiness.openPeriod.code} (${enablePanel.readiness.openPeriod.status}) · ${enablePanel.readiness.openPeriod.startDate} → ${enablePanel.readiness.openPeriod.endDate} · as of ${enablePanel.readiness.postingDateChecked ?? '—'}`
+                      : `No OPEN period covers ${enablePanel.readiness.postingDateChecked ?? 'today'}`,
+                  },
+                  {
+                    ok: (enablePanel.readiness.enablementChecks?.failedAccountingEventCount ?? 1) === 0,
+                    label: 'No failed accounting events',
+                    detail: `${enablePanel.readiness.failedEventCount} failed` +
+                      (enablePanel.readiness.eventIntegrity?.counts.retryExhausted
+                        ? ` · ${enablePanel.readiness.eventIntegrity.counts.retryExhausted} retry exhausted`
+                        : ''),
+                  },
+                  {
+                    ok:
+                      (enablePanel.readiness.enablementChecks?.inventoryPostingsUnreconciledCount ??
+                        enablePanel.readiness.inventoryPostingsUnreconciledCount ??
+                        1) === 0,
+                    label: 'No unreconciled inventory / accounting exceptions',
+                    detail: `${enablePanel.readiness.inventoryPostingsUnreconciledCount ?? enablePanel.readiness.eventIntegrity?.counts.unreconciled ?? 0} exceptions` +
+                      (enablePanel.readiness.eventIntegrity
+                        ? ` (unposted ${enablePanel.readiness.eventIntegrity.counts.unreconciled}, inv↔acct ${enablePanel.readiness.eventIntegrity.counts.inventoryMissingAccounting + enablePanel.readiness.eventIntegrity.counts.accountingMissingInventory}, dup ${enablePanel.readiness.eventIntegrity.counts.duplicatePendingPosting}, reversal ${enablePanel.readiness.eventIntegrity.counts.reversalChainInconsistent})`
+                        : ''),
+                  },
+                ].map((row) => (
+                  <li
+                    key={row.label}
+                    className={cn(
+                      'rounded-md border px-3 py-2',
+                      row.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : 'border-rose-200 bg-rose-50 text-rose-950',
+                    )}
+                  >
+                    <p className="font-semibold">
+                      {row.ok ? '✓' : '✗'} {row.label}
+                    </p>
+                    <p className="text-[11px] opacity-80">{row.detail}</p>
+                  </li>
+                ))}
+              </ul>
+              {enablePanel.enablement.blockers.filter(
+                (b) => b !== 'INVENTORY_RECONCILE_NOT_SIGNED_OFF' && b !== 'PILOT_FINANCE_SIGNOFF_REQUIRED',
+              ).length > 0 ? (
+                <p className="flex items-start gap-1.5 text-[12px] text-rose-800">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span>
+                    Blockers:{' '}
+                    {enablePanel.enablement.blockers
+                      .filter((b) => b !== 'INVENTORY_RECONCILE_NOT_SIGNED_OFF' && b !== 'PILOT_FINANCE_SIGNOFF_REQUIRED')
+                      .join(', ')}
+                  </span>
+                </p>
+              ) : null}
+              {enablePanel.readiness.eventIntegrity?.exceptions?.length ? (
+                <div className="max-h-48 overflow-auto rounded-md border border-rose-200 bg-white text-[11px]">
+                  <table className="w-full border-collapse">
+                    <thead className="sticky top-0 bg-rose-50 text-left text-rose-900">
+                      <tr>
+                        <th className="px-2 py-1 font-semibold">Status</th>
+                        <th className="px-2 py-1 font-semibold">Type</th>
+                        <th className="px-2 py-1 font-semibold">WO</th>
+                        <th className="px-2 py-1 font-semibold">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {enablePanel.readiness.eventIntegrity.exceptions.slice(0, 20).map((ex, idx) => (
+                        <tr key={`${ex.eventId ?? ex.sourceDocument}-${idx}`} className="border-t border-rose-100">
+                          <td className="px-2 py-1 whitespace-nowrap">{ex.reconciliationStatus}</td>
+                          <td className="px-2 py-1 whitespace-nowrap">{ex.eventType ?? ex.sourceType}</td>
+                          <td className="px-2 py-1 whitespace-nowrap">{ex.workOrderNumber ?? '—'}</td>
+                          <td className="px-2 py-1">{ex.failureReason ?? ex.failureCode ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+              {enablePanel.readiness.eventIntegrity?.technicalDetails?.length ? (
+                <details className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[11px]">
+                  <summary className="cursor-pointer font-semibold text-slate-800">
+                    Technical details (authorised)
+                  </summary>
+                  <ul className="mt-2 space-y-1 font-mono text-[10px] text-slate-700">
+                    {enablePanel.readiness.eventIntegrity.technicalDetails.slice(0, 15).map((row, idx) => (
+                      <li key={`${row.eventId ?? row.inventoryMovementId}-${idx}`}>
+                        {row.exceptionKind} · event={row.eventId ?? '—'} · posting={row.postingEventId ?? '—'} ·
+                        attempts={row.attemptCount ?? '—'} · inv={row.inventoryMovementId ?? '—'}
+                        {row.postingErrorCode ? ` · code=${row.postingErrorCode}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
+              <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px]">
+                {enablePanel.signOffs?.inventoryReconcile.confirmed || enablePanel.signOffs?.pilotFinance.confirmed ? (
+                  <p className="text-[11px] text-erp-muted">
+                    Prior server sign-offs exist
+                    {enablePanel.signOffs.historyCount
+                      ? ` (${enablePanel.signOffs.historyCount} history entries)`
+                      : ''}
+                    — you must still explicitly confirm below to enable.
+                  </p>
+                ) : null}
+                <label className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={inventoryReconcileConfirmed}
+                    onChange={(e) => setInventoryReconcileConfirmed(e.target.checked)}
+                  />
+                  <span>
+                    <strong>Inventory reconciliation signed off</strong> — inventory vs production postings reviewed for
+                    this legal entity. Checkbox starts unchecked; confirmation is stored on the server only.
+                  </span>
+                </label>
+                <label className="block">
+                  <span className="text-erp-muted">Inventory reconcile remarks</span>
+                  <input
+                    className="mt-1 w-full rounded border border-erp-border bg-white px-2 py-1.5 text-[12px]"
+                    value={inventoryReconcileRemarks}
+                    maxLength={1000}
+                    onChange={(e) => setInventoryReconcileRemarks(e.target.value)}
+                    placeholder="Pilot plant, selected warehouses and Work Orders reconciled…"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-erp-muted">Reconciliation report reference (optional)</span>
+                  <input
+                    className="mt-1 w-full rounded border border-erp-border bg-white px-2 py-1.5 text-[12px]"
+                    value={inventoryReportRef}
+                    maxLength={200}
+                    onChange={(e) => setInventoryReportRef(e.target.value)}
+                    placeholder="Workspace export / report id…"
+                  />
+                </label>
+                <label className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={pilotSignOff}
+                    onChange={(e) => setPilotSignOff(e.target.checked)}
+                  />
+                  <span>
+                    <strong>Pilot Finance approval</strong> — Finance authorises Manufacturing Accounting for this legal
+                    entity. Checkbox starts unchecked.
+                  </span>
+                </label>
+                <label className="block">
+                  <span className="text-erp-muted">Pilot Finance remarks</span>
+                  <input
+                    className="mt-1 w-full rounded border border-erp-border bg-white px-2 py-1.5 text-[12px]"
+                    value={pilotSignOffRemarks}
+                    maxLength={1000}
+                    onChange={(e) => setPilotSignOffRemarks(e.target.value)}
+                    placeholder="Approved for one plant, one FG product and pilot warehouses…"
+                  />
+                </label>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  size="sm"
+                  disabled={
+                    featureBusy ||
+                    !inventoryReconcileConfirmed ||
+                    !pilotSignOff ||
+                    !(enablePanel.readiness.enablementChecks?.accountMappingsReady &&
+                      enablePanel.readiness.enablementChecks?.openFinancialPeriodExists &&
+                      enablePanel.readiness.enablementChecks.failedAccountingEventCount === 0 &&
+                      (enablePanel.readiness.enablementChecks.inventoryPostingsUnreconciledCount ??
+                        enablePanel.readiness.enablementChecks.unreconciledAccountingEventCount) === 0)
+                  }
+                  onClick={() => void handleConfirmEnable()}
+                >
+                  Confirm enable
+                </Button>
+              </div>
+            </section>
           ) : null}
 
           {gate?.enabled && canManageAccountingFeatureFlag() ? (

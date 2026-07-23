@@ -42,6 +42,7 @@ import { useCrmRecordLoadState } from '@/components/crm/CrmRecordLoadGate'
 import { PageLoadingFallback } from '@/components/system/PageLoadingFallback'
 import { resolveQuotationPrintLayout } from '../../utils/quotationEngine/printLayout'
 import { QuotationPrintDocument } from '@/components/quotations/QuotationPrintDocument'
+import { DocumentPrintShell } from '@/components/print/DocumentPrintShell'
 import { QuotationTemplateBuilder } from '@/components/quotations/QuotationTemplateBuilder'
 import { QuotationTemplateCard, QuotationTemplateEmptyState } from '@/components/quotations/QuotationTemplateCard'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
@@ -551,7 +552,7 @@ export function CrmQuotationListPage() {
             }
             conversion.openConversionModal(item.document.id)
           }}
-          onPrint={(item) => navigate(`/crm/quotations/${item.document.quotationId}/preview?doc=${item.document.id}`)}
+          onPrint={(item) => navigate(`/crm/quotations/${item.document.quotationId}/print?doc=${item.document.id}`)}
           onSubmitApproval={(item) => {
             void (async () => {
               if (item.document.status !== 'draft' && item.document.status !== 'rejected') {
@@ -745,6 +746,7 @@ export function CrmQuotationPreviewPage() {
 
 export function CrmQuotationPrintPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [params] = useSearchParams()
   const docId = params.get('doc')
   const getLatest = useCrmStore((s) => s.getLatestQuotationDocument)
@@ -764,9 +766,15 @@ export function CrmQuotationPrintPage() {
   }
 
   return (
-    <div className="quo-print-page">
+    <DocumentPrintShell
+      title={quotation.quotationNo}
+      subtitle="Quotation — print-ready / Save as PDF"
+      backLabel="Back to quotation"
+      onBack={() => navigate(`/crm/quotations/${doc.quotationId}`)}
+      className="quo-print-page"
+    >
       <QuotationPrintDocument doc={doc} quotation={quotation} customer={customer} opportunity={opportunity} printLayout={printLayout} />
-    </div>
+    </DocumentPrintShell>
   )
 }
 

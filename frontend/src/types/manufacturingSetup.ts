@@ -137,6 +137,8 @@ export interface BomVersion {
   createdAt: string
   updatedAt: string
   lines?: BomLine[]
+  /** Component / line count for this revision (list summaries). */
+  lineCount?: number
 }
 
 export interface BomLine {

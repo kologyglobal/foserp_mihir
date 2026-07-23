@@ -97,9 +97,9 @@ export function OperationalPageShell({
   /**
    * Dynamics pages merge into the sticky Leads-style chrome (breadcrumbs, title,
    * badge, fav, help, actions). Opt out with mergeHeaderWithWorkspace={false}.
-   * Auto-on for sticky record headers.
+   * Default ON for all shells so the in-page hero title band is not duplicated.
    */
-  const mergeHeader = mergeHeaderWithWorkspace ?? (variant === 'dynamics' || Boolean(workspaceRecordHeader))
+  const mergeHeader = mergeHeaderWithWorkspace ?? true
   /** Tip lives in WorkspaceUnifiedHeader when header is merged; local hero otherwise. */
   const showLocalPurchaseTip = !mergeHeader && (badge === 'Purchase' || isPurchasePath(pathname))
   const showLocalPageTip = !mergeHeader && !showLocalPurchaseTip && shouldShowPageTip(pathname)

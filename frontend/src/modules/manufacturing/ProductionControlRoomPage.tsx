@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
+  CalendarDays,
   CheckCircle2,
   Clock,
   LayoutGrid,
   Play,
   RefreshCw,
   RotateCcw,
+  Route,
   Truck,
   Wrench,
   XCircle,
@@ -201,6 +203,8 @@ function DemoProductionControlRoomPage() {
         onClick: () => navigate('/manufacturing/work-orders'),
       }}
       secondaryActions={[
+        { id: 'today', label: 'Today', icon: CalendarDays, onClick: () => navigate('/manufacturing/today') },
+        { id: 'fulfilment', label: 'Fulfilment', icon: Route, onClick: () => navigate('/manufacturing/guided-fulfilment?step=produce') },
         { id: 'shopfloor', label: 'Shopfloor', icon: LayoutGrid, onClick: () => navigate('/manufacturing/shopfloor') },
         { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => setRefreshToken((n) => n + 1) },
       ]}
@@ -220,7 +224,7 @@ function DemoProductionControlRoomPage() {
         {loadState === 'ready' && data ? (
           <div className="grid gap-4 lg:grid-cols-2">
               <section id="todays-plan" className="overflow-hidden rounded-lg border border-erp-border bg-white shadow-sm">
-                <PanelHeader title="Today's Plan" count={data.todaysPlan.length} to="/manufacturing/work-orders" linkLabel="All WOs" />
+                <PanelHeader title="Today's Plan" count={data.todaysPlan.length} to="/manufacturing/today" linkLabel="Today" />
                 <WoList rows={data.todaysPlan} empty="No work orders planned for today." showMaterial />
               </section>
 

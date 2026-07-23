@@ -188,6 +188,13 @@ export const updateRouting = asyncHandler(async (req: Request, res: Response) =>
 
 })
 
+export const deleteRouting = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const routingId = getRouteParam(req, 'routingId')
+  await service.softDeleteRouting(req, tenantId, routingId)
+  return sendSuccess(res, 'Routing deleted', null)
+})
+
 
 
 export const getRouting = asyncHandler(async (req: Request, res: Response) => {

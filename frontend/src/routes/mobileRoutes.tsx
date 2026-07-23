@@ -7,7 +7,6 @@ import {
   MobileModulesPage,
   MobileProfilePage,
 } from '../modules/mobile/MobileShellPages'
-import { MobileScanPage } from '../modules/mobile/MobileScanPage'
 import {
   MobileGatePage,
   MobileGateInwardPage,
@@ -26,25 +25,21 @@ import {
   MobileWarehouseTransferPage,
 } from '../modules/mobile/MobileInventoryPages'
 import {
-  MobileShopFloorPage,
-  MobileJobCardPage,
-  MobileJobCardDailyEntryPage,
-} from '../modules/mobile/MobileProductionPages'
-import {
   MobileQcListPage,
   MobileQcDetailPage,
   MobileNcrPage,
 } from '../modules/mobile/MobileQualityPages'
 import { MobileKioskHomePage } from '../modules/mobile/kiosk/MobileKioskHomePage'
+import { MobileShopfloorKioskPage } from '../modules/mobile/kiosk/MobileShopfloorKioskPage'
+import {
+  MobileDispatchListPage,
+  MobileDispatchDetailPage,
+} from '../modules/mobile/MobileDispatchPages'
 import {
   MobileJobWorkListPage,
   MobileJobWorkSendPage,
   MobileJobWorkReceivePage,
 } from '../modules/mobile/MobileJobWorkPages'
-import {
-  MobileDispatchListPage,
-  MobileDispatchDetailPage,
-} from '../modules/mobile/MobileDispatchPages'
 import { MobileApprovalsPage } from '../modules/mobile/MobileApprovalsPage'
 import {
   MobileCrmOpportunitiesPage,
@@ -57,6 +52,7 @@ import {
 } from '../modules/mobile/MobileCrmPages'
 import { MobileCrmPipelinePage } from '../modules/mobile/MobileCrmPipelinePage'
 
+/** Mobile shell — dual-mode: shopfloor/QC/gate/GRN/inventory/dispatch/job-work/approvals hit live APIs when VITE_USE_API=true. */
 export const mobileRouteTree = {
   path: '/m',
   element: <MobileLayout />,
@@ -65,7 +61,6 @@ export const mobileRouteTree = {
     { index: true, element: <Navigate to="home" replace /> },
     { path: 'home', element: <MobileHomePage /> },
     { path: 'tasks', element: <MobileTasksPage /> },
-    { path: 'scan', element: <MobileScanPage /> },
     { path: 'modules', element: <MobileModulesPage /> },
     { path: 'profile', element: <MobileProfilePage /> },
     { path: 'gate', element: <MobileGatePage /> },
@@ -81,18 +76,16 @@ export const mobileRouteTree = {
     { path: 'material-return', element: <MobileMaterialReturnPage /> },
     { path: 'warehouse-transfer', element: <MobileWarehouseTransferPage /> },
     { path: 'kiosk', element: <MobileKioskHomePage /> },
-    { path: 'shop-floor', element: <MobileShopFloorPage /> },
-    { path: 'job-card/:id', element: <MobileJobCardPage /> },
-    { path: 'job-card/:id/daily-entry', element: <MobileJobCardDailyEntryPage /> },
+    { path: 'shop-floor', element: <MobileShopfloorKioskPage /> },
     { path: 'qc', element: <MobileQcListPage /> },
     { path: 'qc/:id', element: <MobileQcDetailPage /> },
     { path: 'ncr/:id', element: <MobileNcrPage /> },
-    { path: 'job-work', element: <MobileJobWorkListPage /> },
-    { path: 'job-work-send/:id', element: <MobileJobWorkSendPage /> },
-    { path: 'job-work-receive/:id', element: <MobileJobWorkReceivePage /> },
     { path: 'dispatch', element: <MobileDispatchListPage /> },
     { path: 'dispatch/:id', element: <MobileDispatchDetailPage /> },
     { path: 'gate-pass/:id', element: <MobileGatePassPage /> },
+    { path: 'job-work', element: <MobileJobWorkListPage /> },
+    { path: 'job-work/:id/send', element: <MobileJobWorkSendPage /> },
+    { path: 'job-work/:id/receive', element: <MobileJobWorkReceivePage /> },
     { path: 'approvals', element: <MobileApprovalsPage /> },
     { path: 'crm', element: <MobileCrmPipelinePage /> },
     { path: 'crm/follow-ups', element: <MobileCrmFollowUpsPage /> },

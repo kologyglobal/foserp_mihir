@@ -18,6 +18,7 @@ type ComparisonData = VendorComparison & {
 export function mapComparisonToDto(
   comparison: ComparisonData,
   quotations: Array<VendorQuotation & { lines: VendorQuotationLine[] }>,
+  userNames?: Map<string, string>,
 ) {
   const vendors = quotations.map((quotation) => {
     const basicRateTotal = quotation.lines.reduce((total, line) => total + num(line.amount), 0)
@@ -49,6 +50,8 @@ export function mapComparisonToDto(
     awardedVendorQuotationId: comparison.awardedVendorQuotationId,
     selectionReason: comparison.selectionReason,
     awardedById: comparison.awardedById,
+    awardedByName:
+      (comparison.awardedById && userNames?.get(comparison.awardedById)) || null,
     selectedAt: comparison.selectedAt?.toISOString() ?? null,
     remarks: comparison.remarks,
     vendors,

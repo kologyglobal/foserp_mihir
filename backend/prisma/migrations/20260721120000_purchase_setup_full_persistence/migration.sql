@@ -103,59 +103,10 @@ CREATE TABLE `purchase_inspection_categories` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-CREATE TABLE `quality_inspections` (
-    `id` VARCHAR(191) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
-    `inspectionNumber` VARCHAR(64) NOT NULL,
-    `inspectionDate` DATE NOT NULL,
-    `goodsReceiptId` VARCHAR(191) NULL,
-    `purchaseOrderId` VARCHAR(191) NULL,
-    `vendorId` VARCHAR(191) NULL,
-    `status` ENUM('DRAFT', 'PENDING', 'IN_PROGRESS', 'ACCEPTED', 'PARTIALLY_ACCEPTED', 'REJECTED', 'DEVIATION_PENDING', 'CLOSED', 'CANCELLED') NOT NULL DEFAULT 'DRAFT',
-    `warehouseId` VARCHAR(191) NULL,
-    `remarks` TEXT NULL,
-    `deviationRemarks` TEXT NULL,
-    `inspectedById` VARCHAR(36) NULL,
-    `inspectedByName` VARCHAR(200) NULL,
-    `completedAt` DATETIME(3) NULL,
-    `createdById` VARCHAR(36) NULL,
-    `updatedById` VARCHAR(36) NULL,
-    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `updatedAt` DATETIME(3) NOT NULL,
-    `deletedAt` DATETIME(3) NULL,
-
-    UNIQUE INDEX `quality_inspections_tenantId_inspectionNumber_key`(`tenantId`, `inspectionNumber`),
-    INDEX `quality_inspections_tenantId_idx`(`tenantId`),
-    INDEX `quality_inspections_tenantId_status_idx`(`tenantId`, `status`),
-    INDEX `quality_inspections_tenantId_deletedAt_idx`(`tenantId`, `deletedAt`),
-    INDEX `quality_inspections_tenantId_goodsReceiptId_idx`(`tenantId`, `goodsReceiptId`),
-    INDEX `quality_inspections_tenantId_purchaseOrderId_idx`(`tenantId`, `purchaseOrderId`),
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-CREATE TABLE `quality_inspection_lines` (
-    `id` VARCHAR(191) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
-    `qualityInspectionId` VARCHAR(191) NOT NULL,
-    `lineNumber` INTEGER NOT NULL,
-    `goodsReceiptLineId` VARCHAR(191) NULL,
-    `purchaseOrderLineId` VARCHAR(191) NULL,
-    `itemId` VARCHAR(191) NULL,
-    `itemCodeSnapshot` VARCHAR(64) NOT NULL DEFAULT '',
-    `itemNameSnapshot` VARCHAR(300) NOT NULL DEFAULT '',
-    `inspectedQuantity` DECIMAL(18, 4) NOT NULL DEFAULT 0,
-    `acceptedQuantity` DECIMAL(18, 4) NOT NULL DEFAULT 0,
-    `rejectedQuantity` DECIMAL(18, 4) NOT NULL DEFAULT 0,
-    `deviationQuantity` DECIMAL(18, 4) NOT NULL DEFAULT 0,
-    `remarks` TEXT NULL,
-    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `updatedAt` DATETIME(3) NOT NULL,
-
-    UNIQUE INDEX `qi_lines_tenant_qi_lineno_key`(`tenantId`, `qualityInspectionId`, `lineNumber`),
-    INDEX `quality_inspection_lines_tenantId_idx`(`tenantId`),
-    INDEX `qi_lines_tenant_qi_idx`(`tenantId`, `qualityInspectionId`),
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- NOTE: Do not create quality_inspections / quality_inspection_lines here.
+-- Manufacturing owns quality_inspections via 20260720200000_quality_phase4a_inspections.
+-- Purchase GRN QC tables are created later by 20260722010000_purchase_quality_inspections_split
+-- (purchase_quality_inspections / purchase_quality_inspection_lines).
 
 CREATE TABLE `purchase_invoices` (
     `id` VARCHAR(191) NOT NULL,
@@ -302,16 +253,6 @@ ALTER TABLE `purchase_inspection_categories`
     FOREIGN KEY (`tenantId`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   ADD CONSTRAINT `purchase_inspection_categories_purchaseSettingsId_fkey`
     FOREIGN KEY (`purchaseSettingsId`) REFERENCES `purchase_settings`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
-ALTER TABLE `quality_inspections`
-  ADD CONSTRAINT `quality_inspections_tenantId_fkey`
-    FOREIGN KEY (`tenantId`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
-ALTER TABLE `quality_inspection_lines`
-  ADD CONSTRAINT `quality_inspection_lines_tenantId_fkey`
-    FOREIGN KEY (`tenantId`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  ADD CONSTRAINT `quality_inspection_lines_qualityInspectionId_fkey`
-    FOREIGN KEY (`qualityInspectionId`) REFERENCES `quality_inspections`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE `purchase_invoices`
   ADD CONSTRAINT `purchase_invoices_tenantId_fkey`

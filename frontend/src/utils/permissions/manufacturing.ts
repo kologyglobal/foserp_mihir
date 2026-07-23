@@ -539,6 +539,7 @@ const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: ManufacturingPer
   { prefix: '/manufacturing/machines', permission: 'manufacturing.machine.view' },
   { prefix: '/manufacturing/routes', permission: 'manufacturing.routes.view' },
   { prefix: '/manufacturing/control-room', permission: 'manufacturing.dashboard.view' },
+  { prefix: '/manufacturing/guided-fulfilment', permission: 'manufacturing.dashboard.view' },
   { prefix: '/manufacturing/today', permission: 'manufacturing.control_room.view' },
   { prefix: '/manufacturing/daily-update', permission: 'manufacturing.daily_production.view' },
   { prefix: '/manufacturing/my-work', permission: 'manufacturing.operator.my_work' },

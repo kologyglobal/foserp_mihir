@@ -32,12 +32,23 @@ import shopfloorRoutes from '../ops-reports/shopfloor/shopfloor.routes.js'
 import traceabilityRoutes from '../ops-reports/traceability/traceability.routes.js'
 import manufacturingSettingsRoutes from './settings/manufacturing-settings.routes.js'
 import { authenticate } from '../../middleware/auth.middleware.js'
+import { requireModule } from '../../middleware/require-module.middleware.js'
 import { attachRequestContext } from '../../middleware/request-context.middleware.js'
 import { resolveTenant, requireTenantAccess } from '../../middleware/tenant.middleware.js'
 import { validateParams } from '../../middleware/validation.middleware.js'
 import { tenantRouteParamSchema } from '../../utils/pagination.js'
 
 const router = Router({ mergeParams: true })
+
+/** Phase 10 proof gate — fail-open when no TenantModuleFlag row exists. */
+router.use(
+  authenticate,
+  attachRequestContext,
+  validateParams(tenantRouteParamSchema),
+  resolveTenant,
+  requireTenantAccess,
+  requireModule('manufacturing'),
+)
 
 router.use('/work-centres', workCentreRoutes)
 router.use('/machines', machineRoutes)

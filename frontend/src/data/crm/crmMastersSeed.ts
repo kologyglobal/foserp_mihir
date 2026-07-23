@@ -151,7 +151,7 @@ export const CRM_MASTERS_SEED: CrmMasterEntry[] = [
 
   // requiredFields: Opportunity model keys — mirror of config/crmStageRequirements.ts (DB home later)
   entry('opportunity-stages', 'new_lead', 'New Lead', 1, { probability: 10, stageType: 'open', color: '#0078D4', requiredFields: 'opportunityName,customerId,ownerId' }, { systemControlled: true }),
-  entry('opportunity-stages', 'qualified', 'Qualified', 2, { probability: 20, stageType: 'open', color: '#00B7C3', requiredFields: 'productRequirement,expectedCloseDate,priority' }, { systemControlled: true }),
+  entry('opportunity-stages', 'qualified', 'Qualified', 2, { probability: 20, stageType: 'open', color: '#00B7C3', requiredFields: 'expectedCloseDate,priority' }, { systemControlled: true }),
   entry('opportunity-stages', 'requirement_discussion', 'Requirement Discussion', 3, { probability: 30, stageType: 'open', color: '#8764B8', requiredFields: 'productRequirement,contactId,value,expectedCloseDate' }, { systemControlled: true }),
   entry('opportunity-stages', 'technical_review', 'Technical Review', 4, { probability: 40, stageType: 'open', color: '#498205', requiredFields: 'productRequirement,lines' }, { systemControlled: true }),
   entry('opportunity-stages', 'quotation_prepared', 'Quotation Prepared', 5, { probability: 55, stageType: 'open', color: '#CA5010', requiredFields: 'lines,value' }, { systemControlled: true }),

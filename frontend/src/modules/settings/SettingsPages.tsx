@@ -154,10 +154,10 @@ export function PermissionMatrixPage() {
 
 export function SettingsHomePage() {
   const links = [
-    { to: '/settings/demo-data', title: 'Demo Data', desc: 'Reset factory demo dataset' },
+    { to: '/settings/profile', title: 'My Profile', desc: 'Edit name, contact details, and password' },
     { to: '/masters/roles', title: 'Role Master', desc: 'View ERP roles' },
     { to: '/masters/role-permissions', title: 'Role Permission Matrix', desc: 'Role × module × action' },
-    { to: '/masters/approval-workflows', title: 'Approval Workflow', desc: 'Document approval rules' },
+    { to: '/accounting/settings/approval-rules', title: 'Finance Approval Rules', desc: 'Journal and AP/AR approval chains' },
   ]
 
   return (
@@ -165,7 +165,7 @@ export function SettingsHomePage() {
       variant="dynamics"
       badge="Settings"
       title="Settings"
-      description="RBAC and approval configuration"
+      description="Account, RBAC, and approval configuration"
     >
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {links.map((l) => (

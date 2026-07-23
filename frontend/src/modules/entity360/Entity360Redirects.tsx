@@ -1,10 +1,9 @@
 import { Navigate, useParams } from 'react-router-dom'
-import { bom360Path, customer360Path } from '../../config/entity360Routes'
+import { customer360Path } from '../../config/entity360Routes'
+import { BOM_SETUP_PATH } from '../../config/bomRoutes'
 
 export function Bom360LegacyRedirect() {
-  const { id } = useParams()
-  if (!id) return <Navigate to="/masters/bom" replace />
-  return <Navigate to={bom360Path(id)} replace />
+  return <Navigate to={BOM_SETUP_PATH} replace />
 }
 
 export function Customer360LegacyRedirect() {

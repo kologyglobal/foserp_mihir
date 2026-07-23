@@ -1,5 +1,5 @@
 import { prisma } from '../../../config/database.js'
-import { NotFoundError } from '../../../utils/errors.js'
+import { AppError, NotFoundError } from '../../../utils/errors.js'
 import { collectQualityBlockers } from '../../quality/shared/blockers.service.js'
 import { getMaterialReconciliation } from '../materials/material-reconciliation.service.js'
 import { sumPostedFgReceived } from '../fg-receipts/fg-eligibility.service.js'
@@ -14,14 +14,40 @@ export type CloseReadinessCheck = {
   detail?: unknown
 }
 
+export type CloseReadinessResult = {
+  productionOrderId: string
+  orderNumber: string
+  orderStatus: string
+  /** COMPLETE = operational Complete WO preview; CLOSE = post-completion close gate. */
+  purpose: 'COMPLETE' | 'CLOSE'
+  readyToClose: boolean
+  summary: {
+    blockerCount: number
+    warningCount: number
+    checkCount: number
+  }
+  /** Hard gates only (`severity === 'BLOCKER'`). */
+  blockers: CloseReadinessCheck[]
+  /** Soft / advisory (`severity === 'WARNING'`). */
+  warnings: CloseReadinessCheck[]
+  checks: CloseReadinessCheck[]
+}
+
 /**
- * Advisory close-readiness for a work order. Does NOT auto-close on FG receipt.
+ * Close / complete readiness for a work order. Does NOT auto-close on FG receipt.
+ *
+ * Hard vs soft:
+ * - `allowInProgress` only relaxes OPERATIONAL_STATUS (and marks purpose COMPLETE).
+ * - Quality softens when `allowCloseWithoutQc` or `flexibleExecution`.
+ * - Material / open-reservation softens only when `flexibleExecution`.
+ * - FG remaining is never a hard block for operational Complete; hard for CLOSE unless flexible.
+ * - Job work is always advisory (WARNING).
  */
 export async function getCloseReadiness(
   tenantId: string,
   workOrderId: string,
   options?: { allowInProgress?: boolean },
-) {
+): Promise<CloseReadinessResult> {
   const order = await prisma.productionOrder.findFirst({
     where: { id: workOrderId, tenantId, deletedAt: null },
     select: {
@@ -35,10 +61,12 @@ export async function getCloseReadiness(
   if (!order) throw new NotFoundError('Work order not found')
 
   const allowInProgress = options?.allowInProgress === true
+  const purpose: 'COMPLETE' | 'CLOSE' = allowInProgress ? 'COMPLETE' : 'CLOSE'
   const settings = await getManufacturingSettingsForTenant(tenantId)
   const flexible = Boolean(settings.flexibleExecution)
-  /** Soft gates: operational Complete WO / flexible execution — inventory & QC advise, do not block. */
-  const softGates = flexible || allowInProgress
+  const softQualityGates = Boolean(settings.allowCloseWithoutQc) || flexible
+  /** Inventory / reservation hard gates soft only under flexible execution — not merely COMPLETE preview. */
+  const softMaterialGates = flexible
   const checks: CloseReadinessCheck[] = []
 
   const statusOk =
@@ -54,8 +82,8 @@ export async function getCloseReadiness(
     checks.push({
       code: 'OPERATIONAL_STATUS',
       severity: 'INFO',
-      message: `Operational status ${order.status} is acceptable`,
-      detail: { status: order.status },
+      message: `Operational status ${order.status} is acceptable for ${purpose}`,
+      detail: { status: order.status, purpose },
     })
   }
 
@@ -63,7 +91,7 @@ export async function getCloseReadiness(
   if (qualityBlockers.length > 0) {
     checks.push({
       code: 'QUALITY_BLOCKERS',
-      severity: softGates ? 'WARNING' : 'BLOCKER',
+      severity: softQualityGates ? 'WARNING' : 'BLOCKER',
       message: `${qualityBlockers.length} open quality blocker(s)`,
       detail: qualityBlockers,
     })
@@ -80,7 +108,7 @@ export async function getCloseReadiness(
     checks.push({
       code: 'MATERIAL_RECONCILIATION',
       severity:
-        materialRecon.status === 'BLOCKED' && !softGates ? 'BLOCKER' : 'WARNING',
+        materialRecon.status === 'BLOCKED' && !softMaterialGates ? 'BLOCKER' : 'WARNING',
       message: `Material reconciliation is ${materialRecon.status}`,
       detail: {
         status: materialRecon.status,
@@ -109,7 +137,7 @@ export async function getCloseReadiness(
   if (openReservations > 0) {
     checks.push({
       code: 'OPEN_RESERVATIONS',
-      severity: softGates ? 'WARNING' : 'BLOCKER',
+      severity: softMaterialGates ? 'WARNING' : 'BLOCKER',
       message: `${openReservations} active WO reservation(s) remain`,
       detail: { count: openReservations },
     })
@@ -128,7 +156,7 @@ export async function getCloseReadiness(
     checks.push({
       code: 'FG_NOT_FULLY_RECEIVED',
       // FG receipt is a separate posting — never hard-block operational Complete WO.
-      severity: softGates ? 'WARNING' : 'BLOCKER',
+      severity: allowInProgress || softMaterialGates ? 'WARNING' : 'BLOCKER',
       message: `FG remaining to receive: ${dec(fgRemaining)} (completed ${dec(completedGood)}, received ${dec(fgReceived)})`,
       detail: {
         completedGoodQuantity: dec(completedGood),
@@ -192,12 +220,38 @@ export async function getCloseReadiness(
     productionOrderId: order.id,
     orderNumber: order.orderNumber,
     orderStatus: order.status,
+    purpose,
     readyToClose: blockers.length === 0,
     summary: {
       blockerCount: blockers.length,
       warningCount: warnings.length,
       checkCount: checks.length,
     },
+    blockers,
+    warnings,
     checks,
   }
+}
+
+/**
+ * Enforces hard close-readiness gates for operational Complete WO (`IN_PROGRESS` → `COMPLETED`).
+ * Soft / WARNING checks do not block. Flexible / allowCloseWithoutQc soften quality & material gates.
+ */
+export async function assertCompleteAllowed(tenantId: string, workOrderId: string): Promise<CloseReadinessResult> {
+  const readiness = await getCloseReadiness(tenantId, workOrderId, { allowInProgress: true })
+  if (readiness.blockers.length === 0) return readiness
+
+  throw new AppError(
+    409,
+    `Cannot complete work order due to readiness blockers: ${readiness.blockers.map((b) => b.code).join(', ')}`,
+    'WO_COMPLETE_BLOCKED',
+    readiness.blockers.map((b) => ({ field: b.code, message: b.message })),
+    {
+      purpose: readiness.purpose,
+      readyToClose: false,
+      blockers: readiness.blockers,
+      warnings: readiness.warnings,
+      summary: readiness.summary,
+    },
+  )
 }

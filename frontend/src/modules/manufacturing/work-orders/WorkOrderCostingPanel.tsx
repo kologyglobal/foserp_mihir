@@ -85,8 +85,27 @@ function humanizeBlocker(code: string): string {
     NO_LEGAL_ENTITY: 'No active legal entity is configured',
     MANUFACTURING_ACCOUNTING_FLAG_DISABLED: 'Manufacturing Accounting feature flag is disabled for this tenant',
     MISSING_ACCOUNT_MAPPINGS: 'Required default account mappings are missing',
+    WIP_ACCOUNT_NOT_CONFIGURED: 'WIP inventory account is not configured',
+    FG_ACCOUNT_NOT_CONFIGURED: 'Finished goods inventory account is not configured',
+    FINISHED_GOODS_ACCOUNT_NOT_CONFIGURED: 'Finished goods inventory account is not configured',
+    VARIANCE_ACCOUNT_NOT_CONFIGURED: 'Production variance account is not configured',
+    PRODUCTION_VARIANCE_ACCOUNT_NOT_CONFIGURED: 'Production variance account is not configured',
+    LABOUR_ACCOUNT_NOT_CONFIGURED: 'Labour absorption account is not configured',
+    MACHINE_ACCOUNT_NOT_CONFIGURED: 'Machine absorption account is not configured',
+    JOB_WORK_ACCOUNT_NOT_CONFIGURED: 'Job-work absorption account is not configured',
+    OVERHEAD_ACCOUNT_NOT_CONFIGURED: 'Manufacturing overhead absorption account is not configured',
+    SCRAP_ACCOUNT_NOT_CONFIGURED: 'Scrap expense account is not configured',
+    MAPPING_ACCOUNT_INACTIVE: 'A mapped account is inactive or blocked',
+    MAPPING_ACCOUNT_NOT_POSTABLE: 'A mapped account is a group account and cannot be posted',
+    MAPPING_ACCOUNT_WRONG_SCOPE: 'A mapped account is outside the current legal entity',
+    DUPLICATE_CONFLICTING_MAPPING: 'Duplicate conflicting account mappings exist',
     NO_OPEN_ACCOUNTING_PERIOD: 'No open accounting period covers today',
     FAILED_ACCOUNTING_EVENTS: 'There are failed accounting events to resolve',
+    UNRECONCILED_ACCOUNTING_EVENTS: 'There are unposted (RECORDED) accounting events to clear',
+    INVENTORY_POSTINGS_UNRECONCILED:
+      'Inventory-linked or unreconciled manufacturing accounting exceptions remain',
+    INVENTORY_RECONCILE_NOT_SIGNED_OFF: 'Inventory reconciliation has not been signed off',
+    PILOT_FINANCE_SIGNOFF_REQUIRED: 'Pilot Finance approval is required before enabling Manufacturing Accounting',
     WORK_ORDER_NOT_COMPLETED: 'Work order is not completed yet',
     COST_NOT_CALCULATED: 'Work-order cost has not been calculated',
   }
@@ -330,7 +349,14 @@ export function WorkOrderCostingPanel({ workOrderId }: { workOrderId: string }) 
             </div>
             <div>
               <p className="text-erp-muted">Open accounting period</p>
-              <p className="font-medium">{readiness.openPeriod ? readiness.openPeriod.name : 'None'}</p>
+              <p className="font-medium">
+                {readiness.openPeriod
+                  ? `${readiness.openPeriod.code} (${readiness.openPeriod.status})`
+                  : 'None'}
+              </p>
+              {readiness.postingDateChecked ? (
+                <p className="text-xs text-erp-muted">As of {readiness.postingDateChecked}</p>
+              ) : null}
             </div>
             <div>
               <p className="text-erp-muted">Account mappings</p>

@@ -1,44 +1,37 @@
 import type { RouteObject } from 'react-router-dom'
-import { DocumentRegisterPage, DocumentDetailPage, DocumentApprovalQueuePage } from '@/modules/dms'
-import { SettingsHomePage, DemoDataPage } from '@/modules/settings'
+import { Navigate, useParams } from 'react-router-dom'
+import { ProfileSettingsPage, SettingsHomePage } from '@/modules/settings'
 import { UatDashboardPage } from '@/modules/uat/UatDashboardPage'
-import { MyApprovalsPage, ApprovalDetailPage } from '@/modules/approval'
+import { PlatformOverviewPage } from '@/modules/systemAdmin/PlatformOverviewPage'
 import {
-  BarcodeHubPage,
-  BarcodeMasterPage,
-  BarcodeGeneratorPage,
-  BarcodePrintPage,
-  BarcodeHistoryPage,
-  BarcodeTraceReportPage,
-} from '@/modules/barcode'
-import {
-  QrPrintPage,
-  QrPrintBatchPage,
-  QrScannerPage,
-  Traceability360Page,
-  QrRegistryPage,
-} from '@/modules/qr'
+  TenantAdminListPage,
+  TenantAdminFormPage,
+  TenantAdminDetailPage,
+} from '@/modules/systemAdmin/TenantAdminPages'
 
+function AdminTenantsToPlatformRedirect({ suffix = '' }: { suffix?: string }) {
+  const { id } = useParams()
+  if (id) return <Navigate to={`/platform/tenants/${id}${suffix}`} replace />
+  return <Navigate to={`/platform/tenants${suffix}`} replace />
+}
+
+/**
+ * Platform surfaces: Super Admin tree + settings/UAT.
+ * Tenant IAM stays under /admin; workspace tenants CRUD lives under /platform/tenants.
+ */
 export const platformRouteChildren: RouteObject[] = [
-  { path: 'documents', element: <DocumentRegisterPage /> },
-  { path: 'documents/approvals', element: <DocumentApprovalQueuePage /> },
-  { path: 'documents/:id', element: <DocumentDetailPage /> },
+  { path: 'platform', element: <PlatformOverviewPage /> },
+  { path: 'platform/tenants', element: <TenantAdminListPage /> },
+  { path: 'platform/tenants/new', element: <TenantAdminFormPage /> },
+  { path: 'platform/tenants/:id', element: <TenantAdminDetailPage /> },
+  { path: 'platform/tenants/:id/edit', element: <TenantAdminFormPage /> },
+
+  { path: 'admin/tenants', element: <AdminTenantsToPlatformRedirect /> },
+  { path: 'admin/tenants/new', element: <Navigate to="/platform/tenants/new" replace /> },
+  { path: 'admin/tenants/:id', element: <AdminTenantsToPlatformRedirect /> },
+  { path: 'admin/tenants/:id/edit', element: <AdminTenantsToPlatformRedirect suffix="/edit" /> },
+
   { path: 'settings', element: <SettingsHomePage /> },
-  { path: 'settings/demo-data', element: <DemoDataPage /> },
+  { path: 'settings/profile', element: <ProfileSettingsPage /> },
   { path: 'uat/dashboard', element: <UatDashboardPage /> },
-  { path: 'approvals', element: <MyApprovalsPage /> },
-  { path: 'approvals/:id', element: <ApprovalDetailPage /> },
-
-  { path: 'barcode', element: <BarcodeHubPage /> },
-  { path: 'barcode/master', element: <BarcodeMasterPage /> },
-  { path: 'barcode/generator', element: <BarcodeGeneratorPage /> },
-  { path: 'barcode/print', element: <BarcodePrintPage /> },
-  { path: 'barcode/history', element: <BarcodeHistoryPage /> },
-  { path: 'barcode/trace', element: <BarcodeTraceReportPage /> },
-
-  { path: 'scan', element: <QrScannerPage /> },
-  { path: 'traceability', element: <Traceability360Page /> },
-  { path: 'qr/registry', element: <QrRegistryPage /> },
-  { path: 'qr/print-batch', element: <QrPrintBatchPage /> },
-  { path: 'qr/print/:qrId', element: <QrPrintPage /> },
 ]

@@ -24,6 +24,10 @@ Maps warehouse **roles** for production stores without duplicating the Warehouse
 
 ## Readiness
 
+Profile / plant readiness treats FG + (when configured) QC Hold / Scrap as hard gates for activation.
+
+**Example:** Fuel Tank plant `MAIN-PLANT` — see [`examples/FUEL_TANK_PROFILE.md`](./examples/FUEL_TANK_PROFILE.md).
+
 `GET .../readiness` and `GET .../:id/readiness` report missing FG/WIP warehouses and inactive FKs.
 
 Plant-specific rows override tenant default. Scrap cannot be selected as usable return destination in issue/return validators.

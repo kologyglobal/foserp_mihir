@@ -557,6 +557,8 @@ export function Quotation360Page() {
       salesOrderId={soGate.salesOrderId ?? quo.salesOrderId ?? quoDoc.salesOrderId ?? null}
       onEdit={() => navigate(`/crm/quotations/${quoId}/editor?doc=${quoDoc.id}`)}
       onPreview={() => navigate(`/crm/quotations/${quoId}/preview?doc=${quoDoc.id}`)}
+      onPrint={() => navigate(`/crm/quotations/${quoId}/print?doc=${quoDoc.id}`)}
+      onExportPdf={() => navigate(`/crm/quotations/${quoId}/print?doc=${quoDoc.id}`)}
       onScheduleFollowUp={() => setFollowUpOpen(true)}
       onMarkSent={() => void handleMarkSent()}
       onSubmitApproval={() => void handleSubmitApproval()}

@@ -491,7 +491,7 @@ export function buildTransactionSearchIndex(sources: TransactionSearchSources): 
   for (const wo of sources.workOrders ?? []) {
     pushEntry(
       out,
-      { id: wo.id, type: 'WO', label: wo.woNo, sublabel: wo.status, href: `/work-orders/${wo.id}`, group: 'document' },
+      { id: wo.id, type: 'WO', label: wo.woNo, sublabel: wo.status, href: `/manufacturing/work-orders/${wo.id}`, group: 'document' },
       [wo.woNo, wo.status],
     )
     pushEntry(
@@ -501,7 +501,7 @@ export function buildTransactionSearchIndex(sources: TransactionSearchSources): 
         type: 'WO 360',
         label: `${wo.woNo} 360`,
         sublabel: 'Operational workspace',
-        href: `/work-orders/${wo.id}/360`,
+        href: `/manufacturing/work-orders/${wo.id}`,
         group: 'document',
       },
       [wo.woNo, wo.status, '360'],
@@ -510,7 +510,7 @@ export function buildTransactionSearchIndex(sources: TransactionSearchSources): 
       const jwoNo = `JWO-${wo.woNo}`
       pushEntry(
         out,
-        { id: wo.id, type: 'JWO', label: jwoNo, sublabel: wo.status, href: `/job-work/${wo.id}`, group: 'document' },
+        { id: wo.id, type: 'JWO', label: jwoNo, sublabel: wo.status, href: `/manufacturing/job-work`, group: 'document' },
         [jwoNo, wo.woNo, wo.status],
       )
     }
@@ -524,7 +524,7 @@ export function buildTransactionSearchIndex(sources: TransactionSearchSources): 
         type: 'Job Card',
         label: jc.jobCardNo,
         sublabel: jc.woNo,
-        href: '/production/job-cards',
+        href: '/manufacturing/work-orders',
         group: 'document',
       },
       [jc.jobCardNo, jc.woNo],
@@ -539,7 +539,7 @@ export function buildTransactionSearchIndex(sources: TransactionSearchSources): 
         type: 'Challan',
         label: sh.challanNo,
         sublabel: 'Job work challan',
-        href: `/job-work/${sh.workOrderId}/print`,
+        href: `/manufacturing/job-work`,
         group: 'document',
       },
       [sh.challanNo],
@@ -549,7 +549,7 @@ export function buildTransactionSearchIndex(sources: TransactionSearchSources): 
   for (const inv of sources.invoices ?? []) {
     pushEntry(
       out,
-      { id: inv.id, type: 'Invoice', label: inv.invoiceNo, sublabel: inv.status, href: `/invoices/${inv.id}`, group: 'document' },
+      { id: inv.id, type: 'Invoice', label: inv.invoiceNo, sublabel: inv.status, href: `/accounting/money-in/invoices/${inv.id}`, group: 'document' },
       [inv.invoiceNo, inv.status],
     )
   }
@@ -565,7 +565,7 @@ export function buildTransactionSearchIndex(sources: TransactionSearchSources): 
   for (const qr of sources.qrRecords ?? []) {
     pushEntry(
       out,
-      { id: qr.qrId, type: 'QR', label: qr.displayCode, sublabel: qr.entityType, href: `/qr/${qr.qrId}`, group: 'document' },
+      { id: qr.qrId, type: 'QR', label: qr.displayCode, sublabel: qr.entityType, href: `/manufacturing/traceability`, group: 'document' },
       [qr.displayCode, qr.qrCode, qr.entityType],
     )
   }
@@ -573,7 +573,7 @@ export function buildTransactionSearchIndex(sources: TransactionSearchSources): 
   for (const sn of sources.serials ?? []) {
     pushEntry(
       out,
-      { id: sn.id, type: 'Serial', label: sn.serialNo, sublabel: sn.serialType, href: `/serial/${sn.id}`, group: 'document' },
+      { id: sn.id, type: 'Serial', label: sn.serialNo, sublabel: sn.serialType, href: `/manufacturing/traceability`, group: 'document' },
       [sn.serialNo, sn.serialType],
     )
   }
@@ -581,7 +581,7 @@ export function buildTransactionSearchIndex(sources: TransactionSearchSources): 
   for (const eco of sources.ecos ?? []) {
     pushEntry(
       out,
-      { id: eco.id, type: 'ECO', label: eco.ecoNo, sublabel: eco.approvalStatus, href: `/engineering/eco/${eco.id}`, group: 'document' },
+      { id: eco.id, type: 'ECO', label: eco.ecoNo, sublabel: eco.approvalStatus, href: `/manufacturing/setup/boms`, group: 'document' },
       [eco.ecoNo, eco.approvalStatus],
     )
   }

@@ -42,3 +42,13 @@ export function createStatusHistory(
     data: { tenantId, documentType: 'VENDOR_COMPARISON', documentId, action: 'STATUS_CHANGED', fromStatus, toStatus, actorId, remarks },
   })
 }
+
+export async function resolveUserNames(tenantId: string, userIds: Array<string | null | undefined>) {
+  const ids = [...new Set(userIds.filter((id): id is string => Boolean(id)))]
+  if (ids.length === 0) return new Map<string, string>()
+  const users = await prisma.user.findMany({
+    where: { tenantId, id: { in: ids }, deletedAt: null },
+    select: { id: true, firstName: true, lastName: true },
+  })
+  return new Map(users.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim()]))
+}

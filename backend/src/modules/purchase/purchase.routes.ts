@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { authenticate } from '../../middleware/auth.middleware.js'
+import { requireModule } from '../../middleware/require-module.middleware.js'
 import { attachRequestContext } from '../../middleware/request-context.middleware.js'
 import { requirePermission } from '../../middleware/permission.middleware.js'
 import { requireTenantAccess, resolveTenant } from '../../middleware/tenant.middleware.js'
@@ -28,6 +29,7 @@ router.use(
   validateParams(tenantRouteParamSchema),
   resolveTenant,
   requireTenantAccess,
+  requireModule('purchase'),
 )
 
 router.use('/setup', setupRoutes)

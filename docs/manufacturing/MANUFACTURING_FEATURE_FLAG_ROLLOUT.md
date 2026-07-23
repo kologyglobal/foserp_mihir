@@ -37,7 +37,7 @@ Stage 4 is controlled by **two independent switches** that must both be on:
 1. **`MANUFACTURING_ACCOUNTING` feature control (per legal entity)** — managed via the admin API:
    - `GET /manufacturing/accounting/feature-controls` — list finance feature controls for the tenant (`?featureKey=` optional).
    - `GET /manufacturing/accounting/feature-controls/:legalEntityId/MANUFACTURING_ACCOUNTING` — flag status + readiness summary (`manufacturing.accounting.view`).
-   - `PUT /manufacturing/accounting/feature-controls/:legalEntityId/MANUFACTURING_ACCOUNTING` — body `{ "isEnabled": boolean }` (`finance.settings.manage`). Enabling runs the readiness gate (mappings, open period, no failed events — the flag blocker itself is ignored) and returns **409 with the blockers** when not ready. Disabling is always allowed.
+   - `PUT /manufacturing/accounting/feature-controls/:legalEntityId/MANUFACTURING_ACCOUNTING` — body `{ "isEnabled": boolean, "pilotSignOff"?: boolean, "inventoryReconcileConfirmed"?: boolean, "signOffNote"?: string }` (`finance.settings.manage`). Enabling requires readiness (mappings, open period, no failed/unreconciled events) **and** both sign-offs; returns **409 with blockers** or **400** when sign-offs missing. Disabling is always allowed.
 2. **`ManufacturingSettings.autoPostAbsorption` (per tenant, default `false`)** — Wave 1 denormalized field (`costing.autoPostAbsorption` in the settings payload).
 
 When both are on, submitting a daily-production batch recalculates work-order cost and records + posts absorption deltas automatically (`autoPostAbsorptionAfterProduction` in `costing/posting-orchestrator.service.ts`). Failures never block shop-floor confirmation — events stay `RECORDED`/`FAILED` in the accounting workspace.
@@ -49,27 +49,87 @@ Manual absorption is also HTTP-exposed (`manufacturing.accounting.post`):
 
 ---
 
-## Readiness gate (must pass before posting)
+## Required mapping set (readiness)
 
-`getManufacturingAccountingReadiness` blockers:
+**Core (always):** `WIP_INVENTORY`, `FINISHED_GOODS_INVENTORY`, `PRODUCTION_VARIANCE`
+
+**Conditional (policy / MappingReady events):** see [`MANUFACTURING_ACCOUNT_MAPPING.md`](./MANUFACTURING_ACCOUNT_MAPPING.md). Typical enable set also requires `RAW_MATERIAL_INVENTORY`, `LABOUR_ABSORPTION`, `MACHINE_ABSORPTION`, `JOB_WORK_ABSORPTION`, `SCRAP_LOSS`; overhead when `overheadMethod !== NONE`.
+
+Missing keys are returned on readiness as `mappingKeys.missing`. Specific blockers include `WIP_ACCOUNT_NOT_CONFIGURED`, `FINISHED_GOODS_ACCOUNT_NOT_CONFIGURED`, `PRODUCTION_VARIANCE_ACCOUNT_NOT_CONFIGURED`, labour/machine/job-work/overhead/scrap variants, plus `MISSING_ACCOUNT_MAPPINGS`.
+
+`getManufacturingAccountingReadiness` — SoT for the enablement formula:
+
+```ts
+canEnable =
+  accountMappingsReady &&
+  openFinancialPeriodExists &&
+  failedAccountingEventCount === 0 &&
+  inventoryPostingsUnreconciledCount === 0 && // RECORDED + inv↔acct gaps + duplicates + reversal issues
+  inventoryReconcileConfirmed &&
+  pilotSignOff
+```
 
 | Blocker | Cause |
 |---------|-------|
 | `NO_LEGAL_ENTITY` | no active legal entity |
-| `MANUFACTURING_ACCOUNTING_FLAG_DISABLED` | flag off |
+| `MANUFACTURING_ACCOUNTING_FLAG_DISABLED` | flag off (ignored when **enabling**) |
 | `MISSING_ACCOUNT_MAPPINGS` | any required `DefaultAccountMapping` key missing |
-| `NO_OPEN_ACCOUNTING_PERIOD` | no OPEN period covering today |
-| `FAILED_ACCOUNTING_EVENTS` | unresolved `FAILED` events |
+| `NO_OPEN_ACCOUNTING_PERIOD` | no OPEN/REOPENED period covering `postingDateChecked` (tenant TZ today or `?postingDate=`) |
+| `FAILED_ACCOUNTING_EVENTS` | unresolved `FAILED` / retry-exhausted events |
+| `INVENTORY_POSTINGS_UNRECONCILED` | RECORDED pending, inventory without accounting, accounting without inventory, duplicate pending, or inconsistent reversal chain |
+| `INVENTORY_RECONCILE_NOT_SIGNED_OFF` | no inventory reconcile timestamp on feature control JSON |
+| `PILOT_FINANCE_SIGNOFF_REQUIRED` | no pilot Finance sign-off timestamp |
 
-Warning `PROVISIONAL_COST_PRESENT` when snapshots carry provisional cost (does not block).
+Readiness returns `openPeriod` + `postingDateChecked`, and UI-safe `eventIntegrity.exceptions` (no stack traces). `technicalDetails` only for settings/post roles. Enablement does **not** bypass posting-time `resolvePostingPeriod`.
 
-`allowedActions`: `validate` (LE present), `post` (no blockers), `retry` (flag on + failed events), `financialClose` (no blockers + no failed events).
+Warning `PROVISIONAL_COST_PRESENT` when snapshots carry provisional cost (does not block enablement).
+
+`allowedActions`: `validate` (LE present), `post` (no blockers), `retry` (flag on + failed events), `financialClose` (no blockers + no failed), `enable` (`canEnable` and flag currently off).
+
+---
+
+## Sign-offs (server-stored only)
+
+Enable PUT requires **explicit** request values every time (checkboxes must not be preselected in UI):
+
+```json
+{
+  "isEnabled": true,
+  "inventoryReconcileConfirmed": true,
+  "inventoryReconcileRemarks": "…",
+  "inventoryReconcileScope": { "plantId": "…", "warehouseIds": ["…"], "workOrderIds": ["…"] },
+  "inventoryReconcileReportRef": "optional-report-ref",
+  "pilotSignOff": true,
+  "pilotSignOffRemarks": "…",
+  "pilotScope": { "plantId": "…", "finishedItemIds": ["…"], "warehouseIds": ["…"] }
+}
+```
+
+| Code (HTTP 422) | When |
+|-----------------|------|
+| `INVENTORY_RECONCILE_NOT_SIGNED_OFF` | `inventoryReconcileConfirmed !== true`, reconcile unavailable, or missing reconcile permission |
+| `PILOT_FINANCE_SIGNOFF_REQUIRED` | `pilotSignOff !== true`, finance not activated, mappings/period/failed-event pre-checks fail |
+
+Stored on `FinanceFeatureControl.configurationJson` (current snapshot) plus additive `signOffHistory[]` (never overwrites prior entries). No frontend-only persistence.
+
+Permissions: enable route `finance.settings.manage`; inventory confirm also accepts `manufacturing.accounting.reconcile`.
 
 ---
 
 ## Turning it on
 
-1. Ensure the legal entity has the 8 required `DefaultAccountMapping` keys and an OPEN accounting period.
-2. Create the `FinanceFeatureControl` row (`MANUFACTURING_ACCOUNTING`, `isEnabled = true`) for that LE.
-3. Verify `GET /accounting/gate` shows `enabled: true` and `GET /costing/readiness` has no blockers.
-4. Post manually (Stage 2/3). Do **not** enable Stage 4 auto-posting without a separate rollout decision.
+1. Ensure the legal entity has all **9** required `DefaultAccountMapping` keys and an OPEN accounting period covering today.
+2. Clear `FAILED` and `RECORDED` production accounting events for that LE.
+3. From **Accounting → Manufacturing Accounting** (API mode), open **Enable…**, review the readiness checklist, tick inventory reconcile + pilot Finance sign-off.
+4. `PUT /manufacturing/accounting/feature-controls/:legalEntityId/MANUFACTURING_ACCOUNTING` with:
+   ```json
+   {
+     "isEnabled": true,
+     "inventoryReconcileConfirmed": true,
+     "pilotSignOff": true,
+     "signOffNote": "optional"
+   }
+   ```
+   Permission: `finance.settings.manage`. Incomplete readiness → **409** with blockers; missing sign-offs → **400**.
+5. Verify `GET /accounting/gate` shows `enabled: true`.
+6. Post manually (Stage 2/3). Do **not** enable Stage 4 `autoPostAbsorption` without a separate rollout decision.

@@ -275,6 +275,25 @@ export async function getBom(bomId: string) {
   return apiRequest<Bom & { versions: BomVersion[] }>(tenantPath(`/manufacturing/boms/${bomId}`))
 }
 
+export async function updateBom(bomId: string, data: Record<string, unknown>) {
+  return apiRequest<Bom>(tenantPath(`/manufacturing/boms/${bomId}`), {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteBom(bomId: string) {
+  return apiRequest<null>(tenantPath(`/manufacturing/boms/${bomId}`), { method: 'DELETE' })
+}
+
+export async function activateBom(bomId: string) {
+  return apiRequest<Bom>(tenantPath(`/manufacturing/boms/${bomId}/activate`), { method: 'POST' })
+}
+
+export async function deactivateBom(bomId: string) {
+  return apiRequest<Bom>(tenantPath(`/manufacturing/boms/${bomId}/deactivate`), { method: 'POST' })
+}
+
 export async function listBomVersions(bomId: string, params?: Record<string, string | number | boolean | undefined>) {
   return apiRequest<BomVersion[]>(`${tenantPath(`/manufacturing/boms/${bomId}/versions`)}${buildQuery(params)}`)
 }
@@ -363,6 +382,10 @@ export async function updateRouting(id: string, data: Record<string, unknown>) {
     method: 'PATCH',
     body: JSON.stringify(data),
   })
+}
+
+export async function deleteRouting(id: string) {
+  return apiRequest<null>(tenantPath(`/manufacturing/routings/${id}`), { method: 'DELETE' })
 }
 
 export async function getRouting(routingId: string) {
@@ -1210,6 +1233,10 @@ export async function issueWorkOrderMaterial(
     remarks?: string
     warehouseId?: string
     additional?: boolean
+    batchId?: string
+    batchNumber?: string
+    serialId?: string
+    serialNumber?: string
   },
 ) {
   return apiRequest<ProductionOrderMaterial>(tenantPath(`/manufacturing/work-orders/${workOrderId}/materials/issue`), {

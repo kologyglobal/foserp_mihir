@@ -36,7 +36,7 @@ CREATE TABLE `job_work_orders` (
   CONSTRAINT `job_work_orders_itemId_fkey` FOREIGN KEY (`itemId`) REFERENCES `master_items` (`id`),
   CONSTRAINT `job_work_orders_materialWarehouseId_fkey` FOREIGN KEY (`materialWarehouseId`) REFERENCES `master_warehouses` (`id`),
   CONSTRAINT `job_work_orders_receiptWarehouseId_fkey` FOREIGN KEY (`receiptWarehouseId`) REFERENCES `master_warehouses` (`id`)
-);
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE `job_work_material_lines` (
   `id` VARCHAR(191) NOT NULL, `tenantId` VARCHAR(191) NOT NULL, `jobWorkOrderId` VARCHAR(191) NOT NULL, `lineNo` INTEGER NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE `job_work_material_lines` (
   CONSTRAINT `job_work_material_lines_tenantId_fkey` FOREIGN KEY (`tenantId`) REFERENCES `tenants` (`id`),
   CONSTRAINT `job_work_material_lines_jobWorkOrderId_fkey` FOREIGN KEY (`jobWorkOrderId`) REFERENCES `job_work_orders` (`id`) ON DELETE CASCADE,
   CONSTRAINT `job_work_material_lines_itemId_fkey` FOREIGN KEY (`itemId`) REFERENCES `master_items` (`id`)
-);
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE `job_work_dispatches` (
   `id` VARCHAR(191) NOT NULL, `tenantId` VARCHAR(191) NOT NULL, `jobWorkOrderId` VARCHAR(191) NOT NULL, `dispatchNumber` VARCHAR(64) NULL,
@@ -58,7 +58,7 @@ CREATE TABLE `job_work_dispatches` (
   INDEX `job_work_dispatches_tenantId_jobWorkOrderId_idx` (`tenantId`,`jobWorkOrderId`),
   CONSTRAINT `job_work_dispatches_tenantId_fkey` FOREIGN KEY (`tenantId`) REFERENCES `tenants` (`id`),
   CONSTRAINT `job_work_dispatches_jobWorkOrderId_fkey` FOREIGN KEY (`jobWorkOrderId`) REFERENCES `job_work_orders` (`id`) ON DELETE CASCADE
-);
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE `job_work_dispatch_lines` (
   `id` VARCHAR(191) NOT NULL, `tenantId` VARCHAR(191) NOT NULL, `dispatchId` VARCHAR(191) NOT NULL, `materialLineId` VARCHAR(191) NOT NULL,
@@ -66,7 +66,7 @@ CREATE TABLE `job_work_dispatch_lines` (
   CONSTRAINT `job_work_dispatch_lines_tenantId_fkey` FOREIGN KEY (`tenantId`) REFERENCES `tenants` (`id`),
   CONSTRAINT `job_work_dispatch_lines_dispatchId_fkey` FOREIGN KEY (`dispatchId`) REFERENCES `job_work_dispatches` (`id`) ON DELETE CASCADE,
   CONSTRAINT `job_work_dispatch_lines_materialLineId_fkey` FOREIGN KEY (`materialLineId`) REFERENCES `job_work_material_lines` (`id`)
-);
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE `job_work_receipts` (
   `id` VARCHAR(191) NOT NULL, `tenantId` VARCHAR(191) NOT NULL, `jobWorkOrderId` VARCHAR(191) NOT NULL, `receivedAt` DATETIME(3) NOT NULL,
@@ -77,7 +77,7 @@ CREATE TABLE `job_work_receipts` (
   INDEX `job_work_receipts_tenantId_jobWorkOrderId_idx` (`tenantId`,`jobWorkOrderId`),
   CONSTRAINT `job_work_receipts_tenantId_fkey` FOREIGN KEY (`tenantId`) REFERENCES `tenants` (`id`),
   CONSTRAINT `job_work_receipts_jobWorkOrderId_fkey` FOREIGN KEY (`jobWorkOrderId`) REFERENCES `job_work_orders` (`id`) ON DELETE CASCADE
-);
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE INDEX `quality_inspections_tenantId_jobWorkOrderId_idx` ON `quality_inspections`(`tenantId`,`jobWorkOrderId`);
 ALTER TABLE `quality_inspections` ADD CONSTRAINT `quality_inspections_jobWorkOrderId_fkey` FOREIGN KEY (`jobWorkOrderId`) REFERENCES `job_work_orders`(`id`);

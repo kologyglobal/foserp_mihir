@@ -1,13 +1,9 @@
 import type { LucideIcon } from 'lucide-react'
 import {
-  AlertTriangle,
   ArrowDownToLine,
   ArrowUpFromLine,
   BarChart3,
-  Bell,
-  Bookmark,
   BookOpen,
-  Calendar,
   CalendarCheck,
   ClipboardList,
   FileSpreadsheet,
@@ -16,28 +12,28 @@ import {
   Handshake,
   HardHat,
   Inbox,
-  IndianRupee,
+  KeyRound,
   Landmark,
   LayoutDashboard,
+  Lock,
+  Network,
   Package,
   PackageCheck,
-  Play,
   Factory,
   RotateCcw,
   Receipt,
   ShieldAlert,
   Settings2,
-  ShoppingBag,
   ShoppingCart,
   SlidersHorizontal,
   Truck,
   Users,
+  UserPlus,
   Building2,
   Warehouse,
   Wrench,
   Clock,
   ShieldCheck,
-  QrCode,
   ScanLine,
   Target,
   TrendingUp,
@@ -48,8 +44,6 @@ import {
 
 import { buildMasterNavItems } from './masterModuleStructure'
 import { TAX_COMPLIANCE_NAV } from './taxComplianceNav'
-import { BUDGETING_NAV } from './budgetingNav'
-import { RECEIVABLES_NAV, RECEIVABLES_NAV_GROUP } from './receivablesNav'
 
 export type NavItem = {
   label: string
@@ -83,42 +77,12 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Executive', path: '/executive', icon: BarChart3 },
       { label: 'Inbox', path: '/inbox', icon: Inbox },
       { label: 'Role Inbox', path: '/home/inbox', icon: Inbox },
-      { label: 'Role Approvals', path: '/home/approvals', icon: ShieldCheck },
     ],
   },
   {
     id: 'masters',
     title: 'Master Data',
     items: buildMasterNavItems(),
-  },
-  {
-    id: 'traceability',
-    title: 'QR Traceability',
-    items: [
-      { label: 'QR Scanner', path: '/scan', icon: ScanLine, end: true, workspace: true },
-      { label: 'Traceability 360', path: '/traceability', icon: GitBranch },
-      { label: 'Trailer Genealogy', path: '/traceability/trailers', icon: Layers },
-      { label: 'QR Registry', path: '/qr/registry', icon: QrCode },
-    ],
-  },
-  {
-    id: 'traceability-barcode',
-    title: 'Barcode Traceability',
-    items: [
-      { label: 'Barcode Hub', path: '/barcode', icon: LayoutDashboard, end: true, workspace: true },
-      { label: 'Barcode Generator', path: '/barcode/generator', icon: QrCode },
-      { label: 'Print Labels', path: '/barcode/print', icon: PackageCheck },
-      { label: 'Barcode History', path: '/barcode/history', icon: ClipboardList },
-      { label: 'Traceability Report', path: '/barcode/trace', icon: BarChart3 },
-    ],
-  },
-  {
-    id: 'engineering',
-    title: 'Engineering',
-    items: [
-      { label: 'Engineering Change', path: '/engineering/eco', icon: GitBranch, end: true, workspace: true },
-      { label: 'BOM Master', path: '/engineering/bom', icon: Layers },
-    ],
   },
   {
     id: 'crm',
@@ -129,7 +93,7 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Leads', path: '/crm/leads', icon: Target },
       { label: 'Opportunities', path: '/crm/opportunities', icon: Handshake },
       { label: 'Quotations', path: '/crm/quotations', icon: FileText },
-      { label: 'Quotation Templates', path: '/crm/quotation-templates', icon: Bookmark },
+      { label: 'Quotation Templates', path: '/crm/quotation-templates', icon: ClipboardList },
       { label: 'Sales Orders', path: '/crm/sales-orders', icon: ShoppingCart },
       { label: 'Companies', path: '/crm/companies', icon: Building2 },
       { label: 'Contacts', path: '/crm/contacts', icon: Users },
@@ -144,11 +108,7 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Sales Dashboard', path: '/sales', icon: LayoutDashboard, end: true, workspace: true },
       { label: 'Quotation Approvals', path: '/sales/approvals', icon: Handshake },
       { label: 'Sales Orders', path: '/sales/orders', icon: ShoppingCart },
-      { label: 'Proforma Invoices', path: '/sales/proforma-invoices', icon: Receipt },
       { label: 'Company 360', path: '/sales/customers', icon: Building2 },
-      { label: 'Order Status', path: '/sales/order-status', icon: ClipboardList },
-      { label: 'Run Planning', path: '/mrp/run', icon: Play },
-      { label: 'Sales Reports', path: '/sales/reports', icon: BarChart3 },
     ],
   },
   {
@@ -171,7 +131,7 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Setup', path: '/inventory/setup', icon: Settings2 },
       /** Legacy routes — kept for bookmarks / deep links; hidden from workspace tabs */
       { label: 'Stock Ledger', path: '/inventory/ledger', icon: BookOpen, subNav: false },
-      { label: 'Reservations', path: '/inventory/reservations', icon: Bookmark, subNav: false },
+      { label: 'Reservations', path: '/inventory/reservations', icon: ClipboardList, subNav: false },
       { label: 'Opening Stock', path: '/inventory/opening-stock', icon: ClipboardList, subNav: false },
       { label: 'Material Inward', path: '/inventory/inward', icon: ArrowDownToLine, subNav: false },
       { label: 'Material Issue', path: '/inventory/issue', icon: ArrowUpFromLine, subNav: false },
@@ -179,14 +139,6 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Scan To Receive', path: '/inventory/scan/receive', icon: ScanLine, subNav: false },
       { label: 'Scan To Issue', path: '/inventory/scan/issue', icon: ScanLine, subNav: false },
       { label: 'Scan To Transfer', path: '/inventory/scan/transfer', icon: ScanLine, subNav: false },
-    ],
-  },
-  {
-    id: 'mrp',
-    title: 'Planning',
-    items: [
-      { label: 'Planning', path: '/mrp', icon: LayoutDashboard, end: true, workspace: true },
-      { label: 'Run Planning', path: '/mrp/run', icon: Play },
     ],
   },
   {
@@ -204,8 +156,6 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Purchase Returns', path: '/purchase/returns', icon: RotateCcw, group: 'Warehouse' },
       { label: 'Purchase Invoices', path: '/purchase/invoices', icon: Receipt, group: 'Accounts' },
       { label: 'Vendor Quotations', path: '/purchase/vendor-quotations', icon: Receipt, group: 'Vendors' },
-      { label: 'Vendor Performance', path: '/purchase/vendor-performance', icon: TrendingUp, group: 'Vendors' },
-      { label: 'Reports', path: '/purchase/reports', icon: BarChart3 },
       { label: 'Masters', path: '/purchase/masters', icon: Settings2 },
       { label: 'Setup', path: '/purchase/setup', icon: Settings2 },
     ],
@@ -227,9 +177,6 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Setup', path: '/manufacturing/setup', icon: Settings2, end: true, group: 'Setup' },
       { label: 'Reports', path: '/manufacturing/reports', icon: BarChart3 },
       { label: 'Settings', path: '/manufacturing/settings', icon: Settings2 },
-      /** Demo / legacy registers — deep-link only; hide from fixed workspace tabs */
-      { label: 'BOM (Demo)', path: '/manufacturing/bom', icon: Layers, subNav: false },
-      { label: 'Routes (Demo)', path: '/manufacturing/routes', icon: GitBranch, subNav: false },
     ],
   },
   {
@@ -252,9 +199,6 @@ export const moduleCategories: NavCategory[] = [
     items: [
       { label: 'Dispatch Workspace', path: '/dispatch', icon: LayoutDashboard, end: true, workspace: true },
       { label: 'Dispatch Register', path: '/dispatch/register', icon: ClipboardList },
-      { label: 'Dispatch Plan', path: '/dispatch/plan', icon: PackageCheck },
-      { label: 'Scan Trailer', path: '/dispatch/scan/trailer', icon: ScanLine },
-      { label: 'Scan Dispatch', path: '/dispatch/scan/dispatch', icon: ScanLine },
       { label: 'Reports', path: '/dispatch/reports', icon: BarChart3 },
     ],
   },
@@ -277,106 +221,27 @@ export const moduleCategories: NavCategory[] = [
     ],
   },
   {
-    id: 'finance',
-    title: 'Finance',
-    items: [
-      { label: 'Finance Workspace', path: '/invoices', icon: LayoutDashboard, end: true, workspace: true },
-      { label: 'Invoice Register', path: '/invoices/register', icon: Receipt },
-    ],
-  },
-  {
     id: 'accounting',
     title: 'Accounting',
     items: [
       { label: 'Dashboard', path: '/accounting', icon: LayoutDashboard, end: true, workspace: true },
+      { label: 'Organisation Setup', path: '/settings/organisation', icon: Building2 },
       { label: 'Chart of Accounts', path: '/accounting/settings/chart-of-accounts', icon: BookOpen },
       { label: 'Journals', path: '/accounting/entries/journals', icon: FileText },
-      /** Receivables workspace — DynamicsTabs dropdown group */
-      ...RECEIVABLES_NAV.map((item) => ({
-        label: item.label,
-        path: item.path,
-        icon:
-          item.id === 'overview'
-            ? LayoutDashboard
-            : item.id === 'outstanding'
-              ? Users
-              : item.id === 'invoices'
-                ? Receipt
-                : item.id === 'ageing'
-                  ? Clock
-                  : item.id === 'collections'
-                    ? ClipboardList
-                    : item.id === 'receipts'
-                      ? ArrowDownToLine
-                      : item.id === 'allocations'
-                        ? Layers
-                        : item.id === 'credit-notes'
-                          ? FileText
-                          : item.id === 'disputes'
-                            ? ShieldAlert
-                            : Bell,
-        end: item.end,
-        group: RECEIVABLES_NAV_GROUP,
-      })),
-      /** API-backed Money In (Phase 3A) — discover via deep link / search */
-      { label: 'Money In (API)', path: '/accounting/money-in', icon: ArrowDownToLine, subNav: false as const },
-      /** API-backed Money Out (Phase 4A5) — vendor invoices; payments/ageing preview later */
-      { label: 'Money Out (API)', path: '/accounting/money-out', icon: ArrowUpFromLine, subNav: false as const },
-      {
-        label: 'Commercial Commitments',
-        path: '/accounting/commercial-commitments',
-        icon: Handshake,
-        subNav: false as const,
-      },
-      { label: 'Payables', path: '/accounting/payables', icon: ArrowUpFromLine },
+      { label: 'Money In', path: '/accounting/money-in', icon: ArrowDownToLine },
+      { label: 'Money Out', path: '/accounting/money-out', icon: ArrowUpFromLine },
       { label: 'Bank & Cash', path: '/accounting/bank-cash', icon: Landmark },
       { label: 'Fixed Assets', path: '/accounting/fixed-assets', icon: Building2 },
       { label: 'Manufacturing Accounting', path: '/accounting/manufacturing', icon: Factory },
-      /** Parent tab in Accounting sub-nav — children listed below with subNav:false for titles/search */
-      { label: 'GST & TDS', path: '/accounting/tax-compliance', icon: Receipt },
+      { label: 'GST & Tax', path: '/accounting/tax-compliance', icon: Receipt },
       ...TAX_COMPLIANCE_NAV.map((item) => ({
         label: item.label,
         path: item.path,
-        icon:
-          item.group === 'gst'
-            ? FileSpreadsheet
-            : item.group === 'tds' || item.group === 'tcs'
-              ? IndianRupee
-              : item.id === 'calendar'
-                ? Calendar
-                : item.id === 'notices' || item.id === 'exceptions'
-                  ? AlertTriangle
-                  : item.id === 'setup'
-                    ? Settings2
-                    : item.id === 'reports'
-                      ? BarChart3
-                      : Receipt,
+        icon: item.group === 'gst' ? FileSpreadsheet : Receipt,
         end: item.end,
-        /** Hidden from Accounting Dynamics tabs — rendered in GST & TDS in-page tree */
         subNav: false as const,
       })),
       { label: 'Ledger Entries', path: '/accounting/ledger-entries', icon: ClipboardList },
-      { label: 'Financial Reports', path: '/accounting/reports', icon: IndianRupee },
-      /** Budgeting is demo-only — demoted from Accounting primary tabs (discover via search / deep link) */
-      { label: 'Budgeting & Forecasting', path: '/accounting/budgeting', icon: TrendingUp, subNav: false },
-      ...BUDGETING_NAV.map((item) => ({
-        label: item.label,
-        path: item.path,
-        icon:
-          item.id === 'overview'
-            ? LayoutDashboard
-            : item.id === 'approvals'
-              ? ShieldCheck
-              : item.id === 'setup'
-                ? Settings2
-                : item.id === 'reports' || item.id === 'vs-actual' || item.id === 'rolling'
-                  ? BarChart3
-                  : item.id === 'cash-flow'
-                    ? Landmark
-                    : TrendingUp,
-        end: item.end,
-        subNav: false as const,
-      })),
       { label: 'Period Close', path: '/accounting/period-close', icon: CalendarCheck },
       { label: 'Setup', path: '/accounting/settings', icon: Settings2 },
     ],
@@ -385,31 +250,35 @@ export const moduleCategories: NavCategory[] = [
     id: 'admin',
     title: 'Administration',
     items: [
-      { label: 'Users', path: '/admin/users', icon: Users, end: true, workspace: true },
+      { label: 'Overview', path: '/admin', icon: LayoutDashboard, end: true, workspace: true },
+      { label: 'Users', path: '/admin/users', icon: Users },
       { label: 'Roles', path: '/admin/roles', icon: ShieldCheck },
-      { label: 'Tenants', path: '/admin/tenants', icon: Building2 },
-    ],
-  },
-  {
-    id: 'reports',
-    title: 'Analytics',
-    items: [
-      { label: 'Reports Hub', path: '/reports', icon: LayoutDashboard, end: true, workspace: true },
-      { label: 'Stock Aging', path: '/reports/inventory/stock-aging', icon: Warehouse },
-      { label: 'Negative Stock', path: '/reports/inventory/negative-stock', icon: Package },
-      { label: 'Slow Moving', path: '/reports/inventory/slow-moving', icon: Clock },
-      { label: 'Open PO', path: '/reports/purchase/open-po', icon: ShoppingCart },
-      { label: 'Delayed PO', path: '/reports/purchase/delayed-po', icon: Truck },
-      { label: 'WO Status', path: '/reports/production/wo-status', icon: Wrench },
-      { label: 'WIP Aging', path: '/reports/production/wip-aging', icon: Factory },
-      { label: 'NCR Aging', path: '/reports/quality/ncr-aging', icon: ShieldAlert },
-      { label: 'Rework Trend', path: '/reports/quality/rework-trend', icon: RotateCcw },
-      { label: 'Pending Dispatch', path: '/reports/dispatch/pending-dispatch', icon: Truck },
-      { label: 'Open Orders', path: '/reports/sales/open-orders', icon: ShoppingBag },
-      { label: 'Barcode Traceability', path: '/reports/traceability/barcode', icon: QrCode },
+      { label: 'Invitations', path: '/admin/invitations', icon: UserPlus },
+      { label: 'Responsibilities', path: '/admin/responsibilities', icon: ClipboardList },
+      { label: 'Access Review', path: '/admin/access-review', icon: ClipboardList },
+      { label: 'Login Activity', path: '/admin/security/login-activity', icon: ShieldAlert },
+      { label: 'Active Sessions', path: '/admin/security/sessions', icon: KeyRound },
+      { label: 'Locked Accounts', path: '/admin/security/locked-accounts', icon: Lock },
+      { label: 'Admin Audit', path: '/admin/security/audit', icon: ClipboardList },
+      { label: 'Organization Structure', path: '/admin/org-structure', icon: GitBranch },
+      { label: 'Departments', path: '/admin/departments', icon: Layers },
+      { label: 'Companies', path: '/admin/companies', icon: Building2 },
+      { label: 'Branches', path: '/admin/branches', icon: Network },
+      { label: 'Tenant Profile', path: '/admin/tenant-profile', icon: Building2 },
+      { label: 'Module Access', path: '/admin/modules', icon: SlidersHorizontal },
     ],
   },
 ]
+
+/** Platform Admin — Super Admin only (filtered in nav consumers). */
+export const platformNavCategory: NavCategory = {
+  id: 'platform',
+  title: 'Platform',
+  items: [
+    { label: 'Platform Overview', path: '/platform', icon: LayoutDashboard, end: true },
+    { label: 'Tenants', path: '/platform/tenants', icon: Building2 },
+  ],
+}
 
 /** Flat list of all workspace landing pages — used for quick access / keyboard nav */
 export const workspaceNav: NavItem[] = moduleCategories
@@ -418,7 +287,7 @@ export const workspaceNav: NavItem[] = moduleCategories
 export type SearchablePage = NavItem & { category: string; keywords?: string }
 
 /** All navigable pages indexed for global search and discovery audits */
-export const searchablePages: SearchablePage[] = moduleCategories.flatMap((cat) =>
+export const searchablePages: SearchablePage[] = allNavCategories().flatMap((cat) =>
   cat.items
     .filter((item) => !item.disabled)
     .map((item) => ({
@@ -437,14 +306,24 @@ export function categoryIsActive(category: NavCategory, pathname: string): boole
   return category.items.some((item) => navItemIsActive(item, pathname))
 }
 
+export function getNavCategoryById(id: string): NavCategory | undefined {
+  if (id === platformNavCategory.id) return platformNavCategory
+  return moduleCategories.find((c) => c.id === id)
+}
+
+/** Workspace + platform categories (platform filtered in nav consumers for Super Admin). */
+export function allNavCategories(): NavCategory[] {
+  return [...moduleCategories, platformNavCategory]
+}
+
 export function findActiveCategoryId(pathname: string): string | null {
+  if (pathname.startsWith('/platform')) return 'platform'
   if (pathname.startsWith('/entity360/customers')) return 'crm'
   if (pathname.startsWith('/sales/leads')) return 'crm'
   if (pathname.startsWith('/logistics')) return 'dispatch'
   if (pathname.startsWith('/masters') || pathname.startsWith('/settings/roles') || pathname.startsWith('/settings/permissions')) {
     return 'masters'
   }
-  // API manufacturing setup masters live under paths not covered by demo /bom|/routes prefixes.
   if (
     pathname.startsWith('/manufacturing/setup') ||
     pathname.startsWith('/manufacturing/profiles') ||
@@ -453,7 +332,7 @@ export function findActiveCategoryId(pathname: string): string | null {
   ) {
     return 'production'
   }
-  for (const cat of moduleCategories) {
+  for (const cat of allNavCategories()) {
     if (categoryIsActive(cat, pathname)) return cat.id
   }
   return null

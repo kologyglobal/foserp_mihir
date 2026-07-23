@@ -120,7 +120,21 @@ export async function calculateVendorInvoice(
   const includeAccountReadiness = context.includeAccountReadiness ?? hasTenant
   const includeAccountingPreview = context.includeAccountingPreview ?? hasTenant
 
-  const amounts = calculateVendorInvoiceAmounts(input)
+  let calcInput = input
+  if (context.tenantId) {
+    const { enrichLinesWithMasterGstRates } = await import(
+      '../../../shared/master-resolvers/accounting-tax-resolver.js'
+    )
+    const lines = await enrichLinesWithMasterGstRates(context.tenantId, input.lines, {
+      applicableFor: 'PURCHASE',
+      asOfDate: input.invoiceDate ?? input.postingDate,
+      fromState: input.companyStateCode,
+      toState: input.placeOfSupply ?? input.vendorStateCode,
+    })
+    calcInput = { ...input, lines }
+  }
+
+  const amounts = calculateVendorInvoiceAmounts(calcInput)
   const normalizedSupplierInvoiceNumber = normalizeSupplierInvoiceNumber(input.supplierInvoiceNumber ?? '')
 
   const duplicateAssessment: VendorInvoiceDuplicateAssessment =

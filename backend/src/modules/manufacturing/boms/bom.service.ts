@@ -11,6 +11,7 @@ import type {
   CreateBomVersionInput,
   ListBomVersionsQuery,
   ListBomsQuery,
+  UpdateBomInput,
   UpdateBomLineInput,
   UpdateBomVersionInput,
 } from './bom.schemas.js'
@@ -56,6 +57,30 @@ export async function createBom(req: Request, tenantId: string, input: CreateBom
   const userId = req.context?.userId ?? ''
   const record = await repo.createBom(tenantId, userId, input)
   await audit(req, tenantId, 'manufacturingBom', record.id, 'CREATE', undefined, record)
+  return record
+}
+
+export async function updateBom(req: Request, tenantId: string, bomId: string, input: UpdateBomInput) {
+  const userId = req.context?.userId ?? ''
+  const before = await repo.getBom(tenantId, bomId)
+  const record = await repo.updateBom(tenantId, userId, bomId, input)
+  await audit(req, tenantId, 'manufacturingBom', bomId, 'UPDATE', before, record)
+  return record
+}
+
+export async function softDeleteBom(req: Request, tenantId: string, bomId: string) {
+  const userId = req.context?.userId ?? ''
+  const before = await repo.getBom(tenantId, bomId)
+  const record = await repo.softDeleteBom(tenantId, userId, bomId)
+  await audit(req, tenantId, 'manufacturingBom', bomId, 'DELETE', before, record)
+  return record
+}
+
+export async function setBomActive(req: Request, tenantId: string, bomId: string, isActive: boolean) {
+  const userId = req.context?.userId ?? ''
+  const before = await repo.getBom(tenantId, bomId)
+  const record = await repo.setBomActive(tenantId, userId, bomId, isActive)
+  await audit(req, tenantId, 'manufacturingBom', bomId, isActive ? 'ACTIVATE' : 'DEACTIVATE', before, record)
   return record
 }
 

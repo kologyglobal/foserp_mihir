@@ -1,7 +1,9 @@
 import { createAuditLog } from '../../services/audit.service.js'
+import { prisma } from '../../config/database.js'
 import { ConflictError, NotFoundError } from '../../utils/errors.js'
 import { buildPaginationMeta } from '../../utils/pagination.js'
 import { hashPassword } from '../../utils/password.js'
+import * as invitationService from './user-invitation.service.js'
 import * as userRepository from './user.repository.js'
 import type { UserWithRoles } from './user.repository.js'
 import type {
@@ -20,6 +22,7 @@ export interface SafeUser {
   mobile: string | null
   designation: string | null
   department: string | null
+  departmentId: string | null
   status: string
   emailVerified: boolean
   lastLoginAt: Date | null
@@ -40,6 +43,7 @@ export function sanitizeUser(user: UserWithRoles): SafeUser {
     mobile: user.mobile,
     designation: user.designation,
     department: user.department,
+    departmentId: user.departmentId,
     status: user.status,
     emailVerified: user.emailVerified,
     lastLoginAt: user.lastLoginAt,
@@ -137,6 +141,10 @@ export async function updateUser(
   const user = await userRepository.updateUser(tenantId, userId, input, audit?.userId)
   const safeUser = sanitizeUser(user)
 
+  if (input.status && input.status !== 'ACTIVE' && input.status !== existing.status) {
+    await invitationService.revokeUserSessions(userId, tenantId)
+  }
+
   await createAuditLog({
     tenantId,
     userId: audit?.userId ?? null,
@@ -160,6 +168,11 @@ export async function deleteUser(tenantId: string, userId: string, audit?: Audit
   }
 
   const user = await userRepository.softDeleteUser(tenantId, userId, audit?.userId)
+  await invitationService.revokeUserSessions(userId, tenantId)
+  await prisma.userInvitation.updateMany({
+    where: { userId, tenantId, acceptedAt: null, revokedAt: null },
+    data: { revokedAt: new Date() },
+  })
   const safeUser = sanitizeUser(user)
 
   await createAuditLog({

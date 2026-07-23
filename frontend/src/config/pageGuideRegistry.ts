@@ -6,12 +6,10 @@ export interface PageGuideEntry {
 /** Route-prefix → user-facing page guide (longest prefix wins) */
 const GUIDES: { prefix: string; guide: PageGuideEntry }[] = [
   // —— Home / shell ——
-  { prefix: '/home/approvals', guide: { purpose: 'Role approvals waiting for your sign-off.', nextStep: 'Open a request, review, then Approve or Reject.' } },
   { prefix: '/home/inbox', guide: { purpose: 'Role inbox — items assigned to your persona.', nextStep: 'Open the next due item and complete the action.' } },
-  { prefix: '/home', guide: { purpose: 'Personal home — shortcuts and work waiting on you.', nextStep: 'Open Inbox, Approvals, or jump to your primary module.' } },
+  { prefix: '/home', guide: { purpose: 'Personal home — shortcuts and work waiting on you.', nextStep: 'Open Inbox or jump to your primary module.' } },
   { prefix: '/executive', guide: { purpose: 'Executive dashboard — plant KPIs and exceptions.', nextStep: 'Drill into a KPI or open Unified Inbox for action items.' } },
   { prefix: '/inbox', guide: { purpose: 'Unified inbox across modules.', nextStep: 'Clear overdue items first, then open the linked document.' } },
-  { prefix: '/approvals', guide: { purpose: 'My approvals queue across documents.', nextStep: 'Review each request and Approve or Reject with a note.' } },
 
   // —— CRM ——
   { prefix: '/crm/guided-deal', guide: { purpose: 'Guided commercial flow — Lead → Qualify → Opportunity → Quote → Order.', nextStep: 'Complete the current step with minimum data, then Continue. Use header Quick create for fast capture.' } },
@@ -30,17 +28,9 @@ const GUIDES: { prefix: string; guide: PageGuideEntry }[] = [
 
   // —— Sales ——
   { prefix: '/sales/customers', guide: { purpose: 'Sales company hub — commercial operations, receivables context, and order history by company. Pipeline and deal work stays in CRM → Companies.', nextStep: 'Open Company 360, or jump to CRM for opportunities and quotations.' } },
-  { prefix: '/sales/orders', guide: { purpose: 'Sales order fulfilment — confirm orders, run MRP, production, and dispatch. CRM → Sales Orders supports direct create and quotation handover.', nextStep: 'Confirm an open SO, then run MRP for production planning.' } },
-  { prefix: '/sales/proforma-invoices', guide: { purpose: 'Proforma invoices for advance billing before tax invoice.', nextStep: 'Create from sales order or direct, then issue to customer.' } },
-  { prefix: '/sales/approvals', guide: { purpose: 'Quotation and commercial approvals for sales.', nextStep: 'Open a pending item and Approve or send back with comments.' } },
-  { prefix: '/sales/order-status', guide: { purpose: 'Order status board — fulfilment progress by sales order.', nextStep: 'Filter delayed orders and open the SO for next action.' } },
-  { prefix: '/sales/reports', guide: { purpose: 'Sales operational reports.', nextStep: 'Choose a report and apply period / customer filters.' } },
+  { prefix: '/sales/orders', guide: { purpose: 'Sales order fulfilment — confirm orders, run MRP, production, and dispatch. CRM → Sales Orders supports direct create and quotation handover.', nextStep: 'Confirm an open SO, then open Manufacturing for production planning.' } },
   { prefix: '/sales/inquiries', guide: { purpose: 'Inquiries are now managed as Opportunities.', nextStep: 'Open Opportunities and create a quotation from there.' } },
-  { prefix: '/sales', guide: { purpose: 'Sales workspace for orders, pipeline, and approvals.', nextStep: 'Open order status or pending approvals.' } },
-
-  // —— MRP / Planning ——
-  { prefix: '/mrp/run', guide: { purpose: 'Run material planning for a sales order.', nextStep: 'Select an order and run planning to see shortages and purchase needs.' } },
-  { prefix: '/mrp', guide: { purpose: 'Planning hub — shortages, purchase needs, and order readiness.', nextStep: 'Run planning on an open sales order.' } },
+  { prefix: '/sales', guide: { purpose: 'Sales workspace for orders and company 360.', nextStep: 'Open Sales Orders or Company 360.' } },
 
   // —— Purchase ——
   { prefix: '/purchase/planning-sheet', guide: { purpose: 'Purchase Planning Sheet for approved PRs where RFQ is not required — one row per item for vendor selection and direct PO.', nextStep: 'Assign buyer, select vendor, approve, then Create Purchase Order when net qty and rate are ready.' } },
@@ -72,7 +62,6 @@ const GUIDES: { prefix: string; guide: PageGuideEntry }[] = [
   { prefix: '/inventory/opening-stock', guide: { purpose: 'Opening stock entry for go-live balances.', nextStep: 'Enter quantities by warehouse, then post opening.' } },
   { prefix: '/inventory/inward', guide: { purpose: 'Material inward outside the purchase GRN flow.', nextStep: 'Create an inward document and post to stock.' } },
   { prefix: '/inventory/reservations', guide: { purpose: 'Stock reservations against sales or production demand.', nextStep: 'Review soft allocations and release unused holds.' } },
-  { prefix: '/inventory/scan', guide: { purpose: 'Scan-assisted inventory receive / issue / transfer.', nextStep: 'Scan barcode or enter code, then confirm the movement.' } },
   { prefix: '/inventory/reports', guide: { purpose: 'Inventory reports — valuation, ageing, and movement.', nextStep: 'Select a report and set warehouse / period filters.' } },
   { prefix: '/inventory/setup', guide: { purpose: 'Inventory module setup.', nextStep: 'Confirm warehouses, locations, and posting defaults.' } },
   { prefix: '/inventory', guide: { purpose: 'Inventory operations — inward, issue, transfer, count.', nextStep: 'Open stock ledger or material issue.' } },
@@ -86,27 +75,23 @@ const GUIDES: { prefix: string; guide: PageGuideEntry }[] = [
   { prefix: '/manufacturing/job-work', guide: { purpose: 'Job Work handles outside processing linked to a Work Order.', nextStep: 'Create Job Work from a WO, then send / receive / reconcile.' } },
   { prefix: '/manufacturing/reports', guide: { purpose: 'Reports show production performance across Work Orders.', nextStep: 'Open a report card, filter, export or print.' } },
   { prefix: '/manufacturing/settings', guide: { purpose: 'Settings control complexity — keep Advanced off for simple mode.', nextStep: 'Review Quick Mode and Auto Consumption defaults.' } },
-  { prefix: '/manufacturing/control-room', guide: { purpose: 'Owner / manager Production Control Room — today\'s plan, running WOs, shortages, QC, delays, job work.', nextStep: 'Click a WO to execute; use Accept/Reject/Rework for QC pending.' } },
+  { prefix: '/manufacturing/control-room', guide: { purpose: 'Owner / manager Production Control Room — today\'s plan, running WOs, shortages, QC, delays, job work.', nextStep: 'Click a WO to execute; use Fulfilment for Produce → Dispatch coach; use Accept/Reject/Rework for QC pending.' } },
+  { prefix: '/manufacturing/guided-fulfilment', guide: { purpose: 'Guided Fulfilment — Produce → Quality → Stock → Dispatch. Progress stored in ?step= (like Guided Deal).', nextStep: 'Open the linked WO, Store workbench, or Dispatch workbench for the current step.' } },
   { prefix: '/manufacturing', guide: { purpose: 'Simple manufacturing: BOM → Plan → Work Order → Start/Hold/Complete/QC/Close → Shopfloor + Reports. Not Job Card / Material Issue / FG Receipt chains.', nextStep: 'Open Work Orders to execute, or Control Room for manager attention.' } },
   { prefix: '/work-orders', guide: { purpose: 'Legacy work-order URLs redirect to Manufacturing › Work Orders.', nextStep: 'Use /manufacturing/work-orders.' } },
   { prefix: '/job-cards', guide: { purpose: 'Job Cards are not used — actions live on the Work Order.', nextStep: 'Open Manufacturing › Work Orders.' } },
   { prefix: '/production', guide: { purpose: 'Production control tower — legacy production views.', nextStep: 'Prefer Manufacturing › Control Room for day-to-day execution.' } },
-  { prefix: '/shop-floor', guide: { purpose: 'Shop floor job queue (legacy path).', nextStep: 'Use Manufacturing › Shopfloor for live WO operations.' } },
-  { prefix: '/costing', guide: { purpose: 'Work order costing and variance review.', nextStep: 'Open a WO cost sheet and investigate material or labour variance.' } },
 
   // —— Quality ——
   { prefix: '/quality/queue', guide: { purpose: 'Pending QC inspections across incoming and in-process.', nextStep: 'Open next inspection and record pass/fail.' } },
   { prefix: '/quality/ncr', guide: { purpose: 'Non-conformance reports and rework tracking.', nextStep: 'Review open NCRs and assign rework.' } },
   { prefix: '/quality', guide: { purpose: 'Quality workspace for inspections and NCR.', nextStep: 'Open QC queue or incoming QC.' } },
 
-  // —— Dispatch / Finance ops ——
-  { prefix: '/dispatch', guide: { purpose: 'Dispatch planning, gate pass, and POD.', nextStep: 'Create dispatch plan after final QC and FG receipt.' } },
-  { prefix: '/invoices', guide: { purpose: 'Tax invoices, receivables, and payments.', nextStep: 'Post invoice and record customer payment.' } },
+  // —— Dispatch ——
+  { prefix: '/dispatch', guide: { purpose: 'Dispatch planning and fulfilment workbench.', nextStep: 'Open the register or plan, then work from the dispatch workbench.' } },
 
-  // —— Engineering ——
-  { prefix: '/engineering/eco', guide: { purpose: 'Engineering change orders — impact, approval, release.', nextStep: 'Create ECO from ECR or release approved change.' } },
-  { prefix: '/engineering/bom', guide: { purpose: 'Bill of materials for trailer products.', nextStep: 'Open BOM 360 or create new BOM revision via ECO.' } },
-  { prefix: '/engineering', guide: { purpose: 'Engineering change and BOM control.', nextStep: 'Open ECO or BOM Master.' } },
+  // —— Engineering / BOM ——
+  { prefix: '/manufacturing/setup/boms', guide: { purpose: 'Manufacturing BOMs and versions used when creating work orders.', nextStep: 'Create or activate a BOM version, then link it on the manufacturing profile.' } },
 
   // —— Master Data ——
   { prefix: '/masters/companies/new', guide: { purpose: 'Register a new company master record.', nextStep: 'Complete profile, address, and contact — then Save.' } },
@@ -118,7 +103,6 @@ const GUIDES: { prefix: string; guide: PageGuideEntry }[] = [
   { prefix: '/masters/users', guide: { purpose: 'User Management — CRM owners and assignment identities.', nextStep: 'Create or edit a user, then assign territory and role context.' } },
   { prefix: '/masters/roles', guide: { purpose: 'Role Master — ERP role catalogue.', nextStep: 'Review roles, then open Role Permission Matrix to see effective rights.' } },
   { prefix: '/masters/role-permissions', guide: { purpose: 'Role Permission Matrix — role × module × action.', nextStep: 'Review matrix coverage; code changes live in permissionMatrix.ts until AuthModule ships.' } },
-  { prefix: '/masters/approval-workflows', guide: { purpose: 'Approval Workflow — document approval rules and limits.', nextStep: 'Configure rules for PR, PO, quotations, and other documents.' } },
   { prefix: '/masters/contacts', guide: { purpose: 'Contact Master — people linked to companies.', nextStep: 'Create a contact or open Company 360 to manage related people.' } },
   { prefix: '/masters/uom', guide: { purpose: 'Unit of Measure Master.', nextStep: 'Add or activate UOMs used on items and documents.' } },
   { prefix: '/masters/warehouses', guide: { purpose: 'Warehouse Master — storage sites.', nextStep: 'Maintain RM/WIP/FG warehouses used by inventory and GRN.' } },
@@ -127,45 +111,53 @@ const GUIDES: { prefix: string; guide: PageGuideEntry }[] = [
   { prefix: '/masters/gst-groups', guide: { purpose: 'GST Group Code Master.', nextStep: 'Maintain groups used by items and rate slabs.' } },
   { prefix: '/masters/gst-rates', guide: { purpose: 'GST Rate Master — SGST/CGST/IGST slabs.', nextStep: 'Keep rates current for the active financial year.' } },
   { prefix: '/masters/code-series', guide: { purpose: 'Code / Number Series Master.', nextStep: 'Configure prefixes and running numbers for documents and masters.' } },
-  { prefix: '/masters/bom', guide: { purpose: 'BOM Master under Master Data.', nextStep: 'Open a BOM or use Engineering / Manufacturing BOM for execution links.' } },
+  { prefix: '/manufacturing/setup', guide: { purpose: 'Manufacturing setup — profiles, BOMs, routings, work centres.', nextStep: 'Configure BOM and routing before releasing a work order.' } },
   { prefix: '/masters/payment-terms', guide: { purpose: 'Payment Terms Master — shared with CRM and purchase.', nextStep: 'Create or edit terms used on quotations, SO, and PO.' } },
   { prefix: '/masters', guide: { purpose: 'Master data hub for items, companies, vendors, products.', nextStep: 'Open the register you need to maintain.' } },
 
   // —— Accounting / Finance ——
   { prefix: '/accounting/settings', guide: { purpose: 'Finance setup — legal entities, years, periods, CoA, mappings, and approval rules.', nextStep: 'Complete the setup wizard, then open Chart of Accounts or periods.' } },
+  { prefix: '/settings/organisation', guide: { purpose: 'Organisation foundation — legal entity, tax registrations, CoA, mappings, fiscal years, and posting periods.', nextStep: 'Confirm GST registration and active fiscal year, then review account mappings.' } },
   { prefix: '/accounting/settings/chart-of-accounts', guide: { purpose: 'Chart of Accounts for the active legal entity.', nextStep: 'Create or open an account; keep postable leaves for journals.' } },
   { prefix: '/accounting/entries/journals', guide: { purpose: 'Manual journals and accounting entries register.', nextStep: 'Create a journal, balance lines, then post when ready.' } },
   { prefix: '/accounting/money-in', guide: { purpose: 'Money In — sales invoices, outstanding, ageing, and AR-to-GL reconciliation.', nextStep: 'Create a draft invoice or review ready-to-post items.' } },
-  { prefix: '/accounting/receivables', guide: { purpose: 'Legacy receivables demo — receipts and collections stubs.', nextStep: 'Use Money In for sales invoices and reporting.' } },
-  { prefix: '/accounting/payables', guide: { purpose: 'Accounts payable — vendor invoices, payments, and ageing.', nextStep: 'Review payment planning, then create a vendor payment.' } },
-  { prefix: '/accounting/bank-cash', guide: { purpose: 'Bank and cash — accounts, statements, and reconciliation.', nextStep: 'Import a statement or open reconciliation workbench.' } },
+  { prefix: '/accounting/money-out', guide: { purpose: 'Money Out — vendor invoices, payments, ageing, and AP close gate.', nextStep: 'Create a vendor invoice or review payment planning.' } },
+  { prefix: '/accounting/bank-cash', guide: { purpose: 'Bank & Cash — live API for internal UAT / controlled pilot (liquidity, statements, transfers, recon). AIS / FX / intercompany deferred.', nextStep: 'Import a statement or open reconciliation. Use connectors for sandbox/REST/SFTP only — not AIS pull.' } },
   { prefix: '/accounting/fixed-assets', guide: { purpose: 'Fixed assets register, depreciation, and disposal.', nextStep: 'Open the register or run the depreciation workbench.' } },
-  { prefix: '/accounting/manufacturing', guide: { purpose: 'Manufacturing costing and WIP accounting.', nextStep: 'Review WIP or production costing for the period.' } },
-  { prefix: '/accounting/tax-compliance', guide: { purpose: 'GST / TDS / TCS compliance workspace.', nextStep: 'Open GST dashboard or TDS workbench for the return period.' } },
-  { prefix: '/accounting/budgeting', guide: { purpose: 'Budgets, forecasts, and budget vs actual.', nextStep: 'Open annual budget or department budgets for the version in use.' } },
+  { prefix: '/accounting/manufacturing', guide: { purpose: 'Manufacturing accounting workspace — WIP and production cost events.', nextStep: 'Review unposted events or open Work Order costing.' } },
+  { prefix: '/accounting/tax-compliance', guide: { purpose: 'GST extract, e-invoice, and e-way bill registers.', nextStep: 'Open outward/inward supplies or e-invoice / e-way.' } },
   { prefix: '/accounting/ledger-entries', guide: { purpose: 'Posted ledger entries and drill-down ledgers.', nextStep: 'Filter by account, voucher, or party.' } },
-  { prefix: '/accounting/reports', guide: { purpose: 'Financial reports — TB, P&L, balance sheet, and MIS.', nextStep: 'Run Trial Balance or P&L for the open period.' } },
-  { prefix: '/accounting/commercial-commitments', guide: { purpose: 'Commercial commitments linked to sales and finance.', nextStep: 'Review open commitments and follow up overdue items.' } },
-  { prefix: '/accounting', guide: { purpose: 'Finance & accounting workspace.', nextStep: 'Open dashboard KPIs, or jump to receivables / payables / CoA.' } },
+  { prefix: '/accounting', guide: { purpose: 'Finance & accounting workspace.', nextStep: 'Open Money In / Money Out, journals, or CoA.' } },
 
-  // —— Documents / barcode / mobile ——
-  { prefix: '/documents', guide: { purpose: 'Controlled document register with versions.', nextStep: 'Upload document or open approval queue.' } },
-  { prefix: '/barcode', guide: { purpose: 'Barcode hub — generate, print, and trace labels.', nextStep: 'Open Generator or Print Labels for the next batch.' } },
-  { prefix: '/scan', guide: { purpose: 'QR scanner for shop-floor and warehouse capture.', nextStep: 'Scan a code to open the linked record or movement.' } },
-  { prefix: '/traceability', guide: { purpose: 'Traceability 360 — genealogy and as-built history.', nextStep: 'Search a serial / trailer and review linked documents.' } },
-  { prefix: '/qr/registry', guide: { purpose: 'QR code registry.', nextStep: 'Look up a code or print replacements.' } },
+  // —— Mobile ——
   { prefix: '/m/grn', guide: { purpose: 'Mobile GRN receipt at store gate.', nextStep: 'Scan PO/GRN and submit receipt.' } },
-  { prefix: '/m/job-card', guide: { purpose: 'Mobile shop floor daily job card entry.', nextStep: 'Record actual quantity and hours, then Save Entry.' } },
   { prefix: '/m/qc', guide: { purpose: 'Mobile QC inspection at line.', nextStep: 'Complete checklist and submit pass or fail.' } },
-  { prefix: '/m/dispatch', guide: { purpose: 'Mobile dispatch confirmation.', nextStep: 'Confirm loading and dispatch with scan.' } },
-  { prefix: '/m', guide: { purpose: 'Mobile shop-floor apps.', nextStep: 'Pick GRN, QC, job card, or dispatch for the current task.' } },
+  { prefix: '/m/dispatch', guide: { purpose: 'Mobile dispatch confirmation.', nextStep: 'Confirm loading and dispatch.' } },
+  { prefix: '/m', guide: { purpose: 'Mobile operational apps.', nextStep: 'Pick GRN, QC, dispatch, or CRM for the current task.' } },
 
   // —— Settings / reports / platform ——
-  { prefix: '/settings', guide: { purpose: 'System settings — demo data, roles, and approval links.', nextStep: 'Open Role Permission Matrix or Approval Workflow from here.' } },
-  { prefix: '/reports', guide: { purpose: 'Operational reports across modules.', nextStep: 'Pick a report card and apply filters.' } },
-  { prefix: '/admin', guide: { purpose: 'Administration tools.', nextStep: 'Use Master Data for day-to-day registers; reserve admin for system tasks.' } },
+  { prefix: '/settings', guide: { purpose: 'System settings and organisation setup.', nextStep: 'Open Organisation Setup or Role Permission Matrix.' } },
+  { prefix: '/reports/crm', guide: { purpose: 'CRM operational reports.', nextStep: 'Pick a report and apply filters.' } },
+  { prefix: '/admin/invitations', guide: { purpose: 'Invite users and track open invitations.', nextStep: 'Share the invite link; acceptants set a password on /login?invite=…' } },
+  { prefix: '/admin/departments', guide: { purpose: 'Department master for people admin (IAM org units).', nextStep: 'Create departments, then assign them on Users.' } },
+  { prefix: '/admin/responsibilities', guide: { purpose: 'Cross-module responsibility catalog and ownership labels.', nextStep: 'Assign responsibilities on a user detail page; do not rebuild approval engines here.' } },
+  { prefix: '/admin/access-review', guide: { purpose: 'Live access review of users needing attention (roles, sensitive perms, scopes).', nextStep: 'Open a flagged user and use Effective Access to explain grants.' } },
+  { prefix: '/admin/security/login-activity', guide: { purpose: 'Review successful and failed sign-ins.', nextStep: 'Investigate failures; unlock accounts under Locked Accounts if auto-locked.' } },
+  { prefix: '/admin/security/sessions', guide: { purpose: 'Tenant-wide active refresh-token sessions.', nextStep: 'Revoke a device session or open the user to revoke all.' } },
+  { prefix: '/admin/security/locked-accounts', guide: { purpose: 'Users with BLOCKED status (admin lock or failed-login lockout).', nextStep: 'Unlock to restore ACTIVE and clear the failure counter.' } },
+  { prefix: '/admin/modules', guide: { purpose: 'Enable or disable workspace modules for this tenant (missing flags default to enabled).', nextStep: 'Disable only unused modules; manage permissions on Roles.' } },
+  { prefix: '/admin/org-structure', guide: { purpose: 'Read-only Legal Entity → Branch map with department/warehouse links.', nextStep: 'Open Companies or Branches to manage masters.' } },
+  { prefix: '/admin/security/audit', guide: { purpose: 'IAM and security AuditLog register for this tenant.', nextStep: 'Filter by module, then open the related Admin register if action is needed.' } },
+  { prefix: '/admin/tenant-profile', guide: { purpose: 'Workspace tenant profile — name, contact, timezone, currency.', nextStep: 'Save profile, then open Companies for legal entities.' } },
+  { prefix: '/admin/companies', guide: { purpose: 'Companies hub over Legal Entity organisation APIs.', nextStep: 'Open Organisation Setup to create or edit an entity.' } },
+  { prefix: '/admin/branches', guide: { purpose: 'Branches hub over finance Branch APIs.', nextStep: 'Manage create/activate under Accounting → Branches.' } },
+  { prefix: '/admin', guide: { purpose: 'Administration — Dynamics chrome aligned with CRM/Accounting. People, organisation, and security.', nextStep: 'Use workspace tabs or Invite User from the command bar.' } },
+  { prefix: '/admin/users', guide: { purpose: 'Manage tenant users and role assignments.', nextStep: 'Open a user to assign roles or check status.' } },
+  { prefix: '/admin/roles', guide: { purpose: 'Define roles with the guided Role Builder and permission matrix.', nextStep: 'Walk Identity → Modules → Sensitive review, then save.' } },
+  { prefix: '/admin/tenants', guide: { purpose: 'Legacy tenants path — redirects to Platform Tenants.', nextStep: 'Use /platform/tenants (Super Admin).' } },
+  { prefix: '/platform/tenants', guide: { purpose: 'Platform Super Admin tenant workspaces and subscriptions.', nextStep: 'Create a tenant or open one to edit status and plan.' } },
+  { prefix: '/platform', guide: { purpose: 'Platform Admin home for Super Admins (tenant.manage).', nextStep: 'Open Tenants to manage workspaces across the platform.' } },
 ]
-
 function matchGuide(pathname: string): PageGuideEntry | null {
   const path = pathname.split('?')[0].replace(/\/$/, '') || '/'
   let best: { prefix: string; guide: PageGuideEntry } | null = null

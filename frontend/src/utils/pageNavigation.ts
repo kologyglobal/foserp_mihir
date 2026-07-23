@@ -11,6 +11,9 @@ const PAGE_LABELS: Record<string, string> = {
   '/inventory/issue': 'Material Issue',
   '/inventory/adjustment': 'Stock Adjustment',
   '/inventory/reservations': 'Reservations',
+  '/inventory/scan/receive': 'Scan To Receive',
+  '/inventory/scan/issue': 'Scan To Issue',
+  '/inventory/scan/transfer': 'Scan To Transfer',
   '/purchase': 'Purchase Workspace',
   '/purchase/requisitions': 'Requisitions (PR)',
   '/purchase/orders': 'Purchase Orders',
@@ -26,31 +29,26 @@ const PAGE_LABELS: Record<string, string> = {
   '/sales/approvals': 'Quotation Approvals',
   '/sales/orders': 'Sales Orders',
   '/sales/customers': 'Company 360',
-  '/work-orders': 'Work Order Register',
-  '/work-orders/create-from-mrp': 'Create from MRP',
+  '/manufacturing': 'Manufacturing',
+  '/manufacturing/today': 'Manufacturing Today',
+  '/manufacturing/work-orders': 'Work Order Register',
+  '/manufacturing/production-plan': 'Production Plan',
+  '/manufacturing/shopfloor': 'Shopfloor',
+  '/manufacturing/traceability': 'Traceability',
+  '/manufacturing/setup/boms': 'BOMs',
   '/production': 'Production Control Tower',
   '/production/control-tower': 'Production Control Tower',
-  '/shop-floor': 'Shop Floor Job Queue',
-  '/mrp': 'MRP Dashboard',
-  '/mrp/planner': 'MRP Planner Workbench',
-  '/mrp/workbench': 'MRP Planner Workbench',
-  '/mrp/run': 'Run MRP',
   '/quality': 'Quality Workspace',
   '/quality/queue': 'QC Queue',
   '/dispatch': 'Dispatch Workspace',
   '/dispatch/register': 'Dispatch Register',
   '/dispatch/plan': 'Dispatch Plan',
-  '/invoices': 'Finance Workspace',
-  '/invoices/register': 'Invoice Register',
+  '/accounting': 'Accounting',
+  '/accounting/money-in': 'Money In',
+  '/accounting/money-in/invoices': 'Sales Invoices',
+  '/accounting/manufacturing': 'Manufacturing Accounting',
   '/masters': 'Master Data Overview',
-  '/reports': 'Operational Reports',
-  '/costing': 'Work Order Costing',
-  '/barcode': 'Barcode Hub',
-  '/barcode/master': 'Barcode Master',
-  '/barcode/generator': 'Barcode Generator',
-  '/barcode/print': 'Print Labels',
-  '/barcode/history': 'Barcode History',
-  '/barcode/trace': 'Barcode Traceability',
+  '/reports/crm': 'CRM Reports',
   '/crm': 'CRM Dashboard',
   '/crm/leads': 'Leads',
   '/crm/opportunities': 'Opportunities',
@@ -60,36 +58,33 @@ const PAGE_LABELS: Record<string, string> = {
   '/crm/customers': 'Companies',
   '/crm/sales-orders': 'CRM Sales Orders',
   '/crm/quotation-templates': 'Quotation Templates',
-  '/scan': 'QR Scanner',
-  '/traceability': 'Traceability 360',
-  '/qr/registry': 'QR Registry',
 }
 
 const MODULE_HOME: Record<string, { label: string; to: string; group?: string }> = {
   inventory: { label: 'Inventory', to: '/inventory', group: 'Operations' },
   purchase: { label: 'Purchase', to: '/purchase', group: 'Procurement' },
   sales: { label: 'Sales', to: '/sales', group: 'Commercial' },
-  mrp: { label: 'Planning', to: '/mrp', group: 'Planning' },
+  manufacturing: { label: 'Manufacturing', to: '/manufacturing/today', group: 'Shop Floor' },
   inbox: { label: 'Executive', to: '/executive', group: 'Inbox' },
-  production: { label: 'Production', to: '/production/control-tower', group: 'Shop Floor' },
-  'work-orders': { label: 'Production', to: '/production/control-tower', group: 'Shop Floor' },
+  production: { label: 'Production', to: '/manufacturing/today', group: 'Shop Floor' },
+  'work-orders': { label: 'Production', to: '/manufacturing/work-orders', group: 'Shop Floor' },
   quality: { label: 'Quality', to: '/quality', group: 'Quality Ops' },
   dispatch: { label: 'Dispatch', to: '/dispatch', group: 'Logistics' },
-  invoices: { label: 'Finance', to: '/invoices', group: 'Finance' },
+  accounting: { label: 'Finance', to: '/accounting', group: 'Finance' },
   masters: { label: 'Master Data', to: '/masters', group: 'Administration' },
   crm: { label: 'CRM', to: '/crm', group: 'CRM' },
-  reports: { label: 'Analytics', to: '/reports', group: 'Reports' },
-  costing: { label: 'Costing', to: '/costing', group: 'Shop Floor' },
+  reports: { label: 'Analytics', to: '/reports/crm', group: 'Reports' },
 }
 
 export function getPageLabel(pathname: string): string {
   if (PAGE_LABELS[pathname]) return PAGE_LABELS[pathname]
+  if (pathname.match(/\/manufacturing\/work-orders\/[^/]+$/)) return 'Work Order Detail'
   if (pathname.match(/\/work-orders\/[^/]+$/)) return 'Work Order Detail'
   if (pathname.match(/\/purchase\/orders\/[^/]+$/)) return 'Purchase Order'
   if (pathname.match(/\/sales\/orders\/[^/]+$/)) return 'Sales Order'
   if (pathname.match(/\/sales\/customers\/[^/]+\/360$/)) return 'Company 360'
   if (pathname.match(/\/purchase\/grns\/[^/]+$/)) return 'GRN Detail'
-  if (pathname.match(/\/invoices\/[^/]+$/)) return 'Invoice Detail'
+  if (pathname.match(/\/accounting\/money-in\/invoices\/[^/]+$/)) return 'Invoice Detail'
   if (pathname.match(/\/dispatch\/[^/]+$/)) return 'Dispatch Detail'
   if (pathname.startsWith('/masters/items')) return 'Item Master'
   if (pathname.startsWith('/masters/customers') || pathname.startsWith('/masters/companies')) return 'Company Master'

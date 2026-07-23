@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified against codebase: **2026-07-21** (Purchase Setup full persistence + Invoice/QI/Return; Accounting Phase 3C5 credit-note allocation backend verified 2026-07-18 — focused tests 11/11 and backend typecheck pass).
+Last verified against codebase: **2026-07-23** (Fuel Tank manufacturing master UAT example on `vasant-trailers`; Purchase Setup + prior accounting/dispatch notes).
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
@@ -400,7 +400,7 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ⚠️ | **2026-07-17:** Finance Settings Phase 1 + **Journals + Approvals** workspaces (`/accounting/entries/journals`, `/accounting/entries/approvals`, dual-mode). Post + GL drill-down on journal detail. Other operational workspaces still UI/mock |
+| Frontend | ⚠️ | **2026-07-17:** Finance Settings Phase 1 + **Journals + Approvals** workspaces (`/accounting/entries/journals`, `/accounting/entries/approvals`, dual-mode). Post + GL drill-down on journal detail. **Bank & Cash:** live API for internal UAT / controlled pilot; AIS / FX / intercompany deferred — `docs/accounting/BANK_CASH_STATUS.md`. Other operational workspaces still UI/mock |
 | Backend | ⚠️ | Phase 1 setup + 2A ledger + 2B posting engine + **2C1 journals** + **2C2A approval** + **2C2B posting** + **3A1–3A5 AR sales invoice** + **3B1–3B5 customer receipt/allocation** + **3C1–3C4 customer credit notes** (draft, minimal approval, atomic GL/open-item posting) + **3C5 credit-note allocation** (subledger-only, unified with receipt allocation read APIs) |
 | DB | ⚠️ | Setup + ledger + approval tables + manual journals on `AccountingVoucher`; GL via existing-voucher post path; `ReceivableOpenItem` DEBIT (invoice) / CREDIT (receipt/credit-note) rows on post; `CustomerCreditNoteAllocationBatch` / `CustomerCreditNoteAllocation` subledger tables (no GL) |
 | API | ⚠️ | Setup + `/accounting/journals` (+ `post`, `ledger`) + `/accounting/approvals` + approve/send-back/reject; read-only voucher/GL/posting-event GET; `/accounting/receivables/invoices/:id/post`; `/accounting/receivables/receipts/:id/post`; `/accounting/receivables/credit-notes/:id/allocations` (+ `/preview`) |

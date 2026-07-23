@@ -3,6 +3,7 @@ import { prisma } from '../../config/database.js'
 import { env } from '../../config/env.js'
 import {
   AuthenticationError,
+  AuthorizationError,
   InvalidStateError,
   NotFoundError,
 } from '../../utils/errors.js'
@@ -14,13 +15,17 @@ import {
 } from '../../utils/jwt.js'
 import { hashPassword, hashToken, verifyPassword, verifyTokenHash } from '../../utils/password.js'
 import type {
+  AcceptInvitationInput,
   ChangePasswordInput,
   ForgotPasswordInput,
+  LoginDirectoryQuery,
   LoginInput,
   LogoutInput,
   RefreshTokenInput,
   ResetPasswordInput,
+  UpdateProfileInput,
 } from './auth.validation.js'
+import { MAX_FAILED_LOGINS, type LoginActivityReason } from '../security/security.constants.js'
 
 export interface UserPermissions {
   roles: string[]
@@ -65,6 +70,8 @@ const userSelect = {
   status: true,
   emailVerified: true,
   lastLoginAt: true,
+  failedLoginCount: true,
+  lockedAt: true,
   passwordHash: true,
 } as const
 
@@ -153,6 +160,28 @@ function toAuthUser(
   }
 }
 
+async function recordLoginActivity(input: {
+  tenantId?: string | null
+  userId?: string | null
+  email: string
+  success: boolean
+  reason: LoginActivityReason
+  ipAddress?: string | null
+  userAgent?: string | null
+}) {
+  await prisma.loginActivity.create({
+    data: {
+      tenantId: input.tenantId ?? null,
+      userId: input.userId ?? null,
+      email: input.email,
+      success: input.success,
+      reason: input.reason,
+      ipAddress: input.ipAddress ?? null,
+      userAgent: input.userAgent ?? null,
+    },
+  })
+}
+
 export async function login(
   input: LoginInput,
   meta?: { userAgent?: string | null; ipAddress?: string | null },
@@ -162,6 +191,13 @@ export async function login(
   })
 
   if (!tenant) {
+    await recordLoginActivity({
+      email: input.email,
+      success: false,
+      reason: 'INVALID_CREDENTIALS',
+      ipAddress: meta?.ipAddress,
+      userAgent: meta?.userAgent,
+    })
     throw new AuthenticationError('Invalid tenant, email, or password')
   }
 
@@ -170,12 +206,57 @@ export async function login(
     select: userSelect,
   })
 
+  const fail = async (reason: LoginActivityReason, userId?: string | null): Promise<never> => {
+    await recordLoginActivity({
+      tenantId: tenant.id,
+      userId: userId ?? user?.id ?? null,
+      email: input.email,
+      success: false,
+      reason,
+      ipAddress: meta?.ipAddress,
+      userAgent: meta?.userAgent,
+    })
+    throw new AuthenticationError(
+      reason === 'BLOCKED' || reason === 'LOCKED_OUT'
+        ? 'Account is locked'
+        : reason === 'INACTIVE'
+          ? 'Account is not active'
+          : 'Invalid tenant, email, or password',
+    )
+  }
+
   if (!user || !(await verifyPassword(input.password, user.passwordHash))) {
-    throw new AuthenticationError('Invalid tenant, email, or password')
+    if (user) {
+      const nextCount = user.failedLoginCount + 1
+      if (nextCount >= MAX_FAILED_LOGINS) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            failedLoginCount: nextCount,
+            status: 'BLOCKED',
+            lockedAt: new Date(),
+          },
+        })
+        await prisma.refreshToken.updateMany({
+          where: { userId: user.id, tenantId: tenant.id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        })
+        await fail('LOCKED_OUT', user.id)
+      }
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginCount: nextCount },
+      })
+    }
+    await fail('INVALID_CREDENTIALS', user?.id ?? null)
+  }
+
+  if (user.status === 'BLOCKED') {
+    await fail('BLOCKED', user.id)
   }
 
   if (user.status !== 'ACTIVE') {
-    throw new AuthenticationError('Account is not active')
+    await fail('INACTIVE', user.id)
   }
 
   const userPermissions = await loadUserPermissions(user.id, tenant.id)
@@ -183,14 +264,24 @@ export async function login(
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { lastLoginAt: new Date() },
+    data: { lastLoginAt: new Date(), failedLoginCount: 0, lockedAt: null },
   })
 
-  const { passwordHash: _, ...safeUser } = user
+  await recordLoginActivity({
+    tenantId: tenant.id,
+    userId: user.id,
+    email: input.email,
+    success: true,
+    reason: 'SUCCESS',
+    ipAddress: meta?.ipAddress,
+    userAgent: meta?.userAgent,
+  })
+
+  const { passwordHash: _, failedLoginCount: __, lockedAt: ___, ...safeUser } = user
 
   return {
     ...tokens,
-    user: toAuthUser(safeUser, userPermissions),
+    user: toAuthUser({ ...safeUser, lastLoginAt: new Date() }, userPermissions),
   }
 }
 
@@ -356,6 +447,11 @@ export async function resetPassword(input: ResetPasswordInput): Promise<void> {
   ])
 }
 
+export async function acceptInvitation(input: AcceptInvitationInput): Promise<void> {
+  const { acceptInvitationByToken } = await import('../users/user-invitation.service.js')
+  await acceptInvitationByToken(input.token, input.password)
+}
+
 export async function changePassword(
   userId: string,
   tenantId: string,
@@ -390,4 +486,103 @@ export async function changePassword(
       data: { revokedAt: new Date() },
     }),
   ])
+}
+
+export async function updateProfile(
+  userId: string,
+  tenantId: string,
+  input: UpdateProfileInput,
+): Promise<AuthUser & { tenant: { id: string; name: string; slug: string } }> {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, tenantId, deletedAt: null },
+    select: { id: true, status: true },
+  })
+
+  if (!user) {
+    throw new NotFoundError('User not found')
+  }
+
+  if (user.status !== 'ACTIVE') {
+    throw new InvalidStateError('Account is not active')
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      firstName: input.firstName,
+      lastName: input.lastName,
+      mobile: input.mobile,
+      designation: input.designation,
+      updatedBy: userId,
+    },
+  })
+
+  return getMe(userId, tenantId)
+}
+
+export interface LoginDirectoryUser {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  designation: string | null
+  department: string | null
+  status: string
+  roles: string[]
+}
+
+/**
+ * Dev/test helper for the login page — lists non-deleted users for a tenant.
+ * Never returns password hashes or tokens.
+ */
+export async function listLoginDirectory(query: LoginDirectoryQuery): Promise<{
+  tenantSlug: string
+  tenantName: string
+  users: LoginDirectoryUser[]
+}> {
+  if (!env.isDev && !env.isTest) {
+    throw new AuthorizationError('Login directory is only available in development')
+  }
+
+  const tenant = await prisma.tenant.findFirst({
+    where: { slug: query.tenantSlug, deletedAt: null, status: { not: 'ARCHIVED' } },
+    select: { id: true, slug: true, name: true },
+  })
+
+  if (!tenant) {
+    throw new NotFoundError('Tenant not found')
+  }
+
+  const users = await prisma.user.findMany({
+    where: { tenantId: tenant.id, deletedAt: null },
+    orderBy: [{ status: 'asc' }, { email: 'asc' }],
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      designation: true,
+      department: true,
+      status: true,
+      userRoles: {
+        where: { role: { deletedAt: null } },
+        select: { role: { select: { name: true } } },
+      },
+    },
+  })
+
+  return {
+    tenantSlug: tenant.slug,
+    tenantName: tenant.name,
+    users: users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      designation: u.designation,
+      department: u.department,
+      status: u.status,
+      roles: u.userRoles.map((ur) => ur.role.name),
+    })),
+  }
 }

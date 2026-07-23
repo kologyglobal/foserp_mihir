@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { isApiMode } from '@/config/apiConfig'
 import { ManufacturingDashboardPage } from '@/modules/manufacturing/ManufacturingDashboardPage'
 import { ProductionControlRoomPage } from '@/modules/manufacturing/ProductionControlRoomPage'
+import { GuidedFulfilmentPage } from '@/modules/manufacturing/GuidedFulfilmentPage'
 import { ShopfloorViewPage } from '@/modules/manufacturing/shopfloor/ShopfloorViewPage'
 import { BomRegisterPage } from '@/modules/manufacturing/bom/BomRegisterPage'
 import { BomFormPage } from '@/modules/manufacturing/bom/BomFormPage'
@@ -34,12 +35,17 @@ import { RouteFormPage } from '@/modules/manufacturing/routes/RouteFormPage'
 import { RouteDetailPage } from '@/modules/manufacturing/routes/RouteDetailPage'
 import { SetupHubPage } from '@/modules/manufacturing/setup/SetupHubPage'
 import { WorkCentresSetupPage } from '@/modules/manufacturing/setup/WorkCentresSetupPage'
+import { WorkCentreEditorPage } from '@/modules/manufacturing/setup/WorkCentreEditorPage'
 import { MachinesSetupPage } from '@/modules/manufacturing/setup/MachinesSetupPage'
+import { MachineEditorPage } from '@/modules/manufacturing/setup/MachineEditorPage'
 import { ProfilesSetupPage } from '@/modules/manufacturing/setup/ProfilesSetupPage'
+import { ProfileEditorPage } from '@/modules/manufacturing/setup/ProfileEditorPage'
 import { BomsSetupPage } from '@/modules/manufacturing/setup/boms/BomsSetupPage'
+import { BomDetailPage as SetupBomDetailPage } from '@/modules/manufacturing/setup/boms/BomDetailPage'
 import { BomVersionEditorPage } from '@/modules/manufacturing/setup/boms/BomVersionEditorPage'
 import { RoutingsSetupPage } from '@/modules/manufacturing/setup/routings/RoutingsSetupPage'
 import { RoutingCreatePage } from '@/modules/manufacturing/setup/routings/RoutingCreatePage'
+import { RoutingDetailPage } from '@/modules/manufacturing/setup/routings/RoutingDetailPage'
 import { RoutingVersionEditorPage } from '@/modules/manufacturing/setup/routings/RoutingVersionEditorPage'
 import { CorrectionsRegisterPage } from '@/modules/manufacturing/corrections/CorrectionsRegisterPage'
 import { StoreWorkbenchPage } from '@/modules/manufacturing/store-workbench/StoreWorkbenchPage'
@@ -58,6 +64,7 @@ function ApiModeWorkOrderEditRedirect() {
 export const manufacturingRouteChildren: RouteObject[] = [
   { path: 'manufacturing', element: <Navigate to="/manufacturing/today" replace /> },
   { path: 'manufacturing/control-room', element: <ProductionControlRoomPage /> },
+  { path: 'manufacturing/guided-fulfilment', element: <GuidedFulfilmentPage /> },
   { path: 'manufacturing/dashboard', element: <ManufacturingDashboardPage /> },
   {
     path: 'manufacturing/shopfloor',
@@ -107,17 +114,33 @@ export const manufacturingRouteChildren: RouteObject[] = [
   { path: 'manufacturing/reports', element: <ManufacturingReportsPage /> },
   { path: 'manufacturing/reports/:reportKey', element: <ManufacturingReportRunnerPage /> },
   { path: 'manufacturing/settings', element: <ManufacturingSettingsPage /> },
+  /** Spec alias — Manufacturing Accounting Readiness (canonical UI: Accounting → Manufacturing) */
+  {
+    path: 'manufacturing/costing/accounting-readiness',
+    element: <Navigate to="/accounting/manufacturing" replace />,
+  },
 
   // ── Phase 1 setup masters (API-backed) ───────────────────────────────────
   { path: 'manufacturing/setup', element: <SetupHubPage /> },
   { path: 'manufacturing/profiles', element: <ProfilesSetupPage /> },
+  { path: 'manufacturing/profiles/new', element: <ProfileEditorPage /> },
+  { path: 'manufacturing/profiles/:profileId/edit', element: <ProfileEditorPage /> },
+  { path: 'manufacturing/profiles/:profileId', element: <ProfileEditorPage /> },
   { path: 'manufacturing/work-centres', element: <WorkCentresSetupPage /> },
+  { path: 'manufacturing/work-centres/new', element: <WorkCentreEditorPage /> },
+  { path: 'manufacturing/work-centres/:workCentreId/edit', element: <WorkCentreEditorPage /> },
+  { path: 'manufacturing/work-centres/:workCentreId', element: <WorkCentreEditorPage /> },
   { path: 'manufacturing/machines', element: <MachinesSetupPage /> },
+  { path: 'manufacturing/machines/new', element: <MachineEditorPage /> },
+  { path: 'manufacturing/machines/:machineId/edit', element: <MachineEditorPage /> },
+  { path: 'manufacturing/machines/:machineId', element: <MachineEditorPage /> },
   { path: 'manufacturing/setup/boms', element: <BomsSetupPage /> },
+  { path: 'manufacturing/setup/boms/:bomId/view', element: <SetupBomDetailPage /> },
   { path: 'manufacturing/setup/boms/:bomId', element: <BomVersionEditorPage /> },
   { path: 'manufacturing/setup/bom-versions/:versionId', element: <BomVersionEditorPage /> },
   { path: 'manufacturing/setup/routings', element: <RoutingsSetupPage /> },
   { path: 'manufacturing/setup/routings/new', element: <RoutingCreatePage /> },
+  { path: 'manufacturing/setup/routings/:routingId/view', element: <RoutingDetailPage /> },
   { path: 'manufacturing/setup/routings/:routingId', element: <RoutingVersionEditorPage /> },
   { path: 'manufacturing/setup/routing-versions/:versionId', element: <RoutingVersionEditorPage /> },
 ]

@@ -3,12 +3,15 @@ import { getContext } from '../../types/request-context.js'
 import { sendSuccess } from '../../utils/response.js'
 import * as authService from './auth.service.js'
 import type {
+  AcceptInvitationInput,
   ChangePasswordInput,
   ForgotPasswordInput,
+  LoginDirectoryQuery,
   LoginInput,
   LogoutInput,
   RefreshTokenInput,
   ResetPasswordInput,
+  UpdateProfileInput,
 } from './auth.validation.js'
 
 function requestMeta(req: Request) {
@@ -50,10 +53,26 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
   sendSuccess(res, 'Password reset successful', null)
 }
 
+export async function acceptInvitation(req: Request, res: Response): Promise<void> {
+  await authService.acceptInvitation(req.body as AcceptInvitationInput)
+  sendSuccess(res, 'Invitation accepted', null)
+}
+
 export async function changePassword(req: Request, res: Response): Promise<void> {
   const ctx = getContext(req)
   await authService.changePassword(ctx.userId, ctx.tenantId, req.body as ChangePasswordInput)
   sendSuccess(res, 'Password changed successfully', null)
+}
+
+export async function updateProfile(req: Request, res: Response): Promise<void> {
+  const ctx = getContext(req)
+  const user = await authService.updateProfile(ctx.userId, ctx.tenantId, req.body as UpdateProfileInput)
+  sendSuccess(res, 'Profile updated', user)
+}
+
+export async function loginDirectory(req: Request, res: Response): Promise<void> {
+  const result = await authService.listLoginDirectory(req.query as unknown as LoginDirectoryQuery)
+  sendSuccess(res, 'Login directory retrieved', result)
 }
 
 function envSafePayload(result: { message: string; resetToken?: string }) {

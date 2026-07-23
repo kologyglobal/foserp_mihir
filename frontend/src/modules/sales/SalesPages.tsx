@@ -85,8 +85,6 @@ import {
   PENDING_SO_STATUS,
 } from '../../utils/pendingSalesOrderHandover'
 import { salesOrderStatusLabel } from '../../utils/salesOrderStatus'
-import { buildProformaNewUrl } from '../../utils/proformaInvoicePrefill'
-import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
 import { systemConfirm } from '../../utils/systemConfirm'
 import { QuickCreateSelect } from '../../components/quick-create/QuickCreateSelect'
 import { useQuickCreate } from '../../hooks/useQuickCreate'
@@ -1058,29 +1056,6 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
     navigate(resolveSalesOrderPrintPath(so.id, crmMode))
   }
 
-  function handleCreateProforma(so: SalesOrder) {
-    if (isPendingSalesOrderHandover(so)) {
-      setToast('Create the sales order from this quotation before raising a proforma.')
-      return
-    }
-    const active = useProformaInvoiceStore
-      .getState()
-      .proformaInvoices.find((p) => p.salesOrderId === so.id && p.status !== 'cancelled')
-    if (active) {
-      navigate(`/sales/proforma-invoices/${active.id}`)
-      return
-    }
-    if (so.status === 'open') {
-      setToast('Confirm the sales order before creating a proforma invoice.')
-      return
-    }
-    if (so.status === 'closed') {
-      setToast('Cannot create proforma for a closed sales order.')
-      return
-    }
-    navigate(buildProformaNewUrl(so.id))
-  }
-
   function handleConvertSalesOrder(so: SalesOrder) {
     if (isPendingSalesOrderHandover(so)) {
       navigate(buildPendingSoCreateUrl(so, { fromCrm: crmMode }))
@@ -1289,7 +1264,6 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
           onPrint={handlePrintSalesOrder}
           onConvert={handleConvertSalesOrder}
           onDuplicate={handleDuplicateSalesOrder}
-          onCreateProforma={handleCreateProforma}
         />
       </EnterpriseRegisterTableShell>
       {toast ? <Toast message={toast} /> : null}

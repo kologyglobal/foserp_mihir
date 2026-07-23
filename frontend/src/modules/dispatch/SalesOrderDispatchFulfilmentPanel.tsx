@@ -14,6 +14,7 @@ import { notify } from '@/store/toastStore'
 import {
   FulfilmentJourneyStrip,
   deriveSoFulfilmentJourney,
+  useFulfilmentJourneyStep,
 } from '@/modules/manufacturing/ui'
 import {
   createDraftDispatchFromRequirements,
@@ -95,6 +96,15 @@ export function SalesOrderDispatchFulfilmentPanel({ salesOrderId }: Props) {
     })
   }, [totals, requirements])
 
+  const { step: journeyStep, urlStep: journeyUrlStep, setStep: setJourneyStep } =
+    useFulfilmentJourneyStep(journey.activeStep)
+
+  useEffect(() => {
+    if (journeyUrlStep || totals == null) return
+    setJourneyStep(journey.activeStep, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salesOrderId, totals == null])
+
   const readyRequirementIds = useMemo(
     () =>
       requirements
@@ -147,11 +157,11 @@ export function SalesOrderDispatchFulfilmentPanel({ salesOrderId }: Props) {
   if (loading) return <LoadingState variant="card" />
 
   const nextCoach =
-    journey.activeStep === 'produce'
+    journeyStep === 'produce'
       ? 'Finish linked work orders, then sync requirements.'
-      : journey.activeStep === 'quality'
+      : journeyStep === 'quality'
         ? 'Clear quality holds on FG / stages, then refresh.'
-        : journey.activeStep === 'stock'
+        : journeyStep === 'stock'
           ? 'Receive FG on the work order, then Sync requirements.'
           : readyRequirementIds.length > 0
             ? 'Create a draft outbound, then reserve → pick → pack → challan on the workbench.'
@@ -160,17 +170,17 @@ export function SalesOrderDispatchFulfilmentPanel({ salesOrderId }: Props) {
   return (
     <div className="space-y-4 p-4">
       <FulfilmentJourneyStrip
-        activeStep={journey.activeStep}
+        activeStep={journeyStep}
         steps={journey.steps.map((step) => ({
           ...step,
-          onSelect:
-            step.id === 'dispatch'
-              ? () => navigate(`/dispatch/workbench?salesOrderId=${encodeURIComponent(salesOrderId)}`)
-              : step.id === 'stock' || step.id === 'produce' || step.id === 'quality'
-                ? () => navigate(`/dispatch/workbench?salesOrderId=${encodeURIComponent(salesOrderId)}`)
-                : undefined,
+          onSelect: () => {
+            setJourneyStep(step.id)
+            if (step.id === 'dispatch') {
+              navigate(`/dispatch/workbench?salesOrderId=${encodeURIComponent(salesOrderId)}`)
+            }
+          },
         }))}
-        compactTip={nextCoach}
+        compactTip={`${nextCoach} Progress resumes via ?step= in the URL.`}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-2">

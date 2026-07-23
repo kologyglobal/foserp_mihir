@@ -1,53 +1,66 @@
 # Manufacturing Account Mapping
 
-Source: `backend/src/modules/manufacturing/costing/accounting-readiness.service.ts`, `accounting/manufacturing-accounting-builder.service.ts`. Model `DefaultAccountMapping`.
+Source: `backend/src/modules/manufacturing/costing/manufacturing-account-mapping-readiness.service.ts`, `accounting-readiness.service.ts`, `accounting/manufacturing-accounting-builder.service.ts`. Model `DefaultAccountMapping`.
 
 Manufacturing accounting resolves **all** GL accounts through the finance **`DefaultAccountMapping`** table, keyed per `(tenantId, legalEntityId, mappingKey)`. **There is no `ManufacturingAccountMapping` table** (ADR-039).
 
 ---
 
-## Keys used by manufacturing
+## Core mandatory keys (always)
 
-Posting pairs reference these `DefaultAccountMappingKey` values:
-
-| Key | Role |
-|-----|------|
-| `RAW_MATERIAL_INVENTORY` | RM credited on issue / debited on return |
-| `WIP_INVENTORY` | Work-in-progress control (debited by inputs, credited by FG/variance) |
-| `FINISHED_GOODS_INVENTORY` | FG debited on capitalisation |
-| `LABOUR_ABSORPTION` | Labour absorption clearing (credited) |
-| `MACHINE_ABSORPTION` | Machine absorption clearing (credited) |
-| `JOB_WORK_ABSORPTION` | Job-work absorption clearing (credited) |
-| `PRODUCTION_OVERHEAD_ABSORPTION` | Overhead absorption clearing (credited) |
-| `PRODUCTION_VARIANCE` | Residual production variance |
-| `SCRAP_LOSS` | Scrap loss (used by `SCRAP_RECORDED` mapping; scrap capture not yet wired) |
+| Key | Blocker if missing / invalid |
+|-----|------------------------------|
+| `WIP_INVENTORY` | `WIP_ACCOUNT_NOT_CONFIGURED` |
+| `FINISHED_GOODS_INVENTORY` | `FINISHED_GOODS_ACCOUNT_NOT_CONFIGURED` |
+| `PRODUCTION_VARIANCE` | `PRODUCTION_VARIANCE_ACCOUNT_NOT_CONFIGURED` |
 
 ---
 
-## Required mapping set (readiness)
+## Conditional keys (when cost/event type enabled)
 
-`REQUIRED_MANUFACTURING_MAPPING_KEYS` — the 8 keys readiness checks must all exist for the resolved legal entity before posting is allowed:
+| Product name | Existing `DefaultAccountMappingKey` | Default required? | Blocker |
+|--------------|-------------------------------------|-------------------|---------|
+| RAW_MATERIAL_INVENTORY | `RAW_MATERIAL_INVENTORY` | Yes (material issue) | via `MISSING_ACCOUNT_MAPPINGS` |
+| MATERIAL_CONSUMPTION | `MATERIAL_CONSUMPTION` | No (not MappingReady yet) | — |
+| DIRECT_LABOUR_ABSORPTION | `LABOUR_ABSORPTION` | Yes | `LABOUR_ACCOUNT_NOT_CONFIGURED` |
+| MACHINE_COST_ABSORPTION | `MACHINE_ABSORPTION` | Yes | `MACHINE_ACCOUNT_NOT_CONFIGURED` |
+| JOB_WORK_COST | `JOB_WORK_ABSORPTION` | Yes | `JOB_WORK_ACCOUNT_NOT_CONFIGURED` |
+| MANUFACTURING_OVERHEAD | `PRODUCTION_OVERHEAD_ABSORPTION` | When costing policy `overheadMethod !== NONE` | `OVERHEAD_ACCOUNT_NOT_CONFIGURED` |
+| SCRAP_EXPENSE | `SCRAP_LOSS` | Yes | `SCRAP_ACCOUNT_NOT_CONFIGURED` |
+| REWORK_COST | *(no enum key)* | Not validated separately | — |
+| PRODUCTION_CLEARING | *(no enum key)* | Not validated | — |
+| WIP_ADJUSTMENT | `STOCK_ADJUSTMENT` | No (not MappingReady yet) | — |
+| FG_CAPITALISATION | `FINISHED_GOODS_INVENTORY` | Covered by core FG | — |
 
-```
-RAW_MATERIAL_INVENTORY, WIP_INVENTORY, FINISHED_GOODS_INVENTORY,
-LABOUR_ABSORPTION, MACHINE_ABSORPTION, JOB_WORK_ABSORPTION,
-PRODUCTION_OVERHEAD_ABSORPTION, PRODUCTION_VARIANCE
-```
+Any missing required key also sets `MISSING_ACCOUNT_MAPPINGS`. Readiness returns `mappingKeys.missing`.
 
-If any are missing, readiness reports blocker `MISSING_ACCOUNT_MAPPINGS` and lists them under `mappingKeys.missing`. (`SCRAP_LOSS` is used by the scrap mapping pair but is not in the required-set gate.)
+---
+
+## Account validation rules (per mapped key)
+
+For each required mapping the readiness service checks:
+
+1. Mapping exists for the legal entity  
+2. Linked account exists  
+3. Account is active (`isActive`)  
+4. Account belongs to the same tenant + legal entity  
+5. Account is allowed for posting (`!isGroup`; system mfg posts do not require `allowManualPosting`)  
+6. Account is not blocked (`isActive === true` — `Account` has no separate `isBlocked` flag)  
+7. No duplicate conflicting `DefaultAccountMapping` rows for the same key (`@@unique` + readiness check)  
+
+Invalid rows appear under `mappingKeys.invalid` and count toward `mappingKeys.missing`.
 
 ---
 
 ## Resolution flow
 
-1. `resolveManufacturingLegalEntityId` — default active legal entity, else the first active one.
-2. `getManufacturingAccountingReadiness` — loads `DefaultAccountMapping` rows for that LE filtered to the required keys, computes `present` / `missing`.
-3. On post, `buildManufacturingPostingRequest` puts the chosen `accountMappingKey` on each voucher line; the finance `post()` engine resolves the key → account for that legal entity.
-
-Because resolution happens inside the shared posting engine, the manufacturing module never looks up account IDs itself and cannot drift from finance's mapping.
+1. `resolveManufacturingLegalEntityId` — default active legal entity, else the first active one.  
+2. `validateManufacturingAccountMappings` — core + policy-driven conditional keys, account quality.  
+3. `getManufacturingAccountingReadiness` — merges mapping blockers with period / events / sign-offs.  
+4. On post, `buildManufacturingPostingRequest` puts `accountMappingKey` on each voucher line; finance `post()` resolves key → account.
 
 ---
 
 ## Why no parallel table (ADR-039)
 
-Adding a `ManufacturingAccountMapping` table would fork the account-mapping source of truth and risk manufacturing GL diverging from finance. Reusing `DefaultAccountMapping` keeps one mapping surface, one validation path, and one posting engine. The Phase 7E migration only **extends** the `DefaultAccountMappingKey` enum (manufacturing keys were already present) — it creates no mapping table.
+Adding a `ManufacturingAccountMapping` table would fork the account-mapping source of truth. Reusing `DefaultAccountMapping` keeps one mapping surface, one validation path, and one posting engine.

@@ -11,6 +11,7 @@ import { formatCurrency, formatNumber } from './formatters/currency'
 import { formatDate } from './dates/format'
 import { gstSchemeLabel } from './gstEngine'
 import { downloadTextFile } from './purchaseOrderExport'
+import { openHtmlPrintWindow } from './documentPrint'
 
 function escapeTsv(value: string | number): string {
   const s = String(value ?? '')
@@ -199,15 +200,5 @@ export function buildProformaPrintHtml(proforma: ProformaInvoice): string {
 
 /** Opens a print-ready window — user can choose Save as PDF */
 export function downloadProformaPdf(proforma: ProformaInvoice): void {
-  const html = buildProformaPrintHtml(proforma)
-  const win = window.open('', '_blank', 'noopener,noreferrer')
-  if (!win) return
-  win.document.open()
-  win.document.write(html)
-  win.document.close()
-  win.focus()
-  win.onload = () => {
-    win.print()
-  }
-  setTimeout(() => win.print(), 400)
+  openHtmlPrintWindow(buildProformaPrintHtml(proforma), `${proforma.proformaNo}.pdf`)
 }

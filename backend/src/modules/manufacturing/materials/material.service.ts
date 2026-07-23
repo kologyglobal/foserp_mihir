@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { Request } from 'express'
 import type { ProductionOrderMaterialLineStatus } from '@prisma/client'
 import { prisma } from '../../../config/database.js'
@@ -546,6 +547,24 @@ export async function issueMaterial(req: Request, tenantId: string, orderId: str
     }
   }
 
+  const batchTracked = Boolean(material.item.batchTracked)
+  const serialTracked = Boolean(material.item.serialTracked)
+  if (batchTracked && !input.batchId && !input.batchNumber?.trim()) {
+    throw new ValidationError(
+      `Item ${material.item.code} is batch-tracked — provide batchId or batchNumber when issuing`,
+    )
+  }
+  if (serialTracked && !input.serialId && !input.serialNumber?.trim()) {
+    throw new ValidationError(
+      `Item ${material.item.code} is serial-tracked — provide serialId or serialNumber when issuing`,
+    )
+  }
+  if (serialTracked && !issueQty.equals(1)) {
+    throw new ValidationError(
+      `Item ${material.item.code} is serial-tracked — issue quantity must be 1 (one serial per posting)`,
+    )
+  }
+
   const movement = await postIssueToWorkOrder(req, tenantId, {
     itemId: material.itemId,
     warehouseId,
@@ -556,6 +575,10 @@ export async function issueMaterial(req: Request, tenantId: string, orderId: str
     remarks: input.remarks,
     rate: input.rate,
     referenceNo: material.bomLine.sequence.toString(),
+    batchId: input.batchId,
+    batchNumber: input.batchNumber,
+    serialId: input.serialId,
+    serialNumber: input.serialNumber,
   })
 
   const movementAmount = Math.abs(Number(movement.value ?? 0))
@@ -926,6 +949,7 @@ export async function createShortageRequisition(
     purpose: `Production shortage for WO ${order.orderNumber}`,
     idempotencyKey,
     submit: input.submit,
+    rfqRequired: input.rfqRequired === true ? true : undefined,
     lines: shortageLines.map(({ material, qty }) => ({
       itemId: material.itemId,
       quantity: qty.toNumber(),
@@ -1043,8 +1067,13 @@ export async function createBulkShortageRequisition(
     .map((id) => orderById.get(id)?.orderNumber ?? id.slice(0, 8))
     .join(', ')
 
+  // Keep ≤150 chars (purchase_requisition.idempotencyKey / Zod). Joining UUIDs overflows at ~3+ lines.
   const idempotencyKey =
-    input.idempotencyKey ?? `wo-shortage-pr-bulk:${[...input.materialIds].sort().join(',')}`
+    input.idempotencyKey ??
+    `wo-shortage-pr-bulk:${createHash('sha256')
+      .update([...input.materialIds].sort().join(','))
+      .digest('hex')
+      .slice(0, 40)}`
 
   const requisition = await createFromProductionShortage(req, tenantId, {
     productionOrderId: primaryOrder.id,
@@ -1056,6 +1085,7 @@ export async function createBulkShortageRequisition(
         : `Production shortage for ${shortageLines.length} line(s) across ${orderIds.length} WOs (${woLabels})`,
     idempotencyKey,
     submit: input.submit,
+    rfqRequired: input.rfqRequired === true ? true : undefined,
     lines: shortageLines.map(({ material, qty }) => ({
       itemId: material.itemId,
       quantity: qty.toNumber(),

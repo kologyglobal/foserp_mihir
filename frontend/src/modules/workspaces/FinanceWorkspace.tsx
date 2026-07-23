@@ -22,8 +22,8 @@ export function FinanceWorkspacePage() {
   const liveAlerts = useMemo(() => buildFinanceLiveAlerts(), [unpaid.length, outstanding])
   const nextActions = useMemo(
     () => [
-      { id: 'payment', label: 'Record Payment', href: '/invoices/register', priority: 'primary' as const },
-      { id: 'overdue', label: 'Review Overdue', href: '/invoices/register' },
+      { id: 'payment', label: 'Record Payment', href: '/accounting/money-in/invoices', priority: 'primary' as const },
+      { id: 'overdue', label: 'Review Overdue', href: '/accounting/money-in/invoices' },
       { id: 'dispatch', label: 'Unbilled Dispatch', href: '/dispatch/register' },
     ],
     [],
@@ -34,13 +34,13 @@ export function FinanceWorkspacePage() {
       title="Finance Command Center"
       subtitle="GST invoices, collections, and receivables linked to dispatch."
       badge="Finance"
-      favoritePath="/invoices"
+      favoritePath="/accounting/money-in"
       healthScore={unpaid.length > 5 ? 72 : 90}
       heroMetrics={[
-        { id: 'posted', label: 'Invoices Posted', value: posted.length, icon: FileCheck, accent: 'blue', href: '/invoices/register' },
-        { id: 'value', label: 'Invoice Value', value: formatCurrency(totalValue), icon: IndianRupee, accent: 'green', href: '/invoices/register' },
-        { id: 'out', label: 'Outstanding', value: formatCurrency(outstanding), icon: Receipt, accent: 'amber', href: '/invoices/register' },
-        { id: 'unpaid', label: 'Unpaid Count', value: unpaid.length, icon: AlertCircle, accent: unpaid.length > 0 ? 'red' : 'green', href: '/invoices/register' },
+        { id: 'posted', label: 'Invoices Posted', value: posted.length, icon: FileCheck, accent: 'blue', href: '/accounting/money-in/invoices' },
+        { id: 'value', label: 'Invoice Value', value: formatCurrency(totalValue), icon: IndianRupee, accent: 'green', href: '/accounting/money-in/invoices' },
+        { id: 'out', label: 'Outstanding', value: formatCurrency(outstanding), icon: Receipt, accent: 'amber', href: '/accounting/money-in/invoices' },
+        { id: 'unpaid', label: 'Unpaid Count', value: unpaid.length, icon: AlertCircle, accent: unpaid.length > 0 ? 'red' : 'green', href: '/accounting/money-in/invoices' },
       ]}
       alert={liveAlerts.length > 0 ? <LiveAlertStrip alerts={liveAlerts} /> : undefined}
       liveSections={
@@ -48,15 +48,15 @@ export function FinanceWorkspacePage() {
       }
       quickActions={
         <>
-          <DynamicsCommandButton primary onClick={() => navigate('/invoices/register')}>Invoice Register</DynamicsCommandButton>
-          <DynamicsCommandButton onClick={() => navigate('/invoices')}>Finance Workspace</DynamicsCommandButton>
-          <DynamicsCommandButton onClick={() => navigate('/reports/sales/open-orders')}>Open Orders Report</DynamicsCommandButton>
+          <DynamicsCommandButton primary onClick={() => navigate('/accounting/money-in/invoices')}>Invoice Register</DynamicsCommandButton>
+          <DynamicsCommandButton onClick={() => navigate('/accounting')}>Finance Workspace</DynamicsCommandButton>
+          <DynamicsCommandButton onClick={() => navigate('/sales/orders')}>Open Orders</DynamicsCommandButton>
         </>
       }
       kpiStrip={[
-        { label: 'Posted Invoices', value: posted.length, tone: 'primary', href: '/invoices/register' },
-        { label: 'Outstanding AR', value: formatCurrency(outstanding), tone: outstanding > 0 ? 'warning' : 'success', href: '/invoices/register' },
-        { label: 'Unpaid Invoices', value: unpaid.length, tone: unpaid.length ? 'critical' : 'success', href: '/invoices/register' },
+        { label: 'Posted Invoices', value: posted.length, tone: 'primary', href: '/accounting/money-in/invoices' },
+        { label: 'Outstanding AR', value: formatCurrency(outstanding), tone: outstanding > 0 ? 'warning' : 'success', href: '/accounting/money-in/invoices' },
+        { label: 'Unpaid Invoices', value: unpaid.length, tone: unpaid.length ? 'critical' : 'success', href: '/accounting/money-in/invoices' },
       ]}
     >
       <DynamicsDashboardPanel title="Collections Snapshot">
@@ -65,7 +65,7 @@ export function FinanceWorkspacePage() {
             <strong>{posted.length}</strong> posted invoices · outstanding{' '}
             <strong>{formatCurrency(outstanding)}</strong>
           </p>
-          <DynamicsCommandButton primary onClick={() => navigate('/invoices/register')}>
+          <DynamicsCommandButton primary onClick={() => navigate('/accounting/money-in/invoices')}>
             Open Register
           </DynamicsCommandButton>
         </div>

@@ -10,6 +10,18 @@ import { prisma } from './config/database.js'
 import { errorMiddleware } from './middleware/error.middleware.js'
 import authRoutes from './modules/auth/auth.routes.js'
 import crmRoutes from './modules/crm/crm.routes.js'
+import departmentRoutes from './modules/departments/department.routes.js'
+import {
+  responsibilityRoutes,
+  userResponsibilityRoutes,
+} from './modules/responsibilities/responsibility.routes.js'
+import scopeRoutes from './modules/access-scopes/scope.routes.js'
+import {
+  accessReviewRoutes,
+  userEffectiveAccessRoutes,
+} from './modules/effective-access/effective-access.routes.js'
+import { securityRouter, userSecurityRouter } from './modules/security/security.routes.js'
+import moduleRoutes from './modules/modules/module.routes.js'
 import purchaseRoutes from './modules/purchase/purchase.routes.js'
 import mastersRoutes from './modules/masters/masters.routes.js'
 import masterImportRoutes from './modules/masters/imports/import.routes.js'
@@ -19,6 +31,7 @@ import inventoryMastersRoutes from './modules/masters/inventory-masters.routes.j
 import itemRoutes, { itemLookupRouter } from './modules/items/item.routes.js'
 import vendorRoutes, { vendorLookupRouter } from './modules/vendors/vendor.routes.js'
 import accountingRoutes from './modules/accounting/accounting.routes.js'
+import organisationRoutes from './modules/organisation/organisation.routes.js'
 import manufacturingRoutes from './modules/manufacturing/manufacturing.routes.js'
 import inventoryRoutes from './modules/inventory/inventory.routes.js'
 import qualityRoutes from './modules/quality/quality.routes.js'
@@ -66,12 +79,24 @@ export function createApp() {
   app.use(express.json({ limit: jsonBodyLimitBytes }))
   app.use(express.urlencoded({ extended: true, limit: jsonBodyLimitBytes }))
 
+  // Dev/test: generous budget (login directory + refresh also hit /auth).
+  // Prod: skip session endpoints so only credential attempts consume the quota.
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 30,
+    max: env.isDev || env.isTest ? 2000 : 60,
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, message: 'Too many authentication attempts' },
+    skip: (req) => {
+      if (env.isDev || env.isTest) return false
+      const path = req.path.replace(/\/+$/, '') || '/'
+      return (
+        path === '/refresh-token' ||
+        path === '/me' ||
+        path === '/logout' ||
+        path === '/change-password'
+      )
+    },
   })
 
   app.get('/api/v1/health', async (_req, res) => {
@@ -96,6 +121,15 @@ export function createApp() {
 
   app.use('/api/v1/tenants', tenantRoutes)
   app.use('/api/v1/tenants/:tenantId/users', userRoutes)
+  app.use('/api/v1/tenants/:tenantId/users', scopeRoutes)
+  app.use('/api/v1/tenants/:tenantId/users', userResponsibilityRoutes)
+  app.use('/api/v1/tenants/:tenantId/users', userEffectiveAccessRoutes)
+  app.use('/api/v1/tenants/:tenantId/users', userSecurityRouter)
+  app.use('/api/v1/tenants/:tenantId/departments', departmentRoutes)
+  app.use('/api/v1/tenants/:tenantId/responsibilities', responsibilityRoutes)
+  app.use('/api/v1/tenants/:tenantId/access-review', accessReviewRoutes)
+  app.use('/api/v1/tenants/:tenantId/security', securityRouter)
+  app.use('/api/v1/tenants/:tenantId/modules', moduleRoutes)
   app.use('/api/v1/tenants/:tenantId/roles', roleRoutes)
   app.use('/api/v1/tenants/:tenantId/crm', crmRoutes)
   app.use('/api/v1/tenants/:tenantId/masters/items', itemRoutes)
@@ -111,6 +145,7 @@ export function createApp() {
   app.use('/api/v1/tenants/:tenantId/lookups/vendors', vendorLookupRouter)
   app.use('/api/v1/tenants/:tenantId/lookups', lookupRoutes)
   app.use('/api/v1/tenants/:tenantId/accounting', accountingRoutes)
+  app.use('/api/v1/tenants/:tenantId/organisation', organisationRoutes)
   app.use('/api/v1/tenants/:tenantId/manufacturing', manufacturingRoutes)
   app.use('/api/v1/tenants/:tenantId/purchase', purchaseRoutes)
   app.use('/api/v1/tenants/:tenantId/quality', qualityRoutes)
@@ -122,6 +157,15 @@ export function createApp() {
 
   // Tenant slug aliases
   app.use('/api/v1/t/:tenantSlug/users', userRoutes)
+  app.use('/api/v1/t/:tenantSlug/users', scopeRoutes)
+  app.use('/api/v1/t/:tenantSlug/users', userResponsibilityRoutes)
+  app.use('/api/v1/t/:tenantSlug/users', userEffectiveAccessRoutes)
+  app.use('/api/v1/t/:tenantSlug/users', userSecurityRouter)
+  app.use('/api/v1/t/:tenantSlug/departments', departmentRoutes)
+  app.use('/api/v1/t/:tenantSlug/responsibilities', responsibilityRoutes)
+  app.use('/api/v1/t/:tenantSlug/access-review', accessReviewRoutes)
+  app.use('/api/v1/t/:tenantSlug/security', securityRouter)
+  app.use('/api/v1/t/:tenantSlug/modules', moduleRoutes)
   app.use('/api/v1/t/:tenantSlug/roles', roleRoutes)
   app.use('/api/v1/t/:tenantSlug/crm', crmRoutes)
   app.use('/api/v1/t/:tenantSlug/masters/items', itemRoutes)
@@ -135,6 +179,7 @@ export function createApp() {
   app.use('/api/v1/t/:tenantSlug/lookups/vendors', vendorLookupRouter)
   app.use('/api/v1/t/:tenantSlug/lookups', lookupRoutes)
   app.use('/api/v1/t/:tenantSlug/accounting', accountingRoutes)
+  app.use('/api/v1/t/:tenantSlug/organisation', organisationRoutes)
   app.use('/api/v1/t/:tenantSlug/manufacturing', manufacturingRoutes)
   app.use('/api/v1/t/:tenantSlug/purchase', purchaseRoutes)
   app.use('/api/v1/t/:tenantSlug/quality', qualityRoutes)

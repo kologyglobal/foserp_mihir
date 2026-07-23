@@ -9,6 +9,8 @@ import * as userController from './user.controller.js'
 import {
   assignRoleSchema,
   createUserSchema,
+  inviteUserSchema,
+  listInvitationsQuerySchema,
   listUsersQuerySchema,
   updateUserSchema,
   userIdParamSchema,
@@ -24,6 +26,20 @@ router.get(
   requirePermission('user.view'),
   validateQuery(listUsersQuerySchema),
   asyncHandler(userController.list),
+)
+
+router.get(
+  '/invitations',
+  requirePermission('user.view'),
+  validateQuery(listInvitationsQuerySchema),
+  asyncHandler(userController.listInvitations),
+)
+
+router.post(
+  '/invite',
+  requirePermission('user.create'),
+  validateBody(inviteUserSchema),
+  asyncHandler(userController.invite),
 )
 
 router.post(
@@ -53,6 +69,41 @@ router.delete(
   requirePermission('user.delete'),
   validateParams(userIdParamSchema),
   asyncHandler(userController.remove),
+)
+
+router.post(
+  '/:userId/resend-invitation',
+  requirePermission('user.create'),
+  validateParams(userIdParamSchema),
+  asyncHandler(userController.resendInvitation),
+)
+
+router.post(
+  '/:userId/deactivate',
+  requirePermission('user.update'),
+  validateParams(userIdParamSchema),
+  asyncHandler(userController.deactivate),
+)
+
+router.post(
+  '/:userId/activate',
+  requirePermission('user.update'),
+  validateParams(userIdParamSchema),
+  asyncHandler(userController.activate),
+)
+
+router.get(
+  '/:userId/sessions',
+  requirePermission('user.view'),
+  validateParams(userIdParamSchema),
+  asyncHandler(userController.listSessions),
+)
+
+router.post(
+  '/:userId/revoke-sessions',
+  requirePermission('user.update'),
+  validateParams(userIdParamSchema),
+  asyncHandler(userController.revokeSessions),
 )
 
 router.post(

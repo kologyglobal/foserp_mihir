@@ -50,8 +50,32 @@ export function SetupHubPage() {
       <div className="mb-4 flex items-start gap-2 rounded-md border border-erp-border bg-erp-surface-alt px-3 py-2 text-[12px] text-erp-muted">
         <Factory className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
         <span>
-          Phase 1 covers manufacturing setup/master data only. Production Orders and execution are Phase 2 — not
-          available yet.
+          This hub is for manufacturing masters (work centres, machines, BOMs, routings, profiles). For production
+          execution, use{' '}
+          <button
+            type="button"
+            className="font-semibold text-erp-primary underline-offset-2 hover:underline"
+            onClick={() => navigate('/manufacturing/work-orders')}
+          >
+            Work Orders
+          </button>
+          ,{' '}
+          <button
+            type="button"
+            className="font-semibold text-erp-primary underline-offset-2 hover:underline"
+            onClick={() => navigate('/manufacturing/today')}
+          >
+            Today
+          </button>
+          , or{' '}
+          <button
+            type="button"
+            className="font-semibold text-erp-primary underline-offset-2 hover:underline"
+            onClick={() => navigate('/manufacturing/shopfloor')}
+          >
+            Shopfloor
+          </button>
+          .
         </span>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">

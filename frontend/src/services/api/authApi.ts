@@ -58,7 +58,60 @@ export async function logout(): Promise<void> {
 
 export async function fetchMe() {
   const { apiRequest } = await import('../api/client')
-  return apiRequest<AuthSession['user']>('/auth/me')
+  return apiRequest<AuthSession['user'] & {
+    mobile?: string | null
+    designation?: string | null
+    department?: string | null
+  }>('/auth/me')
+}
+
+export async function updateProfile(input: {
+  firstName: string
+  lastName: string
+  mobile?: string | null
+  designation?: string | null
+}) {
+  const { apiRequest, getStoredSession, setStoredSession, withAccessExpiry } = await import('../api/client')
+  const res = await apiRequest<{
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+    mobile?: string | null
+    designation?: string | null
+    roles: string[]
+    permissions: string[]
+  }>('/auth/me', {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+  const current = getStoredSession()
+  if (current) {
+    const next = withAccessExpiry({
+      ...current,
+      user: {
+        ...current.user,
+        firstName: res.data.firstName,
+        lastName: res.data.lastName,
+        email: res.data.email,
+        roles: res.data.roles ?? current.user.roles,
+        permissions: res.data.permissions ?? current.user.permissions,
+      },
+    })
+    setStoredSession(next)
+  }
+  return res
+}
+
+export async function changePassword(input: {
+  currentPassword: string
+  newPassword: string
+}): Promise<void> {
+  const { apiRequest } = await import('../api/client')
+  await apiRequest<null>('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
 }
 
 export async function forgotPassword(
@@ -100,4 +153,54 @@ export async function resetPassword(token: string, password: string): Promise<vo
   if (!res.ok || !body.success) {
     throw new Error(body.message ?? 'Password reset failed')
   }
+}
+
+export async function acceptInvitation(token: string, password: string): Promise<void> {
+  let res: Response
+  try {
+    res = await fetch(`${API_CONFIG.baseUrl}/auth/accept-invitation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password }),
+    })
+  } catch {
+    throw new Error('Cannot reach the API server. Ensure the backend is running on port 5000.')
+  }
+  const body = await res.json()
+  if (!res.ok || !body.success) {
+    throw new Error(body.message ?? 'Could not accept invitation')
+  }
+}
+
+export interface LoginDirectoryUser {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  designation: string | null
+  department: string | null
+  status: string
+  roles: string[]
+}
+
+export interface LoginDirectory {
+  tenantSlug: string
+  tenantName: string
+  users: LoginDirectoryUser[]
+}
+
+/** Dev-only: list users for a tenant on the login page (no passwords). */
+export async function fetchLoginDirectory(tenantSlug: string): Promise<LoginDirectory> {
+  let res: Response
+  try {
+    const qs = new URLSearchParams({ tenantSlug })
+    res = await fetch(`${API_CONFIG.baseUrl}/auth/login-directory?${qs}`)
+  } catch {
+    throw new Error('Cannot reach the API server. Ensure the backend is running on port 5000.')
+  }
+  const body = await res.json()
+  if (!res.ok || !body.success) {
+    throw new Error(body.message ?? 'Could not load tenant users')
+  }
+  return body.data as LoginDirectory
 }

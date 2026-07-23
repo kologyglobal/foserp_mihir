@@ -160,6 +160,9 @@ describe.skipIf(!dbAvailable)('Manufacturing Phase 7A', () => {
     expect(close.status).toBe(200)
     expect(typeof close.body?.data?.readyToClose).toBe('boolean')
     expect(Array.isArray(close.body?.data?.checks)).toBe(true)
+    expect(Array.isArray(close.body?.data?.blockers)).toBe(true)
+    expect(Array.isArray(close.body?.data?.warnings)).toBe(true)
+    expect(close.body?.data?.purpose).toBe('CLOSE')
   })
 
   it('rejects cross-tenant warehouse on mapping create', async () => {

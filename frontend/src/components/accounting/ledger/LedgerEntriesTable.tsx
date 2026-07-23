@@ -312,7 +312,10 @@ function OptionalCell({
       )
     case 'reversalVoucher':
       return (
-        <td className="px-2 py-2 font-mono text-erp-muted">
+        <td
+          className="min-w-[120px] max-w-[160px] truncate px-2 py-2 font-mono text-erp-muted"
+          title={row.reversal?.reversalVoucherNumber ?? row.reversal?.originalVoucherNumber ?? undefined}
+        >
           {row.reversal?.reversalVoucherNumber ?? row.reversal?.originalVoucherNumber ?? '—'}
         </td>
       )
@@ -338,7 +341,7 @@ const OPTIONAL_COLUMN_LABELS: Record<string, string> = {
   createdBy: 'Created by',
   postedBy: 'Posted by',
   postedAt: 'Posted at',
-  reversalVoucher: 'Reversal voucher',
+  reversalVoucher: 'Reversal',
 }
 
 export function LedgerEntriesTable({
@@ -491,12 +494,13 @@ export function LedgerEntriesTable({
                 <th
                   key={colId}
                   className="whitespace-nowrap border-b border-erp-border bg-erp-surface px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-erp-muted"
+                  title={colId === 'reversalVoucher' ? 'Reversal voucher' : undefined}
                 >
                   {OPTIONAL_COLUMN_LABELS[colId] ?? colId}
                 </th>
               ))}
               <SortHeader label="Status" sortKey="status" activeKey={sortKey} sortDir={sortDir} onSort={onSort} />
-              <th className="sticky right-0 z-20 border-b border-erp-border bg-erp-surface px-2 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
+              <th className="sticky right-0 z-30 w-14 min-w-[3.5rem] border-b border-l border-erp-border bg-erp-surface px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-erp-muted shadow-[-8px_0_10px_-8px_rgba(15,23,42,0.18)]">
                 Actions
               </th>
             </tr>
@@ -511,13 +515,19 @@ export function LedgerEntriesTable({
             ) : (
               rows.map((row) => {
                 const selected = selectedIds.has(row.id)
+                const stripe = isReversalStripe(row)
+                const stickyActionBg = selected
+                  ? 'bg-[#e8f0fe]'
+                  : stripe
+                    ? 'bg-rose-50'
+                    : 'bg-white group-hover:bg-erp-surface-alt'
                 return (
                   <tr
                     key={row.id}
                     className={cn(
-                      'cursor-pointer border-b border-erp-border transition-colors hover:bg-erp-surface-alt/60',
+                      'group cursor-pointer border-b border-erp-border transition-colors hover:bg-erp-surface-alt/60',
                       selected && 'bg-erp-primary-soft/40',
-                      isReversalStripe(row) && 'bg-rose-50/30',
+                      stripe && 'bg-rose-50/30',
                     )}
                     onClick={() => onToggleSelect(row.id)}
                     aria-selected={selected}
@@ -578,11 +588,19 @@ export function LedgerEntriesTable({
                     {visibleOptionalColumns.map((colId) => (
                       <OptionalCell key={colId} columnId={colId} row={row} optionalSet={optionalSet} />
                     ))}
-                    <td className="px-2 py-2">
+                    <td className="whitespace-nowrap px-2 py-2">
                       <LedgerStatusBadge status={row.status} isPreviewOnly={row.isPreviewOnly} />
                     </td>
-                    <td className="sticky right-0 z-[1] bg-inherit px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                      <EnterpriseRowActionsMenu actions={buildRowActions(row, onAction)} />
+                    <td
+                      className={cn(
+                        'sticky right-0 z-[2] w-14 min-w-[3.5rem] border-l border-erp-border px-2 py-2 text-center align-middle shadow-[-8px_0_10px_-8px_rgba(15,23,42,0.18)]',
+                        stickyActionBg,
+                      )}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="inline-flex items-center justify-center">
+                        <EnterpriseRowActionsMenu actions={buildRowActions(row, onAction)} />
+                      </div>
                     </td>
                   </tr>
                 )

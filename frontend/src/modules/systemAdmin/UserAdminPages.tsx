@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { z } from 'zod'
@@ -11,27 +11,30 @@ import { DetailLayout, DetailSection, DetailGrid, DetailField, FormLayout, FormS
 import { Badge } from '../../components/ui/Badge'
 import { FormField } from '../../components/forms/FormField'
 import { Input, Select } from '../../components/forms/Inputs'
+import { SELECT_PLACEHOLDER } from '../../components/forms/selectStandards'
 import { EnterpriseRowActionsMenu, type RowActionItem } from '../../design-system/enterprise/EnterpriseTablePrimitives'
 import { MasterLifecycleDialog } from '../../components/masters/MasterLifecycleDialog'
 import { useMasterLifecycle } from '../../hooks/useMasterLifecycle'
+import { AdminEffectiveAccessPanel, AdminUserAccessPanels, AdminUserStatusBadge } from '../../components/admin'
+import { ErpButton } from '../../components/erp/ErpButton'
+import { isApiMode } from '../../config/apiConfig'
+import {
+  fetchAdminDepartmentsApi,
+  fetchAdminUserSessionsApi,
+  lockAdminUserApi,
+  resendAdminInvitationApi,
+  revokeAdminUserSessionsApi,
+  unlockAdminUserApi,
+  type AdminDepartment,
+  type AdminUserSession,
+} from '../../services/api/adminApi'
 import { useAdminStore } from '../../store/adminStore'
 import { resolveMaybeId, resolveStoreAction, type MaybePromise, type StoreActionResult } from '../../store/storeAction'
 import { formatApiError } from '../../services/api/apiErrors'
 import { notify } from '../../store/toastStore'
 import { canAdminPermission } from '../../utils/permissions'
+import { appConfirm } from '../../store/confirmDialogStore'
 import type { AdminUserStatus } from '../../types/admin'
-
-const STATUS_COLOR: Record<AdminUserStatus, 'green' | 'gray' | 'yellow' | 'red'> = {
-  ACTIVE: 'green',
-  INVITED: 'yellow',
-  INACTIVE: 'gray',
-  BLOCKED: 'red',
-  ARCHIVED: 'gray',
-}
-
-function UserStatusBadge({ status }: { status: AdminUserStatus }) {
-  return <Badge color={STATUS_COLOR[status]}>{status}</Badge>
-}
 
 function wrapVoid(fn: (id: string) => MaybePromise<StoreActionResult>) {
   return async (id: string) => {
@@ -121,7 +124,7 @@ export function UserAdminListPage() {
       ),
     },
     { accessorKey: 'designation', header: 'Designation' },
-    { id: 'status', header: 'Status', cell: ({ row }) => <UserStatusBadge status={row.original.status} /> },
+    { id: 'status', header: 'Status', cell: ({ row }) => <AdminUserStatusBadge status={row.original.status} /> },
     {
       id: 'actions',
       header: 'Actions',
@@ -133,6 +136,7 @@ export function UserAdminListPage() {
   return (
     <MasterListShell
       title="Users"
+      badge="Admin"
       description="Manage tenant users, invitations, and role assignments"
       breadcrumbs={[{ label: 'Administration', to: '/admin' }, { label: 'Users' }]}
       favoritePath="/admin/users"
@@ -162,7 +166,7 @@ const createSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
   mobile: z.string().optional(),
   designation: z.string().optional(),
-  department: z.string().optional(),
+  departmentId: z.string().optional(),
 })
 
 const editSchema = z.object({
@@ -171,12 +175,39 @@ const editSchema = z.object({
   email: z.string().email('Valid email is required'),
   mobile: z.string().optional(),
   designation: z.string().optional(),
-  department: z.string().optional(),
+  departmentId: z.string().optional(),
   status: z.enum(['INVITED', 'ACTIVE', 'INACTIVE', 'BLOCKED', 'ARCHIVED']),
 })
 
 type CreateFormData = z.infer<typeof createSchema>
 type EditFormData = z.infer<typeof editSchema>
+
+const DEMO_DEPT_KEY = 'fos-admin-departments-demo'
+
+function useDepartmentOptions() {
+  const [options, setOptions] = useState<AdminDepartment[]>([])
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        if (isApiMode()) {
+          const rows = await fetchAdminDepartmentsApi({ active: 'true' })
+          if (!cancelled) setOptions(rows)
+          return
+        }
+        const raw = localStorage.getItem(DEMO_DEPT_KEY)
+        const rows = raw ? (JSON.parse(raw) as AdminDepartment[]) : []
+        if (!cancelled) setOptions(rows.filter((d) => d.isActive))
+      } catch {
+        if (!cancelled) setOptions([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  return options
+}
 
 export function UserAdminFormPage() {
   const { id } = useParams()
@@ -235,15 +266,24 @@ function CreateUserForm({
 }) {
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<CreateFormData>({
     resolver: zodResolver(createSchema) as Resolver<CreateFormData>,
-    defaultValues: { firstName: '', lastName: '', email: '', password: '', mobile: '', designation: '', department: '' },
+    defaultValues: { firstName: '', lastName: '', email: '', password: '', mobile: '', designation: '', departmentId: '' },
   })
+  const departments = useDepartmentOptions()
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     void handleSubmit(async (data) => {
       setSaveError(null)
       try {
-        const res = await resolveStoreAction(createUser({ ...data, roleIds: selectedRoleIds }))
+        const dept = departments.find((d) => d.id === data.departmentId)
+        const res = await resolveStoreAction(
+          createUser({
+            ...data,
+            departmentId: data.departmentId || null,
+            department: dept?.name,
+            roleIds: selectedRoleIds,
+          }),
+        )
         if (!res.ok) {
           setSaveError(res.error ?? 'Failed to create user')
           return
@@ -280,7 +320,14 @@ function CreateUserForm({
         <FormField label="Temporary Password" required hint="User can change this after first login" error={errors.password?.message}><Input type="password" {...register('password')} error={!!errors.password} /></FormField>
         <FormField label="Mobile"><Input {...register('mobile')} /></FormField>
         <FormField label="Designation"><Input {...register('designation')} /></FormField>
-        <FormField label="Department"><Input {...register('department')} /></FormField>
+        <FormField label="Department">
+          <Select {...register('departmentId')}>
+            <option value="">{SELECT_PLACEHOLDER}</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </Select>
+        </FormField>
       </FormSection>
       <FormSection title="Roles" className="md:col-span-2">
         <div className="md:col-span-2 flex flex-wrap gap-2">
@@ -314,6 +361,7 @@ function UserEditForm({
   setSaveError: (v: string | null) => void
   navigate: (path: string) => void
 }) {
+  const departments = useDepartmentOptions()
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<EditFormData>({
     resolver: zodResolver(editSchema) as Resolver<EditFormData>,
     defaultValues: {
@@ -322,7 +370,7 @@ function UserEditForm({
       email: existing.email,
       mobile: existing.mobile ?? '',
       designation: existing.designation ?? '',
-      department: existing.department ?? '',
+      departmentId: existing.departmentId ?? '',
       status: existing.status,
     },
   })
@@ -332,7 +380,14 @@ function UserEditForm({
     void handleSubmit(async (data) => {
       setSaveError(null)
       try {
-        const res = await resolveStoreAction(updateUser(existing.id, data))
+        const dept = departments.find((d) => d.id === data.departmentId)
+        const res = await resolveStoreAction(
+          updateUser(existing.id, {
+            ...data,
+            departmentId: data.departmentId || null,
+            department: dept?.name ?? null,
+          }),
+        )
         if (!res.ok) {
           setSaveError(res.error ?? 'Failed to save user')
           return
@@ -365,7 +420,14 @@ function UserEditForm({
         <FormField label="Email" required error={errors.email?.message}><Input type="email" {...register('email')} error={!!errors.email} /></FormField>
         <FormField label="Mobile"><Input {...register('mobile')} /></FormField>
         <FormField label="Designation"><Input {...register('designation')} /></FormField>
-        <FormField label="Department"><Input {...register('department')} /></FormField>
+        <FormField label="Department">
+          <Select {...register('departmentId')}>
+            <option value="">{SELECT_PLACEHOLDER}</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </Select>
+        </FormField>
         <FormField label="Status" required>
           <Select {...register('status')}>
             <option value="INVITED">Invited</option>
@@ -388,9 +450,36 @@ export function UserAdminDetailPage() {
   const removeUserRole = useAdminStore((s) => s.removeUserRole)
   const canAssign = canAdminPermission('user.assign_role')
   const canEdit = canAdminPermission('user.update')
+  const canInvite = canAdminPermission('user.create')
+  const canSecurity = canAdminPermission('security.manage')
+  const updateUser = useAdminStore((s) => s.updateUser)
   const [pendingRoleId, setPendingRoleId] = useState('')
   const [roleError, setRoleError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [sessions, setSessions] = useState<AdminUserSession[]>([])
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!id || !isApiMode()) {
+      setSessions([])
+      return
+    }
+    let cancelled = false
+    setSessionsLoading(true)
+    void fetchAdminUserSessionsApi(id)
+      .then((res) => {
+        if (!cancelled) setSessions(res.data)
+      })
+      .catch(() => {
+        if (!cancelled) setSessions([])
+      })
+      .finally(() => {
+        if (!cancelled) setSessionsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [id])
 
   if (!user) return <MasterNotFound message="User not found." />
 
@@ -426,6 +515,106 @@ export function UserAdminDetailPage() {
     }
   }
 
+  async function handleResendInvite() {
+    if (!user) return
+    const ok = await appConfirm({
+      title: 'Resend invitation?',
+      description: 'Issues a new invite link and revokes the previous one.',
+    })
+    if (!ok) return
+    setBusy(true)
+    try {
+      if (isApiMode()) {
+        const res = await resendAdminInvitationApi(user.id)
+        notify.success(
+          res.data.inviteToken
+            ? `Invitation resent. Dev token: ${res.data.inviteToken}`
+            : 'Invitation resent',
+        )
+      } else {
+        notify.success('Demo invitation resent')
+      }
+    } catch (err) {
+      notify.error(formatApiError(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleRevokeSessions() {
+    if (!user) return
+    const ok = await appConfirm({
+      title: 'Revoke all sessions?',
+      description: 'Signs the user out of every active device. They must sign in again.',
+      tone: 'danger',
+    })
+    if (!ok) return
+    setBusy(true)
+    try {
+      if (isApiMode()) {
+        const res = await revokeAdminUserSessionsApi(user.id)
+        notify.success(`Revoked ${res.data.revokedSessions} session(s)`)
+        setSessions([])
+      } else {
+        notify.success('Demo sessions revoked')
+      }
+    } catch (err) {
+      notify.error(formatApiError(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleLock() {
+    if (!user) return
+    const ok = await appConfirm({
+      title: 'Lock account?',
+      description: 'Sets status to BLOCKED and revokes all sessions.',
+      tone: 'danger',
+    })
+    if (!ok) return
+    setBusy(true)
+    try {
+      if (isApiMode()) {
+        const res = await lockAdminUserApi(user.id)
+        notify.success(`Locked · revoked ${res.data.revokedSessions} session(s)`)
+        await resolveStoreAction(updateUser(user.id, { status: 'BLOCKED' }))
+        setSessions([])
+      } else {
+        await resolveStoreAction(updateUser(user.id, { status: 'BLOCKED' }))
+        notify.success('Demo account locked')
+      }
+    } catch (err) {
+      notify.error(formatApiError(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleUnlock() {
+    if (!user) return
+    const ok = await appConfirm({
+      title: 'Unlock account?',
+      description: 'Sets status to ACTIVE and clears failed-login counter.',
+    })
+    if (!ok) return
+    setBusy(true)
+    try {
+      if (isApiMode()) {
+        await unlockAdminUserApi(user.id)
+        notify.success('Account unlocked')
+        await resolveStoreAction(updateUser(user.id, { status: 'ACTIVE' }))
+      } else {
+        await resolveStoreAction(updateUser(user.id, { status: 'ACTIVE' }))
+        notify.success('Demo account unlocked')
+      }
+    } catch (err) {
+      notify.error(formatApiError(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <DetailLayout
       backTo="/admin/users"
@@ -434,7 +623,7 @@ export function UserAdminDetailPage() {
       subtitle={user.email}
       editTo={canEdit ? `/admin/users/${user.id}/edit` : undefined}
       breadcrumbs={[{ label: 'Administration', to: '/admin' }, { label: 'Users', to: '/admin/users' }, { label: `${user.firstName} ${user.lastName}` }]}
-      badges={<UserStatusBadge status={user.status} />}
+      badges={<AdminUserStatusBadge status={user.status} />}
     >
       <div className="space-y-6">
         <DetailSection title="User Details">
@@ -446,6 +635,13 @@ export function UserAdminDetailPage() {
             <DetailField label="Email Verified" value={user.emailVerified ? 'Yes' : 'No'} />
             <DetailField label="Last Login" value={user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never'} />
           </DetailGrid>
+          {user.status === 'INVITED' && canInvite ? (
+            <div className="mt-3">
+              <ErpButton size="sm" type="button" variant="secondary" disabled={busy} onClick={() => void handleResendInvite()}>
+                Resend invitation
+              </ErpButton>
+            </div>
+          ) : null}
         </DetailSection>
 
         <DetailSection title="Roles">
@@ -468,7 +664,7 @@ export function UserAdminDetailPage() {
               <div className="flex items-end gap-2">
                 <div className="w-56">
                   <Select value={pendingRoleId} onChange={(e) => setPendingRoleId(e.target.value)}>
-                    <option value="">Select a role…</option>
+                    <option value="">{SELECT_PLACEHOLDER}</option>
                     {availableRoles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </Select>
                 </div>
@@ -483,6 +679,58 @@ export function UserAdminDetailPage() {
               </div>
             )}
           </div>
+        </DetailSection>
+
+        <DetailSection title="Active sessions">
+          <div className="space-y-3">
+            <p className="text-xs text-erp-muted">
+              Sessions are backed by refresh tokens. Revoking signs the user out everywhere.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {canEdit ? (
+                <ErpButton size="sm" type="button" variant="secondary" disabled={busy} onClick={() => void handleRevokeSessions()}>
+                  Revoke all sessions
+                </ErpButton>
+              ) : null}
+              {canSecurity && user.status !== 'BLOCKED' && user.status !== 'ARCHIVED' ? (
+                <ErpButton size="sm" type="button" variant="secondary" disabled={busy} onClick={() => void handleLock()}>
+                  Lock account
+                </ErpButton>
+              ) : null}
+              {canSecurity && user.status === 'BLOCKED' ? (
+                <ErpButton size="sm" type="button" disabled={busy} onClick={() => void handleUnlock()}>
+                  Unlock account
+                </ErpButton>
+              ) : null}
+            </div>
+            {!isApiMode() ? (
+              <p className="text-sm text-erp-muted">Session list is available in API mode.</p>
+            ) : sessionsLoading ? (
+              <p className="text-sm text-erp-muted">Loading sessions…</p>
+            ) : sessions.length === 0 ? (
+              <p className="text-sm text-erp-muted">No active sessions.</p>
+            ) : (
+              <ul className="divide-y divide-erp-border rounded-lg border border-erp-border">
+                {sessions.map((s) => (
+                  <li key={s.id} className="px-3 py-2 text-sm">
+                    <p className="font-medium text-erp-text">{s.userAgent ?? 'Unknown device'}</p>
+                    <p className="text-xs text-erp-muted">
+                      {s.ipAddress ?? '—'} · started {new Date(s.createdAt).toLocaleString()} · expires{' '}
+                      {new Date(s.expiresAt).toLocaleString()}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </DetailSection>
+
+        <DetailSection title="Data scopes & responsibilities">
+          <AdminUserAccessPanels userId={user.id} />
+        </DetailSection>
+
+        <DetailSection title="Effective Access">
+          <AdminEffectiveAccessPanel userId={user.id} userName={`${user.firstName} ${user.lastName}`} />
         </DetailSection>
       </div>
     </DetailLayout>

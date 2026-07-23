@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Package, RotateCcw, ShieldAlert, Warehouse } from 'lucide-react'
+import { Package, RotateCcw, Route, ShieldAlert, Warehouse } from 'lucide-react'
 import { isApiMode } from '@/config/apiConfig'
 import { ManufacturingDemoBanner } from '@/components/manufacturing'
 import { LoadingState } from '@/design-system/components/LoadingState'
@@ -191,6 +191,12 @@ export function StoreWorkbenchPage() {
       secondaryActions={
         isApiMode()
           ? [
+              {
+                id: 'fulfilment',
+                label: 'Fulfilment',
+                icon: Route,
+                onClick: () => navigate('/manufacturing/guided-fulfilment?step=stock'),
+              },
               {
                 id: 'stock-lookup',
                 label: 'Check Stock',

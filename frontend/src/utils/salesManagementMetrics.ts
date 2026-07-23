@@ -259,7 +259,7 @@ export function buildSalesCommercialActivity(input: {
       icon: 'payment',
       action: `Invoice ${inv.invoiceNo} posted`,
       timestamp: inv.createdAt,
-      href: `/invoices/register/${inv.id}`,
+      href: `/accounting/money-in/invoices/${inv.id}`,
       documentRef: formatCrmCurrency(inv.gst.grandTotal),
     })
   }

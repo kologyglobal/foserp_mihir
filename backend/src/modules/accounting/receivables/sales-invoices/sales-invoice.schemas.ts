@@ -116,7 +116,7 @@ export interface NormalizedSalesInvoiceBody {
   legalEntityId?: string
   branchId?: string | null
   customerId: string
-  sourceType: 'DIRECT' | 'SALES_ORDER'
+  sourceType: 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH'
   sourceDocumentId?: string | null
   invoiceDate: string
   postingDate: string
@@ -143,6 +143,21 @@ export interface NormalizedSalesInvoiceBody {
   customerPoNumber?: string | null
   narration: string | null
   lines: SalesInvoiceLineRequest[]
+  /** Optional consumption links (OUTBOUND_DISPATCH / SO / challan). */
+  sourceLinks?: Array<{
+    sourceType: 'SALES_ORDER' | 'OUTBOUND_DISPATCH' | 'DELIVERY_CHALLAN'
+    sourceDocumentId: string
+    sourceLineId?: string | null
+    salesOrderId?: string | null
+    salesOrderLineId?: string | null
+    deliveryChallanId?: string | null
+    deliveryChallanLineId?: string | null
+    quantity: string
+    itemId?: string | null
+    itemCodeSnapshot?: string | null
+    itemNameSnapshot?: string | null
+    sourceDocumentNumberSnapshot?: string | null
+  }>
 }
 
 function normalizeDraftBody(body: DraftFields | Omit<DraftFields, 'legalEntityId'>): NormalizedSalesInvoiceBody {
@@ -169,6 +184,13 @@ export const createSalesInvoiceSchema = salesInvoiceDraftFieldsSchema
       ctx.addIssue({
         code: 'custom',
         message: 'sourceDocumentId is required when sourceType is SALES_ORDER',
+        path: ['sourceDocumentId'],
+      })
+    }
+    if (body.sourceType === 'OUTBOUND_DISPATCH' && !body.sourceDocumentId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'sourceDocumentId (outbound dispatch id) is required when sourceType is OUTBOUND_DISPATCH',
         path: ['sourceDocumentId'],
       })
     }

@@ -1,19 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ClipboardList, Pencil, Printer, Send, ShoppingCart } from 'lucide-react'
-import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
-import { ErpCommandBar } from '../../components/erp/ErpCommandBar'
-import { ErpViewField } from '../../components/erp/card-form/ErpViewField'
-import { Badge } from '../../components/ui/Badge'
-import { EmptyState } from '../../components/ui/EmptyState'
-import { LoadingState } from '../../design-system/components/LoadingState'
-import { TableLink } from '../../components/ui/AppLink'
-import { PurchaseRequisitionLinesTable } from '../../components/purchase/PurchaseRequisitionLinesTable'
-import { PurchaseRequisitionPathBanner } from '../../components/purchase/PurchaseRequisitionPathBanner'
+import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
+import {
+  PurchaseDocumentFactBox,
+  buildPurchaseRelatedLinks,
+  purchaseDocumentApprovalFact,
+} from '@/components/purchase/PurchaseDocumentFactBox'
+import { PurchaseRequisitionWorkflowStrip } from '@/components/purchase/PurchaseDocumentWorkflowStrip'
+import { PurchaseRequisitionLinesTable } from '@/components/purchase/PurchaseRequisitionLinesTable'
 import {
   PurchaseAuditTimeline,
   buildDemoPurchaseTimeline,
-} from '../../components/purchase/PurchaseAuditTimeline'
+} from '@/components/purchase/PurchaseAuditTimeline'
+import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
+import { ErpCardSection, ErpViewField } from '@/components/erp/card-form'
+import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { Badge } from '@/components/ui/Badge'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { LoadingState } from '@/design-system/components/LoadingState'
+import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
+import { TableLink } from '@/components/ui/AppLink'
 import {
   convertPurchaseRequisitionToRfq,
   getPurchaseRequisitionById,
@@ -26,21 +33,21 @@ import {
   PURCHASE_REQUISITION_SOURCE_LABELS,
   PURCHASE_REQUISITION_STATUS_LABELS,
   PurchaseServiceError,
-} from '../../services/purchase'
-import type { PurchaseRequisition, Vendor } from '../../types/purchaseDomain'
-import { purchaseRequisitionApprovalStatusLabel } from '../../types/purchaseDomain'
-import { formatCurrency } from '../../utils/formatters/currency'
-import { formatDate } from '../../utils/dates/format'
-import { notify } from '../../store/toastStore'
-import { usePurchasePermissions } from '../../utils/permissions'
+} from '@/services/purchase'
+import type { PurchaseRequisition, Vendor } from '@/types/purchaseDomain'
+import { purchaseRequisitionApprovalStatusLabel } from '@/types/purchaseDomain'
+import { formatCurrency } from '@/utils/formatters/currency'
+import { formatDate } from '@/utils/dates/format'
+import { notify } from '@/store/toastStore'
+import { usePurchasePermissions } from '@/utils/permissions'
 import {
   canConvertPrToRfq,
   isPrPendingPo,
   prProcurementPathLabel,
   purchasePlanningSheetHrefForPr,
-} from '../../utils/purchaseRequisitionNextStep'
-import { mapPurchaseCategoryToEngineeringProductType } from '../../utils/purchaseProductType'
-import type { PrEditorLine } from '../../utils/purchaseRequisitionValidation'
+} from '@/utils/purchaseRequisitionNextStep'
+import { mapPurchaseCategoryToEngineeringProductType } from '@/utils/purchaseProductType'
+import type { PrEditorLine } from '@/utils/purchaseRequisitionValidation'
 import { PurchaseRequisitionDocumentPage } from './PurchaseFormPages'
 
 export function PurchaseRequisitionDomainDetailPage({
@@ -64,7 +71,6 @@ export function PurchaseRequisitionDomainDetailPage({
   const [converting, setConverting] = useState(false)
   const [vendors, setVendors] = useState<Vendor[]>([])
 
-  const readOnly = mode === 'view' || pr?.status === 'cancelled' || pr?.status === 'pending_approval'
   const canEdit = pr && (pr.status === 'draft' || pr.status === 'rejected')
   const showCreateRfq = pr ? canConvertPrToRfq(pr) && perms.canCreateRfq : false
   const showViewRfq = Boolean(pr?.convertedRfqId)
@@ -143,6 +149,16 @@ export function PurchaseRequisitionDomainDetailPage({
     )
   }, [pr])
 
+  const headerFacts = useMemo(() => {
+    if (!pr) return []
+    return [
+      { label: 'Requester', value: pr.requester.name },
+      { label: 'Department', value: pr.department || '—' },
+      { label: 'PR Date', value: formatDate(pr.documentDate) },
+      { label: 'Required By', value: requiredBy ? formatDate(requiredBy) : '—' },
+    ]
+  }, [pr, requiredBy])
+
   const save = async () => {
     if (!pr || !canEdit) return
     setSaving(true)
@@ -177,13 +193,23 @@ export function PurchaseRequisitionDomainDetailPage({
 
   if (loading) {
     return (
-      <OperationalPageShell
+      <PurchaseCardFormShell
         title="Purchase Requisition"
-        badge="Purchase"
-        variant="dynamics"
+        description="Loading…"
+        status="…"
+        favoritePath="/purchase/requisitions"
+        breadcrumbs={[
+          { label: 'Purchase', to: '/purchase' },
+          { label: 'Requisitions', to: '/purchase/requisitions' },
+          { label: 'Loading' },
+        ]}
+        backLink={{ to: '/purchase/requisitions', label: 'Back to Requisitions' }}
+        footer={null}
+        stickyFooter={false}
+        detailMode
       >
-        <LoadingState variant="form" rows={6} />
-      </OperationalPageShell>
+        <LoadingState variant="form" rows={8} />
+      </PurchaseCardFormShell>
     )
   }
 
@@ -193,10 +219,20 @@ export function PurchaseRequisitionDomainDetailPage({
 
   if (!pr) {
     return (
-      <OperationalPageShell
+      <PurchaseCardFormShell
         title="Purchase Requisition"
-        badge="Purchase"
-        variant="dynamics"
+        description="Not found"
+        status="—"
+        favoritePath="/purchase/requisitions"
+        breadcrumbs={[
+          { label: 'Purchase', to: '/purchase' },
+          { label: 'Requisitions', to: '/purchase/requisitions' },
+          { label: 'Not found' },
+        ]}
+        backLink={{ to: '/purchase/requisitions', label: 'Back to Requisitions' }}
+        footer={null}
+        stickyFooter={false}
+        detailMode
       >
         <EmptyState
           icon={ClipboardList}
@@ -208,97 +244,176 @@ export function PurchaseRequisitionDomainDetailPage({
             </Link>
           }
         />
-      </OperationalPageShell>
+      </PurchaseCardFormShell>
     )
   }
 
+  const statusLabel = purchaseRequisitionApprovalStatusLabel(pr.status)
+  const preferredLineVendor = pr.lines.find((l) => l.preferredVendorId && l.preferredVendorName)
+  const headerVendor = pr.vendor
+
+  const documentFactBox = (
+    <PurchaseDocumentFactBox
+      vendor={
+        headerVendor
+          ? {
+              id: headerVendor.id,
+              code: headerVendor.code,
+              name: headerVendor.name,
+            }
+          : preferredLineVendor
+            ? {
+                id: preferredLineVendor.preferredVendorId ?? undefined,
+                name: preferredLineVendor.preferredVendorName ?? undefined,
+              }
+            : null
+      }
+      documentStatus={{
+        statusLabel,
+        ...purchaseDocumentApprovalFact(pr.status, pr.approver?.name),
+        createdBy: pr.createdBy,
+        modifiedBy: pr.updatedBy,
+        modifiedDate: pr.updatedAt ? formatDate(pr.updatedAt.slice(0, 10)) : null,
+      }}
+      related={buildPurchaseRelatedLinks({
+        rfqId: pr.convertedRfqId,
+        rfqNumber: linkedRfqNo,
+        purchaseOrderId: pr.convertedPoId,
+        purchaseOrderNumber: linkedPoNo,
+      })}
+    />
+  )
+
+  const canSubmitDraft =
+    mode === 'view' && pr.status === 'draft' && perms.canSubmitRequisition
+  const primaryAction =
+    mode === 'edit' && canEdit && perms.canEditRequisition
+      ? {
+          id: 'save',
+          label: saving ? 'Saving…' : 'Save',
+          onClick: () => void save(),
+          disabled: saving,
+        }
+      : showCreateRfq
+        ? {
+            id: 'rfq',
+            label: converting ? 'Creating…' : 'Create RFQ',
+            icon: ShoppingCart,
+            onClick: () => void createRfq(),
+            disabled: converting,
+          }
+        : showViewPlanning
+          ? {
+              id: 'view-planning',
+              label: 'View Planning Items',
+              icon: ClipboardList,
+              onClick: () => navigate(purchasePlanningSheetHrefForPr(pr.documentNumber)),
+            }
+          : canSubmitDraft
+            ? {
+                id: 'submit',
+                label: submitting ? 'Submitting…' : 'Submit',
+                icon: Send,
+                onClick: () => void submit(),
+                disabled: submitting,
+              }
+            : undefined
+
   return (
-    <OperationalPageShell
+    <PurchaseCardFormShell
       title={pr.documentNumber}
-      description={`${purchaseRequisitionApprovalStatusLabel(pr.status)} · ${PURCHASE_REQUISITION_SOURCE_LABELS[pr.source]}`}
-      badge="Purchase"
-      variant="dynamics"
+      description={`${PURCHASE_REQUISITION_SOURCE_LABELS[pr.source]} · ${pr.location.name}`}
+      recordNo={pr.documentNumber}
+      status={statusLabel}
+      statusTone={purchaseStatusTone(pr.status)}
+      statusKey={pr.status}
+      company={pr.department || pr.requester.name}
       favoritePath={`/purchase/requisitions/${pr.id}`}
+      breadcrumbs={[
+        { label: 'Purchase', to: '/purchase' },
+        { label: 'Requisitions', to: '/purchase/requisitions' },
+        { label: pr.documentNumber },
+      ]}
+      backLink={{ to: '/purchase/requisitions', label: 'Back to Requisitions' }}
+      createdBy={pr.createdBy}
+      createdDate={formatDate(pr.createdAt.slice(0, 10))}
+      modifiedBy={pr.updatedBy ?? undefined}
+      modifiedDate={pr.updatedAt ? formatDate(pr.updatedAt.slice(0, 10)) : undefined}
+      recordHeaderFacts={headerFacts}
+      factBox={documentFactBox}
+      collapsibleFactBox
       commandBar={
         <ErpCommandBar
           inline
           sticky={false}
+          collapseSecondaryOnNarrow={false}
+          primaryAction={primaryAction}
           secondaryActions={[
-            ...(canEdit && mode === 'view' && perms.canEditRequisition
-              ? [
-                  {
-                    id: 'edit',
-                    label: 'Edit',
-                    icon: Pencil,
-                    onClick: () => navigate(`/purchase/requisitions/${pr.id}/edit`),
-                  },
-                ]
-              : []),
-            ...(showCreateRfq
-              ? [
-                  {
-                    id: 'rfq',
-                    label: converting ? 'Creating…' : 'Create RFQ',
-                    icon: ShoppingCart,
-                    onClick: () => void createRfq(),
-                    disabled: converting,
-                  },
-                ]
-              : []),
-            ...(showViewRfq
-              ? [
-                  {
-                    id: 'view-rfq',
-                    label: 'View RFQ',
-                    icon: ShoppingCart,
-                    onClick: () => navigate(`/purchase/rfqs/${pr.convertedRfqId}`),
-                  },
-                ]
-              : []),
-            ...(showViewPlanning
-              ? [
-                  {
-                    id: 'view-planning',
-                    label: 'View Planning Items',
-                    icon: ClipboardList,
-                    onClick: () => navigate(purchasePlanningSheetHrefForPr(pr.documentNumber)),
-                  },
-                ]
-              : []),
+            {
+              id: 'edit',
+              label: 'Edit',
+              icon: Pencil,
+              pin: true,
+              onClick: () => navigate(`/purchase/requisitions/${pr.id}/edit`),
+              hidden: !(canEdit && mode === 'view' && perms.canEditRequisition),
+            },
+            {
+              id: 'rfq-sec',
+              label: converting ? 'Creating…' : 'Create RFQ',
+              icon: ShoppingCart,
+              onClick: () => void createRfq(),
+              disabled: converting,
+              hidden: !showCreateRfq || Boolean(primaryAction && primaryAction.id === 'rfq'),
+            },
+            {
+              id: 'view-rfq',
+              label: 'View RFQ',
+              icon: ShoppingCart,
+              onClick: () => navigate(`/purchase/rfqs/${pr.convertedRfqId}`),
+              hidden: !showViewRfq,
+            },
+            {
+              id: 'view-planning-sec',
+              label: 'View Planning Items',
+              icon: ClipboardList,
+              onClick: () => navigate(purchasePlanningSheetHrefForPr(pr.documentNumber)),
+              hidden:
+                !showViewPlanning ||
+                Boolean(primaryAction && primaryAction.id === 'view-planning'),
+            },
             {
               id: 'print',
               label: 'Print',
               icon: Printer,
+              pin: true,
               onClick: () => window.print(),
             },
           ]}
-          primaryAction={
-            mode === 'edit' && canEdit && perms.canEditRequisition
-              ? {
-                  id: 'save',
-                  label: saving ? 'Saving…' : 'Save',
-                  onClick: () => void save(),
-                }
-              : mode === 'view' && pr.status === 'draft' && perms.canSubmitRequisition
-                ? {
-                    id: 'submit',
-                    label: submitting ? 'Submitting…' : 'Submit',
-                    icon: Send,
-                    onClick: () => void submit(),
-                    disabled: submitting,
-                  }
-              : undefined
-          }
         />
       }
+      footer={null}
+      stickyFooter={false}
+      detailMode
     >
-      <div className="space-y-4">
-        <PurchaseRequisitionPathBanner rfqRequired={pr.rfqRequired} />
+      <div className="space-y-3">
+        <PurchaseRequisitionWorkflowStrip
+          status={pr.status}
+          rfqRequired={pr.rfqRequired}
+          purpose="Purchase requisitions — request, approve, then source via RFQ or direct planning."
+          nextActionContext={{
+            canSubmit: canSubmitDraft,
+            canCreateRfq: showCreateRfq,
+            canOpenPlanning: showViewPlanning,
+          }}
+        />
 
-        <div className="erp-page-panel grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ErpCardSection title="General" subtitle="Identity, requester, and process path" defaultOpen>
           <ErpViewField label="PR Number" value={pr.documentNumber} />
           <ErpViewField label="Requisition Date" value={formatDate(pr.documentDate)} />
-          <ErpViewField label="Status" value={purchaseRequisitionApprovalStatusLabel(pr.status)} />
+          <ErpViewField
+            label="Status"
+            value={<StatusDot label={statusLabel} tone={statusToneFromLabel(pr.status)} />}
+          />
           <ErpViewField
             label="Department"
             value={
@@ -307,10 +422,9 @@ export function PurchaseRequisitionDomainDetailPage({
                   className="erp-input h-9 w-full text-[13px]"
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
-                  disabled={readOnly && mode !== 'edit'}
                 />
               ) : (
-                pr.department
+                pr.department || '—'
               )
             }
           />
@@ -318,6 +432,7 @@ export function PurchaseRequisitionDomainDetailPage({
           <ErpViewField label="Required By Date" value={requiredBy ? formatDate(requiredBy) : '—'} />
           <ErpViewField label="Warehouse" value={pr.location.name} />
           <ErpViewField label="Priority" value={PURCHASE_REQUISITION_PRIORITY_LABELS[pr.priority]} />
+          <ErpViewField label="Source" value={PURCHASE_REQUISITION_SOURCE_LABELS[pr.source]} />
           <ErpViewField
             label="RFQ Required?"
             value={
@@ -328,17 +443,7 @@ export function PurchaseRequisitionDomainDetailPage({
           />
           <ErpViewField label="Process path" value={prProcurementPathLabel(pr)} />
           <ErpViewField label="Estimated Value" value={formatCurrency(pr.totalAmount)} />
-          <ErpViewField label="Purchase Purpose" value={pr.purpose || '—'} />
-          {showViewPlanning ? (
-            <ErpViewField
-              label="Next step"
-              value={
-                <span className="font-semibold text-emerald-700">
-                  Ready for Purchase Planning Sheet — use View Planning Items above
-                </span>
-              }
-            />
-          ) : null}
+          <ErpViewField label="Purchase Purpose" value={pr.purpose || '—'} colSpan={3} />
           <ErpViewField
             label="Linked RFQ"
             value={
@@ -359,13 +464,14 @@ export function PurchaseRequisitionDomainDetailPage({
               )
             }
           />
-        </div>
+        </ErpCardSection>
 
-        <div className="erp-page-panel p-4">
-          <h3 className="mb-1 text-[13px] font-semibold text-erp-text">Item Details</h3>
-          <p className="mb-3 text-[12px] text-erp-muted">
-            Item code, name, qty, rate, preferred vendor, warehouse, BIN, and need-by date.
-          </p>
+        <ErpCardSection
+          title="Item Lines"
+          subtitle={`${pr.lines.length} line${pr.lines.length === 1 ? '' : 's'} · ${formatCurrency(pr.totalAmount)}`}
+          columns={1}
+          defaultOpen
+        >
           <PurchaseRequisitionLinesTable
             lines={worksheetLines}
             catalogItems={[]}
@@ -376,42 +482,53 @@ export function PurchaseRequisitionDomainDetailPage({
             formatCurrency={formatCurrency}
             estimatedTotal={pr.totalAmount}
           />
-        </div>
+        </ErpCardSection>
 
-        <div className="erp-page-panel space-y-2 p-4">
-          <label className="text-[12px] font-medium text-erp-muted">Remarks</label>
+        <ErpCardSection title="Remarks" subtitle="Notes and restrictions" collapsible defaultOpen={false}>
           {mode === 'edit' && canEdit ? (
-            <textarea
-              className="erp-input min-h-[80px] w-full text-[13px]"
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
+            <ErpViewField
+              label="Remarks"
+              colSpan={3}
+              value={
+                <textarea
+                  className="erp-input min-h-[80px] w-full text-[13px]"
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                />
+              }
             />
           ) : (
-            <p className="text-[13px] text-erp-text">{pr.remarks || '—'}</p>
+            <ErpViewField label="Remarks" value={pr.remarks || '—'} colSpan={3} />
           )}
           {pr.status === 'cancelled' ? (
-            <Badge color="red">Cancelled — read-only</Badge>
+            <div className="col-span-full">
+              <Badge color="red">Cancelled — read-only</Badge>
+            </div>
           ) : null}
           {pr.status === 'pending_approval' ? (
-            <Badge color="orange">Pending approval — requester cannot edit</Badge>
+            <div className="col-span-full">
+              <Badge color="orange">Pending approval — requester cannot edit</Badge>
+            </div>
           ) : null}
-        </div>
+        </ErpCardSection>
 
-        <PurchaseAuditTimeline
-          entityType="purchase-requisition"
-          entityId={pr.id}
-          title="Audit Timeline"
-          demoEvents={buildDemoPurchaseTimeline({
-            entityId: pr.id,
-            entityType: 'PurchaseRequisition',
-            createdAt: pr.createdAt,
-            createdBy: pr.createdBy,
-            updatedAt: pr.updatedAt,
-            updatedBy: pr.updatedBy,
-            statusLabel: PURCHASE_REQUISITION_STATUS_LABELS[pr.status],
-          })}
-        />
+        <ErpCardSection title="Audit" subtitle="Lifecycle history" columns={1} collapsible defaultOpen={false}>
+          <PurchaseAuditTimeline
+            entityType="purchase-requisition"
+            entityId={pr.id}
+            title="Audit Timeline"
+            demoEvents={buildDemoPurchaseTimeline({
+              entityId: pr.id,
+              entityType: 'PurchaseRequisition',
+              createdAt: pr.createdAt,
+              createdBy: pr.createdBy,
+              updatedAt: pr.updatedAt,
+              updatedBy: pr.updatedBy,
+              statusLabel: PURCHASE_REQUISITION_STATUS_LABELS[pr.status],
+            })}
+          />
+        </ErpCardSection>
       </div>
-    </OperationalPageShell>
+    </PurchaseCardFormShell>
   )
 }

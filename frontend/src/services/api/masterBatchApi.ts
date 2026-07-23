@@ -70,6 +70,13 @@ export interface ItemDto {
   reorderLevel: number | string
   reorderQty: number | string
   standardRate: number | string
+  defaultSalesRate?: number | string
+  salesDescription?: string | null
+  salesUomId?: string | null
+  salesLeadDays?: number
+  salesAllowed?: boolean
+  defaultFulfilmentMethod?: string
+  productionAllowed?: boolean
   isPurchasable: boolean
   isStockable: boolean
   isBlocked: boolean
@@ -133,6 +140,11 @@ export interface ItemLookupRow {
   hsnId?: string | null
   gstGroupId?: string | null
   standardRate?: number | string
+  defaultSalesRate?: number | string
+  salesAllowed?: boolean
+  defaultFulfilmentMethod?: string
+  salesUomId?: string | null
+  salesLeadDays?: number
   status: 'ACTIVE' | 'INACTIVE'
 }
 
@@ -175,6 +187,9 @@ export function mapCategoryDto(row: MasterRecordDto): ItemCategory {
     parentId: row.parentId ?? null,
     level: row.level ?? 1,
     defaultWarehouseId: row.defaultWarehouseId ?? null,
+    stockPolicy: (row.stockPolicy as ItemCategory['stockPolicy']) ?? 'REQUIRED',
+    defaultIsStockable: row.defaultIsStockable ?? true,
+    defaultInventoryType: (row.defaultInventoryType as ItemCategory['defaultInventoryType']) ?? 'inventory',
     isActive: row.status === 'ACTIVE',
     createdAt: row.createdAt,
   }
@@ -216,6 +231,7 @@ export function mapGstRateDto(row: MasterRecordDto): GstRate {
     sgst: num(row.sgst),
     cgst: num(row.cgst),
     igst: num(row.igst),
+    applicableFor: (row.applicableFor as GstRate['applicableFor']) || 'BOTH',
     isActive: row.status === 'ACTIVE',
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -242,6 +258,13 @@ export function mapItemDto(row: ItemDto): Item {
     reorderLevel: num(row.reorderLevel),
     reorderQty: num(row.reorderQty),
     standardRate: num(row.standardRate),
+    defaultSalesRate: num(row.defaultSalesRate ?? 0),
+    salesDescription: row.salesDescription ?? null,
+    salesUomId: row.salesUomId ?? null,
+    salesLeadDays: row.salesLeadDays ?? 0,
+    salesAllowed: row.salesAllowed ?? false,
+    defaultFulfilmentMethod: (row.defaultFulfilmentMethod ?? 'MANUAL') as Item['defaultFulfilmentMethod'],
+    productionAllowed: row.productionAllowed ?? false,
     isPurchasable: row.isPurchasable,
     isStockable: row.isStockable,
     isBlocked: row.isBlocked,
@@ -296,13 +319,29 @@ export function mapVendorDto(row: VendorDto): Vendor {
   }
 }
 
-export function categoryToApiPayload(data: Pick<ItemCategory, 'categoryCode' | 'categoryName' | 'parentId' | 'level' | 'defaultWarehouseId' | 'isActive'>) {
+export function categoryToApiPayload(
+  data: Pick<
+    ItemCategory,
+    | 'categoryCode'
+    | 'categoryName'
+    | 'parentId'
+    | 'level'
+    | 'defaultWarehouseId'
+    | 'stockPolicy'
+    | 'defaultIsStockable'
+    | 'defaultInventoryType'
+    | 'isActive'
+  >,
+) {
   return {
     code: data.categoryCode.trim(),
     name: data.categoryName.trim(),
     parentId: data.parentId || null,
     level: data.level,
     defaultWarehouseId: data.defaultWarehouseId || null,
+    stockPolicy: data.stockPolicy ?? 'REQUIRED',
+    defaultIsStockable: data.defaultIsStockable ?? true,
+    defaultInventoryType: data.defaultInventoryType ?? 'inventory',
     status: toStatus(data.isActive),
   }
 }
@@ -325,7 +364,22 @@ export function gstGroupToApiPayload(data: Pick<GstGroupCode, 'code' | 'goodsTyp
   }
 }
 
-export function gstRateToApiPayload(data: Pick<GstRate, 'code' | 'gstGroupId' | 'fromState' | 'locationStateCode' | 'dateFrom' | 'dateTo' | 'sgst' | 'cgst' | 'igst' | 'isActive'>) {
+export function gstRateToApiPayload(
+  data: Pick<
+    GstRate,
+    | 'code'
+    | 'gstGroupId'
+    | 'fromState'
+    | 'locationStateCode'
+    | 'dateFrom'
+    | 'dateTo'
+    | 'sgst'
+    | 'cgst'
+    | 'igst'
+    | 'applicableFor'
+    | 'isActive'
+  >,
+) {
   return {
     code: data.code.trim(),
     gstGroupId: data.gstGroupId,
@@ -336,6 +390,7 @@ export function gstRateToApiPayload(data: Pick<GstRate, 'code' | 'gstGroupId' | 
     sgst: data.sgst,
     cgst: data.cgst,
     igst: data.igst,
+    applicableFor: data.applicableFor ?? 'BOTH',
     status: toStatus(data.isActive),
   }
 }
@@ -359,6 +414,13 @@ export function itemToApiPayload(data: Item): Record<string, unknown> {
     reorderLevel: data.reorderLevel,
     reorderQty: data.reorderQty,
     standardRate: data.standardRate,
+    defaultSalesRate: data.defaultSalesRate ?? 0,
+    salesDescription: data.salesDescription?.trim() || null,
+    salesUomId: data.salesUomId || null,
+    salesLeadDays: data.salesLeadDays ?? 0,
+    salesAllowed: data.salesAllowed ?? false,
+    defaultFulfilmentMethod: data.defaultFulfilmentMethod ?? 'MANUAL',
+    productionAllowed: data.productionAllowed ?? false,
     isPurchasable: data.isPurchasable,
     isStockable: data.isStockable,
     isBlocked: data.isBlocked ?? false,
@@ -436,6 +498,7 @@ export async function searchItemLookups(params: {
   search?: string
   itemType?: string
   itemTypes?: string[]
+  salesAllowed?: boolean
   activeOnly?: boolean
   page?: number
   limit?: number
@@ -451,6 +514,7 @@ export async function searchItemLookups(params: {
         search: params.search,
         itemType: itemTypesCsv ? undefined : params.itemType,
         itemTypes: itemTypesCsv,
+        salesAllowed: params.salesAllowed,
         activeOnly,
         page: params.page ?? 1,
         limit: params.limit ?? 25,
@@ -468,6 +532,7 @@ export async function searchItemLookups(params: {
         search: params.search,
         itemType: itemTypesCsv ? undefined : params.itemType,
         itemTypes: itemTypesCsv,
+        salesAllowed: params.salesAllowed,
         activeOnly,
         page,
         limit: pageSize,

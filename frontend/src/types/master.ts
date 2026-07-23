@@ -23,7 +23,7 @@ export {
 } from './taxMaster'
 
 export type UomType = 'integer' | 'weight' | 'length' | 'volume'
-export type ItemType = 'raw' | 'bought_out' | 'consumable' | 'sub_assembly' | 'finished_good'
+export type ItemType = 'raw' | 'bought_out' | 'consumable' | 'sub_assembly' | 'finished_good' | 'scrap' | 'service'
 /** Sub-assembly planning rule — applies when itemType = sub_assembly */
 export type SubAssemblyRule = 'phantom' | 'manufactured' | 'purchased' | 'subcontracted'
 export type CustomerType = 'corporate' | 'dealer' | 'government'
@@ -76,6 +76,7 @@ export type WarehouseType =
   | 'scrap'
   | 'transit'
   | 'dispatch'
+  | 'job_work'
 export type ProductType =
   | 'bulker'
   | 'iso_tank'
@@ -211,6 +212,10 @@ export interface ItemCategory extends MasterRecordAudit {
   parentId: string | null
   level: number
   defaultWarehouseId: string | null
+  /** REQUIRED | OPTIONAL | FORBIDDEN — drives item stockability on create. */
+  stockPolicy?: 'REQUIRED' | 'OPTIONAL' | 'FORBIDDEN'
+  defaultIsStockable?: boolean
+  defaultInventoryType?: InventoryPostingType
   isActive: boolean
   createdAt: string
 }
@@ -236,6 +241,14 @@ export interface Item extends MasterRecordAudit {
   reorderLevel: number
   reorderQty: number
   standardRate: number
+  /** Interim CRM sales price — do not use standardRate as sales SoT. */
+  defaultSalesRate?: number
+  salesDescription?: string | null
+  salesUomId?: string | null
+  salesLeadDays?: number
+  salesAllowed?: boolean
+  defaultFulfilmentMethod?: ItemSalesFulfilmentMethod
+  productionAllowed?: boolean
   isPurchasable: boolean
   isStockable: boolean
   isBlocked?: boolean
@@ -258,6 +271,14 @@ export interface Item extends MasterRecordAudit {
   createdAt: string
   updatedAt: string
 }
+
+export type ItemSalesFulfilmentMethod =
+  | 'STOCK'
+  | 'PURCHASE'
+  | 'PRODUCTION'
+  | 'SUBCONTRACT'
+  | 'SERVICE'
+  | 'MANUAL'
 
 export interface Customer extends MasterRecordAudit {
   id: string

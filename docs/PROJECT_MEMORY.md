@@ -1,6 +1,6 @@
 # FOS ERP — Project Memory
 
-> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-22** (Mfg/Inventory accounting API pilot; Fixed Assets Phase 4; Purchase Setup + Dispatch 7C0–7C4). Next Manufacturing (approval): **7C5 hardened posting** — do not auto-start.
+> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-23** (CRM Item Phase 2; Dispatch **7C0–7C5** controlled UAT; Bank & Cash **live API for internal UAT / controlled pilot** — AIS/FX/intercompany deferred; Fuel Tank mfg master; Fixed Assets Phase 4). Next: CRM Item Phase 3 (`itemId` shapes) — do not switch CRM Product pickers until Phases 3–5.
 
 ---
 
@@ -14,8 +14,8 @@
 | **Architecture** | React SPA + Node.js/Express API + MySQL 8 |
 | **Tenancy** | Multi-tenant SaaS — shared database, shared schema |
 | **Tenant scope** | Every tenant-owned record scoped by `tenantId` |
-| **Current backend scope** | Auth, RBAC, CRM, masters; finance (Phase 1–5D Bank & Cash, Budgeting Phase 1, Fixed Assets 1–4, AR/AP through credit-note allocation); manufacturing 1–2B + **materials 3C** + **7A** + planning/costing/accounting 6B–7E + **live multilevel BOM combined-CSV import**; inventory 3A + inventory accounting events; **Purchase** PR + Planning + RFQ/VQ/comparison/award→PO + GRN + Setup full persistence + Invoice/QI/Return; **quality 4A/4B**; **Dispatch 7C0–7C4** (fulfilment + workbench + reservation/pick + packing + Delivery Challan document-only) |
-| **Deferred backend** | **7C5 hardened posting**; incoming GRN QC; **AIS / cron (5D4)**; FX treasury, intercompany, cheque print; GST portal filing / live NIC; FA physical verification API; Budgeting Phase 2+; SO MRP beyond Phase 1 |
+| **Current backend scope** | Auth, RBAC, CRM, masters; finance (Phase 1–**5D Bank & Cash** live API for internal UAT / controlled pilot — AIS/FX/intercompany deferred; Budgeting Phase 1, Fixed Assets 1–4, AR/AP through credit-note allocation); manufacturing 1–2B + **materials 3C** + **7A** + planning/costing/accounting 6B–7E + **live multilevel BOM combined-CSV import**; inventory 3A + inventory accounting events; **Purchase** PR + Planning + RFQ/VQ/comparison/award→PO + GRN + Setup full persistence + Invoice/QI/Return; **quality 4A/4B**; **Dispatch 7C0–7C5** (fulfilment + workbench + reservation/pick + packing + Delivery Challan document-only + **hardened posting** via `DispatchPostingService`) |
+| **Deferred backend** | Dispatch client production hardening (manual UAT sign-off); Bank & Cash **AIS / cron (5D4)**, **FX**, **intercompany**; cheque print; **live NIC** GST portal (e-invoice / e-Way currently **SIMULATED** adapter); FA physical verification API; Budgeting Phase 2+; SO MRP beyond Phase 1 |
 
 ---
 
@@ -207,6 +207,7 @@ AR/AP invoices reuse the **real** masters — never parallel finance copies:
 | `docs/REMAINING_WORK.md` | Prioritized backlog |
 | `docs/MASTER_REGISTRY.md` | Canonical master routes, aliases, dual-source warnings |
 | `docs/ui/production/MANUFACTURING_FORM_DESIGN_STANDARD.md` | Manufacturing form UX standard (CRM-aligned shell, readiness, posting drawers) |
+| `docs/manufacturing/examples/FUEL_TANK_MASTER_SETUP.md` | 5000 L Fuel Tank live BOM/Route/Profile/WO UAT example |
 | `docs/ui/production/MANUFACTURING_FORM_INFORMATION_MATRIX.md` | Per-form 10-point information scores (before/after) |
 | `docs/accounting/AP_ARCHITECTURE.md` | AP vendor invoice / payable open-item design |
 | `docs/accounting/AP_STATUS.md` | AP phase checklist and status |

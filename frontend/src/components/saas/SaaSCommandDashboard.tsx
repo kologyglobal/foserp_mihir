@@ -46,13 +46,13 @@ export function SaaSCommandDashboard({
 
   const heroKpis: SaaSKpiCardProps[] = [
     { label: 'Order book', value: formatMetricCurrency(a.orderBookValue), helper: `${a.orderBookCount} open orders`, href: '/sales/orders' },
-    { label: 'WIP value', value: formatMetricCurrency(a.wipValue), helper: `${a.runningWorkOrders} WOs running`, href: '/work-orders' },
+    { label: 'WIP value', value: formatMetricCurrency(a.wipValue), helper: `${a.runningWorkOrders} WOs running`, href: '/manufacturing/work-orders' },
     { label: 'Dispatch ready', value: formatMetricCurrency(a.dispatchReadyValue), helper: `${a.dispatchReadyCount} ready to load`, href: '/dispatch/register' },
-    { label: 'Invoiced YTD', value: formatMetricCurrency(a.invoicedYtd), helper: 'Revenue posted this FY', href: '/invoices/register' },
-    { label: 'Outstanding AR', value: formatMetricCurrency(a.outstandingAr), helper: a.overdueCount > 0 ? `${a.overdueCount} overdue` : 'Collections on track', href: '/invoices/register' },
-    { label: 'Delayed orders', value: a.delayedOrders, helper: a.delayedOrders ? 'Late SO / delivery risk' : 'On-time delivery healthy', href: '/reports/sales/open-orders' },
+    { label: 'Invoiced YTD', value: formatMetricCurrency(a.invoicedYtd), helper: 'Revenue posted this FY', href: '/accounting/money-in/invoices' },
+    { label: 'Outstanding AR', value: formatMetricCurrency(a.outstandingAr), helper: a.overdueCount > 0 ? `${a.overdueCount} overdue` : 'Collections on track', href: '/accounting/money-in/invoices' },
+    { label: 'Delayed orders', value: a.delayedOrders, helper: a.delayedOrders ? 'Late SO / delivery risk' : 'On-time delivery healthy', href: '/sales/orders' },
     { label: 'Open NCR', value: a.openNcr, helper: a.openNcr ? 'Quality review needed' : `First-pass yield ${a.firstPassYieldPct}%`, href: '/quality/ncr' },
-    { label: 'Pending approvals', value: a.pendingApprovals, helper: 'Awaiting sign-off', href: '/home/approvals' },
+    { label: 'Pending approvals', value: a.pendingApprovals, helper: 'Awaiting sign-off', href: '/purchase/approvals' },
   ]
 
   return (

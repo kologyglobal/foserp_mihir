@@ -88,9 +88,9 @@ export function Bom360Page() {
       badge="BOM 360"
       title={bom.description}
       subtitle={`${bom.bomNo} · Rev ${bom.revision}`}
-      backTo="/masters/bom"
-      backLabel="BOM Master"
-      editTo={bom.status === 'draft' ? `/masters/bom/${bom.id}/edit` : `/masters/bom/${bom.id}/manage`}
+      backTo="/manufacturing/setup/boms"
+      backLabel="BOMs"
+      editTo={`/manufacturing/setup/boms`}
       editLabel={bom.status === 'draft' ? 'Edit BOM' : 'Manage BOM'}
       favoritePath={bom360Path(bom.id)}
       insights={[
@@ -104,8 +104,8 @@ export function Bom360Page() {
       commandBar={
         <CommandBar>
           <CommandBarGroup label="BOM Actions">
-            <CommandBarButton icon={GitBranch} label="Revise BOM" onClick={() => navigate(`/masters/bom/${bom.id}/manage`)} primary />
-            <CommandBarButton icon={GitCompare} label="Compare Revision" onClick={() => navigate(`/masters/bom/${bom.id}/manage`)} />
+            <CommandBarButton icon={GitBranch} label="Revise BOM" onClick={() => navigate(`/manufacturing/setup/boms`)} primary />
+            <CommandBarButton icon={GitCompare} label="Compare Revision" onClick={() => navigate(`/manufacturing/setup/boms`)} />
             <CommandBarButton icon={Download} label="Export BOM" onClick={handleExport} />
             <CommandBarButton icon={Printer} label="Print BOM" onClick={() => window.print()} />
             <CommandBarButton icon={Layers} label="View Product" onClick={() => product && navigate(`/masters/products/${product.id}`)} />
@@ -129,10 +129,10 @@ export function Bom360Page() {
       activity={data.activity}
       quickActions={
         <QuickActions actions={[
-          { label: 'Manage Structure', onClick: () => navigate(`/masters/bom/${bom.id}/manage`) },
-          { label: 'MRP Workbench', onClick: () => navigate('/mrp/workbench') },
-          { label: 'WO Register', onClick: () => navigate('/work-orders') },
-          { label: 'Costing', onClick: () => navigate('/costing') },
+          { label: 'Manage Structure', onClick: () => navigate(`/manufacturing/setup/boms`) },
+          { label: 'Production Plan', onClick: () => navigate('/manufacturing/production-plan') },
+          { label: 'WO Register', onClick: () => navigate('/manufacturing/work-orders') },
+          { label: 'Costing', onClick: () => navigate('/accounting/manufacturing') },
         ]} />
       }
       factBoxes={
@@ -249,22 +249,22 @@ export function Bom360Page() {
                 { accessorKey: 'woNo', header: 'WO', cell: ({ row }) => <TableLink to={`/work-orders/${row.original.id}`}>{row.original.woNo}</TableLink> },
                 { accessorKey: 'qty', header: 'Qty' },
                 { accessorKey: 'status', header: 'Status', cell: ({ row }) => <StatusBadge status={row.original.status} /> },
-                { id: 'wo360', header: '', cell: ({ row }) => <TableLink to={`/work-orders/${row.original.id}/360`}>WO 360</TableLink> },
+                { id: 'wo360', header: '', cell: ({ row }) => <TableLink to={`/manufacturing/work-orders/${row.original.id}`}>WO</TableLink> },
               ]}
               compact
               emptyMessage="No open work orders pegged to this BOM."
             />
           </Entity360Panel>
-          <Entity360Panel title="Recent MRP Runs">
+          <Entity360Panel title="Recent Production Plans">
             <DataGrid
               data={data.mrpRunsUsing}
               columns={[
-                { accessorKey: 'runNo', header: 'Run', cell: ({ row }) => <TableLink to={`/mrp/runs/${row.original.id}`}>{row.original.runNo}</TableLink> },
+                { accessorKey: 'runNo', header: 'Run', cell: ({ row }) => <TableLink to="/manufacturing/production-plan">{row.original.runNo}</TableLink> },
                 { accessorKey: 'runBy', header: 'Run By' },
                 { accessorKey: 'runAt', header: 'Date', cell: ({ row }) => formatDate(row.original.runAt.slice(0, 10)) },
               ]}
               compact
-              emptyMessage="No MRP runs reference BOM components yet."
+              emptyMessage="No planning runs reference BOM components yet."
             />
           </Entity360Panel>
         </div>

@@ -94,7 +94,7 @@ export function CrmLeadsTable({
   emptyAction,
   hasActiveFilters,
   onClearFilters,
-  showCompactSearch = true,
+  showCompactSearch = false,
   selectable = true,
   enableColumnSorting = false,
   registerFilter,

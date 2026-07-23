@@ -15,6 +15,7 @@ export type PermissionModule =
   | 'reports'
   | 'traceability'
   | 'settings'
+  | 'organisation'
 
 export type PermissionAction =
   | 'view'
@@ -56,25 +57,19 @@ function mod(module: PermissionModule, actions: PermissionAction[]): PermissionK
 /** Route prefix → required view permission (longest match wins) */
 export const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: PermissionKey; pageName: string }> = [
   { prefix: '/admin', permission: 'settings.view', pageName: 'Administration' },
-  { prefix: '/masters/approval-workflows', permission: 'approval.view', pageName: 'Approval Workflow' },
-  { prefix: '/masters/approval-matrix', permission: 'approval.view', pageName: 'Approval Workflow' },
   { prefix: '/masters/role-permissions', permission: 'settings.view', pageName: 'Role Permission Matrix' },
   { prefix: '/masters/permissions', permission: 'settings.view', pageName: 'Role Permission Matrix' },
   { prefix: '/masters/roles', permission: 'settings.view', pageName: 'Role Master' },
-  { prefix: '/settings/approval-matrix', permission: 'approval.view', pageName: 'Approval Workflow' },
+  { prefix: '/settings/organisation', permission: 'organisation.view', pageName: 'Organisation Setup' },
   { prefix: '/settings/permissions', permission: 'settings.view', pageName: 'Role Permission Matrix' },
   { prefix: '/settings/roles', permission: 'settings.view', pageName: 'Role Master' },
   { prefix: '/settings', permission: 'settings.view', pageName: 'Settings' },
-  { prefix: '/approvals', permission: 'approval.view', pageName: 'My Approvals' },
-  { prefix: '/masters/serial-numbers', permission: 'masters.view', pageName: 'Serial Numbers' },
   { prefix: '/masters', permission: 'masters.view', pageName: 'Masters' },
-  { prefix: '/engineering', permission: 'engineering.view', pageName: 'Engineering' },
   { prefix: '/purchase', permission: 'purchase.view', pageName: 'Purchase' },
   { prefix: '/inventory', permission: 'inventory.view', pageName: 'Inventory' },
   { prefix: '/manufacturing', permission: 'production.view', pageName: 'Manufacturing & Production' },
   { prefix: '/work-orders', permission: 'production.view', pageName: 'Work Orders' },
   { prefix: '/job-work', permission: 'production.view', pageName: 'Job Work' },
-  { prefix: '/shop-floor', permission: 'production.view', pageName: 'Shop Floor' },
   { prefix: '/production', permission: 'production.view', pageName: 'Production' },
   { prefix: '/quality', permission: 'quality.view', pageName: 'Quality' },
   { prefix: '/logistics', permission: 'dispatch.view', pageName: 'Logistics' },
@@ -84,35 +79,19 @@ export const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: Permissio
   { prefix: '/sales', permission: 'sales.view', pageName: 'Sales' },
   // CRM shell: canRoute uses canAccessCrmShell / JWT crm.*.view — matrix key only for AccessDenied label in demo.
   { prefix: '/crm', permission: 'sales.view', pageName: 'CRM' },
-  { prefix: '/invoice', permission: 'accounts.view', pageName: 'Invoice' },
-  { prefix: '/documents', permission: 'dms.view', pageName: 'Documents' },
   { prefix: '/reports', permission: 'reports.view', pageName: 'Reports' },
-  { prefix: '/serials', permission: 'masters.view', pageName: 'Serial Numbers' },
-  { prefix: '/traceability/trailers', permission: 'traceability.view', pageName: 'Trailer Genealogy' },
-  { prefix: '/traceability/warranty', permission: 'traceability.view', pageName: 'Warranty Investigation' },
-  { prefix: '/traceability/components', permission: 'traceability.view', pageName: 'Component Genealogy' },
-  { prefix: '/traceability', permission: 'traceability.view', pageName: 'Traceability 360' },
-  { prefix: '/genealogy', permission: 'traceability.view', pageName: 'Genealogy' },
   { prefix: '/m/crm', permission: 'sales.view', pageName: 'Mobile CRM' },
-  { prefix: '/m/approvals', permission: 'approval.view', pageName: 'Mobile Approvals' },
   { prefix: '/m/qc', permission: 'quality.view', pageName: 'Mobile QC' },
   { prefix: '/m/ncr', permission: 'quality.view', pageName: 'Mobile NCR' },
   { prefix: '/m/grn', permission: 'purchase.view', pageName: 'Mobile GRN' },
   { prefix: '/m/gate-pass', permission: 'dispatch.view', pageName: 'Mobile Gate Pass' },
   { prefix: '/m/gate', permission: 'dispatch.view', pageName: 'Mobile Gate' },
   { prefix: '/m/dispatch', permission: 'dispatch.view', pageName: 'Mobile Dispatch' },
-  { prefix: '/m/job-work', permission: 'production.view', pageName: 'Mobile Job Work' },
-  { prefix: '/m/job-card', permission: 'production.view', pageName: 'Mobile Job Card' },
   { prefix: '/m/shop-floor', permission: 'production.view', pageName: 'Mobile Shop Floor' },
   { prefix: '/m/material-issue', permission: 'inventory.post', pageName: 'Mobile Material Issue' },
   { prefix: '/m/material-return', permission: 'inventory.post', pageName: 'Mobile Material Return' },
   { prefix: '/m/warehouse-transfer', permission: 'inventory.post', pageName: 'Mobile Warehouse Transfer' },
   { prefix: '/m/stock-count', permission: 'inventory.view', pageName: 'Mobile Stock Count' },
-  { prefix: '/m/scan', permission: 'traceability.view', pageName: 'Mobile Scan' },
-  { prefix: '/scan', permission: 'traceability.view', pageName: 'QR Scanner' },
-  { prefix: '/qr', permission: 'traceability.view', pageName: 'QR Registry' },
-  { prefix: '/mrp', permission: 'production.view', pageName: 'MRP' },
-  { prefix: '/costing', permission: 'accounts.view', pageName: 'Costing' },
   { prefix: '/executive', permission: 'reports.view', pageName: 'Executive Dashboard' },
   { prefix: '/inbox', permission: 'reports.view', pageName: 'Inbox' },
   { prefix: '/home', permission: 'reports.view', pageName: 'Home' },
@@ -309,6 +288,10 @@ export const ROLE_PERMISSION_MATRIX: Record<ErpRole, PermissionKey[] | '*'> = {
 }
 
 export function resolveRoutePermission(pathname: string): PermissionKey | null {
+  // Own profile is available to every authenticated user.
+  if (pathname === '/settings/profile' || pathname.startsWith('/settings/profile/')) {
+    return null
+  }
   const sorted = [...ROUTE_PERMISSION_MAP].sort((a, b) => b.prefix.length - a.prefix.length)
   for (const entry of sorted) {
     if (pathname === entry.prefix || pathname.startsWith(`${entry.prefix}/`)) {
@@ -319,6 +302,9 @@ export function resolveRoutePermission(pathname: string): PermissionKey | null {
 }
 
 export function resolveRoutePageName(pathname: string): string {
+  if (pathname === '/settings/profile' || pathname.startsWith('/settings/profile/')) {
+    return 'My Profile'
+  }
   const sorted = [...ROUTE_PERMISSION_MAP].sort((a, b) => b.prefix.length - a.prefix.length)
   for (const entry of sorted) {
     if (pathname === entry.prefix || pathname.startsWith(`${entry.prefix}/`)) {

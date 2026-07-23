@@ -36,6 +36,11 @@ export interface RecordInventoryAccountingEventInput {
   postingDate?: string
   narration?: string | null
   userId?: string | null
+  /**
+   * Legal Entity that owns the accounting policy (`INVENTORY_ACCOUNTING` flag + mappings).
+   * When omitted, resolves the tenant default active LE.
+   */
+  legalEntityId?: string | null
   /** When false, never call post() even if flag is on (tests / dry). Default true. */
   attemptPost?: boolean
 }
@@ -66,11 +71,23 @@ export async function recordInventoryAccountingEvent(
   const existing = await findEventByIdempotencyKey(tenantId, input.idempotencyKey)
   if (existing) return existing
 
-  const legalEntityId = await resolveInventoryLegalEntityId(tenantId)
+  let legalEntityId = input.legalEntityId ?? null
+  if (legalEntityId) {
+    const owned = await prisma.legalEntity.findFirst({
+      where: { id: legalEntityId, tenantId, isActive: true },
+      select: { id: true },
+    })
+    if (!owned) legalEntityId = null
+  }
+  if (!legalEntityId) {
+    legalEntityId = await resolveInventoryLegalEntityId(tenantId)
+  }
+
   const userId = input.userId ?? req?.context?.userId ?? null
   const qty = toDecimal(input.quantity)
   const amount = toDecimal(input.amount)
   const attemptPost = input.attemptPost !== false
+  // G/L only when this Legal Entity has INVENTORY_ACCOUNTING enabled — never from Dispatch/UI.
   const flagOn = attemptPost && legalEntityId
     ? await isInventoryAccountingEnabled(tenantId, legalEntityId)
     : false
@@ -166,6 +183,8 @@ export interface MovementAccountingOptions {
   narration?: string | null
   userId?: string | null
   attemptPost?: boolean
+  /** LE for feature flag + default-account mappings (central Accounting policy). */
+  legalEntityId?: string | null
 }
 
 /**
@@ -214,6 +233,7 @@ export async function tryRecordInventoryAccountingEventForMovement(
       narration: options.narration ?? `Inventory ${eventType} ${movement.movementNumber}`,
       userId: options.userId ?? null,
       attemptPost: options.attemptPost,
+      legalEntityId: options.legalEntityId ?? null,
       payloadJson: {
         movementId: movement.id,
         movementNumber: movement.movementNumber,

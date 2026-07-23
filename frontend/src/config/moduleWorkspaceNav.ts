@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   categoryIsActive,
   findActiveCategoryId,
+  getNavCategoryById,
   navItemIsActive,
   moduleCategories,
   type NavCategory,
@@ -43,7 +44,7 @@ export function getModuleSubNavForPath(pathname: string): {
 
   const categoryId = findActiveCategoryId(pathname)
   if (!categoryId) return null
-  const category = moduleCategories.find((c) => c.id === categoryId)
+  const category = getNavCategoryById(categoryId)
   if (!category) return null
 
   const base = getCategoryWorkspacePath(category)
@@ -97,7 +98,7 @@ export function getAllModuleSubNavBases(): string[] {
 
 export function findCategoryByPath(pathname: string): NavCategory | null {
   const id = findActiveCategoryId(pathname)
-  return moduleCategories.find((c) => c.id === id) ?? null
+  return (id ? getNavCategoryById(id) : undefined) ?? null
 }
 
 export function pathnameInCategory(pathname: string, category: NavCategory): boolean {

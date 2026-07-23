@@ -35,7 +35,7 @@ function KpiTile({ label, value, to }: { label: string; value: number | string; 
 
 /**
  * Live dispatch reports (API mode) — sourced from the 7C1 requirements
- * workbench and 7C0 outbound register. POD tracking has no backend yet.
+ * workbench and 7C0 outbound register. POD is on posted outbound detail (`DispatchPodPanel`).
  */
 export function ApiDispatchReportsPage() {
   const [summary, setSummary] = useState<DispatchWorkbenchSummary | null>(null)

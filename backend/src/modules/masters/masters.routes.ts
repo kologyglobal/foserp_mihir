@@ -9,6 +9,7 @@ import { NotFoundError } from '../../utils/errors.js'
 import { getMasterResource, masterPermission, MASTER_RESOURCE_SLUGS } from './master.registry.js'
 import { masterResourceParamSchema } from './master.validation.js'
 import * as controller from './master.controller.js'
+import * as taxResolve from './tax-resolve.controller.js'
 
 const router = Router({ mergeParams: true })
 
@@ -44,6 +45,14 @@ function validateMasterListQuery(req: Request, _res: Response, next: NextFunctio
 }
 
 const resourceParams = tenantRouteParamSchema.and(masterResourceParamSchema)
+
+/** Tax master → finance engine resolve (must be registered before /:resource). */
+router.get(
+  '/tax/resolve',
+  requirePermission('master.gst_rate.view'),
+  validateQuery(taxResolve.resolveGstTaxQuerySchema),
+  taxResolve.resolveGstTax,
+)
 
 router.get(
   '/:resource',

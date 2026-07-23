@@ -11,6 +11,28 @@ export const PERMISSIONS = [
   'user.delete',
   'user.assign_role',
 
+  'department.view',
+  'department.create',
+  'department.update',
+  'department.delete',
+
+  'scope.view',
+  'scope.manage',
+
+  'responsibility.view',
+  'responsibility.create',
+  'responsibility.update',
+  'responsibility.delete',
+
+  'access.view',
+  'access.review',
+
+  'security.view',
+  'security.manage',
+
+  'module.view',
+  'module.manage',
+
   'role.view',
   'role.create',
   'role.update',
@@ -264,6 +286,16 @@ export const PERMISSIONS = [
   'finance.approval_rule.manage',
   'finance.activate',
   'finance.audit.view',
+
+  // Organisation foundation setup (aliases + org-specific)
+  'organisation.view',
+  'organisation.create',
+  'organisation.update',
+  'finance.chart_accounts.view',
+  'finance.chart_accounts.create',
+  'finance.account_mapping.manage',
+  'finance.fiscal_year.manage',
+  'finance.posting_period.manage',
 
   // Finance Phase 2A/2B — ledger foundation + internal posting engine
   'finance.voucher.view',
@@ -582,6 +614,13 @@ export const PERMISSIONS = [
   'manufacturing.accounting.view', 'manufacturing.accounting.validate', 'manufacturing.accounting.post',
   'manufacturing.accounting.retry', 'manufacturing.accounting.financial_close',
   'manufacturing.accounting.reconcile',
+  'manufacturing.accounting.readiness',
+  'manufacturing.accounting.reconcile_signoff',
+  'manufacturing.accounting.finance_signoff',
+  'manufacturing.accounting.enable',
+  'manufacturing.accounting.disable',
+  'manufacturing.accounting.failed_events.view',
+  'manufacturing.accounting.failed_events.retry',
   'manufacturing.cost_reports.view', 'manufacturing.cost_reports.export',
   'manufacturing.job_work.view', 'manufacturing.job_work.create', 'manufacturing.job_work.edit',
   'manufacturing.job_work.dispatch', 'manufacturing.job_work.receive',
@@ -651,7 +690,14 @@ export const PERMISSIONS = [
 
   'dispatch.view', 'dispatch.create', 'dispatch.edit', 'dispatch.submit', 'dispatch.approve',
   'dispatch.release', 'dispatch.post', 'dispatch.cancel', 'dispatch.close', 'dispatch.print',
+  'dispatch.pod.view', 'dispatch.pod.record',
   'dispatch.export', 'dispatch.override',
+  // Phase 7C5 — reverse / reconciliation
+  'dispatch.reverse.request',
+  'dispatch.reverse.approve',
+  'dispatch.reverse.apply',
+  'dispatch.reconciliation.view',
+  'dispatch.reconciliation.export',
   // Phase 7C1 — requirements / readiness / draft orders
   'dispatch.requirement.view',
   'dispatch.requirement.synchronise',
@@ -1076,10 +1122,14 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'manufacturing.accounting.view',
     'manufacturing.accounting.validate',
     'manufacturing.accounting.reconcile',
+    'manufacturing.accounting.readiness',
     'manufacturing.cost_reports.view',
   ],
   'Finance Manager': [
     ...FINANCE_PERMISSIONS,
+    'organisation.view',
+    'organisation.create',
+    'organisation.update',
     'purchase.view',
     'purchase.dashboard.view',
     'purchase.po.view',
@@ -1108,6 +1158,12 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'manufacturing.accounting.retry',
     'manufacturing.accounting.financial_close',
     'manufacturing.accounting.reconcile',
+    'manufacturing.accounting.readiness',
+    'manufacturing.accounting.finance_signoff',
+    'manufacturing.accounting.enable',
+    'manufacturing.accounting.disable',
+    'manufacturing.accounting.failed_events.view',
+    'manufacturing.accounting.failed_events.retry',
     'manufacturing.cost_reports.view',
     'manufacturing.cost_reports.export',
   ],
@@ -1158,6 +1214,10 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'master.bin.update',
     'master.bin.delete',
     ...INVENTORY_MODULE_PERMISSIONS,
+    'manufacturing.accounting.view',
+    'manufacturing.accounting.readiness',
+    'manufacturing.accounting.reconcile',
+    'manufacturing.accounting.reconcile_signoff',
     'dispatch.requirement.view',
     'dispatch.readiness.view',
     'dispatch.fulfilment.view',
@@ -1316,7 +1376,13 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'master.warehouse.view',
     'master.location.view',
     'master.bin.view',
-    ...PRODUCTION_PERMISSIONS,
+    // Ops manufacturing only — Finance owns enable / sign-off / failed-event retry.
+    ...PRODUCTION_PERMISSIONS.filter(
+      (p) =>
+        !p.startsWith('manufacturing.accounting.') ||
+        p === 'manufacturing.accounting.view' ||
+        p === 'manufacturing.accounting.readiness',
+    ),
     // Manufacturing QC list/get needs module quality.view (decide can use manufacturing.quality.inspect)
     'quality.view',
     'quality.submit',

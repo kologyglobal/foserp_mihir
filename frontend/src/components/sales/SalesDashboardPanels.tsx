@@ -139,11 +139,11 @@ export function SalesReceivablesPanel({ receivables }: { receivables: Receivable
               <tr
                 key={r.invoiceId}
                 className="dashboard-clickable-row"
-                onClick={() => navigate(`/invoices/register/${r.invoiceId}`)}
+                onClick={() => navigate(`/accounting/money-in/invoices/${r.invoiceId}`)}
                 role="link"
                 tabIndex={0}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') navigate(`/invoices/register/${r.invoiceId}`)
+                  if (e.key === 'Enter') navigate(`/accounting/money-in/invoices/${r.invoiceId}`)
                 }}
               >
                 <td>{r.invoiceNo}</td>
@@ -162,7 +162,7 @@ export function SalesReceivablesPanel({ receivables }: { receivables: Receivable
         </table>
       )}
       <div className="sales-panel-footer">
-        <button type="button" className="sales-inline-action" onClick={() => navigate('/invoices/register')}>
+        <button type="button" className="sales-inline-action" onClick={() => navigate('/accounting/money-in/invoices')}>
           Open invoice register
         </button>
       </div>
@@ -334,14 +334,11 @@ export function SalesBillingSummaryPanel({ metrics }: { metrics: SalesManagement
         </div>
       </div>
       <div className="sales-panel-footer sales-panel-footer-split">
-        <button type="button" className="sales-inline-action" onClick={() => navigate('/invoices/register')}>
-          Invoices
+        <button type="button" className="sales-inline-action" onClick={() => navigate('/accounting/money-in/invoices')}>
+          Money In invoices
         </button>
-        <button type="button" className="sales-inline-action" onClick={() => navigate('/sales/proforma-invoices')}>
-          Proforma invoices
-        </button>
-        <button type="button" className="sales-inline-action" onClick={() => navigate('/reports/sales/open-orders')}>
-          Open orders report
+        <button type="button" className="sales-inline-action" onClick={() => navigate('/sales/orders')}>
+          Sales orders
         </button>
       </div>
     </DynamicsDashboardPanel>

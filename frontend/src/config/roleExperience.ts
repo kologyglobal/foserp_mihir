@@ -22,7 +22,8 @@ import { CONTROL_TOWER_ROUTES } from './controlTowerRoutes'
 export const ROLE_HOME_ROUTES = {
   home: '/home',
   inbox: '/home/inbox',
-  approvals: '/home/approvals',
+  /** Live purchase approvals (demo /home/approvals removed) */
+  approvals: '/purchase/approvals',
 } as const
 
 const CEO: RoleExperienceDefinition = {
@@ -37,8 +38,7 @@ const CEO: RoleExperienceDefinition = {
   shortcuts: [
     { label: 'Executive Dashboard', path: CONTROL_TOWER_ROUTES.executive, icon: BarChart3 },
     { label: 'Unified Inbox', path: ROLE_HOME_ROUTES.inbox, icon: Inbox },
-    { label: 'Approvals', path: ROLE_HOME_ROUTES.approvals, icon: ShieldCheck },
-    { label: 'Reports Hub', path: '/reports', icon: FileText },
+    { label: 'CRM Reports', path: '/reports/crm', icon: FileText },
     { label: 'Sales Orders', path: '/sales/orders', icon: ShoppingCart },
   ],
 }
@@ -55,7 +55,7 @@ const COO: RoleExperienceDefinition = {
   shortcuts: [
     { label: 'Manufacturing', path: '/manufacturing', icon: Factory },
     { label: 'Work Orders', path: '/manufacturing/work-orders', icon: Wrench },
-    { label: 'Planning', path: '/mrp', icon: Gauge },
+    { label: 'Production Plan', path: '/manufacturing/production-plan', icon: Gauge },
     { label: 'Dispatch Register', path: '/dispatch/register', icon: Truck },
     { label: 'Quality Queue', path: '/quality/queue', icon: ShieldCheck },
   ],
@@ -70,10 +70,10 @@ const ENGINEERING: RoleExperienceDefinition = {
   kpiIds: ['submittedBom', 'releasedProducts', 'openEco', 'pendingDrawings', 'routingDraft', 'costOverridePending'],
   shortcuts: [
     { label: 'Product Master', path: '/masters/products', icon: Box },
-    { label: 'BOM Master', path: '/engineering/bom', icon: Layers },
+    { label: 'BOMs', path: '/manufacturing/setup/boms', icon: Layers },
     { label: 'Routing Master', path: '/masters/routing', icon: Factory },
-    { label: 'Document Register', path: '/documents', icon: FileText },
-    { label: 'Approval Workflow', path: '/masters/approval-workflows', icon: ShieldCheck },
+    { label: 'Work Centres', path: '/manufacturing/work-centres', icon: Wrench },
+    { label: 'Manufacturing Setup', path: '/manufacturing/setup', icon: ShieldCheck },
   ],
 }
 
@@ -81,17 +81,17 @@ const PLANNING: RoleExperienceDefinition = {
   role: 'planning',
   title: 'Planning',
   tagline: 'Check material needs, run planning, and see what to buy or make.',
-  deepDashboardPath: '/mrp',
-  deepDashboardLabel: 'Planning',
+  deepDashboardPath: '/manufacturing/production-plan',
+  deepDashboardLabel: 'Production Plan',
   inboxModules: ['Procurement', 'Production', 'Planning'],
   approvalModules: ['Procurement', 'Sales'],
   kpiIds: ['openSo', 'mrpShortages', 'expediteCount', 'delayedPo', 'woMaterialShort', 'activeWo'],
   shortcuts: [
-    { label: 'Planning', path: '/mrp', icon: Gauge },
-    { label: 'Run Planning', path: '/mrp/run', icon: ClipboardList },
-    { label: 'Reservations', path: '/inventory/reservations', icon: Package },
+    { label: 'Production Plan', path: '/manufacturing/production-plan', icon: Gauge },
     { label: 'Sales Orders', path: '/sales/orders', icon: ShoppingCart },
+    { label: 'Reservations', path: '/inventory/reservations', icon: Package },
     { label: 'Work Orders', path: '/manufacturing/work-orders', icon: Wrench },
+    { label: 'Purchase Requisitions', path: '/purchase/requisitions', icon: ClipboardList },
   ],
 }
 
@@ -106,7 +106,7 @@ const PURCHASE: RoleExperienceDefinition = {
     { label: 'Purchase Workspace', path: '/purchase', icon: ShoppingCart },
     { label: 'Purchase Requisitions', path: '/purchase/requisitions', icon: ClipboardList },
     { label: 'Purchase Orders', path: '/purchase/orders', icon: FileText },
-    { label: 'Goods Receipt Notes', path: '/purchase/grns', icon: PackageCheck },
+    { label: 'Goods Receipt Notes', path: '/purchase/grn', icon: PackageCheck },
     { label: 'Request for Quotations', path: '/purchase/rfqs', icon: Truck },
   ],
 }
@@ -141,8 +141,8 @@ const PRODUCTION: RoleExperienceDefinition = {
     { label: 'Manufacturing', path: '/manufacturing', icon: Factory },
     { label: 'Work Orders', path: '/manufacturing/work-orders', icon: FileText },
     { label: 'Production Plan', path: '/manufacturing/production-plan', icon: ClipboardList },
-    { label: 'Shop Floor Queue', path: '/shop-floor', icon: Wrench },
-    { label: 'BOM', path: '/manufacturing/bom', icon: Layers },
+    { label: 'Shopfloor', path: '/manufacturing/shopfloor', icon: Wrench },
+    { label: 'BOMs', path: '/manufacturing/setup/boms', icon: Layers },
   ],
 }
 
@@ -173,8 +173,7 @@ const DISPATCH: RoleExperienceDefinition = {
     { label: 'Dispatch Workspace', path: '/dispatch', icon: Truck },
     { label: 'Dispatch Register', path: '/dispatch/register', icon: ClipboardList },
     { label: 'Plan Dispatch', path: '/dispatch/plan', icon: FileText },
-    { label: 'Pending Dispatch Report', path: '/reports/dispatch/pending-dispatch', icon: BarChart3 },
-    { label: 'Invoices', path: '/invoices', icon: Receipt },
+    { label: 'Money In', path: '/accounting/money-in', icon: Receipt },
   ],
 }
 
@@ -186,10 +185,10 @@ const ACCOUNTS: RoleExperienceDefinition = {
   approvalModules: ['Finance', 'Procurement'],
   kpiIds: ['invoiceValue', 'outstanding', 'paymentPending', 'overdueInvoices', 'costOverridePending', 'dispatchUnbilled'],
   shortcuts: [
-    { label: 'Finance Workspace', path: '/invoices', icon: Receipt },
-    { label: 'Invoice Register', path: '/invoices/register', icon: FileText },
-    { label: 'Costing Dashboard', path: '/costing', icon: BarChart3 },
-    { label: 'Approvals', path: ROLE_HOME_ROUTES.approvals, icon: ShieldCheck },
+    { label: 'Accounting', path: '/accounting', icon: Receipt },
+    { label: 'Money In', path: '/accounting/money-in', icon: FileText },
+    { label: 'Money Out', path: '/accounting/money-out', icon: BarChart3 },
+    { label: 'Journal Approvals', path: '/accounting/entries/approvals', icon: ShieldCheck },
     { label: 'Dispatch Register', path: '/dispatch/register', icon: Truck },
   ],
 }

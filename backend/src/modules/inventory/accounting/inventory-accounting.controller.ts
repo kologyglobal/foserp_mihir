@@ -7,8 +7,15 @@ import { buildPaginationMeta } from '../../../utils/pagination.js'
 import { sendPaginated, sendSuccess } from '../../../utils/response.js'
 import { dec } from '../shared/quantity.helpers.js'
 import * as eventService from './inventory-accounting-event.service.js'
+import {
+  getInventoryAccountingFeatureStatus,
+  putInventoryAccountingFeatureControl,
+} from './inventory-accounting-feature.service.js'
 import { getInventoryAccountingGateStatus } from './inventory-accounting-gate.service.js'
-import type { ListInventoryAccountingEventsQuery } from './inventory-accounting.schemas.js'
+import type {
+  ListInventoryAccountingEventsQuery,
+  PutInventoryAccountingFeatureInput,
+} from './inventory-accounting.schemas.js'
 
 function mapEvent(row: {
   id: string
@@ -55,6 +62,27 @@ export const getGateStatus = asyncHandler(async (req: Request, res: Response) =>
     res,
     'Inventory accounting gate status',
     await getInventoryAccountingGateStatus(getTenantId(req), legalEntityId),
+  )
+})
+
+export const getFeatureStatus = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const legalEntityId = getRouteParam(req, 'legalEntityId')
+  return sendSuccess(
+    res,
+    'Inventory accounting feature status',
+    await getInventoryAccountingFeatureStatus(tenantId, legalEntityId),
+  )
+})
+
+export const putFeatureControl = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const legalEntityId = getRouteParam(req, 'legalEntityId')
+  const body = req.body as PutInventoryAccountingFeatureInput
+  return sendSuccess(
+    res,
+    'Inventory accounting feature updated',
+    await putInventoryAccountingFeatureControl(req, tenantId, legalEntityId, body),
   )
 })
 

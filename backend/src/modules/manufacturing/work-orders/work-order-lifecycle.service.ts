@@ -11,6 +11,7 @@ import { collectQualityBlockers } from '../../quality/shared/blockers.service.js
 import { getFgEligibility } from '../fg-receipts/fg-eligibility.service.js'
 import { postFinishedGoodsReceipt } from '../fg-receipts/fg-receipt.service.js'
 import { getManufacturingSettingsForTenant } from '../settings/manufacturing-settings.service.js'
+import { assertCompleteAllowed } from './close-readiness.service.js'
 
 async function audit(req: Request, tenantId: string, entityId: string, action: string, oldValues: unknown, newValues: unknown) {
   const meta = auditFromRequest(req)
@@ -269,6 +270,10 @@ export async function completeWorkOrder(
       `Cannot complete work order: mandatory stage(s) not completed: ${incomplete.map((s) => s.name).join(', ')}`,
     )
   }
+
+  // Hard close-readiness gates (OPEN_RESERVATIONS, MATERIAL_RECONCILIATION, QUALITY when strict, …).
+  // Soft/WARNING checks do not block; flexibleExecution / allowCloseWithoutQc soften material & QC.
+  await assertCompleteAllowed(tenantId, id)
 
   const qualityBlockers = await collectQualityBlockers(tenantId, id)
   const qualityWarnings: string[] = []

@@ -279,7 +279,7 @@ export function Customer360Page() {
 
   const invoiceColumns = useMemo<ColumnDef<SalesInvoice, unknown>[]>(
     () => [
-      { accessorKey: 'invoiceNo', header: 'Invoice', cell: ({ row }) => <TableLink to={`/invoices/${row.original.id}`}>{row.original.invoiceNo}</TableLink> },
+      { accessorKey: 'invoiceNo', header: 'Invoice', cell: ({ row }) => <TableLink to={`/accounting/money-in/invoices/${row.original.id}`}>{row.original.invoiceNo}</TableLink> },
       { accessorKey: 'gst.grandTotal', header: 'Total', cell: ({ row }) => formatCurrency(row.original.gst.grandTotal) },
       { accessorKey: 'balanceDue', header: 'Balance', cell: ({ row }) => formatCurrency(row.original.balanceDue) },
       { accessorKey: 'paymentStatus', header: 'Payment', cell: ({ row }) => <StatusBadge status={row.original.paymentStatus} /> },

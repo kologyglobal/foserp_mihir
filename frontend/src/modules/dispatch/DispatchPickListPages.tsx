@@ -22,6 +22,8 @@ import { TableLink } from '@/components/ui/AppLink'
 import { DetailSection } from '@/components/masters/MasterLayouts'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { notify } from '@/store/toastStore'
+import { getFulfilmentAutoMode } from '@/modules/manufacturing/ui'
+import { advanceAfterPickComplete } from '@/modules/dispatch/fulfilmentAutoAdvance'
 import {
   completeDispatchPickList,
   getDispatchPickList,
@@ -196,12 +198,15 @@ export function DispatchPickListDetailPage() {
   const navigate = useNavigate()
   const { row, loading, busy, setBusy, reload } = usePickList(id)
 
-  async function act(label: string, fn: () => Promise<unknown>) {
+  async function act(label: string, fn: () => Promise<unknown>, opts?: { afterComplete?: boolean }) {
     setBusy(true)
     try {
       await fn()
       notify.success(label)
       await reload()
+      if (opts?.afterComplete && row?.outboundDispatchId) {
+        await advanceAfterPickComplete(row.outboundDispatchId, navigate)
+      }
     } catch (err) {
       notify.error(err instanceof Error ? err.message : 'Action failed')
     } finally {
@@ -270,7 +275,11 @@ export function DispatchPickListDetailPage() {
               <CommandBarButton
                 icon={CheckCircle2}
                 label="Complete"
-                onClick={() => void act('Pick list completed', () => completeDispatchPickList(id))}
+                onClick={() =>
+                  void act('Pick list completed', () => completeDispatchPickList(id), {
+                    afterComplete: true,
+                  })
+                }
                 disabled={busy}
               />
             ) : null}
@@ -473,7 +482,25 @@ export function DispatchPickListPickModePage() {
         idempotencyKey: `pick-${current.id}-${Date.now()}`,
       })
       notify.success('Pick recorded')
+      const refreshed = await getDispatchPickList(pickListId)
       await reload()
+      const dispatchId = refreshed.outboundDispatchId
+      if (!getFulfilmentAutoMode() || !dispatchId) return
+      const allDone = (refreshed.lines ?? []).every(
+        (l) => l.pickedQuantity + l.shortageQuantity >= l.reservedQuantity - 1e-9,
+      )
+      if (!allDone || refreshed.status === 'PICKED' || refreshed.status === 'CANCELLED') return
+      try {
+        await completeDispatchPickList(pickListId)
+        notify.success('Pick list completed')
+        await advanceAfterPickComplete(dispatchId, navigate)
+      } catch (completeErr) {
+        notify.info(
+          completeErr instanceof Error
+            ? `Lines picked — complete manually (${completeErr.message})`
+            : 'Lines picked — complete the pick list to continue',
+        )
+      }
     } catch (err) {
       notify.error(err instanceof Error ? err.message : 'Pick failed')
     } finally {

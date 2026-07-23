@@ -14,6 +14,11 @@ export const issueMaterialSchema = z.object({
   warehouseId: z.string().uuid().optional(),
   /** When true (or with manufacturing.material.additional_issue), allow issue beyond remaining requirement. */
   additional: z.boolean().optional(),
+  /** Inventory batch/serial allocation — same fields as inventory ISSUE_TO_WO movements. */
+  batchId: z.string().uuid().optional(),
+  batchNumber: z.string().trim().max(64).optional(),
+  serialId: z.string().uuid().optional(),
+  serialNumber: z.string().trim().max(100).optional(),
 })
 
 export const issuePreviewSchema = z.object({
@@ -34,6 +39,11 @@ export const shortageRequisitionSchema = z.object({
   idempotencyKey: z.string().trim().min(1).max(150).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
   submit: z.boolean().default(false),
+  /**
+   * Default false → planning-sheet → PO gold path.
+   * Opt in true → RFQ → comparison → award → PO.
+   */
+  rfqRequired: z.boolean().optional(),
   /** When set, only these material lines are considered for the shortage PR. */
   materialIds: z.array(z.string().uuid()).min(1).optional(),
 })
@@ -41,9 +51,17 @@ export const shortageRequisitionSchema = z.object({
 /** Multi-select shortage PR — one requisition shared across selected material lines (any WO). */
 export const bulkShortageRequisitionSchema = z.object({
   materialIds: z.array(z.string().uuid()).min(1).max(200),
-  idempotencyKey: z.string().trim().min(1).max(150).optional(),
+  // Must stay ≤150 — purchase requisition column + FE must not join all material UUIDs.
+  idempotencyKey: z
+    .string()
+    .trim()
+    .min(1)
+    .max(150, 'idempotencyKey must be at most 150 characters')
+    .optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
   submit: z.boolean().default(false),
+  /** Opt in true for RFQ path; default undefined keeps planning-sheet gold path. */
+  rfqRequired: z.boolean().optional(),
 })
 
 export const releaseReservationSchema = z.object({

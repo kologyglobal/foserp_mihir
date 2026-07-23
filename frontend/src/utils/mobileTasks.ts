@@ -150,7 +150,7 @@ export function buildMobileTasks(role: ExperienceRole): MobileTask[] {
       module: 'Approvals',
       count: approvals.length,
       priority: 'high',
-      path: '/m/approvals',
+      path: '/purchase/approvals',
       actionLabel: 'Review',
     })
   }

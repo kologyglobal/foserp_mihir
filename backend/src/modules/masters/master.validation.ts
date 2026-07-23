@@ -86,6 +86,7 @@ export const WAREHOUSE_TYPES = [
   'scrap',
   'transit',
   'dispatch',
+  'job_work',
 ] as const
 
 export const createWarehouseSchema = z.object({
@@ -133,6 +134,9 @@ export const createItemCategorySchema = z.object({
   parentId: z.string().uuid().nullable().optional(),
   level: z.coerce.number().int().min(1).max(3).default(1),
   defaultWarehouseId: z.string().uuid().nullable().optional(),
+  stockPolicy: z.enum(['REQUIRED', 'OPTIONAL', 'FORBIDDEN']).default('REQUIRED'),
+  defaultIsStockable: z.boolean().default(true),
+  defaultInventoryType: z.enum(['inventory', 'non_inventory', 'service']).default('inventory'),
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
 })
 export const updateItemCategorySchema = createItemCategorySchema.partial()
@@ -163,6 +167,7 @@ const gstRateBaseSchema = z.object({
   sgst: z.coerce.number().min(0).max(100),
   cgst: z.coerce.number().min(0).max(100),
   igst: z.coerce.number().min(0).max(100),
+  applicableFor: z.enum(['SALES', 'PURCHASE', 'BOTH']).default('BOTH'),
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
 })
 

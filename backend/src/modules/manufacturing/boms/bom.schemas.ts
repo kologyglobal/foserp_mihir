@@ -34,6 +34,12 @@ export const createBomSchema = z.object({
   isActive: z.boolean().optional(),
 })
 
+export const updateBomSchema = z.object({
+  name: z.string().trim().min(1).max(300).optional(),
+  description: z.string().trim().max(2000).nullable().optional(),
+  isActive: z.boolean().optional(),
+})
+
 export const listBomVersionsQuerySchema = paginationSchema.extend({
   status: z.enum(['DRAFT', 'ACTIVE', 'INACTIVE', 'SUPERSEDED', 'ARCHIVED']).optional(),
 })
@@ -108,6 +114,7 @@ export const confirmBomImportSchema = previewBomImportSchema.extend({
 
 export type ListBomsQuery = z.infer<typeof listBomsQuerySchema>
 export type CreateBomInput = z.infer<typeof createBomSchema>
+export type UpdateBomInput = z.infer<typeof updateBomSchema>
 export type ListBomVersionsQuery = z.infer<typeof listBomVersionsQuerySchema>
 export type CreateBomVersionInput = z.infer<typeof createBomVersionSchema>
 export type UpdateBomVersionInput = z.infer<typeof updateBomVersionSchema>

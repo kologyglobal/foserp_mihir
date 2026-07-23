@@ -162,7 +162,7 @@ export function SalesCommercialFunnelChart({ funnel }: { funnel: SalesManagement
     if (shortLabel === 'Opportunities') return '/crm/opportunities'
     if (shortLabel === 'Quotations') return '/crm/quotations'
     if (shortLabel === 'Sales Orders') return '/sales/orders'
-    return '/invoices/register'
+    return '/accounting/money-in/invoices'
   }
 
   return (

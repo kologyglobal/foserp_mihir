@@ -84,6 +84,49 @@ export async function getSalesOrderFulfilmentPositions(
     dispatchIdsByLine.set(row.salesOrderLineId, set)
   }
 
+  // Reversed headers leave CONFIRMED filter; surface reversed qty for position display.
+  const reversedLines = await prisma.outboundDispatchLine.findMany({
+    where: {
+      tenantId,
+      salesOrderId,
+      salesOrderLineId: { not: null },
+      outboundDispatch: { tenantId, status: 'REVERSED', deletedAt: null },
+      reverseInventoryMovementId: { not: null },
+    },
+    select: { salesOrderLineId: true, quantity: true, outboundDispatchId: true },
+  })
+  const reversedMap = new Map<string, number>()
+  for (const row of reversedLines) {
+    if (!row.salesOrderLineId) continue
+    reversedMap.set(row.salesOrderLineId, (reversedMap.get(row.salesOrderLineId) ?? 0) + n(row.quantity))
+    const set = dispatchIdsByLine.get(row.salesOrderLineId) ?? new Set<string>()
+    set.add(row.outboundDispatchId)
+    dispatchIdsByLine.set(row.salesOrderLineId, set)
+  }
+
+  // Partial reverses on still-CONFIRMED outbounds (posting line cumulative).
+  const partialReversed = await prisma.dispatchPostingLine.findMany({
+    where: {
+      tenantId,
+      salesOrderId,
+      salesOrderLineId: { not: null },
+      reversedQuantity: { gt: 0 },
+      posting: {
+        tenantId,
+        status: { in: ['POSTED', 'PARTIALLY_REVERSED', 'LEGACY_POSTED'] },
+      },
+    },
+    select: { salesOrderLineId: true, reversedQuantity: true },
+  })
+  const partialReversedMap = new Map<string, number>()
+  for (const row of partialReversed) {
+    if (!row.salesOrderLineId) continue
+    partialReversedMap.set(
+      row.salesOrderLineId,
+      (partialReversedMap.get(row.salesOrderLineId) ?? 0) + n(row.reversedQuantity),
+    )
+  }
+
   const itemIds: string[] = []
   const lineItemMap = new Map<string, string | null>()
   for (const line of lines) {
@@ -157,8 +200,10 @@ export async function getSalesOrderFulfilmentPositions(
     const cancelledQty = cancelledMap.get(line.id) ?? 0
     const netOrderedQty = roundQty(Math.max(0, orderedQty - cancelledQty))
     const grossPostedDispatchQty = roundQty(dispatchedMap.get(line.id) ?? 0)
-    const reversedDispatchQty = 0 // 7C0/7C1: confirmed reverse not supported
-    const netDispatchedQty = roundQty(Math.max(0, grossPostedDispatchQty - reversedDispatchQty))
+    const partialReversedQty = roundQty(partialReversedMap.get(line.id) ?? 0)
+    // Full header reverses + partial posting-line reverses.
+    const reversedDispatchQty = roundQty((reversedMap.get(line.id) ?? 0) + partialReversedQty)
+    const netDispatchedQty = roundQty(Math.max(0, grossPostedDispatchQty - partialReversedQty))
     const activeDraftDispatchQty = roundQty(draftMap.get(line.id) ?? 0)
     const remainingToDispatchQty = roundQty(Math.max(0, netOrderedQty - netDispatchedQty))
     const itemId = lineItemMap.get(line.id) ?? null

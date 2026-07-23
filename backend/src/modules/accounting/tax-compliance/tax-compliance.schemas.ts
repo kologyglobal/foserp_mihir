@@ -90,6 +90,8 @@ export const generateEWayBillSchema = z
     distanceKm: z.coerce.number().int().min(0).max(20000),
     vehicleNumber: z.string().trim().max(64).optional().nullable(),
     transporterName: z.string().trim().max(200).optional().nullable(),
+    transporterId: z.string().trim().max(20).optional().nullable(),
+    movementReason: z.string().trim().max(200).optional().nullable(),
     /** Bypass ₹50k threshold (SI only) — still uses simulated NIC. */
     force: z.boolean().optional().default(false),
   })
@@ -113,3 +115,28 @@ export const cancelGstDocumentSchema = z.object({
 })
 
 export type CancelGstDocumentInput = z.infer<typeof cancelGstDocumentSchema>
+
+export const updateEWayVehicleSchema = z.object({
+  vehicleNumber: z.string().trim().min(1).max(64),
+  fromPlace: z.string().trim().max(200).optional().nullable(),
+  reasonCode: z.string().trim().max(32).optional().nullable(),
+})
+
+export type UpdateEWayVehicleInput = z.infer<typeof updateEWayVehicleSchema>
+
+export const ewayPanelQuerySchema = z
+  .object({
+    deliveryChallanId: z.string().uuid().optional(),
+    outboundDispatchId: z.string().uuid().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.deliveryChallanId && !data.outboundDispatchId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'deliveryChallanId or outboundDispatchId is required',
+        path: ['deliveryChallanId'],
+      })
+    }
+  })
+
+export type EWayPanelQueryInput = z.infer<typeof ewayPanelQuerySchema>

@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react'
 import type { ColumnDef, RowSelectionState } from '@tanstack/react-table'
-import { Copy, Eye, MoreHorizontal, Pencil, Printer, Receipt, Send, Trash2 } from 'lucide-react'
+import { Copy, Eye, MoreHorizontal, Pencil, Printer, Send, Trash2 } from 'lucide-react'
 import { ErpDataGrid } from '../erp/ErpDataGrid'
 import { TableLink } from '../ui/AppLink'
 import { useMasterStore } from '../../store/masterStore'
 import { useWorkOrderStore } from '../../store/workOrderStore'
-import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import type { SalesOrder } from '../../types/mrp'
@@ -41,7 +40,6 @@ export interface SalesOrdersTableProps {
   onPrint?: (row: SalesOrder) => void
   onConvert?: (row: SalesOrder) => void
   onDuplicate?: (row: SalesOrder) => void
-  onCreateProforma?: (row: SalesOrder) => void
   emptyMessage?: string
   search?: string
   onSearchChange?: (value: string) => void
@@ -65,7 +63,6 @@ export function SalesOrdersTable({
   onPrint,
   onConvert,
   onDuplicate,
-  onCreateProforma,
   emptyMessage,
   search = '',
   onSearchChange,
@@ -80,7 +77,6 @@ export function SalesOrdersTable({
   const customers = useMasterStore((s) => s.customers)
   const products = useMasterStore((s) => s.products)
   const workOrders = useWorkOrderStore((s) => s.workOrders)
-  const proformaInvoices = useProformaInvoiceStore((s) => s.proformaInvoices)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
   const selectedRows = useMemo(() => {
@@ -240,11 +236,6 @@ export function SalesOrdersTable({
         cell: ({ row }) => {
           const so = row.original
           const pending = isPendingSalesOrderHandover(so)
-          const activeProforma = pending
-            ? undefined
-            : proformaInvoices.find(
-              (p) => p.salesOrderId === so.id && p.status !== 'cancelled',
-            )
           const ai = buildAiRowActions({
             onAiSummary: onPreview ? () => onPreview(so) : undefined,
             onSuggestNext: () => onPreview?.(so),
@@ -282,17 +273,6 @@ export function SalesOrdersTable({
                 },
                 { id: 'duplicate', label: 'Duplicate', icon: Copy, onClick: () => onDuplicate?.(so) },
                 { id: 'print', label: 'Print', icon: Printer, onClick: () => onPrint?.(so) },
-                {
-                  id: 'proforma',
-                  label: activeProforma
-                    ? `Proforma ${activeProforma.proformaNo}`
-                    : 'Create Proforma Invoice',
-                  icon: Receipt,
-                  onClick: () => onCreateProforma?.(so),
-                  disabled:
-                    !onCreateProforma ||
-                    (!activeProforma && (so.status === 'open' || so.status === 'closed')),
-                },
                 ...(so.status === 'open' || !crmMode
                   ? [
                       {
@@ -312,7 +292,7 @@ export function SalesOrdersTable({
         },
       },
     ],
-    [customers, products, workOrders, proformaInvoices, crmMode, onView, onEdit, onPreview, onDelete, onPrint, onConvert, onDuplicate, onCreateProforma],
+    [customers, products, workOrders, crmMode, onView, onEdit, onPreview, onDelete, onPrint, onConvert, onDuplicate],
   )
 
   const resolvedEmptyMessage = emptyMessage ?? (hasActiveFilters ? 'No sales orders match current filters.' : 'No sales orders found.')

@@ -37,8 +37,12 @@ export class NotFoundError extends AppError {
 }
 
 export class ConflictError extends AppError {
-  constructor(message = 'Resource conflict', errors?: Array<{ field: string; message: string }>) {
-    super(409, message, 'CONFLICT', errors)
+  constructor(
+    message = 'Resource conflict',
+    errors?: Array<{ field: string; message: string }>,
+    details?: Record<string, unknown>,
+  ) {
+    super(409, message, 'CONFLICT', errors, details)
   }
 }
 
@@ -51,6 +55,18 @@ export class TenantMismatchError extends AppError {
 export class InvalidStateError extends AppError {
   constructor(message = 'Invalid state transition') {
     super(422, message, 'INVALID_STATE')
+  }
+}
+
+/** Business rule rejection (422) with a stable product `code` (e.g. sign-off blockers). */
+export class UnprocessableEntityError extends AppError {
+  constructor(
+    message: string,
+    code: string,
+    errors?: Array<{ field: string; message: string }>,
+    details?: Record<string, unknown>,
+  ) {
+    super(422, message, code, errors, details)
   }
 }
 

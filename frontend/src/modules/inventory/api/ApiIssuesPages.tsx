@@ -36,6 +36,7 @@ import { FormField } from '@/components/forms/FormField'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { notify } from '@/store/toastStore'
+import { formatApiError } from '@/services/api/apiErrors'
 import { fetchLookup } from '@/services/api/masterApi'
 import {
   getWorkOrderMaterialsReadiness,
@@ -509,19 +510,25 @@ export function ApiIssuesRegisterPage() {
 
       setBusy(true)
       try {
+        // Keep idempotencyKey ≤150 (Zod). Do not join material UUIDs — 3+ lines overflowed and toasted "Validation failed".
         const res = await createStoreWorkbenchShortageRequisition({
           materialIds: eligible.map((r) => r.materialId),
-          idempotencyKey: `issues-queue-bulk-pr:${[...eligible.map((r) => r.materialId)].sort().join(',')}:${crypto.randomUUID()}`,
+          idempotencyKey: `issues-bulk-pr:${crypto.randomUUID()}`,
           submit: false,
         })
         const pr = res.data.requisition
         const prNo = pr.prNumber ?? pr.requisitionNumber ?? pr.id.slice(0, 8)
         const linked = res.data.linkedMaterialIds?.length ?? eligible.length
+        const skipped = res.data.skippedAlreadyLinkedIds?.length ?? 0
         const woLabel =
           res.data.workOrderNumbers?.length === 1
             ? res.data.workOrderNumbers[0]
             : `${res.data.workOrderNumbers?.length ?? woCount} WOs`
-        notify.success(`PR ${prNo} created with ${linked} line(s) · ${woLabel}`)
+        notify.success(
+          skipped > 0
+            ? `PR ${prNo} created with ${linked} line(s) · ${woLabel} (${skipped} already had a PR)`
+            : `PR ${prNo} created with ${linked} line(s) · ${woLabel}`,
+        )
         await loadAssignQueue()
         setTab('prs')
         const nextParams = new URLSearchParams(searchParams)
@@ -529,7 +536,7 @@ export function ApiIssuesRegisterPage() {
         setSearchParams(nextParams, { replace: true })
         void loadProductionPrs()
       } catch (e) {
-        notify.error(e instanceof Error ? e.message : 'Could not create shortage PR')
+        notify.error(formatApiError(e) || 'Could not create shortage PR')
       } finally {
         setBusy(false)
       }

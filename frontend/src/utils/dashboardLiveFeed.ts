@@ -269,7 +269,7 @@ export function buildSalesManagementFeed(input: {
       subtitle: customerName,
       timestamp: inv.createdAt,
       icon: 'payment',
-      href: `/invoices/register/${inv.id}`,
+      href: `/accounting/money-in/invoices/${inv.id}`,
       documentRef: formatCurrency(inv.gst.grandTotal),
       quickView: {
         title: inv.invoiceNo,
@@ -280,7 +280,7 @@ export function buildSalesManagementFeed(input: {
           { label: 'Status', value: inv.status },
           ...(inv.dueDate ? [{ label: 'Due date', value: formatDate(inv.dueDate) }] : []),
         ],
-        primaryAction: { label: 'Open invoice', href: `/invoices/register/${inv.id}` },
+        primaryAction: { label: 'Open invoice', href: `/accounting/money-in/invoices/${inv.id}` },
       },
     })
   }
@@ -315,7 +315,7 @@ export function buildSalesManagementFeed(input: {
       timestamp: r.dueDate,
       severity: 'critical',
       icon: 'payment',
-      href: `/invoices/register/${r.invoiceId}`,
+      href: `/accounting/money-in/invoices/${r.invoiceId}`,
       quickView: {
         title: r.invoiceNo,
         subtitle: r.customerName,
@@ -326,7 +326,7 @@ export function buildSalesManagementFeed(input: {
           { label: 'Due date', value: formatDate(r.dueDate) },
           { label: 'Days overdue', value: `${r.daysOverdue}d` },
         ],
-        primaryAction: { label: 'Open invoice', href: `/invoices/register/${r.invoiceId}` },
+        primaryAction: { label: 'Open invoice', href: `/accounting/money-in/invoices/${r.invoiceId}` },
       },
     })
   }

@@ -109,6 +109,15 @@ export function snapshotInventoryStockCount(id: string) {
     method: 'POST', body: JSON.stringify({}),
   })
 }
+export function enterInventoryStockCount(
+  id: string,
+  lines: Array<{ lineId: string; countedQty: number; remarks?: string }>,
+) {
+  return apiRequest<ApiInventoryDocument>(tenantPath(`/inventory/stock-counts/${id}/counts`), {
+    method: 'PUT',
+    body: JSON.stringify({ lines }),
+  })
+}
 export function submitInventoryStockCount(id: string) {
   return apiRequest<ApiInventoryDocument>(tenantPath(`/inventory/stock-counts/${id}/submit`), {
     method: 'POST', body: JSON.stringify({}),

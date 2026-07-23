@@ -62,6 +62,8 @@ export interface Quotation360RecordHeaderProps {
   onCreateSalesOrder: () => void
   onViewSalesOrder?: () => void
   onDelete?: () => void
+  onPrint?: () => void
+  onExportPdf?: () => void
 }
 
 function useNarrowViewport() {
@@ -112,6 +114,8 @@ export function Quotation360RecordHeader({
   onCreateSalesOrder,
   onViewSalesOrder,
   onDelete,
+  onPrint,
+  onExportPdf,
 }: Quotation360RecordHeaderProps) {
   const narrow = useNarrowViewport()
   const toggleFavorite = useUIStore((s) => s.toggleFavorite)
@@ -185,8 +189,8 @@ export function Quotation360RecordHeader({
     ...(canDelete && onDelete
       ? [{ id: 'delete', label: 'Delete', icon: Trash2, onClick: onDelete, danger: true as const }]
       : []),
-    { id: 'export', label: 'Export PDF', icon: FileDown, onClick: () => window.print() },
-    { id: 'print', label: 'Print', icon: Printer, onClick: () => window.print() },
+    { id: 'export', label: 'Export PDF', icon: FileDown, onClick: onExportPdf ?? onPrint ?? (() => window.print()) },
+    { id: 'print', label: 'Print', icon: Printer, onClick: onPrint ?? (() => window.print()) },
   ]
 
   const lifecyclePrimary =

@@ -41,7 +41,11 @@ export function CompleteWorkOrderDialog({
     setLoading(true)
     getCloseReadiness(workOrder.id, { allowInProgress: true })
       .then((res) => {
-        const data = res.data as { checks?: CloseReadinessCheck[] }
+        const data = res.data as {
+          checks?: CloseReadinessCheck[]
+          blockers?: CloseReadinessCheck[]
+          warnings?: CloseReadinessCheck[]
+        }
         setChecks(data.checks ?? [])
       })
       .catch(() => setChecks([]))
@@ -49,7 +53,7 @@ export function CompleteWorkOrderDialog({
   }, [open, workOrder.id])
 
   const blockers = checks
-    .filter((c) => c.severity === 'BLOCKER' && c.code !== 'OPERATIONAL_STATUS')
+    .filter((c) => c.severity === 'BLOCKER')
     .map((c) => c.message)
   const warnings = checks.filter((c) => c.severity === 'WARNING').map((c) => c.message)
   const remaining = Math.max(

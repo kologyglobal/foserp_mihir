@@ -116,7 +116,7 @@ export function SalesExecutionPipelineBoard({
             <button
               type="button"
               className="crm-pipeline-footer-pill crm-pipeline-footer-pill-won"
-              onClick={() => navigate('/invoices/register')}
+              onClick={() => navigate('/accounting/money-in/invoices')}
             >
               <span className="crm-pipeline-footer-pill-title">Invoiced &amp; closed</span>
               <span className="crm-pipeline-footer-pill-meta">

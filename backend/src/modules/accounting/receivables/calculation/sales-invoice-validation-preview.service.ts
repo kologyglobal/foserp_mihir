@@ -69,6 +69,15 @@ export async function validateSalesInvoiceDraft(
 
   await checkMultiCurrency(tenantId, input.legalEntityId, enrichedInput, errors)
 
+  const { enrichLinesWithMasterGstRates } = await import('../../shared/master-resolvers/accounting-tax-resolver.js')
+  const linesWithMasterRates = await enrichLinesWithMasterGstRates(tenantId, enrichedInput.lines, {
+    applicableFor: 'SALES',
+    asOfDate: enrichedInput.invoiceDate ?? enrichedInput.postingDate,
+    fromState: enrichedInput.legalEntityStateCode,
+    toState: enrichedInput.placeOfSupply,
+  })
+  enrichedInput.lines = linesWithMasterRates
+
   const calculation: SalesInvoiceCalculationResult = calculateSalesInvoice(enrichedInput)
   errors.push(...calculation.errors)
   warnings.push(...calculation.warnings)

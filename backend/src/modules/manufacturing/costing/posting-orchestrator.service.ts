@@ -25,6 +25,18 @@ function postingContext(req: Request, tenantId: string): PostingContext {
   }
 }
 
+/**
+ * Enablement readiness includes RECORDED events as INVENTORY_POSTINGS_UNRECONCILED.
+ * That must not block posting of those same pending events (chicken-and-egg).
+ * Sign-off codes are enablement-only once the flag is already on.
+ */
+const POST_EVENT_IGNORED_BLOCKERS = new Set([
+  'INVENTORY_POSTINGS_UNRECONCILED',
+  'FAILED_ACCOUNTING_EVENTS',
+  'INVENTORY_RECONCILE_NOT_SIGNED_OFF',
+  'PILOT_FINANCE_SIGNOFF_REQUIRED',
+])
+
 function classifyFailure(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
   if (/mapping|legal entity|feature|configuration/i.test(message)) return `CONFIGURATION: ${message}`
@@ -37,7 +49,7 @@ export async function validateEvent(tenantId: string, eventId: string) {
   const event = await prisma.productionAccountingEvent.findFirst({ where: { id: eventId, tenantId } })
   if (!event) throw new NotFoundError('Manufacturing accounting event not found')
   const readiness = await getManufacturingAccountingReadiness(tenantId, event.productionOrderId ?? undefined)
-  const blockers = [...readiness.blockers]
+  const blockers = readiness.blockers.filter((blocker) => !POST_EVENT_IGNORED_BLOCKERS.has(blocker))
   if (!['RECORDED', 'FAILED', 'POSTED'].includes(event.status)) blockers.push(`EVENT_STATUS_${event.status}`)
   if (event.amount.lessThanOrEqualTo(0)) blockers.push('ZERO_EVENT_AMOUNT')
   return { ready: blockers.length === 0 || event.status === 'POSTED', event, readiness, blockers }

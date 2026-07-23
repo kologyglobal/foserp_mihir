@@ -51,6 +51,12 @@ export {
   type DeriveSoJourneyInput,
 } from './FulfilmentJourneyStrip'
 export { getFulfilmentAutoMode, setFulfilmentAutoMode } from './fulfilmentAutoMode'
+export {
+  parseFulfilmentJourneyStep,
+  fulfilmentJourneyPath,
+  FULFILMENT_JOURNEY_STEPS,
+} from './fulfilmentJourneyUrl'
+export { useFulfilmentJourneyStep } from './useFulfilmentJourneyStep'
 export { WorkOrderStatusBadge } from './WorkOrderStatusBadge'
 export { WorkOrderHealthBadge } from './WorkOrderHealthBadge'
 export { JobWorkStatusBadge } from './JobWorkStatusBadge'

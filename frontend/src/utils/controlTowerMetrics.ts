@@ -293,9 +293,9 @@ export function getUnifiedInboxData() {
   const user = getSessionUser()
   for (const req of listPendingApprovalsForUser(user)) {
     const step = req.steps[req.currentStepIndex]
-    let href = '/masters/approval-workflows'
+    let href = '/purchase/approvals'
     if (req.documentType === 'purchase_order') href = `/purchase/orders/${req.entityId}`
-    if (req.documentType === 'bom_revision') href = `/masters/bom/${req.entityId}/manage`
+    if (req.documentType === 'bom_revision') href = `/manufacturing/setup/boms`
     if (req.documentType === 'cost_override') href = `/masters/products/${req.entityId}`
     approvals.push({
       id: `apreq-${req.id}`,
@@ -341,7 +341,7 @@ export function getUnifiedInboxData() {
     })
   }
   for (const jc of jobCards.filter((j) => ['pending', 'assigned', 'in_progress'].includes(j.status))) {
-    tasks.push({ id: `jc-${jc.id}`, kind: 'task', title: `${jc.jobCardNo} · ${jc.operationName}`, description: `${jc.woNo} · ${jc.workCenterCode}`, severity: jc.status === 'in_progress' ? 'green' : 'amber', href: '/production/job-cards', module: 'Shop Floor' })
+    tasks.push({ id: `jc-${jc.id}`, kind: 'task', title: `${jc.jobCardNo} · ${jc.operationName}`, description: `${jc.woNo} · ${jc.workCenterCode}`, severity: jc.status === 'in_progress' ? 'green' : 'amber', href: '/manufacturing/work-orders', module: 'Shop Floor' })
   }
   for (const insp of useQualityStore.getState().getPendingInspections()) {
     tasks.push({ id: `qc-${insp.id}`, kind: 'task', title: `QC — ${insp.inspectionNo}`, description: `${insp.woNo ?? 'Incoming'} · ${insp.status}`, severity: 'amber', href: `/quality/inspections/${insp.id}`, module: 'Quality' })
@@ -353,7 +353,7 @@ export function getUnifiedInboxData() {
     alerts.push({ id: `disp-${d.id}`, kind: 'alert', title: `Dispatch pending — ${d.dispatchNo}`, description: d.status, severity: 'amber', href: `/dispatch/${d.id}`, module: 'Dispatch' })
   }
   for (const inv of invoices.filter((i) => i.balanceDue > 0).slice(0, 6)) {
-    alerts.push({ id: `pay-${inv.id}`, kind: 'alert', title: `Payment pending — ${inv.invoiceNo}`, description: `Balance due`, severity: inv.paymentStatus === 'overdue' ? 'red' : 'amber', href: `/invoices/${inv.id}`, module: 'Finance' })
+    alerts.push({ id: `pay-${inv.id}`, kind: 'alert', title: `Payment pending — ${inv.invoiceNo}`, description: `Balance due`, severity: inv.paymentStatus === 'overdue' ? 'red' : 'amber', href: `/accounting/money-in/invoices/${inv.id}`, module: 'Finance' })
   }
   for (const w of workOrders.filter(isLateWo).slice(0, 6)) {
     alerts.push({ id: `late-wo-${w.id}`, kind: 'alert', title: `Delayed WO — ${w.woNo}`, description: `Planned finish ${w.plannedFinishDate}`, severity: 'red', href: wo360Path(w.id), module: 'Production' })

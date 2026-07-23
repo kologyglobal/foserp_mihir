@@ -9,8 +9,8 @@ export function entity360CustomerPath(customerId: string) {
   return `/entity360/customers/${customerId}`
 }
 
-export function bom360Path(bomId: string) {
-  return `/engineering/boms/${bomId}/360`
+export function bom360Path(_bomId: string) {
+  return `/manufacturing/setup/boms`
 }
 
 /** Masters company 360 */
@@ -69,7 +69,7 @@ export function resolveCustomer360Path(pathname: string, customerId: string): st
 
 export const ENTITY_360_ROUTES = {
   entity360Customer: '/entity360/customers/:id',
-  bom360: '/engineering/boms/:id/360',
+  bom360: '/manufacturing/setup/boms',
   customer360: '/masters/companies/:id/360',
   salesCustomer360: '/sales/customers/:id/360',
 } as const

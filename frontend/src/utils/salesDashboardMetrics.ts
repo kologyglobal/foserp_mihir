@@ -88,10 +88,10 @@ const STAGE_META: Record<
 > = {
   draft: { label: 'Draft SO', shortLabel: 'Draft', href: '/sales/orders?status=open' },
   confirmed: { label: 'Confirmed', shortLabel: 'Confirmed', href: '/sales/orders?status=confirmed' },
-  in_production: { label: 'In Production', shortLabel: 'Production', href: '/work-orders' },
+  in_production: { label: 'In Production', shortLabel: 'Production', href: '/manufacturing/work-orders' },
   dispatch_ready: { label: 'Dispatch Ready', shortLabel: 'Dispatch', href: '/dispatch/register' },
   dispatched: { label: 'Dispatched', shortLabel: 'Shipped', href: '/dispatch/register' },
-  invoiced: { label: 'Invoiced / Closed', shortLabel: 'Invoiced', href: '/invoices/register' },
+  invoiced: { label: 'Invoiced / Closed', shortLabel: 'Invoiced', href: '/accounting/money-in/invoices' },
 }
 
 export function buildSalesExecutionStages(

@@ -8,7 +8,7 @@ import { ClipboardList, PackageCheck, RefreshCw, Truck } from 'lucide-react'
 import { isApiMode } from '@/config/apiConfig'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { DataGrid } from '@/components/design-system/DataGrid'
-import { CommandBar, CommandBarButton, CommandBarGroup } from '@/components/ui/CommandBar'
+import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Button } from '@/components/ui/Button'
 import { TableLink } from '@/components/ui/AppLink'
@@ -301,7 +301,9 @@ export function DispatchWorkbenchPage() {
     return (
       <OperationalPageShell
         title="Dispatch workbench"
-        description="API mode required for Phase 7C1 requirement readiness."
+        badge="Dispatch"
+        variant="dynamics"
+        pageGuide={null}
       >
         <p className="text-sm text-erp-muted p-4">
           Set <code>VITE_USE_API=true</code> to use the live Dispatch Workbench. Demo mode continues to
@@ -317,39 +319,63 @@ export function DispatchWorkbenchPage() {
   return (
     <OperationalPageShell
       title="Dispatch & Delivery"
-      description="Reserve FG and manage Store picking. Reserved/Picked ≠ Dispatched until confirm (7C0)."
-      badge={`${summary.draftDispatches} drafts · ${summary.activeReservations ?? 0} reserved`}
+      badge="Dispatch"
+      variant="dynamics"
+      pageGuide={null}
       commandBar={
-        <CommandBar>
-          <CommandBarGroup label="Actions">
-            <CommandBarButton
-              icon={RefreshCw}
-              label="Refresh"
-              onClick={() => void load(mainTab, reqTab, true)}
-              disabled={busy}
-            />
-            {mainTab === 'requirements' ? (
-              <>
-                <CommandBarButton
-                  icon={PackageCheck}
-                  label="Synchronise"
-                  onClick={() => void handleSync()}
-                  disabled={busy}
-                />
-                <CommandBarButton
-                  icon={Truck}
-                  label={`Create draft (${selected.size})`}
-                  onClick={() => void handleCreateDraft()}
-                  disabled={busy || selected.size === 0}
-                  primary
-                />
-              </>
-            ) : null}
-            <CommandBarButton icon={ClipboardList} label="Outbound register" onClick={() => navigate('/dispatch/register')} />
-            <CommandBarButton icon={PackageCheck} label="Pick lists" onClick={() => navigate('/dispatch/pick-lists')} />
-            <CommandBarButton icon={PackageCheck} label="Packing sessions" onClick={() => navigate('/dispatch/packing-sessions')} />
-          </CommandBarGroup>
-        </CommandBar>
+        <ErpCommandBar
+          inline
+          sticky={false}
+          primaryAction={
+            mainTab === 'requirements'
+              ? {
+                  id: 'create-draft',
+                  label: `Create draft (${selected.size})`,
+                  icon: Truck,
+                  onClick: () => void handleCreateDraft(),
+                  disabled: busy || selected.size === 0,
+                }
+              : undefined
+          }
+          secondaryActions={[
+            {
+              id: 'refresh',
+              label: 'Refresh',
+              icon: RefreshCw,
+              onClick: () => void load(mainTab, reqTab, true),
+              disabled: busy,
+            },
+            ...(mainTab === 'requirements'
+              ? [
+                  {
+                    id: 'synchronise',
+                    label: 'Synchronise',
+                    icon: PackageCheck,
+                    onClick: () => void handleSync(),
+                    disabled: busy,
+                  },
+                ]
+              : []),
+            {
+              id: 'register',
+              label: 'Outbound register',
+              icon: ClipboardList,
+              onClick: () => navigate('/dispatch/register'),
+            },
+            {
+              id: 'pick-lists',
+              label: 'Pick lists',
+              icon: PackageCheck,
+              onClick: () => navigate('/dispatch/pick-lists'),
+            },
+            {
+              id: 'packing',
+              label: 'Packing sessions',
+              icon: PackageCheck,
+              onClick: () => navigate('/dispatch/packing-sessions'),
+            },
+          ]}
+        />
       }
     >
       {focusSalesOrderId ? (

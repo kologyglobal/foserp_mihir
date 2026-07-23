@@ -31,6 +31,7 @@ export function mapOutboundDispatch(
     id: row.id,
     dispatchNo: row.dispatchNo,
     status: row.status,
+    deliveryStatus: row.deliveryStatus ?? null,
     salesOrderId: row.salesOrderId,
     salesOrderNo: row.salesOrderNo,
     customerId: row.customerId ?? null,

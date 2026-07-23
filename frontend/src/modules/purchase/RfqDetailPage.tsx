@@ -21,6 +21,7 @@ import {
   buildPurchaseRelatedLinks,
   purchaseDocumentApprovalFact,
 } from '@/components/purchase/PurchaseDocumentFactBox'
+import { RfqWorkflowStrip } from '@/components/purchase/PurchaseDocumentWorkflowStrip'
 import { ErpCardSection, ErpViewField } from '@/components/erp/card-form'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpButton } from '@/components/erp/ErpButton'
@@ -182,7 +183,9 @@ export function RfqDetailPage() {
           { label: 'RFQs', to: '/purchase/rfqs' },
           { label: 'Loading' },
         ]}
+        backLink={{ to: '/purchase/rfqs', label: 'Back to RFQs' }}
         footer={null}
+        stickyFooter={false}
         detailMode
       >
         <LoadingState variant="form" rows={8} />
@@ -223,6 +226,12 @@ export function RfqDetailPage() {
   })
 
   const primaryVendor = selectedVendors[0]
+  const headerFacts = [
+    { label: 'Buyer', value: buyerName },
+    { label: 'Location', value: purchaseLoc },
+    { label: 'Enquiry Due', value: formatDate(rfq.bidDueDate) },
+    { label: 'Est. Value', value: formatCurrency(rfq.estimatedValue) },
+  ]
   const documentFactBox = (
     <PurchaseDocumentFactBox
       vendor={
@@ -262,6 +271,7 @@ export function RfqDetailPage() {
         recordNo={rfq.documentNumber}
         status={statusLabel}
         statusTone={purchaseStatusTone(rfq.status)}
+        statusKey={rfq.status}
         company={sourcePrLabel === 'Manual' ? 'Manual RFQ' : `From ${sourcePrLabel}`}
         favoritePath={`/purchase/rfqs/${rfq.id}`}
         breadcrumbs={[
@@ -269,24 +279,19 @@ export function RfqDetailPage() {
           { label: 'RFQs', to: '/purchase/rfqs' },
           { label: rfq.documentNumber },
         ]}
+        backLink={{ to: '/purchase/rfqs', label: 'Back to RFQs' }}
         createdBy={rfq.createdBy}
         createdDate={formatDate(rfq.createdAt.slice(0, 10))}
         modifiedBy={rfq.updatedBy ?? undefined}
         modifiedDate={rfq.updatedAt ? formatDate(rfq.updatedAt.slice(0, 10)) : undefined}
-        documentStrip={[
-          { label: 'Status', value: statusLabel, highlight: true },
-          { label: 'Enquiry Due', value: formatDate(rfq.bidDueDate), highlight: true },
-          { label: 'Buyer', value: buyerName },
-          { label: 'Location', value: purchaseLoc },
-          { label: 'Vendors', value: `${responseStats.quoted}/${responseStats.selected} quoted` },
-          { label: 'Lines', value: String(rfq.lines.length) },
-          { label: 'Est. Value', value: formatCurrency(rfq.estimatedValue), highlight: true },
-        ]}
+        recordHeaderFacts={headerFacts}
         factBox={documentFactBox}
+        collapsibleFactBox
         commandBar={
           <ErpCommandBar
             inline
             sticky={false}
+            collapseSecondaryOnNarrow={false}
             primaryAction={
               isDraft && !sendGate.hidden
                 ? {
@@ -313,6 +318,7 @@ export function RfqDetailPage() {
                 id: 'edit',
                 label: 'Edit',
                 icon: Pencil,
+                pin: true,
                 onClick: () => navigate(`/purchase/rfqs/${rfq.id}/edit`),
                 hidden: editGate.hidden || !isDraft,
               },
@@ -339,6 +345,7 @@ export function RfqDetailPage() {
                 id: 'print',
                 label: 'Print',
                 icon: Printer,
+                pin: true,
                 onClick: () => window.print(),
               },
             ]}
@@ -354,221 +361,253 @@ export function RfqDetailPage() {
           />
         }
         footer={null}
+        stickyFooter={false}
         detailMode
       >
         <div className="space-y-3">
-        <ErpCardSection title="General" subtitle="Identity, buyer, and locations" defaultOpen>
-          <ErpViewField label="RFQ Number" value={rfq.documentNumber} />
-          <ErpViewField label="RFQ Date" value={formatDate(rfq.documentDate)} />
-          <ErpViewField
-            label="Status"
-            value={<StatusDot label={statusLabel} tone={statusToneFromLabel(rfq.status)} />}
+          <RfqWorkflowStrip
+            status={rfq.status}
+            purpose="RFQs — invite vendors, collect quotations, then compare and select."
+            nextActionContext={{
+              canSend: isDraft && !sendGate.hidden && !sendGate.disabled,
+              canCompare: !compareGate.hidden && !compareGate.disabled,
+            }}
           />
-          <ErpViewField label="Enquiry Due Date" value={formatDate(rfq.bidDueDate)} />
-          <ErpViewField label="Buyer" value={buyerName} />
-          <ErpViewField label="Department" value={rfq.department || '—'} />
-          <ErpViewField label="Purchase Location" value={purchaseLoc} />
-          <ErpViewField
-            label="Delivery Location"
-            value={rfq.deliveryLocation?.name ?? '—'}
-          />
-          <ErpViewField label="Currency" value={rfq.currency} />
-          <ErpViewField
-            label="Expected Delivery"
-            value={rfq.expectedDeliveryDate ? formatDate(rfq.expectedDeliveryDate) : '—'}
-          />
-          <ErpViewField label="Source PR(s)" hideIfEmpty={sourcePrLabel === 'Manual'}>
-            {rfq.purchaseRequisitionIds?.length ? (
-              <span className="flex flex-wrap gap-x-2 gap-y-1">
-                {rfq.purchaseRequisitionIds.map((prId, i) => (
-                  <Link
-                    key={prId}
-                    className="font-mono text-erp-primary"
-                    to={`/purchase/requisitions/${prId}`}
-                  >
-                    {rfq.purchaseRequisitionNumbers[i] ?? prId}
-                  </Link>
-                ))}
-              </span>
-            ) : (
-              'Manual'
-            )}
-          </ErpViewField>
-          {sourcePrLabel === 'Manual' ? (
-            <ErpViewField label="Origin" value="Manual entry" />
-          ) : null}
-          <ErpViewField label="Sent At" value={rfq.sentAt ? formatDate(rfq.sentAt.slice(0, 10)) : '—'} />
-          <ErpViewField label="Estimated Value" value={formatCurrency(rfq.estimatedValue)} />
-        </ErpCardSection>
 
-        <ErpCardSection title="Commercial & Contacts" subtitle="Terms and communication" defaultOpen>
-          <ErpViewField label="Payment Terms" value={rfq.paymentTerms} />
-          <ErpViewField label="Delivery Terms" value={rfq.deliveryTerms} />
-          <ErpViewField label="Freight Terms" value={rfq.freightTerms || '—'} />
-          <ErpViewField label="Inspection Requirement" value={rfq.inspectionRequirement || '—'} />
-          <ErpViewField label="Technical Contact" value={rfq.technicalContact || '—'} />
-          <ErpViewField label="Commercial Contact" value={rfq.commercialContact || '—'} />
-          <ErpViewField label="Remarks" value={rfq.remarks || '—'} colSpan={3} />
-        </ErpCardSection>
-
-        <ErpCardSection
-          title="Item Lines"
-          subtitle={`${rfq.lines.length} line${rfq.lines.length === 1 ? '' : 's'}`}
-          columns={1}
-          defaultOpen
-        >
-          {rfq.lines.length === 0 ? (
-            <EmptyState icon={FileText} title="No lines" description="This RFQ has no item lines." />
-          ) : (
-            <div className="overflow-x-auto rounded-md border border-erp-border">
-              <table className="erp-table min-w-[960px] text-[12px]">
-                <thead>
-                  <tr>
-                    <th className="w-10">#</th>
-                    <th>Item</th>
-                    <th>Specification</th>
-                    <th>HSN/SAC</th>
-                    <th className="num">Qty</th>
-                    <th>UOM</th>
-                    <th>Required</th>
-                    <th className="num">Target Price</th>
-                    <th className="num">Amount</th>
-                    <th>Source PR</th>
-                    <th>Remarks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rfq.lines.map((l) => (
-                    <tr key={l.id}>
-                      <td className="tabular-nums text-erp-muted">{l.lineNo}</td>
-                      <td>
-                        <div className="font-mono text-[11px] text-erp-muted">{l.itemCode}</div>
-                        <div className="font-medium text-erp-text">{l.itemName}</div>
-                      </td>
-                      <td className="max-w-[12rem] text-erp-muted">{l.specification || '—'}</td>
-                      <td className="font-mono">{l.hsnCode || l.sacCode || '—'}</td>
-                      <td className="num tabular-nums">{l.quantity}</td>
-                      <td>{l.uom}</td>
-                      <td>{formatDate(l.requiredDate)}</td>
-                      <td className="num tabular-nums">{formatCurrency(l.targetPrice)}</td>
-                      <td className="num tabular-nums font-medium">{formatCurrency(l.amount)}</td>
-                      <td className="font-mono">
-                        {l.purchaseRequisitionId ? (
-                          <Link
-                            className="text-erp-primary"
-                            to={`/purchase/requisitions/${l.purchaseRequisitionId}`}
-                          >
-                            {l.purchaseRequisitionNumber}
-                          </Link>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td className="text-erp-muted">{l.remarks || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </ErpCardSection>
-
-        <ErpCardSection
-          title="Vendors"
-          subtitle={`${responseStats.quoted} of ${responseStats.selected} responded`}
-          icon={Users}
-          columns={1}
-          defaultOpen
-        >
-          {rfq.vendors.length === 0 ? (
-            <EmptyState
-              icon={Users}
-              title="No vendors"
-              description="Invite vendors before sending this RFQ."
+          <ErpCardSection
+            title="General"
+            subtitle="Identity, buyer, and locations"
+            collapsible
+            defaultOpen
+            columns={4}
+          >
+            <ErpViewField label="RFQ Number" value={rfq.documentNumber} />
+            <ErpViewField label="RFQ Date" value={formatDate(rfq.documentDate)} />
+            <ErpViewField
+              label="Status"
+              value={<StatusDot label={statusLabel} tone={statusToneFromLabel(rfq.status)} />}
             />
-          ) : (
-            <div className="overflow-x-auto rounded-md border border-erp-border">
-              <table className="erp-table min-w-[1100px] text-[12px]">
-                <thead>
-                  <tr>
-                    <th>Vendor</th>
-                    <th>GSTIN</th>
-                    <th>State</th>
-                    <th>Contact</th>
-                    <th>Email / Mobile</th>
-                    <th className="num">Rating</th>
-                    <th>Invite</th>
-                    <th>Sent</th>
-                    <th>Responded</th>
-                    <th className="num">Last Price</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rfq.vendors.map((v) => (
-                    <tr key={v.id} className={cn(!v.selected && 'opacity-45')}>
-                      <td>
-                        <div className="font-mono text-[11px] text-erp-muted">{v.vendorCode}</div>
-                        <div className="font-medium">
-                          {v.vendorName}
-                          {!v.selected ? (
-                            <span className="ml-1 text-[10px] font-normal text-erp-muted">
-                              (not selected)
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="font-mono text-[11px]">{v.gstin || '—'}</td>
-                      <td>{v.state}</td>
-                      <td>{v.contactPerson || '—'}</td>
-                      <td>
-                        <div>{v.contactEmail || '—'}</div>
-                        <div className="text-erp-muted">{v.contactPhone || '—'}</div>
-                      </td>
-                      <td className="num">
-                        <span className="inline-flex items-center justify-end gap-1 tabular-nums">
-                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                          {v.vendorRating != null ? v.vendorRating.toFixed(1) : '—'}
-                        </span>
-                      </td>
-                      <td>
-                        <Badge color={inviteBadgeColor(v.status)}>
-                          {RFQ_VENDOR_INVITE_STATUS_LABELS[v.status]}
-                        </Badge>
-                      </td>
-                      <td>{v.sentAt ? formatDate(v.sentAt.slice(0, 10)) : '—'}</td>
-                      <td>{v.respondedAt ? formatDate(v.respondedAt.slice(0, 10)) : '—'}</td>
-                      <td className="num tabular-nums">
-                        {v.lastPurchasePrice != null
-                          ? formatCurrency(v.lastPurchasePrice)
-                          : '—'}
-                      </td>
-                    </tr>
+            <ErpViewField label="Enquiry Due Date" value={formatDate(rfq.bidDueDate)} />
+            <ErpViewField label="Buyer" value={buyerName} />
+            <ErpViewField label="Department" value={rfq.department || '—'} />
+            <ErpViewField label="Purchase Location" value={purchaseLoc} />
+            <ErpViewField label="Delivery Location" value={rfq.deliveryLocation?.name ?? '—'} />
+            <ErpViewField label="Currency" value={rfq.currency} />
+            <ErpViewField
+              label="Expected Delivery"
+              value={rfq.expectedDeliveryDate ? formatDate(rfq.expectedDeliveryDate) : '—'}
+            />
+            <ErpViewField label="Sent At" value={rfq.sentAt ? formatDate(rfq.sentAt.slice(0, 10)) : '—'} />
+            <ErpViewField label="Estimated Value" value={formatCurrency(rfq.estimatedValue)} />
+            <ErpViewField label="Source PR(s)" hideIfEmpty={sourcePrLabel === 'Manual'}>
+              {rfq.purchaseRequisitionIds?.length ? (
+                <span className="flex flex-wrap gap-x-2 gap-y-1">
+                  {rfq.purchaseRequisitionIds.map((prId, i) => (
+                    <Link
+                      key={prId}
+                      className="font-mono text-erp-primary"
+                      to={`/purchase/requisitions/${prId}`}
+                    >
+                      {rfq.purchaseRequisitionNumbers[i] ?? prId}
+                    </Link>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </ErpCardSection>
+                </span>
+              ) : (
+                'Manual'
+              )}
+            </ErpViewField>
+            {sourcePrLabel === 'Manual' ? (
+              <ErpViewField label="Origin" value="Manual entry" />
+            ) : null}
+            <ErpViewField
+              label="Vendor response"
+              value={`${responseStats.quoted}/${responseStats.selected} quoted`}
+            />
+            <ErpViewField label="Lines" value={String(rfq.lines.length)} />
+          </ErpCardSection>
 
-        <ErpCardSection title="Audit Timeline" subtitle="Lifecycle and vendor activity" columns={1} defaultOpen>
-          <PurchaseAuditTimeline
-            entityType="rfq"
-            entityId={rfq.id}
-            className="border-0 p-0 shadow-none"
-            demoEvents={buildDemoPurchaseTimeline({
-              entityId: rfq.id,
-              entityType: 'RequestForQuotation',
-              createdAt: rfq.createdAt,
-              createdBy: rfq.createdBy,
-              updatedAt: rfq.updatedAt,
-              updatedBy: rfq.updatedBy,
-              statusLabel: RFQ_DOMAIN_STATUS_LABELS[rfq.status],
-              extra: rfq.sentAt
-                ? [{ action: 'RFQ_SENT', actionLabel: 'Sent', timestamp: rfq.sentAt }]
-                : [],
-            })}
-          />
-        </ErpCardSection>
+          <ErpCardSection
+            title="Commercial & Contacts"
+            subtitle="Terms and communication"
+            collapsible
+            defaultOpen
+            columns={4}
+          >
+            <ErpViewField label="Payment Terms" value={rfq.paymentTerms} />
+            <ErpViewField label="Delivery Terms" value={rfq.deliveryTerms} />
+            <ErpViewField label="Freight Terms" value={rfq.freightTerms || '—'} />
+            <ErpViewField label="Inspection Requirement" value={rfq.inspectionRequirement || '—'} />
+            <ErpViewField label="Technical Contact" value={rfq.technicalContact || '—'} />
+            <ErpViewField label="Commercial Contact" value={rfq.commercialContact || '—'} />
+            <ErpViewField label="Remarks" value={rfq.remarks || '—'} colSpan={3} />
+          </ErpCardSection>
+
+          <ErpCardSection
+            title="Item Lines"
+            subtitle={`${rfq.lines.length} line${rfq.lines.length === 1 ? '' : 's'} · ${formatCurrency(rfq.estimatedValue)}`}
+            columns={1}
+            collapsible
+            defaultOpen
+          >
+            {rfq.lines.length === 0 ? (
+              <EmptyState icon={FileText} title="No lines" description="This RFQ has no item lines." />
+            ) : (
+              <div className="overflow-x-auto rounded-md border border-erp-border">
+                <table className="erp-table min-w-[960px] text-[12px]">
+                  <thead>
+                    <tr>
+                      <th className="w-10">#</th>
+                      <th>Item</th>
+                      <th>Specification</th>
+                      <th>HSN/SAC</th>
+                      <th className="num">Qty</th>
+                      <th>UOM</th>
+                      <th>Required</th>
+                      <th className="num">Target Price</th>
+                      <th className="num">Amount</th>
+                      <th>Source PR</th>
+                      <th>Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rfq.lines.map((l) => (
+                      <tr key={l.id}>
+                        <td className="tabular-nums text-erp-muted">{l.lineNo}</td>
+                        <td>
+                          <div className="font-mono text-[11px] text-erp-muted">{l.itemCode}</div>
+                          <div className="font-medium text-erp-text">{l.itemName}</div>
+                        </td>
+                        <td className="max-w-[12rem] text-erp-muted">{l.specification || '—'}</td>
+                        <td className="font-mono">{l.hsnCode || l.sacCode || '—'}</td>
+                        <td className="num tabular-nums">{l.quantity}</td>
+                        <td>{l.uom}</td>
+                        <td>{formatDate(l.requiredDate)}</td>
+                        <td className="num tabular-nums">{formatCurrency(l.targetPrice)}</td>
+                        <td className="num tabular-nums font-medium">{formatCurrency(l.amount)}</td>
+                        <td className="font-mono">
+                          {l.purchaseRequisitionId ? (
+                            <Link
+                              className="text-erp-primary"
+                              to={`/purchase/requisitions/${l.purchaseRequisitionId}`}
+                            >
+                              {l.purchaseRequisitionNumber}
+                            </Link>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td className="text-erp-muted">{l.remarks || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </ErpCardSection>
+
+          <ErpCardSection
+            title="Vendors"
+            subtitle={`${responseStats.quoted} of ${responseStats.selected} responded`}
+            icon={Users}
+            columns={1}
+            collapsible
+            defaultOpen
+          >
+            {rfq.vendors.length === 0 ? (
+              <EmptyState
+                icon={Users}
+                title="No vendors"
+                description="Invite vendors before sending this RFQ."
+              />
+            ) : (
+              <div className="overflow-x-auto rounded-md border border-erp-border">
+                <table className="erp-table min-w-[1100px] text-[12px]">
+                  <thead>
+                    <tr>
+                      <th>Vendor</th>
+                      <th>GSTIN</th>
+                      <th>State</th>
+                      <th>Contact</th>
+                      <th>Email / Mobile</th>
+                      <th className="num">Rating</th>
+                      <th>Invite</th>
+                      <th>Sent</th>
+                      <th>Responded</th>
+                      <th className="num">Last Price</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rfq.vendors.map((v) => (
+                      <tr key={v.id} className={cn(!v.selected && 'opacity-45')}>
+                        <td>
+                          <div className="font-mono text-[11px] text-erp-muted">{v.vendorCode}</div>
+                          <div className="font-medium">
+                            {v.vendorName}
+                            {!v.selected ? (
+                              <span className="ml-1 text-[10px] font-normal text-erp-muted">
+                                (not selected)
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td className="font-mono text-[11px]">{v.gstin || '—'}</td>
+                        <td>{v.state}</td>
+                        <td>{v.contactPerson || '—'}</td>
+                        <td>
+                          <div>{v.contactEmail || '—'}</div>
+                          <div className="text-erp-muted">{v.contactPhone || '—'}</div>
+                        </td>
+                        <td className="num">
+                          <span className="inline-flex items-center justify-end gap-1 tabular-nums">
+                            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                            {v.vendorRating != null ? v.vendorRating.toFixed(1) : '—'}
+                          </span>
+                        </td>
+                        <td>
+                          <Badge color={inviteBadgeColor(v.status)}>
+                            {RFQ_VENDOR_INVITE_STATUS_LABELS[v.status]}
+                          </Badge>
+                        </td>
+                        <td>{v.sentAt ? formatDate(v.sentAt.slice(0, 10)) : '—'}</td>
+                        <td>{v.respondedAt ? formatDate(v.respondedAt.slice(0, 10)) : '—'}</td>
+                        <td className="num tabular-nums">
+                          {v.lastPurchasePrice != null
+                            ? formatCurrency(v.lastPurchasePrice)
+                            : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </ErpCardSection>
+
+          <ErpCardSection
+            title="Audit"
+            subtitle="Lifecycle and vendor activity"
+            columns={1}
+            collapsible
+            defaultOpen={false}
+          >
+            <PurchaseAuditTimeline
+              entityType="rfq"
+              entityId={rfq.id}
+              className="border-0 p-0 shadow-none"
+              demoEvents={buildDemoPurchaseTimeline({
+                entityId: rfq.id,
+                entityType: 'RequestForQuotation',
+                createdAt: rfq.createdAt,
+                createdBy: rfq.createdBy,
+                updatedAt: rfq.updatedAt,
+                updatedBy: rfq.updatedBy,
+                statusLabel: RFQ_DOMAIN_STATUS_LABELS[rfq.status],
+                extra: rfq.sentAt
+                  ? [{ action: 'RFQ_SENT', actionLabel: 'Sent', timestamp: rfq.sentAt }]
+                  : [],
+              })}
+            />
+          </ErpCardSection>
         </div>
       </PurchaseCardFormShell>
 

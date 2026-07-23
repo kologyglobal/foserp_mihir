@@ -31,7 +31,7 @@ export const LEAD_STAGE_FIELD_LABELS: Record<string, string> = {
   leadOwnerId: 'Lead Owner',
   source: 'Lead Source',
   industry: 'Industry',
-  productRequirement: 'Product Requirement',
+  productRequirement: 'Requirement',
   expectedValue: 'Expected Value',
   expectedQty: 'Expected Qty',
   expectedCloseDate: 'Expected Close Date',
@@ -49,7 +49,7 @@ export const OPPORTUNITY_STAGE_FIELD_LABELS: Record<string, string> = {
   contactId: 'Contact',
   ownerId: 'Owner',
   productId: 'Product',
-  productRequirement: 'Product Requirement',
+  productRequirement: 'Requirement',
   lines: 'Item Lines',
   value: 'Deal Value',
   probability: 'Probability',
@@ -74,9 +74,10 @@ export const LEAD_STAGE_REQUIREMENTS: Record<string, readonly string[]> = {
   closed: [],
 }
 
+/** Qualified: dates/priority only — scope text deferred to Requirement Discussion. */
 export const OPPORTUNITY_STAGE_REQUIREMENTS: Record<string, readonly string[]> = {
   new_lead: ['opportunityName', 'customerId', 'ownerId'],
-  qualified: ['productRequirement', 'expectedCloseDate', 'priority'],
+  qualified: ['expectedCloseDate', 'priority'],
   requirement_discussion: ['productRequirement', 'contactId', 'value', 'expectedCloseDate'],
   technical_review: ['productRequirement', 'lines'],
   quotation_prepared: ['lines', 'value'],
@@ -138,11 +139,17 @@ export function isStageFieldFilled(value: unknown): boolean {
     if (value.length === 0) return false
     return value.some((row) => {
       if (row == null || typeof row !== 'object') return true
-      const line = row as { productOrItem?: string; itemCode?: string; productId?: string | null }
+      const line = row as {
+        productOrItem?: string
+        itemCode?: string
+        productId?: string | null
+        itemId?: string | null
+      }
       return Boolean(
         line.productOrItem?.trim()
         || line.itemCode?.trim()
-        || line.productId?.trim(),
+        || line.productId?.trim()
+        || line.itemId?.trim(),
       )
     })
   }
@@ -156,6 +163,13 @@ function missingFieldsFor(
 ): StageRequirementField[] {
   const missing: StageRequirementField[] = []
   for (const field of fields) {
+    if (field === 'productRequirement') {
+      if (isStageFieldFilled(entity.productRequirement) || isStageFieldFilled(entity.lines)) {
+        continue
+      }
+      missing.push({ field, label: labelOf(field) })
+      continue
+    }
     if (!isStageFieldFilled(entity[field])) {
       missing.push({ field, label: labelOf(field) })
     }

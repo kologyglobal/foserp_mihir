@@ -24,6 +24,8 @@ import { TableLink } from '@/components/ui/AppLink'
 import { DetailSection } from '@/components/masters/MasterLayouts'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { notify } from '@/store/toastStore'
+import { getFulfilmentAutoMode } from '@/modules/manufacturing/ui'
+import { advanceAfterPackReady } from '@/modules/dispatch/fulfilmentAutoAdvance'
 import {
   completeDispatchPackingSession,
   createDispatchPackage,
@@ -211,12 +213,15 @@ export function DispatchPackingDetailPage() {
   const navigate = useNavigate()
   const { row, packages, recon, loading, busy, setBusy, reload } = usePackingSession(id)
 
-  async function act(label: string, fn: () => Promise<unknown>) {
+  async function act(label: string, fn: () => Promise<unknown>, opts?: { afterReady?: boolean }) {
     setBusy(true)
     try {
       await fn()
       notify.success(label)
       await reload()
+      if (opts?.afterReady && row?.outboundDispatchId) {
+        await advanceAfterPackReady(row.outboundDispatchId, navigate)
+      }
     } catch (err) {
       notify.error(err instanceof Error ? err.message : 'Action failed')
     } finally {
@@ -281,7 +286,11 @@ export function DispatchPackingDetailPage() {
               <CommandBarButton
                 icon={CheckCircle2}
                 label="Complete"
-                onClick={() => void act('Session completed', () => completeDispatchPackingSession(id))}
+                onClick={() =>
+                  void act('Session completed', () => completeDispatchPackingSession(id), {
+                    afterReady: true,
+                  })
+                }
                 disabled={busy}
               />
             ) : null}
@@ -290,7 +299,11 @@ export function DispatchPackingDetailPage() {
                 icon={CheckCircle2}
                 label="Verify"
                 primary
-                onClick={() => void act('Session verified', () => verifyDispatchPackingSession(id))}
+                onClick={() =>
+                  void act('Session verified', () => verifyDispatchPackingSession(id), {
+                    afterReady: true,
+                  })
+                }
                 disabled={busy}
               />
             ) : null}
@@ -485,6 +498,26 @@ export function DispatchPackingPackModePage() {
       notify.success('Pack recorded')
       await reload()
       if (row?.outboundDispatchId) await loadPickLines(row.outboundDispatchId)
+      if (!getFulfilmentAutoMode() || !row?.outboundDispatchId || !id) return
+      const session = await getDispatchPackingSession(id)
+      const picked = Number(session.totalPickedQuantity ?? 0)
+      const packed = Number(session.totalPackedQuantity ?? 0)
+      if (picked <= 0 || packed + 1e-9 < picked) return
+      if (['PACKED', 'VERIFIED', 'CANCELLED'].includes(session.status)) {
+        await advanceAfterPackReady(row.outboundDispatchId, navigate)
+        return
+      }
+      try {
+        await completeDispatchPackingSession(id)
+        notify.success('Session completed')
+        await advanceAfterPackReady(row.outboundDispatchId, navigate)
+      } catch (completeErr) {
+        notify.info(
+          completeErr instanceof Error
+            ? `Fully packed — complete session manually (${completeErr.message})`
+            : 'Fully packed — complete the session to continue',
+        )
+      }
     } catch (err) {
       notify.error(err instanceof Error ? err.message : 'Pack failed')
     } finally {

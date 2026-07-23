@@ -78,7 +78,7 @@ export function buildWoNextActions(wo: WorkOrder): NextBestAction[] {
     actions.unshift({ id: 'qc-open', label: 'Open QC Inspection', href: '/quality/queue', priority: 'primary' })
     actions.push({ id: 'rework', label: 'View Rework Orders', href: '/quality/rework' })
   }
-  actions.push({ id: '360', label: 'Open WO 360', href: `/work-orders/${wo.id}/360` })
+  actions.push({ id: '360', label: 'Open Work Order', href: `/manufacturing/work-orders/${wo.id}` })
   return actions
 }
 
@@ -98,7 +98,7 @@ export function buildProductionLiveAlerts(): LiveAlert[] {
       category: 'qc_hold',
       message: `QC hold on ${w.woNo} — reinspection may be pending`,
       documentRef: w.outputItemCode ?? '',
-      href: `/work-orders/${w.id}/360`,
+      href: `/manufacturing/work-orders/${w.id}`,
       actionLabel: 'Open QC',
     })
   }
@@ -110,7 +110,7 @@ export function buildProductionLiveAlerts(): LiveAlert[] {
       severity: 'critical',
       category: 'shortage',
       message: `${shortages} material shortage(s) affecting production`,
-      href: '/mrp/planner',
+      href: '/manufacturing/production-plan',
       actionLabel: 'Open MRP',
     })
   }
@@ -214,12 +214,12 @@ export function buildSoNextActions(so: SalesOrder): NextBestAction[] {
     actions.push({ id: 'confirm', label: 'Confirm Order', href: `/sales/orders/${so.id}`, priority: 'primary' })
   }
   if (so.status === 'confirmed') {
-    actions.push({ id: 'mrp', label: 'Run MRP', href: '/mrp/run', priority: 'primary' })
-    actions.push({ id: 'wo', label: 'Create Work Order', href: '/work-orders' })
+    actions.push({ id: 'mrp', label: 'Open Production Plan', href: '/manufacturing/production-plan', priority: 'primary' })
+    actions.push({ id: 'wo', label: 'Create Work Order', href: '/manufacturing/work-orders' })
   }
   if (['confirmed', 'in_production', 'ready_dispatch'].includes(so.status)) {
-    actions.push({ id: 'material', label: 'Check Material Readiness', href: '/mrp/planner' })
-    actions.push({ id: 'dispatch', label: 'Plan Dispatch', href: '/dispatch/plan' })
+    actions.push({ id: 'material', label: 'Check Material Readiness', href: '/manufacturing/production-plan' })
+    actions.push({ id: 'dispatch', label: 'Plan Dispatch', href: '/dispatch/workbench' })
   }
   actions.push({ id: 'customer', label: 'Company 360', href: salesCustomer360Path(so.customerId) })
   return actions
@@ -245,8 +245,8 @@ export function buildSoDocumentAlerts(so: SalesOrder): LiveAlert[] {
       severity: 'medium',
       category: 'general',
       message: 'Order confirmed — MRP / production planning may be required',
-      href: '/mrp/run',
-      actionLabel: 'Run MRP',
+      href: '/manufacturing/production-plan',
+      actionLabel: 'Open Plan',
     })
   }
   return alerts
@@ -434,7 +434,7 @@ export function buildQcNextActions(inspection: QcInspection): NextBestAction[] {
     { id: 'ncr', label: 'Raise NCR', href: '/quality/ncr' },
   ]
   if (inspection.workOrderId) {
-    actions.push({ id: 'release', label: 'Release Operation', href: `/work-orders/${inspection.workOrderId}/360` })
+    actions.push({ id: 'release', label: 'Release Operation', href: `/manufacturing/work-orders/${inspection.workOrderId}` })
   }
   return actions
 }
@@ -451,7 +451,7 @@ export function buildJobWorkNextActions(jwo: JobWorkOrderView): NextBestAction[]
   if (jwo.qcStatus === 'pending' || jwo.status === 'qc_pending') {
     actions.push({ id: 'qc', label: 'Complete QC', href: '/quality/queue', priority: 'primary' })
   }
-  actions.push({ id: 'wo', label: 'Open WO 360', href: `/work-orders/${jwo.workOrderId}/360` })
+  actions.push({ id: 'wo', label: 'Open Work Order', href: `/manufacturing/work-orders/${jwo.workOrderId}` })
   return actions
 }
 
@@ -483,8 +483,8 @@ export function buildSalesLiveAlerts(input?: {
       severity: pendingMrp > 2 ? 'high' : 'medium',
       category: 'general',
       message: `${pendingMrp} confirmed order(s) need MRP / work order`,
-      href: '/mrp/run',
-      actionLabel: 'Run MRP',
+      href: '/manufacturing/production-plan',
+      actionLabel: 'Open Plan',
     })
   }
 
@@ -507,8 +507,8 @@ export function buildSalesLiveAlerts(input?: {
       severity: 'high',
       category: 'delay',
       message: `${highRisk.length} order(s) at delivery or QC risk`,
-      href: '/sales/order-status',
-      actionLabel: 'View Status',
+      href: '/sales/orders',
+      actionLabel: 'View Orders',
     })
   }
 
@@ -553,7 +553,7 @@ export function buildFinanceLiveAlerts(): LiveAlert[] {
       severity: 'critical',
       category: 'payment',
       message: `${overdue} overdue invoice(s) — collection action required`,
-      href: '/invoices/register',
+      href: '/accounting/money-in/invoices',
       actionLabel: 'Open Invoices',
     })
   }
@@ -564,7 +564,7 @@ export function buildFinanceLiveAlerts(): LiveAlert[] {
       severity: 'medium',
       category: 'payment',
       message: `${unpaid} posted invoice(s) awaiting payment`,
-      href: '/invoices/register',
+      href: '/accounting/money-in/invoices',
       actionLabel: 'Record Payment',
     })
   }

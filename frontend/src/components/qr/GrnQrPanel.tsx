@@ -86,7 +86,7 @@ function GrnQrActions({ qr, compact }: { qr: { qrId: string; displayCode: string
         <QrCode className="h-3.5 w-3.5" /> QR Generated
       </span>
       <Link
-        to={`/qr/print/${qr.qrId}`}
+        to="/manufacturing/traceability"
         className="inline-flex items-center gap-1 rounded border border-erp-border px-2 py-1 text-xs hover:border-erp-accent"
       >
         <Printer className="h-3.5 w-3.5" /> Print QR

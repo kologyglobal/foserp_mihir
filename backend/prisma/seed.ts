@@ -56,39 +56,60 @@ async function main(): Promise<void> {
   const tenant = await prisma.tenant.upsert({
     where: { slug: 'vasant-trailers' },
     create: {
-      name: 'Vasant Trailers',
+      name: 'Veer International',
       slug: 'vasant-trailers',
-      legalName: 'Vasant Trailers Pvt Ltd',
+      legalName: 'VEER INTERNATIONAL TANKS AND CONTAINERS PRIVATE LIMITED',
       email: 'admin@vasant-trailers.com',
       phone: '+91 9876543210',
       country: 'India',
       state: 'Gujarat',
-      city: 'Ahmedabad',
+      city: 'Chhapi',
+      timezone: 'Asia/Kolkata',
+      currency: 'INR',
       status: 'ACTIVE',
       subscriptionPlan: 'trial',
       subscriptionStatus: 'active',
     },
-    update: {},
+    update: {
+      name: 'Veer International',
+      legalName: 'VEER INTERNATIONAL TANKS AND CONTAINERS PRIVATE LIMITED',
+      email: 'admin@vasant-trailers.com',
+      phone: '+91 9876543210',
+      country: 'India',
+      state: 'Gujarat',
+      city: 'Chhapi',
+      timezone: 'Asia/Kolkata',
+      currency: 'INR',
+      status: 'ACTIVE',
+      subscriptionPlan: 'trial',
+      subscriptionStatus: 'active',
+    },
   })
 
   const tenantAdminRoleId = await seedRole('Tenant Admin', permissionMap, tenant.id, true)
-  await seedRole('Admin', permissionMap, tenant.id, true)
+  const adminRoleId = await seedRole('Admin', permissionMap, tenant.id, true)
   await seedRole('Administrator', permissionMap, tenant.id, true)
   await seedRole('CEO', permissionMap, tenant.id, true)
   await seedRole('CRM Admin', permissionMap, tenant.id, true)
   await seedRole('Master Data Manager', permissionMap, tenant.id, true)
-  await seedRole('Purchase Manager', permissionMap, tenant.id, true)
+  const purchaseManagerRoleId = await seedRole('Purchase Manager', permissionMap, tenant.id, true)
   await seedRole('Purchase Executive', permissionMap, tenant.id, true)
   await seedRole('Requester', permissionMap, tenant.id, true)
   await seedRole('Department Manager', permissionMap, tenant.id, true)
   await seedRole('Department Head', permissionMap, tenant.id, true)
-  await seedRole('Administrator', permissionMap, tenant.id, true)
-  await seedRole('Inventory Manager', permissionMap, tenant.id, true)
-  await seedRole('Sales Manager', permissionMap, tenant.id, true)
-  await seedRole('Production Manager', permissionMap, tenant.id, true)
+  await seedRole('Store Executive', permissionMap, tenant.id, true)
+  const inventoryManagerRoleId = await seedRole('Inventory Manager', permissionMap, tenant.id, true)
+  const salesManagerRoleId = await seedRole('Sales Manager', permissionMap, tenant.id, true)
+  await seedRole('Sales Executive', permissionMap, tenant.id, true)
+  const productionManagerRoleId = await seedRole('Production Manager', permissionMap, tenant.id, true)
   await seedRole('Production Supervisor', permissionMap, tenant.id, true)
   await seedRole('Production Engineer', permissionMap, tenant.id, true)
-  await seedRole('Sales Executive', permissionMap, tenant.id, true)
+  await seedRole('Production Operator', permissionMap, tenant.id, true)
+  const qualityInspectorRoleId = await seedRole('Quality Inspector', permissionMap, tenant.id, true)
+  const financeManagerRoleId = await seedRole('Finance Manager', permissionMap, tenant.id, true)
+  await seedRole('Finance Executive', permissionMap, tenant.id, true)
+  await seedRole('Dispatch Manager', permissionMap, tenant.id, true)
+  await seedRole('Dispatch User', permissionMap, tenant.id, true)
   await seedRole('Viewer', permissionMap, tenant.id, true)
 
   // Rebuild Tenant Admin / Admin / Administrator grants on every tenant so catalog
@@ -98,57 +119,151 @@ async function main(): Promise<void> {
     await seedRole('Tenant Admin', permissionMap, t.id, true)
     await seedRole('Admin', permissionMap, t.id, true)
     await seedRole('Administrator', permissionMap, t.id, true)
-    console.log(`  Synced workspace-admin role packs for tenant ${t.slug}`)
+    await seedRole('Finance Manager', permissionMap, t.id, true)
+    await seedRole('Finance Executive', permissionMap, t.id, true)
+    await seedRole('Quality Inspector', permissionMap, t.id, true)
+    console.log(`  Synced workspace-admin + finance/QC role packs for tenant ${t.slug}`)
   }
 
   await initTenantCodeSeries(tenant.id)
 
-  const adminPassword = await hashPassword('Admin@123')
-  const superPassword = await hashPassword('Super@123')
+  async function upsertActiveUser(input: {
+    email: string
+    password: string
+    firstName: string
+    lastName: string
+    designation: string
+    department: string
+    mobile?: string
+    roleIds: string[]
+  }) {
+    const passwordHash = await hashPassword(input.password)
+    const user = await prisma.user.upsert({
+      where: { tenantId_email: { tenantId: tenant.id, email: input.email } },
+      create: {
+        tenantId: tenant.id,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email: input.email,
+        mobile: input.mobile ?? null,
+        passwordHash,
+        status: 'ACTIVE',
+        emailVerified: true,
+        designation: input.designation,
+        department: input.department,
+      },
+      update: {
+        firstName: input.firstName,
+        lastName: input.lastName,
+        mobile: input.mobile ?? null,
+        passwordHash,
+        status: 'ACTIVE',
+        emailVerified: true,
+        designation: input.designation,
+        department: input.department,
+        deletedAt: null,
+      },
+    })
 
-  const superAdmin = await prisma.user.upsert({
-    where: { tenantId_email: { tenantId: tenant.id, email: 'super@fos-erp.com' } },
-    create: {
-      tenantId: tenant.id,
-      firstName: 'Super',
-      lastName: 'Admin',
-      email: 'super@fos-erp.com',
-      passwordHash: superPassword,
-      status: 'ACTIVE',
-      emailVerified: true,
-      designation: 'System Administrator',
-    },
-    update: {},
+    for (const roleId of input.roleIds) {
+      await prisma.userRole.upsert({
+        where: { userId_roleId: { userId: user.id, roleId } },
+        create: { userId: user.id, roleId, tenantId: tenant.id },
+        update: {},
+      })
+    }
+    return user
+  }
+
+  const superAdmin = await upsertActiveUser({
+    email: 'super@fos-erp.com',
+    password: 'Super@123',
+    firstName: 'Super',
+    lastName: 'Admin',
+    designation: 'System Administrator',
+    department: 'Platform',
+    roleIds: [superAdminRoleId],
   })
 
-  const tenantAdmin = await prisma.user.upsert({
-    where: { tenantId_email: { tenantId: tenant.id, email: 'admin@vasant-trailers.com' } },
-    create: {
-      tenantId: tenant.id,
-      firstName: 'Rajesh',
-      lastName: 'Patel',
-      email: 'admin@vasant-trailers.com',
-      mobile: '9876543210',
-      passwordHash: adminPassword,
-      status: 'ACTIVE',
-      emailVerified: true,
-      designation: 'Managing Director',
-      department: 'Management',
-    },
-    update: {},
+  const tenantAdmin = await upsertActiveUser({
+    email: 'admin@vasant-trailers.com',
+    password: 'Admin@123',
+    firstName: 'Rajesh',
+    lastName: 'Patel',
+    designation: 'Managing Director',
+    department: 'Management',
+    mobile: '9876543210',
+    roleIds: [tenantAdminRoleId, adminRoleId],
   })
 
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: superAdmin.id, roleId: superAdminRoleId } },
-    create: { userId: superAdmin.id, roleId: superAdminRoleId, tenantId: tenant.id },
-    update: {},
+  await upsertActiveUser({
+    email: 'purchase@vasant-trailers.com',
+    password: 'Purchase@123',
+    firstName: 'Priya',
+    lastName: 'Shah',
+    designation: 'Purchase Manager',
+    department: 'Purchase',
+    mobile: '9876543211',
+    roleIds: [purchaseManagerRoleId],
   })
 
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: tenantAdmin.id, roleId: tenantAdminRoleId } },
-    create: { userId: tenantAdmin.id, roleId: tenantAdminRoleId, tenantId: tenant.id },
-    update: {},
+  await upsertActiveUser({
+    email: 'inventory@vasant-trailers.com',
+    password: 'Inventory@123',
+    firstName: 'Amit',
+    lastName: 'Desai',
+    designation: 'Inventory Manager',
+    department: 'Inventory',
+    mobile: '9876543212',
+    roleIds: [inventoryManagerRoleId],
   })
+
+  await upsertActiveUser({
+    email: 'production@vasant-trailers.com',
+    password: 'Production@123',
+    firstName: 'Vikram',
+    lastName: 'Joshi',
+    designation: 'Production Manager',
+    department: 'Production',
+    mobile: '9876543213',
+    roleIds: [productionManagerRoleId],
+  })
+
+  await upsertActiveUser({
+    email: 'sales@vasant-trailers.com',
+    password: 'Sales@123',
+    firstName: 'Sneha',
+    lastName: 'Mehta',
+    designation: 'Sales Manager',
+    department: 'Sales',
+    mobile: '9876543214',
+    roleIds: [salesManagerRoleId],
+  })
+
+  await upsertActiveUser({
+    email: 'quality@vasant-trailers.com',
+    password: 'Quality@123',
+    firstName: 'Neha',
+    lastName: 'Trivedi',
+    designation: 'Quality Inspector',
+    department: 'Quality Control',
+    mobile: '9876543215',
+    roleIds: [qualityInspectorRoleId],
+  })
+
+  await upsertActiveUser({
+    email: 'accounts@vasant-trailers.com',
+    password: 'Accounts@123',
+    firstName: 'Kiran',
+    lastName: 'Bhatt',
+    designation: 'Finance Manager',
+    department: 'Accounts',
+    mobile: '9876543216',
+    roleIds: [financeManagerRoleId],
+  })
+
+  void superAdmin
+  void tenantAdmin
 
   const pipeline = await prisma.crmPipeline.upsert({
     where: { id: '00000000-0000-4000-8000-000000000001' },
@@ -281,38 +396,198 @@ async function main(): Promise<void> {
     }
   }
 
-  const { PRODUCT_SEED_ROWS, VASANT_FG_ITEM_SEED } = await import('./productSeedData.js')
+  const { UOM_SEED_ROWS, ITEM_CATEGORY_SEED_ROWS } = await import('./uomCategorySeedData.js')
+  const uomIdByCode = new Map<string, string>()
+  for (const row of UOM_SEED_ROWS) {
+    const uom = await prisma.masterUom.upsert({
+      where: { tenantId_code: { tenantId: tenant.id, code: row.code } },
+      create: {
+        tenantId: tenant.id,
+        code: row.code,
+        name: row.name,
+        description: row.description,
+        uomType: row.uomType,
+        decimalPlaces: row.decimalPlaces,
+        isBaseUnit: row.isBaseUnit,
+        status: 'ACTIVE',
+        createdBy: tenantAdmin.id,
+        updatedBy: tenantAdmin.id,
+      },
+      update: {
+        name: row.name,
+        description: row.description,
+        uomType: row.uomType,
+        decimalPlaces: row.decimalPlaces,
+        isBaseUnit: row.isBaseUnit,
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+    })
+    uomIdByCode.set(row.code, uom.id)
+  }
+  const nosUomId = uomIdByCode.get('NOS') ?? uomIdByCode.get('Nos')
+  if (!nosUomId) throw new Error('NOS UOM missing after seed')
+  const nosUom = { id: nosUomId }
 
-  const nosUom = await prisma.masterUom.upsert({
-    where: { tenantId_code: { tenantId: tenant.id, code: 'Nos' } },
-    create: {
-      tenantId: tenant.id,
-      code: 'Nos',
-      name: 'Numbers',
-      description: 'Each / unit count',
-      uomType: 'integer',
-      decimalPlaces: 0,
-      isBaseUnit: true,
-      status: 'ACTIVE',
-      createdBy: tenantAdmin.id,
-      updatedBy: tenantAdmin.id,
-    },
-    update: { status: 'ACTIVE', deletedAt: null, name: 'Numbers' },
-  })
-
-  const fgCategory = await prisma.masterItemCategory.upsert({
+  const categoryIdByCode = new Map<string, string>()
+  const orderedCategories = [...ITEM_CATEGORY_SEED_ROWS].sort((a, b) => a.level - b.level)
+  for (const row of orderedCategories) {
+    const parentId = row.parentCode ? categoryIdByCode.get(row.parentCode) ?? null : null
+    if (row.parentCode && !parentId) {
+      throw new Error(`Item category parent missing: ${row.parentCode} for ${row.code}`)
+    }
+    const cat = await prisma.masterItemCategory.upsert({
+      where: { tenantId_code: { tenantId: tenant.id, code: row.code } },
+      create: {
+        tenantId: tenant.id,
+        code: row.code,
+        name: row.name,
+        level: row.level,
+        parentId,
+        stockPolicy: row.stockPolicy,
+        defaultIsStockable: row.defaultIsStockable,
+        defaultInventoryType: row.defaultInventoryType,
+        status: 'ACTIVE',
+        createdBy: tenantAdmin.id,
+        updatedBy: tenantAdmin.id,
+      },
+      update: {
+        name: row.name,
+        level: row.level,
+        parentId,
+        stockPolicy: row.stockPolicy,
+        defaultIsStockable: row.defaultIsStockable,
+        defaultInventoryType: row.defaultInventoryType,
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+    })
+    categoryIdByCode.set(row.code, cat.id)
+  }
+  // Legacy CAT-FG alias → same stock rules as FG (existing FG item FKs).
+  const fgDefaults = ITEM_CATEGORY_SEED_ROWS.find((r) => r.code === 'FG')!
+  const legacyFg = await prisma.masterItemCategory.upsert({
     where: { tenantId_code: { tenantId: tenant.id, code: 'CAT-FG' } },
     create: {
       tenantId: tenant.id,
       code: 'CAT-FG',
       name: 'Finished Goods',
       level: 1,
+      stockPolicy: fgDefaults.stockPolicy,
+      defaultIsStockable: fgDefaults.defaultIsStockable,
+      defaultInventoryType: fgDefaults.defaultInventoryType,
       status: 'ACTIVE',
       createdBy: tenantAdmin.id,
       updatedBy: tenantAdmin.id,
     },
-    update: { status: 'ACTIVE', deletedAt: null, name: 'Finished Goods' },
+    update: {
+      name: 'Finished Goods',
+      stockPolicy: fgDefaults.stockPolicy,
+      defaultIsStockable: fgDefaults.defaultIsStockable,
+      defaultInventoryType: fgDefaults.defaultInventoryType,
+      status: 'ACTIVE',
+      deletedAt: null,
+    },
   })
+  categoryIdByCode.set('CAT-FG', legacyFg.id)
+
+  const fgCategoryId = categoryIdByCode.get('FG') ?? categoryIdByCode.get('CAT-FG')
+  if (!fgCategoryId) throw new Error('FG category missing after seed')
+  const fgCategory = { id: fgCategoryId }
+
+  const { GST_GROUP_SEED_ROWS, GST_RATE_SEED_ROWS, HSN_SEED_ROWS } = await import('./gstTaxSeedData.js')
+  const gstGroupIdByCode = new Map<string, string>()
+  for (const row of GST_GROUP_SEED_ROWS) {
+    const group = await prisma.masterGstGroup.upsert({
+      where: { tenantId_code: { tenantId: tenant.id, code: row.code } },
+      create: {
+        tenantId: tenant.id,
+        code: row.code,
+        goodsType: row.goodsType,
+        description: row.description,
+        status: 'ACTIVE',
+        createdBy: tenantAdmin.id,
+        updatedBy: tenantAdmin.id,
+      },
+      update: {
+        goodsType: row.goodsType,
+        description: row.description,
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+    })
+    gstGroupIdByCode.set(row.code, group.id)
+  }
+
+  let gstRateCount = 0
+  for (const row of GST_RATE_SEED_ROWS) {
+    const gstGroupId = gstGroupIdByCode.get(row.gstGroupCode)
+    if (!gstGroupId) continue
+    await prisma.masterGstRate.upsert({
+      where: { tenantId_code: { tenantId: tenant.id, code: row.code } },
+      create: {
+        tenantId: tenant.id,
+        code: row.code,
+        gstGroupId,
+        fromState: row.fromState,
+        locationStateCode: row.locationStateCode,
+        dateFrom: new Date(row.dateFrom),
+        dateTo: null,
+        sgst: row.sgst,
+        cgst: row.cgst,
+        igst: row.igst,
+        applicableFor: row.applicableFor ?? 'BOTH',
+        status: 'ACTIVE',
+        createdBy: tenantAdmin.id,
+        updatedBy: tenantAdmin.id,
+      },
+      update: {
+        gstGroupId,
+        fromState: row.fromState,
+        locationStateCode: row.locationStateCode,
+        dateFrom: new Date(row.dateFrom),
+        sgst: row.sgst,
+        cgst: row.cgst,
+        igst: row.igst,
+        applicableFor: row.applicableFor ?? 'BOTH',
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+    })
+    gstRateCount += 1
+  }
+
+  let hsnCount = 0
+  const hsnIdByCode = new Map<string, string>()
+  for (const row of HSN_SEED_ROWS) {
+    const gstGroupId = gstGroupIdByCode.get(row.gstGroupCode)
+    if (!gstGroupId) continue
+    const hsn = await prisma.masterHsnCode.upsert({
+      where: { tenantId_code: { tenantId: tenant.id, code: row.code } },
+      create: {
+        tenantId: tenant.id,
+        code: row.code,
+        gstGroupId,
+        description: row.description,
+        status: 'ACTIVE',
+        createdBy: tenantAdmin.id,
+        updatedBy: tenantAdmin.id,
+      },
+      update: {
+        gstGroupId,
+        description: row.description,
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+    })
+    hsnIdByCode.set(row.code, hsn.id)
+    hsnCount += 1
+  }
+
+  const trailerHsnId = hsnIdByCode.get('871639') ?? null
+  const trailerGstGroupId = gstGroupIdByCode.get('GST18-GOODS') ?? null
+
+  const { PRODUCT_SEED_ROWS, VASANT_FG_ITEM_SEED } = await import('./productSeedData.js')
 
   const fgItemIdByCode = new Map<string, string>()
   const fgItemSeed = [
@@ -337,7 +612,9 @@ async function main(): Promise<void> {
         itemType: 'finished_good',
         productType: 'finish_product',
         inventoryType: 'inventory',
-        hsnCode: '8716',
+        hsnCode: '871639',
+        hsnId: trailerHsnId,
+        gstGroupId: trailerGstGroupId,
         standardRate: fg.standardRate,
         isPurchasable: false,
         isStockable: true,
@@ -352,6 +629,9 @@ async function main(): Promise<void> {
         baseUomId: nosUom.id,
         itemType: 'finished_good',
         productType: 'finish_product',
+        hsnCode: '871639',
+        hsnId: trailerHsnId,
+        gstGroupId: trailerGstGroupId,
         standardRate: fg.standardRate,
         status: 'ACTIVE',
         deletedAt: null,
@@ -623,17 +903,25 @@ async function main(): Promise<void> {
 
   console.log('\n=== Seed complete ===')
   console.log(`Tenant: ${tenant.name} (slug: ${tenant.slug})`)
+  console.log(`Company: ${tenant.legalName} · ${tenant.city}, ${tenant.state}, ${tenant.country}`)
   console.log(`Geography: ${GEO_COUNTRY_SEED.length} countries, ${GEO_STATE_SEED.length} states, ${cityCount} cities`)
+  console.log(`UOMs: ${UOM_SEED_ROWS.length} · Item categories: ${ITEM_CATEGORY_SEED_ROWS.length}`)
+  console.log(`GST groups: ${GST_GROUP_SEED_ROWS.length} · rates: ${gstRateCount} · HSN: ${hsnCount}`)
   console.log(`Warehouses: ${WAREHOUSE_SEED_ROWS.length}`)
   console.log(`Locations: ${locationCount}`)
   console.log(`Products: ${PRODUCT_SEED_ROWS.length}`)
   console.log(`FG items: ${fgItemIdByCode.size}`)
   console.log(`Quotation templates: ${QUOTATION_TEMPLATE_SEED_ROWS.length}`)
   console.log(`QC parameters: 3 · plans: ${inProcessPlan.planCode}, ${finalPlan.planCode}`)
-  console.log('\nDevelopment credentials:')
-  console.log('  Super Admin: super@fos-erp.com / Super@123')
-  console.log('  Tenant Admin: admin@vasant-trailers.com / Admin@123')
-  console.log(`\nLogin with tenantSlug: "${tenant.slug}"`)
+  console.log('\nDevelopment credentials (tenantSlug: vasant-trailers):')
+  console.log('  Superadmin:  super@fos-erp.com           / Super@123      → Super Admin')
+  console.log('  Admin:       admin@vasant-trailers.com   / Admin@123      → Tenant Admin + Admin')
+  console.log('  Purchase:    purchase@vasant-trailers.com / Purchase@123   → Purchase Manager')
+  console.log('  Inventory:   inventory@vasant-trailers.com / Inventory@123 → Inventory Manager')
+  console.log('  Production:  production@vasant-trailers.com / Production@123 → Production Manager')
+  console.log('  Sales:       sales@vasant-trailers.com   / Sales@123      → Sales Manager')
+  console.log('  Quality:     quality@vasant-trailers.com  / Quality@123    → Quality Inspector')
+  console.log('  Accounts:    accounts@vasant-trailers.com / Accounts@123   → Finance Manager')
 }
 
 main()

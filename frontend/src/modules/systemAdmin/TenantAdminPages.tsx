@@ -5,30 +5,18 @@ import { ShieldX, Eye, Pencil, Power, PowerOff, Trash2 } from 'lucide-react'
 import { MasterRegisterTable } from '../../components/masters/MasterRegisterTable'
 import { MasterListShell, STATUS_FILTER_OPTIONS } from '../../components/masters/MasterListShell'
 import { DetailLayout, DetailSection, DetailGrid, DetailField, FormLayout, FormSection, MasterNotFound } from '../../components/masters/MasterLayouts'
-import { Badge } from '../../components/ui/Badge'
 import { FormField } from '../../components/forms/FormField'
 import { Input, Select } from '../../components/forms/Inputs'
 import { EnterpriseRowActionsMenu, type RowActionItem } from '../../design-system/enterprise/EnterpriseTablePrimitives'
 import { MasterLifecycleDialog } from '../../components/masters/MasterLifecycleDialog'
 import { useMasterLifecycle } from '../../hooks/useMasterLifecycle'
+import { AdminTenantStatusBadge } from '../../components/admin'
 import { useAdminStore } from '../../store/adminStore'
 import { resolveStoreAction, type MaybePromise, type StoreActionResult } from '../../store/storeAction'
 import { formatApiError } from '../../services/api/apiErrors'
 import { notify } from '../../store/toastStore'
 import { isSuperAdminUser } from '../../utils/permissions'
 import type { AdminTenantStatus } from '../../types/admin'
-
-const STATUS_COLOR: Record<AdminTenantStatus, 'green' | 'gray' | 'yellow' | 'red'> = {
-  ACTIVE: 'green',
-  TRIAL: 'yellow',
-  INACTIVE: 'gray',
-  SUSPENDED: 'red',
-  ARCHIVED: 'gray',
-}
-
-function TenantStatusBadge({ status }: { status: AdminTenantStatus }) {
-  return <Badge color={STATUS_COLOR[status]}>{status}</Badge>
-}
 
 function SuperAdminOnlyNotice() {
   return (
@@ -62,8 +50,8 @@ function TenantRowActions({ tenantId, status }: { tenantId: string; status: Admi
   })
 
   const actions: RowActionItem[] = [
-    { id: 'view', label: 'View', icon: Eye, to: `/admin/tenants/${tenantId}` },
-    { id: 'edit', label: 'Edit', icon: Pencil, to: `/admin/tenants/${tenantId}/edit` },
+    { id: 'view', label: 'View', icon: Eye, to: `/platform/tenants/${tenantId}` },
+    { id: 'edit', label: 'Edit', icon: Pencil, to: `/platform/tenants/${tenantId}/edit` },
   ]
   if (status === 'ACTIVE') {
     actions.push({ id: 'suspend', label: 'Suspend', icon: PowerOff, onClick: () => lifecycle.open('deactivate', tenantId, 'Tenant') })
@@ -124,7 +112,7 @@ export function TenantAdminListPage() {
     },
     { accessorKey: 'email', header: 'Admin Email' },
     { id: 'plan', header: 'Plan', accessorKey: 'subscriptionPlan' },
-    { id: 'status', header: 'Status', cell: ({ row }) => <TenantStatusBadge status={row.original.status} /> },
+    { id: 'status', header: 'Status', cell: ({ row }) => <AdminTenantStatusBadge status={row.original.status} /> },
     {
       id: 'actions',
       header: 'Actions',
@@ -136,11 +124,12 @@ export function TenantAdminListPage() {
   return (
     <MasterListShell
       title="Tenants"
+      badge="Admin"
       description="Manage platform tenant workspaces and subscriptions"
-      breadcrumbs={[{ label: 'Administration', to: '/admin' }, { label: 'Tenants' }]}
-      favoritePath="/admin/tenants"
+      breadcrumbs={[{ label: 'Platform', to: '/platform' }, { label: 'Tenants' }]}
+      favoritePath="/platform/tenants"
       createLabel="New Tenant"
-      createTo="/admin/tenants/new"
+      createTo="/platform/tenants/new"
       search={search}
       onSearchChange={setSearch}
       statusFilter={status}
@@ -271,7 +260,7 @@ export function TenantAdminFormPage() {
             return
           }
           notify.success('Tenant saved')
-          navigate(`/admin/tenants/${existing.id}`)
+          navigate(`/platform/tenants/${existing.id}`)
         } else {
           const res = await resolveStoreAction(
             createTenant({
@@ -301,7 +290,7 @@ export function TenantAdminFormPage() {
             return
           }
           notify.success('Tenant created')
-          navigate(`/admin/tenants/${res.tenantId}`)
+          navigate(`/platform/tenants/${res.tenantId}`)
         }
       } catch (err) {
         setSaveError(formatApiError(err))
@@ -315,19 +304,19 @@ export function TenantAdminFormPage() {
 
   return (
     <FormLayout
-      backTo="/admin/tenants"
+      backTo="/platform/tenants"
       backLabel="Back to Tenants"
       title={isEdit ? 'Edit Tenant' : 'New Tenant'}
       isEdit={isEdit}
       breadcrumbs={[
-        { label: 'Administration', to: '/admin' },
-        { label: 'Tenants', to: '/admin/tenants' },
+        { label: 'Platform', to: '/platform' },
+        { label: 'Tenants', to: '/platform/tenants' },
         { label: isEdit ? (existing?.name ?? 'Edit') : 'New' },
       ]}
       onSubmit={onSubmit}
       isSubmitting={submitting}
       validationErrors={validationErrors}
-      onCancel={() => navigate(isEdit && existing ? `/admin/tenants/${existing.id}` : '/admin/tenants')}
+      onCancel={() => navigate(isEdit && existing ? `/platform/tenants/${existing.id}` : '/platform/tenants')}
     >
       <FormSection title="Tenant Details">
         <FormField label="Company Name" required><Input value={form.name} onChange={(e) => setField('name', e.target.value)} /></FormField>
@@ -378,13 +367,13 @@ export function TenantAdminDetailPage() {
 
   return (
     <DetailLayout
-      backTo="/admin/tenants"
+      backTo="/platform/tenants"
       backLabel="Back to Tenants"
       title={tenant.name}
       subtitle={tenant.slug}
-      editTo={`/admin/tenants/${tenant.id}/edit`}
-      breadcrumbs={[{ label: 'Administration', to: '/admin' }, { label: 'Tenants', to: '/admin/tenants' }, { label: tenant.name }]}
-      badges={<TenantStatusBadge status={tenant.status} />}
+      editTo={`/platform/tenants/${tenant.id}/edit`}
+      breadcrumbs={[{ label: 'Platform', to: '/platform' }, { label: 'Tenants', to: '/platform/tenants' }, { label: tenant.name }]}
+      badges={<AdminTenantStatusBadge status={tenant.status} />}
     >
       <div className="space-y-6">
         <DetailSection title="Company Details">

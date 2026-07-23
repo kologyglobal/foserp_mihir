@@ -7,11 +7,15 @@ import {
   cancelOutboundDispatchSchema,
   createOutboundDispatchSchema,
   listOutboundDispatchesQuerySchema,
+  postOutboundDispatchSchema,
   reverseOutboundDispatchSchema,
   updateOutboundDispatchSchema,
 } from './outbound-dispatch.schemas.js'
+import podRoutes from '../pod/dispatch-pod.routes.js'
 
 const router = Router({ mergeParams: true })
+
+router.use(podRoutes)
 
 router.get(
   '/',
@@ -44,11 +48,12 @@ router.post(
   controller.confirm,
 )
 
-/** Phase 7C5 hardened post — workbench drafts require ISSUED Delivery Challan. */
+/** Phase 7C5 hardened post — workbench drafts require ISSUED Delivery Challan (unless emergency). */
 router.post(
   '/:id/post',
   validateParams(uuidParamSchema),
-  requirePermission('dispatch.post'),
+  requireAnyPermission('dispatch.post', 'dispatch.override'),
+  validateBody(postOutboundDispatchSchema),
   controller.post,
 )
 

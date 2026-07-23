@@ -154,8 +154,11 @@ export async function cleanupTenant(tenantId: string): Promise<void> {
   await prisma.purchaseRequisition.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.qualityInspectionParameterResult.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.qualityNcr.deleteMany({ where: { tenantId } }).catch(() => {})
-  await prisma.qualityInspectionLine.deleteMany({ where: { tenantId } }).catch(() => {})
-  await prisma.qualityInspection.deleteMany({ where: { tenantId } }).catch(() => {})
+  // Legacy QualityInspection / QualityInspectionLine models were removed from schema;
+  // keep optional guards so cleanup does not throw when the Prisma delegate is absent.
+  const prismaAny = prisma as unknown as Record<string, { deleteMany?: (args: unknown) => Promise<unknown> } | undefined>
+  await prismaAny.qualityInspectionLine?.deleteMany?.({ where: { tenantId } })?.catch?.(() => {})
+  await prismaAny.qualityInspection?.deleteMany?.({ where: { tenantId } })?.catch?.(() => {})
   await prisma.manufacturingQualityInspection.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.manufacturingSettings.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.qualityInspectionPlanLine.deleteMany({ where: { tenantId } }).catch(() => {})

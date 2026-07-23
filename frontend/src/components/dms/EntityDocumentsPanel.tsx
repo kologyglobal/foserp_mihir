@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { Eye, FileText, Upload } from 'lucide-react'
 import { DataGrid } from '../design-system/DataGrid'
 import { Entity360Panel } from '../design-system/Entity360Shell'
@@ -53,7 +52,7 @@ export function EntityDocumentsPanel({
       show('View available for DMS registry documents only')
       return
     }
-    window.open(`/documents/${row.registryId}`, '_blank')
+    handleDownload(row)
   }
 
   function handleDownload(row: (typeof documents)[0]) {
@@ -92,12 +91,7 @@ export function EntityDocumentsPanel({
       )}
       <div className="flex items-center justify-between border-b border-erp-border px-4 py-2">
         {showHubLink ? (
-          <Link
-            to={`/documents?entityType=${entityType}&entityId=${entityId}`}
-            className="text-sm text-erp-accent hover:underline"
-          >
-            Open in Document Center
-          </Link>
+          <span className="text-sm text-erp-muted">Linked documents</span>
         ) : (
           <span />
         )}
@@ -133,9 +127,7 @@ export function EntityDocumentsPanel({
                   <FileText className="h-4 w-4 text-erp-muted" aria-hidden />
                   <span>
                     {row.original.registryId ? (
-                      <Link to={`/documents/${row.original.registryId}`} className="font-medium text-erp-accent hover:underline">
-                        {row.original.title}
-                      </Link>
+                      <span className="font-medium">{row.original.title}</span>
                     ) : (
                       <span className="font-medium">{row.original.title}</span>
                     )}

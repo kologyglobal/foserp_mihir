@@ -22,11 +22,11 @@ export const seedHsnMasters: HsnMaster[] = [
 ]
 
 export const seedGstRates: GstRate[] = [
-  { id: 'gstr-18-mh-mh', code: 'GSTR0001', gstGroupId: 'gstg-18-goods', fromState: 'Maharashtra', locationStateCode: 'Maharashtra', dateFrom: '2017-07-01', dateTo: null, sgst: 9, cgst: 9, igst: 18, isActive: true, createdAt: now(), updatedAt: now() },
-  { id: 'gstr-12-mh-mh', code: 'GSTR0002', gstGroupId: 'gstg-12-goods', fromState: 'Maharashtra', locationStateCode: 'Maharashtra', dateFrom: '2017-07-01', dateTo: null, sgst: 6, cgst: 6, igst: 12, isActive: true, createdAt: now(), updatedAt: now() },
-  { id: 'gstr-5-mh-mh', code: 'GSTR0003', gstGroupId: 'gstg-5-goods', fromState: 'Maharashtra', locationStateCode: 'Maharashtra', dateFrom: '2017-07-01', dateTo: null, sgst: 2.5, cgst: 2.5, igst: 5, isActive: true, createdAt: now(), updatedAt: now() },
-  { id: 'gstr-18-mh-gj', code: 'GSTR0004', gstGroupId: 'gstg-18-goods', fromState: 'Maharashtra', locationStateCode: 'Gujarat', dateFrom: '2017-07-01', dateTo: null, sgst: 0, cgst: 0, igst: 18, isActive: true, createdAt: now(), updatedAt: now() },
-  { id: 'gstr-18-svc-mh', code: 'GSTR0005', gstGroupId: 'gstg-18-service', fromState: 'Maharashtra', locationStateCode: 'Maharashtra', dateFrom: '2017-07-01', dateTo: null, sgst: 9, cgst: 9, igst: 18, isActive: true, createdAt: now(), updatedAt: now() },
+  { id: 'gstr-18-mh-mh', code: 'GSTR0001', gstGroupId: 'gstg-18-goods', fromState: 'Maharashtra', locationStateCode: 'Maharashtra', dateFrom: '2017-07-01', dateTo: null, sgst: 9, cgst: 9, igst: 18, applicableFor: 'BOTH', isActive: true, createdAt: now(), updatedAt: now() },
+  { id: 'gstr-12-mh-mh', code: 'GSTR0002', gstGroupId: 'gstg-12-goods', fromState: 'Maharashtra', locationStateCode: 'Maharashtra', dateFrom: '2017-07-01', dateTo: null, sgst: 6, cgst: 6, igst: 12, applicableFor: 'BOTH', isActive: true, createdAt: now(), updatedAt: now() },
+  { id: 'gstr-5-mh-mh', code: 'GSTR0003', gstGroupId: 'gstg-5-goods', fromState: 'Maharashtra', locationStateCode: 'Maharashtra', dateFrom: '2017-07-01', dateTo: null, sgst: 2.5, cgst: 2.5, igst: 5, applicableFor: 'BOTH', isActive: true, createdAt: now(), updatedAt: now() },
+  { id: 'gstr-18-mh-gj', code: 'GSTR0004', gstGroupId: 'gstg-18-goods', fromState: 'Maharashtra', locationStateCode: 'Gujarat', dateFrom: '2017-07-01', dateTo: null, sgst: 0, cgst: 0, igst: 18, applicableFor: 'BOTH', isActive: true, createdAt: now(), updatedAt: now() },
+  { id: 'gstr-18-svc-mh', code: 'GSTR0005', gstGroupId: 'gstg-18-service', fromState: 'Maharashtra', locationStateCode: 'Maharashtra', dateFrom: '2017-07-01', dateTo: null, sgst: 9, cgst: 9, igst: 18, applicableFor: 'BOTH', isActive: true, createdAt: now(), updatedAt: now() },
 ]
 
 export const itemMasterExtensions: Record<string, Partial<import('../../types/master').Item>> = {

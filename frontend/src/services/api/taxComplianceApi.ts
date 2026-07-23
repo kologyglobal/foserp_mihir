@@ -138,6 +138,7 @@ export type GstEWayBillDto = {
   sourceType: string
   salesInvoiceId: string | null
   deliveryChallanId: string | null
+  outboundDispatchId?: string | null
   documentNumber: string
   documentDate: string
   partyName: string
@@ -147,16 +148,41 @@ export type GstEWayBillDto = {
   distanceKm: number
   vehicleNumber: string | null
   transporterName: string | null
+  transporterId?: string | null
   taxableAmount: string
   status: string
   ewbNumber: string | null
+  generatedAt?: string | null
   validUpto: string | null
+  requiredReason?: string | null
+  movementReason?: string | null
   cancelReason: string | null
   cancelledAt: string | null
   exceptionMessage: string | null
   providerMode: string
+  providerRef?: string | null
+  lastRequestJson?: unknown
+  lastResponseJson?: unknown
   createdAt: string
   updatedAt: string
+}
+
+export type EWayPanelDto = {
+  required: boolean
+  reason: string | null
+  thresholdInr: number
+  taxableAmount: string
+  deliveryChallanId: string | null
+  outboundDispatchId: string | null
+  dispatchNo?: string | null
+  challanNumber?: string | null
+  challanStatus?: string | null
+  vehicleNumber?: string | null
+  transporterName?: string | null
+  destination?: string | null
+  ewayBill: GstEWayBillDto | null
+  canGenerate: boolean
+  message?: string
 }
 
 export async function fetchEInvoices(params: GstExtractQuery): Promise<ApiResponse<{ items: GstEInvoiceDto[] }>> {
@@ -211,6 +237,8 @@ export type GenerateEWayBillPayload = {
   distanceKm: number
   vehicleNumber?: string | null
   transporterName?: string | null
+  transporterId?: string | null
+  movementReason?: string | null
   force?: boolean
 }
 
@@ -228,4 +256,30 @@ export async function cancelEWayBillApi(id: string, reason: string): Promise<Api
     method: 'POST',
     body: JSON.stringify({ reason }),
   })
+}
+
+export async function fetchEWayPanel(params: {
+  deliveryChallanId?: string
+  outboundDispatchId?: string
+}): Promise<ApiResponse<EWayPanelDto>> {
+  return apiRequest<EWayPanelDto>(
+    `${tenantPath(`${BASE}/e-way-bills/panel`)}${buildQuery({
+      deliveryChallanId: params.deliveryChallanId,
+      outboundDispatchId: params.outboundDispatchId,
+    })}`,
+  )
+}
+
+export async function updateEWayVehicleApi(
+  id: string,
+  payload: { vehicleNumber: string; fromPlace?: string | null; reasonCode?: string | null },
+): Promise<ApiResponse<GstEWayBillDto>> {
+  return apiRequest<GstEWayBillDto>(`${tenantPath(`${BASE}/e-way-bills/${id}/update-vehicle`)}`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function getEWayBillApi(id: string): Promise<ApiResponse<GstEWayBillDto>> {
+  return apiRequest<GstEWayBillDto>(`${tenantPath(`${BASE}/e-way-bills/${id}`)}`)
 }

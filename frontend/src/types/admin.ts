@@ -16,6 +16,7 @@ export interface AdminUser {
   mobile: string | null
   designation: string | null
   department: string | null
+  departmentId: string | null
   status: AdminUserStatus
   emailVerified: boolean
   lastLoginAt: string | null
@@ -24,6 +25,18 @@ export interface AdminUser {
   createdAt: string
   updatedAt: string
   roles: AdminUserRoleRef[]
+}
+
+export interface AdminDepartment {
+  id: string
+  tenantId: string
+  code: string
+  name: string
+  description: string | null
+  isActive: boolean
+  userCount: number
+  createdAt: string
+  updatedAt: string
 }
 
 export interface AdminRoleSummary {

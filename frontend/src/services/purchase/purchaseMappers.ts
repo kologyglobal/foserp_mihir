@@ -1080,7 +1080,7 @@ export function mapApiComparisonToDomain(
         : 'recommended',
     recommendedVendorId: awardedVendorId,
     recommendedVendorName: null,
-    approvedBy: api.awardedById,
+    approvedBy: api.awardedByName?.trim() || api.awardedById,
     approvedAt: api.selectedAt,
     currency: 'INR',
     rows,

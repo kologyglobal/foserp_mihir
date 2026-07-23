@@ -189,7 +189,7 @@ ${tracking ? `<h3>Tracking</h3><ul>${tracking}</ul>` : ''}
   <div>Transporter: ${esc(row.transporterName)}</div>
   <div>Vehicle: ${esc(row.vehicleNumber)}</div>
   <div>LR/GR: ${esc(row.lrGrNumber)}${row.lrGrDate ? ` (${esc(row.lrGrDate.toISOString().slice(0, 10))})` : ''}</div>
-  <div>e-Way Bill (manual reference): ${esc(row.eWayBillReference)}${row.eWayBillDate ? ` (${esc(row.eWayBillDate.toISOString().slice(0, 10))})` : ''}</div>
+  <div>e-Way Bill: ${esc(row.eWayBillReference) || '—'}${row.eWayBillDate ? ` (${esc(row.eWayBillDate.toISOString().slice(0, 10))})` : ''} <em>(system / NIC — not manually entered)</em></div>
   <div class="muted">Manual reference only — not externally verified.</div>
 </div>
 

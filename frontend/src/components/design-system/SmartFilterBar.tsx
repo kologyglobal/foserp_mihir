@@ -16,6 +16,8 @@ interface SmartFilterBarProps {
   secondary?: ReactNode
   /** Right-aligned controls before record count / saved view (e.g. sort) */
   trailing?: ReactNode
+  /** Columns control injected by DataGrid when this bar is used as `registerBar` */
+  columnsControl?: ReactNode
   chips?: FilterChip[]
   onRemoveChip?: (id: string) => void
   onClearAll?: () => void
@@ -33,6 +35,7 @@ export function SmartFilterBar({
   children,
   secondary,
   trailing,
+  columnsControl,
   chips = [],
   onRemoveChip,
   onClearAll,
@@ -84,6 +87,7 @@ export function SmartFilterBar({
                 Save view
               </button>
             )}
+            {columnsControl}
           </div>
         </div>
         {secondary && (

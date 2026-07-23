@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, Printer } from 'lucide-react'
-import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
+import { useNavigate, useParams } from 'react-router-dom'
+import { DocumentPrintShell } from '@/components/print/DocumentPrintShell'
 import { getPurchaseInvoiceById } from '@/services/purchase'
 import type { PurchaseInvoice } from '@/types/purchaseDomain'
 import {
@@ -47,27 +46,12 @@ export function PurchaseInvoicePrintPage() {
   }
 
   return (
-    <div className="po-print-page erp-page">
-      <div className="po-print-toolbar no-print">
-        <div>
-          <p className="po-print-toolbar__title">{inv.documentNumber}</p>
-          <p className="po-print-toolbar__subtitle">Purchase invoice print preview</p>
-        </div>
-        <ErpButtonGroup>
-          <ErpButton type="button" variant="secondary" icon={Printer} onClick={() => window.print()}>
-            Print
-          </ErpButton>
-          <ErpButton type="button" variant="secondary" icon={Download} onClick={() => window.print()}>
-            Download PDF
-          </ErpButton>
-          <Link to={`/purchase/invoices/${inv.id}`}>
-            <ErpButton type="button" variant="ghost" icon={ArrowLeft}>
-              Back to invoice
-            </ErpButton>
-          </Link>
-        </ErpButtonGroup>
-      </div>
-
+    <DocumentPrintShell
+      title={inv.documentNumber}
+      subtitle="Purchase invoice — print-ready / Save as PDF"
+      backLabel="Back to invoice"
+      onBack={() => navigate(`/purchase/invoices/${inv.id}`)}
+    >
       <article className="po-print-doc">
         <header className="po-print-header">
           <div>
@@ -154,6 +138,6 @@ export function PurchaseInvoicePrintPage() {
           </section>
         )}
       </article>
-    </div>
+    </DocumentPrintShell>
   )
 }

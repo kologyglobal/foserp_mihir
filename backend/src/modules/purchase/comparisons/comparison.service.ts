@@ -26,7 +26,8 @@ async function loadOrThrow(tenantId: string, id: string) {
 
 async function mapComparison(tenantId: string, comparison: Awaited<ReturnType<typeof loadOrThrow>>) {
   const quotations = await repo.findComparisonQuotations(tenantId, comparison.requestForQuotationId)
-  return mapComparisonToDto(comparison, quotations)
+  const userNames = await repo.resolveUserNames(tenantId, [comparison.awardedById, comparison.createdById])
+  return mapComparisonToDto(comparison, quotations, userNames)
 }
 
 export async function listComparisons(tenantId: string, query: ComparisonListQuery) {

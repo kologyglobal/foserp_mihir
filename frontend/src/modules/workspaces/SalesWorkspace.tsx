@@ -260,15 +260,15 @@ export function SalesWorkspacePage() {
         ? [{ id: 'won-so', label: `${metrics.wonDealsWithoutSo} won deal(s) need SO`, href: '/crm/opportunities?status=won', priority: 'primary' as const }]
         : []),
       ...(m.ordersPendingMrp > 0
-        ? [{ id: 'mrp', label: 'Run MRP for pending orders', href: '/mrp/run', priority: metrics.wonDealsWithoutSo > 0 ? undefined : ('primary' as const) }]
+        ? [{ id: 'mrp', label: 'Open production plan for pending orders', href: '/manufacturing/production-plan', priority: metrics.wonDealsWithoutSo > 0 ? undefined : ('primary' as const) }]
         : [{ id: 'orders', label: 'Sales Orders', href: '/sales/orders', priority: 'primary' as const }]),
       ...(metrics.overdueReceivables > 0
-        ? [{ id: 'ar', label: `${metrics.overdueReceivables} overdue invoice(s)`, href: '/invoices/register' }]
+        ? [{ id: 'ar', label: `${metrics.overdueReceivables} overdue invoice(s)`, href: '/accounting/money-in/invoices' }]
         : []),
       ...(metrics.quotationsPending > 0
         ? [{ id: 'quotes', label: 'Review quotation approvals', href: '/crm/quotations?status=pending_approval' }]
         : []),
-      { id: 'status', label: 'Order Status', href: '/sales/order-status' },
+      { id: 'status', label: 'Sales Orders', href: '/sales/orders' },
       { id: 'crm', label: 'CRM Pipeline', href: '/crm' },
     ],
     [m.ordersPendingMrp, metrics],
@@ -341,7 +341,7 @@ export function SalesWorkspacePage() {
           helper: metrics.overdueReceivables > 0 ? `${metrics.overdueReceivables} overdue` : `${metrics.collectionRate}% collected`,
           icon: IndianRupee,
           accent: metrics.overdueReceivables > 0 ? 'amber' : 'green',
-          href: '/invoices/register',
+          href: '/accounting/money-in/invoices',
         },
         {
           id: 'dispatch',
@@ -402,13 +402,13 @@ export function SalesWorkspacePage() {
               <DynamicsCommandButton icon={<GitBranch className="h-4 w-4" />} onClick={() => navigate('/crm')}>
                 CRM Pipeline
               </DynamicsCommandButton>
-              <DynamicsCommandButton icon={<BarChart3 className="h-4 w-4" />} onClick={() => navigate('/sales/reports')}>
+              <DynamicsCommandButton icon={<BarChart3 className="h-4 w-4" />} onClick={() => navigate('/reports/crm')}>
                 Reports
               </DynamicsCommandButton>
-              <DynamicsCommandButton icon={<Gauge className="h-4 w-4" />} onClick={() => navigate('/mrp/run')}>
-                Run MRP
+              <DynamicsCommandButton icon={<Gauge className="h-4 w-4" />} onClick={() => navigate('/manufacturing/production-plan')}>
+                Production Plan
               </DynamicsCommandButton>
-              <DynamicsCommandButton icon={<FileText className="h-4 w-4" />} onClick={() => navigate('/sales/order-status')}>
+              <DynamicsCommandButton icon={<FileText className="h-4 w-4" />} onClick={() => navigate('/sales/orders')}>
                 Order Status
               </DynamicsCommandButton>
             </>
@@ -443,17 +443,17 @@ export function SalesWorkspacePage() {
           icon: AlertTriangle,
           accent: atRiskOrders.length ? 'red' : 'green',
           context: atRiskOrders.length ? `${overdueDeliveries} overdue` : 'On track',
-          href: '/sales/order-status',
+          href: '/sales/orders',
           updatedAt: Date.now(),
         },
         {
           id: 'mrp',
-          label: 'Pending MRP',
+          label: 'Pending Plan',
           value: m.ordersPendingMrp,
           icon: Gauge,
           accent: m.ordersPendingMrp ? 'amber' : 'green',
           context: m.ordersPendingMrp ? 'WO not created' : 'All planned',
-          href: '/mrp/run',
+          href: '/manufacturing/production-plan',
           updatedAt: Date.now(),
         },
         {
@@ -463,7 +463,7 @@ export function SalesWorkspacePage() {
           icon: Receipt,
           accent: 'green',
           context: formatSalesCurrency(metrics.totalInvoiced),
-          href: '/invoices/register',
+          href: '/accounting/money-in/invoices',
           updatedAt: Date.now(),
         },
       ]}

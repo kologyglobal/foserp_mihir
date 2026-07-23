@@ -157,6 +157,14 @@ export async function updateRouting(
   })
 }
 
+export async function softDeleteRouting(tenantId: string, userId: string, routingId: string) {
+  await getRouting(tenantId, routingId)
+  return prisma.manufacturingRouting.update({
+    where: { id: routingId, tenantId },
+    data: { deletedAt: new Date(), isActive: false, updatedBy: userId },
+  })
+}
+
 // ─── Routing versions ───────────────────────────────────────────────────────
 
 export async function listRoutingVersions(tenantId: string, routingId: string, query: ListRoutingVersionsQuery) {

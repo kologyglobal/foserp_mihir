@@ -5,9 +5,9 @@ import { useUIStore } from '../../store/uiStore'
 const CHORD_ROUTES: Record<string, string> = {
   i: '/inventory',
   p: '/purchase',
-  w: '/work-orders',
+  w: '/manufacturing/work-orders',
   s: '/sales',
-  m: '/mrp',
+  m: '/manufacturing/today',
 }
 
 /** Global productivity shortcuts — UI navigation only */

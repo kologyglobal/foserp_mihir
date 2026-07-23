@@ -55,14 +55,14 @@ function routesForType(type: MobileScanEntityType, entityId?: string): MobileSca
     case 'dispatch':
       return entityId ? [{ label: 'Dispatch Loading', path: `/m/dispatch/${entityId}` }] : [{ label: 'Dispatch', path: '/m/dispatch' }]
     case 'trailer_serial':
-      return [{ label: 'Dispatch Scan', path: '/m/dispatch' }, { label: 'Genealogy', path: '/genealogy' }]
+      return [{ label: 'Dispatch Scan', path: '/m/dispatch' }, { label: 'Traceability', path: '/manufacturing/traceability' }]
     case 'material_lot':
       return [
         { label: 'Material Issue', path: '/m/material-issue' },
         { label: 'QC', path: '/m/qc' },
       ]
     default:
-      return [{ label: 'Scan Again', path: '/m/scan' }]
+      return [{ label: 'Shop Floor', path: '/m/shop-floor' }]
   }
 }
 

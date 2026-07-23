@@ -221,6 +221,12 @@ router.patch(
 )
 
 router.get(
+  '/workbench/ready-to-pack',
+  requirePermission('dispatch.packing.view'),
+  controller.workbenchReadyToPack,
+)
+
+router.get(
   '/workbench/packing',
   requirePermission('dispatch.packing.view'),
   controller.workbenchPacking,

@@ -4,7 +4,115 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Done recently — Bank & Cash UAT readiness (2026-07-23)
+
+| Field | Value |
+|-------|-------|
+| Module | Accounting / Treasury |
+| Description | Live API for **internal UAT / controlled pilot**; workspace tabs + seed redirects cleaned |
+| Doc | `docs/accounting/BANK_CASH_STATUS.md` |
+| Status | **done** for core UAT surface — **open** / deferred: **AIS (5D4)**, **FX**, **intercompany** |
+
+---
+
+## Done recently — ISO tank child MAKE SA WO depth (2026-07-23)
+
+| Field | Value |
+|-------|-------|
+| Module | Manufacturing |
+| Description | Live harness proves child MAKE SA WO end-to-end (SA-LADDER): SA receipt into WIP → parent reserve/issue |
+| Script | `backend/scripts/test-iso-tank-child-sa-wo.ts` |
+| Status | **done** for ladder SA path — **open** for heavier SAs (shell/frame) + QC-gated child routes |
+
+---
+
+## Done recently — CRM Item Phase 2 sales fields (2026-07-23)
+
+| Field | Value |
+|-------|-------|
+| Module | CRM / Masters |
+| Description | MasterItem sales commercial fields, API `salesAllowed` filter, Item form Sales section, migration metrics script |
+| Doc | `docs/crm/CRM_ITEM_PHASE2_SALES_FIELDS.md` |
+| Status | **done** |
+
+---
+
+## Done recently — Dispatch 7C5 hardened posting (2026-07-23)
+
+| Field | Value |
+|-------|-------|
+| Module | Dispatch |
+| Description | Canonical `DispatchPostingService`, policy gates, readiness API, reverse, reconciliation; emergency override API; serial/lot + concurrency stress; live **17/17** |
+| Doc | `docs/dispatch/PHASE7C5_HARDENED_POSTING.md` |
+| Status | **done** for controlled UAT foundation — **open** for client production (manual UAT sign-off); emergency override FE drawer + audit register shipped |
+
+---
+
+## Done recently — Dispatch domain outbox (2026-07-23)
+
+| Field | Value |
+|-------|-------|
+| Module | Dispatch |
+| Description | `DISPATCH_POSTED` / `SALES_ORDER_INVOICE_READY` (+ fulfilment / reverse) enqueue + drain to PUBLISHED; list/process/retry APIs |
+| Doc | `docs/dispatch/DISPATCH_DOMAIN_EVENTS.md` |
+| Status | **done** (auto-invoice consumer still deferred) |
+
+---
+
+## Done recently — Dispatch reverse Invoice/COGS blockers (2026-07-23)
+
+| Field | Value |
+|-------|-------|
+| Module | Dispatch |
+| Description | Hard-block reverse on posted/open SI links + posted inv-acct COGS; force requires override; FE preflight |
+| Doc | `docs/dispatch/DISPATCH_REVERSAL_DEPENDENCIES.md` |
+| Status | **done** (auto Dispatch→Invoice creation still deferred) |
+
+---
+
+## Done recently — Dispatch partial reverse / approval (2026-07-23)
+
+| Field | Value |
+|-------|-------|
+| Module | Dispatch |
+| Description | Partial line reverse (`reversedQuantity`), reversal lifecycle DRAFT→APPLIED, routes under `/reversals`, invoice/COGS hard blocks |
+| Doc | `docs/dispatch/DISPATCH_REVERSAL.md` |
+| Status | **done** |
+
+---
+
+## Done recently — Fuel Tank mfg master (2026-07-23)
+
+| Field | Value |
+|-------|-------|
+| Module | Manufacturing / Masters |
+| Description | 5000 L Fuel Tank live seed: multilevel BOM, PARALLEL route RT-000001, profile MP-FUEL-TANK-5000L, LOGICAL SFG Job Cards under FG WO |
+| Doc | `docs/manufacturing/examples/FUEL_TANK_MASTER_SETUP.md` |
+| Status | **done** (READY FOR INTERNAL UAT) — full FG serial receipt + WO close remain manual/extendable E2E |
+
+---
+
 ## P0 — Critical (blocks API-mode production CRM)
+
+### P0-ADMIN: Admin Panel (IAM / org / security UX)
+
+| Field | Value |
+|-------|-------|
+| Module | Admin / Platform |
+| Description | Production Admin Panel over existing User/Role/Tenant/LegalEntity/Branch/Auth — no duplicate company or permission systems |
+| Doc | `docs/admin/ADMIN_PANEL_PHASE1_AUDIT.md` |
+| Status | **done** — Phases 1–10 complete (close-out polish); holds: editable password/MFA, ModuleAdmin entity, blanket API module gates |
+| Next step | Product UAT of Admin Panel; optional later: editable security settings / Module Admins if signed off |
+
+### P0-CRM-ITEM: CRM/Sales Product Master → Item Master migration
+
+| Field | Value |
+|-------|-------|
+| Module | CRM / Sales / Masters |
+| Description | Architectural cut-over: CRM & Sales lines use `MasterItem` only; dual-read legacy `productId→fgItemId` during transition; do not drop `master_products` until Phase 10 |
+| Doc | `docs/crm/CRM_PRODUCT_TO_ITEM_MIGRATION_MAP.md` |
+| Status | **in_progress** — Phase 1 audit done; **Phase 2 sales fields done**; Phases 3–10 open |
+| Next step | Phase 3: nullable `itemId` columns / JSON shapes / indexes; keep `productId` |
 
 ### P0-0: Product master API hydration (CRM-P0-1)
 

@@ -96,13 +96,13 @@ export function DynamicsExecutiveDashboard({
 
       <DynamicsKpiRow>
         <DynamicsKpiTile label="Order book" value={formatMetricCurrency(a.orderBookValue)} helper={`${a.orderBookCount} open`} href="/sales/orders" />
-        <DynamicsKpiTile label="Invoiced YTD" value={formatMetricCurrency(a.invoicedYtd)} helper="Revenue posted" href="/invoices/register" />
-        <DynamicsKpiTile label="Outstanding AR" value={formatMetricCurrency(a.outstandingAr)} helper={a.overdueCount ? `${a.overdueCount} overdue` : 'On track'} href="/invoices/register" tone="warning" />
-        <DynamicsKpiTile label="WIP value" value={formatMetricCurrency(a.wipValue)} helper={`${a.runningWorkOrders} WOs running`} href="/work-orders" />
+        <DynamicsKpiTile label="Invoiced YTD" value={formatMetricCurrency(a.invoicedYtd)} helper="Revenue posted" href="/accounting/money-in/invoices" />
+        <DynamicsKpiTile label="Outstanding AR" value={formatMetricCurrency(a.outstandingAr)} helper={a.overdueCount ? `${a.overdueCount} overdue` : 'On track'} href="/accounting/money-in/invoices" tone="warning" />
+        <DynamicsKpiTile label="WIP value" value={formatMetricCurrency(a.wipValue)} helper={`${a.runningWorkOrders} WOs running`} href="/manufacturing/work-orders" />
         <DynamicsKpiTile label="Dispatch ready" value={formatMetricCurrency(a.dispatchReadyValue)} helper={`${a.dispatchReadyCount} ready`} href="/dispatch/register" tone="success" />
-        <DynamicsKpiTile label="Delayed orders" value={a.delayedOrders} helper="Delivery risk" href="/reports/sales/open-orders" tone={a.delayedOrders ? 'critical' : 'neutral'} />
+        <DynamicsKpiTile label="Delayed orders" value={a.delayedOrders} helper="Delivery risk" href="/sales/orders" tone={a.delayedOrders ? 'critical' : 'neutral'} />
         <DynamicsKpiTile label="Open NCR" value={a.openNcr} helper={`Yield ${a.firstPassYieldPct}%`} href="/quality/ncr" tone={a.openNcr ? 'warning' : 'neutral'} />
-        <DynamicsKpiTile label="Pending approvals" value={a.pendingApprovals} helper="Awaiting sign-off" href="/home/approvals" tone="primary" />
+        <DynamicsKpiTile label="Pending approvals" value={a.pendingApprovals} helper="Awaiting sign-off" href="/purchase/approvals" tone="primary" />
       </DynamicsKpiRow>
 
       <DynamicsDashboardGrid>

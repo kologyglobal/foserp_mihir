@@ -14,6 +14,7 @@ import {
   listBomVersionsQuerySchema,
   listBomsQuerySchema,
   previewBomImportSchema,
+  updateBomSchema,
 } from './bom.schemas.js'
 
 const router = Router({ mergeParams: true })
@@ -43,6 +44,35 @@ router.get(
   validateParams(bomIdParamSchema),
   requirePermission('manufacturing.bom.view'),
   controller.getBom,
+)
+
+router.patch(
+  '/:bomId',
+  validateParams(bomIdParamSchema),
+  requirePermission('manufacturing.bom.edit'),
+  validateBody(updateBomSchema),
+  controller.updateBom,
+)
+
+router.delete(
+  '/:bomId',
+  validateParams(bomIdParamSchema),
+  requirePermission('manufacturing.bom.edit'),
+  controller.deleteBom,
+)
+
+router.post(
+  '/:bomId/activate',
+  validateParams(bomIdParamSchema),
+  requirePermission('manufacturing.bom.edit'),
+  controller.activateBom,
+)
+
+router.post(
+  '/:bomId/deactivate',
+  validateParams(bomIdParamSchema),
+  requirePermission('manufacturing.bom.edit'),
+  controller.deactivateBom,
 )
 
 router.get(

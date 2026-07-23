@@ -131,6 +131,41 @@ export async function apiDeleteAdminUser(id: string): Promise<StoreActionResult>
   })
 }
 
+export async function apiDeactivateAdminUser(id: string): Promise<StoreActionResult> {
+  return withSubmitLock(lockKey('admin-user:deactivate', id), async () => {
+    try {
+      const res = await api.deactivateAdminUserApi(id)
+      upsertUser(res.data.user)
+      return { ok: true }
+    } catch (err) {
+      return fail(err)
+    }
+  })
+}
+
+export async function apiActivateAdminUser(id: string): Promise<StoreActionResult> {
+  return withSubmitLock(lockKey('admin-user:activate', id), async () => {
+    try {
+      const res = await api.activateAdminUserApi(id)
+      upsertUser(res.data)
+      return { ok: true }
+    } catch (err) {
+      return fail(err)
+    }
+  })
+}
+
+export async function apiRevokeAdminUserSessions(id: string): Promise<StoreActionResult & { revokedSessions?: number }> {
+  return withSubmitLock(lockKey('admin-user:revoke-sessions', id), async () => {
+    try {
+      const res = await api.revokeAdminUserSessionsApi(id)
+      return { ok: true, revokedSessions: res.data.revokedSessions }
+    } catch (err) {
+      return fail(err)
+    }
+  })
+}
+
 export async function apiAssignAdminUserRole(userId: string, roleId: string): Promise<StoreActionResult> {
   return withSubmitLock(lockKey('admin-user:assign-role', userId), async () => {
     try {

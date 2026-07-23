@@ -81,6 +81,31 @@ check(
   'getMissingStageFields uses opp map for qualified without lead keys',
   getMissingStageFields({ opportunityName: 'X', productRequirement: '' }, 'qualified').some((m) => m.field === 'expectedCloseDate'),
 )
+check(
+  19b,
+  'opp qualified does not require productRequirement text',
+  !getMissingOpportunityStageFields(
+    { opportunityName: 'Deal', customerId: 'c1', ownerId: 'u1', expectedCloseDate: '2026-08-01', priority: 'high' },
+    'qualified',
+  ).some((m) => m.field === 'productRequirement'),
+)
+check(
+  19c,
+  'opp requirement_discussion accepts item lines as requirement',
+  canAdvanceToOpportunityStage(
+    {
+      opportunityName: 'Deal',
+      customerId: 'c1',
+      ownerId: 'u1',
+      contactId: 'ct1',
+      value: 1000,
+      expectedCloseDate: '2026-08-01',
+      productRequirement: '',
+      lines: [{ itemId: 'item-1', productOrItem: '26 KL ISO Tank' }],
+    },
+    'requirement_discussion',
+  ),
+)
 
 const leadNewCompleteness = getLeadStageCompleteness({}, 'new')
 check(20, 'lead new stage 0 reqs → 100%', leadNewCompleteness.percent === 100 && leadNewCompleteness.isComplete)

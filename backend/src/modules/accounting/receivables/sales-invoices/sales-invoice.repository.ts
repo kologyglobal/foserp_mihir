@@ -7,6 +7,7 @@ import { resolvePeriodByDate } from '../../posting/posting-period.service.js'
 import type { SalesInvoiceCalculationResult } from '../calculation/sales-invoice-calculation.types.js'
 import type { CustomerParty } from '../customer-party/customer-party.types.js'
 import type { CreateSalesInvoiceInput, UpdateSalesInvoiceInput } from './sales-invoice.schemas.js'
+import type { CreateSalesInvoiceSourceLinkInput } from './sales-invoice-source-link.repository.js'
 import {
   SalesInvoiceAlreadyCancelledError,
   SalesInvoiceInvalidStatusError,
@@ -24,7 +25,6 @@ import {
   deriveDiscountPercent,
   findLineContext,
 } from './sales-invoice-validation.service.js'
-import type { SalesOrderSourceSnapshot } from '../source/sales-order-source.service.js'
 
 const DRAFT_CHARS = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ'
 
@@ -181,7 +181,8 @@ export async function createSalesInvoiceDraft(
   party: CustomerParty,
   createdBy: string | undefined,
   options?: {
-    sourceDocumentSnapshot?: SalesOrderSourceSnapshot | null
+    sourceDocumentSnapshot?: unknown
+    sourceLinks?: CreateSalesInvoiceSourceLinkInput[]
   },
 ): Promise<SalesInvoiceWithLines> {
   await getLegalEntityOrThrow(tenantId, input.legalEntityId)
@@ -189,7 +190,21 @@ export async function createSalesInvoiceDraft(
   const draftReference = await generateUniqueDraftReference(input.legalEntityId)
   const context = buildCalculationContextFromRequest(input)
 
+  const outboundLineIds = (options?.sourceLinks ?? [])
+    .filter((l) => l.sourceType === 'OUTBOUND_DISPATCH' && l.sourceLineId)
+    .map((l) => l.sourceLineId!)
+
   return prisma.$transaction(async (tx) => {
+    if (outboundLineIds.length) {
+      const { lockDispatchLineConsumption } = await import('../source/invoice-ready.service.js')
+      await lockDispatchLineConsumption(tx, tenantId, outboundLineIds)
+      const { assertDispatchLineInvoiceReadyQty } = await import('../source/invoice-ready.service.js')
+      for (const link of options?.sourceLinks ?? []) {
+        if (link.sourceType !== 'OUTBOUND_DISPATCH' || !link.sourceLineId) continue
+        await assertDispatchLineInvoiceReadyQty(tenantId, link.sourceLineId, link.quantity, { tx })
+      }
+    }
+
     const header = await tx.salesInvoice.create({
       data: {
         tenantId,
@@ -204,7 +219,7 @@ export async function createSalesInvoiceDraft(
         sourceType: input.sourceType,
         sourceDocumentId: input.sourceDocumentId ?? null,
         sourceDocumentSnapshot: options?.sourceDocumentSnapshot
-          ? (options.sourceDocumentSnapshot as unknown as Prisma.InputJsonValue)
+          ? (options.sourceDocumentSnapshot as Prisma.InputJsonValue)
           : undefined,
         invoiceDate: parseDateOnly(input.invoiceDate),
         postingDate: parseDateOnly(input.postingDate),
@@ -229,9 +244,28 @@ export async function createSalesInvoiceDraft(
     const lineData = mapLineData(tenantId, input.legalEntityId, header.id, calc, context)
     if (lineData.length > 0) await tx.salesInvoiceLine.createMany({ data: lineData })
 
+    if (options?.sourceLinks?.length) {
+      const { replaceSalesInvoiceSourceLinks } = await import('./sales-invoice-source-link.repository.js')
+      const createdLines = await tx.salesInvoiceLine.findMany({
+        where: { salesInvoiceId: header.id, tenantId },
+        orderBy: { lineNumber: 'asc' },
+      })
+      const linksWithLineIds = options.sourceLinks.map((link, idx) => ({
+        ...link,
+        salesInvoiceLineId: createdLines[idx]?.id ?? null,
+      }))
+      await replaceSalesInvoiceSourceLinks(
+        tenantId,
+        input.legalEntityId,
+        header.id,
+        linksWithLineIds,
+        tx,
+      )
+    }
+
     return tx.salesInvoice.findFirstOrThrow({
       where: { id: header.id, tenantId },
-      include: { lines: { orderBy: { lineNumber: 'asc' } } },
+      include: { lines: { orderBy: { lineNumber: 'asc' } }, sourceLinks: true },
     })
   })
 }

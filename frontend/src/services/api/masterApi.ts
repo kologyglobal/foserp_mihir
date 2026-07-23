@@ -16,6 +16,9 @@ export interface MasterRecordDto {
   parentId?: string | null
   level?: number
   defaultWarehouseId?: string | null
+  stockPolicy?: string
+  defaultIsStockable?: boolean
+  defaultInventoryType?: string
   gstGroupId?: string
   goodsType?: string
   fromState?: string
@@ -25,6 +28,7 @@ export interface MasterRecordDto {
   sgst?: number | string
   cgst?: number | string
   igst?: number | string
+  applicableFor?: 'SALES' | 'PURCHASE' | 'BOTH'
   description?: string | null
   uomType?: string
   decimalPlaces?: number

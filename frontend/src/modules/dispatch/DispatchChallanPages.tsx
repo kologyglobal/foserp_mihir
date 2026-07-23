@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { CheckCircle2, FileText, RefreshCw, Send } from 'lucide-react'
+import { CheckCircle2, Download, FileText, Printer, RefreshCw, Send } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { CommandBar, CommandBarButton, CommandBarGroup } from '@/components/ui/CommandBar'
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -11,7 +11,7 @@ import {
   approveDeliveryChallan,
   cancelDeliveryChallan,
   createDeliveryChallan,
-  deliveryChallanPreviewUrl,
+  fetchDeliveryChallanPrintHtml,
   getDeliveryChallan,
   issueDeliveryChallan,
   listDeliveryChallans,
@@ -21,6 +21,9 @@ import {
 } from '@/services/api/dispatchApi'
 import { notify } from '@/store/toastStore'
 import { appPromptNote } from '@/store/confirmDialogStore'
+import { advanceAfterChallanIssued } from '@/modules/dispatch/fulfilmentAutoAdvance'
+import { DispatchEWayBillPanel } from '@/modules/dispatch/DispatchEWayBillPanel'
+import { openHtmlPrintWindow } from '@/utils/documentPrint'
 
 function ApiRequired({ title }: { title: string }) {
   return (
@@ -115,13 +118,13 @@ export function DispatchChallanRegisterPage() {
 
 export function DispatchChallanDetailPage() {
   const { id = '' } = useParams()
+  const navigate = useNavigate()
   const [row, setRow] = useState<DeliveryChallanRow | null>(null)
   const [busy, setBusy] = useState(false)
   const [transport, setTransport] = useState({
     transporterName: '',
     vehicleNumber: '',
     lrGrNumber: '',
-    eWayBillReference: '',
   })
 
   const load = useCallback(async () => {
@@ -133,7 +136,6 @@ export function DispatchChallanDetailPage() {
         transporterName: (data as { transporterName?: string | null }).transporterName ?? '',
         vehicleNumber: data.vehicleNumber ?? '',
         lrGrNumber: (data as { lrGrNumber?: string | null }).lrGrNumber ?? '',
-        eWayBillReference: (data as { eWayBillReference?: string | null }).eWayBillReference ?? '',
       })
     } catch (err) {
       notify.error(err instanceof Error ? err.message : 'Failed to load challan')
@@ -144,12 +146,15 @@ export function DispatchChallanDetailPage() {
     void load()
   }, [load])
 
-  async function act(label: string, fn: () => Promise<unknown>) {
+  async function act(label: string, fn: () => Promise<unknown>, opts?: { afterIssue?: boolean }) {
     setBusy(true)
     try {
       await fn()
       notify.success(label)
       await load()
+      if (opts?.afterIssue && row?.outboundDispatchId) {
+        advanceAfterChallanIssued(row.outboundDispatchId, navigate)
+      }
     } catch (err) {
       notify.error(err instanceof Error ? err.message : 'Action failed')
     } finally {
@@ -174,6 +179,21 @@ export function DispatchChallanDetailPage() {
 
   const editable = row.status === 'DRAFT' || row.status === 'SENT_BACK'
 
+  async function openChallanPrint(mode: 'preview' | 'pdf') {
+    setBusy(true)
+    try {
+      const { html, filename } = await fetchDeliveryChallanPrintHtml(row.id, mode)
+      openHtmlPrintWindow(html, filename)
+      if (mode === 'pdf') {
+        notify.info('Use “Save as PDF” in the print dialog to download a PDF')
+      }
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : 'Failed to open challan document')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <OperationalPageShell
       variant="dynamics"
@@ -189,9 +209,22 @@ export function DispatchChallanDetailPage() {
           <CommandBarGroup label="Actions">
             <CommandBarButton icon={RefreshCw} label="Refresh" onClick={() => void load()} disabled={busy} />
             <CommandBarButton
+              icon={Printer}
+              label="Print"
+              disabled={busy}
+              onClick={() => void openChallanPrint('preview')}
+            />
+            <CommandBarButton
+              icon={Download}
+              label="Download PDF"
+              disabled={busy}
+              onClick={() => void openChallanPrint('pdf')}
+            />
+            <CommandBarButton
               icon={FileText}
               label="Preview"
-              onClick={() => window.open(deliveryChallanPreviewUrl(row.id), '_blank')}
+              disabled={busy}
+              onClick={() => void openChallanPrint('preview')}
             />
             {editable ? (
               <CommandBarButton
@@ -223,8 +256,10 @@ export function DispatchChallanDetailPage() {
                 primary={row.status === 'APPROVED'}
                 disabled={busy}
                 onClick={() =>
-                  void act('Challan issued — no stock movement', () =>
-                    issueDeliveryChallan(row.id, { idempotencyKey: `issue-${row.id}` }),
+                  void act(
+                    'Challan issued — no stock movement',
+                    () => issueDeliveryChallan(row.id, { idempotencyKey: `issue-${row.id}` }),
+                    { afterIssue: true },
                   )
                 }
               />
@@ -287,16 +322,16 @@ export function DispatchChallanDetailPage() {
               onChange={(e) => setTransport((t) => ({ ...t, lrGrNumber: e.target.value }))}
             />
           </label>
-          <label className="text-sm">
-            e-Way Bill (manual reference)
-            <input
-              className="mt-1 w-full rounded border px-2 py-1"
-              value={transport.eWayBillReference}
-              onChange={(e) => setTransport((t) => ({ ...t, eWayBillReference: e.target.value }))}
-            />
-          </label>
         </div>
       ) : null}
+
+      <div className="mt-3">
+        <DispatchEWayBillPanel
+          deliveryChallanId={row.id}
+          outboundDispatchId={row.outboundDispatchId}
+          onChanged={() => void load()}
+        />
+      </div>
 
       <div className="grid gap-2 text-sm md:grid-cols-2">
         <div>Dispatch: {row.outboundDispatch?.dispatchNo ?? row.outboundDispatchId}</div>

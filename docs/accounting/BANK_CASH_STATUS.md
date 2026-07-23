@@ -1,8 +1,12 @@
 # Bank & Cash — Status
 
-**Status:** Phases **5A1–5A3**, **5B1–5B3**, **5C1**, **MT940/CAMT.053 file ingest**, **5D1–5D3 bank connectors** (sandbox/REST/live SFTP + Open Banking consent scaffold) complete.
+**Status:** Live API for **internal UAT / controlled pilot**; **AIS / FX / intercompany** still deferred.
 
-Bank & Cash supports controlled bank-originated transactions, statement import (CSV/XLSX/**MT940/CAMT.053**), reconciliation, transfers, cheques, treasury adjustments, live cash position / liquidity, and **bank connectors** (sandbox FS + allow-listed REST + **live SFTP** → `BANK_API` statements; Open Banking **consent only**). **AIS statement download and cron remain deferred as Phase 5D4.**
+**UAT / pilot surface (API mode):** `/accounting/bank-cash` liquidity hub + transfers, statements, reconciliation, cheques, adjustments, standing instructions, posting rules, connectors, bankbook/cashbook. Seed registers (`bank-accounts`, `transactions`, `deposits`, `cash-counts`, `setup`, …) are **not routed** — deep links redirect to the hub.
+
+Phases **5A1–5A3**, **5B1–5B3**, **5C1**, **MT940/CAMT.053 file ingest**, **5D1–5D3 bank connectors** (sandbox/REST/live SFTP + Open Banking consent scaffold) complete.
+
+Core (API mode): bank-originated controls, statement import (CSV/XLSX/**MT940/CAMT.053**), reconciliation, transfers, cheques, treasury adjustments, liquidity / cash position, connectors (sandbox FS + allow-listed REST + **live SFTP** → `BANK_API`). Open Banking = **consent only**. Use `VITE_USE_API=true`; demo seed is not the SoT.
 
 ## Phase 5A1–5B3 — Shipped ✅
 
@@ -66,7 +70,7 @@ Docs: [`BANK_CONNECTOR_ARCHITECTURE.md`](BANK_CONNECTOR_ARCHITECTURE.md)
 
 | Item | Why deferred | Next phase name |
 |------|--------------|-----------------|
-| **Live SFTP / PSD2 OAuth** | Live SFTP ✅; Open Banking consent scaffold ✅; AIS pull ❌ | **5D4 — AIS / cron** |
+| **AIS statement download / cron** | Open Banking consent scaffold only; pull returns 422 | **5D4 — AIS / cron** |
 | **FX / cross-currency treasury** | No FX rate table posting | Treasury **FX Phase** |
 | **Intercompany dual-LE transfers** | Needs dual-entity posting | Treasury **Intercompany Phase** |
 | Payment files (pain.001) | Outbound initiation | Payment execution phase |
@@ -85,4 +89,4 @@ Docs: [`BANK_CONNECTOR_ARCHITECTURE.md`](BANK_CONNECTOR_ARCHITECTURE.md)
 
 ## Next
 
-A new finance phase (separate approval — do not auto-start). Prefer **Budgeting Phase 1** or **5D4 AIS/cron** only after product approval; do not conflate with FX or intercompany.
+Do not auto-start **5D4 AIS/cron**, **FX**, or **intercompany** without product approval. Prefer a separate finance phase decision.

@@ -1,6 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
 import { Navigate } from 'react-router-dom'
-import { ApprovalMatrixConfigPage } from '@/modules/approval'
 import { PermissionMatrixPage, RoleMasterPage } from '@/modules/settings'
 import {
   CrmContactsPage,
@@ -92,12 +91,6 @@ import {
 } from '@/modules/masters/product/ProductPages'
 import { ProductDetailPage } from '@/modules/entity360'
 import {
-  BomListPage,
-  BomFormPage,
-  BomDetailPage,
-} from '@/modules/masters/bom/BomPages'
-import { Bom360LegacyRedirect } from '@/modules/entity360/Entity360Redirects'
-import {
   UserMasterListPage,
   UserMasterFormPage,
   UserMasterDetailPage,
@@ -177,12 +170,8 @@ export const masterRouteChildren: RouteObject[] = [
   { path: 'masters/price-lists', element: <MasterPlaceholderPage masterId="price-lists" /> },
   { path: 'masters/quality-test-groups', element: <MasterPlaceholderPage masterId="quality-test-groups" /> },
 
-  { path: 'masters/approval-workflows', element: <ApprovalMatrixConfigPage /> },
-  { path: 'masters/approval-matrix', element: <Navigate to="/masters/approval-workflows" replace /> },
-
   { path: 'settings/roles', element: <Navigate to="/masters/roles" replace /> },
   { path: 'settings/permissions', element: <Navigate to="/masters/role-permissions" replace /> },
-  { path: 'settings/approval-matrix', element: <Navigate to="/masters/approval-workflows" replace /> },
 
   { path: 'masters/uom', element: <UomListPage /> },
   { path: 'masters/uom/new', element: <UomFormPage /> },
@@ -265,11 +254,12 @@ export const masterRouteChildren: RouteObject[] = [
   { path: 'masters/products/:id', element: <ProductDetailPage /> },
   { path: 'masters/products/:id/edit', element: <ProductFormPage /> },
 
-  { path: 'masters/bom', element: <BomListPage /> },
-  { path: 'masters/bom/new', element: <BomFormPage /> },
-  { path: 'masters/bom/:id/manage', element: <BomDetailPage /> },
-  { path: 'masters/bom/:id', element: <Bom360LegacyRedirect /> },
-  { path: 'masters/bom/:id/edit', element: <BomFormPage /> },
+  /** Canonical BOM is Manufacturing Setup — Masters BOM URLs redirect there. */
+  { path: 'masters/bom', element: <Navigate to="/manufacturing/setup/boms" replace /> },
+  { path: 'masters/bom/new', element: <Navigate to="/manufacturing/setup/boms" replace /> },
+  { path: 'masters/bom/:id/manage', element: <Navigate to="/manufacturing/setup/boms" replace /> },
+  { path: 'masters/bom/:id', element: <Navigate to="/manufacturing/setup/boms" replace /> },
+  { path: 'masters/bom/:id/edit', element: <Navigate to="/manufacturing/setup/boms" replace /> },
 
   { path: 'masters/work-centers', element: <WorkCenterListPage /> },
   { path: 'masters/work-centers/new', element: <WorkCenterFormPage /> },

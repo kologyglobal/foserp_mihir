@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getAvailableBatches } from '@/services/inventory/traceabilityService'
-import { listInventoryLots } from '@/services/api/inventoryApi'
+import { getInventoryItemLineage, listInventoryLots } from '@/services/api/inventoryApi'
 import { isApiMode } from '@/config/apiConfig'
 import type { BatchSelectionMethod, BatchSelectionPreviewLine } from '@/types/inventoryDomain'
 import { BATCH_METHOD_LABELS } from '@/utils/inventoryMovementLabels'
@@ -8,12 +8,50 @@ import { formatDate } from '@/utils/dates/format'
 import { formatNumber } from '@/utils/formatters/currency'
 import { cn } from '@/utils/cn'
 
+/** Prefer InventoryLot when present; fall back to InventoryBatch balances (stock-posting SoT). */
+async function loadApiBatches(
+  itemId: string,
+  warehouseId: string,
+  qty: number,
+): Promise<BatchSelectionPreviewLine[]> {
+  const lots = await listInventoryLots({ itemId, warehouseId, status: 'ACTIVE', limit: 100 })
+  const fromLots = lots.data
+    .map((lot) => ({
+      itemId: lot.itemId,
+      itemCode: '',
+      batchNo: lot.lotNumber,
+      expiryDate: lot.expiryDate,
+      availableQty: Number(lot.quantityOnHand),
+      selectedQty: Math.min(qty, Number(lot.quantityOnHand)),
+    }))
+    .filter((lot) => lot.availableQty > 0)
+  if (fromLots.length > 0) return fromLots
+
+  const lineage = await getInventoryItemLineage(itemId)
+  return lineage.data.batches
+    .map((batch) => {
+      const availableQty = batch.balances
+        .filter((b) => b.warehouseId === warehouseId && b.stockStatus === 'UNRESTRICTED')
+        .reduce((sum, b) => sum + Number(b.quantity), 0)
+      return {
+        itemId,
+        itemCode: '',
+        batchNo: batch.batchNumber,
+        expiryDate: batch.expiryDate,
+        availableQty,
+        selectedQty: Math.min(qty, availableQty),
+        batchId: batch.id,
+      }
+    })
+    .filter((row) => row.availableQty > 0)
+}
+
 export interface BatchSelectorProps {
   itemId: string
   warehouseId: string
   qty: number
   value: string | null
-  onChange: (batchNo: string | null) => void
+  onChange: (batchNo: string | null, meta?: { batchId?: string }) => void
   method?: BatchSelectionMethod
   disabled?: boolean
   showFefoPreview?: boolean
@@ -42,16 +80,7 @@ export function BatchSelector({
     let cancelled = false
     setLoading(true)
     const request = isApiMode()
-      ? listInventoryLots({ itemId, warehouseId, status: 'ACTIVE', limit: 100 }).then((res) =>
-          res.data.map((lot) => ({
-            itemId: lot.itemId,
-            itemCode: '',
-            batchNo: lot.lotNumber,
-            expiryDate: lot.expiryDate,
-            availableQty: Number(lot.quantityOnHand),
-            selectedQty: Math.min(qty, Number(lot.quantityOnHand)),
-          })).filter((lot) => lot.availableQty > 0),
-        )
+      ? loadApiBatches(itemId, warehouseId, qty)
       : getAvailableBatches(itemId, warehouseId, qty, method)
     request
       .then((rows) => {
@@ -59,7 +88,8 @@ export function BatchSelector({
           setPreview(rows)
           if (!value && rows[0] && method !== 'manual' && !autoSelectedRef.current) {
             autoSelectedRef.current = true
-            onChange(rows[0].batchNo)
+            const first = rows[0] as BatchSelectionPreviewLine & { batchId?: string }
+            onChange(first.batchNo, first.batchId ? { batchId: first.batchId } : undefined)
           }
         }
       })
@@ -78,7 +108,13 @@ export function BatchSelector({
         className="erp-input h-9 w-full text-[12px]"
         value={value ?? ''}
         disabled={disabled}
-        onChange={(e) => onChange(e.target.value || null)}
+        onChange={(e) => {
+          const batchNo = e.target.value || null
+          const match = preview.find((b) => b.batchNo === batchNo) as
+            | (BatchSelectionPreviewLine & { batchId?: string })
+            | undefined
+          onChange(batchNo, match?.batchId ? { batchId: match.batchId } : undefined)
+        }}
       >
         <option value="">— Select —</option>
         {preview.map((b) => (

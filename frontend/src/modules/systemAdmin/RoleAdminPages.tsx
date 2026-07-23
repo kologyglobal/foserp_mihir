@@ -4,108 +4,26 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { Eye, Pencil, ShieldCheck, Trash2 } from 'lucide-react'
 import { MasterRegisterTable } from '../../components/masters/MasterRegisterTable'
 import { MasterListShell } from '../../components/masters/MasterListShell'
-import { DetailLayout, DetailSection, DetailGrid, DetailField, FormLayout, FormSection, MasterNotFound } from '../../components/masters/MasterLayouts'
+import { DetailLayout, DetailSection, DetailGrid, DetailField, MasterNotFound } from '../../components/masters/MasterLayouts'
 import { Badge } from '../../components/ui/Badge'
-import { FormField } from '../../components/forms/FormField'
-import { Input, Textarea, Checkbox } from '../../components/forms/Inputs'
-import { ErpCardSection } from '../../components/erp/card-form'
 import { EnterpriseRowActionsMenu, type RowActionItem } from '../../design-system/enterprise/EnterpriseTablePrimitives'
 import { MasterLifecycleDialog } from '../../components/masters/MasterLifecycleDialog'
 import { useMasterLifecycle } from '../../hooks/useMasterLifecycle'
+import {
+  AdminPermissionMatrix,
+  AdminRoleBuilderWizard,
+  AdminRoleTypeBadge,
+  type AdminPermissionPreset,
+} from '../../components/admin'
 import { useAdminStore } from '../../store/adminStore'
 import { resolveStoreAction } from '../../store/storeAction'
 import { formatApiError } from '../../services/api/apiErrors'
 import { notify } from '../../store/toastStore'
 import { canAdminPermission } from '../../utils/permissions'
-import type { AdminPermission, AdminRoleSummary } from '../../types/admin'
-
-function groupPermissionsByModule(catalog: AdminPermission[]): Array<{ module: string; permissions: AdminPermission[] }> {
-  const groups = new Map<string, AdminPermission[]>()
-  for (const perm of catalog) {
-    const list = groups.get(perm.module) ?? []
-    list.push(perm)
-    groups.set(perm.module, list)
-  }
-  return [...groups.entries()]
-    .map(([module, permissions]) => ({ module, permissions: permissions.slice().sort((a, b) => a.name.localeCompare(b.name)) }))
-    .sort((a, b) => a.module.localeCompare(b.module))
-}
-
-function moduleLabel(module: string): string {
-  const labels: Record<string, string> = {
-    tenant: 'Tenant Administration',
-    user: 'User Administration',
-    role: 'Role Administration',
-    crm: 'CRM',
-    master: 'Master Data',
-  }
-  return labels[module] ?? module.charAt(0).toUpperCase() + module.slice(1)
-}
-
-function PermissionMatrixEditor({
-  catalog,
-  selected,
-  onToggle,
-  onToggleModule,
-  readOnly,
-}: {
-  catalog: AdminPermission[]
-  selected: Set<string>
-  onToggle: (name: string) => void
-  onToggleModule: (names: string[], checked: boolean) => void
-  readOnly?: boolean
-}) {
-  const groups = useMemo(() => groupPermissionsByModule(catalog), [catalog])
-
-  if (groups.length === 0) {
-    return <p className="text-sm text-erp-muted">No permissions available.</p>
-  }
-
-  return (
-    <div className="space-y-3">
-      {groups.map((group) => {
-        const names = group.permissions.map((p) => p.name)
-        const allChecked = names.every((n) => selected.has(n))
-        const someChecked = !allChecked && names.some((n) => selected.has(n))
-        return (
-          <ErpCardSection
-            key={group.module}
-            title={moduleLabel(group.module)}
-            subtitle={`${names.filter((n) => selected.has(n)).length} of ${names.length} selected`}
-            collapsible
-            defaultOpen={group.module !== 'crm' && group.module !== 'master'}
-            columns={1}
-          >
-            <div className="flex flex-wrap items-center gap-3">
-              {!readOnly && (
-                <Checkbox
-                  label="Select all"
-                  checked={allChecked}
-                  indeterminate={someChecked}
-                  onChange={(e) => onToggleModule(names, e.target.checked)}
-                  className="rounded-md border border-erp-border bg-erp-surface-alt px-2.5 py-1.5 text-xs font-semibold"
-                />
-              )}
-              {group.permissions.map((perm) => (
-                <Checkbox
-                  key={perm.id}
-                  label={perm.name}
-                  checked={selected.has(perm.name)}
-                  disabled={readOnly}
-                  onChange={() => onToggle(perm.name)}
-                  className="rounded-md border border-erp-border px-2.5 py-1.5 text-xs font-medium"
-                />
-              ))}
-            </div>
-          </ErpCardSection>
-        )
-      })}
-    </div>
-  )
-}
+import type { AdminRoleSummary } from '../../types/admin'
 
 function RoleScopeBadge({ tenantId, isSystem }: { tenantId: string | null; isSystem: boolean }) {
-  if (isSystem) return <Badge color="purple">System</Badge>
+  if (isSystem) return <AdminRoleTypeBadge isSystem />
   return <Badge color={tenantId ? 'blue' : 'gray'}>{tenantId ? 'Tenant' : 'Platform'}</Badge>
 }
 
@@ -191,6 +109,7 @@ export function RoleAdminListPage() {
   return (
     <MasterListShell
       title="Roles"
+      badge="Admin"
       description="Manage tenant roles and permission grants"
       breadcrumbs={[{ label: 'Administration', to: '/admin' }, { label: 'Roles' }]}
       favoritePath="/admin/roles"
@@ -271,6 +190,19 @@ export function RoleAdminFormPage() {
     })
   }
 
+  function applyPreset(_module: string, names: string[], preset: AdminPermissionPreset) {
+    setSelectedPermissions((prev) => {
+      const next = new Set(prev)
+      for (const n of names) next.delete(n)
+      if (preset === 'view') {
+        for (const n of names) {
+          if (n.endsWith('.view') || n.includes('.view.') || n.endsWith('.read')) next.add(n)
+        }
+      }
+      return next
+    })
+  }
+
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (!name.trim()) {
@@ -313,40 +245,41 @@ export function RoleAdminFormPage() {
   const validationErrors = saveError ? [saveError] : []
 
   return (
-    <FormLayout
-      backTo="/admin/roles"
-      backLabel="Back to Roles"
-      title={isEdit ? 'Edit Role' : 'New Role'}
-      isEdit={isEdit}
-      breadcrumbs={[
-        { label: 'Administration', to: '/admin' },
-        { label: 'Roles', to: '/admin/roles' },
-        { label: isEdit ? (detail?.name ?? 'Edit') : 'New' },
-      ]}
-      onSubmit={onSubmit}
-      isSubmitting={submitting}
-      validationErrors={validationErrors}
-      onCancel={() => navigate(isEdit ? `/admin/roles/${id}` : '/admin/roles')}
-    >
-      <FormSection title="Role Details">
-        <FormField label="Role Name" required>
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
-        </FormField>
-        <FormField label="Description" className="md:col-span-2">
-          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
-        </FormField>
-      </FormSection>
-      <FormSection title="Permissions" className="md:col-span-2">
-        <div className="md:col-span-2">
-          <PermissionMatrixEditor
-            catalog={permissionCatalog}
-            selected={selectedPermissions}
-            onToggle={togglePermission}
-            onToggleModule={toggleModule}
-          />
+    <div className="mx-auto max-w-5xl space-y-4 p-4 md:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <button
+            type="button"
+            className="text-sm font-medium text-erp-primary hover:underline"
+            onClick={() => navigate('/admin/roles')}
+          >
+            ← Back to Roles
+          </button>
+          <h1 className="mt-2 text-xl font-semibold text-erp-text">{isEdit ? 'Edit Role' : 'New Role'}</h1>
+          <p className="text-sm text-erp-muted">Guided Role Builder — identity, modules, sensitive review, save.</p>
         </div>
-      </FormSection>
-    </FormLayout>
+      </div>
+      {validationErrors.length > 0 ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {validationErrors.join(' · ')}
+        </div>
+      ) : null}
+      <AdminRoleBuilderWizard
+        catalog={permissionCatalog}
+        name={name}
+        description={description}
+        onNameChange={setName}
+        onDescriptionChange={setDescription}
+        selected={selectedPermissions}
+        onToggle={togglePermission}
+        onToggleModule={toggleModule}
+        onApplyPreset={applyPreset}
+        onSubmit={onSubmit}
+        onCancel={() => navigate(isEdit ? `/admin/roles/${id}` : '/admin/roles')}
+        submitting={submitting}
+        isEdit={isEdit}
+      />
+    </div>
   )
 }
 
@@ -393,7 +326,7 @@ export function RoleAdminDetailPage() {
           <div className="flex items-center gap-2 pb-2 text-xs text-erp-muted">
             <ShieldCheck className="h-3.5 w-3.5" /> {detail.permissions.length} permissions granted
           </div>
-          <PermissionMatrixEditor
+          <AdminPermissionMatrix
             catalog={permissionCatalog}
             selected={selected}
             onToggle={() => {}}

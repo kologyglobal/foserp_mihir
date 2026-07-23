@@ -8,6 +8,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Lock, PackagePlus, RefreshCw, RotateCcw } from 'lucide-react'
+import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SectionCard } from '@/components/ui/SectionCard'
 import { Button } from '@/components/ui/Button'
@@ -29,6 +31,7 @@ import {
 } from '@/services/api/inventoryApi'
 import { useInventoryPermissions } from '@/utils/permissions/inventory'
 import { formatDate } from '@/utils/dates/format'
+import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
 
 interface LookupOption {
   id: string
@@ -96,10 +99,16 @@ function refLabel(ref: { code: string; name: string } | undefined, id: string): 
 
 function AccessDenied({ title }: { title: string }) {
   return (
-    <div className="erp-page">
-      <PageHeader title={title} breadcrumbs={[{ label: 'Inventory', to: '/inventory/stock' }]} />
+    <OperationalPageShell
+      variant="dynamics"
+      layout="enterprise"
+      badge="Inventory & Warehouse"
+      title={title}
+      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: title }]}
+      autoBreadcrumbs={false}
+    >
       <EmptyState icon={Lock} title="Access denied" description="You do not hold the required inventory permission." />
-    </div>
+    </OperationalPageShell>
   )
 }
 
@@ -183,28 +192,36 @@ export function ApiReturnsRegisterPage() {
   }
 
   return (
-    <div className="erp-page">
-      <PageHeader
-        title="Returns"
-        description="Live material returns from work orders posted to the inventory ledger. You can also return from the Work Order Materials tab."
-        breadcrumbs={[{ label: 'Inventory', to: '/inventory/stock' }, { label: 'Returns' }]}
-        actions={(
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" onClick={() => void load()}>
-              <RefreshCw className="h-4 w-4" /> Refresh
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => navigate('/manufacturing/work-orders')}>
-              Open Work Orders
-            </Button>
-            {perms.canPostReturn || perms.canCreateReturn ? (
-              <Button size="sm" onClick={() => navigate('/inventory/movements/returns/new')}>
-                <PackagePlus className="h-4 w-4" /> New Return
-              </Button>
-            ) : null}
-          </div>
-        )}
-      />
-
+    <OperationalPageShell
+      variant="dynamics"
+      layout="enterprise"
+      badge="Inventory & Warehouse"
+      title="Returns"
+      description="Live material returns from work orders. You can also return from the Work Order Materials tab."
+      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }, { label: 'Returns' }]}
+      autoBreadcrumbs={false}
+      favoritePath="/inventory/movements/returns"
+      commandBar={(
+        <ErpCommandBar
+          inline
+          sticky={false}
+          primaryAction={
+            perms.canPostReturn || perms.canCreateReturn
+              ? {
+                  id: 'new',
+                  label: 'New Return',
+                  icon: PackagePlus,
+                  onClick: () => navigate('/inventory/movements/returns/new'),
+                }
+              : undefined
+          }
+          secondaryActions={[
+            { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load() },
+            { id: 'wo', label: 'Open Work Orders', onClick: () => navigate('/manufacturing/work-orders') },
+          ]}
+        />
+      )}
+    >
       <div className="mb-3 flex flex-wrap items-end gap-2">
         <label className="text-[11px] text-erp-muted">
           Item
@@ -234,79 +251,75 @@ export function ApiReturnsRegisterPage() {
         </label>
       </div>
 
-      <SectionCard title="Return from work order" noPadding>
-        {loading ? (
-          <div className="p-6"><LoadingState variant="table" rows={8} /></div>
-        ) : rows.length === 0 ? (
-          <div className="p-6">
-            <EmptyState
-              icon={RotateCcw}
-              title="No returns posted yet"
-              description="Post a return from work order here, or use the Work Order Materials tab."
-              action={
-                perms.canPostReturn || perms.canCreateReturn ? (
-                  <Button size="sm" onClick={() => navigate('/inventory/movements/returns/new')}>
-                    <PackagePlus className="h-4 w-4" /> New Return
-                  </Button>
-                ) : undefined
-              }
-            />
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="erp-table w-full min-w-[980px] text-[13px]">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Movement #</th>
-                    <th>Work Order</th>
-                    <th>Item</th>
-                    <th>Warehouse</th>
-                    <th className="text-right">Qty</th>
-                    <th className="text-right">Value</th>
-                    <th className="text-right">Balance After</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((m) => (
-                    <tr key={m.id}>
-                      <td>{formatDate(m.movementDate)}</td>
-                      <td>
+      {loading ? <LoadingState variant="table" rows={8} /> : null}
+      {!loading && rows.length === 0 ? (
+        <EmptyState
+          icon={RotateCcw}
+          title="No returns posted yet"
+          description="Post a return from work order here, or use the Work Order Materials tab."
+          action={
+            perms.canPostReturn || perms.canCreateReturn ? (
+              <Button size="sm" onClick={() => navigate('/inventory/movements/returns/new')}>
+                <PackagePlus className="h-4 w-4" /> New Return
+              </Button>
+            ) : undefined
+          }
+        />
+      ) : null}
+      {!loading && rows.length > 0 ? (
+        <EnterpriseRegisterTableShell>
+          <div className="overflow-x-auto">
+            <table className="erp-table w-full min-w-[980px] text-[13px]">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Movement #</th>
+                  <th>Work Order</th>
+                  <th>Item</th>
+                  <th>Warehouse</th>
+                  <th className="text-right">Qty</th>
+                  <th className="text-right">Value</th>
+                  <th className="text-right">Balance After</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((m) => (
+                  <tr key={m.id}>
+                    <td>{formatDate(m.movementDate)}</td>
+                    <td>
+                      <Link
+                        to={`/inventory/movements/returns/${m.id}`}
+                        className="font-mono font-semibold text-erp-primary hover:underline"
+                      >
+                        {m.movementNumber}
+                      </Link>
+                    </td>
+                    <td className="font-mono text-[12px]">
+                      {m.workOrderId ? (
                         <Link
-                          to={`/inventory/movements/returns/${m.id}`}
-                          className="font-mono font-semibold text-erp-primary hover:underline"
+                          to={`/manufacturing/work-orders/${m.workOrderId}`}
+                          className="text-erp-primary hover:underline"
                         >
-                          {m.movementNumber}
+                          {m.referenceNo ?? m.workOrderId.slice(0, 8)}
                         </Link>
-                      </td>
-                      <td className="font-mono text-[12px]">
-                        {m.workOrderId ? (
-                          <Link
-                            to={`/manufacturing/work-orders/${m.workOrderId}`}
-                            className="text-erp-primary hover:underline"
-                          >
-                            {m.referenceNo ?? m.workOrderId.slice(0, 8)}
-                          </Link>
-                        ) : (
-                          m.referenceNo ?? '—'
-                        )}
-                      </td>
-                      <td>{refLabel(m.item, m.itemId)}</td>
-                      <td>{refLabel(m.warehouse, m.warehouseId)}</td>
-                      <td className="text-right tabular-nums font-semibold text-emerald-700">{fmtQty(m.quantity)}</td>
-                      <td className="text-right tabular-nums">{fmtQty(m.value)}</td>
-                      <td className="text-right tabular-nums">{fmtQty(m.balanceAfter)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <Pager meta={meta} onPage={setPage} />
-          </>
-        )}
-      </SectionCard>
-    </div>
+                      ) : (
+                        m.referenceNo ?? '—'
+                      )}
+                    </td>
+                    <td>{refLabel(m.item, m.itemId)}</td>
+                    <td>{refLabel(m.warehouse, m.warehouseId)}</td>
+                    <td className="text-right tabular-nums font-semibold text-emerald-700">{fmtQty(m.quantity)}</td>
+                    <td className="text-right tabular-nums">{fmtQty(m.value)}</td>
+                    <td className="text-right tabular-nums">{fmtQty(m.balanceAfter)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pager meta={meta} onPage={setPage} />
+        </EnterpriseRegisterTableShell>
+      ) : null}
+    </OperationalPageShell>
   )
 }
 

@@ -35,6 +35,13 @@ export function enrichItemWithDefaults(item: Item): Item {
     productionBomId: item.productionBomId ?? ext.productionBomId ?? null,
     routingNo: item.routingNo ?? ext.routingNo ?? null,
     drawingNo: item.drawingNo ?? ext.drawingNo ?? null,
+    salesDescription: item.salesDescription ?? null,
+    salesUomId: item.salesUomId ?? item.baseUomId,
+    defaultSalesRate: item.defaultSalesRate ?? 0,
+    salesLeadDays: item.salesLeadDays ?? 0,
+    salesAllowed: item.salesAllowed ?? false,
+    defaultFulfilmentMethod: item.defaultFulfilmentMethod ?? 'MANUAL',
+    productionAllowed: item.productionAllowed ?? false,
   }
 }
 

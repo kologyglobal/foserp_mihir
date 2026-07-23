@@ -6,7 +6,7 @@ import { ErpStatusChip, type ErpStatusChipTone } from '@/components/erp/ErpStatu
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SearchInput } from '@/components/ui/SearchInput'
-import { listRoutings } from '@/services/api/manufacturingApi'
+import { deleteRouting, listRoutings, updateRouting } from '@/services/api/manufacturingApi'
 import type { ManufacturingVersionStatus, Routing } from '@/types/manufacturingSetup'
 import {
   ROUTING_FLOW_TYPE_LABELS,
@@ -15,8 +15,8 @@ import {
 import { isApiMode } from '@/config/apiConfig'
 import { useManufacturingSetupPermissions } from '@/utils/permissions/manufacturing'
 import { notify } from '@/store/toastStore'
+import { appConfirm } from '@/store/confirmDialogStore'
 import { ManufacturingSetupShell } from '../ManufacturingSetupShell'
-import { SetupViewPopup } from '../SetupViewPopup'
 
 const VERSION_STATUS_TONE: Record<ManufacturingVersionStatus, ErpStatusChipTone> = {
   DRAFT: 'pending',
@@ -52,7 +52,7 @@ export function RoutingsSetupPage() {
   const [rows, setRows] = useState<Routing[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [viewing, setViewing] = useState<Routing | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!apiMode) {
@@ -82,8 +82,37 @@ export function RoutingsSetupPage() {
     return rows.filter((r) => r.code.toLowerCase().includes(q) || r.name.toLowerCase().includes(q))
   }, [rows, search])
 
-  const openEditor = (row: Routing) => {
-    navigate(`/manufacturing/setup/routings/${row.id}`)
+  const toggleActive = async (row: Routing) => {
+    setBusyId(row.id)
+    try {
+      await updateRouting(row.id, { isActive: !row.isActive })
+      notify.success(row.isActive ? 'Route deactivated.' : 'Route activated.')
+      await load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Action failed')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const remove = async (row: Routing) => {
+    const ok = await appConfirm({
+      title: 'Delete route?',
+      description: `Delete ${row.code}? This soft-deletes the route header.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })
+    if (!ok) return
+    setBusyId(row.id)
+    try {
+      await deleteRouting(row.id)
+      notify.success('Route deleted.')
+      await load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Delete failed')
+    } finally {
+      setBusyId(null)
+    }
   }
 
   return (
@@ -123,7 +152,7 @@ export function RoutingsSetupPage() {
           ) : null}
           {!loading && filtered.length > 0 ? (
             <div className="overflow-x-auto rounded-lg border border-erp-border bg-white">
-              <table className="erp-table w-full min-w-[640px] text-left text-[12px]">
+              <table className="erp-table w-full min-w-[760px] text-left text-[12px]">
                 <thead>
                   <tr>
                     <th>Route Code</th>
@@ -131,26 +160,59 @@ export function RoutingsSetupPage() {
                     <th>Flow</th>
                     <th>Status</th>
                     <th>Updated</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((row) => {
                     const status = routingListStatus(row)
                     return (
-                      <tr
-                        key={row.id}
-                        className="cursor-pointer hover:bg-erp-surface-alt/60"
-                        onClick={() => openEditor(row)}
-                      >
+                      <tr key={row.id}>
                         <td className="font-mono text-[11px]">{row.code}</td>
                         <td className="font-medium">{row.name}</td>
                         <td>{ROUTING_FLOW_TYPE_LABELS[row.productionFlowType ?? 'SERIAL']}</td>
-                        <td onClick={(e) => e.stopPropagation()}>
-                          <button type="button" className="text-left" onClick={() => openEditor(row)}>
-                            <ErpStatusChip label={status.label} tone={status.tone} />
-                          </button>
+                        <td>
+                          <ErpStatusChip label={status.label} tone={status.tone} />
                         </td>
                         <td>{row.updatedAt.slice(0, 10)}</td>
+                        <td>
+                          <div className="flex flex-wrap gap-1">
+                            <ErpButton
+                              size="sm"
+                              variant="outline"
+                              onClick={() => navigate(`/manufacturing/setup/routings/${row.id}/view`)}
+                            >
+                              View
+                            </ErpButton>
+                            {perms.canManageRouting ? (
+                              <>
+                                <ErpButton
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => navigate(`/manufacturing/setup/routings/${row.id}`)}
+                                >
+                                  Edit
+                                </ErpButton>
+                                <ErpButton
+                                  size="sm"
+                                  variant="outline"
+                                  loading={busyId === row.id}
+                                  onClick={() => void toggleActive(row)}
+                                >
+                                  {row.isActive ? 'Deactivate' : 'Activate'}
+                                </ErpButton>
+                                <ErpButton
+                                  size="sm"
+                                  variant="outline"
+                                  loading={busyId === row.id}
+                                  onClick={() => void remove(row)}
+                                >
+                                  Delete
+                                </ErpButton>
+                              </>
+                            ) : null}
+                          </div>
+                        </td>
                       </tr>
                     )
                   })}
@@ -160,41 +222,6 @@ export function RoutingsSetupPage() {
           ) : null}
         </>
       )}
-
-      <SetupViewPopup
-        open={Boolean(viewing)}
-        onClose={() => setViewing(null)}
-        title={viewing?.name ?? 'Route'}
-        subtitle={viewing?.code}
-        fields={
-          viewing
-            ? [
-                { label: 'Route Code', value: viewing.code, mono: true },
-                { label: 'Status', value: routingListStatus(viewing).label },
-                { label: 'Route Name', value: viewing.name, fullWidth: true },
-                {
-                  label: 'Production Type',
-                  value: ROUTING_FLOW_TYPE_LABELS[viewing.productionFlowType ?? 'SERIAL'],
-                },
-                { label: 'Description', value: viewing.description ?? '—', fullWidth: true },
-                { label: 'Updated', value: viewing.updatedAt.slice(0, 10) },
-              ]
-            : []
-        }
-        footerExtra={
-          viewing ? (
-            <ErpButton
-              onClick={() => {
-                const id = viewing.id
-                setViewing(null)
-                navigate(`/manufacturing/setup/routings/${id}`)
-              }}
-            >
-              Open Editor
-            </ErpButton>
-          ) : null
-        }
-      />
     </ManufacturingSetupShell>
   )
 }

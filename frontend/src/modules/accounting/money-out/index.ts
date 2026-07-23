@@ -17,6 +17,7 @@ export { PayableAllocationDetailPage } from './allocations/PayableAllocationDeta
 export { VendorAdjustmentListPage } from './vendor-adjustments/VendorAdjustmentListPage'
 export { VendorAdjustmentNewPage, VendorAdjustmentEditPage } from './vendor-adjustments/VendorAdjustmentFormPage'
 export { VendorAdjustmentDetailPage } from './vendor-adjustments/VendorAdjustmentDetailPage'
+export { VendorAdjustmentPrintPage } from './vendor-adjustments/VendorAdjustmentPrintPage'
 export { VendorAdjustmentAllocatePage } from './vendor-adjustments/VendorAdjustmentAllocatePage'
 export { CorrectionsWorkspacePage } from './corrections/CorrectionsWorkspacePage'
 export { ReversalHistoryPage } from './corrections/ReversalHistoryPage'

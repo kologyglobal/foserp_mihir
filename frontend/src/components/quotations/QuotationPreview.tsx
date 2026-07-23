@@ -58,7 +58,7 @@ export function QuotationPreview({ documentId }: QuotationPreviewProps) {
         </Link>
         <div className="quo-preview-toolbar__actions">
           <ErpButton variant="secondary" size="sm" icon={Printer} onClick={printQuotationDocument}>Print</ErpButton>
-          <ErpButton variant="secondary" size="sm" icon={Download} onClick={printQuotationDocument}>Export PDF</ErpButton>
+          <ErpButton variant="secondary" size="sm" icon={Download} onClick={printQuotationDocument}>Download PDF</ErpButton>
           <ErpButton variant="secondary" size="sm" icon={Send} onClick={handleDmsSave}>Save to DMS</ErpButton>
           <ConvertQuotationToSOAction documentId={documentId} variant="card-action" />
           <ErpButton variant="primary" size="sm" icon={Eye} onClick={() => navigate(`/crm/quotations/${doc.quotationId}`)}>Quote 360</ErpButton>

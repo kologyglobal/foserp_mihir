@@ -4,7 +4,7 @@ import { getRouteParam, getTenantId } from '../../../types/request-context.js'
 import { asyncHandler } from '../../../utils/asyncHandler.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import { buildPaginationMeta } from '../../../utils/pagination.js'
-import { sendPaginated, sendSuccess } from '../../../utils/response.js'
+import { sendCreated, sendPaginated, sendSuccess } from '../../../utils/response.js'
 import { dec } from '../shared/manufacturing.mappers.js'
 import * as eventService from './manufacturing-accounting-event.service.js'
 import * as featureControlService from './manufacturing-feature-control.service.js'
@@ -14,7 +14,14 @@ import type {
   ListAccountingEventsQuery,
   ListFeatureControlsQuery,
   PutFeatureControlInput,
+  ReadinessQuery,
+  InventorySignOffBody,
+  FinancePilotSignOffBody,
+  EnableBody,
+  DisableBody,
 } from './manufacturing-accounting.schemas.js'
+import * as enablementService from './manufacturing-accounting-enablement.service.js'
+import { getReadiness } from './manufacturing-accounting-readiness.service.js'
 
 function mapEvent(row: {
   id: string
@@ -92,15 +99,24 @@ export const listFeatureControls = asyncHandler(async (req: Request, res: Respon
   )
 })
 
-export const getManufacturingAccountingFeatureControl = asyncHandler(async (req: Request, res: Response) =>
-  sendSuccess(
+export const getManufacturingAccountingFeatureControl = asyncHandler(async (req: Request, res: Response) => {
+  const ctx = req.context
+  const includeTechnicalDetails = Boolean(
+    ctx?.isSuperAdmin ||
+      ctx?.permissions.includes('finance.settings.manage') ||
+      ctx?.permissions.includes('manufacturing.accounting.post'),
+  )
+
+  return sendSuccess(
     res,
     'Manufacturing accounting feature status fetched',
     await featureControlService.getManufacturingAccountingFeatureStatus(
       getTenantId(req),
       getRouteParam(req, 'legalEntityId'),
+      { includeTechnicalDetails },
     ),
-  ))
+  )
+})
 
 export const putManufacturingAccountingFeatureControl = asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as PutFeatureControlInput
@@ -111,7 +127,7 @@ export const putManufacturingAccountingFeatureControl = asyncHandler(async (req:
       req,
       getTenantId(req),
       getRouteParam(req, 'legalEntityId'),
-      body.isEnabled,
+      body,
     ),
   )
 })
@@ -123,3 +139,63 @@ export const getCostPreview = asyncHandler(async (req: Request, res: Response) =
     await getWorkOrderCostPreview(getTenantId(req), getRouteParam(req, 'id')),
   ),
 )
+
+export const getAccountingReadiness = asyncHandler(async (req: Request, res: Response) => {
+  const query = req.query as unknown as ReadinessQuery
+  const ctx = req.context
+  const includeTechnicalDetails = Boolean(
+    ctx?.isSuperAdmin ||
+      ctx?.permissions.includes('finance.settings.manage') ||
+      ctx?.permissions.includes('manufacturing.accounting.post') ||
+      ctx?.permissions.includes('manufacturing.accounting.enable') ||
+      (query.includeTechnicalDetails === 'true' || query.includeTechnicalDetails === '1'),
+  )
+  // Technical details only for elevated roles even if query asks.
+  const allowTechnical =
+    Boolean(ctx?.isSuperAdmin) ||
+    Boolean(ctx?.permissions.includes('finance.settings.manage')) ||
+    Boolean(ctx?.permissions.includes('manufacturing.accounting.post')) ||
+    Boolean(ctx?.permissions.includes('manufacturing.accounting.enable'))
+
+  return sendSuccess(
+    res,
+    'Manufacturing accounting readiness fetched',
+    await getReadiness({
+      tenantId: getTenantId(req),
+      legalEntityId: query.legalEntityId,
+      postingDate: query.postingDate,
+      userId: ctx?.userId ?? null,
+      includeTechnicalDetails: includeTechnicalDetails && allowTechnical,
+    }),
+  )
+})
+
+export const postInventoryReconciliationSignOff = asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as InventorySignOffBody
+  return sendCreated(
+    res,
+    'Inventory reconciliation sign-off recorded',
+    await enablementService.createInventoryReconciliationSignOff(req, getTenantId(req), body),
+  )
+})
+
+export const postFinancePilotSignOff = asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as FinancePilotSignOffBody
+  return sendCreated(
+    res,
+    'Finance pilot sign-off recorded',
+    await enablementService.createFinancePilotSignOff(req, getTenantId(req), body),
+  )
+})
+
+export const postEnableManufacturingAccounting = asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as EnableBody
+  const result = await enablementService.enableManufacturingAccounting(req, getTenantId(req), body)
+  return sendSuccess(res, 'Manufacturing Accounting enabled', result)
+})
+
+export const postDisableManufacturingAccounting = asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as DisableBody
+  const result = await enablementService.disableManufacturingAccounting(req, getTenantId(req), body)
+  return sendSuccess(res, 'Manufacturing Accounting disabled', result)
+})

@@ -93,7 +93,7 @@ export function buildNotifications(): NotificationItem[] {
       severity: 'red',
       title: `${mrp.materialShortages} material shortage(s)`,
       description: 'MRP flagged items below requirement',
-      href: '/mrp',
+      href: '/manufacturing/today',
       createdAt: now,
     })
   }
@@ -109,7 +109,7 @@ export function buildNotifications(): NotificationItem[] {
       severity: 'red',
       title: `Overdue WO ${wo.woNo}`,
       description: `Planned finish ${wo.plannedFinishDate}`,
-      href: `/work-orders/${wo.id}`,
+      href: `/manufacturing/work-orders/${wo.id}`,
       createdAt: now,
     })
   }

@@ -48,7 +48,7 @@ export function ErpDataGrid<T>({
   className,
   initialSortColumnId,
   initialSortDesc = true,
-  showCompactSearch = true,
+  showCompactSearch = false,
   showToolbarView = false,
   showToolbarExport = false,
   enableColumnSorting = true,

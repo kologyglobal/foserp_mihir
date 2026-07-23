@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Download, Layers, Plus, RefreshCw, Upload } from 'lucide-react'
+import { Download, Layers, Plus, RefreshCw, Upload } from 'lucide-react'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { ErpStatusChip, type ErpStatusChipTone } from '@/components/erp/ErpStatusChip'
 import { DynamicsKpiRow, DynamicsKpiTile } from '@/components/dynamics/DynamicsKpiTile'
@@ -11,14 +11,14 @@ import { LoadingState } from '@/design-system/components/LoadingState'
 import { AccountDrawerShell } from '@/components/accounting/coa/AccountDrawerShell'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SearchInput } from '@/components/ui/SearchInput'
-import { createBom, createBomVersion, downloadBomImportTemplate, listBoms, type BomImportResult } from '@/services/api/manufacturingApi'
+import { createBom, createBomVersion, downloadBomImportTemplate, listBoms, activateBom, deactivateBom, deleteBom, type BomImportResult } from '@/services/api/manufacturingApi'
 import type { Bom, ManufacturingVersionStatus } from '@/types/manufacturingSetup'
 import { isApiMode } from '@/config/apiConfig'
 import { useManufacturingSetupPermissions } from '@/utils/permissions/manufacturing'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
+import { appConfirm } from '@/store/confirmDialogStore'
 import { ManufacturingSetupShell } from '../ManufacturingSetupShell'
-import { SetupViewPopup } from '../SetupViewPopup'
 import { useSetupLookup } from '../useSetupLookups'
 import { BomCsvImportDialog } from './BomCsvImportDialog'
 
@@ -50,6 +50,15 @@ const VERSION_STATUS_TONE: Record<ManufacturingVersionStatus, ErpStatusChipTone>
 
 type LifecycleFilter = '' | 'live' | 'draft' | 'inactive'
 
+/** Prefer ACTIVE revision line count; otherwise newest revision. */
+function bomItemCount(row: Bom): number | null {
+  const versions = row.versions ?? []
+  if (!versions.length) return null
+  const active = versions.find((v) => v.status === 'ACTIVE')
+  const target = active ?? versions[0]
+  return typeof target.lineCount === 'number' ? target.lineCount : null
+}
+
 /** Live = has an ACTIVE revision; Draft = newest revision still in DRAFT with none active. */
 function bomLifecycle(row: Bom): Exclude<LifecycleFilter, ''> | 'idle' {
   if (!row.isActive) return 'inactive'
@@ -70,9 +79,9 @@ export function BomsSetupPage() {
   const [search, setSearch] = useState('')
   const [lifecycleFilter, setLifecycleFilter] = useState<LifecycleFilter>('')
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [viewing, setViewing] = useState<Bom | null>(null)
   const [form, setForm] = useState<BomFormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [setupApiAvailable, setSetupApiAvailable] = useState(false)
 
@@ -183,6 +192,44 @@ export function BomsSetupPage() {
     }
   }
 
+  const toggleActive = async (row: Bom) => {
+    setBusyId(row.id)
+    try {
+      if (row.isActive) {
+        await deactivateBom(row.id)
+        notify.success('BOM deactivated.')
+      } else {
+        await activateBom(row.id)
+        notify.success('BOM activated.')
+      }
+      await load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Action failed')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const remove = async (row: Bom) => {
+    const ok = await appConfirm({
+      title: 'Delete BOM?',
+      description: `Delete ${row.code}? This soft-deletes the BOM header.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })
+    if (!ok) return
+    setBusyId(row.id)
+    try {
+      await deleteBom(row.id)
+      notify.success('BOM deleted.')
+      await load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Delete failed')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const kpiClick = (value: LifecycleFilter) => () => setLifecycleFilter((current) => (current === value ? '' : value))
 
   return (
@@ -290,11 +337,12 @@ export function BomsSetupPage() {
           {!loading && filtered.length > 0 ? (
             <div className="overflow-hidden rounded-lg border border-erp-border bg-erp-surface shadow-sm">
               <div className="overflow-x-auto">
-                <table className="erp-table w-full min-w-[860px] text-left text-[12px]">
+                <table className="erp-table w-full min-w-[940px] text-left text-[12px]">
                   <thead>
                     <tr>
                       <th>BOM</th>
                       <th>Output Item</th>
+                      <th className="text-center">Items</th>
                       <th>Latest Revision</th>
                       <th className="text-center">Versions</th>
                       <th>Status</th>
@@ -307,6 +355,7 @@ export function BomsSetupPage() {
                       const versions = row.versions ?? []
                       const latest = versions[0]
                       const lifecycle = bomLifecycle(row)
+                      const itemCount = bomItemCount(row)
                       return (
                         <tr key={row.id} className="group transition-colors hover:bg-erp-primary-soft/30">
                           <td className="px-4 py-2.5">
@@ -324,6 +373,16 @@ export function BomsSetupPage() {
                             <span className="block truncate" title={itemLabel(row)}>
                               {itemLabel(row)}
                             </span>
+                          </td>
+                          <td
+                            className="px-4 py-2.5 text-center tabular-nums font-semibold text-erp-text"
+                            title={
+                              itemCount == null
+                                ? 'No revisions yet'
+                                : 'Component lines on the active revision (or latest if none active)'
+                            }
+                          >
+                            {itemCount == null ? '—' : itemCount}
                           </td>
                           <td className="px-4 py-2.5">
                             {latest ? (
@@ -352,17 +411,48 @@ export function BomsSetupPage() {
                           <td className="px-4 py-2.5 whitespace-nowrap text-erp-muted">{formatDate(row.updatedAt)}</td>
                           <td className="px-4 py-2.5">
                             <div className="flex flex-wrap items-center gap-1">
-                              <ErpButton size="sm" variant="outline" onClick={() => setViewing(row)}>
-                                View
-                              </ErpButton>
                               <ErpButton
                                 size="sm"
                                 variant="outline"
-                                onClick={() => navigate(`/manufacturing/setup/boms/${row.id}`)}
+                                onClick={() => navigate(`/manufacturing/setup/boms/${row.id}/view`)}
                               >
-                                Open
+                                View
                               </ErpButton>
-                              <ChevronRight className="h-4 w-4 text-erp-muted" aria-hidden />
+                              {perms.canManageBom ? (
+                                <>
+                                  <ErpButton
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => navigate(`/manufacturing/setup/boms/${row.id}`)}
+                                  >
+                                    Edit
+                                  </ErpButton>
+                                  <ErpButton
+                                    size="sm"
+                                    variant="outline"
+                                    loading={busyId === row.id}
+                                    onClick={() => void toggleActive(row)}
+                                  >
+                                    {row.isActive ? 'Deactivate' : 'Activate'}
+                                  </ErpButton>
+                                  <ErpButton
+                                    size="sm"
+                                    variant="outline"
+                                    loading={busyId === row.id}
+                                    onClick={() => void remove(row)}
+                                  >
+                                    Delete
+                                  </ErpButton>
+                                </>
+                              ) : (
+                                <ErpButton
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => navigate(`/manufacturing/setup/boms/${row.id}`)}
+                                >
+                                  Open
+                                </ErpButton>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -375,48 +465,6 @@ export function BomsSetupPage() {
           ) : null}
         </>
       )}
-
-      <SetupViewPopup
-        open={Boolean(viewing)}
-        onClose={() => setViewing(null)}
-        title={viewing?.name ?? 'BOM'}
-        subtitle={viewing?.code}
-        fields={
-          viewing
-            ? [
-                { label: 'Code', value: viewing.code, mono: true },
-                {
-                  label: 'Lifecycle',
-                  value: bomLifecycle(viewing).replace(/^\w/, (c) => c.toUpperCase()),
-                },
-                { label: 'Name', value: viewing.name, fullWidth: true },
-                { label: 'Output Item', value: itemLabel(viewing), fullWidth: true },
-                {
-                  label: 'Latest Revision',
-                  value: viewing.versions?.[0]
-                    ? `Rev ${viewing.versions[0].revisionCode} (${viewing.versions[0].status})`
-                    : 'No revisions',
-                },
-                { label: 'Versions', value: String(viewing.versions?.length ?? 0) },
-                { label: 'Description', value: viewing.description ?? '—', fullWidth: true },
-                { label: 'Updated', value: formatDate(viewing.updatedAt) },
-              ]
-            : []
-        }
-        footerExtra={
-          viewing ? (
-            <ErpButton
-              onClick={() => {
-                const id = viewing.id
-                setViewing(null)
-                navigate(`/manufacturing/setup/boms/${id}`)
-              }}
-            >
-              Open Editor
-            </ErpButton>
-          ) : null
-        }
-      />
 
       <AccountDrawerShell
         open={drawerOpen}

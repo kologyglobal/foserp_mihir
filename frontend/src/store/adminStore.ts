@@ -30,10 +30,11 @@ interface AdminState {
     mobile?: string
     designation?: string
     department?: string
+    departmentId?: string | null
     status?: AdminUser['status']
     roleIds?: string[]
   }) => MaybePromise<StoreActionResult & { userId?: string }>
-  updateUser: (id: string, data: Partial<Pick<AdminUser, 'firstName' | 'lastName' | 'email' | 'mobile' | 'designation' | 'department' | 'status'>>) => MaybePromise<StoreActionResult>
+  updateUser: (id: string, data: Partial<Pick<AdminUser, 'firstName' | 'lastName' | 'email' | 'mobile' | 'designation' | 'department' | 'departmentId' | 'status'>>) => MaybePromise<StoreActionResult>
   deleteUser: (id: string) => MaybePromise<StoreActionResult>
   activateUser: (id: string) => MaybePromise<StoreActionResult>
   deactivateUser: (id: string) => MaybePromise<StoreActionResult>
@@ -95,6 +96,7 @@ export const useAdminStore = create<AdminState>()((set, get) => ({
       mobile: data.mobile ?? null,
       designation: data.designation ?? null,
       department: data.department ?? null,
+      departmentId: data.departmentId ?? null,
       status: data.status ?? 'INVITED',
       emailVerified: false,
       lastLoginAt: null,
@@ -124,8 +126,14 @@ export const useAdminStore = create<AdminState>()((set, get) => ({
     return { ok: true }
   },
 
-  activateUser: (id) => get().updateUser(id, { status: 'ACTIVE' }),
-  deactivateUser: (id) => get().updateUser(id, { status: 'INACTIVE' }),
+  activateUser: (id) => {
+    if (isApiMode()) return import('../services/bridges/adminApiBridge').then((m) => m.apiActivateAdminUser(id))
+    return get().updateUser(id, { status: 'ACTIVE' })
+  },
+  deactivateUser: (id) => {
+    if (isApiMode()) return import('../services/bridges/adminApiBridge').then((m) => m.apiDeactivateAdminUser(id))
+    return get().updateUser(id, { status: 'INACTIVE' })
+  },
 
   assignUserRole: (userId, roleId) => {
     if (isApiMode()) return import('../services/bridges/adminApiBridge').then((m) => m.apiAssignAdminUserRole(userId, roleId))

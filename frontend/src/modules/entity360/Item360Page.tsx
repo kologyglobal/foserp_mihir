@@ -60,7 +60,7 @@ export function Item360Page() {
             <CommandBarButton icon={ArrowDownToLine} label="Material Inward" onClick={() => navigate('/inventory/inward')} primary />
             <CommandBarButton icon={Package} label="Stock Ledger" onClick={() => navigate(`/inventory/stock/${item.id}`)} />
             <CommandBarButton icon={ShoppingCart} label="Create PR" onClick={() => navigate('/purchase/requisitions/new')} />
-            <CommandBarButton icon={TrendingDown} label="MRP Workbench" onClick={() => navigate('/mrp/workbench')} />
+            <CommandBarButton icon={TrendingDown} label="Production Plan" onClick={() => navigate('/manufacturing/production-plan')} />
           </CommandBarGroup>
           <CommandBarGroup label="QR">
             <EntityQrToolbar
@@ -82,7 +82,7 @@ export function Item360Page() {
           { label: 'Issue to WO', onClick: () => navigate('/inventory/issue') },
           { label: 'Adjust Stock', onClick: () => navigate('/inventory/adjustment') },
           { label: 'View Reservations', onClick: () => navigate('/inventory/reservations') },
-          { label: 'Run MRP', onClick: () => navigate('/mrp/run') },
+          { label: 'Production Plan', onClick: () => navigate('/manufacturing/production-plan') },
         ]} />
       }
       factBoxes={

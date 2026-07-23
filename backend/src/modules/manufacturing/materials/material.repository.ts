@@ -4,7 +4,16 @@ import { tenantActiveFilter } from '../../../shared/index.js'
 import { NotFoundError } from '../../../utils/errors.js'
 
 export const materialInclude = {
-  item: { select: { id: true, code: true, name: true, isStockable: true } },
+  item: {
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      isStockable: true,
+      batchTracked: true,
+      serialTracked: true,
+    },
+  },
   uom: { select: { id: true, code: true, name: true } },
   warehouse: { select: { id: true, code: true, name: true } },
   bomLine: {

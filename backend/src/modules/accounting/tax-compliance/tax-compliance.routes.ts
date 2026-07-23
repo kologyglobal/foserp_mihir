@@ -12,6 +12,8 @@ import {
   gstExtractQuerySchema,
   gstSummaryQuerySchema,
   listGstDocumentQuerySchema,
+  updateEWayVehicleSchema,
+  ewayPanelQuerySchema,
 } from './tax-compliance.schemas.js'
 import * as controller from './tax-compliance.controller.js'
 
@@ -103,6 +105,13 @@ router.get(
   controller.listEWayBills,
 )
 
+router.get(
+  '/e-way-bills/panel',
+  requirePermission('finance.tax.view'),
+  validateQuery(ewayPanelQuerySchema),
+  controller.getEWayPanel,
+)
+
 router.post(
   '/e-way-bills/generate',
   requirePermission('finance.tax.eway.manage'),
@@ -123,6 +132,14 @@ router.post(
   validateParams(taxDocumentIdParamSchema),
   validateBody(cancelGstDocumentSchema),
   controller.cancelEWayBill,
+)
+
+router.post(
+  '/e-way-bills/:id/update-vehicle',
+  requirePermission('finance.tax.eway.manage'),
+  validateParams(taxDocumentIdParamSchema),
+  validateBody(updateEWayVehicleSchema),
+  controller.updateEWayVehicle,
 )
 
 export default router

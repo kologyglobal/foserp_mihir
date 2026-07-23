@@ -1,8 +1,10 @@
-# Bank & Cash — Architecture (Phase 5A1)
+# Bank & Cash — Architecture (Phase 5A1 foundation)
 
-> Last verified: **2026-07-19** against `backend/prisma/schema.prisma`, `backend/src/modules/accounting/treasury/`, and `backend/tests/finance/finance-treasury-foundation.test.ts`.
-> Phase **5A1** is the treasury **database + master-data foundation** only: account master, GL mapping, payment-account routing, reconciliation settings, and a bank-statement DB foundation with internal-only validation/identity helpers.
-> Still deferred: statement import (file parsing), matching, reconciliation execution/posting, cheque lifecycle, inter-account transfers, and any operational frontend (Phase 5A2+).
+> **Current product status:** see [`BANK_CASH_STATUS.md`](BANK_CASH_STATUS.md) — **live API for internal UAT / controlled pilot**; **AIS / FX / intercompany** still deferred. This document remains the **5A1 foundation** reference (treasury account master + schema intent).
+>
+> Last verified (5A1 section): **2026-07-19** against `backend/prisma/schema.prisma`, `backend/src/modules/accounting/treasury/`, and `backend/tests/finance/finance-treasury-foundation.test.ts`.
+> Phase **5A1** was the treasury **database + master-data foundation**: account master, GL mapping, payment-account routing, reconciliation settings, and bank-statement DB foundation.
+> Later phases added statement import, reconciliation, transfers, cheques, adjustments, liquidity, and connectors — do not treat the deferred list below as current product gaps.
 
 Account master: [`TREASURY_ACCOUNT_MASTER.md`](TREASURY_ACCOUNT_MASTER.md). Payment routing: [`PAYMENT_ACCOUNT_MAPPING.md`](PAYMENT_ACCOUNT_MAPPING.md). Reconciliation settings: [`BANK_RECONCILIATION_FOUNDATION.md`](BANK_RECONCILIATION_FOUNDATION.md). Statement schema: [`BANK_STATEMENT_SCHEMA.md`](BANK_STATEMENT_SCHEMA.md). Status: [`BANK_CASH_STATUS.md`](BANK_CASH_STATUS.md).
 
@@ -10,7 +12,7 @@ Account master: [`TREASURY_ACCOUNT_MASTER.md`](TREASURY_ACCOUNT_MASTER.md). Paym
 
 ## Scope and design intent
 
-Bank & Cash (Treasury) is the master-data layer that AP/AR payment posting will eventually route through. Phase 5A1 intentionally ships **setup APIs only** — nothing here mutates `AccountingVoucher`, `GeneralLedgerEntry`, `PostingEvent`, `VendorPayment`, or `CustomerReceipt`. Those integrations (payment posting reading a resolved treasury/mapping account, statement import/match/reconcile) are deferred to later phases.
+Bank & Cash (Treasury) started as a master-data layer that AP/AR payment posting routes through. Phase 5A1 shipped **setup APIs** first. Operational posting, statement import/match/reconcile, transfers, and cheques landed in **5A2–5B** and are covered in their own architecture docs — not “still deferred” relative to today’s status.
 
 ```text
 Account (GL, existing)  ◄──── glAccountId ──── TreasuryAccount (BANK | CASH | CLEARING)

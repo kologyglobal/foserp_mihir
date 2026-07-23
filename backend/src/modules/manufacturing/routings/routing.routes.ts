@@ -39,6 +39,13 @@ router.patch(
   controller.updateRouting,
 )
 
+router.delete(
+  '/:routingId',
+  validateParams(routingIdParamSchema),
+  requirePermission('manufacturing.routes.edit'),
+  controller.deleteRouting,
+)
+
 router.get(
   '/:routingId/versions',
   validateParams(routingIdParamSchema),

@@ -88,14 +88,114 @@ export interface ManufacturingAccountingReadiness {
   costingEnabled: boolean
   accountingFlag: ManufacturingAccountingGateStatus
   legalEntityId: string | null
-  mappingKeys: { required: string[]; present: string[]; missing: string[] }
-  openPeriod: { id: string; name: string; startDate: string; endDate: string } | null
+  mappingKeys: {
+    required: string[]
+    core?: string[]
+    conditional?: string[]
+    present: string[]
+    missing: string[]
+    invalid?: Array<{ mappingKey: string; code: string; message: string }>
+    conditionalEnabled?: Record<string, boolean>
+  }
+  openPeriod: {
+    id: string
+    code: string
+    periodNumber?: number
+    name: string
+    startDate: string
+    endDate: string
+    status: string
+  } | null
+  /** YYYY-MM-DD used for OPEN period containment */
+  postingDateChecked?: string | null
+  /** @deprecated prefer postingDateChecked */
+  postingDate?: string | null
   pendingEventCount: number
   failedEventCount: number
+  unreconciledAccountingEventCount?: number
+  inventoryPostingsUnreconciledCount?: number
   provisionalCostCount: number
+  eventIntegrity?: {
+    counts: {
+      failed: number
+      unreconciled: number
+      retryExhausted: number
+      inventoryMissingAccounting: number
+      accountingMissingInventory: number
+      reversalChainInconsistent: number
+      duplicatePendingPosting: number
+      totalExceptions: number
+    }
+    exceptions: Array<{
+      eventId: string | null
+      sourceType: string
+      sourceDocument: string
+      workOrderId: string | null
+      workOrderNumber: string | null
+      eventType: string | null
+      status: string | null
+      reconciliationStatus: string
+      failureCode: string | null
+      failureReason: string | null
+      retryEligible: boolean
+      createdAt: string | null
+      lastAttemptedAt: string | null
+    }>
+    technicalDetails?: Array<{
+      eventId: string | null
+      postingEventId: string | null
+      voucherId: string | null
+      idempotencyKey: string | null
+      attemptCount: number | null
+      postingErrorCode: string | null
+      rawFailureReason: string | null
+      inventoryMovementId: string | null
+      exceptionKind: string
+    }>
+  }
   blockers: string[]
   warnings: string[]
-  allowedActions: { validate: boolean; post: boolean; retry: boolean; financialClose: boolean }
+  notes?: {
+    periodCheckDoesNotBypassPosting?: string
+    eventExceptionsUiSafe?: string
+  }
+  enablementChecks?: {
+    accountMappingsReady: boolean
+    openFinancialPeriodExists: boolean
+    failedAccountingEventCount: number
+    unreconciledAccountingEventCount: number
+    inventoryPostingsUnreconciledCount?: number
+    inventoryReconcileConfirmed: boolean
+    pilotSignOff: boolean
+    canEnable: boolean
+  }
+  checklist?: {
+    wipConfigured: boolean
+    fgConfigured: boolean
+    finishedGoodsConfigured?: boolean
+    varianceConfigured: boolean
+    productionVarianceConfigured?: boolean
+    rmConfigured: boolean
+    labourConfigured?: boolean
+    machineConfigured?: boolean
+    jobWorkConfigured?: boolean
+    overheadConfigured?: boolean
+    scrapConfigured?: boolean
+    periodOpen: boolean
+    accountMappingsReady?: boolean
+    noFailedEvents?: boolean
+    noUnreconciledEvents?: boolean
+    inventoryReconcileSignedOff: boolean
+    pilotFinanceSignedOff: boolean
+    canEnable?: boolean
+  }
+  allowedActions: {
+    validate: boolean
+    post: boolean
+    retry: boolean
+    financialClose: boolean
+    enable?: boolean
+  }
 }
 
 export async function getCostingReadiness() {
@@ -280,6 +380,25 @@ export interface ManufacturingAccountingFeatureStatus {
   control: FinanceFeatureControlRow | null
   readiness: ManufacturingAccountingReadiness
   enablement: { ready: boolean; blockers: string[] }
+  signOffs?: {
+    inventoryReconcile: {
+      confirmed: boolean
+      confirmedBy: string | null
+      confirmedAt: string | null
+      remarks: string | null
+      scope: Record<string, unknown> | null
+      reportRef: string | null
+    }
+    pilotFinance: {
+      confirmed: boolean
+      signedOffBy: string | null
+      signedOffAt: string | null
+      remarks: string | null
+      scope: Record<string, unknown> | null
+      legalEntityId: string
+    }
+    historyCount: number
+  }
 }
 
 export async function listFinanceFeatureControls(featureKey?: string) {
@@ -294,11 +413,125 @@ export async function getManufacturingAccountingFeatureControl(legalEntityId: st
   )
 }
 
-export async function setManufacturingAccountingFeatureControl(legalEntityId: string, isEnabled: boolean) {
+/** @deprecated Prefer postEnable / postDisable / dedicated sign-off endpoints. */
+export async function setManufacturingAccountingFeatureControl(
+  legalEntityId: string,
+  input: {
+    isEnabled: boolean
+    inventoryReconcileConfirmed?: boolean
+    inventoryReconcileRemarks?: string
+    inventoryReconcileScope?: {
+      plantId?: string
+      warehouseIds?: string[]
+      workOrderIds?: string[]
+      productIds?: string[]
+    }
+    inventoryReconcileReportRef?: string
+    pilotSignOff?: boolean
+    pilotSignOffRemarks?: string
+    pilotScope?: {
+      plantId?: string
+      finishedItemIds?: string[]
+      warehouseIds?: string[]
+      sampleWorkOrderId?: string
+      samplePostingPreviewReviewed?: boolean
+    }
+    signOffNote?: string
+  },
+) {
   return apiRequest<ManufacturingAccountingFeatureStatus>(
     tenantPath(`/manufacturing/accounting/feature-controls/${legalEntityId}/MANUFACTURING_ACCOUNTING`),
-    { method: 'PUT', body: JSON.stringify({ isEnabled }) },
+    { method: 'PUT', body: JSON.stringify(input) },
   )
+}
+
+export async function getManufacturingAccountingReadinessConsolidated(params?: {
+  legalEntityId?: string
+  postingDate?: string
+  includeTechnicalDetails?: boolean
+}) {
+  return apiRequest<{
+    ready: boolean
+    canEnable: boolean
+    legalEntityId: string | null
+    postingDateChecked: string | null
+    featureFlag: {
+      enabled: boolean
+      reason: string
+      enabledBy: string | null
+      enabledAt: string | null
+      disabledBy: string | null
+      disabledAt: string | null
+      activationNote: string | null
+      configurationVersion: number
+      pilotScope: unknown
+    }
+    checks: Record<string, unknown>
+    blockingCodes: string[]
+    blockers: string[]
+    nextAction: { code: string; label: string }
+    allowedActions: Record<string, boolean>
+    signOffHistorySummary: Array<{
+      id: string
+      signOffType: string
+      status: string
+      confirmedById: string
+      confirmedAt: string
+      remarks: string | null
+    }>
+    readiness: ManufacturingAccountingReadiness
+  }>(`${tenantPath('/manufacturing/accounting/readiness')}${buildQuery(params)}`)
+}
+
+export async function postInventoryReconciliationSignOff(body: {
+  legalEntityId: string
+  inventoryReconcileConfirmed: true
+  remarks?: string
+  scope?: Record<string, unknown>
+  reportRef?: string
+  idempotencyKey?: string
+}) {
+  return apiRequest(tenantPath('/manufacturing/accounting/sign-offs/inventory-reconciliation'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function postFinancePilotSignOff(body: {
+  legalEntityId: string
+  pilotSignOff: true
+  remarks?: string
+  scope?: Record<string, unknown>
+  idempotencyKey?: string
+}) {
+  return apiRequest(tenantPath('/manufacturing/accounting/sign-offs/finance-pilot'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function postEnableManufacturingAccounting(body: {
+  legalEntityId: string
+  postingDate?: string
+  inventoryReconcileConfirmed: true
+  pilotSignOff: true
+  confirmationNote?: string
+  idempotencyKey?: string
+}) {
+  return apiRequest(tenantPath('/manufacturing/accounting/enable'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function postDisableManufacturingAccounting(body: {
+  legalEntityId: string
+  reason: string
+}) {
+  return apiRequest(tenantPath('/manufacturing/accounting/disable'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
 }
 
 export async function listManufacturingAccountingEvents(

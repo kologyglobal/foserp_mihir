@@ -44,10 +44,51 @@ export const getCostDetails = asyncHandler(async (req: Request, res: Response) =
 export const getCostSnapshots = asyncHandler(async (req: Request, res: Response) =>
   sendSuccess(res, 'Work-order cost snapshots fetched', await costing.listCostSnapshots(getTenantId(req), getRouteParam(req, 'id'))))
 
-export const getTenantReadiness = asyncHandler(async (req: Request, res: Response) =>
-  sendSuccess(res, 'Manufacturing accounting readiness fetched', await getManufacturingAccountingReadiness(getTenantId(req))))
-export const getWorkOrderReadiness = asyncHandler(async (req: Request, res: Response) =>
-  sendSuccess(res, 'Work-order accounting readiness fetched', await getManufacturingAccountingReadiness(getTenantId(req), getRouteParam(req, 'id'))))
+function parsePostingDateQuery(req: Request): string | undefined {
+  return typeof req.query.postingDate === 'string' && req.query.postingDate.trim()
+    ? req.query.postingDate.trim()
+    : undefined
+}
+
+function canIncludeTechnicalDetails(req: Request): boolean {
+  if (req.query.includeTechnicalDetails !== 'true' && req.query.includeTechnicalDetails !== '1') {
+    return false
+  }
+  const ctx = req.context
+  if (!ctx) return false
+  if (ctx.isSuperAdmin) return true
+  return (
+    ctx.permissions.includes('finance.settings.manage') ||
+    ctx.permissions.includes('manufacturing.accounting.post')
+  )
+}
+
+export const getTenantReadiness = asyncHandler(async (req: Request, res: Response) => {
+  return sendSuccess(
+    res,
+    'Manufacturing accounting readiness fetched',
+    await getManufacturingAccountingReadiness(
+      getTenantId(req),
+      undefined,
+      undefined,
+      parsePostingDateQuery(req),
+      { includeTechnicalDetails: canIncludeTechnicalDetails(req) },
+    ),
+  )
+})
+export const getWorkOrderReadiness = asyncHandler(async (req: Request, res: Response) => {
+  return sendSuccess(
+    res,
+    'Work-order accounting readiness fetched',
+    await getManufacturingAccountingReadiness(
+      getTenantId(req),
+      getRouteParam(req, 'id'),
+      undefined,
+      parsePostingDateQuery(req),
+      { includeTechnicalDetails: canIncludeTechnicalDetails(req) },
+    ),
+  )
+})
 export const previewFinancialClose = asyncHandler(async (req: Request, res: Response) =>
   sendSuccess(res, 'Financial close preview fetched', await posting.financialClosePreview(getTenantId(req), getRouteParam(req, 'id'))))
 export const financialClose = asyncHandler(async (req: Request, res: Response) =>
