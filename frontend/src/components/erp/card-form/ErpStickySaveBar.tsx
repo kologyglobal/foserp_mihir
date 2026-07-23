@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Save, X } from 'lucide-react'
 import { ErpButton, ErpButtonGroup } from '../ErpButton'
 import { ErpFormFooter } from '../ErpFormFooter'
 import type { ErpCardFormSaveMode } from './types'
@@ -50,7 +49,6 @@ export function ErpStickySaveBar({
         <ErpButton
           type="button"
           variant="primary"
-          icon={Save}
           disabled={submitDisabled || isSubmitting}
           disabledReason={submitDisabledReason}
           onClick={onSave}
@@ -64,21 +62,21 @@ export function ErpStickySaveBar({
         </ErpButton>
       ) : null}
       {onSaveAndNew ? (
-        <ErpButton type="button" variant="secondary" icon={Save} disabled={isSubmitting} onClick={onSaveAndNew}>
+        <ErpButton type="button" variant="secondary" disabled={isSubmitting} onClick={onSaveAndNew}>
           Save &amp; New
         </ErpButton>
       ) : null}
       {onSaveAndClose ? (
-        <ErpButton type="button" variant="outline" icon={X} disabled={isSubmitting} onClick={onSaveAndClose}>
+        <ErpButton type="button" variant="outline" disabled={isSubmitting} onClick={onSaveAndClose}>
           Save &amp; Close
         </ErpButton>
       ) : null}
       {cancelTo ? (
-        <ErpButton type="button" variant="secondary" icon={X} onClick={() => navigate(cancelTo)}>
+        <ErpButton type="button" variant="secondary" onClick={() => navigate(cancelTo)}>
           {cancelLabel}
         </ErpButton>
       ) : onCancel ? (
-        <ErpButton type="button" variant="secondary" icon={X} onClick={onCancel}>
+        <ErpButton type="button" variant="secondary" onClick={onCancel}>
           {cancelLabel}
         </ErpButton>
       ) : null}

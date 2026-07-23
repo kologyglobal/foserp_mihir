@@ -761,6 +761,7 @@ const CRM_SO_FILTER_FIELDS: CrmFilterField[] = [
 ]
 
 const SALES_ORDER_SORT_OPTIONS: { value: SalesOrderSortKey; label: string }[] = [
+  { value: 'lastModified', label: 'Sort: Last Modified' },
   { value: 'orderDate', label: 'Sort: Order Date' },
   { value: 'requiredDate', label: 'Sort: Required Date' },
   { value: 'value', label: 'Sort: Order Value' },
@@ -799,7 +800,7 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
     [pendingHandoverRows, salesOrders],
   )
   const [search, setSearch] = useState('')
-  const [sortBy, setSortBy] = useState<SalesOrderSortKey>('orderDate')
+  const [sortBy, setSortBy] = useState<SalesOrderSortKey>('lastModified')
   const [statusFilter, setStatusFilter] = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
   const [toast, setToast] = useState<string | null>(null)
@@ -822,7 +823,7 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
     setSourceFilter(saved.source ?? '')
     const sb = saved.sortBy
     if (
-      sb === 'orderDate' || sb === 'requiredDate' || sb === 'value'
+      sb === 'lastModified' || sb === 'orderDate' || sb === 'requiredDate' || sb === 'value'
       || sb === 'customer' || sb === 'status' || sb === 'soNo'
     ) {
       setSortBy(sb)
@@ -897,7 +898,7 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
 
   const clearCrmFilters = useCallback(() => {
     crmFilterDrawer.clearAll()
-    setSortBy('orderDate')
+    setSortBy('lastModified')
   }, [crmFilterDrawer])
 
   const hasActiveCrmSoFilters = useMemo(
@@ -1090,6 +1091,10 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
       return
     }
     if (so.status === 'confirmed') {
+      if (crmMode) {
+        navigate(resolveSalesOrderDetailPath(so.id, true))
+        return
+      }
       const r = triggerProduction(so.id)
       setToast(r.ok ? `Production triggered for ${so.salesOrderNo}` : r.error ?? 'Convert failed')
       return

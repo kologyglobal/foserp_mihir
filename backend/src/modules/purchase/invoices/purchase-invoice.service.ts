@@ -4,7 +4,7 @@ import { tenantActiveFilter } from '../../../shared/index.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
 import { resolveEffectivePurchaseDefaults } from '../shared/purchase-defaults.js'
 import { PurchaseInvoiceNotFoundError, PurchaseInvoiceValidationError } from './purchase-invoice.errors.js'
-import { mapPurchaseInvoice } from './purchase-invoice.mapper.js'
+import { mapPurchaseInvoice, type PurchaseInvoiceEnrichment } from './purchase-invoice.mapper.js'
 import * as repo from './purchase-invoice.repository.js'
 import type {
   CreatePurchaseInvoiceInput, ListPurchaseInvoicesQuery, PurchaseInvoiceLineInput, UpdatePurchaseInvoiceInput,
@@ -14,6 +14,69 @@ import {
 } from './purchase-invoice.workflow.js'
 
 type Defaults = Awaited<ReturnType<typeof resolveEffectivePurchaseDefaults>>
+type InvoiceRow = NonNullable<Awaited<ReturnType<typeof repo.findPurchaseInvoiceById>>>
+
+function parsePaymentTermsDays(terms: string | null | undefined): number {
+  if (!terms?.trim()) return 30
+  const match = terms.match(/(\d+)/)
+  const days = match ? Number(match[1]) : 30
+  return Number.isFinite(days) && days >= 0 ? days : 30
+}
+
+function addDaysIso(dateIso: string | null | undefined, days: number): string | null {
+  if (!dateIso) return null
+  const base = new Date(`${dateIso}T00:00:00.000Z`)
+  if (Number.isNaN(base.getTime())) return null
+  base.setUTCDate(base.getUTCDate() + days)
+  return base.toISOString().slice(0, 10)
+}
+
+async function enrichmentForInvoices(
+  tenantId: string,
+  invoices: Array<{ purchaseOrderId: string | null; goodsReceiptId: string | null; vendorInvoiceDate: Date | null; invoiceDate: Date }>,
+): Promise<Map<number, PurchaseInvoiceEnrichment>> {
+  const poIds = [...new Set(invoices.map((i) => i.purchaseOrderId).filter(Boolean))] as string[]
+  const grnIds = [...new Set(invoices.map((i) => i.goodsReceiptId).filter(Boolean))] as string[]
+  const [pos, grns] = await Promise.all([
+    poIds.length
+      ? prisma.purchaseOrder.findMany({
+          where: { tenantId, id: { in: poIds }, deletedAt: null },
+          select: { id: true, orderNumber: true, paymentTerms: true },
+        })
+      : Promise.resolve([]),
+    grnIds.length
+      ? prisma.goodsReceipt.findMany({
+          where: { tenantId, id: { in: grnIds }, deletedAt: null },
+          select: { id: true, grnNumber: true },
+        })
+      : Promise.resolve([]),
+  ])
+  const poById = new Map(pos.map((p) => [p.id, p]))
+  const grnById = new Map(grns.map((g) => [g.id, g]))
+  const out = new Map<number, PurchaseInvoiceEnrichment>()
+  invoices.forEach((invoice, index) => {
+    const po = invoice.purchaseOrderId ? poById.get(invoice.purchaseOrderId) : undefined
+    const grn = invoice.goodsReceiptId ? grnById.get(invoice.goodsReceiptId) : undefined
+    const paymentTerms = po?.paymentTerms || ''
+    const baseDate = dateOnly(invoice.vendorInvoiceDate) || dateOnly(invoice.invoiceDate)
+    out.set(index, {
+      purchaseOrderNumber: po?.orderNumber ?? '',
+      goodsReceiptNumber: grn?.grnNumber ?? '',
+      paymentTerms,
+      dueDate: addDaysIso(baseDate, parsePaymentTermsDays(paymentTerms)),
+    })
+  })
+  return out
+}
+
+function dateOnly(value?: Date | null) {
+  return value?.toISOString().slice(0, 10) ?? null
+}
+
+async function toInvoiceDto(tenantId: string, invoice: InvoiceRow) {
+  const enrichment = await enrichmentForInvoices(tenantId, [invoice])
+  return mapPurchaseInvoice(invoice, enrichment.get(0))
+}
 
 async function loadOrThrow(tenantId: string, id: string) {
   const invoice = await repo.findPurchaseInvoiceById(tenantId, id)
@@ -128,9 +191,15 @@ function evaluateMatching(
 
 export async function listPurchaseInvoices(tenantId: string, query: ListPurchaseInvoicesQuery) {
   const result = await repo.findPurchaseInvoices(tenantId, query)
-  return { ...result, items: result.items.map(mapPurchaseInvoice) }
+  const enrichment = await enrichmentForInvoices(tenantId, result.items)
+  return {
+    ...result,
+    items: result.items.map((row, index) => mapPurchaseInvoice(row, enrichment.get(index))),
+  }
 }
-export async function getPurchaseInvoice(tenantId: string, id: string) { return mapPurchaseInvoice(await loadOrThrow(tenantId, id)) }
+export async function getPurchaseInvoice(tenantId: string, id: string) {
+  return toInvoiceDto(tenantId, await loadOrThrow(tenantId, id))
+}
 
 export async function createPurchaseInvoice(tenantId: string, actorId: string, input: CreatePurchaseInvoiceInput) {
   const defaults = await resolveEffectivePurchaseDefaults(tenantId, input.plantId)
@@ -157,7 +226,7 @@ export async function createPurchaseInvoice(tenantId: string, actorId: string, i
     await repo.addInvoiceHistory(tenantId, row.id, row.invoiceNumber, 'INVOICE_CREATED', null, 'DRAFT', actorId, undefined, tx)
     return row
   })
-  return mapPurchaseInvoice(created as Parameters<typeof mapPurchaseInvoice>[0])
+  return toInvoiceDto(tenantId, created as InvoiceRow)
 }
 
 export async function updatePurchaseInvoice(tenantId: string, id: string, actorId: string, input: UpdatePurchaseInvoiceInput) {
@@ -187,7 +256,7 @@ export async function updatePurchaseInvoice(tenantId: string, id: string, actorI
     }, tx)
     await repo.addInvoiceHistory(tenantId, id, existing.invoiceNumber, 'INVOICE_UPDATED', existing.status, existing.status, actorId, undefined, tx)
   })
-  return mapPurchaseInvoice(await loadOrThrow(tenantId, id))
+  return toInvoiceDto(tenantId, await loadOrThrow(tenantId, id))
 }
 
 export async function submitPurchaseInvoice(
@@ -210,7 +279,7 @@ export async function submitPurchaseInvoice(
     overrideAuthorized: failures.length ? true : false,
     overrideRemarks: failures.length ? body.overrideRemarks!.trim() : null,
   })
-  return mapPurchaseInvoice(await loadOrThrow(tenantId, id))
+  return toInvoiceDto(tenantId, await loadOrThrow(tenantId, id))
 }
 
 async function transition(
@@ -227,12 +296,12 @@ async function transition(
 export async function approvePurchaseInvoice(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
   const existing = await loadOrThrow(tenantId, id); assertInvoiceStatus(existing.status, ['PENDING_APPROVAL'], 'approved')
   await transition(tenantId, existing, actorId, 'APPROVED', 'INVOICE_APPROVED', body.remarks, { approvedAt: new Date() })
-  return mapPurchaseInvoice(await loadOrThrow(tenantId, id))
+  return toInvoiceDto(tenantId, await loadOrThrow(tenantId, id))
 }
 export async function rejectPurchaseInvoice(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
   const existing = await loadOrThrow(tenantId, id); assertInvoiceStatus(existing.status, ['PENDING_APPROVAL'], 'rejected')
   await transition(tenantId, existing, actorId, 'REJECTED', 'INVOICE_REJECTED', body.remarks)
-  return mapPurchaseInvoice(await loadOrThrow(tenantId, id))
+  return toInvoiceDto(tenantId, await loadOrThrow(tenantId, id))
 }
 export async function postPurchaseInvoice(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
   const existing = await loadOrThrow(tenantId, id); assertInvoiceStatus(existing.status, ['APPROVED', 'MATCHED', 'PARTIALLY_MATCHED'], 'posted')
@@ -245,7 +314,7 @@ export async function postPurchaseInvoice(tenantId: string, id: string, actorId:
   // Soft AP handoff — create VendorInvoice draft (no GL posting from Purchase).
   const { handoffPurchaseInvoiceToVendorInvoiceDraft } = await import('./purchase-invoice-ap-handoff.service.js')
   const ap = await handoffPurchaseInvoiceToVendorInvoiceDraft(tenantId, id, actorId)
-  const mapped = mapPurchaseInvoice(await loadOrThrow(tenantId, id))
+  const mapped = await toInvoiceDto(tenantId, await loadOrThrow(tenantId, id))
   return { ...mapped, apHandoff: ap }
 }
 
@@ -257,5 +326,5 @@ export async function previewPurchaseInvoiceApHandoff(tenantId: string, id: stri
 export async function cancelPurchaseInvoice(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
   const existing = await loadOrThrow(tenantId, id); assertInvoiceStatus(existing.status, ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'MATCHED', 'PARTIALLY_MATCHED', 'MISMATCH'], 'cancelled')
   await transition(tenantId, existing, actorId, 'CANCELLED', 'INVOICE_CANCELLED', body.remarks, { cancelledAt: new Date() })
-  return mapPurchaseInvoice(await loadOrThrow(tenantId, id))
+  return toInvoiceDto(tenantId, await loadOrThrow(tenantId, id))
 }

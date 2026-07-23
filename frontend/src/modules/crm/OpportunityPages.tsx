@@ -88,7 +88,7 @@ export function OpportunityPipelinePage() {
   const canDelete = canCrmPermission('crm.opportunity.delete')
   const canEdit = canCrmPermission('crm.opportunity.update')
   const [search, setSearch] = useState('')
-  const [sortBy, setSortBy] = useState<OpportunitySortKey>('value')
+  const [sortBy, setSortBy] = useState<OpportunitySortKey>('lastModified')
   const [stageFilter, setStageFilter] = useState<OpportunityStage | ''>('')
   const [ownerFilter, setOwnerFilter] = useState('')
   const [lostReasonFilter, setLostReasonFilter] = useState('')
@@ -159,7 +159,7 @@ export function OpportunityPipelinePage() {
     setLostReasonFilter(saved.lostReason ?? '')
     const sb = saved.sortBy
     if (
-      sb === 'value' || sb === 'closeDate' || sb === 'probability'
+      sb === 'lastModified' || sb === 'value' || sb === 'closeDate' || sb === 'probability'
       || sb === 'name' || sb === 'stage' || sb === 'owner' || sb === 'lastActivity'
     ) {
       setSortBy(sb)
@@ -176,7 +176,7 @@ export function OpportunityPipelinePage() {
   const clearFilters = useCallback(() => {
     filterDrawer.clearAll()
     setLostReasonFilter('')
-    setSortBy('value')
+    setSortBy('lastModified')
     savedViews.markFiltersCustomized()
   }, [filterDrawer, savedViews])
 
@@ -442,6 +442,7 @@ export function OpportunityPipelinePage() {
                 onChange={(v) => setSortBy(v as OpportunitySortKey)}
                 aria-label="Sort opportunities"
                 options={[
+                  { value: 'lastModified', label: 'Sort: Last Modified' },
                   { value: 'value', label: 'Sort: Deal Value' },
                   { value: 'closeDate', label: 'Sort: Close Date' },
                   { value: 'probability', label: 'Sort: Probability' },
@@ -487,6 +488,7 @@ export function OpportunityPipelinePage() {
                       onChange={(v) => setSortBy(v as OpportunitySortKey)}
                       aria-label="Sort opportunities"
                       options={[
+                        { value: 'lastModified', label: 'Sort: Last Modified' },
                         { value: 'value', label: 'Sort: Deal Value' },
                         { value: 'closeDate', label: 'Sort: Close Date' },
                         { value: 'probability', label: 'Sort: Probability' },

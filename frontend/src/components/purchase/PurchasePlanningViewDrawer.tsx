@@ -114,7 +114,6 @@ export function PurchasePlanningViewDrawer({ open, row, onClose, onEdit }: Props
             label="Priority"
             value={PURCHASE_PLANNING_PRIORITY_LABELS[row.priority] ?? row.priority}
           />
-          <ErpViewField label="Action Message" value={row.actionMessage ? 'Yes' : 'No'} />
           <ErpViewField label="Remarks" value={row.remarks || '—'} />
         </Section>
 

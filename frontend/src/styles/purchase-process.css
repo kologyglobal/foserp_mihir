@@ -570,7 +570,7 @@ a.purchase-process-map__step:hover {
   outline-offset: 2px;
 }
 
-/* Register list band — above table, collapsible like CRM section cards */
+/* Register insights — gold path (filterBar): sparkle in filter bar; open = right rail */
 .purchase-register-insights {
   width: 100%;
   min-width: 0;
@@ -583,9 +583,14 @@ a.purchase-process-map__step:hover {
   min-height: 34px;
 }
 
-/* Split: open = table left | insights right; closed = sparkle above full-width table */
+/* Legacy split (closed sparkle above table). Prefer filterBar + afterFilters. */
 .purchase-register-split--collapsed .purchase-register-insights--collapsed {
   justify-content: flex-end;
+}
+
+/* filterBar / Requisitions: stack on small screens, rail beside table from xl */
+.purchase-register-split.flex.flex-col.xl\:flex-row {
+  align-items: stretch;
 }
 
 /* PR Quick Entry — stacked labels, 4 compact fields per row */

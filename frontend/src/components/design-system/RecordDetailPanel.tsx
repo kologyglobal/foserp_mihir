@@ -1,13 +1,24 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { MessageSquare, X } from 'lucide-react'
 import { useUIStore } from '../../store/uiStore'
 import { cn } from '../../utils/cn'
 
 /** Right-side record detail panel — no route change */
 export function RecordDetailPanel() {
+  const { pathname, search } = useLocation()
   const open = useUIStore((s) => s.detailPanelOpen)
   const panel = useUIStore((s) => s.detailPanel)
   const closeDetailPanel = useUIStore((s) => s.closeDetailPanel)
+  const locationKey = `${pathname}${search}`
+  const prevLocationKey = useRef(locationKey)
+
+  // Dismiss Quick View when the route changes (Edit / Preview / Open record, etc.).
+  useEffect(() => {
+    if (prevLocationKey.current === locationKey) return
+    prevLocationKey.current = locationKey
+    closeDetailPanel()
+  }, [locationKey, closeDetailPanel])
 
   if (!open || !panel) return null
 
@@ -140,7 +151,10 @@ export function RecordDetailPanel() {
                       ? 'bg-erp-primary text-white hover:opacity-90'
                       : 'border border-erp-border bg-white text-erp-text hover:bg-erp-surface',
                   )}
-                  onClick={action.onClick}
+                  onClick={() => {
+                    closeDetailPanel()
+                    action.onClick()
+                  }}
                 >
                   {action.label}
                 </button>

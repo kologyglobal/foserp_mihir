@@ -466,6 +466,8 @@ export interface ApiPurchaseOrder {
   deliveryWarehouseCode?: string
   deliveryWarehouseName?: string
   deliveryWarehousePlantId?: string | null
+  createdById?: string | null
+  createdByName?: string | null
   subtotalAmount?: number
   taxAmount?: number
   freightAmount?: number
@@ -711,6 +713,10 @@ export interface ApiPurchaseInvoice {
   vendorId: string
   purchaseOrderId: string | null
   goodsReceiptId: string | null
+  purchaseOrderNumber?: string | null
+  goodsReceiptNumber?: string | null
+  paymentTerms?: string | null
+  dueDate?: string | null
   status: ApiPurchaseInvoiceStatus
   isDirectInvoice: boolean
   currencyCode: string
@@ -775,7 +781,9 @@ export interface ApiQualityInspection {
   documentDate: string | null
   inspectionDate: string | null
   goodsReceiptId: string | null
+  goodsReceiptNumber?: string | null
   purchaseOrderId: string | null
+  purchaseOrderNumber?: string | null
   vendorId: string | null
   warehouseId: string | null
   status: ApiQualityInspectionStatus
@@ -783,6 +791,7 @@ export interface ApiQualityInspection {
   deviationRemarks: string | null
   inspectedById: string | null
   inspectedByName: string | null
+  batchLotNo?: string | null
   completedAt: string | null
   createdAt: string | null
   updatedAt: string | null
@@ -827,8 +836,11 @@ export interface ApiPurchaseReturn {
   returnDate: string | null
   vendorId: string
   purchaseOrderId: string | null
+  purchaseOrderNumber?: string | null
   goodsReceiptId: string | null
+  goodsReceiptNumber?: string | null
   qualityInspectionId: string | null
+  qualityInspectionNumber?: string | null
   warehouseId: string | null
   status: ApiPurchaseReturnStatus
   reason: string | null

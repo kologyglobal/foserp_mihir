@@ -150,7 +150,7 @@ export async function assertChallanAllowsConfirm(
   if (!challans.length) {
     if (options?.requireIssuedChallan) {
       throw new ConflictError(
-        'Outbound confirm blocked: an ISSUED Delivery Challan is required before confirm (Phase 7C5)',
+        'Outbound post blocked: an ISSUED Delivery Challan is required before post (Phase 7C5)',
       )
     }
     return

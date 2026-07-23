@@ -7,12 +7,16 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { type ColumnDef, type RowSelectionState } from '@tanstack/react-table'
 import { ArrowUpFromLine, Lock, PackageMinus, RefreshCw } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SectionCard } from '@/components/ui/SectionCard'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { DataGrid } from '@/components/design-system/DataGrid'
+import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
+import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFilterBar'
 import { FormField } from '@/components/forms/FormField'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
@@ -24,7 +28,11 @@ import {
   listWorkOrderMaterials,
   listWorkOrders,
   createWorkOrderShortageRequisition,
+  getStoreWorkbenchIssues,
+  reserveWorkOrderMaterials,
 } from '@/services/api/manufacturingApi'
+import { listPurchaseRequisitionsApi } from '@/services/purchase/purchaseRequisitionApi'
+import type { ApiPurchaseRequisition } from '@/services/purchase/purchaseApiTypes'
 import {
   getInventoryLedgerMovement,
   getInventoryPosition,
@@ -135,13 +143,80 @@ function Pager({ meta, onPage }: { meta: PageMeta | null; onPage: (page: number)
   )
 }
 
-/** Posted ISSUE movements register (live stock issues). */
+type IssuesTab = 'assign' | 'prs' | 'posted'
+
+type AssignQueueRow = {
+  workOrderId: string
+  orderNumber: string
+  materialId: string
+  itemId: string
+  itemCode: string
+  itemName: string
+  warehouseId: string | null
+  warehouseLabel: string
+  requiredQty: number
+  reservedQty: number
+  issuedQty: number
+  balanceToIssue: number
+  freeQty: number | null
+  issuableQty: number
+  shortageQty: number
+  hasShortage: boolean
+  purchaseRequisitionId: string | null
+  purchaseRequisitionNumber: string | null
+  purchaseRequisitionStatus: string | null
+  status: string
+}
+
+const ASSIGN_VIEW_OPTIONS = [
+  { id: 'all' as const, label: 'All lines' },
+  { id: 'available' as const, label: 'Available to assign' },
+  { id: 'shortage' as const, label: 'Shortage' },
+  { id: 'pr_raised' as const, label: 'PR raised' },
+]
+
+function parseAssignRows(raw: Record<string, unknown>[]): AssignQueueRow[] {
+  return raw.map((row) => {
+    const item = row.item as { code?: string; name?: string } | undefined
+    const warehouse = row.warehouse as { code?: string; name?: string } | null | undefined
+    const pr = row.purchaseRequisition as { id?: string; requisitionNumber?: string; status?: string } | null | undefined
+    return {
+      workOrderId: String(row.workOrderId ?? ''),
+      orderNumber: String(row.orderNumber ?? ''),
+      materialId: String(row.materialId ?? ''),
+      itemId: String(row.itemId ?? ''),
+      itemCode: item?.code ?? '',
+      itemName: item?.name ?? '',
+      warehouseId: (row.warehouseId as string | null) ?? null,
+      warehouseLabel: warehouse ? `${warehouse.code} — ${warehouse.name}` : '—',
+      requiredQty: num(row.requiredQty as string | number),
+      reservedQty: num(row.reservedQty as string | number),
+      issuedQty: num(row.issuedQty as string | number),
+      balanceToIssue: num(row.balanceToIssue as string | number),
+      freeQty: row.freeQty == null ? null : num(row.freeQty as string | number),
+      issuableQty: num(row.issuableQty as string | number),
+      shortageQty: num(row.shortageQty as string | number),
+      hasShortage: Boolean(row.hasShortage),
+      purchaseRequisitionId: (row.purchaseRequisitionId as string | null) ?? pr?.id ?? null,
+      purchaseRequisitionNumber: pr?.requisitionNumber ?? null,
+      purchaseRequisitionStatus: pr?.status ?? null,
+      status: String(row.status ?? ''),
+    }
+  })
+}
+
+/** Posted ISSUE movements register + production assign / shortage PR queues. */
 export function ApiIssuesRegisterPage() {
   const navigate = useNavigate()
   const perms = useInventoryPermissions()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const items = useLookupOptions('items')
   const warehouses = useLookupOptions('warehouses')
+  const initialTab = (searchParams.get('tab') as IssuesTab | null) ?? 'assign'
+  const [tab, setTab] = useState<IssuesTab>(
+    initialTab === 'prs' || initialTab === 'posted' || initialTab === 'assign' ? initialTab : 'assign',
+  )
+
   const [itemId, setItemId] = useState(searchParams.get('itemId') ?? '')
   const [warehouseId, setWarehouseId] = useState(searchParams.get('warehouseId') ?? '')
   const [fromDate, setFromDate] = useState('')
@@ -151,7 +226,33 @@ export function ApiIssuesRegisterPage() {
   const [meta, setMeta] = useState<PageMeta | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const load = useCallback(async () => {
+  const [assignRows, setAssignRows] = useState<AssignQueueRow[]>([])
+  const [assignLoading, setAssignLoading] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [busy, setBusy] = useState(false)
+  const [assignSearch, setAssignSearch] = useState('')
+  const [assignView, setAssignView] = useState<'all' | 'available' | 'shortage' | 'pr_raised'>('all')
+  const [assignSort, setAssignSort] = useState('wo_asc')
+  const [assignWarehouseFilter, setAssignWarehouseFilter] = useState('')
+  const [assignStockFilter, setAssignStockFilter] = useState<'all' | 'available' | 'shortage' | 'no_stock'>('all')
+  const [assignFiltersOpen, setAssignFiltersOpen] = useState(false)
+  const [assignPageSize, setAssignPageSize] = useState(25)
+
+  const [prRows, setPrRows] = useState<ApiPurchaseRequisition[]>([])
+  const [prLoading, setPrLoading] = useState(false)
+
+  const canCreateShortagePr = canManufacturingPermission('manufacturing.materials.create_requirement')
+  const canIssueMaterials = canManufacturingPermission('manufacturing.materials.issue')
+  const canReserveMaterials = canManufacturingPermission('manufacturing.materials.reserve')
+
+  const switchTab = (next: IssuesTab) => {
+    setTab(next)
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('tab', next)
+    setSearchParams(nextParams, { replace: true })
+  }
+
+  const loadPosted = useCallback(async () => {
     setLoading(true)
     try {
       const res = await listInventoryLedger({
@@ -174,9 +275,456 @@ export function ApiIssuesRegisterPage() {
     }
   }, [page, itemId, warehouseId, fromDate, toDate])
 
+  const loadAssignQueue = useCallback(async () => {
+    setAssignLoading(true)
+    try {
+      const res = await getStoreWorkbenchIssues(100)
+      const parsed = parseAssignRows((res.data?.rows ?? []) as Record<string, unknown>[])
+      setAssignRows(parsed)
+      setSelected(new Set(parsed.filter((r) => r.issuableQty > 0 && !r.purchaseRequisitionId).map((r) => r.materialId)))
+    } catch (e) {
+      setAssignRows([])
+      notify.error(e instanceof Error ? e.message : 'Could not load production issue queue')
+    } finally {
+      setAssignLoading(false)
+    }
+  }, [])
+
+  const loadProductionPrs = useCallback(async () => {
+    setPrLoading(true)
+    try {
+      const res = await listPurchaseRequisitionsApi({
+        page: 1,
+        limit: 50,
+        search: 'Production shortage',
+        sortOrder: 'desc',
+      })
+      const list = Array.isArray(res.data) ? res.data : ((res.data as { items?: ApiPurchaseRequisition[] } | undefined)?.items ?? [])
+      setPrRows(list)
+    } catch {
+      try {
+        const res = await listPurchaseRequisitionsApi({ page: 1, limit: 50, sortOrder: 'desc' })
+        const list = Array.isArray(res.data) ? res.data : ((res.data as { items?: ApiPurchaseRequisition[] } | undefined)?.items ?? [])
+        setPrRows(
+          list.filter(
+            (pr) =>
+              (pr.purchasePurpose ?? '').toLowerCase().includes('production shortage') ||
+              (pr.remarks ?? '').includes('productionOrderId:'),
+          ),
+        )
+      } catch (e) {
+        setPrRows([])
+        notify.error(e instanceof Error ? e.message : 'Could not load production requisitions')
+      }
+    } finally {
+      setPrLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
-    void load()
-  }, [load])
+    if (tab === 'posted') void loadPosted()
+    if (tab === 'assign') void loadAssignQueue()
+    if (tab === 'prs') void loadProductionPrs()
+  }, [tab, loadPosted, loadAssignQueue, loadProductionPrs])
+
+  const assignWarehouseOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const row of assignRows) {
+      if (row.warehouseId) map.set(row.warehouseId, row.warehouseLabel)
+    }
+    return [...map.entries()].map(([id, label]) => ({ id, label }))
+  }, [assignRows])
+
+  const filteredAssignRows = useMemo(() => {
+    const q = assignSearch.trim().toLowerCase()
+    let rows = assignRows.filter((row) => {
+      if (assignView === 'available' && row.issuableQty <= 0) return false
+      if (assignView === 'shortage' && !(row.hasShortage || row.shortageQty > 0 || (row.freeQty != null && row.freeQty < row.balanceToIssue))) {
+        return false
+      }
+      if (assignView === 'pr_raised' && !row.purchaseRequisitionId) return false
+      if (assignWarehouseFilter && row.warehouseId !== assignWarehouseFilter) return false
+      if (assignStockFilter === 'available' && row.issuableQty <= 0) return false
+      if (assignStockFilter === 'shortage' && !(row.hasShortage || row.shortageQty > 0)) return false
+      if (assignStockFilter === 'no_stock' && !(row.freeQty != null && row.freeQty <= 0)) return false
+      if (!q) return true
+      return (
+        row.orderNumber.toLowerCase().includes(q) ||
+        row.itemCode.toLowerCase().includes(q) ||
+        row.itemName.toLowerCase().includes(q) ||
+        row.warehouseLabel.toLowerCase().includes(q) ||
+        (row.purchaseRequisitionNumber ?? '').toLowerCase().includes(q)
+      )
+    })
+
+    const sorted = [...rows]
+    sorted.sort((a, b) => {
+      switch (assignSort) {
+        case 'wo_desc':
+          return b.orderNumber.localeCompare(a.orderNumber)
+        case 'item_asc':
+          return a.itemCode.localeCompare(b.itemCode)
+        case 'balance_desc':
+          return b.balanceToIssue - a.balanceToIssue
+        case 'available_asc':
+          return (a.freeQty ?? -1) - (b.freeQty ?? -1)
+        case 'shortage_desc':
+          return b.shortageQty - a.shortageQty
+        case 'wo_asc':
+        default:
+          return a.orderNumber.localeCompare(b.orderNumber)
+      }
+    })
+    return sorted
+  }, [
+    assignRows,
+    assignSearch,
+    assignView,
+    assignWarehouseFilter,
+    assignStockFilter,
+    assignSort,
+  ])
+
+  const selectedRows = filteredAssignRows.filter((r) => selected.has(r.materialId))
+  const selectedIssuable = selectedRows.filter((r) => r.issuableQty > 0)
+  const selectedShortNeedingPr = selectedRows.filter(
+    (r) =>
+      !r.purchaseRequisitionId &&
+      (r.hasShortage || r.shortageQty > 0 || (r.freeQty != null && r.freeQty < r.balanceToIssue)),
+  )
+
+  const assignFilterChips = useMemo(() => {
+    const chips: Array<{ id: string; label: string }> = []
+    if (assignWarehouseFilter) {
+      const label = assignWarehouseOptions.find((w) => w.id === assignWarehouseFilter)?.label ?? 'Warehouse'
+      chips.push({ id: 'warehouse', label: `Warehouse: ${label}` })
+    }
+    if (assignStockFilter !== 'all') {
+      chips.push({
+        id: 'stock',
+        label:
+          assignStockFilter === 'available'
+            ? 'Stock: Available'
+            : assignStockFilter === 'no_stock'
+              ? 'Stock: No stock'
+              : 'Stock: Shortage',
+      })
+    }
+    return chips
+  }, [assignWarehouseFilter, assignStockFilter, assignWarehouseOptions])
+
+  const assignViewLabel =
+    ASSIGN_VIEW_OPTIONS.find((v) => v.id === assignView)?.label ?? 'All lines'
+
+  const parseAssignView = (labelOrId: string): typeof assignView => {
+    const byId = ASSIGN_VIEW_OPTIONS.find((v) => v.id === labelOrId || v.label === labelOrId)
+    return byId?.id ?? 'all'
+  }
+
+  const assignActiveFilterCount =
+    (assignWarehouseFilter ? 1 : 0) + (assignStockFilter !== 'all' ? 1 : 0)
+
+  const rowSelection = useMemo(() => {
+    const next: RowSelectionState = {}
+    for (const id of selected) next[id] = true
+    return next
+  }, [selected])
+
+  const assignSelected = useCallback(async () => {
+    if (selectedIssuable.length === 0) {
+      notify.error('Select lines with available stock to assign')
+      return
+    }
+    setBusy(true)
+    let ok = 0
+    const errors: string[] = []
+    try {
+      for (const row of selectedIssuable) {
+        try {
+          if (canReserveMaterials && row.reservedQty < row.requiredQty) {
+            await reserveWorkOrderMaterials(row.workOrderId, { materialIds: [row.materialId] }).catch(() => undefined)
+          }
+          await issueWorkOrderMaterial(row.workOrderId, {
+            materialId: row.materialId,
+            quantity: row.issuableQty,
+            warehouseId: row.warehouseId ?? undefined,
+            idempotencyKey: `issues-assign:${row.materialId}:${row.issuableQty}:${crypto.randomUUID()}`,
+          })
+          ok += 1
+        } catch (e) {
+          errors.push(`${row.itemCode}: ${e instanceof Error ? e.message : 'failed'}`)
+        }
+      }
+      if (ok > 0) notify.success(`Assigned ${ok} material line(s) to production`)
+      if (errors.length > 0) notify.error(errors.slice(0, 3).join(' · ') + (errors.length > 3 ? '…' : ''))
+      await loadAssignQueue()
+      if (ok > 0) void loadPosted()
+    } finally {
+      setBusy(false)
+    }
+  }, [canReserveMaterials, loadAssignQueue, loadPosted, selectedIssuable])
+
+  const createPrForRows = useCallback(
+    async (rowsToPr: AssignQueueRow[]) => {
+      const eligible = rowsToPr.filter(
+        (r) =>
+          !r.purchaseRequisitionId &&
+          (r.hasShortage || r.shortageQty > 0 || (r.freeQty != null && r.freeQty < r.balanceToIssue)),
+      )
+      if (eligible.length === 0) {
+        notify.error('Select short / out-of-stock lines without an existing PR')
+        return
+      }
+      setBusy(true)
+      let ok = 0
+      const errors: string[] = []
+      try {
+        const byWo = new Map<string, AssignQueueRow[]>()
+        for (const row of eligible) {
+          const list = byWo.get(row.workOrderId) ?? []
+          list.push(row)
+          byWo.set(row.workOrderId, list)
+        }
+        for (const [workOrderId, group] of byWo) {
+          try {
+            const res = await createWorkOrderShortageRequisition(workOrderId, {
+              materialIds: group.map((g) => g.materialId),
+              idempotencyKey: `issues-queue-pr:${workOrderId}:${group.map((g) => g.materialId).join(',')}:${crypto.randomUUID()}`,
+              submit: false,
+            })
+            const pr = res.data.requisition
+            const prNo = pr.prNumber ?? pr.requisitionNumber ?? pr.id.slice(0, 8)
+            notify.success(`PR ${prNo} created for ${group[0]?.orderNumber ?? 'WO'} (${group.length} line(s))`)
+            ok += 1
+          } catch (e) {
+            errors.push(`${group[0]?.orderNumber ?? workOrderId}: ${e instanceof Error ? e.message : 'failed'}`)
+          }
+        }
+        if (errors.length > 0) notify.error(errors.slice(0, 3).join(' · ') + (errors.length > 3 ? '…' : ''))
+        await loadAssignQueue()
+        if (ok > 0) {
+          setTab('prs')
+          const nextParams = new URLSearchParams(searchParams)
+          nextParams.set('tab', 'prs')
+          setSearchParams(nextParams, { replace: true })
+          void loadProductionPrs()
+        }
+      } finally {
+        setBusy(false)
+      }
+    },
+    [loadAssignQueue, loadProductionPrs, searchParams, setSearchParams],
+  )
+
+  const assignOne = useCallback(
+    async (r: AssignQueueRow) => {
+      setBusy(true)
+      try {
+        await issueWorkOrderMaterial(r.workOrderId, {
+          materialId: r.materialId,
+          quantity: r.issuableQty,
+          warehouseId: r.warehouseId ?? undefined,
+          idempotencyKey: `issues-assign-one:${r.materialId}:${crypto.randomUUID()}`,
+        })
+        notify.success(`Assigned ${fmtQty(r.issuableQty)} of ${r.itemCode}`)
+        await loadAssignQueue()
+      } catch (e) {
+        notify.error(e instanceof Error ? e.message : 'Assign failed')
+      } finally {
+        setBusy(false)
+      }
+    },
+    [loadAssignQueue],
+  )
+
+  const assignColumns = useMemo<ColumnDef<AssignQueueRow, unknown>[]>(() => {
+    return [
+      {
+        id: 'workOrder',
+        header: 'Work order',
+        accessorKey: 'orderNumber',
+        size: 120,
+        cell: ({ row }) => (
+          <Link
+            to={`/manufacturing/work-orders/${row.original.workOrderId}`}
+            className="font-mono text-[12px] font-semibold text-erp-primary hover:underline"
+          >
+            {row.original.orderNumber}
+          </Link>
+        ),
+      },
+      {
+        id: 'item',
+        header: 'Item',
+        accessorFn: (r) => `${r.itemCode} ${r.itemName}`,
+        size: 220,
+        cell: ({ row }) => (
+          <div className="min-w-[11rem]">
+            <p className="font-medium text-erp-text">{row.original.itemCode}</p>
+            <p className="truncate text-[11px] text-erp-muted" title={row.original.itemName}>
+              {row.original.itemName}
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: 'warehouse',
+        header: 'Warehouse',
+        accessorKey: 'warehouseLabel',
+        size: 140,
+        cell: ({ row }) => <span className="text-[12px] text-erp-text">{row.original.warehouseLabel}</span>,
+      },
+      {
+        id: 'required',
+        header: 'Required',
+        accessorKey: 'requiredQty',
+        size: 88,
+        meta: { align: 'right' },
+        cell: ({ row }) => <span className="tabular-nums">{fmtQty(row.original.requiredQty)}</span>,
+      },
+      {
+        id: 'issued',
+        header: 'Issued',
+        accessorKey: 'issuedQty',
+        size: 80,
+        meta: { align: 'right' },
+        cell: ({ row }) => <span className="tabular-nums">{fmtQty(row.original.issuedQty)}</span>,
+      },
+      {
+        id: 'balance',
+        header: 'Balance',
+        accessorKey: 'balanceToIssue',
+        size: 88,
+        meta: { align: 'right' },
+        cell: ({ row }) => (
+          <span className="tabular-nums font-semibold">{fmtQty(row.original.balanceToIssue)}</span>
+        ),
+      },
+      {
+        id: 'available',
+        header: 'Available',
+        accessorKey: 'freeQty',
+        size: 88,
+        meta: { align: 'right' },
+        cell: ({ row }) => {
+          const free = row.original.freeQty
+          const noStock = free != null && free <= 0
+          return (
+            <span className={cn('tabular-nums font-semibold', noStock ? 'text-rose-700' : 'text-erp-text')}>
+              {free == null ? '—' : fmtQty(free)}
+            </span>
+          )
+        },
+      },
+      {
+        id: 'canAssign',
+        header: 'Can assign',
+        accessorKey: 'issuableQty',
+        size: 96,
+        meta: { align: 'right' },
+        cell: ({ row }) => (
+          <span className="tabular-nums font-semibold text-emerald-700">{fmtQty(row.original.issuableQty)}</span>
+        ),
+      },
+      {
+        id: 'shortage',
+        header: 'Shortage',
+        accessorKey: 'shortageQty',
+        size: 88,
+        meta: { align: 'right' },
+        cell: ({ row }) => (
+          <span className="tabular-nums text-amber-900">
+            {row.original.shortageQty > 0 ? fmtQty(row.original.shortageQty) : '—'}
+          </span>
+        ),
+      },
+      {
+        id: 'stock',
+        header: 'Stock',
+        size: 100,
+        cell: ({ row }) => {
+          const free = row.original.freeQty
+          const noStock = free != null && free <= 0
+          const short =
+            row.original.hasShortage ||
+            row.original.shortageQty > 0 ||
+            (free != null && free < row.original.balanceToIssue)
+          if (noStock || short) {
+            return (
+              <span className="inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-900 ring-1 ring-amber-200">
+                {noStock ? 'No stock' : 'Shortage'}
+              </span>
+            )
+          }
+          return (
+            <span className="inline-flex rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 ring-1 ring-emerald-200">
+              Available
+            </span>
+          )
+        },
+      },
+      {
+        id: 'pr',
+        header: 'PR ref',
+        size: 130,
+        cell: ({ row }) =>
+          row.original.purchaseRequisitionId ? (
+            <div className="min-w-[7rem]">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800">PR generated</p>
+              <Link
+                to={`/purchase/requisitions/${row.original.purchaseRequisitionId}`}
+                className="font-mono text-[12px] font-semibold text-erp-primary hover:underline"
+              >
+                {row.original.purchaseRequisitionNumber ?? row.original.purchaseRequisitionId.slice(0, 8)}
+              </Link>
+            </div>
+          ) : (
+            <span className="text-erp-muted">—</span>
+          ),
+      },
+      {
+        id: 'actions',
+        header: 'Actions',
+        size: 200,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const r = row.original
+          const needsPr =
+            !r.purchaseRequisitionId &&
+            (r.hasShortage || r.shortageQty > 0 || (r.freeQty != null && r.freeQty < r.balanceToIssue))
+          return (
+            <div className="flex flex-wrap justify-end gap-1">
+              {r.issuableQty > 0 && (canIssueMaterials || perms.canPostIssue) ? (
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void assignOne(r)}>
+                  Assign
+                </Button>
+              ) : null}
+              {needsPr && canCreateShortagePr ? (
+                <Button size="sm" variant="ghost" disabled={busy} onClick={() => void createPrForRows([r])}>
+                  Create PR
+                </Button>
+              ) : null}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => navigate(`/inventory/movements/issues/new?workOrderId=${r.workOrderId}`)}
+              >
+                Open
+              </Button>
+            </div>
+          )
+        },
+      },
+    ]
+  }, [
+    assignOne,
+    busy,
+    canCreateShortagePr,
+    canIssueMaterials,
+    createPrForRows,
+    navigate,
+    perms.canPostIssue,
+  ])
 
   if (!perms.canViewIssues && !perms.canViewStock && !perms.canViewItemLedger) {
     return <AccessDenied title="Issues" />
@@ -187,15 +735,21 @@ export function ApiIssuesRegisterPage() {
     setter(v)
   }
 
+  const refreshCurrent = () => {
+    if (tab === 'assign') void loadAssignQueue()
+    else if (tab === 'prs') void loadProductionPrs()
+    else void loadPosted()
+  }
+
   return (
     <div className="erp-page">
       <PageHeader
         title="Issues"
-        description="Live stock issues posted to the inventory ledger (general, work-order, and dispatch). Work-order material issues also run from the Work Order Materials tab."
+        description="Assign available stock to production, raise shortage PRs, and review posted issue movements."
         breadcrumbs={[{ label: 'Inventory', to: '/inventory/stock' }, { label: 'Issues' }]}
         actions={(
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" onClick={() => void load()}>
+            <Button size="sm" variant="secondary" onClick={() => void refreshCurrent()}>
               <RefreshCw className="h-4 w-4" /> Refresh
             </Button>
             <Button size="sm" variant="secondary" onClick={() => navigate('/manufacturing/work-orders')}>
@@ -210,116 +764,379 @@ export function ApiIssuesRegisterPage() {
         )}
       />
 
-      <div className="mb-3 flex flex-wrap items-end gap-2">
-        <label className="text-[11px] text-erp-muted">
-          Item
-          <Select wrapClassName="w-64" value={itemId} onChange={(e) => resetPageAnd(setItemId)(e.target.value)}>
-            <option value="">All items</option>
-            {items.map((i) => (
-              <option key={i.id} value={i.id}>{i.label}</option>
-            ))}
-          </Select>
-        </label>
-        <label className="text-[11px] text-erp-muted">
-          Warehouse
-          <Select wrapClassName="w-56" value={warehouseId} onChange={(e) => resetPageAnd(setWarehouseId)(e.target.value)}>
-            <option value="">All warehouses</option>
-            {warehouses.map((w) => (
-              <option key={w.id} value={w.id}>{w.label}</option>
-            ))}
-          </Select>
-        </label>
-        <label className="text-[11px] text-erp-muted">
-          From
-          <Input type="date" className="w-36" value={fromDate} onChange={(e) => resetPageAnd(setFromDate)(e.target.value)} />
-        </label>
-        <label className="text-[11px] text-erp-muted">
-          To
-          <Input type="date" className="w-36" value={toDate} onChange={(e) => resetPageAnd(setToDate)(e.target.value)} />
-        </label>
+      <div className="mb-3 flex flex-wrap gap-2">
+        {(
+          [
+            { id: 'assign' as const, label: 'Assign to production' },
+            { id: 'prs' as const, label: 'Production requisitions' },
+            { id: 'posted' as const, label: 'Posted issues' },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={`erp-btn h-8 px-3 text-[12px] ${tab === t.id ? 'erp-btn-primary' : 'erp-btn-ghost'}`}
+            onClick={() => switchTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      <SectionCard title="Issue movements" noPadding>
-        {loading ? (
-          <div className="p-6"><LoadingState variant="table" rows={8} /></div>
-        ) : rows.length === 0 ? (
-          <div className="p-6">
+      {tab === 'assign' ? (
+        <SectionCard
+          title="Production material requests"
+          actions={
+            <div className="flex flex-wrap gap-2">
+              {(canIssueMaterials || perms.canPostIssue) ? (
+                <Button size="sm" disabled={busy || selectedIssuable.length === 0} onClick={() => void assignSelected()}>
+                  {busy ? 'Assigning…' : `Assign available (${selectedIssuable.length})`}
+                </Button>
+              ) : null}
+              {canCreateShortagePr ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy || selectedShortNeedingPr.length === 0}
+                  onClick={() => void createPrForRows(selectedShortNeedingPr)}
+                >
+                  Create PR for short ({selectedShortNeedingPr.length})
+                </Button>
+              ) : null}
+            </div>
+          }
+        >
+          <p className="mb-3 text-[12px] text-erp-muted">
+            Open WO material lines waiting to be issued. Available stock can be assigned here; short lines can raise a
+            purchase requisition (single or multi-select). When a PR already exists, the row shows the PR reference only.
+          </p>
+          {assignLoading ? (
+            <LoadingState variant="table" />
+          ) : assignRows.length === 0 ? (
             <EmptyState
-              icon={ArrowUpFromLine}
-              title="No stock issued yet"
-              description="Issue to a work order from Today’s Work (recommended), or post a direct issue here."
+              icon={PackageMinus}
+              title="Nothing waiting to assign"
+              description="When work orders need materials, they appear here with free stock and shortage status."
               action={
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => navigate('/inventory/store-workbench')}>
-                    Today’s Work
-                  </Button>
-                  {perms.canPostIssue || perms.canCreateIssue ? (
-                    <Button size="sm" onClick={() => navigate('/inventory/movements/issues/new')}>
-                      <PackageMinus className="h-4 w-4" /> Direct Issue
-                    </Button>
-                  ) : null}
-                </div>
+                <Button size="sm" onClick={() => navigate('/inventory/movements/issues/new')}>
+                  Issue to work order
+                </Button>
               }
             />
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="erp-table w-full min-w-[980px] text-[13px]">
+          ) : (
+            <EnterpriseRegisterTableShell className="min-w-0">
+              <DataGrid
+                data={filteredAssignRows}
+                columns={assignColumns}
+                loading={assignLoading}
+                stickyHeader
+                stickyFirstColumn
+                zebra
+                compact
+                selectable
+                getRowId={(r) => r.materialId}
+                rowSelection={rowSelection}
+                onRowSelectionChange={(updater) => {
+                  const next = typeof updater === 'function' ? updater(rowSelection) : updater
+                  setSelected(new Set(Object.keys(next).filter((id) => next[id])))
+                }}
+                pageSize={assignPageSize}
+                onPageSizeChange={setAssignPageSize}
+                pageSizeOptions={[10, 25, 50, 100]}
+                showPagination
+                showCompactSearch={false}
+                enableColumnSorting
+                emptyMessage={
+                  assignActiveFilterCount > 0 || assignSearch || assignView !== 'all'
+                    ? 'No material lines match the current filters or view.'
+                    : 'No open material lines to assign.'
+                }
+                emptyAction={
+                  assignActiveFilterCount > 0 || assignSearch || assignView !== 'all' ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        setAssignSearch('')
+                        setAssignView('all')
+                        setAssignWarehouseFilter('')
+                        setAssignStockFilter('all')
+                        setAssignFiltersOpen(false)
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  ) : undefined
+                }
+                viewName={assignViewLabel}
+                showToolbarView={false}
+                registerBar={
+                  <CrmListFilterBar
+                    search={assignSearch}
+                    onSearchChange={setAssignSearch}
+                    searchPlaceholder="Search WO, item, warehouse, PR…"
+                    activeFilterCount={assignActiveFilterCount}
+                    onOpenFilters={() => setAssignFiltersOpen((o) => !o)}
+                    filtersExpanded={assignFiltersOpen}
+                    filtersButtonLabel={assignFiltersOpen ? 'Hide filters' : 'Filters'}
+                    chips={assignFilterChips}
+                    onRemoveChip={(id) => {
+                      if (id === 'warehouse') setAssignWarehouseFilter('')
+                      if (id === 'stock') setAssignStockFilter('all')
+                    }}
+                    onClearAll={() => {
+                      setAssignWarehouseFilter('')
+                      setAssignStockFilter('all')
+                      setAssignSearch('')
+                      setAssignView('all')
+                    }}
+                    savedView={assignViewLabel}
+                    onSavedViewChange={(v) => setAssignView(parseAssignView(v))}
+                    savedViews={ASSIGN_VIEW_OPTIONS.map((v) => v.label)}
+                    className="crm-list-filter-bar--embedded"
+                    showCommandPaletteHint={false}
+                    sort={
+                      <CrmListSortSelect
+                        value={assignSort}
+                        onChange={setAssignSort}
+                        aria-label="Sort assign queue"
+                        options={[
+                          { value: 'wo_asc', label: 'Sort: Work order (A–Z)' },
+                          { value: 'wo_desc', label: 'Sort: Work order (Z–A)' },
+                          { value: 'item_asc', label: 'Sort: Item' },
+                          { value: 'balance_desc', label: 'Sort: Balance' },
+                          { value: 'available_asc', label: 'Sort: Available' },
+                          { value: 'shortage_desc', label: 'Sort: Shortage' },
+                        ]}
+                      />
+                    }
+                    filterPanel={
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <FormField label="Warehouse">
+                          <Select
+                            value={assignWarehouseFilter}
+                            onChange={(e) => setAssignWarehouseFilter(e.target.value)}
+                          >
+                            <option value="">All warehouses</option>
+                            {assignWarehouseOptions.map((w) => (
+                              <option key={w.id} value={w.id}>
+                                {w.label}
+                              </option>
+                            ))}
+                          </Select>
+                        </FormField>
+                        <FormField label="Stock status">
+                          <Select
+                            value={assignStockFilter}
+                            onChange={(e) =>
+                              setAssignStockFilter(e.target.value as typeof assignStockFilter)
+                            }
+                          >
+                            <option value="all">All</option>
+                            <option value="available">Available to assign</option>
+                            <option value="shortage">Shortage</option>
+                            <option value="no_stock">No stock</option>
+                          </Select>
+                        </FormField>
+                      </div>
+                    }
+                    trailing={
+                      <span className="text-[11px] text-erp-muted tabular-nums">
+                        {filteredAssignRows.length} of {assignRows.length} line
+                        {assignRows.length === 1 ? '' : 's'}
+                        {selected.size > 0 ? ` · ${selected.size} selected` : ''}
+                      </span>
+                    }
+                  />
+                }
+              />
+            </EnterpriseRegisterTableShell>
+          )}
+        </SectionCard>
+      ) : null}
+
+      {tab === 'prs' ? (
+        <SectionCard title="Requisitions requested by production">
+          <p className="mb-3 text-[12px] text-erp-muted">
+            Purchase requisitions raised from work-order material shortages (store / production).
+          </p>
+          {prLoading ? (
+            <LoadingState variant="table" />
+          ) : prRows.length === 0 ? (
+            <EmptyState
+              icon={PackageMinus}
+              title="No production shortage PRs yet"
+              description="When store raises a shortage PR from Assign to production, it will list here."
+              action={
+                <Button size="sm" variant="secondary" onClick={() => switchTab('assign')}>
+                  Go to assign queue
+                </Button>
+              }
+            />
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-erp-border">
+              <table className="erp-table w-full text-[12px]">
                 <thead>
-                  <tr>
+                  <tr className="bg-slate-50/90">
+                    <th>PR #</th>
                     <th>Date</th>
-                    <th>Movement #</th>
-                    <th>Reference</th>
-                    <th>Item</th>
-                    <th>Warehouse</th>
-                    <th className="text-right">Qty</th>
-                    <th className="text-right">Value</th>
-                    <th className="text-right">Balance After</th>
+                    <th>Purpose</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th className="text-right">Lines</th>
+                    <th className="text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((m) => (
-                    <tr key={m.id}>
-                      <td>{formatDate(m.movementDate)}</td>
+                  {prRows.map((pr) => (
+                    <tr key={pr.id}>
                       <td>
                         <Link
-                          to={`/inventory/movements/issues/${m.id}`}
+                          to={`/purchase/requisitions/${pr.id}`}
                           className="font-mono font-semibold text-erp-primary hover:underline"
                         >
-                          {m.movementNumber}
+                          {pr.requisitionNumber}
                         </Link>
                       </td>
-                      <td>
-                        {m.referenceType}
-                        {m.workOrderId ? (
-                          <>
-                            {' · '}
-                            <Link
-                              to={`/manufacturing/work-orders/${m.workOrderId}`}
-                              className="text-erp-primary hover:underline"
-                            >
-                              {m.referenceNo ?? m.workOrderId.slice(0, 8)}
-                            </Link>
-                          </>
-                        ) : m.referenceNo ? (
-                          <span className="text-erp-muted"> · {m.referenceNo}</span>
-                        ) : null}
+                      <td>{formatDate(pr.requisitionDate)}</td>
+                      <td className="max-w-[20rem] truncate" title={pr.purchasePurpose ?? ''}>
+                        {pr.purchasePurpose ?? '—'}
                       </td>
-                      <td>{refLabel(m.item, m.itemId)}</td>
-                      <td>{refLabel(m.warehouse, m.warehouseId)}</td>
-                      <td className="text-right tabular-nums font-semibold text-rose-700">{fmtQty(m.quantity)}</td>
-                      <td className="text-right tabular-nums">{fmtQty(m.value)}</td>
-                      <td className="text-right tabular-nums">{fmtQty(m.balanceAfter)}</td>
+                      <td className="uppercase">{pr.priority}</td>
+                      <td>
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-700">
+                          {pr.status}
+                        </span>
+                      </td>
+                      <td className="text-right tabular-nums">{pr.lines?.length ?? '—'}</td>
+                      <td className="text-right">
+                        <Button size="sm" variant="ghost" onClick={() => navigate(`/purchase/requisitions/${pr.id}`)}>
+                          Open PR
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <Pager meta={meta} onPage={setPage} />
-          </>
-        )}
-      </SectionCard>
+          )}
+        </SectionCard>
+      ) : null}
+
+      {tab === 'posted' ? (
+        <>
+          <div className="mb-3 flex flex-wrap items-end gap-2">
+            <label className="text-[11px] text-erp-muted">
+              Item
+              <Select wrapClassName="w-64" value={itemId} onChange={(e) => resetPageAnd(setItemId)(e.target.value)}>
+                <option value="">All items</option>
+                {items.map((i) => (
+                  <option key={i.id} value={i.id}>{i.label}</option>
+                ))}
+              </Select>
+            </label>
+            <label className="text-[11px] text-erp-muted">
+              Warehouse
+              <Select wrapClassName="w-56" value={warehouseId} onChange={(e) => resetPageAnd(setWarehouseId)(e.target.value)}>
+                <option value="">All warehouses</option>
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>{w.label}</option>
+                ))}
+              </Select>
+            </label>
+            <label className="text-[11px] text-erp-muted">
+              From
+              <Input type="date" className="w-36" value={fromDate} onChange={(e) => resetPageAnd(setFromDate)(e.target.value)} />
+            </label>
+            <label className="text-[11px] text-erp-muted">
+              To
+              <Input type="date" className="w-36" value={toDate} onChange={(e) => resetPageAnd(setToDate)(e.target.value)} />
+            </label>
+          </div>
+
+          <SectionCard title="Issue movements" noPadding>
+            {loading ? (
+              <div className="p-6"><LoadingState variant="table" rows={8} /></div>
+            ) : rows.length === 0 ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={ArrowUpFromLine}
+                  title="No stock issued yet"
+                  description="Assign materials from the Assign to production tab, or post a direct issue."
+                  action={
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => switchTab('assign')}>
+                        Assign to production
+                      </Button>
+                      {perms.canPostIssue || perms.canCreateIssue ? (
+                        <Button size="sm" onClick={() => navigate('/inventory/movements/issues/new')}>
+                          <PackageMinus className="h-4 w-4" /> Direct Issue
+                        </Button>
+                      ) : null}
+                    </div>
+                  }
+                />
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="erp-table w-full min-w-[980px] text-[13px]">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Movement #</th>
+                        <th>Reference</th>
+                        <th>Item</th>
+                        <th>Warehouse</th>
+                        <th className="text-right">Qty</th>
+                        <th className="text-right">Value</th>
+                        <th className="text-right">Balance After</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((m) => (
+                        <tr key={m.id}>
+                          <td>{formatDate(m.movementDate)}</td>
+                          <td>
+                            <Link
+                              to={`/inventory/movements/issues/${m.id}`}
+                              className="font-mono font-semibold text-erp-primary hover:underline"
+                            >
+                              {m.movementNumber}
+                            </Link>
+                          </td>
+                          <td>
+                            {m.referenceType}
+                            {m.workOrderId ? (
+                              <>
+                                {' · '}
+                                <Link
+                                  to={`/manufacturing/work-orders/${m.workOrderId}`}
+                                  className="text-erp-primary hover:underline"
+                                >
+                                  {m.referenceNo ?? m.workOrderId.slice(0, 8)}
+                                </Link>
+                              </>
+                            ) : m.referenceNo ? (
+                              <span className="text-erp-muted"> · {m.referenceNo}</span>
+                            ) : null}
+                          </td>
+                          <td>{refLabel(m.item, m.itemId)}</td>
+                          <td>{refLabel(m.warehouse, m.warehouseId)}</td>
+                          <td className="text-right tabular-nums font-semibold text-rose-700">{fmtQty(m.quantity)}</td>
+                          <td className="text-right tabular-nums">{fmtQty(m.value)}</td>
+                          <td className="text-right tabular-nums">{fmtQty(m.balanceAfter)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Pager meta={meta} onPage={setPage} />
+              </>
+            )}
+          </SectionCard>
+        </>
+      ) : null}
     </div>
   )
 }

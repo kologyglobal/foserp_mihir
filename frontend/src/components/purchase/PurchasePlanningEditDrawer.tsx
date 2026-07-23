@@ -47,7 +47,6 @@ export function PurchasePlanningEditDrawer({
   const [purchaseType, setPurchaseType] = useState<PurchasePlanningPurchaseType>('direct_purchase')
   const [buyerId, setBuyerId] = useState('')
   const [priority, setPriority] = useState<PurchasePlanningPriority>('medium')
-  const [actionMessage, setActionMessage] = useState(false)
   const [remarks, setRemarks] = useState('')
 
   useEffect(() => {
@@ -59,7 +58,6 @@ export function PurchasePlanningEditDrawer({
     setPurchaseType(row.purchaseType)
     setBuyerId(row.buyerId || '')
     setPriority(row.priority)
-    setActionMessage(Boolean(row.actionMessage))
     setRemarks(row.remarks || '')
   }, [row, open])
 
@@ -74,7 +72,6 @@ export function PurchasePlanningEditDrawer({
     purchaseType !== row.purchaseType ||
     buyerId !== (row.buyerId || '') ||
     priority !== row.priority ||
-    actionMessage !== Boolean(row.actionMessage) ||
     remarks !== (row.remarks || '')
 
   return (
@@ -102,7 +99,6 @@ export function PurchasePlanningEditDrawer({
               buyerId,
               buyerName: selectedBuyer?.name ?? row.buyerName,
               priority,
-              actionMessage,
               remarks,
             })
           }
@@ -204,17 +200,6 @@ export function PurchasePlanningEditDrawer({
                 </option>
               ))}
             </Select>
-          </ErpFieldRow>
-          <ErpFieldRow label="Action Message" horizontal={false}>
-            <label className="flex h-9 items-center gap-2 text-[13px] text-erp-text">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-[var(--erp-primary,#2563eb)]"
-                checked={actionMessage}
-                onChange={(e) => setActionMessage(e.target.checked)}
-              />
-              Mark action message
-            </label>
           </ErpFieldRow>
           <div className="sm:col-span-2">
             <ErpFieldRow label="Remarks" horizontal={false}>

@@ -225,6 +225,7 @@ export async function createVisitorEntry(
         approvalStatus: needsApproval ? 'pending' : 'not_required',
         gate: input.gate,
         visitDate: todayIsoDate(),
+        expectedArrival: ((input.expectedArrival as string | undefined) ?? '').trim() || 'ASAP',
         approvalHistoryJson: needsApproval
           ? [{ at: now.toISOString(), by: actor, action: 'approval_requested' }]
           : [],

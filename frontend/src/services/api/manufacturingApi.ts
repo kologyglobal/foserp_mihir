@@ -1230,7 +1230,7 @@ export async function returnWorkOrderMaterial(
 
 export async function createWorkOrderShortageRequisition(
   workOrderId: string,
-  data?: { idempotencyKey?: string; priority?: string; submit?: boolean },
+  data?: { idempotencyKey?: string; priority?: string; submit?: boolean; materialIds?: string[] },
 ) {
   return apiRequest<ShortageRequisitionResult>(
     tenantPath(`/manufacturing/work-orders/${workOrderId}/materials/shortage-requisition`),

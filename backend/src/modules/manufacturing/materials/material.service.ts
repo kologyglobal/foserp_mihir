@@ -875,6 +875,7 @@ export async function createShortageRequisition(
   const userId = req.context?.userId ?? ''
   const order = await repo.findWorkOrderWithProfile(tenantId, orderId)
   const materials = await repo.listMaterials(tenantId, orderId)
+  const selectedIds = input.materialIds?.length ? new Set(input.materialIds) : null
 
   const shortageLines: Array<{
     material: repo.MaterialRow
@@ -882,6 +883,7 @@ export async function createShortageRequisition(
   }> = []
 
   for (const material of materials) {
+    if (selectedIds && !selectedIds.has(material.id)) continue
     const warehouseId = material.warehouseId
     if (!warehouseId) continue
 
@@ -896,6 +898,14 @@ export async function createShortageRequisition(
       qty = fromShortageField
     } else if (uncovered.greaterThan(0)) {
       qty = uncovered
+    }
+
+    // Selected lines with no free stock still raise PR for remaining-to-issue when reserve remaining is 0
+    // but issue balance remains (already reserved but stock gone is rare). Prefer remaining-to-issue shortfall.
+    if (!isPositive(qty) && selectedIds) {
+      const issueRemaining = remainingToIssue(material)
+      const issueShort = subDec(issueRemaining, free)
+      if (issueShort.greaterThan(0)) qty = issueShort
     }
 
     if (isPositive(qty)) {

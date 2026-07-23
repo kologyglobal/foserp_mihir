@@ -6,10 +6,15 @@ import { OperationalPageShell } from '@/components/design-system/OperationalPage
 import { PurchaseSimpleListFilterBar } from '@/components/purchase/PurchaseSimpleListFilterBar'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { ErpDataGrid } from '@/components/erp/ErpDataGrid'
 import { TableLink } from '@/components/ui/AppLink'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { DataTable } from '@/components/tables/DataTable'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
+import {
+  EnterpriseRowActionsMenu,
+  type RowActionItem,
+} from '@/design-system/enterprise/EnterpriseTablePrimitives'
 import {
   getQualityInspectionList,
   QUALITY_INSPECTION_STATUS_LABELS,
@@ -66,82 +71,119 @@ export function QualityInspectionListPage() {
       {
         accessorKey: 'documentNumber',
         header: 'Inspection No.',
+        meta: { columnLabel: 'Inspection No.' },
         cell: ({ row }) => (
           <TableLink
             to={`/purchase/quality-inspections/${row.original.id}`}
             className="font-mono"
           >
-            {row.original.documentNumber}
+            {row.original.documentNumber || '—'}
           </TableLink>
         ),
       },
       {
         accessorKey: 'documentDate',
         header: 'Date',
-        cell: ({ row }) => formatDate(row.original.documentDate),
+        meta: { columnLabel: 'Date' },
+        cell: ({ row }) => formatDate(row.original.documentDate) || '—',
       },
       {
         accessorKey: 'goodsReceiptNumber',
         header: 'GRN',
-        cell: ({ row }) => (
-          <TableLink to={`/purchase/grn/${row.original.goodsReceiptId}`} className="font-mono">
-            {row.original.goodsReceiptNumber}
-          </TableLink>
-        ),
+        meta: { columnLabel: 'GRN' },
+        cell: ({ row }) =>
+          row.original.goodsReceiptId ? (
+            <TableLink to={`/purchase/grn/${row.original.goodsReceiptId}`} className="font-mono">
+              {row.original.goodsReceiptNumber || 'Open GRN'}
+            </TableLink>
+          ) : (
+            '—'
+          ),
       },
       {
         accessorKey: 'itemCode',
         header: 'Item',
+        meta: { columnLabel: 'Item' },
         cell: ({ row }) => (
           <div>
-            <div className="font-mono text-xs">{row.original.itemCode}</div>
-            <div className="text-erp-muted">{row.original.itemName}</div>
+            <div className="font-mono text-xs">{row.original.itemCode || '—'}</div>
+            <div className="text-erp-muted">{row.original.itemName || ''}</div>
           </div>
         ),
       },
-      { accessorKey: 'batchLotNo', header: 'Batch / Lot' },
+      {
+        accessorKey: 'batchLotNo',
+        header: 'Batch / Lot',
+        meta: { columnLabel: 'Batch / Lot' },
+        cell: ({ row }) => row.original.batchLotNo || '—',
+      },
       {
         accessorKey: 'receivedQty',
         header: 'Received',
+        meta: { columnLabel: 'Received' },
         cell: ({ row }) => formatNumber(row.original.receivedQty),
       },
       {
         accessorKey: 'sampleQty',
         header: 'Sample',
+        meta: { columnLabel: 'Sample' },
         cell: ({ row }) => formatNumber(row.original.sampleQty),
       },
-      { accessorKey: 'inspectorName', header: 'Inspector' },
+      {
+        accessorKey: 'inspectorName',
+        header: 'Inspector',
+        meta: { columnLabel: 'Inspector' },
+        cell: ({ row }) => row.original.inspectorName || '—',
+      },
       {
         accessorKey: 'status',
         header: 'Status',
+        meta: { columnLabel: 'Status' },
         cell: ({ row }) => (
           <StatusDot
             tone={statusToneFromLabel(row.original.statusLabel)}
-            label={row.original.statusLabel}
+            label={row.original.statusLabel || '—'}
           />
         ),
       },
       {
         accessorKey: 'resultLabel',
         header: 'Result',
+        meta: { columnLabel: 'Result' },
         cell: ({ row }) => row.original.resultLabel ?? '—',
       },
       {
         id: 'actions',
         header: '',
-        cell: ({ row }) => (
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 text-sm text-erp-primary"
-            onClick={() => navigate(`/purchase/quality-inspections/${row.original.id}`)}
-          >
-            <Eye className="h-4 w-4" /> Open
-          </button>
-        ),
+        enableHiding: false,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const r = row.original
+          const actions: RowActionItem[] = [
+            {
+              id: 'view',
+              label: 'View',
+              icon: Eye,
+              onClick: () => navigate(`/purchase/quality-inspections/${r.id}`),
+            },
+            {
+              id: 'grn',
+              label: 'Open GRN',
+              icon: ClipboardCheck,
+              onClick: () => navigate(`/purchase/grn/${r.goodsReceiptId}`),
+              disabled: !r.goodsReceiptId,
+            },
+          ]
+          return <EnterpriseRowActionsMenu actions={actions} />
+        },
       },
     ],
     [navigate],
   )
+
+  const createHref = grnFilter
+    ? `/purchase/quality-inspections/new?grnId=${encodeURIComponent(grnFilter)}`
+    : '/purchase/quality-inspections/new'
 
   return (
     <OperationalPageShell
@@ -156,13 +198,12 @@ export function QualityInspectionListPage() {
           inline
           sticky={false}
           primaryAction={
-            grnFilter && perms.canInspectQuality
+            perms.canInspectQuality
               ? {
                   id: 'create',
-                  label: 'Create Inspection',
+                  label: grnFilter ? 'Create Inspection' : 'New Inspection',
                   icon: Plus,
-                  onClick: () =>
-                    navigate(`/purchase/quality-inspections/new?grnId=${encodeURIComponent(grnFilter)}`),
+                  onClick: () => navigate(createHref),
                 }
               : undefined
           }
@@ -171,7 +212,7 @@ export function QualityInspectionListPage() {
               id: 'grn',
               label: 'GRN Register',
               icon: ClipboardCheck,
-              onClick: () => navigate('/purchase/grn'),
+              onClick: () => navigate(grnFilter ? `/purchase/grn/${grnFilter}` : '/purchase/grn'),
             },
             {
               id: 'refresh',
@@ -201,28 +242,36 @@ export function QualityInspectionListPage() {
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={ClipboardCheck}
-          title="No quality inspections"
+          title={grnFilter ? 'No inspection for this GRN yet' : 'No quality inspections'}
           description={
             grnFilter
-              ? 'Create an inspection for this goods receipt.'
-              : 'Submit a GRN that requires inspection to create a QI document.'
+              ? 'This goods receipt is pending inspection. Create a quality inspection to record accept / reject quantities.'
+              : 'Submit a GRN that requires inspection, then create a QI document.'
           }
           action={
-            grnFilter && perms.canInspectQuality ? (
+            perms.canInspectQuality ? (
               <button
                 type="button"
-                className="text-sm font-medium text-erp-primary"
-                onClick={() =>
-                  navigate(`/purchase/quality-inspections/new?grnId=${encodeURIComponent(grnFilter)}`)
-                }
+                className="erp-btn erp-btn--primary text-[13px]"
+                onClick={() => navigate(createHref)}
               >
-                Create inspection
+                {grnFilter ? 'Create inspection' : 'New inspection'}
               </button>
             ) : undefined
           }
         />
       ) : (
-        <DataTable columns={columns} data={filtered} />
+        <EnterpriseRegisterTableShell className="min-w-0">
+          <ErpDataGrid
+            data={filtered}
+            columns={columns}
+            showCompactSearch={false}
+            enableColumnSorting={false}
+            stickyFirstColumn
+            emptyMessage="No quality inspections match current filters."
+            getRowId={(r) => r.id}
+          />
+        </EnterpriseRegisterTableShell>
       )}
     </OperationalPageShell>
   )

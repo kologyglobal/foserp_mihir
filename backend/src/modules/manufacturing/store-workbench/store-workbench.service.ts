@@ -1,4 +1,5 @@
 import { prisma } from '../../../config/database.js'
+import { getStockPosition } from '../../inventory/balances/balance.service.js'
 import { isPositive, subDec, toDecimal } from '../shared/quantity.service.js'
 import { dec } from '../shared/manufacturing.mappers.js'
 
@@ -181,8 +182,13 @@ export async function listStoreWorkbenchIssues(tenantId: string, opts?: QueueOpt
       reservedQty: true,
       issuedQty: true,
       returnedQty: true,
+      shortageQty: true,
+      warehouseId: true,
       itemId: true,
+      purchaseRequisitionId: true,
       item: { select: { code: true, name: true } },
+      warehouse: { select: { id: true, code: true, name: true } },
+      purchaseRequisition: { select: { id: true, requisitionNumber: true, status: true } },
       productionOrder: {
         select: {
           id: true,
@@ -199,6 +205,29 @@ export async function listStoreWorkbenchIssues(tenantId: string, opts?: QueueOpt
     const netIssued = toDecimal(m.issuedQty).minus(toDecimal(m.returnedQty))
     const balance = subDec(required, netIssued)
     if (!isPositive(balance)) continue
+
+    let freeQty: string | null = null
+    let hasShortage = toDecimal(m.shortageQty).greaterThan(0)
+    if (m.warehouseId) {
+      try {
+        const position = await getStockPosition(tenantId, m.itemId, m.warehouseId)
+        freeQty = position.freeQty
+        const free = toDecimal(position.freeQty)
+        if (balance.greaterThan(free)) hasShortage = true
+      } catch {
+        freeQty = '0'
+        hasShortage = true
+      }
+    } else {
+      freeQty = null
+      hasShortage = true
+    }
+
+    const freeDec = freeQty != null ? toDecimal(freeQty) : null
+    const issuable =
+      freeDec == null ? balance : balance.lessThanOrEqualTo(freeDec) ? balance : freeDec.lessThan(0) ? toDecimal(0) : freeDec
+    const shortQty = freeDec == null ? balance : subDec(balance, freeDec).lessThan(0) ? toDecimal(0) : subDec(balance, freeDec)
+
     rows.push({
       workOrderId: m.productionOrder.id,
       orderNumber: m.productionOrder.orderNumber,
@@ -206,10 +235,18 @@ export async function listStoreWorkbenchIssues(tenantId: string, opts?: QueueOpt
       materialId: m.id,
       itemId: m.itemId,
       item: m.item,
+      warehouseId: m.warehouseId,
+      warehouse: m.warehouse,
       requiredQty: dec(required),
       reservedQty: dec(m.reservedQty),
       issuedQty: dec(m.issuedQty),
       balanceToIssue: dec(balance),
+      freeQty: freeQty == null ? null : dec(freeDec!),
+      issuableQty: dec(issuable.lessThan(0) ? toDecimal(0) : issuable),
+      shortageQty: dec(shortQty),
+      hasShortage,
+      purchaseRequisitionId: m.purchaseRequisitionId,
+      purchaseRequisition: m.purchaseRequisition,
       status: netIssued.greaterThan(0) ? 'PARTIALLY_ISSUED' : 'NOT_ISSUED',
     })
     if (rows.length >= limit) break

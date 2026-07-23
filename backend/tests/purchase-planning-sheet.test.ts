@@ -305,7 +305,7 @@ describe.skipIf(!dbAvailable)('Purchase planning sheet APIs (integration)', () =
     expect(recalc.body.data[0]).toHaveProperty('estimatedAmount')
   }, 90_000)
 
-  it('creates draft PO from ready Action Message rows and blocks RFQ-required demand', async () => {
+  it('creates draft PO from ready planning rows and blocks RFQ-required demand', async () => {
     const vendor = await prisma.masterVendor.create({
       data: {
         tenantId,
@@ -328,18 +328,6 @@ describe.skipIf(!dbAvailable)('Purchase planning sheet APIs (integration)', () =
     ).find((r) => r.selectedVendorId === vendor.id)
     expect(row).toBeTruthy()
     expect(row!.status).toBe('vendor_selected')
-
-    const blockedWithoutAction = await request(app)
-      .post(`${base()}/create-po`)
-      .set(auth())
-      .send({ rowIds: [row!.id] })
-    expect(blockedWithoutAction.status).toBe(400)
-    expect(blockedWithoutAction.body.code).toBe('PPS_NOT_SELECTED')
-
-    await request(app)
-      .patch(`${base()}/${row!.id}`)
-      .set(auth())
-      .send({ actionMessage: true })
 
     const created = await request(app)
       .post(`${base()}/create-po`)

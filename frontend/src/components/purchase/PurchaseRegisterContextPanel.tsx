@@ -12,6 +12,12 @@ import {
 
 export type PurchaseRegisterOverviewRow = PurchaseAiOverviewRow
 
+export type PurchaseRegisterFilterBarChildren = (ctx: {
+  restoreButton: ReactNode
+  open: boolean
+  setOpen: (open: boolean) => void
+}) => ReactNode
+
 interface PurchaseRegisterContextPanelProps {
   overview: PurchaseRegisterOverviewRow[]
   suggestions: EnterpriseQuickAction[]
@@ -25,15 +31,17 @@ interface PurchaseRegisterContextPanelProps {
    * `band` — full-width above the table (default).
    * `rail` — sticky column (parent supplies flex row).
    * `split` — wraps `children`: open = table left | insights right; closed = sparkle above table.
+   * `filterBar` — gold path (Requisitions): closed = no band (page puts restore in filter `afterFilters`);
+   *   open = table left | insights right. Pass children as a function to receive `restoreButton`.
    */
-  placement?: 'band' | 'rail' | 'split'
-  /** Required for `placement="split"` — usually the register table. */
-  children?: ReactNode
+  placement?: 'band' | 'rail' | 'split' | 'filterBar'
+  /** Required for `placement="split"` / `filterBar` — usually the register table. */
+  children?: ReactNode | PurchaseRegisterFilterBarChildren
 }
 
 /**
  * Register insights panel.
- * `split`: open → table left + insights right; closed → restore sparkle above table.
+ * Prefer `placement="filterBar"` so the restore sparkle sits beside Filters (Requisitions gold path).
  */
 export function PurchaseRegisterContextPanel({
   overview,
@@ -47,20 +55,17 @@ export function PurchaseRegisterContextPanel({
   children,
 }: PurchaseRegisterContextPanelProps) {
   const [open, setOpen] = usePurchaseAiInsightsOpen(storageKey)
-  const isRail = placement === 'rail' || placement === 'split'
+  const isRail = placement === 'rail' || placement === 'split' || placement === 'filterBar'
 
-  const panel = !open ? (
-    <div
-      className={cn(
-        'purchase-register-insights purchase-register-insights--collapsed',
-        placement === 'rail' && 'purchase-register-insights--rail purchase-register-insights--rail-collapsed',
-        className,
-      )}
-      aria-label={ariaLabel}
-    >
-      <PurchaseAiInsightsRestoreButton label={title} onClick={() => setOpen(true)} />
-    </div>
-  ) : (
+  const restoreButton = (
+    <PurchaseAiInsightsRestoreButton
+      label={title}
+      pressed={open}
+      onClick={() => setOpen(!open)}
+    />
+  )
+
+  const openPanel = (
     <div
       className={cn(
         'purchase-register-insights',
@@ -81,23 +86,58 @@ export function PurchaseRegisterContextPanel({
     </div>
   )
 
+  const collapsedBand = (
+    <div
+      className={cn(
+        'purchase-register-insights purchase-register-insights--collapsed',
+        placement === 'rail' && 'purchase-register-insights--rail purchase-register-insights--rail-collapsed',
+        className,
+      )}
+      aria-label={ariaLabel}
+    >
+      <PurchaseAiInsightsRestoreButton label={title} onClick={() => setOpen(true)} />
+    </div>
+  )
+
+  if (placement === 'filterBar' && children != null) {
+    const table =
+      typeof children === 'function'
+        ? children({ restoreButton, open, setOpen })
+        : children
+
+    return (
+      <div
+        className={
+          open
+            ? 'purchase-register-split flex flex-col gap-3 xl:flex-row xl:items-start'
+            : 'space-y-3'
+        }
+      >
+        <div className="min-w-0 flex-1 overflow-x-auto">{table}</div>
+        {open ? openPanel : null}
+      </div>
+    )
+  }
+
   if (placement === 'split' && children != null) {
+    const table = typeof children === 'function' ? children({ restoreButton, open, setOpen }) : children
+
     if (!open) {
       return (
         <div className="purchase-register-split purchase-register-split--collapsed space-y-3">
-          {panel}
-          <div className="min-w-0">{children}</div>
+          {collapsedBand}
+          <div className="min-w-0">{table}</div>
         </div>
       )
     }
 
     return (
-      <div className="purchase-register-split flex flex-row items-start gap-3">
-        <div className="min-w-0 flex-1 overflow-x-auto">{children}</div>
-        {panel}
+      <div className="purchase-register-split flex flex-col gap-3 xl:flex-row xl:items-start">
+        <div className="min-w-0 flex-1 overflow-x-auto">{table}</div>
+        {openPanel}
       </div>
     )
   }
 
-  return panel
+  return open ? openPanel : collapsedBand
 }

@@ -364,50 +364,53 @@ export function RfqListPage() {
               storageKey="purchase.ai-insights.rfqs"
               overview={registerOverview}
               suggestions={registerSuggestions}
-              placement="split"
+              placement="filterBar"
             >
-              <EnterpriseRegisterTableShell className="min-w-0">
-                <ErpDataGrid
-                  data={filtered}
-                  columns={columns}
-                  showCompactSearch={false}
-                  enableColumnSorting={false}
-                  stickyFirstColumn
-                  emptyMessage={
-                    activeFilters
-                      ? 'No RFQs match current filters.'
-                      : 'No RFQs found. Create from an approved PR, manually, or combine multiple requisitions.'
-                  }
-                  emptyAction={emptyAction}
-                  getRowId={(r) => r.id}
-                  registerBar={
-                    <CrmListFilterBar
-                      search={filters.search}
-                      onSearchChange={(search) => setFilters((f) => ({ ...f, search }))}
-                      searchPlaceholder="Search RFQ / buyer / PR"
-                      activeFilterCount={filterDrawer.activeCount}
-                      onOpenFilters={filterDrawer.openDrawer}
-                      chips={filterDrawer.chips}
-                      onRemoveChip={filterDrawer.removeChip}
-                      onClearAll={clearFilters}
-                      savedView={savedViews.activeView}
-                      onSavedViewChange={savedViews.selectView}
-                      savedViews={savedViews.viewNames}
-                      onSaveView={savedViews.openSaveDialog}
-                      className="crm-list-filter-bar--embedded"
-                      showCommandPaletteHint={false}
-                      sort={
-                        <CrmListSortSelect
-                          value={sortBy}
-                          onChange={(v) => setSortBy(v as RfqSortKey)}
-                          aria-label="Sort RFQs"
-                          options={RFQ_SORT_OPTIONS}
-                        />
-                      }
-                    />
-                  }
-                />
-              </EnterpriseRegisterTableShell>
+              {({ restoreButton }) => (
+                <EnterpriseRegisterTableShell className="min-w-0">
+                  <ErpDataGrid
+                    data={filtered}
+                    columns={columns}
+                    showCompactSearch={false}
+                    enableColumnSorting={false}
+                    stickyFirstColumn
+                    emptyMessage={
+                      activeFilters
+                        ? 'No RFQs match current filters.'
+                        : 'No RFQs found. Create from an approved PR, manually, or combine multiple requisitions.'
+                    }
+                    emptyAction={emptyAction}
+                    getRowId={(r) => r.id}
+                    registerBar={
+                      <CrmListFilterBar
+                        search={filters.search}
+                        onSearchChange={(search) => setFilters((f) => ({ ...f, search }))}
+                        searchPlaceholder="Search RFQ / buyer / PR"
+                        activeFilterCount={filterDrawer.activeCount}
+                        onOpenFilters={filterDrawer.openDrawer}
+                        chips={filterDrawer.chips}
+                        onRemoveChip={filterDrawer.removeChip}
+                        onClearAll={clearFilters}
+                        savedView={savedViews.activeView}
+                        onSavedViewChange={savedViews.selectView}
+                        savedViews={savedViews.viewNames}
+                        onSaveView={savedViews.openSaveDialog}
+                        className="crm-list-filter-bar--embedded"
+                        showCommandPaletteHint={false}
+                        afterFilters={restoreButton}
+                        sort={
+                          <CrmListSortSelect
+                            value={sortBy}
+                            onChange={(v) => setSortBy(v as RfqSortKey)}
+                            aria-label="Sort RFQs"
+                            options={RFQ_SORT_OPTIONS}
+                          />
+                        }
+                      />
+                    }
+                  />
+                </EnterpriseRegisterTableShell>
+              )}
             </PurchaseRegisterContextPanel>
           )}
         </OperationalPageShell>

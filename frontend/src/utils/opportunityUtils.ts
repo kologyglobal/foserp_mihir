@@ -157,6 +157,7 @@ export function buildOpportunityPipelineStages(stage: OpportunityStage, stages?:
 }
 
 export type OpportunitySortKey =
+  | 'lastModified'
   | 'value'
   | 'closeDate'
   | 'probability'
@@ -189,6 +190,8 @@ export function sortOpportunities<T extends {
   ownerName: string
   stage: OpportunityStage
   lastActivityAt: string | null
+  modifiedAt?: string | null
+  createdAt?: string | null
 }>(rows: T[], sortBy: OpportunitySortKey): T[] {
   const sorted = [...rows]
   const stageOrder = resolveOpportunityStages().map((s) => s.id)
@@ -196,8 +199,12 @@ export function sortOpportunities<T extends {
     const i = stageOrder.indexOf(stage)
     return i >= 0 ? i : stageOrder.length
   }
+  const lastTouched = (row: T) => row.modifiedAt || row.createdAt || row.lastActivityAt || ''
 
   switch (sortBy) {
+    case 'lastModified':
+      sorted.sort((a, b) => lastTouched(b).localeCompare(lastTouched(a)))
+      break
     case 'closeDate':
       sorted.sort((a, b) => (a.expectedCloseDate || '9999-12-31').localeCompare(b.expectedCloseDate || '9999-12-31'))
       break

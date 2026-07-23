@@ -13,11 +13,11 @@ export const LEAD_REGISTER_PRESETS: Record<string, Record<string, string>> = {
 }
 
 export const QUOTATION_REGISTER_PRESETS: Record<string, Record<string, string>> = {
-  'My View': { search: '', status: '', segment: '', sortBy: 'date' },
-  'Pending Approval': { search: '', status: 'pending_approval', segment: 'pending', sortBy: 'date' },
-  Drafts: { search: '', status: 'draft', segment: 'draft', sortBy: 'date' },
+  'My View': { search: '', status: '', segment: '', sortBy: 'lastModified' },
+  'Pending Approval': { search: '', status: 'pending_approval', segment: 'pending', sortBy: 'lastModified' },
+  Drafts: { search: '', status: 'draft', segment: 'draft', sortBy: 'lastModified' },
   Approved: { search: '', status: 'approved', segment: 'approved', sortBy: 'value' },
-  Converted: { search: '', status: 'converted', segment: '', sortBy: 'date' },
+  Converted: { search: '', status: 'converted', segment: '', sortBy: 'lastModified' },
 }
 
 export const COMPANY_REGISTER_PRESETS: Record<string, Record<string, string>> = {
@@ -42,18 +42,18 @@ export const CONTACT_REGISTER_PRESETS: Record<string, Record<string, string>> = 
 }
 
 export const OPPORTUNITY_REGISTER_PRESETS: Record<string, Record<string, string>> = {
-  'My View': { search: '', stage: '', owner: '', sortBy: 'value' },
-  Negotiation: { search: '', stage: 'negotiation', owner: '', sortBy: 'value' },
+  'My View': { search: '', stage: '', owner: '', sortBy: 'lastModified' },
+  Negotiation: { search: '', stage: 'negotiation', owner: '', sortBy: 'lastModified' },
   'Quotation Stage': { search: '', stage: 'quotation_sent', owner: '', sortBy: 'closeDate' },
   'High Value': { search: '', stage: '', owner: '', sortBy: 'value' },
 }
 
 export const SALES_ORDER_REGISTER_PRESETS: Record<string, Record<string, string>> = {
-  'My View': { search: '', status: '', source: '', sortBy: 'orderDate' },
-  'Pending SO': { search: '', status: 'pending_so', source: '', sortBy: 'orderDate' },
-  'Draft Orders': { search: '', status: 'open', source: '', sortBy: 'orderDate' },
-  Confirmed: { search: '', status: 'confirmed', source: '', sortBy: 'orderDate' },
-  'From Quotation': { search: '', status: '', source: 'quotation', sortBy: 'orderDate' },
+  'My View': { search: '', status: '', source: '', sortBy: 'lastModified' },
+  'Pending SO': { search: '', status: 'pending_so', source: '', sortBy: 'lastModified' },
+  'Draft Orders': { search: '', status: 'open', source: '', sortBy: 'lastModified' },
+  Confirmed: { search: '', status: 'confirmed', source: '', sortBy: 'lastModified' },
+  'From Quotation': { search: '', status: '', source: 'quotation', sortBy: 'lastModified' },
 }
 
 export const WORK_ORDER_REGISTER_PRESETS: Record<string, Record<string, string>> = {

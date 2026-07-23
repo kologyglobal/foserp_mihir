@@ -34,6 +34,8 @@ export const shortageRequisitionSchema = z.object({
   idempotencyKey: z.string().trim().min(1).max(150).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
   submit: z.boolean().default(false),
+  /** When set, only these material lines are considered for the shortage PR. */
+  materialIds: z.array(z.string().uuid()).min(1).optional(),
 })
 
 export const releaseReservationSchema = z.object({

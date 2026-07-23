@@ -101,7 +101,7 @@ export async function reopenPurchaseOrderApi(id: string, payload: Record<string,
   })
 }
 
-/** Create PO(s) from Planning Sheet Action Message selection — server-side grouping. */
+/** Create PO(s) from Planning Sheet selection — server-side grouping. */
 export async function createPurchaseOrdersFromPlanningApi(payload: {
   rowIds: string[]
 }) {

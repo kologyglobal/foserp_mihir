@@ -50,6 +50,8 @@ export interface SalesOrder {
   status: SalesOrderStatus
   remarks: string
   createdAt: string
+  /** Last update timestamp from API audit fields (demo may omit). */
+  modifiedAt?: string | null
   /** Commercial linkage — set when SO created from approved quotation; may be null after quote/opp cleanup */
   quotationId?: string | null
   quotationNo?: string | null

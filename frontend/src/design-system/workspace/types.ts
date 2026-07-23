@@ -156,6 +156,11 @@ export interface EnterpriseWorkspaceProps {
    * Use when the factBox content already includes a compact header (e.g. lead smart overview).
    */
   suppressFactBoxRecord?: boolean
+  /**
+   * Hide the in-page record status bar (NEW · title · chips · Draft).
+   * Use on create forms where the bar only shows placeholder chrome.
+   */
+  hideRecordBar?: boolean
   /** Hide chrome title/fav — commandBar is the sticky record header */
   workspaceRecordHeader?: boolean
   /** View/detail back — top of workspace header */

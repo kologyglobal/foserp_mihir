@@ -63,6 +63,13 @@ export async function reverseGoodsReceiptApi(id: string, payload: Record<string,
   })
 }
 
+export async function postInventoryGoodsReceiptApi(id: string, payload: Record<string, unknown> = {}) {
+  return apiRequest<ApiGoodsReceipt>(`${base()}/${id}/post-inventory`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
 export async function getReceivableLinesApi(purchaseOrderId: string) {
   return apiRequest<ApiReceivableLinesResponse>(
     `${tenantPath('/purchase/orders')}/${purchaseOrderId}/receivable-lines`,

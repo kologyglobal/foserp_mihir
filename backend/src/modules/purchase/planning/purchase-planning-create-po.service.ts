@@ -194,6 +194,7 @@ export async function createPurchaseOrdersFromPlanning(
           origin: 'PLANNING_SHEET',
           status: 'DRAFT',
           purchaseRequisitionId: first.purchaseRequisitionId,
+          deliveryWarehouseId: first.purchaseRequisition?.warehouseId ?? null,
           currencyCode: 'INR',
           expectedDeliveryDate: first.requiredDate,
           subtotalAmount: subtotal,

@@ -74,12 +74,14 @@ export const OPPORTUNITY_STAGE_FIELD_LABELS: Record<string, string> = {
 /**
  * Mandatory fields to enter / occupy each lead stage.
  * Empty arrays = stage change does not gate on optional / collapsed fields.
+ * Qualify (`qualified`) intentionally requires nothing — product, value, company, contact are optional.
  * Convert still requires a linked company (conversion safeguard).
  */
 export const LEAD_STAGE_REQUIREMENTS: Record<LeadStage, readonly string[]> = {
   new: [],
   contacted: [],
   requirement_collected: [],
+  /** No field gates — qualify with empty product / value / company. */
   qualified: [],
   not_qualified: [],
   converted_to_opportunity: ['customerId'],

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ClipboardList, History, Package, Save, X } from 'lucide-react'
+import { ClipboardList, History, Package, Save, X } from 'lucide-react'
 import {
   ErpCardSection,
   ErpFieldRow,
@@ -140,10 +140,10 @@ export function PoAmendFormPage() {
       hint="Ctrl+S Save · Esc Cancel"
       actions={(
         <ErpButtonGroup>
-          <ErpButton type="button" variant="ghost" icon={ArrowLeft} onClick={() => navigate(`/purchase/orders/${po.id}`)}>
+          <ErpButton type="button" variant="ghost" onClick={() => navigate(`/purchase/orders/${po.id}`)}>
             Cancel
           </ErpButton>
-          <ErpButton type="button" variant="primary" icon={Save} onClick={persist} disabled={submitting}>
+          <ErpButton type="button" variant="primary" onClick={persist} disabled={submitting}>
             Save as Rev {nextRev}
           </ErpButton>
         </ErpButtonGroup>

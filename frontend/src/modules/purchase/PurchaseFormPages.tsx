@@ -422,10 +422,10 @@ export function PurchaseRequisitionDocumentPage({ readOnly = false }: { readOnly
       )}
       actions={isCreate ? (
         <ErpButtonGroup>
-          <ErpButton type="button" variant="ghost" icon={X} onClick={() => navigate('/purchase/requisitions')}>
+          <ErpButton type="button" variant="ghost" onClick={() => navigate('/purchase/requisitions')}>
             Cancel
           </ErpButton>
-          <ErpButton type="button" variant="secondary" icon={Save} onClick={() => persist(false)}>
+          <ErpButton type="button" variant="secondary" onClick={() => persist(false)}>
             Save Draft
           </ErpButton>
           <ErpButton type="button" variant="primary" icon={Send} onClick={() => persist(true)}>

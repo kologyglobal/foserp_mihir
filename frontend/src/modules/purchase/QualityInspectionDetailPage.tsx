@@ -171,6 +171,11 @@ export function QualityInspectionDetailPage() {
       title={qi.documentNumber}
       description={`${qi.itemCode} · ${qi.goodsReceiptNumber}`}
       recordNo={qi.documentNumber}
+      recordTitle={
+        [qi.itemCode, qi.itemName].filter(Boolean).join(' — ') ||
+        qi.goodsReceiptNumber ||
+        'Quality Inspection'
+      }
       status={statusLabel}
       statusTone={purchaseStatusTone(qi.status)}
       favoritePath={`/purchase/quality-inspections/${qi.id}`}
@@ -230,6 +235,7 @@ export function QualityInspectionDetailPage() {
               onClick: () => void save(),
               hidden: !perms.canInspectQuality,
               disabled: saving || !canEdit,
+              pin: true,
             },
             {
               id: 'reject',
@@ -242,23 +248,26 @@ export function QualityInspectionDetailPage() {
                 ),
               hidden: !perms.canInspectQuality,
               disabled: saving || !canEdit,
+              pin: true,
             },
+          ]}
+          moreActions={[
             {
               id: 'hold',
               label: 'Put on Hold',
               icon: PauseCircle,
               onClick: () =>
                 void runAction(() => holdQualityInspection(qi.id, remarks), 'Inspection on hold'),
-              hidden: !perms.canInspectQuality,
-              disabled: saving || !canEdit,
+              hidden: !perms.canInspectQuality || !canEdit,
+              disabled: saving,
             },
             {
               id: 'deviation',
               label: 'Request Deviation Approval',
               icon: ShieldAlert,
               onClick: () => setDeviationOpen(true),
-              hidden: !perms.canInspectQuality,
-              disabled: saving || !canEdit,
+              hidden: !perms.canInspectQuality || !canEdit,
+              disabled: saving,
             },
             {
               id: 'print',
@@ -545,7 +554,8 @@ export function QualityInspectionDetailPage() {
         }
       >
         <p className="text-sm">
-          Material accepted and GRN posted. Stock is updated in Inventory and ready to issue.
+          Material accepted and GRN posted. Accepting the quality inspection posts accepted quantity
+          to stock — use Stock balances to confirm on-hand after QI complete / Post inventory.
         </p>
       </Modal>
     </PurchaseCardFormShell>

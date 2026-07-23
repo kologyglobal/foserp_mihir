@@ -418,9 +418,9 @@ See [`PURCHASE_FORM_FOOTER_AUDIT.md`](PURCHASE_FORM_FOOTER_AUDIT.md).
 
 | Check | Result |
 |-------|--------|
-| `purchase-planning-workflow.test.ts` | **6/6 PASS** — net qty, transitions, Action Message + PO-ready codes |
+| `purchase-planning-workflow.test.ts` | **6/6 PASS** — net qty, transitions, PO-ready codes (vendor/qty/rate/date; Action Message not required) |
 | `purchase-planning-sheet.test.ts` | **5/5 PASS** — approve→PPS sync, edit/bulk, create-po grouping, RFQ-required never syncs |
-| FE Create PO eligibility | Aligns with backend: Action Message + vendor_selected/approved/po_pending + vendor/qty/rate/date |
+| FE Create PO eligibility | Aligns with backend: vendor_selected/approved/po_pending + vendor/qty/rate/date |
 | Who can Create PO | `purchase.planning.create_po` (Purchase Manager / Purchase Executive); Requester & Dept Manager cannot |
 | Frontend `/purchase/planning-sheet` HTTP | **200** |
 

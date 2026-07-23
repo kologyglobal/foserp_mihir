@@ -17,7 +17,12 @@ const includeOrder = {
     },
   },
   purchaseRequisition: {
-    select: { id: true, requisitionNumber: true },
+    select: {
+      id: true,
+      requisitionNumber: true,
+      warehouseId: true,
+      warehouse: { select: { id: true, code: true, name: true, plantId: true } },
+    },
   },
   requestForQuotation: {
     select: { id: true, rfqNumber: true },
@@ -26,6 +31,16 @@ const includeOrder = {
     select: { id: true, code: true, name: true, plantId: true },
   },
 } as const
+
+export async function resolveUserNames(tenantId: string, userIds: Array<string | null | undefined>) {
+  const ids = [...new Set(userIds.filter((id): id is string => Boolean(id)))]
+  if (ids.length === 0) return new Map<string, string>()
+  const users = await prisma.user.findMany({
+    where: { tenantId, id: { in: ids }, deletedAt: null },
+    select: { id: true, firstName: true, lastName: true },
+  })
+  return new Map(users.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim()]))
+}
 
 export async function findPurchaseOrders(tenantId: string, query: ListPurchaseOrdersQuery) {
   const { getPagination } = await import('../../../utils/pagination.js')

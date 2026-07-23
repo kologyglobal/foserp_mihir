@@ -8,6 +8,8 @@
  * Promise-based `purchaseService`. Map to store shapes only via an adapter.
  */
 
+import type { EngineeringProductType } from './taxMaster'
+
 /** ISO calendar date `YYYY-MM-DD` or full ISO timestamp where noted. */
 export type IsoDate = string
 export type IsoDateTime = string
@@ -628,6 +630,8 @@ export interface PurchaseItem {
   itemCode: string
   itemName: string
   category: PurchaseItemCategory
+  /** Item Master engineering product type (source of truth for PR Product Type UI). */
+  productType?: EngineeringProductType | null
   description: string
   /** Master UOM UUID — required by purchase APIs. */
   uomId?: string | null
@@ -1206,6 +1210,35 @@ export const PURCHASE_REQUISITION_APPROVAL_STATUS_LABELS: Record<
   approved: 'Approved',
   rejected: 'Rejected',
   n_a: 'N/A',
+}
+
+/** List/detail “Status” column — approval-stage view derived from document lifecycle. */
+export function purchaseRequisitionApprovalStatusFromDocument(
+  status: PurchaseRequisitionStatus,
+): PurchaseRequisitionApprovalStatus {
+  switch (status) {
+    case 'draft':
+      return 'not_submitted'
+    case 'pending_approval':
+      return 'pending'
+    case 'approved':
+    case 'converted_to_rfq':
+    case 'converted_to_po':
+    case 'closed':
+      return 'approved'
+    case 'rejected':
+      return 'rejected'
+    default:
+      return 'n_a'
+  }
+}
+
+export function purchaseRequisitionApprovalStatusLabel(
+  status: PurchaseRequisitionStatus,
+): string {
+  return PURCHASE_REQUISITION_APPROVAL_STATUS_LABELS[
+    purchaseRequisitionApprovalStatusFromDocument(status)
+  ]
 }
 
 export interface PurchaseRequisitionLine {
@@ -2635,6 +2668,26 @@ export type PurchaseInvoiceInput = {
   }>
 }
 
+export type PurchaseReturnLineInput = {
+  itemId: string
+  returnQty: number
+  unitCost?: number
+  /** @deprecated use unitCost */
+  rate?: number
+  goodsReceiptLineId?: string | null
+  purchaseOrderLineId?: string | null
+  itemCode?: string
+  itemName?: string
+  description?: string
+  batchLotNo?: string
+  serialNumber?: string
+  receivedQty?: number
+  availableReturnQty?: number
+  reason?: PurchaseReturnReason
+  replacementQty?: number
+  remarks?: string
+}
+
 export type PurchaseReturnInput = {
   vendorId: string
   origin?: PurchaseReturnOrigin
@@ -2650,20 +2703,5 @@ export type PurchaseReturnInput = {
   debitNoteRequired?: boolean
   replacementRequired?: boolean
   remarks?: string
-  lines: Array<{
-    itemId: string
-    returnQty: number
-    unitCost?: number
-    /** @deprecated use unitCost */
-    rate?: number
-    goodsReceiptLineId?: string | null
-    description?: string
-    batchLotNo?: string
-    serialNumber?: string
-    receivedQty?: number
-    availableReturnQty?: number
-    reason?: PurchaseReturnReason
-    replacementQty?: number
-    remarks?: string
-  }>
+  lines: PurchaseReturnLineInput[]
 }

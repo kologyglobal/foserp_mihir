@@ -13,6 +13,7 @@ import {
   Plus,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
+import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import {
   purchaseSectionId,
   scrollToPurchaseValidationTarget,
@@ -1094,6 +1095,28 @@ export function PurchaseOrderEditorPage() {
     setOriginChosen(false)
   }
 
+  if (isNew && !recordId && !originChosen) {
+    return (
+      <OperationalPageShell
+        title="New Purchase Order"
+        badge="Purchase"
+        variant="dynamics"
+        favoritePath="/purchase/orders/new"
+        breadcrumbs={[
+          { label: 'Orders', to: '/purchase/orders' },
+          { label: 'New' },
+        ]}
+      >
+        <PurchaseOrderOriginPicker
+          onSelect={selectOrigin}
+          onCancel={() => navigate(PURCHASE_FORM_ROUTES.purchaseOrder.list)}
+          pendingPoCount={approvedPrs.filter((p) => !p.rfqRequired && !p.convertedPoId).length}
+          disabledOrigins={apiOriginDisabled}
+        />
+      </OperationalPageShell>
+    )
+  }
+
   /** Origin-gated source refs: only relevant labels; hide empty values (no wall of "—"). */
   const allSourceRefs: { label: string; value: string | null }[] = [
     { label: 'Source PR', value: header.purchaseRequisitionNumber },
@@ -1183,16 +1206,9 @@ export function PurchaseOrderEditorPage() {
       }
       onSaveShortcut={() => void saveDraft()}
     >
-      {isNew && !recordId ? (
+      {isNew && !recordId && originChosen && originMode !== 'manual' ? (
         <div className="mb-3 space-y-3">
-          <PurchaseOrderOriginPicker
-            selected={originChosen ? originMode : null}
-            onSelect={selectOrigin}
-            pendingPoCount={approvedPrs.filter((p) => !p.rfqRequired && !p.convertedPoId).length}
-            disabledOrigins={apiOriginDisabled}
-          />
-          {originChosen && originMode !== 'manual' ? (
-            <PurchaseOrderOriginSourcePanel
+          <PurchaseOrderOriginSourcePanel
               originLabel={PURCHASE_ORDER_ORIGIN_LABELS[originMode]}
               description={
                 originMode === 'purchase_requisition'
@@ -1203,6 +1219,7 @@ export function PurchaseOrderEditorPage() {
                       ? 'Select a vendor quotation marked as selected / approved.'
                       : 'Release quantities against an active blanket order.'
               }
+              onChangeSource={reopenOriginSelector}
               actions={
                 <>
                   <ErpButton type="button" variant="ghost" disabled={creating} onClick={reopenOriginSelector}>
@@ -1380,7 +1397,6 @@ export function PurchaseOrderEditorPage() {
                 </div>
               ) : null}
             </PurchaseOrderOriginSourcePanel>
-          ) : null}
         </div>
       ) : null}
 

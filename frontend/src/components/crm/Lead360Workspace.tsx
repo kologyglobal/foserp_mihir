@@ -781,10 +781,12 @@ export function Lead360Workspace() {
                           onClick={() => {
                             void (async () => {
                               const target = stage as Lead['stage']
-                              const missing = getLeadStageCompleteness(currentLead, target).missingFields
-                              if (missing.length > 0) {
-                                setToast(formatMissingStageFieldsMessage(missing, leadStageLabel(target)))
-                                return
+                              if (target !== 'qualified') {
+                                const missing = getLeadStageCompleteness(currentLead, target).missingFields
+                                if (missing.length > 0) {
+                                  setToast(formatMissingStageFieldsMessage(missing, leadStageLabel(target)))
+                                  return
+                                }
                               }
                               const r = await resolveStoreAction(advanceLeadStage(lead.id, target))
                               setToast(r.ok ? `Moved to ${leadStageLabel(target)}` : (r.error ?? 'Failed'))

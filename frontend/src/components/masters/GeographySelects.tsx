@@ -150,7 +150,7 @@ export function CommercialTermSelect({
       <option value="">{placeholder}</option>
       {resolvedTerms.map((t) => (
         <option key={t.id} value={t.name}>
-          {t.code === 'CUSTOM' ? t.name : `${t.code} — ${t.name}`}
+          {t.name}
         </option>
       ))}
     </Select>

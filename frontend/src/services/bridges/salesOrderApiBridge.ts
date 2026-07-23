@@ -57,6 +57,7 @@ export function salesOrderFromApi(dto: api.SalesOrderApiDto): SalesOrder {
     requiredDate: asText(raw.requiredDate),
     remarks: asText(raw.remarks),
     createdAt: asText(raw.createdAt, new Date().toISOString()),
+    modifiedAt: (raw as { modifiedAt?: string | null }).modifiedAt ?? null,
     quotationId: raw.quotationId ?? null,
     quotationNo: raw.quotationNo ?? null,
     opportunityId: raw.opportunityId ?? null,

@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import {
+  ArrowRight,
   ClipboardList,
   FileEdit,
   FileSpreadsheet,
@@ -13,44 +14,76 @@ import {
   type PurchaseOrderOrigin,
 } from '@/types/purchaseDomain'
 
-const ORIGIN_META: Record<
-  PurchaseOrderOrigin,
-  { icon: LucideIcon; description: string }
-> = {
-  manual: {
-    icon: FileEdit,
-    description: 'Start a blank PO and enter vendor, lines, and terms yourself.',
-  },
-  purchase_requisition: {
+const OPTIONS: Array<{
+  mode: PurchaseOrderOrigin
+  title: string
+  subtitle: string
+  points: string[]
+  icon: LucideIcon
+  recommended?: boolean
+}> = [
+  {
+    mode: 'purchase_requisition',
+    title: PURCHASE_ORDER_ORIGIN_LABELS.purchase_requisition,
+    subtitle: 'Create from an approved requisition — including PRs marked for direct PO.',
+    points: [
+      'Best for Planning / direct PR demand',
+      'Vendor and lines can flow from the PR',
+      'Keeps PR → PO traceability',
+    ],
     icon: ClipboardList,
-    description: 'Create from an approved requisition — including PRs marked for direct PO.',
+    recommended: true,
   },
-  quotation_comparison: {
+  {
+    mode: 'quotation_comparison',
+    title: PURCHASE_ORDER_ORIGIN_LABELS.quotation_comparison,
+    subtitle: 'Award a completed vendor quote comparison into a purchase order.',
+    points: [
+      'Use after RFQ → quotation → comparison',
+      'Recommended vendor and rates carry over',
+      'Preferred RFQ-path create PO',
+    ],
     icon: Scale,
-    description: 'Award a completed vendor quote comparison into a purchase order.',
+    recommended: true,
   },
-  vendor_quotation: {
+  {
+    mode: 'vendor_quotation',
+    title: PURCHASE_ORDER_ORIGIN_LABELS.vendor_quotation,
+    subtitle: 'Convert an approved vendor quotation into a purchase order.',
+    points: [
+      'Pick a selected / approved vendor quote',
+      'Useful when comparison is not required',
+      'Carries vendor commercial terms',
+    ],
     icon: FileSpreadsheet,
-    description: 'Convert an approved vendor quotation into a purchase order.',
   },
-  blanket_order: {
+  {
+    mode: 'blanket_order',
+    title: PURCHASE_ORDER_ORIGIN_LABELS.blanket_order,
+    subtitle: 'Raise a call-off against an active blanket / rate-contract order.',
+    points: [
+      'Release quantities against a blanket',
+      'Reuse contracted rates and vendor',
+      'Best for recurring scheduled buys',
+    ],
     icon: Layers,
-    description: 'Raise a call-off against an active blanket / rate-contract order.',
   },
-}
-
-const ORIGIN_ORDER: PurchaseOrderOrigin[] = [
-  'purchase_requisition',
-  'vendor_quotation',
-  'quotation_comparison',
-  'blanket_order',
-  'manual',
+  {
+    mode: 'manual',
+    title: PURCHASE_ORDER_ORIGIN_LABELS.manual,
+    subtitle: 'Start a blank PO and enter vendor, lines, and terms yourself.',
+    points: [
+      'Full manual entry of header and lines',
+      'Use for ad-hoc or exception buys',
+      'No source document required',
+    ],
+    icon: FileEdit,
+  },
 ]
 
 export type PurchaseOrderOriginPickerProps = {
   onSelect: (origin: PurchaseOrderOrigin) => void
-  /** Currently selected origin — chips stay mounted so the bar does not jump. */
-  selected?: PurchaseOrderOrigin | null
+  onCancel: () => void
   /** Optional count badge on Approved PR (e.g. pending direct PO). */
   pendingPoCount?: number
   /** Origins that cannot be used (e.g. not API-backed yet). */
@@ -59,75 +92,94 @@ export type PurchaseOrderOriginPickerProps = {
 }
 
 /**
- * Compact origin chips (invoice-style). Selection does not swap the whole block —
- * only highlights the chip and lets the parent show the source panel below.
+ * First step for blank New Purchase Order — choose create path (quotation-style cards).
  */
 export function PurchaseOrderOriginPicker({
   onSelect,
-  selected = null,
+  onCancel,
   pendingPoCount,
   disabledOrigins,
   className,
 }: PurchaseOrderOriginPickerProps) {
   return (
     <div
-      className={cn('rounded-md border border-erp-border bg-white p-4', className)}
+      className={cn('so-create-chooser', className)}
+      role="dialog"
+      aria-labelledby="po-create-chooser-title"
     >
-      <div className="mb-3 max-w-2xl">
-        <h2 className="text-[15px] font-semibold text-erp-text">How do you want to create this PO?</h2>
-        <p className="mt-0.5 text-[12px] leading-snug text-erp-muted">
-          Prefer Planning (direct PR) or Quotation Comparison (RFQ path). Other origins require APIs not enabled yet.
-        </p>
-      </div>
+      <div className="so-create-chooser__panel so-create-chooser__panel--wide">
+        <header className="so-create-chooser__header">
+          <p className="so-create-chooser__eyebrow">Purchase · Order</p>
+          <h1 id="po-create-chooser-title" className="so-create-chooser__title">
+            How do you want to create this PO?
+          </h1>
+          <p className="so-create-chooser__lead">
+            Prefer Planning (direct PR) or Quotation Comparison (RFQ path). Pick a card to continue.
+          </p>
+        </header>
 
-      <div
-        className="flex flex-wrap gap-1.5"
-        role="listbox"
-        aria-label="Create purchase order from"
-      >
-        {ORIGIN_ORDER.map((mode) => {
-          const meta = ORIGIN_META[mode]
-          const Icon = meta.icon
-          const isSelected = selected === mode
-          const recommended = mode === 'purchase_requisition' || mode === 'quotation_comparison'
-          const disabledReason = disabledOrigins?.[mode]
-          const disabled = Boolean(disabledReason)
-          return (
-            <button
-              key={mode}
-              type="button"
-              role="option"
-              aria-selected={isSelected}
-              aria-disabled={disabled}
-              disabled={disabled}
-              title={disabledReason ?? meta.description}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-[12px] font-medium transition-colors',
-                isSelected
-                  ? 'border-erp-primary bg-erp-primary text-white'
-                  : 'border-erp-border bg-erp-surface text-erp-text hover:border-erp-primary hover:bg-erp-primary-soft',
-                recommended && !isSelected && !disabled && 'border-erp-primary/50',
-                disabled && 'cursor-not-allowed opacity-45 hover:border-erp-border hover:bg-erp-surface',
-              )}
-              onClick={() => {
-                if (!disabled) onSelect(mode)
-              }}
-            >
-              <Icon className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-              <span>{PURCHASE_ORDER_ORIGIN_LABELS[mode]}</span>
-              {mode === 'purchase_requisition' && pendingPoCount != null && pendingPoCount > 0 ? (
-                <span
-                  className={cn(
-                    'rounded px-1.5 py-0.5 text-[10px] font-semibold',
-                    isSelected ? 'bg-white/20 text-white' : 'bg-erp-primary text-white',
-                  )}
-                >
-                  {pendingPoCount}
+        <div className="so-create-chooser__grid so-create-chooser__grid--po">
+          {OPTIONS.map((opt) => {
+            const Icon = opt.icon
+            const disabledReason = disabledOrigins?.[opt.mode]
+            const disabled = Boolean(disabledReason)
+            return (
+              <button
+                key={opt.mode}
+                type="button"
+                className={cn(
+                  'so-create-chooser__card',
+                  opt.recommended && !disabled && 'so-create-chooser__card--recommended',
+                  disabled && 'so-create-chooser__card--disabled',
+                )}
+                disabled={disabled}
+                title={disabledReason ?? undefined}
+                onClick={() => {
+                  if (!disabled) onSelect(opt.mode)
+                }}
+              >
+                <div className="so-create-chooser__card-top">
+                  <span className="so-create-chooser__icon" aria-hidden>
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  {disabled ? (
+                    <span className="so-create-chooser__pill so-create-chooser__pill--muted">
+                      Unavailable
+                    </span>
+                  ) : opt.recommended ? (
+                    <span className="so-create-chooser__pill">Recommended</span>
+                  ) : null}
+                  {opt.mode === 'purchase_requisition' &&
+                  pendingPoCount != null &&
+                  pendingPoCount > 0 ? (
+                    <span className="so-create-chooser__count">{pendingPoCount}</span>
+                  ) : null}
+                </div>
+                <h2 className="so-create-chooser__card-title">{opt.title}</h2>
+                <p className="so-create-chooser__card-sub">
+                  {disabledReason ?? opt.subtitle}
+                </p>
+                {!disabled ? (
+                  <ul className="so-create-chooser__points">
+                    {opt.points.map((p) => (
+                      <li key={p}>{p}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                <span className="so-create-chooser__cta">
+                  {disabled ? 'Not available' : 'Continue'}
+                  {!disabled ? <ArrowRight className="h-4 w-4" aria-hidden /> : null}
                 </span>
-              ) : null}
-            </button>
-          )
-        })}
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="so-create-chooser__footer">
+          <button type="button" className="so-create-chooser__cancel" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -142,7 +194,7 @@ export type PurchaseOrderOriginSourcePanelProps = {
   className?: string
 }
 
-/** Inline source picker after choosing an origin chip (PR / VQ / comparison / blanket). */
+/** Inline source picker after choosing an origin card (PR / VQ / comparison / blanket). */
 export function PurchaseOrderOriginSourcePanel({
   originLabel,
   description,

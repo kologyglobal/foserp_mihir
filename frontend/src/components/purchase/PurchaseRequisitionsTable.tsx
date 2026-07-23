@@ -356,25 +356,16 @@ export function PurchaseRequisitionsTable({
         ),
       },
       {
+        // Single Status column = approval-stage view (not lifecycle Converted/Closed).
+        // Document `status` still drives filters, actions, and workflow behind the scenes.
         accessorKey: 'approvalStatusLabel',
-        header: 'Approval',
-        meta: { columnLabel: 'Approval' },
-        cell: ({ row }) => (
-          <StatusDot
-            label={row.original.approvalStatusLabel}
-            tone={statusToneFromLabel(row.original.approvalStatusLabel)}
-          />
-        ),
-      },
-      {
-        accessorKey: 'status',
         header: 'Status',
         meta: { columnLabel: 'Status' },
         cell: ({ row }) => (
           <div className="space-y-0.5">
             <StatusDot
-              label={row.original.statusLabel}
-              tone={statusToneFromLabel(row.original.statusLabel)}
+              label={row.original.approvalStatusLabel}
+              tone={statusToneFromLabel(row.original.approvalStatusLabel)}
             />
             {isPrPendingPo(row.original) ? (
               <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">

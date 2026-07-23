@@ -281,7 +281,7 @@ export function PurchaseCardFormShell({
 
   factBoxLabel = 'Document Insights',
 
-  factBoxSubtitle = 'AI suggested vendor, history, and next actions for this document.',
+  factBoxSubtitle = 'Vendor, history, and linked documents for this record.',
 
 }: PurchaseCardFormShellProps) {
 
@@ -423,7 +423,7 @@ export function PurchaseCardFormShell({
 
     workspaceRecordHeader: useStickyRecordHeader,
 
-    showAi: useStickyRecordHeader ? false : undefined,
+    showAi: false,
 
     backLink,
 

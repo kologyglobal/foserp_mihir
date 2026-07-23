@@ -104,10 +104,10 @@ const PURCHASE: RoleExperienceDefinition = {
   kpiIds: ['pendingPr', 'poApprovalPending', 'openPo', 'delayedPo', 'grnPending', 'vendorQuotes'],
   shortcuts: [
     { label: 'Purchase Workspace', path: '/purchase', icon: ShoppingCart },
-    { label: 'Requisitions', path: '/purchase/requisitions', icon: ClipboardList },
+    { label: 'Purchase Requisitions', path: '/purchase/requisitions', icon: ClipboardList },
     { label: 'Purchase Orders', path: '/purchase/orders', icon: FileText },
-    { label: 'GRN Register', path: '/purchase/grns', icon: PackageCheck },
-    { label: 'RFQ Register', path: '/purchase/rfqs', icon: Truck },
+    { label: 'Goods Receipt Notes', path: '/purchase/grns', icon: PackageCheck },
+    { label: 'Request for Quotations', path: '/purchase/rfqs', icon: Truck },
   ],
 }
 

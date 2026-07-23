@@ -275,38 +275,40 @@ model Tenant {
   manufacturingWarehouseMappings     ManufacturingWarehouseMapping[]
   manufacturingSettings              ManufacturingSettings?
 
-  productionDemands                 ProductionDemand[]
-  productionOrders                  ProductionOrder[]
-  productionOrderSplits             ProductionOrderSplit[]
-  productionOrderBomSnapshots       ProductionOrderBomSnapshot[]
-  productionOrderBomLines           ProductionOrderBomLine[]
-  productionOrderRoutingSnapshots   ProductionOrderRoutingSnapshot[]
-  productionOrderStages             ProductionOrderStage[]
-  productionOrderOperations         ProductionOrderOperation[]
-  productionOrderDependencies       ProductionOrderDependency[]
-  productionStageLedgerEntries      ProductionStageLedger[]
-  productionActivities              ProductionActivity[]
-  productionAssignments             ProductionAssignment[]
-  dailyProductionBatches            DailyProductionBatch[]
-  dailyProductionLines              DailyProductionLine[]
-  productionIssues                  ProductionIssue[]
-  productionDowntimes               ProductionDowntime[]
-  inventoryStockBalances            InventoryStockBalance[]
-  inventoryStockMovements           InventoryStockMovement[]
-  inventoryStockReservations        InventoryStockReservation[]
-  inventorySettings                 InventorySettings?
-  inventoryTransfers                InventoryTransfer[]
-  inventoryTransferLines            InventoryTransferLine[]
-  inventoryStockCounts              InventoryStockCount[]
-  inventoryStockCountLines          InventoryStockCountLine[]
-  inventoryAdjustments              InventoryAdjustment[]
-  inventoryAdjustmentLines          InventoryAdjustmentLine[]
-  inventoryBatches                  InventoryBatch[]
-  inventoryBatchBalances            InventoryBatchBalance[]
-  inventorySerials                  InventorySerial[]
-  inventorySerialMovements          InventorySerialMovement[]
-  inventoryLots                     InventoryLot[]
-  inventoryLotMovements             InventoryLotMovement[]
+  productionDemands               ProductionDemand[]
+  productionOrders                ProductionOrder[]
+  productionOrderSplits           ProductionOrderSplit[]
+  productionOrderBomSnapshots     ProductionOrderBomSnapshot[]
+  productionOrderBomLines         ProductionOrderBomLine[]
+  productionOrderRoutingSnapshots ProductionOrderRoutingSnapshot[]
+  productionOrderStages           ProductionOrderStage[]
+  productionOrderOperations       ProductionOrderOperation[]
+  productionOrderDependencies     ProductionOrderDependency[]
+  productionStageLedgerEntries    ProductionStageLedger[]
+  productionActivities            ProductionActivity[]
+  productionAssignments           ProductionAssignment[]
+  dailyProductionBatches          DailyProductionBatch[]
+  dailyProductionLines            DailyProductionLine[]
+  productionIssues                ProductionIssue[]
+  productionDowntimes             ProductionDowntime[]
+  inventoryStockBalances          InventoryStockBalance[]
+  inventoryStockMovements         InventoryStockMovement[]
+  inventoryStockReservations      InventoryStockReservation[]
+  inventorySettings               InventorySettings?
+
+  inventoryTransfers       InventoryTransfer[]
+  inventoryTransferLines   InventoryTransferLine[]
+  inventoryStockCounts     InventoryStockCount[]
+  inventoryStockCountLines InventoryStockCountLine[]
+  inventoryAdjustments     InventoryAdjustment[]
+  inventoryAdjustmentLines InventoryAdjustmentLine[]
+  inventoryBatches         InventoryBatch[]
+  inventoryBatchBalances   InventoryBatchBalance[]
+  inventorySerials         InventorySerial[]
+  inventorySerialMovements InventorySerialMovement[]
+  inventoryLots            InventoryLot[]
+  inventoryLotMovements    InventoryLotMovement[]
+
   productionOrderMaterials          ProductionOrderMaterial[]
   qualityNcrs                       QualityNcr[]
   qualityParameters                 QualityParameter[]
@@ -363,35 +365,35 @@ model Tenant {
   deliveryChallanPackages            DeliveryChallanPackage[]
   deliveryChallanTrackingAllocations DeliveryChallanTrackingAllocation[]
 
-  purchaseRequisitions     PurchaseRequisition[]
-  purchaseRequisitionLines PurchaseRequisitionLine[]
-  purchasePlanningRows     PurchasePlanningRow[]
-  requestForQuotations     RequestForQuotation[]
-  requestForQuotationLines RequestForQuotationLine[]
-  rfqVendors               RfqVendor[]
-  vendorQuotations         VendorQuotation[]
-  vendorQuotationLines     VendorQuotationLine[]
-  vendorComparisons        VendorComparison[]
-  vendorComparisonLines    VendorComparisonLine[]
-  purchaseOrders           PurchaseOrder[]
-  purchaseOrderLines       PurchaseOrderLine[]
-  goodsReceipts            GoodsReceipt[]
-  goodsReceiptLines        GoodsReceiptLine[]
-  purchaseApprovals              PurchaseApproval[]
-  purchaseStatusHistories        PurchaseStatusHistory[]
-  purchaseSettings               PurchaseSettings?
-  purchasePlantSettings          PurchasePlantSettings[]
-  purchaseApprovalTiers          PurchaseApprovalTier[]
-  purchaseInspectionCategories   PurchaseInspectionCategory[]
-  purchaseQualityInspections     PurchaseQualityInspection[]
-  purchaseQualityInspectionLines PurchaseQualityInspectionLine[]
+  purchaseRequisitions            PurchaseRequisition[]
+  purchaseRequisitionLines        PurchaseRequisitionLine[]
+  purchasePlanningRows            PurchasePlanningRow[]
+  requestForQuotations            RequestForQuotation[]
+  requestForQuotationLines        RequestForQuotationLine[]
+  rfqVendors                      RfqVendor[]
+  vendorQuotations                VendorQuotation[]
+  vendorQuotationLines            VendorQuotationLine[]
+  vendorComparisons               VendorComparison[]
+  vendorComparisonLines           VendorComparisonLine[]
+  purchaseOrders                  PurchaseOrder[]
+  purchaseOrderLines              PurchaseOrderLine[]
+  goodsReceipts                   GoodsReceipt[]
+  goodsReceiptLines               GoodsReceiptLine[]
+  purchaseApprovals               PurchaseApproval[]
+  purchaseStatusHistories         PurchaseStatusHistory[]
+  purchaseSettings                PurchaseSettings?
+  purchasePlantSettings           PurchasePlantSettings[]
+  purchaseApprovalTiers           PurchaseApprovalTier[]
+  purchaseInspectionCategories    PurchaseInspectionCategory[]
+  purchaseQualityInspections      PurchaseQualityInspection[]
+  purchaseQualityInspectionLines  PurchaseQualityInspectionLine[]
   manufacturingQualityInspections ManufacturingQualityInspection[]
-  purchaseInvoices               PurchaseInvoice[]
-  purchaseInvoiceLines           PurchaseInvoiceLine[]
-  purchaseReturns                PurchaseReturn[]
-  purchaseReturnLines            PurchaseReturnLine[]
-  labourRateCards                LabourRateCard[]
-  overheadCostPools              OverheadCostPool[]
+  purchaseInvoices                PurchaseInvoice[]
+  purchaseInvoiceLines            PurchaseInvoiceLine[]
+  purchaseReturns                 PurchaseReturn[]
+  purchaseReturnLines             PurchaseReturnLine[]
+  labourRateCards                 LabourRateCard[]
+  overheadCostPools               OverheadCostPool[]
 
   // Gate & Security — physical entry/exit only (no inventory / attendance / vouchers)
   gateSettings          GateSettings[]
@@ -1484,9 +1486,9 @@ model MasterPlant {
   updatedAt DateTime           @updatedAt
   deletedAt DateTime?
 
-  tenant                Tenant                 @relation(fields: [tenantId], references: [id])
+  tenant                Tenant                  @relation(fields: [tenantId], references: [id])
   warehouses            MasterWarehouse[]
-  purchaseSettings      PurchaseSettings[]     @relation("PurchaseSettingsDefaultPlant")
+  purchaseSettings      PurchaseSettings[]      @relation("PurchaseSettingsDefaultPlant")
   purchasePlantSettings PurchasePlantSettings[]
 
   @@unique([tenantId, code])
@@ -1512,25 +1514,25 @@ model MasterWarehouse {
   updatedAt     DateTime           @updatedAt
   deletedAt     DateTime?
 
-  tenant                   Tenant                    @relation(fields: [tenantId], references: [id])
-  plant                    MasterPlant?              @relation(fields: [plantId], references: [id])
-  locations                MasterLocation[]
-  bins                     MasterBin[]
-  categories               MasterItemCategory[]
-  purchaseRequisitions     PurchaseRequisition[]
-  purchaseRequisitionLines PurchaseRequisitionLine[]
-  goodsReceipts            GoodsReceipt[]
-  goodsReceiptLines        GoodsReceiptLine[]
-  purchaseOrdersDelivery   PurchaseOrder[]           @relation("PurchaseOrderDeliveryWarehouse")
-  purchaseSettingsDefault  PurchaseSettings[]        @relation("PurchaseSettingsDefaultWarehouse")
-  purchaseSettingsRequisitionDefault PurchaseSettings[] @relation("PurchaseSettingsRequisitionWarehouse")
-  plantSettingsDefault     PurchasePlantSettings[]   @relation("PurchasePlantSettingsDefaultWarehouse")
+  tenant                             Tenant                    @relation(fields: [tenantId], references: [id])
+  plant                              MasterPlant?              @relation(fields: [plantId], references: [id])
+  locations                          MasterLocation[]
+  bins                               MasterBin[]
+  categories                         MasterItemCategory[]
+  purchaseRequisitions               PurchaseRequisition[]
+  purchaseRequisitionLines           PurchaseRequisitionLine[]
+  goodsReceipts                      GoodsReceipt[]
+  goodsReceiptLines                  GoodsReceiptLine[]
+  purchaseOrdersDelivery             PurchaseOrder[]           @relation("PurchaseOrderDeliveryWarehouse")
+  purchaseSettingsDefault            PurchaseSettings[]        @relation("PurchaseSettingsDefaultWarehouse")
+  purchaseSettingsRequisitionDefault PurchaseSettings[]        @relation("PurchaseSettingsRequisitionWarehouse")
+  plantSettingsDefault               PurchasePlantSettings[]   @relation("PurchasePlantSettingsDefaultWarehouse")
 
-  manufacturingProfilesProduction    ManufacturingProfile[] @relation("ProfileProductionWarehouse")
-  manufacturingProfilesWip           ManufacturingProfile[] @relation("ProfileWipWarehouse")
-  manufacturingProfilesFinishedGoods ManufacturingProfile[] @relation("ProfileFinishedGoodsWarehouse")
-  manufacturingProfilesScrap         ManufacturingProfile[] @relation("ProfileScrapWarehouse")
-  manufacturingProfilesQualityHold   ManufacturingProfile[] @relation("ProfileQualityHoldWarehouse")
+  manufacturingProfilesProduction    ManufacturingProfile[]           @relation("ProfileProductionWarehouse")
+  manufacturingProfilesWip           ManufacturingProfile[]           @relation("ProfileWipWarehouse")
+  manufacturingProfilesFinishedGoods ManufacturingProfile[]           @relation("ProfileFinishedGoodsWarehouse")
+  manufacturingProfilesScrap         ManufacturingProfile[]           @relation("ProfileScrapWarehouse")
+  manufacturingProfilesQualityHold   ManufacturingProfile[]           @relation("ProfileQualityHoldWarehouse")
   qualityHoldInspections             ManufacturingQualityInspection[] @relation("InspectionQualityHoldWarehouse")
 
   mfgWhMapRawMaterial     ManufacturingWarehouseMapping[] @relation("MfgWhMapRawMaterial")
@@ -1543,11 +1545,12 @@ model MasterWarehouse {
   mfgWhMapJobWork         ManufacturingWarehouseMapping[] @relation("MfgWhMapJobWork")
   mfgWhMapDefaultReturn   ManufacturingWarehouseMapping[] @relation("MfgWhMapDefaultReturn")
 
-  inventoryStockBalances          InventoryStockBalance[]
-  inventoryStockMovements         InventoryStockMovement[]
-  inventoryStockReservations      InventoryStockReservation[]
-  inventoryTransfersFrom          InventoryTransfer[]     @relation("InventoryTransferFromWarehouse")
-  inventoryTransfersTo            InventoryTransfer[]     @relation("InventoryTransferToWarehouse")
+  inventoryStockBalances     InventoryStockBalance[]
+  inventoryStockMovements    InventoryStockMovement[]
+  inventoryStockReservations InventoryStockReservation[]
+  inventoryTransfersFrom     InventoryTransfer[]         @relation("InventoryTransferFromWarehouse")
+  inventoryTransfersTo       InventoryTransfer[]         @relation("InventoryTransferToWarehouse")
+
   inventoryStockCounts            InventoryStockCount[]
   inventoryAdjustments            InventoryAdjustment[]
   inventoryBatchBalances          InventoryBatchBalance[]
@@ -1603,14 +1606,14 @@ model MasterLocation {
   updatedAt       DateTime           @updatedAt
   deletedAt       DateTime?
 
-  tenant            Tenant             @relation(fields: [tenantId], references: [id])
-  warehouse         MasterWarehouse    @relation(fields: [warehouseId], references: [id])
+  tenant            Tenant                  @relation(fields: [tenantId], references: [id])
+  warehouse         MasterWarehouse         @relation(fields: [warehouseId], references: [id])
   bins              MasterBin[]
   goodsReceiptLines GoodsReceiptLine[]
-  settingsReceiving PurchaseSettings[] @relation("PurchaseSettingsReceivingLocation")
-  settingsQcHold    PurchaseSettings[] @relation("PurchaseSettingsQcHoldLocation")
-  settingsRejected  PurchaseSettings[] @relation("PurchaseSettingsRejectedLocation")
-  settingsVendorRet PurchaseSettings[] @relation("PurchaseSettingsVendorReturnLocation")
+  settingsReceiving PurchaseSettings[]      @relation("PurchaseSettingsReceivingLocation")
+  settingsQcHold    PurchaseSettings[]      @relation("PurchaseSettingsQcHoldLocation")
+  settingsRejected  PurchaseSettings[]      @relation("PurchaseSettingsRejectedLocation")
+  settingsVendorRet PurchaseSettings[]      @relation("PurchaseSettingsVendorReturnLocation")
   plantReceiving    PurchasePlantSettings[] @relation("PurchasePlantSettingsReceivingLocation")
   plantQcHold       PurchasePlantSettings[] @relation("PurchasePlantSettingsQcHoldLocation")
   plantRejected     PurchasePlantSettings[] @relation("PurchasePlantSettingsRejectedLocation")
@@ -1830,16 +1833,17 @@ model MasterItem {
   demandConsolidationDemandLines DemandConsolidationDemandLine[]
   demandConsolidationSuggestions DemandConsolidationSuggestion[]
 
-  inventoryStockBalances          InventoryStockBalance[]
-  inventoryStockMovements         InventoryStockMovement[]
-  inventoryStockReservations      InventoryStockReservation[]
-  inventoryBatches                InventoryBatch[]
-  inventoryBatchBalances          InventoryBatchBalance[]
-  inventorySerials                InventorySerial[]
-  inventoryLots                   InventoryLot[]
-  inventoryTransferLines          InventoryTransferLine[]
-  inventoryStockCountLines        InventoryStockCountLine[]
-  inventoryAdjustmentLines        InventoryAdjustmentLine[]
+  inventoryStockBalances     InventoryStockBalance[]
+  inventoryStockMovements    InventoryStockMovement[]
+  inventoryStockReservations InventoryStockReservation[]
+  inventoryBatches           InventoryBatch[]
+  inventoryBatchBalances     InventoryBatchBalance[]
+  inventorySerials           InventorySerial[]
+  inventoryLots              InventoryLot[]
+  inventoryTransferLines     InventoryTransferLine[]
+  inventoryStockCountLines   InventoryStockCountLine[]
+  inventoryAdjustmentLines   InventoryAdjustmentLine[]
+
   productionOrderMaterials        ProductionOrderMaterial[]
   productionWipMovements          ProductionWipMovement[]
   productionFinishedGoodsReceipts ProductionFinishedGoodsReceipt[]
@@ -2149,6 +2153,10 @@ model LegalEntity {
   updatedAt             DateTime        @updatedAt
 
   tenant                                 Tenant                                  @relation(fields: [tenantId], references: [id])
+  apDisputes                             ApDispute[]
+  arDisputes                             ArDispute[]
+  salesInvoiceSourceLinks                SalesInvoiceSourceLink[]
+  inventoryAccountingEvents              InventoryAccountingEvent[]
   branches                               Branch[]
   financialYears                         FinancialYear[]
   accountingPeriods                      AccountingPeriod[]
@@ -2168,9 +2176,7 @@ model LegalEntity {
   financeApprovalSteps                   FinanceApprovalStep[]
   salesInvoices                          SalesInvoice[]
   salesInvoiceLines                      SalesInvoiceLine[]
-  salesInvoiceSourceLinks                SalesInvoiceSourceLink[]
   receivableOpenItems                    ReceivableOpenItem[]
-  arDisputes                             ArDispute[]
   customerReceipts                       CustomerReceipt[]
   customerReceiptAllocations             CustomerReceiptAllocation[]
   customerReceiptDeductionLines          CustomerReceiptDeductionLine[]
@@ -2183,7 +2189,6 @@ model LegalEntity {
   vendorInvoiceLines                     VendorInvoiceLine[]
   vendorInvoiceSourceLinks               VendorInvoiceSourceLink[]
   payableOpenItems                       PayableOpenItem[]
-  apDisputes                             ApDispute[]
   vendorPayments                         VendorPayment[]
   vendorPaymentAdjustmentLines           VendorPaymentAdjustmentLine[]
   payableAllocationBatches               PayableAllocationBatch[]
@@ -2234,7 +2239,6 @@ model LegalEntity {
   fixedAssetImpairments        FixedAssetImpairment[]
   fixedAssetMaintenance        FixedAssetMaintenance[]
   productionAccountingEvents   ProductionAccountingEvent[]
-  inventoryAccountingEvents    InventoryAccountingEvent[]
   gstEInvoices                 GstEInvoice[]
   gstEWayBills                 GstEWayBill[]
   manufacturingCostingPolicies ManufacturingCostingPolicy[]
@@ -2366,16 +2370,16 @@ enum PeriodCloseChecklistAckStatus {
 
 /// Period-scoped acknowledge / N/A overrides for close readiness checks (not full checklist templates).
 model PeriodCloseChecklistAck {
-  id        String                         @id @default(uuid())
+  id        String                        @id @default(uuid())
   tenantId  String
   periodId  String
-  checkKey  String                         @db.VarChar(64)
+  checkKey  String                        @db.VarChar(64)
   status    PeriodCloseChecklistAckStatus
-  note      String?                        @db.VarChar(500)
+  note      String?                       @db.VarChar(500)
   ackedBy   String?
-  ackedAt   DateTime                       @default(now())
-  createdAt DateTime                       @default(now())
-  updatedAt DateTime                       @updatedAt
+  ackedAt   DateTime                      @default(now())
+  createdAt DateTime                      @default(now())
+  updatedAt DateTime                      @updatedAt
 
   tenant Tenant           @relation(fields: [tenantId], references: [id])
   period AccountingPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
@@ -3271,6 +3275,7 @@ model SalesInvoice {
   sourceDocumentSnapshot Json?
 
   /// Optional project dimension (snapshot only — no Project master yet)
+
   projectRef          String? @db.VarChar(100)
   projectNameSnapshot String? @db.VarChar(200)
 
@@ -3334,15 +3339,16 @@ model SalesInvoice {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant                Tenant                         @relation(fields: [tenantId], references: [id])
-  legalEntity           LegalEntity                    @relation(fields: [legalEntityId], references: [id])
-  branch                Branch?                        @relation(fields: [branchId], references: [id])
-  financialYear         FinancialYear?                 @relation(fields: [financialYearId], references: [id])
-  accountingVoucher     AccountingVoucher?             @relation(fields: [accountingVoucherId], references: [id])
-  postingEvent          PostingEvent?                  @relation(fields: [postingEventId], references: [id])
-  reversalVoucher       AccountingVoucher?             @relation("SalesInvoiceReversalVoucher", fields: [reversalVoucherId], references: [id])
-  lines                 SalesInvoiceLine[]
-  sourceLinks           SalesInvoiceSourceLink[]
+  tenant            Tenant                   @relation(fields: [tenantId], references: [id])
+  legalEntity       LegalEntity              @relation(fields: [legalEntityId], references: [id])
+  branch            Branch?                  @relation(fields: [branchId], references: [id])
+  financialYear     FinancialYear?           @relation(fields: [financialYearId], references: [id])
+  accountingVoucher AccountingVoucher?       @relation(fields: [accountingVoucherId], references: [id])
+  postingEvent      PostingEvent?            @relation(fields: [postingEventId], references: [id])
+  reversalVoucher   AccountingVoucher?       @relation("SalesInvoiceReversalVoucher", fields: [reversalVoucherId], references: [id])
+  lines             SalesInvoiceLine[]
+  sourceLinks       SalesInvoiceSourceLink[]
+
   receivableOpenItems   ReceivableOpenItem[]
   receiptAllocations    CustomerReceiptAllocation[]
   creditNoteAllocations CustomerCreditNoteAllocation[]
@@ -3532,6 +3538,7 @@ model ReceivableOpenItem {
   updatedAt DateTime @updatedAt
 
   tenant                  Tenant                           @relation(fields: [tenantId], references: [id])
+  arDisputes              ArDispute[]
   legalEntity             LegalEntity                      @relation(fields: [legalEntityId], references: [id])
   branch                  Branch?                          @relation(fields: [branchId], references: [id])
   salesInvoice            SalesInvoice?                    @relation(fields: [salesInvoiceId], references: [id])
@@ -3549,7 +3556,6 @@ model ReceivableOpenItem {
   creditNoteCreditAllocations       CustomerCreditNoteAllocation[]      @relation("CreditNoteCreditOpenItem")
   creditNoteDebitAllocations        CustomerCreditNoteAllocation[]      @relation("CreditNoteInvoiceDebitOpenItem")
   creditNoteCreditAllocationBatches CustomerCreditNoteAllocationBatch[] @relation("CreditNoteCreditAllocationBatch")
-  arDisputes                        ArDispute[]
 
   @@unique([tenantId, legalEntityId, documentType, documentId], map: "recv_open_doc_key")
   @@index([tenantId])
@@ -3607,10 +3613,10 @@ model ArDispute {
 
   /// CrmCompany.id — application-validated, no DB FK.
   customerId            String
-  customerNameSnapshot  String @db.VarChar(300)
+  customerNameSnapshot  String  @db.VarChar(300)
   salesInvoiceId        String
   openItemId            String?
-  invoiceNumberSnapshot String @db.VarChar(64)
+  invoiceNumberSnapshot String  @db.VarChar(64)
 
   disputeDate           DateTime          @db.Date
   disputeType           ArDisputeType
@@ -4383,13 +4389,13 @@ model PurchaseRequisition {
   updatedAt         DateTime                  @updatedAt
   deletedAt         DateTime?
 
-  tenant         Tenant                    @relation(fields: [tenantId], references: [id])
-  warehouse      MasterWarehouse?          @relation(fields: [warehouseId], references: [id])
-  lines          PurchaseRequisitionLine[]
-  planningRows   PurchasePlanningRow[]
-  rfqs           RequestForQuotation[]
-  purchaseOrders PurchaseOrder[]
-  approvals      PurchaseApproval[]        @relation("PurchaseApprovalPr")
+  tenant              Tenant                    @relation(fields: [tenantId], references: [id])
+  warehouse           MasterWarehouse?          @relation(fields: [warehouseId], references: [id])
+  lines               PurchaseRequisitionLine[]
+  planningRows        PurchasePlanningRow[]
+  rfqs                RequestForQuotation[]
+  purchaseOrders      PurchaseOrder[]
+  approvals           PurchaseApproval[]        @relation("PurchaseApprovalPr")
   productionMaterials ProductionOrderMaterial[]
 
   @@unique([tenantId, requisitionNumber])
@@ -4618,7 +4624,9 @@ model VendorQuotation {
   quotationDate         DateTime              @db.Date
   requestForQuotationId String?
   vendorId              String
-  /** Vendor's own quotation / reference number (optional). */
+  /**
+   * Vendor's own quotation / reference number (optional).
+   */
   vendorReferenceNumber String?               @db.VarChar(100)
   status                VendorQuotationStatus @default(DRAFT)
   currencyCode          String                @default("INR") @db.VarChar(8)
@@ -5136,87 +5144,87 @@ enum PurchaseReturnStatus {
 
 /// Tenant-scoped purchase configuration (one active core record per tenant).
 model PurchaseSettings {
-  id                              String                   @id @default(uuid())
-  tenantId                        String                   @unique
-  defaultPlantId                  String?
-  defaultWarehouseId              String?
+  id                             String                      @id @default(uuid())
+  tenantId                       String                      @unique
+  defaultPlantId                 String?
+  defaultWarehouseId             String?
   /// Default warehouse pre-selected on new Purchase Requisitions (falls back to defaultWarehouseId).
-  defaultRequisitionWarehouseId   String?
-  defaultReceivingLocationId      String?
-  defaultQualityHoldLocationId    String?
-  defaultRejectedLocationId       String?
-  defaultVendorReturnLocationId   String?
-  defaultCurrencyCode             String                   @default("INR") @db.VarChar(8)
-  defaultPaymentTermCode          String?                  @db.VarChar(64)
-  defaultPaymentTermName          String?                  @db.VarChar(200)
-  defaultDeliveryTerms            String?                  @db.VarChar(200)
-  defaultBuyerId                  String?                  @db.VarChar(36)
-  defaultRfqRequired              Boolean                  @default(true)
-  allowDirectPo                   Boolean                  @default(true)
-  requirePrBeforePo               Boolean                  @default(false)
-  requireRfqAboveAmount           Decimal?                 @db.Decimal(18, 2)
-  minimumRfqVendorCount           Int                      @default(1)
-  requireQuotationComparison      Boolean                  @default(false)
-  requirePoWarehouse              Boolean                  @default(false)
-  requireExpectedDeliveryDate     Boolean                  @default(false)
-  requirePaymentTerms             Boolean                  @default(false)
-  allowOverReceipt                Boolean                  @default(false)
-  overReceiptTolerancePct         Decimal                  @default(0) @db.Decimal(5, 2)
-  allowShortClose                 Boolean                  @default(true)
-  requireVendorChallan            Boolean                  @default(false)
-  requireVehicleNumber            Boolean                  @default(false)
-  requireGateEntry                Boolean                  @default(false)
-  requireBatch                    Boolean                  @default(false)
-  requireSerial                   Boolean                  @default(false)
-  requireExpiry                   Boolean                  @default(false)
-  duplicateChallanPolicy          DuplicateChallanPolicy   @default(BLOCK)
-  autoCreateQualityInspection     Boolean                  @default(false)
-  autoCompleteRef                 Boolean                  @default(false)
-  allowAcceptanceUnderDeviation   Boolean                  @default(false)
-  deviationApproverRole           PurchaseApprovalMatrixRole?
-  allowRejectedStockInQuarantine  Boolean                  @default(true)
-  allowDirectInvoice              Boolean                  @default(false)
-  requirePoMatch                  Boolean                  @default(true)
-  requireGrnMatch                 Boolean                  @default(true)
-  quantityTolerancePct            Decimal                  @default(0) @db.Decimal(5, 2)
-  rateTolerancePct                Decimal                  @default(0) @db.Decimal(5, 2)
-  amountToleranceInr              Decimal                  @default(0) @db.Decimal(18, 2)
-  amountTolerancePct              Decimal                  @default(0) @db.Decimal(5, 2)
-  taxToleranceInr                 Decimal                  @default(0) @db.Decimal(18, 2)
-  taxTolerancePct                 Decimal                  @default(0) @db.Decimal(5, 2)
-  allowAuthorizedOverride         Boolean                  @default(true)
-  defaultGstScheme                PurchaseGstScheme        @default(CGST_SGST)
-  placeOfSupplyState              String?                  @db.VarChar(100)
-  placeOfSupplyStateCode          String?                  @db.VarChar(8)
-  reverseChargeDefault            Boolean                  @default(false)
-  tcsEnabled                      Boolean                  @default(false)
-  tdsEnabled                      Boolean                  @default(false)
-  roundOffRule                    PurchaseGstRoundOffRule  @default(NEAREST_RUPEE)
-  printCompanyName                String?                  @db.VarChar(300)
-  printLogoUrl                    String?                  @db.VarChar(500)
-  showTermsOnPo                   Boolean                  @default(true)
-  showTermsOnGrn                  Boolean                  @default(false)
-  showTermsOnInvoice              Boolean                  @default(true)
-  printDefaultCopies              Int                      @default(1)
-  printPaperSize                  PurchasePrintPaperSize   @default(A4)
-  printOrientation                PurchasePrintOrientation @default(PORTRAIT)
-  selfApprovalPolicy              SelfApprovalPolicy       @default(PERMISSION_ONLY)
-  version                         Int                      @default(1)
-  createdById                     String?                  @db.VarChar(36)
-  updatedById                     String?                  @db.VarChar(36)
-  createdAt                       DateTime                 @default(now())
-  updatedAt                       DateTime                 @updatedAt
+  defaultRequisitionWarehouseId  String?
+  defaultReceivingLocationId     String?
+  defaultQualityHoldLocationId   String?
+  defaultRejectedLocationId      String?
+  defaultVendorReturnLocationId  String?
+  defaultCurrencyCode            String                      @default("INR") @db.VarChar(8)
+  defaultPaymentTermCode         String?                     @db.VarChar(64)
+  defaultPaymentTermName         String?                     @db.VarChar(200)
+  defaultDeliveryTerms           String?                     @db.VarChar(200)
+  defaultBuyerId                 String?                     @db.VarChar(36)
+  defaultRfqRequired             Boolean                     @default(true)
+  allowDirectPo                  Boolean                     @default(true)
+  requirePrBeforePo              Boolean                     @default(false)
+  requireRfqAboveAmount          Decimal?                    @db.Decimal(18, 2)
+  minimumRfqVendorCount          Int                         @default(1)
+  requireQuotationComparison     Boolean                     @default(false)
+  requirePoWarehouse             Boolean                     @default(false)
+  requireExpectedDeliveryDate    Boolean                     @default(false)
+  requirePaymentTerms            Boolean                     @default(false)
+  allowOverReceipt               Boolean                     @default(false)
+  overReceiptTolerancePct        Decimal                     @default(0) @db.Decimal(5, 2)
+  allowShortClose                Boolean                     @default(true)
+  requireVendorChallan           Boolean                     @default(false)
+  requireVehicleNumber           Boolean                     @default(false)
+  requireGateEntry               Boolean                     @default(false)
+  requireBatch                   Boolean                     @default(false)
+  requireSerial                  Boolean                     @default(false)
+  requireExpiry                  Boolean                     @default(false)
+  duplicateChallanPolicy         DuplicateChallanPolicy      @default(BLOCK)
+  autoCreateQualityInspection    Boolean                     @default(false)
+  autoCompleteRef                Boolean                     @default(false)
+  allowAcceptanceUnderDeviation  Boolean                     @default(false)
+  deviationApproverRole          PurchaseApprovalMatrixRole?
+  allowRejectedStockInQuarantine Boolean                     @default(true)
+  allowDirectInvoice             Boolean                     @default(false)
+  requirePoMatch                 Boolean                     @default(true)
+  requireGrnMatch                Boolean                     @default(true)
+  quantityTolerancePct           Decimal                     @default(0) @db.Decimal(5, 2)
+  rateTolerancePct               Decimal                     @default(0) @db.Decimal(5, 2)
+  amountToleranceInr             Decimal                     @default(0) @db.Decimal(18, 2)
+  amountTolerancePct             Decimal                     @default(0) @db.Decimal(5, 2)
+  taxToleranceInr                Decimal                     @default(0) @db.Decimal(18, 2)
+  taxTolerancePct                Decimal                     @default(0) @db.Decimal(5, 2)
+  allowAuthorizedOverride        Boolean                     @default(true)
+  defaultGstScheme               PurchaseGstScheme           @default(CGST_SGST)
+  placeOfSupplyState             String?                     @db.VarChar(100)
+  placeOfSupplyStateCode         String?                     @db.VarChar(8)
+  reverseChargeDefault           Boolean                     @default(false)
+  tcsEnabled                     Boolean                     @default(false)
+  tdsEnabled                     Boolean                     @default(false)
+  roundOffRule                   PurchaseGstRoundOffRule     @default(NEAREST_RUPEE)
+  printCompanyName               String?                     @db.VarChar(300)
+  printLogoUrl                   String?                     @db.VarChar(500)
+  showTermsOnPo                  Boolean                     @default(true)
+  showTermsOnGrn                 Boolean                     @default(false)
+  showTermsOnInvoice             Boolean                     @default(true)
+  printDefaultCopies             Int                         @default(1)
+  printPaperSize                 PurchasePrintPaperSize      @default(A4)
+  printOrientation               PurchasePrintOrientation    @default(PORTRAIT)
+  selfApprovalPolicy             SelfApprovalPolicy          @default(PERMISSION_ONLY)
+  version                        Int                         @default(1)
+  createdById                    String?                     @db.VarChar(36)
+  updatedById                    String?                     @db.VarChar(36)
+  createdAt                      DateTime                    @default(now())
+  updatedAt                      DateTime                    @updatedAt
 
-  tenant                       Tenant                         @relation(fields: [tenantId], references: [id])
-  defaultPlant                 MasterPlant?                   @relation("PurchaseSettingsDefaultPlant", fields: [defaultPlantId], references: [id])
-  defaultWarehouse             MasterWarehouse?               @relation("PurchaseSettingsDefaultWarehouse", fields: [defaultWarehouseId], references: [id])
-  defaultRequisitionWarehouse  MasterWarehouse?               @relation("PurchaseSettingsRequisitionWarehouse", fields: [defaultRequisitionWarehouseId], references: [id])
-  defaultReceivingLocation     MasterLocation?                @relation("PurchaseSettingsReceivingLocation", fields: [defaultReceivingLocationId], references: [id])
-  defaultQualityHoldLocation   MasterLocation?                @relation("PurchaseSettingsQcHoldLocation", fields: [defaultQualityHoldLocationId], references: [id])
-  defaultRejectedLocation      MasterLocation?                @relation("PurchaseSettingsRejectedLocation", fields: [defaultRejectedLocationId], references: [id])
-  defaultVendorReturnLocation  MasterLocation?                @relation("PurchaseSettingsVendorReturnLocation", fields: [defaultVendorReturnLocationId], references: [id])
-  approvalTiers                PurchaseApprovalTier[]
-  inspectionCategories         PurchaseInspectionCategory[]
+  tenant                      Tenant                       @relation(fields: [tenantId], references: [id])
+  defaultPlant                MasterPlant?                 @relation("PurchaseSettingsDefaultPlant", fields: [defaultPlantId], references: [id])
+  defaultWarehouse            MasterWarehouse?             @relation("PurchaseSettingsDefaultWarehouse", fields: [defaultWarehouseId], references: [id])
+  defaultRequisitionWarehouse MasterWarehouse?             @relation("PurchaseSettingsRequisitionWarehouse", fields: [defaultRequisitionWarehouseId], references: [id])
+  defaultReceivingLocation    MasterLocation?              @relation("PurchaseSettingsReceivingLocation", fields: [defaultReceivingLocationId], references: [id])
+  defaultQualityHoldLocation  MasterLocation?              @relation("PurchaseSettingsQcHoldLocation", fields: [defaultQualityHoldLocationId], references: [id])
+  defaultRejectedLocation     MasterLocation?              @relation("PurchaseSettingsRejectedLocation", fields: [defaultRejectedLocationId], references: [id])
+  defaultVendorReturnLocation MasterLocation?              @relation("PurchaseSettingsVendorReturnLocation", fields: [defaultVendorReturnLocationId], references: [id])
+  approvalTiers               PurchaseApprovalTier[]
+  inspectionCategories        PurchaseInspectionCategory[]
 
   @@index([tenantId])
   @@index([tenantId, defaultWarehouseId])
@@ -5225,20 +5233,20 @@ model PurchaseSettings {
 
 /// Amount-band approval matrix tier (tenant-scoped via PurchaseSettings).
 model PurchaseApprovalTier {
-  id               String                           @id @default(uuid())
-  tenantId         String
+  id                 String                           @id @default(uuid())
+  tenantId           String
   purchaseSettingsId String
-  minAmount        Decimal                          @db.Decimal(18, 2)
-  maxAmount        Decimal?                         @db.Decimal(18, 2)
-  sortOrder        Int                              @default(1)
-  isActive         Boolean                          @default(true)
-  label            String                           @db.VarChar(200)
-  documentType     PurchaseApprovalTierDocumentType @default(ALL)
-  createdAt        DateTime                         @default(now())
-  updatedAt        DateTime                         @updatedAt
+  minAmount          Decimal                          @db.Decimal(18, 2)
+  maxAmount          Decimal?                         @db.Decimal(18, 2)
+  sortOrder          Int                              @default(1)
+  isActive           Boolean                          @default(true)
+  label              String                           @db.VarChar(200)
+  documentType       PurchaseApprovalTierDocumentType @default(ALL)
+  createdAt          DateTime                         @default(now())
+  updatedAt          DateTime                         @updatedAt
 
-  tenant           Tenant                       @relation(fields: [tenantId], references: [id])
-  purchaseSettings PurchaseSettings             @relation(fields: [purchaseSettingsId], references: [id], onDelete: Cascade)
+  tenant           Tenant                     @relation(fields: [tenantId], references: [id])
+  purchaseSettings PurchaseSettings           @relation(fields: [purchaseSettingsId], references: [id], onDelete: Cascade)
   roles            PurchaseApprovalTierRole[]
 
   @@index([tenantId])
@@ -5248,10 +5256,10 @@ model PurchaseApprovalTier {
 }
 
 model PurchaseApprovalTierRole {
-  id     String                     @id @default(uuid())
-  tierId String
-  role   PurchaseApprovalMatrixRole
-  sortOrder Int                     @default(1)
+  id        String                     @id @default(uuid())
+  tierId    String
+  role      PurchaseApprovalMatrixRole
+  sortOrder Int                        @default(1)
 
   tier PurchaseApprovalTier @relation(fields: [tierId], references: [id], onDelete: Cascade)
 
@@ -5307,28 +5315,28 @@ model PurchasePlantSettings {
 }
 
 model PurchaseQualityInspection {
-  id                   String                          @id @default(uuid())
-  tenantId             String
-  inspectionNumber     String                          @db.VarChar(64)
-  inspectionDate       DateTime                        @db.Date
-  goodsReceiptId       String?
-  purchaseOrderId      String?
-  vendorId             String?
-  status               QualityInspectionStatus         @default(DRAFT)
-  warehouseId          String?
-  remarks              String?                         @db.Text
-  deviationRemarks     String?                         @db.Text
-  inspectedById        String?                         @db.VarChar(36)
-  inspectedByName      String?                         @db.VarChar(200)
-  completedAt          DateTime?
-  createdById          String?                         @db.VarChar(36)
-  updatedById          String?                         @db.VarChar(36)
-  createdAt            DateTime                        @default(now())
-  updatedAt            DateTime                        @updatedAt
-  deletedAt            DateTime?
+  id               String                  @id @default(uuid())
+  tenantId         String
+  inspectionNumber String                  @db.VarChar(64)
+  inspectionDate   DateTime                @db.Date
+  goodsReceiptId   String?
+  purchaseOrderId  String?
+  vendorId         String?
+  status           QualityInspectionStatus @default(DRAFT)
+  warehouseId      String?
+  remarks          String?                 @db.Text
+  deviationRemarks String?                 @db.Text
+  inspectedById    String?                 @db.VarChar(36)
+  inspectedByName  String?                 @db.VarChar(200)
+  completedAt      DateTime?
+  createdById      String?                 @db.VarChar(36)
+  updatedById      String?                 @db.VarChar(36)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  deletedAt        DateTime?
 
-  tenant  Tenant                            @relation(fields: [tenantId], references: [id])
-  lines   PurchaseQualityInspectionLine[]
+  tenant Tenant                          @relation(fields: [tenantId], references: [id])
+  lines  PurchaseQualityInspectionLine[]
 
   @@unique([tenantId, inspectionNumber])
   @@index([tenantId])
@@ -5340,25 +5348,25 @@ model PurchaseQualityInspection {
 }
 
 model PurchaseQualityInspectionLine {
-  id                    String   @id @default(uuid())
-  tenantId              String
-  qualityInspectionId   String
-  lineNumber            Int
-  goodsReceiptLineId    String?
-  purchaseOrderLineId   String?
-  itemId                String?
-  itemCodeSnapshot      String   @default("") @db.VarChar(64)
-  itemNameSnapshot      String   @default("") @db.VarChar(300)
-  inspectedQuantity     Decimal  @default(0) @db.Decimal(18, 4)
-  acceptedQuantity      Decimal  @default(0) @db.Decimal(18, 4)
-  rejectedQuantity      Decimal  @default(0) @db.Decimal(18, 4)
-  deviationQuantity     Decimal  @default(0) @db.Decimal(18, 4)
-  remarks               String?  @db.Text
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                  String   @id @default(uuid())
+  tenantId            String
+  qualityInspectionId String
+  lineNumber          Int
+  goodsReceiptLineId  String?
+  purchaseOrderLineId String?
+  itemId              String?
+  itemCodeSnapshot    String   @default("") @db.VarChar(64)
+  itemNameSnapshot    String   @default("") @db.VarChar(300)
+  inspectedQuantity   Decimal  @default(0) @db.Decimal(18, 4)
+  acceptedQuantity    Decimal  @default(0) @db.Decimal(18, 4)
+  rejectedQuantity    Decimal  @default(0) @db.Decimal(18, 4)
+  deviationQuantity   Decimal  @default(0) @db.Decimal(18, 4)
+  remarks             String?  @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  tenant             Tenant                      @relation(fields: [tenantId], references: [id])
-  qualityInspection  PurchaseQualityInspection   @relation(fields: [qualityInspectionId], references: [id], onDelete: Cascade)
+  tenant            Tenant                    @relation(fields: [tenantId], references: [id])
+  qualityInspection PurchaseQualityInspection @relation(fields: [qualityInspectionId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, qualityInspectionId, lineNumber], map: "qi_lines_tenant_qi_lineno_key")
   @@index([tenantId])
@@ -5367,43 +5375,43 @@ model PurchaseQualityInspectionLine {
 }
 
 model PurchaseInvoice {
-  id                    String                @id @default(uuid())
-  tenantId              String
-  invoiceNumber         String                @db.VarChar(64)
-  invoiceDate           DateTime              @db.Date
-  vendorInvoiceNumber   String?               @db.VarChar(100)
-  vendorInvoiceDate     DateTime?             @db.Date
-  vendorId              String
-  purchaseOrderId       String?
-  goodsReceiptId        String?
-  status                PurchaseInvoiceStatus @default(DRAFT)
-  isDirectInvoice       Boolean               @default(false)
-  currencyCode          String                @default("INR") @db.VarChar(8)
-  gstScheme             PurchaseGstScheme     @default(CGST_SGST)
-  placeOfSupplyState    String?               @db.VarChar(100)
-  placeOfSupplyStateCode String?              @db.VarChar(8)
-  reverseCharge         Boolean               @default(false)
-  subtotalAmount        Decimal               @default(0) @db.Decimal(18, 2)
-  taxAmount             Decimal               @default(0) @db.Decimal(18, 2)
-  roundOffAmount        Decimal               @default(0) @db.Decimal(18, 2)
-  totalAmount           Decimal               @default(0) @db.Decimal(18, 2)
-  matchingStatus        String?               @db.VarChar(64)
-  matchingRemarks       String?               @db.Text
-  overrideAuthorized    Boolean               @default(false)
-  overrideRemarks       String?               @db.Text
+  id                     String                @id @default(uuid())
+  tenantId               String
+  invoiceNumber          String                @db.VarChar(64)
+  invoiceDate            DateTime              @db.Date
+  vendorInvoiceNumber    String?               @db.VarChar(100)
+  vendorInvoiceDate      DateTime?             @db.Date
+  vendorId               String
+  purchaseOrderId        String?
+  goodsReceiptId         String?
+  vendorInvoiceId        String?               @db.VarChar(36)
+  vendorInvoiceDraftRef  String?               @db.VarChar(64)
+  status                 PurchaseInvoiceStatus @default(DRAFT)
+  isDirectInvoice        Boolean               @default(false)
+  currencyCode           String                @default("INR") @db.VarChar(8)
+  gstScheme              PurchaseGstScheme     @default(CGST_SGST)
+  placeOfSupplyState     String?               @db.VarChar(100)
+  placeOfSupplyStateCode String?               @db.VarChar(8)
+  reverseCharge          Boolean               @default(false)
+  subtotalAmount         Decimal               @default(0) @db.Decimal(18, 2)
+  taxAmount              Decimal               @default(0) @db.Decimal(18, 2)
+  roundOffAmount         Decimal               @default(0) @db.Decimal(18, 2)
+  totalAmount            Decimal               @default(0) @db.Decimal(18, 2)
+  matchingStatus         String?               @db.VarChar(64)
+  matchingRemarks        String?               @db.Text
+  overrideAuthorized     Boolean               @default(false)
+  overrideRemarks        String?               @db.Text
   /// Soft link to Accounting VendorInvoice (no FK; Accounting remains SoT).
-  vendorInvoiceId       String?               @db.VarChar(36)
-  vendorInvoiceDraftRef String?               @db.VarChar(64)
-  remarks               String?               @db.Text
-  submittedAt           DateTime?
-  approvedAt            DateTime?
-  postedAt              DateTime?
-  cancelledAt           DateTime?
-  createdById           String?               @db.VarChar(36)
-  updatedById           String?               @db.VarChar(36)
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @updatedAt
-  deletedAt             DateTime?
+  remarks                String?               @db.Text
+  submittedAt            DateTime?
+  approvedAt             DateTime?
+  postedAt               DateTime?
+  cancelledAt            DateTime?
+  createdById            String?               @db.VarChar(36)
+  updatedById            String?               @db.VarChar(36)
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  deletedAt              DateTime?
 
   tenant Tenant                @relation(fields: [tenantId], references: [id])
   lines  PurchaseInvoiceLine[]
@@ -5421,26 +5429,26 @@ model PurchaseInvoice {
 }
 
 model PurchaseInvoiceLine {
-  id                   String   @id @default(uuid())
-  tenantId             String
-  purchaseInvoiceId    String
-  lineNumber           Int
-  purchaseOrderLineId  String?
-  goodsReceiptLineId   String?
-  itemId               String?
-  itemCodeSnapshot     String   @default("") @db.VarChar(64)
-  itemNameSnapshot     String   @default("") @db.VarChar(300)
-  description          String?  @db.Text
-  quantity             Decimal  @default(0) @db.Decimal(18, 4)
-  uomCodeSnapshot      String   @default("") @db.VarChar(32)
-  rate                 Decimal  @default(0) @db.Decimal(18, 2)
-  amount               Decimal  @default(0) @db.Decimal(18, 2)
-  taxRatePct           Decimal  @default(0) @db.Decimal(5, 2)
-  taxAmount            Decimal  @default(0) @db.Decimal(18, 2)
-  lineTotal            Decimal  @default(0) @db.Decimal(18, 2)
-  remarks              String?  @db.Text
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                  String   @id @default(uuid())
+  tenantId            String
+  purchaseInvoiceId   String
+  lineNumber          Int
+  purchaseOrderLineId String?
+  goodsReceiptLineId  String?
+  itemId              String?
+  itemCodeSnapshot    String   @default("") @db.VarChar(64)
+  itemNameSnapshot    String   @default("") @db.VarChar(300)
+  description         String?  @db.Text
+  quantity            Decimal  @default(0) @db.Decimal(18, 4)
+  uomCodeSnapshot     String   @default("") @db.VarChar(32)
+  rate                Decimal  @default(0) @db.Decimal(18, 2)
+  amount              Decimal  @default(0) @db.Decimal(18, 2)
+  taxRatePct          Decimal  @default(0) @db.Decimal(5, 2)
+  taxAmount           Decimal  @default(0) @db.Decimal(18, 2)
+  lineTotal           Decimal  @default(0) @db.Decimal(18, 2)
+  remarks             String?  @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   tenant          Tenant          @relation(fields: [tenantId], references: [id])
   purchaseInvoice PurchaseInvoice @relation(fields: [purchaseInvoiceId], references: [id], onDelete: Cascade)
@@ -5452,26 +5460,26 @@ model PurchaseInvoiceLine {
 }
 
 model PurchaseReturn {
-  id                String               @id @default(uuid())
-  tenantId          String
-  returnNumber      String               @db.VarChar(64)
-  returnDate        DateTime             @db.Date
-  vendorId          String
-  purchaseOrderId   String?
-  goodsReceiptId    String?
+  id                  String               @id @default(uuid())
+  tenantId            String
+  returnNumber        String               @db.VarChar(64)
+  returnDate          DateTime             @db.Date
+  vendorId            String
+  purchaseOrderId     String?
+  goodsReceiptId      String?
   qualityInspectionId String?
-  status            PurchaseReturnStatus @default(DRAFT)
-  warehouseId       String?
-  reason            String?              @db.Text
-  remarks           String?              @db.Text
-  submittedAt       DateTime?
-  completedAt       DateTime?
-  cancelledAt       DateTime?
-  createdById       String?              @db.VarChar(36)
-  updatedById       String?              @db.VarChar(36)
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-  deletedAt         DateTime?
+  status              PurchaseReturnStatus @default(DRAFT)
+  warehouseId         String?
+  reason              String?              @db.Text
+  remarks             String?              @db.Text
+  submittedAt         DateTime?
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+  createdById         String?              @db.VarChar(36)
+  updatedById         String?              @db.VarChar(36)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  deletedAt           DateTime?
 
   tenant Tenant               @relation(fields: [tenantId], references: [id])
   lines  PurchaseReturnLine[]
@@ -5487,21 +5495,21 @@ model PurchaseReturn {
 }
 
 model PurchaseReturnLine {
-  id                 String   @id @default(uuid())
-  tenantId           String
-  purchaseReturnId   String
-  lineNumber         Int
-  goodsReceiptLineId String?
+  id                  String   @id @default(uuid())
+  tenantId            String
+  purchaseReturnId    String
+  lineNumber          Int
+  goodsReceiptLineId  String?
   purchaseOrderLineId String?
-  itemId             String?
-  itemCodeSnapshot   String   @default("") @db.VarChar(64)
-  itemNameSnapshot   String   @default("") @db.VarChar(300)
-  returnQuantity     Decimal  @default(0) @db.Decimal(18, 4)
-  rate               Decimal  @default(0) @db.Decimal(18, 2)
-  amount             Decimal  @default(0) @db.Decimal(18, 2)
-  remarks            String?  @db.Text
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  itemId              String?
+  itemCodeSnapshot    String   @default("") @db.VarChar(64)
+  itemNameSnapshot    String   @default("") @db.VarChar(300)
+  returnQuantity      Decimal  @default(0) @db.Decimal(18, 4)
+  rate                Decimal  @default(0) @db.Decimal(18, 2)
+  amount              Decimal  @default(0) @db.Decimal(18, 2)
+  remarks             String?  @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   tenant         Tenant         @relation(fields: [tenantId], references: [id])
   purchaseReturn PurchaseReturn @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
@@ -5891,10 +5899,10 @@ model VendorInvoice {
   roundOffAccount            Account? @relation("VendorInvoiceRoundOffAccount", fields: [roundOffAccountId], references: [id])
 
   lines           VendorInvoiceLine[]
+  apDisputes      ApDispute[]
   sourceLinks     VendorInvoiceSourceLink[]
   /// Reverse of PayableOpenItem.sourceVendorInvoiceId (FK lives on open item).
   payableOpenItem PayableOpenItem?
-  apDisputes      ApDispute[]
 
   @@unique([tenantId, draftReference], map: "vend_inv_tenant_draft_ref_key")
   @@unique([tenantId, legalEntityId, vendorInvoiceNumber], map: "vend_inv_tenant_le_number_key")
@@ -6061,14 +6069,14 @@ model ApDispute {
   disputeNumber String @db.VarChar(64)
 
   /// MasterVendor.id snapshot identity — application-validated, no DB FK.
-  vendorId            String
-  vendorCodeSnapshot  String @db.VarChar(32)
-  vendorNameSnapshot  String @db.VarChar(300)
+  vendorId           String
+  vendorCodeSnapshot String @db.VarChar(32)
+  vendorNameSnapshot String @db.VarChar(300)
 
   vendorInvoiceId               String
   payableOpenItemId             String?
-  vendorInvoiceNumberSnapshot   String @db.VarChar(64)
-  supplierInvoiceNumberSnapshot String @db.VarChar(128)
+  vendorInvoiceNumberSnapshot   String  @db.VarChar(64)
+  supplierInvoiceNumberSnapshot String  @db.VarChar(128)
 
   disputeDate           DateTime          @db.Date
   disputeType           ApDisputeType
@@ -6171,6 +6179,7 @@ model PayableOpenItem {
   updatedAt DateTime @updatedAt
 
   tenant                 Tenant             @relation(fields: [tenantId], references: [id])
+  apDisputes             ApDispute[]
   legalEntity            LegalEntity        @relation(fields: [legalEntityId], references: [id])
   branch                 Branch?            @relation(fields: [branchId], references: [id])
   sourceVendorInvoice    VendorInvoice?     @relation(fields: [sourceVendorInvoiceId], references: [id])
@@ -6191,7 +6200,6 @@ model PayableOpenItem {
   vendorPaymentHeaderLink       VendorPayment?                  @relation("VendorPaymentOpenItemHeaderLink")
   /// Optional header link from VendorAdjustment.payableOpenItemId (set on post).
   vendorAdjustmentHeaderLink    VendorAdjustment?               @relation("VendorAdjustmentOpenItemHeaderLink")
-  apDisputes                    ApDispute[]
 
   @@unique([tenantId, legalEntityId, documentType, documentId], map: "pay_open_doc_key")
   @@index([tenantId])
@@ -8516,14 +8524,14 @@ model ManufacturingWorkCentre {
   updatedAt        DateTime  @updatedAt
   deletedAt        DateTime?
 
-  tenant      Tenant          @relation(fields: [tenantId], references: [id])
-  location    MasterLocation? @relation(fields: [locationId], references: [id])
-  capacityUom MasterUom?      @relation(fields: [capacityUomId], references: [id])
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  labourRateCards LabourRateCard[]
+  location        MasterLocation?  @relation(fields: [locationId], references: [id])
+  capacityUom     MasterUom?       @relation(fields: [capacityUomId], references: [id])
 
   machines           ManufacturingMachine[]
   stageGroupsDefault ManufacturingStageGroup[]
   routingOperations  ManufacturingRoutingOperation[]
-  labourRateCards    LabourRateCard[]
 
   productionOrderStages     ProductionOrderStage[]
   productionOrderOperations ProductionOrderOperation[]
@@ -9469,45 +9477,45 @@ model ProductionOrder {
   updatedAt                DateTime                             @updatedAt
   deletedAt                DateTime?
 
-  tenant               Tenant                       @relation(fields: [tenantId], references: [id])
-  demand               ProductionDemand?            @relation(fields: [demandId], references: [id])
-  salesOrder           CrmSalesOrder?               @relation(fields: [salesOrderId], references: [id])
-  productItem          MasterItem                   @relation(fields: [productItemId], references: [id])
-  manufacturingProfile ManufacturingProfile         @relation(fields: [manufacturingProfileId], references: [id])
-  bomVersion           ManufacturingBomVersion      @relation(fields: [bomVersionId], references: [id])
-  routingVersion       ManufacturingRoutingVersion? @relation(fields: [routingVersionId], references: [id])
-  uom                  MasterUom                    @relation(fields: [uomId], references: [id])
-  parentProductionOrder ProductionOrder?            @relation("ProductionOrderParentChild", fields: [parentProductionOrderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  childProductionOrders ProductionOrder[]           @relation("ProductionOrderParentChild")
-  splitFromOrder       ProductionOrder?             @relation("ProductionOrderSplitLineage", fields: [splitFromOrderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  splitChildOrders     ProductionOrder[]            @relation("ProductionOrderSplitLineage")
-  splitsAsParent       ProductionOrderSplit[]       @relation("ProductionOrderSplitParent")
-  splitAsChild         ProductionOrderSplit?        @relation("ProductionOrderSplitChild")
+  tenant                Tenant                       @relation(fields: [tenantId], references: [id])
+  splitAsChild          ProductionOrderSplit?        @relation("ProductionOrderSplitChild")
+  demand                ProductionDemand?            @relation(fields: [demandId], references: [id])
+  salesOrder            CrmSalesOrder?               @relation(fields: [salesOrderId], references: [id])
+  productItem           MasterItem                   @relation(fields: [productItemId], references: [id])
+  manufacturingProfile  ManufacturingProfile         @relation(fields: [manufacturingProfileId], references: [id])
+  bomVersion            ManufacturingBomVersion      @relation(fields: [bomVersionId], references: [id])
+  routingVersion        ManufacturingRoutingVersion? @relation(fields: [routingVersionId], references: [id])
+  uom                   MasterUom                    @relation(fields: [uomId], references: [id])
+  parentProductionOrder ProductionOrder?             @relation("ProductionOrderParentChild", fields: [parentProductionOrderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  childProductionOrders ProductionOrder[]            @relation("ProductionOrderParentChild")
+  splitFromOrder        ProductionOrder?             @relation("ProductionOrderSplitLineage", fields: [splitFromOrderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  splitChildOrders      ProductionOrder[]            @relation("ProductionOrderSplitLineage")
+  splitsAsParent        ProductionOrderSplit[]       @relation("ProductionOrderSplitParent")
 
-  bomSnapshot              ProductionOrderBomSnapshot?
-  routingSnapshot          ProductionOrderRoutingSnapshot?
-  stages                   ProductionOrderStage[]
-  operations               ProductionOrderOperation[]
-  dependencies             ProductionOrderDependency[]
-  ledgerEntries            ProductionStageLedger[]
-  activities               ProductionActivity[]
-  assignments              ProductionAssignment[]
-  dailyLines               DailyProductionLine[]
-  issues                   ProductionIssue[]
-  downtimes                ProductionDowntime[]
-  materials                ProductionOrderMaterial[]
+  bomSnapshot                     ProductionOrderBomSnapshot?
+  routingSnapshot                 ProductionOrderRoutingSnapshot?
+  stages                          ProductionOrderStage[]
+  operations                      ProductionOrderOperation[]
+  dependencies                    ProductionOrderDependency[]
+  ledgerEntries                   ProductionStageLedger[]
+  activities                      ProductionActivity[]
+  assignments                     ProductionAssignment[]
+  dailyLines                      DailyProductionLine[]
+  issues                          ProductionIssue[]
+  downtimes                       ProductionDowntime[]
+  materials                       ProductionOrderMaterial[]
   manufacturingQualityInspections ManufacturingQualityInspection[]
-  qualityNcrs              QualityNcr[]
-  jobWorkOrders            JobWorkOrder[]
-  runtimeChanges           ProductionRuntimeChange[]
-  wipMovements             ProductionWipMovement[]              @relation("WipMovementSourceOrder")
-  wipMovementsIncoming     ProductionWipMovement[]              @relation("WipMovementTargetOrder")
-  transactionCorrections   ManufacturingTransactionCorrection[]
-  productionPlanLines      ProductionPlanLine[]
-  accountingEvents         ProductionAccountingEvent[]
-  costSnapshots            WorkOrderCostSnapshot[]
-  costEntries              WorkOrderCostEntry[]
-  finishedGoodsReceipts    ProductionFinishedGoodsReceipt[]
+  qualityNcrs                     QualityNcr[]
+  jobWorkOrders                   JobWorkOrder[]
+  runtimeChanges                  ProductionRuntimeChange[]
+  wipMovements                    ProductionWipMovement[]              @relation("WipMovementSourceOrder")
+  wipMovementsIncoming            ProductionWipMovement[]              @relation("WipMovementTargetOrder")
+  transactionCorrections          ManufacturingTransactionCorrection[]
+  productionPlanLines             ProductionPlanLine[]
+  accountingEvents                ProductionAccountingEvent[]
+  costSnapshots                   WorkOrderCostSnapshot[]
+  costEntries                     WorkOrderCostEntry[]
+  finishedGoodsReceipts           ProductionFinishedGoodsReceipt[]
 
   @@unique([tenantId, orderNumber])
   @@unique([tenantId, idempotencyKey])
@@ -9701,15 +9709,15 @@ model ProductionOrderStage {
   workCentre      ManufacturingWorkCentre? @relation(fields: [workCentreId], references: [id])
   assignedMachine ManufacturingMachine?    @relation("StageAssignedMachine", fields: [assignedMachineId], references: [id])
 
-  operations         ProductionOrderOperation[]
-  ledgerEntries      ProductionStageLedger[]
-  assignments        ProductionAssignment[]
-  dailyLines         DailyProductionLine[]
-  issues             ProductionIssue[]
-  downtimes          ProductionDowntime[]
+  operations                      ProductionOrderOperation[]
+  ledgerEntries                   ProductionStageLedger[]
+  assignments                     ProductionAssignment[]
+  dailyLines                      DailyProductionLine[]
+  issues                          ProductionIssue[]
+  downtimes                       ProductionDowntime[]
   manufacturingQualityInspections ManufacturingQualityInspection[]
-  runtimeChanges     ProductionRuntimeChange[]
-  wipMovements       ProductionWipMovement[]
+  runtimeChanges                  ProductionRuntimeChange[]
+  wipMovements                    ProductionWipMovement[]
 
   @@index([tenantId])
   @@index([productionOrderId, displayOrder])
@@ -9756,16 +9764,16 @@ model ProductionOrderOperation {
   machine         ManufacturingMachine?    @relation(fields: [machineId], references: [id])
   assignedMachine ManufacturingMachine?    @relation("OperationAssignedMachine", fields: [assignedMachineId], references: [id])
 
-  predecessorOf      ProductionOrderDependency[] @relation("ProdOrderDepPredecessor")
-  successorOf        ProductionOrderDependency[] @relation("ProdOrderDepSuccessor")
-  ledgerEntries      ProductionStageLedger[]
-  assignments        ProductionAssignment[]
-  dailyLines         DailyProductionLine[]
-  issues             ProductionIssue[]
-  downtimes          ProductionDowntime[]
+  predecessorOf                   ProductionOrderDependency[]      @relation("ProdOrderDepPredecessor")
+  successorOf                     ProductionOrderDependency[]      @relation("ProdOrderDepSuccessor")
+  ledgerEntries                   ProductionStageLedger[]
+  assignments                     ProductionAssignment[]
+  dailyLines                      DailyProductionLine[]
+  issues                          ProductionIssue[]
+  downtimes                       ProductionDowntime[]
   manufacturingQualityInspections ManufacturingQualityInspection[]
-  runtimeChanges     ProductionRuntimeChange[]
-  wipMovements       ProductionWipMovement[]
+  runtimeChanges                  ProductionRuntimeChange[]
+  wipMovements                    ProductionWipMovement[]
 
   @@index([tenantId])
   @@index([productionOrderId, sequence])
@@ -10165,7 +10173,6 @@ enum InventoryLotStatus {
   CANCELLED
 }
 
-
 enum InventoryTransferStatus {
   DRAFT
   SUBMITTED
@@ -10265,13 +10272,13 @@ model InventoryTransferLine {
 }
 
 model InventoryStockCount {
-  id             String                     @id @default(uuid())
+  id             String                    @id @default(uuid())
   tenantId       String
-  countNumber    String                     @db.VarChar(64)
+  countNumber    String                    @db.VarChar(64)
   warehouseId    String
-  status         InventoryStockCountStatus  @default(DRAFT)
-  countDate      DateTime                   @db.Date
-  remarks        String?                    @db.Text
+  status         InventoryStockCountStatus @default(DRAFT)
+  countDate      DateTime                  @db.Date
+  remarks        String?                   @db.Text
   snapshotAt     DateTime?
   submittedAt    DateTime?
   submittedBy    String?
@@ -10281,14 +10288,14 @@ model InventoryStockCount {
   postedBy       String?
   reversedAt     DateTime?
   reversedBy     String?
-  reversalReason String?                    @db.Text
+  reversalReason String?                   @db.Text
   createdBy      String?
   updatedBy      String?
-  createdAt      DateTime                   @default(now())
-  updatedAt      DateTime                   @updatedAt
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
 
-  tenant    Tenant                     @relation(fields: [tenantId], references: [id])
-  warehouse MasterWarehouse            @relation(fields: [warehouseId], references: [id])
+  tenant    Tenant                    @relation(fields: [tenantId], references: [id])
+  warehouse MasterWarehouse           @relation(fields: [warehouseId], references: [id])
   lines     InventoryStockCountLine[]
 
   @@unique([tenantId, countNumber])
@@ -10298,17 +10305,17 @@ model InventoryStockCount {
 }
 
 model InventoryStockCountLine {
-  id          String   @id @default(uuid())
-  tenantId    String
+  id           String   @id @default(uuid())
+  tenantId     String
   stockCountId String
-  itemId      String
-  systemQty   Decimal  @db.Decimal(18, 4)
-  countedQty  Decimal? @db.Decimal(18, 4)
-  varianceQty Decimal? @db.Decimal(18, 4)
-  rate        Decimal  @default(0) @db.Decimal(18, 2)
-  remarks     String?  @db.Text
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  itemId       String
+  systemQty    Decimal  @db.Decimal(18, 4)
+  countedQty   Decimal? @db.Decimal(18, 4)
+  varianceQty  Decimal? @db.Decimal(18, 4)
+  rate         Decimal  @default(0) @db.Decimal(18, 2)
+  remarks      String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   tenant     Tenant              @relation(fields: [tenantId], references: [id])
   stockCount InventoryStockCount @relation(fields: [stockCountId], references: [id])
@@ -10320,14 +10327,14 @@ model InventoryStockCountLine {
 }
 
 model InventoryAdjustment {
-  id               String                     @id @default(uuid())
+  id               String                    @id @default(uuid())
   tenantId         String
-  adjustmentNumber String                     @db.VarChar(64)
+  adjustmentNumber String                    @db.VarChar(64)
   warehouseId      String
-  status           InventoryAdjustmentStatus  @default(DRAFT)
-  adjustmentDate   DateTime                   @db.Date
-  reason           String                     @db.VarChar(500)
-  remarks          String?                    @db.Text
+  status           InventoryAdjustmentStatus @default(DRAFT)
+  adjustmentDate   DateTime                  @db.Date
+  reason           String                    @db.VarChar(500)
+  remarks          String?                   @db.Text
   submittedAt      DateTime?
   submittedBy      String?
   approvedAt       DateTime?
@@ -10336,14 +10343,14 @@ model InventoryAdjustment {
   postedBy         String?
   reversedAt       DateTime?
   reversedBy       String?
-  reversalReason   String?                    @db.Text
+  reversalReason   String?                   @db.Text
   createdBy        String?
   updatedBy        String?
-  createdAt        DateTime                   @default(now())
-  updatedAt        DateTime                   @updatedAt
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
 
-  tenant    Tenant                      @relation(fields: [tenantId], references: [id])
-  warehouse MasterWarehouse             @relation(fields: [warehouseId], references: [id])
+  tenant    Tenant                    @relation(fields: [tenantId], references: [id])
+  warehouse MasterWarehouse           @relation(fields: [warehouseId], references: [id])
   lines     InventoryAdjustmentLine[]
 
   @@unique([tenantId, adjustmentNumber])
@@ -10386,11 +10393,11 @@ model InventoryBatch {
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
-  tenant     Tenant                   @relation(fields: [tenantId], references: [id])
-  item       MasterItem               @relation(fields: [itemId], references: [id])
-  balances   InventoryBatchBalance[]
-  serials    InventorySerial[]
-  movements  InventoryStockMovement[]
+  tenant        Tenant                   @relation(fields: [tenantId], references: [id])
+  item          MasterItem               @relation(fields: [itemId], references: [id])
+  balances      InventoryBatchBalance[]
+  serials       InventorySerial[]
+  movements     InventoryStockMovement[]
   transferLines InventoryTransferLine[]
 
   @@unique([tenantId, itemId, batchNumber])
@@ -10438,18 +10445,21 @@ model InventorySerial {
   updatedAt           DateTime                       @updatedAt
   deletedAt           DateTime?
 
-  tenant    Tenant                     @relation(fields: [tenantId], references: [id])
-  item      MasterItem                 @relation(fields: [itemId], references: [id])
-  batch     InventoryBatch?            @relation(fields: [batchId], references: [id])
-  warehouse MasterWarehouse?           @relation(fields: [warehouseId], references: [id])
-  lot       InventoryLot?              @relation(fields: [lotId], references: [id])
-  movements InventorySerialMovement[]
-  stockMovements InventoryStockMovement[]
-  transferLines InventoryTransferLine[]
+  tenant                      Tenant                       @relation(fields: [tenantId], references: [id])
+  item                        MasterItem                   @relation(fields: [itemId], references: [id])
+  batch                       InventoryBatch?              @relation(fields: [batchId], references: [id])
+  warehouse                   MasterWarehouse?             @relation(fields: [warehouseId], references: [id])
+  lot                         InventoryLot?                @relation(fields: [lotId], references: [id])
+  movements                   InventorySerialMovement[]
+  stockMovements              InventoryStockMovement[]
+  transferLines               InventoryTransferLine[]
+  dispatchTrackingAllocations DispatchTrackingAllocation[]
 
   @@unique([tenantId, itemId, serialNumber])
   @@index([tenantId, serialNumber])
   @@index([tenantId, itemId, warehouseId, stockStatus])
+  @@index([tenantId, lotId])
+  @@index([tenantId, deletedAt])
   @@map("inventory_serials")
 }
 
@@ -10495,16 +10505,18 @@ model InventoryLot {
   updatedAt           DateTime           @updatedAt
   deletedAt           DateTime?
 
-  tenant    Tenant                  @relation(fields: [tenantId], references: [id])
-  item      MasterItem              @relation(fields: [itemId], references: [id])
-  warehouse MasterWarehouse?        @relation(fields: [warehouseId], references: [id])
-  movements InventoryLotMovement[]
-  serials   InventorySerial[]
-  fgReceipts ProductionFinishedGoodsReceipt[]
-  goodsReceiptLines GoodsReceiptLine[]
+  tenant                      Tenant                           @relation(fields: [tenantId], references: [id])
+  item                        MasterItem                       @relation(fields: [itemId], references: [id])
+  warehouse                   MasterWarehouse?                 @relation(fields: [warehouseId], references: [id])
+  movements                   InventoryLotMovement[]
+  serials                     InventorySerial[]
+  fgReceipts                  ProductionFinishedGoodsReceipt[]
+  goodsReceiptLines           GoodsReceiptLine[]
+  dispatchTrackingAllocations DispatchTrackingAllocation[]
 
   @@unique([tenantId, itemId, lotNumber])
-  @@index([tenantId, warehouseId])
+  @@index([tenantId, warehouseId, status])
+  @@index([tenantId, deletedAt])
   @@map("inventory_lots")
 }
 
@@ -10553,35 +10565,35 @@ model InventoryStockBalance {
 }
 
 model InventoryStockMovement {
-  id                String                 @id @default(uuid())
-  tenantId          String
-  movementNumber    String                 @db.VarChar(64)
-  movementDate      DateTime               @db.Date
-  movementType      InventoryMovementType
-  referenceType     InventoryReferenceType
+  id                   String                 @id @default(uuid())
+  tenantId             String
+  movementNumber       String                 @db.VarChar(64)
+  movementDate         DateTime               @db.Date
+  movementType         InventoryMovementType
+  referenceType        InventoryReferenceType
   /// Signed quantity: inward/opening positive; issue negative; adjustment either sign.
-  quantity          Decimal                @db.Decimal(18, 4)
-  rate              Decimal                @default(0) @db.Decimal(18, 2)
-  value             Decimal                @default(0) @db.Decimal(18, 2)
-  balanceAfter      Decimal                @db.Decimal(18, 4)
-  itemId            String
-  warehouseId       String
+  quantity             Decimal                @db.Decimal(18, 4)
+  rate                 Decimal                @default(0) @db.Decimal(18, 2)
+  value                Decimal                @default(0) @db.Decimal(18, 2)
+  balanceAfter         Decimal                @db.Decimal(18, 4)
+  itemId               String
+  warehouseId          String
   /// Soft Production Order reference until Production materials FKs land in Phase 3C.
-  workOrderId       String?
-  sourceWorkOrderId String?
-  parentWorkOrderId String?
-  reservationId     String?
-  referenceNo       String?                @db.VarChar(100)
-  remarks           String?                @db.Text
-  stockStatus       InventoryStockStatus   @default(UNRESTRICTED)
-  fromStockStatus   InventoryStockStatus?
-  batchId           String?
-  serialId          String?
-  batchNumberSnapshot String?              @db.VarChar(64)
-  serialNumberSnapshot String?             @db.VarChar(100)
-  idempotencyKey    String?                @db.VarChar(150)
-  createdBy         String?
-  createdAt         DateTime               @default(now())
+  workOrderId          String?
+  sourceWorkOrderId    String?
+  parentWorkOrderId    String?
+  reservationId        String?
+  referenceNo          String?                @db.VarChar(100)
+  remarks              String?                @db.Text
+  stockStatus          InventoryStockStatus   @default(UNRESTRICTED)
+  fromStockStatus      InventoryStockStatus?
+  batchId              String?
+  serialId             String?
+  batchNumberSnapshot  String?                @db.VarChar(64)
+  serialNumberSnapshot String?                @db.VarChar(100)
+  idempotencyKey       String?                @db.VarChar(150)
+  createdBy            String?
+  createdAt            DateTime               @default(now())
 
   tenant      Tenant                     @relation(fields: [tenantId], references: [id])
   item        MasterItem                 @relation(fields: [itemId], references: [id])
@@ -10589,6 +10601,7 @@ model InventoryStockMovement {
   reservation InventoryStockReservation? @relation(fields: [reservationId], references: [id])
   batch       InventoryBatch?            @relation(fields: [batchId], references: [id])
   serial      InventorySerial?           @relation(fields: [serialId], references: [id])
+
   serialMovements InventorySerialMovement[]
   lotMovements    InventoryLotMovement[]
 
@@ -10762,25 +10775,25 @@ model OutboundDispatch {
 }
 
 model OutboundDispatchLine {
-  id                    String   @id @default(uuid())
-  tenantId              String
-  outboundDispatchId    String
-  lineNo                Int
-  itemId                String
-  warehouseId           String
-  quantity              Decimal  @db.Decimal(18, 4)
-  salesOrderId          String?
+  id                         String   @id @default(uuid())
+  tenantId                   String
+  outboundDispatchId         String
+  lineNo                     Int
+  itemId                     String
+  warehouseId                String
+  quantity                   Decimal  @db.Decimal(18, 4)
+  salesOrderId               String?
   /// Matches CrmSalesOrder.lines[].id when fulfilling an SO line.
-  salesOrderLineId      String?  @db.VarChar(64)
-  dispatchRequirementId String?
-  readyQuantitySnapshot Decimal? @db.Decimal(18, 4)
-  inventoryMovementId          String?
-  inventoryMovementNo          String?  @db.VarChar(64)
-  reverseInventoryMovementId   String?
-  reverseInventoryMovementNo   String?  @db.VarChar(64)
-  remarks                      String?  @db.Text
-  createdAt                    DateTime @default(now())
-  updatedAt                    DateTime @updatedAt
+  salesOrderLineId           String?  @db.VarChar(64)
+  dispatchRequirementId      String?
+  readyQuantitySnapshot      Decimal? @db.Decimal(18, 4)
+  inventoryMovementId        String?
+  inventoryMovementNo        String?  @db.VarChar(64)
+  reverseInventoryMovementId String?
+  reverseInventoryMovementNo String?  @db.VarChar(64)
+  remarks                    String?  @db.Text
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
   tenant                      Tenant                       @relation(fields: [tenantId], references: [id])
   outboundDispatch            OutboundDispatch             @relation(fields: [outboundDispatchId], references: [id], onDelete: Cascade)
@@ -10945,10 +10958,14 @@ model DispatchTrackingAllocation {
   heatNumber             String?                          @db.VarChar(100)
   allocatedQuantity      Decimal                          @db.Decimal(18, 4)
   status                 DispatchTrackingAllocationStatus @default(ALLOCATED)
+  inventoryLotId         String?
+  inventorySerialId      String?
   createdAt              DateTime                         @default(now())
   updatedAt              DateTime                         @updatedAt
 
   tenant               Tenant                    @relation(fields: [tenantId], references: [id])
+  inventoryLot         InventoryLot?             @relation(fields: [inventoryLotId], references: [id])
+  inventorySerial      InventorySerial?          @relation(fields: [inventorySerialId], references: [id])
   inventoryReservation InventoryStockReservation @relation(fields: [inventoryReservationId], references: [id])
   outboundDispatch     OutboundDispatch          @relation(fields: [outboundDispatchId], references: [id])
   outboundDispatchLine OutboundDispatchLine      @relation(fields: [outboundDispatchLineId], references: [id])
@@ -11581,8 +11598,8 @@ model QualityInspectionPlan {
   createdAt           DateTime                    @default(now())
   updatedAt           DateTime                    @updatedAt
 
-  tenant      Tenant                          @relation(fields: [tenantId], references: [id])
-  item        MasterItem?                     @relation(fields: [itemId], references: [id])
+  tenant      Tenant                           @relation(fields: [tenantId], references: [id])
+  item        MasterItem?                      @relation(fields: [itemId], references: [id])
   lines       QualityInspectionPlanLine[]
   revisions   QualityInspectionPlanRevision[]
   inspections ManufacturingQualityInspection[]
@@ -11614,8 +11631,8 @@ model QualityInspectionPlanRevision {
   createdBy         String?
   updatedBy         String?
 
-  tenant         Tenant                @relation(fields: [tenantId], references: [id])
-  inspectionPlan QualityInspectionPlan @relation(fields: [inspectionPlanId], references: [id], onDelete: Cascade)
+  tenant         Tenant                           @relation(fields: [tenantId], references: [id])
+  inspectionPlan QualityInspectionPlan            @relation(fields: [inspectionPlanId], references: [id], onDelete: Cascade)
   inspections    ManufacturingQualityInspection[]
 
   @@unique([inspectionPlanId, revisionNumber])
@@ -11652,9 +11669,9 @@ model QualityInspectionPlanLine {
 }
 
 model ManufacturingQualityInspection {
-  id                       String                     @id @default(uuid())
+  id                       String                               @id @default(uuid())
   tenantId                 String
-  inspectionNumber         String                     @db.VarChar(64)
+  inspectionNumber         String                               @db.VarChar(64)
   category                 QualityInspectionCategory
   status                   ManufacturingQualityInspectionStatus @default(PENDING)
   decision                 QualityInspectionDecision?
@@ -11665,43 +11682,43 @@ model ManufacturingQualityInspection {
   itemId                   String?
   inspectionPlanId         String?
   inspectionPlanRevisionId String?
-  planCodeSnapshot         String?                    @db.VarChar(64)
-  planRevisionSnapshot     String?                    @db.VarChar(32)
+  planCodeSnapshot         String?                              @db.VarChar(64)
+  planRevisionSnapshot     String?                              @db.VarChar(32)
   parameterSnapshotJson    Json?
-  inspectedQty             Decimal?                   @db.Decimal(18, 4)
-  acceptedQty              Decimal?                   @db.Decimal(18, 4)
-  rejectedQty              Decimal?                   @db.Decimal(18, 4)
-  reworkQty                Decimal?                   @db.Decimal(18, 4)
-  sampleQty                Decimal?                   @db.Decimal(18, 4)
-  conditionallyAcceptedQty Decimal?                   @db.Decimal(18, 4)
-  heldQty                  Decimal?                   @db.Decimal(18, 4)
-  scrapQty                 Decimal?                   @db.Decimal(18, 4)
-  pendingQty               Decimal?                   @db.Decimal(18, 4)
+  inspectedQty             Decimal?                             @db.Decimal(18, 4)
+  acceptedQty              Decimal?                             @db.Decimal(18, 4)
+  rejectedQty              Decimal?                             @db.Decimal(18, 4)
+  reworkQty                Decimal?                             @db.Decimal(18, 4)
+  sampleQty                Decimal?                             @db.Decimal(18, 4)
+  conditionallyAcceptedQty Decimal?                             @db.Decimal(18, 4)
+  heldQty                  Decimal?                             @db.Decimal(18, 4)
+  scrapQty                 Decimal?                             @db.Decimal(18, 4)
+  pendingQty               Decimal?                             @db.Decimal(18, 4)
   stockDisposition         QualityStockDisposition?
   qualityHoldWarehouseId   String?
   warehouseFromId          String?
   warehouseToId            String?
-  certificateRequired      Boolean                    @default(false)
+  certificateRequired      Boolean                              @default(false)
   certificateStatus        QualityCertificateStatus?
   supersededById           String?
   supersedesId             String?
-  releaseIdempotencyKey    String?                    @db.VarChar(150)
-  decisionReason           String?                    @db.Text
-  sourceType               String?                    @db.VarChar(64)
+  releaseIdempotencyKey    String?                              @db.VarChar(150)
+  decisionReason           String?                              @db.Text
+  sourceType               String?                              @db.VarChar(64)
   sourceDocumentId         String?
-  sourceDocumentNumber     String?                    @db.VarChar(64)
-  title                    String                     @db.VarChar(200)
-  remarks                  String?                    @db.Text
-  decisionRemarks          String?                    @db.Text
+  sourceDocumentNumber     String?                              @db.VarChar(64)
+  title                    String                               @db.VarChar(200)
+  remarks                  String?                              @db.Text
+  decisionRemarks          String?                              @db.Text
   requestedByUserId        String?
   decidedByUserId          String?
-  requestedAt              DateTime                   @default(now())
+  requestedAt              DateTime                             @default(now())
   decidedAt                DateTime?
-  idempotencyKey           String?                    @db.VarChar(150)
+  idempotencyKey           String?                              @db.VarChar(150)
   createdBy                String?
   updatedBy                String?
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime                   @updatedAt
+  createdAt                DateTime                             @default(now())
+  updatedAt                DateTime                             @updatedAt
 
   tenant                 Tenant                             @relation(fields: [tenantId], references: [id])
   productionOrder        ProductionOrder?                   @relation(fields: [productionOrderId], references: [id])
@@ -11752,7 +11769,7 @@ model QualityInspectionParameterResult {
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
 
-  tenant     Tenant            @relation(fields: [tenantId], references: [id])
+  tenant     Tenant                         @relation(fields: [tenantId], references: [id])
   inspection ManufacturingQualityInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
 
   @@unique([inspectionId, parameterId])
@@ -11793,10 +11810,10 @@ model QualityNcr {
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
 
-  tenant          Tenant             @relation(fields: [tenantId], references: [id])
-  productionOrder ProductionOrder?   @relation(fields: [productionOrderId], references: [id])
+  tenant          Tenant                          @relation(fields: [tenantId], references: [id])
+  productionOrder ProductionOrder?                @relation(fields: [productionOrderId], references: [id])
   inspection      ManufacturingQualityInspection? @relation(fields: [inspectionId], references: [id])
-  item            MasterItem?        @relation(fields: [itemId], references: [id])
+  item            MasterItem?                     @relation(fields: [itemId], references: [id])
 
   @@unique([tenantId, ncrNumber])
   @@index([tenantId])
@@ -11829,7 +11846,7 @@ model QualityCertificate {
   createdBy         String?
   updatedBy         String?
 
-  tenant     Tenant             @relation(fields: [tenantId], references: [id])
+  tenant     Tenant                          @relation(fields: [tenantId], references: [id])
   inspection ManufacturingQualityInspection? @relation(fields: [inspectionId], references: [id])
 
   @@unique([tenantId, certificateNumber])
@@ -11919,17 +11936,17 @@ model JobWorkOrder {
   updatedAt           DateTime             @updatedAt
   deletedAt           DateTime?
 
-  tenant             Tenant                    @relation(fields: [tenantId], references: [id])
-  vendor             MasterVendor              @relation(fields: [vendorId], references: [id])
-  productionOrder    ProductionOrder?          @relation(fields: [productionOrderId], references: [id])
-  item               MasterItem                @relation("JobWorkOutputItem", fields: [itemId], references: [id])
-  materialWarehouse  MasterWarehouse           @relation("JobWorkMaterialWarehouse", fields: [materialWarehouseId], references: [id])
-  receiptWarehouse   MasterWarehouse           @relation("JobWorkReceiptWarehouse", fields: [receiptWarehouseId], references: [id])
-  materialLines      JobWorkMaterialLine[]
-  dispatches         JobWorkDispatch[]
-  receipts           JobWorkReceipt[]
+  tenant                          Tenant                           @relation(fields: [tenantId], references: [id])
+  vendor                          MasterVendor                     @relation(fields: [vendorId], references: [id])
+  productionOrder                 ProductionOrder?                 @relation(fields: [productionOrderId], references: [id])
+  item                            MasterItem                       @relation("JobWorkOutputItem", fields: [itemId], references: [id])
+  materialWarehouse               MasterWarehouse                  @relation("JobWorkMaterialWarehouse", fields: [materialWarehouseId], references: [id])
+  receiptWarehouse                MasterWarehouse                  @relation("JobWorkReceiptWarehouse", fields: [receiptWarehouseId], references: [id])
+  materialLines                   JobWorkMaterialLine[]
+  dispatches                      JobWorkDispatch[]
+  receipts                        JobWorkReceipt[]
   manufacturingQualityInspections ManufacturingQualityInspection[]
-  runtimeChanges     ProductionRuntimeChange[]
+  runtimeChanges                  ProductionRuntimeChange[]
 
   @@unique([tenantId, jwNumber])
   @@unique([tenantId, idempotencyKey])
@@ -12867,32 +12884,32 @@ enum GstEWayBillSourceType {
 }
 
 model GstEInvoice {
-  id               String           @id @default(uuid())
+  id               String            @id @default(uuid())
   tenantId         String
   legalEntityId    String
   salesInvoiceId   String
-  invoiceNumber    String?          @db.VarChar(64)
-  invoiceDate      DateTime         @db.Date
-  customerName     String           @db.VarChar(300)
-  customerGstin    String?          @db.VarChar(20)
-  taxableAmount    Decimal          @default(0) @db.Decimal(18, 4)
-  taxAmount        Decimal          @default(0) @db.Decimal(18, 4)
-  totalAmount      Decimal          @default(0) @db.Decimal(18, 4)
+  invoiceNumber    String?           @db.VarChar(64)
+  invoiceDate      DateTime          @db.Date
+  customerName     String            @db.VarChar(300)
+  customerGstin    String?           @db.VarChar(20)
+  taxableAmount    Decimal           @default(0) @db.Decimal(18, 4)
+  taxAmount        Decimal           @default(0) @db.Decimal(18, 4)
+  totalAmount      Decimal           @default(0) @db.Decimal(18, 4)
   status           GstEInvoiceStatus @default(PENDING)
-  irn              String?          @db.VarChar(100)
-  ackNo            String?          @db.VarChar(64)
+  irn              String?           @db.VarChar(100)
+  ackNo            String?           @db.VarChar(64)
   ackDate          DateTime?
-  qrPayload        String?          @db.Text
-  cancelReason     String?          @db.VarChar(500)
+  qrPayload        String?           @db.Text
+  cancelReason     String?           @db.VarChar(500)
   cancelledAt      DateTime?
   cancelledBy      String?
-  exceptionMessage String?          @db.VarChar(1000)
-  providerMode     String           @default("SIMULATED") @db.VarChar(32)
-  providerRef      String?          @db.VarChar(150)
+  exceptionMessage String?           @db.VarChar(1000)
+  providerMode     String            @default("SIMULATED") @db.VarChar(32)
+  providerRef      String?           @db.VarChar(150)
   createdBy        String?
   updatedBy        String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   tenant       Tenant       @relation(fields: [tenantId], references: [id])
   legalEntity  LegalEntity  @relation(fields: [legalEntityId], references: [id])
@@ -12907,35 +12924,35 @@ model GstEInvoice {
 }
 
 model GstEWayBill {
-  id                 String                @id @default(uuid())
-  tenantId           String
-  legalEntityId      String
-  sourceType         GstEWayBillSourceType
-  salesInvoiceId     String?
-  deliveryChallanId  String?
-  documentNumber     String                @db.VarChar(64)
-  documentDate       DateTime              @db.Date
-  partyName          String                @db.VarChar(300)
-  partyGstin         String?               @db.VarChar(20)
-  fromPlace          String                @db.VarChar(200)
-  toPlace            String                @db.VarChar(200)
-  distanceKm         Int                   @default(0)
-  vehicleNumber      String?               @db.VarChar(64)
-  transporterName    String?               @db.VarChar(200)
-  taxableAmount      Decimal               @default(0) @db.Decimal(18, 4)
-  status             GstEWayBillStatus     @default(REQUIRED)
-  ewbNumber          String?               @db.VarChar(64)
-  validUpto          DateTime?
-  cancelReason       String?               @db.VarChar(500)
-  cancelledAt        DateTime?
-  cancelledBy        String?
-  exceptionMessage   String?               @db.VarChar(1000)
-  providerMode       String                @default("SIMULATED") @db.VarChar(32)
-  providerRef        String?               @db.VarChar(150)
-  createdBy          String?
-  updatedBy          String?
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
+  id                String                @id @default(uuid())
+  tenantId          String
+  legalEntityId     String
+  sourceType        GstEWayBillSourceType
+  salesInvoiceId    String?
+  deliveryChallanId String?
+  documentNumber    String                @db.VarChar(64)
+  documentDate      DateTime              @db.Date
+  partyName         String                @db.VarChar(300)
+  partyGstin        String?               @db.VarChar(20)
+  fromPlace         String                @db.VarChar(200)
+  toPlace           String                @db.VarChar(200)
+  distanceKm        Int                   @default(0)
+  vehicleNumber     String?               @db.VarChar(64)
+  transporterName   String?               @db.VarChar(200)
+  taxableAmount     Decimal               @default(0) @db.Decimal(18, 4)
+  status            GstEWayBillStatus     @default(REQUIRED)
+  ewbNumber         String?               @db.VarChar(64)
+  validUpto         DateTime?
+  cancelReason      String?               @db.VarChar(500)
+  cancelledAt       DateTime?
+  cancelledBy       String?
+  exceptionMessage  String?               @db.VarChar(1000)
+  providerMode      String                @default("SIMULATED") @db.VarChar(32)
+  providerRef       String?               @db.VarChar(150)
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
   tenant          Tenant           @relation(fields: [tenantId], references: [id])
   legalEntity     LegalEntity      @relation(fields: [legalEntityId], references: [id])
@@ -13155,31 +13172,31 @@ enum WorkOrderCostCategory {
 }
 
 model ManufacturingCostingPolicy {
-  id                      String                               @id @default(uuid())
-  tenantId                String
-  legalEntityId           String?
-  plantCode               String?                              @db.VarChar(32)
-  name                    String                               @db.VarChar(191)
-  costingMethod           ManufacturingCostingMethod           @default(PLANNED_AS_PROVISIONAL)
-  materialValuationSource ManufacturingMaterialValuationSource @default(MOVEMENT_UNIT_COST)
-  labourRateSource        ManufacturingLabourRateSource        @default(WORK_CENTRE_RATE)
-  machineRateSource       ManufacturingMachineRateSource       @default(MACHINE_RATE)
-  jobWorkCostSource       ManufacturingJobWorkCostSource       @default(LINKED_INVOICE)
-  overheadMethod          ManufacturingOverheadMethod          @default(NONE)
-  overheadRate            Decimal                              @default(0) @db.Decimal(18, 4)
-  defaultLabourRate       Decimal                              @default(0) @db.Decimal(18, 2)
-  defaultMachineRate      Decimal                              @default(0) @db.Decimal(18, 2)
-  fgPostingMode           ManufacturingPostingMode             @default(MANUAL)
-  variancePostingMode     ManufacturingPostingMode             @default(MANUAL)
+  id                       String                                @id @default(uuid())
+  tenantId                 String
+  legalEntityId            String?
+  plantCode                String?                               @db.VarChar(32)
+  name                     String                                @db.VarChar(191)
+  costingMethod            ManufacturingCostingMethod            @default(PLANNED_AS_PROVISIONAL)
+  materialValuationSource  ManufacturingMaterialValuationSource  @default(MOVEMENT_UNIT_COST)
+  labourRateSource         ManufacturingLabourRateSource         @default(WORK_CENTRE_RATE)
+  machineRateSource        ManufacturingMachineRateSource        @default(MACHINE_RATE)
+  jobWorkCostSource        ManufacturingJobWorkCostSource        @default(LINKED_INVOICE)
+  overheadMethod           ManufacturingOverheadMethod           @default(NONE)
+  overheadRate             Decimal                               @default(0) @db.Decimal(18, 4)
+  defaultLabourRate        Decimal                               @default(0) @db.Decimal(18, 2)
+  defaultMachineRate       Decimal                               @default(0) @db.Decimal(18, 2)
+  fgPostingMode            ManufacturingPostingMode              @default(MANUAL)
+  variancePostingMode      ManufacturingPostingMode              @default(MANUAL)
   inventoryValuationMethod ManufacturingInventoryValuationMethod @default(MOVING_AVERAGE)
-  status                  ManufacturingCostingPolicyStatus     @default(DRAFT)
-  effectiveFrom           DateTime?                            @db.Date
-  currencyCode            String                               @default("INR") @db.VarChar(8)
-  createdBy               String?
-  updatedBy               String?
-  createdAt               DateTime                             @default(now())
-  updatedAt               DateTime                             @updatedAt
-  deletedAt               DateTime?
+  status                   ManufacturingCostingPolicyStatus      @default(DRAFT)
+  effectiveFrom            DateTime?                             @db.Date
+  currencyCode             String                                @default("INR") @db.VarChar(8)
+  createdBy                String?
+  updatedBy                String?
+  createdAt                DateTime                              @default(now())
+  updatedAt                DateTime                              @updatedAt
+  deletedAt                DateTime?
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   legalEntity LegalEntity? @relation(fields: [legalEntityId], references: [id])
@@ -14382,15 +14399,15 @@ model FixedAssetRevaluation {
   revaluationNumber String   @db.VarChar(64)
   revaluationDate   DateTime @db.Date
 
-  previousNbv     Decimal @db.Decimal(18, 4)
-  revaluedAmount  Decimal @db.Decimal(18, 4)
-  surplusAmount   Decimal @db.Decimal(18, 4)
+  previousNbv    Decimal @db.Decimal(18, 4)
+  revaluedAmount Decimal @db.Decimal(18, 4)
+  surplusAmount  Decimal @db.Decimal(18, 4)
 
   status FixedAssetRevaluationStatus @default(DRAFT)
   reason String                      @db.VarChar(1000)
 
   voucherId      String?
-  postingEventId String? @unique
+  postingEventId String?   @unique
   postedAt       DateTime?
   postedById     String?
   cancelledAt    DateTime?
@@ -14437,7 +14454,7 @@ model FixedAssetImpairment {
   reason String                     @db.VarChar(1000)
 
   voucherId      String?
-  postingEventId String? @unique
+  postingEventId String?   @unique
   postedAt       DateTime?
   postedById     String?
   cancelledAt    DateTime?
@@ -14482,7 +14499,7 @@ model FixedAssetMaintenance {
   legalEntityId String
   assetId       String
 
-  maintenanceNumber String                     @db.VarChar(64)
+  maintenanceNumber String                      @db.VarChar(64)
   type              FixedAssetMaintenanceType
   status            FixedAssetMaintenanceStatus @default(SCHEDULED)
 
@@ -14934,17 +14951,18 @@ model GateVisitorVisit {
   gate                      String    @db.VarChar(120)
   visitDate                 String    @db.VarChar(10)
   expectedArrival           String?   @db.VarChar(64)
-  entryTime                 DateTime?
-  exitTime                  DateTime?
-  exitRemarks               String?   @db.Text
-  badgeReturned             Boolean?
-  instructions              String?   @db.Text
-  approvalHistoryJson       Json
-  createdBy                 String    @db.VarChar(200)
-  updatedBy                 String    @db.VarChar(200)
-  createdAt                 DateTime  @default(now())
-  updatedAt                 DateTime  @updatedAt
-  deletedAt                 DateTime?
+
+  entryTime           DateTime?
+  exitTime            DateTime?
+  exitRemarks         String?   @db.Text
+  badgeReturned       Boolean?
+  instructions        String?   @db.Text
+  approvalHistoryJson Json
+  createdBy           String    @db.VarChar(200)
+  updatedBy           String    @db.VarChar(200)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
 
   tenant         Tenant              @relation(fields: [tenantId], references: [id])
   visitorProfile GateVisitorProfile? @relation(fields: [visitorProfileId], references: [id], onDelete: SetNull)
@@ -14984,33 +15002,33 @@ model GateExpectedVisitor {
 }
 
 model GateVehicle {
-  id               String    @id @default(uuid())
-  tenantId         String
-  entryNumber      String    @db.VarChar(40)
-  status           String    @db.VarChar(32)
-  vehicleNumber    String    @db.VarChar(40)
-  vehicleType      String    @db.VarChar(64)
-  purpose          String    @db.VarChar(300)
-  companyName      String?   @db.VarChar(200)
-  transporter      String?   @db.VarChar(200)
-  driverName       String    @db.VarChar(200)
-  driverMobile     String?   @db.VarChar(30)
-  licenceVerified  String    @default("not_checked") @db.VarChar(32)
-  relatedDocument  String?   @db.VarChar(120)
-  gate             String    @db.VarChar(120)
-  plannedLocation  String?   @db.VarChar(200)
-  currentLocation  String?   @db.VarChar(200)
-  sealNumber       String?   @db.VarChar(64)
-  remarks          String?   @db.Text
-  entryTime        DateTime?
-  exitTime         DateTime?
-  exitRemarks      String?   @db.Text
-  timelineJson     Json
-  createdBy        String    @db.VarChar(200)
-  updatedBy        String    @db.VarChar(200)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  deletedAt        DateTime?
+  id              String    @id @default(uuid())
+  tenantId        String
+  entryNumber     String    @db.VarChar(40)
+  status          String    @db.VarChar(32)
+  vehicleNumber   String    @db.VarChar(40)
+  vehicleType     String    @db.VarChar(64)
+  purpose         String    @db.VarChar(300)
+  companyName     String?   @db.VarChar(200)
+  transporter     String?   @db.VarChar(200)
+  driverName      String    @db.VarChar(200)
+  driverMobile    String?   @db.VarChar(30)
+  licenceVerified String    @default("not_checked") @db.VarChar(32)
+  relatedDocument String?   @db.VarChar(120)
+  gate            String    @db.VarChar(120)
+  plannedLocation String?   @db.VarChar(200)
+  currentLocation String?   @db.VarChar(200)
+  sealNumber      String?   @db.VarChar(64)
+  remarks         String?   @db.Text
+  entryTime       DateTime?
+  exitTime        DateTime?
+  exitRemarks     String?   @db.Text
+  timelineJson    Json
+  createdBy       String    @db.VarChar(200)
+  updatedBy       String    @db.VarChar(200)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -15162,33 +15180,33 @@ model GatePassItem {
 }
 
 model GateContractorEntry {
-  id                   String    @id @default(uuid())
-  tenantId             String
-  entryNumber          String    @db.VarChar(40)
-  status               String    @db.VarChar(32)
-  workerName           String    @db.VarChar(200)
-  mobile               String    @db.VarChar(30)
-  contractorCompany    String    @db.VarChar(200)
-  workReference        String?   @db.VarChar(120)
-  department           String    @db.VarChar(120)
-  supervisor           String    @db.VarChar(200)
-  workLocation         String    @db.VarChar(200)
-  validFrom            String    @db.VarChar(10)
-  validUntil           String    @db.VarChar(10)
-  safetyInductionDone  Boolean   @default(false)
-  ppeIssued            Boolean   @default(false)
-  toolsCarried         String?   @db.Text
-  photoUrl             String?   @db.VarChar(500)
-  purpose              String    @db.VarChar(300)
-  remarks              String?   @db.Text
-  gate                 String    @db.VarChar(120)
-  entryTime            DateTime?
-  exitTime             DateTime?
-  createdBy            String    @db.VarChar(200)
-  updatedBy            String    @db.VarChar(200)
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  deletedAt            DateTime?
+  id                  String    @id @default(uuid())
+  tenantId            String
+  entryNumber         String    @db.VarChar(40)
+  status              String    @db.VarChar(32)
+  workerName          String    @db.VarChar(200)
+  mobile              String    @db.VarChar(30)
+  contractorCompany   String    @db.VarChar(200)
+  workReference       String?   @db.VarChar(120)
+  department          String    @db.VarChar(120)
+  supervisor          String    @db.VarChar(200)
+  workLocation        String    @db.VarChar(200)
+  validFrom           String    @db.VarChar(10)
+  validUntil          String    @db.VarChar(10)
+  safetyInductionDone Boolean   @default(false)
+  ppeIssued           Boolean   @default(false)
+  toolsCarried        String?   @db.Text
+  photoUrl            String?   @db.VarChar(500)
+  purpose             String    @db.VarChar(300)
+  remarks             String?   @db.Text
+  gate                String    @db.VarChar(120)
+  entryTime           DateTime?
+  exitTime            DateTime?
+  createdBy           String    @db.VarChar(200)
+  updatedBy           String    @db.VarChar(200)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
