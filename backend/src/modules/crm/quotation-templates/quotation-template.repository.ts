@@ -145,3 +145,65 @@ export async function softDeleteQuotationTemplate(_tenantId: string, id: string,
     data: { deletedAt: new Date(), updatedBy: userId, isActive: false },
   })
 }
+
+/** Create/restore keep-catalog rows when live DB is missing one (e.g. only ISO-TANK-26KL). */
+export async function ensureKeptQuotationTemplates(
+  tenantId: string,
+  rows: Array<{
+    code: string
+    templateName: string
+    productFamily: string
+    version: number
+    sections: unknown[]
+    defaultTerms: string
+    defaultWarranty: string
+    defaultExclusions: string
+    printLayout: unknown
+  }>,
+) {
+  let changed = false
+  for (const row of rows) {
+    const existing = await prisma.crmQuotationTemplate.findFirst({
+      where: { tenantId, code: row.code },
+      select: { id: true, deletedAt: true, isActive: true },
+    })
+    if (!existing) {
+      await prisma.crmQuotationTemplate.create({
+        data: {
+          tenantId,
+          code: row.code,
+          templateName: row.templateName,
+          productFamily: row.productFamily,
+          version: row.version,
+          sections: toTemplateJson(row.sections),
+          defaultTerms: row.defaultTerms,
+          defaultWarranty: row.defaultWarranty,
+          defaultExclusions: row.defaultExclusions,
+          printLayout: toTemplateJson(row.printLayout),
+          isActive: true,
+        },
+      })
+      changed = true
+      continue
+    }
+    if (existing.deletedAt != null || !existing.isActive) {
+      await prisma.crmQuotationTemplate.update({
+        where: { id: existing.id },
+        data: {
+          deletedAt: null,
+          isActive: true,
+          templateName: row.templateName,
+          productFamily: row.productFamily,
+          version: row.version,
+          sections: toTemplateJson(row.sections),
+          defaultTerms: row.defaultTerms,
+          defaultWarranty: row.defaultWarranty,
+          defaultExclusions: row.defaultExclusions,
+          printLayout: toTemplateJson(row.printLayout),
+        },
+      })
+      changed = true
+    }
+  }
+  return changed
+}

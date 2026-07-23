@@ -7,6 +7,10 @@ import {
   isQuotationTemplateCatalogLocked,
   quotationTemplateKeepCodes,
 } from './quotation-template.catalog.js'
+import {
+  QUOTATION_TEMPLATE_SEED_ROWS,
+  VF_WORD_PRINT_LAYOUT_SEED,
+} from './quotation-template.catalog-seed.js'
 import type {
   CreateQuotationTemplateInput,
   DuplicateQuotationTemplateInput,
@@ -31,6 +35,14 @@ function assertCatalogUnlockedForWrite() {
 }
 
 export async function listQuotationTemplates(tenantId: string, query: ListQuotationTemplatesQuery) {
+  // Always create/restore the two ISO templates if missing — live often only had ISO-TANK-26KL.
+  await repo.ensureKeptQuotationTemplates(
+    tenantId,
+    QUOTATION_TEMPLATE_SEED_ROWS.map((row) => ({
+      ...row,
+      printLayout: VF_WORD_PRINT_LAYOUT_SEED,
+    })),
+  )
   const catalogCodes = isQuotationTemplateCatalogLocked() ? quotationTemplateKeepCodes() : undefined
   const result = await repo.findQuotationTemplates(tenantId, query, catalogCodes)
   const nameMap = await resolveUserNames(
