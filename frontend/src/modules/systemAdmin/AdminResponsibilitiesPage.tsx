@@ -225,7 +225,7 @@ export function AdminResponsibilitiesPage() {
       ) : loading ? (
         <AdminSkeleton rows={4} />
       ) : error ? (
-        <AdminErrorState message={error} onRetry={() => void load()} />
+        <AdminErrorState title="Could not load responsibilities" description={error} />
       ) : (
         <div className="space-y-4">
           <AdminSummaryStrip>

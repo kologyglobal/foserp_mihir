@@ -323,7 +323,7 @@ export async function processPendingDomainEvents(
   const limit = Math.min(Math.max(options?.limit ?? 50, 1), 200)
   const now = new Date()
   const statusFilter = options?.includeFailed
-    ? { in: ['PENDING', 'FAILED'] as const }
+    ? { in: ['PENDING', 'FAILED'] as Array<'PENDING' | 'FAILED'> }
     : ('PENDING' as const)
 
   const batch = await prisma.dispatchDomainEvent.findMany({

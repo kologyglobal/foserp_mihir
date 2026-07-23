@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { requireAnyPermission, requirePermission } from '../../../middleware/permission.middleware.js'
+import { requireAnyPermission } from '../../../middleware/permission.middleware.js'
 import { validateBody, validateParams } from '../../../middleware/validation.middleware.js'
 import { uuidParamSchema } from '../../../utils/pagination.js'
 import * as controller from './dispatch-pod.controller.js'

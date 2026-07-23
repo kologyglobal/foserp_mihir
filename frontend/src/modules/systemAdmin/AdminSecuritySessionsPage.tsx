@@ -100,7 +100,7 @@ export function AdminSecuritySessionsPage() {
       ) : loading ? (
         <AdminSkeleton rows={5} />
       ) : error ? (
-        <AdminErrorState message={error} onRetry={() => void load()} />
+        <AdminErrorState title="Could not load sessions" description={error} />
       ) : (
         <div className="space-y-4">
           <AdminSummaryStrip>

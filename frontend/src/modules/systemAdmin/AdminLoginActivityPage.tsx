@@ -83,7 +83,7 @@ export function AdminLoginActivityPage() {
       ) : loading ? (
         <AdminSkeleton rows={5} />
       ) : error ? (
-        <AdminErrorState message={error} onRetry={() => void load()} />
+        <AdminErrorState title="Could not load login activity" description={error} />
       ) : (
         <div className="space-y-4">
           <AdminSummaryStrip>

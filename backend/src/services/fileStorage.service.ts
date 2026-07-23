@@ -44,6 +44,11 @@ export async function saveTreasuryStatementFile(
   return path.join(tenantId, filename).replace(/\\/g, '/')
 }
 
+export async function readTreasuryStatementFile(storageKey: string): Promise<Buffer> {
+  const fullPath = path.join(TREASURY_STATEMENT_BASE_DIR, storageKey)
+  return readFile(fullPath)
+}
+
 export async function saveDispatchPodFile(
   tenantId: string,
   attachmentId: string,

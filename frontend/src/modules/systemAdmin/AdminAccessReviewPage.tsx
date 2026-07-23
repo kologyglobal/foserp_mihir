@@ -85,7 +85,7 @@ export function AdminAccessReviewPage() {
       ) : loading ? (
         <AdminSkeleton rows={5} />
       ) : error ? (
-        <AdminErrorState message={error} onRetry={() => void load()} />
+        <AdminErrorState title="Could not load access review" description={error} />
       ) : !report ? null : (
         <div className="space-y-4">
           <AdminSummaryStrip>

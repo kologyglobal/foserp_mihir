@@ -9,7 +9,6 @@ import {
   Truck,
   ExternalLink,
   Pencil,
-  Receipt,
   LayoutGrid,
   Banknote,
   Printer,
@@ -29,7 +28,6 @@ import { DataGrid } from '../../components/design-system/DataGrid'
 import { TableLink } from '../../components/ui/AppLink'
 import { Badge, formatStatus, statusColor } from '../../components/ui/Badge'
 import { salesOrderStatusLabel } from '../../utils/salesOrderStatus'
-import { Toast } from '../../components/ui/Toast'
 import { notify } from '../../store/toastStore'
 import { useMrpStore } from '../../store/mrpStore'
 import { useSalesStore } from '../../store/salesStore'
@@ -151,7 +149,6 @@ export function SalesOrder360Page() {
 
   const [tab, setTab] = useState<SoTab>('overview')
   const [activeSection, setActiveSection] = useState<SoTab>('overview')
-  const [toast, setToast] = useState<string | null>(null)
   const [expectedEntryOpen, setExpectedEntryOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmBusy, setConfirmBusy] = useState(false)
@@ -796,7 +793,6 @@ export function SalesOrder360Page() {
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleConfirmSubmit}
       />
-      {toast ? <Toast message={toast} variant="success" /> : null}
     </>
   )
 }

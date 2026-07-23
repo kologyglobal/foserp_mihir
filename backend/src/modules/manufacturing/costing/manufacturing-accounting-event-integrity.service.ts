@@ -307,10 +307,7 @@ export async function inspectManufacturingAccountingEventIntegrity(
         null
       const original = originalId ? eventsById.get(originalId) : undefined
       const originalOk =
-        original &&
-        (original.status === 'POSTED' ||
-          original.status === 'REVERSED' ||
-          (event.status === 'POSTED' && original.status === 'REVERSED'))
+        original && (original.status === 'POSTED' || original.status === 'REVERSED')
       if (!originalId || !original || !originalOk) {
         reversalChainInconsistentCount += 1
         addException('REVERSAL_CHAIN_INCONSISTENT', {

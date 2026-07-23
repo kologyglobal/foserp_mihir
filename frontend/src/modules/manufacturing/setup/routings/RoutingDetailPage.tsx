@@ -381,7 +381,7 @@ export function RoutingDetailPage() {
               <div>
                 <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Production flow</dt>
                 <dd className="mt-0.5 font-medium text-erp-text">
-                  {ROUTING_FLOW_TYPE_LABELS[routing.productionFlowType] ?? routing.productionFlowType}
+                  {ROUTING_FLOW_TYPE_LABELS[routing.productionFlowType ?? 'SERIAL'] ?? routing.productionFlowType}
                 </dd>
               </div>
               <div>

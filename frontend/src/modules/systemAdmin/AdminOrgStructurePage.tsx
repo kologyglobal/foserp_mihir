@@ -163,7 +163,7 @@ export function AdminOrgStructurePage() {
         ) : loading ? (
           <AdminSkeleton rows={5} />
         ) : error ? (
-          <AdminErrorState message={error} onRetry={() => void load()} />
+          <AdminErrorState title="Could not load org structure" description={error} />
         ) : (
           <>
             <AdminSummaryStrip>

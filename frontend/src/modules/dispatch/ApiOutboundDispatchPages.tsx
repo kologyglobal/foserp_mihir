@@ -1056,7 +1056,7 @@ export function ApiOutboundDispatchDetailPage() {
 
       {status === 'CONFIRMED' || detail.deliveryStatus ? (
         <DetailSection title="Proof of Delivery">
-          <DispatchPodPanel detail={detail} onChanged={() => void load()} />
+          <DispatchPodPanel detail={detail} onChanged={() => void reload()} />
         </DetailSection>
       ) : null}
 

@@ -189,7 +189,7 @@ function ApiAccountingDashboardPage() {
         heroMetrics={[]}
         quickActions={null}
       >
-        <LoadingState label="Loading posted finance data…" />
+        <LoadingState variant="dashboard" />
       </DynamicsModuleDashboard>
     )
   }

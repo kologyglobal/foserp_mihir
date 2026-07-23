@@ -179,7 +179,7 @@ export async function getEWayPanel(req: Request, tenantId: string, query: EWayPa
         tenantId,
         outboundDispatchId: query.outboundDispatchId,
         deletedAt: null,
-        status: { in: ['ISSUED', 'APPROVED', 'DRAFT', 'IN_REVIEW'] },
+        status: { in: ['ISSUED', 'APPROVED', 'DRAFT', 'READY_FOR_REVIEW'] },
       },
       orderBy: { createdAt: 'desc' },
       include: { outboundDispatch: { select: { id: true, salesOrderId: true, dispatchNo: true } } },

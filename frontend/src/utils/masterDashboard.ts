@@ -81,7 +81,7 @@ export function buildMasterRecentModified(input: {
       input.bomHeaders,
       (b) => b.bomNo,
       (b) => b.description || 'BOM',
-      (b) => `/manufacturing/setup/boms`,
+      () => `/manufacturing/setup/boms`,
       limit,
     ),
   ]

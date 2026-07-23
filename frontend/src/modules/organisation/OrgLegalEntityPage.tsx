@@ -64,13 +64,13 @@ export function OrgLegalEntityPage() {
         setRows(
           entities.map((e) => ({
             id: e.id,
-            tenantId: e.tenantId,
+            tenantId: e.tenantId ?? '',
             code: e.code,
             legalName: e.legalName,
             tradeName: e.displayName,
             businessType: e.entityType,
-            gstNumber: e.gstin,
-            pan: e.pan,
+            gstNumber: e.gstin ?? null,
+            pan: e.pan ?? null,
             country: e.countryCode === 'IN' ? 'India' : e.countryCode,
             state: '',
             district: null,
@@ -80,8 +80,8 @@ export function OrgLegalEntityPage() {
             status: e.isActive ? 'ACTIVE' : 'INACTIVE',
             isDefault: e.isDefault,
             fiscalYearStartMonth: e.fiscalYearStartMonth,
-            createdAt: e.createdAt,
-            updatedAt: e.updatedAt,
+            createdAt: e.createdAt ?? '',
+            updatedAt: e.updatedAt ?? '',
           })),
         )
       }

@@ -30,7 +30,6 @@ import {
   postManufacturingAccountingEvent,
   retryManufacturingAccountingEvent,
   getManufacturingAccountingFeatureControl,
-  setManufacturingAccountingFeatureControl,
   postEnableManufacturingAccounting,
   postDisableManufacturingAccounting,
   postInventoryReconciliationSignOff,

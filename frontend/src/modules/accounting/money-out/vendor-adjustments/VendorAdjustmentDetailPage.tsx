@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Pencil } from 'lucide-react'
+import { Download, Pencil, Printer } from 'lucide-react'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { ErpStatusChip } from '@/components/erp/ErpStatusChip'
 import { Textarea } from '@/components/forms/Inputs'

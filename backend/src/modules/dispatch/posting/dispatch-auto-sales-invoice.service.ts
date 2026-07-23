@@ -208,6 +208,10 @@ export async function createDraftSalesInvoiceFromDispatchPosting(
       lineDiscountType: l.discountPct > 0 ? ('PERCENTAGE' as const) : undefined,
       lineDiscountValue: l.discountPct > 0 ? String(l.discountPct) : undefined,
       gstRate: l.taxPct > 0 ? String(l.taxPct) : undefined,
+      cessRate: undefined,
+      revenueAccountId: null,
+      costCentreId: null,
+      isTaxInclusive: undefined,
       sourceLineId: l.outboundDispatchLineId,
     })),
   }

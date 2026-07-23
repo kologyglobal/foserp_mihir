@@ -155,6 +155,7 @@ export async function ensureDispatchPostingForOutbound(
       reversalApprovalRequired: true,
       blockReversalWhenInvoiced: true,
       blockReversalWhenCogsPosted: true,
+      requirePodBeforeInvoice: false,
     },
     postedBy: outbound.confirmedBy,
     movementsByLineId,

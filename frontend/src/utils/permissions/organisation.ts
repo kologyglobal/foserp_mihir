@@ -1,12 +1,11 @@
 import { useMemo } from 'react'
 import { isApiMode } from '@/config/apiConfig'
 import { getStoredSession } from '@/services/api/client'
-import { getSessionUser } from '@/utils/permissions'
 import { hasWorkspaceAdminRole } from '@/utils/permissions/workspaceAdmin'
 
 function sessionPerms(): string[] {
   if (isApiMode()) return getStoredSession()?.user.permissions ?? []
-  return getSessionUser()?.permissions ?? []
+  return []
 }
 
 export function useOrganisationPermissions() {

@@ -126,7 +126,7 @@ export async function updateUser(
 
   if (input.departmentId !== undefined) {
     if (input.departmentId === null) {
-      data.departmentId = null
+      data.departmentRef = { disconnect: true }
       if (input.department !== undefined) data.department = input.department
       else data.department = null
     } else {
@@ -134,7 +134,7 @@ export async function updateUser(
         where: { id: input.departmentId, tenantId, deletedAt: null },
       })
       if (!dept) throw new NotFoundError('Department not found')
-      data.departmentId = input.departmentId
+      data.departmentRef = { connect: { id: input.departmentId } }
       data.department = dept.name
     }
   } else if (input.department !== undefined) {

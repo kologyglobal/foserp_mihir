@@ -225,38 +225,40 @@ export async function login(
     )
   }
 
-  if (!user || !(await verifyPassword(input.password, user.passwordHash))) {
-    if (user) {
-      const nextCount = user.failedLoginCount + 1
-      if (nextCount >= MAX_FAILED_LOGINS) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            failedLoginCount: nextCount,
-            status: 'BLOCKED',
-            lockedAt: new Date(),
-          },
-        })
-        await prisma.refreshToken.updateMany({
-          where: { userId: user.id, tenantId: tenant.id, revokedAt: null },
-          data: { revokedAt: new Date() },
-        })
-        await fail('LOCKED_OUT', user.id)
-      }
+  if (!user) {
+    return await fail('INVALID_CREDENTIALS')
+  }
+
+  if (!(await verifyPassword(input.password, user.passwordHash))) {
+    const nextCount = user.failedLoginCount + 1
+    if (nextCount >= MAX_FAILED_LOGINS) {
       await prisma.user.update({
         where: { id: user.id },
-        data: { failedLoginCount: nextCount },
+        data: {
+          failedLoginCount: nextCount,
+          status: 'BLOCKED',
+          lockedAt: new Date(),
+        },
       })
+      await prisma.refreshToken.updateMany({
+        where: { userId: user.id, tenantId: tenant.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      })
+      return await fail('LOCKED_OUT', user.id)
     }
-    await fail('INVALID_CREDENTIALS', user?.id ?? null)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { failedLoginCount: nextCount },
+    })
+    return await fail('INVALID_CREDENTIALS', user.id)
   }
 
   if (user.status === 'BLOCKED') {
-    await fail('BLOCKED', user.id)
+    return await fail('BLOCKED', user.id)
   }
 
   if (user.status !== 'ACTIVE') {
-    await fail('INACTIVE', user.id)
+    return await fail('INACTIVE', user.id)
   }
 
   const userPermissions = await loadUserPermissions(user.id, tenant.id)

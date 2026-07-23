@@ -69,6 +69,7 @@ export function assertBlockersAllowEmergencyOverride(blockers: BlockerLike[]): {
   if (!classified.overridable.length) {
     throw new UnprocessableEntityError(
       'Emergency override requires at least one operational overridable blocker',
+      'EMERGENCY_OVERRIDE_NO_OVERRIDABLE_BLOCKER',
     )
   }
   return {
@@ -80,10 +81,16 @@ export function assertBlockersAllowEmergencyOverride(blockers: BlockerLike[]): {
 export async function grantEmergencyOverride(input: GrantEmergencyOverrideInput) {
   const reason = input.businessReason?.trim()
   if (!reason || reason.length < 8) {
-    throw new UnprocessableEntityError('Business reason is required (min 8 characters)')
+    throw new UnprocessableEntityError(
+      'Business reason is required (min 8 characters)',
+      'EMERGENCY_OVERRIDE_REASON_REQUIRED',
+    )
   }
   if (!input.riskAcknowledged) {
-    throw new UnprocessableEntityError('Risk acknowledgement is required for emergency override')
+    throw new UnprocessableEntityError(
+      'Risk acknowledgement is required for emergency override',
+      'EMERGENCY_OVERRIDE_RISK_REQUIRED',
+    )
   }
 
   const { overridable, primaryBlockerCode } = assertBlockersAllowEmergencyOverride(input.blockers)
@@ -94,7 +101,10 @@ export async function grantEmergencyOverride(input: GrantEmergencyOverrideInput)
         : new Date(input.expiresAt)
       : defaultExpiry()
   if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
-    throw new UnprocessableEntityError('Override expiry must be a future date/time')
+    throw new UnprocessableEntityError(
+      'Override expiry must be a future date/time',
+      'EMERGENCY_OVERRIDE_EXPIRY_INVALID',
+    )
   }
 
   const grantImmediately = input.grantImmediately !== false

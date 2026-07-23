@@ -178,11 +178,12 @@ export function DispatchChallanDetailPage() {
   }
 
   const editable = row.status === 'DRAFT' || row.status === 'SENT_BACK'
+  const challanId = row.id
 
   async function openChallanPrint(mode: 'preview' | 'pdf') {
     setBusy(true)
     try {
-      const { html, filename } = await fetchDeliveryChallanPrintHtml(row.id, mode)
+      const { html, filename } = await fetchDeliveryChallanPrintHtml(challanId, mode)
       openHtmlPrintWindow(html, filename)
       if (mode === 'pdf') {
         notify.info('Use “Save as PDF” in the print dialog to download a PDF')

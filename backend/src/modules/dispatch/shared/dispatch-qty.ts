@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 
-export function n(value: Prisma.Decimal | number | string | null | undefined): number {
+export function n(value: Prisma.Decimal | number | string | null | undefined | unknown): number {
   if (value == null) return 0
-  return Number(value)
+  if (typeof value === 'object' && value !== null && 'toString' in value) {
+    return Number((value as { toString(): string }).toString())
+  }
+  return Number(value as string | number)
 }
 
 export function roundQty(value: number): number {
