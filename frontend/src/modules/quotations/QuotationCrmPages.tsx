@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useEffect } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  Plus, FileText, Download, Bookmark, Pencil, Eye, ArrowLeft, Copy, Layers, LayoutGrid, Table2, Save,
+  Plus, FileText, Download, Bookmark, Pencil, Eye, ArrowLeft, LayoutGrid, Table2, Save,
 } from 'lucide-react'
 import { ErpCommandBar } from '../../components/erp/ErpCommandBar'
 import { crmChildBreadcrumbs, crmModuleBreadcrumbs } from '../../utils/crmNavigation'
@@ -17,7 +17,6 @@ import { CrmListFilterBar, CrmListSortSelect } from '../../components/crm/CrmLis
 import { ErpButton } from '../../components/erp/ErpButton'
 import { useCrmStore } from '../../store/crmStore'
 import { resolveStoreAction } from '../../store/storeAction'
-import { findFeaturedQuotationTemplate } from '../../utils/quotationTemplates'
 import { useSalesStore } from '../../store/salesStore'
 import { useMasterStore } from '../../store/masterStore'
 import { useUIStore } from '../../store/uiStore'
@@ -25,10 +24,6 @@ import { notify } from '@/store/toastStore'
 import { isApiMode } from '../../config/apiConfig'
 import { syncQuotationsFromApi } from '../../services/bridges/quotationApiBridge'
 import { systemPrompt } from '@/utils/systemConfirm'
-import {
-  CreateBlankQuotationTemplateModal,
-  blankTemplateDefaultTerms,
-} from '@/components/quotations/CreateBlankQuotationTemplateModal'
 import { exportRowsToCsv } from '../../utils/exportCsv'
 import { runCrmExport } from '../../utils/crmServerExport'
 import { useSavedViews } from '../../hooks/useSavedViews'
@@ -41,6 +36,7 @@ import { QuickFollowUpDrawer } from '@/components/crm'
 import { useCrmRecordLoadState } from '@/components/crm/CrmRecordLoadGate'
 import { PageLoadingFallback } from '@/components/system/PageLoadingFallback'
 import { resolveQuotationPrintLayout } from '../../utils/quotationEngine/printLayout'
+import { filterAllowedQuotationTemplates } from '../../utils/quotationEngine/builtinTemplateSync'
 import { QuotationPrintDocument } from '@/components/quotations/QuotationPrintDocument'
 import { QuotationTemplateBuilder } from '@/components/quotations/QuotationTemplateBuilder'
 import { QuotationTemplateCard, QuotationTemplateEmptyState } from '@/components/quotations/QuotationTemplateCard'
@@ -804,8 +800,11 @@ export function CrmQuotationDetailPage() {
 export function CrmQuotationTemplatesPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const templates = useCrmStore((s) => s.quotationTemplates)
-  const duplicateTemplate = useCrmStore((s) => s.duplicateQuotationTemplate)
+  const quotationTemplates = useCrmStore((s) => s.quotationTemplates)
+  const templates = useMemo(
+    () => filterAllowedQuotationTemplates(quotationTemplates),
+    [quotationTemplates],
+  )
   const tpl = id ? templates.find((t) => t.id === id) : null
 
   const [search, setSearch] = useState('')
@@ -884,21 +883,6 @@ export function CrmQuotationTemplatesPage() {
     </div>
   )
 
-  async function handleDuplicate(sourceId: string) {
-    const source = templates.find((t) => t.id === sourceId)
-    const name = await systemPrompt({
-      title: 'Duplicate template',
-      fieldLabel: 'Template name',
-      defaultValue: source ? `${source.templateName} (Copy)` : 'New Template',
-      confirmLabel: 'Duplicate',
-      required: true,
-    })
-    if (!name) return
-    const r = await resolveStoreAction(duplicateTemplate(sourceId, name))
-    if (r.ok && r.templateId) navigate(`/crm/quotation-templates/${r.templateId}/editor`)
-    else if (!r.ok) notify.error(r.error ?? 'Could not duplicate template')
-  }
-
   if (id && tpl) {
     const specCount = tpl.sections.filter((s) => s.contentFormat === 'spec_table').length
     const layout = resolveQuotationPrintLayout(tpl)
@@ -930,7 +914,6 @@ export function CrmQuotationTemplatesPage() {
             }}
             secondaryActions={[
               { id: 'preview', label: 'Preview', icon: Eye, onClick: () => navigate(`/crm/quotation-templates/${tpl.id}/preview`) },
-              { id: 'duplicate', label: 'Duplicate', icon: Copy, onClick: () => handleDuplicate(tpl.id) },
             ]}
             moreActions={[
               { id: 'templates', label: 'All Templates', icon: Bookmark, onClick: () => navigate('/crm/quotation-templates') },
@@ -999,16 +982,10 @@ export function CrmQuotationTemplatesPage() {
       breadcrumbs={crmModuleBreadcrumbs('Quotation Templates', '/crm/quotation-templates')}
       autoBreadcrumbs={false}
       actions={viewToggle}
-      commandBar={(
+        commandBar={(
         <ErpCommandBar
           inline
           sticky={false}
-          primaryAction={{
-            id: 'new',
-            label: 'New Template',
-            icon: Plus,
-            onClick: () => navigate('/crm/quotation-templates/new'),
-          }}
           secondaryActions={[
             { id: 'quotations', label: 'Quotations', icon: FileText, onClick: () => navigate('/crm/quotations') },
             { id: 'new-quotation', label: 'New Quotation', icon: Plus, onClick: () => navigate('/crm/quotations/new') },
@@ -1044,11 +1021,11 @@ export function CrmQuotationTemplatesPage() {
       )}
     >
       {filtered.length === 0 ? (
-        <QuotationTemplateEmptyState onCreate={() => navigate('/crm/quotation-templates/new')} />
+        <QuotationTemplateEmptyState />
       ) : viewMode === 'card' ? (
         <div className="crm-template-grid">
           {filtered.map((t) => (
-            <QuotationTemplateCard key={t.id} template={t} onDuplicate={handleDuplicate} />
+            <QuotationTemplateCard key={t.id} template={t} />
           ))}
         </div>
       ) : (
@@ -1086,9 +1063,6 @@ export function CrmQuotationTemplatesPage() {
                       <button type="button" className="crm-card-action" onClick={() => navigate(`/crm/quotation-templates/${t.id}/preview`)}>
                         <Eye className="h-3.5 w-3.5" /> Preview
                       </button>
-                      <button type="button" className="crm-card-action" onClick={() => handleDuplicate(t.id)}>
-                        <Copy className="h-3.5 w-3.5" /> Duplicate
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1113,121 +1087,22 @@ export function CrmQuotationTemplatesPage() {
 
 export function CrmQuotationTemplateNewPage() {
   const navigate = useNavigate()
-  const templates = useCrmStore((s) => s.quotationTemplates)
-  const createTemplate = useCrmStore((s) => s.createQuotationTemplate)
-  const [blankOpen, setBlankOpen] = useState(false)
 
-  async function handleBlankCreate(values: Parameters<typeof blankTemplateDefaultTerms>[0]) {
-    const r = await resolveStoreAction(
-      createTemplate({
-        templateName: values.templateName,
-        productFamily: values.templateType,
-        sections: [],
-        defaultTerms: blankTemplateDefaultTerms(values),
-        printLayout: values.printLayout,
-      }),
-    )
-    if (r.ok && r.templateId) {
-      navigate(`/crm/quotation-templates/${r.templateId}/editor`)
-      return
-    }
-    throw new Error(r.error ?? 'Could not create template')
-  }
-
-  async function handleFromBase(baseId: string) {
-    const base = templates.find((t) => t.id === baseId)
-    if (!base) return
-    const name = await systemPrompt({
-      title: 'Create from template',
-      fieldLabel: 'Template name',
-      defaultValue: `${base.templateName} (Copy)`,
-      confirmLabel: 'Create',
-      required: true,
-    })
-    if (!name) return
-    const r = await resolveStoreAction(
-      createTemplate({ templateName: name, productFamily: base.productFamily, sourceTemplateId: baseId }),
-    )
-    if (r.ok && r.templateId) navigate(`/crm/quotation-templates/${r.templateId}/editor`)
-    else if (!r.ok) notify.error(r.error ?? 'Could not create template')
-  }
-
-  const featured = findFeaturedQuotationTemplate(templates)
-  const others = templates.filter((t) => !featured || t.id !== featured.id)
+  useEffect(() => {
+    // Catalog locked to the two ISO Word templates — no blank/copy creation.
+    navigate('/crm/quotation-templates', { replace: true })
+  }, [navigate])
 
   return (
     <OperationalPageShell
-      title="New Quotation Template"
-      description="Start from a proven technical-commercial base or build a blank template"
+      title="Quotation Templates"
+      description="Catalog is locked to the two ISO templates (26 KL and 25 m³)."
       badge="CRM"
       variant="dynamics"
-      breadcrumbs={crmChildBreadcrumbs('Quotation Templates', '/crm/quotation-templates', 'New Template')}
+      breadcrumbs={crmChildBreadcrumbs('Quotation Templates', '/crm/quotation-templates', 'Catalog')}
       autoBreadcrumbs={false}
-      favoritePath="/crm/quotation-templates/new"
-      commandBar={(
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={{
-            id: 'blank',
-            label: 'Blank Template',
-            icon: Layers,
-            onClick: () => setBlankOpen(true),
-          }}
-          secondaryActions={[
-            { id: 'back', label: 'All Templates', icon: ArrowLeft, onClick: () => navigate('/crm/quotation-templates') },
-            { id: 'quotations', label: 'Quotations', icon: FileText, onClick: () => navigate('/crm/quotations') },
-          ]}
-        />
-      )}
-      kpiStrip={buildQuotationTemplateKpis({
-        total: templates.length,
-        active: templates.filter((t) => t.isActive).length,
-        avgSections: templates.length
-          ? Math.round(templates.reduce((s, t) => s + t.sections.length, 0) / templates.length)
-          : 0,
-        specTables: templates.reduce(
-          (s, t) => s + t.sections.filter((sec) => sec.contentFormat === 'spec_table').length,
-          0,
-        ),
-        families: new Set(templates.map((t) => t.productFamily)).size,
-      })}
     >
-      <div className="crm-template-new">
-        <button type="button" className="crm-template-new__blank" onClick={() => setBlankOpen(true)}>
-          <Layers className="h-6 w-6" />
-          <div>
-            <p className="crm-template-new__title">Blank template</p>
-            <p className="crm-template-new__hint">Add sections manually — scope, specs, terms, and price grid</p>
-          </div>
-        </button>
-
-        {featured ? (
-          <button type="button" className="crm-template-new__featured" onClick={() => handleFromBase(featured.id)}>
-            <Bookmark className="h-6 w-6" />
-            <div>
-              <p className="crm-template-new__eyebrow">Recommended base</p>
-              <p className="crm-template-new__title">{featured.templateName}</p>
-              <p className="crm-template-new__hint">{featured.sections.length} sections · full ISO tank technical-commercial structure</p>
-            </div>
-          </button>
-        ) : null}
-
-        <h2 className="crm-template-new__section-title">Other product templates</h2>
-        <div className="crm-template-new__grid">
-          {others.map((t) => (
-            <button key={t.id} type="button" className="crm-template-new__option" onClick={() => handleFromBase(t.id)}>
-              <p className="crm-template-new__title">{t.templateName}</p>
-              <p className="crm-template-new__hint">{t.productFamily} · {t.sections.length} sections</p>
-            </button>
-          ))}
-        </div>
-      </div>
-      <CreateBlankQuotationTemplateModal
-        open={blankOpen}
-        onClose={() => setBlankOpen(false)}
-        onCreate={handleBlankCreate}
-      />
+      <p className="crm-template-new__hint">Creating or duplicating templates is disabled on live.</p>
     </OperationalPageShell>
   )
 }

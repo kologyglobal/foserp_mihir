@@ -127,7 +127,7 @@ export const QUOTATION_TEMPLATE_SEED_ROWS: QuotationTemplateSeedRow[] = [
     code: 'ISO-TANK-26KL',
     templateName: '26 KL ISO Tank Container Quotation',
     productFamily: 'ISO Tank',
-    version: 1,
+    version: 6,
     defaultTerms: 'Ex works Chhapi, Banaskantha, North Gujarat. GST @ 18% extra. Validity 60 days. Subject to Chhapi jurisdiction.',
     defaultWarranty: '12 months against defective material and workmanship. Bought-out items carry OEM warranty.',
     defaultExclusions: 'Freight, insurance, extra connections/flanges, and statutory registrations excluded unless specified.',
@@ -138,15 +138,32 @@ export const QUOTATION_TEMPLATE_SEED_ROWS: QuotationTemplateSeedRow[] = [
   },
   {
     code: 'ISO-DRY-BULK-25CBM',
-    templateName: "20' ISO Dry Bulk Tanker (25 CBM) Quotation",
+    templateName: '25 m³ ISO Tank Container Quotation',
     productFamily: 'ISO Dry Bulk',
-    version: 1,
+    version: 3,
     defaultTerms: 'Ex works Chhapi, Banaskantha, North Gujarat. GST extra. Validity 20 days. Advance non-refundable on cancellation. Subject to Chhapi jurisdiction.',
     defaultWarranty: '12 months against defective material and workmanship. Bought-out items carry OEM warranty.',
     defaultExclusions: 'Freight, insurance, site unloading, and statutory registrations excluded unless specified.',
     sections: isoShellSections(
-      "20' ISO Dry Bulk Tanker (25 CBM)",
-      "Quotation for supply of 20' ISO Dry Bulk Tanker (25 CBM)",
+      '25 m³ ISO Tank Container',
+      "Quotation for supply of 25 m³ ISO Tank Container (20' dry bulk / Model 25 CBM)",
     ),
   },
 ]
+
+/** Only these catalog codes stay active — seed + live cleanup soft-delete everything else. */
+export const QUOTATION_TEMPLATE_KEEP_CODES = QUOTATION_TEMPLATE_SEED_ROWS.map((r) => r.code)
+
+export const VF_WORD_PRINT_LAYOUT_SEED = {
+  pageSize: 'A4',
+  marginMm: 18,
+  fontScale: 1,
+  headerStyle: 'minimal',
+  showLogo: false,
+  showCompanyHeader: false,
+  showCustomerBlock: false,
+  showPageFooter: true,
+  showSignatureBlock: true,
+  pageBreakBefore: ['price_table'],
+  printSkin: 'vf_word',
+} as const

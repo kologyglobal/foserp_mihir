@@ -5,10 +5,15 @@ import { getPagination } from '../../../utils/pagination.js'
 import type { ListQuotationTemplatesQuery } from './quotation-template.validation.js'
 import { toTemplateJson } from './quotation-template.types.js'
 
-export async function findQuotationTemplates(tenantId: string, query: ListQuotationTemplatesQuery) {
+export async function findQuotationTemplates(
+  tenantId: string,
+  query: ListQuotationTemplatesQuery,
+  catalogCodes?: string[],
+) {
   const { skip, take, page, limit } = getPagination(query)
   const where = {
     ...tenantActiveFilter(tenantId),
+    ...(catalogCodes && catalogCodes.length > 0 ? { code: { in: catalogCodes } } : {}),
     ...(query.productFamily ? { productFamily: query.productFamily } : {}),
     ...(query.isActive !== undefined ? { isActive: query.isActive } : {}),
     ...(query.search

@@ -3,6 +3,10 @@ import { NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { resolveUserNames } from '../../../shared/index.js'
 import * as repo from './quotation-template.repository.js'
 import { mapQuotationTemplateToDto } from './quotation-template.types.js'
+import {
+  isQuotationTemplateCatalogLocked,
+  quotationTemplateKeepCodes,
+} from './quotation-template.catalog.js'
 import type {
   CreateQuotationTemplateInput,
   DuplicateQuotationTemplateInput,
@@ -18,8 +22,17 @@ async function mapWithNames(tenantId: string, row: NonNullable<Awaited<ReturnTyp
   })
 }
 
+function assertCatalogUnlockedForWrite() {
+  if (isQuotationTemplateCatalogLocked()) {
+    throw new ValidationError(
+      'Quotation template catalog is locked to the two ISO templates (26 KL and 25 m³). Creating or duplicating templates is disabled on live.',
+    )
+  }
+}
+
 export async function listQuotationTemplates(tenantId: string, query: ListQuotationTemplatesQuery) {
-  const result = await repo.findQuotationTemplates(tenantId, query)
+  const catalogCodes = isQuotationTemplateCatalogLocked() ? quotationTemplateKeepCodes() : undefined
+  const result = await repo.findQuotationTemplates(tenantId, query, catalogCodes)
   const nameMap = await resolveUserNames(
     result.items.flatMap((r) => [r.createdBy, r.updatedBy]),
     tenantId,
@@ -45,6 +58,8 @@ export async function getQuotationTemplate(tenantId: string, id: string) {
 }
 
 export async function createQuotationTemplate(tenantId: string, userId: string, input: CreateQuotationTemplateInput) {
+  assertCatalogUnlockedForWrite()
+
   let sections: unknown[] = input.sections ?? []
   let defaultTerms = input.defaultTerms ?? ''
   let defaultWarranty = input.defaultWarranty ?? ''
@@ -96,6 +111,7 @@ export async function duplicateQuotationTemplate(
   userId: string,
   input: DuplicateQuotationTemplateInput,
 ) {
+  assertCatalogUnlockedForWrite()
   const source = await repo.findQuotationTemplateById(tenantId, id)
   if (!source) throw new NotFoundError('Quotation template not found')
   const row = await repo.createQuotationTemplate(tenantId, userId, {
@@ -115,5 +131,8 @@ export async function duplicateQuotationTemplate(
 export async function deleteQuotationTemplate(tenantId: string, id: string, userId: string) {
   const existing = await repo.findQuotationTemplateById(tenantId, id)
   if (!existing) throw new NotFoundError('Quotation template not found')
+  if (isQuotationTemplateCatalogLocked() && quotationTemplateKeepCodes().includes(existing.code)) {
+    throw new ValidationError('The two ISO quotation templates cannot be deleted on live.')
+  }
   await repo.softDeleteQuotationTemplate(tenantId, id, userId)
 }

@@ -36,6 +36,7 @@ import { CrmStageNotes } from '../../components/crm/shared/CrmStageNotes'
 import { OPPORTUNITY_NOTE_STAGE_OPTIONS } from '../../utils/crmNoteStageOptions'
 import { OpportunitySmartOverviewPanel } from '../../components/crm/OpportunitySmartOverviewPanel'
 import { useCrmStore } from '../../store/crmStore'
+import { filterAllowedQuotationTemplates } from '../../utils/quotationEngine/builtinTemplateSync'
 import { resolveStoreAction } from '../../store/storeAction'
 import { useMasterStore } from '../../store/masterStore'
 import { useSalesStore } from '../../store/salesStore'
@@ -98,7 +99,11 @@ export function Opportunity360Page() {
   const followUps = useCrmStore((s) => s.followUps)
   const contacts = useCrmStore((s) => s.contacts)
   const quotationDocuments = useCrmStore((s) => s.quotationDocuments)
-  const templates = useCrmStore((s) => s.quotationTemplates)
+  const quotationTemplates = useCrmStore((s) => s.quotationTemplates)
+  const templates = useMemo(
+    () => filterAllowedQuotationTemplates(quotationTemplates),
+    [quotationTemplates],
+  )
   const createQuotation = useCrmStore((s) => s.createQuotationFromOpportunity)
   const customers = useMasterStore((s) => s.customers)
   const products = useMasterStore((s) => s.products)

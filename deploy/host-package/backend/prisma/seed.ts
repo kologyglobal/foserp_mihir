@@ -495,7 +495,8 @@ async function main(): Promise<void> {
     })
   }
 
-  const { QUOTATION_TEMPLATE_SEED_ROWS } = await import('./quotationTemplateSeedData.js')
+  const { QUOTATION_TEMPLATE_SEED_ROWS, QUOTATION_TEMPLATE_KEEP_CODES, VF_WORD_PRINT_LAYOUT_SEED } =
+    await import('./quotationTemplateSeedData.js')
   for (const row of QUOTATION_TEMPLATE_SEED_ROWS) {
     await prisma.crmQuotationTemplate.upsert({
       where: { tenantId_code: { tenantId: tenant.id, code: row.code } },
@@ -509,6 +510,7 @@ async function main(): Promise<void> {
         defaultTerms: row.defaultTerms,
         defaultWarranty: row.defaultWarranty,
         defaultExclusions: row.defaultExclusions,
+        printLayout: VF_WORD_PRINT_LAYOUT_SEED,
         isActive: true,
         createdBy: tenantAdmin.id,
         updatedBy: tenantAdmin.id,
@@ -521,12 +523,22 @@ async function main(): Promise<void> {
         defaultTerms: row.defaultTerms,
         defaultWarranty: row.defaultWarranty,
         defaultExclusions: row.defaultExclusions,
+        printLayout: VF_WORD_PRINT_LAYOUT_SEED,
         isActive: true,
         deletedAt: null,
         updatedBy: tenantAdmin.id,
       },
     })
   }
+
+  await prisma.crmQuotationTemplate.updateMany({
+    where: {
+      tenantId: tenant.id,
+      deletedAt: null,
+      code: { notIn: [...QUOTATION_TEMPLATE_KEEP_CODES] },
+    },
+    data: { deletedAt: new Date(), isActive: false, updatedBy: tenantAdmin.id },
+  })
 
   console.log('\n=== Seed complete ===')
   console.log(`Tenant: ${tenant.name} (slug: ${tenant.slug})`)

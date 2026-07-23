@@ -21,9 +21,9 @@ export const ISO_DRY_BULK_25CBM_SECTIONS: TemplateSection[] = [
       'Ref. No.: {{reference_no}}',
       'Date: {{quotation_date}}',
       '',
-      "Sub: Quotation for supply of 20' ISO Dry Bulk Tanker",
-      'For transportation by Rail, Sea and Road — with CSC certificate',
-      'Designed for dry bulk material discharge by compressed air — Model 25 CBM',
+      "Sub: Quotation for supply of 25 m³ ISO Tank Container",
+      "20' ISO Dry Bulk Tanker — Model 25 CBM (rail / sea / road, CSC)",
+      'Designed for dry bulk material discharge by compressed air',
       'With Rail Impact Test',
     ].join('\n'),
     sequenceNo: 1,
@@ -52,7 +52,7 @@ export const ISO_DRY_BULK_25CBM_SECTIONS: TemplateSection[] = [
     content: [
       'Dear Sir,',
       '',
-      "We appreciate your interest in our products and are delighted to provide the following price for your requirement of 20' ISO Dry Bulk Tanker (Model 25 CBM).",
+      'We appreciate your interest in our products and are delighted to provide the following price for your requirement of 25 m³ ISO Tank Container (Model 25 CBM dry bulk).',
       '',
       'We trust that our offer will meet your technical and commercial expectations and look forward to your valued enquiry/order.',
     ].join('\n'),
@@ -318,4 +318,4 @@ export const ISO_DRY_BULK_25CBM_SECTIONS: TemplateSection[] = [
 ]
 
 export const ISO_DRY_BULK_TEMPLATE_ID = 'qtpl-iso-dry-bulk-25cbm'
-export const ISO_DRY_BULK_TEMPLATE_VERSION = 2
+export const ISO_DRY_BULK_TEMPLATE_VERSION = 3

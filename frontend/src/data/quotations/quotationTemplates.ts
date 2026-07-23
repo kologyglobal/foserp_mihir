@@ -28,7 +28,7 @@ export const DEFAULT_QUOTATION_TEMPLATES: QuotationTemplate[] = [
   },
   {
     id: 'qtpl-iso-dry-bulk-25cbm',
-    templateName: "20' ISO Dry Bulk Tanker (25 CBM) Quotation",
+    templateName: '25 m³ ISO Tank Container Quotation',
     productFamily: 'ISO Dry Bulk',
     version: ISO_DRY_BULK_TEMPLATE_VERSION,
     sections: ISO_DRY_BULK_25CBM_SECTIONS,
