@@ -7,7 +7,7 @@ import { VF_WORD_PRINT_LAYOUT } from '../../utils/quotationEngine/printLayout'
 export const DEFAULT_QUOTATION_TEMPLATES: QuotationTemplate[] = [
   {
     id: 'qtpl-iso-tank',
-    templateName: '26 KL ISO Tank Container Quotation',
+    templateName: '76 — 26 KL ISO Tank Container Quotation',
     productFamily: 'ISO Tank',
     version: ISO_TANK_TEMPLATE_VERSION,
     sections: ISO_TANK_26KL_SECTIONS,
@@ -28,7 +28,7 @@ export const DEFAULT_QUOTATION_TEMPLATES: QuotationTemplate[] = [
   },
   {
     id: 'qtpl-iso-dry-bulk-25cbm',
-    templateName: '25 m³ ISO Tank Container Quotation',
+    templateName: '109 — 25 m³ ISO Tank Container Quotation',
     productFamily: 'ISO Dry Bulk',
     version: ISO_DRY_BULK_TEMPLATE_VERSION,
     sections: ISO_DRY_BULK_25CBM_SECTIONS,

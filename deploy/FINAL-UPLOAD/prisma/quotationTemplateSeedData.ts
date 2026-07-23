@@ -125,9 +125,9 @@ function isoShellSections(title: string, subject: string): Array<Record<string, 
 export const QUOTATION_TEMPLATE_SEED_ROWS: QuotationTemplateSeedRow[] = [
   {
     code: 'ISO-TANK-26KL',
-    templateName: '26 KL ISO Tank Container Quotation',
+    templateName: '76 — 26 KL ISO Tank Container Quotation',
     productFamily: 'ISO Tank',
-    version: 6,
+    version: 7,
     defaultTerms: 'Ex works Chhapi, Banaskantha, North Gujarat. GST @ 18% extra. Validity 60 days. Subject to Chhapi jurisdiction.',
     defaultWarranty: '12 months against defective material and workmanship. Bought-out items carry OEM warranty.',
     defaultExclusions: 'Freight, insurance, extra connections/flanges, and statutory registrations excluded unless specified.',
@@ -138,9 +138,9 @@ export const QUOTATION_TEMPLATE_SEED_ROWS: QuotationTemplateSeedRow[] = [
   },
   {
     code: 'ISO-DRY-BULK-25CBM',
-    templateName: '25 m³ ISO Tank Container Quotation',
+    templateName: '109 — 25 m³ ISO Tank Container Quotation',
     productFamily: 'ISO Dry Bulk',
-    version: 3,
+    version: 4,
     defaultTerms: 'Ex works Chhapi, Banaskantha, North Gujarat. GST extra. Validity 20 days. Advance non-refundable on cancellation. Subject to Chhapi jurisdiction.',
     defaultWarranty: '12 months against defective material and workmanship. Bought-out items carry OEM warranty.',
     defaultExclusions: 'Freight, insurance, site unloading, and statutory registrations excluded unless specified.',

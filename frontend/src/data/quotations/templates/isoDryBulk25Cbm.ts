@@ -318,4 +318,4 @@ export const ISO_DRY_BULK_25CBM_SECTIONS: TemplateSection[] = [
 ]
 
 export const ISO_DRY_BULK_TEMPLATE_ID = 'qtpl-iso-dry-bulk-25cbm'
-export const ISO_DRY_BULK_TEMPLATE_VERSION = 3
+export const ISO_DRY_BULK_TEMPLATE_VERSION = 4
