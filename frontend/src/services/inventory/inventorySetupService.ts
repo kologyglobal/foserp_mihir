@@ -1,7 +1,8 @@
 /**
- * Inventory Setup & Saved Views mock service (Phase 6).
+ * Inventory Setup — demo memory store + live API/master dual-mode.
  */
 
+import { isApiMode } from '../../config/apiConfig'
 import { useMasterStore } from '../../store/masterStore'
 import type {
   InventorySavedView,
@@ -14,6 +15,14 @@ import {
   INVENTORY_SAVED_VIEW_PRESETS,
   mapMasterWarehouseToSetup,
 } from './inventorySetupSeed'
+import {
+  createMasterApi,
+  fetchMasterWarehouses,
+  mapWarehouseDto,
+  updateMasterApi,
+  warehouseToApiPayload,
+} from '../api/masterApi'
+import { getInventorySetupApi, putInventorySetupApi } from '../api/inventorySetupApi'
 
 const delay = (ms = 60) => new Promise<void>((r) => setTimeout(r, ms))
 
@@ -34,12 +43,36 @@ let savedViewsStore: InventorySavedView[] = INVENTORY_SAVED_VIEW_PRESETS.map((p,
   createdAt: '2026-01-01T00:00:00.000Z',
 }))
 
+function stripMeta(setup: InventorySetup & { version?: number; updatedAt?: string | null }): InventorySetup {
+  const { version: _v, updatedAt: _u, ...rest } = setup as InventorySetup & {
+    version?: number
+    updatedAt?: string | null
+  }
+  return {
+    general: { ...DEFAULT_INVENTORY_SETUP.general, ...rest.general },
+    tracking: { ...DEFAULT_INVENTORY_SETUP.tracking, ...rest.tracking },
+    quality: { ...DEFAULT_INVENTORY_SETUP.quality, ...rest.quality },
+    planning: { ...DEFAULT_INVENTORY_SETUP.planning, ...rest.planning },
+    approvals: { ...DEFAULT_INVENTORY_SETUP.approvals, ...rest.approvals },
+    advancedWarehouse: { ...DEFAULT_INVENTORY_SETUP.advancedWarehouse, ...rest.advancedWarehouse },
+    numberSeries: { ...DEFAULT_INVENTORY_SETUP.numberSeries, ...rest.numberSeries },
+  }
+}
+
 export async function getInventorySetup(): Promise<InventorySetup> {
+  if (isApiMode()) {
+    const res = await getInventorySetupApi()
+    return stripMeta(res.data)
+  }
   await delay()
   return structuredClone(setupStore)
 }
 
-export async function updateInventorySetupDemo(patch: Partial<InventorySetup>): Promise<InventorySetup> {
+export async function updateInventorySetup(patch: Partial<InventorySetup>): Promise<InventorySetup> {
+  if (isApiMode()) {
+    const res = await putInventorySetupApi(patch)
+    return stripMeta(res.data)
+  }
   await delay()
   setupStore = {
     ...setupStore,
@@ -55,7 +88,19 @@ export async function updateInventorySetupDemo(patch: Partial<InventorySetup>): 
   return structuredClone(setupStore)
 }
 
+/** @deprecated Prefer updateInventorySetup */
+export async function updateInventorySetupDemo(patch: Partial<InventorySetup>): Promise<InventorySetup> {
+  return updateInventorySetup(patch)
+}
+
 export async function getWarehouses(): Promise<InventoryWarehouseRecord[]> {
+  if (isApiMode()) {
+    const rows = await fetchMasterWarehouses()
+    return rows.map((row, idx) => {
+      const wh = mapWarehouseDto(row)
+      return mapMasterWarehouseToSetup(wh, idx)
+    })
+  }
   await delay()
   const master = useMasterStore.getState()
   return master.warehouses.map((wh, idx) => {
@@ -66,35 +111,96 @@ export async function getWarehouses(): Promise<InventoryWarehouseRecord[]> {
 }
 
 export async function createWarehouse(input: InventoryWarehouseInput): Promise<InventoryWarehouseRecord> {
+  if (isApiMode()) {
+    const created = await createMasterApi(
+      'warehouses',
+      warehouseToApiPayload({
+        warehouseCode: input.warehouseCode,
+        warehouseName: input.warehouseName,
+        warehouseType:
+          input.warehouseType === 'wip'
+            ? 'wip'
+            : input.warehouseType === 'finished'
+              ? 'fg'
+              : input.warehouseType === 'transit'
+                ? 'sub'
+                : 'main',
+        plantCode: input.plantCode,
+        address: input.location || '',
+        isActive: input.isActive,
+      }),
+    )
+    const wh = mapWarehouseDto(created.data)
+    return { ...mapMasterWarehouseToSetup(wh, 0), ...input, id: wh.id }
+  }
   await delay()
   const master = useMasterStore.getState()
   if (master.warehouses.some((w) => w.warehouseCode.toLowerCase() === input.warehouseCode.toLowerCase())) {
     throw new Error('Warehouse code already exists')
   }
-  const id = await Promise.resolve(master.addWarehouse({
-    warehouseCode: input.warehouseCode,
-    warehouseName: input.warehouseName,
-    warehouseType: input.warehouseType === 'wip' ? 'wip' : input.warehouseType === 'finished' ? 'fg' : input.warehouseType === 'transit' ? 'sub' : 'main',
-    plantCode: input.plantCode,
-    address: input.location || '',
-    isActive: input.isActive,
-  }))
+  const id = await Promise.resolve(
+    master.addWarehouse({
+      warehouseCode: input.warehouseCode,
+      warehouseName: input.warehouseName,
+      warehouseType:
+        input.warehouseType === 'wip'
+          ? 'wip'
+          : input.warehouseType === 'finished'
+            ? 'fg'
+            : input.warehouseType === 'transit'
+              ? 'sub'
+              : 'main',
+      plantCode: input.plantCode,
+      address: input.location || '',
+      isActive: input.isActive,
+    }),
+  )
   const record: InventoryWarehouseRecord = { id, ...input }
   warehouseExtensions.set(id, record)
   return record
 }
 
-export async function updateWarehouse(id: string, input: Partial<InventoryWarehouseInput>): Promise<InventoryWarehouseRecord> {
+export async function updateWarehouse(
+  id: string,
+  input: Partial<InventoryWarehouseInput>,
+): Promise<InventoryWarehouseRecord> {
+  if (isApiMode()) {
+    const current = (await getWarehouses()).find((w) => w.id === id)
+    if (!current) throw new Error('Warehouse not found')
+    const merged = { ...current, ...input }
+    await updateMasterApi(
+      'warehouses',
+      id,
+      warehouseToApiPayload({
+        warehouseCode: merged.warehouseCode,
+        warehouseName: merged.warehouseName,
+        warehouseType:
+          merged.warehouseType === 'wip'
+            ? 'wip'
+            : merged.warehouseType === 'finished'
+              ? 'fg'
+              : merged.warehouseType === 'transit'
+                ? 'sub'
+                : 'main',
+        plantCode: merged.plantCode,
+        address: merged.location || '',
+        isActive: merged.isActive,
+      }),
+    )
+    return merged
+  }
   await delay()
   const master = useMasterStore.getState()
   const existing = master.getWarehouse(id)
   if (!existing) throw new Error('Warehouse not found')
-  await Promise.resolve(master.updateWarehouse(id, {
-    warehouseCode: input.warehouseCode,
-    warehouseName: input.warehouseName,
-    plantCode: input.plantCode,
-    isActive: input.isActive,
-  }))
+  await Promise.resolve(
+    master.updateWarehouse(id, {
+      warehouseCode: input.warehouseCode,
+      warehouseName: input.warehouseName,
+      plantCode: input.plantCode,
+      isActive: input.isActive,
+    }),
+  )
   const current = (await getWarehouses()).find((w) => w.id === id)!
   const updated = { ...current, ...input }
   warehouseExtensions.set(id, updated)

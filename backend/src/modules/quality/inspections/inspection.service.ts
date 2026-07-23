@@ -5,6 +5,7 @@ import { nextCode } from '../../../services/codeSeries.service.js'
 import { InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { logProductionActivity } from '../../manufacturing/shared/activity.service.js'
 import { promoteSuccessorsAfterStageComplete } from '../../manufacturing/shared/stage-completion.service.js'
+import { getManufacturingSettingsForTenant } from '../../manufacturing/settings/manufacturing-settings.service.js'
 import { mapInspection, mapNcr } from '../shared/mappers.js'
 import {
   persistParameterResults,
@@ -228,8 +229,19 @@ export async function decideInspection(req: Request, tenantId: string, id: strin
     : []
 
   if ((input.decision === 'PASS' || input.decision === 'CONDITIONAL_PASS') && snapshot.length > 0) {
-    const err = validatePassAgainstSnapshot(snapshot, input.parameterResults ?? [])
-    if (err) throw new ValidationError(err)
+    const hasResults = (input.parameterResults?.length ?? 0) > 0
+    // Flexible WO shopfloor popup may approve without filling plan parameters.
+    // Still validate when parameter results are supplied.
+    if (hasResults) {
+      const err = validatePassAgainstSnapshot(snapshot, input.parameterResults ?? [])
+      if (err) throw new ValidationError(err)
+    } else {
+      const settings = await getManufacturingSettingsForTenant(tenantId)
+      if (!settings.flexibleExecution) {
+        const err = validatePassAgainstSnapshot(snapshot, input.parameterResults ?? [])
+        if (err) throw new ValidationError(err)
+      }
+    }
   }
 
   const now = new Date()
@@ -239,14 +251,25 @@ export async function decideInspection(req: Request, tenantId: string, id: strin
       await persistParameterResults(tx, tenantId, id, snapshot, input.parameterResults)
     }
 
-    if (input.decision === 'PASS') {
+    if (input.decision === 'PASS' || input.decision === 'CONDITIONAL_PASS') {
+      const isConditional = input.decision === 'CONDITIONAL_PASS'
       const updated = await repo.updateInspection(tx, tenantId, id, {
         status: 'PASSED',
-        decision: 'PASS',
-        acceptedQty: toDecimal(input.acceptedQty ?? Number(inspection.inspectedQty ?? 0)),
+        decision: input.decision,
+        acceptedQty: toDecimal(
+          input.acceptedQty ?? (isConditional ? 0 : Number(inspection.inspectedQty ?? 0)),
+        ),
+        conditionallyAcceptedQty: toDecimal(
+          input.conditionallyAcceptedQty ?? (isConditional ? Number(inspection.inspectedQty ?? 0) : 0),
+        ),
         rejectedQty: toDecimal(input.rejectedQty ?? 0),
         reworkQty: toDecimal(input.reworkQty ?? 0),
+        heldQty: toDecimal(input.heldQty ?? 0),
+        scrapQty: toDecimal(input.scrapQty ?? 0),
+        pendingQty: toDecimal(input.pendingQty ?? 0),
+        stockDisposition: input.stockDisposition ?? (isConditional ? 'USE_AS_IS' : null),
         decisionRemarks: input.remarks ?? null,
+        decisionReason: input.remarks ?? null,
         decidedByUserId: userId,
         decidedAt: now,
         updatedBy: userId,
@@ -299,21 +322,42 @@ export async function decideInspection(req: Request, tenantId: string, id: strin
           productionOrderId: inspection.productionOrderId!,
           activityType: 'QC_PASSED',
           userId,
-          message: `Inspection ${inspection.inspectionNumber} passed`,
+          message: isConditional
+            ? `Inspection ${inspection.inspectionNumber} conditionally passed`
+            : `Inspection ${inspection.inspectionNumber} passed`,
           reason: input.remarks ?? null,
         },
         tx,
       )
 
+      if (inspection.category === 'IN_PROCESS' && inspection.stageId) {
+        const stageName =
+          (await tx.productionOrderStage.findFirst({
+            where: { id: inspection.stageId, tenantId },
+            select: { name: true },
+          }))?.name ?? 'stage'
+        await logProductionActivity(
+          {
+            tenantId,
+            productionOrderId: inspection.productionOrderId!,
+            activityType: 'STAGE_COMPLETED',
+            userId,
+            message: `Stage "${stageName}" completed after QC ${isConditional ? 'conditional pass' : 'pass'}`,
+            reason: input.remarks ?? null,
+          },
+          tx,
+        )
+      }
+
       return { inspection: updated, promotedStages }
     }
 
-    if (input.decision === 'CONDITIONAL_PASS' || input.decision === 'HOLD' || input.decision === 'USE_AS_IS') {
+    if (input.decision === 'HOLD' || input.decision === 'USE_AS_IS') {
       const updated = await repo.updateInspection(tx, tenantId, id, {
         status: input.decision === 'HOLD' ? 'DECIDED' : 'PASSED',
         decision: input.decision,
         acceptedQty: toDecimal(input.acceptedQty ?? 0),
-        conditionallyAcceptedQty: toDecimal(input.conditionallyAcceptedQty ?? (input.decision === 'CONDITIONAL_PASS' ? Number(inspection.inspectedQty ?? 0) : 0)),
+        conditionallyAcceptedQty: toDecimal(input.conditionallyAcceptedQty ?? 0),
         heldQty: toDecimal(input.heldQty ?? (input.decision === 'HOLD' ? Number(inspection.inspectedQty ?? 0) : 0)),
         scrapQty: toDecimal(input.scrapQty ?? 0),
         pendingQty: toDecimal(input.pendingQty ?? 0),

@@ -144,6 +144,7 @@ export async function bootstrapManufacturingFixture(ctx: {
 
 export async function cleanupTenant(tenantId: string): Promise<void> {
   await prisma.auditLog.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.refreshToken.deleteMany({ where: { user: { tenantId } } }).catch(() => {})
   await prisma.productionOrderMaterial.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.inventoryStockMovement.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.inventoryStockReservation.deleteMany({ where: { tenantId } }).catch(() => {})
@@ -153,16 +154,22 @@ export async function cleanupTenant(tenantId: string): Promise<void> {
   await prisma.purchaseRequisition.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.qualityInspectionParameterResult.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.qualityNcr.deleteMany({ where: { tenantId } }).catch(() => {})
-  await prisma.purchaseQualityInspectionLine.deleteMany({ where: { tenantId } }).catch(() => {})
-  await prisma.purchaseQualityInspection.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.qualityInspectionLine.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.qualityInspection.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.manufacturingQualityInspection.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.manufacturingSettings.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.qualityInspectionPlanLine.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.qualityInspectionPlan.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.qualityParameter.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.manufacturingOperationDependency.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.manufacturingRoutingOperation.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.manufacturingStageGroup.deleteMany({ where: { tenantId } }).catch(() => {})
-  await prisma.manufacturingRoutingVersion.updateMany({ where: { tenantId }, data: {} }).catch(() => {})
+  await prisma.manufacturingProfile
+    .updateMany({
+      where: { tenantId },
+      data: { defaultBomVersionId: null, defaultRoutingVersionId: null },
+    })
+    .catch(() => {})
   await prisma.manufacturingProfile.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.manufacturingRoutingVersion.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.manufacturingRouting.deleteMany({ where: { tenantId } }).catch(() => {})
@@ -178,6 +185,7 @@ export async function cleanupTenant(tenantId: string): Promise<void> {
   await prisma.masterUom.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.masterVendor.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.userRole.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.rolePermission.deleteMany({ where: { role: { tenantId } } }).catch(() => {})
   await prisma.role.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.user.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.tenant.delete({ where: { id: tenantId } }).catch(() => {})

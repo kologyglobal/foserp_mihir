@@ -66,8 +66,48 @@ export async function promoteSuccessorsAfterStageComplete(
     if (derived === 'READY' || derived === 'IN_PROGRESS') readyOrRunningStages.push({ ...s, status: derived })
   }
 
+  // Sequential fallback: when routing has no op-level dependencies, promote the next
+  // incomplete stage by display order so shopfloor can continue without a stuck NOT_STARTED gap.
+  if (readyOrRunningStages.length === 0) {
+    const nextSequential = allStages
+      .filter((s) => s.id !== completedStage.id)
+      .filter((s) => !['COMPLETED', 'SKIPPED', 'CANCELLED'].includes(s.status))
+      .sort((a, b) => a.displayOrder - b.displayOrder)[0]
+    if (nextSequential) {
+      const nextOps = await tx.productionOrderOperation.findMany({
+        where: { stageId: nextSequential.id, tenantId },
+      })
+      for (const op of nextOps) {
+        if (op.status === 'NOT_STARTED') {
+          await tx.productionOrderOperation.update({ where: { id: op.id }, data: { status: 'READY' } })
+        }
+      }
+      const refreshedNextOps = nextOps.map((op) =>
+        op.status === 'NOT_STARTED' ? { ...op, status: 'READY' as const } : op,
+      )
+      const derived =
+        refreshedNextOps.length === 0
+          ? ('READY' as const)
+          : deriveStageStatusFromOperations(
+              refreshedNextOps.map((op) => ({
+                id: op.id,
+                stageId: op.stageId,
+                isOptional: op.isOptional,
+                status: op.status,
+              })),
+            )
+      const nextStatus = derived === 'NOT_STARTED' ? 'READY' : derived
+      await tx.productionOrderStage.update({ where: { id: nextSequential.id }, data: { status: nextStatus } })
+      const promoted = { ...nextSequential, status: nextStatus }
+      if (nextStatus === 'READY' || nextStatus === 'IN_PROGRESS') {
+        readyOrRunningStages.push(promoted)
+      }
+      if (nextStatus === 'READY') promotedStages.push(promoted)
+    }
+  }
+
   let currentStageId = orderCurrentStageId
-  if (currentStageId === completedStage.id) {
+  if (currentStageId === completedStage.id || currentStageId == null) {
     const next = readyOrRunningStages.sort((a, b) => a.displayOrder - b.displayOrder)[0]
     currentStageId = next?.id ?? null
     await tx.productionOrder.update({ where: { id: productionOrderId }, data: { currentStageId } })

@@ -14,9 +14,10 @@ Statuses: `VERIFIED COMPLETE` | `BACKEND COMPLETE` | `FRONTEND ONLY` | `PARTIAL`
 | 3B | Customer receipts and allocations | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ drafts/post/alloc | Money In verify | **VERIFIED COMPLETE** |
 | 3C | Credit notes and allocations | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ post/alloc | Money In verify | **VERIFIED COMPLETE** |
 | 3D | AR reversals (receipt/CN) | ✅ | ✅ | ✅ | ✅ | ✅ reverse perms | ✅ receipt+CN reversal **14/14** | Money In reverse demos | **VERIFIED COMPLETE** |
+| 3E | Sales invoice document reverse | ✅ | ✅ | ✅ | ✅ | ✅ `finance.ar.invoice.reverse` | ✅ `finance-ar-invoice-reversal.test.ts` | Money In Reverse Document | **VERIFIED COMPLETE** |
 | 4A1 | AP vendor invoice / open-item foundation | ✅ | repos only | ❌ | ❌ | ✅ seeded | ✅ ap-vendor-invoice-foundation (live MySQL) | N/A | **PARTIAL** (DB foundation complete; calculation/API/posting/frontend pending) |
 | 4A2 | AP vendor invoice calculation/validation engine | N/A (no writes) | ✅ pure/DB-optional | ❌ | ❌ | N/A (no writes) | ✅ ap-vendor-invoice-calculation 22 + ap-vendor-invoice-duplicate 3 (live MySQL) | N/A | **PARTIAL** (calculation engine complete; API/workflow/posting/frontend pending) |
-| — | Sales invoice document reverse | — | ❌ | ❌ | ❌ | ❌ no `invoice.reverse` | N/A | N/A | **DOCUMENTED ONLY** (deferred) |
+| — | Sales invoice document reverse | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **See Phase 3E** |
 
 ## Overall Accounting classification
 
@@ -27,20 +28,18 @@ Live:
 - Finance Settings
 - Journals and Approvals
 - General Ledger
-- Accounts Receivable / Money In (incl. Phase 3D receipt/CN reverse + Phase 2C3 journal reverse)
+- Accounts Receivable / Money In (incl. Phase 3D receipt/CN reverse + **sales invoice document reverse** + Phase 2C3 journal reverse)
 - Legacy demo CoA/vouchers routes redirect to settings CoA + journals / GL voucher ledger (2026-07-21)
 
 Deferred or preview:
-- Sales invoice document reverse
-- AP / Money Out (4A1 DB foundation + 4A2 calculation engine only — see [`AP_STATUS.md`](AP_STATUS.md))
+- AP / Money Out (see [`AP_STATUS.md`](AP_STATUS.md) — often ahead of this matrix)
 - Bank and Cash
-- Fixed Assets
+- Fixed Assets (Phases 1–4 live: register/capitalize/depreciate/dispose/transfer/revalue/impair/maint/reports; PV/acquisition still demo)
 - GST and TDS returns
 - Budgeting
-- Period Close
-- Inventory Accounting
-- Manufacturing Accounting
-```
+- Period Close (Phase 1 lock + live inventory/mfg close feeds; accruals/year-end still demo)
+- Inventory Accounting (events + FE register; flag OFF by default — pilot)
+- Manufacturing Accounting (Phase 7E workspace live; flag OFF by default — pilot)```
 
 ## Actual Phase definitions (from code)
 
@@ -56,7 +55,7 @@ Deferred or preview:
 - Receipt doc reverse: `…/receipts/:id/reverse` (`finance.ar.receipt.reverse`) — REVERSAL voucher
 - CN alloc reverse: `…/credit-notes/:id/allocations/:batchId/reverse` — **no GL**
 - CN doc reverse: `…/credit-notes/:id/reverse` (`finance.ar.credit_note.reverse`) — REVERSAL voucher
-- **Does not include** sales invoice document reverse
+- **Sales invoice doc reverse:** `POST …/receivables/invoices/:id/reverse` (`finance.ar.invoice.reverse`) — REVERSAL voucher; requires no POSTED receipt/CN allocations and fully unallocated debit open item; preserves `invoiceNumber`
 
 ### Phase 4A1
 - Tables: `vendor_invoices`, `vendor_invoice_lines`, `vendor_invoice_source_links`, `payable_open_items`

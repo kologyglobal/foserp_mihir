@@ -1,4 +1,139 @@
-﻿<<<<<<< Updated upstream
+﻿## 2026-07-23 — Period Close Control Hardening
+
+### Shipped
+
+- Backend `GET …/periods/:id/close-readiness` aggregator (AP gate, unposted journals, bank recon, inv/mfg GL when flags on).
+- Optional hard-block: `FinanceSettings.periodCloseHardBlock` (default off); close returns `PERIOD_CLOSE_BLOCKED` when on + blockers.
+- `PeriodCloseChecklistAck` + GET/PUT checklist-acks (ACK / NA + note).
+- FE: Period Locking blocker panel; checklist Ack/N/A; Bank scorecard live; Features page toggle.
+- Migration `20260723120000_period_close_hardening`.
+- Tests: `tests/finance/period-close-hardening.test.ts`; FE `npm run test:period-close`.
+- Docs: `docs/accounting/PERIOD_CLOSE_STATUS.md`.
+
+### Verification
+
+- `npx vitest run tests/finance/period-close-hardening.test.ts` (when MySQL up)
+- `cd frontend && npm run test:period-close`
+
+---
+
+## 2026-07-22 — Routing ↔ BOM alignment (panel + generate)
+
+
+### Shipped
+
+- Migration `20260722190000_routing_stage_source_bom_line` — optional `ManufacturingStageGroup.sourceBomLineId`.
+- Backend: `GET …/routing-versions/:id/bom-context` and `POST …/generate-stages-from-bom` (DRAFT only; MAKE sub-assemblies + FINAL).
+- FE routing version editor: BOM reference panel, Generate stages from BOM, “From BOM” stage badges.
+- Live test: `tests/routing-bom-alignment.test.ts` (4).
+
+### Verification
+
+- `npx vitest run tests/routing-bom-alignment.test.ts` — 4/4 PASS
+
+---
+
+## 2026-07-22 — Flexible Work Order Execution
+
+### Shipped
+
+- Settings: `flexibleExecution` (default on), `allowCloseWithoutQc` default on with flexible; denormalized on settings DTO.
+- Lifecycle softens: overproduction → warnings; start reservation → warn when flexible; complete WO QC blockers → warnings; complete stage skips QC gate by default when flexible (`skipQcGate` / `qcOverrideReason`).
+- FE: WO detail flexible banner + tracking strip; Stage QC panel (decide / override); Record Progress remaining qty; Assignments Start/Pause/Resume.
+- Docs: `docs/manufacturing/FLEXIBLE_WO_EXECUTION.md`; Phase 2A README rules updated.
+- Tests: `manufacturing-phase2a.test.ts` flexible execution (2).
+
+### Verification
+
+- `npx vitest run tests/manufacturing-phase2a.test.ts -t "flexible execution"` — PASS
+
+---
+
+## 2026-07-22 — Live Inventory Issues register (API mode)
+
+### Shipped
+
+- `/inventory/movements/issues` (+ new/detail) no longer demo-gated in API mode.
+- Live pages list `movementType=ISSUE` from stock ledger; post via `POST /inventory/movements/issue` or `issue-to-work-order`.
+- Ledger GET/list permissions include `inventory.issues.view` (also receipts/returns view on list).
+- Ledger query `referenceType` accepts `FG_DISPATCH` / `SA_RECEIPT`.
+
+### Note
+
+- No draft multi-line issue documents — same model as live Receipts/Returns.
+- Demo mode Issues register unchanged.
+
+---
+
+## 2026-07-22 — GST e-invoice / e-way (simulated NIC)
+
+### Shipped
+
+- Migration `20260722153000_tax_einvoice_eway_registers` — `gst_e_invoices` / `gst_e_way_bills`.
+- Backend: generate/list/cancel IRN + EWB via `SimulatedNicAdapter` (`GST_NIC_PROVIDER`, default SIMULATED).
+- Permissions: `finance.tax.einvoice.manage`, `finance.tax.eway.manage`.
+- FE dual-mode registers + Generate/Cancel on e-invoice / e-way pages (API mode).
+- Docs: `docs/accounting/TAX_COMPLIANCE_STATUS.md` Phase 2.
+
+### Verification
+
+- `migrate deploy` + `prisma generate`
+- `tests/finance/finance-gst-einvoice-eway.test.ts` (live MySQL)
+- FE `scripts/verify-tax-compliance.ts`
+
+### Ops
+
+- `npm run db:sync-permissions` then re-login.
+- Not live GST portal — simulated IRN/EWB only.
+
+---
+
+## 2026-07-22 — Manufacturing / Inventory Accounting API-complete pilot
+
+### Shipped
+
+- Prisma: `InventoryAccountingEvent` model + enums aligned to migration `20260722041000_inventory_accounting_events`.
+- FE: `/accounting/manufacturing/**` wrapped in `ManufacturingAccountingApiGate` (API mode → live Phase 7E workspace + costing policies tab; demo seed unchanged).
+- FE: `/inventory/accounting` dual-mode event register (gate + list + detail; voucher deep-link).
+- Period Close Inventory / Manufacturing module pages compose live event/workspace counts in API mode.
+- Docs: `PERIOD_CLOSE_STATUS.md`, accounting matrix, project memory.
+
+### Verification
+
+- `npx prisma generate` — PASS
+- `tests/inventory-accounting-events.test.ts` — **11/11 PASS**
+- `npx tsx scripts/verify-mfg-inventory-accounting.ts` — PASS (FE seed-leak guards)
+
+### Ops
+
+- Flags stay **OFF by default**: `MANUFACTURING_ACCOUNTING`, `INVENTORY_ACCOUNTING`.
+- Enable after mappings + open period; see `PERIOD_CLOSE_STATUS.md` enable SOP.
+- SoT for mfg GL: `docs/manufacturing/PRODUCTION_PHASE7E_README.md`.
+
+---
+
+## 2026-07-22 — Fixed Assets Phase 4 (revaluation, impairment, maintenance, reports)
+
+### Shipped
+
+- Migration `20260722120000_finance_fixed_assets_phase4_reval_impair_maint` — reval/impair/maint tables; asset surplus/impairment fields; mappings `ASSET_REVALUATION_SURPLUS` / `ASSET_IMPAIRMENT_LOSS`.
+- API: revaluations (create/post/cancel), impairments (create/recognize/cancel), maintenance CRUD/complete/cancel, reports summary/register/NBV-by-category/disposals.
+- Permissions: `finance.fa.revalue` / `finance.fa.impair` / `finance.fa.maintain`.
+- FE dual-mode lists + live report print preview; banners use live when API mode is on.
+- Docs: `docs/accounting/FIXED_ASSETS_STATUS.md` Phase 4 section.
+
+### Verification
+
+- `migrate deploy` + `prisma generate` — PASS
+- `tests/finance/finance-fixed-assets-phase4.test.ts` — **4/4 PASS**
+
+### Ops
+
+- Configure default mappings for revaluation surplus + impairment loss.
+- `npm run db:sync-permissions` then re-login for new FA perms.
+
+---
+
 ## 2026-07-21 — Purchase Setup full persistence
 
 ### Shipped
@@ -496,7 +631,9 @@ cd frontend && npm run test:purchase-phase15-all
 
 - Purchase Planning Sheet list/update + Create PO from planning
 - Optional: dual-mode FE bridge for PR when `VITE_USE_API=true`
-=======
+
+---
+
 ## 2026-07-21 - CRM route source audit (old UI string trace)
 
 ### Verdict
@@ -612,7 +749,6 @@ No business-rule, permission, or API contract changes.
   resolution under `tsx`; live 409/sent/customer-approve code path updated in
   script. Static UAT-06.3 string check also pre-existing vs current convert
   action copy.
->>>>>>> Stashed changes
 
 ---
 

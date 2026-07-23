@@ -36,7 +36,7 @@ export async function getSerialLineage(tenantId: string, serialId: string) {
       item: { select: { id: true, code: true, name: true } },
       batch: true,
       warehouse: { select: { id: true, code: true, name: true } },
-      lineage: {
+      movements: {
         include: {
           movement: { include: movementInclude },
           warehouse: { select: { id: true, code: true, name: true } },
@@ -48,7 +48,7 @@ export async function getSerialLineage(tenantId: string, serialId: string) {
   if (!serial) throw new NotFoundError('Inventory serial not found')
   return {
     ...serial,
-    lineage: serial.lineage.map((row) => ({
+    lineage: serial.movements.map((row) => ({
       ...row,
       quantity: dec(row.quantity),
       movement: mapStockMovement(row.movement),

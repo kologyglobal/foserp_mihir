@@ -18,6 +18,7 @@ import { cn } from '@/utils/cn'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDateTime } from '@/utils/dates/format'
 import {
+  activateCostingPolicy,
   getAccountingWorkspaceSummary,
   getManufacturingAccountingGateStatus,
   listAccountingWorkspaceCloseReady,
@@ -25,6 +26,7 @@ import {
   listAccountingWorkspaceProvisional,
   listAccountingWorkspaceReconciliation,
   listAccountingWorkspaceUnposted,
+  listCostingPolicies,
   postManufacturingAccountingEvent,
   retryManufacturingAccountingEvent,
   setManufacturingAccountingFeatureControl,
@@ -33,14 +35,17 @@ import {
   type ManufacturingAccountingEvent,
   type ManufacturingAccountingGateStatus,
   type ManufacturingAccountingWorkspaceSummary,
+  type ManufacturingCostingPolicy,
   type ProvisionalCostRow,
   type ReconciliationRow,
 } from '@/services/api/manufacturingCostingApi'
 import {
+  canManageCostingPolicy,
   canPostAccounting,
   canReconcileAccounting,
   canRetryAccounting,
   canValidateAccounting,
+  canViewCostingPolicy,
 } from '@/utils/permissions/manufacturing'
 import { hasWorkspaceAdminRole } from '@/utils/permissions/workspaceAdmin'
 import { getStoredSession } from '@/services/api/client'
@@ -51,7 +56,7 @@ function canManageAccountingFeatureFlag(): boolean {
   return (getStoredSession()?.user.permissions ?? []).includes('finance.settings.manage')
 }
 
-type WorkspaceTab = 'overview' | 'unposted' | 'failed' | 'provisional' | 'close-ready' | 'reconciliation'
+type WorkspaceTab = 'overview' | 'unposted' | 'failed' | 'provisional' | 'close-ready' | 'reconciliation' | 'policies'
 
 const num = (value: string | number | null | undefined) => Number(value ?? 0)
 
@@ -171,8 +176,11 @@ export function ManufacturingAccountingWorkspacePage() {
   const [provisional, setProvisional] = useState<ProvisionalCostRow[]>([])
   const [closeReady, setCloseReady] = useState<CloseReadyRow[]>([])
   const [reconciliation, setReconciliation] = useState<ReconciliationRow[]>([])
+  const [policies, setPolicies] = useState<ManufacturingCostingPolicy[]>([])
 
   const reconcileAllowed = canReconcileAccounting()
+  const policiesAllowed = canViewCostingPolicy()
+  const policiesManage = canManageCostingPolicy()
 
   const loadSummary = useCallback(async () => {
     setLoading(true)
@@ -202,13 +210,16 @@ export function ManufacturingAccountingWorkspacePage() {
         if (nextTab === 'reconciliation' && reconcileAllowed) {
           setReconciliation((await listAccountingWorkspaceReconciliation()).data)
         }
+        if (nextTab === 'policies' && policiesAllowed) {
+          setPolicies((await listCostingPolicies({ limit: 100 })).data)
+        }
       } catch (e) {
         notify.error(e instanceof Error ? e.message : 'Failed to load workspace list')
       } finally {
         setTabLoading(false)
       }
     },
-    [reconcileAllowed],
+    [reconcileAllowed, policiesAllowed],
   )
 
   useEffect(() => {
@@ -289,6 +300,30 @@ export function ManufacturingAccountingWorkspacePage() {
     [gate, loadSummary],
   )
 
+  const handleActivatePolicy = useCallback(
+    async (policy: ManufacturingCostingPolicy) => {
+      if (!policiesManage) return
+      const confirmed = await appConfirm({
+        title: 'Activate costing policy?',
+        description: `Activate “${policy.name}”? Any other ACTIVE policy in the same plant scope will be archived.`,
+        confirmLabel: 'Activate',
+        tone: 'danger',
+      })
+      if (!confirmed) return
+      setBusy(true)
+      try {
+        await activateCostingPolicy(policy.id)
+        notify.success('Costing policy activated')
+        await loadTab('policies')
+      } catch (e) {
+        notify.error(e instanceof Error ? e.message : 'Failed to activate policy')
+      } finally {
+        setBusy(false)
+      }
+    },
+    [policiesManage, loadTab],
+  )
+
   const kpis = useMemo(
     () => [
       { id: 'unposted', label: 'Unposted', value: summary?.unpostedCount ?? 0, accent: 'amber' as const, onClick: () => setTab('unposted') },
@@ -308,6 +343,7 @@ export function ManufacturingAccountingWorkspacePage() {
     { id: 'provisional', label: 'Provisional' },
     { id: 'close-ready', label: 'Close Ready' },
     ...(reconcileAllowed ? [{ id: 'reconciliation' as const, label: 'Reconciliation' }] : []),
+    ...(policiesAllowed ? [{ id: 'policies' as const, label: 'Policies' }] : []),
   ]
 
   return (
@@ -548,6 +584,58 @@ export function ManufacturingAccountingWorkspacePage() {
                               <td className="text-right tabular-nums font-semibold">{formatCurrency(num(row.difference))}</td>
                               <td>
                                 <DynamicsStatusChip label={row.status} tone={reconciliationTone(row.status)} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+              ) : null}
+
+              {tab === 'policies' && policiesAllowed ? (
+                <section className="rounded-lg border border-erp-border bg-white">
+                  {policies.length === 0 ? (
+                    <p className="px-4 py-10 text-center text-[13px] text-erp-muted">No costing policies yet.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="erp-table w-full text-[12px]">
+                        <thead>
+                          <tr>
+                            <th>Name</th>
+                            <th>Plant</th>
+                            <th>Method</th>
+                            <th>Status</th>
+                            <th className="text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {policies.map((policy) => (
+                            <tr key={policy.id}>
+                              <td className="font-medium">{policy.name}</td>
+                              <td>{policy.plantCode ?? 'All plants'}</td>
+                              <td>{policy.costingMethod.replace(/_/g, ' ')}</td>
+                              <td>
+                                <DynamicsStatusChip
+                                  label={policy.status}
+                                  tone={
+                                    policy.status === 'ACTIVE'
+                                      ? 'success'
+                                      : policy.status === 'DRAFT'
+                                        ? 'warning'
+                                        : 'neutral'
+                                  }
+                                />
+                              </td>
+                              <td className="text-right">
+                                {policiesManage && policy.status !== 'ACTIVE' ? (
+                                  <Button size="sm" disabled={busy} onClick={() => void handleActivatePolicy(policy)}>
+                                    Activate
+                                  </Button>
+                                ) : (
+                                  <span className="text-erp-muted">—</span>
+                                )}
                               </td>
                             </tr>
                           ))}

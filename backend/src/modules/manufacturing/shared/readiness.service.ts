@@ -34,7 +34,8 @@ export function computeInitialOperationStatus(
  * otherwise NOT_STARTED.
  */
 export function deriveStageStatusFromOperations(operations: ReadinessOperation[]): ProductionStageStatus {
-  if (operations.length === 0) return 'NOT_STARTED'
+  // Empty-op stages are still executable shopfloor steps in flexible routing.
+  if (operations.length === 0) return 'READY'
   if (operations.some((op) => op.status === 'IN_PROGRESS')) return 'IN_PROGRESS'
   if (operations.some((op) => op.status === 'ON_HOLD')) return 'ON_HOLD'
   if (operations.some((op) => op.status === 'BLOCKED')) return 'BLOCKED'

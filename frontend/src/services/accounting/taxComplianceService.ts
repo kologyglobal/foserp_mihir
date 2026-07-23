@@ -1,8 +1,8 @@
 /**
  * GST & TDS Compliance service — dual-mode.
  * Demo (`VITE_USE_API=false`): in-memory seed.
- * API (`VITE_USE_API=true`): live GST extract for overview KPIs + outward/inward registers.
- * Filing / e-invoice / challans / portal remain demo preview only.
+ * API (`VITE_USE_API=true`): live GST extract + e-invoice / e-way registers (simulated NIC).
+ * Portal filing / challans / GSTR auto-submit remain demo preview only.
  */
 
 import { isApiMode } from '@/config/apiConfig'
@@ -30,9 +30,18 @@ import {
   buildGstDashboard,
 } from '@/data/accounting/taxComplianceSeed'
 import {
+  cancelEInvoiceApi,
+  cancelEWayBillApi,
+  fetchEInvoices,
+  fetchEWayBills,
   fetchGstComplianceSummary,
   fetchInwardSupplies,
   fetchOutwardSupplies,
+  generateEInvoiceApi,
+  generateEWayBillApi,
+  type GenerateEWayBillPayload,
+  type GstEInvoiceDto,
+  type GstEWayBillDto,
   type GstSupplyExtractDto,
 } from '@/services/api/taxComplianceApi'
 import {
@@ -365,14 +374,131 @@ export async function markReturnFiledExternally(
   return structuredClone(row)
 }
 
-export async function getEInvoices(_filter?: PeriodFilterState): Promise<EInvoiceRow[]> {
-  await delay()
-  return structuredClone(EINVOICE_SEED)
+export async function getEInvoices(filter?: PeriodFilterState): Promise<EInvoiceRow[]> {
+  if (!isApiMode()) {
+    await delay()
+    return structuredClone(EINVOICE_SEED)
+  }
+  const f = filter ?? loadPeriodFilter()
+  const legalEntity = await resolveDefaultLegalEntity()
+  const { fromDate, toDate } = filterDatesFromPeriod(f)
+  const res = await fetchEInvoices({
+    legalEntityId: legalEntity.id,
+    fromDate,
+    toDate,
+    page: 1,
+    pageSize: 200,
+  })
+  return res.data.items.map(mapEInvoiceDto)
 }
 
-export async function getEWayBills(_filter?: PeriodFilterState): Promise<EWayBillRow[]> {
-  await delay()
-  return structuredClone(EWAY_SEED)
+function mapEInvoiceDto(row: GstEInvoiceDto): EInvoiceRow {
+  const irnStatus: EInvoiceRow['irnStatus'] =
+    row.status === 'GENERATED'
+      ? 'Generated'
+      : row.status === 'CANCELLED'
+        ? 'Cancelled'
+        : row.status === 'EXCEPTION'
+          ? 'Exception'
+          : 'Pending'
+  return {
+    id: row.id,
+    invoiceNo: row.invoiceNumber ?? row.salesInvoiceId.slice(0, 8),
+    invoiceDate: row.invoiceDate,
+    customerName: row.customerName,
+    customerGstin: row.customerGstin ?? '',
+    taxableValue: money(row.taxableAmount),
+    taxAmount: money(row.taxAmount),
+    irnStatus,
+    irn: row.irn ?? undefined,
+    ackNo: row.ackNo ?? undefined,
+    ackDate: row.ackDate?.slice(0, 10),
+    salesInvoiceId: row.salesInvoiceId,
+    providerMode: row.providerMode,
+    sourceDocPath: `/accounting/money-in/invoices/${row.salesInvoiceId}`,
+  }
+}
+
+export async function generateEInvoice(salesInvoiceId: string): Promise<EInvoiceRow> {
+  if (!isApiMode()) {
+    throw new TaxComplianceServiceError('Generate IRN is available in API mode only (simulated NIC).')
+  }
+  const res = await generateEInvoiceApi(salesInvoiceId)
+  return mapEInvoiceDto(res.data.item)
+}
+
+export async function cancelEInvoice(id: string, reason: string): Promise<EInvoiceRow> {
+  if (!isApiMode()) {
+    throw new TaxComplianceServiceError('Cancel IRN is available in API mode only (simulated NIC).')
+  }
+  const res = await cancelEInvoiceApi(id, reason)
+  return mapEInvoiceDto(res.data)
+}
+
+export async function getEWayBills(filter?: PeriodFilterState): Promise<EWayBillRow[]> {
+  if (!isApiMode()) {
+    await delay()
+    return structuredClone(EWAY_SEED)
+  }
+  const f = filter ?? loadPeriodFilter()
+  const legalEntity = await resolveDefaultLegalEntity()
+  const { fromDate, toDate } = filterDatesFromPeriod(f)
+  const res = await fetchEWayBills({
+    legalEntityId: legalEntity.id,
+    fromDate,
+    toDate,
+    page: 1,
+    pageSize: 200,
+  })
+  return res.data.items.map(mapEWayDto)
+}
+
+function mapEWayDto(row: GstEWayBillDto): EWayBillRow {
+  const ewbStatus: EWayBillRow['ewbStatus'] =
+    row.status === 'GENERATED'
+      ? 'Generated'
+      : row.status === 'CANCELLED'
+        ? 'Cancelled'
+        : row.status === 'NOT_REQUIRED'
+          ? 'Not Required'
+          : row.status === 'EXPIRED'
+            ? 'Expired'
+            : row.status === 'EXCEPTION'
+              ? 'Exception'
+              : 'Required'
+  return {
+    id: row.id,
+    docNo: row.documentNumber,
+    docDate: row.documentDate,
+    partyName: row.partyName,
+    fromPlace: row.fromPlace,
+    toPlace: row.toPlace,
+    distanceKm: row.distanceKm,
+    vehicleNo: row.vehicleNumber ?? undefined,
+    ewbStatus,
+    ewbNo: row.ewbNumber ?? undefined,
+    validUpto: row.validUpto?.slice(0, 10),
+    sourceType: row.sourceType as EWayBillRow['sourceType'],
+    salesInvoiceId: row.salesInvoiceId ?? undefined,
+    deliveryChallanId: row.deliveryChallanId ?? undefined,
+    providerMode: row.providerMode,
+  }
+}
+
+export async function generateEWayBill(payload: GenerateEWayBillPayload): Promise<EWayBillRow> {
+  if (!isApiMode()) {
+    throw new TaxComplianceServiceError('Generate e-way is available in API mode only (simulated NIC).')
+  }
+  const res = await generateEWayBillApi(payload)
+  return mapEWayDto(res.data.item)
+}
+
+export async function cancelEWayBill(id: string, reason: string): Promise<EWayBillRow> {
+  if (!isApiMode()) {
+    throw new TaxComplianceServiceError('Cancel e-way is available in API mode only (simulated NIC).')
+  }
+  const res = await cancelEWayBillApi(id, reason)
+  return mapEWayDto(res.data)
 }
 
 export async function getGstExceptions(_filter?: PeriodFilterState): Promise<GstExceptionRow[]> {

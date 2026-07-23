@@ -17,7 +17,7 @@ function buildQuery(params?: Record<string, string | number | boolean | undefine
 
 export type QualityInspectionCategory = 'INCOMING' | 'IN_PROCESS' | 'FINAL' | 'SUBCONTRACT_RETURN'
 export type QualityInspectionStatus = 'PENDING' | 'PASSED' | 'REWORK' | 'REJECTED' | 'CANCELLED'
-export type QualityInspectionDecision = 'PASS' | 'REWORK' | 'REJECT'
+export type QualityInspectionDecision = 'PASS' | 'CONDITIONAL_PASS' | 'HOLD' | 'USE_AS_IS' | 'REWORK' | 'REJECT'
 export type QualityNcrStatus = 'OPEN' | 'INVESTIGATING' | 'CORRECTIVE_ACTION' | 'APPROVED' | 'CLOSED' | 'CANCELLED'
 export type QualityNcrSeverity = 'MINOR' | 'MAJOR' | 'CRITICAL'
 export type QualityParameterType = 'BOOLEAN' | 'NUMERIC' | 'TEXT' | 'DROPDOWN' | 'PHOTO_REQUIRED'
@@ -236,6 +236,43 @@ export async function listInspections(params?: {
   productionOrderId?: string
 }) {
   return apiRequest<QualityInspection[]>(tenantPath(`/quality/inspections${buildQuery(params)}`))
+}
+
+export interface QcKioskQueueResult {
+  items: Array<{
+    id: string
+    inspectionNumber: string
+    category: string
+    status: string
+    title: string
+    productionOrderId: string | null
+    stageId: string | null
+    itemId: string | null
+    inspectedQty: string | null
+    requestedAt: string
+    planCode: string | null
+    planName: string | null
+  }>
+  summary: { openCount: number; pendingCount: number; reworkCount: number }
+}
+
+export async function getQcKioskQueue(params?: { limit?: number; category?: QualityInspectionCategory; productionOrderId?: string }) {
+  return apiRequest<QcKioskQueueResult>(tenantPath(`/quality/kiosk/queue${buildQuery(params)}`))
+}
+
+export async function getQcKioskSummary() {
+  return apiRequest<{ openCount: number; pendingCount: number; reworkCount: number }>(tenantPath('/quality/kiosk/summary'))
+}
+
+export async function getQcKioskInspection(id: string) {
+  return apiRequest<QualityInspection>(tenantPath(`/quality/kiosk/inspections/${id}`))
+}
+
+export async function decideQcKioskInspection(id: string, payload: DecideInspectionPayload) {
+  return apiRequest<{ inspection: QualityInspection; promotedStages?: unknown[]; ncr?: QualityNcr }>(
+    tenantPath(`/quality/kiosk/inspections/${id}/decide`),
+    { method: 'POST', body: JSON.stringify(payload) },
+  )
 }
 
 export async function getInspection(id: string) {

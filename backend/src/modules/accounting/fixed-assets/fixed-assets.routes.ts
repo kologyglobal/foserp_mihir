@@ -9,18 +9,25 @@ import {
   capitalizeFixedAssetSchema,
   createDepreciationRunSchema,
   createFixedAssetCategorySchema,
+  createFixedAssetImpairmentSchema,
+  createFixedAssetMaintenanceSchema,
+  createFixedAssetRevaluationSchema,
   createFixedAssetSchema,
+  createFixedAssetTransferSchema,
+  completeFixedAssetMaintenanceSchema,
+  completeFixedAssetTransferSchema,
   depreciationPreviewSchema,
   disposeFixedAssetSchema,
   disposePreviewSchema,
   fixedAssetOverviewQuerySchema,
+  fixedAssetReportQuerySchema,
   listDepreciationRunsQuerySchema,
   listFixedAssetCategoriesQuerySchema,
+  listFixedAssetPhase4QuerySchema,
   listFixedAssetTransfersQuerySchema,
   listFixedAssetsQuerySchema,
-  createFixedAssetTransferSchema,
-  completeFixedAssetTransferSchema,
   updateFixedAssetCategorySchema,
+  updateFixedAssetMaintenanceSchema,
   updateFixedAssetSchema,
 } from './fixed-assets.schemas.js'
 import * as controller from './fixed-assets.controller.js'
@@ -180,5 +187,31 @@ router.get(
   requirePermission('finance.fa.view'),
   controller.getDepreciationRun,
 )
+
+// ─── Phase 4 — revaluation / impairment / maintenance / reports ──────────────
+
+router.get('/revaluations', requirePermission('finance.fa.view'), validateQuery(listFixedAssetPhase4QuerySchema), controller.listRevaluations)
+router.post('/revaluations', requirePermission('finance.fa.revalue'), validateBody(createFixedAssetRevaluationSchema), controller.createRevaluation)
+router.get('/revaluations/:id', validateParams(uuidParamSchema), requirePermission('finance.fa.view'), controller.getRevaluation)
+router.post('/revaluations/:id/post', validateParams(uuidParamSchema), requirePermission('finance.fa.revalue'), controller.postRevaluation)
+router.post('/revaluations/:id/cancel', validateParams(uuidParamSchema), requirePermission('finance.fa.revalue'), controller.cancelRevaluation)
+
+router.get('/impairments', requirePermission('finance.fa.view'), validateQuery(listFixedAssetPhase4QuerySchema), controller.listImpairments)
+router.post('/impairments', requirePermission('finance.fa.impair'), validateBody(createFixedAssetImpairmentSchema), controller.createImpairment)
+router.get('/impairments/:id', validateParams(uuidParamSchema), requirePermission('finance.fa.view'), controller.getImpairment)
+router.post('/impairments/:id/recognize', validateParams(uuidParamSchema), requirePermission('finance.fa.impair'), controller.recognizeImpairment)
+router.post('/impairments/:id/cancel', validateParams(uuidParamSchema), requirePermission('finance.fa.impair'), controller.cancelImpairment)
+
+router.get('/maintenance', requirePermission('finance.fa.view'), validateQuery(listFixedAssetPhase4QuerySchema), controller.listMaintenance)
+router.post('/maintenance', requirePermission('finance.fa.maintain'), validateBody(createFixedAssetMaintenanceSchema), controller.createMaintenance)
+router.get('/maintenance/:id', validateParams(uuidParamSchema), requirePermission('finance.fa.view'), controller.getMaintenance)
+router.patch('/maintenance/:id', validateParams(uuidParamSchema), requirePermission('finance.fa.maintain'), validateBody(updateFixedAssetMaintenanceSchema), controller.updateMaintenance)
+router.post('/maintenance/:id/complete', validateParams(uuidParamSchema), requirePermission('finance.fa.maintain'), validateBody(completeFixedAssetMaintenanceSchema), controller.completeMaintenance)
+router.post('/maintenance/:id/cancel', validateParams(uuidParamSchema), requirePermission('finance.fa.maintain'), controller.cancelMaintenance)
+
+router.get('/reports/summary', requirePermission('finance.fa.view'), validateQuery(fixedAssetReportQuerySchema), controller.reportSummary)
+router.get('/reports/nbv-by-category', requirePermission('finance.fa.view'), validateQuery(fixedAssetReportQuerySchema), controller.reportNbvByCategory)
+router.get('/reports/register', requirePermission('finance.fa.view'), validateQuery(fixedAssetReportQuerySchema), controller.reportRegister)
+router.get('/reports/disposals', requirePermission('finance.fa.view'), validateQuery(fixedAssetReportQuerySchema), controller.reportDisposals)
 
 export default router

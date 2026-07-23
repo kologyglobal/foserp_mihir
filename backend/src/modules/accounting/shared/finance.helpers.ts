@@ -101,6 +101,11 @@ export function parseDateOnly(value: string | Date): Date {
   return d
 }
 
+/** UTC calendar date as YYYY-MM-DD (API / NIC payload dates). */
+export function toDateOnlyString(value: Date): string {
+  return value.toISOString().slice(0, 10)
+}
+
 export function datesOverlap(
   aStart: Date,
   aEnd: Date,

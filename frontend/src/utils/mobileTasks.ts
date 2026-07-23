@@ -90,6 +90,15 @@ export function buildMobileTasks(role: ExperienceRole): MobileTask[] {
   }
 
   if (mobileRole === 'shop_floor' || mobileRole === 'manager') {
+    tasks.push({
+      id: 'shopfloor-kiosk',
+      title: 'Shopfloor Kiosk',
+      subtitle: 'Start · Hold · Complete my work',
+      module: 'Production',
+      priority: 'high',
+      path: '/m/kiosk',
+      actionLabel: 'Open',
+    })
     const myJobs = jobCards.filter((j) => ['pending', 'assigned', 'in_progress'].includes(j.status))
     if (myJobs.length > 0) {
       tasks.push({
@@ -106,18 +115,16 @@ export function buildMobileTasks(role: ExperienceRole): MobileTask[] {
   }
 
   if (mobileRole === 'quality_inspector' || mobileRole === 'manager') {
-    if (pendingQc.length > 0) {
-      tasks.push({
-        id: 'qc-pending',
-        title: 'Pending QC',
-        subtitle: `${pendingQc.length} inspections waiting`,
-        module: 'Quality',
-        count: pendingQc.length,
-        priority: 'high',
-        path: '/m/qc',
-        actionLabel: 'Inspect',
-      })
-    }
+    tasks.push({
+      id: 'qc-kiosk',
+      title: 'Quality Kiosk',
+      subtitle: pendingQc.length > 0 ? `${pendingQc.length} inspections waiting` : 'Pass · Rework · Reject',
+      module: 'Quality',
+      count: pendingQc.length > 0 ? pendingQc.length : undefined,
+      priority: 'high',
+      path: '/m/qc',
+      actionLabel: 'Inspect',
+    })
   }
 
   if (mobileRole === 'dispatch_user' || mobileRole === 'manager') {

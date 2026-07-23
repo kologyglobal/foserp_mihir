@@ -1,5 +1,10 @@
+import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
+  cancelEInvoice,
+  cancelEWayBill,
+  generateEInvoice,
+  generateEWayBill,
   getEInvoices,
   getEWayBills,
   getGstExceptions,
@@ -13,6 +18,10 @@ import {
   getTdsReturns,
   getTdsTransactions,
 } from '@/services/accounting/taxComplianceService'
+import { appPromptNote } from '@/store/confirmDialogStore'
+import { notify } from '@/store/toastStore'
+import type { EInvoiceRow, EWayBillRow, PeriodFilterState } from '@/types/taxCompliance'
+import { useTaxCompliancePermissions } from '@/utils/permissions/taxCompliance'
 import { inr, statusCell, TaxRegisterPage } from './TaxRegisterPage'
 import { formatDate } from '@/utils/dates/format'
 
@@ -93,13 +102,74 @@ export function ReverseChargePage() {
 }
 
 export function EInvoicesPage() {
+  const perms = useTaxCompliancePermissions()
+  const [reloadKey, setReloadKey] = useState(0)
+
+  const loadRows = useCallback(
+    async (filter: PeriodFilterState) => {
+      void reloadKey
+      return getEInvoices(filter)
+    },
+    [reloadKey],
+  )
+
+  const onGenerate = async () => {
+    if (!perms.canEInvoice) return
+    const salesInvoiceId = await appPromptNote({
+      title: 'Generate e-invoice (simulated NIC)',
+      description: 'Enter the posted sales invoice UUID. IRN is generated locally — not sent to the GST portal.',
+      confirmLabel: 'Generate IRN',
+      note: { required: true, label: 'Sales invoice UUID', placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' },
+    })
+    if (!salesInvoiceId?.trim()) return
+    try {
+      const row = await generateEInvoice(salesInvoiceId.trim())
+      notify.success(row.irn ? `IRN generated (${row.providerMode ?? 'SIMULATED'})` : 'E-invoice recorded')
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Generate failed')
+    }
+  }
+
+  const onCancel = async (row: EInvoiceRow) => {
+    if (!perms.canEInvoice || row.irnStatus !== 'Generated') return
+    const reason = await appPromptNote({
+      title: 'Cancel e-invoice',
+      description: `Cancel simulated IRN for ${row.invoiceNo}?`,
+      confirmLabel: 'Cancel IRN',
+      tone: 'danger',
+      note: { required: true, label: 'Cancellation reason', placeholder: 'Reason…' },
+    })
+    if (!reason?.trim()) return
+    try {
+      await cancelEInvoice(row.id, reason.trim())
+      notify.success('E-invoice cancelled (simulated)')
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Cancel failed')
+    }
+  }
+
   return (
     <TaxRegisterPage
       title="E-Invoices"
-      description="IRN tracking register — capture externally only; no portal generation."
+      description="IRN register — generate/cancel via simulated NIC adapter (API mode). Demo seed when offline."
       exportKind="e-invoices"
-      loadRows={getEInvoices}
+      loadRows={loadRows}
       searchKeys={(r) => `${r.invoiceNo} ${r.customerName} ${r.irn ?? ''}`}
+      emptyTitle="No e-invoices"
+      emptyHint="Generate from a posted B2B sales invoice (customer GSTIN required)."
+      headerExtra={
+        perms.canEInvoice && perms.isApiMode ? (
+          <button
+            type="button"
+            className="h-8 rounded border border-erp-border bg-white px-2 text-[12px] font-semibold text-erp-primary hover:bg-erp-surface"
+            onClick={() => void onGenerate()}
+          >
+            Generate IRN
+          </button>
+        ) : null
+      }
       columns={[
         { key: 'inv', header: 'Invoice', render: (r) => r.invoiceNo },
         { key: 'date', header: 'Date', render: (r) => formatDate(r.invoiceDate) },
@@ -107,19 +177,104 @@ export function EInvoicesPage() {
         { key: 'taxable', header: 'Taxable', className: 'text-right', render: (r) => inr(r.taxableValue) },
         { key: 'status', header: 'IRN Status', render: (r) => statusCell(r.irnStatus) },
         { key: 'irn', header: 'IRN / Ack', render: (r) => r.irn?.slice(0, 18) ?? r.ackNo ?? '—' },
+        {
+          key: 'act',
+          header: 'Actions',
+          render: (r) =>
+            perms.canEInvoice && perms.isApiMode && r.irnStatus === 'Generated' ? (
+              <button
+                type="button"
+                className="text-[11px] font-semibold text-rose-700 hover:underline"
+                onClick={() => void onCancel(r)}
+              >
+                Cancel
+              </button>
+            ) : (
+              '—'
+            ),
+        },
       ]}
     />
   )
 }
 
 export function EWayBillsPage() {
+  const perms = useTaxCompliancePermissions()
+  const [reloadKey, setReloadKey] = useState(0)
+
+  const loadRows = useCallback(
+    async (filter: PeriodFilterState) => {
+      void reloadKey
+      return getEWayBills(filter)
+    },
+    [reloadKey],
+  )
+
+  const onGenerate = async () => {
+    if (!perms.canEWay) return
+    const salesInvoiceId = await appPromptNote({
+      title: 'Generate e-way bill (simulated NIC)',
+      description:
+        'Enter posted sales invoice UUID. Uses default route placeholders (100 km). Not sent to the GST portal.',
+      confirmLabel: 'Generate EWB',
+      note: { required: true, label: 'Sales invoice UUID', placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' },
+    })
+    if (!salesInvoiceId?.trim()) return
+    try {
+      const row = await generateEWayBill({
+        sourceType: 'SALES_INVOICE',
+        salesInvoiceId: salesInvoiceId.trim(),
+        fromPlace: 'Factory',
+        toPlace: 'Customer',
+        distanceKm: 100,
+        force: true,
+      })
+      notify.success(row.ewbNo ? `EWB ${row.ewbNo} (${row.providerMode ?? 'SIMULATED'})` : 'E-way recorded')
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Generate failed')
+    }
+  }
+
+  const onCancel = async (row: EWayBillRow) => {
+    if (!perms.canEWay || row.ewbStatus !== 'Generated') return
+    const reason = await appPromptNote({
+      title: 'Cancel e-way bill',
+      description: `Cancel simulated EWB for ${row.docNo}?`,
+      confirmLabel: 'Cancel EWB',
+      tone: 'danger',
+      note: { required: true, label: 'Cancellation reason', placeholder: 'Reason…' },
+    })
+    if (!reason?.trim()) return
+    try {
+      await cancelEWayBill(row.id, reason.trim())
+      notify.success('E-way bill cancelled (simulated)')
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Cancel failed')
+    }
+  }
+
   return (
     <TaxRegisterPage
       title="E-Way Bills"
-      description="E-way requirement / external capture register — no portal generation."
+      description="E-way register — generate/cancel via simulated NIC (API). Demo seed when offline."
       exportKind="e-way-bills"
-      loadRows={getEWayBills}
+      loadRows={loadRows}
       searchKeys={(r) => `${r.docNo} ${r.partyName} ${r.ewbNo ?? ''}`}
+      emptyTitle="No e-way bills"
+      emptyHint="Generate from a posted sales invoice or issued delivery challan."
+      headerExtra={
+        perms.canEWay && perms.isApiMode ? (
+          <button
+            type="button"
+            className="h-8 rounded border border-erp-border bg-white px-2 text-[12px] font-semibold text-erp-primary hover:bg-erp-surface"
+            onClick={() => void onGenerate()}
+          >
+            Generate EWB
+          </button>
+        ) : null
+      }
       columns={[
         { key: 'doc', header: 'Document', render: (r) => r.docNo },
         { key: 'party', header: 'Party', render: (r) => r.partyName },
@@ -127,6 +282,22 @@ export function EWayBillsPage() {
         { key: 'km', header: 'Km', render: (r) => String(r.distanceKm) },
         { key: 'status', header: 'Status', render: (r) => statusCell(r.ewbStatus) },
         { key: 'ewb', header: 'EWB No', render: (r) => r.ewbNo ?? '—' },
+        {
+          key: 'act',
+          header: 'Actions',
+          render: (r) =>
+            perms.canEWay && perms.isApiMode && r.ewbStatus === 'Generated' ? (
+              <button
+                type="button"
+                className="text-[11px] font-semibold text-rose-700 hover:underline"
+                onClick={() => void onCancel(r)}
+              >
+                Cancel
+              </button>
+            ) : (
+              '—'
+            ),
+        },
       ]}
     />
   )

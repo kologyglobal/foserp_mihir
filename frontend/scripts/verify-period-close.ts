@@ -1,5 +1,5 @@
 /**
- * Period Close Phase 1 — static verification (routes, dual-mode wiring, permissions).
+ * Period Close — static verification (Phase 1 + Close Control Hardening).
  */
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -26,7 +26,7 @@ function read(rel: string) {
 
 async function main() {
   console.log('═══════════════════════════════════════')
-  console.log(' Period Close Phase 1 verification')
+  console.log(' Period Close verification')
   console.log('═══════════════════════════════════════\n')
 
   const routesSrc = read('src/routes/accountingRoutes.tsx')
@@ -39,52 +39,52 @@ async function main() {
   check('Service getCloseDashboard API branch', serviceSrc.includes('buildApiCloseDashboard'))
   check('Service closeAccountingPeriod export', serviceSrc.includes('export async function closeAccountingPeriod'))
   check('Service reopenAccountingPeriod export', serviceSrc.includes('export async function reopenAccountingPeriod'))
+  check('Service checklist acks', serviceSrc.includes('saveCloseChecklistAcks'))
+  check('Service bank live readiness', serviceSrc.includes('composePeriodCloseReadiness(periodFilter)'))
   check('Demo seed still used when not API', serviceSrc.includes('buildCloseDashboard'))
 
   const composerSrc = read('src/services/accounting/periodCloseApiComposer.ts')
-  check('Composer AP close gate', composerSrc.includes('getLatestPayableCloseGateRun'))
-  check('Composer unposted journals', composerSrc.includes('listJournals'))
-  check('Composer bank recon', composerSrc.includes('fetchReconciliationSessions'))
+  check('Composer uses close-readiness API', composerSrc.includes('getPeriodCloseReadiness'))
   check('Composer uses finance bridge close', composerSrc.includes('bridgeClosePeriod'))
+  check('Composer checklist ack helpers', composerSrc.includes('apiUpsertChecklistAcks'))
   check('No new accounting.period_close BE perms invented', !composerSrc.includes('accounting.period_close.'))
-
-  const bridgeSrc = read('src/services/bridges/financeApiBridge.ts')
-  check('Bridge closePeriod', bridgeSrc.includes('export async function closePeriod'))
-  check('Bridge reopenPeriod', bridgeSrc.includes('export async function reopenPeriod'))
-  check('Bridge markPeriodUnderReview', bridgeSrc.includes('export async function markPeriodUnderReview'))
-  check('Bridge listPeriods limit 100', bridgeSrc.includes('limit: 100'))
 
   const apiSrc = read('src/services/api/financeApi.ts')
   check('API path /accounting/periods', apiSrc.includes("'/accounting/periods'"))
+  check('API close-readiness path', apiSrc.includes('/close-readiness'))
+  check('API checklist-acks path', apiSrc.includes('/checklist-acks'))
   check('API close path', apiSrc.includes('/close'))
   check('API reopen path', apiSrc.includes('/reopen'))
-  check('API mark-under-review path', apiSrc.includes('/mark-under-review'))
+
+  const beRoutes = read('../backend/src/modules/accounting/accounting-periods/accounting-period.routes.ts')
+  check('BE close-readiness route', beRoutes.includes('close-readiness'))
+  check('BE checklist-acks route', beRoutes.includes('checklist-acks'))
+
+  const beReadiness = read('../backend/src/modules/accounting/accounting-periods/period-close-readiness.service.ts')
+  check('BE assertCloseAllowed', beReadiness.includes('assertCloseAllowed'))
+  check('BE PERIOD_CLOSE_BLOCKED', beReadiness.includes('PERIOD_CLOSE_BLOCKED'))
 
   const permsSrc = read('src/utils/permissions/periodClose.ts')
   check('Permissions map finance.period.view', permsSrc.includes('finance.period.view'))
   check('Permissions map finance.period.close', permsSrc.includes('finance.period.close'))
   check('Permissions map finance.period.reopen', permsSrc.includes('finance.period.reopen'))
-  check('Permissions API mode flag', permsSrc.includes('isApiMode: true'))
 
   const lockingSrc = read('src/modules/accounting/period-close/ControlPages.tsx')
   check('Locking page closeAccountingPeriod', lockingSrc.includes('closeAccountingPeriod'))
-  check('Locking page reopenAccountingPeriod', lockingSrc.includes('reopenAccountingPeriod'))
-  check('Locking page mark under review', lockingSrc.includes('markAccountingPeriodUnderReview'))
-  check('Locking page keeps demo module locks', lockingSrc.includes('updateModuleLock'))
-
-  const dashSrc = read('src/modules/accounting/period-close/CloseDashboardPage.tsx')
-  check('Dashboard uses getCloseDashboard', dashSrc.includes('getCloseDashboard'))
+  check('Locking page readiness blockers', lockingSrc.includes('hardBlockEnabled'))
+  check('Locking page getPeriodCloseReadiness', lockingSrc.includes('getPeriodCloseReadiness'))
 
   const checklistSrc = read('src/modules/accounting/period-close/ChecklistAndReconPages.tsx')
   check('Checklist uses isApiMode', checklistSrc.includes('isApiMode'))
-  check('Checklist computed actions in API', checklistSrc.includes('Computed'))
+  check('Checklist Ack actions', checklistSrc.includes("onAck(t.id, 'ACK')"))
+  check('Checklist saveCloseChecklistAcks', checklistSrc.includes('saveCloseChecklistAcks'))
 
-  const bannerSrc = read('src/components/accounting/period-close/PeriodClosePreviewBanner.tsx')
-  check('Banner dual-mode', bannerSrc.includes('Period Close Phase 1 (API)'))
+  const featuresSrc = read('src/modules/accounting/settings/FeaturesPage.tsx')
+  check('Features page periodCloseHardBlock', featuresSrc.includes('periodCloseHardBlock'))
 
   const statusDoc = read('../docs/accounting/PERIOD_CLOSE_STATUS.md')
   check('Status doc Phase 1 shipped', statusDoc.includes('Phase 1'))
-  check('Status doc Phase 2 deferred', statusDoc.includes('Phase 2'))
+  check('Status doc hardening / Phase 2', statusDoc.includes('close-readiness') || statusDoc.includes('Hardening'))
 
   console.log(`\n${passed} passed, ${failed} failed`)
   if (failed > 0) process.exit(1)

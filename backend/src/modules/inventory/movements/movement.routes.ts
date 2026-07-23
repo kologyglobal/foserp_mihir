@@ -64,6 +64,13 @@ router.post(
 )
 
 router.post(
+  '/sa-receipt',
+  requireAnyPermission('inventory.receipts.post', 'inventory.post'),
+  validateBody(fgReceiptSchema),
+  controller.postSaReceipt,
+)
+
+router.post(
   '/fg-dispatch',
   requireAnyPermission('inventory.issues.post', 'dispatch.post'),
   validateBody(fgDispatchIssueSchema),

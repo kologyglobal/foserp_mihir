@@ -14,18 +14,26 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_stock_balances' AND COLUMN_NAME='rejectedQty'), 'SELECT 1', 'ALTER TABLE `inventory_stock_balances` ADD COLUMN `rejectedQty` DECIMAL(18,4) NOT NULL DEFAULT 0'));
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-ALTER TABLE `inventory_stock_movements`
-  ADD COLUMN `stockStatus` ENUM('UNRESTRICTED','QC_HOLD','BLOCKED','REJECTED') NOT NULL DEFAULT 'UNRESTRICTED',
-  ADD COLUMN `fromStockStatus` ENUM('UNRESTRICTED','QC_HOLD','BLOCKED','REJECTED') NULL,
-  ADD COLUMN `batchId` VARCHAR(191) NULL,
-  ADD COLUMN `serialId` VARCHAR(191) NULL,
-  ADD COLUMN `batchNumberSnapshot` VARCHAR(64) NULL,
-  ADD COLUMN `serialNumberSnapshot` VARCHAR(100) NULL,
-  ADD INDEX `inventory_stock_movements_tenantId_stockStatus_idx` (`tenantId`, `stockStatus`),
-  ADD INDEX `inventory_stock_movements_tenantId_batchId_idx` (`tenantId`, `batchId`),
-  ADD INDEX `inventory_stock_movements_tenantId_serialId_idx` (`tenantId`, `serialId`);
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_stock_movements' AND COLUMN_NAME='stockStatus'), 'SELECT 1', "ALTER TABLE `inventory_stock_movements` ADD COLUMN `stockStatus` ENUM('UNRESTRICTED','QC_HOLD','BLOCKED','REJECTED') NOT NULL DEFAULT 'UNRESTRICTED'"));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_stock_movements' AND COLUMN_NAME='fromStockStatus'), 'SELECT 1', "ALTER TABLE `inventory_stock_movements` ADD COLUMN `fromStockStatus` ENUM('UNRESTRICTED','QC_HOLD','BLOCKED','REJECTED') NULL"));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_stock_movements' AND COLUMN_NAME='batchId'), 'SELECT 1', 'ALTER TABLE `inventory_stock_movements` ADD COLUMN `batchId` VARCHAR(191) NULL'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_stock_movements' AND COLUMN_NAME='serialId'), 'SELECT 1', 'ALTER TABLE `inventory_stock_movements` ADD COLUMN `serialId` VARCHAR(191) NULL'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_stock_movements' AND COLUMN_NAME='batchNumberSnapshot'), 'SELECT 1', 'ALTER TABLE `inventory_stock_movements` ADD COLUMN `batchNumberSnapshot` VARCHAR(64) NULL'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_stock_movements' AND COLUMN_NAME='serialNumberSnapshot'), 'SELECT 1', 'ALTER TABLE `inventory_stock_movements` ADD COLUMN `serialNumberSnapshot` VARCHAR(100) NULL'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_stock_movements' AND INDEX_NAME='inventory_stock_movements_tenantId_stockStatus_idx'), 'SELECT 1', 'ALTER TABLE `inventory_stock_movements` ADD INDEX `inventory_stock_movements_tenantId_stockStatus_idx` (`tenantId`, `stockStatus`)'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_stock_movements' AND INDEX_NAME='inventory_stock_movements_tenantId_batchId_idx'), 'SELECT 1', 'ALTER TABLE `inventory_stock_movements` ADD INDEX `inventory_stock_movements_tenantId_batchId_idx` (`tenantId`, `batchId`)'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_stock_movements' AND INDEX_NAME='inventory_stock_movements_tenantId_serialId_idx'), 'SELECT 1', 'ALTER TABLE `inventory_stock_movements` ADD INDEX `inventory_stock_movements_tenantId_serialId_idx` (`tenantId`, `serialId`)'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-CREATE TABLE `inventory_batches` (
+CREATE TABLE IF NOT EXISTS `inventory_batches` (
   `id` VARCHAR(191) NOT NULL,
   `tenantId` VARCHAR(191) NOT NULL,
   `itemId` VARCHAR(191) NOT NULL,
@@ -46,7 +54,7 @@ CREATE TABLE `inventory_batches` (
   CONSTRAINT `inventory_batches_itemId_fkey` FOREIGN KEY (`itemId`) REFERENCES `master_items` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-CREATE TABLE `inventory_batch_balances` (
+CREATE TABLE IF NOT EXISTS `inventory_batch_balances` (
   `id` VARCHAR(191) NOT NULL,
   `tenantId` VARCHAR(191) NOT NULL,
   `batchId` VARCHAR(191) NOT NULL,
@@ -65,7 +73,7 @@ CREATE TABLE `inventory_batch_balances` (
   CONSTRAINT `inventory_batch_balances_warehouseId_fkey` FOREIGN KEY (`warehouseId`) REFERENCES `master_warehouses` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-CREATE TABLE `inventory_serials` (
+CREATE TABLE IF NOT EXISTS `inventory_serials` (
   `id` VARCHAR(191) NOT NULL,
   `tenantId` VARCHAR(191) NOT NULL,
   `itemId` VARCHAR(191) NOT NULL,
@@ -88,7 +96,7 @@ CREATE TABLE `inventory_serials` (
   CONSTRAINT `inventory_serials_warehouseId_fkey` FOREIGN KEY (`warehouseId`) REFERENCES `master_warehouses` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-CREATE TABLE `inventory_serial_movements` (
+CREATE TABLE IF NOT EXISTS `inventory_serial_movements` (
   `id` VARCHAR(191) NOT NULL,
   `tenantId` VARCHAR(191) NOT NULL,
   `serialId` VARCHAR(191) NOT NULL,
@@ -108,16 +116,25 @@ CREATE TABLE `inventory_serial_movements` (
   CONSTRAINT `inventory_serial_movements_warehouseId_fkey` FOREIGN KEY (`warehouseId`) REFERENCES `master_warehouses` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-ALTER TABLE `inventory_stock_movements`
-  ADD CONSTRAINT `inventory_stock_movements_batchId_fkey` FOREIGN KEY (`batchId`) REFERENCES `inventory_batches` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `inventory_stock_movements_serialId_fkey` FOREIGN KEY (`serialId`) REFERENCES `inventory_serials` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=@db AND TABLE_NAME='inventory_stock_movements' AND CONSTRAINT_NAME='inventory_stock_movements_batchId_fkey'), 'SELECT 1', 'ALTER TABLE `inventory_stock_movements` ADD CONSTRAINT `inventory_stock_movements_batchId_fkey` FOREIGN KEY (`batchId`) REFERENCES `inventory_batches` (`id`) ON DELETE SET NULL ON UPDATE CASCADE'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=@db AND TABLE_NAME='inventory_stock_movements' AND CONSTRAINT_NAME='inventory_stock_movements_serialId_fkey'), 'SELECT 1', 'ALTER TABLE `inventory_stock_movements` ADD CONSTRAINT `inventory_stock_movements_serialId_fkey` FOREIGN KEY (`serialId`) REFERENCES `inventory_serials` (`id`) ON DELETE SET NULL ON UPDATE CASCADE'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-ALTER TABLE `inventory_transfer_lines`
-  ADD COLUMN `batchId` VARCHAR(191) NULL,
-  ADD COLUMN `serialId` VARCHAR(191) NULL,
-  ADD COLUMN `batchNumberSnapshot` VARCHAR(64) NULL,
-  ADD COLUMN `serialNumberSnapshot` VARCHAR(100) NULL,
-  ADD INDEX `inventory_transfer_lines_tenantId_batchId_idx` (`tenantId`, `batchId`),
-  ADD INDEX `inventory_transfer_lines_tenantId_serialId_idx` (`tenantId`, `serialId`),
-  ADD CONSTRAINT `inventory_transfer_lines_batchId_fkey` FOREIGN KEY (`batchId`) REFERENCES `inventory_batches` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `inventory_transfer_lines_serialId_fkey` FOREIGN KEY (`serialId`) REFERENCES `inventory_serials` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_transfer_lines' AND COLUMN_NAME='batchId'), 'SELECT 1', 'ALTER TABLE `inventory_transfer_lines` ADD COLUMN `batchId` VARCHAR(191) NULL'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_transfer_lines' AND COLUMN_NAME='serialId'), 'SELECT 1', 'ALTER TABLE `inventory_transfer_lines` ADD COLUMN `serialId` VARCHAR(191) NULL'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_transfer_lines' AND COLUMN_NAME='batchNumberSnapshot'), 'SELECT 1', 'ALTER TABLE `inventory_transfer_lines` ADD COLUMN `batchNumberSnapshot` VARCHAR(64) NULL'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_transfer_lines' AND COLUMN_NAME='serialNumberSnapshot'), 'SELECT 1', 'ALTER TABLE `inventory_transfer_lines` ADD COLUMN `serialNumberSnapshot` VARCHAR(100) NULL'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_transfer_lines' AND INDEX_NAME='inventory_transfer_lines_tenantId_batchId_idx'), 'SELECT 1', 'ALTER TABLE `inventory_transfer_lines` ADD INDEX `inventory_transfer_lines_tenantId_batchId_idx` (`tenantId`, `batchId`)'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='inventory_transfer_lines' AND INDEX_NAME='inventory_transfer_lines_tenantId_serialId_idx'), 'SELECT 1', 'ALTER TABLE `inventory_transfer_lines` ADD INDEX `inventory_transfer_lines_tenantId_serialId_idx` (`tenantId`, `serialId`)'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=@db AND TABLE_NAME='inventory_transfer_lines' AND CONSTRAINT_NAME='inventory_transfer_lines_batchId_fkey'), 'SELECT 1', 'ALTER TABLE `inventory_transfer_lines` ADD CONSTRAINT `inventory_transfer_lines_batchId_fkey` FOREIGN KEY (`batchId`) REFERENCES `inventory_batches` (`id`) ON DELETE SET NULL ON UPDATE CASCADE'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(EXISTS(SELECT 1 FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=@db AND TABLE_NAME='inventory_transfer_lines' AND CONSTRAINT_NAME='inventory_transfer_lines_serialId_fkey'), 'SELECT 1', 'ALTER TABLE `inventory_transfer_lines` ADD CONSTRAINT `inventory_transfer_lines_serialId_fkey` FOREIGN KEY (`serialId`) REFERENCES `inventory_serials` (`id`) ON DELETE SET NULL ON UPDATE CASCADE'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+

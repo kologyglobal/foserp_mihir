@@ -11,7 +11,9 @@ export const SERVER_DEFAULT = {
     autoBomFill: true, autoWarehouseFill: true, autoQcDetection: true,
     allowManualWorkOrder: true, allowPartialProduction: true, allowOverproduction: true,
     overproductionTolerancePercent: 5, allowUnderCompletion: true,
-    requireWorkOrderClosing: true, allowCloseWithoutQc: false,
+    /** Self-contained WO execution: inventory/QC/purchase warn instead of hard-block. */
+    flexibleExecution: true,
+    requireWorkOrderClosing: true, allowCloseWithoutQc: true,
   },
   numberSeries: { workOrderPrefix: 'WO-MFG-', jobWorkPrefix: 'JWO-MFG-', reworkPrefix: 'RW-MFG-' },
   materialConsumption: {

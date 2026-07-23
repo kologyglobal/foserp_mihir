@@ -287,6 +287,15 @@
     border-bottom: 1px solid var(--mob-border);
   }
 
+  .mob-kiosk {
+    max-width: 42rem;
+    margin: 0 auto;
+  }
+
+  .mob-kiosk .mob-card {
+    border-radius: 16px;
+  }
+
   .mob-checklist-item:last-child {
     border-bottom: none;
   }

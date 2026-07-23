@@ -52,7 +52,9 @@ function buildWhere(tenantId: string, query: ListItemsQuery | ItemLookupQuery, a
   }
   if ('status' in query && query.status) where.status = query.status
   if ('categoryId' in query && query.categoryId) where.categoryId = query.categoryId
-  if (query.itemType) where.itemType = query.itemType
+  const itemTypes = 'itemTypes' in query ? query.itemTypes : undefined
+  if (itemTypes && itemTypes.length > 0) where.itemType = { in: itemTypes }
+  else if (query.itemType) where.itemType = query.itemType
   if (activeOnly === true) where.status = 'ACTIVE'
   if (query.search) {
     where.OR = [{ code: { contains: query.search } }, { name: { contains: query.search } }]

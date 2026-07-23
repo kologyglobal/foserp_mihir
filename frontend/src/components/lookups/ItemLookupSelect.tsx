@@ -15,6 +15,7 @@ export interface ItemLookupSelectProps {
   value: string
   onChange: (selection: ItemLookupSelection | null) => void
   itemType?: string
+  itemTypes?: string[]
   activeOnly?: boolean
   disabled?: boolean
   compact?: boolean
@@ -28,6 +29,7 @@ export function ItemLookupSelect({
   value,
   onChange,
   itemType,
+  itemTypes,
   activeOnly = true,
   disabled,
   compact,
@@ -36,8 +38,9 @@ export function ItemLookupSelect({
   className,
   error,
 }: ItemLookupSelectProps) {
-  const { query, setQuery, options, loading, error: lookupError, selected } = useItemLookup({
+  const { query, setQuery, options, loading, error: lookupError, selected, totalCount } = useItemLookup({
     itemType,
+    itemTypes,
     activeOnly,
     selectedId: value || undefined,
   })
@@ -183,8 +186,11 @@ export function ItemLookupSelect({
           ) : (
             <>
               <p className="erp-smart-select__hint">
-                {options.length} item{options.length === 1 ? '' : 's'}
+                {totalCount != null && totalCount > options.length
+                  ? `Showing ${options.length} of ${totalCount} items`
+                  : `${options.length} item${options.length === 1 ? '' : 's'}`}
                 {query.trim() ? ` matching “${query.trim()}”` : ''}
+                {!query.trim() ? ' — scroll or type to find' : ''}
               </p>
               <ul className="erp-smart-select__list">
                 {options.map((opt, index) => (

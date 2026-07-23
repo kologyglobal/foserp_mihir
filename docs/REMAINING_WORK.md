@@ -310,10 +310,10 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Field | Value |
 |-------|-------|
 | Module | Accounting |
-| Description | **Finance Settings Phase 1** + **Phase 2C1–2C2B journals** + **Phase 3A1–3A6 AR** + **Phase 3B1–3B5 customer receipts** + **Phase 3C1–3C4 customer credit-note backend posting** + **Phase 3C5 credit-note allocation**. |
-| Next step | **Phase 3C6** credit-note frontend. Phase **3B6** receipt workspace UI and document reversal remain open. |
-| Test required | Finance tests (`tests/finance/`) + `npm run test:money-in` |
-| Status | partial (**3C1–3C5 implemented; focused tests/typecheck pass**; 3C6 frontend deferred) |
+| Description | **Finance Settings Phase 1** + journals/AR/AP/treasury + **Period Close P1 + Close Control Hardening** (close-readiness, optional hard-block, checklist acks). |
+| Next step | Period close year-end / accruals; Budgeting Phase 2+ / GST filing as prioritized. |
+| Test required | Finance tests (`tests/finance/`) + `npm run test:money-in` + `npm run test:period-close` |
+| Status | partial (Period Close lock/readiness hardening shipped 2026-07-23; year-end/accruals/calendar still demo) |
 
 ### P3-6: Commercial terms single source
 

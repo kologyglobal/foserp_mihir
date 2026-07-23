@@ -48,7 +48,12 @@ export const convertSalesOrderLineSchema = z.object({
   supervisorId: z.string().uuid().optional(),
   managerId: z.string().uuid().optional(),
   notes: z.string().trim().max(2000).optional(),
+  manufacturingProfileId: z.string().uuid().optional(),
+  bomVersionId: z.string().uuid().optional(),
+  routingVersionId: z.string().uuid().optional(),
   idempotencyKey: z.string().trim().max(150).optional(),
+  /** When true (or profile.childProductionOrdersEnabled), explode BOM child WOs after FG create. */
+  generateChildOrders: z.boolean().optional(),
 })
 
 export type ListDemandsQuery = z.infer<typeof listDemandsQuerySchema>

@@ -7,6 +7,7 @@ import { validateBody, validateParams } from '../../../middleware/validation.mid
 import { tenantRouteParamSchema } from '../../../utils/pagination.js'
 import * as controller from './material.controller.js'
 import {
+  addMaterialRequirementSchema,
   issueMaterialSchema,
   issuePreviewSchema,
   reallocateReservationSchema,
@@ -14,6 +15,7 @@ import {
   reserveMaterialsSchema,
   returnMaterialSchema,
   shortageRequisitionSchema,
+  updateMaterialRequirementSchema,
 } from './material.schemas.js'
 
 const router = Router({ mergeParams: true })
@@ -36,6 +38,23 @@ router.post(
   '/sync-requirements',
   requirePermission('manufacturing.materials.create_requirement'),
   controller.syncRequirements,
+)
+router.post(
+  '/',
+  requirePermission('manufacturing.materials.create_requirement'),
+  validateBody(addMaterialRequirementSchema),
+  controller.addMaterialRequirement,
+)
+router.patch(
+  '/:materialId',
+  requirePermission('manufacturing.materials.create_requirement'),
+  validateBody(updateMaterialRequirementSchema),
+  controller.updateMaterialRequirement,
+)
+router.delete(
+  '/:materialId',
+  requirePermission('manufacturing.materials.create_requirement'),
+  controller.removeMaterialRequirement,
 )
 router.post(
   '/reserve',

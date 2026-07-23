@@ -1,0 +1,34 @@
+﻿[
+    {
+        "name":  "test:dispatch:production",
+        "exit":  1
+    },
+    {
+        "name":  "test:wo-flow",
+        "exit":  1
+    },
+    {
+        "name":  "test:wip",
+        "exit":  1
+    },
+    {
+        "name":  "test:sa-receipt",
+        "exit":  1
+    },
+    {
+        "name":  "test:costing",
+        "exit":  1
+    },
+    {
+        "name":  "test:manufacturing-module",
+        "exit":  1
+    },
+    {
+        "name":  "test:quality",
+        "exit":  1
+    },
+    {
+        "name":  "test:dispatch",
+        "exit":  1
+    }
+]

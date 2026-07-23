@@ -15,6 +15,12 @@ import type {
   UpdateBomVersionInput,
 } from './bom.schemas.js'
 
+/** Item/UOM snapshots so list/tree UIs never fall back to raw UUIDs. */
+const bomLineMasterInclude = {
+  item: { select: { id: true, code: true, name: true } },
+  uom: { select: { id: true, code: true, name: true } },
+} as const
+
 function buildBomWhere(tenantId: string, query: ListBomsQuery) {
   const where: Prisma.ManufacturingBomWhereInput = {
     ...tenantActiveFilter(tenantId),
@@ -38,6 +44,7 @@ export async function listBoms(tenantId: string, query: ListBomsQuery) {
       take,
       orderBy: { [sortField]: query.sortOrder },
       include: {
+        productItem: { select: { id: true, code: true, name: true } },
         // Lightweight revision summary so list pages can show revision/status
         // chips without N+1 detail calls.
         versions: {
@@ -53,7 +60,12 @@ export async function listBoms(tenantId: string, query: ListBomsQuery) {
 }
 
 export async function getBom(tenantId: string, bomId: string) {
-  const bom = await prisma.manufacturingBom.findFirst({ where: { id: bomId, ...tenantActiveFilter(tenantId) } })
+  const bom = await prisma.manufacturingBom.findFirst({
+    where: { id: bomId, ...tenantActiveFilter(tenantId) },
+    include: {
+      productItem: { select: { id: true, code: true, name: true } },
+    },
+  })
   if (!bom) throw new NotFoundError('BOM not found')
   return bom
 }
@@ -112,6 +124,7 @@ export async function getBomVersionWithLines(tenantId: string, versionId: string
   const lines = await prisma.manufacturingBomLine.findMany({
     where: { bomVersionId: versionId, ...tenantActiveFilter(tenantId) },
     orderBy: { sequence: 'asc' },
+    include: bomLineMasterInclude,
   })
   return { version, lines }
 }
@@ -183,11 +196,15 @@ export async function listBomLines(tenantId: string, bomVersionId: string) {
   return prisma.manufacturingBomLine.findMany({
     where: { bomVersionId, ...tenantActiveFilter(tenantId) },
     orderBy: { sequence: 'asc' },
+    include: bomLineMasterInclude,
   })
 }
 
 export async function getBomLine(tenantId: string, lineId: string) {
-  const line = await prisma.manufacturingBomLine.findFirst({ where: { id: lineId, ...tenantActiveFilter(tenantId) } })
+  const line = await prisma.manufacturingBomLine.findFirst({
+    where: { id: lineId, ...tenantActiveFilter(tenantId) },
+    include: bomLineMasterInclude,
+  })
   if (!line) throw new NotFoundError('BOM line not found')
   return line
 }
@@ -247,6 +264,7 @@ export async function createBomLine(
       createdBy: userId,
       updatedBy: userId,
     },
+    include: bomLineMasterInclude,
   })
 }
 
@@ -273,7 +291,11 @@ export async function updateBomLine(tenantId: string, userId: string, lineId: st
     }
   }
 
-  return prisma.manufacturingBomLine.update({ where: { id: lineId, tenantId }, data })
+  return prisma.manufacturingBomLine.update({
+    where: { id: lineId, tenantId },
+    data,
+    include: bomLineMasterInclude,
+  })
 }
 
 export async function deleteBomLine(tenantId: string, lineId: string) {
@@ -294,7 +316,7 @@ export async function deleteBomLine(tenantId: string, lineId: string) {
   })
 }
 
-export function buildBomTree(lines: ManufacturingBomLine[]) {
+export function buildBomTree(lines: Array<ManufacturingBomLine & Record<string, unknown>>) {
   const byId = new Map(lines.map((line) => [line.id, { ...line, children: [] as unknown[] }]))
   const roots: unknown[] = []
   for (const line of byId.values()) {

@@ -13,14 +13,17 @@ import {
   getCloseCalendar,
   getCloseTasks,
   getSubledgerReconciliations,
+  listCloseChecklistAcks,
   loadPeriodCloseFilter,
   markReconciliationReviewed,
+  saveCloseChecklistAcks,
   updateCloseTaskStatus,
 } from '@/services/accounting/periodCloseService'
 import type {
   CloseCalendarEvent,
   CloseTask,
   CloseTaskStatus,
+  PeriodCloseChecklistAck,
   PeriodFilterState,
   SubledgerReconciliation,
 } from '@/types/periodClose'
@@ -126,6 +129,8 @@ export function CloseChecklistPage() {
   const api = isApiMode()
   const [filter, setFilter] = useState<PeriodFilterState>(() => loadPeriodCloseFilter())
   const [tasks, setTasks] = useState<CloseTask[]>([])
+  const [acks, setAcks] = useState<PeriodCloseChecklistAck[]>([])
+  const [ackNote, setAckNote] = useState<Record<string, string>>({})
   const [moduleFilter, setModuleFilter] = useState<string>('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -139,13 +144,25 @@ export function CloseChecklistPage() {
     setLoading(true)
     setError(null)
     try {
-      setTasks(await getCloseTasks(filter.periodCode))
+      const nextTasks = await getCloseTasks(filter.periodCode)
+      setTasks(nextTasks)
+      if (api) {
+        const nextAcks = await listCloseChecklistAcks(filter.periodId)
+        setAcks(nextAcks)
+        const notes: Record<string, string> = {}
+        for (const a of nextAcks) {
+          if (a.note) notes[a.checkKey] = a.note
+        }
+        setAckNote(notes)
+      } else {
+        setAcks([])
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load checklist')
     } finally {
       setLoading(false)
     }
-  }, [filter.periodCode, filter.periodId, perms.canView])
+  }, [filter.periodCode, filter.periodId, perms.canView, api])
 
   useEffect(() => {
     void load()
@@ -156,9 +173,15 @@ export function CloseChecklistPage() {
     [tasks, moduleFilter],
   )
 
+  const ackByKey = useMemo(() => {
+    const map = new Map<string, PeriodCloseChecklistAck>()
+    for (const a of acks) map.set(a.checkKey, a)
+    return map
+  }, [acks])
+
   const onStatus = async (id: string, status: CloseTaskStatus) => {
     if (api) {
-      notify.error('Readiness checklist is computed in API mode — resolve the underlying finance item instead.')
+      notify.error('Readiness checklist is computed in API mode — use Acknowledge / N/A or resolve the underlying item.')
       return
     }
     if (!perms.canManageChecklist) {
@@ -174,12 +197,32 @@ export function CloseChecklistPage() {
     }
   }
 
+  const onAck = async (taskId: string, status: 'ACK' | 'NA') => {
+    const checkKey = taskId.replace(/^ready-/, '')
+    if (!perms.canManageChecklist) {
+      notify.error('Missing finance.period.manage permission for checklist acks.')
+      return
+    }
+    const note = ackNote[checkKey]?.trim() || null
+    if (status === 'NA' && !note) {
+      notify.error('N/A requires a note.')
+      return
+    }
+    try {
+      const saved = await saveCloseChecklistAcks([{ checkKey, status, note }], filter.periodId)
+      setAcks(saved)
+      notify.success(status === 'ACK' ? 'Acknowledged.' : 'Marked N/A.')
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Ack save failed')
+    }
+  }
+
   return (
     <PeriodCloseShell
       title="Close Checklist"
       description={
         api
-          ? 'Phase 1 readiness checklist composed from period status, AP close gate, unposted journals, and bank recon.'
+          ? 'Backend close-readiness checks with optional Acknowledge / N/A notes (persisted per period).'
           : 'Configurable department close tasks with owners, dependencies and evidence.'
       }
       periodFilter={filter}
@@ -194,7 +237,8 @@ export function CloseChecklistPage() {
     >
       {api ? (
         <p className="mb-2 text-[12px] text-erp-muted">
-          Soft warnings only — closing a period is not hard-blocked by AP gate or unposted journals in Phase 1.
+          Checks come from GET close-readiness. Acknowledge or mark N/A with a reason — this does not clear blockers.
+          Enable periodCloseHardBlock in Finance Settings to enforce blockers on close.
         </p>
       ) : (
       <div className="mb-2 flex flex-wrap gap-2">
@@ -238,11 +282,20 @@ export function CloseChecklistPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((t) => (
+                {filtered.map((t) => {
+                  const checkKey = t.id.replace(/^ready-/, '')
+                  const ack = ackByKey.get(checkKey)
+                  return (
                   <tr key={t.id} className="border-b border-erp-border/60 align-top">
                     <td className="py-1.5 pr-2 font-medium text-erp-text">
                       {t.task}
                       {t.comments ? <div className="text-[11px] font-normal text-erp-muted">{t.comments}</div> : null}
+                      {ack ? (
+                        <div className="mt-0.5 text-[11px] font-normal text-emerald-800">
+                          {ack.status === 'ACK' ? 'Acknowledged' : 'N/A'}
+                          {ack.note ? ` — ${ack.note}` : ''}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="py-1.5 pr-2 text-erp-muted">{CLOSE_TASK_MODULE_LABELS[t.module]}</td>
                     <td className="py-1.5 pr-2 text-erp-muted">{t.owner}</td>
@@ -255,7 +308,33 @@ export function CloseChecklistPage() {
                     <td className="py-1.5 pr-2 text-erp-muted">{t.evidence ?? '—'}</td>
                     <td className="py-1.5">
                       {api ? (
-                        <span className="text-[11px] text-erp-muted">Computed</span>
+                        <div className="flex min-w-[200px] flex-col gap-1">
+                          <input
+                            className="h-7 rounded border border-erp-border px-1.5 text-[11px]"
+                            placeholder="Ack / N/A note"
+                            value={ackNote[checkKey] ?? ''}
+                            onChange={(e) => setAckNote((prev) => ({ ...prev, [checkKey]: e.target.value }))}
+                            aria-label={`Note for ${t.task}`}
+                          />
+                          <div className="flex flex-wrap gap-1">
+                            <button
+                              type="button"
+                              className="rounded border border-erp-border px-1.5 py-0.5 text-[11px] font-semibold disabled:opacity-50"
+                              disabled={!perms.canManageChecklist}
+                              onClick={() => void onAck(t.id, 'ACK')}
+                            >
+                              Ack
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded border border-erp-border px-1.5 py-0.5 text-[11px] font-semibold disabled:opacity-50"
+                              disabled={!perms.canManageChecklist}
+                              onClick={() => void onAck(t.id, 'NA')}
+                            >
+                              N/A
+                            </button>
+                          </div>
+                        </div>
                       ) : (
                       <select
                         className="h-8 max-w-[140px] rounded border border-erp-border px-1 text-[11px]"
@@ -273,7 +352,8 @@ export function CloseChecklistPage() {
                       )}
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

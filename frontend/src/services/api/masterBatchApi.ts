@@ -435,19 +435,58 @@ export async function fetchVendors() {
 export async function searchItemLookups(params: {
   search?: string
   itemType?: string
+  itemTypes?: string[]
   activeOnly?: boolean
   page?: number
   limit?: number
+  /** When true, pages through the API until every matching item is returned (page size 100). */
+  fetchAll?: boolean
 }) {
-  return apiRequest<ItemLookupRow[]>(
-    `${tenantPath('/lookups/items')}${buildQuery({
-      search: params.search,
-      itemType: params.itemType,
-      activeOnly: params.activeOnly ?? true,
-      page: params.page ?? 1,
-      limit: params.limit ?? 25,
-    })}`,
-  )
+  const activeOnly = params.activeOnly ?? true
+  const itemTypesCsv =
+    params.itemTypes && params.itemTypes.length > 0 ? params.itemTypes.join(',') : undefined
+  if (!params.fetchAll) {
+    return apiRequest<ItemLookupRow[]>(
+      `${tenantPath('/lookups/items')}${buildQuery({
+        search: params.search,
+        itemType: itemTypesCsv ? undefined : params.itemType,
+        itemTypes: itemTypesCsv,
+        activeOnly,
+        page: params.page ?? 1,
+        limit: params.limit ?? 25,
+      })}`,
+    )
+  }
+
+  const pageSize = Math.min(params.limit ?? 100, 100)
+  let page = 1
+  const all: ItemLookupRow[] = []
+  let total = 0
+  for (;;) {
+    const res = await apiRequest<ItemLookupRow[]>(
+      `${tenantPath('/lookups/items')}${buildQuery({
+        search: params.search,
+        itemType: itemTypesCsv ? undefined : params.itemType,
+        itemTypes: itemTypesCsv,
+        activeOnly,
+        page,
+        limit: pageSize,
+      })}`,
+    )
+    all.push(...res.data)
+    total = res.meta?.total ?? all.length
+    if (!res.meta || page >= res.meta.totalPages) break
+    page += 1
+  }
+  return {
+    data: all,
+    meta: {
+      page: 1,
+      limit: all.length,
+      total,
+      totalPages: 1,
+    },
+  }
 }
 
 export async function searchVendorLookups(params: {

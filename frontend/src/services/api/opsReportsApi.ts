@@ -234,7 +234,7 @@ export async function getShopfloorLive(filters?: Record<string, string | number 
       orderNumber: String(r.orderNumber ?? ''),
       itemCode: (r.itemCode as string | null | undefined) ?? (r.productItemCode as string | null | undefined) ?? null,
       itemName: (r.itemName as string | null | undefined) ?? (r.productItemName as string | null | undefined) ?? null,
-      status: String(r.status ?? r.healthStatus ?? 'IN_PROGRESS'),
+      status: String(r.status ?? r.orderStatus ?? r.healthStatus ?? 'READY').toLowerCase(),
       health: (r.health as string | null | undefined) ?? (r.healthStatus as string | null | undefined) ?? null,
       workCentreName: (r.workCentreName as string | null | undefined) ?? (r.workCentre as string | null | undefined) ?? null,
       machineName: (r.machineName as string | null | undefined) ?? (r.machine as string | null | undefined) ?? null,

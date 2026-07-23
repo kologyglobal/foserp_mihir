@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/utils/cn'
 
+/** Centered form popup (replaces the old right-side drawer). */
 export function LedgerDrawerShell({
   open,
   onClose,
@@ -39,21 +40,26 @@ export function LedgerDrawerShell({
   if (!open) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[80] flex justify-end" role="presentation">
-      <button type="button" className="absolute inset-0 bg-slate-900/30" onClick={onClose} aria-label="Close drawer" />
-      <aside
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6" role="presentation">
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-900/40 backdrop-blur-[1px]"
+        onClick={onClose}
+        aria-label="Close dialog"
+      />
+      <div
         className={cn(
-          'relative flex h-full w-full flex-col border-l border-erp-border bg-white shadow-xl',
+          'relative flex max-h-[min(92vh,880px)] w-full flex-col overflow-hidden rounded-xl border border-erp-border bg-white shadow-2xl',
           widthClassName,
         )}
         role="dialog"
         aria-modal="true"
         aria-labelledby="ledger-drawer-title"
       >
-        <header className="flex shrink-0 items-start gap-3 border-b border-erp-border px-4 py-3">
+        <header className="flex shrink-0 items-start gap-3 border-b border-erp-border px-5 py-4">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-erp-muted">{eyebrow}</p>
-            <h2 id="ledger-drawer-title" className="truncate text-[15px] font-semibold text-erp-text">
+            <h2 id="ledger-drawer-title" className="truncate text-[16px] font-semibold text-erp-text">
               {title}
             </h2>
             {subtitle ? <p className="mt-0.5 text-[12px] text-erp-muted">{subtitle}</p> : null}
@@ -61,17 +67,17 @@ export function LedgerDrawerShell({
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1.5 text-erp-muted hover:bg-erp-surface-alt hover:text-erp-text"
+            className="rounded-md p-1.5 text-erp-muted hover:bg-erp-surface-alt hover:text-erp-text"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
         {footer ? (
-          <div className="shrink-0 border-t border-erp-border bg-erp-surface px-4 py-3">{footer}</div>
+          <div className="shrink-0 border-t border-erp-border bg-erp-surface px-5 py-3">{footer}</div>
         ) : null}
-      </aside>
+      </div>
     </div>,
     document.body,
   )
@@ -112,7 +118,7 @@ export function LedgerConfirmModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="ledger-confirm-title"
-        className="relative w-full max-w-md rounded-lg border border-erp-border bg-white p-5 shadow-xl"
+        className="relative w-full max-w-md rounded-xl border border-erp-border bg-white p-5 shadow-2xl"
       >
         <h3 id="ledger-confirm-title" className="text-[15px] font-semibold text-erp-text">
           {title}

@@ -38,3 +38,34 @@ export function mapProductionOrder(row: ProductionOrder) {
     releasedAt: isoDate(row.releasedAt),
   }
 }
+
+type ProductionOrderListRow = ProductionOrder & {
+  productItem?: { code: string; name: string } | null
+  salesOrder?: {
+    salesOrderNo: string
+    customerCode: string | null
+    company?: { name: string; companyCode: string | null } | null
+  } | null
+  stages?: Array<{ id: string; name: string; code: string; status: string }>
+}
+
+/** List/register payload — includes human-readable product, customer, and stage labels. */
+export function mapProductionOrderListItem(row: ProductionOrderListRow, supervisorName?: string | null) {
+  const { productItem, salesOrder, stages, ...order } = row
+  const currentStage =
+    (row.currentStageId ? stages?.find((s) => s.id === row.currentStageId) : null) ??
+    stages?.find((s) => s.status === 'IN_PROGRESS') ??
+    null
+
+  return {
+    ...mapProductionOrder(order),
+    productItemCode: productItem?.code ?? null,
+    productItemName: productItem?.name ?? null,
+    salesOrderNo: salesOrder?.salesOrderNo ?? null,
+    customerName: salesOrder?.company?.name ?? null,
+    customerCode: salesOrder?.company?.companyCode ?? salesOrder?.customerCode ?? null,
+    currentStageName: currentStage?.name ?? null,
+    currentStageCode: currentStage?.code ?? null,
+    supervisorName: supervisorName ?? null,
+  }
+}

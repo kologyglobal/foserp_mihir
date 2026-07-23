@@ -24,6 +24,27 @@ export const getPeriod = asyncHandler(async (req: Request, res: Response) => {
   return sendSuccess(res, 'accounting period fetched', item)
 })
 
+export const getCloseReadiness = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const item = await service.getCloseReadiness(tenantId, id)
+  return sendSuccess(res, 'period close readiness fetched', item)
+})
+
+export const listChecklistAcks = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const items = await service.listChecklistAcks(tenantId, id)
+  return sendSuccess(res, 'period close checklist acks listed', items)
+})
+
+export const upsertChecklistAcks = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const items = await service.upsertChecklistAcks(req, tenantId, id, req.body)
+  return sendSuccess(res, 'period close checklist acks saved', items)
+})
+
 export const updatePeriod = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const id = getRouteParam(req, 'id')

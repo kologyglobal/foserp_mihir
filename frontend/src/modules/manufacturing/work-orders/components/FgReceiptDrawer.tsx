@@ -81,7 +81,7 @@ export function FgReceiptDrawer({
   const quantity = num(qty)
   const overEligible = quantity > eligible
   const blockers = [
-    ...(eligibility && !eligibility.isStockable ? ['Product item is not stockable'] : []),
+    ...(eligibility && !eligibility.isStockable ? ['Item is not stockable'] : []),
     ...(eligibility?.qualityHold ? ['Quality blockers prevent unrestricted FG receipt'] : []),
     ...(eligibility && eligible <= 0 ? ['No eligible finished goods quantity remaining'] : []),
     ...previewErrors,

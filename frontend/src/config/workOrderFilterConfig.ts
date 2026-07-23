@@ -46,9 +46,9 @@ export function buildWorkOrderFilterFields(input: {
     {
       type: 'search-select',
       key: 'productItemId',
-      label: 'Product',
+      label: 'Item',
       options: input.productOptions.map((p) => ({ value: p.id, label: p.label })),
-      placeholder: 'Search product…',
+      placeholder: 'Search item…',
     },
   ]
 }

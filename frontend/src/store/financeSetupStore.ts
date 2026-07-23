@@ -201,6 +201,7 @@ function createSeedState() {
       roundingMethod: 'ROUND_HALF_UP' as RoundingMethod,
       roundingTolerance: 1,
       allowBackdatedPosting: false,
+      periodCloseHardBlock: false,
       backdatedDaysLimit: 0,
       allowManualControlAccountPosting: false,
       financeActivated: false,

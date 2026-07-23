@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { Search, ChevronDown, X } from 'lucide-react'
+import { Search, ChevronDown, X, Check } from 'lucide-react'
 import { cn } from '../../utils/cn'
 
 export interface ErpSmartSelectOption<T = string> {
@@ -344,9 +344,14 @@ export function ErpSmartSelect<T extends string = string>({
                       >
                         <span className="erp-smart-select__option-head">
                           <span className="erp-smart-select__option-label">{opt.label}</span>
-                          {opt.trailing ? (
-                            <span className="erp-smart-select__option-trailing">{opt.trailing}</span>
-                          ) : null}
+                          <span className="erp-smart-select__option-end">
+                            {opt.trailing ? (
+                              <span className="erp-smart-select__option-trailing">{opt.trailing}</span>
+                            ) : null}
+                            {value === opt.value ? (
+                              <Check className="erp-smart-select__option-check" strokeWidth={2.5} aria-hidden />
+                            ) : null}
+                          </span>
                         </span>
                         {opt.subtitle ? (
                           <span className="erp-smart-select__option-subtitle">{opt.subtitle}</span>

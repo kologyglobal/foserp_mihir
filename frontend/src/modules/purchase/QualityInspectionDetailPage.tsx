@@ -211,7 +211,7 @@ export function QualityInspectionDetailPage() {
                       try {
                         const posted = await postGRN(qi.goodsReceiptId)
                         notify.success(`${posted.documentNumber} posted`)
-                        if (posted.inventoryPostDeferred) setInventoryMsgOpen(true)
+                        setInventoryMsgOpen(true)
                       } catch (err) {
                         notify.error(err instanceof PurchaseServiceError ? err.message : 'Post failed')
                       } finally {
@@ -528,15 +528,24 @@ export function QualityInspectionDetailPage() {
         onClose={() => setInventoryMsgOpen(false)}
         title="GRN posted"
         footer={
-          <ErpButton variant="primary" onClick={() => setInventoryMsgOpen(false)}>
-            OK
-          </ErpButton>
+          <div className="flex gap-2">
+            <ErpButton variant="secondary" onClick={() => setInventoryMsgOpen(false)}>
+              Close
+            </ErpButton>
+            <ErpButton
+              variant="primary"
+              onClick={() => {
+                setInventoryMsgOpen(false)
+                navigate('/inventory/stock')
+              }}
+            >
+              View Stock
+            </ErpButton>
+          </div>
         }
       >
         <p className="text-sm">
-          GRN posted successfully.{' '}
-          <strong>Inventory will be updated when the backend is connected</strong> (demo mock — stock
-          quantities are not written live).
+          Material accepted and GRN posted. Stock is updated in Inventory and ready to issue.
         </p>
       </Modal>
     </PurchaseCardFormShell>

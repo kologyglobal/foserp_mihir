@@ -101,6 +101,9 @@ export interface Bom {
   code: string
   name: string
   productItemId: string
+  /** Present when API includes the product item snapshot. */
+  productItemCode?: string | null
+  productItemName?: string | null
   description: string | null
   isActive: boolean
   createdBy: string | null
@@ -144,9 +147,13 @@ export interface BomLine {
   sequence: number
   level: number
   itemId: string
+  /** Snapshot from API — prefer over lookup for display. */
+  itemCode?: string | null
+  itemName?: string | null
   descriptionOverride: string | null
   quantity: string
   uomId: string
+  uomCode?: string | null
   quantityBasis: QuantityBasis
   fixedQuantity: string | null
   scrapPercent: string
@@ -178,6 +185,65 @@ export interface BomTreeNode extends BomLine {
 
 // ─── Routings ───────────────────────────────────────────────────────────────
 
+export type RoutingFlowType = 'SERIAL' | 'PARALLEL'
+
+export const ROUTING_FLOW_TYPE_VALUES: RoutingFlowType[] = ['SERIAL', 'PARALLEL']
+
+export const ROUTING_FLOW_TYPE_LABELS: Record<RoutingFlowType, string> = {
+  SERIAL: 'Serial',
+  PARALLEL: 'Parallel',
+}
+
+export type ManufacturingTimeUnit = 'SECOND' | 'MINUTE' | 'HOUR' | 'DAY' | 'WEEK'
+
+export const MANUFACTURING_TIME_UNIT_VALUES: ManufacturingTimeUnit[] = [
+  'SECOND',
+  'MINUTE',
+  'HOUR',
+  'DAY',
+  'WEEK',
+]
+
+export const MANUFACTURING_TIME_UNIT_LABELS: Record<ManufacturingTimeUnit, string> = {
+  SECOND: 'Seconds',
+  MINUTE: 'Minutes',
+  HOUR: 'Hours',
+  DAY: 'Days',
+  WEEK: 'Weeks',
+}
+
+export type RoutingLifecycleLabel =
+  | 'UNDER_DEVELOPMENT'
+  | 'CERTIFIED'
+  | 'CLOSED'
+  | 'SUPERSEDED'
+  | 'INACTIVE'
+
+export const ROUTING_LIFECYCLE_LABEL_DISPLAY: Record<RoutingLifecycleLabel, string> = {
+  UNDER_DEVELOPMENT: 'Under Development',
+  CERTIFIED: 'Certified',
+  CLOSED: 'Closed',
+  SUPERSEDED: 'Superseded',
+  INACTIVE: 'Inactive',
+}
+
+const STATUS_TO_LIFECYCLE: Record<ManufacturingVersionStatus, RoutingLifecycleLabel> = {
+  DRAFT: 'UNDER_DEVELOPMENT',
+  ACTIVE: 'CERTIFIED',
+  ARCHIVED: 'CLOSED',
+  SUPERSEDED: 'SUPERSEDED',
+  INACTIVE: 'INACTIVE',
+}
+
+/** User-facing lifecycle label from version status and optional API lifecycleLabel. */
+export function routingLifecycleLabel(
+  status: ManufacturingVersionStatus,
+  lifecycleLabel?: RoutingLifecycleLabel,
+): string {
+  const key = lifecycleLabel ?? STATUS_TO_LIFECYCLE[status]
+  return ROUTING_LIFECYCLE_LABEL_DISPLAY[key] ?? status
+}
+
 export type StageCompletionRule = 'ALL_OPERATIONS' | 'ANY_OPERATION' | 'MANUAL_CONFIRMATION' | 'QUANTITY_TARGET'
 export type RunTimeBasis = 'PER_ORDER' | 'PER_UNIT' | 'PER_BATCH'
 export type IoType = 'MATERIAL' | 'SEMI_FINISHED' | 'FINISHED_GOOD' | 'NONE'
@@ -199,7 +265,10 @@ export interface Routing {
   code: string
   name: string
   productItemId: string | null
+  productItemCode?: string | null
+  productItemName?: string | null
   description: string | null
+  productionFlowType?: RoutingFlowType
   isActive: boolean
   createdBy: string | null
   updatedBy: string | null
@@ -216,6 +285,7 @@ export interface RoutingVersion {
   versionNumber: number
   revisionCode: string
   status: ManufacturingVersionStatus
+  lifecycleLabel?: RoutingLifecycleLabel
   effectiveFrom: string
   effectiveTo: string | null
   revisionNotes: string | null
@@ -246,6 +316,7 @@ export interface StageGroup {
   qualityRequired: boolean
   completionRule: StageCompletionRule
   isActive: boolean
+  sourceBomLineId?: string | null
   createdBy: string | null
   updatedBy: string | null
   createdAt: string
@@ -264,7 +335,9 @@ export interface Operation {
   workCentreId: string | null
   defaultMachineId: string | null
   setupTimeMinutes: string
+  setupTimeUnit?: ManufacturingTimeUnit
   runTimeValue: string
+  runTimeUnit?: ManufacturingTimeUnit
   runTimeBasis: RunTimeBasis
   workInstructions: string | null
   drawingReference: string | null
@@ -273,6 +346,7 @@ export interface Operation {
   outputItemId: string | null
   qualityRequired: boolean
   qualityPlanRef: string | null
+  qcTestGroupId?: string | null
   outsourced: boolean
   defaultVendorId: string | null
   isOptional: boolean
@@ -406,6 +480,7 @@ export interface ProfileReadiness {
 export interface ValidationResult {
   valid: boolean
   errors: string[]
+  warnings?: string[]
   lineCount?: number
   operationCount?: number
   stageGroupCount?: number

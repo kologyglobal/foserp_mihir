@@ -10,6 +10,7 @@ import traceabilityRoutes from './traceability/traceability.routes.js'
 import { lotRoutes, serialRoutes } from './tracking-masters/tracking-master.routes.js'
 import storeWorkbenchRoutes from './store-workbench/store-workbench.routes.js'
 import accountingRoutes from './accounting/inventory-accounting.routes.js'
+import setupRoutes from './setup/setup.routes.js'
 
 const router = Router({ mergeParams: true })
 
@@ -27,5 +28,7 @@ router.use('/serials', serialRoutes)
 router.use('/store-workbench', storeWorkbenchRoutes)
 // Inventory GL events — flag-gated by FinanceFeatureKey.INVENTORY_ACCOUNTING.
 router.use('/accounting', accountingRoutes)
+// Tenant inventory setup + scan code lookup.
+router.use('/setup', setupRoutes)
 
 export default router

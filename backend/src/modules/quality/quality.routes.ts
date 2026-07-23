@@ -11,6 +11,7 @@ import ncrRoutes from './ncrs/ncr.routes.js'
 import parameterRoutes from './parameters/parameter.routes.js'
 import inspectionPlanRoutes from './inspection-plans/inspection-plan.routes.js'
 import certificateRoutes from './certificates/certificate.routes.js'
+import kioskRoutes from './kiosk/kiosk.routes.js'
 import { productionOrderIdParamSchema } from './inspections/inspection.schemas.js'
 import * as blockersController from './blockers.controller.js'
 import * as workspaceController from './workspace.controller.js'
@@ -24,6 +25,7 @@ router.use('/ncrs', ncrRoutes)
 router.use('/parameters', parameterRoutes)
 router.use('/inspection-plans', inspectionPlanRoutes)
 router.use('/certificates', certificateRoutes)
+router.use('/kiosk', kioskRoutes)
 
 router.get('/workspace/summary', requirePermission('quality.view'), workspaceController.summary)
 router.get('/workspace/incoming', requirePermission('quality.view'), workspaceController.incoming)

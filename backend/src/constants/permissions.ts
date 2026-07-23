@@ -286,6 +286,7 @@ export const PERMISSIONS = [
   'finance.ar.invoice.edit',
   'finance.ar.invoice.post',
   'finance.ar.invoice.cancel',
+  'finance.ar.invoice.reverse',
   'finance.ar.reconcile.view',
   'finance.ar.receipt.view',
   'finance.ar.receipt.create',
@@ -461,6 +462,9 @@ export const PERMISSIONS = [
   // Tax compliance extracts (GST outward/inward/summary + future export)
   'finance.tax.view',
   'finance.tax.extract',
+  // Tax compliance Phase 2 — e-invoice / e-way (simulated NIC by default)
+  'finance.tax.einvoice.manage',
+  'finance.tax.eway.manage',
 
   // Finance Fixed Assets Phase 1–2 — register, capitalize, depreciate, simple dispose
   'finance.fa.view',
@@ -470,6 +474,9 @@ export const PERMISSIONS = [
   'finance.fa.depreciate',
   'finance.fa.dispose',
   'finance.fa.transfer',
+  'finance.fa.revalue',
+  'finance.fa.impair',
+  'finance.fa.maintain',
 
   // Finance Budgeting Phase 1 — versions, annual lines, budget vs actual
   'finance.budget.view',
@@ -524,6 +531,7 @@ export const PERMISSIONS = [
   'manufacturing.view', 'manufacturing.dashboard.view',
   'manufacturing.bom.view', 'manufacturing.bom.create', 'manufacturing.bom.edit',
   'manufacturing.bom.activate', 'manufacturing.bom.deactivate', 'manufacturing.bom.view_cost',
+  'manufacturing.bom.import',
   'manufacturing.production_plan.view',
   'manufacturing.production_plan.create',
   'manufacturing.production_plan.edit',
@@ -541,9 +549,11 @@ export const PERMISSIONS = [
   'manufacturing.work_orders.release', 'manufacturing.work_orders.assign',
   'manufacturing.stage.view', 'manufacturing.stage.execute',
   'manufacturing.progress.record', 'manufacturing.progress.correct',
+  'manufacturing.progress.reverse',
   'manufacturing.timeline.view', 'manufacturing.control_room.view',
   // Phase 2B — assignments, daily production, issues, operator UX
   'manufacturing.daily_production.view', 'manufacturing.daily_production.create', 'manufacturing.daily_production.submit',
+  'manufacturing.daily_production.reverse',
   'manufacturing.assignment.view', 'manufacturing.assignment.manage', 'manufacturing.assignment.reassign',
   'manufacturing.operator.my_work', 'manufacturing.operator.start', 'manufacturing.operator.pause', 'manufacturing.operator.complete',
   'manufacturing.issue.view', 'manufacturing.issue.report', 'manufacturing.issue.acknowledge', 'manufacturing.issue.resolve',
@@ -556,7 +566,11 @@ export const PERMISSIONS = [
   'manufacturing.material.release_reservation',
   'manufacturing.material.reallocate',
   'manufacturing.material.additional_issue',
+  'manufacturing.material_issue.reverse',
+  'manufacturing.material_return.reverse',
+  'manufacturing.material_transfer.reverse',
   'manufacturing.wip.move',
+  'manufacturing.wip.reverse',
   'manufacturing.production.complete', 'manufacturing.production.complete_and_close',
   'manufacturing.quality.view', 'manufacturing.quality.inspect', 'manufacturing.quality.accept_deviation',
   'manufacturing.scrap.record', 'manufacturing.rework.manage',
@@ -574,6 +588,16 @@ export const PERMISSIONS = [
   'manufacturing.job_work.return_material', 'manufacturing.job_work.reconcile',
   'manufacturing.job_work.approve_difference', 'manufacturing.job_work.link_invoice',
   'manufacturing.job_work.close', 'manufacturing.job_work.cancel', 'manufacturing.job_work.view_cost',
+  'manufacturing.job_work_dispatch.reverse',
+  'manufacturing.job_work_receipt.reverse',
+  'manufacturing.split.reverse',
+  // Phase 5C — transaction corrections / reversals
+  'manufacturing.correction.view',
+  'manufacturing.correction.request',
+  'manufacturing.correction.approve',
+  'manufacturing.correction.reject',
+  'manufacturing.correction.apply',
+  'manufacturing.correction.admin',
   'manufacturing.reports.view', 'manufacturing.reports.export',
   'manufacturing.settings.view', 'manufacturing.settings.manage',
   // Phase 5A — runtime change requests (manufacturing-scoped approval workflow)
@@ -587,6 +611,10 @@ export const PERMISSIONS = [
   'manufacturing.runtime_change.admin',
   'manufacturing.routes.view', 'manufacturing.routes.create', 'manufacturing.routes.edit',
   'manufacturing.routes.activate',
+  'manufacturing.routes.validate',
+  'manufacturing.routes.certify',
+  'manufacturing.routes.version',
+  'manufacturing.routes.close',
   'manufacturing.setup.view',
   'manufacturing.profile.view', 'manufacturing.profile.manage',
   'manufacturing.warehouse_mapping.view', 'manufacturing.warehouse_mapping.manage',
@@ -615,6 +643,7 @@ export const PERMISSIONS = [
   'quality.view', 'quality.create', 'quality.edit', 'quality.submit', 'quality.approve',
   'quality.release', 'quality.post', 'quality.cancel', 'quality.close', 'quality.print',
   'quality.export', 'quality.override',
+  'quality.decision.correct',
   // Phase 7D — quality reporting
   'quality.reports.view',
   'quality.reports.production',
@@ -700,6 +729,42 @@ export const PERMISSIONS = [
   'dispatch.reports.view',
   'dispatch.reports.fulfilment',
   'dispatch.reports.invoice_readiness',
+
+  // Gate & Security
+  'gate.dashboard.view',
+  'gate.register.view',
+  'gate.visitor.view',
+  'gate.visitor.create',
+  'gate.visitor.edit',
+  'gate.visitor.approve',
+  'gate.visitor.entry',
+  'gate.visitor.exit',
+  'gate.vehicle.view',
+  'gate.vehicle.create',
+  'gate.vehicle.edit',
+  'gate.vehicle.entry',
+  'gate.vehicle.exit',
+  'gate.material_inward.view',
+  'gate.material_inward.create',
+  'gate.material_inward.edit',
+  'gate.material_outward.view',
+  'gate.material_outward.verify',
+  'gate.material_outward.release',
+  'gate.pass.view',
+  'gate.pass.create',
+  'gate.pass.edit',
+  'gate.pass.approve',
+  'gate.pass.return',
+  'gate.contractor.view',
+  'gate.contractor.create',
+  'gate.contractor.exit',
+  'gate.courier.view',
+  'gate.courier.create',
+  'gate.courier.handover',
+  'gate.approval.view',
+  'gate.approval.action',
+  'gate.report.view',
+  'gate.settings.manage',
 
   // Phase 7D — cross-module operational exception centre
   'operations.exceptions.view',
@@ -971,6 +1036,20 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'purchase.qi.complete',
     'purchase.qi.cancel',
     'purchase.return.view',
+    // Manufacturing / shopfloor QC kiosk (module quality.* + manufacturing.quality.*)
+    'quality.view',
+    'quality.create',
+    'quality.edit',
+    'quality.submit',
+    'quality.cancel',
+    'quality.close',
+    'quality.reports.view',
+    'quality.reports.production',
+    'quality.reports.ncr',
+    'manufacturing.view',
+    'manufacturing.quality.view',
+    'manufacturing.quality.inspect',
+    'manufacturing.work_orders.view',
     'master.lookup.view',
     'master.item.view',
   ],
@@ -1238,6 +1317,9 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'master.location.view',
     'master.bin.view',
     ...PRODUCTION_PERMISSIONS,
+    // Manufacturing QC list/get needs module quality.view (decide can use manufacturing.quality.inspect)
+    'quality.view',
+    'quality.submit',
     // Phase 7D — cross-module reporting/exceptions visible to Production Manager
     'quality.reports.view',
     'quality.reports.production',
@@ -1318,6 +1400,8 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'manufacturing.issue.report',
     'manufacturing.issue.view',
     'manufacturing.downtime.view',
+    // Product label on kiosk cards (read-only WO header fields)
+    'manufacturing.work_orders.view',
     'master.item.view',
   ],
   'Production Engineer': [
@@ -1334,8 +1418,13 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'manufacturing.profile.view', 'manufacturing.profile.manage',
     'manufacturing.bom.view', 'manufacturing.bom.create', 'manufacturing.bom.edit',
     'manufacturing.bom.activate', 'manufacturing.bom.deactivate', 'manufacturing.bom.view_cost',
+    'manufacturing.bom.import',
     'manufacturing.routes.view', 'manufacturing.routes.create', 'manufacturing.routes.edit',
     'manufacturing.routes.activate',
+    'manufacturing.routes.validate',
+    'manufacturing.routes.certify',
+    'manufacturing.routes.version',
+    'manufacturing.routes.close',
     'manufacturing.work_centre.view', 'manufacturing.work_centre.manage',
     'manufacturing.machine.view', 'manufacturing.machine.manage',
     'manufacturing.work_orders.view',
@@ -1385,6 +1474,9 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     ...MASTER_VIEW_PERMISSIONS,
   ],
 }
+
+/** Product / UI persona — same grants as Production Manager (includes manufacturing.bom.create). */
+ROLE_PERMISSIONS['Production Head'] = [...ROLE_PERMISSIONS['Production Manager']]
 
 /**
  * Legacy → canonical purchase permission aliases.

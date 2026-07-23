@@ -1,4 +1,5 @@
 import type { InventoryStockBalance, InventoryStockStatus, Prisma } from '@prisma/client'
+import { Prisma as PrismaRuntime } from '@prisma/client'
 import { prisma } from '../../../config/database.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import { addDec, subDec } from './quantity.helpers.js'
@@ -53,9 +54,30 @@ export async function getBalance(
   itemId: string,
   warehouseId: string,
 ): Promise<InventoryStockBalance | null> {
-  return prisma.inventoryStockBalance.findFirst({
+  // Quantity-only select so readiness/stock position keep working if valuation
+  // columns (avgRate/stockValue) are not migrated yet.
+  const row = await prisma.inventoryStockBalance.findFirst({
     where: { tenantId, itemId, warehouseId },
+    select: {
+      id: true,
+      tenantId: true,
+      itemId: true,
+      warehouseId: true,
+      onHandQty: true,
+      reservedQty: true,
+      qcHoldQty: true,
+      blockedQty: true,
+      rejectedQty: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   })
+  if (!row) return null
+  return {
+    ...row,
+    avgRate: new PrismaRuntime.Decimal(0),
+    stockValue: new PrismaRuntime.Decimal(0),
+  }
 }
 
 export async function applyMovementInTx(

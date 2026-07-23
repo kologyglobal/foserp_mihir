@@ -55,6 +55,8 @@ export function WorkspaceUnifiedHeader({
     </div>
   ) : null
 
+  const showCrumbs = !recordHeader && crumbs && crumbs.length > 0
+
   return (
     <div className="d365-workspace-unified-header">
       {meta.backLink ? (
@@ -62,6 +64,13 @@ export function WorkspaceUnifiedHeader({
           <PageBackLink to={meta.backLink.to} label={meta.backLink.label} />
         </div>
       ) : null}
+
+      {showCrumbs ? (
+        <div className="d365-workspace-unified-breadcrumbs">
+          <Breadcrumbs items={crumbs} />
+        </div>
+      ) : null}
+
       <div
         className={cn(
           'd365-workspace-unified-head',
@@ -70,12 +79,6 @@ export function WorkspaceUnifiedHeader({
         )}
       >
         <div className="d365-workspace-unified-main">
-          {!recordHeader && crumbs && crumbs.length > 0 ? (
-            <div className="d365-workspace-unified-breadcrumbs">
-              <Breadcrumbs items={crumbs} />
-            </div>
-          ) : null}
-
           {!recordHeader ? (
             <div className="d365-workspace-unified-title">
               <h1 className="d365-workspace-unified-title-text">{chromeTitle}</h1>

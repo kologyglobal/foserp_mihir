@@ -357,3 +357,75 @@ export type DisposePreviewInput = z.infer<typeof disposePreviewSchema>
 export type ListFixedAssetTransfersQueryInput = z.infer<typeof listFixedAssetTransfersQuerySchema>
 export type CreateFixedAssetTransferInput = z.infer<typeof createFixedAssetTransferSchema>
 export type CompleteFixedAssetTransferInput = z.infer<typeof completeFixedAssetTransferSchema>
+
+// ─── Phase 4 — revaluation / impairment / maintenance / reports ──────────────
+
+export const listFixedAssetPhase4QuerySchema = z.object({
+  legalEntityId: z.string().uuid(),
+  search: z.string().trim().max(100).optional(),
+  ...paginationFields,
+})
+
+export const createFixedAssetRevaluationSchema = z.object({
+  legalEntityId: z.string().uuid(),
+  assetId: z.string().uuid(),
+  revaluationDate: dateOnlySchema,
+  revaluedAmount: decimalStringSchema.refine((v) => Number(v) > 0, 'revaluedAmount must be positive'),
+  reason: z.string().trim().min(1).max(1000),
+})
+
+export const createFixedAssetImpairmentSchema = z.object({
+  legalEntityId: z.string().uuid(),
+  assetId: z.string().uuid(),
+  impairmentDate: dateOnlySchema,
+  recoverableAmount: decimalStringSchema.refine((v) => Number(v) >= 0, 'recoverableAmount cannot be negative'),
+  reason: z.string().trim().min(1).max(1000),
+})
+
+export const createFixedAssetMaintenanceSchema = z.object({
+  legalEntityId: z.string().uuid(),
+  assetId: z.string().uuid(),
+  maintenanceType: z.enum([
+    'Preventive',
+    'Breakdown',
+    'Calibration',
+    'AMC',
+    'Inspection',
+    'PREVENTIVE',
+    'BREAKDOWN',
+    'CALIBRATION',
+    'INSPECTION',
+  ]),
+  scheduledDate: dateOnlySchema,
+  vendorName: z.string().trim().max(200).optional().nullable(),
+  cost: decimalStringSchema.optional(),
+  downtimeHours: z.coerce.number().min(0).max(100000).optional().nullable(),
+  notes: z.string().trim().max(2000).optional().nullable(),
+})
+
+export const updateFixedAssetMaintenanceSchema = z
+  .object({
+    scheduledDate: dateOnlySchema.optional(),
+    vendorName: z.string().trim().max(200).optional().nullable(),
+    cost: decimalStringSchema.optional(),
+    downtimeHours: z.coerce.number().min(0).max(100000).optional().nullable(),
+    notes: z.string().trim().max(2000).optional().nullable(),
+    status: z.enum(['Scheduled', 'In Progress', 'SCHEDULED', 'IN_PROGRESS']).optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, 'At least one field is required')
+
+export const completeFixedAssetMaintenanceSchema = z.object({
+  completedDate: dateOnlySchema.optional(),
+})
+
+export const fixedAssetReportQuerySchema = z.object({
+  legalEntityId: z.string().uuid(),
+})
+
+export type ListFixedAssetPhase4QueryInput = z.infer<typeof listFixedAssetPhase4QuerySchema>
+export type CreateFixedAssetRevaluationInput = z.infer<typeof createFixedAssetRevaluationSchema>
+export type CreateFixedAssetImpairmentInput = z.infer<typeof createFixedAssetImpairmentSchema>
+export type CreateFixedAssetMaintenanceInput = z.infer<typeof createFixedAssetMaintenanceSchema>
+export type UpdateFixedAssetMaintenanceInput = z.infer<typeof updateFixedAssetMaintenanceSchema>
+export type CompleteFixedAssetMaintenanceInput = z.infer<typeof completeFixedAssetMaintenanceSchema>
+export type FixedAssetReportQueryInput = z.infer<typeof fixedAssetReportQuerySchema>

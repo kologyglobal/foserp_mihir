@@ -91,7 +91,7 @@ export function InventoryClosePage() {
   return (
     <PeriodCloseShell
       title="Inventory Close"
-      description="Inventory valuation, movements and ledger alignment for the close period."
+      description="Inventory GL event readiness for the close period (live when API mode is on)."
       periodFilter={filter}
       onPeriodChange={setFilter}
       commandBar={
@@ -109,13 +109,14 @@ export function InventoryClosePage() {
           items={[
             { label: 'Inventory Value', value: formatCurrency(data.inventoryValue) },
             { label: 'Negative-stock Items', value: String(data.negativeStockItems) },
-            { label: 'Unposted Movements', value: String(data.unpostedMovements) },
+            { label: 'Unposted Inventory GL Events', value: String(data.unpostedMovements) },
             { label: 'Pending Transfers', value: String(data.pendingTransfers) },
-            { label: 'Pending Adjustments', value: String(data.pendingAdjustments) },
+            { label: 'Pending Adjustment Events', value: String(data.pendingAdjustments) },
             { label: 'Item Ledger vs GL Diff', value: formatCurrency(data.itemLedgerVsGlDiff) },
             { label: 'Cost Adjustment Status', value: data.costAdjustmentStatus },
           ]}
           links={[
+            { label: 'Inventory Accounting', to: '/inventory/accounting' },
             { label: 'Open Inventory', to: '/inventory' },
             { label: 'Subledger Reconciliation', to: '/accounting/period-close/subledger-reconciliation' },
           ]}
@@ -156,7 +157,7 @@ export function ManufacturingClosePage() {
   return (
     <PeriodCloseShell
       title="Manufacturing Close"
-      description="Production orders, WIP and variance review before period lock."
+      description="Production WIP, unposted cost events and close-ready work orders (live when API mode is on)."
       periodFilter={filter}
       onPeriodChange={setFilter}
       commandBar={
@@ -172,19 +173,19 @@ export function ManufacturingClosePage() {
       {data ? (
         <Scorecard
           items={[
-            { label: 'Open Production Orders', value: String(data.openProductionOrders) },
-            { label: 'Completed but Unclosed', value: String(data.completedUnclosedOrders) },
+            { label: 'Open / Attention WOs', value: String(data.openProductionOrders) },
+            { label: 'Close-Ready Work Orders', value: String(data.completedUnclosedOrders) },
             { label: 'WIP Value', value: formatCurrency(data.wipValue) },
-            { label: 'Unposted Consumption', value: String(data.unpostedConsumption) },
-            { label: 'Missing Labour Booking', value: String(data.missingLabourBooking) },
-            { label: 'Missing Machine Booking', value: String(data.missingMachineBooking) },
+            { label: 'Unposted Mfg Events', value: String(data.unpostedConsumption) },
+            { label: 'Provisional Cost Snapshots', value: String(data.missingLabourBooking) },
+            { label: 'Failed Mfg Events', value: String(data.missingMachineBooking) },
             { label: 'Unallocated Overhead', value: formatCurrency(data.unallocatedOverhead) },
-            { label: 'Production Variance', value: formatCurrency(data.productionVariance) },
+            { label: 'Reconciliation Difference', value: formatCurrency(data.productionVariance) },
             { label: 'Scrap Variance', value: formatCurrency(data.scrapVariance) },
           ]}
           links={[
-            { label: 'Open Production', to: '/production' },
             { label: 'Manufacturing Accounting', to: '/accounting/manufacturing' },
+            { label: 'Work Orders', to: '/manufacturing/work-orders' },
           ]}
         />
       ) : null}
@@ -286,7 +287,7 @@ export function BankReconciliationStatusPage() {
   return (
     <PeriodCloseShell
       title="Bank Reconciliation Status"
-      description="Bank and cash close readiness for the selected period."
+      description="Bank and cash close readiness for the selected period (live open recon sessions when API mode is on)."
       periodFilter={filter}
       onPeriodChange={setFilter}
       commandBar={
@@ -302,11 +303,14 @@ export function BankReconciliationStatusPage() {
       {data ? (
         <Scorecard
           items={[
-            { label: 'Accounts Pending Recon', value: String(data.accountsPendingRecon) },
+            { label: 'Open Recon Sessions (period)', value: String(data.accountsPendingRecon) },
             { label: 'Cash Counts Pending', value: String(data.cashCountsPending) },
             { label: 'Cheques in Transit', value: String(data.chequesInTransit) },
             { label: 'Unidentified Transactions', value: String(data.unidentifiedTransactions) },
             { label: 'Bank vs GL Diff', value: formatCurrency(data.bankVsGlDiff) },
+            ...(data.statusMessage
+              ? [{ label: 'Readiness', value: data.statusMessage }]
+              : []),
           ]}
           links={[
             { label: 'Bank Reconciliation', to: '/accounting/bank-cash/reconciliation' },

@@ -41,6 +41,16 @@ export {
   type ReadinessState,
   type NextBestAction,
 } from './ReadinessChecklist'
+export {
+  FulfilmentJourneyStrip,
+  deriveWoFulfilmentJourney,
+  deriveSoFulfilmentJourney,
+  type FulfilmentJourneyStep,
+  type FulfilmentJourneyStepId,
+  type DeriveWoJourneyInput,
+  type DeriveSoJourneyInput,
+} from './FulfilmentJourneyStrip'
+export { getFulfilmentAutoMode, setFulfilmentAutoMode } from './fulfilmentAutoMode'
 export { WorkOrderStatusBadge } from './WorkOrderStatusBadge'
 export { WorkOrderHealthBadge } from './WorkOrderHealthBadge'
 export { JobWorkStatusBadge } from './JobWorkStatusBadge'

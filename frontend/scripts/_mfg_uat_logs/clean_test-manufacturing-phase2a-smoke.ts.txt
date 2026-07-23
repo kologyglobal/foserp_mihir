@@ -1,0 +1,77 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+── Manufacturing production (Phase 2A) smoke ──
+
+Types & API service:
+  ✓ manufacturingProduction types file exists
+  ✓ manufacturingApi service file exists
+  ✓ API client exports listDemands
+  ✓ API client exports getDemand
+  ✓ API client exports createManualDemand
+  ✓ API client exports cancelDemand
+  ✓ API client exports listEligibleSalesOrders
+  ✓ API client exports getSalesOrderLineEligibility
+  ✓ API client exports convertSalesOrderLine
+  ✓ API client exports listWorkOrders
+  ✓ API client exports getWorkOrdersSummary
+  ✓ API client exports getWorkOrder
+  ✓ API client exports getWorkOrderDetail
+  ✓ API client exports getWorkOrderActivities
+  ✓ API client exports getWorkOrderLedger
+  ✓ API client exports createManualWorkOrder
+  ✓ API client exports cancelWorkOrder
+  ✓ API client exports releaseWorkOrder
+  ✓ API client exports startWorkOrder
+  ✓ API client exports holdWorkOrder
+  ✓ API client exports resumeWorkOrder
+  ✓ API client exports completeWorkOrder
+  ✓ API client exports recordProgress
+  ✓ API client exports completeStage
+  ✓ API client exports correctProgress
+  ✓ API client exports getTodayDashboard
+  ✓ API client exports getControlRoomDashboard
+
+Permissions:
+  ✓ Permission key defined: manufacturing.demand.view
+  ✓ Permission key defined: manufacturing.demand.create
+  ✓ Permission key defined: manufacturing.demand.convert
+  ✓ Permission key defined: manufacturing.work_orders.release
+  ✓ Permission key defined: manufacturing.work_orders.assign
+  ✓ Permission key defined: manufacturing.stage.view
+  ✓ Permission key defined: manufacturing.stage.execute
+  ✓ Permission key defined: manufacturing.progress.record
+  ✓ Permission key defined: manufacturing.progress.correct
+  ✓ Permission key defined: manufacturing.timeline.view
+  ✓ Permission key defined: manufacturing.control_room.view
+  ✓ useManufacturingWorkOrderPermissions hook exported
+  ✗ permissions index re-exports work order hook
+
+Pages & components:
+  ✓ API work order register page — src/modules/manufacturing/work-orders/ApiWorkOrderRegisterPage.tsx
+  ✓ API work order create page — src/modules/manufacturing/work-orders/ApiWorkOrderCreatePage.tsx
+  ✓ API work order detail page — src/modules/manufacturing/work-orders/ApiWorkOrderDetailPage.tsx
+  ✓ Record progress drawer — src/modules/manufacturing/work-orders/components/RecordProgressDrawer.tsx
+  ✓ Work order tone helpers — src/modules/manufacturing/work-orders/workOrderTone.ts
+  ✓ Today page — src/modules/manufacturing/today/TodayPage.tsx
+  ✓ API control room view — src/modules/manufacturing/ApiProductionControlRoomView.tsx
+
+Routes:
+  ✓ Route registered: manufacturing/today
+  ✓ Route registered: manufacturing/work-orders
+  ✓ Route registered: manufacturing/work-orders/:workOrderId
+  ✓ Route registered: manufacturing/work-orders/new
+  ✓ Work order routes branch on isApiMode()
+  ✓ No competing /manufacturing/orders route
+
+Navigation:
+  ✗ Nav includes Today link
+  ✓ Nav preserves Work Orders link
+  ✓ Nav preserves Control Room link
+  ✓ Nav preserves Setup group
+
+Control Room:
+  ✓ Control Room branches on isApiMode()
+  ✓ Control Room renders ApiProductionControlRoomView
+
+✗ 2 check(s) failed (57 passed, 2 failed)
+

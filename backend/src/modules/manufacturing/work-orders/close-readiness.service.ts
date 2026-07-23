@@ -3,6 +3,7 @@ import { NotFoundError } from '../../../utils/errors.js'
 import { collectQualityBlockers } from '../../quality/shared/blockers.service.js'
 import { getMaterialReconciliation } from '../materials/material-reconciliation.service.js'
 import { sumPostedFgReceived } from '../fg-receipts/fg-eligibility.service.js'
+import { getManufacturingSettingsForTenant } from '../settings/manufacturing-settings.service.js'
 import { isPositive, subDec, toDecimal } from '../shared/quantity.service.js'
 import { dec } from '../shared/manufacturing.mappers.js'
 
@@ -34,6 +35,10 @@ export async function getCloseReadiness(
   if (!order) throw new NotFoundError('Work order not found')
 
   const allowInProgress = options?.allowInProgress === true
+  const settings = await getManufacturingSettingsForTenant(tenantId)
+  const flexible = Boolean(settings.flexibleExecution)
+  /** Soft gates: operational Complete WO / flexible execution — inventory & QC advise, do not block. */
+  const softGates = flexible || allowInProgress
   const checks: CloseReadinessCheck[] = []
 
   const statusOk =
@@ -58,7 +63,7 @@ export async function getCloseReadiness(
   if (qualityBlockers.length > 0) {
     checks.push({
       code: 'QUALITY_BLOCKERS',
-      severity: 'BLOCKER',
+      severity: softGates ? 'WARNING' : 'BLOCKER',
       message: `${qualityBlockers.length} open quality blocker(s)`,
       detail: qualityBlockers,
     })
@@ -74,7 +79,8 @@ export async function getCloseReadiness(
   if (materialRecon.status === 'BLOCKED' || materialRecon.status === 'DIFFERENCE') {
     checks.push({
       code: 'MATERIAL_RECONCILIATION',
-      severity: materialRecon.status === 'BLOCKED' ? 'BLOCKER' : 'WARNING',
+      severity:
+        materialRecon.status === 'BLOCKED' && !softGates ? 'BLOCKER' : 'WARNING',
       message: `Material reconciliation is ${materialRecon.status}`,
       detail: {
         status: materialRecon.status,
@@ -103,7 +109,7 @@ export async function getCloseReadiness(
   if (openReservations > 0) {
     checks.push({
       code: 'OPEN_RESERVATIONS',
-      severity: 'BLOCKER',
+      severity: softGates ? 'WARNING' : 'BLOCKER',
       message: `${openReservations} active WO reservation(s) remain`,
       detail: { count: openReservations },
     })
@@ -121,7 +127,8 @@ export async function getCloseReadiness(
   if (isPositive(completedGood) && isPositive(fgRemaining)) {
     checks.push({
       code: 'FG_NOT_FULLY_RECEIVED',
-      severity: 'BLOCKER',
+      // FG receipt is a separate posting — never hard-block operational Complete WO.
+      severity: softGates ? 'WARNING' : 'BLOCKER',
       message: `FG remaining to receive: ${dec(fgRemaining)} (completed ${dec(completedGood)}, received ${dec(fgReceived)})`,
       detail: {
         completedGoodQuantity: dec(completedGood),

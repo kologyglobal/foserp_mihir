@@ -61,7 +61,7 @@ export async function getLot(tenantId: string, id: string) {
     include: {
       ...lotInclude,
       serials: { where: { deletedAt: null }, orderBy: { serialNumber: 'asc' } },
-      movementLinks: {
+      movements: {
         include: { stockMovement: true },
         orderBy: { createdAt: 'desc' },
         take: 100,
@@ -114,7 +114,7 @@ export async function listSerials(tenantId: string, query: ListSerialsInput) {
 export async function getSerial(tenantId: string, id: string) {
   const serial = await prisma.inventorySerial.findFirst({
     where: { id, tenantId, deletedAt: null },
-    include: { ...serialInclude, lineage: { orderBy: { createdAt: 'desc' }, take: 100 } },
+    include: { ...serialInclude, movements: { orderBy: { createdAt: 'desc' }, take: 100 } },
   })
   if (!serial) throw new NotFoundError('Inventory serial not found')
   return serial

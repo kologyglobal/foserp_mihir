@@ -72,6 +72,21 @@ export function moduleHeaderIsActive(category: NavCategory, pathname: string): b
 
 export function subNavItemIsActive(pathname: string, item: ModuleSubNavItem): boolean {
   if (item.end) return pathname === item.path
+  // BOM / routing editors use sibling version routes under /manufacturing/setup/*.
+  if (item.path === '/manufacturing/setup/boms') {
+    return (
+      pathname === item.path ||
+      pathname.startsWith(`${item.path}/`) ||
+      pathname.startsWith('/manufacturing/setup/bom-versions')
+    )
+  }
+  if (item.path === '/manufacturing/setup/routings') {
+    return (
+      pathname === item.path ||
+      pathname.startsWith(`${item.path}/`) ||
+      pathname.startsWith('/manufacturing/setup/routing-versions')
+    )
+  }
   return pathname === item.path || pathname.startsWith(`${item.path}/`)
 }
 

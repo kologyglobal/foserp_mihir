@@ -1,0 +1,35 @@
+-- Route Master BC redesign (additive)
+-- Production flow type on routing header; time units + QC plan FK on operations;
+-- MANUFACTURING_ROUTING code series entity (Prisma enum alter).
+
+-- 1) New enums
+ALTER TABLE `manufacturing_routings`
+  ADD COLUMN `productionFlowType` ENUM('SERIAL', 'PARALLEL') NOT NULL DEFAULT 'SERIAL'
+    AFTER `description`;
+
+-- 2) Operation time units + QC test group (QualityInspectionPlan id)
+ALTER TABLE `manufacturing_routing_operations`
+  ADD COLUMN `setupTimeUnit` ENUM('SECOND', 'MINUTE', 'HOUR', 'DAY', 'WEEK') NOT NULL DEFAULT 'MINUTE'
+    AFTER `setupTimeMinutes`,
+  ADD COLUMN `runTimeUnit` ENUM('SECOND', 'MINUTE', 'HOUR', 'DAY', 'WEEK') NOT NULL DEFAULT 'MINUTE'
+    AFTER `runTimeValue`,
+  ADD COLUMN `qcTestGroupId` CHAR(36) NULL
+    AFTER `qualityPlanRef`;
+
+CREATE INDEX `mfg_routing_op_qc_test_group_idx`
+  ON `manufacturing_routing_operations` (`tenantId`, `qcTestGroupId`);
+
+-- 3) Extend CodeSeriesEntity for auto RT-###### (MySQL enum append)
+ALTER TABLE `code_series`
+  MODIFY COLUMN `entityType` ENUM(
+    'USER','LEAD','CONTACT','CRM_COMPANY','OPPORTUNITY','QUOTATION','SALES_ORDER',
+    'PRODUCTION_DEMAND','PRODUCTION_ORDER','DAILY_PRODUCTION_BATCH','PRODUCTION_ISSUE',
+    'STOCK_MOVEMENT','STOCK_RESERVATION','PURCHASE_REQUISITION','PURCHASE_PLANNING',
+    'REQUEST_FOR_QUOTATION','VENDOR_QUOTATION','VENDOR_COMPARISON','PURCHASE_ORDER',
+    'GOODS_RECEIPT','QUALITY_INSPECTION','QUALITY_NCR','PURCHASE_INVOICE','PURCHASE_RETURN',
+    'JOB_WORK_ORDER','PRODUCTION_RUNTIME_CHANGE','PRODUCTION_WIP_MOVEMENT','MANUFACTURING_CORRECTION',
+    'PRODUCTION_PLAN','DEMAND_CONSOLIDATION_PLAN','OUTBOUND_DISPATCH','PRODUCTION_FG_RECEIPT',
+    'DISPATCH_REQUIREMENT','DISPATCH_PICK_LIST','DISPATCH_PACKING_SESSION','DISPATCH_PACKAGE',
+    'DELIVERY_CHALLAN','PURCHASE_QUALITY_INSPECTION','INVENTORY_TRANSFER','INVENTORY_STOCK_COUNT',
+    'INVENTORY_ADJUSTMENT','MANUFACTURING_ROUTING'
+  ) NOT NULL;

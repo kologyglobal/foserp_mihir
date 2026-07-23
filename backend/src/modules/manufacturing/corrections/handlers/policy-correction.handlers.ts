@@ -157,7 +157,28 @@ export const workOrderSplitHandler: CorrectionHandler = {
       where: { id: ctx.sourceEntityId, tenantId: ctx.tenantId },
       include: { parentOrder: true, childOrder: true },
     })
-    if (!split) throw new NotFoundError('Work Order split not found')
+    if (!split) {
+      const blockers = [
+        'Work Order split correction requires a valid split record. Split reversal remains policy-gated until a real split is selected.',
+      ]
+      return emptyPreview({
+        headline: 'Work Order split correction blocked by policy',
+        blockers,
+        warnings: ['Work Order merge remains deferred'],
+        dependencies: blockers.map((message) => ({
+          code: 'SPLIT_NOT_FOUND',
+          severity: 'blocker' as const,
+          message,
+        })),
+        approvalRequired: true,
+        riskLevel: 'HIGH',
+        followUpActions: [],
+        original: { splitId: ctx.sourceEntityId },
+        proposed: { cancelChild: false },
+        sourceVersion: makeSourceVersion(new Date(0), ctx.sourceEntityId),
+        previewToken: makePreviewToken({ split: ctx.sourceEntityId, missing: true }),
+      })
+    }
     const blockers = await collectSplitReversalBlockers(ctx.tenantId, split.childOrderId)
     const sourceVersion = makeSourceVersion(split.createdAt, `${split.id}:${split.childOrder.updatedAt.toISOString()}`)
     return emptyPreview({

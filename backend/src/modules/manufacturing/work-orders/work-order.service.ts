@@ -33,7 +33,34 @@ export async function getWorkOrder(tenantId: string, id: string) {
 }
 
 export async function getWorkOrderDetail(tenantId: string, id: string) {
-  return repo.getWorkOrderDetail(tenantId, id)
+  const detail = await repo.getWorkOrderDetail(tenantId, id)
+
+  const patches: { qualityStatus?: typeof detail.qualityStatus; materialControlStatus?: typeof detail.materialControlStatus } = {}
+
+  // Released WOs created before Quality wiring may still sit on PENDING_INTEGRATION.
+  if (detail.status !== 'DRAFT' && detail.qualityStatus === 'PENDING_INTEGRATION') {
+    const qualityRequired =
+      detail.stages.some((s) => s.qualityRequired) || detail.operations.some((o) => o.qualityRequired)
+    patches.qualityStatus = qualityRequired ? 'PENDING_QC' : 'NOT_APPLICABLE'
+  }
+
+  // Materials rows may exist while status was left NOT_CONNECTED (failed post-release sync).
+  if (detail.status !== 'DRAFT' && detail.materialControlStatus === 'NOT_CONNECTED') {
+    const materialCount = await prisma.productionOrderMaterial.count({
+      where: { tenantId, productionOrderId: id },
+    })
+    if (materialCount > 0) {
+      patches.materialControlStatus = 'ACTIVE'
+    }
+  }
+
+  if (Object.keys(patches).length === 0) return detail
+
+  await prisma.productionOrder.update({
+    where: { id, tenantId },
+    data: patches,
+  })
+  return { ...detail, ...patches }
 }
 
 export async function getWorkOrderActivities(tenantId: string, id: string) {
@@ -62,6 +89,9 @@ export async function createManualWorkOrder(req: Request, tenantId: string, inpu
       userId,
       sourceType: 'MANUAL',
       productItemId: input.productItemId,
+      manufacturingProfileId: input.manufacturingProfileId ?? null,
+      bomVersionId: input.bomVersionId ?? null,
+      routingVersionId: input.routingVersionId ?? null,
       plannedQuantity: input.plannedQuantity,
       requiredCompletionDate: new Date(input.requiredCompletionDate),
       plannedStartDate: input.plannedStartDate ? new Date(input.plannedStartDate) : null,

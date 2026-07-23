@@ -1,9 +1,11 @@
 /**
  * Inventory Planning mock service (Phase 6).
  * Simple replenishment — no advanced MRP.
+ * API mode uses masters + live balances (see inventoryPlanningLive).
  */
 
 import { useMasterStore } from '../../store/masterStore'
+import { isApiMode } from '../../config/apiConfig'
 import { createPurchaseRequisition } from '../purchase'
 import type {
   InventoryPlanningFilter,
@@ -12,6 +14,13 @@ import type {
   PlanningSuggestionStatus,
 } from '../../types/inventoryDomain'
 import { getItemById, getStockAvailability } from './inventoryService'
+import {
+  createLivePurchaseRequisitionFromPlanning,
+  ignoreLivePlanningSuggestion,
+  listLiveInventoryPlanning,
+  updateLivePlanningQuantity,
+  updateLivePlanningRequiredDate,
+} from './inventoryPlanningLive'
 
 const delay = (ms = 80) => new Promise<void>((r) => setTimeout(r, ms))
 
@@ -48,6 +57,7 @@ function resolveSuggestedSource(
 export async function getInventoryPlanning(
   filter: InventoryPlanningFilter = {},
 ): Promise<InventoryPlanningRow[]> {
+  if (isApiMode()) return listLiveInventoryPlanning(filter)
   await delay()
   const stockRows = await getStockAvailability({
     search: filter.search,
@@ -117,16 +127,19 @@ export async function getInventoryPlanning(
 }
 
 export async function ignorePlanningSuggestion(id: string): Promise<void> {
+  if (isApiMode()) return ignoreLivePlanningSuggestion(id)
   await delay(40)
   ignoredIds.add(id)
 }
 
 export async function updatePlanningQuantity(id: string, qty: number): Promise<void> {
+  if (isApiMode()) return updateLivePlanningQuantity(id, qty)
   await delay(40)
   qtyOverrides.set(id, Math.max(0, qty))
 }
 
 export async function updatePlanningRequiredDate(id: string, date: string): Promise<void> {
+  if (isApiMode()) return updateLivePlanningRequiredDate(id, date)
   await delay(40)
   dateOverrides.set(id, date)
 }
@@ -134,6 +147,7 @@ export async function updatePlanningRequiredDate(id: string, date: string): Prom
 export async function createPurchaseRequisitionDraftDemo(
   row: InventoryPlanningRow,
 ): Promise<{ id: string; documentNumber: string }> {
+  if (isApiMode()) return createLivePurchaseRequisitionFromPlanning(row)
   await delay()
   const master = useMasterStore.getState()
   const item = master.getItem(row.itemId)
@@ -160,7 +174,11 @@ export async function createPurchaseRequisitionDraftDemo(
 export async function createProductionRequestDraftDemo(
   row: InventoryPlanningRow,
 ): Promise<{ id: string; documentNumber: string }> {
+  if (isApiMode()) {
+    throw new Error('Create a work order from Manufacturing → Work Orders for production replenishment')
+  }
   await delay()
+  void row
   const docNo = `PRD-REQ-${Date.now().toString(36).toUpperCase()}`
   draftCreated.add(row.id)
   return { id: genId('prd-req'), documentNumber: docNo }
@@ -169,7 +187,11 @@ export async function createProductionRequestDraftDemo(
 export async function createTransferDraftFromPlanningDemo(
   row: InventoryPlanningRow,
 ): Promise<{ id: string; documentNumber: string }> {
+  if (isApiMode()) {
+    throw new Error('Create a transfer from Inventory → Transfers')
+  }
   await delay()
+  void row
   const docNo = `TRF-PLAN-${Date.now().toString(36).toUpperCase()}`
   draftCreated.add(row.id)
   return { id: genId('trf-draft'), documentNumber: docNo }

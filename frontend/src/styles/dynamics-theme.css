@@ -3,8 +3,8 @@
 
 /* Microsoft Dynamics 365–inspired layout & tokens */
 :root {
-  --d365-suite-height: 52px;
-  --d365-suite-bg: #001a33;
+  --d365-suite-height: 48px;
+  --d365-suite-bg: #001b3a;
   --d365-suite-text: #ffffff;
   --d365-brand: #0078d4;
   --d365-brand-hover: #106ebe;
@@ -236,13 +236,13 @@ html {
     display: flex;
     align-items: center;
     height: var(--d365-suite-height);
-    background: linear-gradient(180deg, #00294d 0%, var(--d365-suite-bg) 55%, #001428 100%);
+    background: var(--d365-suite-bg);
     color: var(--d365-suite-text);
-    padding: 0 12px;
-    gap: 10px;
+    padding: 0 16px;
+    gap: 12px;
     font-family: var(--d365-font-family);
-    border-bottom: 1px solid rgb(255 255 255 / 0.1);
-    box-shadow: 0 1px 0 rgb(0 120 212 / 0.35), 0 2px 8px rgb(0 0 0 / 0.18);
+    border-bottom: 1px solid rgb(0 120 212 / 0.45);
+    box-shadow: 0 1px 0 rgb(0 120 212 / 0.28);
   }
 
   .d365-suite-leading {
@@ -323,18 +323,20 @@ html {
     line-height: 16px;
     color: rgb(255 255 255 / 0.72);
     white-space: nowrap;
-    padding: 0 4px;
+    padding: 0 6px;
+    border-right: 1px solid rgb(255 255 255 / 0.16);
+    margin-right: 2px;
   }
 
   .d365-suite-quick-action {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    height: 32px;
+    height: 30px;
     padding: 0 10px;
-    border-radius: var(--d365-radius);
-    border: 1px solid rgb(255 255 255 / 0.22);
-    background: rgb(255 255 255 / 0.1);
+    border-radius: 2px;
+    border: 1px solid rgb(255 255 255 / 0.28);
+    background: rgb(255 255 255 / 0.08);
     font-family: var(--d365-font-family);
     font-size: var(--d365-font-xs);
     font-weight: var(--d365-fw-semibold);
@@ -414,37 +416,39 @@ html {
   }
 
   .d365-suite-search {
-    flex: 1;
-    max-width: 32rem;
+    flex: 1 1 auto;
+    max-width: 28rem;
+    min-width: 12rem;
     margin: 0 auto;
   }
 
   .d365-suite-search .d365-search-trigger {
     width: 100%;
-    height: 36px;
-    border-radius: var(--d365-radius);
-    border: 1px solid rgb(255 255 255 / 0.15);
-    background: rgb(255 255 255 / 0.08);
-    color: rgb(255 255 255 / 0.85);
+    height: 32px;
+    border-radius: 2px;
+    border: 1px solid rgb(255 255 255 / 0.22);
+    background: rgb(255 255 255 / 0.12);
+    color: rgb(255 255 255 / 0.92);
     font-family: var(--d365-font-family);
-    font-size: var(--d365-font-sm);
+    font-size: var(--d365-font-xs);
     font-weight: var(--d365-fw-regular);
-    line-height: 36px;
-    padding: 0 12px;
+    line-height: 32px;
+    padding: 0 10px;
     text-align: left;
-    transition: background 0.1s ease;
+    transition: background 0.1s ease, border-color 0.1s ease;
   }
 
   .d365-suite-search .d365-search-trigger:hover {
-    background: rgb(255 255 255 / 0.12);
-    border-color: rgb(255 255 255 / 0.25);
+    background: rgb(255 255 255 / 0.18);
+    border-color: rgb(255 255 255 / 0.35);
   }
 
   .d365-suite-actions {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 4px;
     margin-left: auto;
+    flex-shrink: 0;
   }
 
   .d365-suite-icon-btn {
@@ -906,14 +910,14 @@ html {
 
   .d365-workspace-unified-head {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding: 10px 16px 10px;
+    padding: 8px 16px 10px;
   }
 
   .d365-workspace-unified-head--with-actions {
-    align-items: flex-start;
+    align-items: center;
   }
 
   .d365-workspace-unified-main {
@@ -921,7 +925,7 @@ html {
     flex-direction: column;
     align-items: flex-start;
     justify-content: center;
-    gap: 4px;
+    gap: 2px;
     min-width: 0;
     flex: 1 1 auto;
   }
@@ -953,8 +957,11 @@ html {
   .d365-workspace-unified-breadcrumbs {
     flex: 0 0 auto;
     min-width: 0;
-    padding: 0;
-    order: -1;
+    padding: 8px 16px 0;
+  }
+
+  .d365-workspace-unified-breadcrumbs + .d365-workspace-unified-head {
+    padding-top: 4px;
   }
 
   .d365-workspace-unified-breadcrumbs nav {
@@ -974,7 +981,7 @@ html {
   .d365-workspace-unified-title-text {
     margin: 0;
     font-family: var(--d365-font-family);
-    font-size: 22px;
+    font-size: 20px;
     font-weight: var(--d365-fw-semibold);
     line-height: 1.25;
     color: var(--d365-text);
@@ -1053,13 +1060,20 @@ html {
   .d365-workspace-unified-actions {
     display: flex;
     flex-shrink: 0;
-    flex-wrap: wrap;
-    align-self: flex-end;
+    flex-wrap: nowrap;
+    align-self: center;
     align-items: center;
     justify-content: flex-end;
-    gap: 6px;
+    gap: 8px;
     margin-left: auto;
-    padding-top: 18px;
+    padding-top: 0;
+    max-width: min(720px, 58%);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .d365-workspace-unified-actions::-webkit-scrollbar {
+    display: none;
   }
 
   .d365-workspace-unified-actions .erp-command-bar--inline {
@@ -1071,7 +1085,7 @@ html {
 
   .d365-workspace-unified-actions .erp-command-bar--inline .flex.items-center.gap-1 {
     justify-content: flex-end;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
   }
 

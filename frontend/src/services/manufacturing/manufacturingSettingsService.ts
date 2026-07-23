@@ -34,11 +34,28 @@ let savedViews: ManufacturingSavedView[] = [
   },
 ]
 
+function mergeWithDefaults(payload: ManufacturingSettings | null | undefined): ManufacturingSettings {
+  const p = payload ?? DEFAULT_MANUFACTURING_SETTINGS
+  return {
+    ...DEFAULT_MANUFACTURING_SETTINGS,
+    ...p,
+    general: { ...DEFAULT_MANUFACTURING_SETTINGS.general, ...p.general },
+    numberSeries: { ...DEFAULT_MANUFACTURING_SETTINGS.numberSeries, ...p.numberSeries },
+    materialConsumption: { ...DEFAULT_MANUFACTURING_SETTINGS.materialConsumption, ...p.materialConsumption },
+    operations: { ...DEFAULT_MANUFACTURING_SETTINGS.operations, ...p.operations },
+    quality: { ...DEFAULT_MANUFACTURING_SETTINGS.quality, ...p.quality },
+    jobWork: { ...DEFAULT_MANUFACTURING_SETTINGS.jobWork, ...p.jobWork },
+    costing: { ...DEFAULT_MANUFACTURING_SETTINGS.costing, ...p.costing },
+    approvals: { ...DEFAULT_MANUFACTURING_SETTINGS.approvals, ...p.approvals },
+    advanced: { ...DEFAULT_MANUFACTURING_SETTINGS.advanced, ...p.advanced },
+  }
+}
+
 export async function getManufacturingSettings(): Promise<ManufacturingSettings> {
   if (isApiMode()) {
     const response = await getManufacturingSettingsApi()
     apiVersion = response.data.version
-    apiSettings = structuredClone(response.data.payloadJson)
+    apiSettings = mergeWithDefaults(response.data.payloadJson)
     return structuredClone(apiSettings)
   }
   await delay()
@@ -69,7 +86,7 @@ export async function updateManufacturingSettings(
     }
     const response = await putManufacturingSettingsApi(next, apiVersion)
     apiVersion = response.data.version
-    apiSettings = structuredClone(response.data.payloadJson)
+    apiSettings = mergeWithDefaults(response.data.payloadJson)
     return { ok: true, settings: structuredClone(apiSettings) }
   }
   await delay()

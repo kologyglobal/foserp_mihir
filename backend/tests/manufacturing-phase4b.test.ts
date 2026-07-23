@@ -74,7 +74,7 @@ describe.skipIf(!dbAvailable)('Manufacturing Phase 4B — Job Work / subcontract
       await prisma.jobWorkDispatch.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
       await prisma.jobWorkReceipt.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
       await prisma.jobWorkMaterialLine.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
-      await prisma.qualityInspection.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
+      await prisma.manufacturingQualityInspection.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
       await prisma.jobWorkOrder.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
       await cleanupTenant(fx.tenantId)
     }
@@ -168,7 +168,7 @@ describe.skipIf(!dbAvailable)('Manufacturing Phase 4B — Job Work / subcontract
         .send({ receivedQty: 10, acceptedQty: 10 }),
     )
     expect(receive.status).toBe(200)
-    const inspections = await prisma.qualityInspection.findMany({
+    const inspections = await prisma.manufacturingQualityInspection.findMany({
       where: { tenantId: fx.tenantId, jobWorkOrderId: jw.id },
     })
     expect(inspections).toHaveLength(1)

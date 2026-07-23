@@ -22,7 +22,21 @@ export const reopenPeriodSchema = z.object({
   reason: z.string().trim().min(1).max(500),
 })
 
+export const upsertChecklistAcksSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        checkKey: z.string().trim().min(1).max(64),
+        status: z.enum(['ACK', 'NA']),
+        note: z.string().trim().max(500).nullable().optional(),
+      }),
+    )
+    .min(1)
+    .max(50),
+})
+
 export type ListPeriodsQuery = z.infer<typeof listPeriodsQuerySchema>
 export type GeneratePeriodsInput = z.infer<typeof generatePeriodsSchema>
 export type UpdatePeriodInput = z.infer<typeof updatePeriodSchema>
 export type ReopenPeriodInput = z.infer<typeof reopenPeriodSchema>
+export type UpsertChecklistAcksInput = z.infer<typeof upsertChecklistAcksSchema>

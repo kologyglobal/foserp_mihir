@@ -3734,7 +3734,7 @@ const swaggerSpecDraft = {
         tags: ['Work Orders'],
         summary: 'Complete a stage; promotes newly-ready successor stages',
         description:
-          'Permission: `manufacturing.stage.execute`. Validates good quantity against profile underproduction tolerance. Returns `promotedStages[]` — stages newly transitioned to READY.',
+          'Permission: `manufacturing.stage.execute`. Underproduction vs planned good qty is allowed (logged on the activity). Returns `promotedStages[]` — stages newly transitioned to READY.',
         parameters: [tenantSlugParam, idParam],
         responses: { 200: { description: 'Completed stage + promotedStages[]' } },
       },
@@ -4487,7 +4487,7 @@ function mergeSwaggerPaths(
   return merged
 }
 
-const handTags = swaggerSpecDraft.tags as Array<{ name: string; description?: string }>
+const handTags = swaggerSpecDraft.tags as unknown as Array<{ name: string; description?: string }>
 const handTagNames = new Set(handTags.map((t) => t.name))
 const mergedTags = [
   ...handTags,

@@ -36,22 +36,28 @@
 
 ## Sales invoice document reverse
 
-| Item | Status |
-|------|--------|
-| Route / service / permission | **Absent** |
-| Gate treatment | Accepted deferred — not a Phase 3D coded deliverable |
+| Case | Evidence |
+|------|----------|
+| Route / service / permission | `POST …/receivables/invoices/:id/reverse` · `finance.ar.invoice.reverse` · `sales-invoice-reverse.service.ts` |
+| Blocked while POSTED allocs | `SALES_INVOICE_ALLOCATIONS_MUST_BE_REVERSED` |
+| Full alloc→reverse-alloc→invoice-reverse; GL nets; number kept | `finance-ar-invoice-reversal.test.ts` |
+| Idempotent replay | ✓ |
+| 403 without permission | ✓ |
+| Source links released on reverse | N/A in current schema (source-link release deferred if/when SI source links ship) |
+| Gate treatment | **Shipped** (catalog permission `finance.ar.invoice.reverse` added 2026-07-22) |
 
 ## Ordering rules (verified)
 
 ```text
+Reverse sales invoice document
+  requires: no POSTED receipt/CN allocations (else 422 SALES_INVOICE_ALLOCATIONS_MUST_BE_REVERSED)
+  requires: debit open item allocatedAmount = 0
+
 Reverse receipt/CN document
   requires: no POSTED allocation batches (else 422 …_ALLOCATIONS_MUST_BE_REVERSED)
 
-Reverse allocations first → then document reverse
+Reverse allocations first → then document reverse → then invoice reverse
 ```
-
-Invoice reverse ordering N/A (not implemented).
-
 ## Idempotency / concurrency
 
 - Document reverse: replay when already REVERSED returns existing reversal (journal/receipt/CN tests).

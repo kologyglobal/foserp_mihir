@@ -35,6 +35,7 @@ import {
   MobileQcDetailPage,
   MobileNcrPage,
 } from '../modules/mobile/MobileQualityPages'
+import { MobileKioskHomePage } from '../modules/mobile/kiosk/MobileKioskHomePage'
 import {
   MobileJobWorkListPage,
   MobileJobWorkSendPage,
@@ -70,6 +71,8 @@ export const mobileRouteTree = {
     { path: 'gate', element: <MobileGatePage /> },
     { path: 'gate/inward', element: <MobileGateInwardPage /> },
     { path: 'gate/outward', element: <MobileGateOutwardPage /> },
+    { path: 'gate/visitors/new', element: <Navigate to="/gate/visitors/new" replace /> },
+    { path: 'gate/visitors/*', element: <Navigate to="/gate/visitors" replace /> },
     { path: 'grn', element: <MobileGrnListPage /> },
     { path: 'grn/:id', element: <MobileGrnDetailPage /> },
     { path: 'grn/:id/receive', element: <MobileGrnReceivePage /> },
@@ -77,6 +80,7 @@ export const mobileRouteTree = {
     { path: 'material-issue', element: <MobileMaterialIssuePage /> },
     { path: 'material-return', element: <MobileMaterialReturnPage /> },
     { path: 'warehouse-transfer', element: <MobileWarehouseTransferPage /> },
+    { path: 'kiosk', element: <MobileKioskHomePage /> },
     { path: 'shop-floor', element: <MobileShopFloorPage /> },
     { path: 'job-card/:id', element: <MobileJobCardPage /> },
     { path: 'job-card/:id/daily-entry', element: <MobileJobCardDailyEntryPage /> },

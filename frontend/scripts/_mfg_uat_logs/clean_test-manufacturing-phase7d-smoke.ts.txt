@@ -1,0 +1,82 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+── Manufacturing Phase 7D (Ops Reporting) smoke ──
+
+API client:
+  ✓ opsReportsApi.ts exists
+  ✓ getManufacturingReportCatalog
+  ✓ queryManufacturingReport
+  ✓ exportManufacturingReport
+  ✓ listSavedViews
+  ✓ createSavedView
+  ✓ updateSavedView
+  ✓ deleteSavedView
+  ✓ getShopfloorLive
+  ✓ getExceptionsSummary
+  ✓ listExceptions
+  ✓ acknowledgeException
+  ✓ searchTraceability
+  ✓ getTraceabilityLineage
+  ✓ path /reports/manufacturing/catalog
+  ✓ path /reports/manufacturing/${key}/query
+  ✓ path /reports/manufacturing/${key}/export
+  ✓ path /reports/saved-views
+  ✓ path /manufacturing/shopfloor/live
+  ✓ path /operations/exceptions
+  ✓ path /manufacturing/traceability/search
+  ✓ apiPostDownloadBlob helper
+
+Pages:
+  ✓ ManufacturingReportsPage.tsx
+  ✓ reports page loads catalog in API mode
+  ✓ reports page groups by module
+  ✓ reports page marks UNAVAILABLE reports
+  ✓ ManufacturingReportRunnerPage.tsx
+  ✓ runner page queries report
+  ✓ runner page export CSV
+  ✓ runner page calculation notes
+  ✓ runner page pagination
+  ✓ runner page demo banner
+  ✓ ShopfloorLivePage.tsx
+  ✓ shopfloor live auto-refresh toggle
+  ✗ shopfloor live never claims Live when off
+  ✓ shopfloor live uses getShopfloorLive
+  ✓ shopfloor live demo banner
+  ✓ ExceptionCentrePage.tsx
+  ✓ exceptions page KPI summary
+  ✓ exceptions page list
+  ✓ exceptions page acknowledge
+  ✓ exceptions page open-source link
+  ✓ exceptions page demo banner
+  ✓ TraceabilityPage.tsx
+  ✓ traceability search
+  ✓ traceability lineage timeline
+  ✓ traceability demo banner
+
+Quality / Dispatch soft-wire:
+  ✗ QualityReportsPage soft-wires to manufacturing reports
+  ✗ DispatchReportsPage soft-wires to manufacturing reports
+
+Routes:
+  ✓ route manufacturing/reports/:reportKey
+  ✓ route manufacturing/shopfloor dual-mode
+  ✓ route manufacturing/traceability
+  ✗ routes/index.tsx wires operationsRouteChildren
+  ✓ route operations/exceptions
+
+Navigation:
+  ✗ nav Traceability
+  ✗ nav Exceptions
+
+Permissions:
+  ✓ permission reports.shopfloor.view
+  ✓ permission traceability.view
+  ✓ permission exceptions.view
+  ✓ permission exceptions.acknowledge
+  ✓ canViewShopfloorLive helper
+  ✓ canViewTraceability helper
+  ✓ canViewExceptions helper
+  ✓ canAcknowledgeException helper
+
+Result: 58 passed, 6 failed
+

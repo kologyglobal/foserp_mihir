@@ -5,6 +5,7 @@
 
 import { useMasterStore } from '../../store/masterStore'
 import { useInventoryStore } from '../../store/inventoryStore'
+import { isApiMode } from '../../config/apiConfig'
 import type {
   InventoryAuditEntry,
   InventoryDashboardData,
@@ -16,6 +17,12 @@ import type {
   StockDetailsData,
 } from '../../types/inventoryDomain'
 import { getItemBatches, getItemSerials, getReservations } from './traceabilityService'
+import {
+  deactivateLiveInventoryItem,
+  getLiveInventoryItem,
+  getLiveStockDetails,
+  listLiveInventoryItems,
+} from './inventoryItemsLive'
 import {
   defaultExtensionForItem,
   DEMO_BLOCKED,
@@ -194,6 +201,10 @@ function matchesItemFilter(row: InventoryItem, filter: InventoryFilter): boolean
 }
 
 export async function getInventoryDashboard(): Promise<InventoryDashboardData> {
+  if (isApiMode()) {
+    const { getLiveInventoryDashboard } = await import('./inventoryDashboardLive')
+    return getLiveInventoryDashboard()
+  }
   await delay()
   ensureInitialized()
   const master = getMaster()
@@ -324,6 +335,7 @@ export async function getInventoryDashboard(): Promise<InventoryDashboardData> {
 }
 
 export async function getItems(filter: InventoryFilter = {}): Promise<InventoryItem[]> {
+  if (isApiMode()) return listLiveInventoryItems(filter)
   await delay()
   ensureInitialized()
   const master = getMaster()
@@ -335,11 +347,15 @@ export async function getItems(filter: InventoryFilter = {}): Promise<InventoryI
 }
 
 export async function getItemById(id: string): Promise<InventoryItem | null> {
+  if (isApiMode()) return getLiveInventoryItem(id)
   await delay()
   return buildInventoryItem(id)
 }
 
 export async function createItem(input: InventoryItemInput): Promise<InventoryItem> {
+  if (isApiMode()) {
+    throw new InventoryServiceError('Create items under Masters → Items in live mode', 'API_REDIRECT')
+  }
   await delay()
   ensureInitialized()
   const master = getMaster()
@@ -408,6 +424,9 @@ export async function createItem(input: InventoryItemInput): Promise<InventoryIt
 }
 
 export async function updateItem(id: string, input: Partial<InventoryItemInput>): Promise<InventoryItem> {
+  if (isApiMode()) {
+    throw new InventoryServiceError('Edit items under Masters → Items in live mode', 'API_REDIRECT')
+  }
   await delay()
   ensureInitialized()
   const master = getMaster()
@@ -469,10 +488,14 @@ export async function updateItem(id: string, input: Partial<InventoryItemInput>)
 }
 
 export async function deactivateItem(id: string): Promise<InventoryItem> {
+  if (isApiMode()) return deactivateLiveInventoryItem(id)
   return updateItem(id, { status: 'inactive' } as Partial<InventoryItemInput>)
 }
 
 export async function duplicateItem(id: string): Promise<InventoryItem> {
+  if (isApiMode()) {
+    throw new InventoryServiceError('Duplicate items under Masters → Items in live mode', 'API_REDIRECT')
+  }
   await delay()
   const source = await getItemById(id)
   if (!source) throw new InventoryServiceError('Item not found', 'NOT_FOUND')
@@ -613,6 +636,7 @@ export async function getStockAvailability(filter: StockAvailabilityFilter = {})
 }
 
 export async function getStockDetails(itemId: string, warehouseId?: string): Promise<StockDetailsData | null> {
+  if (isApiMode()) return getLiveStockDetails(itemId)
   await delay()
   ensureInitialized()
   const item = await getItemById(itemId)
@@ -762,6 +786,7 @@ export async function getStockDetails(itemId: string, warehouseId?: string): Pro
 }
 
 export async function getInventoryAuditTrail(itemId: string): Promise<InventoryAuditEntry[]> {
+  if (isApiMode()) return []
   await delay()
   return auditTrail.filter((a) => a.itemId === itemId)
 }

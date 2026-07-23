@@ -211,6 +211,33 @@ export async function postFgReceipt(req: Request, tenantId: string, input: FgRec
   return mapStockMovement(movement)
 }
 
+/** Semi-finished / sub-assembly receipt into WIP (Tank SA family). */
+export async function postSaReceipt(req: Request, tenantId: string, input: FgReceiptInput) {
+  const rate = await resolveFgReceiptRate(
+    tenantId,
+    input.itemId,
+    input.workOrderId,
+    input.rate,
+  )
+  const movement = await postStockMovement({
+    tenantId,
+    itemId: input.itemId,
+    warehouseId: input.warehouseId,
+    ...tracking(input),
+    movementType: 'INWARD',
+    referenceType: 'SA_RECEIPT',
+    quantity: input.quantity,
+    movementDate: input.movementDate,
+    workOrderId: input.workOrderId,
+    referenceNo: input.referenceNo,
+    remarks: input.remarks,
+    idempotencyKey: input.idempotencyKey,
+    rate,
+    createdBy: userId(req),
+  })
+  return mapStockMovement(movement)
+}
+
 export async function postFgDispatchIssue(req: Request, tenantId: string, input: FgDispatchIssueInput) {
   const movement = await postStockMovement({
     tenantId,

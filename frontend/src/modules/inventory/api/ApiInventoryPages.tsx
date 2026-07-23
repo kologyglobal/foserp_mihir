@@ -5,7 +5,7 @@
  * the original store-backed inventory workspace.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Boxes, ClipboardList, FileCheck2, Lock, PackagePlus, RefreshCw, Warehouse } from 'lucide-react'
 import { PageHeader } from '../../../components/ui/PageHeader'
 import { SectionCard } from '../../../components/ui/SectionCard'
@@ -119,6 +119,7 @@ function Pager({ meta, onPage }: { meta: PageMeta | null; onPage: (page: number)
 // ─── Stock balances register ──────────────────────────────────────────────────
 
 export function ApiStockBalancesPage() {
+  const navigate = useNavigate()
   const perms = useInventoryPermissions()
   const warehouses = useLookupOptions('warehouses')
   const [warehouseId, setWarehouseId] = useState('')
@@ -161,7 +162,7 @@ export function ApiStockBalancesPage() {
     <div className="erp-page">
       <PageHeader
         title="Stock on Hand"
-        description="Live balances from the inventory stock ledger — on-hand, reserved and free quantity."
+        description="How much you have right now — on hand, reserved, and free to issue."
         breadcrumbs={[{ label: 'Inventory' }, { label: 'Stock' }]}
         actions={(
           <Button size="sm" variant="secondary" onClick={() => void load()}>
@@ -199,8 +200,18 @@ export function ApiStockBalancesPage() {
           <div className="p-6">
             <EmptyState
               icon={Boxes}
-              title="No stock balances"
-              description="Post opening stock or inward movements to build stock, or clear the filters."
+              title="No stock on hand yet"
+              description="Receive against a PO (Purchase GRN), post opening stock, or clear filters to see balances."
+              action={
+                <div className="flex flex-wrap gap-2 p-0">
+                  <Button size="sm" variant="secondary" onClick={() => navigate('/purchase/grn')}>
+                    Purchase GRN
+                  </Button>
+                  <Button size="sm" onClick={() => navigate('/inventory/opening-stock')}>
+                    Opening Stock
+                  </Button>
+                </div>
+              }
             />
           </div>
         ) : (
@@ -1081,7 +1092,13 @@ export function ApiInventoryDocumentsPage({ kind }: { kind: DocumentKind }) {
     <div className="erp-page">
       <PageHeader
         title={cfg.title}
-        description="Live inventory documents from the tenant-scoped API."
+        description={
+          kind === 'transfers'
+            ? 'Move stock from one warehouse to another — create, dispatch, then receive.'
+            : kind === 'stock-counts'
+              ? 'Physical stock count — create, count, approve variance, then post.'
+              : 'Correct on-hand quantity — create, approve if needed, then post.'
+        }
         breadcrumbs={[{ label: 'Inventory', to: '/inventory/stock' }, { label: cfg.title }]}
         actions={(
           <div className="flex gap-2">

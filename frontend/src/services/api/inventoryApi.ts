@@ -54,6 +54,13 @@ export interface InventoryStockBalance {
   onHandQty: string | number
   reservedQty: string | number
   freeQty: string | number
+  unrestrictedQty?: string | number
+  qcHoldQty?: string | number
+  blockedQty?: string | number
+  rejectedQty?: string | number
+  inTransitQty?: string | number
+  avgRate?: string | number
+  stockValue?: string | number
   item?: InventoryRefSummary
   warehouse?: InventoryRefSummary
   updatedAt?: string
@@ -192,6 +199,10 @@ export async function reconcileInventoryBalances(
 
 export async function listInventoryLedger(params?: Record<string, string | number | boolean | undefined>) {
   return apiRequest<InventoryStockMovement[]>(`${tenantPath('/inventory/ledger')}${buildQuery(params)}`)
+}
+
+export async function getInventoryLedgerMovement(id: string) {
+  return apiRequest<InventoryStockMovement>(tenantPath(`/inventory/ledger/${id}`))
 }
 
 export async function postOpeningStock(data: PostMovementPayload) {

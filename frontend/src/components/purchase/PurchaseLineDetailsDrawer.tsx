@@ -13,7 +13,7 @@ export type PurchaseLineDetailsDrawerProps = {
   widthClassName?: string
 }
 
-/** Right-rail details drawer for purchase document line secondary fields. */
+/** Centered details popup for purchase document line secondary fields. */
 export function PurchaseLineDetailsDrawer({
   open,
   onClose,
@@ -40,16 +40,16 @@ export function PurchaseLineDetailsDrawer({
   if (!open) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[80] flex justify-end" role="presentation">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6" role="presentation">
       <button
         type="button"
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-[1px]"
         onClick={onClose}
         aria-label="Close line details"
       />
-      <aside
+      <div
         className={cn(
-          'relative flex h-full w-full flex-col border-l border-erp-border bg-erp-surface shadow-2xl',
+          'relative flex max-h-[min(92vh,880px)] w-full flex-col overflow-hidden rounded-xl border border-erp-border bg-erp-surface shadow-2xl',
           widthClassName,
         )}
         role="dialog"
@@ -90,7 +90,7 @@ export function PurchaseLineDetailsDrawer({
             <div className="flex items-center justify-end gap-2">{footer}</div>
           </div>
         ) : null}
-      </aside>
+      </div>
     </div>,
     document.body,
   )

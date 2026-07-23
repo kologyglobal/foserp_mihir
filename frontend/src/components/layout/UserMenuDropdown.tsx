@@ -86,9 +86,11 @@ export function UserMenuDropdown({
           <span className={cn(isSuite ? 'd365-suite-user-name block' : 'erp-type-caption-strong block leading-tight')}>
             {name}
           </span>
-          <span className={cn(isSuite ? 'd365-suite-user-role' : 'erp-type-micro')}>
-            {roleLabel}
-          </span>
+          {roleLabel && roleLabel.toLowerCase() !== name.toLowerCase() ? (
+            <span className={cn(isSuite ? 'd365-suite-user-role' : 'erp-type-micro')}>
+              {roleLabel}
+            </span>
+          ) : null}
         </span>
         <ChevronDown
           className={cn(

@@ -2,6 +2,7 @@ import type { Request } from 'express'
 import type { ProductionOrderMaterialLineStatus } from '@prisma/client'
 import { prisma } from '../../../config/database.js'
 import { InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
+import { assertItem, assertUom } from '../shared/manufacturing.helpers.js'
 import {
   cancelReservation,
   createReservation,
@@ -22,12 +23,14 @@ import { createFromProductionShortage } from '../../purchase/requisitions/produc
 import { dec } from '../shared/manufacturing.mappers.js'
 import * as repo from './material.repository.js'
 import type {
+  AddMaterialRequirementInput,
   IssueMaterialInput,
   ReallocateReservationInput,
   ReleaseReservationInput,
   ReserveMaterialsInput,
   ReturnMaterialInput,
   ShortageRequisitionInput,
+  UpdateMaterialRequirementInput,
 } from './material.schemas.js'
 
 function hasPerm(req: Request, permission: string) {
@@ -183,6 +186,195 @@ export async function listMaterials(tenantId: string, orderId: string) {
   return materials.map((m) => mapMaterial(m))
 }
 
+/**
+ * Add a material requirement to this WO only: appends a BOM-snapshot line + material row.
+ * Does not change the master BOM.
+ */
+export async function addMaterialRequirement(
+  req: Request,
+  tenantId: string,
+  orderId: string,
+  input: AddMaterialRequirementInput,
+) {
+  const userId = req.context?.userId ?? ''
+  const order = await repo.findWorkOrderWithProfile(tenantId, orderId)
+
+  if (order.status === 'DRAFT') {
+    throw new InvalidStateError('Release the work order before adding material requirements')
+  }
+  if (!order.bomSnapshot) {
+    throw new ValidationError('Work order has no BOM snapshot; release the order first')
+  }
+
+  await assertItem(tenantId, input.itemId)
+  await assertUom(tenantId, input.uomId)
+
+  const warehouseId = order.manufacturingProfile.productionWarehouseId
+  const planned = toDecimal(order.plannedQuantity)
+  const required = toDecimal(input.requiredQty)
+  const perUnit = planned.greaterThan(0) ? required.div(planned) : required
+
+  const material = await prisma.$transaction(async (tx) => {
+    const maxSeq = await tx.productionOrderBomLine.aggregate({
+      where: { tenantId, bomSnapshotId: order.bomSnapshot!.id },
+      _max: { sequence: true },
+    })
+    const sequence = (maxSeq._max.sequence ?? 0) + 10
+
+    const bomLine = await tx.productionOrderBomLine.create({
+      data: {
+        tenantId,
+        bomSnapshotId: order.bomSnapshot!.id,
+        sourceBomLineId: null,
+        parentLineId: null,
+        sequence,
+        level: 1,
+        itemId: input.itemId,
+        descriptionOverride: null,
+        perUnitQuantity: perUnit,
+        uomId: input.uomId,
+        scrapPercent: 0,
+        requiredQuantity: required,
+        makeOrBuy: input.makeOrBuy,
+        lineType: input.lineType,
+        isOptional: false,
+      },
+    })
+
+    const created = await tx.productionOrderMaterial.create({
+      data: {
+        tenantId,
+        productionOrderId: orderId,
+        bomLineId: bomLine.id,
+        itemId: input.itemId,
+        uomId: input.uomId,
+        warehouseId: warehouseId ?? null,
+        requiredQty: required,
+        status: 'OPEN',
+        remarks: input.remarks ?? null,
+        createdBy: userId,
+        updatedBy: userId,
+      },
+      include: repo.materialInclude,
+    })
+
+    await tx.productionOrder.update({
+      where: { id: orderId, tenantId },
+      data: {
+        materialControlStatus: warehouseId ? 'ACTIVE' : 'PENDING_INVENTORY',
+        updatedBy: userId,
+      },
+    })
+
+    return created
+  })
+
+  return mapMaterial(material)
+}
+
+/**
+ * Edit required qty or substitute item on a WO material line (and its snapshot BOM line).
+ * Item change is blocked once reservation or issue has started.
+ */
+export async function updateMaterialRequirement(
+  req: Request,
+  tenantId: string,
+  orderId: string,
+  materialId: string,
+  input: UpdateMaterialRequirementInput,
+) {
+  const userId = req.context?.userId ?? ''
+  const material = await repo.findMaterialOrThrow(tenantId, orderId, materialId)
+
+  if (input.itemId) await assertItem(tenantId, input.itemId)
+  if (input.uomId) await assertUom(tenantId, input.uomId)
+
+  const reserved = toDecimal(material.reservedQty)
+  const issued = toDecimal(material.issuedQty)
+  const returned = toDecimal(material.returnedQty)
+  const net = subDec(issued, returned)
+
+  if ((input.itemId || input.uomId) && (reserved.greaterThan(0) || net.greaterThan(0))) {
+    throw new InvalidStateError('Cannot change item/UOM after reservation or issue has started')
+  }
+
+  if (input.requiredQty !== undefined) {
+    const nextRequired = toDecimal(input.requiredQty)
+    if (nextRequired.lessThan(net)) {
+      throw new ValidationError(`Required qty cannot be less than net issued (${dec(net)})`)
+    }
+    if (nextRequired.lessThan(reserved) && reserved.greaterThan(net)) {
+      throw new ValidationError(
+        `Required qty cannot be less than reserved qty (${dec(reserved)}). Release reservation first.`,
+      )
+    }
+  }
+
+  const nextItemId = input.itemId ?? material.itemId
+  const nextUomId = input.uomId ?? material.uomId
+  const nextRequired = input.requiredQty !== undefined ? toDecimal(input.requiredQty) : toDecimal(material.requiredQty)
+
+  const order = await repo.findWorkOrderWithProfile(tenantId, orderId)
+  const planned = toDecimal(order.plannedQuantity)
+  const perUnit = planned.greaterThan(0) ? nextRequired.div(planned) : nextRequired
+
+  const shortage = toDecimal(material.shortageQty)
+  const status = deriveMaterialStatus(nextRequired, reserved, issued, returned, shortage)
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.productionOrderBomLine.update({
+      where: { id: material.bomLineId, tenantId },
+      data: {
+        itemId: nextItemId,
+        uomId: nextUomId,
+        requiredQuantity: nextRequired,
+        perUnitQuantity: perUnit,
+      },
+    })
+
+    return tx.productionOrderMaterial.update({
+      where: { id: materialId, tenantId },
+      data: {
+        itemId: nextItemId,
+        uomId: nextUomId,
+        requiredQty: nextRequired,
+        status,
+        remarks: input.remarks === undefined ? undefined : input.remarks,
+        updatedBy: userId,
+      },
+      include: repo.materialInclude,
+    })
+  })
+
+  return mapMaterial(updated)
+}
+
+/** Remove a WO material line that has no reservation/issue activity. */
+export async function removeMaterialRequirement(
+  req: Request,
+  tenantId: string,
+  orderId: string,
+  materialId: string,
+) {
+  const userId = req.context?.userId ?? ''
+  const material = await repo.findMaterialOrThrow(tenantId, orderId, materialId)
+
+  if (toDecimal(material.reservedQty).greaterThan(0) || toDecimal(material.issuedQty).greaterThan(0)) {
+    throw new InvalidStateError('Cannot remove a material line with reservation or issue history')
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.productionOrderMaterial.delete({ where: { id: materialId, tenantId } })
+    await tx.productionOrderBomLine.delete({ where: { id: material.bomLineId, tenantId } })
+    await tx.productionOrder.update({
+      where: { id: orderId, tenantId },
+      data: { updatedBy: userId },
+    })
+  })
+
+  return { id: materialId }
+}
+
 export async function getMaterialsReadiness(tenantId: string, orderId: string) {
   const materials = await repo.listMaterials(tenantId, orderId)
   const readiness = await Promise.all(
@@ -192,17 +384,22 @@ export async function getMaterialsReadiness(tenantId: string, orderId: string) {
         return mapMaterial(material, { freeQty: '0', hasShortage: true })
       }
 
-      const position = await getStockPosition(tenantId, material.itemId, warehouseId)
-      const free = toDecimal(position.freeQty)
-      const remaining = remainingToReserve(material)
-      const uncovered = subDec(remaining, free)
-      const hasShortage =
-        toDecimal(material.shortageQty).greaterThan(0) || (remaining.greaterThan(0) && uncovered.greaterThan(0))
+      try {
+        const position = await getStockPosition(tenantId, material.itemId, warehouseId)
+        const free = toDecimal(position.freeQty)
+        const remaining = remainingToReserve(material)
+        const uncovered = subDec(remaining, free)
+        const hasShortage =
+          toDecimal(material.shortageQty).greaterThan(0) || (remaining.greaterThan(0) && uncovered.greaterThan(0))
 
-      return mapMaterial(material, {
-        freeQty: position.freeQty,
-        hasShortage,
-      })
+        return mapMaterial(material, {
+          freeQty: position.freeQty,
+          hasShortage,
+        })
+      } catch {
+        // Stock-balance schema / lookup must not hide requirement lines (e.g. missing valuation columns).
+        return mapMaterial(material, { freeQty: '0', hasShortage: toDecimal(material.shortageQty).greaterThan(0) })
+      }
     }),
   )
 
@@ -332,8 +529,8 @@ export async function reserveMaterials(req: Request, tenantId: string, orderId: 
 export async function issueMaterial(req: Request, tenantId: string, orderId: string, input: IssueMaterialInput) {
   const userId = req.context?.userId ?? ''
   const material = await repo.findMaterialOrThrow(tenantId, orderId, input.materialId)
-  const warehouseId = material.warehouseId
-  if (!warehouseId) throw new ValidationError('Material line has no warehouse configured')
+  const warehouseId = input.warehouseId ?? material.warehouseId
+  if (!warehouseId) throw new ValidationError('Material line has no warehouse configured — pick a warehouse to issue from')
 
   const issueQty = toDecimal(input.quantity)
   const remaining = remainingToIssue(material)
@@ -384,7 +581,12 @@ export async function issueMaterial(req: Request, tenantId: string, orderId: str
 
   const updated = await prisma.productionOrderMaterial.update({
     where: { id: material.id },
-    data: { issuedQty: newIssued, status, updatedBy: userId },
+    data: {
+      issuedQty: newIssued,
+      status,
+      updatedBy: userId,
+      ...(!material.warehouseId && input.warehouseId ? { warehouseId: input.warehouseId } : {}),
+    },
     include: repo.materialInclude,
   })
 

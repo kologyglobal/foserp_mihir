@@ -16,6 +16,7 @@ import { ReservationsPanel } from '@/components/inventory/ReservationsPanel'
 import { TraceabilityDrawer } from '@/components/inventory/TraceabilityDrawer'
 import { BATCH_STATUS_LABELS } from '@/utils/inventoryTraceabilityLabels'
 import { useInventoryPermissions } from '@/utils/permissions/inventory'
+import { isApiMode } from '@/config/apiConfig'
 
 type LoadState = 'loading' | 'ready' | 'error'
 
@@ -138,13 +139,57 @@ export function InventoryItemDetailPage() {
         <ErpCommandBar
           inline
           sticky={false}
-          primaryAction={perms.canEditItem ? { id: 'edit', label: 'Edit', icon: Pencil, onClick: () => navigate(`/inventory/items/${recordId}/edit`) } : undefined}
+          primaryAction={
+            perms.canEditItem
+              ? {
+                  id: 'edit',
+                  label: 'Edit',
+                  icon: Pencil,
+                  onClick: () =>
+                    navigate(
+                      isApiMode()
+                        ? `/masters/items/${recordId}/edit`
+                        : `/inventory/items/${recordId}/edit`,
+                    ),
+                }
+              : undefined
+          }
           secondaryActions={[
-            ...(perms.canCreateItem ? [{ id: 'dup', label: 'Duplicate', onClick: async () => { const d = await duplicateItem(recordId!); notify.success('Duplicated'); navigate(`/inventory/items/${d.id}`) } }] : []),
-            ...(perms.canDeactivateItem && item.status === 'active' ? [{ id: 'deact', label: 'Deactivate', onClick: async () => { await deactivateItem(recordId!); notify.success('Deactivated'); navigate('/inventory/items') } }] : []),
+            ...(perms.canCreateItem
+              ? [{
+                  id: 'dup',
+                  label: 'Duplicate',
+                  onClick: async () => {
+                    if (isApiMode()) {
+                      navigate(`/masters/items/${recordId}/edit`)
+                      notify.info('Open Masters → Items to create a copy in live mode')
+                      return
+                    }
+                    const d = await duplicateItem(recordId!)
+                    notify.success('Duplicated')
+                    navigate(`/inventory/items/${d.id}`)
+                  },
+                }]
+              : []),
+            ...(perms.canDeactivateItem && item.status === 'active'
+              ? [{
+                  id: 'deact',
+                  label: 'Deactivate',
+                  onClick: async () => {
+                    await deactivateItem(recordId!)
+                    notify.success('Deactivated')
+                    navigate('/inventory/items')
+                  },
+                }]
+              : []),
             { id: 'stock', label: 'Stock Availability', onClick: () => navigate(`/inventory/stock?search=${encodeURIComponent(item.itemCode)}`) },
             ...(perms.canViewItemLedger ? [{ id: 'ledger', label: 'Item Ledger', onClick: () => navigate(`/inventory/items/${recordId}/ledger`) }] : []),
-            ...(perms.canViewTraceability ? [{ id: 'trace', label: 'Traceability', onClick: () => setTraceOpen(true) }] : []),
+            ...(perms.canViewTraceability && !isApiMode()
+              ? [{ id: 'trace', label: 'Traceability', onClick: () => setTraceOpen(true) }]
+              : []),
+            ...(isApiMode()
+              ? [{ id: 'master', label: 'Open in Masters', onClick: () => navigate(`/masters/items/${recordId}`) }]
+              : []),
           ]}
         />
       )}

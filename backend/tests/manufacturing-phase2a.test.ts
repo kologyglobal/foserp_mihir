@@ -400,6 +400,84 @@ describe.skipIf(!dbAvailable)('Manufacturing Phase 2A — production demands + w
     }, 30_000)
   })
 
+  // ─── Flexible execution ───────────────────────────────────────────────────
+
+  describe('flexible execution', () => {
+    it('allows underproduction on stage complete and overproduction on progress with warnings', async () => {
+      const wo = await auth(
+        request(app)
+          .post(`${base(fx.slug)}/work-orders`)
+          .send({
+            productItemId: fx.itemId,
+            plannedQuantity: 10,
+            requiredCompletionDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          }),
+      )
+      const orderId = wo.body.data.id as string
+      await auth(request(app).post(`${base(fx.slug)}/work-orders/${orderId}/release`))
+      await auth(request(app).post(`${base(fx.slug)}/work-orders/${orderId}/start`).send({}))
+
+      const detail = await auth(request(app).get(`${base(fx.slug)}/work-orders/${orderId}/detail`))
+      const stage1 = (detail.body.data.stages as Array<{ id: string; displayOrder: number }>).find(
+        (s) => s.displayOrder === 1,
+      )!
+      const stage2 = (detail.body.data.stages as Array<{ id: string; displayOrder: number }>).find(
+        (s) => s.displayOrder === 2,
+      )!
+
+      const under = await auth(
+        request(app).post(`${base(fx.slug)}/work-orders/${orderId}/stages/complete`).send({ stageId: stage1.id }),
+      )
+      expect(under.status).toBe(200)
+      expect(under.body.data.stage.status).toBe('COMPLETED')
+      expect(under.body.data.warnings).toEqual(expect.arrayContaining(['UNDERPRODUCTION']))
+
+      const over = await auth(
+        request(app)
+          .post(`${base(fx.slug)}/work-orders/${orderId}/progress`)
+          .send({ stageId: stage2.id, goodQuantity: 500 }),
+      )
+      expect(over.status).toBe(201)
+      expect(over.body.data.warnings?.some((w: string) => String(w).includes('OVERPRODUCTION'))).toBe(true)
+    }, 45_000)
+
+    it('completes qualityRequired stage without waiting for Quality module when flexible', async () => {
+      const wo = await auth(
+        request(app)
+          .post(`${base(fx.slug)}/work-orders`)
+          .send({
+            productItemId: fx.itemId,
+            plannedQuantity: 5,
+            requiredCompletionDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          }),
+      )
+      const orderId = wo.body.data.id as string
+      await auth(request(app).post(`${base(fx.slug)}/work-orders/${orderId}/release`))
+      await auth(request(app).post(`${base(fx.slug)}/work-orders/${orderId}/start`).send({}))
+
+      const detail = await auth(request(app).get(`${base(fx.slug)}/work-orders/${orderId}/detail`))
+      const stage1 = (detail.body.data.stages as Array<{ id: string; displayOrder: number }>).find(
+        (s) => s.displayOrder === 1,
+      )!
+
+      const { prisma } = await import('../src/config/database.js')
+      await prisma.productionOrderStage.update({
+        where: { id: stage1.id },
+        data: { qualityRequired: true },
+      })
+
+      const complete = await auth(
+        request(app)
+          .post(`${base(fx.slug)}/work-orders/${orderId}/stages/complete`)
+          .send({ stageId: stage1.id, skipQcGate: true, qcOverrideReason: 'Shopfloor override for flexible run' }),
+      )
+      expect(complete.status).toBe(200)
+      expect(complete.body.data.awaitingQuality).toBe(false)
+      expect(complete.body.data.stage.status).toBe('COMPLETED')
+      expect(complete.body.data.warnings?.some((w: string) => String(w).startsWith('QC_'))).toBe(true)
+    }, 45_000)
+  })
+
   // ─── Tenant isolation & permissions ───────────────────────────────────────
 
   describe('tenant isolation and permissions', () => {

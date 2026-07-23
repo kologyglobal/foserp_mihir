@@ -28,16 +28,16 @@ export function DocumentSummaryStrip({ items }: { items: DocumentSummaryItem[] }
   return (
     <div
       className={cn(
-        'grid grid-cols-2 gap-2 sm:grid-cols-3',
+        'grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-erp-border bg-erp-border sm:grid-cols-3',
         items.length >= 6 ? 'lg:grid-cols-6' : items.length === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4',
       )}
     >
       {items.map((item) => (
-        <div key={item.id} className="rounded-md border border-erp-border bg-white px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-erp-muted">{item.label}</div>
+        <div key={item.id} className="bg-white px-3.5 py-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.06em] text-erp-muted">{item.label}</div>
           <div
             className={cn(
-              'mt-0.5 text-[15px] font-semibold tabular-nums',
+              'mt-1 text-[18px] font-semibold leading-none tabular-nums tracking-tight',
               item.tone === 'danger'
                 ? 'text-rose-700'
                 : item.tone === 'warning'
@@ -49,7 +49,7 @@ export function DocumentSummaryStrip({ items }: { items: DocumentSummaryItem[] }
           >
             {item.value}
           </div>
-          {item.helper ? <div className="text-[11px] text-erp-muted">{item.helper}</div> : null}
+          {item.helper ? <div className="mt-1 truncate text-[11px] text-erp-muted">{item.helper}</div> : null}
         </div>
       ))}
     </div>

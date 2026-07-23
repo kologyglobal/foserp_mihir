@@ -72,7 +72,7 @@ export function CompleteWorkOrderDialog({
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
-          <Button disabled={busy || loading} onClick={() => onConfirm(remarks)}>
+          <Button disabled={busy || loading || blockers.length > 0} onClick={() => onConfirm(remarks)}>
             {busy ? 'Completing…' : 'Complete Work Order'}
           </Button>
         </div>
@@ -114,6 +114,12 @@ export function CompleteWorkOrderDialog({
         {!loading && blockers.length === 0 && warnings.length === 0 ? (
           <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] font-medium text-emerald-900">
             No close-readiness blockers found — this work order is ready to complete.
+          </p>
+        ) : null}
+        {!loading && blockers.length === 0 && warnings.length > 0 ? (
+          <p className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-[12px] text-sky-950">
+            Warnings above do not block Complete. Finished goods receipt can stay a separate step if not
+            posted automatically.
           </p>
         ) : null}
 

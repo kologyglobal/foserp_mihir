@@ -222,7 +222,7 @@ export function GrnListPage() {
 
   const shellProps = {
     title: 'Goods Receipt Notes',
-    description: 'Receive against released purchase orders · inspection · post (inventory deferred)',
+    description: 'Receive against purchase orders · quality check · stock updates automatically',
     badge: 'Purchase' as const,
     variant: 'dynamics' as const,
     breadcrumbs: grnListBreadcrumbs(),

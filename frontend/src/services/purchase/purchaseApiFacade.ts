@@ -1070,12 +1070,10 @@ export async function postGRN(id: string): Promise<GoodsReceiptNote> {
   const grn = await getGRNById(id)
   if (!grn) throw new PurchaseServiceError('GRN_NOT_FOUND', `GRN not found: ${id}`)
   if (grn.status === 'draft') {
+    // submitGRN mapper sets inventoryPostDeferred from backend INVENTORY_POSTED status.
     return submitGRN(id)
   }
-  if (grn.status === 'posted') {
-    return { ...grn, inventoryPostDeferred: true }
-  }
-  return { ...grn, inventoryPostDeferred: true }
+  return grn
 }
 
 export async function cancelGRN(id: string, remarks = ''): Promise<GoodsReceiptNote> {

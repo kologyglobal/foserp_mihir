@@ -207,16 +207,37 @@ export function ManufacturingSettingsPage() {
             onChange={(v) => patchGeneral({ allowManualWorkOrder: v })}
           />
           <ToggleRow
+            label="Flexible Work Order execution"
+            description="Inventory, QC, and purchase do not hard-block production. Warnings only — complete stages and WO without other modules."
+            checked={settings.general.flexibleExecution}
+            disabled={readOnly}
+            onChange={(v) =>
+              patchGeneral({
+                flexibleExecution: v,
+                ...(v ? { allowCloseWithoutQc: true, allowUnderCompletion: true } : {}),
+              })
+            }
+          />
+          <ToggleRow
             label="Allow WO close without QC"
-            description="When off, quality hold blocks close until Accept / Reject / Rework."
+            description="When off (and flexible execution off), quality blockers prevent WO complete."
             checked={settings.general.allowCloseWithoutQc}
             disabled={readOnly}
             onChange={(v) => patchGeneral({ allowCloseWithoutQc: v })}
           />
+          <ToggleRow
+            label="Allow under-completion"
+            description="Complete a stage when good qty is below planned (warns on activity)."
+            checked={settings.general.allowUnderCompletion}
+            disabled={readOnly}
+            onChange={(v) => patchGeneral({ allowUnderCompletion: v })}
+          />
           <div className="flex items-start justify-between gap-4 border-b border-erp-border/70 py-3">
             <div>
               <p className="text-[13px] font-medium text-erp-text">Allow over-production %</p>
-              <p className="mt-0.5 text-[12px] text-erp-muted">Tolerance above planned quantity.</p>
+              <p className="mt-0.5 text-[12px] text-erp-muted">
+                Tolerance above planned. With flexible execution, exceeding tolerance still records with a warning.
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <Switch

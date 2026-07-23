@@ -14,7 +14,9 @@ import { manufacturingRouteChildren } from './manufacturingRoutes'
 import { salesRouteChildren } from './salesRoutes'
 import { qualityRouteChildren } from './qualityRoutes'
 import { dispatchFinanceRouteChildren } from './dispatchFinanceRoutes'
+import { logisticsRouteChildren } from './logisticsRoutes'
 import { gateRouteChildren } from './gateRoutes'
+import { gateOperatorRouteTree } from './gateOperatorRoutes'
 import { reportsRouteChildren } from './reportsRoutes'
 import { mobileRouteTree } from './mobileRoutes'
 import { crmRouteTree } from './crmRoutes'
@@ -25,6 +27,7 @@ import { adminRouteChildren } from './adminRoutes'
 export const router = createBrowserRouter([
   authRoute,
   mobileRouteTree,
+  gateOperatorRouteTree,
   {
     path: '/',
     element: (
@@ -46,6 +49,7 @@ export const router = createBrowserRouter([
       ...manufacturingRouteChildren,
       ...productionRouteChildren,
       ...qualityRouteChildren,
+      ...logisticsRouteChildren,
       ...dispatchFinanceRouteChildren,
       ...gateRouteChildren,
       ...reportsRouteChildren,

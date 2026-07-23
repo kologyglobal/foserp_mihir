@@ -54,6 +54,12 @@ export const postFgReceipt = asyncHandler(async (req: Request, res: Response) =>
   return sendCreated(res, 'FG receipt posted', movement)
 })
 
+export const postSaReceipt = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const movement = await service.postSaReceipt(req, tenantId, req.body as FgReceiptInput)
+  return sendCreated(res, 'Semi-finished (SA) receipt posted', movement)
+})
+
 export const postFgDispatchIssue = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const movement = await service.postFgDispatchIssue(req, tenantId, req.body as FgDispatchIssueInput)

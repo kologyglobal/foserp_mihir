@@ -26,6 +26,10 @@ export const createManualWorkOrderSchema = z.object({
   supervisorId: z.string().uuid().optional(),
   jobNumber: z.string().trim().max(64).optional(),
   notes: z.string().trim().max(2000).optional(),
+  /** Optional overrides for this WO (defaults come from the manufacturing profile). */
+  manufacturingProfileId: z.string().uuid().optional(),
+  bomVersionId: z.string().uuid().optional(),
+  routingVersionId: z.string().uuid().optional(),
   idempotencyKey: z.string().trim().max(150).optional(),
 })
 
@@ -72,6 +76,12 @@ export const recordProgressSchema = z
 export const completeStageSchema = z.object({
   stageId: z.string().uuid(),
   remarks: z.string().trim().max(2000).optional(),
+  /** Skip QC_PENDING gate and complete the stage (flexible execution / authorised override). */
+  skipQcGate: z.boolean().optional(),
+  /** Force QC even when the stage is not marked qualityRequired (shopfloor popup). */
+  requireQc: z.boolean().optional(),
+  /** Required when skipping a qualityRequired stage gate (stored on activity). */
+  qcOverrideReason: z.string().trim().min(1).max(2000).optional(),
 })
 
 export const correctProgressSchema = z.object({

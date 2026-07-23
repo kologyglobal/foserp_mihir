@@ -22,6 +22,7 @@ import { isApiMode } from '@/config/apiConfig'
 import { useManufacturingSetupPermissions } from '@/utils/permissions/manufacturing'
 import { notify } from '@/store/toastStore'
 import { ManufacturingSetupShell } from './ManufacturingSetupShell'
+import { SetupViewPopup } from './SetupViewPopup'
 
 interface MachineFormState {
   code: string
@@ -53,6 +54,7 @@ export function MachinesSetupPage() {
   const [workCentreFilter, setWorkCentreFilter] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState<Machine | null>(null)
+  const [viewing, setViewing] = useState<Machine | null>(null)
   const [form, setForm] = useState<MachineFormState>(EMPTY_FORM)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -102,6 +104,7 @@ export function MachinesSetupPage() {
   }
 
   const openEdit = (row: Machine) => {
+    setViewing(null)
     setEditing(row)
     setForm({
       code: row.code,
@@ -113,6 +116,10 @@ export function MachinesSetupPage() {
       isActive: row.isActive,
     })
     setDrawerOpen(true)
+  }
+
+  const openView = (row: Machine) => {
+    setViewing(row)
   }
 
   const save = async () => {
@@ -263,21 +270,26 @@ export function MachinesSetupPage() {
                         />
                       </td>
                       <td>
-                        {perms.canManageMachine ? (
-                          <div className="flex flex-wrap gap-1">
-                            <ErpButton size="sm" variant="outline" onClick={() => openEdit(row)}>
-                              Edit
-                            </ErpButton>
-                            <ErpButton
-                              size="sm"
-                              variant="outline"
-                              loading={busyId === row.id}
-                              onClick={() => void toggleActive(row)}
-                            >
-                              {row.isActive ? 'Deactivate' : 'Activate'}
-                            </ErpButton>
-                          </div>
-                        ) : null}
+                        <div className="flex flex-wrap gap-1">
+                          <ErpButton size="sm" variant="outline" onClick={() => openView(row)}>
+                            View
+                          </ErpButton>
+                          {perms.canManageMachine ? (
+                            <>
+                              <ErpButton size="sm" variant="outline" onClick={() => openEdit(row)}>
+                                Edit
+                              </ErpButton>
+                              <ErpButton
+                                size="sm"
+                                variant="outline"
+                                loading={busyId === row.id}
+                                onClick={() => void toggleActive(row)}
+                              >
+                                {row.isActive ? 'Deactivate' : 'Activate'}
+                              </ErpButton>
+                            </>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -287,6 +299,48 @@ export function MachinesSetupPage() {
           ) : null}
         </>
       )}
+
+      <SetupViewPopup
+        open={Boolean(viewing)}
+        onClose={() => setViewing(null)}
+        title={viewing?.name ?? 'Machine'}
+        subtitle={viewing?.code}
+        fields={
+          viewing
+            ? [
+                { label: 'Code', value: viewing.code, mono: true },
+                {
+                  label: 'Active',
+                  value: (
+                    <DynamicsStatusChip
+                      label={viewing.isActive ? 'Active' : 'Inactive'}
+                      tone={viewing.isActive ? 'success' : 'neutral'}
+                    />
+                  ),
+                },
+                { label: 'Name', value: viewing.name, fullWidth: true },
+                { label: 'Work Centre', value: workCentreLabel(viewing.workCentreId), fullWidth: true },
+                { label: 'Status', value: MACHINE_STATUS_LABELS[viewing.status] },
+                { label: 'Manufacturer', value: viewing.manufacturer ?? '—' },
+                { label: 'Model', value: viewing.model ?? '—' },
+                { label: 'Updated', value: viewing.updatedAt.slice(0, 10) },
+              ]
+            : []
+        }
+        footerExtra={
+          viewing && perms.canManageMachine ? (
+            <ErpButton
+              onClick={() => {
+                const row = viewing
+                setViewing(null)
+                openEdit(row)
+              }}
+            >
+              Edit
+            </ErpButton>
+          ) : null
+        }
+      />
 
       <AccountDrawerShell
         open={drawerOpen}

@@ -1,6 +1,6 @@
 # FOS ERP — Project Memory
 
-> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-21** (Purchase Setup full persistence + Invoice/QI/Return; **Dispatch 7C0–7C4**; manufacturing through forms/7A; finance Bank & Cash 5A–5D + Budgeting + FA). Next Manufacturing (approval): **7C5 hardened posting** — do not auto-start. Migrations through `20260721210000_dispatch_phase7c4_delivery_challan` / purchase setup migrations deployed.
+> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-22** (Mfg/Inventory accounting API pilot; Fixed Assets Phase 4; Purchase Setup + Dispatch 7C0–7C4). Next Manufacturing (approval): **7C5 hardened posting** — do not auto-start.
 
 ---
 
@@ -14,8 +14,8 @@
 | **Architecture** | React SPA + Node.js/Express API + MySQL 8 |
 | **Tenancy** | Multi-tenant SaaS — shared database, shared schema |
 | **Tenant scope** | Every tenant-owned record scoped by `tenantId` |
-| **Current backend scope** | Auth, RBAC, CRM, masters; finance (Phase 1–5D Bank & Cash, Budgeting Phase 1, Fixed Assets 1–3, AR/AP through credit-note allocation); manufacturing 1–2B + **materials 3C** + **7A** + planning/costing + **live multilevel BOM combined-CSV import**; inventory 3A; **Purchase** PR + Planning + RFQ/VQ/comparison/award→PO + GRN + Setup full persistence + Invoice/QI/Return; **quality 4A/4B**; **Dispatch 7C0–7C4** (fulfilment + workbench + reservation/pick + packing + Delivery Challan document-only) |
-| **Deferred backend** | Sales invoice document reverse; **7C5 hardened posting**; incoming GRN QC; **AIS / cron (5D4)**; FX treasury, intercompany, cheque print; FA/GST returns; Budgeting Phase 2+; finance receipt/allocation/credit-note reversal; SO MRP beyond Phase 1 |
+| **Current backend scope** | Auth, RBAC, CRM, masters; finance (Phase 1–5D Bank & Cash, Budgeting Phase 1, Fixed Assets 1–4, AR/AP through credit-note allocation); manufacturing 1–2B + **materials 3C** + **7A** + planning/costing/accounting 6B–7E + **live multilevel BOM combined-CSV import**; inventory 3A + inventory accounting events; **Purchase** PR + Planning + RFQ/VQ/comparison/award→PO + GRN + Setup full persistence + Invoice/QI/Return; **quality 4A/4B**; **Dispatch 7C0–7C4** (fulfilment + workbench + reservation/pick + packing + Delivery Challan document-only) |
+| **Deferred backend** | **7C5 hardened posting**; incoming GRN QC; **AIS / cron (5D4)**; FX treasury, intercompany, cheque print; GST portal filing / live NIC; FA physical verification API; Budgeting Phase 2+; SO MRP beyond Phase 1 |
 
 ---
 

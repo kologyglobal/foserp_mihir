@@ -53,15 +53,15 @@ export function InventoryOverviewPage() {
       <OperationalPageShell
         variant="dynamics"
         layout="enterprise"
-        badge="Inventory & Warehouse"
-        title="Inventory & Warehouse"
-        breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }]}
+        badge="Store"
+        title="Store Home"
+        breadcrumbs={[{ label: 'Store', to: '/inventory' }]}
         autoBreadcrumbs={false}
       >
         <EmptyState
           icon={ShieldOff}
           title="Access denied"
-          description="You do not have permission to view Inventory & Warehouse (inventory.view)."
+          description="Ask your admin for Inventory view access (inventory.view)."
         />
       </OperationalPageShell>
     )
@@ -88,18 +88,18 @@ export function InventoryOverviewPage() {
       variant="dynamics"
       layout="enterprise"
       badge="Inventory & Warehouse"
-      title="Inventory & Warehouse"
-      description="Monitor stock availability, warehouse activity and inventory exceptions."
-      breadcrumbs={[{ label: 'Inventory & Warehouse', to: '/inventory' }]}
+      title="Store Home"
+      description="See stock health at a glance, then receive, issue, or clear today’s production requests."
+      breadcrumbs={[{ label: 'Store', to: '/inventory' }]}
       autoBreadcrumbs={false}
       favoritePath="/inventory"
       commandBar={(
         <ErpCommandBar
           inline
           sticky={false}
-          primaryAction={{ id: 'items', label: 'Items', onClick: () => navigate('/inventory/items') }}
+          primaryAction={{ id: 'today', label: 'Today’s Work', onClick: () => navigate('/inventory/store-workbench') }}
           secondaryActions={[
-            { id: 'stock', label: 'Stock Availability', onClick: () => navigate('/inventory/stock') },
+            { id: 'stock', label: 'Check Stock', onClick: () => navigate('/inventory/stock') },
             {
               id: 'retry',
               label: 'Refresh',
@@ -114,8 +114,8 @@ export function InventoryOverviewPage() {
       {loadState === 'error' ? (
         <EmptyState
           icon={Package}
-          title="Could not load inventory dashboard"
-          description="Something went wrong while loading overview data. Try again."
+          title="Could not load Store Home"
+          description="Check that you are online and signed in, then try again."
           action={(
             <button
               type="button"
@@ -129,13 +129,39 @@ export function InventoryOverviewPage() {
       ) : null}
       {loadState === 'ready' && data ? (
         <>
+          <div className="mb-4 rounded-lg border border-[#c7e0f4] bg-[#f3f9fd] px-4 py-3 text-[13px] text-[#242424]">
+            <p className="font-semibold">How store works (start here)</p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-[#605e5c]">
+              <li>
+                <button type="button" className="font-medium text-[#0078d4] underline" onClick={() => navigate('/purchase/grn')}>
+                  Receive against PO
+                </button>
+                {' '}(Purchase GRN) — stock is updated automatically.
+              </li>
+              <li>
+                <button type="button" className="font-medium text-[#0078d4] underline" onClick={() => navigate('/inventory/store-workbench')}>
+                  Issue / reserve for production
+                </button>
+                {' '}from Today’s Work.
+              </li>
+              <li>
+                <button type="button" className="font-medium text-[#0078d4] underline" onClick={() => navigate('/inventory/stock')}>
+                  Check available stock
+                </button>
+                {' '}before issuing.
+              </li>
+            </ol>
+          </div>
+
           <div className="mb-6 flex flex-wrap gap-2">
             {[
-              { label: 'Receive Material', icon: ArrowDownToLine, href: '/inventory/movements/receipts' },
-              { label: 'Issue Material', icon: ArrowUpFromLine, href: '/inventory/movements/issues' },
-              { label: 'Transfer Stock', icon: ArrowLeftRight, href: '/inventory/movements/transfers' },
+              { label: 'Receive vs PO (GRN)', icon: ArrowDownToLine, href: '/purchase/grn' },
+              { label: 'Direct Receive', icon: ArrowDownToLine, href: '/inventory/movements/receipts/new' },
+              { label: 'Issue Stock', icon: ArrowUpFromLine, href: '/inventory/movements/issues/new' },
+              { label: 'Move Warehouses', icon: ArrowLeftRight, href: '/inventory/movements/transfers' },
               { label: 'Adjust Stock', icon: SlidersHorizontal, href: '/inventory/movements/adjustments' },
-              { label: 'Start Stock Count', icon: ClipboardList, href: '/inventory/stock-count' },
+              { label: 'Stock Count', icon: ClipboardList, href: '/inventory/stock-count' },
+              { label: 'Today’s Work', icon: Package, href: '/inventory/store-workbench' },
             ].map((action) => (
               <button
                 key={action.label}
@@ -150,14 +176,14 @@ export function InventoryOverviewPage() {
           </div>
 
           <DynamicsDashboardGrid>
-            <DynamicsDashboardPanel title="Pending Warehouse Actions" noPadding>
+            <DynamicsDashboardPanel title="What to do next" noPadding>
               <table className="erp-table w-full">
-                <thead><tr><th>Action</th><th className="text-right">Count</th></tr></thead>
+                <thead><tr><th>Task</th><th className="text-right">Waiting</th></tr></thead>
                 <tbody>
                   {data.pendingActions.map((row) => (
                     <tr key={row.id} className="cursor-pointer hover:bg-erp-bg-subtle" onClick={() => navigate(row.href)}>
                       <td>{row.label}</td>
-                      <td className="text-right font-mono">{row.count}</td>
+                      <td className="text-right font-mono">{row.count > 0 ? row.count : '—'}</td>
                     </tr>
                   ))}
                 </tbody>

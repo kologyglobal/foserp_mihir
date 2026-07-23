@@ -21,16 +21,17 @@ export function TaxCompliancePreviewBanner({
     mode === 'extract-live'
       ? (
           <>
-            <span className="font-semibold">Live GST extract from posted AR/AP invoices.</span> Outward and
-            inward registers use the accounting extract API. Portal filing, e-invoice generation, challans, and
-            GSTR auto-submit are not connected.
+            <span className="font-semibold">Live GST extract + simulated e-invoice / e-way.</span> Outward/inward
+            registers and IRN/EWB registers use the accounting API. NIC calls are <strong>SIMULATED</strong> (no
+            GST portal). GSTR auto-submit and challans remain disconnected.
           </>
         )
       : mode === 'filing-demo' ? (
           <>
             <span className="font-semibold">Extract live; filing preview demo.</span> Register totals may come
-            from posted invoices. Mark-filed / portal / e-invoice / challan actions are demo-only and do not
-            submit to GST Portal, Income Tax, or TRACES.
+            from posted invoices. Mark-filed / portal / challan actions are demo-only and do not submit to GST
+            Portal, Income Tax, or TRACES. E-invoice / e-way use a simulated NIC adapter when generated in API
+            mode.
           </>
         ) : (
           <>

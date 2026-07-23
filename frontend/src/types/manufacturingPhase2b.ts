@@ -136,7 +136,13 @@ export interface ProductionAssignment {
   operation?: AssignmentNestedRef
   machine?: AssignmentNestedRef
   workCentre?: AssignmentNestedRef
-  productionOrder?: { id: string; orderNumber: string; status: string }
+  productionOrder?: {
+    id: string
+    orderNumber: string
+    status: string
+    productItemId?: string | null
+    productItem?: { id: string; code: string; name: string } | null
+  }
   allowedActions?: AssignmentAllowedActions
 }
 

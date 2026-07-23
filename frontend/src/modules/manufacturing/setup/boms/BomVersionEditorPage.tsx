@@ -25,8 +25,10 @@ import type { LucideIcon } from 'lucide-react'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { ErpStatusChip, type ErpStatusChipTone } from '@/components/erp/ErpStatusChip'
 import { DynamicsKpiRow, DynamicsKpiTile } from '@/components/dynamics/DynamicsKpiTile'
-import { Input, Select } from '@/components/forms/Inputs'
+import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { FormField } from '@/components/forms/FormField'
+import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
+import { ItemLookupSelect } from '@/components/lookups/ItemLookupSelect'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { AccountDrawerShell, AccountConfirmModal } from '@/components/accounting/coa/AccountDrawerShell'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -64,6 +66,7 @@ import { cn } from '@/utils/cn'
 import { ManufacturingSetupShell } from '../ManufacturingSetupShell'
 import { useSetupLookup } from '../useSetupLookups'
 import { BomCsvImportDialog } from './BomCsvImportDialog'
+import { bomLineDescription, buildBomOutlineIndexMap } from './bomOutlineIndex'
 
 const VERSION_STATUS_TONE: Record<ManufacturingVersionStatus, ErpStatusChipTone> = {
   DRAFT: 'pending',
@@ -91,6 +94,10 @@ interface ComponentFormState {
   makeOrBuy: MakeOrBuy
   lineType: BomLineType
   scrapPercent: string
+  descriptionOverride: string
+  drawingReference: string
+  specification: string
+  notes: string
 }
 
 const EMPTY_COMPONENT_FORM: ComponentFormState = {
@@ -101,6 +108,10 @@ const EMPTY_COMPONENT_FORM: ComponentFormState = {
   makeOrBuy: 'MAKE',
   lineType: 'RAW_MATERIAL',
   scrapPercent: '0',
+  descriptionOverride: '',
+  drawingReference: '',
+  specification: '',
+  notes: '',
 }
 
 interface FlatEntry {
@@ -168,12 +179,32 @@ export function BomVersionEditorPage() {
   const [removingLineId, setRemovingLineId] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
 
-  const itemLabel = useCallback((id: string) => items.find((i) => i.id === id)?.label ?? `${id.slice(0, 8)}…`, [items])
-  const uomLabel = useCallback((id: string) => {
-    const label = uoms.find((u) => u.id === id)?.label ?? id.slice(0, 8)
-    // Lookup labels come as "CODE — Name"; the code alone reads better next to a quantity.
-    return label.split('—')[0]?.trim() ?? label
-  }, [uoms])
+  const itemLabel = useCallback(
+    (id: string, snap?: { itemCode?: string | null; itemName?: string | null }) => {
+      if (snap?.itemName && snap?.itemCode) return `${snap.itemCode} — ${snap.itemName}`
+      if (snap?.itemName) return snap.itemName
+      if (snap?.itemCode) return snap.itemCode
+      const fromLookup = items.find((i) => i.id === id)?.label
+      if (fromLookup) return fromLookup
+      return id ? `${id.slice(0, 8)}…` : '—'
+    },
+    [items],
+  )
+  const lineLabel = useCallback((node: Pick<BomTreeNode, 'itemId' | 'itemCode' | 'itemName'>) => itemLabel(node.itemId, node), [itemLabel])
+  const productLabel = useCallback(
+    (b: Bom) => itemLabel(b.productItemId, { itemCode: b.productItemCode, itemName: b.productItemName }),
+    [itemLabel],
+  )
+  const uomLabel = useCallback(
+    (id: string, code?: string | null) => {
+      if (code) return code
+      const label = uoms.find((u) => u.id === id)?.label
+      if (!label) return id ? id.slice(0, 8) : '—'
+      // Lookup labels come as "CODE — Name"; the code alone reads better next to a quantity.
+      return label.split('—')[0]?.trim() ?? label
+    },
+    [uoms],
+  )
 
   const formatDiffLine = useCallback(
     (d: BomCompareResult['added'][number]) => {
@@ -250,6 +281,7 @@ export function BomVersionEditorPage() {
   }
 
   const flatLines = useMemo(() => flattenTree(tree), [tree])
+  const outlineIndexById = useMemo(() => buildBomOutlineIndexMap(tree), [tree])
   const isDraft = version?.status === 'DRAFT'
   const canEdit = isDraft && perms.canManageBom
 
@@ -271,8 +303,27 @@ export function BomVersionEditorPage() {
   const visibleLines = useMemo(() => {
     const q = treeSearch.trim().toLowerCase()
     const out: FlatEntry[] = []
-    const matchesSelf = (n: BomTreeNode) =>
-      itemLabel(n.itemId).toLowerCase().includes(q) || n.lineType.toLowerCase().includes(q)
+    const matchesSelf = (n: BomTreeNode) => {
+      if (!q) return true
+      const outline = outlineIndexById.get(n.id) ?? ''
+      const haystack = [
+        outline,
+        lineLabel(n),
+        n.itemCode,
+        n.itemName,
+        n.lineType,
+        n.makeOrBuy,
+        bomLineDescription(n),
+        n.descriptionOverride,
+        n.notes,
+        n.drawingReference,
+        n.specification,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(q)
+    }
     const hasMatchInside = (n: BomTreeNode): boolean => matchesSelf(n) || n.children.some(hasMatchInside)
 
     const walk = (nodes: BomTreeNode[], depth: number) => {
@@ -289,7 +340,7 @@ export function BomVersionEditorPage() {
     }
     walk(tree, 0)
     return out
-  }, [tree, expanded, treeSearch, itemLabel])
+  }, [tree, expanded, treeSearch, lineLabel, outlineIndexById])
 
   const toggleExpand = (id: string) => {
     setExpanded((prev) => {
@@ -319,6 +370,10 @@ export function BomVersionEditorPage() {
       makeOrBuy: node.makeOrBuy,
       lineType: node.lineType,
       scrapPercent: node.scrapPercent ?? '0',
+      descriptionOverride: node.descriptionOverride ?? '',
+      drawingReference: node.drawingReference ?? '',
+      specification: node.specification ?? '',
+      notes: node.notes ?? '',
     })
     setDrawerOpen(true)
   }
@@ -327,6 +382,12 @@ export function BomVersionEditorPage() {
     if (!selectedVersionId) return
     setSaving(true)
     try {
+      const detailPayload = {
+        descriptionOverride: form.descriptionOverride.trim() || undefined,
+        drawingReference: form.drawingReference.trim() || undefined,
+        specification: form.specification.trim() || undefined,
+        notes: form.notes.trim() || undefined,
+      }
       if (editingLine) {
         await updateBomLine(editingLine.id, {
           quantity: Number(form.quantity) || 0,
@@ -334,6 +395,7 @@ export function BomVersionEditorPage() {
           makeOrBuy: form.makeOrBuy,
           lineType: form.lineType,
           scrapPercent: Number(form.scrapPercent) || 0,
+          ...detailPayload,
         })
         notify.success('Component updated.')
       } else {
@@ -345,6 +407,7 @@ export function BomVersionEditorPage() {
           makeOrBuy: form.makeOrBuy,
           lineType: form.lineType,
           scrapPercent: Number(form.scrapPercent) || 0,
+          ...detailPayload,
         })
         notify.success('Component added.')
       }
@@ -480,7 +543,11 @@ export function BomVersionEditorPage() {
   return (
     <ManufacturingSetupShell
       title={`${bom.code} — ${bom.name}`}
-      description="Multi-level bill of material with revision control."
+      description={
+        bom.description?.trim()
+          ? bom.description
+          : 'Multi-level bill of material with revision control — index, description, and structure by level.'
+      }
       actions={
         <div className="flex flex-wrap gap-2">
           {perms.canImportBom ? (
@@ -533,8 +600,8 @@ export function BomVersionEditorPage() {
           <dl className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12px]">
             <div className="flex items-baseline gap-1.5">
               <dt className="text-erp-muted">Output</dt>
-              <dd className="max-w-[260px] truncate font-medium text-erp-text" title={itemLabel(bom.productItemId)}>
-                {itemLabel(bom.productItemId)}
+              <dd className="max-w-[260px] truncate font-medium text-erp-text" title={productLabel(bom)}>
+                {productLabel(bom)}
               </dd>
             </div>
             <div className="flex items-baseline gap-1.5">
@@ -551,6 +618,12 @@ export function BomVersionEditorPage() {
               <dt className="text-erp-muted">Effective from</dt>
               <dd className="font-medium text-erp-text">{formatDate(version.effectiveFrom)}</dd>
             </div>
+            {version.drawingRevision ? (
+              <div className="flex items-baseline gap-1.5">
+                <dt className="text-erp-muted">Drawing rev</dt>
+                <dd className="font-medium text-erp-text">{version.drawingRevision}</dd>
+              </div>
+            ) : null}
           </dl>
 
           {canEdit ? (
@@ -560,6 +633,23 @@ export function BomVersionEditorPage() {
             </ErpButton>
           ) : null}
         </div>
+
+        {(bom.description?.trim() || version.revisionNotes?.trim()) ? (
+          <div className="space-y-1 border-b border-erp-border px-4 py-2.5 text-[12px]">
+            {bom.description?.trim() ? (
+              <p className="text-erp-text">
+                <span className="font-semibold text-erp-muted">BOM description · </span>
+                {bom.description}
+              </p>
+            ) : null}
+            {version.revisionNotes?.trim() ? (
+              <p className="text-erp-muted">
+                <span className="font-semibold">Revision notes · </span>
+                {version.revisionNotes}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         <DynamicsKpiRow columns={4} className="border-0 px-3 py-2.5">
           <DynamicsKpiTile label="Components" value={stats.total} helper="All levels of this revision" tone="primary" />
@@ -616,7 +706,7 @@ export function BomVersionEditorPage() {
 
       {/* Tree toolbar */}
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <SearchInput value={treeSearch} onChange={setTreeSearch} placeholder="Find component…" className="w-64" />
+        <SearchInput value={treeSearch} onChange={setTreeSearch} placeholder="Find by index, item, description…" className="w-72" />
         <ErpButton size="sm" variant="ghost" onClick={expandAll} disabled={flatLines.length === 0}>
           <ChevronsUpDown className="mr-1 h-3.5 w-3.5" />
           Expand all
@@ -654,11 +744,14 @@ export function BomVersionEditorPage() {
           <EmptyState icon={Layers} title="No matches" description="No component matches the current search." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="erp-table w-full min-w-[880px] text-left text-[12.5px]">
+            <table className="erp-table w-full min-w-[1180px] text-left text-[12.5px]">
               <thead>
                 <tr>
-                  <th>Component</th>
-                  <th className="w-36">Type</th>
+                  <th className="w-16">Index</th>
+                  <th className="min-w-[220px]">Item</th>
+                  <th className="min-w-[200px]">Description</th>
+                  <th className="w-28">Drawing / Spec</th>
+                  <th className="w-32">Type</th>
                   <th className="w-20 text-center">Source</th>
                   <th className="w-28 text-right">Qty / base</th>
                   <th className="w-20 text-right">Scrap %</th>
@@ -672,11 +765,23 @@ export function BomVersionEditorPage() {
                   const isExpanded = expanded.has(node.id) || Boolean(treeSearch.trim())
                   const meta = LINE_TYPE_META[node.lineType]
                   const TypeIcon = meta.icon
+                  const outline = outlineIndexById.get(node.id) ?? String(node.sequence)
+                  const description = bomLineDescription(node)
+                  const drawingSpec = [node.drawingReference, node.specification].filter(Boolean).join(' · ') || '—'
+                  const isAssembly = node.lineType === 'SUBASSEMBLY' || node.lineType === 'MANUFACTURED_COMPONENT'
                   return (
-                    <tr key={node.id} className="group transition-colors hover:bg-erp-primary-soft/20">
+                    <tr
+                      key={node.id}
+                      className={cn(
+                        'group transition-colors hover:bg-erp-primary-soft/20',
+                        isAssembly && depth === 0 ? 'bg-slate-50/80' : null,
+                      )}
+                    >
+                      <td className="whitespace-nowrap px-3 py-1.5 font-mono text-[12px] font-semibold tabular-nums text-erp-text">
+                        {outline}
+                      </td>
                       <td className="px-3 py-1.5">
                         <div className="flex items-stretch">
-                          {/* Indent guides */}
                           {Array.from({ length: depth }).map((_, i) => (
                             <span key={i} className="ml-[9px] w-[15px] shrink-0 border-l border-erp-border/60" aria-hidden />
                           ))}
@@ -703,14 +808,31 @@ export function BomVersionEditorPage() {
                               <TypeIcon className="h-3.5 w-3.5" aria-hidden />
                             </span>
                             <span className="min-w-0">
-                              <span className="block truncate font-medium text-erp-text">{itemLabel(node.itemId)}</span>
+                              <span className="block truncate font-medium text-erp-text" title={lineLabel(node)}>
+                                {node.itemName ?? lineLabel(node)}
+                              </span>
                               <span className="block font-mono text-[10px] leading-tight text-erp-muted">
-                                #{node.sequence} · L{depth + 1}
+                                {node.itemCode ?? '—'}
                                 {hasChildren ? ` · ${node.children.length} sub` : ''}
                               </span>
                             </span>
                           </div>
                         </div>
+                      </td>
+                      <td className="max-w-[280px] px-3 py-1.5">
+                        <span className="line-clamp-2 text-erp-text" title={description}>
+                          {description}
+                        </span>
+                        {node.notes?.trim() && node.notes.trim() !== description ? (
+                          <span className="mt-0.5 block line-clamp-1 text-[10.5px] text-erp-muted" title={node.notes}>
+                            Note: {node.notes}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="max-w-[140px] px-3 py-1.5 text-[11.5px] text-erp-muted">
+                        <span className="line-clamp-2" title={drawingSpec}>
+                          {drawingSpec}
+                        </span>
                       </td>
                       <td className="px-3 py-1.5">
                         <LineBadge label={meta.label} className={meta.className} />
@@ -723,7 +845,7 @@ export function BomVersionEditorPage() {
                       </td>
                       <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
                         <span className="font-semibold text-erp-text">{formatQty(node.quantity)}</span>{' '}
-                        <span className="text-[11px] text-erp-muted">{uomLabel(node.uomId)}</span>
+                        <span className="text-[11px] text-erp-muted">{uomLabel(node.uomId, node.uomCode)}</span>
                       </td>
                       <td className="px-3 py-1.5 text-right tabular-nums text-erp-muted">
                         {Number(node.scrapPercent) > 0 ? `${formatQty(node.scrapPercent)}%` : '—'}
@@ -746,7 +868,7 @@ export function BomVersionEditorPage() {
                               onClick={() => openAddComponent(node.id)}
                               className="rounded p-1 text-erp-primary hover:bg-erp-primary-soft"
                               title="Add sub-component"
-                              aria-label={`Add sub-component under ${itemLabel(node.itemId)}`}
+                              aria-label={`Add sub-component under ${lineLabel(node)}`}
                             >
                               <Plus className="h-3.5 w-3.5" />
                             </button>
@@ -755,7 +877,7 @@ export function BomVersionEditorPage() {
                               onClick={() => openEditComponent(node)}
                               className="rounded p-1 text-erp-muted hover:bg-erp-surface-alt hover:text-erp-text"
                               title="Edit line"
-                              aria-label={`Edit ${itemLabel(node.itemId)}`}
+                              aria-label={`Edit ${lineLabel(node)}`}
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
@@ -765,7 +887,7 @@ export function BomVersionEditorPage() {
                               onClick={() => void runRemoveLine(node.id, hasChildren)}
                               className="rounded p-1 text-red-600 hover:bg-red-50 disabled:opacity-50"
                               title="Remove line"
-                              aria-label={`Remove ${itemLabel(node.itemId)}`}
+                              aria-label={`Remove ${lineLabel(node)}`}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -781,12 +903,13 @@ export function BomVersionEditorPage() {
         )}
       </div>
 
-      {/* Add / edit component drawer */}
+      {/* Add / edit component popup */}
       <AccountDrawerShell
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         title={editingLine ? 'Edit Component' : 'Add Component'}
-        eyebrow="BOM Draft"
+        eyebrow="Manufacturing Setup"
+        widthClassName="max-w-lg"
         footer={
           <div className="flex justify-end gap-2">
             <ErpButton variant="outline" onClick={() => setDrawerOpen(false)}>
@@ -805,9 +928,9 @@ export function BomVersionEditorPage() {
         <div className="space-y-3">
           {editingLine ? (
             <div className="rounded-md border border-erp-border bg-erp-surface-alt/50 px-3 py-2 text-[12px]">
-              <span className="block font-medium text-erp-text">{itemLabel(editingLine.itemId)}</span>
+              <span className="block font-medium text-erp-text">{lineLabel(editingLine)}</span>
               <span className="text-erp-muted">
-                Line #{editingLine.sequence} · level {editingLine.level}
+                Index {outlineIndexById.get(editingLine.id) ?? '—'}
               </span>
             </div>
           ) : (
@@ -817,27 +940,27 @@ export function BomVersionEditorPage() {
                   <option value="">— Root (top-level) —</option>
                   {flatLines.map(({ node, depth }) => (
                     <option key={node.id} value={node.id}>
-                      {'—'.repeat(depth)} #{node.sequence} {itemLabel(node.itemId)}
+                      {'—'.repeat(depth)} {outlineIndexById.get(node.id) ?? `#${node.sequence}`} {lineLabel(node)}
                     </option>
                   ))}
                 </Select>
               </FormField>
-              <FormField label="Item" required hint={items.length === 0 ? 'Paste the item UUID (item lookup unavailable).' : undefined}>
-                {items.length > 0 ? (
-                  <Select value={form.itemId} onChange={(e) => setForm((f) => ({ ...f, itemId: e.target.value }))}>
-                    <option value="">Select item…</option>
-                    {items.map((i) => (
-                      <option key={i.id} value={i.id}>
-                        {i.label}
-                      </option>
-                    ))}
-                  </Select>
-                ) : (
-                  <Input value={form.itemId} onChange={(e) => setForm((f) => ({ ...f, itemId: e.target.value.trim() }))} placeholder="Item UUID" />
-                )}
+              <FormField label="Item" required hint="Search Item Master by code or name.">
+                <ItemLookupSelect
+                  value={form.itemId}
+                  placeholder="Search item code or name…"
+                  onChange={(sel) => setForm((f) => ({ ...f, itemId: sel?.itemId ?? '' }))}
+                />
               </FormField>
             </>
           )}
+          <FormField label="Description">
+            <Input
+              value={form.descriptionOverride}
+              onChange={(e) => setForm((f) => ({ ...f, descriptionOverride: e.target.value }))}
+              placeholder="Part description override (optional)"
+            />
+          </FormField>
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Quantity" required>
               <Input type="number" min={0} value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} />
@@ -855,7 +978,7 @@ export function BomVersionEditorPage() {
           <FormField label="UOM" required hint={uoms.length === 0 ? 'Paste the UOM UUID (lookup unavailable).' : undefined}>
             {uoms.length > 0 ? (
               <Select value={form.uomId} onChange={(e) => setForm((f) => ({ ...f, uomId: e.target.value }))}>
-                <option value="">Select UOM…</option>
+                <option value="">{SELECT_PLACEHOLDER}</option>
                 {uoms.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.label}
@@ -886,6 +1009,28 @@ export function BomVersionEditorPage() {
               </Select>
             </FormField>
           </div>
+          <FormField label="Drawing reference">
+            <Input
+              value={form.drawingReference}
+              onChange={(e) => setForm((f) => ({ ...f, drawingReference: e.target.value }))}
+              placeholder="e.g. DWG-CHS-001"
+            />
+          </FormField>
+          <FormField label="Specification">
+            <Input
+              value={form.specification}
+              onChange={(e) => setForm((f) => ({ ...f, specification: e.target.value }))}
+              placeholder="Material grade / size / standard"
+            />
+          </FormField>
+          <FormField label="Notes">
+            <Textarea
+              rows={3}
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              placeholder="Manufacturing / issue notes"
+            />
+          </FormField>
         </div>
       </AccountDrawerShell>
 

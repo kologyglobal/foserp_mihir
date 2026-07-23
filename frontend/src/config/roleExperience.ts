@@ -119,12 +119,12 @@ const STORES: RoleExperienceDefinition = {
   approvalModules: [],
   kpiIds: ['grnPending', 'openReservations', 'negativeStock', 'pendingIssues', 'slowMoving', 'qcIncoming'],
   shortcuts: [
-    { label: 'Inventory Workspace', path: '/inventory', icon: Warehouse },
-    { label: 'Store Workbench', path: '/manufacturing/store-workbench', icon: Package },
-    { label: 'Material Inward', path: '/inventory/inward', icon: PackageCheck },
-    { label: 'Material Issue', path: '/inventory/issue', icon: Package },
-    { label: 'Stock Ledger', path: '/inventory/ledger', icon: ClipboardList },
-    { label: 'Reservations', path: '/inventory/reservations', icon: Box },
+    { label: 'Store Home', path: '/inventory', icon: Warehouse },
+    { label: 'Today’s Work', path: '/inventory/store-workbench', icon: Package },
+    { label: 'Receive Stock', path: '/inventory/movements/receipts', icon: PackageCheck },
+    { label: 'Issue Stock', path: '/inventory/movements/issues', icon: Package },
+    { label: 'Stock', path: '/inventory/stock', icon: ClipboardList },
+    { label: 'Purchase GRN', path: '/purchase/grn', icon: Box },
   ],
 }
 

@@ -93,6 +93,8 @@ export type PeriodCloseReadinessCheckCode =
   | 'AP_CLOSE_GATE'
   | 'UNPOSTED_JOURNALS'
   | 'BANK_RECON'
+  | 'INVENTORY_GL'
+  | 'MFG_GL'
 
 export interface PeriodCloseReadinessCheck {
   code: PeriodCloseReadinessCheckCode
@@ -102,6 +104,18 @@ export interface PeriodCloseReadinessCheck {
   message: string
   href?: string
   count?: number
+  featureEnabled?: boolean
+}
+
+export interface PeriodCloseChecklistAck {
+  id: string
+  periodId: string
+  checkKey: string
+  status: 'ACK' | 'NA'
+  note: string | null
+  ackedBy: string | null
+  ackedAt: string
+  updatedAt: string
 }
 
 export interface PeriodCloseReadiness {
@@ -114,9 +128,13 @@ export interface PeriodCloseReadiness {
   blockingCount: number
   warningCount: number
   unpostedJournalCount: number
+  openBankReconCount?: number
   checks: PeriodCloseReadinessCheck[]
-  /** Soft warnings only — backend close is not blocked by these. */
+  /** When hard-block is off, close is allowed despite BLOCK checks. */
   canCloseSoft: boolean
+  hardBlockEnabled?: boolean
+  canClose?: boolean
+  blockers?: PeriodCloseReadinessCheck[]
 }
 
 export interface CloseTask {
@@ -264,6 +282,7 @@ export interface BankCloseSummary {
   chequesInTransit: number
   unidentifiedTransactions: number
   bankVsGlDiff: number
+  statusMessage?: string
 }
 
 export interface GstTdsCloseSummary {

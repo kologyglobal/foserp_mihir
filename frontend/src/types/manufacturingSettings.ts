@@ -25,6 +25,8 @@ export interface ManufacturingSettings {
     overproductionTolerancePercent: number
     allowUnderCompletion: boolean
     requireWorkOrderClosing: boolean
+    /** Self-contained WO: inventory/QC/purchase warn instead of hard-block. */
+    flexibleExecution: boolean
     /** Allow close when QC is still open / not required path. */
     allowCloseWithoutQc: boolean
   }
@@ -215,7 +217,8 @@ export const DEFAULT_MANUFACTURING_SETTINGS: ManufacturingSettings = {
     overproductionTolerancePercent: 5,
     allowUnderCompletion: true,
     requireWorkOrderClosing: true,
-    allowCloseWithoutQc: false,
+    flexibleExecution: true,
+    allowCloseWithoutQc: true,
   },
   numberSeries: {
     workOrderPrefix: 'WO-MFG-',

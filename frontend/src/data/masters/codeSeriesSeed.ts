@@ -89,7 +89,8 @@ export const seedCodeSeries: CodeSeries[] = [
   series('PO', 'Purchase Order', 'purchase', 'purchase_order', { prefix: 'PO', financialYearRequired: true, runningNumberLength: 5, currentNumber: 11 }),
   series('GRN', 'GRN', 'purchase', 'grn', { prefix: 'GRN', financialYearRequired: true, currentNumber: 7 }),
   series('PROD', 'Production Order', 'production', 'production_order', { prefix: 'PROD', financialYearRequired: true, currentNumber: 4 }),
-  series('WO', 'Work Order', 'production', 'work_order', { prefix: 'WO', currentNumber: 14 }),
+  // Anchor SO-0001 MRP creates WO-0001…WO-0005 (Tank SA first). Keep counter at 0 for that contract.
+  series('WO', 'Work Order', 'production', 'work_order', { prefix: 'WO', currentNumber: 0 }),
   series('QC', 'QC Inspection', 'quality', 'qc_inspection', { prefix: 'QC', financialYearRequired: true, runningNumberLength: 5, currentNumber: 3 }),
   series('INV', 'Invoice', 'finance', 'invoice', { prefix: 'INV', financialYearRequired: true, currentNumber: 2 }),
   series('BOM', 'BOM', 'engineering', 'bom', { prefix: 'BOM', currentNumber: 6 }),

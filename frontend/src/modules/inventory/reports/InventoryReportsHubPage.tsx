@@ -3,6 +3,7 @@ import { BarChart3, ChevronRight, ExternalLink, FileSpreadsheet } from 'lucide-r
 import { useEffect, useState } from 'react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { isApiMode } from '@/config/apiConfig'
 import { getInventoryReports } from '@/services/inventory'
 import type { InventoryReportCategoryGroup } from '@/types/inventoryDomain'
 import { useInventoryPermissions } from '@/utils/permissions/inventory'
@@ -32,7 +33,11 @@ export function InventoryReportsHubPage() {
   return (
     <OperationalPageShell
       title="Inventory Reports"
-      description="Stock, movement, tracking, exception and planning reports — demo mock data."
+      description={
+        isApiMode()
+          ? 'Live stock, movement, tracking and planning reports from Inventory balances and ledger.'
+          : 'Stock, movement, tracking, exception and planning reports — demo mock data.'
+      }
       badge="Inventory & Warehouse"
       variant="dynamics"
       favoritePath="/inventory/reports"

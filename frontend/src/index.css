@@ -1609,6 +1609,55 @@
     pointer-events: none;
   }
 
+  /* Standard date field — matches Select height and chevron affordance */
+  .erp-date-field {
+    position: relative;
+    display: block;
+    width: 100%;
+  }
+
+  .erp-date-field__input.erp-input {
+    width: 100%;
+    padding-right: 2.25rem;
+    color-scheme: light;
+  }
+
+  .erp-date-field__input.erp-input::-webkit-calendar-picker-indicator {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0;
+  }
+
+  .erp-date-field__icon {
+    position: absolute;
+    right: 0.625rem;
+    top: 50%;
+    z-index: 0;
+    width: 1rem;
+    height: 1rem;
+    transform: translateY(-50%);
+    color: var(--erp-muted);
+    pointer-events: none;
+  }
+
+  .erp-date-field:hover .erp-date-field__icon {
+    color: var(--erp-text);
+  }
+
+  .erp-date-field:focus-within .erp-date-field__icon {
+    color: var(--erp-primary);
+  }
+
+  .erp-date-field--disabled {
+    opacity: 0.65;
+    pointer-events: none;
+  }
+
   /* Custom listbox / autocomplete dropdown panels */
   .erp-dropdown-panel {
     font-family: var(--d365-font-family, var(--erp-font-family));

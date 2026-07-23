@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express'
-import type { ManufacturingBomLine, ManufacturingBomVersion } from '@prisma/client'
+import type { ManufacturingBom, ManufacturingBomLine, ManufacturingBomVersion } from '@prisma/client'
 import { getContext, getRouteParam, getTenantId } from '../../../types/request-context.js'
 import { asyncHandler } from '../../../utils/asyncHandler.js'
 import { buildPaginationMeta } from '../../../utils/pagination.js'
@@ -20,6 +20,11 @@ import type {
   UpdateBomVersionInput,
 } from './bom.schemas.js'
 
+type ItemSnap = { id: string; code: string; name: string }
+type UomSnap = { id: string; code: string; name: string }
+type BomLineWithMasters = ManufacturingBomLine & { item?: ItemSnap | null; uom?: UomSnap | null }
+type BomWithProduct = ManufacturingBom & { productItem?: ItemSnap | null }
+
 export const getBomImportTemplate = asyncHandler(async (_req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')
   res.setHeader('Content-Disposition', 'attachment; filename="bom-combined-import-template.csv"')
@@ -38,6 +43,15 @@ export const confirmBomImport = asyncHandler(async (req: Request, res: Response)
   return sendCreated(res, 'BOM CSV import completed', result)
 })
 
+export function mapBom(bom: BomWithProduct) {
+  const { productItem, ...rest } = bom
+  return {
+    ...rest,
+    productItemCode: productItem?.code ?? null,
+    productItemName: productItem?.name ?? null,
+  }
+}
+
 export function mapBomVersion(version: ManufacturingBomVersion) {
   return {
     ...version,
@@ -46,25 +60,34 @@ export function mapBomVersion(version: ManufacturingBomVersion) {
   }
 }
 
-export function mapBomLine(line: ManufacturingBomLine) {
+export function mapBomLine(line: BomLineWithMasters) {
+  const { item, uom, ...rest } = line
   return {
-    ...line,
+    ...rest,
     quantity: dec(line.quantity),
     fixedQuantity: dec(line.fixedQuantity),
     scrapPercent: dec(line.scrapPercent),
     yieldPercent: dec(line.yieldPercent),
+    itemCode: item?.code ?? null,
+    itemName: item?.name ?? null,
+    uomCode: uom?.code ?? null,
   }
 }
 
 function mapTreeNode(node: unknown): unknown {
-  const typed = node as ManufacturingBomLine & { children: unknown[] }
+  const typed = node as BomLineWithMasters & { children: unknown[] }
   return { ...mapBomLine(typed), children: typed.children.map(mapTreeNode) }
 }
 
 export const listBoms = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const result = await service.listBoms(tenantId, req.query as unknown as ListBomsQuery)
-  return sendPaginated(res, 'BOMs listed', result.items, buildPaginationMeta(result.total, result.page, result.limit))
+  return sendPaginated(
+    res,
+    'BOMs listed',
+    result.items.map((row) => mapBom(row as BomWithProduct)),
+    buildPaginationMeta(result.total, result.page, result.limit),
+  )
 })
 
 export const createBom = asyncHandler(async (req: Request, res: Response) => {
@@ -77,7 +100,7 @@ export const getBom = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const bomId = getRouteParam(req, 'bomId')
   const { bom, versions } = await service.getBom(tenantId, bomId)
-  return sendSuccess(res, 'BOM fetched', { ...bom, versions: versions.map(mapBomVersion) })
+  return sendSuccess(res, 'BOM fetched', { ...mapBom(bom), versions: versions.map(mapBomVersion) })
 })
 
 export const listBomVersions = asyncHandler(async (req: Request, res: Response) => {

@@ -356,7 +356,7 @@ export function GrnDetailPage() {
               onClick={async () => {
                 setPostConfirmOpen(false)
                 const updated = await run(() => postGRN(grn.id), `${grn.documentNumber} posted`)
-                if (updated?.inventoryPostDeferred) setInventoryMsgOpen(true)
+                if (updated) setInventoryMsgOpen(true)
               }}
             >
               Post
@@ -365,8 +365,8 @@ export function GrnDetailPage() {
         }
       >
         <p className="text-sm text-erp-muted">
-          Post {grn.documentNumber}? PO receipt quantities will be updated. Inventory stock posting
-          remains deferred until the backend is connected.
+          Post {grn.documentNumber}? This updates PO received quantities and posts stock into Inventory
+          (or holds it for Quality Inspection when QC is required).
         </p>
       </Modal>
 
@@ -375,14 +375,26 @@ export function GrnDetailPage() {
         onClose={() => setInventoryMsgOpen(false)}
         title="GRN posted"
         footer={
-          <ErpButton variant="primary" onClick={() => setInventoryMsgOpen(false)}>
-            OK
-          </ErpButton>
+          <div className="flex gap-2">
+            <ErpButton variant="secondary" onClick={() => setInventoryMsgOpen(false)}>
+              Close
+            </ErpButton>
+            <ErpButton
+              variant="primary"
+              onClick={() => {
+                setInventoryMsgOpen(false)
+                navigate('/inventory/stock')
+              }}
+            >
+              View Stock
+            </ErpButton>
+          </div>
         }
       >
         <p className="text-sm">
-          GRN posted successfully. <strong>Inventory will be updated when the backend is connected</strong>{' '}
-          (demo mock — stock quantities are not written live).
+          {grn.inventoryPostDeferred || grn.inspectionRequired
+            ? 'GRN saved. Stock will show as available after Quality Inspection accepts the material (or when inventory posting completes).'
+            : 'GRN posted and stock is now available in Inventory.'}
         </p>
       </Modal>
     </PurchaseCardFormShell>

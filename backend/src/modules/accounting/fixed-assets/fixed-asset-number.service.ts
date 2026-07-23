@@ -69,6 +69,41 @@ export function buildDepreciationEventKey(runId: string): string {
   return `FIXED_ASSET_DEPRECIATE:${runId}:V1`
 }
 
+export function buildRevalueEventKey(revaluationId: string): string {
+  return `FIXED_ASSET_REVALUE:${revaluationId}:V1`
+}
+
+export function buildImpairEventKey(impairmentId: string): string {
+  return `FIXED_ASSET_IMPAIR:${impairmentId}:V1`
+}
+
+export async function nextRevaluationNumber(tenantId: string, legalEntityId: string): Promise<string> {
+  const year = new Date().getUTCFullYear()
+  const prefix = `FAR-${year}-`
+  const count = await prisma.fixedAssetRevaluation.count({
+    where: { tenantId, legalEntityId, revaluationNumber: { startsWith: prefix } },
+  })
+  return `${prefix}${String(count + 1).padStart(4, '0')}`
+}
+
+export async function nextImpairmentNumber(tenantId: string, legalEntityId: string): Promise<string> {
+  const year = new Date().getUTCFullYear()
+  const prefix = `FAI-${year}-`
+  const count = await prisma.fixedAssetImpairment.count({
+    where: { tenantId, legalEntityId, impairmentNumber: { startsWith: prefix } },
+  })
+  return `${prefix}${String(count + 1).padStart(4, '0')}`
+}
+
+export async function nextMaintenanceNumber(tenantId: string, legalEntityId: string): Promise<string> {
+  const year = new Date().getUTCFullYear()
+  const prefix = `FAM-${year}-`
+  const count = await prisma.fixedAssetMaintenance.count({
+    where: { tenantId, legalEntityId, maintenanceNumber: { startsWith: prefix } },
+  })
+  return `${prefix}${String(count + 1).padStart(4, '0')}`
+}
+
 export function parsePeriodKey(periodKey: string): { periodFrom: Date; periodTo: Date } {
   const [year, month] = periodKey.split('-').map(Number)
   const periodFrom = new Date(Date.UTC(year, month - 1, 1))

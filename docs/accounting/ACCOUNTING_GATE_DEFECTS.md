@@ -15,7 +15,7 @@
 
 | ID | Issue | Owner | Workaround / decision |
 |----|-------|-------|------------------------|
-| R1 | Sales invoice document reverse not implemented | Product | Explicitly out of coded Phase 3D; allocate-first + CN/receipt reverse cover AR correction paths |
+| R1 | Sales invoice document reverse | Product | **Shipped** — `finance.ar.invoice.reverse` + `POST …/invoices/:id/reverse` + Money In UI |
 | R2 | Full parallel `vitest run tests/finance` flakes (write conflicts / unique LE codes) | Eng | Run critical suites serial (`--fileParallelism=false`); serial critical path green |
 
 ## P2 — Accepted

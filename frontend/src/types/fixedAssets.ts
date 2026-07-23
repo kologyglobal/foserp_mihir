@@ -41,9 +41,9 @@ export type MaintenanceStatus = 'Scheduled' | 'In Progress' | 'Completed' | 'Can
 
 export type MaintenanceType = 'Preventive' | 'Breakdown' | 'Calibration' | 'AMC' | 'Inspection'
 
-export type RevaluationStatus = 'Draft' | 'Pending Approval' | 'Approved' | 'Posted' | 'Rejected'
+export type RevaluationStatus = 'Draft' | 'Pending Approval' | 'Approved' | 'Posted' | 'Rejected' | 'Cancelled'
 
-export type ImpairmentStatus = 'Draft' | 'Pending Approval' | 'Recognized' | 'Rejected'
+export type ImpairmentStatus = 'Draft' | 'Pending Approval' | 'Recognized' | 'Rejected' | 'Cancelled'
 
 export type DisposalStatus = 'Draft' | 'Pending Approval' | 'Approved' | 'Completed' | 'Cancelled'
 

@@ -44,7 +44,11 @@ export function mobileGrnCanReceive(): boolean {
 }
 
 export function mobileQcCanInspect(): boolean {
-  return canPermission('quality', 'post')
+  return (
+    canPermission('quality', 'post') ||
+    canPermission('quality', 'edit') ||
+    canPermission('production', 'post')
+  )
 }
 
 export function mobileCanApprove(): boolean {

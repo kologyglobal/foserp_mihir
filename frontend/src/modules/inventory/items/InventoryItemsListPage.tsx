@@ -17,6 +17,7 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { useInventoryPermissions } from '@/utils/permissions/inventory'
 import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
+import { isApiMode } from '@/config/apiConfig'
 
 export function InventoryItemsListPage() {
   const navigate = useNavigate()
@@ -54,6 +55,11 @@ export function InventoryItemsListPage() {
   }, [load])
 
   const onDuplicate = useCallback(async (id: string) => {
+    if (isApiMode()) {
+      navigate(`/masters/items/${id}/edit`)
+      notify.info('Open Masters → Items to create a copy in live mode')
+      return
+    }
     try {
       const d = await duplicateItem(id)
       notify.success('Item duplicated')
@@ -149,7 +155,15 @@ export function InventoryItemsListPage() {
                   {[
                     { label: 'View Item', onClick: () => navigate(`/inventory/items/${item.id}`) },
                     ...(perms.canEditItem
-                      ? [{ label: 'Edit Item', onClick: () => navigate(`/inventory/items/${item.id}/edit`) }]
+                      ? [{
+                          label: 'Edit Item',
+                          onClick: () =>
+                            navigate(
+                              isApiMode()
+                                ? `/masters/items/${item.id}/edit`
+                                : `/inventory/items/${item.id}/edit`,
+                            ),
+                        }]
                       : []),
                     {
                       label: 'View Stock',
@@ -226,7 +240,12 @@ export function InventoryItemsListPage() {
           sticky={false}
           primaryAction={
             perms.canCreateItem
-              ? { id: 'new', label: 'New Item', icon: Plus, onClick: () => navigate('/inventory/items/new') }
+              ? {
+                  id: 'new',
+                  label: 'New Item',
+                  icon: Plus,
+                  onClick: () => navigate(isApiMode() ? '/masters/items/new' : '/inventory/items/new'),
+                }
               : undefined
           }
           secondaryActions={[

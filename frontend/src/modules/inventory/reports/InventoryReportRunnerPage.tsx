@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Download, FileDown, FileSpreadsheet, Printer, RefreshCw, RotateCcw } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
@@ -11,7 +11,7 @@ import {
   exportInventoryData,
   getInventoryPrintPreview,
   getInventoryReportEntry,
-  getInventoryReportFilterOptions,
+  getInventoryReportFilterOptionsAsync,
   isInventoryReportId,
   runInventoryReport,
 } from '@/services/inventory'
@@ -63,7 +63,18 @@ export function InventoryReportRunnerPage() {
   const [filters, setFilters] = useState<InventoryReportFilters>(DEFAULT_FILTERS)
   const [result, setResult] = useState<InventoryReportResult | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('loading')
-  const filterOptions = useMemo(() => getInventoryReportFilterOptions(), [])
+  const [filterOptions, setFilterOptions] = useState<Awaited<ReturnType<typeof getInventoryReportFilterOptionsAsync>>>({
+    warehouses: [],
+    categories: [],
+    plants: [],
+    movementTypes: ['receipt', 'issue', 'transfer', 'adjustment', 'return'],
+    sourceModules: ['purchase', 'production', 'sales', 'quality', 'manual'],
+    statuses: ['draft', 'posted', 'pending', 'quality_hold', 'blocked'],
+  })
+
+  useEffect(() => {
+    void getInventoryReportFilterOptionsAsync().then(setFilterOptions).catch(() => undefined)
+  }, [])
 
   const load = useCallback(async () => {
     if (!reportId) return

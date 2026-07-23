@@ -82,23 +82,33 @@ const STAGE_TONE: Record<StageStatus, DynamicsStatusTone> = {
 const QUALITY_TONE: Record<ProductionQualityStatus, DynamicsStatusTone> = {
   NOT_APPLICABLE: 'neutral',
   PENDING_INTEGRATION: 'pending',
+  PENDING_QC: 'pending',
+  IN_QC: 'live',
+  PASSED: 'success',
+  FAILED: 'critical',
+  HOLD: 'warning',
 }
 
 const QUALITY_LABELS: Record<ProductionQualityStatus, string> = {
-  NOT_APPLICABLE: 'N/A',
+  NOT_APPLICABLE: 'Not required',
   PENDING_INTEGRATION: 'QC pending setup',
+  PENDING_QC: 'Pending QC',
+  IN_QC: 'In QC',
+  PASSED: 'Passed',
+  FAILED: 'Failed',
+  HOLD: 'On hold',
 }
 
 const MATERIAL_CONTROL_TONE: Record<MaterialControlStatus, DynamicsStatusTone> = {
-  NOT_CONNECTED: 'neutral',
+  NOT_CONNECTED: 'warning',
   PENDING_INVENTORY: 'pending',
   ACTIVE: 'success',
 }
 
 const MATERIAL_CONTROL_LABELS: Record<MaterialControlStatus, string> = {
-  NOT_CONNECTED: 'Not connected',
-  PENDING_INVENTORY: 'Pending inventory',
-  ACTIVE: 'Materials active',
+  NOT_CONNECTED: 'Not connected to Inventory',
+  PENDING_INVENTORY: 'Connecting to Inventory…',
+  ACTIVE: 'Connected to Inventory',
 }
 
 const MATERIAL_LINE_TONE: Record<MaterialLineStatus, DynamicsStatusTone> = {

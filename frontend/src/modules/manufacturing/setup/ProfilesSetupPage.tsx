@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Plus, SlidersHorizontal } from 'lucide-react
 import { ErpButton } from '@/components/erp/ErpButton'
 import { Input, Select, Switch } from '@/components/forms/Inputs'
 import { FormField } from '@/components/forms/FormField'
+import { ItemLookupSelect } from '@/components/lookups/ItemLookupSelect'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { AccountDrawerShell, AccountConfirmModal } from '@/components/accounting/coa/AccountDrawerShell'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -28,6 +29,7 @@ import { isApiMode } from '@/config/apiConfig'
 import { useManufacturingSetupPermissions } from '@/utils/permissions/manufacturing'
 import { notify } from '@/store/toastStore'
 import { ManufacturingSetupShell } from './ManufacturingSetupShell'
+import { SetupViewPopup } from './SetupViewPopup'
 
 interface ProfileFormState {
   code: string
@@ -76,6 +78,7 @@ export function ProfilesSetupPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [viewing, setViewing] = useState<Profile | null>(null)
   const [form, setForm] = useState<ProfileFormState>(EMPTY_FORM)
   const [moreOpen, setMoreOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -90,6 +93,14 @@ export function ProfilesSetupPage() {
       return item?.label ?? '—'
     },
     [items],
+  )
+
+  const warehouseLabel = useCallback(
+    (id: string | null) => {
+      if (!id) return '—'
+      return warehouses.find((w) => w.id === id)?.label ?? '—'
+    },
+    [warehouses],
   )
 
   const load = useCallback(async () => {
@@ -220,7 +231,7 @@ export function ProfilesSetupPage() {
                   <tr>
                     <th>Code</th>
                     <th>Name</th>
-                    <th>Product Item</th>
+                    <th>Item</th>
                     <th>Production Type</th>
                     <th>Execution</th>
                     <th>Status</th>
@@ -243,6 +254,9 @@ export function ProfilesSetupPage() {
                       </td>
                       <td>
                         <div className="flex flex-wrap gap-1">
+                          <ErpButton size="sm" variant="outline" onClick={() => setViewing(row)}>
+                            View
+                          </ErpButton>
                           <ErpButton size="sm" variant="outline" onClick={() => void checkReadiness(row)}>
                             Check Readiness
                           </ErpButton>
@@ -266,6 +280,61 @@ export function ProfilesSetupPage() {
           ) : null}
         </>
       )}
+
+      <SetupViewPopup
+        open={Boolean(viewing)}
+        onClose={() => setViewing(null)}
+        title={viewing?.name ?? 'Manufacturing Profile'}
+        subtitle={viewing?.code}
+        widthClassName="max-w-2xl"
+        fields={
+          viewing
+            ? [
+                { label: 'Code', value: viewing.code, mono: true },
+                {
+                  label: 'Status',
+                  value: (
+                    <DynamicsStatusChip
+                      label={viewing.isActive ? 'Active' : 'Inactive'}
+                      tone={viewing.isActive ? 'success' : 'neutral'}
+                    />
+                  ),
+                },
+                { label: 'Name', value: viewing.name, fullWidth: true },
+                { label: 'Item', value: itemLabel(viewing.productItemId), fullWidth: true },
+                { label: 'Production Type', value: viewing.productionType.replace(/_/g, ' ') },
+                { label: 'Execution Mode', value: viewing.executionMode },
+                { label: 'Material Consumption', value: viewing.materialConsumptionMethod },
+                { label: 'WIP Tracking', value: viewing.wipTrackingMethod.replace(/_/g, ' ') },
+                { label: 'Output Tracking', value: viewing.outputTrackingMethod },
+                { label: 'Plant', value: viewing.plantCode ?? '—' },
+                { label: 'Production WH', value: warehouseLabel(viewing.productionWarehouseId) },
+                { label: 'WIP WH', value: warehouseLabel(viewing.wipWarehouseId) },
+                { label: 'FG WH', value: warehouseLabel(viewing.finishedGoodsWarehouseId) },
+                { label: 'Scrap WH', value: warehouseLabel(viewing.scrapWarehouseId) },
+                {
+                  label: 'Serial / Batch',
+                  value: `${viewing.serialTrackingRequired ? 'Serial' : '—'} / ${viewing.batchTrackingRequired ? 'Batch' : '—'}`,
+                },
+                { label: 'Updated', value: viewing.updatedAt.slice(0, 10) },
+              ]
+            : []
+        }
+        footerExtra={
+          viewing ? (
+            <ErpButton
+              variant="outline"
+              onClick={() => {
+                const row = viewing
+                setViewing(null)
+                void checkReadiness(row)
+              }}
+            >
+              Check Readiness
+            </ErpButton>
+          ) : null
+        }
+      />
 
       <AccountDrawerShell
         open={drawerOpen}
@@ -294,23 +363,12 @@ export function ProfilesSetupPage() {
           <FormField label="Name" required>
             <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
           </FormField>
-          <FormField label="Product Item" required hint={items.length === 0 ? 'Paste the item UUID (item lookup unavailable).' : undefined}>
-            {items.length > 0 ? (
-              <Select value={form.productItemId} onChange={(e) => setForm((f) => ({ ...f, productItemId: e.target.value }))}>
-                <option value="">Select item…</option>
-                {items.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.label}
-                  </option>
-                ))}
-              </Select>
-            ) : (
-              <Input
-                value={form.productItemId}
-                onChange={(e) => setForm((f) => ({ ...f, productItemId: e.target.value.trim() }))}
-                placeholder="Item UUID"
-              />
-            )}
+          <FormField label="Item" required hint="Search Item Master by code or name.">
+            <ItemLookupSelect
+              value={form.productItemId}
+              placeholder="Search item code or name…"
+              onChange={(sel) => setForm((f) => ({ ...f, productItemId: sel?.itemId ?? '' }))}
+            />
           </FormField>
           <FormField label="Production Type">
             <Select

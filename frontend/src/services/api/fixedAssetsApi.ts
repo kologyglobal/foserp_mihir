@@ -472,3 +472,119 @@ export async function completeFixedAssetTransfer(
     body: JSON.stringify(body ?? {}),
   })
 }
+
+// ─── Phase 4 ─────────────────────────────────────────────────────────────────
+
+export interface FixedAssetRevaluationDto {
+  id: string
+  legalEntityId: string
+  assetId: string
+  assetNumber: string
+  assetName: string
+  revaluationNumber: string
+  revaluationDate: string
+  previousNbv: string
+  revaluedAmount: string
+  surplusAmount: string
+  status: string
+  reason: string
+  voucherId: string | null
+  postedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface FixedAssetImpairmentDto {
+  id: string
+  legalEntityId: string
+  assetId: string
+  assetNumber: string
+  assetName: string
+  impairmentNumber: string
+  impairmentDate: string
+  carryingAmount: string
+  recoverableAmount: string
+  impairmentLoss: string
+  status: string
+  reason: string
+  voucherId: string | null
+  postedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface FixedAssetMaintenanceDto {
+  id: string
+  legalEntityId: string
+  assetId: string
+  assetNumber: string
+  assetName: string
+  maintenanceNumber: string
+  maintenanceType: string
+  status: string
+  scheduledDate: string
+  completedDate: string | null
+  vendorName: string | null
+  cost: string
+  downtimeHours: number | null
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface FixedAssetReportSummaryDto {
+  legalEntityId: string
+  assetCount: number
+  activeCount: number
+  disposedCount: number
+  totalCost: string
+  totalAccumDep: string
+  totalNbv: string
+  totalRevaluationSurplus: string
+  totalAccumulatedImpairment: string
+  postedRevaluations: number
+  recognizedImpairments: number
+  openMaintenance: number
+}
+
+export async function fetchFixedAssetRevaluations(legalEntityId: string) {
+  return apiRequest<FixedAssetRevaluationDto[]>(
+    `${tenantPath(`${BASE}/revaluations`)}${buildQuery({ legalEntityId, page: 1, pageSize: 200 })}`,
+  )
+}
+
+export async function fetchFixedAssetImpairments(legalEntityId: string) {
+  return apiRequest<FixedAssetImpairmentDto[]>(
+    `${tenantPath(`${BASE}/impairments`)}${buildQuery({ legalEntityId, page: 1, pageSize: 200 })}`,
+  )
+}
+
+export async function fetchFixedAssetMaintenance(legalEntityId: string) {
+  return apiRequest<FixedAssetMaintenanceDto[]>(
+    `${tenantPath(`${BASE}/maintenance`)}${buildQuery({ legalEntityId, page: 1, pageSize: 200 })}`,
+  )
+}
+
+export async function fetchFixedAssetReportSummary(legalEntityId: string) {
+  return apiRequest<FixedAssetReportSummaryDto>(
+    `${tenantPath(`${BASE}/reports/summary`)}${buildQuery({ legalEntityId })}`,
+  )
+}
+
+export async function fetchFixedAssetReportRegister(legalEntityId: string) {
+  return apiRequest<Array<Record<string, string | number | null>>>(
+    `${tenantPath(`${BASE}/reports/register`)}${buildQuery({ legalEntityId })}`,
+  )
+}
+
+export async function fetchFixedAssetReportNbvByCategory(legalEntityId: string) {
+  return apiRequest<Array<Record<string, string | number | null>>>(
+    `${tenantPath(`${BASE}/reports/nbv-by-category`)}${buildQuery({ legalEntityId })}`,
+  )
+}
+
+export async function fetchFixedAssetReportDisposals(legalEntityId: string) {
+  return apiRequest<Array<Record<string, string | number | null>>>(
+    `${tenantPath(`${BASE}/reports/disposals`)}${buildQuery({ legalEntityId })}`,
+  )
+}

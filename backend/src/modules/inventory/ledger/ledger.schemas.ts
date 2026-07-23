@@ -11,6 +11,8 @@ const referenceTypeValues = [
   'ISSUE_TO_WO',
   'RETURN_FROM_WO',
   'FG_RECEIPT',
+  'SA_RECEIPT',
+  'FG_DISPATCH',
 ] as const
 
 export const listLedgerQuerySchema = paginationSchema.extend({

@@ -3,7 +3,7 @@
  * Demo mode keeps legacy DispatchWorkspace / plan pages.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ClipboardList, PackageCheck, RefreshCw, Truck } from 'lucide-react'
 import { isApiMode } from '@/config/apiConfig'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
@@ -147,6 +147,8 @@ const KPI_CARDS: Array<{
 
 export function DispatchWorkbenchPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const focusSalesOrderId = searchParams.get('salesOrderId')?.trim() || undefined
   const [mainTab, setMainTab] = useState<MainTab>('requirements')
   const [reqTab, setReqTab] = useState<RequirementTab>('ready')
   const [summary, setSummary] = useState<DispatchWorkbenchSummary>(EMPTY)
@@ -181,7 +183,12 @@ export function DispatchWorkbenchPage() {
         setPickedKpi((await listWorkbenchPicked()).length)
 
         if (activeMain === 'requirements') {
-          const list = await listDispatchRequirements({ tab: activeReq, limit: 100, refresh })
+          const list = await listDispatchRequirements({
+            tab: activeReq,
+            limit: 100,
+            refresh,
+            salesOrderId: focusSalesOrderId,
+          })
           setReqRows(list.items)
           setSelected(new Set())
         } else if (activeMain === 'reservations') {
@@ -221,19 +228,29 @@ export function DispatchWorkbenchPage() {
         setLoading(false)
       }
     },
-    [],
+    [focusSalesOrderId],
   )
 
   useEffect(() => {
     void load(mainTab, reqTab)
   }, [mainTab, reqTab, load])
 
-  const selectedRows = useMemo(() => reqRows.filter((r) => selected.has(r.id)), [reqRows, selected])
+  const visibleReqRows = useMemo(() => {
+    if (!focusSalesOrderId) return reqRows
+    return reqRows.filter((r) => r.salesOrderId === focusSalesOrderId)
+  }, [reqRows, focusSalesOrderId])
+
+  const selectedRows = useMemo(
+    () => visibleReqRows.filter((r) => selected.has(r.id)),
+    [visibleReqRows, selected],
+  )
 
   async function handleSync() {
     setBusy(true)
     try {
-      await synchroniseDispatchRequirements()
+      await synchroniseDispatchRequirements(
+        focusSalesOrderId ? { salesOrderId: focusSalesOrderId } : undefined,
+      )
       notify.success('Requirements synchronised')
       await load(mainTab, reqTab, true)
     } catch (err) {
@@ -335,6 +352,21 @@ export function DispatchWorkbenchPage() {
         </CommandBar>
       }
     >
+      {focusSalesOrderId ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2 text-[12px] text-sky-950">
+          <p>
+            <span className="font-semibold">Guided focus</span> — showing requirements for sales order{' '}
+            <TableLink to={`/crm/sales-orders/${focusSalesOrderId}`} className="font-semibold">
+              this SO
+            </TableLink>
+            . Sync → select ready lines → Create draft → reserve / pick / pack / challan.
+          </p>
+          <Button size="sm" variant="secondary" onClick={() => navigate('/dispatch/workbench')}>
+            Clear focus
+          </Button>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
         {KPI_CARDS.map((kpi) => (
           <div
@@ -397,7 +429,7 @@ export function DispatchWorkbenchPage() {
         <LoadingState variant="card" />
       ) : mainTab === 'requirements' ? (
         <DataGrid
-          data={reqRows}
+          data={visibleReqRows}
           compact
           emptyMessage="No dispatch requirements in this queue."
           columns={[

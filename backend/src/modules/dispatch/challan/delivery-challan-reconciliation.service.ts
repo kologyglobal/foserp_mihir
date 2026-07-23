@@ -134,7 +134,11 @@ export async function reconcileDispatchForChallan(tenantId: string, dispatchId: 
   }
 }
 
-export async function assertChallanAllowsConfirm(tenantId: string, dispatchId: string): Promise<void> {
+export async function assertChallanAllowsConfirm(
+  tenantId: string,
+  dispatchId: string,
+  options?: { requireIssuedChallan?: boolean },
+): Promise<void> {
   const challans = await prisma.deliveryChallan.findMany({
     where: {
       tenantId,
@@ -143,7 +147,14 @@ export async function assertChallanAllowsConfirm(tenantId: string, dispatchId: s
       status: { not: 'CANCELLED' },
     },
   })
-  if (!challans.length) return
+  if (!challans.length) {
+    if (options?.requireIssuedChallan) {
+      throw new ConflictError(
+        'Outbound confirm blocked: an ISSUED Delivery Challan is required before confirm (Phase 7C5)',
+      )
+    }
+    return
+  }
 
   const active = challans.filter((c) => c.status !== 'SUPERSEDED')
   const issued = active.filter((c) => c.status === 'ISSUED')

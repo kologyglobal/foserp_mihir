@@ -14239,12 +14239,21 @@ a.crm-companies-table__name:hover {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  min-height: 36px;
-  padding: 0 0.65rem;
+  min-height: 2.25rem;
+  padding: 0 0.7rem;
   border: 1px solid var(--erp-border);
-  border-radius: var(--erp-radius-md);
+  border-radius: 0.5rem;
   background: var(--erp-surface);
   cursor: text;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.erp-smart-select__anchor:hover:not(.erp-smart-select__anchor--disabled) {
+  border-color: var(--erp-border-strong, #cbd5e1);
+  background: color-mix(in srgb, var(--erp-surface) 92%, var(--erp-surface-alt, #f8fafc));
 }
 
 .erp-smart-select__anchor--disabled {
@@ -14254,12 +14263,16 @@ a.crm-companies-table__name:hover {
 
 .erp-smart-select__anchor--open {
   border-color: var(--erp-primary);
-  box-shadow: 0 0 0 2px rgb(var(--erp-primary-rgb, 0 78 140) / 0.12);
+  background: var(--erp-surface);
+  box-shadow:
+    0 0 0 3px rgb(var(--erp-primary-rgb, 0 78 140) / 0.12),
+    0 1px 2px rgb(15 23 42 / 0.04);
 }
 
 .erp-smart-select--compact .erp-smart-select__anchor {
   min-height: 32px;
   padding: 0 0.5rem;
+  border-radius: var(--erp-radius-md);
 }
 
 .erp-smart-select--compact .erp-smart-select__input {
@@ -14274,12 +14287,13 @@ a.crm-companies-table__name:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.15rem;
+  padding: 0.2rem;
   border: 0;
-  border-radius: var(--erp-radius-sm);
+  border-radius: 999px;
   background: transparent;
   color: var(--erp-muted);
   cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
 }
 
 .erp-smart-select__clear:hover {
@@ -14299,6 +14313,7 @@ a.crm-companies-table__name:hover {
 .erp-smart-select__icon {
   color: var(--erp-muted);
   flex-shrink: 0;
+  transition: color 0.15s ease, opacity 0.15s ease;
 }
 
 /* Form dropdowns — hide search icon until open (Dynamics-style) */
@@ -14350,29 +14365,56 @@ a.crm-companies-table__name:hover {
 
 .erp-smart-select__chevron {
   color: var(--erp-muted);
-  transition: transform 0.15s ease;
+  flex-shrink: 0;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), color 0.15s ease;
+}
+
+.erp-smart-select__anchor:hover .erp-smart-select__chevron,
+.erp-smart-select__anchor--open .erp-smart-select__chevron {
+  color: var(--erp-text);
 }
 
 .erp-smart-select__chevron--open {
   transform: rotate(180deg);
 }
 
+@keyframes erp-smart-select-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .erp-smart-select__dropdown {
-  max-height: min(280px, calc(100dvh - 16px));
+  max-height: min(420px, calc(100dvh - 24px));
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  border: 1px solid var(--erp-border);
-  border-radius: var(--erp-radius-md);
+  border: 1px solid color-mix(in srgb, var(--erp-border) 80%, #94a3b8);
+  border-radius: 0.75rem;
   background: var(--erp-surface);
+  box-shadow:
+    0 12px 32px rgb(15 23 42 / 0.12),
+    0 2px 8px rgb(15 23 42 / 0.06);
+  animation: erp-smart-select-in 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: top center;
+}
+
+.erp-smart-select--compact .erp-smart-select__dropdown {
+  border-radius: var(--erp-radius-md);
+  animation: none;
   box-shadow: var(--erp-shadow-lg);
 }
 
 .erp-smart-select__list {
   list-style: none;
   margin: 0;
-  padding: 0.25rem;
+  padding: 0.35rem;
 }
 
 .erp-smart-select__option {
@@ -14381,12 +14423,13 @@ a.crm-companies-table__name:hover {
   align-items: flex-start;
   gap: 0.15rem;
   width: 100%;
-  padding: 0.5rem 0.65rem;
+  padding: 0.55rem 0.7rem;
   border: 0;
-  border-radius: var(--erp-radius-sm);
+  border-radius: 0.5rem;
   background: transparent;
   text-align: left;
   cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease, transform 0.14s ease;
 }
 
 .erp-smart-select__option:hover,
@@ -14395,13 +14438,17 @@ a.crm-companies-table__name:hover {
   background: var(--erp-primary-soft);
 }
 
+.erp-smart-select__option--highlight:not(.erp-smart-select__option--selected) {
+  transform: translateX(1px);
+}
+
 .erp-smart-select__option--selected {
   box-shadow: inset 2px 0 0 var(--erp-primary);
 }
 
 .erp-smart-select__hint {
   margin: 0;
-  padding: 0.4rem 0.65rem 0.25rem;
+  padding: 0.45rem 0.75rem 0.35rem;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -14412,9 +14459,9 @@ a.crm-companies-table__name:hover {
 
 .erp-smart-select__option-label {
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
   color: var(--erp-text);
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 .erp-smart-select__option-meta {
@@ -14431,10 +14478,24 @@ a.crm-companies-table__name:hover {
 
 .erp-smart-select__option-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
   width: 100%;
+}
+
+.erp-smart-select__option-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.erp-smart-select__option-check {
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--erp-primary);
+  flex-shrink: 0;
 }
 
 .erp-smart-select__option--rich .erp-smart-select__option-label {
@@ -14474,7 +14535,7 @@ a.crm-companies-table__name:hover {
 }
 
 .erp-smart-select__empty {
-  padding: 0.75rem;
+  padding: 0.85rem 0.75rem;
   font-size: 12px;
   color: var(--erp-muted);
 }

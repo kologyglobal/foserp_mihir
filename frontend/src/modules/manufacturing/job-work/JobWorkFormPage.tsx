@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Save } from 'lucide-react'
-import { ErpCardSection } from '@/components/erp/card-form'
+import { Save, Truck } from 'lucide-react'
+import { ErpStatusChip } from '@/components/erp/ErpStatusChip'
 import { FormField } from '@/components/forms/FormField'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
+import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { isApiMode } from '@/config/apiConfig'
 import { ProductionPageHeader } from '../ui'
@@ -30,7 +31,7 @@ const PROCESSES = [
   'Fabrication',
   'Heat Treatment',
   'Other',
-]
+] as const
 
 const VENDORS = [
   'ABC Welding Works',
@@ -40,6 +41,15 @@ const VENDORS = [
 ]
 
 type ApiOption = { id: string; label: string; code?: string; name?: string }
+
+function formatMoney(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '—'
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 2,
+  }).format(value)
+}
 
 export function JobWorkFormPage() {
   const { jobWorkId } = useParams()
@@ -164,6 +174,8 @@ export function JobWorkFormPage() {
     setQuantity((prev) => (prev > 1 ? prev : Math.max(1, Number(selectedApiWo.plannedQuantity) || 1)))
   }, [isEdit, apiMode, selectedApiWo])
 
+  const expectedCost = useMemo(() => (Number(rate) || 0) * (Number(quantity) || 0), [rate, quantity])
+
   const save = async () => {
     if (!perms.canCreateJobWork && !isEdit) {
       notify.error('No permission to create job work')
@@ -286,14 +298,18 @@ export function JobWorkFormPage() {
     )
   }
 
+  const linkedWoLabel = apiMode
+    ? selectedApiWo
+      ? `${selectedApiWo.orderNumber} · ${selectedApiWo.status}`
+      : null
+    : selectedWo
+      ? `${selectedWo.woNumber} — ${selectedWo.finishedItemCode}`
+      : null
+
   return (
     <ProductionPageHeader
       title={isEdit ? 'Edit Job Work' : 'Create Job Work'}
-      description={
-        apiMode
-          ? 'Vendor → process → material → warehouses → expected return.'
-          : 'Select WO → Vendor → Material → Expected return.'
-      }
+      description="Create a subcontract job work order for vendor processing."
       breadcrumbs={[
         { label: 'Manufacturing & Production', to: '/manufacturing' },
         { label: 'Job Work', to: '/manufacturing/job-work' },
@@ -310,172 +326,229 @@ export function JobWorkFormPage() {
       }}
       secondaryActions={[{ id: 'cancel', label: 'Cancel', onClick: () => navigate('/manufacturing/job-work') }]}
     >
-      <div className="mx-auto max-w-3xl space-y-4">
-        <p className="rounded-md border border-erp-border bg-erp-surface-alt/50 px-3 py-2 text-[12px] text-erp-muted">
-          {apiMode
-            ? 'Draft posts to the manufacturing service. Dispatch/receive use inventory SUBCON when items are stockable.'
-            : 'Rate is a planning estimate only — no vendor accounting posts from this screen.'}
-        </p>
+      <div className="overflow-hidden rounded-xl border border-erp-border bg-erp-surface shadow-sm">
+        {/* Form chrome */}
+        <div className="flex flex-wrap items-center gap-3 border-b border-erp-border px-5 py-3.5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-erp-primary-soft text-erp-primary ring-1 ring-erp-primary/10">
+            <Truck className="h-5 w-5" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-[15px] font-semibold tracking-tight text-erp-text">Job Work Order</h2>
+              <ErpStatusChip label="DRAFT" tone="pending" />
+            </div>
+            <p className="mt-0.5 truncate text-[12px] text-erp-muted">
+              {linkedWoLabel ? `Linked to ${linkedWoLabel}` : 'Standalone subcontract — link a work order if needed'}
+            </p>
+          </div>
+          <div className="rounded-lg border border-erp-border bg-erp-surface-alt/60 px-3.5 py-2 text-right">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-erp-muted">Expected cost</p>
+            <p className="text-[15px] font-bold tabular-nums text-erp-text">{formatMoney(expectedCost)}</p>
+          </div>
+        </div>
 
-        <ErpCardSection title="Job work details">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <FormField label="Work Order" className="sm:col-span-2" required={!apiMode}>
-              <Select
-                value={workOrderId}
-                onChange={(e) => setWorkOrderId(e.target.value)}
-                disabled={isEdit}
-              >
-                <option value="">{apiMode ? 'Optional — link production order' : 'Select work order'}</option>
-                {apiMode
-                  ? apiWorkOrders.map((wo) => (
-                      <option key={wo.id} value={wo.id}>
-                        {wo.orderNumber} ({wo.status})
-                      </option>
-                    ))
-                  : workOrders.map((wo) => (
-                      <option key={wo.id} value={wo.id}>
-                        {wo.woNumber} — {wo.finishedItemCode} ({wo.status})
-                      </option>
-                    ))}
-              </Select>
-            </FormField>
-
-            {!apiMode && selectedWo ? (
-              <p className="sm:col-span-2 rounded-md border border-erp-border bg-slate-50 px-3 py-2 text-[12px] text-erp-muted">
-                Finished item: <strong className="text-erp-text">{selectedWo.finishedItemCode} — {selectedWo.finishedItemName}</strong>
-                {' · '}Planned {selectedWo.plannedQty} {selectedWo.uom}
-              </p>
-            ) : null}
-
-            {apiMode ? (
-              <>
-                <FormField label="Vendor" required>
-                  <Select value={vendorId} onChange={(e) => setVendorId(e.target.value)} disabled={isEdit}>
-                    <option value="">Select vendor</option>
-                    {vendors.map((v) => (
-                      <option key={v.id} value={v.id}>{v.label}</option>
-                    ))}
-                  </Select>
-                </FormField>
-                <FormField label="Output item" required>
-                  <Select value={outputItemId} onChange={(e) => setOutputItemId(e.target.value)} disabled={isEdit}>
-                    <option value="">Select output item</option>
-                    {items.map((i) => (
-                      <option key={i.id} value={i.id}>{i.label}</option>
-                    ))}
-                  </Select>
-                </FormField>
-                <FormField label="Material item" required className="sm:col-span-2">
-                  <Select value={materialItemId} onChange={(e) => setMaterialItemId(e.target.value)} disabled={isEdit}>
-                    <option value="">Select material to send</option>
-                    {items.map((i) => (
-                      <option key={i.id} value={i.id}>{i.label}</option>
-                    ))}
-                  </Select>
-                </FormField>
-                <FormField label="Material warehouse" required>
-                  <Select value={materialWarehouseId} onChange={(e) => setMaterialWarehouseId(e.target.value)} disabled={isEdit}>
-                    <option value="">Select warehouse</option>
-                    {warehouses.map((w) => (
-                      <option key={w.id} value={w.id}>{w.label}</option>
-                    ))}
-                  </Select>
-                </FormField>
-                <FormField label="Receipt warehouse" required>
-                  <Select value={receiptWarehouseId} onChange={(e) => setReceiptWarehouseId(e.target.value)} disabled={isEdit}>
-                    <option value="">Select warehouse</option>
-                    {warehouses.map((w) => (
-                      <option key={w.id} value={w.id}>{w.label}</option>
-                    ))}
-                  </Select>
-                </FormField>
-                <FormField label="Quality required" className="sm:col-span-2">
-                  <label className="flex items-center gap-2 text-[13px] text-erp-text">
-                    <input
-                      type="checkbox"
-                      checked={qualityRequired}
-                      onChange={(e) => setQualityRequired(e.target.checked)}
-                    />
-                    Create SUBCONTRACT_RETURN inspection on receive
-                  </label>
-                </FormField>
-              </>
-            ) : (
-              <FormField label="Vendor" required>
-                <Input
-                  list="jw-vendor-list"
-                  value={vendorName}
-                  onChange={(e) => setVendorName(e.target.value)}
-                  placeholder="Select or type vendor"
-                />
-                <datalist id="jw-vendor-list">
-                  {VENDORS.map((v) => (
-                    <option key={v} value={v} />
+        <form
+          className="grid grid-cols-1 gap-x-5 gap-y-4 p-5 md:grid-cols-2 xl:grid-cols-3"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void save()
+          }}
+        >
+          <FormField label="Work Order" required={!apiMode} hint={apiMode ? 'Optional link to production order' : undefined}>
+            <Select value={workOrderId} onChange={(e) => setWorkOrderId(e.target.value)} disabled={isEdit}>
+              <option value="">{apiMode ? `${SELECT_PLACEHOLDER} (optional)` : SELECT_PLACEHOLDER}</option>
+              {apiMode
+                ? apiWorkOrders.map((wo) => (
+                    <option key={wo.id} value={wo.id}>
+                      {wo.orderNumber} · {wo.status}
+                    </option>
+                  ))
+                : workOrders.map((wo) => (
+                    <option key={wo.id} value={wo.id}>
+                      {wo.woNumber} — {wo.finishedItemCode} ({wo.status})
+                    </option>
                   ))}
-                </datalist>
-              </FormField>
-            )}
+            </Select>
+          </FormField>
 
-            <FormField label="Process / Operation" required>
-              <Select value={process} onChange={(e) => setProcess(e.target.value)}>
-                <option value="">Select process</option>
-                {PROCESSES.map((p) => (
-                  <option key={p} value={p}>{p}</option>
+          {apiMode ? (
+            <FormField label="Vendor" required>
+              <Select value={vendorId} onChange={(e) => setVendorId(e.target.value)} disabled={isEdit}>
+                <option value="">{SELECT_PLACEHOLDER}</option>
+                {vendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
+                  </option>
                 ))}
               </Select>
             </FormField>
+          ) : (
+            <FormField label="Vendor" required>
+              <Input
+                list="jw-vendor-list"
+                value={vendorName}
+                onChange={(e) => setVendorName(e.target.value)}
+                placeholder="Type or pick a vendor"
+              />
+              <datalist id="jw-vendor-list">
+                {VENDORS.map((v) => (
+                  <option key={v} value={v} />
+                ))}
+              </datalist>
+            </FormField>
+          )}
 
-            <FormField label="Material to Send" required={!apiMode} className="sm:col-span-2">
+          <FormField label="Process / Operation" required>
+            <Select value={process} onChange={(e) => setProcess(e.target.value)}>
+              <option value="">{SELECT_PLACEHOLDER}</option>
+              {PROCESSES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+
+          {apiMode ? (
+            <>
+              <FormField label="Output item" required>
+                <Select value={outputItemId} onChange={(e) => setOutputItemId(e.target.value)} disabled={isEdit}>
+                  <option value="">{SELECT_PLACEHOLDER}</option>
+                  {items.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.label}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+
+              <FormField label="Material item" required>
+                <Select value={materialItemId} onChange={(e) => setMaterialItemId(e.target.value)} disabled={isEdit}>
+                  <option value="">{SELECT_PLACEHOLDER}</option>
+                  {items.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.label}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+
+              <FormField label="Material note" hint="Optional for stores / gate">
+                <Input
+                  value={materialToSend}
+                  onChange={(e) => setMaterialToSend(e.target.value)}
+                  placeholder="e.g. Cut pieces with drawing Rev B"
+                />
+              </FormField>
+
+              <FormField label="Material warehouse" required>
+                <Select
+                  value={materialWarehouseId}
+                  onChange={(e) => setMaterialWarehouseId(e.target.value)}
+                  disabled={isEdit}
+                >
+                  <option value="">{SELECT_PLACEHOLDER}</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.label}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+
+              <FormField label="Receipt warehouse" required>
+                <Select
+                  value={receiptWarehouseId}
+                  onChange={(e) => setReceiptWarehouseId(e.target.value)}
+                  disabled={isEdit}
+                >
+                  <option value="">{SELECT_PLACEHOLDER}</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.label}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+
+              <FormField label="Quality on receive">
+                <label className="flex h-9 cursor-pointer items-center gap-2.5 rounded-md border border-erp-border bg-erp-surface-alt/40 px-3 text-[13px] text-erp-text transition-colors hover:border-erp-primary/40 hover:bg-erp-primary-soft/20">
+                  <input
+                    type="checkbox"
+                    className="size-3.5 accent-[var(--erp-primary)]"
+                    checked={qualityRequired}
+                    onChange={(e) => setQualityRequired(e.target.checked)}
+                  />
+                  <span className="leading-tight">QC inspection on receive</span>
+                </label>
+              </FormField>
+            </>
+          ) : (
+            <FormField label="Material to Send" required className="md:col-span-2 xl:col-span-2">
               <Input
                 value={materialToSend}
                 onChange={(e) => setMaterialToSend(e.target.value)}
                 placeholder="e.g. MS Plate / Chassis sub-assembly"
               />
             </FormField>
+          )}
 
-            <FormField label="Quantity" required>
-              <Input
-                type="number"
-                min={0.001}
-                step="any"
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-              />
-            </FormField>
+          <FormField label="Quantity" required>
+            <Input
+              type="number"
+              min={0.001}
+              step="any"
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+            />
+          </FormField>
 
-            <FormField label="Expected Return Date" required>
-              <Input
-                type="date"
-                value={expectedReturnDate}
-                onChange={(e) => setExpectedReturnDate(e.target.value)}
-              />
-            </FormField>
+          <FormField label="Expected Return Date" required>
+            <Input
+              type="date"
+              value={expectedReturnDate}
+              onChange={(e) => setExpectedReturnDate(e.target.value)}
+            />
+          </FormField>
 
-            <FormField label="Rate (placeholder)" hint="Planning estimate only — not posted to accounts">
-              <Input
-                type="number"
-                min={0}
-                step="any"
-                value={rate}
-                onChange={(e) => setRate(Number(e.target.value))}
-                placeholder="0"
-              />
-            </FormField>
+          <FormField label="Rate (per piece)" hint="Planning estimate — not posted to accounts">
+            <Input
+              type="number"
+              min={0}
+              step="any"
+              value={rate}
+              onChange={(e) => setRate(Number(e.target.value))}
+              placeholder="0"
+            />
+          </FormField>
 
-            <FormField label="Remarks" className="sm:col-span-2">
-              <Textarea
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                rows={3}
-                placeholder="Instructions for vendor / stores"
-              />
-            </FormField>
-          </div>
-        </ErpCardSection>
+          <FormField label="Remarks" className="md:col-span-2 xl:col-span-3">
+            <Textarea
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              rows={3}
+              placeholder="Instructions for vendor, stores, or quality…"
+            />
+          </FormField>
 
-        <p className="text-[12px] text-erp-muted">
-          Flow after save: Send Material → Receive Qty → Reconcile → Link Vendor Invoice (placeholder) → Close
-        </p>
+          {!apiMode && selectedWo ? (
+            <div className="md:col-span-2 xl:col-span-3 flex items-center gap-2 rounded-lg border border-erp-border bg-erp-surface-alt/50 px-3.5 py-2.5 text-[12.5px] text-erp-muted">
+              <span className="font-medium text-erp-text">Finished item</span>
+              <span className="text-erp-border">·</span>
+              <span>
+                <strong className="text-erp-text">
+                  {selectedWo.finishedItemCode} — {selectedWo.finishedItemName}
+                </strong>
+                {' · '}Planned {selectedWo.plannedQty} {selectedWo.uom}
+              </span>
+            </div>
+          ) : null}
+        </form>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-erp-border bg-erp-surface-alt/30 px-5 py-2.5 text-[11.5px] text-erp-muted">
+          <span>Qty × rate = {formatMoney(expectedCost)} (planning only)</span>
+          <span>Press Save Draft in the header to create the order</span>
+        </div>
       </div>
     </ProductionPageHeader>
   )

@@ -15,6 +15,8 @@ const EXTRACT_LIVE_PATHS = new Set([
   '/accounting/tax-compliance/gst',
   '/accounting/tax-compliance/gst/outward-supplies',
   '/accounting/tax-compliance/gst/inward-supplies',
+  '/accounting/tax-compliance/gst/e-invoices',
+  '/accounting/tax-compliance/gst/e-way-bills',
 ])
 
 const FILING_DEMO_PATHS = [

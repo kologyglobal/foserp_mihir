@@ -1,6 +1,6 @@
 # Fixed Assets — Status
 
-Last verified: **2026-07-21** (Phase 1–2 + **Phase 3 transfers & partial dispose**).
+Last verified: **2026-07-22** (Phase 1–3 + **Phase 4 reval / impair / maintenance / reports**).
 
 ## Phase 1 — shipped
 
@@ -46,6 +46,20 @@ Last verified: **2026-07-21** (Phase 1–2 + **Phase 3 transfers & partial dispo
 | Partial posting | ✅ | `FIXED_ASSET_PARTIAL_DISPOSE:{disposalId}:V1` / event type `FIXED_ASSET_PARTIAL_DISPOSED` |
 | FE | ✅ | Transfers dual-mode create→complete; Disposal optional “Dispose cost” for partial |
 
+## Phase 4 — revaluation, impairment, maintenance, reports ✅ (2026-07-22)
+
+| Layer | Status | Notes |
+|-------|--------|-------|
+| DB | ✅ | Migration `20260722120000_finance_fixed_assets_phase4_reval_impair_maint` — reval/impair/maint tables; `revaluationSurplus` / `accumulatedImpairment` on assets; mappings `ASSET_REVALUATION_SURPLUS` / `ASSET_IMPAIRMENT_LOSS` |
+| Revaluation API | ✅ | `GET/POST …/revaluations`, `POST …/:id/post`, `POST …/:id/cancel` — perm `finance.fa.revalue` |
+| Revaluation GL | ✅ | Up: Dr asset / Cr surplus; Down: consume surplus then Dr impairment loss / Cr asset |
+| Impairment API | ✅ | `GET/POST …/impairments`, `POST …/:id/recognize`, `POST …/:id/cancel` — perm `finance.fa.impair` |
+| Impairment GL | ✅ | Dr `ASSET_IMPAIRMENT_LOSS` / Cr asset; updates cost/NBV/accum impairment |
+| Maintenance API | ✅ | CRUD + complete/cancel — perm `finance.fa.maintain`; **no GL** |
+| Reports API | ✅ | `GET …/reports/summary\|register\|nbv-by-category\|disposals` |
+| FE dual-mode | ✅ | Lists + report preview live in API mode; create/post UI still list-first (API clients available) |
+| Tests | ✅ | `finance-fixed-assets-phase4.test.ts` |
+
 ## Live vs demo FE
 
 | Surface | API mode | Demo mode |
@@ -54,28 +68,37 @@ Last verified: **2026-07-21** (Phase 1–2 + **Phase 3 transfers & partial dispo
 | Categories / register / capitalize / depreciation | Live | Seed |
 | **Simple + partial dispose** | Live GL post | Draft → complete (no GL) |
 | **Transfers** | Live create/complete (no GL) | Seed create/complete (no GL) |
-| Acquisition workspace, maintenance, revaluation, impairment, PV, ledger, reports, setup | Still demo | Seed |
+| **Revaluation / impairment / maintenance lists** | Live | Seed |
+| **Reports (register / category NBV / disposals / summary)** | Live preview | Seed catalog |
+| Acquisition workspace, PV, ledger, setup | Still demo | Seed |
 
-## Out of scope (Phase 4+)
+## Out of scope (later)
 
 - Intercompany / cross-LE asset transfers
 - Component / multi-asset disposal packs
-- Revaluation, impairment, maintenance, physical verification (API)
+- Physical verification (API)
 - WDV / units-of-production methods
 - CWIP multi-source capitalization documents
 - Period-close FA gate
-- Disposal reversal
+- Disposal / revaluation / impairment reversal
+- Full create/post wizards on reval & impair list pages (API exists; UI is read + refresh)
 
 ## Ops
 
 ```bash
 cd backend
 npx tsx scripts/prisma-cli.ts migrate deploy
-npx vitest run tests/finance/finance-fixed-assets.test.ts --no-file-parallelism
+npx vitest run tests/finance/finance-fixed-assets-phase4.test.ts --no-file-parallelism
 ```
 
 ```bash
 cd frontend && npm run test:fixed-assets
 ```
 
-Configure Finance › Default Mappings: **Asset Disposal Gain** + **Asset Disposal Loss**. Re-login so `finance.fa.*` (including **transfer**) are on roles.
+Configure Finance › Default Mappings: **Asset Disposal Gain**, **Asset Disposal Loss**, **Asset Revaluation Surplus**, **Asset Impairment Loss**.
+
+```bash
+cd backend && npm run db:sync-permissions
+```
+
+Re-login so `finance.fa.*` (including **revalue**, **impair**, **maintain**) are on roles.

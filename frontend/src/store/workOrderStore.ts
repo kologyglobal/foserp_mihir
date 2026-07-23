@@ -48,13 +48,33 @@ import { erpStorage } from './persistConfig'
 import { useQualityStore, assertWoCanComplete, assertWoCanReceiveFg } from './qualityStore'
 
 import { getNextCode } from '../services/codeSeriesService'
+import { useCodeSeriesStore } from './codeSeriesStore'
 
 function genId(prefix: string) {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`
 }
 
-function nextWoNo(_existing: string[]): string {
-  return getNextCode('work_order')
+/** Align WO series to numbers already in the store so cleared demos/tests restart at WO-0001. */
+function alignWorkOrderSeries(existingWoNos: string[]) {
+  const store = useCodeSeriesStore.getState()
+  const series = store.getActiveSeriesByEntity('work_order')
+  if (!series) return
+  const re = new RegExp(`(\\d{${series.runningNumberLength}})$`)
+  let max = 0
+  for (const code of existingWoNos) {
+    const match = code.match(re)
+    if (!match) continue
+    const n = parseInt(match[1]!, 10)
+    if (!Number.isNaN(n)) max = Math.max(max, n)
+  }
+  if (series.currentNumber !== max) {
+    store.updateSeries(series.id, { currentNumber: max })
+  }
+}
+
+function nextWoNo(existing: string[]): string {
+  alignWorkOrderSeries(existing)
+  return getNextCode('work_order', { existingNumbers: existing })
 }
 
 function addDays(dateStr: string, days: number): string {

@@ -91,7 +91,7 @@ export function AssetMaintenancePage() {
     >
       <FixedAssetsWorkspaceTabs active="maintenance" />
       <div className="space-y-3 p-4">
-        <FixedAssetsDemoBanner variant="partial" />
+        <FixedAssetsDemoBanner variant="auto" />
         <FixedAssetsSummaryCards items={kpis} columns={4} />
 
         <div className="flex flex-wrap items-end gap-2">

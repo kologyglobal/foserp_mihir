@@ -7,8 +7,26 @@ export const listItemsQuerySchema = paginationSchema.extend({
   itemType: z.enum(['raw', 'bought_out', 'consumable', 'sub_assembly', 'finished_good']).optional(),
 })
 
+const ITEM_TYPE_ENUM = z.enum(['raw', 'bought_out', 'consumable', 'sub_assembly', 'finished_good'])
+
 export const itemLookupQuerySchema = paginationSchema.extend({
-  itemType: z.enum(['raw', 'bought_out', 'consumable', 'sub_assembly', 'finished_good']).optional(),
+  itemType: ITEM_TYPE_ENUM.optional(),
+  /** Comma-separated or repeated query values — e.g. finished_good,sub_assembly */
+  itemTypes: z
+    .union([ITEM_TYPE_ENUM, z.array(ITEM_TYPE_ENUM), z.string()])
+    .optional()
+    .transform((value) => {
+      if (value === undefined) return undefined
+      const list = Array.isArray(value)
+        ? value
+        : String(value)
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean)
+      const allowed = new Set(ITEM_TYPE_ENUM.options)
+      const unique = [...new Set(list)].filter((v): v is z.infer<typeof ITEM_TYPE_ENUM> => allowed.has(v as z.infer<typeof ITEM_TYPE_ENUM>))
+      return unique.length > 0 ? unique : undefined
+    }),
   activeOnly: z
     .union([z.boolean(), z.enum(['true', 'false', '1', '0'])])
     .optional()

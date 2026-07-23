@@ -146,7 +146,7 @@ export interface ProductionOrderMaterial {
     fulfilledQty: string
   } | null
   purchaseRequisitionId: string | null
-  purchaseRequisition: { id: string; prNumber: string; status: string } | null
+  purchaseRequisition: { id: string; prNumber?: string; requisitionNumber?: string; status: string } | null
   issueStageGroupId: string | null
   issueOperationId: string | null
   remarks: string | null
@@ -173,12 +173,26 @@ export interface ReserveMaterialsResult {
 }
 
 export interface ShortageRequisitionResult {
-  requisition: { id: string; prNumber: string; source: string; lines: Array<{ id: string; quantity: string }> }
+  requisition: {
+    id: string
+    prNumber?: string
+    requisitionNumber?: string
+    source: string
+    lines: Array<{ id: string; quantity: string | number }>
+  }
   linkedMaterialIds: string[]
   materials: ProductionOrderMaterial[]
 }
 
-export const QUALITY_STATUS_VALUES = ['NOT_APPLICABLE', 'PENDING_INTEGRATION'] as const
+export const QUALITY_STATUS_VALUES = [
+  'NOT_APPLICABLE',
+  'PENDING_INTEGRATION',
+  'PENDING_QC',
+  'IN_QC',
+  'PASSED',
+  'FAILED',
+  'HOLD',
+] as const
 export type ProductionQualityStatus = (typeof QUALITY_STATUS_VALUES)[number]
 
 export const PRODUCTION_ACTIVITY_TYPE_VALUES = [
@@ -261,6 +275,15 @@ export interface ProductionOrder {
   customerId: string | null
   projectRef: string | null
   productItemId: string
+  /** Present on list responses when API enriches the row. */
+  productItemCode?: string | null
+  productItemName?: string | null
+  salesOrderNo?: string | null
+  customerName?: string | null
+  customerCode?: string | null
+  currentStageName?: string | null
+  currentStageCode?: string | null
+  supervisorName?: string | null
   manufacturingProfileId: string
   bomVersionId: string
   routingVersionId: string | null
@@ -421,12 +444,39 @@ export interface ProductionOrderRoutingSnapshot {
 }
 
 /** GET /work-orders/:id/detail response — order + immutable snapshots + live stage/operation state. */
+export interface WorkOrderRelatedSalesOrder {
+  id: string
+  salesOrderNo: string
+  status: string
+  customerId: string | null
+  customerName: string | null
+  customerCode: string | null
+}
+
 export interface WorkOrderDetail extends ProductionOrder {
   bomSnapshot: ProductionOrderBomSnapshot | null
   routingSnapshot: ProductionOrderRoutingSnapshot | null
   stages: ProductionOrderStage[]
   operations: ProductionOrderOperation[]
   dependencies: ProductionOrderDependency[]
+  /** Enriched commercial context when WO is linked to a CRM sales order. */
+  relatedSalesOrder?: WorkOrderRelatedSalesOrder | null
+}
+
+export interface WorkOrderFgReceiptSummary {
+  id: string
+  receiptNumber: string
+  receiptQuantity: string
+  acceptedQuantity: string
+  status: string
+  qualityStatus: string | null
+  batchOrLotNumber: string | null
+  receiptDate: string | null
+  postedAt: string | null
+  warehouse?: { id: string; code: string; name: string } | null
+  item?: { id: string; code: string; name: string } | null
+  uom?: { id: string; code: string; name: string } | null
+  remarks: string | null
 }
 
 export interface ProductionStageLedgerEntry {
@@ -469,6 +519,10 @@ export interface EligibleSalesOrder {
   id: string
   salesOrderNo: string
   customerId: string | null
+  /** Company / customer display name from CRM */
+  customerName: string | null
+  /** Company code when available */
+  customerCode: string | null
   status: string
   orderDate: string
   requiredDate: string | null
@@ -605,7 +659,11 @@ export interface ConvertSalesOrderLinePayload {
   supervisorId?: string
   managerId?: string
   notes?: string
+  manufacturingProfileId?: string
+  bomVersionId?: string
+  routingVersionId?: string
   idempotencyKey?: string
+  generateChildOrders?: boolean
 }
 
 export interface CreateManualWorkOrderPayload {
@@ -619,6 +677,9 @@ export interface CreateManualWorkOrderPayload {
   supervisorId?: string
   jobNumber?: string
   notes?: string
+  manufacturingProfileId?: string
+  bomVersionId?: string
+  routingVersionId?: string
   idempotencyKey?: string
 }
 
@@ -642,6 +703,9 @@ export interface RecordProgressPayload {
 export interface CompleteStagePayload {
   stageId: string
   remarks?: string
+  skipQcGate?: boolean
+  requireQc?: boolean
+  qcOverrideReason?: string
 }
 
 export interface CorrectProgressPayload {
@@ -659,12 +723,16 @@ export interface RecordProgressResult {
   ledgerEntry: ProductionStageLedgerEntry
   stage: ProductionOrderStage | null
   order: ProductionOrder
+  warnings?: string[]
 }
 
 export interface CompleteStageResult {
   stage: ProductionOrderStage
   promotedStages: ProductionOrderStage[]
   order: ProductionOrder
+  awaitingQuality?: boolean
+  inspection?: unknown
+  warnings?: string[]
 }
 
 export interface CompleteWorkOrderResult {

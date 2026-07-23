@@ -44,8 +44,10 @@ function PanelHeader({
   return (
     <header className="flex items-center justify-between gap-2 border-b border-erp-border px-4 py-2.5">
       <div className="flex min-w-0 items-center gap-2">
-        <h2 className="truncate text-[13px] font-semibold text-erp-text">{title}</h2>
-        <span className="rounded px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-erp-muted ring-1 ring-erp-border">
+        <h2 className="truncate text-[12px] font-semibold uppercase tracking-[0.04em] text-erp-muted">
+          {title}
+        </h2>
+        <span className="rounded-md bg-slate-50 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-erp-text ring-1 ring-erp-border">
           {count}
         </span>
       </div>
@@ -221,22 +223,22 @@ function DemoProductionControlRoomPage() {
         ) : null}
 
         {loadState === 'ready' && data ? (
-          <div className="grid gap-3 lg:grid-cols-2">
-              <section id="todays-plan" className="overflow-hidden rounded-lg border border-erp-border bg-white">
+          <div className="grid gap-4 lg:grid-cols-2">
+              <section id="todays-plan" className="overflow-hidden rounded-lg border border-erp-border bg-white shadow-sm">
                 <PanelHeader title="Today's Plan" count={data.todaysPlan.length} to="/manufacturing/work-orders" linkLabel="All WOs" />
                 <WoList rows={data.todaysPlan} empty="No work orders planned for today." showMaterial />
               </section>
 
-              <section id="running" className="overflow-hidden rounded-lg border border-erp-border bg-white">
+              <section id="running" className="overflow-hidden rounded-lg border border-erp-border bg-white shadow-sm">
                 <PanelHeader title="Running WOs" count={data.runningOrders.length} to="/manufacturing/shopfloor" linkLabel="Shopfloor" />
-                <div className="flex items-center gap-2 border-b border-erp-border/60 bg-emerald-50/30 px-4 py-1.5 text-[11px] text-emerald-900">
+                <div className="flex items-center gap-2 border-b border-erp-border/60 bg-emerald-50/40 px-4 py-1.5 text-[11px] text-emerald-900">
                   <Play className="h-3.5 w-3.5" aria-hidden />
                   In progress — open WO to hold, complete, or QC.
                 </div>
                 <WoList rows={data.runningOrders} empty="No work orders running." />
               </section>
 
-              <section id="shortage" className="overflow-hidden rounded-lg border border-erp-border bg-white">
+              <section id="shortage" className="overflow-hidden rounded-lg border border-erp-border bg-white shadow-sm">
                 <PanelHeader
                   title="Material Shortage"
                   count={data.materialRisks.length}
@@ -276,7 +278,7 @@ function DemoProductionControlRoomPage() {
                 )}
               </section>
 
-              <section id="qc" className="overflow-hidden rounded-lg border border-erp-border bg-white">
+              <section id="qc" className="overflow-hidden rounded-lg border border-erp-border bg-white shadow-sm">
                 <PanelHeader title="QC Pending" count={data.qcAttention.length} to="/manufacturing/work-orders" linkLabel="Work Orders" />
                 {data.qcAttention.length === 0 ? (
                   <p className="px-4 py-8 text-center text-[13px] text-erp-muted">No QC backlog.</p>
@@ -333,16 +335,16 @@ function DemoProductionControlRoomPage() {
                 )}
               </section>
 
-              <section id="delayed" className="overflow-hidden rounded-lg border border-erp-border bg-white">
+              <section id="delayed" className="overflow-hidden rounded-lg border border-erp-border bg-white shadow-sm">
                 <PanelHeader title="Delayed WOs" count={data.delayedOrders.length} to="/manufacturing/work-orders" linkLabel="Work Orders" />
-                <div className="flex items-center gap-2 border-b border-erp-border/60 bg-rose-50/30 px-4 py-1.5 text-[11px] text-rose-900">
+                <div className="flex items-center gap-2 border-b border-erp-border/60 bg-rose-50/40 px-4 py-1.5 text-[11px] text-rose-900">
                   <Clock className="h-3.5 w-3.5" aria-hidden />
                   Past due and still open — prioritize on the Work Order.
                 </div>
                 <WoList rows={data.delayedOrders} empty="No delayed work orders." showMaterial />
               </section>
 
-              <section id="job-work" className="overflow-hidden rounded-lg border border-erp-border bg-white">
+              <section id="job-work" className="overflow-hidden rounded-lg border border-erp-border bg-white shadow-sm">
                 <PanelHeader title="Job Work Pending" count={jwPending} to="/manufacturing/job-work" linkLabel="Job Work" />
                 <div className="grid gap-2 border-b border-erp-border p-3 sm:grid-cols-3">
                   {[
@@ -350,9 +352,9 @@ function DemoProductionControlRoomPage() {
                     { label: 'Partially Received', value: data.jobWork.partiallyReceived, icon: Truck },
                     { label: 'Pending Reconciliation', value: data.jobWork.pendingReconciliation, icon: Truck },
                   ].map((c) => (
-                    <div key={c.label} className="rounded-md bg-erp-surface-alt/50 px-3 py-2 text-center ring-1 ring-erp-border">
-                      <div className="text-[18px] font-bold tabular-nums">{c.value}</div>
-                      <div className="text-[11px] font-semibold text-erp-muted">{c.label}</div>
+                    <div key={c.label} className="rounded-md border border-erp-border bg-slate-50/60 px-3 py-2.5 text-center">
+                      <div className="text-[18px] font-semibold tabular-nums tracking-tight text-erp-text">{c.value}</div>
+                      <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-erp-muted">{c.label}</div>
                     </div>
                   ))}
                 </div>

@@ -52,55 +52,87 @@ function mapApiRow(row: ItemLookupRow, getUomName: (id: string) => string): Item
 
 export function useItemLookup(options?: {
   itemType?: string
+  /** Prefer over itemType when multiple manufacturable types are needed. */
+  itemTypes?: string[]
   activeOnly?: boolean
   selectedId?: string
   initialQuery?: string
+  /** Max rows when not fetching all. Ignored when fetchAll is true. */
+  limit?: number
+  /** Load every matching item (paged). Default true so pickers are not truncated at 25. */
+  fetchAll?: boolean
 }) {
   const storeItems = useMasterStore((s) => s.items)
   const getItem = useMasterStore((s) => s.getItem)
   const getUomName = useMasterStore((s) => s.getUomName)
   const activeOnly = options?.activeOnly ?? true
   const itemType = options?.itemType
+  const itemTypes = options?.itemTypes
+  const itemTypesKey = itemTypes?.join(',') ?? ''
+  const fetchAll = options?.fetchAll ?? true
+  const limit = options?.limit ?? (fetchAll ? 100 : 25)
 
   const [query, setQuery] = useState(options?.initialQuery ?? '')
   const debouncedQuery = useDebouncedValue(query, 300)
   const [optionsList, setOptionsList] = useState<ItemLookupOption[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [totalCount, setTotalCount] = useState<number | null>(null)
 
-  const search = useCallback(async (q: string) => {
-    if (!isApiMode()) {
-      const needle = q.trim().toLowerCase()
-      const filtered = storeItems
-        .filter((i) => (activeOnly ? i.isActive : true))
-        .filter((i) => !itemType || i.itemType === itemType)
-        .filter((i) => !needle || i.itemCode.toLowerCase().includes(needle) || i.itemName.toLowerCase().includes(needle))
-        .slice(0, 25)
-        .map((i) => mapStoreItem(i, getUomName))
-      setOptionsList(filtered)
-      return filtered
-    }
+  const matchesType = useCallback(
+    (type: string) => {
+      if (itemTypes && itemTypes.length > 0) return itemTypes.includes(type)
+      if (itemType) return type === itemType
+      return true
+    },
+    [itemType, itemTypes],
+  )
 
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await searchItemLookups({
-        search: q.trim() || undefined,
-        itemType,
-        activeOnly,
-        limit: 25,
-      })
-      const rows = res.data.map((r) => mapApiRow(r, getUomName))
-      setOptionsList(rows)
-      return rows
-    } catch (err) {
-      setError(formatApiError(err))
-      setOptionsList([])
-      return []
-    } finally {
-      setLoading(false)
-    }
-  }, [storeItems, getUomName, activeOnly, itemType])
+  const search = useCallback(
+    async (q: string) => {
+      if (!isApiMode()) {
+        const needle = q.trim().toLowerCase()
+        const filtered = storeItems
+          .filter((i) => (activeOnly ? i.isActive : true))
+          .filter((i) => matchesType(i.itemType))
+          .filter(
+            (i) =>
+              !needle ||
+              i.itemCode.toLowerCase().includes(needle) ||
+              i.itemName.toLowerCase().includes(needle),
+          )
+        const rows = (fetchAll ? filtered : filtered.slice(0, limit)).map((i) => mapStoreItem(i, getUomName))
+        setOptionsList(rows)
+        setTotalCount(filtered.length)
+        return rows
+      }
+
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await searchItemLookups({
+          search: q.trim() || undefined,
+          itemType: itemTypes && itemTypes.length > 0 ? undefined : itemType,
+          itemTypes,
+          activeOnly,
+          limit,
+          fetchAll,
+        })
+        const rows = res.data.map((r) => mapApiRow(r, getUomName))
+        setOptionsList(rows)
+        setTotalCount(res.meta?.total ?? rows.length)
+        return rows
+      } catch (err) {
+        setError(formatApiError(err))
+        setOptionsList([])
+        setTotalCount(null)
+        return []
+      } finally {
+        setLoading(false)
+      }
+    },
+    [storeItems, getUomName, activeOnly, itemType, itemTypes, itemTypesKey, matchesType, fetchAll, limit],
+  )
 
   useEffect(() => {
     void search(debouncedQuery)
@@ -118,8 +150,11 @@ export function useItemLookup(options?: {
   const selected = useMemo(() => {
     const id = options?.selectedId
     if (!id) return undefined
-    return mergedOptions.find((o) => o.itemId === id) ?? (getItem(id) ? mapStoreItem(getItem(id)!, getUomName) : undefined)
+    return (
+      mergedOptions.find((o) => o.itemId === id) ??
+      (getItem(id) ? mapStoreItem(getItem(id)!, getUomName) : undefined)
+    )
   }, [mergedOptions, options?.selectedId, getItem, getUomName])
 
-  return { query, setQuery, options: mergedOptions, loading, error, search, selected }
+  return { query, setQuery, options: mergedOptions, loading, error, search, selected, totalCount }
 }

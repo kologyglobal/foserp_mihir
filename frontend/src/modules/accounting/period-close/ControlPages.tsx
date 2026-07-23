@@ -16,6 +16,7 @@ import { isApiMode } from '@/config/apiConfig'
 import {
   closeAccountingPeriod,
   getModuleLocks,
+  getPeriodCloseReadiness,
   getReopenRequests,
   getYearEndPreview,
   listPeriodClosePeriods,
@@ -31,6 +32,7 @@ import type { AccountingPeriod } from '@/types/financeSetup'
 import type {
   ModuleLockStatus,
   ModulePeriodLock,
+  PeriodCloseReadiness,
   PeriodFilterState,
   ReopenRequest,
   YearEndPreview,
@@ -51,6 +53,7 @@ export function PeriodLockingPage() {
   const [filter, setFilter] = useState<PeriodFilterState>(() => loadPeriodCloseFilter())
   const [rows, setRows] = useState<ModulePeriodLock[]>([])
   const [periods, setPeriods] = useState<AccountingPeriod[]>([])
+  const [readiness, setReadiness] = useState<PeriodCloseReadiness | null>(null)
   const [overrideReason, setOverrideReason] = useState('')
   const [reopenTarget, setReopenTarget] = useState<AccountingPeriod | null>(null)
   const [reopenReason, setReopenReason] = useState('')
@@ -67,11 +70,17 @@ export function PeriodLockingPage() {
     try {
       if (api) {
         savePeriodCloseFilter(filter)
-        setPeriods(await listPeriodClosePeriods())
+        const [periodRows, ready] = await Promise.all([
+          listPeriodClosePeriods(),
+          getPeriodCloseReadiness(filter).catch(() => null),
+        ])
+        setPeriods(periodRows)
+        setReadiness(ready)
         setRows([])
       } else {
         setRows(await getModuleLocks())
         setPeriods([])
+        setReadiness(null)
       }
       setError(null)
     } catch (e) {
@@ -111,6 +120,10 @@ export function PeriodLockingPage() {
   const onClose = async (p: AccountingPeriod) => {
     if (!perms.canClosePeriod) {
       notify.error('Missing finance.period.close permission.')
+      return
+    }
+    if (readiness?.hardBlockEnabled && readiness.blockingCount > 0 && readiness.periodId === p.id) {
+      notify.error('Hard-block close is enabled. Clear readiness blockers before closing this period.')
       return
     }
     const ok = await appConfirm({
@@ -189,10 +202,25 @@ export function PeriodLockingPage() {
           />
         </label>
       ) : (
-        <p className="mb-3 text-[12px] text-erp-muted">
-          Soft readiness warnings on the dashboard do not hard-block close. Backend closes any OPEN / UNDER_REVIEW /
-          REOPENED period; posting is blocked only after status is CLOSED.
-        </p>
+        <div className="mb-3 space-y-2">
+          <p className="text-[12px] text-erp-muted">
+            {readiness?.hardBlockEnabled
+              ? 'Hard-block close is ON (Finance Settings → periodCloseHardBlock). Close is rejected when readiness has BLOCK checks.'
+              : 'Hard-block close is OFF. Readiness blockers below are advisory — backend still allows close unless you enable periodCloseHardBlock.'}
+          </p>
+          {readiness && readiness.blockingCount > 0 ? (
+            <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
+              <div className="font-semibold">
+                {readiness.blockingCount} blocker(s) for {readiness.periodLabel}
+              </div>
+              <ul className="mt-1 list-disc pl-4">
+                {(readiness.blockers ?? readiness.checks.filter((c) => c.severity === 'blocking')).map((b) => (
+                  <li key={b.code}>{b.message}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
       )}
       {loading ? <LoadingState /> : null}
       {error ? <p className="text-[13px] text-rose-700">{error}</p> : null}
@@ -246,7 +274,19 @@ export function PeriodLockingPage() {
                         <button
                           type="button"
                           className="rounded border border-erp-border px-1.5 py-0.5 text-[11px] font-semibold disabled:opacity-50"
-                          disabled={!perms.canClosePeriod}
+                          disabled={
+                            !perms.canClosePeriod ||
+                            Boolean(
+                              readiness?.hardBlockEnabled &&
+                                readiness.blockingCount > 0 &&
+                                readiness.periodId === p.id,
+                            )
+                          }
+                          title={
+                            readiness?.hardBlockEnabled && readiness.blockingCount > 0 && readiness.periodId === p.id
+                              ? 'Clear readiness blockers first'
+                              : undefined
+                          }
                           onClick={() => void onClose(p)}
                         >
                           Close

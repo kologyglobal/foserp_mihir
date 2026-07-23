@@ -64,26 +64,24 @@ export function ReceiptListPage() {
   return (
     <MoneyInWorkspaceShell
       title="Receipts"
-      actions={
-        mergeAllowedAction(perms.canCreateReceipt) ? (
-          <ErpButton variant="primary" icon={Plus} onClick={() => navigate('/accounting/money-in/receipts/new')}>
-            New Receipt
-          </ErpButton>
-        ) : null
-      }
       commandBar={
-        <div className="flex flex-wrap items-center gap-2">
-          <Select className="h-9 min-w-[180px] text-[12px]" value={status} onChange={(e) => setStatus(e.target.value as '' | CustomerReceiptStatus)}>
+        <div className="flex flex-nowrap items-center gap-2">
+          <Select className="h-9 min-w-[160px] text-[12px]" value={status} onChange={(e) => setStatus(e.target.value as '' | CustomerReceiptStatus)}>
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value || 'all'} value={o.value}>
                 {o.label}
               </option>
             ))}
           </Select>
-          <Input className="h-9 min-w-[200px] text-[12px]" placeholder="Search receipt / customer" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="h-9 w-[200px] text-[12px]" placeholder="Search receipt / customer" value={search} onChange={(e) => setSearch(e.target.value)} />
           <ErpButton variant="secondary" icon={RefreshCw} onClick={() => void load()}>
             Refresh
           </ErpButton>
+          {mergeAllowedAction(perms.canCreateReceipt) ? (
+            <ErpButton variant="primary" icon={Plus} onClick={() => navigate('/accounting/money-in/receipts/new')}>
+              New Receipt
+            </ErpButton>
+          ) : null}
         </div>
       }
     >

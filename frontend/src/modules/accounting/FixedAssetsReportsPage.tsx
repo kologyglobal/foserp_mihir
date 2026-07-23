@@ -71,7 +71,7 @@ export function FixedAssetsReportsPage() {
     }
     try {
       const result = await exportFixedAssetsData({ reportName: selected.name, format, filter: {}, includeAudit: false })
-      notify.success(`${result.fileName} generated (${result.rowCount} rows, demo).`)
+      notify.success(`${result.fileName} generated (${result.rowCount} rows).`)
     } catch (e) {
       notify.error(e instanceof FixedAssetsServiceError ? e.message : 'Export failed')
     }
@@ -84,7 +84,7 @@ export function FixedAssetsReportsPage() {
     }
     try {
       const preview = await getFixedAssetsPrintPreview(selected.name)
-      notify.info(`${preview.reportName} print preview ready — ${preview.rows.length} row(s) (demo).`)
+      notify.info(`${preview.reportName} print preview ready — ${preview.rows.length} row(s).`)
     } catch (e) {
       notify.error(e instanceof FixedAssetsServiceError ? e.message : 'Print failed')
     }
@@ -104,7 +104,7 @@ export function FixedAssetsReportsPage() {
       layout="enterprise"
       badge="Accounting"
       title="Fixed Assets Reports"
-      description="Report catalog with export and print preview (demo)."
+      description="Report catalog with live register, category NBV, disposals, and FA summary when API mode is on."
       breadcrumbs={[...FIXED_ASSETS_BREADCRUMB, { label: 'Reports' }]}
       autoBreadcrumbs={false}
       favoritePath="/accounting/fixed-assets/reports"
@@ -125,7 +125,7 @@ export function FixedAssetsReportsPage() {
     >
       <FixedAssetsWorkspaceTabs active="reports" />
       <div className="space-y-3 p-4">
-        <FixedAssetsDemoBanner variant="partial" />
+        <FixedAssetsDemoBanner variant="auto" />
         <div className="flex flex-wrap items-end gap-2">
           <div className="min-w-[200px] flex-1"><SearchInput value={search} onChange={setSearch} placeholder="Search reports…" /></div>
           <nav className="flex gap-1">

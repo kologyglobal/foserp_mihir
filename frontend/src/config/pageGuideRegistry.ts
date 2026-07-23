@@ -65,6 +65,7 @@ const GUIDES: { prefix: string; guide: PageGuideEntry }[] = [
   { prefix: '/inventory/movements', guide: { purpose: 'Inventory movements — receipts, issues, transfers, adjustments, returns.', nextStep: 'Open the movement type you need and post a document.' } },
   { prefix: '/inventory/stock-count', guide: { purpose: 'Physical stock count and variance posting.', nextStep: 'Start a count, enter quantities, then post variances.' } },
   { prefix: '/inventory/planning', guide: { purpose: 'Inventory planning signals — reorder and shortage context.', nextStep: 'Review shortages and create purchase demand if needed.' } },
+  { prefix: '/inventory/accounting', guide: { purpose: 'Inventory GL event trail for GRN, adjustments, and FG dispatch (flag-gated).', nextStep: 'Review event status; enable INVENTORY_ACCOUNTING when mappings are ready.' } },
   { prefix: '/inventory/issue', guide: { purpose: 'Issue material to production or projects.', nextStep: 'Select item, warehouse, and quantity — save to post issue.' } },
   { prefix: '/inventory/adjustment', guide: { purpose: 'Stock adjustment requests with approval.', nextStep: 'Enter variance reason and submit for approval.' } },
   { prefix: '/inventory/ledger', guide: { purpose: 'Stock movement ledger across warehouses.', nextStep: 'Filter by item or open item stock detail.' } },

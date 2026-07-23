@@ -1,7 +1,8 @@
 /**
- * Inventory Reports mock service (Phase 6).
+ * Inventory Reports service — demo mock + live API composition.
  */
 
+import { isApiMode } from '../../config/apiConfig'
 import { useInventoryStore } from '../../store/inventoryStore'
 import { useMasterStore } from '../../store/masterStore'
 import type {
@@ -65,11 +66,16 @@ export function getInventoryReportEntry(id: InventoryReportId): InventoryReportC
 
 export async function getInventoryReports(): Promise<InventoryReportCategoryGroup[]> {
   await delay()
+  // In API mode, keep analysis reports inside the inventory runner (live balances),
+  // not the demo operational report pack.
+  const catalog = isApiMode()
+    ? CATALOG.map((r) => (r.externalPath ? { ...r, externalPath: undefined } : r))
+    : CATALOG
   return CATEGORY_META.map((cat) => ({
     id: cat.id,
     label: cat.label,
     description: cat.description,
-    reports: CATALOG.filter((r) => r.categoryId === cat.id),
+    reports: catalog.filter((r) => r.categoryId === cat.id),
   }))
 }
 
@@ -90,6 +96,10 @@ export async function runInventoryReport(
   filters: InventoryReportFilters,
   canViewCost: boolean,
 ): Promise<InventoryReportResult> {
+  if (isApiMode()) {
+    const { runLiveInventoryReport } = await import('./inventoryReportsLive')
+    return runLiveInventoryReport(reportId, filters, canViewCost)
+  }
   await delay()
   const entry = getInventoryReportEntry(reportId)
   const generatedAt = new Date().toISOString()
@@ -422,6 +432,17 @@ export async function getInventoryPrintPreview(
 }
 
 export function getInventoryReportFilterOptions() {
+  if (isApiMode()) {
+    // Sync stub — runner should prefer getInventoryReportFilterOptionsAsync in API mode.
+    return {
+      warehouses: [] as Array<{ id: string; label: string }>,
+      categories: [] as Array<{ id: string; label: string }>,
+      plants: [] as string[],
+      movementTypes: ['receipt', 'issue', 'transfer', 'adjustment', 'return'],
+      sourceModules: ['purchase', 'production', 'sales', 'quality', 'manual'],
+      statuses: ['draft', 'posted', 'pending', 'quality_hold', 'blocked'],
+    }
+  }
   const master = useMasterStore.getState()
   return {
     warehouses: master.warehouses.filter((w) => w.isActive).map((w) => ({ id: w.id, label: w.warehouseName })),
@@ -431,4 +452,12 @@ export function getInventoryReportFilterOptions() {
     sourceModules: ['purchase', 'production', 'sales', 'quality', 'manual'],
     statuses: ['draft', 'posted', 'pending', 'quality_hold', 'blocked'],
   }
+}
+
+export async function getInventoryReportFilterOptionsAsync() {
+  if (isApiMode()) {
+    const { getLiveInventoryReportFilterOptions } = await import('./inventoryReportsLive')
+    return getLiveInventoryReportFilterOptions()
+  }
+  return getInventoryReportFilterOptions()
 }

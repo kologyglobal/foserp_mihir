@@ -13,7 +13,16 @@ import { canRequestAssignmentChange, canRequestHoldChange, canRequestJobWorkChan
 import { notify } from '@/store/toastStore'
 import { useSetupLookup } from '../setup/useSetupLookups'
 
-type Props = { open: boolean; onClose: () => void; workOrder: WorkOrderDetail; onChanged: () => void }
+type Props = {
+  open: boolean
+  onClose: () => void
+  workOrder: WorkOrderDetail
+  onChanged: () => void
+  /** Prefill when opened from Route / BOM edit affordances on the WO. */
+  initialChangeType?: RuntimeChangeType
+  initialOperationId?: string
+  initialStageId?: string
+}
 type Option = { id: string; label: string }
 const terminal = new Set(['COMPLETED', 'CLOSED', 'CANCELLED'])
 const operationTypes = new Set<RuntimeChangeType>(['MACHINE_CHANGE', 'WORK_CENTRE_CHANGE', 'REPEAT_OPERATION', 'SKIP_OPERATION'])
@@ -38,7 +47,15 @@ function display(value: unknown): string {
 }
 
 /** Preview-first runtime change request flow for API work orders. */
-export function RuntimeChangeDrawer({ open, onClose, workOrder, onChanged }: Props) {
+export function RuntimeChangeDrawer({
+  open,
+  onClose,
+  workOrder,
+  onChanged,
+  initialChangeType,
+  initialOperationId,
+  initialStageId,
+}: Props) {
   const [step, setStep] = useState(1)
   const [changeType, setChangeType] = useState<RuntimeChangeType>('QUANTITY_CHANGE')
   const [stageId, setStageId] = useState('')
@@ -57,14 +74,21 @@ export function RuntimeChangeDrawer({ open, onClose, workOrder, onChanged }: Pro
 
   useEffect(() => {
     if (!open) return
-    setStep(1); setReason(''); setValues({}); setPreview(null); setChangeType(types[0] ?? 'QUANTITY_CHANGE')
-    setStageId(workOrder.stages[0]?.id ?? ''); setOperationId(workOrder.operations[0]?.id ?? '')
+    setStep(1)
+    setReason('')
+    setValues({})
+    setPreview(null)
+    const preferred =
+      initialChangeType && types.includes(initialChangeType) ? initialChangeType : (types[0] ?? 'QUANTITY_CHANGE')
+    setChangeType(preferred)
+    setStageId(initialStageId || workOrder.stages[0]?.id || '')
+    setOperationId(initialOperationId || workOrder.operations[0]?.id || '')
     void Promise.all([
       fetchAdminUsersApi().then((rows) => setUsers(rows.map((u) => ({ id: u.id, label: `${u.firstName} ${u.lastName}`.trim() || u.email })))),
       listMachines({ limit: 100 }).then((r) => setMachines(r.data.map((x) => ({ id: x.id, label: `${x.code} — ${x.name}` })))),
       listWorkCentres({ limit: 100 }).then((r) => setWorkCentres(r.data.map((x) => ({ id: x.id, label: `${x.code} — ${x.name}` })))),
     ]).catch(() => notify.warning('Some change form lookups could not be loaded'))
-  }, [open, types, workOrder.operations, workOrder.stages])
+  }, [open, types, workOrder.operations, workOrder.stages, initialChangeType, initialOperationId, initialStageId])
 
   const set = (key: string, value: string) => setValues((old) => ({ ...old, [key]: value }))
   const proposed = (): Record<string, unknown> => {

@@ -61,14 +61,15 @@ export function MobileTasksPage() {
 export function MobileModulesPage() {
   const navigate = useNavigate()
   const modules = [
+    { label: 'Shopfloor Kiosk', path: '/m/kiosk' },
+    { label: 'Shop Floor', path: '/m/shop-floor' },
+    { label: 'Quality / QC', path: '/m/qc' },
     { label: 'Gate Keeper', path: '/m/gate' },
     { label: 'GRN Receiving', path: '/m/grn' },
     { label: 'Stock Count', path: '/m/stock-count' },
     { label: 'Material Issue', path: '/m/material-issue' },
     { label: 'Material Return', path: '/m/material-return' },
     { label: 'Warehouse Transfer', path: '/m/warehouse-transfer' },
-    { label: 'Shop Floor', path: '/m/shop-floor' },
-    { label: 'Quality / QC', path: '/m/qc' },
     { label: 'Job Work', path: '/m/job-work' },
     { label: 'Dispatch Loading', path: '/m/dispatch' },
     { label: 'Approvals', path: '/m/approvals' },

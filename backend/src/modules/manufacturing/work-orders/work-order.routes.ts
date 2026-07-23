@@ -20,6 +20,8 @@ import {
   splitWorkOrderSchema,
   startWorkOrderSchema,
 } from './work-order.schemas.js'
+import { generateChildOrdersSchema, postSaReceiptSchema } from './sa-receipt.schemas.js'
+import { addWorkOrderBomLineSchema, updateWorkOrderBomLineSchema } from './work-order-bom.schemas.js'
 import { listAssignmentsQuerySchema } from '../assignments/assignment.schemas.js'
 import materialRoutes from '../materials/material.routes.js'
 import runtimeChangeRoutes from '../runtime-changes/runtime-change.routes.js'
@@ -32,6 +34,11 @@ import { z } from 'zod'
 const transferToParamsSchema = z.object({
   id: z.string().uuid(),
   targetId: z.string().uuid(),
+})
+
+const bomLineParamsSchema = z.object({
+  id: z.string().uuid(),
+  lineId: z.string().uuid(),
 })
 
 const router = Router({ mergeParams: true })
@@ -56,6 +63,26 @@ router.get(
   assignmentController.listWorkOrderAssignments,
 )
 router.use('/:id/materials', validateParams(uuidParamSchema), materialRoutes)
+router.post(
+  '/:id/bom-lines',
+  validateParams(uuidParamSchema),
+  requirePermission('manufacturing.materials.create_requirement'),
+  validateBody(addWorkOrderBomLineSchema),
+  controller.addWorkOrderBomLine,
+)
+router.patch(
+  '/:id/bom-lines/:lineId',
+  validateParams(bomLineParamsSchema),
+  requirePermission('manufacturing.materials.create_requirement'),
+  validateBody(updateWorkOrderBomLineSchema),
+  controller.updateWorkOrderBomLine,
+)
+router.delete(
+  '/:id/bom-lines/:lineId',
+  validateParams(bomLineParamsSchema),
+  requirePermission('manufacturing.materials.create_requirement'),
+  controller.removeWorkOrderBomLine,
+)
 router.use('/:id/runtime-changes', validateParams(uuidParamSchema), runtimeChangeRoutes)
 router.use('/:id/wip-movements', validateParams(uuidParamSchema), wipMovementRoutes)
 router.use('/:id/transfer-to/:targetId', validateParams(transferToParamsSchema), transferToRouter)
@@ -66,6 +93,29 @@ router.get(
   validateParams(uuidParamSchema),
   requirePermission('manufacturing.fg_receipt.view'),
   fgController.getEligibility,
+)
+
+router.get(
+  '/:id/children',
+  validateParams(uuidParamSchema),
+  requirePermission('manufacturing.work_orders.view'),
+  controller.listChildOrders,
+)
+
+router.post(
+  '/:id/generate-child-orders',
+  validateParams(uuidParamSchema),
+  requirePermission('manufacturing.work_orders.create'),
+  validateBody(generateChildOrdersSchema),
+  controller.generateChildOrders,
+)
+
+router.post(
+  '/:id/sa-receipts',
+  validateParams(uuidParamSchema),
+  requirePermission('manufacturing.fg_receipt.post'),
+  validateBody(postSaReceiptSchema),
+  controller.postSaReceipt,
 )
 
 router.get(

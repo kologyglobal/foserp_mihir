@@ -13,7 +13,10 @@ export function useSetupLookup(resource: string): { options: LookupOption[]; rel
 
   const load = useCallback(() => {
     if (!isApiMode()) return
-    void fetchLookup(resource)
+    // Items/vendors are large — load up to API max so static selects don't miss rows.
+    // Prefer ItemLookupSelect / searchItemLookups for searchable pickers.
+    const params = resource === 'items' || resource === 'vendors' ? { limit: '100' } : undefined
+    void fetchLookup(resource, params)
       .then((res) => {
         setOptions(res.data.map((row) => ({ id: row.id, label: row.code ? `${row.code} — ${row.name}` : row.name })))
       })

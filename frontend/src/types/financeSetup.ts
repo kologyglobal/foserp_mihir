@@ -258,6 +258,8 @@ export interface FinanceSettings {
   useTreasuryAdjustmentsForStatementItems?: boolean
   treasuryAdjustmentApprovalLimit?: number | null
   treasuryAdjustmentPreventSelfApprove?: boolean
+  /** When true, period close rejects if any readiness check is BLOCK. Default false. */
+  periodCloseHardBlock?: boolean
   financeActivated: boolean
   activatedAt?: string | null
   activatedBy?: string | null

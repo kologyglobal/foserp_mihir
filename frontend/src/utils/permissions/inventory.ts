@@ -173,6 +173,7 @@ const ROLE_INVENTORY_PERMISSIONS: Partial<Record<ErpRole, InventoryPermission[]>
 const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: InventoryPermission }> = [
   { prefix: '/inventory/setup', permission: 'inventory.setup.manage' },
   { prefix: '/inventory/reports', permission: 'inventory.reports.view' },
+  { prefix: '/inventory/accounting', permission: 'inventory.view' },
   { prefix: '/inventory/planning', permission: 'inventory.planning.view' },
   { prefix: '/inventory/stock-count/new', permission: 'inventory.stock_count.create' },
   { prefix: '/inventory/stock-count', permission: 'inventory.stock_count.view' },

@@ -1,10 +1,10 @@
 /**
  * Phase 7C1/7C4 — Sales Order 360 dispatch/fulfilment panel (API mode).
- * Challan qty is document-only and must not be shown as dispatched/fulfilled.
+ * Guided Fulfilment strip + coach CTAs. Challan qty is document-only.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RefreshCw, Truck } from 'lucide-react'
+import { PackageCheck, RefreshCw, Truck } from 'lucide-react'
 import { DataGrid } from '@/components/design-system/DataGrid'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -12,9 +12,15 @@ import { TableLink } from '@/components/ui/AppLink'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { notify } from '@/store/toastStore'
 import {
+  FulfilmentJourneyStrip,
+  deriveSoFulfilmentJourney,
+} from '@/modules/manufacturing/ui'
+import {
+  createDraftDispatchFromRequirements,
   getSalesOrderDispatchHistory,
   getSalesOrderDispatchRequirements,
   getSalesOrderFulfilmentSummary,
+  synchroniseDispatchRequirements,
   type DispatchRequirementListItem,
   type SalesOrderDispatchHistoryItem,
 } from '@/services/api/dispatchApi'
@@ -35,6 +41,7 @@ type ChallanLink = {
 export function SalesOrderDispatchFulfilmentPanel({ salesOrderId }: Props) {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
   const [requirements, setRequirements] = useState<DispatchRequirementListItem[]>([])
   const [history, setHistory] = useState<SalesOrderDispatchHistoryItem[]>([])
   const [totals, setTotals] = useState<Record<string, number> | null>(null)
@@ -49,7 +56,7 @@ export function SalesOrderDispatchFulfilmentPanel({ salesOrderId }: Props) {
         getSalesOrderDispatchHistory(salesOrderId),
         getSalesOrderFulfilmentSummary(salesOrderId),
       ])
-      setRequirements(reqs)
+      setRequirements(Array.isArray(reqs) ? reqs : [])
       setHistory(hist?.items ?? [])
       setTotals(summary?.totals ?? null)
       setChallans((summary as { deliveryChallans?: ChallanLink[] })?.deliveryChallans ?? [])
@@ -72,10 +79,100 @@ export function SalesOrderDispatchFulfilmentPanel({ salesOrderId }: Props) {
     void load()
   }, [load])
 
+  const journey = useMemo(() => {
+    const t = totals ?? {}
+    return deriveSoFulfilmentJourney({
+      remainingQty: Number(t.remainingQty ?? 0),
+      reservedQty: Number(t.reservedQty ?? 0),
+      pickedQty: Number(t.pickedQty ?? 0),
+      packedQty: Number(t.packedQty ?? 0),
+      challanQty: Number(t.challanQty ?? 0),
+      dispatchedQty: Number(t.netDispatchedQty ?? t.dispatchedQty ?? 0),
+      waitingProduction: requirements.some((r) => r.readinessStatus === 'WAITING_FOR_PRODUCTION'),
+      waitingQuality: requirements.some((r) => r.readinessStatus === 'WAITING_FOR_QUALITY'),
+      waitingStock: requirements.some((r) => r.readinessStatus === 'WAITING_FOR_STOCK'),
+      readyQty: requirements.reduce((sum, r) => sum + Number(r.readyQty ?? 0), 0),
+    })
+  }, [totals, requirements])
+
+  const readyRequirementIds = useMemo(
+    () =>
+      requirements
+        .filter(
+          (r) =>
+            r.readinessStatus === 'READY_TO_DISPATCH' ||
+            r.readinessStatus === 'PARTIALLY_READY' ||
+            Number(r.readyQty) > 0,
+        )
+        .map((r) => r.id),
+    [requirements],
+  )
+
+  const syncRequirements = async () => {
+    setBusy(true)
+    try {
+      const result = await synchroniseDispatchRequirements({
+        salesOrderId,
+        idempotencyKey: crypto.randomUUID(),
+      })
+      notify.success(`Synchronised ${result.synchronised ?? 0} requirement(s)`)
+      await load()
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : 'Sync failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const createDraft = async () => {
+    if (readyRequirementIds.length === 0) {
+      notify.warning('No ready requirements — sync and wait for FG stock first')
+      return
+    }
+    setBusy(true)
+    try {
+      const draft = await createDraftDispatchFromRequirements({
+        requirementIds: readyRequirementIds,
+        idempotencyKey: crypto.randomUUID(),
+      })
+      notify.success(`Draft dispatch ${draft.dispatchNo ?? draft.id} created`)
+      navigate(`/dispatch/${draft.id}`)
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : 'Could not create draft dispatch')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (loading) return <LoadingState variant="card" />
+
+  const nextCoach =
+    journey.activeStep === 'produce'
+      ? 'Finish linked work orders, then sync requirements.'
+      : journey.activeStep === 'quality'
+        ? 'Clear quality holds on FG / stages, then refresh.'
+        : journey.activeStep === 'stock'
+          ? 'Receive FG on the work order, then Sync requirements.'
+          : readyRequirementIds.length > 0
+            ? 'Create a draft outbound, then reserve → pick → pack → challan on the workbench.'
+            : 'Open the workbench to reserve, pick, pack, and issue the delivery challan.'
 
   return (
     <div className="space-y-4 p-4">
+      <FulfilmentJourneyStrip
+        activeStep={journey.activeStep}
+        steps={journey.steps.map((step) => ({
+          ...step,
+          onSelect:
+            step.id === 'dispatch'
+              ? () => navigate(`/dispatch/workbench?salesOrderId=${encodeURIComponent(salesOrderId)}`)
+              : step.id === 'stock' || step.id === 'produce' || step.id === 'quality'
+                ? () => navigate(`/dispatch/workbench?salesOrderId=${encodeURIComponent(salesOrderId)}`)
+                : undefined,
+        }))}
+        compactTip={nextCoach}
+      />
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm text-erp-muted space-y-1">
           {totals ? (
@@ -92,11 +189,21 @@ export function SalesOrderDispatchFulfilmentPanel({ salesOrderId }: Props) {
             <span>Fulfilment position from server (not demo store).</span>
           )}
         </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={() => void load()}>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => void load()}>
             <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
           </Button>
-          <Button size="sm" onClick={() => navigate('/dispatch/workbench')}>
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => void syncRequirements()}>
+            Sync requirements
+          </Button>
+          <Button size="sm" variant="secondary" disabled={busy || readyRequirementIds.length === 0} onClick={() => void createDraft()}>
+            <PackageCheck className="h-3.5 w-3.5 mr-1" /> Create draft outbound
+          </Button>
+          <Button
+            size="sm"
+            disabled={busy}
+            onClick={() => navigate(`/dispatch/workbench?salesOrderId=${encodeURIComponent(salesOrderId)}`)}
+          >
             <Truck className="h-3.5 w-3.5 mr-1" /> Open workbench
           </Button>
         </div>
@@ -107,7 +214,7 @@ export function SalesOrderDispatchFulfilmentPanel({ salesOrderId }: Props) {
         <DataGrid
           data={requirements}
           compact
-          emptyMessage="No dispatch requirements yet — confirm the sales order and synchronise from the workbench."
+          emptyMessage="No dispatch requirements yet — confirm the sales order and synchronise from here or the workbench."
           columns={[
             { accessorKey: 'requirementNumber', header: 'Requirement' },
             { accessorKey: 'productOrItem', header: 'Item' },

@@ -1,5 +1,6 @@
-import { Prisma } from '@prisma/client'
+import { Prisma, type ManufacturingTimeUnit } from '@prisma/client'
 import { prisma } from '../../../config/database.js'
+import { nextCode } from '../../../services/codeSeries.service.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import { getPagination } from '../../../utils/pagination.js'
 import { ConflictError, InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
@@ -13,9 +14,72 @@ import type {
   ListRoutingVersionsQuery,
   ListRoutingsQuery,
   UpdateOperationInput,
+  UpdateRoutingInput,
   UpdateRoutingVersionInput,
   UpdateStageGroupInput,
 } from './routing.schemas.js'
+
+function timeValueToMinutes(value: number, unit: ManufacturingTimeUnit): number {
+  switch (unit) {
+    case 'SECOND':
+      return value / 60
+    case 'MINUTE':
+      return value
+    case 'HOUR':
+      return value * 60
+    case 'DAY':
+      return value * 60 * 24
+    case 'WEEK':
+      return value * 60 * 24 * 7
+    default:
+      return value
+  }
+}
+
+function resolveSetupTimeMinutes(input: {
+  setupTimeMinutes?: number
+  setupTimeValue?: number
+  setupTimeUnit: ManufacturingTimeUnit
+}): number {
+  if (input.setupTimeValue !== undefined) {
+    return timeValueToMinutes(input.setupTimeValue, input.setupTimeUnit)
+  }
+  return input.setupTimeMinutes ?? 0
+}
+
+async function ensureDefaultStageGroup(tenantId: string, userId: string, routingVersionId: string) {
+  const existing = await prisma.manufacturingStageGroup.findFirst({
+    where: { routingVersionId, tenantId, code: 'MAIN', deletedAt: null },
+  })
+  if (existing) return existing
+
+  try {
+    return await prisma.manufacturingStageGroup.create({
+      data: {
+        tenantId,
+        routingVersionId,
+        code: 'MAIN',
+        name: 'Operations',
+        displayOrder: 10,
+        isOptional: false,
+        parallelAllowed: false,
+        qualityRequired: false,
+        completionRule: 'ALL_OPERATIONS',
+        isActive: true,
+        createdBy: userId,
+        updatedBy: userId,
+      },
+    })
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      const retry = await prisma.manufacturingStageGroup.findFirst({
+        where: { routingVersionId, tenantId, code: 'MAIN', deletedAt: null },
+      })
+      if (retry) return retry
+    }
+    throw err
+  }
+}
 
 function buildRoutingWhere(tenantId: string, query: ListRoutingsQuery) {
   const where: Prisma.ManufacturingRoutingWhereInput = {
@@ -34,7 +98,13 @@ export async function listRoutings(tenantId: string, query: ListRoutingsQuery) {
   const where = buildRoutingWhere(tenantId, query)
   const sortField = query.sortBy === 'code' || query.sortBy === 'name' ? query.sortBy : 'createdAt'
   const [items, total] = await Promise.all([
-    prisma.manufacturingRouting.findMany({ where, skip, take, orderBy: { [sortField]: query.sortOrder } }),
+    prisma.manufacturingRouting.findMany({
+      where,
+      skip,
+      take,
+      orderBy: { [sortField]: query.sortOrder },
+      include: { productItem: { select: { id: true, code: true, name: true } } },
+    }),
     prisma.manufacturingRouting.count({ where }),
   ])
   return { items, total, page: query.page, limit: query.limit }
@@ -50,14 +120,16 @@ export async function getRouting(tenantId: string, routingId: string) {
 
 export async function createRouting(tenantId: string, userId: string, input: CreateRoutingInput) {
   if (input.productItemId) await assertItem(tenantId, input.productItemId)
+  const code = input.code ?? (await nextCode(tenantId, 'MANUFACTURING_ROUTING'))
   try {
     return await prisma.manufacturingRouting.create({
       data: {
         tenantId,
-        code: input.code,
+        code,
         name: input.name,
         productItemId: input.productItemId ?? null,
         description: input.description ?? null,
+        productionFlowType: input.productionFlowType ?? 'SERIAL',
         isActive: input.isActive ?? true,
         createdBy: userId,
         updatedBy: userId,
@@ -69,6 +141,20 @@ export async function createRouting(tenantId: string, userId: string, input: Cre
     }
     throw err
   }
+}
+
+export async function updateRouting(
+  tenantId: string,
+  userId: string,
+  routingId: string,
+  input: UpdateRoutingInput,
+) {
+  await getRouting(tenantId, routingId)
+  if (input.productItemId) await assertItem(tenantId, input.productItemId)
+  return prisma.manufacturingRouting.update({
+    where: { id: routingId, tenantId },
+    data: { ...input, updatedBy: userId },
+  })
 }
 
 // ─── Routing versions ───────────────────────────────────────────────────────
@@ -193,6 +279,7 @@ export async function createStageGroup(
         qualityRequired: input.qualityRequired,
         completionRule: input.completionRule,
         isActive: input.isActive,
+        sourceBomLineId: input.sourceBomLineId ?? null,
         createdBy: userId,
         updatedBy: userId,
       },
@@ -239,6 +326,27 @@ export async function deleteStageGroup(tenantId: string, stageGroupId: string) {
   })
 }
 
+/** Soft-delete all stage groups, operations, and dependencies for a draft version (BOM generate replace). */
+export async function clearRoutingVersionStructure(tenantId: string, routingVersionId: string) {
+  const version = await getRoutingVersion(tenantId, routingVersionId)
+  assertDraft(version)
+  const now = new Date()
+  await prisma.$transaction([
+    prisma.manufacturingOperationDependency.updateMany({
+      where: { routingVersionId, tenantId, deletedAt: null },
+      data: { deletedAt: now },
+    }),
+    prisma.manufacturingRoutingOperation.updateMany({
+      where: { routingVersionId, tenantId, deletedAt: null },
+      data: { deletedAt: now },
+    }),
+    prisma.manufacturingStageGroup.updateMany({
+      where: { routingVersionId, tenantId, deletedAt: null },
+      data: { deletedAt: now },
+    }),
+  ])
+}
+
 // ─── Operations ─────────────────────────────────────────────────────────────
 
 export async function listOperations(tenantId: string, routingVersionId: string) {
@@ -258,11 +366,23 @@ export async function getOperation(tenantId: string, operationId: string) {
 
 async function assertOperationRefs(
   tenantId: string,
-  input: { workCentreId?: string | null; defaultMachineId?: string | null; outputItemId?: string | null; defaultVendorId?: string | null },
+  input: {
+    workCentreId?: string | null
+    defaultMachineId?: string | null
+    outputItemId?: string | null
+    defaultVendorId?: string | null
+    qcTestGroupId?: string | null
+  },
 ) {
   if (input.workCentreId) await assertWorkCentre(tenantId, input.workCentreId)
   if (input.outputItemId) await assertItem(tenantId, input.outputItemId)
   if (input.defaultVendorId) await assertVendor(tenantId, input.defaultVendorId)
+  if (input.qcTestGroupId) {
+    const plan = await prisma.qualityInspectionPlan.findFirst({
+      where: { id: input.qcTestGroupId, tenantId, deletedAt: null },
+    })
+    if (!plan) throw new ValidationError('qcTestGroupId must reference an existing quality inspection plan')
+  }
   if (input.defaultMachineId) {
     const machine = await assertMachine(tenantId, input.defaultMachineId)
     if (input.workCentreId && machine.workCentreId !== input.workCentreId) {
@@ -279,26 +399,43 @@ export async function createOperation(
 ) {
   const version = await getRoutingVersion(tenantId, routingVersionId)
   assertDraft(version)
-  const stageGroup = await getStageGroup(tenantId, input.stageGroupId)
-  if (stageGroup.routingVersionId !== routingVersionId) {
-    throw new ValidationError('stageGroupId must belong to the same routing version')
+
+  if (!input.workCentreId) {
+    throw new ValidationError('workCentreId is required')
   }
-  await assertOperationRefs(tenantId, input)
+
+  let stageGroupId = input.stageGroupId
+  if (stageGroupId) {
+    const stageGroup = await getStageGroup(tenantId, stageGroupId)
+    if (stageGroup.routingVersionId !== routingVersionId) {
+      throw new ValidationError('stageGroupId must belong to the same routing version')
+    }
+  } else {
+    const defaultStage = await ensureDefaultStageGroup(tenantId, userId, routingVersionId)
+    stageGroupId = defaultStage.id
+  }
+
+  const qcTestGroupId = input.qualityRequired ? (input.qcTestGroupId ?? null) : null
+  await assertOperationRefs(tenantId, { ...input, qcTestGroupId })
+
+  const setupTimeMinutes = resolveSetupTimeMinutes(input)
 
   try {
     return await prisma.manufacturingRoutingOperation.create({
       data: {
         tenantId,
         routingVersionId,
-        stageGroupId: input.stageGroupId,
+        stageGroupId,
         code: input.code,
         name: input.name,
         sequence: input.sequence,
         description: input.description ?? null,
-        workCentreId: input.workCentreId ?? null,
+        workCentreId: input.workCentreId,
         defaultMachineId: input.defaultMachineId ?? null,
-        setupTimeMinutes: input.setupTimeMinutes,
+        setupTimeMinutes,
+        setupTimeUnit: input.setupTimeUnit,
         runTimeValue: input.runTimeValue,
+        runTimeUnit: input.runTimeUnit,
         runTimeBasis: input.runTimeBasis,
         workInstructions: input.workInstructions ?? null,
         drawingReference: input.drawingReference ?? null,
@@ -307,6 +444,7 @@ export async function createOperation(
         outputItemId: input.outputItemId ?? null,
         qualityRequired: input.qualityRequired,
         qualityPlanRef: input.qualityPlanRef ?? null,
+        qcTestGroupId,
         outsourced: input.outsourced,
         defaultVendorId: input.defaultVendorId ?? null,
         isOptional: input.isOptional,
@@ -342,16 +480,56 @@ export async function updateOperation(
       throw new ValidationError('stageGroupId must belong to the same routing version')
     }
   }
+
+  const workCentreId = input.workCentreId ?? operation.workCentreId
+  const qualityRequired = input.qualityRequired ?? operation.qualityRequired
+  const qcTestGroupId = qualityRequired
+    ? input.qcTestGroupId !== undefined
+      ? input.qcTestGroupId
+      : operation.qcTestGroupId
+    : null
+
+  let defaultMachineId = input.defaultMachineId !== undefined ? input.defaultMachineId : operation.defaultMachineId
+  if (input.workCentreId !== undefined && input.workCentreId !== operation.workCentreId) {
+    if (defaultMachineId) {
+      const machine = await prisma.manufacturingMachine.findFirst({
+        where: { id: defaultMachineId, tenantId, deletedAt: null },
+      })
+      if (!machine || machine.workCentreId !== workCentreId) {
+        defaultMachineId = null
+      }
+    }
+  }
+
   await assertOperationRefs(tenantId, {
-    workCentreId: input.workCentreId ?? operation.workCentreId,
-    defaultMachineId: input.defaultMachineId ?? operation.defaultMachineId,
+    workCentreId,
+    defaultMachineId,
     outputItemId: input.outputItemId,
     defaultVendorId: input.defaultVendorId,
+    qcTestGroupId,
   })
+
+  const setupTimeMinutes =
+    input.setupTimeValue !== undefined || input.setupTimeMinutes !== undefined || input.setupTimeUnit !== undefined
+      ? resolveSetupTimeMinutes({
+          setupTimeMinutes: input.setupTimeMinutes ?? Number(operation.setupTimeMinutes),
+          setupTimeValue: input.setupTimeValue,
+          setupTimeUnit: input.setupTimeUnit ?? operation.setupTimeUnit,
+        })
+      : undefined
+
+  const { setupTimeValue: _setupTimeValue, setupTimeMinutes: _setupTimeMinutes, ...restInput } = input
 
   return prisma.manufacturingRoutingOperation.update({
     where: { id: operationId, tenantId },
-    data: { ...input, updatedBy: userId },
+    data: {
+      ...restInput,
+      ...(setupTimeMinutes !== undefined ? { setupTimeMinutes } : {}),
+      ...(input.workCentreId !== undefined ? { workCentreId: input.workCentreId } : {}),
+      defaultMachineId,
+      qcTestGroupId,
+      updatedBy: userId,
+    },
   })
 }
 

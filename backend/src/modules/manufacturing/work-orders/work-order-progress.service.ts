@@ -61,7 +61,12 @@ async function executeRecordProgress(
     const existing = await client.productionStageLedger.findFirst({ where: { tenantId, idempotencyKey: input.idempotencyKey } })
     if (existing) {
       const stage = await client.productionOrderStage.findFirst({ where: { id: existing.stageId, tenantId } })
-      return { ledgerEntry: existing, stage, order: await client.productionOrder.findFirstOrThrow({ where: { id: orderId, tenantId } }) }
+      return {
+        ledgerEntry: existing,
+        stage,
+        order: await client.productionOrder.findFirstOrThrow({ where: { id: orderId, tenantId } }),
+        warnings: [] as string[],
+      }
     }
   }
 
@@ -100,10 +105,18 @@ async function executeRecordProgress(
   const toleratedMax = toDecimal(stage.plannedQuantity).times(
     new Prisma.Decimal(1).plus(overproductionTolerancePercent.dividedBy(100)),
   )
-  if (existingStageTotal.plus(additionalTotal).greaterThan(toleratedMax)) {
-    throw new ValidationError(
-      `Recording this progress (${additionalTotal.toString()}) would exceed the stage's planned quantity plus overproduction tolerance (max ${toleratedMax.toString()}, already recorded ${existingStageTotal.toString()})`,
-    )
+  const warnings: string[] = []
+  const overLimit = existingStageTotal.plus(additionalTotal).greaterThan(toleratedMax)
+  if (overLimit) {
+    if (settings.flexibleExecution) {
+      warnings.push(
+        `OVERPRODUCTION: recorded total would be ${existingStageTotal.plus(additionalTotal).toString()} vs tolerated max ${toleratedMax.toString()}`,
+      )
+    } else {
+      throw new ValidationError(
+        `Recording this progress (${additionalTotal.toString()}) would exceed the stage's planned quantity plus overproduction tolerance (max ${toleratedMax.toString()}, already recorded ${existingStageTotal.toString()})`,
+      )
+    }
   }
 
   const finalStageId = await getFinalStageId(client, tenantId, orderId)
@@ -184,8 +197,10 @@ async function executeRecordProgress(
         productionOrderId: orderId,
         activityType: 'PROGRESS_RECORDED',
         userId,
-        message: `Progress recorded on stage "${stage.name}": good ${goodQuantity.toString()}, rework ${reworkQuantity.toString()}, rejected ${rejectedQuantity.toString()}, scrap ${scrapQuantity.toString()}`,
-        newValue: resultingBalanceJson,
+        message:
+          `Progress recorded on stage "${stage.name}": good ${goodQuantity.toString()}, rework ${reworkQuantity.toString()}, rejected ${rejectedQuantity.toString()}, scrap ${scrapQuantity.toString()}`
+          + (warnings.length ? ` (${warnings.join('; ')})` : ''),
+        newValue: { ...resultingBalanceJson, warnings },
         sourceTransactionId: ledgerEntry.id,
       },
       client,
@@ -197,6 +212,7 @@ async function executeRecordProgress(
     ledgerEntry,
     stage: updatedStage,
     order: await client.productionOrder.findFirstOrThrow({ where: { id: orderId, tenantId } }),
+    warnings,
   }
 }
 
@@ -231,8 +247,18 @@ export async function completeStage(req: Request, tenantId: string, orderId: str
 
   const stage = await prisma.productionOrderStage.findFirst({ where: { id: input.stageId, productionOrderId: orderId, tenantId } })
   if (!stage) throw new NotFoundError('Stage not found on this work order')
-  if (stage.status !== 'IN_PROGRESS' && stage.status !== 'READY') {
+  if (stage.status !== 'IN_PROGRESS' && stage.status !== 'READY' && stage.status !== 'QC_PENDING') {
     throw new InvalidStateError(`Cannot complete a stage in ${stage.status} status`)
+  }
+
+  const settings = await getManufacturingSettingsForTenant(tenantId)
+  const flexible = Boolean(settings.flexibleExecution)
+  // requireQc / skipQcGate:false forces QC_PENDING even under flexible execution.
+  const qualityGateApplies = Boolean(stage.qualityRequired) || input.requireQc === true
+  const forceStrictQc = input.skipQcGate === false || input.requireQc === true
+  const bypassQc = qualityGateApplies && !forceStrictQc && (Boolean(input.skipQcGate) || flexible)
+  if (bypassQc && input.skipQcGate === true && !input.qcOverrideReason?.trim() && !flexible) {
+    throw new ValidationError('qcOverrideReason is required when skipQcGate is true')
   }
 
   const profile = await prisma.manufacturingProfile.findFirst({ where: { id: order.manufacturingProfileId, tenantId } })
@@ -240,9 +266,18 @@ export async function completeStage(req: Request, tenantId: string, orderId: str
   const minimumRequiredGood = toDecimal(stage.plannedQuantity).times(
     new Prisma.Decimal(1).minus(underproductionTolerancePercent.dividedBy(100)),
   )
-  if (toDecimal(stage.goodQuantity).lessThan(minimumRequiredGood)) {
-    throw new ValidationError(
-      `Stage "${stage.name}" good quantity (${toDecimal(stage.goodQuantity).toString()}) is below the minimum required to complete (${minimumRequiredGood.toString()}, tolerance ${underproductionTolerancePercent.toString()}%)`,
+  const stageGood = toDecimal(stage.goodQuantity)
+  const underproduced = stageGood.lessThan(minimumRequiredGood)
+  const underproductionNote = underproduced
+    ? ` (underproduction allowed: good ${stageGood.toString()} < minimum ${minimumRequiredGood.toString()}, tolerance ${underproductionTolerancePercent.toString()}%)`
+    : ''
+  const warnings: string[] = []
+  if (underproduced) warnings.push('UNDERPRODUCTION')
+  if (bypassQc && qualityGateApplies) {
+    warnings.push(
+      input.qcOverrideReason?.trim()
+        ? `QC_OVERRIDE:${input.qcOverrideReason.trim()}`
+        : 'QC_DEFERRED_FLEXIBLE_EXECUTION',
     )
   }
 
@@ -257,13 +292,17 @@ export async function completeStage(req: Request, tenantId: string, orderId: str
       })
     }
 
-    if (stage.qualityRequired) {
+    if (qualityGateApplies && !bypassQc) {
+      // Reload quantities so inspection inspectedQty reflects progress recorded just before complete.
+      const stageForQc = await tx.productionOrderStage.findFirstOrThrow({
+        where: { id: stage.id, tenantId },
+      })
       const qcPendingStage = await tx.productionOrderStage.update({
         where: { id: stage.id },
         data: { status: 'QC_PENDING' },
       })
 
-      const inspectionRow = await createPendingStageInspection(tx, tenantId, orderId, stage, order, userId)
+      const inspectionRow = await createPendingStageInspection(tx, tenantId, orderId, stageForQc, order, userId)
       const qualityStatus = order.qualityStatus === 'NOT_APPLICABLE' || order.qualityStatus === 'PENDING_INTEGRATION'
         ? 'PENDING_QC'
         : 'IN_QC'
@@ -279,7 +318,7 @@ export async function completeStage(req: Request, tenantId: string, orderId: str
           productionOrderId: orderId,
           activityType: 'QC_REQUESTED',
           userId,
-          message: `Stage "${stage.name}" awaiting QC (${inspectionRow.inspectionNumber})`,
+          message: `Stage "${stage.name}" awaiting QC (${inspectionRow.inspectionNumber})${underproductionNote}`,
           reason: input.remarks ?? null,
         },
         tx,
@@ -293,6 +332,7 @@ export async function completeStage(req: Request, tenantId: string, orderId: str
         awaitingQuality: true as const,
         promotedStages: [] as ProductionOrderStage[],
         order: await tx.productionOrder.findFirstOrThrow({ where: { id: orderId, tenantId } }),
+        warnings,
       }
     }
 
@@ -304,8 +344,12 @@ export async function completeStage(req: Request, tenantId: string, orderId: str
         productionOrderId: orderId,
         activityType: 'STAGE_COMPLETED',
         userId,
-        message: `Stage "${stage.name}" completed`,
-        reason: input.remarks ?? null,
+        message:
+          `Stage "${stage.name}" completed${underproductionNote}`
+          + (bypassQc && stage.qualityRequired
+            ? ` (QC gate skipped${input.qcOverrideReason ? `: ${input.qcOverrideReason}` : ' — flexible execution'})`
+            : ''),
+        reason: input.qcOverrideReason ?? input.remarks ?? null,
       },
       tx,
     )
@@ -315,6 +359,7 @@ export async function completeStage(req: Request, tenantId: string, orderId: str
       awaitingQuality: false as const,
       promotedStages: promotion.promotedStages,
       order: await tx.productionOrder.findFirstOrThrow({ where: { id: orderId, tenantId } }),
+      warnings,
     }
   })
 

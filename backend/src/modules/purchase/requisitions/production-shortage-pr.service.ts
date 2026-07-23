@@ -36,7 +36,7 @@ export async function createFromProductionShortage(
       },
       include: prInclude,
     })
-    if (existing) return mapPurchaseRequisitionToDto(existing)
+    if (existing) return withProductionShortageShape(mapPurchaseRequisitionToDto(existing))
   }
 
   const itemIds = [...new Set(input.lines.map((line) => line.itemId))]
@@ -105,9 +105,21 @@ export async function createFromProductionShortage(
   })
 
   if (input.submit) {
-    return submitPurchaseRequisition(tenantId, created.id, actorId, {})
+    const submitted = await submitPurchaseRequisition(tenantId, created.id, actorId, {})
+    return withProductionShortageShape(submitted)
   }
 
   const loaded = await findPurchaseRequisitionById(tenantId, created.id)
-  return mapPurchaseRequisitionToDto(loaded!)
+  return withProductionShortageShape(mapPurchaseRequisitionToDto(loaded!))
+}
+
+function withProductionShortageShape<T extends { lines: Array<{ requiredQuantity: number }> }>(dto: T) {
+  return {
+    ...dto,
+    source: 'PRODUCTION_SHORTAGE' as const,
+    lines: dto.lines.map((line) => ({
+      ...line,
+      quantity: line.requiredQuantity,
+    })),
+  }
 }

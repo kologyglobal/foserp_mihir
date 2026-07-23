@@ -45,7 +45,7 @@ async function assertBomVersionMatchesProduct(tenantId: string, bomVersionId: st
   })
   if (!version) throw new ValidationError(`BOM version not found in tenant: ${bomVersionId}`)
   if (version.bom.productItemId !== productItemId) {
-    throw new ValidationError('defaultBomVersionId must belong to a BOM for the same productItemId')
+    throw new ValidationError('defaultBomVersionId must belong to a BOM for the same item')
   }
 }
 
@@ -56,7 +56,7 @@ async function assertRoutingVersionMatchesProduct(tenantId: string, routingVersi
   })
   if (!version) throw new ValidationError(`Routing version not found in tenant: ${routingVersionId}`)
   if (version.routing.productItemId && version.routing.productItemId !== productItemId) {
-    throw new ValidationError('defaultRoutingVersionId must belong to a routing for the same productItemId')
+    throw new ValidationError('defaultRoutingVersionId must belong to a routing for the same item')
   }
 }
 

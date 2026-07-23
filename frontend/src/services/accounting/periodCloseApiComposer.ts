@@ -1,9 +1,7 @@
 /**
- * Period Close Phase 1 — API-mode composition (no dedicated readiness BE).
- * Uses AccountingPeriod, AP close-gate, journals, bank recon sessions.
+ * Period Close — API-mode composition via backend close-readiness aggregator.
  */
 
-import { listJournals } from '@/services/bridges/journalApiBridge'
 import {
   closePeriod as bridgeClosePeriod,
   ensureLegalEntity,
@@ -12,22 +10,28 @@ import {
   markPeriodUnderReview as bridgeMarkUnderReview,
   reopenPeriod as bridgeReopenPeriod,
 } from '@/services/bridges/financeApiBridge'
-import { getLatestPayableCloseGateRun } from '@/services/bridges/payablesApiBridge'
-import { fetchReconciliationSessions } from '@/modules/accounting/treasury/bank-reconciliation/api/bank-reconciliation.api'
+import {
+  getPeriodCloseReadiness as fetchCloseReadiness,
+  listPeriodCloseChecklistAcks,
+  upsertPeriodCloseChecklistAcks,
+  type PeriodCloseReadinessApi,
+  type PeriodCloseReadinessApiCheck,
+} from '@/services/api/financeApi'
 import type { AccountingPeriod, FinancialYear, LegalEntity } from '@/types/financeSetup'
-import type { Journal } from '@/types/journals'
 import type {
   CloseDashboardData,
   CloseTask,
+  CloseTaskStatus,
   CloseWorkflowStage,
   ModulePeriodLock,
+  PeriodCloseChecklistAck,
   PeriodCloseReadiness,
   PeriodCloseReadinessCheck,
+  PeriodCloseReadinessCheckCode,
+  PeriodCloseReadinessSeverity,
   PeriodCloseSetup,
   PeriodFilterState,
 } from '@/types/periodClose'
-
-const UNPOSTED_JOURNAL_STATUSES = new Set(['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'SENT_BACK'])
 
 function dateOnly(value: string): string {
   return value.slice(0, 10)
@@ -125,64 +129,6 @@ export async function resolveApiPeriodFilter(filter?: PeriodFilterState): Promis
   return { le, fy, period, filter: nextFilter }
 }
 
-async function loadUnpostedJournals(legalEntityId: string, period: AccountingPeriod): Promise<Journal[]> {
-  try {
-    const rows = await listJournals({
-      legalEntityId,
-      postingDateFrom: dateOnly(period.startDate),
-      postingDateTo: dateOnly(period.endDate),
-      limit: 100,
-      page: 1,
-    })
-    return rows.filter((j) => UNPOSTED_JOURNAL_STATUSES.has(j.status))
-  } catch {
-    return []
-  }
-}
-
-async function loadApCloseGate(
-  legalEntityId: string,
-  periodId: string,
-): Promise<{ status: string | null; message: string; available: boolean }> {
-  try {
-    const detail = await getLatestPayableCloseGateRun(periodId, legalEntityId)
-    if (!detail?.run) {
-      return {
-        status: null,
-        available: true,
-        message: 'No AP close-gate run for this period yet. Run assessment from Money Out → Close Gate.',
-      }
-    }
-    return {
-      status: detail.run.status,
-      available: true,
-      message: `Latest AP close gate: ${detail.run.status} (${detail.run.checksPassed}/${detail.run.checksTotal} passed).`,
-    }
-  } catch {
-    return {
-      status: null,
-      available: false,
-      message: 'AP close gate unavailable (permission or API error). Soft warning only.',
-    }
-  }
-}
-
-async function loadBankReconOpenCount(legalEntityId: string, period: AccountingPeriod): Promise<number> {
-  try {
-    const page = await fetchReconciliationSessions({ legalEntityId, page: 1, limit: 50 })
-    const start = dateOnly(period.startDate)
-    const end = dateOnly(period.endDate)
-    return page.items.filter((s) => {
-      if (s.status === 'FINALIZED' || s.status === 'CANCELLED') return false
-      const sStart = dateOnly(s.statementStartDate)
-      const sEnd = dateOnly(s.statementEndDate)
-      return sStart <= end && sEnd >= start
-    }).length
-  } catch {
-    return -1
-  }
-}
-
 function workflowFromStatus(status: string): CloseWorkflowStage {
   switch (status) {
     case 'CLOSED':
@@ -211,162 +157,67 @@ function statusLabel(status: string): string {
   }
 }
 
-export async function composePeriodCloseReadiness(filter?: PeriodFilterState): Promise<PeriodCloseReadiness> {
-  const { le, period } = await resolveApiPeriodFilter(filter)
-  const [unposted, apGate, bankOpen] = await Promise.all([
-    loadUnpostedJournals(le.id, period),
-    loadApCloseGate(le.id, period.id),
-    loadBankReconOpenCount(le.id, period),
-  ])
-
-  const checks: PeriodCloseReadinessCheck[] = []
-
-  if (period.status === 'CLOSED') {
-    checks.push({
-      code: 'PERIOD_STATUS',
-      label: 'Period status',
-      status: 'completed',
-      severity: 'ok',
-      message: `${period.name} is CLOSED. Journal posting into this period is blocked.`,
-      href: '/accounting/period-close/period-locking',
-    })
-  } else if (period.status === 'UNDER_REVIEW') {
-    checks.push({
-      code: 'PERIOD_STATUS',
-      label: 'Period status',
-      status: 'ready_for_review',
-      severity: 'warning',
-      message: `${period.name} is UNDER_REVIEW. Close when ready.`,
-      href: '/accounting/period-close/period-locking',
-    })
-  } else {
-    checks.push({
-      code: 'PERIOD_STATUS',
-      label: 'Period status',
-      status: period.status === 'REOPENED' ? 'reopened' : 'in_progress',
-      severity: 'info',
-      message: `${period.name} is ${period.status}. Soft readiness checks below do not hard-block close.`,
-      href: '/accounting/period-close/period-locking',
-    })
+function mapSeverity(sev: PeriodCloseReadinessApiCheck['severity']): PeriodCloseReadinessSeverity {
+  switch (sev) {
+    case 'PASS':
+      return 'ok'
+    case 'WARN':
+      return 'warning'
+    case 'BLOCK':
+      return 'blocking'
+    default:
+      return 'info'
   }
+}
 
-  if (!apGate.available) {
-    checks.push({
-      code: 'AP_CLOSE_GATE',
-      label: 'AP close gate',
-      status: 'waiting',
-      severity: 'warning',
-      message: apGate.message,
-      href: '/accounting/money-out/close-gate',
-    })
-  } else if (!apGate.status) {
-    checks.push({
-      code: 'AP_CLOSE_GATE',
-      label: 'AP close gate',
-      status: 'not_started',
-      severity: 'warning',
-      message: apGate.message,
-      href: '/accounting/money-out/close-gate',
-    })
-  } else if (apGate.status === 'PASS') {
-    checks.push({
-      code: 'AP_CLOSE_GATE',
-      label: 'AP close gate',
-      status: 'completed',
-      severity: 'ok',
-      message: apGate.message,
-      href: '/accounting/money-out/close-gate',
-    })
-  } else if (apGate.status === 'PASS_WITH_WARNINGS') {
-    checks.push({
-      code: 'AP_CLOSE_GATE',
-      label: 'AP close gate',
-      status: 'ready_for_review',
-      severity: 'warning',
-      message: apGate.message,
-      href: '/accounting/money-out/close-gate',
-    })
-  } else {
-    checks.push({
-      code: 'AP_CLOSE_GATE',
-      label: 'AP close gate',
-      status: 'blocked',
-      severity: 'blocking',
-      message: apGate.message,
-      href: '/accounting/money-out/close-gate',
-    })
-  }
+function mapTaskStatus(check: PeriodCloseReadinessApiCheck, periodStatus: string): CloseTaskStatus {
+  if (check.severity === 'PASS') return 'completed'
+  if (check.severity === 'BLOCK') return 'blocked'
+  if (check.key === 'PERIOD_STATUS' && periodStatus === 'UNDER_REVIEW') return 'ready_for_review'
+  if (check.key === 'PERIOD_STATUS' && periodStatus === 'REOPENED') return 'reopened'
+  return 'in_progress'
+}
 
-  if (unposted.length === 0) {
-    checks.push({
-      code: 'UNPOSTED_JOURNALS',
-      label: 'Unposted journals',
-      status: 'completed',
-      severity: 'ok',
-      message: 'No draft / pending / approved (unposted) journals in this period date range.',
-      href: '/accounting/entries/journals',
-      count: 0,
-    })
-  } else {
-    checks.push({
-      code: 'UNPOSTED_JOURNALS',
-      label: 'Unposted journals',
-      status: 'in_progress',
-      severity: 'warning',
-      message: `${unposted.length} unposted journal(s) with posting date in ${period.name}. Soft warning — close still allowed.`,
-      href: '/accounting/entries/journals',
-      count: unposted.length,
-    })
-  }
-
-  if (bankOpen < 0) {
-    checks.push({
-      code: 'BANK_RECON',
-      label: 'Bank reconciliation',
-      status: 'waiting',
-      severity: 'info',
-      message: 'Bank reconciliation status unavailable (permission or API error).',
-      href: '/accounting/bank-cash/reconciliation',
-    })
-  } else if (bankOpen === 0) {
-    checks.push({
-      code: 'BANK_RECON',
-      label: 'Bank reconciliation',
-      status: 'completed',
-      severity: 'ok',
-      message: 'No open bank reconciliation sessions overlapping this period.',
-      href: '/accounting/bank-cash/reconciliation',
-      count: 0,
-    })
-  } else {
-    checks.push({
-      code: 'BANK_RECON',
-      label: 'Bank reconciliation',
-      status: 'in_progress',
-      severity: 'warning',
-      message: `${bankOpen} open bank reconciliation session(s) overlap this period. Soft warning.`,
-      href: '/accounting/bank-cash/reconciliation',
-      count: bankOpen,
-    })
-  }
-
-  const completed = checks.filter((c) => c.status === 'completed' || c.status === 'not_applicable').length
-  const blockingCount = checks.filter((c) => c.severity === 'blocking').length
-  const warningCount = checks.filter((c) => c.severity === 'warning').length
-
+function mapCheck(check: PeriodCloseReadinessApiCheck, periodStatus: string): PeriodCloseReadinessCheck {
   return {
-    periodId: period.id,
-    periodCode: periodCodeFromStart(period.startDate),
-    periodLabel: period.name,
-    periodStatus: period.status,
-    legalEntityId: le.id,
-    overallProgressPct: checks.length ? Math.round((completed / checks.length) * 100) : 0,
-    blockingCount,
-    warningCount,
-    unpostedJournalCount: unposted.length,
-    checks,
-    canCloseSoft: period.status !== 'CLOSED',
+    code: check.key as PeriodCloseReadinessCheckCode,
+    label: check.label,
+    status: mapTaskStatus(check, periodStatus),
+    severity: mapSeverity(check.severity),
+    message: check.message,
+    href: check.href,
+    count: check.count,
+    featureEnabled: check.featureEnabled,
   }
+}
+
+function mapApiReadiness(api: PeriodCloseReadinessApi, periodCode: string): PeriodCloseReadiness {
+  const checks = api.checks.map((c) => mapCheck(c, api.periodStatus))
+  const completed = checks.filter((c) => c.status === 'completed' || c.status === 'not_applicable').length
+  return {
+    periodId: api.periodId,
+    periodCode,
+    periodLabel: api.periodName,
+    periodStatus: api.periodStatus,
+    legalEntityId: api.legalEntityId,
+    overallProgressPct: checks.length ? Math.round((completed / checks.length) * 100) : 0,
+    blockingCount: api.blockingCount,
+    warningCount: api.warningCount,
+    unpostedJournalCount: api.unpostedJournalCount,
+    openBankReconCount: api.openBankReconCount,
+    checks,
+    canCloseSoft: api.periodStatus !== 'CLOSED',
+    hardBlockEnabled: api.hardBlockEnabled,
+    canClose: api.canClose,
+    blockers: api.blockers.map((c) => mapCheck(c, api.periodStatus)),
+  }
+}
+
+export async function composePeriodCloseReadiness(filter?: PeriodFilterState): Promise<PeriodCloseReadiness> {
+  const { period } = await resolveApiPeriodFilter(filter)
+  const res = await fetchCloseReadiness(period.id)
+  if (!res.data) throw new Error(res.message || 'Failed to load close readiness')
+  return mapApiReadiness(res.data, periodCodeFromStart(period.startDate))
 }
 
 export async function buildApiCloseDashboard(filter?: PeriodFilterState): Promise<CloseDashboardData> {
@@ -374,6 +225,9 @@ export async function buildApiCloseDashboard(filter?: PeriodFilterState): Promis
   const { period } = await resolveApiPeriodFilter(filter)
   const completed = readiness.checks.filter((c) => c.status === 'completed' || c.status === 'not_applicable').length
   const pending = readiness.checks.length - completed
+  const hardNote = readiness.hardBlockEnabled
+    ? 'Hard-block close is ON — blockers must be cleared before close.'
+    : 'Hard-block close is OFF — blockers are advisory only.'
 
   return {
     periodCode: readiness.periodCode,
@@ -384,11 +238,9 @@ export async function buildApiCloseDashboard(filter?: PeriodFilterState): Promis
     tasksPending: pending,
     overdueTasks: 0,
     unpostedDocuments: readiness.unpostedJournalCount,
-    reconciliationDifferences: readiness.checks.some((c) => c.code === 'BANK_RECON' && (c.count ?? 0) > 0)
-      ? (readiness.checks.find((c) => c.code === 'BANK_RECON')?.count ?? 0)
-      : 0,
+    reconciliationDifferences: readiness.openBankReconCount ?? 0,
     blockingExceptions: readiness.blockingCount,
-    periodStatusLabel: statusLabel(readiness.periodStatus),
+    periodStatusLabel: `${statusLabel(readiness.periodStatus)} · ${hardNote}`,
     deptProgress: [
       {
         department: 'General Ledger',
@@ -409,14 +261,12 @@ export async function buildApiCloseDashboard(filter?: PeriodFilterState): Promis
         pct: readiness.checks.find((c) => c.code === 'BANK_RECON')?.status === 'completed' ? 100 : 0,
       },
     ],
-    criticalBlockers: readiness.checks
-      .filter((c) => c.severity === 'blocking')
-      .map((c) => ({
-        id: c.code,
-        title: c.message,
-        module: c.label,
-        href: c.href ?? '/accounting/period-close/checklist',
-      })),
+    criticalBlockers: (readiness.blockers ?? readiness.checks.filter((c) => c.severity === 'blocking')).map((c) => ({
+      id: c.code,
+      title: c.message,
+      module: c.label,
+      href: c.href ?? '/accounting/period-close/checklist',
+    })),
     pendingReconciliations: [],
     unpostedItems: [],
     approvalWorklist: readiness.checks
@@ -467,9 +317,11 @@ export async function buildApiCloseTasks(filter?: PeriodFilterState): Promise<Cl
         ? 'purchase_ap'
         : c.code === 'BANK_RECON'
           ? 'bank_cash'
-          : c.code === 'UNPOSTED_JOURNALS'
-            ? 'general_ledger'
-            : 'general_ledger',
+          : c.code === 'INVENTORY_GL'
+            ? 'inventory'
+            : c.code === 'MFG_GL'
+              ? 'manufacturing'
+              : 'general_ledger',
     owner: 'Finance',
     reviewer: 'Finance Manager',
     dueDate: dateOnly(new Date().toISOString()),
@@ -477,7 +329,13 @@ export async function buildApiCloseTasks(filter?: PeriodFilterState): Promise<Cl
     status: c.status,
     completionPct: c.status === 'completed' || c.status === 'not_applicable' ? 100 : c.status === 'not_started' ? 0 : 40,
     evidence: c.message,
-    comments: c.severity === 'blocking' ? 'Soft advisory — period close API does not hard-block on this check.' : undefined,
+    comments: readiness.hardBlockEnabled
+      ? c.severity === 'blocking'
+        ? 'Hard-block enabled — must clear before close.'
+        : undefined
+      : c.severity === 'blocking'
+        ? 'Advisory blocker — hard-block close is off.'
+        : undefined,
   }))
 }
 
@@ -517,4 +375,17 @@ export async function apiMarkPeriodUnderReview(periodId: string) {
 export async function listApiPeriodsForLocking(filter?: PeriodFilterState): Promise<AccountingPeriod[]> {
   const { le, fy } = await resolveApiPeriodFilter(filter)
   return listPeriods(le.id, fy.id)
+}
+
+export async function apiListChecklistAcks(periodId: string): Promise<PeriodCloseChecklistAck[]> {
+  const res = await listPeriodCloseChecklistAcks(periodId)
+  return res.data ?? []
+}
+
+export async function apiUpsertChecklistAcks(
+  periodId: string,
+  items: Array<{ checkKey: string; status: 'ACK' | 'NA'; note?: string | null }>,
+): Promise<PeriodCloseChecklistAck[]> {
+  const res = await upsertPeriodCloseChecklistAcks(periodId, items)
+  return res.data ?? []
 }

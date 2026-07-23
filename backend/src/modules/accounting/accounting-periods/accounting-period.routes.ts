@@ -10,6 +10,7 @@ import {
   listPeriodsQuerySchema,
   reopenPeriodSchema,
   updatePeriodSchema,
+  upsertChecklistAcksSchema,
 } from './accounting-period.validation.js'
 import * as controller from './accounting-period.controller.js'
 
@@ -26,6 +27,25 @@ router.use(
 router.get('/', requirePermission('finance.period.view'), validateQuery(listPeriodsQuerySchema), controller.listPeriods)
 router.post('/generate', requirePermission('finance.period.manage'), validateBody(generatePeriodsSchema), controller.generatePeriods)
 router.get('/:id', validateParams(uuidParamSchema), requirePermission('finance.period.view'), controller.getPeriod)
+router.get(
+  '/:id/close-readiness',
+  validateParams(uuidParamSchema),
+  requirePermission('finance.period.view'),
+  controller.getCloseReadiness,
+)
+router.get(
+  '/:id/checklist-acks',
+  validateParams(uuidParamSchema),
+  requirePermission('finance.period.view'),
+  controller.listChecklistAcks,
+)
+router.put(
+  '/:id/checklist-acks',
+  validateParams(uuidParamSchema),
+  requirePermission('finance.period.manage'),
+  validateBody(upsertChecklistAcksSchema),
+  controller.upsertChecklistAcks,
+)
 router.put(
   '/:id',
   validateParams(uuidParamSchema),

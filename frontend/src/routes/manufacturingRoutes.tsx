@@ -39,6 +39,7 @@ import { ProfilesSetupPage } from '@/modules/manufacturing/setup/ProfilesSetupPa
 import { BomsSetupPage } from '@/modules/manufacturing/setup/boms/BomsSetupPage'
 import { BomVersionEditorPage } from '@/modules/manufacturing/setup/boms/BomVersionEditorPage'
 import { RoutingsSetupPage } from '@/modules/manufacturing/setup/routings/RoutingsSetupPage'
+import { RoutingCreatePage } from '@/modules/manufacturing/setup/routings/RoutingCreatePage'
 import { RoutingVersionEditorPage } from '@/modules/manufacturing/setup/routings/RoutingVersionEditorPage'
 import { CorrectionsRegisterPage } from '@/modules/manufacturing/corrections/CorrectionsRegisterPage'
 import { StoreWorkbenchPage } from '@/modules/manufacturing/store-workbench/StoreWorkbenchPage'
@@ -70,7 +71,7 @@ export const manufacturingRouteChildren: RouteObject[] = [
   { path: 'manufacturing/bom/:bomId/edit', element: isApiMode() ? <Navigate to="/manufacturing/setup/boms" replace /> : <BomFormPage /> },
   { path: 'manufacturing/bom/:bomId', element: isApiMode() ? <Navigate to="/manufacturing/setup/boms" replace /> : <BomDetailPage /> },
   { path: 'manufacturing/routes', element: isApiMode() ? <Navigate to="/manufacturing/setup/routings" replace /> : <RouteRegisterPage /> },
-  { path: 'manufacturing/routes/new', element: isApiMode() ? <Navigate to="/manufacturing/setup/routings" replace /> : <RouteFormPage /> },
+  { path: 'manufacturing/routes/new', element: isApiMode() ? <Navigate to="/manufacturing/setup/routings/new" replace /> : <RouteFormPage /> },
   { path: 'manufacturing/routes/:routeId/edit', element: isApiMode() ? <Navigate to="/manufacturing/setup/routings" replace /> : <RouteFormPage /> },
   { path: 'manufacturing/routes/:routeId', element: isApiMode() ? <Navigate to="/manufacturing/setup/routings" replace /> : <RouteDetailPage /> },
   /** Production Plans (Phase 6A) — dual-mode: demo store or live `/manufacturing/plans`. */
@@ -116,6 +117,7 @@ export const manufacturingRouteChildren: RouteObject[] = [
   { path: 'manufacturing/setup/boms/:bomId', element: <BomVersionEditorPage /> },
   { path: 'manufacturing/setup/bom-versions/:versionId', element: <BomVersionEditorPage /> },
   { path: 'manufacturing/setup/routings', element: <RoutingsSetupPage /> },
+  { path: 'manufacturing/setup/routings/new', element: <RoutingCreatePage /> },
   { path: 'manufacturing/setup/routings/:routingId', element: <RoutingVersionEditorPage /> },
   { path: 'manufacturing/setup/routing-versions/:versionId', element: <RoutingVersionEditorPage /> },
 ]

@@ -42,6 +42,7 @@ import { useSetupLookup } from '../setup/useSetupLookups'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { useManufacturingWorkOrderPermissions } from '@/utils/permissions/manufacturing'
+import { cn } from '@/utils/cn'
 import {
   ProductionEmptyState,
   ProductionPageHeader,
@@ -52,19 +53,40 @@ import {
 
 const EMPTY_SUMMARY: WorkOrdersSummary = { total: 0, byStatus: [], byHealth: [] }
 
-function sourceCustomerLabel(wo: ProductionOrder): string {
-  const source =
-    wo.sourceType === 'SALES_ORDER'
-      ? 'Sales Order'
-      : wo.sourceType.replace(/_/g, ' ')
-  if (wo.customerId) return `${source} · ${wo.customerId.slice(0, 8)}…`
-  return source
+function sourceLabel(wo: ProductionOrder): string {
+  if (wo.sourceType === 'SALES_ORDER') return 'Sales Order'
+  if (wo.sourceType === 'MANUAL') return 'Manual'
+  return wo.sourceType.replace(/_/g, ' ')
 }
 
-function completionPct(wo: ProductionOrder): string {
+function productTitle(wo: ProductionOrder, fallbackLabel: string): { name: string; code: string } {
+  const name = wo.productItemName?.trim() || fallbackLabel
+  const code = wo.productItemCode?.trim() || ''
+  return { name, code }
+}
+
+function completionPct(wo: ProductionOrder): number {
   const n = Number(wo.completionPercent)
-  if (!Number.isFinite(n)) return '—'
-  return `${Math.min(100, Math.max(0, Math.round(n)))}%`
+  if (!Number.isFinite(n)) return 0
+  return Math.min(100, Math.max(0, Math.round(n)))
+}
+
+function CompletionCell({ wo }: { wo: ProductionOrder }) {
+  const pct = completionPct(wo)
+  return (
+    <div className="min-w-[96px]">
+      <div className="mb-0.5 text-[11px] font-semibold tabular-nums text-erp-text">{pct}%</div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-erp-surface-alt">
+        <div
+          className={cn(
+            'h-full rounded-full',
+            pct >= 100 ? 'bg-emerald-500' : pct > 0 ? 'bg-sky-500' : 'bg-slate-300',
+          )}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  )
 }
 
 export function ApiWorkOrderRegisterPage() {
@@ -79,7 +101,7 @@ export function ApiWorkOrderRegisterPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const itemLabel = useCallback(
-    (id: string) => items.find((i) => i.id === id)?.label ?? `${id.slice(0, 8)}…`,
+    (id: string) => items.find((i) => i.id === id)?.label ?? 'Item',
     [items],
   )
 
@@ -206,43 +228,90 @@ export function ApiWorkOrderRegisterPage() {
         accessorKey: 'workOrderNo',
         header: 'WO',
         cell: ({ row }) => (
-          <TableLink to={`/manufacturing/work-orders/${row.original.id}`} className="font-mono font-semibold">
-            {row.original.workOrderNo}
-          </TableLink>
+          <div className="min-w-[108px]">
+            <TableLink to={`/manufacturing/work-orders/${row.original.id}`} className="font-mono text-[13px] font-semibold">
+              {row.original.workOrderNo}
+            </TableLink>
+            {row.original.jobNumber ? (
+              <p className="mt-0.5 text-[11px] text-erp-muted">Job {row.original.jobNumber}</p>
+            ) : null}
+          </div>
         ),
       },
       {
         id: 'product',
-        header: 'Product',
-        cell: ({ row }) => <span className="text-[12px] text-erp-text">{itemLabel(row.original.productItemId)}</span>,
+        header: 'Item',
+        cell: ({ row }) => {
+          const product = productTitle(row.original, itemLabel(row.original.productItemId))
+          return (
+            <div className="min-w-0 max-w-[240px]">
+              <p className="truncate text-[13px] font-medium text-erp-text">{product.name}</p>
+              {product.code ? (
+                <p className="truncate font-mono text-[11px] text-erp-muted">{product.code}</p>
+              ) : null}
+            </div>
+          )
+        },
       },
       {
         id: 'source',
         header: 'Source / Customer',
-        cell: ({ row }) => <span className="text-[12px] text-erp-muted">{sourceCustomerLabel(row.original)}</span>,
+        cell: ({ row }) => {
+          const wo = row.original
+          const soNo = wo.salesOrderNo?.trim()
+          const customer = wo.customerName?.trim() || wo.customerCode?.trim()
+          return (
+            <div className="min-w-0 max-w-[220px]">
+              <p className="truncate text-[12px] font-medium text-erp-text">
+                {sourceLabel(wo)}
+                {soNo ? ` · ${soNo}` : ''}
+              </p>
+              <p className="truncate text-[11px] text-erp-muted">{customer || '—'}</p>
+            </div>
+          )
+        },
       },
       {
         accessorKey: 'plannedQuantity',
         header: 'Qty',
-        cell: ({ row }) => <span className="tabular-nums">{row.original.plannedQuantity}</span>,
+        cell: ({ row }) => {
+          const planned = row.original.plannedQuantity
+          const done = row.original.completedGoodQuantity
+          return (
+            <div className="tabular-nums">
+              <p className="text-[12px] font-semibold text-erp-text">{planned}</p>
+              <p className="text-[10px] text-erp-muted">Done {done || '0'}</p>
+            </div>
+          )
+        },
       },
       {
         id: 'currentStage',
         header: 'Current Stage',
-        cell: ({ row }) => (
-          <span className="text-[12px] text-erp-muted">{row.original.currentStageId ? 'In progress' : '—'}</span>
-        ),
+        cell: ({ row }) => {
+          const name = row.original.currentStageName?.trim()
+          const code = row.original.currentStageCode?.trim()
+          if (!name && !code) {
+            return <span className="text-[12px] text-erp-muted">—</span>
+          }
+          return (
+            <div className="min-w-0 max-w-[160px]">
+              <p className="truncate text-[12px] font-medium text-erp-text">{name || code}</p>
+              {name && code ? <p className="truncate font-mono text-[10px] text-erp-muted">{code}</p> : null}
+            </div>
+          )
+        },
       },
       {
         id: 'completion',
         header: 'Completion',
-        cell: ({ row }) => <span className="tabular-nums font-medium text-erp-text">{completionPct(row.original)}</span>,
+        cell: ({ row }) => <CompletionCell wo={row.original} />,
       },
       {
         accessorKey: 'requiredCompletionDate',
         header: 'Due',
         cell: ({ row }) => (
-          <span className="tabular-nums">
+          <span className="tabular-nums text-[12px] text-erp-text">
             {row.original.requiredCompletionDate ? formatDate(row.original.requiredCompletionDate) : '—'}
           </span>
         ),
@@ -251,9 +320,7 @@ export function ApiWorkOrderRegisterPage() {
         id: 'supervisor',
         header: 'Supervisor',
         cell: ({ row }) => (
-          <span className="font-mono text-[11px] text-erp-muted">
-            {row.original.supervisorId ? `${row.original.supervisorId.slice(0, 8)}…` : '—'}
-          </span>
+          <span className="text-[12px] text-erp-text">{row.original.supervisorName?.trim() || '—'}</span>
         ),
       },
       {
@@ -272,7 +339,7 @@ export function ApiWorkOrderRegisterPage() {
         cell: ({ row }) => {
           const wo = row.original
           const busy = busyId === wo.id
-          const items: RowActionItem[] = [
+          const actions: RowActionItem[] = [
             { id: 'view', label: 'View', icon: Eye, onClick: () => navigate(`/manufacturing/work-orders/${wo.id}`) },
             {
               id: 'release',
@@ -318,7 +385,7 @@ export function ApiWorkOrderRegisterPage() {
               onClick: () => void runAction(wo.id, () => cancelWorkOrder(wo.id), 'Work order cancelled'),
             },
           ]
-          return <EnterpriseRowActionsMenu actions={items} />
+          return <EnterpriseRowActionsMenu actions={actions} />
         },
       },
     ],
@@ -413,7 +480,7 @@ export function ApiWorkOrderRegisterPage() {
             />
           ) : null}
           {!loading && rows.length > 0 ? (
-            <div className="overflow-x-auto rounded-lg border border-erp-border bg-white">
+            <div className="overflow-x-auto rounded-xl border border-erp-border bg-white shadow-sm">
               <DataTable columns={columns} data={rows} />
             </div>
           ) : null}
@@ -421,7 +488,7 @@ export function ApiWorkOrderRegisterPage() {
             <p className="text-[11px] text-erp-muted">
               Showing {viewLabel} view
               {filters.search ? ` · filtered by “${filters.search}”` : ''}
-              {filters.productItemId ? ` · product ${itemLabel(filters.productItemId)}` : ''}
+              {filters.productItemId ? ` · item ${itemLabel(filters.productItemId)}` : ''}
             </p>
           ) : null}
         </div>

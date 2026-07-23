@@ -16,6 +16,7 @@ import workOrderRoutes from './work-orders/work-order.routes.js'
 import { todayRouter, controlRoomRouter } from './work-orders/dashboard.routes.js'
 import assignmentRoutes from './assignments/assignment.routes.js'
 import myWorkRoutes from './assignments/my-work.routes.js'
+import kioskRoutes from './kiosk/kiosk.routes.js'
 import dailyProductionRoutes from './daily-production/daily-production.routes.js'
 import issueRoutes from './issues/issue.routes.js'
 import jobWorkRoutes from './job-work/job-work.routes.js'
@@ -67,6 +68,7 @@ router.use('/control-room', controlRoomRouter)
 // Phase 2B — Assignments, daily production, issues, my work
 router.use('/assignments', assignmentRoutes)
 router.use('/my-work', myWorkRoutes)
+router.use('/kiosk', kioskRoutes)
 router.use('/daily-production', dailyProductionRoutes)
 router.use('/issues', issueRoutes)
 router.use('/job-work', jobWorkRoutes)

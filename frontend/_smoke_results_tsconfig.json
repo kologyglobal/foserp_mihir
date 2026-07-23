@@ -1,0 +1,56 @@
+﻿[
+    {
+        "name":  "test:quality:production",
+        "exit":  0,
+        "passed":  "8",
+        "failed":  "0"
+    },
+    {
+        "name":  "test:dispatch:production",
+        "exit":  0,
+        "passed":  "9",
+        "failed":  "0"
+    },
+    {
+        "name":  "test:wo-flow",
+        "exit":  0,
+        "passed":  "60",
+        "failed":  "0"
+    },
+    {
+        "name":  "test:wip",
+        "exit":  1,
+        "passed":  null,
+        "failed":  null
+    },
+    {
+        "name":  "test:sa-receipt",
+        "exit":  1,
+        "passed":  null,
+        "failed":  null
+    },
+    {
+        "name":  "test:costing",
+        "exit":  1,
+        "passed":  "11",
+        "failed":  "1"
+    },
+    {
+        "name":  "test:manufacturing-module",
+        "exit":  1,
+        "passed":  "25",
+        "failed":  "1"
+    },
+    {
+        "name":  "test:quality",
+        "exit":  1,
+        "passed":  "25",
+        "failed":  "3"
+    },
+    {
+        "name":  "test:dispatch",
+        "exit":  0,
+        "passed":  "17",
+        "failed":  "0"
+    }
+]

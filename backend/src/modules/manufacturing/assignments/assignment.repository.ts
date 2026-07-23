@@ -10,7 +10,15 @@ const assignmentInclude = {
   operation: { select: { id: true, code: true, name: true } },
   machine: { select: { id: true, code: true, name: true, status: true } },
   workCentre: { select: { id: true, code: true, name: true } },
-  productionOrder: { select: { id: true, orderNumber: true, status: true } },
+  productionOrder: {
+    select: {
+      id: true,
+      orderNumber: true,
+      status: true,
+      productItemId: true,
+      productItem: { select: { id: true, code: true, name: true } },
+    },
+  },
 } satisfies Prisma.ProductionAssignmentInclude
 
 export async function getAssignment(tenantId: string, id: string) {

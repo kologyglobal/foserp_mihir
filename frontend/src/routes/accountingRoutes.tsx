@@ -267,6 +267,7 @@ import { ManufacturingProductCostSheetPage } from '@/modules/accounting/Manufact
 import { ManufacturingProductionLedgerPage } from '@/modules/accounting/ManufacturingProductionLedgerPage'
 import { ManufacturingCostingReportsPage } from '@/modules/accounting/ManufacturingCostingReportsPage'
 import { ManufacturingCostingSetupPage } from '@/modules/accounting/ManufacturingCostingSetupPage'
+import { ManufacturingAccountingApiGate } from '@/components/accounting/manufacturingAccounting/ManufacturingAccountingApiGate'
 import {
   ApprovalRulesPage,
   BranchesPage,
@@ -551,21 +552,21 @@ export const accountingRouteChildren: RouteObject[] = [
   { path: 'accounting/fixed-assets/reports', element: <FixedAssetsReportsPage /> },
   { path: 'accounting/fixed-assets/setup', element: <FixedAssetsSetupPage /> },
 
-  /** Manufacturing Accounting & Costing — existing demo frontend module */
-  { path: 'accounting/manufacturing', element: <ManufacturingAccountingOverviewPage /> },
-  { path: 'accounting/manufacturing/material-consumption', element: <ManufacturingMaterialConsumptionPage /> },
-  { path: 'accounting/manufacturing/wip', element: <ManufacturingWipRegisterPage /> },
-  { path: 'accounting/manufacturing/finished-goods', element: <ManufacturingFinishedGoodsPage /> },
-  { path: 'accounting/manufacturing/production-costing', element: <ManufacturingProductionCostingPage /> },
-  { path: 'accounting/manufacturing/variances', element: <ManufacturingVariancesPage /> },
-  { path: 'accounting/manufacturing/subcontracting', element: <ManufacturingSubcontractingPage /> },
-  { path: 'accounting/manufacturing/scrap-rework', element: <ManufacturingScrapReworkPage /> },
-  { path: 'accounting/manufacturing/overhead', element: <ManufacturingOverheadPage /> },
-  { path: 'accounting/manufacturing/cost-centres', element: <ManufacturingCostCentresPage /> },
-  { path: 'accounting/manufacturing/cost-sheet', element: <ManufacturingProductCostSheetPage /> },
-  { path: 'accounting/manufacturing/ledger', element: <ManufacturingProductionLedgerPage /> },
-  { path: 'accounting/manufacturing/reports', element: <ManufacturingCostingReportsPage /> },
-  { path: 'accounting/manufacturing/setup', element: <ManufacturingCostingSetupPage /> },
+  /** Manufacturing Accounting & Costing — demo pages; API mode gated to live Phase 7E workspace */
+  { path: 'accounting/manufacturing', element: <ManufacturingAccountingApiGate><ManufacturingAccountingOverviewPage /></ManufacturingAccountingApiGate> },
+  { path: 'accounting/manufacturing/material-consumption', element: <ManufacturingAccountingApiGate><ManufacturingMaterialConsumptionPage /></ManufacturingAccountingApiGate> },
+  { path: 'accounting/manufacturing/wip', element: <ManufacturingAccountingApiGate><ManufacturingWipRegisterPage /></ManufacturingAccountingApiGate> },
+  { path: 'accounting/manufacturing/finished-goods', element: <ManufacturingAccountingApiGate><ManufacturingFinishedGoodsPage /></ManufacturingAccountingApiGate> },
+  { path: 'accounting/manufacturing/production-costing', element: <ManufacturingAccountingApiGate><ManufacturingProductionCostingPage /></ManufacturingAccountingApiGate> },
+  { path: 'accounting/manufacturing/variances', element: <ManufacturingAccountingApiGate><ManufacturingVariancesPage /></ManufacturingAccountingApiGate> },
+  { path: 'accounting/manufacturing/subcontracting', element: <ManufacturingAccountingApiGate><ManufacturingSubcontractingPage /></ManufacturingAccountingApiGate> },
+  { path: 'accounting/manufacturing/scrap-rework', element: <ManufacturingAccountingApiGate><ManufacturingScrapReworkPage /></ManufacturingAccountingApiGate> },
+  { path: 'accounting/manufacturing/overhead', element: <ManufacturingAccountingApiGate><ManufacturingOverheadPage /></ManufacturingAccountingApiGate> },
+  { path: 'accounting/manufacturing/cost-centres', element: <ManufacturingAccountingApiGate><ManufacturingCostCentresPage /></ManufacturingAccountingApiGate> },
+  { path: 'accounting/manufacturing/cost-sheet', element: <ManufacturingAccountingApiGate><ManufacturingProductCostSheetPage /></ManufacturingAccountingApiGate> },
+  { path: 'accounting/manufacturing/ledger', element: <ManufacturingAccountingApiGate><ManufacturingProductionLedgerPage /></ManufacturingAccountingApiGate> },
+  { path: 'accounting/manufacturing/reports', element: <ManufacturingAccountingApiGate><ManufacturingCostingReportsPage /></ManufacturingAccountingApiGate> },
+  { path: 'accounting/manufacturing/setup', element: <ManufacturingAccountingApiGate><ManufacturingCostingSetupPage /></ManufacturingAccountingApiGate> },
 
   /** Legacy path → GST & TDS compliance workspace */
   { path: 'accounting/gst-tds', element: <Navigate to="/accounting/tax-compliance" replace /> },

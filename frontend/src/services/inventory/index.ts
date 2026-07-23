@@ -34,10 +34,12 @@ export {
   exportInventoryData,
   getInventoryPrintPreview,
   getInventoryReportFilterOptions,
+  getInventoryReportFilterOptionsAsync,
 } from './inventoryReportsService'
 
 export {
   getInventorySetup,
+  updateInventorySetup,
   updateInventorySetupDemo,
   getWarehouses,
   createWarehouse,

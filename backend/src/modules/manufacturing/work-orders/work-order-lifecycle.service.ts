@@ -32,27 +32,59 @@ export async function startWorkOrder(req: Request, tenantId: string, id: string,
   const userId = req.context?.userId ?? ''
   const before = await repo.getWorkOrder(tenantId, id)
 
-  if (before.status !== 'READY') {
-    throw new InvalidStateError(`Work order can only be started from READY status (current: ${before.status})`)
+  // Allow starting an individual READY stage while the WO is already running.
+  const startStageOnly = before.status === 'IN_PROGRESS' && Boolean(input.stageId)
+  if (before.status !== 'READY' && !startStageOnly) {
+    throw new InvalidStateError(
+      `Work order can only be started from READY status, or start a stage while IN_PROGRESS (current: ${before.status})`,
+    )
   }
 
   const settings = await getManufacturingSettingsForTenant(tenantId)
-  if (settings.requireReservation) {
+  let reservationWarning: string | null = null
+  if (!startStageOnly && settings.requireReservation) {
     const reservations = await prisma.inventoryStockReservation.count({
       where: { tenantId, demandType: 'WO', demandId: id, status: 'ACTIVE' },
     })
     if (reservations === 0) {
-      throw new ConflictError('Manufacturing settings require material reservation before starting this work order')
+      if (settings.flexibleExecution) {
+        reservationWarning = 'MATERIAL_RESERVATION_MISSING'
+      } else {
+        throw new ConflictError('Manufacturing settings require material reservation before starting this work order')
+      }
     }
   }
 
   const order = await prisma.$transaction(async (tx) => {
-    const targetStageId = input.stageId ?? before.currentStageId
+    let targetStageId = input.stageId ?? before.currentStageId
+    // Flexible start: if WO has no current stage yet, pick the first incomplete stage.
+    if (!startStageOnly && !targetStageId) {
+      const firstOpen = await tx.productionOrderStage.findFirst({
+        where: {
+          productionOrderId: id,
+          tenantId,
+          status: { in: ['READY', 'NOT_STARTED'] },
+        },
+        orderBy: { displayOrder: 'asc' },
+      })
+      targetStageId = firstOpen?.id ?? null
+    }
     if (targetStageId) {
       const stage = await tx.productionOrderStage.findFirst({ where: { id: targetStageId, productionOrderId: id, tenantId } })
       if (!stage) throw new NotFoundError('Stage not found on this work order')
-      if (stage.status === 'READY') {
-        await tx.productionOrderStage.update({ where: { id: stage.id }, data: { status: 'IN_PROGRESS', startedAt: new Date() } })
+      const canStartStageStatus = stage.status === 'READY' || stage.status === 'NOT_STARTED'
+      if (canStartStageStatus) {
+        // Promote ops so shopfloor progress can be recorded after start.
+        if (stage.status === 'NOT_STARTED') {
+          await tx.productionOrderOperation.updateMany({
+            where: { stageId: stage.id, tenantId, status: 'NOT_STARTED' },
+            data: { status: 'READY' },
+          })
+        }
+        await tx.productionOrderStage.update({
+          where: { id: stage.id },
+          data: { status: 'IN_PROGRESS', startedAt: stage.startedAt ?? new Date() },
+        })
         await logProductionActivity(
           {
             tenantId,
@@ -63,33 +95,52 @@ export async function startWorkOrder(req: Request, tenantId: string, id: string,
           },
           tx,
         )
+      } else if (startStageOnly) {
+        throw new InvalidStateError(`Cannot start stage in ${stage.status} status (expected READY or NOT_STARTED)`)
       }
     }
 
-    await tx.productionOrder.update({
-      where: { id, tenantId },
-      data: { status: 'IN_PROGRESS', actualStartAt: before.actualStartAt ?? new Date(), currentStageId: targetStageId, updatedBy: userId },
-    })
+    if (!startStageOnly) {
+      await tx.productionOrder.update({
+        where: { id, tenantId },
+        data: {
+          status: 'IN_PROGRESS',
+          actualStartAt: before.actualStartAt ?? new Date(),
+          currentStageId: targetStageId,
+          updatedBy: userId,
+        },
+      })
 
-    await logProductionActivity(
-      {
-        tenantId,
-        productionOrderId: id,
-        activityType: 'STARTED',
-        userId,
-        message: `Work order ${before.orderNumber} started`,
-        oldValue: { status: before.status },
-        newValue: { status: 'IN_PROGRESS' },
-      },
-      tx,
-    )
+      await logProductionActivity(
+        {
+          tenantId,
+          productionOrderId: id,
+          activityType: 'STARTED',
+          userId,
+          message: reservationWarning
+            ? `Work order ${before.orderNumber} started (warning: ${reservationWarning})`
+            : `Work order ${before.orderNumber} started`,
+          oldValue: { status: before.status },
+          newValue: { status: 'IN_PROGRESS', warnings: reservationWarning ? [reservationWarning] : [] },
+        },
+        tx,
+      )
+    } else if (targetStageId) {
+      await tx.productionOrder.update({
+        where: { id, tenantId },
+        data: { currentStageId: targetStageId, updatedBy: userId },
+      })
+    }
 
     await recomputeOrderHealth(tx, tenantId, id)
     return tx.productionOrder.findFirstOrThrow({ where: { id, tenantId } })
   })
 
-  await audit(req, tenantId, id, 'START', before, order)
-  return order
+  await audit(req, tenantId, id, startStageOnly ? 'STAGE_START' : 'START', before, order)
+  return {
+    order,
+    warnings: reservationWarning ? [reservationWarning] : ([] as string[]),
+  }
 }
 
 export async function holdWorkOrder(req: Request, tenantId: string, id: string, input: HoldWorkOrderInput) {
@@ -203,13 +254,15 @@ export async function completeWorkOrder(
   }
 
   const settings = await getManufacturingSettingsForTenant(tenantId)
+  const flexible = Boolean(settings.flexibleExecution)
+  const allowCloseWithoutQc = Boolean(settings.allowCloseWithoutQc) || flexible
   const stages = await prisma.productionOrderStage.findMany({ where: { productionOrderId: id, tenantId } })
   const mandatoryStages = stages.filter((s) => !s.isOptional)
   const incomplete = mandatoryStages.filter(
     (s) =>
       s.status !== 'COMPLETED'
       && s.status !== 'SKIPPED'
-      && !(settings.allowCloseWithoutQc && s.status === 'QC_PENDING'),
+      && !(allowCloseWithoutQc && s.status === 'QC_PENDING'),
   )
   if (incomplete.length > 0) {
     throw new ValidationError(
@@ -218,9 +271,15 @@ export async function completeWorkOrder(
   }
 
   const qualityBlockers = await collectQualityBlockers(tenantId, id)
-  if (!settings.allowCloseWithoutQc && qualityBlockers.length > 0) {
-    throw new ConflictError(
-      `Cannot complete work order due to quality blockers: ${qualityBlockers.map((b) => b.message).join('; ')}`,
+  const qualityWarnings: string[] = []
+  if (qualityBlockers.length > 0) {
+    if (!allowCloseWithoutQc) {
+      throw new ConflictError(
+        `Cannot complete work order due to quality blockers: ${qualityBlockers.map((b) => b.message).join('; ')}`,
+      )
+    }
+    qualityWarnings.push(
+      ...qualityBlockers.map((b) => `QUALITY_WARNING:${b.code}:${b.message}`),
     )
   }
 
@@ -268,7 +327,7 @@ export async function completeWorkOrder(
 
   await audit(req, tenantId, id, 'COMPLETE', before, order)
 
-  const warnings: string[] = []
+  const warnings: string[] = [...qualityWarnings]
   if (!fgReceiptPosted) {
     warnings.push('FINISHED_GOODS_RECEIPT_PENDING')
   }

@@ -6,6 +6,7 @@ import { ErpStatusChip, type ErpStatusChipTone } from '@/components/erp/ErpStatu
 import { DynamicsKpiRow, DynamicsKpiTile } from '@/components/dynamics/DynamicsKpiTile'
 import { Input, Select } from '@/components/forms/Inputs'
 import { FormField } from '@/components/forms/FormField'
+import { ItemLookupSelect } from '@/components/lookups/ItemLookupSelect'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { AccountDrawerShell } from '@/components/accounting/coa/AccountDrawerShell'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -17,6 +18,7 @@ import { useManufacturingSetupPermissions } from '@/utils/permissions/manufactur
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { ManufacturingSetupShell } from '../ManufacturingSetupShell'
+import { SetupViewPopup } from '../SetupViewPopup'
 import { useSetupLookup } from '../useSetupLookups'
 import { BomCsvImportDialog } from './BomCsvImportDialog'
 
@@ -68,12 +70,24 @@ export function BomsSetupPage() {
   const [search, setSearch] = useState('')
   const [lifecycleFilter, setLifecycleFilter] = useState<LifecycleFilter>('')
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [viewing, setViewing] = useState<Bom | null>(null)
   const [form, setForm] = useState<BomFormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [setupApiAvailable, setSetupApiAvailable] = useState(false)
 
-  const itemLabel = useCallback((id: string) => items.find((i) => i.id === id)?.label ?? `${id.slice(0, 8)}…`, [items])
+  const itemLabel = useCallback(
+    (row: Pick<Bom, 'productItemId' | 'productItemCode' | 'productItemName'> | string) => {
+      if (typeof row === 'string') {
+        return items.find((i) => i.id === row)?.label ?? `${row.slice(0, 8)}…`
+      }
+      if (row.productItemName && row.productItemCode) return `${row.productItemCode} — ${row.productItemName}`
+      if (row.productItemName) return row.productItemName
+      if (row.productItemCode) return row.productItemCode
+      return items.find((i) => i.id === row.productItemId)?.label ?? `${row.productItemId.slice(0, 8)}…`
+    },
+    [items],
+  )
 
   const load = useCallback(async () => {
     if (!apiMode) {
@@ -285,7 +299,7 @@ export function BomsSetupPage() {
                       <th className="text-center">Versions</th>
                       <th>Status</th>
                       <th>Updated</th>
-                      <th className="w-10" aria-label="Open" />
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -294,11 +308,7 @@ export function BomsSetupPage() {
                       const latest = versions[0]
                       const lifecycle = bomLifecycle(row)
                       return (
-                        <tr
-                          key={row.id}
-                          className="group cursor-pointer transition-colors hover:bg-erp-primary-soft/30"
-                          onClick={() => navigate(`/manufacturing/setup/boms/${row.id}`)}
-                        >
+                        <tr key={row.id} className="group transition-colors hover:bg-erp-primary-soft/30">
                           <td className="px-4 py-2.5">
                             <div className="flex items-center gap-3">
                               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-erp-primary-soft text-erp-primary">
@@ -311,8 +321,8 @@ export function BomsSetupPage() {
                             </div>
                           </td>
                           <td className="max-w-[260px] px-4 py-2.5">
-                            <span className="block truncate" title={itemLabel(row.productItemId)}>
-                              {itemLabel(row.productItemId)}
+                            <span className="block truncate" title={itemLabel(row)}>
+                              {itemLabel(row)}
                             </span>
                           </td>
                           <td className="px-4 py-2.5">
@@ -340,11 +350,20 @@ export function BomsSetupPage() {
                             )}
                           </td>
                           <td className="px-4 py-2.5 whitespace-nowrap text-erp-muted">{formatDate(row.updatedAt)}</td>
-                          <td className="px-4 py-2.5 text-right">
-                            <ChevronRight
-                              className="ml-auto h-4 w-4 text-erp-muted transition-transform group-hover:translate-x-0.5 group-hover:text-erp-primary"
-                              aria-hidden
-                            />
+                          <td className="px-4 py-2.5">
+                            <div className="flex flex-wrap items-center gap-1">
+                              <ErpButton size="sm" variant="outline" onClick={() => setViewing(row)}>
+                                View
+                              </ErpButton>
+                              <ErpButton
+                                size="sm"
+                                variant="outline"
+                                onClick={() => navigate(`/manufacturing/setup/boms/${row.id}`)}
+                              >
+                                Open
+                              </ErpButton>
+                              <ChevronRight className="h-4 w-4 text-erp-muted" aria-hidden />
+                            </div>
                           </td>
                         </tr>
                       )
@@ -356,6 +375,48 @@ export function BomsSetupPage() {
           ) : null}
         </>
       )}
+
+      <SetupViewPopup
+        open={Boolean(viewing)}
+        onClose={() => setViewing(null)}
+        title={viewing?.name ?? 'BOM'}
+        subtitle={viewing?.code}
+        fields={
+          viewing
+            ? [
+                { label: 'Code', value: viewing.code, mono: true },
+                {
+                  label: 'Lifecycle',
+                  value: bomLifecycle(viewing).replace(/^\w/, (c) => c.toUpperCase()),
+                },
+                { label: 'Name', value: viewing.name, fullWidth: true },
+                { label: 'Output Item', value: itemLabel(viewing), fullWidth: true },
+                {
+                  label: 'Latest Revision',
+                  value: viewing.versions?.[0]
+                    ? `Rev ${viewing.versions[0].revisionCode} (${viewing.versions[0].status})`
+                    : 'No revisions',
+                },
+                { label: 'Versions', value: String(viewing.versions?.length ?? 0) },
+                { label: 'Description', value: viewing.description ?? '—', fullWidth: true },
+                { label: 'Updated', value: formatDate(viewing.updatedAt) },
+              ]
+            : []
+        }
+        footerExtra={
+          viewing ? (
+            <ErpButton
+              onClick={() => {
+                const id = viewing.id
+                setViewing(null)
+                navigate(`/manufacturing/setup/boms/${id}`)
+              }}
+            >
+              Open Editor
+            </ErpButton>
+          ) : null
+        }
+      />
 
       <AccountDrawerShell
         open={drawerOpen}
@@ -384,23 +445,12 @@ export function BomsSetupPage() {
           <FormField label="Name" required>
             <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
           </FormField>
-          <FormField label="Product Item" required hint={items.length === 0 ? 'Paste the item UUID (item lookup unavailable).' : undefined}>
-            {items.length > 0 ? (
-              <Select value={form.productItemId} onChange={(e) => setForm((f) => ({ ...f, productItemId: e.target.value }))}>
-                <option value="">Select item…</option>
-                {items.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.label}
-                  </option>
-                ))}
-              </Select>
-            ) : (
-              <Input
-                value={form.productItemId}
-                onChange={(e) => setForm((f) => ({ ...f, productItemId: e.target.value.trim() }))}
-                placeholder="Item UUID"
-              />
-            )}
+          <FormField label="Item" required hint="Finished / output item from Item Master — search by code or name.">
+            <ItemLookupSelect
+              value={form.productItemId}
+              placeholder="Search item code or name…"
+              onChange={(sel) => setForm((f) => ({ ...f, productItemId: sel?.itemId ?? '' }))}
+            />
           </FormField>
           <FormField label="Description">
             <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />

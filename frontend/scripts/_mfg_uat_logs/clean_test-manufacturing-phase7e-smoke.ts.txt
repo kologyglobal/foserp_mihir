@@ -1,0 +1,82 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+── Manufacturing Phase 7E (Costing / Accounting) smoke ──
+
+API client:
+  ✓ manufacturingCostingApi.ts exists
+  ✓ listCostingPolicies
+  ✓ createCostingPolicy
+  ✓ updateCostingPolicy
+  ✓ activateCostingPolicy
+  ✓ getCostingReadiness
+  ✓ getWorkOrderCostSummary
+  ✓ getWorkOrderCostDetails
+  ✓ calculateWorkOrderCost
+  ✓ getWorkOrderCostSnapshots
+  ✓ getWorkOrderAccountingReadiness
+  ✓ previewWorkOrderFinancialClose
+  ✓ recordWorkOrderFinancialClose
+  ✓ getManufacturingAccountingGateStatus
+  ✓ listManufacturingAccountingEvents
+  ✓ validate/post/retry event helpers
+  ✓ workspace summary + list helpers
+  ✓ path /manufacturing/costing/policies
+  ✓ path /manufacturing/costing/readiness
+  ✓ path cost-summary
+  ✓ path cost/calculate
+  ✓ path accounting-readiness
+  ✓ path financial-close/preview
+  ✓ path accounting/workspace/*
+
+Work Order Costing tab:
+  ✓ WorkOrderCostingPanel.tsx exists
+  ✓ panel loads cost summary
+  ✓ panel loads accounting readiness
+  ✓ panel Calculate Cost action
+  ✓ panel Financial Close Preview
+  ✓ panel never fakes zero cost (Not Available)
+  ✓ panel Pending Rate flag
+  ✓ panel accounting-disabled state
+  ✓ panel permission gates
+  ✓ detail page imports WorkOrderCostingPanel
+  ✓ detail page has Costing tab
+  ✓ Costing tab gated on canViewCost
+
+Manufacturing Accounting workspace + gate:
+  ✓ ManufacturingAccountingWorkspacePage.tsx exists
+  ✓ workspace KPI strip from summary
+  ✓ workspace tabs (unposted/failed/provisional/close-ready/reconciliation)
+  ✓ workspace Validate/Post/Retry actions
+  ✓ workspace immutable-voucher confirm
+  ✓ workspace work order drill-down
+  ✓ workspace honest flag-off banner
+  ✓ gate calls accounting gate endpoint
+  ✓ gate honest empty state when flag off
+  ✓ gate links to work order costing
+  ✓ gate renders live workspace when allowed
+  ✓ gate preserves demo mode
+
+Routes:
+  ✗ route accounting/manufacturing still gated
+  ✓ route manufacturing/work-orders/:workOrderId resolves
+
+Navigation:
+  ✓ nav Manufacturing Accounting → /accounting/manufacturing
+
+Permissions:
+  ✓ permission manufacturing.cost.calculate
+  ✓ permission manufacturing.accounting.view
+  ✓ permission manufacturing.accounting.post
+  ✓ permission manufacturing.accounting.financial_close
+  ✓ permission manufacturing.costing_policy.view/manage
+  ✓ canViewCost helper
+  ✓ canCalculateCost helper
+  ✓ canViewAccounting helper
+  ✓ canPostAccounting helper
+  ✓ canFinancialClose helper
+
+Docs:
+  ✓ docs/manufacturing/PRODUCTION_PHASE7E_README.md exists
+
+Result: 61 passed, 1 failed
+

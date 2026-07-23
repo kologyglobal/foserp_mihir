@@ -6,6 +6,7 @@ import * as positionService from './material-position.service.js'
 import * as reconciliationService from './material-reconciliation.service.js'
 import * as service from './material.service.js'
 import type {
+  AddMaterialRequirementInput,
   IssueMaterialInput,
   IssuePreviewInput,
   ReallocateReservationInput,
@@ -13,6 +14,7 @@ import type {
   ReserveMaterialsInput,
   ReturnMaterialInput,
   ShortageRequisitionInput,
+  UpdateMaterialRequirementInput,
 } from './material.schemas.js'
 
 export const listMaterials = asyncHandler(async (req: Request, res: Response) => {
@@ -27,6 +29,40 @@ export const syncRequirements = asyncHandler(async (req: Request, res: Response)
   const orderId = getRouteParam(req, 'id')
   const result = await service.syncRequirements(req, tenantId, orderId)
   return sendSuccess(res, 'Material requirements synced', result)
+})
+
+export const addMaterialRequirement = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const orderId = getRouteParam(req, 'id')
+  const material = await service.addMaterialRequirement(
+    req,
+    tenantId,
+    orderId,
+    req.body as AddMaterialRequirementInput,
+  )
+  return sendCreated(res, 'Material requirement added', material)
+})
+
+export const updateMaterialRequirement = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const orderId = getRouteParam(req, 'id')
+  const materialId = getRouteParam(req, 'materialId')
+  const material = await service.updateMaterialRequirement(
+    req,
+    tenantId,
+    orderId,
+    materialId,
+    req.body as UpdateMaterialRequirementInput,
+  )
+  return sendSuccess(res, 'Material requirement updated', material)
+})
+
+export const removeMaterialRequirement = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const orderId = getRouteParam(req, 'id')
+  const materialId = getRouteParam(req, 'materialId')
+  const result = await service.removeMaterialRequirement(req, tenantId, orderId, materialId)
+  return sendSuccess(res, 'Material requirement removed', result)
 })
 
 export const reserveMaterials = asyncHandler(async (req: Request, res: Response) => {

@@ -173,6 +173,62 @@ export async function reopenPeriod(id: string, reason: string) {
   })
 }
 
+export type PeriodCloseReadinessApiCheck = {
+  key: string
+  label: string
+  severity: 'PASS' | 'WARN' | 'BLOCK'
+  message: string
+  href?: string
+  count?: number
+  featureEnabled?: boolean
+}
+
+export type PeriodCloseReadinessApi = {
+  periodId: string
+  periodName: string
+  periodStatus: string
+  legalEntityId: string
+  startDate: string
+  endDate: string
+  hardBlockEnabled: boolean
+  canClose: boolean
+  blockingCount: number
+  warningCount: number
+  unpostedJournalCount: number
+  openBankReconCount: number
+  checks: PeriodCloseReadinessApiCheck[]
+  blockers: PeriodCloseReadinessApiCheck[]
+}
+
+export type PeriodCloseChecklistAckApi = {
+  id: string
+  periodId: string
+  checkKey: string
+  status: 'ACK' | 'NA'
+  note: string | null
+  ackedBy: string | null
+  ackedAt: string
+  updatedAt: string
+}
+
+export async function getPeriodCloseReadiness(id: string) {
+  return apiRequest<PeriodCloseReadinessApi>(tenantPath(`/accounting/periods/${id}/close-readiness`))
+}
+
+export async function listPeriodCloseChecklistAcks(id: string) {
+  return apiRequest<PeriodCloseChecklistAckApi[]>(tenantPath(`/accounting/periods/${id}/checklist-acks`))
+}
+
+export async function upsertPeriodCloseChecklistAcks(
+  id: string,
+  items: Array<{ checkKey: string; status: 'ACK' | 'NA'; note?: string | null }>,
+) {
+  return apiRequest<PeriodCloseChecklistAckApi[]>(tenantPath(`/accounting/periods/${id}/checklist-acks`), {
+    method: 'PUT',
+    body: JSON.stringify({ items }),
+  })
+}
+
 // ─── Accounts ─────────────────────────────────────────────────────────────────
 
 export async function listAccounts(

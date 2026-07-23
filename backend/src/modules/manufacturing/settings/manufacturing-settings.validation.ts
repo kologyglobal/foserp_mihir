@@ -2,6 +2,8 @@ import { z } from 'zod'
 
 const settingsObject = z.record(z.string(), z.unknown())
 const denormalizedFields = {
+  flexibleExecution: z.boolean().optional(),
+  allowUnderCompletion: z.boolean().optional(),
   allowOverproduction: z.boolean().optional(),
   overproductionTolerancePercent: z.coerce.number().min(0).max(100).optional(),
   allowCloseWithoutQc: z.boolean().optional(),

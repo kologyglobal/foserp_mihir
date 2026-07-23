@@ -38,6 +38,7 @@ import type {
   ProductionActivityEntry,
   ProductionDemand,
   ProductionOrder,
+  ProductionOrderBomSnapshotLine,
   ProductionStageLedgerEntry,
   RecordProgressPayload,
   RecordProgressResult,
@@ -357,6 +358,13 @@ export async function createRouting(data: Record<string, unknown>) {
   })
 }
 
+export async function updateRouting(id: string, data: Record<string, unknown>) {
+  return apiRequest<Routing>(tenantPath(`/manufacturing/routings/${id}`), {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
 export async function getRouting(routingId: string) {
   return apiRequest<Routing & { versions: RoutingVersion[] }>(tenantPath(`/manufacturing/routings/${routingId}`))
 }
@@ -420,20 +428,90 @@ export async function validateRoutingVersion(versionId: string) {
 }
 
 export async function activateRoutingVersion(versionId: string) {
-  return apiRequest<RoutingVersion>(tenantPath(`/manufacturing/routing-versions/${versionId}/activate`), {
+  return certifyRoutingVersion(versionId)
+}
+
+export async function certifyRoutingVersion(versionId: string) {
+  return apiRequest<RoutingVersion>(tenantPath(`/manufacturing/routing-versions/${versionId}/certify`), {
     method: 'POST',
   })
 }
 
-export async function reviseRoutingVersion(versionId: string) {
+export async function closeRoutingVersion(versionId: string, data: { reason: string; forceReplace?: boolean }) {
+  return apiRequest<RoutingVersion>(tenantPath(`/manufacturing/routing-versions/${versionId}/close`), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export type RoutingWhereUsed = {
+  profiles: Array<{
+    id: string
+    code: string
+    name: string
+    defaultRoutingVersionId: string | null
+    isActive: boolean
+  }>
+  openProductionOrders: Array<{
+    id: string
+    orderNumber: string
+    status: string
+    routingVersionId: string | null
+  }>
+}
+
+export async function getRoutingWhereUsed(versionId: string) {
+  return apiRequest<RoutingWhereUsed>(tenantPath(`/manufacturing/routing-versions/${versionId}/where-used`))
+}
+
+export async function reviseRoutingVersion(versionId: string, data?: { revisionNotes: string }) {
   return apiRequest<RoutingVersion>(tenantPath(`/manufacturing/routing-versions/${versionId}/revise`), {
     method: 'POST',
+    body: JSON.stringify(data ?? {}),
   })
 }
 
 export async function compareRoutingVersions(versionId: string, from: string | undefined, to: string) {
   return apiRequest<RoutingCompareResult>(
     `${tenantPath(`/manufacturing/routing-versions/${versionId}/compare`)}${buildQuery({ from, to })}`,
+  )
+}
+
+export type RoutingBomContext = {
+  productItemId: string | null
+  bomVersion: {
+    id: string
+    bomId: string
+    bomCode: string
+    bomName: string
+    versionNumber: number
+    revisionCode: string
+    status: string
+  } | null
+  tree: Array<{
+    id: string
+    itemId: string
+    lineType: string
+    makeOrBuy: string
+    phantomAssembly: boolean
+    descriptionOverride: string | null
+    item: { code: string; name: string } | null
+    children: RoutingBomContext['tree']
+  }>
+  unresolvedReason: 'NO_PRODUCT_ITEM' | 'NO_BOM' | 'NO_ACTIVE_BOM_VERSION' | null
+}
+
+export async function getRoutingBomContext(versionId: string) {
+  return apiRequest<RoutingBomContext>(tenantPath(`/manufacturing/routing-versions/${versionId}/bom-context`))
+}
+
+export async function generateRoutingStagesFromBom(versionId: string, replaceExisting: boolean) {
+  return apiRequest<{ stageGroups: StageGroup[]; bomVersionId: string }>(
+    tenantPath(`/manufacturing/routing-versions/${versionId}/generate-stages-from-bom`),
+    {
+      method: 'POST',
+      body: JSON.stringify({ replaceExisting }),
+    },
   )
 }
 
@@ -677,7 +755,7 @@ export async function listWipMovements(
   workOrderId: string,
   params?: { movementType?: WipMovementType; limit?: number; offset?: number },
 ) {
-  return apiRequest<WipMovement[]>(
+  return apiRequest<{ total: number; items: WipMovement[] }>(
     `${tenantPath(`/manufacturing/work-orders/${workOrderId}/wip-movements`)}${buildQuery(params)}`,
   )
 }
@@ -706,7 +784,7 @@ export async function releaseWorkOrder(id: string) {
 }
 
 export async function startWorkOrder(id: string, data?: { stageId?: string }) {
-  return apiRequest<ProductionOrder>(tenantPath(`/manufacturing/work-orders/${id}/start`), {
+  return apiRequest<ProductionOrder & { warnings?: string[] }>(tenantPath(`/manufacturing/work-orders/${id}/start`), {
     method: 'POST',
     body: JSON.stringify(data ?? {}),
   })
@@ -842,6 +920,52 @@ export async function getMyWork(params?: Partial<ListMyWorkQuery> & Record<strin
   return apiRequest<ProductionAssignment[]>(`${tenantPath('/manufacturing/my-work')}${buildQuery(params)}`)
 }
 
+export interface ShopfloorKioskCard {
+  id: string
+  productionOrderId: string
+  workOrderNo: string
+  productItemId: string | null
+  productCode: string | null
+  productName: string | null
+  productLabel: string
+  stageId: string
+  stageCode: string | null
+  stageName: string | null
+  operationId: string | null
+  operationCode: string | null
+  operationName: string | null
+  machineLabel: string | null
+  workCentreLabel: string | null
+  assignedQuantity: string
+  completedQuantity: string
+  balanceQuantity: string
+  status: string
+  workInstruction: string | null
+  allowedActions: ProductionAssignment['allowedActions']
+  assignmentDate: string | null
+  startedAt: string | null
+  pausedAt: string | null
+}
+
+export interface ShopfloorKioskSummary {
+  openCount: number
+  inProgressCount: number
+  pausedCount: number
+}
+
+/** Mobile kiosk projection of operator assignments (includes product label). */
+export async function getShopfloorKioskMyWork(
+  params?: Partial<ListMyWorkQuery> & Record<string, string | number | boolean | undefined>,
+) {
+  return apiRequest<ShopfloorKioskCard[]>(`${tenantPath('/manufacturing/kiosk/my-work')}${buildQuery(params)}`)
+}
+
+export async function getShopfloorKioskSummary(
+  params?: Partial<ListMyWorkQuery> & Record<string, string | number | boolean | undefined>,
+) {
+  return apiRequest<ShopfloorKioskSummary>(`${tenantPath('/manufacturing/kiosk/summary')}${buildQuery(params)}`)
+}
+
 // ─── Phase 2B — Daily production ─────────────────────────────────────────────
 
 export async function listDailyProductionBatches(
@@ -971,6 +1095,105 @@ export async function syncWorkOrderMaterialRequirements(workOrderId: string) {
   })
 }
 
+export async function addWorkOrderMaterialRequirement(
+  workOrderId: string,
+  data: {
+    itemId: string
+    uomId: string
+    requiredQty: number
+    makeOrBuy?: 'MAKE' | 'BUY'
+    lineType?: string
+    remarks?: string
+  },
+) {
+  return apiRequest<ProductionOrderMaterial>(tenantPath(`/manufacturing/work-orders/${workOrderId}/materials`), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateWorkOrderMaterialRequirement(
+  workOrderId: string,
+  materialId: string,
+  data: {
+    requiredQty?: number
+    itemId?: string
+    uomId?: string
+    remarks?: string | null
+  },
+) {
+  return apiRequest<ProductionOrderMaterial>(
+    tenantPath(`/manufacturing/work-orders/${workOrderId}/materials/${materialId}`),
+    {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    },
+  )
+}
+
+export async function removeWorkOrderMaterialRequirement(workOrderId: string, materialId: string) {
+  return apiRequest<{ id: string }>(
+    tenantPath(`/manufacturing/work-orders/${workOrderId}/materials/${materialId}`),
+    { method: 'DELETE' },
+  )
+}
+
+export async function addWorkOrderBomLine(
+  workOrderId: string,
+  data: {
+    itemId: string
+    uomId: string
+    perUnitQuantity: number
+    scrapPercent?: number
+    makeOrBuy?: 'MAKE' | 'BUY'
+    lineType?: string
+    isOptional?: boolean
+    descriptionOverride?: string | null
+    parentLineId?: string | null
+    syncMaterial?: boolean
+  },
+) {
+  return apiRequest<ProductionOrderBomSnapshotLine>(
+    tenantPath(`/manufacturing/work-orders/${workOrderId}/bom-lines`),
+    {
+      method: 'POST',
+      body: JSON.stringify(data),
+    },
+  )
+}
+
+export async function updateWorkOrderBomLine(
+  workOrderId: string,
+  lineId: string,
+  data: {
+    itemId?: string
+    uomId?: string
+    perUnitQuantity?: number
+    scrapPercent?: number
+    requiredQuantity?: number
+    makeOrBuy?: 'MAKE' | 'BUY'
+    lineType?: string
+    isOptional?: boolean
+    descriptionOverride?: string | null
+    parentLineId?: string | null
+  },
+) {
+  return apiRequest<ProductionOrderBomSnapshotLine>(
+    tenantPath(`/manufacturing/work-orders/${workOrderId}/bom-lines/${lineId}`),
+    {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    },
+  )
+}
+
+export async function removeWorkOrderBomLine(workOrderId: string, lineId: string) {
+  return apiRequest<{ id: string }>(
+    tenantPath(`/manufacturing/work-orders/${workOrderId}/bom-lines/${lineId}`),
+    { method: 'DELETE' },
+  )
+}
+
 export async function reserveWorkOrderMaterials(workOrderId: string, data?: { materialIds?: string[] }) {
   return apiRequest<ReserveMaterialsResult>(tenantPath(`/manufacturing/work-orders/${workOrderId}/materials/reserve`), {
     method: 'POST',
@@ -980,7 +1203,14 @@ export async function reserveWorkOrderMaterials(workOrderId: string, data?: { ma
 
 export async function issueWorkOrderMaterial(
   workOrderId: string,
-  data: { materialId: string; quantity: number; idempotencyKey: string; remarks?: string },
+  data: {
+    materialId: string
+    quantity: number
+    idempotencyKey: string
+    remarks?: string
+    warehouseId?: string
+    additional?: boolean
+  },
 ) {
   return apiRequest<ProductionOrderMaterial>(tenantPath(`/manufacturing/work-orders/${workOrderId}/materials/issue`), {
     method: 'POST',
@@ -1387,7 +1617,9 @@ export async function getFgEligibility(woId: string) {
 }
 
 export async function listFgReceipts(woId: string) {
-  return apiRequest<Record<string, unknown>[]>(tenantPath(`/manufacturing/work-orders/${woId}/fg-receipts`))
+  return apiRequest<import('@/types/manufacturingProduction').WorkOrderFgReceiptSummary[]>(
+    tenantPath(`/manufacturing/work-orders/${woId}/fg-receipts`),
+  )
 }
 
 export async function previewFgReceipt(woId: string, data?: { quantity?: number; warehouseId?: string }) {

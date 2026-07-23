@@ -45,6 +45,8 @@ export const FINANCE_PERMISSIONS = [
   'finance.gl.view',
   'finance.tax.view',
   'finance.tax.extract',
+  'finance.tax.einvoice.manage',
+  'finance.tax.eway.manage',
 ] as const
 
 export type FinancePermission = (typeof FINANCE_PERMISSIONS)[number]
@@ -92,6 +94,8 @@ const MANAGER: FinancePermission[] = [
   'finance.voucher.reverse',
   'finance.gl.view',
   'finance.tax.extract',
+  'finance.tax.einvoice.manage',
+  'finance.tax.eway.manage',
 ]
 
 const ROLE_PACKS: Partial<Record<ErpRole, FinancePermission[]>> = {

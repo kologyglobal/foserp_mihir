@@ -31,13 +31,13 @@ type WorkbenchTab =
   | 'finished_goods'
   | 'reconciliation'
 
-const TABS: Array<{ id: WorkbenchTab; label: string; kpiKey: keyof StoreWorkbenchSummary['kpis'] | null }> = [
-  { id: 'to_issue', label: 'Needs Action', kpiKey: 'waitingIssue' },
-  { id: 'to_reserve', label: 'Production Requests', kpiKey: 'waitingReservation' },
-  { id: 'wip', label: 'Transfers', kpiKey: 'waitingWip' },
-  { id: 'returns', label: 'Incoming', kpiKey: 'waitingReturns' },
-  { id: 'finished_goods', label: 'Finished Goods', kpiKey: 'waitingFg' },
-  { id: 'reconciliation', label: 'Exceptions', kpiKey: null },
+const TABS: Array<{ id: WorkbenchTab; label: string; hint: string; kpiKey: keyof StoreWorkbenchSummary['kpis'] | null }> = [
+  { id: 'to_issue', label: 'Issue to production', hint: 'Materials waiting to be issued to work orders', kpiKey: 'waitingIssue' },
+  { id: 'to_reserve', label: 'Reserve for production', hint: 'Work orders asking the store to reserve stock', kpiKey: 'waitingReservation' },
+  { id: 'returns', label: 'Shop floor returns', hint: 'Unused material returning from production', kpiKey: 'waitingReturns' },
+  { id: 'wip', label: 'WIP moves', hint: 'Work-in-progress warehouse transfers', kpiKey: 'waitingWip' },
+  { id: 'finished_goods', label: 'Finished goods', hint: 'Completed production ready to receive into stock', kpiKey: 'waitingFg' },
+  { id: 'reconciliation', label: 'Stock mismatches', hint: 'Balances that need store attention', kpiKey: null },
 ]
 
 const EMPTY_SUMMARY: StoreWorkbenchSummary = {
@@ -145,7 +145,7 @@ export function StoreWorkbenchPage() {
       },
       {
         id: 'waitingReturns',
-        label: 'Incoming today',
+        label: 'Shop returns',
         value: summary.kpis.waitingReturns,
         accent: 'slate',
         active: tab === 'returns',
@@ -153,7 +153,7 @@ export function StoreWorkbenchPage() {
       },
       {
         id: 'waitingWip',
-        label: 'Transfers pending',
+        label: 'WIP moves',
         value: summary.kpis.waitingWip,
         accent: 'blue',
         active: tab === 'wip',
@@ -161,7 +161,7 @@ export function StoreWorkbenchPage() {
       },
       {
         id: 'waitingFg',
-        label: 'FG receipts pending',
+        label: 'Finished goods',
         value: summary.kpis.waitingFg,
         accent: 'green',
         active: tab === 'finished_goods',
@@ -185,23 +185,23 @@ export function StoreWorkbenchPage() {
 
   return (
     <ProductionPageHeader
-      title="Store Workbench"
-      description="Receive, reserve, issue, transfer and track material from one place."
-      favoritePath="/manufacturing/store-workbench"
+      title="Today’s Store Work"
+      description="What needs the store’s attention today — issue, reserve, return, and receive finished goods."
+      favoritePath="/inventory/store-workbench"
       secondaryActions={
         isApiMode()
           ? [
               {
                 id: 'stock-lookup',
-                label: 'Stock Lookup',
+                label: 'Check Stock',
                 icon: Warehouse,
                 onClick: () => navigate('/inventory/stock'),
               },
               {
-                id: 'open-work-orders',
-                label: 'New Movement',
+                id: 'receive-stock',
+                label: 'Receive Stock',
                 icon: Package,
-                onClick: () => navigate('/inventory/inward'),
+                onClick: () => navigate('/inventory/movements/receipts'),
               },
               {
                 id: 'refresh',
@@ -277,12 +277,32 @@ export function StoreWorkbenchPage() {
           ) : rows.length === 0 ? (
             <ProductionEmptyState
               icon={Warehouse}
-              title="Queue empty"
-              description="No rows in this store queue. Open Work Orders to reserve, issue, return, or post FG."
+              title={
+                tab === 'to_issue'
+                  ? 'Nothing to issue right now'
+                  : tab === 'to_reserve'
+                    ? 'No reservation requests'
+                    : tab === 'returns'
+                      ? 'No shop-floor returns waiting'
+                      : tab === 'finished_goods'
+                        ? 'No finished goods waiting'
+                        : tab === 'wip'
+                          ? 'No WIP moves waiting'
+                          : 'No mismatches found'
+              }
+              description={
+                TABS.find((t) => t.id === tab)?.hint
+                ?? 'Open a work order Materials tab to reserve, issue, return, or receive finished goods.'
+              }
               action={
-                <Button size="sm" onClick={() => navigate('/manufacturing/work-orders')}>
-                  Open Work Orders
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" onClick={() => navigate('/manufacturing/work-orders')}>
+                    Open Work Orders
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => navigate('/inventory')}>
+                    Store Home
+                  </Button>
+                </div>
               }
             />
           ) : (
@@ -314,9 +334,9 @@ export function StoreWorkbenchPage() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => navigate(`/manufacturing/work-orders/${woId}`)}
+                              onClick={() => navigate(`/manufacturing/work-orders/${woId}?tab=materials`)}
                             >
-                              Open
+                              Open Materials
                             </Button>
                           ) : null}
                         </td>

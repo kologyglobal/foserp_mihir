@@ -77,6 +77,7 @@ export const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: Permissio
   { prefix: '/shop-floor', permission: 'production.view', pageName: 'Shop Floor' },
   { prefix: '/production', permission: 'production.view', pageName: 'Production' },
   { prefix: '/quality', permission: 'quality.view', pageName: 'Quality' },
+  { prefix: '/logistics', permission: 'dispatch.view', pageName: 'Logistics' },
   { prefix: '/dispatch', permission: 'dispatch.view', pageName: 'Dispatch' },
   // Gate & Security — route-level shell; fine-grained gate.* checks live in utils/permissions/gate.ts
   { prefix: '/gate', permission: 'dispatch.view', pageName: 'Gate & Security' },

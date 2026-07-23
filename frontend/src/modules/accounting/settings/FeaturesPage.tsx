@@ -82,6 +82,16 @@ export function FeaturesPage() {
                 onChange={(e) => setSettings((s) => s && ({ ...s, allowManualControlAccountPosting: e.target.checked }))}
                 disabled={!perms.canManage}
               />
+              <Checkbox
+                label="Hard-block period close on readiness blockers"
+                checked={settings.periodCloseHardBlock ?? false}
+                onChange={(e) => setSettings((s) => s && ({ ...s, periodCloseHardBlock: e.target.checked }))}
+                disabled={!perms.canManage}
+              />
+              <p className="text-[11px] text-erp-muted">
+                When enabled, closing an accounting period fails if AP close gate, unposted journals, open bank recon,
+                or failed inventory/mfg GL events (when those features are on) report BLOCK.
+              </p>
             </div>
           </section>
           <section className="rounded border border-erp-border p-4">

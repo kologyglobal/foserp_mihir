@@ -8,6 +8,7 @@ import { NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { resolveManufacturedProductItem } from '../shared/manufacturing.helpers.js'
 import { toDecimal } from '../shared/quantity.service.js'
 import { resolveActiveManufacturingSetup, createProductionOrderRecord } from '../shared/production-order-factory.service.js'
+import { generateChildOrdersForParent } from '../work-orders/child-orders.service.js'
 import * as repo from './demand.repository.js'
 import type { ConvertSalesOrderLineInput } from './demand.schemas.js'
 
@@ -36,18 +37,54 @@ async function loadConvertibleSalesOrder(tenantId: string, salesOrderId: string)
 export async function listEligibleSalesOrders(tenantId: string) {
   const orders = await prisma.crmSalesOrder.findMany({
     where: { ...tenantActiveFilter(tenantId), status: { in: Array.from(CONVERTIBLE_SO_STATUSES) } },
+    include: {
+      company: { select: { id: true, name: true, companyCode: true } },
+    },
     orderBy: { orderDate: 'desc' },
     take: 100,
   })
-  return orders.map((order) => ({
-    id: order.id,
-    salesOrderNo: order.salesOrderNo,
-    customerId: order.companyId,
-    status: order.status,
-    orderDate: order.orderDate,
-    requiredDate: order.requiredDate,
-    lineCount: parseLines(order.lines).length,
-  }))
+
+  const orderIds = orders.map((order) => order.id)
+  const demands =
+    orderIds.length === 0
+      ? []
+      : await prisma.productionDemand.findMany({
+          where: { tenantId, salesOrderId: { in: orderIds }, deletedAt: null },
+          select: {
+            salesOrderId: true,
+            sourceLineReference: true,
+            remainingQuantity: true,
+            status: true,
+          },
+        })
+  const demandByLineKey = new Map(
+    demands.map((demand) => [`${demand.salesOrderId}:${demand.sourceLineReference}`, demand] as const),
+  )
+
+  const hasConvertibleRemaining = (salesOrderId: string, lines: SalesOrderLineDto[]) => {
+    if (lines.length === 0) return false
+    return lines.some((line) => {
+      if (!(line.qty > 0)) return false
+      const demand = demandByLineKey.get(`${salesOrderId}:${line.id}`)
+      if (!demand) return true
+      if (demand.status === 'FULLY_CONVERTED' || demand.status === 'CANCELLED') return false
+      return toDecimal(demand.remainingQuantity).greaterThan(0)
+    })
+  }
+
+  return orders
+    .filter((order) => hasConvertibleRemaining(order.id, parseLines(order.lines)))
+    .map((order) => ({
+      id: order.id,
+      salesOrderNo: order.salesOrderNo,
+      customerId: order.companyId,
+      customerName: order.company?.name ?? null,
+      customerCode: order.company?.companyCode ?? order.customerCode ?? null,
+      status: order.status,
+      orderDate: order.orderDate,
+      requiredDate: order.requiredDate,
+      lineCount: parseLines(order.lines).length,
+    }))
 }
 
 export async function getSalesOrderLineEligibility(tenantId: string, salesOrderId: string) {
@@ -225,6 +262,9 @@ export async function convertSalesOrderLine(
       salesOrderId,
       customerId: salesOrder.companyId,
       productItemId: resolvedItem.id,
+      manufacturingProfileId: input.manufacturingProfileId ?? null,
+      bomVersionId: input.bomVersionId ?? null,
+      routingVersionId: input.routingVersionId ?? null,
       plannedQuantity: quantity,
       requiredCompletionDate,
       priority: input.priority ?? demand.priority,
@@ -256,6 +296,21 @@ export async function convertSalesOrderLine(
     return { demand: updatedDemand, order }
   })
 
+  const profile = await prisma.manufacturingProfile.findFirst({
+    where: { id: result.order.manufacturingProfileId, tenantId, deletedAt: null },
+    select: { childProductionOrdersEnabled: true },
+  })
+  const shouldExplode =
+    input.generateChildOrders === true ||
+    (input.generateChildOrders !== false && profile?.childProductionOrdersEnabled === true)
+
+  let children: Awaited<ReturnType<typeof generateChildOrdersForParent>> | null = null
+  if (shouldExplode) {
+    children = await generateChildOrdersForParent(tenantId, userId, result.order.id, {
+      force: input.generateChildOrders === true,
+    })
+  }
+
   const meta = auditFromRequest(req)
   await createAuditLog({
     tenantId,
@@ -264,12 +319,16 @@ export async function convertSalesOrderLine(
     entity: 'productionOrder',
     entityId: result.order.id,
     action: 'CONVERT_SO_LINE',
-    newValues: result,
+    newValues: { ...result, children: children?.children.map((c) => c.id) ?? [] },
     ipAddress: meta.ipAddress,
     userAgent: meta.userAgent,
   })
 
-  return result
+  return {
+    ...result,
+    children: children?.children ?? [],
+    childrenSkipped: children?.skipped ?? [],
+  }
 }
 
 /**

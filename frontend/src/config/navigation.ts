@@ -42,6 +42,8 @@ import {
   Target,
   TrendingUp,
   Layers,
+  Cog,
+  CircuitBoard,
 } from 'lucide-react'
 
 import { buildMasterNavItems } from './masterModuleStructure'
@@ -153,16 +155,18 @@ export const moduleCategories: NavCategory[] = [
     id: 'inventory',
     title: 'Inventory & Warehouse',
     items: [
-      { label: 'Overview', path: '/inventory', icon: LayoutDashboard, end: true, workspace: true },
+      { label: 'Store Home', path: '/inventory', icon: LayoutDashboard, end: true, workspace: true },
+      { label: 'Today’s Work', path: '/inventory/store-workbench', icon: ClipboardList },
       { label: 'Items', path: '/inventory/items', icon: Package },
       { label: 'Stock', path: '/inventory/stock', icon: Warehouse },
-      { label: 'Receipts', path: '/inventory/movements/receipts', icon: ArrowDownToLine },
-      { label: 'Issues', path: '/inventory/movements/issues', icon: ArrowUpFromLine },
-      { label: 'Transfers', path: '/inventory/movements/transfers', icon: GitBranch },
-      { label: 'Adjustments', path: '/inventory/movements/adjustments', icon: SlidersHorizontal },
+      { label: 'Receive Stock', path: '/inventory/movements/receipts', icon: ArrowDownToLine },
+      { label: 'Issue Stock', path: '/inventory/movements/issues', icon: ArrowUpFromLine },
+      { label: 'Move Between Warehouses', path: '/inventory/movements/transfers', icon: GitBranch },
+      { label: 'Adjust Stock', path: '/inventory/movements/adjustments', icon: SlidersHorizontal },
       { label: 'Returns', path: '/inventory/movements/returns', icon: RotateCcw },
       { label: 'Stock Count', path: '/inventory/stock-count', icon: ClipboardList },
-      { label: 'Planning', path: '/inventory/planning', icon: Target },
+      { label: 'Reorder Planning', path: '/inventory/planning', icon: Target },
+      { label: 'Accounting', path: '/inventory/accounting', icon: Landmark },
       { label: 'Reports', path: '/inventory/reports', icon: BarChart3 },
       { label: 'Setup', path: '/inventory/setup', icon: Settings2 },
       /** Legacy routes — kept for bookmarks / deep links; hidden from workspace tabs */
@@ -212,13 +216,20 @@ export const moduleCategories: NavCategory[] = [
     items: [
       { label: 'Control Room', path: '/manufacturing/control-room', icon: LayoutDashboard, end: true, workspace: true },
       { label: 'Shopfloor', path: '/manufacturing/shopfloor', icon: Factory },
-      { label: 'BOM', path: '/manufacturing/bom', icon: Layers },
-      { label: 'Routes', path: '/manufacturing/routes', icon: GitBranch },
       { label: 'Production Plan', path: '/manufacturing/production-plan', icon: ClipboardList },
       { label: 'Work Orders', path: '/manufacturing/work-orders', icon: Wrench },
       { label: 'Job Work', path: '/manufacturing/job-work', icon: Truck },
+      { label: 'BOMs', path: '/manufacturing/setup/boms', icon: Layers, group: 'Setup' },
+      { label: 'Routings', path: '/manufacturing/setup/routings', icon: GitBranch, group: 'Setup' },
+      { label: 'Work Centres', path: '/manufacturing/work-centres', icon: HardHat, group: 'Setup' },
+      { label: 'Machines', path: '/manufacturing/machines', icon: Cog, group: 'Setup' },
+      { label: 'Profiles', path: '/manufacturing/profiles', icon: CircuitBoard, group: 'Setup' },
+      { label: 'Setup', path: '/manufacturing/setup', icon: Settings2, end: true, group: 'Setup' },
       { label: 'Reports', path: '/manufacturing/reports', icon: BarChart3 },
       { label: 'Settings', path: '/manufacturing/settings', icon: Settings2 },
+      /** Demo / legacy registers — deep-link only; hide from fixed workspace tabs */
+      { label: 'BOM (Demo)', path: '/manufacturing/bom', icon: Layers, subNav: false },
+      { label: 'Routes (Demo)', path: '/manufacturing/routes', icon: GitBranch, subNav: false },
     ],
   },
   {
@@ -429,8 +440,18 @@ export function categoryIsActive(category: NavCategory, pathname: string): boole
 export function findActiveCategoryId(pathname: string): string | null {
   if (pathname.startsWith('/entity360/customers')) return 'crm'
   if (pathname.startsWith('/sales/leads')) return 'crm'
+  if (pathname.startsWith('/logistics')) return 'dispatch'
   if (pathname.startsWith('/masters') || pathname.startsWith('/settings/roles') || pathname.startsWith('/settings/permissions')) {
     return 'masters'
+  }
+  // API manufacturing setup masters live under paths not covered by demo /bom|/routes prefixes.
+  if (
+    pathname.startsWith('/manufacturing/setup') ||
+    pathname.startsWith('/manufacturing/profiles') ||
+    pathname.startsWith('/manufacturing/work-centres') ||
+    pathname.startsWith('/manufacturing/machines')
+  ) {
+    return 'production'
   }
   for (const cat of moduleCategories) {
     if (categoryIsActive(cat, pathname)) return cat.id

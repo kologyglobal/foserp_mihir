@@ -1,16 +1,19 @@
 import type { Request, Response } from 'express'
 import type { ProductionOrder } from '@prisma/client'
+import { prisma } from '../../../config/database.js'
 import { getRouteParam, getTenantId } from '../../../types/request-context.js'
 import { asyncHandler } from '../../../utils/asyncHandler.js'
 import { buildPaginationMeta } from '../../../utils/pagination.js'
 import { sendCreated, sendPaginated, sendSuccess } from '../../../utils/response.js'
-import { dec, isoDate, mapProductionOrder } from '../shared/manufacturing.mappers.js'
+import { dec, isoDate, mapProductionOrder, mapProductionOrderListItem } from '../shared/manufacturing.mappers.js'
 import * as service from './work-order.service.js'
 import * as releaseService from './work-order-release.service.js'
 import * as lifecycleService from './work-order-lifecycle.service.js'
 import * as progressService from './work-order-progress.service.js'
 import * as dashboardService from './work-order-dashboard.service.js'
 import * as splitService from './work-order-split.service.js'
+import * as childOrdersService from './child-orders.service.js'
+import * as saReceiptService from './sa-receipt.service.js'
 import { collectQualityBlockers } from '../../quality/shared/blockers.service.js'
 import { getWipPosition as fetchWipPosition } from '../wip-movements/wip-position.service.js'
 import { getCloseReadiness as fetchCloseReadiness } from './close-readiness.service.js'
@@ -27,6 +30,9 @@ import type {
   StartWorkOrderInput,
   SplitWorkOrderInput,
 } from './work-order.schemas.js'
+import type { GenerateChildOrdersInput, PostSaReceiptInput } from './sa-receipt.schemas.js'
+import * as bomService from './work-order-bom.service.js'
+import type { AddWorkOrderBomLineInput, UpdateWorkOrderBomLineInput } from './work-order-bom.schemas.js'
 
 function mapStage(row: {
   plannedQuantity: unknown
@@ -97,10 +103,27 @@ function mapLedgerEntry(row: {
 export const listWorkOrders = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const result = await service.listWorkOrders(tenantId, req.query as unknown as ListWorkOrdersQuery)
+
+  const supervisorIds = [
+    ...new Set(result.items.map((row) => row.supervisorId).filter((id): id is string => Boolean(id))),
+  ]
+  const supervisorNameById = new Map<string, string>()
+  if (supervisorIds.length > 0) {
+    const users = await prisma.user.findMany({
+      where: { tenantId, id: { in: supervisorIds }, deletedAt: null },
+      select: { id: true, firstName: true, lastName: true },
+    })
+    for (const user of users) {
+      supervisorNameById.set(user.id, `${user.firstName} ${user.lastName}`.trim())
+    }
+  }
+
   return sendPaginated(
     res,
     'Work orders listed',
-    result.items.map(mapProductionOrder),
+    result.items.map((row) =>
+      mapProductionOrderListItem(row, row.supervisorId ? supervisorNameById.get(row.supervisorId) ?? null : null),
+    ),
     buildPaginationMeta(result.total, result.page, result.limit),
   )
 })
@@ -116,9 +139,53 @@ export const getWorkOrderDetail = asyncHandler(async (req: Request, res: Respons
   const tenantId = getTenantId(req)
   const id = getRouteParam(req, 'id')
   const item = await service.getWorkOrderDetail(tenantId, id)
-  const { bomSnapshot, routingSnapshot, stages, operations, dependencies, ...order } = item
+  const { bomSnapshot, routingSnapshot, stages, operations, dependencies, productItem, ...order } = item
+
+  let relatedSalesOrder: {
+    id: string
+    salesOrderNo: string
+    status: string
+    customerId: string | null
+    customerName: string | null
+    customerCode: string | null
+  } | null = null
+
+  if (order.salesOrderId) {
+    const so = await prisma.crmSalesOrder.findFirst({
+      where: { id: order.salesOrderId, tenantId, deletedAt: null },
+      select: {
+        id: true,
+        salesOrderNo: true,
+        status: true,
+        companyId: true,
+        customerCode: true,
+        company: { select: { name: true, companyCode: true } },
+      },
+    })
+    if (so) {
+      relatedSalesOrder = {
+        id: so.id,
+        salesOrderNo: so.salesOrderNo,
+        status: so.status,
+        customerId: so.companyId,
+        customerName: so.company?.name ?? null,
+        customerCode: so.company?.companyCode ?? so.customerCode ?? null,
+      }
+    }
+  }
+
+  const currentStage =
+    (order.currentStageId ? stages.find((s) => s.id === order.currentStageId) : null) ??
+    stages.find((s) => s.status === 'IN_PROGRESS') ??
+    null
+
   return sendSuccess(res, 'Work order detail fetched', {
     ...mapProductionOrder(order as ProductionOrder),
+    productItemCode: productItem?.code ?? null,
+    productItemName: productItem?.name ?? null,
+    currentStageName: currentStage?.name ?? null,
+    currentStageCode: currentStage?.code ?? null,
+    relatedSalesOrder,
     bomSnapshot: bomSnapshot
       ? {
           ...bomSnapshot,
@@ -192,8 +259,11 @@ export const releaseWorkOrder = asyncHandler(async (req: Request, res: Response)
 export const startWorkOrder = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
   const id = getRouteParam(req, 'id')
-  const item = await lifecycleService.startWorkOrder(req, tenantId, id, req.body as StartWorkOrderInput)
-  return sendSuccess(res, 'Work order started', mapProductionOrder(item))
+  const result = await lifecycleService.startWorkOrder(req, tenantId, id, req.body as StartWorkOrderInput)
+  return sendSuccess(res, 'Work order started', {
+    ...mapProductionOrder(result.order),
+    warnings: result.warnings,
+  })
 })
 
 export const holdWorkOrder = asyncHandler(async (req: Request, res: Response) => {
@@ -225,6 +295,7 @@ export const recordProgress = asyncHandler(async (req: Request, res: Response) =
     ledgerEntry: mapLedgerEntry(result.ledgerEntry),
     stage: result.stage ? mapStage(result.stage) : null,
     order: mapProductionOrder(result.order),
+    warnings: result.warnings ?? [],
   })
 })
 
@@ -236,6 +307,7 @@ export const completeStage = asyncHandler(async (req: Request, res: Response) =>
     stage: mapStage(result.stage),
     promotedStages: (result.promotedStages ?? []).map(mapStage),
     order: mapProductionOrder(result.order),
+    warnings: result.warnings ?? [],
     ...(result.awaitingQuality
       ? { awaitingQuality: true, inspection: result.inspection }
       : { awaitingQuality: false }),
@@ -294,4 +366,79 @@ export const getControlRoomOverview = asyncHandler(async (req: Request, res: Res
   const tenantId = getTenantId(req)
   const result = await dashboardService.getControlRoomOverview(tenantId)
   return sendSuccess(res, 'Control room overview fetched', result)
+})
+
+export const generateChildOrders = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const userId = req.context?.userId ?? ''
+  const body = req.body as GenerateChildOrdersInput
+  const result = await childOrdersService.generateChildOrdersForParent(tenantId, userId, id, {
+    force: body.force,
+  })
+  return sendCreated(res, 'Child work orders generated', {
+    parent: mapProductionOrder(result.parent),
+    children: result.children.map(mapProductionOrder),
+    skipped: result.skipped,
+  })
+})
+
+export const listChildOrders = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const rows = await saReceiptService.listChildOrders(tenantId, id)
+  return sendSuccess(
+    res,
+    'Child work orders listed',
+    rows.map((row) => ({
+      ...mapProductionOrder(row),
+      productItem: row.productItem,
+    })),
+  )
+})
+
+export const postSaReceipt = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const result = await saReceiptService.postSemiFinishedReceipt(
+    req,
+    tenantId,
+    id,
+    req.body as PostSaReceiptInput,
+  )
+  return sendCreated(res, 'Semi-finished receipt posted', result)
+})
+
+export const addWorkOrderBomLine = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const line = await bomService.addWorkOrderBomLine(
+    req,
+    tenantId,
+    id,
+    req.body as AddWorkOrderBomLineInput,
+  )
+  return sendCreated(res, 'BOM line added', line)
+})
+
+export const updateWorkOrderBomLine = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const lineId = getRouteParam(req, 'lineId')
+  const line = await bomService.updateWorkOrderBomLine(
+    req,
+    tenantId,
+    id,
+    lineId,
+    req.body as UpdateWorkOrderBomLineInput,
+  )
+  return sendSuccess(res, 'BOM line updated', line)
+})
+
+export const removeWorkOrderBomLine = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const lineId = getRouteParam(req, 'lineId')
+  const result = await bomService.removeWorkOrderBomLine(req, tenantId, id, lineId)
+  return sendSuccess(res, 'BOM line removed', result)
 })

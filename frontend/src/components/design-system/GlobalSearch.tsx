@@ -478,13 +478,13 @@ export function GlobalSearchTrigger({ className, variant = 'default' }: { classN
       onClick={() => setOpen(true)}
       className={cn(
         variant === 'suite'
-          ? 'd365-search-trigger flex h-9 w-full items-center gap-2 px-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30'
+          ? 'd365-search-trigger flex h-8 w-full items-center gap-2 px-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30'
           : 'flex h-9 w-full min-w-[200px] items-center gap-2 rounded-[4px] border border-erp-border bg-erp-surface-alt px-3 text-left transition-colors hover:border-erp-border-strong hover:bg-erp-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-erp-primary/25 lg:min-w-[280px]',
         className,
       )}
     >
-      <Search className={cn('h-4 w-4 shrink-0', variant === 'suite' ? 'text-white/70' : 'text-erp-muted')} />
-      <span className={cn('flex-1 truncate', variant === 'suite' ? 'text-white/85' : 'erp-type-caption')}>
+      <Search className={cn('h-3.5 w-3.5 shrink-0', variant === 'suite' ? 'text-white/70' : 'h-4 w-4 text-erp-muted')} />
+      <span className={cn('flex-1 truncate', variant === 'suite' ? 'text-[12px] text-white/85' : 'erp-type-caption')}>
         {variant === 'suite' ? 'Search masters, SO, WO, company, product, command…' : 'Search anything…'}
       </span>
       <kbd className={cn(

@@ -202,8 +202,10 @@ export function SalesOrder360Page() {
   const score = so ? healthScore(so) : 0
   const displayValue = so ? resolveSalesOrderValue(so, product) : 0
   const commercialPosition = useSalesOrderCommercialPosition(id)
-  const demoInvoices = useInvoiceStore((s) =>
-    id ? s.invoices.filter((inv) => inv.salesOrderId === id) : [],
+  const allInvoices = useInvoiceStore((s) => s.invoices)
+  const demoInvoices = useMemo(
+    () => (id ? allInvoices.filter((inv) => inv.salesOrderId === id) : []),
+    [allInvoices, id],
   )
   const demoCommercialMoney = useMemo((): SalesOrderAccountingDemoMetrics | null => {
     if (isApiMode() || !so) return null

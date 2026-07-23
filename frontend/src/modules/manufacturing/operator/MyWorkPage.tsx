@@ -35,7 +35,7 @@ export function MyWorkPage() {
   const [issueTarget, setIssueTarget] = useState<ProductionAssignment | null>(null)
 
   const itemLabel = useCallback(
-    (itemId: string) => items.find((i) => i.id === itemId)?.label ?? 'Product',
+    (itemId: string) => items.find((i) => i.id === itemId)?.label ?? 'Item',
     [items],
   )
 
@@ -56,7 +56,7 @@ export function MyWorkPage() {
             const wo = await getWorkOrder(id)
             return [id, itemLabel(wo.data.productItemId)] as const
           } catch {
-            return [id, 'Product'] as const
+            return [id, 'Item'] as const
           }
         }),
       )

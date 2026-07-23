@@ -80,7 +80,7 @@ export function AssetImpairmentPage() {
     >
       <FixedAssetsWorkspaceTabs active="impairment" />
       <div className="space-y-3 p-4">
-        <FixedAssetsDemoBanner variant="partial" />
+        <FixedAssetsDemoBanner variant="auto" />
         <FixedAssetsSummaryCards items={kpis} columns={3} />
 
         <div className="min-w-[220px]">

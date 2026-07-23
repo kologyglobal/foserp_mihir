@@ -54,7 +54,8 @@ export function MaterialIssueDrawer({ open, onClose, material, workOrderNo, busy
   const quantity = num(qty)
   const overRemaining = quantity > position.remaining
   const overStock = position.free != null && quantity > position.free
-  const canPost = quantity > 0 && !overRemaining && !busy
+  const noStock = position.free != null && position.free <= 0
+  const canPost = quantity > 0 && !overRemaining && !noStock && !busy
 
   return (
     <Modal
@@ -128,7 +129,12 @@ export function MaterialIssueDrawer({ open, onClose, material, workOrderNo, busy
             error={overRemaining}
           />
         </FormField>
-        {overStock ? (
+        {noStock ? (
+          <p className="text-[12px] font-medium text-rose-800">
+            No unrestricted stock is available in this warehouse (Available = 0). Receive stock via GRN / Opening /
+            Transfer before issuing to the work order.
+          </p>
+        ) : overStock ? (
           <p className="text-[12px] font-medium text-amber-800">
             Requested quantity exceeds unrestricted available stock ({fmt(position.free!)}). The server will reject the
             posting if stock is insufficient.

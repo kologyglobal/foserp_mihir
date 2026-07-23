@@ -12,9 +12,10 @@ import {
   getInventorySetup,
   getWarehouses,
   INVENTORY_SETUP_TAB_LABELS,
-  updateInventorySetupDemo,
+  updateInventorySetup,
   updateWarehouse,
 } from '@/services/inventory'
+import { isApiMode } from '@/config/apiConfig'
 import type {
   InventorySetup,
   InventorySetupTabId,
@@ -103,8 +104,8 @@ export function InventorySetupPage() {
     if (!setup) return
     setSaving(true)
     try {
-      await updateInventorySetupDemo(setup)
-      notify.success('Inventory setup saved (demo)')
+      await updateInventorySetup(setup)
+      notify.success(isApiMode() ? 'Inventory setup saved' : 'Inventory setup saved (demo)')
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Save failed')
     } finally {
@@ -156,9 +157,15 @@ export function InventorySetupPage() {
         />
       )}
     >
-      <p className="mb-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
-        Demo mode — settings saved in browser memory only. No backend API.
-      </p>
+      {isApiMode() ? (
+        <p className="mb-4 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">
+          Live mode — settings persist to the tenant inventory setup API. Warehouses use Master Data.
+        </p>
+      ) : (
+        <p className="mb-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+          Demo mode — settings saved in browser memory only. No backend API.
+        </p>
+      )}
 
       <TabStrip
         tabs={SETUP_TABS.map((id) => ({ id, label: INVENTORY_SETUP_TAB_LABELS[id] ?? id }))}
@@ -177,7 +184,12 @@ export function InventorySetupPage() {
                 <FormField label="Default Warehouse">
                   <Select value={setup.general.defaultWarehouseId ?? ''} onChange={(e: ChangeEvent<HTMLSelectElement>) => setSetup({ ...setup, general: { ...setup.general, defaultWarehouseId: e.target.value || null } })}>
                     <option value="">— Select —</option>
-                    {masterWarehouses.map((w) => <option key={w.id} value={w.id}>{w.warehouseName}</option>)}
+                    {(warehouses.length > 0
+                      ? warehouses.map((w) => ({ id: w.id, name: w.warehouseName }))
+                      : masterWarehouses.map((w) => ({ id: w.id, name: w.warehouseName }))
+                    ).map((w) => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
                   </Select>
                 </FormField>
                 <FormField label="Default Costing Method">

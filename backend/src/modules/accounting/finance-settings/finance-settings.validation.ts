@@ -32,6 +32,7 @@ export const upsertFinanceSettingsSchema = z.object({
   useTreasuryAdjustmentsForStatementItems: z.boolean().optional(),
   treasuryAdjustmentApprovalLimit: z.coerce.number().min(0).nullable().optional(),
   treasuryAdjustmentPreventSelfApprove: z.boolean().optional(),
+  periodCloseHardBlock: z.boolean().optional(),
 })
 
 export const activateFinanceSchema = z.object({

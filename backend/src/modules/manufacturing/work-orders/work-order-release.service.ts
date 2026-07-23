@@ -45,7 +45,13 @@ export async function releaseWorkOrder(req: Request, tenantId: string, id: strin
     const { currentStageId } = await snapshotRouting(tx, tenantId, before.id, routingVersion)
 
     const orderStages = await tx.productionOrderStage.findMany({ where: { productionOrderId: id, tenantId } })
-    const qualityStatus = orderStages.some((s) => s.qualityRequired) ? 'PENDING_QC' : 'NOT_APPLICABLE'
+    const orderOps = await tx.productionOrderOperation.findMany({
+      where: { productionOrderId: id, tenantId },
+      select: { qualityRequired: true },
+    })
+    const qualityRequired =
+      orderStages.some((s) => s.qualityRequired) || orderOps.some((o) => o.qualityRequired)
+    const qualityStatus = qualityRequired ? 'PENDING_QC' : 'NOT_APPLICABLE'
 
     const updated = await tx.productionOrder.update({
       where: { id, tenantId },
@@ -95,7 +101,12 @@ export async function releaseWorkOrder(req: Request, tenantId: string, id: strin
     select: { productionWarehouseId: true },
   })
   if (profile?.productionWarehouseId) {
-    await syncRequirements(req, tenantId, id)
+    try {
+      await syncRequirements(req, tenantId, id)
+    } catch {
+      // Release still succeeds; material control stays NOT_CONNECTED until Sync is run
+      // (e.g. BOM has no stockable lines, or warehouse/item validation fails).
+    }
   }
 
   return prisma.productionOrder.findFirstOrThrow({ where: { id, tenantId } })
@@ -191,6 +202,9 @@ async function snapshotRouting(
     where: { routingVersionId: routingVersion.id, tenantId, deletedAt: null, isActive: true },
     orderBy: { displayOrder: 'asc' },
   })
+  if (stageGroups.length === 0) {
+    throw new ValidationError('Routing has no active stage groups — cannot release this work order')
+  }
 
   const stageIdMap = new Map<string, string>()
   for (const group of stageGroups) {
@@ -270,10 +284,29 @@ async function snapshotRouting(
   }
 
   // Compute initial op readiness now that dependencies are remapped to new operation ids.
+  // When the routing has no mandatory dependencies, only the first stage (by displayOrder)
+  // should start READY so the shopfloor advances process-by-process.
   const allNewOperationIds = Array.from(opIdMap.values())
-  for (const operationId of allNewOperationIds) {
-    const status = computeInitialOperationStatus(operationId, newDependencies)
-    await tx.productionOrderOperation.update({ where: { id: operationId }, data: { status } })
+  if (newDependencies.length === 0) {
+    const stageOrder = await tx.productionOrderStage.findMany({
+      where: { productionOrderId, tenantId },
+      select: { id: true, displayOrder: true },
+      orderBy: { displayOrder: 'asc' },
+    })
+    const firstStageId = stageOrder[0]?.id ?? null
+    const ops = await tx.productionOrderOperation.findMany({
+      where: { productionOrderId, tenantId },
+      select: { id: true, stageId: true },
+    })
+    for (const op of ops) {
+      const status = firstStageId && op.stageId === firstStageId ? 'READY' : 'NOT_STARTED'
+      await tx.productionOrderOperation.update({ where: { id: op.id }, data: { status } })
+    }
+  } else {
+    for (const operationId of allNewOperationIds) {
+      const status = computeInitialOperationStatus(operationId, newDependencies)
+      await tx.productionOrderOperation.update({ where: { id: operationId }, data: { status } })
+    }
   }
 
   // Derive each stage's status from its (now-updated) operations.

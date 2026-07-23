@@ -12,6 +12,7 @@ import {
   createRoutingVersionSchema,
   listRoutingVersionsQuerySchema,
   listRoutingsQuerySchema,
+  updateRoutingSchema,
 } from './routing.schemas.js'
 
 const router = Router({ mergeParams: true })
@@ -28,6 +29,14 @@ router.get(
   validateParams(routingIdParamSchema),
   requirePermission('manufacturing.routes.view'),
   controller.getRouting,
+)
+
+router.patch(
+  '/:routingId',
+  validateParams(routingIdParamSchema),
+  requirePermission('manufacturing.routes.edit'),
+  validateBody(updateRoutingSchema),
+  controller.updateRouting,
 )
 
 router.get(

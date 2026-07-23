@@ -25,7 +25,26 @@ export async function listWorkOrders(tenantId: string, query: ListWorkOrdersQuer
   const { skip, take } = getPagination(query)
   const where = buildWhere(tenantId, query)
   const [items, total] = await Promise.all([
-    prisma.productionOrder.findMany({ where, skip, take, orderBy: { createdAt: query.sortOrder } }),
+    prisma.productionOrder.findMany({
+      where,
+      skip,
+      take,
+      orderBy: { createdAt: query.sortOrder },
+      include: {
+        productItem: { select: { code: true, name: true } },
+        salesOrder: {
+          select: {
+            salesOrderNo: true,
+            customerCode: true,
+            company: { select: { name: true, companyCode: true } },
+          },
+        },
+        stages: {
+          select: { id: true, name: true, code: true, status: true },
+          orderBy: { displayOrder: 'asc' },
+        },
+      },
+    }),
     prisma.productionOrder.count({ where }),
   ])
   return { items, total, page: query.page, limit: query.limit }
@@ -41,6 +60,7 @@ export async function getWorkOrderDetail(tenantId: string, id: string) {
   const order = await prisma.productionOrder.findFirst({
     where: { id, ...tenantActiveFilter(tenantId) },
     include: {
+      productItem: { select: { id: true, code: true, name: true } },
       bomSnapshot: { include: { lines: { orderBy: { sequence: 'asc' } } } },
       routingSnapshot: true,
       stages: { orderBy: { displayOrder: 'asc' } },

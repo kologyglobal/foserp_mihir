@@ -48,6 +48,9 @@ export const FIXED_ASSETS_API_PERMISSIONS = [
   'finance.fa.depreciate',
   'finance.fa.dispose',
   'finance.fa.transfer',
+  'finance.fa.revalue',
+  'finance.fa.impair',
+  'finance.fa.maintain',
 ] as const
 
 export type FixedAssetsApiPermission = (typeof FIXED_ASSETS_API_PERMISSIONS)[number]
@@ -171,6 +174,12 @@ export function hasFixedAssetsPermission(permission: FixedAssetsPermission, role
         return hasApiFaPermission('finance.fa.dispose')
       case 'accounting.fixed_assets.transfer':
         return hasApiFaPermission('finance.fa.transfer')
+      case 'accounting.fixed_assets.revalue':
+        return hasApiFaPermission('finance.fa.revalue')
+      case 'accounting.fixed_assets.impair':
+        return hasApiFaPermission('finance.fa.impair')
+      case 'accounting.fixed_assets.maintain':
+        return hasApiFaPermission('finance.fa.maintain')
       default:
         return false
     }
@@ -200,9 +209,9 @@ export function useFixedAssetsPermissions() {
         canRunDepreciation: hasApiFaPermission('finance.fa.depreciate'),
         canApproveDepreciation: hasApiFaPermission('finance.fa.depreciate'),
         canTransfer: hasApiFaPermission('finance.fa.transfer'),
-        canMaintain: false,
-        canRevalue: false,
-        canImpair: false,
+        canMaintain: hasApiFaPermission('finance.fa.maintain'),
+        canRevalue: hasApiFaPermission('finance.fa.revalue'),
+        canImpair: hasApiFaPermission('finance.fa.impair'),
         canDispose: hasApiFaPermission('finance.fa.dispose'),
         canApproveDisposal: false,
         canVerify: false,

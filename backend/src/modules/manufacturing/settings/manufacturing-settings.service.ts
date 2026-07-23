@@ -36,11 +36,23 @@ function denormalize(payload: SettingsPayload, input: SettingsInput) {
   const material = group(payload, 'materialConsumption')
   const advanced = group(payload, 'advanced')
   const costing = group(payload, 'costing')
+  const flexibleExecution =
+    input.flexibleExecution
+    ?? (general.flexibleExecution as boolean | undefined)
+    ?? true
+  const allowCloseWithoutQc = flexibleExecution
+    ? Boolean(general.allowCloseWithoutQc ?? input.allowCloseWithoutQc ?? true)
+    : Boolean(input.allowCloseWithoutQc ?? general.allowCloseWithoutQc ?? false)
   return {
+    flexibleExecution,
+    allowUnderCompletion:
+      input.allowUnderCompletion
+      ?? (general.allowUnderCompletion as boolean | undefined)
+      ?? true,
     allowOverproduction: input.allowOverproduction ?? general.allowOverproduction as boolean ?? true,
     overproductionTolerancePercent:
       input.overproductionTolerancePercent ?? Number(general.overproductionTolerancePercent ?? 5),
-    allowCloseWithoutQc: input.allowCloseWithoutQc ?? general.allowCloseWithoutQc as boolean ?? false,
+    allowCloseWithoutQc,
     requireReservation: input.requireReservation ?? material.requireReservation as boolean ?? false,
     allowPartialProduction:
       input.allowPartialProduction ?? general.allowPartialProduction as boolean ?? true,
@@ -61,9 +73,21 @@ function toDto(row: Awaited<ReturnType<typeof repo.find>> | null) {
     const payloadJson = cloneDefault()
     return { id: null, tenantId: null, version: 0, payloadJson, ...denormalize(payloadJson, {}) }
   }
+  const payloadJson = (row.payloadJson ?? {}) as SettingsPayload
   return {
     ...row,
-    overproductionTolerancePercent: Number(row.overproductionTolerancePercent),
+    payloadJson,
+    ...denormalize(payloadJson, {
+      allowOverproduction: row.allowOverproduction,
+      overproductionTolerancePercent: Number(row.overproductionTolerancePercent),
+      allowCloseWithoutQc: row.allowCloseWithoutQc,
+      requireReservation: row.requireReservation,
+      allowPartialProduction: row.allowPartialProduction,
+      allowProductionWithoutFullMaterial: row.allowProductionWithoutFullMaterial,
+      autoPostAbsorption: row.autoPostAbsorption,
+      oeeEnabled: row.oeeEnabled,
+      shiftMinutesPerDay: row.shiftMinutesPerDay ?? undefined,
+    }),
   }
 }
 
@@ -118,10 +142,10 @@ export type ManufacturingSettingsCheck =
 export async function assertSettingsAllow(tenantId: string, check: ManufacturingSettingsCheck) {
   const settings = await getManufacturingSettingsForTenant(tenantId)
   const allowed = {
-    CLOSE_WITHOUT_QC: settings.allowCloseWithoutQc,
-    START_WITHOUT_RESERVATION: !settings.requireReservation,
-    PRODUCE_WITHOUT_FULL_MATERIAL: settings.allowProductionWithoutFullMaterial,
-    OVERPRODUCTION: settings.allowOverproduction,
+    CLOSE_WITHOUT_QC: settings.allowCloseWithoutQc || settings.flexibleExecution,
+    START_WITHOUT_RESERVATION: !settings.requireReservation || settings.flexibleExecution,
+    PRODUCE_WITHOUT_FULL_MATERIAL: settings.allowProductionWithoutFullMaterial || settings.flexibleExecution,
+    OVERPRODUCTION: settings.allowOverproduction || settings.flexibleExecution,
   }[check]
   if (!allowed) throw new ConflictError(`Manufacturing settings block ${check.toLowerCase().replaceAll('_', ' ')}`)
   return settings

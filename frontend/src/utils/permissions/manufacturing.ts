@@ -5,6 +5,7 @@
 
 import { useMemo } from 'react'
 import type { ManufacturingUiRole } from '../../types/manufacturingRoles'
+import { MANUFACTURING_UI_ROLES } from '../../types/manufacturingRoles'
 import { getManufacturingUiRole, useManufacturingUiRole } from '../manufacturing/uiRoleStore'
 import { isApiMode } from '../../config/apiConfig'
 import { getStoredSession } from '../../services/api/client'
@@ -81,6 +82,10 @@ export const MANUFACTURING_PERMISSIONS = [
   'manufacturing.routes.create',
   'manufacturing.routes.edit',
   'manufacturing.routes.activate',
+  'manufacturing.routes.validate',
+  'manufacturing.routes.certify',
+  'manufacturing.routes.version',
+  'manufacturing.routes.close',
   'manufacturing.work_orders.override_route',
   // Phase 1 setup masters (backend-enforced — see docs/manufacturing/PRODUCTION_PHASE1_README.md)
   'manufacturing.setup.view',
@@ -287,6 +292,10 @@ const PRODUCTION_MANAGER: ManufacturingPermission[] = [
   'manufacturing.routes.create',
   'manufacturing.routes.edit',
   'manufacturing.routes.activate',
+  'manufacturing.routes.validate',
+  'manufacturing.routes.certify',
+  'manufacturing.routes.version',
+  'manufacturing.routes.close',
   'manufacturing.work_orders.override_route',
   'manufacturing.setup.view',
   'manufacturing.profile.view',
@@ -485,6 +494,42 @@ const UI_ROLE_MAP: Record<ManufacturingUiRole, ManufacturingPermission[]> = {
   viewer: VIEWER,
 }
 
+/**
+ * Map session ErpRole / legacy aliases onto manufacturing UI roles.
+ * `production_head` ≡ production manager (plans, BOM create, WO lifecycle).
+ */
+const ERP_ROLE_TO_MFG_UI: Record<string, ManufacturingUiRole> = {
+  owner: 'owner',
+  admin: 'owner',
+  ceo: 'owner',
+  director: 'owner',
+  management: 'owner',
+  production_manager: 'production_manager',
+  production_head: 'production_manager',
+  production: 'production_manager',
+  planning_manager: 'production_manager',
+  production_supervisor: 'supervisor',
+  shop_floor: 'supervisor',
+  store_manager: 'store_user',
+  store_user: 'store_user',
+  stores: 'store_user',
+  quality_head: 'qc_user',
+  quality_inspector: 'qc_user',
+  quality: 'qc_user',
+  job_work_user: 'job_work_user',
+  viewer: 'viewer',
+}
+
+export function resolveManufacturingUiRole(
+  role?: ManufacturingUiRole | string | null,
+): ManufacturingUiRole {
+  if (!role) return getManufacturingUiRole()
+  if ((MANUFACTURING_UI_ROLES as readonly string[]).includes(role)) {
+    return role as ManufacturingUiRole
+  }
+  return ERP_ROLE_TO_MFG_UI[role] ?? 'viewer'
+}
+
 const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: ManufacturingPermission }> = [
   { prefix: '/manufacturing/setup/boms', permission: 'manufacturing.bom.view' },
   { prefix: '/manufacturing/setup/routings', permission: 'manufacturing.routes.view' },
@@ -517,8 +562,10 @@ const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: ManufacturingPer
   { prefix: '/manufacturing', permission: 'manufacturing.view' },
 ]
 
-export function getManufacturingPermissionsForUiRole(role: ManufacturingUiRole): ManufacturingPermission[] {
-  return UI_ROLE_MAP[role] ?? VIEWER
+export function getManufacturingPermissionsForUiRole(
+  role: ManufacturingUiRole | string,
+): ManufacturingPermission[] {
+  return UI_ROLE_MAP[resolveManufacturingUiRole(role)] ?? VIEWER
 }
 
 /** @deprecated Prefer getManufacturingPermissionsForUiRole — kept for any ErpRole callers */
@@ -528,7 +575,7 @@ export function getManufacturingPermissionsForRole(_role: string): Manufacturing
 
 export function canManufacturingPermission(
   permission: ManufacturingPermission,
-  uiRole?: ManufacturingUiRole,
+  uiRole?: ManufacturingUiRole | string,
 ): boolean {
   if (isApiMode() && hasWorkspaceAdminRole()) return true
   if (isApiMode()) {
@@ -542,7 +589,7 @@ export function canManufacturingPermission(
       return true
     }
   }
-  const role = uiRole ?? getManufacturingUiRole()
+  const role = resolveManufacturingUiRole(uiRole)
   return getManufacturingPermissionsForUiRole(role).includes(permission)
 }
 
@@ -563,8 +610,8 @@ export function isManufacturingPath(pathname: string): boolean {
   return pathname === '/manufacturing' || pathname.startsWith('/manufacturing/')
 }
 
-export function isManufacturingUiReadOnly(uiRole?: ManufacturingUiRole): boolean {
-  const role = uiRole ?? getManufacturingUiRole()
+export function isManufacturingUiReadOnly(uiRole?: ManufacturingUiRole | string): boolean {
+  const role = resolveManufacturingUiRole(uiRole)
   return role === 'viewer' || role === 'owner'
 }
 
@@ -776,6 +823,14 @@ export function useManufacturingSetupPermissions() {
       canActivateBom: can('manufacturing.bom.activate'),
       canManageRouting: can('manufacturing.routes.create') || can('manufacturing.routes.edit'),
       canActivateRouting: can('manufacturing.routes.activate'),
+      canValidateRouting:
+        can('manufacturing.routes.validate') || can('manufacturing.routes.edit'),
+      canCertifyRouting:
+        can('manufacturing.routes.certify') || can('manufacturing.routes.activate'),
+      canVersionRouting:
+        can('manufacturing.routes.version') || can('manufacturing.routes.create'),
+      canCloseRouting:
+        can('manufacturing.routes.close') || can('manufacturing.routes.activate'),
       canManageWorkCentre: can('manufacturing.work_centre.manage'),
       canViewWorkCentre: can('manufacturing.work_centre.view'),
       canManageMachine: can('manufacturing.machine.manage'),

@@ -10,7 +10,7 @@ const STRINGS = {
   'myWork.refresh': 'Refresh',
 
   'task.workOrder': 'Work Order',
-  'task.product': 'Product',
+  'task.product': 'Item',
   'task.stage': 'Stage',
   'task.operation': 'Operation',
   'task.target': 'Target',

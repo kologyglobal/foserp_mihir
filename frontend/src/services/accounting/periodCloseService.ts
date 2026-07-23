@@ -28,8 +28,10 @@ import {
 } from '@/data/accounting/periodCloseSeed'
 import {
   apiClosePeriod,
+  apiListChecklistAcks,
   apiMarkPeriodUnderReview,
   apiReopenPeriod,
+  apiUpsertChecklistAcks,
   buildApiCloseDashboard,
   buildApiCloseTasks,
   composePeriodCloseReadiness,
@@ -38,6 +40,14 @@ import {
   loadApiPeriodCloseSetup,
   resolveApiPeriodFilter,
 } from '@/services/accounting/periodCloseApiComposer'
+import {
+  fetchInventoryAccountingEvents,
+  fetchInventoryAccountingGate,
+} from '@/services/api/inventoryAccountingApi'
+import {
+  getAccountingWorkspaceSummary,
+  listAccountingWorkspaceReconciliation,
+} from '@/services/api/manufacturingCostingApi'
 import type { AccountingPeriod } from '@/types/financeSetup'
 import type {
   AccrualEntry,
@@ -49,6 +59,7 @@ import type {
   FxRevaluationLine,
   ModuleLockStatus,
   ModulePeriodLock,
+  PeriodCloseChecklistAck,
   PeriodCloseReadiness,
   PeriodCloseSetup,
   PeriodFilterState,
@@ -188,11 +199,83 @@ export async function addReconciliationNote(id: string, note: string): Promise<S
 }
 
 export async function getInventoryCloseSummary() {
+  if (isApiMode()) {
+    try {
+      const [gateRes, recordedRes, failedRes, adjRes] = await Promise.all([
+        fetchInventoryAccountingGate().catch(() => null),
+        fetchInventoryAccountingEvents({ status: 'RECORDED', limit: 1 }).catch(() => null),
+        fetchInventoryAccountingEvents({ status: 'FAILED', limit: 1 }).catch(() => null),
+        fetchInventoryAccountingEvents({ eventType: 'STOCK_ADJUSTMENT', status: 'RECORDED', limit: 1 }).catch(
+          () => null,
+        ),
+      ])
+      const unposted = recordedRes?.meta?.total ?? recordedRes?.data?.length ?? 0
+      const failed = failedRes?.meta?.total ?? failedRes?.data?.length ?? 0
+      const pendingAdj = adjRes?.meta?.total ?? adjRes?.data?.length ?? 0
+      const enabled = Boolean(gateRes?.data?.enabled)
+      return {
+        inventoryValue: 0,
+        negativeStockItems: 0,
+        unpostedMovements: unposted,
+        pendingTransfers: 0,
+        pendingAdjustments: pendingAdj,
+        itemLedgerVsGlDiff: 0,
+        costAdjustmentStatus: enabled
+          ? failed > 0
+            ? `${failed} failed inventory GL event(s)`
+            : unposted > 0
+              ? `${unposted} unposted inventory GL event(s)`
+              : 'Inventory GL events clear'
+          : 'INVENTORY_ACCOUNTING flag off — events recorded only',
+      }
+    } catch {
+      return {
+        ...SEED_INVENTORY,
+        costAdjustmentStatus: 'Unable to load live inventory accounting — check API',
+      }
+    }
+  }
   await delay()
   return { ...SEED_INVENTORY }
 }
 
 export async function getManufacturingCloseSummary() {
+  if (isApiMode()) {
+    try {
+      const [summaryRes, reconRes] = await Promise.all([
+        getAccountingWorkspaceSummary(),
+        listAccountingWorkspaceReconciliation().catch(() => null),
+      ])
+      const s = summaryRes.data
+      const recon = reconRes?.data ?? []
+      const varianceDiff = recon
+        .filter((r) => r.status === 'DIFFERENCE' || r.status === 'BLOCKED')
+        .reduce((sum, r) => sum + Math.abs(Number(r.difference ?? 0)), 0)
+      return {
+        openProductionOrders: s.workOrdersReadyToClose + s.provisionalCount,
+        completedUnclosedOrders: s.workOrdersReadyToClose,
+        wipValue: Number(s.wipValue ?? 0),
+        unpostedConsumption: s.unpostedCount,
+        missingLabourBooking: s.provisionalCount,
+        missingMachineBooking: s.failedCount,
+        unallocatedOverhead: 0,
+        productionVariance: varianceDiff,
+        scrapVariance: 0,
+      }
+    } catch {
+      return {
+        openProductionOrders: 0,
+        completedUnclosedOrders: 0,
+        wipValue: 0,
+        unpostedConsumption: 0,
+        missingLabourBooking: 0,
+        missingMachineBooking: 0,
+        unallocatedOverhead: 0,
+        productionVariance: 0,
+        scrapVariance: 0,
+      }
+    }
+  }
   await delay()
   return { ...SEED_MANUFACTURING }
 }
@@ -203,8 +286,47 @@ export async function getFixedAssetCloseSummary() {
 }
 
 export async function getBankCloseSummary() {
+  if (isApiMode()) {
+    try {
+      const readiness = await composePeriodCloseReadiness(periodFilter)
+      const bank = readiness.checks.find((c) => c.code === 'BANK_RECON')
+      const open = readiness.openBankReconCount ?? bank?.count ?? 0
+      return {
+        accountsPendingRecon: open,
+        cashCountsPending: 0,
+        chequesInTransit: 0,
+        unidentifiedTransactions: 0,
+        bankVsGlDiff: 0,
+        statusMessage: bank?.message ?? 'Bank recon status loaded from close readiness.',
+      }
+    } catch {
+      return {
+        ...SEED_BANK,
+        statusMessage: 'Unable to load live bank recon — check API',
+      }
+    }
+  }
   await delay()
   return { ...SEED_BANK }
+}
+
+export async function listCloseChecklistAcks(periodId?: string): Promise<PeriodCloseChecklistAck[]> {
+  if (!isApiMode()) return []
+  const resolved = await resolveApiPeriodFilter(
+    periodId ? { ...periodFilter, periodId } : periodFilter,
+  )
+  return apiListChecklistAcks(resolved.period.id)
+}
+
+export async function saveCloseChecklistAcks(
+  items: Array<{ checkKey: string; status: 'ACK' | 'NA'; note?: string | null }>,
+  periodId?: string,
+): Promise<PeriodCloseChecklistAck[]> {
+  if (!isApiMode()) throw new Error('Checklist acks are API-mode only.')
+  const resolved = await resolveApiPeriodFilter(
+    periodId ? { ...periodFilter, periodId } : periodFilter,
+  )
+  return apiUpsertChecklistAcks(resolved.period.id, items)
 }
 
 export async function getGstTdsCloseSummary() {

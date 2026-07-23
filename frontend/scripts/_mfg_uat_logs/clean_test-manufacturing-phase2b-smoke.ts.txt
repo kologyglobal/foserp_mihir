@@ -1,0 +1,93 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+── Manufacturing production (Phase 2B) smoke ──
+
+Types & API service:
+  ✓ manufacturingPhase2b types file exists
+  ✓ operatorStrings i18n module exists
+  ✓ API client exports listAssignments
+  ✓ API client exports getAssignment
+  ✓ API client exports getAssignmentHistory
+  ✓ API client exports createAssignment
+  ✓ API client exports reassignAssignment
+  ✓ API client exports cancelAssignment
+  ✓ API client exports acceptAssignment
+  ✓ API client exports startAssignment
+  ✓ API client exports pauseAssignment
+  ✓ API client exports resumeAssignment
+  ✓ API client exports completeAssignment
+  ✓ API client exports listWorkOrderAssignments
+  ✓ API client exports getMyWork
+  ✓ API client exports listDailyProductionBatches
+  ✓ API client exports getDailyProductionBatch
+  ✓ API client exports createDailyProductionBatch
+  ✓ API client exports updateDailyProductionBatch
+  ✓ API client exports addDailyProductionLine
+  ✓ API client exports updateDailyProductionLine
+  ✓ API client exports removeDailyProductionLine
+  ✓ API client exports validateDailyProductionBatch
+  ✓ API client exports submitDailyProductionBatch
+  ✓ API client exports correctDailyProductionLine
+  ✓ API client exports listIssues
+  ✓ API client exports getIssue
+  ✓ API client exports reportIssue
+  ✓ API client exports acknowledgeIssue
+  ✓ API client exports markIssueInProgress
+  ✓ API client exports resolveIssue
+  ✓ API client exports cancelIssue
+
+Permissions:
+  ✓ Permission key defined: manufacturing.daily_production.view
+  ✓ Permission key defined: manufacturing.daily_production.create
+  ✓ Permission key defined: manufacturing.daily_production.submit
+  ✓ Permission key defined: manufacturing.assignment.view
+  ✓ Permission key defined: manufacturing.assignment.manage
+  ✓ Permission key defined: manufacturing.assignment.reassign
+  ✓ Permission key defined: manufacturing.operator.my_work
+  ✓ Permission key defined: manufacturing.operator.start
+  ✓ Permission key defined: manufacturing.operator.pause
+  ✓ Permission key defined: manufacturing.operator.complete
+  ✓ Permission key defined: manufacturing.issue.view
+  ✓ Permission key defined: manufacturing.issue.report
+  ✓ Permission key defined: manufacturing.issue.acknowledge
+  ✓ Permission key defined: manufacturing.issue.resolve
+  ✓ Permission key defined: manufacturing.downtime.view
+  ✓ Permission key defined: manufacturing.downtime.manage
+  ✓ useManufacturingPhase2bPermissions hook exported
+  ✗ permissions index re-exports phase2b hook
+
+Pages & components:
+  ✓ My Work page — src/modules/manufacturing/operator/MyWorkPage.tsx
+  ✓ Operator task card — src/modules/manufacturing/operator/OperatorTaskCard.tsx
+  ✓ Operator task actions — src/modules/manufacturing/operator/OperatorTaskActions.tsx
+  ✓ Production completion sheet — src/modules/manufacturing/operator/ProductionCompletionSheet.tsx
+  ✓ Quick issue sheet — src/modules/manufacturing/operator/QuickIssueSheet.tsx
+  ✓ Daily update page — src/modules/manufacturing/daily-update/DailyUpdatePage.tsx
+  ✓ Daily production grid — src/modules/manufacturing/daily-update/DailyProductionGrid.tsx
+  ✓ Issues queue page — src/modules/manufacturing/issues/IssuesQueuePage.tsx
+  ✓ Issue status badge — src/modules/manufacturing/issues/IssueStatusBadge.tsx
+  ✓ Assignment drawer — src/modules/manufacturing/work-orders/components/AssignmentDrawer.tsx
+  ✓ Assignment history — src/modules/manufacturing/work-orders/components/AssignmentHistory.tsx
+  ✓ My Work uses t() i18n helper
+  ✓ My Work gates on isApiMode()
+  ✓ My Work renders OperatorTaskCard
+  ✓ Daily Update page loads grid component
+
+Routes:
+  ✓ Route registered: manufacturing/daily-update
+  ✓ Route registered: manufacturing/my-work
+  ✓ Route registered: manufacturing/issues
+  ✓ No duplicate /production/my-jobs route
+
+Navigation:
+  ✗ Nav includes Daily Update link
+  ✗ Nav includes My Work link
+  ✗ Nav includes Issues link
+  ✓ Nav preserves Setup group
+  ✓ Work order detail has Assignments tab
+  ✓ Work order detail has Issues tab
+  ✓ Work order detail uses AssignmentDrawer
+  ✓ Today page handles openIssues field
+
+✗ 4 check(s) failed (73 passed, 4 failed)
+

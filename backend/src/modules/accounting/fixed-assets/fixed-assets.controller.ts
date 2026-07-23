@@ -11,23 +11,31 @@ import * as disposeService from './fixed-asset-dispose.service.js'
 import * as transferService from './fixed-asset-transfer.service.js'
 import * as depreciationService from './fixed-asset-depreciation.service.js'
 import * as overviewService from './fixed-asset-overview.service.js'
+import * as phase4Service from './fixed-asset-phase4.service.js'
 import type {
   CapitalizeFixedAssetInput,
+  CompleteFixedAssetMaintenanceInput,
   CompleteFixedAssetTransferInput,
   CreateDepreciationRunInput,
   CreateFixedAssetCategoryInput,
+  CreateFixedAssetImpairmentInput,
   CreateFixedAssetInput,
+  CreateFixedAssetMaintenanceInput,
+  CreateFixedAssetRevaluationInput,
   CreateFixedAssetTransferInput,
   DepreciationPreviewInput,
   DisposeFixedAssetInput,
   DisposePreviewInput,
   FixedAssetOverviewQueryInput,
+  FixedAssetReportQueryInput,
   ListDepreciationRunsQueryInput,
   ListFixedAssetCategoriesQueryInput,
+  ListFixedAssetPhase4QueryInput,
   ListFixedAssetTransfersQueryInput,
   ListFixedAssetsQueryInput,
   UpdateFixedAssetCategoryInput,
   UpdateFixedAssetInput,
+  UpdateFixedAssetMaintenanceInput,
 } from './fixed-assets.schemas.js'
 
 export const getOverview = asyncHandler(async (req: Request, res: Response) => {
@@ -205,4 +213,133 @@ export const createDepreciationRun = asyncHandler(async (req: Request, res: Resp
     result.idempotentReplay ? 'depreciation run replayed' : 'depreciation run posted',
     result,
   )
+})
+
+// ─── Phase 4 ─────────────────────────────────────────────────────────────────
+
+export const listRevaluations = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const query = req.query as unknown as ListFixedAssetPhase4QueryInput
+  await getLegalEntityOrThrow(tenantId, query.legalEntityId)
+  const result = await phase4Service.listRevaluations(req, tenantId, query)
+  return sendSuccess(res, 'revaluations listed', result.items, 200, buildPaginationMeta(result.total, result.page, result.pageSize))
+})
+
+export const getRevaluation = asyncHandler(async (req: Request, res: Response) => {
+  const data = await phase4Service.getRevaluation(req, getTenantId(req), getRouteParam(req, 'id'))
+  return sendSuccess(res, 'revaluation fetched', data)
+})
+
+export const createRevaluation = asyncHandler(async (req: Request, res: Response) => {
+  const data = await phase4Service.createRevaluation(req, getTenantId(req), req.body as CreateFixedAssetRevaluationInput)
+  return sendCreated(res, 'revaluation created', data)
+})
+
+export const postRevaluation = asyncHandler(async (req: Request, res: Response) => {
+  const result = await phase4Service.postRevaluation(req, getTenantId(req), getRouteParam(req, 'id'))
+  return sendSuccess(res, result.idempotentReplay ? 'revaluation replayed' : 'revaluation posted', result)
+})
+
+export const cancelRevaluation = asyncHandler(async (req: Request, res: Response) => {
+  const data = await phase4Service.cancelRevaluation(req, getTenantId(req), getRouteParam(req, 'id'))
+  return sendSuccess(res, 'revaluation cancelled', data)
+})
+
+export const listImpairments = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const query = req.query as unknown as ListFixedAssetPhase4QueryInput
+  await getLegalEntityOrThrow(tenantId, query.legalEntityId)
+  const result = await phase4Service.listImpairments(req, tenantId, query)
+  return sendSuccess(res, 'impairments listed', result.items, 200, buildPaginationMeta(result.total, result.page, result.pageSize))
+})
+
+export const getImpairment = asyncHandler(async (req: Request, res: Response) => {
+  const data = await phase4Service.getImpairment(req, getTenantId(req), getRouteParam(req, 'id'))
+  return sendSuccess(res, 'impairment fetched', data)
+})
+
+export const createImpairment = asyncHandler(async (req: Request, res: Response) => {
+  const data = await phase4Service.createImpairment(req, getTenantId(req), req.body as CreateFixedAssetImpairmentInput)
+  return sendCreated(res, 'impairment created', data)
+})
+
+export const recognizeImpairment = asyncHandler(async (req: Request, res: Response) => {
+  const result = await phase4Service.recognizeImpairment(req, getTenantId(req), getRouteParam(req, 'id'))
+  return sendSuccess(res, result.idempotentReplay ? 'impairment replayed' : 'impairment recognized', result)
+})
+
+export const cancelImpairment = asyncHandler(async (req: Request, res: Response) => {
+  const data = await phase4Service.cancelImpairment(req, getTenantId(req), getRouteParam(req, 'id'))
+  return sendSuccess(res, 'impairment cancelled', data)
+})
+
+export const listMaintenance = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const query = req.query as unknown as ListFixedAssetPhase4QueryInput
+  await getLegalEntityOrThrow(tenantId, query.legalEntityId)
+  const result = await phase4Service.listMaintenance(req, tenantId, query)
+  return sendSuccess(res, 'maintenance listed', result.items, 200, buildPaginationMeta(result.total, result.page, result.pageSize))
+})
+
+export const getMaintenance = asyncHandler(async (req: Request, res: Response) => {
+  const data = await phase4Service.getMaintenance(req, getTenantId(req), getRouteParam(req, 'id'))
+  return sendSuccess(res, 'maintenance fetched', data)
+})
+
+export const createMaintenance = asyncHandler(async (req: Request, res: Response) => {
+  const data = await phase4Service.createMaintenance(req, getTenantId(req), req.body as CreateFixedAssetMaintenanceInput)
+  return sendCreated(res, 'maintenance created', data)
+})
+
+export const updateMaintenance = asyncHandler(async (req: Request, res: Response) => {
+  const data = await phase4Service.updateMaintenance(
+    req,
+    getTenantId(req),
+    getRouteParam(req, 'id'),
+    req.body as UpdateFixedAssetMaintenanceInput,
+  )
+  return sendSuccess(res, 'maintenance updated', data)
+})
+
+export const completeMaintenance = asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as CompleteFixedAssetMaintenanceInput
+  const data = await phase4Service.completeMaintenance(req, getTenantId(req), getRouteParam(req, 'id'), body.completedDate)
+  return sendSuccess(res, 'maintenance completed', data)
+})
+
+export const cancelMaintenance = asyncHandler(async (req: Request, res: Response) => {
+  const data = await phase4Service.cancelMaintenance(req, getTenantId(req), getRouteParam(req, 'id'))
+  return sendSuccess(res, 'maintenance cancelled', data)
+})
+
+export const reportSummary = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const query = req.query as unknown as FixedAssetReportQueryInput
+  await getLegalEntityOrThrow(tenantId, query.legalEntityId)
+  const data = await phase4Service.reportSummary(req, tenantId, query.legalEntityId)
+  return sendSuccess(res, 'fixed asset report summary', data)
+})
+
+export const reportNbvByCategory = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const query = req.query as unknown as FixedAssetReportQueryInput
+  await getLegalEntityOrThrow(tenantId, query.legalEntityId)
+  const data = await phase4Service.reportNbvByCategory(req, tenantId, query.legalEntityId)
+  return sendSuccess(res, 'nbv by category', data)
+})
+
+export const reportRegister = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const query = req.query as unknown as FixedAssetReportQueryInput
+  await getLegalEntityOrThrow(tenantId, query.legalEntityId)
+  const data = await phase4Service.reportRegister(req, tenantId, query.legalEntityId)
+  return sendSuccess(res, 'fixed asset register report', data)
+})
+
+export const reportDisposals = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const query = req.query as unknown as FixedAssetReportQueryInput
+  await getLegalEntityOrThrow(tenantId, query.legalEntityId)
+  const data = await phase4Service.reportDisposals(req, tenantId, query.legalEntityId)
+  return sendSuccess(res, 'fixed asset disposal report', data)
 })

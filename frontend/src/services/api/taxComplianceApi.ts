@@ -108,3 +108,124 @@ export async function fetchGstComplianceSummary(params: {
     `${tenantPath(`${BASE}/summary`)}${buildQuery(params)}`,
   )
 }
+
+export type GstEInvoiceDto = {
+  id: string
+  legalEntityId: string
+  salesInvoiceId: string
+  invoiceNumber: string | null
+  invoiceDate: string
+  customerName: string
+  customerGstin: string | null
+  taxableAmount: string
+  taxAmount: string
+  totalAmount: string
+  status: string
+  irn: string | null
+  ackNo: string | null
+  ackDate: string | null
+  cancelReason: string | null
+  cancelledAt: string | null
+  exceptionMessage: string | null
+  providerMode: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type GstEWayBillDto = {
+  id: string
+  legalEntityId: string
+  sourceType: string
+  salesInvoiceId: string | null
+  deliveryChallanId: string | null
+  documentNumber: string
+  documentDate: string
+  partyName: string
+  partyGstin: string | null
+  fromPlace: string
+  toPlace: string
+  distanceKm: number
+  vehicleNumber: string | null
+  transporterName: string | null
+  taxableAmount: string
+  status: string
+  ewbNumber: string | null
+  validUpto: string | null
+  cancelReason: string | null
+  cancelledAt: string | null
+  exceptionMessage: string | null
+  providerMode: string
+  createdAt: string
+  updatedAt: string
+}
+
+export async function fetchEInvoices(params: GstExtractQuery): Promise<ApiResponse<{ items: GstEInvoiceDto[] }>> {
+  return apiRequest<{ items: GstEInvoiceDto[] }>(
+    `${tenantPath(`${BASE}/e-invoices`)}${buildQuery({
+      legalEntityId: params.legalEntityId,
+      fromDate: params.fromDate,
+      toDate: params.toDate,
+      page: params.page ?? 1,
+      pageSize: params.pageSize ?? 200,
+      search: params.search,
+    })}`,
+  )
+}
+
+export async function generateEInvoiceApi(salesInvoiceId: string): Promise<ApiResponse<{ item: GstEInvoiceDto; idempotentReplay: boolean }>> {
+  return apiRequest<{ item: GstEInvoiceDto; idempotentReplay: boolean }>(
+    `${tenantPath(`${BASE}/e-invoices/generate`)}`,
+    { method: 'POST', body: JSON.stringify({ salesInvoiceId }) },
+  )
+}
+
+export async function cancelEInvoiceApi(
+  id: string,
+  reason: string,
+): Promise<ApiResponse<GstEInvoiceDto>> {
+  return apiRequest<GstEInvoiceDto>(`${tenantPath(`${BASE}/e-invoices/${id}/cancel`)}`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+}
+
+export async function fetchEWayBills(params: GstExtractQuery): Promise<ApiResponse<{ items: GstEWayBillDto[] }>> {
+  return apiRequest<{ items: GstEWayBillDto[] }>(
+    `${tenantPath(`${BASE}/e-way-bills`)}${buildQuery({
+      legalEntityId: params.legalEntityId,
+      fromDate: params.fromDate,
+      toDate: params.toDate,
+      page: params.page ?? 1,
+      pageSize: params.pageSize ?? 200,
+      search: params.search,
+    })}`,
+  )
+}
+
+export type GenerateEWayBillPayload = {
+  sourceType: 'SALES_INVOICE' | 'DELIVERY_CHALLAN'
+  salesInvoiceId?: string
+  deliveryChallanId?: string
+  fromPlace: string
+  toPlace: string
+  distanceKm: number
+  vehicleNumber?: string | null
+  transporterName?: string | null
+  force?: boolean
+}
+
+export async function generateEWayBillApi(
+  payload: GenerateEWayBillPayload,
+): Promise<ApiResponse<{ item: GstEWayBillDto; idempotentReplay: boolean }>> {
+  return apiRequest<{ item: GstEWayBillDto; idempotentReplay: boolean }>(
+    `${tenantPath(`${BASE}/e-way-bills/generate`)}`,
+    { method: 'POST', body: JSON.stringify(payload) },
+  )
+}
+
+export async function cancelEWayBillApi(id: string, reason: string): Promise<ApiResponse<GstEWayBillDto>> {
+  return apiRequest<GstEWayBillDto>(`${tenantPath(`${BASE}/e-way-bills/${id}/cancel`)}`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+}

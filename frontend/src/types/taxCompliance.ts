@@ -116,11 +116,20 @@ export type EInvoiceRow = {
   customerGstin: string
   taxableValue: number
   taxAmount: number
-  irnStatus: 'Pending' | 'Ready' | 'IRN Captured Externally' | 'Cancelled Externally' | 'Exception'
+  irnStatus:
+    | 'Pending'
+    | 'Ready'
+    | 'Generated'
+    | 'IRN Captured Externally'
+    | 'Cancelled'
+    | 'Cancelled Externally'
+    | 'Exception'
   irn?: string
   ackNo?: string
   ackDate?: string
   sourceDocPath?: string
+  salesInvoiceId?: string
+  providerMode?: string
 }
 
 export type EWayBillRow = {
@@ -132,10 +141,21 @@ export type EWayBillRow = {
   toPlace: string
   distanceKm: number
   vehicleNo?: string
-  ewbStatus: 'Required' | 'Not Required' | 'Generated Externally' | 'Expired' | 'Exception'
+  ewbStatus:
+    | 'Required'
+    | 'Not Required'
+    | 'Generated'
+    | 'Generated Externally'
+    | 'Cancelled'
+    | 'Expired'
+    | 'Exception'
   ewbNo?: string
   validUpto?: string
   sourceDocPath?: string
+  sourceType?: 'SALES_INVOICE' | 'DELIVERY_CHALLAN'
+  salesInvoiceId?: string
+  deliveryChallanId?: string
+  providerMode?: string
 }
 
 export type GstExceptionRow = {

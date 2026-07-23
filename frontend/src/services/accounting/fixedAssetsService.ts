@@ -2,8 +2,9 @@
  * Fixed Assets Management — dual-mode service.
  * Demo (`VITE_USE_API=false`): in-memory seed.
  * API (`VITE_USE_API=true`): live overview, categories, register, capitalize, depreciation,
- * dispose (full + partial), and intra-LE location transfers.
- * Maintenance, revaluation, impairment, verification, ledger remain demo.
+ * dispose (full + partial), intra-LE location transfers, revaluation, impairment,
+ * maintenance, and FA reports.
+ * Acquisition workspace / physical verification remain demo.
  *
  * SECURITY: Backend enforces tenant isolation + finance.fa.* permissions.
  */
@@ -20,6 +21,13 @@ import {
   fetchDepreciationRuns,
   fetchFixedAsset,
   fetchFixedAssetCategories,
+  fetchFixedAssetImpairments,
+  fetchFixedAssetMaintenance,
+  fetchFixedAssetRevaluations,
+  fetchFixedAssetReportDisposals,
+  fetchFixedAssetReportNbvByCategory,
+  fetchFixedAssetReportRegister,
+  fetchFixedAssetReportSummary,
   fetchFixedAssetTransfers,
   fetchFixedAssets,
   fetchFixedAssetsOverview,
@@ -76,6 +84,8 @@ import type {
   FixedAssetsPrintPreview,
   FixedAssetsReportCard,
   FixedAssetsSetup,
+  MaintenanceStatus,
+  MaintenanceType,
   PhysicalVerification,
 } from '../../types/fixedAssets'
 import { DEFAULT_FIXED_ASSETS_FILTER } from '../../types/fixedAssets'
@@ -1024,16 +1034,80 @@ export async function completeTransfer(id: string): Promise<AssetTransfer> {
 }
 
 export async function getMaintenance(): Promise<AssetMaintenance[]> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const rows = await unwrapApiData(fetchFixedAssetMaintenance(le.id))
+    return rows.map((r) => ({
+      id: r.id,
+      maintenanceNumber: r.maintenanceNumber,
+      assetId: r.assetId,
+      assetNumber: r.assetNumber,
+      assetName: r.assetName,
+      maintenanceType: r.maintenanceType as MaintenanceType,
+      status: r.status as MaintenanceStatus,
+      scheduledDate: r.scheduledDate,
+      completedDate: r.completedDate,
+      vendorName: r.vendorName,
+      cost: Number(r.cost),
+      downtimeHours: r.downtimeHours,
+      description: r.notes ?? '',
+      notes: r.notes,
+      createdBy: 'API',
+      createdAt: r.createdAt,
+    }))
+  }
   await delay()
   return clone(maintenanceStore)
 }
 
 export async function getRevaluations(): Promise<AssetRevaluation[]> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const rows = await unwrapApiData(fetchFixedAssetRevaluations(le.id))
+    return rows.map((r) => ({
+      id: r.id,
+      revaluationNumber: r.revaluationNumber,
+      assetId: r.assetId,
+      assetNumber: r.assetNumber,
+      assetName: r.assetName,
+      revaluationDate: r.revaluationDate,
+      previousNBV: Number(r.previousNbv),
+      revaluedAmount: Number(r.revaluedAmount),
+      surplusAmount: Number(r.surplusAmount),
+      status: r.status as AssetRevaluation['status'],
+      reason: r.reason,
+      approvedBy: r.postedAt ? 'Posted' : null,
+      approvedAt: r.postedAt,
+      createdBy: 'API',
+      createdAt: r.createdAt,
+    }))
+  }
   await delay()
   return clone(revaluationsStore)
 }
 
 export async function getImpairments(): Promise<AssetImpairment[]> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const rows = await unwrapApiData(fetchFixedAssetImpairments(le.id))
+    return rows.map((r) => ({
+      id: r.id,
+      impairmentNumber: r.impairmentNumber,
+      assetId: r.assetId,
+      assetNumber: r.assetNumber,
+      assetName: r.assetName,
+      impairmentDate: r.impairmentDate,
+      carryingAmount: Number(r.carryingAmount),
+      recoverableAmount: Number(r.recoverableAmount),
+      impairmentLoss: Number(r.impairmentLoss),
+      status: r.status as AssetImpairment['status'],
+      reason: r.reason,
+      approvedBy: r.postedAt ? 'Recognized' : null,
+      approvedAt: r.postedAt,
+      createdBy: 'API',
+      createdAt: r.createdAt,
+    }))
+  }
   await delay()
   return clone(impairmentsStore)
 }
@@ -1259,6 +1333,15 @@ export async function getAssetLedger(assetId?: string): Promise<AssetLedgerEntry
 }
 
 export async function getReports(): Promise<FixedAssetsReportCard[]> {
+  if (isApiMode()) {
+    const now = new Date().toISOString()
+    return [
+      { id: 'rpt-register', name: 'Asset Register', description: 'Live fixed asset register with NBV', category: 'Register', lastGeneratedAt: now },
+      { id: 'rpt-category', name: 'Assets by Category', description: 'NBV and count grouped by category', category: 'Analysis', lastGeneratedAt: now },
+      { id: 'rpt-disposal', name: 'Asset Disposal Register', description: 'Disposed assets with proceeds / gain-loss', category: 'Register', lastGeneratedAt: now },
+      { id: 'rpt-summary', name: 'FA Summary', description: 'Cost, NBV, surplus, impairment and open maintenance', category: 'Analysis', lastGeneratedAt: now },
+    ]
+  }
   await delay()
   return [
     { id: 'rpt-register', name: 'Asset Register', description: 'Complete fixed asset register with NBV', category: 'Register', lastGeneratedAt: '2026-07-10T10:00:00.000Z' },
@@ -1317,6 +1400,58 @@ export async function getFixedAssetsPrintPreview(
   reportName: string,
   filter?: Partial<FixedAssetsFilter>,
 ): Promise<FixedAssetsPrintPreview> {
+  if (isApiMode()) {
+    const le = await resolveDefaultLegalEntity()
+    const name = reportName.toLowerCase()
+    let rows: Array<Record<string, string | number | null>> = []
+    if (name.includes('disposal')) {
+      rows = (await unwrapApiData(fetchFixedAssetReportDisposals(le.id))).map((r) => ({
+        'Asset No': String(r.assetNumber ?? ''),
+        Name: String(r.name ?? ''),
+        Type: String(r.disposalType ?? ''),
+        Date: String(r.disposalDate ?? ''),
+        Proceeds: String(r.proceeds ?? ''),
+        'Gain/Loss': String(r.gainLoss ?? ''),
+      }))
+    } else if (name.includes('category') || name.includes('nbv') || name.includes('assets by')) {
+      rows = (await unwrapApiData(fetchFixedAssetReportNbvByCategory(le.id))).map((r) => ({
+        Code: String(r.categoryCode ?? ''),
+        Name: String(r.categoryName ?? ''),
+        Count: Number(r.count ?? 0),
+        Cost: String(r.cost ?? ''),
+        NBV: String(r.nbv ?? ''),
+      }))
+    } else if (name.includes('summary')) {
+      const s = await unwrapApiData(fetchFixedAssetReportSummary(le.id))
+      rows = [
+        { Metric: 'Assets', Value: s.assetCount },
+        { Metric: 'Active', Value: s.activeCount },
+        { Metric: 'Total Cost', Value: s.totalCost },
+        { Metric: 'Total NBV', Value: s.totalNbv },
+        { Metric: 'Revaluation Surplus', Value: s.totalRevaluationSurplus },
+        { Metric: 'Accum Impairment', Value: s.totalAccumulatedImpairment },
+        { Metric: 'Open Maintenance', Value: s.openMaintenance },
+      ]
+    } else {
+      rows = (await unwrapApiData(fetchFixedAssetReportRegister(le.id))).map((r) => ({
+        'Asset No': String(r.assetNumber ?? ''),
+        Name: String(r.name ?? ''),
+        Category: String(r.categoryName ?? ''),
+        Status: String(r.status ?? ''),
+        Cost: String(r.acquisitionCost ?? ''),
+        NBV: String(r.netBookValue ?? ''),
+        Location: String(r.location ?? ''),
+      }))
+    }
+    return {
+      reportName,
+      generatedAt: new Date().toISOString(),
+      companyName: COMPANY_NAME,
+      filterSummary: 'Live API',
+      rows,
+    }
+  }
+
   await delay()
   const f = filter ?? {}
   let rows: Array<Record<string, string | number | null>> = []
