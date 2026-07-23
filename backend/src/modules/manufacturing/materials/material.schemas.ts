@@ -38,6 +38,14 @@ export const shortageRequisitionSchema = z.object({
   materialIds: z.array(z.string().uuid()).min(1).optional(),
 })
 
+/** Multi-select shortage PR — one requisition shared across selected material lines (any WO). */
+export const bulkShortageRequisitionSchema = z.object({
+  materialIds: z.array(z.string().uuid()).min(1).max(200),
+  idempotencyKey: z.string().trim().min(1).max(150).optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
+  submit: z.boolean().default(false),
+})
+
 export const releaseReservationSchema = z.object({
   materialIds: z.array(z.string().uuid()).optional(),
   reason: z.string().trim().max(2000).optional(),
@@ -93,6 +101,7 @@ export type IssueMaterialInput = z.infer<typeof issueMaterialSchema>
 export type IssuePreviewInput = z.infer<typeof issuePreviewSchema>
 export type ReturnMaterialInput = z.infer<typeof returnMaterialSchema>
 export type ShortageRequisitionInput = z.infer<typeof shortageRequisitionSchema>
+export type BulkShortageRequisitionInput = z.infer<typeof bulkShortageRequisitionSchema>
 export type ReleaseReservationInput = z.infer<typeof releaseReservationSchema>
 export type ReallocateReservationInput = z.infer<typeof reallocateReservationSchema>
 export type AddMaterialRequirementInput = z.infer<typeof addMaterialRequirementSchema>

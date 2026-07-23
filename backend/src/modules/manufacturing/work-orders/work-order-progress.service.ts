@@ -247,9 +247,6 @@ export async function completeStage(req: Request, tenantId: string, orderId: str
 
   const stage = await prisma.productionOrderStage.findFirst({ where: { id: input.stageId, productionOrderId: orderId, tenantId } })
   if (!stage) throw new NotFoundError('Stage not found on this work order')
-  if (stage.status !== 'IN_PROGRESS' && stage.status !== 'READY' && stage.status !== 'QC_PENDING') {
-    throw new InvalidStateError(`Cannot complete a stage in ${stage.status} status`)
-  }
 
   const settings = await getManufacturingSettingsForTenant(tenantId)
   const flexible = Boolean(settings.flexibleExecution)
@@ -259,6 +256,78 @@ export async function completeStage(req: Request, tenantId: string, orderId: str
   const bypassQc = qualityGateApplies && !forceStrictQc && (Boolean(input.skipQcGate) || flexible)
   if (bypassQc && input.skipQcGate === true && !input.qcOverrideReason?.trim() && !flexible) {
     throw new ValidationError('qcOverrideReason is required when skipQcGate is true')
+  }
+
+  // Recovery: stage was completed while skipping QC (flexible / override). Re-open QC gate.
+  const reopenQcFromCompleted =
+    stage.status === 'COMPLETED' && qualityGateApplies && !bypassQc
+
+  if (
+    stage.status !== 'IN_PROGRESS' &&
+    stage.status !== 'READY' &&
+    stage.status !== 'QC_PENDING' &&
+    !reopenQcFromCompleted
+  ) {
+    throw new InvalidStateError(`Cannot complete a stage in ${stage.status} status`)
+  }
+
+  if (reopenQcFromCompleted) {
+    const alreadyPassed = await prisma.manufacturingQualityInspection.findFirst({
+      where: {
+        tenantId,
+        productionOrderId: orderId,
+        stageId: stage.id,
+        status: 'PASSED',
+      },
+      select: { id: true, inspectionNumber: true },
+    })
+    if (alreadyPassed) {
+      throw new InvalidStateError(
+        `Stage already has passed QC (${alreadyPassed.inspectionNumber}); cannot reopen`,
+      )
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const stageForQc = await tx.productionOrderStage.findFirstOrThrow({
+        where: { id: stage.id, tenantId },
+      })
+      const qcPendingStage = await tx.productionOrderStage.update({
+        where: { id: stage.id },
+        data: { status: 'QC_PENDING', completedAt: null },
+      })
+      const inspectionRow = await createPendingStageInspection(tx, tenantId, orderId, stageForQc, order, userId)
+      const qualityStatus =
+        order.qualityStatus === 'NOT_APPLICABLE' || order.qualityStatus === 'PENDING_INTEGRATION'
+          ? 'PENDING_QC'
+          : 'IN_QC'
+      await tx.productionOrder.update({
+        where: { id: orderId, tenantId },
+        data: { qualityStatus, updatedBy: userId },
+      })
+      await logProductionActivity(
+        {
+          tenantId,
+          productionOrderId: orderId,
+          activityType: 'QC_REQUESTED',
+          userId,
+          message: `Stage "${stage.name}" QC reopened (${inspectionRow.inspectionNumber}) — was completed without QC clearance`,
+          reason: input.remarks ?? null,
+        },
+        tx,
+      )
+      await recomputeOrderHealth(tx, tenantId, orderId)
+      return {
+        stage: qcPendingStage,
+        inspection: mapInspection(inspectionRow),
+        awaitingQuality: true as const,
+        promotedStages: [] as ProductionOrderStage[],
+        order: await tx.productionOrder.findFirstOrThrow({ where: { id: orderId, tenantId } }),
+        warnings: ['QC_REOPENED_FROM_COMPLETED'] as string[],
+      }
+    })
+
+    await audit(req, tenantId, orderId, 'QC_REOPENED', { stageId: stage.id, status: 'COMPLETED' }, result.stage)
+    return result
   }
 
   const profile = await prisma.manufacturingProfile.findFirst({ where: { id: order.manufacturingProfileId, tenantId } })

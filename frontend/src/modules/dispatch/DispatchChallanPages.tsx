@@ -3,6 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { CheckCircle2, FileText, RefreshCw, Send } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { CommandBar, CommandBarButton, CommandBarGroup } from '@/components/ui/CommandBar'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
+import { LoadingState } from '@/design-system/components/LoadingState'
 import { isApiMode } from '@/config/apiConfig'
 import {
   approveDeliveryChallan,
@@ -17,6 +20,7 @@ import {
   type DeliveryChallanRow,
 } from '@/services/api/dispatchApi'
 import { notify } from '@/store/toastStore'
+import { appPromptNote } from '@/store/confirmDialogStore'
 
 function ApiRequired({ title }: { title: string }) {
   return (
@@ -156,8 +160,14 @@ export function DispatchChallanDetailPage() {
   if (!isApiMode()) return <ApiRequired title="Delivery Challan" />
   if (!row) {
     return (
-      <OperationalPageShell title="Delivery Challan" description="Loading…">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Dispatch"
+        title="Delivery Challan"
+        backLink={{ to: '/dispatch/delivery-challans', label: 'Challans' }}
+      >
+        <LoadingState variant="card" />
       </OperationalPageShell>
     )
   }
@@ -166,9 +176,14 @@ export function DispatchChallanDetailPage() {
 
   return (
     <OperationalPageShell
+      variant="dynamics"
+      layout="enterprise"
+      badge="Dispatch"
       title={row.challanNumber ?? 'Delivery Challan Draft'}
-      description={`${row.status.replace(/_/g, ' ')} · v${row.versionNumber} · document only`}
+      description={`Version ${row.versionNumber} · document only (no inventory movement on issue)`}
+      showDescription
       backLink={{ to: '/dispatch/delivery-challans', label: 'Challans' }}
+      actions={<DynamicsStatusChip label={row.status.replace(/_/g, ' ')} tone="info" />}
       commandBar={
         <CommandBar>
           <CommandBarGroup label="Actions">
@@ -220,9 +235,17 @@ export function DispatchChallanDetailPage() {
                 label="Cancel"
                 disabled={busy}
                 onClick={() => {
-                  const reason = window.prompt('Cancellation reason')
-                  if (!reason) return
-                  void act('Cancelled', () => cancelDeliveryChallan(row.id, reason))
+                  void (async () => {
+                    const reason = await appPromptNote({
+                      title: 'Cancel challan?',
+                      description: `Cancel ${row.challanNumber ?? 'this delivery challan'}?`,
+                      confirmLabel: 'Cancel challan',
+                      tone: 'danger',
+                      note: { required: true, label: 'Reason', placeholder: 'Cancellation reason' },
+                    })
+                    if (reason == null) return
+                    await act('Cancelled', () => cancelDeliveryChallan(row.id, reason))
+                  })()
                 }}
               />
             ) : null}
@@ -230,8 +253,12 @@ export function DispatchChallanDetailPage() {
         </CommandBar>
       }
     >
-      <div className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-        DELIVERY_CHALLAN_AS_DOCUMENT_ONLY — Issuing does not reduce inventory or update Sales Order fulfilment.
+      <div className="mb-4 flex items-center gap-2">
+        <StatusBadge status={row.status} />
+        <span className="text-[12px] text-erp-muted">Document-only challan</span>
+      </div>
+      <div className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-[13px] text-amber-900">
+        Issuing does not reduce inventory or update sales order fulfilment.
       </div>
 
       {editable ? (

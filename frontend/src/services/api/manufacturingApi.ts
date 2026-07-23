@@ -1673,6 +1673,29 @@ export async function getStoreWorkbenchIssues(limit?: number) {
   )
 }
 
+/** Multi-select shortage PR — one shared requisition number for all selected lines. */
+export async function createStoreWorkbenchShortageRequisition(data: {
+  materialIds: string[]
+  idempotencyKey?: string
+  priority?: string
+  submit?: boolean
+}) {
+  return apiRequest<{
+    requisition: {
+      id: string
+      prNumber?: string
+      requisitionNumber?: string
+    }
+    linkedMaterialIds: string[]
+    skippedAlreadyLinkedIds?: string[]
+    workOrderIds: string[]
+    workOrderNumbers: string[]
+  }>(tenantPath('/manufacturing/store-workbench/issues/shortage-requisition'), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
 export async function getStoreWorkbenchReturns(limit?: number) {
   const q = limit != null ? `?limit=${limit}` : ''
   return apiRequest<{ asOf: string; rows: Record<string, unknown>[] }>(

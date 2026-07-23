@@ -5,7 +5,6 @@ import { nextCode } from '../../../services/codeSeries.service.js'
 import { InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { logProductionActivity } from '../../manufacturing/shared/activity.service.js'
 import { promoteSuccessorsAfterStageComplete } from '../../manufacturing/shared/stage-completion.service.js'
-import { getManufacturingSettingsForTenant } from '../../manufacturing/settings/manufacturing-settings.service.js'
 import { mapInspection, mapNcr } from '../shared/mappers.js'
 import {
   persistParameterResults,
@@ -228,27 +227,23 @@ export async function decideInspection(req: Request, tenantId: string, id: strin
     ? (inspection.parameterSnapshotJson as ParameterSnapshotEntry[])
     : []
 
+  // PASS / CONDITIONAL_PASS always require measurements when the plan snapshot has parameters
+  // (including under flexible WO execution — skipQcGate may bypass the gate, not empty PASS).
   if ((input.decision === 'PASS' || input.decision === 'CONDITIONAL_PASS') && snapshot.length > 0) {
-    const hasResults = (input.parameterResults?.length ?? 0) > 0
-    // Flexible WO shopfloor popup may approve without filling plan parameters.
-    // Still validate when parameter results are supplied.
-    if (hasResults) {
-      const err = validatePassAgainstSnapshot(snapshot, input.parameterResults ?? [])
-      if (err) throw new ValidationError(err)
-    } else {
-      const settings = await getManufacturingSettingsForTenant(tenantId)
-      if (!settings.flexibleExecution) {
-        const err = validatePassAgainstSnapshot(snapshot, input.parameterResults ?? [])
-        if (err) throw new ValidationError(err)
-      }
-    }
+    const err = validatePassAgainstSnapshot(snapshot, input.parameterResults ?? [])
+    if (err) throw new ValidationError(err)
   }
 
   const now = new Date()
 
   const result = await prisma.$transaction(async (tx) => {
-    if (snapshot.length > 0 && input.parameterResults) {
-      await persistParameterResults(tx, tenantId, id, snapshot, input.parameterResults)
+    const shouldPersistParams =
+      snapshot.length > 0 &&
+      ((input.parameterResults?.length ?? 0) > 0 ||
+        input.decision === 'PASS' ||
+        input.decision === 'CONDITIONAL_PASS')
+    if (shouldPersistParams) {
+      await persistParameterResults(tx, tenantId, id, snapshot, input.parameterResults ?? [])
     }
 
     if (input.decision === 'PASS' || input.decision === 'CONDITIONAL_PASS') {

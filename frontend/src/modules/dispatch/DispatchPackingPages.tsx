@@ -247,9 +247,14 @@ export function DispatchPackingDetailPage() {
 
   return (
     <OperationalPageShell
+      variant="dynamics"
+      layout="enterprise"
+      badge="Dispatch"
       title={row.packingSessionNumber}
       description={`Packed ≠ Dispatched · ${row.status.replace(/_/g, ' ')}`}
+      showDescription
       backLink={{ to: '/dispatch/packing-sessions', label: 'Packing sessions' }}
+      actions={<StatusBadge status={row.status} />}
       commandBar={
         <CommandBar>
           <CommandBarGroup label="Actions">
@@ -298,25 +303,6 @@ export function DispatchPackingDetailPage() {
           Ready for Delivery Challan — informational only; no challan document is created from this screen.
         </p>
       ) : null}
-
-      <div className="mb-6 flex flex-wrap gap-3">
-        {canStart ? (
-          <Button size="lg" className="min-w-[140px]" disabled={busy} onClick={() => void act('Started', () => startDispatchPackingSession(id))}>
-            Start
-          </Button>
-        ) : null}
-        {canPack ? (
-          <Button
-            size="lg"
-            variant="primary"
-            className="min-w-[180px]"
-            disabled={busy}
-            onClick={() => navigate(`/dispatch/packing-sessions/${id}/pack`)}
-          >
-            Continue Packing
-          </Button>
-        ) : null}
-      </div>
 
       <DetailSection title="Header">
         <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3">

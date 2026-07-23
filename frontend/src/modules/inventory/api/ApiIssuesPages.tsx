@@ -43,11 +43,13 @@ import {
   listWorkOrderMaterials,
   listWorkOrders,
   createWorkOrderShortageRequisition,
+  createStoreWorkbenchShortageRequisition,
   getStoreWorkbenchIssues,
   reserveWorkOrderMaterials,
 } from '@/services/api/manufacturingApi'
 import { listPurchaseRequisitionsApi } from '@/services/purchase/purchaseRequisitionApi'
 import type { ApiPurchaseRequisition } from '@/services/purchase/purchaseApiTypes'
+import { appConfirm } from '@/store/confirmDialogStore'
 import {
   getInventoryLedgerMovement,
   getInventoryPosition,
@@ -490,40 +492,44 @@ export function ApiIssuesRegisterPage() {
         notify.error('Select short / out-of-stock lines without an existing PR')
         return
       }
+
+      const woCount = new Set(eligible.map((r) => r.workOrderId)).size
+      const confirmed = await appConfirm({
+        title: 'Create shortage purchase requisition',
+        description:
+          eligible.length === 1
+            ? `Create one PR for ${eligible[0]?.itemCode ?? 'this line'}?`
+            : `Create one PR covering ${eligible.length} selected line(s)${
+                woCount > 1 ? ` across ${woCount} work orders` : ''
+              }? All lines will share the same PR number.`,
+        confirmLabel: eligible.length === 1 ? 'Create PR' : `Create 1 PR (${eligible.length} lines)`,
+        cancelLabel: 'Cancel',
+      })
+      if (!confirmed) return
+
       setBusy(true)
-      let ok = 0
-      const errors: string[] = []
       try {
-        const byWo = new Map<string, AssignQueueRow[]>()
-        for (const row of eligible) {
-          const list = byWo.get(row.workOrderId) ?? []
-          list.push(row)
-          byWo.set(row.workOrderId, list)
-        }
-        for (const [workOrderId, group] of byWo) {
-          try {
-            const res = await createWorkOrderShortageRequisition(workOrderId, {
-              materialIds: group.map((g) => g.materialId),
-              idempotencyKey: `issues-queue-pr:${workOrderId}:${group.map((g) => g.materialId).join(',')}:${crypto.randomUUID()}`,
-              submit: false,
-            })
-            const pr = res.data.requisition
-            const prNo = pr.prNumber ?? pr.requisitionNumber ?? pr.id.slice(0, 8)
-            notify.success(`PR ${prNo} created for ${group[0]?.orderNumber ?? 'WO'} (${group.length} line(s))`)
-            ok += 1
-          } catch (e) {
-            errors.push(`${group[0]?.orderNumber ?? workOrderId}: ${e instanceof Error ? e.message : 'failed'}`)
-          }
-        }
-        if (errors.length > 0) notify.error(errors.slice(0, 3).join(' · ') + (errors.length > 3 ? '…' : ''))
+        const res = await createStoreWorkbenchShortageRequisition({
+          materialIds: eligible.map((r) => r.materialId),
+          idempotencyKey: `issues-queue-bulk-pr:${[...eligible.map((r) => r.materialId)].sort().join(',')}:${crypto.randomUUID()}`,
+          submit: false,
+        })
+        const pr = res.data.requisition
+        const prNo = pr.prNumber ?? pr.requisitionNumber ?? pr.id.slice(0, 8)
+        const linked = res.data.linkedMaterialIds?.length ?? eligible.length
+        const woLabel =
+          res.data.workOrderNumbers?.length === 1
+            ? res.data.workOrderNumbers[0]
+            : `${res.data.workOrderNumbers?.length ?? woCount} WOs`
+        notify.success(`PR ${prNo} created with ${linked} line(s) · ${woLabel}`)
         await loadAssignQueue()
-        if (ok > 0) {
-          setTab('prs')
-          const nextParams = new URLSearchParams(searchParams)
-          nextParams.set('tab', 'prs')
-          setSearchParams(nextParams, { replace: true })
-          void loadProductionPrs()
-        }
+        setTab('prs')
+        const nextParams = new URLSearchParams(searchParams)
+        nextParams.set('tab', 'prs')
+        setSearchParams(nextParams, { replace: true })
+        void loadProductionPrs()
+      } catch (e) {
+        notify.error(e instanceof Error ? e.message : 'Could not create shortage PR')
       } finally {
         setBusy(false)
       }
@@ -684,15 +690,13 @@ export function ApiIssuesRegisterPage() {
         size: 130,
         cell: ({ row }) =>
           row.original.purchaseRequisitionId ? (
-            <div className="min-w-[7rem]">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800">PR generated</p>
-              <Link
-                to={`/purchase/requisitions/${row.original.purchaseRequisitionId}`}
-                className="font-mono text-[12px] font-semibold text-erp-primary hover:underline"
-              >
-                {row.original.purchaseRequisitionNumber ?? row.original.purchaseRequisitionId.slice(0, 8)}
-              </Link>
-            </div>
+            <Link
+              to={`/purchase/requisitions/${row.original.purchaseRequisitionId}`}
+              className="font-mono text-[12px] font-semibold text-erp-primary hover:underline"
+              title="PR generated"
+            >
+              {row.original.purchaseRequisitionNumber ?? row.original.purchaseRequisitionId.slice(0, 8)}
+            </Link>
           ) : (
             <span className="text-erp-muted">—</span>
           ),
@@ -785,7 +789,10 @@ export function ApiIssuesRegisterPage() {
             ? [
                 {
                   id: 'create-pr',
-                  label: `Create PR for short (${selectedShortNeedingPr.length})`,
+                  label:
+                    selectedShortNeedingPr.length <= 1
+                      ? `Create PR for short (${selectedShortNeedingPr.length})`
+                      : `Create 1 PR · ${selectedShortNeedingPr.length} lines`,
                   icon: FilePlus2,
                   variant: 'secondary' as const,
                   disabled: busy || selectedShortNeedingPr.length === 0,

@@ -1,10 +1,11 @@
 import { Router } from 'express'
 import { authenticate } from '../../../middleware/auth.middleware.js'
 import { attachRequestContext } from '../../../middleware/request-context.middleware.js'
-import { requireAnyPermission } from '../../../middleware/permission.middleware.js'
+import { requireAnyPermission, requirePermission } from '../../../middleware/permission.middleware.js'
 import { resolveTenant, requireTenantAccess } from '../../../middleware/tenant.middleware.js'
-import { validateParams } from '../../../middleware/validation.middleware.js'
+import { validateBody, validateParams } from '../../../middleware/validation.middleware.js'
 import { tenantRouteParamSchema } from '../../../utils/pagination.js'
+import { bulkShortageRequisitionSchema } from '../materials/material.schemas.js'
 import * as controller from './store-workbench.controller.js'
 
 const router = Router({ mergeParams: true })
@@ -20,6 +21,12 @@ const view = requireAnyPermission(
 router.get('/summary', view, controller.getSummary)
 router.get('/reservations', view, controller.listReservations)
 router.get('/issues', view, controller.listIssues)
+router.post(
+  '/issues/shortage-requisition',
+  requirePermission('manufacturing.materials.create_requirement'),
+  validateBody(bulkShortageRequisitionSchema),
+  controller.createIssuesShortageRequisition,
+)
 router.get('/returns', view, controller.listReturns)
 router.get('/wip', view, controller.listWip)
 router.get('/finished-goods', view, controller.listFinishedGoods)

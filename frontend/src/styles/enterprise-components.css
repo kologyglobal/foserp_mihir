@@ -67,15 +67,18 @@
 .ent-kpi-strip {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
   margin-bottom: 10px;
 }
 
 .ent-kpi-strip[style*='--ent-kpi-columns: 4'] {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
 }
 
 @media (min-width: 1280px) {
+  .ent-kpi-strip[style*='--ent-kpi-columns: 6'] {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
   .ent-kpi-strip[style*='--ent-kpi-columns: 5'] {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }

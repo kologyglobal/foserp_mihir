@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Ban, CheckCircle2, Eye, FileInput, Pause, Play, Plus, Wrench } from 'lucide-react'
 import { TableLink } from '@/components/ui/AppLink'
@@ -32,12 +32,18 @@ import {
   cancelWorkOrder,
   getWorkOrdersSummary,
   holdWorkOrder,
+  listEligibleSalesOrders,
   listWorkOrders,
   releaseWorkOrder,
   resumeWorkOrder,
   startWorkOrder,
 } from '@/services/api/manufacturingApi'
-import type { ProductionOrder, WorkOrderStatus, WorkOrdersSummary } from '@/types/manufacturingProduction'
+import type {
+  EligibleSalesOrder,
+  ProductionOrder,
+  WorkOrderStatus,
+  WorkOrdersSummary,
+} from '@/types/manufacturingProduction'
 import { useSetupLookup } from '../setup/useSetupLookups'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
@@ -52,6 +58,8 @@ import {
 } from '../ui'
 
 const EMPTY_SUMMARY: WorkOrdersSummary = { total: 0, byStatus: [], byHealth: [] }
+
+type RegisterTab = 'work_orders' | 'sales_orders'
 
 function sourceLabel(wo: ProductionOrder): string {
   if (wo.sourceType === 'SALES_ORDER') return 'Sales Order'
@@ -69,6 +77,10 @@ function completionPct(wo: ProductionOrder): number {
   const n = Number(wo.completionPercent)
   if (!Number.isFinite(n)) return 0
   return Math.min(100, Math.max(0, Math.round(n)))
+}
+
+function soStatusLabel(status: string): string {
+  return status.replace(/_/g, ' ')
 }
 
 function CompletionCell({ wo }: { wo: ProductionOrder }) {
@@ -91,8 +103,13 @@ function CompletionCell({ wo }: { wo: ProductionOrder }) {
 
 export function ApiWorkOrderRegisterPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const perms = useManufacturingWorkOrderPermissions()
   const { options: items } = useSetupLookup('items')
+
+  const initialTab: RegisterTab =
+    searchParams.get('tab') === 'sales_orders' ? 'sales_orders' : 'work_orders'
+  const [registerTab, setRegisterTab] = useState<RegisterTab>(initialTab)
 
   const [filters, setFilters] = useState<WorkOrderListFilters>({ ...DEFAULT_WORK_ORDER_LIST_FILTERS })
   const [rows, setRows] = useState<ProductionOrder[]>([])
@@ -100,9 +117,24 @@ export function ApiWorkOrderRegisterPage() {
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
 
+  const [eligibleSalesOrders, setEligibleSalesOrders] = useState<EligibleSalesOrder[]>([])
+  const [soLoading, setSoLoading] = useState(false)
+  const [soSearch, setSoSearch] = useState('')
+
   const itemLabel = useCallback(
     (id: string) => items.find((i) => i.id === id)?.label ?? 'Item',
     [items],
+  )
+
+  const setTab = useCallback(
+    (tab: RegisterTab) => {
+      setRegisterTab(tab)
+      const next = new URLSearchParams(searchParams)
+      if (tab === 'sales_orders') next.set('tab', 'sales_orders')
+      else next.delete('tab')
+      setSearchParams(next, { replace: true })
+    },
+    [searchParams, setSearchParams],
   )
 
   const applyWoFilters = useCallback((saved: Record<string, string>) => {
@@ -172,6 +204,32 @@ export function ApiWorkOrderRegisterPage() {
     void load()
   }, [load])
 
+  const loadEligibleSalesOrders = useCallback(async () => {
+    if (!perms.canCreateWo) {
+      setEligibleSalesOrders([])
+      return
+    }
+    setSoLoading(true)
+    try {
+      const res = await listEligibleSalesOrders()
+      setEligibleSalesOrders(res.data)
+    } catch (e) {
+      setEligibleSalesOrders([])
+      notify.error(e instanceof Error ? e.message : 'Failed to load sales orders needing work orders')
+    } finally {
+      setSoLoading(false)
+    }
+  }, [perms.canCreateWo])
+
+  useEffect(() => {
+    if (registerTab === 'sales_orders') void loadEligibleSalesOrders()
+  }, [registerTab, loadEligibleSalesOrders])
+
+  // Keep SO-to-convert KPI fresh even on the Work Orders tab.
+  useEffect(() => {
+    if (registerTab === 'work_orders' && perms.canCreateWo) void loadEligibleSalesOrders()
+  }, [registerTab, perms.canCreateWo, loadEligibleSalesOrders])
+
   const setView = useCallback((view: WorkOrderRegisterView) => {
     setFilters((prev) => ({ ...prev, view }))
   }, [])
@@ -195,6 +253,17 @@ export function ApiWorkOrderRegisterPage() {
   const view = filters.view
 
   const kpiStrip = useMemo<EnterpriseKpiItem[]>(() => {
+    if (registerTab === 'sales_orders') {
+      return [
+        {
+          id: 'so-open',
+          label: 'SO needing WO',
+          value: eligibleSalesOrders.length,
+          accent: 'amber',
+          active: true,
+        },
+      ]
+    }
     const countFor = (statusValue: WorkOrderStatus) =>
       summary.byStatus.find((s) => s.status === statusValue)?.count ?? 0
     const healthFor = (h: 'DELAYED') => summary.byHealth.find((s) => s.healthStatus === h)?.count ?? 0
@@ -219,8 +288,145 @@ export function ApiWorkOrderRegisterPage() {
         active: view === 'DELAYED',
         onClick: () => setView('DELAYED'),
       },
+      {
+        id: 'so-convert',
+        label: 'SO to convert',
+        value: eligibleSalesOrders.length,
+        accent: 'amber',
+        active: false,
+        onClick: () => setTab('sales_orders'),
+      },
     ]
-  }, [summary, view, setView])
+  }, [summary, view, setView, registerTab, eligibleSalesOrders.length, setTab])
+
+  const filteredSalesOrders = useMemo(() => {
+    const q = soSearch.trim().toLowerCase()
+    if (!q) return eligibleSalesOrders
+    return eligibleSalesOrders.filter((so) => {
+      const blob = `${so.salesOrderNo} ${so.customerName ?? ''} ${so.customerCode ?? ''} ${so.status}`.toLowerCase()
+      return blob.includes(q)
+    })
+  }, [eligibleSalesOrders, soSearch])
+
+  const soColumns = useMemo<ColumnDef<EligibleSalesOrder>[]>(
+    () => [
+      {
+        accessorKey: 'salesOrderNo',
+        header: 'Sales Order',
+        cell: ({ row }) => (
+          <div className="min-w-[120px]">
+            <TableLink to={`/sales/orders/${row.original.id}`} className="font-mono text-[13px] font-semibold">
+              {row.original.salesOrderNo}
+            </TableLink>
+            <p className="mt-0.5 text-[11px] capitalize text-erp-muted">{soStatusLabel(row.original.status)}</p>
+          </div>
+        ),
+      },
+      {
+        id: 'customer',
+        header: 'Customer',
+        cell: ({ row }) => (
+          <div className="min-w-0 max-w-[240px]">
+            <p className="truncate text-[13px] font-medium text-erp-text">
+              {row.original.customerName?.trim() || '—'}
+            </p>
+            {row.original.customerCode ? (
+              <p className="truncate font-mono text-[11px] text-erp-muted">{row.original.customerCode}</p>
+            ) : null}
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'orderDate',
+        header: 'Order Date',
+        cell: ({ row }) => (
+          <span className="tabular-nums text-[12px]">
+            {row.original.orderDate ? formatDate(row.original.orderDate) : '—'}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'requiredDate',
+        header: 'Required',
+        cell: ({ row }) => (
+          <span className="tabular-nums text-[12px]">
+            {row.original.requiredDate ? formatDate(row.original.requiredDate) : '—'}
+          </span>
+        ),
+      },
+      {
+        id: 'lines',
+        header: 'Lines',
+        cell: ({ row }) => {
+          const remaining = row.original.remainingLineCount ?? row.original.lineCount
+          return (
+            <div className="tabular-nums text-[12px]">
+              <p className="font-semibold text-erp-text">
+                {remaining} open
+              </p>
+              <p className="text-[10px] text-erp-muted">{row.original.lineCount} total</p>
+            </div>
+          )
+        },
+      },
+      {
+        id: 'remainingQty',
+        header: 'Remaining Qty',
+        cell: ({ row }) => (
+          <span className="tabular-nums text-[12px] font-semibold text-erp-text">
+            {row.original.remainingQuantity ?? '—'}
+          </span>
+        ),
+      },
+      {
+        id: 'actions',
+        header: 'Actions',
+        cell: ({ row }) => {
+          const so = row.original
+          const actions: RowActionItem[] = [
+            {
+              id: 'view-so',
+              label: 'View Sales Order',
+              icon: Eye,
+              onClick: () => navigate(`/sales/orders/${so.id}`),
+            },
+            ...(perms.canCreateWo
+              ? [
+                  {
+                    id: 'create-wo',
+                    label: 'Create Work Order',
+                    icon: FileInput,
+                    onClick: () =>
+                      navigate(
+                        `/manufacturing/work-orders/new?mode=sales_order&salesOrderId=${encodeURIComponent(so.id)}`,
+                      ),
+                  } satisfies RowActionItem,
+                ]
+              : []),
+          ]
+          return (
+            <div className="flex items-center gap-2">
+              {perms.canCreateWo ? (
+                <button
+                  type="button"
+                  className="erp-btn erp-btn-primary h-8 px-2.5 text-[12px]"
+                  onClick={() =>
+                    navigate(
+                      `/manufacturing/work-orders/new?mode=sales_order&salesOrderId=${encodeURIComponent(so.id)}`,
+                    )
+                  }
+                >
+                  Create WO
+                </button>
+              ) : null}
+              <EnterpriseRowActionsMenu actions={actions} />
+            </div>
+          )
+        },
+      },
+    ],
+    [navigate, perms.canCreateWo],
+  )
 
   const columns = useMemo<ColumnDef<ProductionOrder>[]>(
     () => [
@@ -408,7 +614,7 @@ export function ApiWorkOrderRegisterPage() {
     <>
       <ProductionPageHeader
         title="Work Orders"
-        description="Release, run, and complete production work orders."
+        description="Release, run, and complete production work orders — or convert open sales orders."
         breadcrumbs={[
           { label: 'Manufacturing & Production', to: '/manufacturing' },
           { label: 'Work Orders' },
@@ -436,61 +642,173 @@ export function ApiWorkOrderRegisterPage() {
               ]
             : undefined
         }
-        kpiStrip={loading && summary.total === 0 ? undefined : kpiStrip}
+        kpiStrip={
+          registerTab === 'sales_orders'
+            ? soLoading && eligibleSalesOrders.length === 0
+              ? undefined
+              : kpiStrip
+            : loading && summary.total === 0
+              ? undefined
+              : kpiStrip
+        }
         filterBar={
-          <CrmListFilterBar
-            search={filters.search}
-            onSearchChange={(search) => setFilters((f) => ({ ...f, search }))}
-            searchPlaceholder="Search WO # / job number…"
-            activeFilterCount={filterDrawer.activeCount}
-            onOpenFilters={filterDrawer.openDrawer}
-            chips={filterDrawer.chips}
-            onRemoveChip={filterDrawer.removeChip}
-            onClearAll={filterDrawer.clearAll}
-            savedView={savedViews.activeView}
-            onSavedViewChange={savedViews.selectView}
-            savedViews={savedViews.viewNames}
-            onSaveView={savedViews.openSaveDialog}
-            showCommandPaletteHint={false}
-          />
+          registerTab === 'work_orders' ? (
+            <CrmListFilterBar
+              search={filters.search}
+              onSearchChange={(search) => setFilters((f) => ({ ...f, search }))}
+              searchPlaceholder="Search WO # / job number…"
+              activeFilterCount={filterDrawer.activeCount}
+              onOpenFilters={filterDrawer.openDrawer}
+              chips={filterDrawer.chips}
+              onRemoveChip={filterDrawer.removeChip}
+              onClearAll={filterDrawer.clearAll}
+              savedView={savedViews.activeView}
+              onSavedViewChange={savedViews.selectView}
+              savedViews={savedViews.viewNames}
+              onSaveView={savedViews.openSaveDialog}
+              showCommandPaletteHint={false}
+            />
+          ) : (
+            <CrmListFilterBar
+              search={soSearch}
+              onSearchChange={setSoSearch}
+              searchPlaceholder="Search SO # / customer…"
+              activeFilterCount={0}
+              chips={[]}
+              onRemoveChip={() => undefined}
+              onClearAll={() => setSoSearch('')}
+              showCommandPaletteHint={false}
+            />
+          )
         }
       >
         <div className="space-y-3">
-          {loading ? <LoadingState variant="table" rows={8} /> : null}
-          {!loading && rows.length === 0 ? (
-            <ProductionEmptyState
-              icon={Wrench}
-              title="No work orders"
-              description={
-                !view && !filters.search && !filters.productItemId
-                  ? 'Create a work order or convert a confirmed sales order line.'
-                  : `No work orders match “${viewLabel}”.`
-              }
-              action={
-                perms.canCreateWo ? (
-                  <button
-                    type="button"
-                    className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"
-                    onClick={() => navigate('/manufacturing/work-orders/new')}
-                  >
-                    New Work Order
-                  </button>
-                ) : undefined
-              }
-            />
-          ) : null}
-          {!loading && rows.length > 0 ? (
-            <div className="overflow-x-auto rounded-xl border border-erp-border bg-white shadow-sm">
-              <DataTable columns={columns} data={rows} />
-            </div>
-          ) : null}
-          {!loading && view && rows.length > 0 ? (
-            <p className="text-[11px] text-erp-muted">
-              Showing {viewLabel} view
-              {filters.search ? ` · filtered by “${filters.search}”` : ''}
-              {filters.productItemId ? ` · item ${itemLabel(filters.productItemId)}` : ''}
-            </p>
-          ) : null}
+          <div
+            className="flex flex-wrap items-center gap-1 rounded-lg border border-erp-border bg-white p-1"
+            role="tablist"
+            aria-label="Work order register tabs"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={registerTab === 'work_orders'}
+              onClick={() => setTab('work_orders')}
+              className={cn(
+                'rounded-md px-3 py-1.5 text-[12px] font-semibold transition',
+                registerTab === 'work_orders'
+                  ? 'bg-erp-primary text-white'
+                  : 'text-erp-muted hover:bg-slate-50 hover:text-erp-text',
+              )}
+            >
+              Work Orders
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={registerTab === 'sales_orders'}
+              onClick={() => setTab('sales_orders')}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-semibold transition',
+                registerTab === 'sales_orders'
+                  ? 'bg-erp-primary text-white'
+                  : 'text-erp-muted hover:bg-slate-50 hover:text-erp-text',
+              )}
+            >
+              Sales Orders to Convert
+              {eligibleSalesOrders.length > 0 ? (
+                <span
+                  className={cn(
+                    'rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
+                    registerTab === 'sales_orders' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-900',
+                  )}
+                >
+                  {eligibleSalesOrders.length}
+                </span>
+              ) : null}
+            </button>
+          </div>
+
+          {registerTab === 'work_orders' ? (
+            <>
+              {loading ? <LoadingState variant="table" rows={8} /> : null}
+              {!loading && rows.length === 0 ? (
+                <ProductionEmptyState
+                  icon={Wrench}
+                  title="No work orders"
+                  description={
+                    !view && !filters.search && !filters.productItemId
+                      ? 'Create a work order or convert a confirmed sales order line.'
+                      : `No work orders match “${viewLabel}”.`
+                  }
+                  action={
+                    perms.canCreateWo ? (
+                      <div className="flex flex-wrap justify-center gap-2">
+                        <button
+                          type="button"
+                          className="erp-btn erp-btn-primary h-9 px-3 text-[13px]"
+                          onClick={() => navigate('/manufacturing/work-orders/new')}
+                        >
+                          New Work Order
+                        </button>
+                        <button
+                          type="button"
+                          className="erp-btn erp-btn-secondary h-9 px-3 text-[13px]"
+                          onClick={() => setTab('sales_orders')}
+                        >
+                          Sales Orders to Convert
+                        </button>
+                      </div>
+                    ) : undefined
+                  }
+                />
+              ) : null}
+              {!loading && rows.length > 0 ? (
+                <div className="overflow-x-auto rounded-xl border border-erp-border bg-white shadow-sm">
+                  <DataTable columns={columns} data={rows} />
+                </div>
+              ) : null}
+              {!loading && view && rows.length > 0 ? (
+                <p className="text-[11px] text-erp-muted">
+                  Showing {viewLabel} view
+                  {filters.search ? ` · filtered by “${filters.search}”` : ''}
+                  {filters.productItemId ? ` · item ${itemLabel(filters.productItemId)}` : ''}
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <p className="text-[12px] text-erp-muted">
+                Confirmed / in-production sales orders with remaining quantity still available to convert into work
+                orders.
+              </p>
+              {soLoading ? <LoadingState variant="table" rows={6} /> : null}
+              {!soLoading && filteredSalesOrders.length === 0 ? (
+                <ProductionEmptyState
+                  icon={FileInput}
+                  title="No sales orders need a work order"
+                  description={
+                    soSearch
+                      ? `No sales orders match “${soSearch}”.`
+                      : 'All confirmed sales order lines are fully converted, or none are eligible yet.'
+                  }
+                  action={
+                    <button
+                      type="button"
+                      className="erp-btn erp-btn-secondary h-9 px-3 text-[13px]"
+                      onClick={() => setTab('work_orders')}
+                    >
+                      Back to Work Orders
+                    </button>
+                  }
+                />
+              ) : null}
+              {!soLoading && filteredSalesOrders.length > 0 ? (
+                <div className="overflow-x-auto rounded-xl border border-erp-border bg-white shadow-sm">
+                  <DataTable columns={soColumns} data={filteredSalesOrders} />
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
       </ProductionPageHeader>
 

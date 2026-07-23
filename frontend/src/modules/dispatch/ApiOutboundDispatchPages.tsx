@@ -1,14 +1,26 @@
 /**
- * Phase 7C0 thin API-mode surface for OutboundDispatch (list / detail / confirm).
- * Demo dispatchStore pages remain when VITE_USE_API=false.
+ * API-mode Outbound Dispatch register + detail.
+ * Aligned with packing/pick OperationalPageShell patterns and CRM/purchase view standards.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { PageHeader } from '@/components/ui/PageHeader'
-import { PageBackLink } from '@/components/ui/PageBackLink'
+import {
+  Ban,
+  CheckCircle2,
+  Package,
+  RefreshCw,
+  RotateCcw,
+  Send,
+  Truck,
+  Warehouse,
+} from 'lucide-react'
+import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { CommandBar, CommandBarButton, CommandBarGroup } from '@/components/ui/CommandBar'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { Button } from '@/components/ui/Button'
-import { ErpCardSection } from '@/components/erp/card-form'
+import { DetailSection } from '@/components/masters/MasterLayouts'
+import { LoadingState } from '@/design-system/components/LoadingState'
+import { DataGrid } from '@/components/design-system/DataGrid'
+import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
 import { appConfirm, appPromptNote } from '@/store/confirmDialogStore'
 import { notify } from '@/store/toastStore'
 import { DispatchReservationDrawer } from '@/modules/dispatch/DispatchReservationDrawer'
@@ -23,10 +35,73 @@ import {
   postOutboundDispatch,
   reverseOutboundDispatch,
   type OutboundDispatch,
+  type OutboundDispatchStatus,
 } from '@/services/api/dispatchApi'
+import { formatDate } from '@/utils/dates/format'
+import { cn } from '@/utils/cn'
 
 function errMsg(e: unknown): string {
   return formatApiError(e) || (e instanceof Error ? e.message : 'Request failed')
+}
+
+function shortId(id: string | null | undefined): string {
+  if (!id) return '—'
+  return id.length > 12 ? `${id.slice(0, 8)}…` : id
+}
+
+function statusTone(status: OutboundDispatchStatus): 'neutral' | 'info' | 'success' | 'warning' | 'critical' {
+  switch (status) {
+    case 'DRAFT':
+      return 'info'
+    case 'CONFIRMED':
+      return 'success'
+    case 'CANCELLED':
+      return 'neutral'
+    case 'REVERSED':
+      return 'warning'
+    default:
+      return 'neutral'
+  }
+}
+
+const LIFECYCLE: { key: string; label: string; match: (s: OutboundDispatchStatus) => boolean }[] = [
+  { key: 'draft', label: 'Draft', match: (s) => s === 'DRAFT' },
+  { key: 'reserved', label: 'Reserved / Pack', match: (s) => s === 'DRAFT' },
+  { key: 'confirmed', label: 'Confirmed', match: (s) => s === 'CONFIRMED' },
+  { key: 'closed', label: 'Cancelled / Reversed', match: (s) => s === 'CANCELLED' || s === 'REVERSED' },
+]
+
+function DispatchLifecycleStrip({ status }: { status: OutboundDispatchStatus }) {
+  const activeIdx =
+    status === 'CANCELLED' || status === 'REVERSED'
+      ? 3
+      : status === 'CONFIRMED'
+        ? 2
+        : 0
+
+  return (
+    <ol className="mb-4 flex flex-wrap items-center gap-1 rounded border border-erp-border bg-erp-surface/60 px-3 py-2 text-[11px]">
+      {LIFECYCLE.map((step, idx) => {
+        const done = idx < activeIdx || (idx === activeIdx && status === 'CONFIRMED' && step.key === 'confirmed')
+        const current = idx === activeIdx
+        return (
+          <li key={step.key} className="flex items-center gap-1">
+            {idx > 0 ? <span className="mx-1 text-erp-muted">→</span> : null}
+            <span
+              className={cn(
+                'rounded px-2 py-0.5 font-semibold',
+                current && 'bg-erp-primary/10 text-erp-primary',
+                done && !current && 'text-erp-muted',
+                !done && !current && 'text-erp-muted/70',
+              )}
+            >
+              {step.label}
+            </span>
+          </li>
+        )
+      })}
+    </ol>
+  )
 }
 
 export function ApiOutboundDispatchRegisterPage() {
@@ -53,67 +128,81 @@ export function ApiOutboundDispatchRegisterPage() {
     void load()
   }, [load])
 
+  const columns = useMemo(
+    () => [
+      {
+        accessorKey: 'dispatchNo',
+        header: 'Dispatch #',
+        cell: ({ row }: { row: { original: OutboundDispatch } }) => (
+          <Link className="font-semibold text-erp-primary hover:underline" to={`/dispatch/${row.original.id}`}>
+            {row.original.dispatchNo}
+          </Link>
+        ),
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        cell: ({ row }: { row: { original: OutboundDispatch } }) => <StatusBadge status={row.original.status} />,
+      },
+      {
+        id: 'salesOrder',
+        header: 'Sales order',
+        cell: ({ row }: { row: { original: OutboundDispatch } }) =>
+          row.original.salesOrderId ? (
+            <Link className="text-erp-primary hover:underline" to={`/crm/sales-orders/${row.original.salesOrderId}`}>
+              {row.original.salesOrderNo ?? shortId(row.original.salesOrderId)}
+            </Link>
+          ) : (
+            '—'
+          ),
+      },
+      {
+        id: 'lines',
+        header: 'Lines',
+        cell: ({ row }: { row: { original: OutboundDispatch } }) => String(row.original.lines?.length ?? 0),
+      },
+      {
+        id: 'planned',
+        header: 'Planned',
+        cell: ({ row }: { row: { original: OutboundDispatch } }) =>
+          row.original.plannedDispatchDate ? formatDate(row.original.plannedDispatchDate.slice(0, 10)) : '—',
+      },
+      {
+        id: 'created',
+        header: 'Created',
+        cell: ({ row }: { row: { original: OutboundDispatch } }) =>
+          formatDate(row.original.createdAt.slice(0, 10)),
+      },
+    ],
+    [],
+  )
+
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title="Outbound Dispatch Register"
-        description="API outbound dispatches (Phase 7C workbench)."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={() => void load()}>
-              Refresh
-            </Button>
-            <Button type="button" variant="primary" onClick={() => navigate('/dispatch/workbench')}>
-              Open workbench
-            </Button>
-          </div>
-        }
-      />
+    <OperationalPageShell
+      variant="dynamics"
+      layout="enterprise"
+      badge="Dispatch"
+      title="Outbound Dispatch Register"
+      description="Outbound dispatches linked to sales orders — reserve, pack, and confirm stock-out."
+      showDescription
+      commandBar={
+        <CommandBar>
+          <CommandBarGroup label="Actions">
+            <CommandBarButton icon={RefreshCw} label="Refresh" onClick={() => void load()} />
+            <CommandBarButton icon={Truck} label="Workbench" primary onClick={() => navigate('/dispatch/workbench')} />
+          </CommandBarGroup>
+        </CommandBar>
+      }
+    >
       {error ? (
-        <div className="rounded border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}</div>
+        <div className="mb-3 rounded border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-800">{error}</div>
       ) : null}
-      {loading ? <p className="text-sm text-gray-500">Loading…</p> : null}
-      {!loading && !error ? (
-        <div className="overflow-x-auto rounded border border-gray-200 bg-white">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-              <tr>
-                <th className="px-3 py-2">Dispatch #</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Sales order</th>
-                <th className="px-3 py-2">Lines</th>
-                <th className="px-3 py-2">Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
-                    No outbound dispatches yet.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row) => (
-                  <tr key={row.id} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="px-3 py-2">
-                      <Link className="font-medium text-blue-700 hover:underline" to={`/dispatch/${row.id}`}>
-                        {row.dispatchNo}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2">
-                      <StatusBadge status={row.status} />
-                    </td>
-                    <td className="px-3 py-2 font-mono text-xs">{row.salesOrderNo ?? row.salesOrderId?.slice(0, 8) ?? '—'}</td>
-                    <td className="px-3 py-2">{row.lines?.length ?? 0}</td>
-                    <td className="px-3 py-2">{new Date(row.createdAt).toLocaleString()}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-    </div>
+      {loading ? (
+        <LoadingState variant="table" rows={6} cols={5} />
+      ) : (
+        <DataGrid data={rows} columns={columns} compact emptyMessage="No outbound dispatches yet." />
+      )}
+    </OperationalPageShell>
   )
 }
 
@@ -152,11 +241,11 @@ export function ApiOutboundDispatchDetailPage() {
     }
   }, [searchParams, detail?.status])
 
-  async function onBasicConfirm() {
+  async function onConfirmStockOut() {
     if (!id || !detail) return
     const ok = await appConfirm({
-      title: 'Basic Confirm (7C0)',
-      description: `Confirm stock-out for ${detail.dispatchNo}? This posts inventory issue.`,
+      title: 'Confirm stock-out?',
+      description: `Confirm stock-out for ${detail.dispatchNo}? This posts an inventory issue.`,
       confirmLabel: 'Confirm stock-out',
       tone: 'danger',
     })
@@ -198,9 +287,9 @@ export function ApiOutboundDispatchDetailPage() {
   async function onStartPacking() {
     if (!id || !detail) return
     const ok = await appConfirm({
-      title: 'Start Packing',
+      title: 'Start packing?',
       description: `Create packing session(s) for ${detail.dispatchNo}?`,
-      confirmLabel: 'Start Packing',
+      confirmLabel: 'Start packing',
     })
     if (!ok) return
     setBusy(true)
@@ -221,15 +310,16 @@ export function ApiOutboundDispatchDetailPage() {
   async function onPostDispatch() {
     if (!id || !detail) return
     const ok = await appConfirm({
-      title: 'Post Dispatch (7C5)',
+      title: 'Post dispatch?',
       description: `Post ${detail.dispatchNo} as confirmed stock-out?`,
-      confirmLabel: 'Post Dispatch (7C5)',
+      confirmLabel: 'Post dispatch',
       tone: 'danger',
     })
     if (!ok) return
     setBusy(true)
     try {
       await postOutboundDispatch(id)
+      notify.success(`Posted ${detail.dispatchNo}`)
       await reload()
     } catch (e) {
       setError(errMsg(e))
@@ -241,9 +331,9 @@ export function ApiOutboundDispatchDetailPage() {
   async function onReverse() {
     if (!id || !detail) return
     const note = await appPromptNote({
-      title: 'Reverse (7C5)',
+      title: 'Reverse dispatch?',
       description: `Reverse posted dispatch ${detail.dispatchNo}?`,
-      confirmLabel: 'Reverse (7C5)',
+      confirmLabel: 'Reverse',
       tone: 'danger',
       note: { required: true, label: 'Reason', placeholder: 'Why reverse this dispatch?' },
     })
@@ -251,6 +341,7 @@ export function ApiOutboundDispatchDetailPage() {
     setBusy(true)
     try {
       await reverseOutboundDispatch(id, { reason: note })
+      notify.success(`Reversed ${detail.dispatchNo}`)
       await reload()
     } catch (e) {
       setError(errMsg(e))
@@ -260,155 +351,273 @@ export function ApiOutboundDispatchDetailPage() {
   }
 
   if (!id) {
-    return <p className="text-sm text-rose-700">Missing dispatch id.</p>
+    return (
+      <OperationalPageShell title="Outbound Dispatch" description="Missing dispatch id.">
+        <Link className="text-[13px] font-semibold text-erp-primary hover:underline" to="/dispatch/register">
+          Back to register
+        </Link>
+      </OperationalPageShell>
+    )
   }
 
-  const status = detail?.status ?? ''
+  const status = detail?.status
   const isDraft = status === 'DRAFT'
-  const canBasicConfirm = isDraft
+  const isWorkbench = detail?.planningSource === 'WORKBENCH_7C1'
+  /** Basic 7C0 drafts use soft confirm; workbench uses hardened 7C5 post. */
+  const canConfirm = isDraft && !isWorkbench
   const canStartPacking = isDraft
-  const canPost = status === 'CONFIRMED'
+  const canPost = isDraft && isWorkbench
   const canReverse = status === 'CONFIRMED'
 
+  const lineColumns = useMemo(
+    () => [
+      {
+        accessorKey: 'lineNo' as const,
+        header: '#',
+        cell: ({ row }: { row: { original: OutboundDispatch['lines'][number] } }) => String(row.original.lineNo),
+      },
+      {
+        id: 'item',
+        header: 'Item',
+        cell: ({ row }: { row: { original: OutboundDispatch['lines'][number] } }) => (
+          <span className="font-medium text-erp-text" title={row.original.itemId}>
+            {shortId(row.original.itemId)}
+          </span>
+        ),
+      },
+      {
+        id: 'warehouse',
+        header: 'Warehouse',
+        cell: ({ row }: { row: { original: OutboundDispatch['lines'][number] } }) => (
+          <span title={row.original.warehouseId}>{shortId(row.original.warehouseId)}</span>
+        ),
+      },
+      {
+        accessorKey: 'quantity' as const,
+        header: 'Qty',
+        cell: ({ row }: { row: { original: OutboundDispatch['lines'][number] } }) => (
+          <span className="tabular-nums">{row.original.quantity}</span>
+        ),
+      },
+      {
+        id: 'ready',
+        header: 'Ready snap.',
+        cell: ({ row }: { row: { original: OutboundDispatch['lines'][number] } }) =>
+          row.original.readyQuantitySnapshot != null ? (
+            <span className="tabular-nums">{row.original.readyQuantitySnapshot}</span>
+          ) : (
+            '—'
+          ),
+      },
+      {
+        id: 'movement',
+        header: 'Movement',
+        cell: ({ row }: { row: { original: OutboundDispatch['lines'][number] } }) =>
+          row.original.inventoryMovementNo ?? '—',
+      },
+    ],
+    [],
+  )
+
+  if (loading) {
+    return (
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Dispatch"
+        title="Outbound Dispatch"
+        backLink={{ to: '/dispatch/register', label: 'Back to register' }}
+      >
+        <LoadingState variant="card" />
+      </OperationalPageShell>
+    )
+  }
+
+  if (!detail || !status) {
+    return (
+      <OperationalPageShell
+        variant="dynamics"
+        layout="enterprise"
+        badge="Dispatch"
+        title="Outbound Dispatch"
+        description={error ?? 'Dispatch not found.'}
+        backLink={{ to: '/dispatch/register', label: 'Back to register' }}
+      >
+        <p className="text-[13px] text-erp-muted">This outbound dispatch could not be loaded.</p>
+      </OperationalPageShell>
+    )
+  }
+
   return (
-    <div className="space-y-4">
-      <PageBackLink to="/dispatch/register" label="Back to register" />
-      <PageHeader
-        title={detail?.dispatchNo ?? 'Outbound Dispatch'}
-        description="Outbound dispatch detail — reserve, pack, confirm stock-out, post / reverse."
-        actions={
-          detail ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={detail.status} />
-              {isDraft ? (
-                <Button type="button" variant="secondary" disabled={busy} onClick={() => setReserveOpen(true)}>
-                  Reserve Stock
-                </Button>
-              ) : null}
-              {canStartPacking ? (
-                <Button type="button" variant="secondary" disabled={busy} onClick={() => void onStartPacking()}>
-                  Start Packing
-                </Button>
-              ) : null}
-              {canBasicConfirm ? (
-                <Button type="button" variant="secondary" disabled={busy} onClick={() => void onBasicConfirm()}>
-                  Basic Confirm (7C0)
-                </Button>
-              ) : null}
-              {isDraft ? (
-                <Button type="button" variant="danger" disabled={busy} onClick={() => void onCancelDraft()}>
-                  Cancel draft
-                </Button>
-              ) : null}
-              {canPost ? (
-                <Button type="button" variant="primary" disabled={busy} onClick={() => void onPostDispatch()}>
-                  Post Dispatch (7C5)
-                </Button>
-              ) : null}
-              {canReverse ? (
-                <Button type="button" variant="danger" disabled={busy} onClick={() => void onReverse()}>
-                  Reverse (7C5)
-                </Button>
-              ) : null}
-            </div>
-          ) : null
-        }
+    <OperationalPageShell
+      variant="dynamics"
+      layout="enterprise"
+      badge="Dispatch"
+      title={detail.dispatchNo}
+      description={
+        detail.salesOrderNo
+          ? `Sales order ${detail.salesOrderNo} · outbound stock-out`
+          : 'Outbound dispatch — reserve, pack, confirm stock-out'
+      }
+      showDescription
+      backLink={{ to: '/dispatch/register', label: 'Back to register' }}
+      actions={<DynamicsStatusChip label={status.replace(/_/g, ' ')} tone={statusTone(status)} />}
+      commandBar={
+        <CommandBar>
+          <CommandBarGroup label="Actions">
+            <CommandBarButton icon={RefreshCw} label="Refresh" onClick={() => void reload()} disabled={busy} />
+            {isDraft ? (
+              <CommandBarButton
+                icon={Warehouse}
+                label="Reserve stock"
+                onClick={() => setReserveOpen(true)}
+                disabled={busy}
+              />
+            ) : null}
+            {canStartPacking ? (
+              <CommandBarButton
+                icon={Package}
+                label="Start packing"
+                onClick={() => void onStartPacking()}
+                disabled={busy}
+              />
+            ) : null}
+            {canConfirm ? (
+              <CommandBarButton
+                icon={CheckCircle2}
+                label="Confirm stock-out"
+                primary
+                onClick={() => void onConfirmStockOut()}
+                disabled={busy}
+              />
+            ) : null}
+            {isDraft ? (
+              <CommandBarButton icon={Ban} label="Cancel draft" onClick={() => void onCancelDraft()} disabled={busy} />
+            ) : null}
+            {canPost ? (
+              <CommandBarButton
+                icon={Send}
+                label="Post Dispatch (7C5)"
+                primary
+                onClick={() => void onPostDispatch()}
+                disabled={busy}
+              />
+            ) : null}
+            {canReverse ? (
+              <CommandBarButton
+                icon={RotateCcw}
+                label="Reverse (7C5)"
+                onClick={() => void onReverse()}
+                disabled={busy}
+              />
+            ) : null}
+          </CommandBarGroup>
+        </CommandBar>
+      }
+    >
+      <DispatchReservationDrawer
+        open={reserveOpen}
+        onClose={() => setReserveOpen(false)}
+        dispatchId={id}
+        onReserved={() => void reload()}
       />
 
-      {id ? (
-        <DispatchReservationDrawer
-          open={reserveOpen}
-          onClose={() => setReserveOpen(false)}
-          dispatchId={id}
-          onReserved={() => void reload()}
-        />
-      ) : null}
-
       {error ? (
-        <div className="rounded border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}</div>
+        <div className="mb-3 rounded border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-800">{error}</div>
       ) : null}
-      {loading ? <p className="text-sm text-gray-500">Loading…</p> : null}
 
-      {detail ? (
-        <>
-          <ErpCardSection title="Header">
-            <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-              <div>
-                <dt className="text-xs text-gray-500">Status</dt>
-                <dd>
-                  <StatusBadge status={detail.status} />
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-gray-500">Sales order</dt>
-                <dd>
-                  {detail.salesOrderId ? (
-                    <Link className="text-blue-700 hover:underline" to={`/crm/sales-orders/${detail.salesOrderId}`}>
-                      {detail.salesOrderNo ?? detail.salesOrderId}
-                    </Link>
-                  ) : (
-                    '—'
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-gray-500">Preferred warehouse</dt>
-                <dd className="font-mono text-xs">{detail.preferredWarehouseId ?? '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-gray-500">Planned date</dt>
-                <dd>{detail.plannedDispatchDate?.slice(0, 10) ?? '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-gray-500">Confirmed at</dt>
-                <dd>{detail.confirmedAt ? new Date(detail.confirmedAt).toLocaleString() : '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-gray-500">Packing</dt>
-                <dd>
-                  <Link className="text-blue-700 hover:underline" to="/dispatch/packing-sessions">
-                    packing-sessions
-                  </Link>
-                </dd>
-              </div>
-            </dl>
-            {detail.remarks ? <p className="mt-3 text-sm text-gray-600">{detail.remarks}</p> : null}
-          </ErpCardSection>
+      <DispatchLifecycleStrip status={status} />
 
-          <ErpCardSection title="Lines">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                  <tr>
-                    <th className="px-3 py-2">#</th>
-                    <th className="px-3 py-2">Item</th>
-                    <th className="px-3 py-2">Warehouse</th>
-                    <th className="px-3 py-2">Qty</th>
-                    <th className="px-3 py-2">Movement</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detail.lines.map((line) => (
-                    <tr key={line.id} className="border-t border-gray-100">
-                      <td className="px-3 py-2">{line.lineNo}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{line.itemId}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{line.warehouseId}</td>
-                      <td className="px-3 py-2">{line.quantity}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{line.inventoryMovementNo ?? '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </ErpCardSection>
+      <div className="mb-4 flex flex-wrap gap-2 text-[12px]">
+        <Link
+          to="/dispatch/packing-sessions"
+          className="rounded border border-erp-border px-2.5 py-1.5 font-semibold text-erp-primary hover:bg-erp-surface"
+        >
+          Packing sessions
+        </Link>
+        <Link
+          to="/dispatch/pick-lists"
+          className="rounded border border-erp-border px-2.5 py-1.5 font-semibold text-erp-primary hover:bg-erp-surface"
+        >
+          Pick lists
+        </Link>
+        <Link
+          to="/dispatch/delivery-challans"
+          className="rounded border border-erp-border px-2.5 py-1.5 font-semibold text-erp-primary hover:bg-erp-surface"
+        >
+          Delivery challans
+        </Link>
+        <Link
+          to="/dispatch/workbench"
+          className="rounded border border-erp-border px-2.5 py-1.5 font-semibold text-erp-primary hover:bg-erp-surface"
+        >
+          Workbench
+        </Link>
+      </div>
 
-          {detail.salesOrderId ? (
-            <ErpCardSection title="SO fulfilment">
-              <SalesOrderDispatchFulfilmentPanel salesOrderId={detail.salesOrderId} />
-            </ErpCardSection>
-          ) : null}
-        </>
+      <DetailSection title="Summary">
+        <dl className="grid gap-3 text-[13px] sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Sales order</dt>
+            <dd className="mt-0.5">
+              {detail.salesOrderId ? (
+                <Link className="font-semibold text-erp-primary hover:underline" to={`/crm/sales-orders/${detail.salesOrderId}`}>
+                  {detail.salesOrderNo ?? shortId(detail.salesOrderId)}
+                </Link>
+              ) : (
+                '—'
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Planned date</dt>
+            <dd className="mt-0.5">{detail.plannedDispatchDate ? formatDate(detail.plannedDispatchDate.slice(0, 10)) : '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Preferred warehouse</dt>
+            <dd className="mt-0.5" title={detail.preferredWarehouseId ?? undefined}>
+              {shortId(detail.preferredWarehouseId)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Ship-to</dt>
+            <dd className="mt-0.5">{detail.shipToAddress?.trim() || detail.shipToKey || '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Confirmed</dt>
+            <dd className="mt-0.5">
+              {detail.confirmedAt ? new Date(detail.confirmedAt).toLocaleString() : '—'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">Lines</dt>
+            <dd className="mt-0.5 tabular-nums">{detail.lines.length}</dd>
+          </div>
+        </dl>
+        {detail.remarks ? (
+          <p className="mt-3 rounded border border-erp-border/70 bg-erp-surface/40 px-3 py-2 text-[12px] text-erp-muted">
+            {detail.remarks}
+          </p>
+        ) : null}
+        {detail.cancellationReason ? (
+          <p className="mt-2 text-[12px] text-rose-700">Cancel reason: {detail.cancellationReason}</p>
+        ) : null}
+      </DetailSection>
+
+      <DetailSection title="Lines">
+        <DataGrid
+          data={detail.lines}
+          columns={lineColumns}
+          compact
+          emptyMessage="No lines on this dispatch."
+        />
+      </DetailSection>
+
+      {detail.salesOrderId ? (
+        <DetailSection title="Sales order fulfilment">
+          <SalesOrderDispatchFulfilmentPanel salesOrderId={detail.salesOrderId} />
+        </DetailSection>
       ) : null}
-    </div>
+    </OperationalPageShell>
   )
 }

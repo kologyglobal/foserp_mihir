@@ -527,6 +527,10 @@ export interface EligibleSalesOrder {
   orderDate: string
   requiredDate: string | null
   lineCount: number
+  /** Lines that still have convertible remaining qty. */
+  remainingLineCount?: number
+  /** Sum of remaining convertible qty across open lines. */
+  remainingQuantity?: string
 }
 
 export interface SalesOrderLineEligibility {

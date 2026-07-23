@@ -216,6 +216,29 @@ export function MobileQcKioskDetailPage() {
 
   async function submit(decision: QualityInspectionDecision) {
     if (!inspection) return
+    const snapList = Array.isArray(inspection.parameterSnapshot) ? inspection.parameterSnapshot : []
+    if (decision === 'PASS' || decision === 'CONDITIONAL_PASS') {
+      for (const snap of snapList) {
+        if (!snap.mandatory) continue
+        const d = drafts.find((x) => x.parameterId === snap.parameterId)
+        if (!d) {
+          notify.error(`Enter measurement for ${snap.parameterCode}`)
+          return
+        }
+        if (snap.parameterType === 'NUMERIC' && (d.measuredNumeric.trim() === '' || !Number.isFinite(Number(d.measuredNumeric)))) {
+          notify.error(`Enter numeric measurement for ${snap.parameterCode}`)
+          return
+        }
+        if (snap.parameterType === 'BOOLEAN' && d.passed == null && !d.measuredValue) {
+          notify.error(`Select result for ${snap.parameterCode}`)
+          return
+        }
+        if (snap.passFailRule === 'MANUAL' && d.passed == null) {
+          notify.error(`Mark pass/fail for ${snap.parameterCode}`)
+          return
+        }
+      }
+    }
     setBusy(true)
     try {
       const parameterResults = drafts.map((d) => {
@@ -224,7 +247,14 @@ export function MobileQcKioskDetailPage() {
           d.measuredNumeric === '' ? null : Number.isFinite(Number(d.measuredNumeric)) ? Number(d.measuredNumeric) : null
         return {
           parameterId: d.parameterId,
-          measuredValue: d.measuredValue || null,
+          measuredValue:
+            snap?.parameterType === 'BOOLEAN'
+              ? d.passed == null
+                ? d.measuredValue || null
+                : d.passed
+                  ? 'true'
+                  : 'false'
+              : d.measuredValue || null,
           measuredNumeric: snap?.parameterType === 'NUMERIC' ? numeric : null,
           passed: d.passed,
           remarks: d.remarks || null,
@@ -240,6 +270,10 @@ export function MobileQcKioskDetailPage() {
         parameterResults: parameterResults.length ? parameterResults : undefined,
       })
       notify.success(`Inspection ${decision}`)
+      if (decision === 'PASS' || decision === 'CONDITIONAL_PASS') {
+        navigate(`/quality/inspections/${inspection.id}/report`)
+        return
+      }
       navigate('/m/qc')
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Decision failed')

@@ -180,11 +180,7 @@ function DemoProductionControlRoomPage() {
 
   if (!perms.canViewDashboard) {
     return (
-      <ProductionPageHeader
-        title="Production Control Room"
-        description="Monitor live Work Orders, Stages, people, machines and issues"
-        favoritePath="/manufacturing/control-room"
-      >
+      <ProductionPageHeader title="Production Control Room" favoritePath="/manufacturing/control-room">
         <ProductionEmptyState
           icon={LayoutGrid}
           title="Access denied"
@@ -197,7 +193,6 @@ function DemoProductionControlRoomPage() {
   return (
     <ProductionPageHeader
       title="Production Control Room"
-      description="Monitor live Work Orders, Stages, people, machines and issues"
       favoritePath="/manufacturing/control-room"
       primaryAction={{
         id: 'work-orders',
@@ -211,7 +206,7 @@ function DemoProductionControlRoomPage() {
       ]}
       kpiStrip={loadState === 'ready' ? kpiStrip : undefined}
     >
-      <div className="space-y-4">
+      <div className="space-y-3">
         <ManufacturingDemoBanner
           showCommandMap
           message="Control Room is the owner/manager attention board. Execute production on the Work Order — not here."

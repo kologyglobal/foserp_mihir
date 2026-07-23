@@ -10,7 +10,8 @@ import {
   Wrench,
 } from 'lucide-react'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { SearchInput } from '@/components/ui/SearchInput'
+import { CrmListFilterBar } from '@/components/crm/CrmListFilterBar'
+import type { FilterChip } from '@/components/design-system/SmartFilterBar'
 import { Select } from '@/components/forms/Inputs'
 import { ErpSegmentedControl } from '@/components/erp/ErpSegmentedControl'
 import { getControlRoomDashboard, getWorkOrdersSummary, listWorkOrders } from '@/services/api/manufacturingApi'
@@ -259,7 +260,8 @@ export function ApiProductionControlRoomView() {
   const [overview, setOverview] = useState<ControlRoomOverview | null>(null)
   const [summary, setSummary] = useState<WorkOrdersSummary | null>(null)
   const [orders, setOrders] = useState<ProductionOrder[]>([])
-  const [loading, setLoading] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('board')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'' | WorkOrderStatus>('')
@@ -271,7 +273,7 @@ export function ApiProductionControlRoomView() {
   )
 
   const load = useCallback(async () => {
-    setLoading(true)
+    setRefreshing(true)
     try {
       const [ov, sum, list] = await Promise.all([
         getControlRoomDashboard(),
@@ -283,16 +285,17 @@ export function ApiProductionControlRoomView() {
           limit: 100,
         }),
       ])
-      setOverview(ov.data)
-      setSummary(sum.data)
-      setOrders(list.data)
+      setOverview(ov.data ?? null)
+      setSummary(sum.data ?? null)
+      setOrders(Array.isArray(list.data) ? list.data : [])
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Failed to load control room')
       setOverview(null)
       setSummary(null)
       setOrders([])
     } finally {
-      setLoading(false)
+      setInitialLoading(false)
+      setRefreshing(false)
     }
   }, [search, statusFilter, healthFilter])
 
@@ -368,69 +371,102 @@ export function ApiProductionControlRoomView() {
     ]
   }, [overview, summary, openIssueCount, navigate])
 
+  const filterChips: FilterChip[] = useMemo(() => {
+    const chips: FilterChip[] = []
+    if (statusFilter) {
+      chips.push({ id: 'status', label: `Status: ${WO_STATUS_UI_LABELS[statusFilter]}` })
+    }
+    if (healthFilter) {
+      chips.push({ id: 'health', label: `Health: ${WO_HEALTH_UI_LABELS[healthFilter]}` })
+    }
+    if (search.trim()) {
+      chips.push({ id: 'search', label: `Search: ${search.trim()}` })
+    }
+    return chips
+  }, [statusFilter, healthFilter, search])
+
+  const clearFilters = useCallback(() => {
+    setSearch('')
+    setStatusFilter('')
+    setHealthFilter('')
+  }, [])
+
+  const removeFilterChip = useCallback((id: string) => {
+    if (id === 'status') setStatusFilter('')
+    else if (id === 'health') setHealthFilter('')
+    else if (id === 'search') setSearch('')
+  }, [])
+
   if (!perms.canViewControlRoom) {
     return (
-      <ProductionPageHeader
-        title="Production Control Room"
-        description="Live work orders, stage load, people, and issues needing attention"
-        favoritePath="/manufacturing/control-room"
-      >
+      <ProductionPageHeader title="Production Control Room" favoritePath="/manufacturing/control-room">
         <p className="text-sm text-erp-muted">You do not have permission to view the Production Control Room.</p>
       </ProductionPageHeader>
     )
   }
 
   const filterBar = (
-    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-      <SearchInput
-        value={search}
-        onChange={setSearch}
-        placeholder="Search work orders…"
-        className="min-w-[12rem] flex-1 sm:max-w-xs"
-      />
-      <Select
-        value={statusFilter}
-        onChange={(e) => setStatusFilter(e.target.value as '' | WorkOrderStatus)}
-        className="h-9 w-full sm:w-40"
-        aria-label="Filter by status"
-      >
-        {STATUS_FILTERS.map((o) => (
-          <option key={o.value || 'all-status'} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </Select>
-      <Select
-        value={healthFilter}
-        onChange={(e) => setHealthFilter(e.target.value as '' | WorkOrderHealth)}
-        className="h-9 w-full sm:w-40"
-        aria-label="Filter by health"
-      >
-        {HEALTH_FILTERS.map((o) => (
-          <option key={o.value || 'all-health'} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </Select>
-      <ErpSegmentedControl
-        name="Control room view"
-        variant="pills"
-        value={viewMode}
-        onChange={setViewMode}
-        options={[
-          { value: 'board', label: 'Board', icon: LayoutGrid },
-          { value: 'list', label: 'List', icon: List },
-        ]}
-        className="sm:ml-auto"
-      />
-    </div>
+    <CrmListFilterBar
+      className="crm-list-filter-bar--embedded border-0 bg-transparent px-0 shadow-none"
+      search={search}
+      onSearchChange={setSearch}
+      searchPlaceholder="Search work orders…"
+      showCommandPaletteHint={false}
+      chips={filterChips}
+      onRemoveChip={removeFilterChip}
+      onClearAll={filterChips.length > 0 ? clearFilters : undefined}
+      sort={
+        <>
+          <Select
+            native
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as '' | WorkOrderStatus)}
+            wrapClassName="w-40 shrink-0"
+            className="h-9"
+            aria-label="Filter by status"
+          >
+            {STATUS_FILTERS.map((o) => (
+              <option key={o.value || 'all-status'} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+          <Select
+            native
+            value={healthFilter}
+            onChange={(e) => setHealthFilter(e.target.value as '' | WorkOrderHealth)}
+            wrapClassName="w-40 shrink-0"
+            className="h-9"
+            aria-label="Filter by health"
+          >
+            {HEALTH_FILTERS.map((o) => (
+              <option key={o.value || 'all-health'} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        </>
+      }
+      trailing={
+        <ErpSegmentedControl
+          name="Control room view"
+          variant="pills"
+          value={viewMode}
+          onChange={setViewMode}
+          options={[
+            { value: 'board', label: 'Board', icon: LayoutGrid },
+            { value: 'list', label: 'List', icon: List },
+          ]}
+        />
+      }
+    />
   )
 
   return (
     <ProductionPageHeader
       title="Production Control Room"
-      description="Live work orders, stage load, people, and issues needing attention"
       favoritePath="/manufacturing/control-room"
+      pageGuide={null}
       primaryAction={{
         id: 'work-orders',
         label: 'Work Orders',
@@ -444,37 +480,31 @@ export function ApiProductionControlRoomView() {
           icon: LayoutGrid,
           onClick: () => navigate('/manufacturing/shopfloor'),
         },
-        { id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load() },
+        {
+          id: 'refresh',
+          label: refreshing ? 'Refreshing…' : 'Refresh',
+          icon: RefreshCw,
+          disabled: refreshing,
+          onClick: () => void load(),
+        },
       ]}
       kpiStrip={kpiStrip.length > 0 ? kpiStrip : undefined}
-      filterBar={filterBar}
     >
-      {loading ? <LoadingState variant="dashboard" rows={6} /> : null}
+      <div className="mb-3 rounded-lg border border-erp-border bg-white px-3 py-2 shadow-sm">
+        {filterBar}
+      </div>
 
-      {!loading && overview && summary ? (
-        <div className="grid gap-4 lg:grid-cols-12">
-          <div className="space-y-3 lg:col-span-8">
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <h2 className="text-[13px] font-semibold text-erp-text">Live work orders</h2>
-                <p className="text-[12px] text-erp-muted">
-                  {orders.length} matching · open a card to execute on the work order
-                </p>
-              </div>
-              {(statusFilter || healthFilter || search) && (
-                <button
-                  type="button"
-                  className="text-[12px] font-semibold text-erp-primary hover:underline"
-                  onClick={() => {
-                    setSearch('')
-                    setStatusFilter('')
-                    setHealthFilter('')
-                  }}
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
+      {initialLoading ? <LoadingState variant="dashboard" rows={6} /> : null}
+
+      {!initialLoading && overview && summary ? (
+        <div className={cn('grid gap-3 lg:grid-cols-12 lg:gap-4', refreshing && 'opacity-70')}>
+          <div className="space-y-2.5 lg:col-span-8">
+            <p className="text-[12px] text-erp-muted">
+              {orders.length} live work order{orders.length === 1 ? '' : 's'}
+              {filterChips.length > 0 ? ' matching filters' : ''}
+              {' · '}
+              open a card to execute
+            </p>
 
             {orders.length === 0 ? (
               <ProductionEmptyState
@@ -511,7 +541,7 @@ export function ApiProductionControlRoomView() {
             )}
           </div>
 
-          <aside className="space-y-3 lg:col-span-4">
+          <aside className="space-y-2.5 lg:col-span-4">
             {(openIssueCount > 0 || (overview.unassignedReadyWork ?? 0) > 0) && (
               <section className="overflow-hidden rounded-lg border border-amber-200/80 bg-amber-50/40">
                 <header className="flex items-center gap-2 border-b border-amber-200/60 px-3.5 py-2.5">
@@ -644,7 +674,7 @@ export function ApiProductionControlRoomView() {
         </div>
       ) : null}
 
-      {!loading && !overview ? (
+      {!initialLoading && !overview ? (
         <ProductionEmptyState
           icon={ClipboardList}
           title="Unable to load Control Room"

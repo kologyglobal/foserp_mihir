@@ -174,9 +174,6 @@ model Tenant {
   financeSettings                        FinanceSettings[]
   costCentres                            CostCentre[]
   financeFeatureControls                 FinanceFeatureControl[]
-  tallyConnectorConfigs                  TallyConnectorConfig[]
-  tallyLedgerMappings                    TallyLedgerMapping[]
-  tallyExportOutbox                      TallyExportOutbox[]
   financeApprovalRules                   FinanceApprovalRule[]
   financeNumberSeries                    FinanceNumberSeries[]
   accountingVouchers                     AccountingVoucher[]
@@ -2083,8 +2080,6 @@ enum FinanceFeatureKey {
   COST_CENTRES
   PROJECT_ACCOUNTING
   APPROVALS
-  /// Phase Tally-1 — gate enqueue / XML export to Tally outbox.
-  TALLY_EXPORT
 }
 
 enum FinanceDocumentType {
@@ -2170,9 +2165,6 @@ model LegalEntity {
   financeSettings                        FinanceSettings?
   costCentres                            CostCentre[]
   financeFeatureControls                 FinanceFeatureControl[]
-  tallyConnectorConfigs                  TallyConnectorConfig[]
-  tallyLedgerMappings                    TallyLedgerMapping[]
-  tallyExportOutbox                      TallyExportOutbox[]
   financeApprovalRules                   FinanceApprovalRule[]
   financeNumberSeries                    FinanceNumberSeries[]
   accountingVouchers                     AccountingVoucher[]
@@ -2427,7 +2419,6 @@ model Account {
   parent                                      Account?                             @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
   children                                    Account[]                            @relation("AccountHierarchy")
   mappings                                    DefaultAccountMapping[]
-  tallyLedgerMappings                          TallyLedgerMapping[]
   voucherLines                                AccountingVoucherLine[]
   generalLedgerEntries                        GeneralLedgerEntry[]
   salesInvoiceLines                           SalesInvoiceLine[]
@@ -2796,7 +2787,6 @@ model AccountingVoucher {
   lines                            AccountingVoucherLine[]
   generalLedgerEntries             GeneralLedgerEntry[]
   postingEvents                    PostingEvent[]
-  tallyExportOutbox                TallyExportOutbox[]
   salesInvoice                     SalesInvoice?
   salesInvoiceReversal             SalesInvoice?             @relation("SalesInvoiceReversalVoucher")
   receivableOpenItems              ReceivableOpenItem[]
@@ -15305,117 +15295,3 @@ model GateActivity {
   @@index([tenantId, time])
   @@map("gate_activities")
 }
-
-
-enum TallyConnectorStatus {
-  DISABLED
-  ENABLED
-  ERROR
-}
-
-enum TallyExportOutboxStatus {
-  PENDING
-  RENDERING
-  READY
-  EXPORTED
-  FAILED
-  CANCELLED
-}
-
-/// Tally export connector — one config per legal entity (Phase Tally-1: XML download/outbox, no live HTTP).
-model TallyConnectorConfig {
-  id            String               @id @default(uuid())
-  tenantId      String
-  legalEntityId String               @unique
-  code          String               @db.VarChar(32)
-  name          String               @db.VarChar(200)
-  status        TallyConnectorStatus @default(DISABLED)
-
-  /// Non-secret: companyName, gstin, host/port hints, exportVoucherTypes[], etc.
-  configJson Json?
-
-  lastExportAt      DateTime?
-  lastExportStatus  String?   @db.VarChar(32)
-  lastExportMessage String?   @db.VarChar(500)
-
-  createdBy String?
-  updatedBy String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  tenant      Tenant               @relation(fields: [tenantId], references: [id])
-  legalEntity LegalEntity          @relation(fields: [legalEntityId], references: [id])
-  mappings    TallyLedgerMapping[]
-  outbox      TallyExportOutbox[]
-
-  @@unique([tenantId, code])
-  @@index([tenantId])
-  @@index([tenantId, legalEntityId, status])
-  @@map("tally_connector_configs")
-}
-
-model TallyLedgerMapping {
-  id            String  @id @default(uuid())
-  tenantId      String
-  legalEntityId String
-  connectorId   String
-  accountId     String
-
-  tallyLedgerName  String  @db.VarChar(300)
-  tallyParentGroup String? @db.VarChar(200)
-  tallyGuid        String? @db.VarChar(64)
-  isActive         Boolean @default(true)
-
-  createdBy String?
-  updatedBy String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  tenant      Tenant               @relation(fields: [tenantId], references: [id])
-  legalEntity LegalEntity          @relation(fields: [legalEntityId], references: [id])
-  connector   TallyConnectorConfig @relation(fields: [connectorId], references: [id], onDelete: Cascade)
-  account     Account              @relation(fields: [accountId], references: [id])
-
-  @@unique([connectorId, accountId])
-  @@index([tenantId])
-  @@index([tenantId, legalEntityId])
-  @@map("tally_ledger_mappings")
-}
-
-model TallyExportOutbox {
-  id             String                  @id @default(uuid())
-  tenantId       String
-  legalEntityId  String
-  connectorId    String
-  voucherId      String
-  status         TallyExportOutboxStatus @default(PENDING)
-  idempotencyKey String                  @db.VarChar(200)
-
-  payloadJson Json?
-  xmlBody     String? @db.LongText
-  xmlHash     String? @db.VarChar(64)
-
-  attemptCount  Int       @default(0)
-  lastAttemptAt DateTime?
-  exportedAt    DateTime?
-  errorCode     String?   @db.VarChar(64)
-  errorMessage  String?   @db.VarChar(500)
-
-  createdBy String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  tenant      Tenant               @relation(fields: [tenantId], references: [id])
-  legalEntity LegalEntity          @relation(fields: [legalEntityId], references: [id])
-  connector   TallyConnectorConfig @relation(fields: [connectorId], references: [id], onDelete: Cascade)
-  voucher     AccountingVoucher    @relation(fields: [voucherId], references: [id])
-
-  @@unique([tenantId, legalEntityId, idempotencyKey])
-  @@unique([connectorId, voucherId])
-  @@index([tenantId])
-  @@index([tenantId, legalEntityId, status, createdAt])
-  @@index([voucherId])
-  @@map("tally_export_outbox")
-}
-

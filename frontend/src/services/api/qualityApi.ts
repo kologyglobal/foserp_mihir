@@ -82,6 +82,8 @@ export interface QualityInspection {
   } | null
   parameterSnapshot?: QualityParameterSnapshot[] | null
   parameterResults?: QualityParameterResultRow[]
+  planCodeSnapshot?: string | null
+  planRevisionSnapshot?: string | null
   inspectedQty: string | null
   acceptedQty: string | null
   rejectedQty: string | null

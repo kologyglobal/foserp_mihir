@@ -72,19 +72,46 @@ export async function listEligibleSalesOrders(tenantId: string) {
     })
   }
 
+  const remainingLineStats = (salesOrderId: string, lines: SalesOrderLineDto[]) => {
+    let remainingLines = 0
+    let remainingQty = new Prisma.Decimal(0)
+    for (const line of lines) {
+      if (!(line.qty > 0)) continue
+      const demand = demandByLineKey.get(`${salesOrderId}:${line.id}`)
+      if (!demand) {
+        remainingLines += 1
+        remainingQty = remainingQty.add(toDecimal(line.qty))
+        continue
+      }
+      if (demand.status === 'FULLY_CONVERTED' || demand.status === 'CANCELLED') continue
+      const rem = toDecimal(demand.remainingQuantity)
+      if (rem.greaterThan(0)) {
+        remainingLines += 1
+        remainingQty = remainingQty.add(rem)
+      }
+    }
+    return { remainingLines, remainingQty: remainingQty.toString() }
+  }
+
   return orders
     .filter((order) => hasConvertibleRemaining(order.id, parseLines(order.lines)))
-    .map((order) => ({
-      id: order.id,
-      salesOrderNo: order.salesOrderNo,
-      customerId: order.companyId,
-      customerName: order.company?.name ?? null,
-      customerCode: order.company?.companyCode ?? order.customerCode ?? null,
-      status: order.status,
-      orderDate: order.orderDate,
-      requiredDate: order.requiredDate,
-      lineCount: parseLines(order.lines).length,
-    }))
+    .map((order) => {
+      const lines = parseLines(order.lines)
+      const stats = remainingLineStats(order.id, lines)
+      return {
+        id: order.id,
+        salesOrderNo: order.salesOrderNo,
+        customerId: order.companyId,
+        customerName: order.company?.name ?? null,
+        customerCode: order.company?.companyCode ?? order.customerCode ?? null,
+        status: order.status,
+        orderDate: order.orderDate,
+        requiredDate: order.requiredDate,
+        lineCount: lines.length,
+        remainingLineCount: stats.remainingLines,
+        remainingQuantity: stats.remainingQty,
+      }
+    })
 }
 
 export async function getSalesOrderLineEligibility(tenantId: string, salesOrderId: string) {

@@ -7,6 +7,7 @@ import {
   cancelOutboundDispatchSchema,
   createOutboundDispatchSchema,
   listOutboundDispatchesQuerySchema,
+  reverseOutboundDispatchSchema,
   updateOutboundDispatchSchema,
 } from './outbound-dispatch.schemas.js'
 
@@ -41,6 +42,23 @@ router.post(
   validateParams(uuidParamSchema),
   requireAnyPermission('dispatch.post', 'dispatch.basic_confirm'),
   controller.confirm,
+)
+
+/** Phase 7C5 hardened post — workbench drafts require ISSUED Delivery Challan. */
+router.post(
+  '/:id/post',
+  validateParams(uuidParamSchema),
+  requirePermission('dispatch.post'),
+  controller.post,
+)
+
+/** Phase 7C5 reverse — compensating FG_DISPATCH inward, status → REVERSED. */
+router.post(
+  '/:id/reverse',
+  validateParams(uuidParamSchema),
+  requirePermission('dispatch.post'),
+  validateBody(reverseOutboundDispatchSchema),
+  controller.reverse,
 )
 
 router.post(

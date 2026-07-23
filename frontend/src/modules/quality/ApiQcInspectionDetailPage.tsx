@@ -1,9 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { DetailLayout, DetailSection, DetailGrid, DetailField } from '@/components/masters/MasterLayouts'
-import { Button } from '@/components/ui/Button'
+import { PageBackLink } from '@/components/ui/PageBackLink'
 import { LoadingState } from '@/design-system/components/LoadingState'
-import { StatusBadge } from '@/components/ui/StatusBadge'
+import {
+  QcParameterMeasurementForm,
+  draftsToParameterResults,
+  snapshotToParameterDrafts,
+  validateMandatoryParameterDrafts,
+  type QcParameterDraft,
+} from '@/components/quality/QcParameterMeasurementForm'
+import {
+  kioskCardClass,
+  kioskDangerBtn,
+  kioskPrimaryBtn,
+  kioskSecondaryBtn,
+  kioskWarnBtn,
+} from '@/modules/mobile/kiosk/kioskCss'
 import { notify } from '@/store/toastStore'
 import {
   decideInspection,
@@ -12,34 +24,33 @@ import {
   type QualityInspectionDecision,
   type QualityParameterSnapshot,
 } from '@/services/api/qualityApi'
+import { formatDateTime } from '@/utils/dates/format'
+import { cn } from '@/utils/cn'
 
-type DraftResult = {
-  parameterId: string
-  measuredValue: string
-  measuredNumeric: string
-  passed: boolean | null
-  remarks: string
+const QC_DECISIONS: Array<{ value: QualityInspectionDecision; label: string }> = [
+  { value: 'PASS', label: 'Passed — continue' },
+  { value: 'CONDITIONAL_PASS', label: 'Conditionally accepted' },
+  { value: 'REWORK', label: 'Rework' },
+  { value: 'REJECT', label: 'Failed / Rejected' },
+  { value: 'HOLD', label: 'QC Hold' },
+]
+
+function decisionTone(value: QualityInspectionDecision, selected: boolean) {
+  if (!selected) return kioskSecondaryBtn
+  if (value === 'PASS' || value === 'CONDITIONAL_PASS') return kioskPrimaryBtn
+  if (value === 'REJECT' || value === 'HOLD') return kioskDangerBtn
+  return kioskWarnBtn
 }
 
-function snapshotToDraft(snapshot: QualityParameterSnapshot[]): DraftResult[] {
-  return [...snapshot]
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((s) => ({
-      parameterId: s.parameterId,
-      measuredValue: '',
-      measuredNumeric: '',
-      passed: null,
-      remarks: '',
-    }))
-}
-
+/** Shopfloor kiosk-style QC inspection decide page (API mode). */
 export function ApiQcInspectionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [inspection, setInspection] = useState<QualityInspection | null>(null)
-  const [drafts, setDrafts] = useState<DraftResult[]>([])
+  const [drafts, setDrafts] = useState<QcParameterDraft[]>([])
   const [remarks, setRemarks] = useState('')
+  const [qcDecision, setQcDecision] = useState<QualityInspectionDecision>('PASS')
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
@@ -60,8 +71,10 @@ export function ApiQcInspectionDetailPage() {
           })),
         )
       } else {
-        setDrafts(snapshotToDraft(snap))
+        setDrafts(snapshotToParameterDrafts(snap))
       }
+      if (res.data.decision) setQcDecision(res.data.decision)
+      setRemarks(res.data.decisionRemarks ?? res.data.remarks ?? '')
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Failed to load inspection')
       setInspection(null)
@@ -81,33 +94,37 @@ export function ApiQcInspectionDetailPage() {
   }, [inspection])
 
   const decided = inspection != null && inspection.status !== 'PENDING' && inspection.status !== 'REWORK'
+  const snapshot = Array.isArray(inspection?.parameterSnapshot) ? inspection.parameterSnapshot : []
+  const backTo = inspection?.status === 'REWORK' ? '/quality/rework' : '/quality/queue'
+  const backLabel = inspection?.status === 'REWORK' ? 'Rework Workbench' : 'QC Queue'
 
-  async function submit(decision: QualityInspectionDecision) {
+  async function submit() {
     if (!inspection) return
+    if (qcDecision === 'PASS' || qcDecision === 'CONDITIONAL_PASS') {
+      const err = validateMandatoryParameterDrafts(snapshot, drafts)
+      if (err) {
+        notify.error(err)
+        return
+      }
+    }
     setBusy(true)
     try {
-      const parameterResults = drafts.map((d) => {
-        const snap = snapshotById.get(d.parameterId)
-        const numeric =
-          d.measuredNumeric === '' ? null : Number.isFinite(Number(d.measuredNumeric)) ? Number(d.measuredNumeric) : null
-        return {
-          parameterId: d.parameterId,
-          measuredValue: d.measuredValue || null,
-          measuredNumeric: snap?.parameterType === 'NUMERIC' ? numeric : null,
-          passed: d.passed,
-          remarks: d.remarks || null,
-        }
-      })
+      const parameterResults = draftsToParameterResults(drafts, snapshotById)
+      const qty = Number(inspection.inspectedQty ?? 0)
       await decideInspection(inspection.id, {
-        decision,
+        decision: qcDecision,
         remarks: remarks || undefined,
-        acceptedQty: decision === 'PASS' ? Number(inspection.inspectedQty ?? 0) : undefined,
-        rejectedQty: decision === 'REJECT' ? Number(inspection.inspectedQty ?? 0) : undefined,
-        reworkQty: decision === 'REWORK' ? Number(inspection.inspectedQty ?? 0) : undefined,
+        acceptedQty: qcDecision === 'PASS' || qcDecision === 'CONDITIONAL_PASS' ? qty : undefined,
+        rejectedQty: qcDecision === 'REJECT' ? qty : undefined,
+        reworkQty: qcDecision === 'REWORK' ? qty : undefined,
         parameterResults: parameterResults.length ? parameterResults : undefined,
       })
-      notify.success(`Inspection ${decision}`)
-      navigate(decision === 'REWORK' || inspection.status === 'REWORK' ? '/quality/rework' : '/quality/queue')
+      notify.success(`Inspection ${qcDecision}`)
+      if (qcDecision === 'PASS' || qcDecision === 'CONDITIONAL_PASS') {
+        navigate(`/quality/inspections/${inspection.id}/report`)
+        return
+      }
+      navigate(qcDecision === 'REWORK' ? '/quality/rework' : '/quality/queue')
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Decision failed')
     } finally {
@@ -118,169 +135,198 @@ export function ApiQcInspectionDetailPage() {
   if (loading) return <LoadingState variant="card" />
   if (!inspection) {
     return (
-      <div className="p-8 text-center text-slate-500">
-        Inspection not found.{' '}
-        <Link to="/quality/queue" className="text-erp-accent hover:underline">
-          Back to queue
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 bg-[#f3f2f1] p-8 text-center">
+        <p className="text-[#605e5c]">Inspection not found.</p>
+        <Link to="/quality/queue" className="text-base font-semibold text-[#0078d4] hover:underline">
+          Back to QC queue
         </Link>
       </div>
     )
   }
 
   return (
-    <DetailLayout
-      backTo={inspection.status === 'REWORK' ? '/quality/rework' : '/quality/queue'}
-      backLabel={inspection.status === 'REWORK' ? 'Rework Workbench' : 'QC Queue'}
-      title={inspection.inspectionNumber}
-      subtitle={`${inspection.category.replace(/_/g, ' ')} · ${inspection.title}`}
-      badges={<StatusBadge status={inspection.status} />}
-    >
-      <DetailSection title="Inspection">
-        <DetailGrid>
-          <DetailField label="Plan" value={inspection.inspectionPlan?.planName ?? inspection.inspectionPlan?.planCode ?? '—'} />
-          <DetailField label="Work Order" value={inspection.productionOrderId ?? '—'} />
-          <DetailField label="Inspected qty" value={inspection.inspectedQty ?? '—'} />
-          <DetailField label="Requested" value={new Date(inspection.requestedAt).toLocaleString()} />
-        </DetailGrid>
-      </DetailSection>
+    <div className="min-h-[calc(100vh-4rem)] bg-[#f3f2f1] pb-32">
+      <div className="mx-auto max-w-3xl px-4 py-5 sm:px-6">
+        <PageBackLink to={backTo} label={backLabel} />
 
-      {(inspection.parameterSnapshot?.length ?? 0) > 0 && (
-        <DetailSection title="Parameter results">
-          <div className="space-y-3">
-            {drafts.map((d) => {
-              const snap = snapshotById.get(d.parameterId)
-              if (!snap) return null
-              return (
-                <div key={d.parameterId} className="rounded-lg border border-erp-border p-3">
-                  <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
-                    <span className="font-semibold">{snap.parameterCode}</span>
-                    <span className="text-erp-muted">{snap.parameterName}</span>
-                    {snap.mandatory && <StatusBadge status="mandatory" />}
-                    {snap.minValue != null && (
-                      <span className="text-xs text-erp-muted">
-                        {snap.minValue}–{snap.maxValue} {snap.uomCode ?? ''}
-                      </span>
-                    )}
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    {snap.parameterType === 'NUMERIC' ? (
-                      <label className="block text-sm">
-                        <span className="font-medium">Measured</span>
-                        <input
-                          type="number"
-                          className="erp-input mt-1 w-full"
-                          disabled={decided}
-                          value={d.measuredNumeric}
-                          onChange={(e) =>
-                            setDrafts((rows) =>
-                              rows.map((r) => (r.parameterId === d.parameterId ? { ...r, measuredNumeric: e.target.value } : r)),
-                            )
-                          }
-                        />
-                      </label>
-                    ) : snap.parameterType === 'BOOLEAN' ? (
-                      <label className="block text-sm">
-                        <span className="font-medium">Result</span>
-                        <select
-                          className="erp-input mt-1 w-full"
-                          disabled={decided}
-                          value={d.measuredValue}
-                          onChange={(e) =>
-                            setDrafts((rows) =>
-                              rows.map((r) =>
-                                r.parameterId === d.parameterId
-                                  ? { ...r, measuredValue: e.target.value, passed: e.target.value === 'true' }
-                                  : r,
-                              ),
-                            )
-                          }
-                        >
-                          <option value="">Select…</option>
-                          <option value="true">Pass / Yes</option>
-                          <option value="false">Fail / No</option>
-                        </select>
-                      </label>
-                    ) : (
-                      <label className="block text-sm sm:col-span-2">
-                        <span className="font-medium">Value</span>
-                        <input
-                          className="erp-input mt-1 w-full"
-                          disabled={decided}
-                          value={d.measuredValue}
-                          onChange={(e) =>
-                            setDrafts((rows) =>
-                              rows.map((r) => (r.parameterId === d.parameterId ? { ...r, measuredValue: e.target.value } : r)),
-                            )
-                          }
-                        />
-                      </label>
-                    )}
-                    {snap.passFailRule === 'MANUAL' && (
-                      <label className="block text-sm">
-                        <span className="font-medium">Pass?</span>
-                        <select
-                          className="erp-input mt-1 w-full"
-                          disabled={decided}
-                          value={d.passed == null ? '' : d.passed ? 'true' : 'false'}
-                          onChange={(e) =>
-                            setDrafts((rows) =>
-                              rows.map((r) =>
-                                r.parameterId === d.parameterId
-                                  ? {
-                                      ...r,
-                                      passed: e.target.value === '' ? null : e.target.value === 'true',
-                                    }
-                                  : r,
-                              ),
-                            )
-                          }
-                        >
-                          <option value="">—</option>
-                          <option value="true">Pass</option>
-                          <option value="false">Fail</option>
-                        </select>
-                      </label>
-                    )}
-                    <label className="block text-sm sm:col-span-3">
-                      <span className="font-medium">Remarks</span>
-                      <input
-                        className="erp-input mt-1 w-full"
-                        disabled={decided}
-                        value={d.remarks}
-                        onChange={(e) =>
-                          setDrafts((rows) =>
-                            rows.map((r) => (r.parameterId === d.parameterId ? { ...r, remarks: e.target.value } : r)),
-                          )
-                        }
-                      />
-                    </label>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </DetailSection>
-      )}
+        <header className="mt-4 mb-5">
+          <p className="text-xs font-bold uppercase tracking-wide text-[#605e5c]">Quality inspection</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#242424] sm:text-3xl">
+            {inspection.inspectionNumber}
+          </h1>
+          <p className="mt-1 text-base text-[#605e5c]">
+            {inspection.category.replace(/_/g, ' ')} · {inspection.title}
+          </p>
+        </header>
 
-      {!decided && (
-        <DetailSection title="Decision">
-          <label className="mb-3 block max-w-xl text-sm">
-            <span className="font-medium">Remarks</span>
-            <textarea className="erp-input mt-1 w-full" rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-          </label>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" disabled={busy} onClick={() => void submit('PASS')}>
-              Pass
-            </Button>
-            <Button size="sm" variant="secondary" disabled={busy} onClick={() => void submit('REWORK')}>
-              Rework
-            </Button>
-            <Button size="sm" variant="danger" disabled={busy} onClick={() => void submit('REJECT')}>
-              Reject
-            </Button>
+        <div className="grid gap-4">
+          <div
+            className={cn(
+              kioskCardClass,
+              decided ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50',
+            )}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#605e5c]">Status</p>
+                <p className="mt-1 text-xl font-bold text-[#242424]">
+                  {inspection.status}
+                  {inspection.decision ? (
+                    <>
+                      <span className="mx-2 font-normal text-[#c8c6c4]">·</span>
+                      <span className="text-base">{inspection.decision.replace(/_/g, ' ')}</span>
+                    </>
+                  ) : null}
+                </p>
+              </div>
+              {decided ? (
+                <button
+                  type="button"
+                  className={`${kioskSecondaryBtn} !w-auto !min-h-12 !px-5 !py-3 !text-base`}
+                  onClick={() => navigate(`/quality/inspections/${inspection.id}/report`)}
+                >
+                  QC Report
+                </button>
+              ) : null}
+            </div>
+            <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-[#605e5c]">Plan</dt>
+                <dd className="mt-0.5 text-base font-semibold text-[#242424]">
+                  {inspection.inspectionPlan?.planName ??
+                    inspection.inspectionPlan?.planCode ??
+                    inspection.planCodeSnapshot ??
+                    '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-[#605e5c]">Inspected qty</dt>
+                <dd className="mt-0.5 text-base font-semibold tabular-nums text-[#242424]">
+                  {inspection.inspectedQty ?? '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-[#605e5c]">Work order</dt>
+                <dd className="mt-0.5 font-mono text-sm text-[#242424]">
+                  {inspection.productionOrderId ? (
+                    <Link
+                      to={`/manufacturing/work-orders/${inspection.productionOrderId}`}
+                      className="font-semibold text-[#0078d4] hover:underline"
+                    >
+                      {inspection.productionOrderId.slice(0, 8)}…
+                    </Link>
+                  ) : (
+                    '—'
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-[#605e5c]">Requested</dt>
+                <dd className="mt-0.5 text-sm text-[#242424]">{formatDateTime(inspection.requestedAt)}</dd>
+              </div>
+            </dl>
           </div>
-        </DetailSection>
-      )}
-    </DetailLayout>
+
+          <QcParameterMeasurementForm
+            snapshot={snapshot}
+            drafts={drafts}
+            onChange={setDrafts}
+            disabled={decided || busy}
+            variant="kiosk"
+          />
+
+          {!decided ? (
+            <div className={kioskCardClass}>
+              <p className="text-sm font-bold uppercase tracking-wide text-[#605e5c]">Decision</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {QC_DECISIONS.map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    disabled={busy}
+                    className={decisionTone(o.value, qcDecision === o.value)}
+                    onClick={() => setQcDecision(o.value)}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              <label className="mt-4 block">
+                <span className="text-sm font-semibold text-[#242424]">Remarks</span>
+                <textarea
+                  className="mt-2 w-full min-h-24 rounded-xl border border-[#edebe9] bg-white px-4 py-3 text-lg text-[#242424] outline-none focus:border-[#0078d4] focus:ring-2 focus:ring-[#0078d4]/30 disabled:opacity-60"
+                  rows={3}
+                  value={remarks}
+                  disabled={busy}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  placeholder="Decision notes"
+                />
+              </label>
+              <p className="mt-3 text-center text-sm text-[#605e5c]">
+                Pass requires measurements · opens QC report when approved
+              </p>
+            </div>
+          ) : (
+            <div className={kioskCardClass}>
+              <p className="text-sm font-bold uppercase tracking-wide text-[#605e5c]">Decision recorded</p>
+              <p className="mt-2 text-lg font-semibold text-[#242424]">
+                {inspection.decision?.replace(/_/g, ' ') ?? inspection.status}
+              </p>
+              {(inspection.decisionRemarks || inspection.remarks) && (
+                <p className="mt-2 whitespace-pre-wrap text-base text-[#605e5c]">
+                  {inspection.decisionRemarks || inspection.remarks}
+                </p>
+              )}
+              {inspection.decidedAt ? (
+                <p className="mt-2 text-sm text-[#605e5c]">Decided {formatDateTime(inspection.decidedAt)}</p>
+              ) : null}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#edebe9] bg-white/95 px-4 py-3 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur sm:px-6">
+        <div className="mx-auto flex max-w-3xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <button
+            type="button"
+            className={`${kioskSecondaryBtn} sm:w-auto sm:min-w-[8rem]`}
+            disabled={busy}
+            onClick={() => navigate(backTo)}
+          >
+            Back
+          </button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:min-w-[18rem]">
+            {decided ? (
+              <button
+                type="button"
+                className={`${kioskPrimaryBtn} sm:min-w-[12rem]`}
+                onClick={() => navigate(`/quality/inspections/${inspection.id}/report`)}
+              >
+                Open QC Report
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={`${kioskSecondaryBtn} sm:w-auto sm:min-w-[7rem]`}
+                  disabled={busy}
+                  onClick={() => navigate(backTo)}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className={`${kioskPrimaryBtn} sm:min-w-[12rem]`}
+                  disabled={busy}
+                  onClick={() => void submit()}
+                >
+                  {busy ? 'Submitting…' : 'Submit QC'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

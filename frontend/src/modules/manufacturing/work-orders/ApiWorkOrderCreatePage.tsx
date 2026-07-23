@@ -673,7 +673,7 @@ export function ApiWorkOrderCreatePage() {
 
   const [salesOrders, setSalesOrders] = useState<EligibleSalesOrder[]>([])
   const [loadingOrders, setLoadingOrders] = useState(false)
-  const [selectedSalesOrderId, setSelectedSalesOrderId] = useState('')
+  const [selectedSalesOrderId, setSelectedSalesOrderId] = useState(searchParams.get('salesOrderId') ?? '')
   const [lines, setLines] = useState<SalesOrderLineEligibility[]>([])
   const [loadingLines, setLoadingLines] = useState(false)
   const [selectedLineId, setSelectedLineId] = useState('')
@@ -728,6 +728,21 @@ export function ApiWorkOrderCreatePage() {
       .then((res) => {
         if (cancelled) return
         setSalesOrders(res.data)
+        const preselect = searchParams.get('salesOrderId') ?? selectedSalesOrderId
+        if (preselect && res.data.some((so) => so.id === preselect)) {
+          setSelectedSalesOrderId(preselect)
+          setLoadingLines(true)
+          getSalesOrderLineEligibility(preselect)
+            .then((linesRes) => {
+              if (!cancelled) setLines(linesRes.data.lines)
+            })
+            .catch((e) => {
+              if (!cancelled) notify.error(e instanceof Error ? e.message : 'Failed to load sales order lines')
+            })
+            .finally(() => {
+              if (!cancelled) setLoadingLines(false)
+            })
+        }
       })
       .catch((e) => {
         if (!cancelled) notify.error(e instanceof Error ? e.message : 'Failed to load sales orders')
@@ -738,15 +753,18 @@ export function ApiWorkOrderCreatePage() {
     return () => {
       cancelled = true
     }
+    // Intentionally once on mode enter — preselect from URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
 
   useEffect(() => {
     if (!selectedSalesOrderId) return
+    if (loadingOrders) return
     if (salesOrders.some((order) => order.id === selectedSalesOrderId)) return
     setSelectedSalesOrderId('')
     setSelectedLineId('')
     setLines([])
-  }, [salesOrders, selectedSalesOrderId])
+  }, [salesOrders, selectedSalesOrderId, loadingOrders])
 
   const loadLines = useCallback((salesOrderId: string) => {
     setSelectedSalesOrderId(salesOrderId)

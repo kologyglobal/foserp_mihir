@@ -424,6 +424,7 @@ function StagesProcessPanel({
   canProgress,
   canEditRoute,
   openInspections,
+  stageInspections,
   onRelease,
   onStartWo,
   onHold,
@@ -432,6 +433,7 @@ function StagesProcessPanel({
   onStartStage,
   onCompleteStage,
   onOverrideComplete,
+  onOpenStageQc,
   onQcChanged,
   onEditRoute,
   onSaveOperationResources,
@@ -446,6 +448,7 @@ function StagesProcessPanel({
   canProgress: boolean
   canEditRoute: boolean
   openInspections: QualityInspection[]
+  stageInspections: QualityInspection[]
   onRelease: () => void
   onStartWo: () => void
   onHold: () => void
@@ -454,6 +457,7 @@ function StagesProcessPanel({
   onStartStage: (stageId: string, stageName: string) => void
   onCompleteStage: (stageId: string, stageName: string) => void
   onOverrideComplete: (stageId: string, stageName: string, reason: string) => void
+  onOpenStageQc: (stageId: string) => void
   onQcChanged: () => void
   onEditRoute: (seed?: { changeType?: RuntimeChangeType; operationId?: string; stageId?: string }) => void
   onSaveOperationResources: (input: {
@@ -645,8 +649,13 @@ function StagesProcessPanel({
           const canStartStage =
             ['READY', 'NOT_STARTED'].includes(stage.status) &&
             ((wo.status === 'READY' && canStartWo) || (wo.status === 'IN_PROGRESS' && canExecuteStage))
+          const stageHasPassedQc = stageInspections.some(
+            (i) => i.stageId === stage.id && i.status === 'PASSED',
+          )
+          const stageNeedsDeferredQc =
+            stage.status === 'COMPLETED' && stage.qualityRequired && !stageHasPassedQc
           const canCompleteStage =
-            ['READY', 'IN_PROGRESS', 'QC_PENDING'].includes(stage.status) &&
+            (['READY', 'IN_PROGRESS', 'QC_PENDING'].includes(stage.status) || stageNeedsDeferredQc) &&
             canExecuteStage &&
             wo.status === 'IN_PROGRESS'
           const doneOps = stageOps.filter((op) => op.status === 'COMPLETED' || op.status === 'SKIPPED').length
@@ -727,9 +736,15 @@ function StagesProcessPanel({
                     <div className="flex flex-wrap justify-end gap-1.5">
                       <DynamicsStatusChip label={stageMeta.label} tone={stageMeta.tone} />
                       {stage.qualityRequired ? (
-                        <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200">
-                          QC required
-                        </span>
+                        stageHasPassedQc ? (
+                          <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 ring-1 ring-emerald-200">
+                            QC cleared
+                          </span>
+                        ) : (
+                          <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                            QC required
+                          </span>
+                        )
                       ) : null}
                       {stage.parallelAllowed ? (
                         <span className="rounded-md bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 ring-1 ring-sky-200">
@@ -754,7 +769,9 @@ function StagesProcessPanel({
                           disabled={busy}
                           onClick={() => onCompleteStage(stage.id, stage.name)}
                         >
-                          {stage.status === 'QC_PENDING' ? 'Open Stage QC' : 'Complete Stage'}
+                          {stage.status === 'QC_PENDING' || stageNeedsDeferredQc
+                            ? 'Open Stage QC'
+                            : 'Complete Stage'}
                         </Button>
                       ) : null}
                     </div>
@@ -954,11 +971,19 @@ function StagesProcessPanel({
                   <StageQcPanel
                     workOrderId={wo.id}
                     stage={stage}
-                    inspection={openInspections.find((i) => i.stageId === stage.id) ?? null}
+                    inspection={
+                      openInspections.find((i) => i.stageId === stage.id) ??
+                      stageInspections.find(
+                        (i) => i.stageId === stage.id && (i.status === 'PENDING' || i.status === 'REWORK'),
+                      ) ??
+                      null
+                    }
+                    qcPassed={stageHasPassedQc}
                     busy={busy}
                     canExecute={canExecuteStage && wo.status === 'IN_PROGRESS'}
                     onChanged={onQcChanged}
                     onOverrideComplete={onOverrideComplete}
+                    onOpenStageQc={onOpenStageQc}
                   />
                 </div>
               </article>
@@ -1001,6 +1026,7 @@ export function ApiWorkOrderDetailPage() {
   const [fgReceiptOpen, setFgReceiptOpen] = useState(false)
   const [qualityBlockers, setQualityBlockers] = useState<QualityBlocker[]>([])
   const [openInspections, setOpenInspections] = useState<QualityInspection[]>([])
+  const [stageInspections, setStageInspections] = useState<QualityInspection[]>([])
   const [runtimeChanges, setRuntimeChanges] = useState<RuntimeChange[]>([])
   const [runtimeChangeOpen, setRuntimeChangeOpen] = useState(false)
   const [runtimeChangeSeed, setRuntimeChangeSeed] = useState<{
@@ -1044,7 +1070,7 @@ export function ApiWorkOrderDetailPage() {
         phase2b.canViewAssignments ? listWorkOrderAssignments(workOrderId, { limit: 50 }).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
         phase2b.canViewIssues ? listIssues({ productionOrderId: workOrderId, limit: 50 }).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
         getWorkOrderQualityBlockers(workOrderId).catch(() => ({ data: { blockers: [] } })),
-        listInspections({ productionOrderId: workOrderId, status: 'PENDING', limit: 20 }).catch(() => ({ data: [] })),
+        listInspections({ productionOrderId: workOrderId, limit: 50 }).catch(() => ({ data: [] })),
         canViewRuntimeChanges() ? listRuntimeChanges(workOrderId, { limit: 100 }).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
         canMoveWip()
           ? listWipMovements(workOrderId, { limit: 100 }).catch(() => ({ data: { total: 0, items: [] as WipMovement[] } }))
@@ -1080,7 +1106,12 @@ export function ApiWorkOrderDetailPage() {
           ? blockerRes.data.blockers
           : asListArray(blockerRes.data),
       )
-      setOpenInspections(asListArray(inspectionRes.data))
+      setOpenInspections(
+        asListArray<QualityInspection>(inspectionRes.data).filter(
+          (i) => i.status === 'PENDING' || i.status === 'REWORK',
+        ),
+      )
+      setStageInspections(asListArray<QualityInspection>(inspectionRes.data))
       setRuntimeChanges(asListArray(changeRows.data))
       // API returns { total, items } — never assign the envelope as the list.
       setWipMovements(asListArray(movementRows.data?.items ?? movementRows.data))
@@ -1329,6 +1360,25 @@ export function ApiWorkOrderDetailPage() {
                 const allStagesDone =
                   wo.stages.length > 0 &&
                   wo.stages.every((s) => s.status === 'COMPLETED' || s.status === 'SKIPPED' || s.isOptional)
+                const deferredQc = wo.stages.find((s) => {
+                  const passed = stageInspections.some(
+                    (i) => i.stageId === s.id && i.status === 'PASSED',
+                  )
+                  return s.qualityRequired && s.status === 'COMPLETED' && !passed
+                })
+                if (deferredQc) {
+                  return {
+                    label: `Stage "${deferredQc.name}" still needs QC measurements.`,
+                    tone: 'warning' as const,
+                    action: {
+                      label: 'Open Stage QC',
+                      onClick: () => {
+                        setTab('stages')
+                        setCompleteStageId(deferredQc.id)
+                      },
+                    },
+                  }
+                }
                 if (allStagesDone && canCompleteWo) {
                   return {
                     label: 'All stages complete — finish the work order.',
@@ -2008,6 +2058,7 @@ export function ApiWorkOrderDetailPage() {
             canProgress={canProgress}
             canEditRoute={canRequestRuntimeChange() && !readOnly}
             openInspections={openInspections}
+            stageInspections={stageInspections}
             onRelease={() => void run(() => releaseWorkOrder(wo.id), 'Work order released')}
             onStartWo={() => void run(() => startWorkOrder(wo.id), 'Work order started')}
             onHold={() => setDialog('hold')}
@@ -2028,6 +2079,7 @@ export function ApiWorkOrderDetailPage() {
                 `Stage "${stageName}" completed (QC override)`,
               )
             }
+            onOpenStageQc={(stageId) => setCompleteStageId(stageId)}
             onQcChanged={() => void load()}
             onEditRoute={(seed) => {
               setRuntimeChangeSeed(seed ?? null)

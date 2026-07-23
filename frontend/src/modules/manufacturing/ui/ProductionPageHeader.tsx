@@ -19,6 +19,8 @@ export type ProductionPageHeaderProps = {
   backLink?: { to: string; label: string }
   /** Header badge text — defaults to "Manufacturing"; override for cross-module ops pages that reuse this shell. */
   badge?: string
+  /** Pass null to suppress the page guide tip. */
+  pageGuide?: { purpose: string; nextStep?: string } | null
 }
 
 /**
@@ -39,6 +41,7 @@ export function ProductionPageHeader({
   className,
   backLink,
   badge = 'Manufacturing',
+  pageGuide,
 }: ProductionPageHeaderProps) {
   const commandBar =
     primaryAction || (secondaryActions && secondaryActions.length > 0) ? (
@@ -52,7 +55,7 @@ export function ProductionPageHeader({
       badge={badge}
       title={title}
       description={description}
-      showDescription={Boolean(description)}
+      showDescription={false}
       breadcrumbs={breadcrumbs ?? [{ label: 'Manufacturing & Production', to: '/manufacturing' }, { label: title }]}
       autoBreadcrumbs={false}
       favoritePath={favoritePath}
@@ -61,6 +64,7 @@ export function ProductionPageHeader({
       kpiStrip={kpiStrip}
       filterBar={filterBar}
       backLink={backLink}
+      pageGuide={pageGuide}
       className={className}
     >
       {children}

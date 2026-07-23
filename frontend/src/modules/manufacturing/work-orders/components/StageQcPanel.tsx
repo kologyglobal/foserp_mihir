@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/design-system/components/Button'
 import { FormField } from '@/components/forms/FormField'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
@@ -23,10 +23,14 @@ interface StageQcPanelProps {
   workOrderId: string
   stage: ProductionOrderStage
   inspection?: QualityInspection | null
+  /** True when this stage already has a PASSED in-process inspection. */
+  qcPassed?: boolean
   busy?: boolean
   canExecute?: boolean
   onChanged: () => void
   onOverrideComplete: (stageId: string, stageName: string, reason: string) => void
+  /** Open kiosk Complete Stage / QC modal (also reopens QC if stage was completed without clearance). */
+  onOpenStageQc: (stageId: string) => void
 }
 
 /** Inline QC + override for flexible Work Order execution (no Quality module navigation required). */
@@ -34,10 +38,12 @@ export function StageQcPanel({
   workOrderId: _workOrderId,
   stage,
   inspection,
+  qcPassed = false,
   busy,
   canExecute,
   onChanged,
   onOverrideComplete,
+  onOpenStageQc,
 }: StageQcPanelProps) {
   const [decision, setDecision] = useState<QualityInspectionDecision | ''>('')
   const [acceptedQty, setAcceptedQty] = useState('')
@@ -46,11 +52,20 @@ export function StageQcPanel({
   const [overrideReason, setOverrideReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  if (!stage.qualityRequired && stage.status !== 'QC_PENDING') return null
+  useEffect(() => {
+    if (inspection?.inspectedQty) setAcceptedQty(inspection.inspectedQty)
+  }, [inspection?.id, inspection?.inspectedQty])
+
+  const showPanel = Boolean(stage.qualityRequired || stage.status === 'QC_PENDING')
+  if (!showPanel || qcPassed) return null
+
+  const deferredCompleted = stage.status === 'COMPLETED' && stage.qualityRequired && !qcPassed
+  const openInspection =
+    inspection && (inspection.status === 'PENDING' || inspection.status === 'REWORK') ? inspection : null
 
   const submitQc = async () => {
-    if (!inspection?.id) {
-      notify.error('No open inspection for this stage — use Override & Complete Stage, or complete stage to create QC.')
+    if (!openInspection?.id) {
+      notify.error('No open inspection — use Open Stage QC to create one.')
       return
     }
     if (!decision) {
@@ -59,7 +74,7 @@ export function StageQcPanel({
     }
     setSubmitting(true)
     try {
-      await decideInspection(inspection.id, {
+      await decideInspection(openInspection.id, {
         decision,
         acceptedQty: acceptedQty !== '' ? Number(acceptedQty) : undefined,
         rejectedQty: rejectedQty !== '' ? Number(rejectedQty) : undefined,
@@ -91,14 +106,23 @@ export function StageQcPanel({
         <div>
           <p className="text-[11px] font-bold uppercase tracking-wide text-amber-900">Stage QC</p>
           <p className="text-[12px] text-erp-muted">
-            {inspection
-              ? `Inspection ${inspection.inspectionNumber} · ${inspection.status}`
-              : 'QC required — complete/override without leaving the Work Order'}
+            {openInspection
+              ? `Inspection ${openInspection.inspectionNumber} · ${openInspection.status}`
+              : deferredCompleted
+                ? 'QC was skipped when the stage completed — reopen to capture measurements'
+                : 'QC required — complete/override without leaving the Work Order'}
           </p>
         </div>
+        <Button
+          size="sm"
+          disabled={busy || submitting || !canExecute}
+          onClick={() => onOpenStageQc(stage.id)}
+        >
+          Open Stage QC
+        </Button>
       </div>
 
-      {inspection ? (
+      {openInspection ? (
         <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <FormField label="QC status">
             <Select value={decision} onChange={(e) => setDecision(e.target.value as QualityInspectionDecision | '')}>
@@ -131,27 +155,29 @@ export function StageQcPanel({
         </div>
       ) : null}
 
-      <div className="mt-3 border-t border-amber-200/80 pt-3">
-        <p className="text-[11px] font-semibold text-erp-muted">Override QC gate (flexible execution)</p>
-        <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-end">
-          <FormField label="Override reason" className="min-w-0 flex-1">
-            <Textarea
-              value={overrideReason}
-              onChange={(e) => setOverrideReason(e.target.value)}
-              rows={2}
-              placeholder="Why production may continue without formal QC clearance…"
-            />
-          </FormField>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={busy || submitting || !canExecute}
-            onClick={override}
-          >
-            Override & Complete Stage
-          </Button>
+      {!deferredCompleted && stage.status !== 'QC_PENDING' ? (
+        <div className="mt-3 border-t border-amber-200/80 pt-3">
+          <p className="text-[11px] font-semibold text-erp-muted">Override QC gate (flexible execution)</p>
+          <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-end">
+            <FormField label="Override reason" className="min-w-0 flex-1">
+              <Textarea
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                rows={2}
+                placeholder="Why production may continue without formal QC clearance…"
+              />
+            </FormField>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={busy || submitting || !canExecute}
+              onClick={override}
+            >
+              Override & Complete Stage
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   )
 }

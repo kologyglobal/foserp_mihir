@@ -50,6 +50,15 @@ export async function listMaterials(tenantId: string, orderId: string): Promise<
   })
 }
 
+export async function listMaterialsByIds(tenantId: string, materialIds: string[]): Promise<MaterialRow[]> {
+  if (materialIds.length === 0) return []
+  return prisma.productionOrderMaterial.findMany({
+    where: { tenantId, id: { in: materialIds } },
+    include: materialInclude,
+    orderBy: [{ productionOrderId: 'asc' }, { createdAt: 'asc' }],
+  })
+}
+
 export async function findMaterialOrThrow(tenantId: string, orderId: string, materialId: string): Promise<MaterialRow> {
   const row = await prisma.productionOrderMaterial.findFirst({
     where: { id: materialId, tenantId, productionOrderId: orderId },

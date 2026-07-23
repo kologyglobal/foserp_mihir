@@ -204,7 +204,7 @@ export function OperationalPageShell({
           <div className="erp-page-hero-insights">
             <EnterpriseKpiStrip
               items={kpiStrip}
-              columns={kpiStrip.length >= 5 ? 5 : kpiStrip.length}
+              columns={kpiStrip.length >= 6 ? 6 : kpiStrip.length >= 5 ? 5 : kpiStrip.length}
             />
           </div>
         )}

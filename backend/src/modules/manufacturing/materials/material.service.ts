@@ -30,6 +30,7 @@ import type {
   ReserveMaterialsInput,
   ReturnMaterialInput,
   ShortageRequisitionInput,
+  BulkShortageRequisitionInput,
   UpdateMaterialRequirementInput,
 } from './material.schemas.js'
 
@@ -954,5 +955,139 @@ export async function createShortageRequisition(
     requisition,
     linkedMaterialIds: shortageLines.map((l) => l.material.id),
     materials: (await repo.listMaterials(tenantId, orderId)).map((m) => mapMaterial(m)),
+  }
+}
+
+/**
+ * One purchase requisition for many selected WO material lines (same PR number).
+ * Used by Issue Stock multi-select “Create PR for short”.
+ */
+export async function createBulkShortageRequisition(
+  req: Request,
+  tenantId: string,
+  input: BulkShortageRequisitionInput,
+) {
+  const userId = req.context?.userId ?? ''
+  const materials = await repo.listMaterialsByIds(tenantId, input.materialIds)
+  if (materials.length === 0) {
+    throw new ValidationError('No material lines found for the selection')
+  }
+
+  const foundIds = new Set(materials.map((m) => m.id))
+  const missing = input.materialIds.filter((id) => !foundIds.has(id))
+  if (missing.length > 0) {
+    throw new ValidationError(
+      `Material line(s) not found: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''}`,
+    )
+  }
+
+  const alreadyLinked = materials.filter((m) => m.purchaseRequisitionId)
+  const candidates = materials.filter((m) => !m.purchaseRequisitionId)
+  if (candidates.length === 0) {
+    throw new ValidationError('All selected lines already have a purchase requisition')
+  }
+
+  const shortageLines: Array<{
+    material: repo.MaterialRow
+    qty: ReturnType<typeof toDecimal>
+  }> = []
+
+  for (const material of candidates) {
+    const warehouseId = material.warehouseId
+    if (!warehouseId) continue
+
+    const position = await getStockPosition(tenantId, material.itemId, warehouseId)
+    const free = toDecimal(position.freeQty)
+    const remaining = remainingToReserve(material)
+    const uncovered = subDec(remaining, free)
+    const fromShortageField = toDecimal(material.shortageQty)
+
+    let qty = toDecimal(0)
+    if (fromShortageField.greaterThan(0)) {
+      qty = fromShortageField
+    } else if (uncovered.greaterThan(0)) {
+      qty = uncovered
+    }
+
+    if (!isPositive(qty)) {
+      const issueRemaining = remainingToIssue(material)
+      const issueShort = subDec(issueRemaining, free)
+      if (issueShort.greaterThan(0)) qty = issueShort
+    }
+
+    if (isPositive(qty)) {
+      shortageLines.push({ material, qty })
+    }
+  }
+
+  if (shortageLines.length === 0) {
+    throw new ValidationError('No material shortages found for the selected lines')
+  }
+
+  const orderIds = [...new Set(shortageLines.map((l) => l.material.productionOrderId))]
+  const orders = await prisma.productionOrder.findMany({
+    where: { tenantId, id: { in: orderIds }, deletedAt: null },
+    select: {
+      id: true,
+      orderNumber: true,
+      manufacturingProfile: { select: { productionWarehouseId: true } },
+    },
+  })
+  const orderById = new Map(orders.map((o) => [o.id, o]))
+  const primaryOrder = orders[0]
+  if (!primaryOrder) {
+    throw new ValidationError('Work order not found for selected materials')
+  }
+
+  const woLabels = orderIds
+    .map((id) => orderById.get(id)?.orderNumber ?? id.slice(0, 8))
+    .join(', ')
+
+  const idempotencyKey =
+    input.idempotencyKey ?? `wo-shortage-pr-bulk:${[...input.materialIds].sort().join(',')}`
+
+  const requisition = await createFromProductionShortage(req, tenantId, {
+    productionOrderId: primaryOrder.id,
+    warehouseId: primaryOrder.manufacturingProfile?.productionWarehouseId ?? undefined,
+    priority: input.priority,
+    purpose:
+      orderIds.length === 1
+        ? `Production shortage for WO ${primaryOrder.orderNumber} (${shortageLines.length} line(s))`
+        : `Production shortage for ${shortageLines.length} line(s) across ${orderIds.length} WOs (${woLabels})`,
+    idempotencyKey,
+    submit: input.submit,
+    lines: shortageLines.map(({ material, qty }) => ({
+      itemId: material.itemId,
+      quantity: qty.toNumber(),
+      warehouseId: material.warehouseId ?? undefined,
+      uomId: material.uomId,
+      bomLineId: material.bomLineId,
+      productionOrderId: material.productionOrderId,
+      stageId: material.issueStageGroupId ?? undefined,
+      operationId: material.issueOperationId ?? undefined,
+      remarks: `Shortage from material line ${material.id} · WO ${
+        orderById.get(material.productionOrderId)?.orderNumber ?? material.productionOrderId
+      }`,
+    })),
+  })
+
+  await prisma.$transaction(async (tx) => {
+    for (const { material } of shortageLines) {
+      await tx.productionOrderMaterial.update({
+        where: { id: material.id },
+        data: {
+          purchaseRequisitionId: requisition.id,
+          updatedBy: userId,
+        },
+      })
+    }
+  })
+
+  return {
+    requisition,
+    linkedMaterialIds: shortageLines.map((l) => l.material.id),
+    skippedAlreadyLinkedIds: alreadyLinked.map((m) => m.id),
+    workOrderIds: orderIds,
+    workOrderNumbers: orderIds.map((id) => orderById.get(id)?.orderNumber ?? id.slice(0, 8)),
   }
 }
