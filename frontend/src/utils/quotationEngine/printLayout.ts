@@ -54,13 +54,19 @@ export const PRINT_LAYOUT_SECTION_OPTIONS: { id: QuotationSectionType; label: st
   { id: 'custom', label: 'Custom Section' },
 ]
 
-export function resolveQuotationPrintLayout(template?: Pick<QuotationTemplate, 'printLayout'> | null): QuotationPrintLayout {
-  if (!template?.printLayout) return { ...DEFAULT_QUOTATION_PRINT_LAYOUT }
+export function resolveQuotationPrintLayout(
+  template?: Pick<QuotationTemplate, 'printLayout' | 'productFamily'> | null,
+): QuotationPrintLayout {
+  const isIsoProduct =
+    template?.productFamily === 'ISO Tank' || template?.productFamily === 'ISO Dry Bulk'
+  const fallback = isIsoProduct ? VF_WORD_PRINT_LAYOUT : DEFAULT_QUOTATION_PRINT_LAYOUT
+  if (!template?.printLayout) return { ...fallback }
   return {
-    ...DEFAULT_QUOTATION_PRINT_LAYOUT,
+    ...fallback,
     ...template.printLayout,
-    pageBreakBefore: template.printLayout.pageBreakBefore ?? DEFAULT_QUOTATION_PRINT_LAYOUT.pageBreakBefore,
-    printSkin: template.printLayout.printSkin ?? DEFAULT_QUOTATION_PRINT_LAYOUT.printSkin,
+    pageBreakBefore: template.printLayout.pageBreakBefore ?? fallback.pageBreakBefore,
+    // ISO Word templates always render with the sans-serif letter skin.
+    printSkin: isIsoProduct ? 'vf_word' : (template.printLayout.printSkin ?? fallback.printSkin),
   }
 }
 

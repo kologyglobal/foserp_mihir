@@ -5,7 +5,7 @@ import { DynamicsStatusChip } from '../dynamics/DynamicsStatusChip'
 
 interface QuotationTemplateCardProps {
   template: QuotationTemplate
-  onDuplicate: (id: string) => void
+  onDuplicate?: (id: string) => void
 }
 
 export function QuotationTemplateCard({ template: t, onDuplicate }: QuotationTemplateCardProps) {
@@ -75,30 +75,36 @@ export function QuotationTemplateCard({ template: t, onDuplicate }: QuotationTem
           <Eye className="h-3.5 w-3.5" />
           Preview
         </button>
-        <button
-          type="button"
-          className="crm-card-action"
-          onClick={() => onDuplicate(t.id)}
-        >
-          <Copy className="h-3.5 w-3.5" />
-          Duplicate
-        </button>
+        {onDuplicate ? (
+          <button
+            type="button"
+            className="crm-card-action"
+            onClick={() => onDuplicate(t.id)}
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Duplicate
+          </button>
+        ) : null}
       </footer>
     </article>
   )
 }
 
-export function QuotationTemplateEmptyState({ onCreate }: { onCreate: () => void }) {
+export function QuotationTemplateEmptyState({ onCreate }: { onCreate?: () => void }) {
   return (
     <div className="crm-template-empty">
       <div className="crm-template-empty__icon">
         <Layers className="h-8 w-8" />
       </div>
       <p className="crm-template-empty__title">No templates match your filters</p>
-      <p className="crm-template-empty__hint">Create a reusable quotation template for ISO tanks, trailers, or services.</p>
-      <button type="button" className="crm-card-action crm-card-action--primary" onClick={onCreate}>
-        Create template
-      </button>
+      <p className="crm-template-empty__hint">
+        Catalog is limited to the two ISO quotation templates (26 KL and 25 m³).
+      </p>
+      {onCreate ? (
+        <button type="button" className="crm-card-action crm-card-action--primary" onClick={onCreate}>
+          Create template
+        </button>
+      ) : null}
     </div>
   )
 }

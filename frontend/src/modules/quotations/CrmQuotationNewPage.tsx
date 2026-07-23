@@ -32,6 +32,7 @@ import { resolveStoreAction } from '../../store/storeAction'
 import { useCrmStore } from '../../store/crmStore'
 import { useMasterStore } from '../../store/masterStore'
 import { findFeaturedQuotationTemplate } from '../../utils/quotationTemplates'
+import { filterAllowedQuotationTemplates } from '../../utils/quotationEngine/builtinTemplateSync'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
 import { formatDate } from '../../utils/dates/format'
 import { opportunityStageLabel } from '../../utils/opportunityUtils'
@@ -123,7 +124,11 @@ export function CrmQuotationNewPage() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [searchParams] = useSearchParams()
-  const templates = useCrmStore((s) => s.quotationTemplates) ?? []
+  const quotationTemplates = useCrmStore((s) => s.quotationTemplates)
+  const templates = useMemo(
+    () => filterAllowedQuotationTemplates(quotationTemplates),
+    [quotationTemplates],
+  )
   const opportunities = useCrmStore((s) => s.opportunities) ?? []
   const customers = useMasterStore((s) => s.customers) ?? []
   const products = useMasterStore((s) => s.products) ?? []

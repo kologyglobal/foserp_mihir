@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, FileText } from 'lucide-react'
 import { useCrmStore } from '../../../store/crmStore'
@@ -9,6 +9,7 @@ import { useActiveCustomers, useSellableProducts } from '../../../hooks/useMaste
 import { buildOpportunityLineFromProduct } from '../../../utils/opportunityLineCalc'
 import { useMasterStore } from '../../../store/masterStore'
 import { crmQuotationEditorPath, crmQuotationPath } from '../../../utils/crmQuotationNavigation'
+import { filterAllowedQuotationTemplates } from '../../../utils/quotationEngine/builtinTemplateSync'
 import { CrmDrawerShell } from '../CrmDrawerShell'
 import { FormField } from '../../forms/FormField'
 import { Input, Select } from '../../forms/Inputs'
@@ -29,7 +30,11 @@ function defaultValidityDate(days = 30): string {
 export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProps) {
   const navigate = useNavigate()
   const createDirect = useCrmStore((s) => s.createQuotationDirect)
-  const templates = useCrmStore((s) => s.quotationTemplates)
+  const quotationTemplates = useCrmStore((s) => s.quotationTemplates)
+  const templates = useMemo(
+    () => filterAllowedQuotationTemplates(quotationTemplates),
+    [quotationTemplates],
+  )
   const customers = useActiveCustomers()
   const products = useSellableProducts()
   const getProduct = useMasterStore((s) => s.getProduct)

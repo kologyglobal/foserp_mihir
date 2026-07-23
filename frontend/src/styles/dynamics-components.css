@@ -7857,9 +7857,10 @@ a.crm-companies-table__name:hover {
 .quo-print-doc--skin-vf-word {
   font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   font-size: calc(11pt * var(--quo-print-font-scale, 1));
-  line-height: 1.4;
+  line-height: 1.45;
   color: #1a1a1a;
   padding: var(--quo-print-margin, 18mm) calc(var(--quo-print-margin, 18mm) * 0.85);
+  -webkit-font-smoothing: antialiased;
 }
 
 .quo-print-doc--skin-vf-word .quo-print-header {

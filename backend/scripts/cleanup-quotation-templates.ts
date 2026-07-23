@@ -2,7 +2,7 @@
  * Reduce the quotation template catalog to the two VF ISO product templates
  * (matches prisma/quotationTemplateSeedData.ts and frontend DEFAULT_QUOTATION_TEMPLATES):
  *   - ISO-TANK-26KL        (26 KL ISO Tank Container Quotation)
- *   - ISO-DRY-BULK-25CBM   (20' ISO Dry Bulk Tanker (25 CBM) Quotation)
+ *   - ISO-DRY-BULK-25CBM   (25 m³ ISO Tank Container Quotation)
  *
  * For every non-deleted tenant:
  *   1. Soft-deletes (deletedAt + isActive=false) all other templates — existing
@@ -18,11 +18,15 @@ import { writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { prisma } from '../src/config/database.js'
-import { QUOTATION_TEMPLATE_SEED_ROWS } from '../prisma/quotationTemplateSeedData.js'
+import {
+  QUOTATION_TEMPLATE_KEEP_CODES,
+  QUOTATION_TEMPLATE_SEED_ROWS,
+  VF_WORD_PRINT_LAYOUT_SEED,
+} from '../prisma/quotationTemplateSeedData.js'
 
 const dryRun = process.argv.includes('--dry-run')
 const emitSql = process.argv.includes('--emit-sql')
-const KEEP_CODES = QUOTATION_TEMPLATE_SEED_ROWS.map((r) => r.code)
+const KEEP_CODES = [...QUOTATION_TEMPLATE_KEEP_CODES]
 
 async function main() {
   const tenants = await prisma.tenant.findMany({ where: { deletedAt: null }, select: { id: true, name: true } })
@@ -62,15 +66,27 @@ async function main() {
             defaultTerms: row.defaultTerms,
             defaultWarranty: row.defaultWarranty,
             defaultExclusions: row.defaultExclusions,
+            printLayout: VF_WORD_PRINT_LAYOUT_SEED,
             isActive: true,
           },
         })
-      } else if (existing.deletedAt || !existing.isActive) {
-        console.log(`  ~ restore ${row.code}`)
+      } else {
+        console.log(`  ~ sync ${row.code}`)
         if (dryRun) continue
         await prisma.crmQuotationTemplate.update({
           where: { id: existing.id },
-          data: { deletedAt: null, isActive: true },
+          data: {
+            deletedAt: null,
+            isActive: true,
+            templateName: row.templateName,
+            productFamily: row.productFamily,
+            version: row.version,
+            sections: row.sections,
+            defaultTerms: row.defaultTerms,
+            defaultWarranty: row.defaultWarranty,
+            defaultExclusions: row.defaultExclusions,
+            printLayout: VF_WORD_PRINT_LAYOUT_SEED,
+          },
         })
       }
     }

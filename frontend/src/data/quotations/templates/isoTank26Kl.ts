@@ -320,7 +320,7 @@ export const ISO_TANK_26KL_SECTIONS: TemplateSection[] = [
 ]
 
 export const ISO_TANK_TEMPLATE_ID = 'qtpl-iso-tank'
-export const ISO_TANK_TEMPLATE_VERSION = 5
+export const ISO_TANK_TEMPLATE_VERSION = 7
 export const ISO_TANK_SHOWCASE_QUOTATION_ID = 'quo-iso-tank-26kl'
 export const ISO_TANK_SHOWCASE_DOCUMENT_ID = 'qdoc-iso-tank-26kl'
 export const ISO_TANK_SHOWCASE_OPPORTUNITY_ID = 'opp-iso-tank-26kl'

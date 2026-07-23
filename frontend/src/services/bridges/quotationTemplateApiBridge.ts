@@ -3,6 +3,7 @@ import { formatApiError } from '../api/apiErrors'
 import * as api from '../api/quotationTemplateApi'
 import { useCrmStore } from '../../store/crmStore'
 import type { StoreActionResult } from '../../store/storeAction'
+import { filterAllowedQuotationTemplates } from '../../utils/quotationEngine/builtinTemplateSync'
 
 const submitLocks = new Set<string>()
 
@@ -35,7 +36,9 @@ function upsertTemplate(row: QuotationTemplate): void {
 
 export async function syncQuotationTemplatesFromApi(): Promise<QuotationTemplate[]> {
   const rows = await api.fetchQuotationTemplatesApi()
-  const templates = (Array.isArray(rows) ? rows : []).map(api.mapQuotationTemplateDto)
+  const templates = filterAllowedQuotationTemplates(
+    (Array.isArray(rows) ? rows : []).map(api.mapQuotationTemplateDto),
+  )
   useCrmStore.setState({ quotationTemplates: templates })
   return templates
 }
