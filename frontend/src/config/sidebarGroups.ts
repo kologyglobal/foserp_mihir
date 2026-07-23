@@ -3,11 +3,11 @@ import {
   Box,
   Database,
   Factory,
-  GitBranch,
+  // GitBranch, // Eng — restore with sidebar entry below
   HardHat,
   Landmark,
   LayoutGrid,
-  QrCode,
+  // QrCode, // Trace — restore with sidebar entry below
   ScanLine,
   Settings2,
   ShieldCheck,
@@ -33,9 +33,9 @@ export const SIDEBAR_ICON_MENU: {
   { categoryId: 'inventory', label: 'Inventory & Warehouse', icon: Warehouse },
   { categoryId: 'dispatch', label: 'Logistics', icon: Box },
   { categoryId: 'gate', label: 'Gate & Security', icon: HardHat },
-  { categoryId: 'engineering', label: 'Eng', icon: GitBranch },
+  // { categoryId: 'engineering', label: 'Eng', icon: GitBranch },
   { categoryId: 'masters', label: 'Masters', icon: Database },
-  { categoryId: 'traceability', label: 'Trace', icon: QrCode },
+  // { categoryId: 'traceability', label: 'Trace', icon: QrCode },
   { categoryId: 'traceability-barcode', label: 'Barcode', icon: ScanLine },
   { categoryId: 'admin', label: 'Admin', icon: Settings2 },
 ]
@@ -59,8 +59,10 @@ export const SIDEBAR_GROUPS = [
   },
   {
     id: 'engineering',
-    label: 'Engineering & Masters',
-    categoryIds: ['engineering', 'masters', 'traceability', 'traceability-barcode'],
+    // label: 'Engineering & Masters',
+    // categoryIds: ['engineering', 'masters', 'traceability', 'traceability-barcode'],
+    label: 'Masters & Barcode',
+    categoryIds: ['masters', 'traceability-barcode'],
   },
   {
     id: 'analytics',
