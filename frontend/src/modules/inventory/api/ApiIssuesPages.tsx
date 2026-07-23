@@ -8,15 +8,30 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { type ColumnDef, type RowSelectionState } from '@tanstack/react-table'
-import { ArrowUpFromLine, Lock, PackageMinus, RefreshCw } from 'lucide-react'
+import {
+  ArrowUpFromLine,
+  ClipboardCheck,
+  Eye,
+  FilePlus2,
+  Lock,
+  PackageMinus,
+  RefreshCw,
+  Wrench,
+} from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SectionCard } from '@/components/ui/SectionCard'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { DataGrid } from '@/components/design-system/DataGrid'
+import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { EnterpriseRegisterTableShell } from '@/design-system/list-page/EnterpriseRegisterTableShell'
+import {
+  EnterpriseRowActionsMenu,
+  type RowActionItem,
+} from '@/design-system/enterprise/EnterpriseTablePrimitives'
 import { CrmListFilterBar, CrmListSortSelect } from '@/components/crm/CrmListFilterBar'
+import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { FormField } from '@/components/forms/FormField'
 import { Input, Select, Textarea } from '@/components/forms/Inputs'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
@@ -684,35 +699,45 @@ export function ApiIssuesRegisterPage() {
       },
       {
         id: 'actions',
-        header: 'Actions',
-        size: 200,
+        header: '',
+        size: 52,
         enableSorting: false,
+        enableHiding: false,
         cell: ({ row }) => {
           const r = row.original
           const needsPr =
             !r.purchaseRequisitionId &&
             (r.hasShortage || r.shortageQty > 0 || (r.freeQty != null && r.freeQty < r.balanceToIssue))
-          return (
-            <div className="flex flex-wrap justify-end gap-1">
-              {r.issuableQty > 0 && (canIssueMaterials || perms.canPostIssue) ? (
-                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void assignOne(r)}>
-                  Assign
-                </Button>
-              ) : null}
-              {needsPr && canCreateShortagePr ? (
-                <Button size="sm" variant="ghost" disabled={busy} onClick={() => void createPrForRows([r])}>
-                  Create PR
-                </Button>
-              ) : null}
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => navigate(`/inventory/movements/issues/new?workOrderId=${r.workOrderId}`)}
-              >
-                Open
-              </Button>
-            </div>
-          )
+          const canAssign = r.issuableQty > 0 && (canIssueMaterials || perms.canPostIssue)
+          const actions: RowActionItem[] = []
+          if (canAssign) {
+            actions.push({
+              id: 'assign',
+              label: 'Assign',
+              icon: ClipboardCheck,
+              primary: true,
+              disabled: busy,
+              disabledReason: 'Busy…',
+              onClick: () => void assignOne(r),
+            })
+          }
+          if (needsPr && canCreateShortagePr) {
+            actions.push({
+              id: 'create-pr',
+              label: 'Create PR',
+              icon: FilePlus2,
+              disabled: busy,
+              disabledReason: 'Busy…',
+              onClick: () => void createPrForRows([r]),
+            })
+          }
+          actions.push({
+            id: 'open',
+            label: 'Open issue',
+            icon: Eye,
+            to: `/inventory/movements/issues/new?workOrderId=${r.workOrderId}`,
+          })
+          return <EnterpriseRowActionsMenu actions={actions} />
         },
       },
     ]
@@ -722,9 +747,95 @@ export function ApiIssuesRegisterPage() {
     canCreateShortagePr,
     canIssueMaterials,
     createPrForRows,
-    navigate,
     perms.canPostIssue,
   ])
+
+  const refreshCurrent = useCallback(() => {
+    if (tab === 'assign') void loadAssignQueue()
+    else if (tab === 'prs') void loadProductionPrs()
+    else void loadPosted()
+  }, [tab, loadAssignQueue, loadProductionPrs, loadPosted])
+
+  const commandBar = useMemo(
+    () => (
+      <ErpCommandBar
+        inline
+        sticky={false}
+        primaryAction={
+          tab === 'assign' && (canIssueMaterials || perms.canPostIssue)
+            ? {
+                id: 'assign-available',
+                label: busy ? 'Assigning…' : `Assign available (${selectedIssuable.length})`,
+                icon: ClipboardCheck,
+                disabled: busy || selectedIssuable.length === 0,
+                disabledReason: 'Select lines with available stock',
+                onClick: () => void assignSelected(),
+              }
+            : perms.canPostIssue || perms.canCreateIssue
+              ? {
+                  id: 'new-issue',
+                  label: 'New Issue',
+                  icon: PackageMinus,
+                  onClick: () => navigate('/inventory/movements/issues/new'),
+                }
+              : undefined
+        }
+        secondaryActions={[
+          ...(tab === 'assign' && canCreateShortagePr
+            ? [
+                {
+                  id: 'create-pr',
+                  label: `Create PR for short (${selectedShortNeedingPr.length})`,
+                  icon: FilePlus2,
+                  variant: 'secondary' as const,
+                  disabled: busy || selectedShortNeedingPr.length === 0,
+                  disabledReason: 'Select short lines without an existing PR',
+                  onClick: () => void createPrForRows(selectedShortNeedingPr),
+                  pin: true,
+                },
+              ]
+            : []),
+          ...(tab === 'assign' && (perms.canPostIssue || perms.canCreateIssue)
+            ? [
+                {
+                  id: 'new-issue',
+                  label: 'New Issue',
+                  icon: PackageMinus,
+                  onClick: () => navigate('/inventory/movements/issues/new'),
+                  pin: true,
+                },
+              ]
+            : []),
+          {
+            id: 'refresh',
+            label: 'Refresh',
+            icon: RefreshCw,
+            onClick: () => void refreshCurrent(),
+          },
+          {
+            id: 'work-orders',
+            label: 'Work Orders',
+            icon: Wrench,
+            onClick: () => navigate('/manufacturing/work-orders'),
+          },
+        ]}
+      />
+    ),
+    [
+      assignSelected,
+      busy,
+      canCreateShortagePr,
+      canIssueMaterials,
+      createPrForRows,
+      navigate,
+      perms.canCreateIssue,
+      perms.canPostIssue,
+      refreshCurrent,
+      selectedIssuable.length,
+      selectedShortNeedingPr,
+      tab,
+    ],
+  )
 
   if (!perms.canViewIssues && !perms.canViewStock && !perms.canViewItemLedger) {
     return <AccessDenied title="Issues" />
@@ -735,36 +846,21 @@ export function ApiIssuesRegisterPage() {
     setter(v)
   }
 
-  const refreshCurrent = () => {
-    if (tab === 'assign') void loadAssignQueue()
-    else if (tab === 'prs') void loadProductionPrs()
-    else void loadPosted()
-  }
-
   return (
-    <div className="erp-page">
-      <PageHeader
-        title="Issues"
-        description="Assign available stock to production, raise shortage PRs, and review posted issue movements."
-        breadcrumbs={[{ label: 'Inventory', to: '/inventory/stock' }, { label: 'Issues' }]}
-        actions={(
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" onClick={() => void refreshCurrent()}>
-              <RefreshCw className="h-4 w-4" /> Refresh
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => navigate('/manufacturing/work-orders')}>
-              Open Work Orders
-            </Button>
-            {perms.canPostIssue || perms.canCreateIssue ? (
-              <Button size="sm" onClick={() => navigate('/inventory/movements/issues/new')}>
-                <PackageMinus className="h-4 w-4" /> New Issue
-              </Button>
-            ) : null}
-          </div>
-        )}
-      />
-
-      <div className="mb-3 flex flex-wrap gap-2">
+    <OperationalPageShell
+      title="Issue Stock"
+      badge="Inventory"
+      variant="dynamics"
+      pageGuide={null}
+      favoritePath="/inventory/movements/issues"
+      breadcrumbs={[
+        { label: 'Inventory', to: '/inventory' },
+        { label: 'Issue Stock' },
+      ]}
+      commandBar={commandBar}
+      className="inventory-issues-register"
+    >
+      <div className="mb-2 flex flex-wrap gap-1.5">
         {(
           [
             { id: 'assign' as const, label: 'Assign to production' },
@@ -784,200 +880,170 @@ export function ApiIssuesRegisterPage() {
       </div>
 
       {tab === 'assign' ? (
-        <SectionCard
-          title="Production material requests"
-          actions={
-            <div className="flex flex-wrap gap-2">
-              {(canIssueMaterials || perms.canPostIssue) ? (
-                <Button size="sm" disabled={busy || selectedIssuable.length === 0} onClick={() => void assignSelected()}>
-                  {busy ? 'Assigning…' : `Assign available (${selectedIssuable.length})`}
-                </Button>
-              ) : null}
-              {canCreateShortagePr ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={busy || selectedShortNeedingPr.length === 0}
-                  onClick={() => void createPrForRows(selectedShortNeedingPr)}
-                >
-                  Create PR for short ({selectedShortNeedingPr.length})
-                </Button>
-              ) : null}
-            </div>
-          }
-        >
-          <p className="mb-3 text-[12px] text-erp-muted">
-            Open WO material lines waiting to be issued. Available stock can be assigned here; short lines can raise a
-            purchase requisition (single or multi-select). When a PR already exists, the row shows the PR reference only.
-          </p>
-          {assignLoading ? (
-            <LoadingState variant="table" />
-          ) : assignRows.length === 0 ? (
-            <EmptyState
-              icon={PackageMinus}
-              title="Nothing waiting to assign"
-              description="When work orders need materials, they appear here with free stock and shortage status."
-              action={
-                <Button size="sm" onClick={() => navigate('/inventory/movements/issues/new')}>
-                  Issue to work order
-                </Button>
+        assignLoading && assignRows.length === 0 ? (
+          <LoadingState variant="table" />
+        ) : assignRows.length === 0 ? (
+          <EmptyState
+            icon={PackageMinus}
+            title="Nothing waiting to assign"
+            description="When work orders need materials, they appear here with free stock and shortage status."
+            action={
+              <Button size="sm" onClick={() => navigate('/inventory/movements/issues/new')}>
+                Issue to work order
+              </Button>
+            }
+          />
+        ) : (
+          <EnterpriseRegisterTableShell className="inventory-issues-register__table min-w-0">
+            <DataGrid
+              data={filteredAssignRows}
+              columns={assignColumns}
+              loading={assignLoading}
+              stickyHeader
+              stickyFirstColumn
+              zebra
+              compact
+              selectable
+              getRowId={(r) => r.materialId}
+              rowSelection={rowSelection}
+              onRowSelectionChange={(updater) => {
+                const next = typeof updater === 'function' ? updater(rowSelection) : updater
+                setSelected(new Set(Object.keys(next).filter((id) => next[id])))
+              }}
+              pageSize={assignPageSize}
+              onPageSizeChange={setAssignPageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+              showPagination
+              showCompactSearch={false}
+              enableColumnSorting
+              emptyMessage={
+                assignActiveFilterCount > 0 || assignSearch || assignView !== 'all'
+                  ? 'No material lines match the current filters or view.'
+                  : 'No open material lines to assign.'
               }
-            />
-          ) : (
-            <EnterpriseRegisterTableShell className="min-w-0">
-              <DataGrid
-                data={filteredAssignRows}
-                columns={assignColumns}
-                loading={assignLoading}
-                stickyHeader
-                stickyFirstColumn
-                zebra
-                compact
-                selectable
-                getRowId={(r) => r.materialId}
-                rowSelection={rowSelection}
-                onRowSelectionChange={(updater) => {
-                  const next = typeof updater === 'function' ? updater(rowSelection) : updater
-                  setSelected(new Set(Object.keys(next).filter((id) => next[id])))
-                }}
-                pageSize={assignPageSize}
-                onPageSizeChange={setAssignPageSize}
-                pageSizeOptions={[10, 25, 50, 100]}
-                showPagination
-                showCompactSearch={false}
-                enableColumnSorting
-                emptyMessage={
-                  assignActiveFilterCount > 0 || assignSearch || assignView !== 'all'
-                    ? 'No material lines match the current filters or view.'
-                    : 'No open material lines to assign.'
-                }
-                emptyAction={
-                  assignActiveFilterCount > 0 || assignSearch || assignView !== 'all' ? (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
-                        setAssignSearch('')
-                        setAssignView('all')
-                        setAssignWarehouseFilter('')
-                        setAssignStockFilter('all')
-                        setAssignFiltersOpen(false)
-                      }}
-                    >
-                      Clear filters
-                    </Button>
-                  ) : undefined
-                }
-                viewName={assignViewLabel}
-                showToolbarView={false}
-                registerBar={
-                  <CrmListFilterBar
-                    search={assignSearch}
-                    onSearchChange={setAssignSearch}
-                    searchPlaceholder="Search WO, item, warehouse, PR…"
-                    activeFilterCount={assignActiveFilterCount}
-                    onOpenFilters={() => setAssignFiltersOpen((o) => !o)}
-                    filtersExpanded={assignFiltersOpen}
-                    filtersButtonLabel={assignFiltersOpen ? 'Hide filters' : 'Filters'}
-                    chips={assignFilterChips}
-                    onRemoveChip={(id) => {
-                      if (id === 'warehouse') setAssignWarehouseFilter('')
-                      if (id === 'stock') setAssignStockFilter('all')
-                    }}
-                    onClearAll={() => {
-                      setAssignWarehouseFilter('')
-                      setAssignStockFilter('all')
+              emptyAction={
+                assignActiveFilterCount > 0 || assignSearch || assignView !== 'all' ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
                       setAssignSearch('')
                       setAssignView('all')
+                      setAssignWarehouseFilter('')
+                      setAssignStockFilter('all')
+                      setAssignFiltersOpen(false)
                     }}
-                    savedView={assignViewLabel}
-                    onSavedViewChange={(v) => setAssignView(parseAssignView(v))}
-                    savedViews={ASSIGN_VIEW_OPTIONS.map((v) => v.label)}
-                    className="crm-list-filter-bar--embedded"
-                    showCommandPaletteHint={false}
-                    sort={
-                      <CrmListSortSelect
-                        value={assignSort}
-                        onChange={setAssignSort}
-                        aria-label="Sort assign queue"
-                        options={[
-                          { value: 'wo_asc', label: 'Sort: Work order (A–Z)' },
-                          { value: 'wo_desc', label: 'Sort: Work order (Z–A)' },
-                          { value: 'item_asc', label: 'Sort: Item' },
-                          { value: 'balance_desc', label: 'Sort: Balance' },
-                          { value: 'available_asc', label: 'Sort: Available' },
-                          { value: 'shortage_desc', label: 'Sort: Shortage' },
-                        ]}
-                      />
-                    }
-                    filterPanel={
-                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        <FormField label="Warehouse">
-                          <Select
-                            value={assignWarehouseFilter}
-                            onChange={(e) => setAssignWarehouseFilter(e.target.value)}
-                          >
-                            <option value="">All warehouses</option>
-                            {assignWarehouseOptions.map((w) => (
-                              <option key={w.id} value={w.id}>
-                                {w.label}
-                              </option>
-                            ))}
-                          </Select>
-                        </FormField>
-                        <FormField label="Stock status">
-                          <Select
-                            value={assignStockFilter}
-                            onChange={(e) =>
-                              setAssignStockFilter(e.target.value as typeof assignStockFilter)
-                            }
-                          >
-                            <option value="all">All</option>
-                            <option value="available">Available to assign</option>
-                            <option value="shortage">Shortage</option>
-                            <option value="no_stock">No stock</option>
-                          </Select>
-                        </FormField>
-                      </div>
-                    }
-                    trailing={
-                      <span className="text-[11px] text-erp-muted tabular-nums">
-                        {filteredAssignRows.length} of {assignRows.length} line
-                        {assignRows.length === 1 ? '' : 's'}
-                        {selected.size > 0 ? ` · ${selected.size} selected` : ''}
-                      </span>
-                    }
-                  />
-                }
-              />
-            </EnterpriseRegisterTableShell>
-          )}
-        </SectionCard>
+                  >
+                    Clear filters
+                  </Button>
+                ) : undefined
+              }
+              viewName={assignViewLabel}
+              showToolbarView={false}
+              registerBar={
+                <CrmListFilterBar
+                  search={assignSearch}
+                  onSearchChange={setAssignSearch}
+                  searchPlaceholder="Search WO, item, warehouse, PR…"
+                  activeFilterCount={assignActiveFilterCount}
+                  onOpenFilters={() => setAssignFiltersOpen((o) => !o)}
+                  filtersExpanded={assignFiltersOpen}
+                  filtersButtonLabel={assignFiltersOpen ? 'Hide filters' : 'Filters'}
+                  chips={assignFilterChips}
+                  onRemoveChip={(id) => {
+                    if (id === 'warehouse') setAssignWarehouseFilter('')
+                    if (id === 'stock') setAssignStockFilter('all')
+                  }}
+                  onClearAll={() => {
+                    setAssignWarehouseFilter('')
+                    setAssignStockFilter('all')
+                    setAssignSearch('')
+                    setAssignView('all')
+                  }}
+                  savedView={assignViewLabel}
+                  onSavedViewChange={(v) => setAssignView(parseAssignView(v))}
+                  savedViews={ASSIGN_VIEW_OPTIONS.map((v) => v.label)}
+                  className="crm-list-filter-bar--embedded"
+                  showCommandPaletteHint={false}
+                  sort={
+                    <CrmListSortSelect
+                      value={assignSort}
+                      onChange={setAssignSort}
+                      aria-label="Sort assign queue"
+                      options={[
+                        { value: 'wo_asc', label: 'Sort: Work order (A–Z)' },
+                        { value: 'wo_desc', label: 'Sort: Work order (Z–A)' },
+                        { value: 'item_asc', label: 'Sort: Item' },
+                        { value: 'balance_desc', label: 'Sort: Balance' },
+                        { value: 'available_asc', label: 'Sort: Available' },
+                        { value: 'shortage_desc', label: 'Sort: Shortage' },
+                      ]}
+                    />
+                  }
+                  filterPanel={
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      <FormField label="Warehouse">
+                        <Select
+                          value={assignWarehouseFilter}
+                          onChange={(e) => setAssignWarehouseFilter(e.target.value)}
+                        >
+                          <option value="">All warehouses</option>
+                          {assignWarehouseOptions.map((w) => (
+                            <option key={w.id} value={w.id}>
+                              {w.label}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormField>
+                      <FormField label="Stock status">
+                        <Select
+                          value={assignStockFilter}
+                          onChange={(e) =>
+                            setAssignStockFilter(e.target.value as typeof assignStockFilter)
+                          }
+                        >
+                          <option value="all">All</option>
+                          <option value="available">Available to assign</option>
+                          <option value="shortage">Shortage</option>
+                          <option value="no_stock">No stock</option>
+                        </Select>
+                      </FormField>
+                    </div>
+                  }
+                  trailing={
+                    <span className="text-[11px] text-erp-muted tabular-nums">
+                      {filteredAssignRows.length} of {assignRows.length} line
+                      {assignRows.length === 1 ? '' : 's'}
+                      {selected.size > 0 ? ` · ${selected.size} selected` : ''}
+                    </span>
+                  }
+                />
+              }
+            />
+          </EnterpriseRegisterTableShell>
+        )
       ) : null}
 
       {tab === 'prs' ? (
-        <SectionCard title="Requisitions requested by production">
-          <p className="mb-3 text-[12px] text-erp-muted">
-            Purchase requisitions raised from work-order material shortages (store / production).
-          </p>
-          {prLoading ? (
-            <LoadingState variant="table" />
-          ) : prRows.length === 0 ? (
-            <EmptyState
-              icon={PackageMinus}
-              title="No production shortage PRs yet"
-              description="When store raises a shortage PR from Assign to production, it will list here."
-              action={
-                <Button size="sm" variant="secondary" onClick={() => switchTab('assign')}>
-                  Go to assign queue
-                </Button>
-              }
-            />
-          ) : (
-            <div className="overflow-x-auto rounded-lg border border-erp-border">
+        prLoading ? (
+          <LoadingState variant="table" />
+        ) : prRows.length === 0 ? (
+          <EmptyState
+            icon={PackageMinus}
+            title="No production shortage PRs yet"
+            description="When store raises a shortage PR from Assign to production, it will list here."
+            action={
+              <Button size="sm" variant="secondary" onClick={() => switchTab('assign')}>
+                Go to assign queue
+              </Button>
+            }
+          />
+        ) : (
+          <EnterpriseRegisterTableShell className="min-w-0">
+            <div className="erp-table-wrap">
               <table className="erp-table w-full text-[12px]">
                 <thead>
-                  <tr className="bg-slate-50/90">
+                  <tr>
                     <th>PR #</th>
                     <th>Date</th>
                     <th>Purpose</th>
@@ -1019,13 +1085,13 @@ export function ApiIssuesRegisterPage() {
                 </tbody>
               </table>
             </div>
-          )}
-        </SectionCard>
+          </EnterpriseRegisterTableShell>
+        )
       ) : null}
 
       {tab === 'posted' ? (
         <>
-          <div className="mb-3 flex flex-wrap items-end gap-2">
+          <div className="mb-2 flex flex-wrap items-end gap-2">
             <label className="text-[11px] text-erp-muted">
               Item
               <Select wrapClassName="w-64" value={itemId} onChange={(e) => resetPageAnd(setItemId)(e.target.value)}>
@@ -1054,90 +1120,88 @@ export function ApiIssuesRegisterPage() {
             </label>
           </div>
 
-          <SectionCard title="Issue movements" noPadding>
-            {loading ? (
-              <div className="p-6"><LoadingState variant="table" rows={8} /></div>
-            ) : rows.length === 0 ? (
-              <div className="p-6">
-                <EmptyState
-                  icon={ArrowUpFromLine}
-                  title="No stock issued yet"
-                  description="Assign materials from the Assign to production tab, or post a direct issue."
-                  action={
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="secondary" onClick={() => switchTab('assign')}>
-                        Assign to production
-                      </Button>
-                      {perms.canPostIssue || perms.canCreateIssue ? (
-                        <Button size="sm" onClick={() => navigate('/inventory/movements/issues/new')}>
-                          <PackageMinus className="h-4 w-4" /> Direct Issue
-                        </Button>
-                      ) : null}
-                    </div>
-                  }
-                />
-              </div>
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="erp-table w-full min-w-[980px] text-[13px]">
-                    <thead>
-                      <tr>
-                        <th>Date</th>
-                        <th>Movement #</th>
-                        <th>Reference</th>
-                        <th>Item</th>
-                        <th>Warehouse</th>
-                        <th className="text-right">Qty</th>
-                        <th className="text-right">Value</th>
-                        <th className="text-right">Balance After</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((m) => (
-                        <tr key={m.id}>
-                          <td>{formatDate(m.movementDate)}</td>
-                          <td>
-                            <Link
-                              to={`/inventory/movements/issues/${m.id}`}
-                              className="font-mono font-semibold text-erp-primary hover:underline"
-                            >
-                              {m.movementNumber}
-                            </Link>
-                          </td>
-                          <td>
-                            {m.referenceType}
-                            {m.workOrderId ? (
-                              <>
-                                {' · '}
-                                <Link
-                                  to={`/manufacturing/work-orders/${m.workOrderId}`}
-                                  className="text-erp-primary hover:underline"
-                                >
-                                  {m.referenceNo ?? m.workOrderId.slice(0, 8)}
-                                </Link>
-                              </>
-                            ) : m.referenceNo ? (
-                              <span className="text-erp-muted"> · {m.referenceNo}</span>
-                            ) : null}
-                          </td>
-                          <td>{refLabel(m.item, m.itemId)}</td>
-                          <td>{refLabel(m.warehouse, m.warehouseId)}</td>
-                          <td className="text-right tabular-nums font-semibold text-rose-700">{fmtQty(m.quantity)}</td>
-                          <td className="text-right tabular-nums">{fmtQty(m.value)}</td>
-                          <td className="text-right tabular-nums">{fmtQty(m.balanceAfter)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+          {loading ? (
+            <LoadingState variant="table" rows={8} />
+          ) : rows.length === 0 ? (
+            <EmptyState
+              icon={ArrowUpFromLine}
+              title="No stock issued yet"
+              description="Assign materials from the Assign to production tab, or post a direct issue."
+              action={
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => switchTab('assign')}>
+                    Assign to production
+                  </Button>
+                  {perms.canPostIssue || perms.canCreateIssue ? (
+                    <Button size="sm" onClick={() => navigate('/inventory/movements/issues/new')}>
+                      <PackageMinus className="h-4 w-4" /> Direct Issue
+                    </Button>
+                  ) : null}
                 </div>
+              }
+            />
+          ) : (
+            <EnterpriseRegisterTableShell className="min-w-0">
+              <div className="erp-table-wrap">
+                <table className="erp-table w-full min-w-[980px] text-[13px]">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Movement #</th>
+                      <th>Reference</th>
+                      <th>Item</th>
+                      <th>Warehouse</th>
+                      <th className="text-right">Qty</th>
+                      <th className="text-right">Value</th>
+                      <th className="text-right">Balance After</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((m) => (
+                      <tr key={m.id}>
+                        <td>{formatDate(m.movementDate)}</td>
+                        <td>
+                          <Link
+                            to={`/inventory/movements/issues/${m.id}`}
+                            className="font-mono font-semibold text-erp-primary hover:underline"
+                          >
+                            {m.movementNumber}
+                          </Link>
+                        </td>
+                        <td>
+                          {m.referenceType}
+                          {m.workOrderId ? (
+                            <>
+                              {' · '}
+                              <Link
+                                to={`/manufacturing/work-orders/${m.workOrderId}`}
+                                className="text-erp-primary hover:underline"
+                              >
+                                {m.referenceNo ?? m.workOrderId.slice(0, 8)}
+                              </Link>
+                            </>
+                          ) : m.referenceNo ? (
+                            <span className="text-erp-muted"> · {m.referenceNo}</span>
+                          ) : null}
+                        </td>
+                        <td>{refLabel(m.item, m.itemId)}</td>
+                        <td>{refLabel(m.warehouse, m.warehouseId)}</td>
+                        <td className="text-right tabular-nums font-semibold text-rose-700">{fmtQty(m.quantity)}</td>
+                        <td className="text-right tabular-nums">{fmtQty(m.value)}</td>
+                        <td className="text-right tabular-nums">{fmtQty(m.balanceAfter)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="border-t border-erp-border px-3 py-2">
                 <Pager meta={meta} onPage={setPage} />
-              </>
-            )}
-          </SectionCard>
+              </div>
+            </EnterpriseRegisterTableShell>
+          )}
         </>
       ) : null}
-    </div>
+    </OperationalPageShell>
   )
 }
 

@@ -1,17 +1,7 @@
 import type { Request } from 'express'
-import type { SalesInvoiceStatus } from './sales-invoice.types.js'
+import type { SalesInvoiceAllowedActions, SalesInvoiceStatus } from './sales-invoice.types.js'
 
-export interface SalesInvoiceAllowedActions {
-  edit: boolean
-  validate: boolean
-  markReady: boolean
-  cancel: boolean
-  post: boolean
-  /** POSTED + no posted receipt/CN allocations + finance.ar.invoice.reverse. */
-  reverse?: boolean
-  viewAccounting?: boolean
-  viewAllocations?: boolean
-}
+export type { SalesInvoiceAllowedActions } from './sales-invoice.types.js'
 
 const EDITABLE_STATUSES: SalesInvoiceStatus[] = ['DRAFT', 'READY_TO_POST']
 const CANCELLABLE_STATUSES: SalesInvoiceStatus[] = ['DRAFT', 'READY_TO_POST']

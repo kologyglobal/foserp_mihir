@@ -1,9 +1,5 @@
 /** Domain types for AR sales invoices — amounts as decimal strings in DTOs. */
 
-import type { SalesInvoice, SalesInvoiceLine, SalesInvoiceSourceLink } from '@prisma/client'
-import type { SalesInvoiceValidationPreview } from '../validation/invoice-validation.types.js'
-import type { SalesInvoiceAllowedActions } from './sales-invoice-allowed-actions.js'
-
 export type SalesInvoiceStatus = 'DRAFT' | 'READY_TO_POST' | 'POSTED' | 'CANCELLED' | 'REVERSED'
 export type SalesInvoiceSourceType = 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH'
 export type SalesInvoiceSettlementStatus =
@@ -21,6 +17,19 @@ export type SalesInvoiceTaxTreatment =
   | 'SEZ_WITH_TAX'
   | 'SEZ_WITHOUT_TAX'
   | 'NON_GST'
+
+/** Permission-gated actions for a sales invoice in the current request context. */
+export interface SalesInvoiceAllowedActions {
+  edit: boolean
+  validate: boolean
+  markReady: boolean
+  cancel: boolean
+  post: boolean
+  /** POSTED + no posted receipt/CN allocations + finance.ar.invoice.reverse. */
+  reverse?: boolean
+  viewAccounting?: boolean
+  viewAllocations?: boolean
+}
 
 export interface SalesInvoiceLineDto {
   id: string
@@ -125,7 +134,12 @@ export interface SalesInvoiceDto {
   updatedAt: string
   lines?: SalesInvoiceLineDto[]
   allowedActions?: SalesInvoiceAllowedActions
-  validationSummary?: Pick<SalesInvoiceValidationPreview, 'valid' | 'errors' | 'warnings'> | null
+  /** Subset of validation preview — kept local to avoid circular imports with calculation types. */
+  validationSummary?: {
+    valid: boolean
+    errors: Array<{ code: string; message: string; field?: string; severity?: string }>
+    warnings: Array<{ code: string; message: string; field?: string; severity?: string }>
+  } | null
   metaWarnings?: Array<{ code: string; message: string }>
   receivableOpenItemId?: string | null
 }
@@ -154,10 +168,7 @@ export interface ListSalesInvoicesQuery {
   sortOrder?: 'asc' | 'desc'
 }
 
-export type SalesInvoiceWithLines = SalesInvoice & {
-  lines: SalesInvoiceLine[]
-  sourceLinks?: SalesInvoiceSourceLink[]
-}
+export type { SalesInvoiceWithLines } from './sales-invoice.model.js'
 
 export interface SalesInvoiceCalculationContext {
   taxPricingMode?: 'EXCLUSIVE' | 'INCLUSIVE'
@@ -166,7 +177,15 @@ export interface SalesInvoiceCalculationContext {
   freightMode?: 'NON_TAXABLE' | 'TAXABLE'
   freightTaxRate?: string | null
   freightRevenueAccountId?: string | null
-  otherCharges?: import('../calculation/sales-invoice-calculation.types.js').OtherChargeInput[]
+  /** Mirrors calculation OtherChargeInput — kept local to avoid circular imports. */
+  otherCharges?: Array<{
+    code: string
+    description: string
+    amount: string
+    taxRate?: string | null
+    accountId?: string | null
+    includeInTaxableValue: boolean
+  }>
   roundingMode?: 'NONE' | 'NEAREST_UNIT' | 'NEAREST_0_05' | 'MANUAL'
   manualRoundOff?: string
   roundingTolerance?: string

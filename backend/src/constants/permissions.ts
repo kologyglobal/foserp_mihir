@@ -459,6 +459,11 @@ export const PERMISSIONS = [
   'finance.bank_connector.manage',
   'finance.bank_connector.sync',
 
+  // Tally export (Phase 1 — mapping + XML outbox)
+  'finance.tally.view',
+  'finance.tally.manage',
+  'finance.tally.export',
+
   // Tax compliance extracts (GST outward/inward/summary + future export)
   'finance.tax.view',
   'finance.tax.extract',

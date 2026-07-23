@@ -638,6 +638,31 @@
   overflow: visible;
 }
 
+/* Issue Stock assign queue — keep thead sticky while the body scrolls */
+.inventory-issues-register .inventory-issues-register__table.erp-register-table-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.inventory-issues-register .inventory-issues-register__table .ent-data-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.inventory-issues-register .inventory-issues-register__table .erp-table-wrap {
+  max-height: min(62vh, calc(100dvh - 260px));
+  overflow: auto;
+}
+
+.inventory-issues-register .inventory-issues-register__table .erp-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background-color: var(--erp-surface-alt, #f8fafc);
+  box-shadow: 0 1px 0 var(--erp-border, #e4e7ec);
+}
+
 /* ── Toolbar in grid ── */
 .ent-data-grid .erp-list-toolbar {
   min-height: 52px;
