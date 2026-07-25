@@ -123,6 +123,19 @@ const DELIVERY_EXTRA = [
   approvalRequired: String(code).includes('ddp'),
 }))
 
+const DELIVERY_TIME_EXTRA = [
+  ['26_weeks', '26 weeks', 26],
+  ['28_weeks', '28 weeks', 28],
+  ['30_weeks', '30 weeks', 30],
+  ['32_weeks', '32 weeks', 32],
+  ['36_weeks', '36 weeks', 36],
+  ['40_weeks', '40 weeks', 40],
+  ['48_weeks', '48 weeks', 48],
+  ['52_weeks', '52 weeks', 52],
+].map(([code, name, weeks], i) => entry('delivery-time', code as string, name as string, 20 + i, {
+  weeks: weeks as number,
+}))
+
 const WARRANTY_EXTRA = [
   ['std_24m', '24 months manufacturing defect', '24 months'], ['std_6m_hydraulic', '6 months on hydraulics', '6 months'],
   ['std_36m_structure', '36 months on main structure', '36 months'], ['roadside_12m', '12 months roadside assistance', '12 months'],
@@ -170,6 +183,7 @@ export const CRM_MASTERS_BULK_SEED: CrmMasterEntry[] = [
   ...ACTIVITY_EXTRA,
   ...PAYMENT_EXTRA,
   ...DELIVERY_EXTRA,
+  ...DELIVERY_TIME_EXTRA,
   ...WARRANTY_EXTRA,
   ...APPROVAL_EXTRA,
 ]

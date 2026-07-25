@@ -1,6 +1,7 @@
 import { LayoutGrid, Menu, Search } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useUIStore } from '../../store/uiStore'
+import { getUserLandingPath } from '../../utils/permissions/moduleCategoryAccess'
 import { GlobalSearchTrigger } from '../design-system/GlobalSearch'
 import { NotificationBell } from '../design-system/NotificationPanel'
 import { UserMenuDropdown } from './UserMenuDropdown'
@@ -9,6 +10,7 @@ import { UserMenuDropdown } from './UserMenuDropdown'
 export function DynamicsSuiteBar() {
   const setSearchOpen = useUIStore((s) => s.setSearchOpen)
   const toggleMobileNav = useUIStore((s) => s.toggleMobileNav)
+  const landingPath = getUserLandingPath()
   const today = new Date().toLocaleDateString('en-IN', {
     weekday: 'short',
     day: 'numeric',
@@ -26,11 +28,11 @@ export function DynamicsSuiteBar() {
         >
           <Menu className="h-4 w-4" strokeWidth={1.75} />
         </button>
-        <Link to="/home" className="d365-suite-waffle hidden md:flex" title="App launcher" aria-label="App launcher">
+        <Link to={landingPath} className="d365-suite-waffle hidden md:flex" title="App launcher" aria-label="App launcher">
           <LayoutGrid className="h-4 w-4" strokeWidth={1.75} />
         </Link>
 
-        <Link to="/home" className="d365-suite-brand" title="Go to home">
+        <Link to={landingPath} className="d365-suite-brand" title="Go to home">
           <span className="d365-suite-title hidden sm:inline">FOS ERP</span>
         </Link>
       </div>

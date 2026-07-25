@@ -3,7 +3,7 @@ import { ChevronDown, LogOut, Settings, User, UserRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth, useOptionalAuth } from '../../context/AuthProvider'
 import { isApiMode } from '../../config/apiConfig'
-import { getSessionUser, getSessionUserRoleLabel } from '../../utils/permissions'
+import { getSessionUser, getSessionUserRoleLabel, canPermission } from '../../utils/permissions'
 import { cn } from '../../utils/cn'
 
 export function UserMenuDropdown({
@@ -38,6 +38,7 @@ export function UserMenuDropdown({
   }, [auth?.session])
 
   const { name, email, roleLabel } = profile
+  const showSettings = canPermission('settings', 'view')
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -167,22 +168,20 @@ export function UserMenuDropdown({
             Edit profile
           </button>
 
-          <button
-            type="button"
-            role="menuitem"
-            className={cn(
-              isSuite
-                ? 'd365-user-menu-item'
-                : 'flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-erp-text hover:bg-erp-surface-alt',
-            )}
-            onClick={() => {
-              setOpen(false)
-              navigate('/settings')
-            }}
-          >
-            <Settings className="h-4 w-4 shrink-0 text-erp-muted" />
-            Settings
-          </button>
+          {showSettings ? (
+            <button
+              type="button"
+              role="menuitem"
+              className={cn(isSuite ? 'd365-user-menu-item' : 'flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-erp-text hover:bg-erp-surface-alt')}
+              onClick={() => {
+                setOpen(false)
+                navigate('/settings')
+              }}
+            >
+              <Settings className="h-4 w-4 shrink-0 text-erp-muted" />
+              Settings
+            </button>
+          ) : null}
 
           <button
             type="button"

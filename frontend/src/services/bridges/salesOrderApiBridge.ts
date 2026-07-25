@@ -174,6 +174,16 @@ export async function apiCreateSalesOrder(
   })
 }
 
+export async function apiFetchSalesOrder(id: string): Promise<StoreActionResult & { salesOrder?: SalesOrder }> {
+  try {
+    const res = await api.fetchSalesOrder(id)
+    applySalesOrderApiResponse(res.data)
+    return { ok: true, salesOrder: salesOrderFromApi(res.data) }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
 export async function apiUpdateSalesOrder(
   id: string,
   patch: api.UpdateSalesOrderBody,

@@ -98,6 +98,7 @@ export type CodeSeriesEntityType =
   | 'lost_reason'
   | 'commercial_term'
   | 'delivery_term'
+  | 'delivery_time'
   | 'warranty_term'
   | 'approval_rule'
   | 'document_type'
@@ -181,6 +182,7 @@ export const CODE_SERIES_ENTITY_LABELS: Record<CodeSeriesEntityType, string> = {
   lost_reason: 'Lost Reason Code',
   commercial_term: 'Commercial Term Code',
   delivery_term: 'Delivery Term Code',
+  delivery_time: 'Delivery Time Code',
   warranty_term: 'Warranty Term Code',
   approval_rule: 'Approval Rule Code',
   document_type: 'Document Type Code',

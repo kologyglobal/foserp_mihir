@@ -115,10 +115,16 @@ export function readFileAsDataUrl(file: File): Promise<string> {
   })
 }
 
-export function documentTypeUploadHint(docType: CrmMasterEntry): string {
+export function documentTypeUploadHint(
+  docType: CrmMasterEntry,
+  options?: { optional?: boolean },
+): string {
   const allowed = parseAllowedFileTypes(docType.attributes.fileTypes)
   const maxMb = Number(docType.attributes.maxSizeMb) || 10
   const typesLabel = allowed.length ? allowed.map((e) => `.${e}`).join(', ') : 'Any file type'
+  if (options?.optional) {
+    return `${typesLabel} · up to ${maxMb} MB · Optional`
+  }
   const requiredFor = docType.attributes.requiredFor
   const req = requiredFor ? ` · Required for ${requiredFor}` : ''
   return `${typesLabel} · up to ${maxMb} MB${req}`

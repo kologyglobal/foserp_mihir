@@ -67,6 +67,7 @@ export const createQuotationSchema = z.object({
   terms: z.string().trim().optional(),
   paymentTerms: z.string().trim().optional(),
   deliveryTerms: z.string().trim().optional(),
+  deliveryTime: z.string().trim().max(100).optional(),
   validityDate: z.string().datetime().optional().nullable(),
   locationId: optionalUuid,
   salesOwnerId: optionalUuid,

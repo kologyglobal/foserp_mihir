@@ -2,12 +2,38 @@ import { describe, expect, it } from 'vitest'
 import { createLeadSchema, convertLeadSchema } from '../src/modules/crm/leads/lead.validation.js'
 
 describe('lead create validation', () => {
-  it('rejects create without notes and contact', () => {
+  it('rejects create without priority', () => {
     const parsed = createLeadSchema.safeParse({
       prospectName: 'Incomplete',
       leadOwnerId: '11111111-1111-1111-1111-111111111111',
     })
     expect(parsed.success).toBe(false)
+  })
+
+  it('accepts create with blank notes', () => {
+    const parsed = createLeadSchema.safeParse({
+      prospectName: 'Lead Without Notes',
+      leadOwnerId: '11111111-1111-1111-1111-111111111111',
+      priority: 'medium',
+      remarks: '',
+    })
+    expect(parsed.success).toBe(true)
+  })
+
+  it('accepts create with null/omitted notes', () => {
+    const omitted = createLeadSchema.safeParse({
+      prospectName: 'Lead Omit Notes',
+      leadOwnerId: '11111111-1111-1111-1111-111111111111',
+      priority: 'medium',
+    })
+    const nullable = createLeadSchema.safeParse({
+      prospectName: 'Lead Null Notes',
+      leadOwnerId: '11111111-1111-1111-1111-111111111111',
+      priority: 'medium',
+      remarks: null,
+    })
+    expect(omitted.success).toBe(true)
+    expect(nullable.success).toBe(true)
   })
 
   it('accepts create with notes, contact, and mobile', () => {

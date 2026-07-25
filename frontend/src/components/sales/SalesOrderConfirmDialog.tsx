@@ -7,13 +7,14 @@ import {
   type ErpDocumentFileMeta,
 } from '../erp/ErpDocumentUpload'
 import { ErpSmartSelect } from '../erp/ErpSmartSelect'
-import { Input, Textarea } from '../forms/Inputs'
+import { Input, Textarea, Select } from '../forms/Inputs'
+import { SELECT_PLACEHOLDER } from '../forms/selectStandards'
 import { CommercialTermSelect } from '../masters/GeographySelects'
 import {
   DOCUMENT_UPLOAD_CATEGORIES,
   getDocumentUploadCategory,
 } from '../../config/documentUploadCategories'
-import { useDocumentTypeOptions } from '../../hooks/useCrmMasters'
+import { useDeliveryTimeOptions, useDocumentTypeOptions } from '../../hooks/useCrmMasters'
 import { useCrmMasterStore } from '../../store/crmMasterStore'
 import { formatCurrency } from '../../utils/formatters/currency'
 import {
@@ -33,6 +34,7 @@ export type SalesOrderConfirmValues = {
   customerPoDate: string
   paymentTerms: string
   deliveryTerms: string
+  deliveryTime: string
   requiredDate: string
   directSoReason: string
   documentTypeCode: string
@@ -45,6 +47,7 @@ export function buildSalesOrderConfirmDefaults(order: SalesOrder): Omit<SalesOrd
     customerPoDate: order.customerPoDate?.slice(0, 10) ?? '',
     paymentTerms: order.paymentTerms?.trim() || '30% advance, balance before dispatch',
     deliveryTerms: order.deliveryTerms?.trim() || 'Ex-works',
+    deliveryTime: order.deliveryTime?.trim() ?? '',
     requiredDate: order.requiredDate?.slice(0, 10) ?? order.expectedDeliveryDate?.slice(0, 10) ?? '',
     directSoReason: order.directSoReason?.trim() ?? '',
     documentTypeCode: SO_CONFIRM_DEFAULT_DOC_TYPE,
@@ -65,8 +68,10 @@ export function validateSalesOrderConfirmValues(
   if (!values.customerPoNumber.trim()) errors.push('Customer PO number is required.')
   if (!values.paymentTerms.trim()) errors.push('Payment terms are required.')
   if (!values.deliveryTerms.trim()) errors.push('Delivery terms are required.')
-  if (!values.documentTypeCode.trim()) errors.push('Document type is required.')
-  if (!values.documentFile) errors.push('Upload the customer PO document (JPG or PDF).')
+  if (!values.deliveryTime.trim()) errors.push('Delivery time / lead time is required.')
+  if (values.documentFile && !values.documentTypeCode.trim()) {
+    errors.push('Document type is required when uploading a file.')
+  }
   if (needsDirectSoReason(order) && !values.directSoReason.trim()) {
     errors.push('Direct sales orders require a justification before confirmation.')
   }
@@ -95,6 +100,7 @@ export function SalesOrderConfirmDialog({
   onConfirm,
 }: SalesOrderConfirmDialogProps) {
   const documentTypeOptions = useDocumentTypeOptions()
+  const deliveryTimeOptions = useDeliveryTimeOptions()
   const getByCode = useCrmMasterStore((s) => s.getByCode)
 
   const [values, setValues] = useState<SalesOrderConfirmValues>(() => ({
@@ -260,6 +266,20 @@ export function SalesOrderConfirmDialog({
             />
           </label>
           <label className="block space-y-1.5 sm:col-span-2">
+            <span className="text-[12px] font-semibold text-erp-text">
+              Delivery Time / Lead Time <span className="text-erp-danger">*</span>
+            </span>
+            <Select
+              value={values.deliveryTime}
+              onChange={(e) => patch({ deliveryTime: e.target.value })}
+            >
+              <option value="">{SELECT_PLACEHOLDER}</option>
+              {deliveryTimeOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </Select>
+          </label>
+          <label className="block space-y-1.5 sm:col-span-2">
             <span className="text-[12px] font-semibold text-erp-text">Required / delivery date</span>
             <Input
               type="date"
@@ -282,9 +302,7 @@ export function SalesOrderConfirmDialog({
           ) : null}
 
           <div className="space-y-1.5 sm:col-span-2">
-            <span className="text-[12px] font-semibold text-erp-text">
-              Document type <span className="text-erp-danger">*</span>
-            </span>
+            <span className="text-[12px] font-semibold text-erp-text">Document type</span>
             <ErpSmartSelect
               options={typeSelectOptions}
               value={values.documentTypeCode}
@@ -297,7 +315,9 @@ export function SalesOrderConfirmDialog({
               disabled={isSubmitting}
             />
             {selectedType ? (
-              <p className="text-[11px] text-erp-muted">{documentTypeUploadHint(selectedType)}</p>
+              <p className="text-[11px] text-erp-muted">
+                {documentTypeUploadHint(selectedType, { optional: true })}
+              </p>
             ) : (
               <p className="text-[11px] text-erp-muted">
                 Types are managed in CRM → Document Type / Attachment Master.
@@ -306,9 +326,7 @@ export function SalesOrderConfirmDialog({
           </div>
 
           <div className="space-y-1.5 sm:col-span-2">
-            <span className="text-[12px] font-semibold text-erp-text">
-              Customer PO document <span className="text-erp-danger">*</span>
-            </span>
+            <span className="text-[12px] font-semibold text-erp-text">Customer PO document</span>
             <ErpDocumentUpload
               category={category.code}
               acceptedMimeTypes={acceptedMimeTypes}
@@ -328,12 +346,12 @@ export function SalesOrderConfirmDialog({
               documentTypeName={selectedType?.name ?? category.label}
               hint={
                 selectedType
-                  ? documentTypeUploadHint(selectedType)
+                  ? documentTypeUploadHint(selectedType, { optional: true })
                   : 'Select a document type to enable upload'
               }
               dropzoneTitle={
                 selectedType
-                  ? `Upload ${selectedType.name} (${allowedExtensions.map((e) => e.toUpperCase()).join(', ')})`
+                  ? `Upload ${selectedType.name} (${allowedExtensions.map((e) => e.toUpperCase()).join(', ')}) — optional`
                   : 'Select document type first'
               }
               hideDropzoneWhenFull

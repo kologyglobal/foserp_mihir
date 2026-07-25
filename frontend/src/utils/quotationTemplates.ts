@@ -14,7 +14,16 @@ type QuotationTemplateMeta = {
   }>
 }
 
-/** Demo id or API seed code for the featured ISO tank template. */
+/** Demo id or API seed code for the featured dry-bulk ISO template. */
+export function isFeaturedDryBulkQuotationTemplate(template: QuotationTemplateIdentity): boolean {
+  return (
+    template.id === 'qtpl-iso-dry-bulk-25cbm' ||
+    template.code === 'ISO-DRY-BULK-25CBM' ||
+    template.productFamily === 'ISO Dry Bulk'
+  )
+}
+
+/** Demo id or API seed code for the 26 KL liquid ISO Tank template (VF/QUO 76). */
 export function isIsoTankQuotationTemplate(template: QuotationTemplateIdentity): boolean {
   return (
     template.id === 'qtpl-iso-tank' ||
@@ -27,7 +36,7 @@ export function findFeaturedQuotationTemplate<T extends QuotationTemplateIdentit
   templates: T[] | null | undefined,
 ): T | undefined {
   const list = Array.isArray(templates) ? templates : []
-  return list.find(isIsoTankQuotationTemplate) ?? list[0]
+  return list.find(isFeaturedDryBulkQuotationTemplate) ?? list[0]
 }
 
 export function countQuotationTemplateSections(

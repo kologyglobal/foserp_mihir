@@ -108,6 +108,7 @@ export async function createQuotation(
         terms: data.terms ?? '',
         paymentTerms: data.paymentTerms ?? '',
         deliveryTerms: data.deliveryTerms ?? '',
+        deliveryTime: data.deliveryTime ?? '',
         locationId: data.locationId ?? null,
         pricing: pricing as unknown as Prisma.InputJsonValue,
         changeHistory: [
@@ -189,6 +190,7 @@ export async function updateQuotation(tenantId: string, id: string, userId: stri
       ...(data.terms !== undefined ? { terms: data.terms } : {}),
       ...(data.paymentTerms !== undefined ? { paymentTerms: data.paymentTerms } : {}),
       ...(data.deliveryTerms !== undefined ? { deliveryTerms: data.deliveryTerms } : {}),
+      ...(data.deliveryTime !== undefined ? { deliveryTime: data.deliveryTime } : {}),
       ...(data.locationId !== undefined ? { locationId: data.locationId } : {}),
       ...(data.customerApproval !== undefined ? { customerApproval: data.customerApproval } : {}),
       ...(data.unitPrice !== undefined || data.discountPct !== undefined || data.gstPct !== undefined || data.qty !== undefined

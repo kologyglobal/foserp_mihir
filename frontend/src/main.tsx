@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { ThemeProvider } from './design-system'
-import { AuthProvider } from './context/AuthProvider'
 import { clearErpLocalStorage } from './demo/demoStorage'
 
 class RootErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -62,9 +61,7 @@ if (new URLSearchParams(window.location.search).get('reset') === '1') {
     <StrictMode>
       <RootErrorBoundary>
         <ThemeProvider>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
+          <App />
         </ThemeProvider>
       </RootErrorBoundary>
     </StrictMode>,

@@ -22,6 +22,8 @@ import exportRoutes from './exports/export.routes.js'
 import quotationRoutes from './quotations/quotation.routes.js'
 import quotationTemplateRoutes from './quotation-templates/quotation-template.routes.js'
 import salesOrderRoutes from './sales-orders/sales-order.routes.js'
+import commercialRoutes from './commercial/commercial.routes.js'
+import indiaMartRoutes from './integrations/indiamart/indiamart.routes.js'
 
 const router = Router({ mergeParams: true })
 
@@ -42,6 +44,7 @@ router.use('/opportunities', opportunityRoutes)
 router.use('/quotations', quotationRoutes)
 router.use('/quotation-templates', quotationTemplateRoutes)
 router.use('/sales-orders', salesOrderRoutes)
+router.use('/commercial', commercialRoutes)
 router.use('/follow-ups', followUpRoutes)
 router.use('/imports', importRoutes)
 router.use('/dashboard', dashboardRoutes)
@@ -51,5 +54,6 @@ router.use('/search', searchRoutes)
 router.use('/masters', crmMasterRoutes)
 router.use('/entities', entityRoutes)
 router.use('/exports', exportRoutes)
+router.use('/integrations/indiamart', indiaMartRoutes)
 
 export default router

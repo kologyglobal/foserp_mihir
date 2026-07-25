@@ -337,9 +337,14 @@ export function CompanyProspectSelect({
           icon={Plus}
           disabled={disabled || !canCreate('customer')}
           onClick={handleAddCompany}
-        >
-          Add New Company
-        </ErpButton>
+          aria-label="Add New Company"
+          title={
+            disabled || !canCreate('customer')
+              ? undefined
+              : 'Add New Company'
+          }
+          className="crm-company-prospect__add"
+        />
       </div>
 
       {duplicateWarning ? (

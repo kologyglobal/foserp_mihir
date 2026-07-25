@@ -56,6 +56,14 @@ export const SALES_ORDER_REGISTER_PRESETS: Record<string, Record<string, string>
   'From Quotation': { search: '', status: '', source: 'quotation', sortBy: 'lastModified' },
 }
 
+export const PROFORMA_REGISTER_PRESETS: Record<string, Record<string, string>> = {
+  'My View': { search: '', status: '', source: '', expired: '', sortBy: 'proformaDate' },
+  Draft: { search: '', status: 'draft', source: '', expired: '', sortBy: 'proformaDate' },
+  Issued: { search: '', status: 'issued', source: '', expired: '', sortBy: 'proformaDate' },
+  Expired: { search: '', status: 'issued', source: '', expired: '1', sortBy: 'validUntil' },
+  'From SO': { search: '', status: '', source: 'sales_order', expired: '', sortBy: 'proformaDate' },
+}
+
 export const WORK_ORDER_REGISTER_PRESETS: Record<string, Record<string, string>> = {
   'My View': { search: '', view: '', productItemId: '' },
   Draft: { search: '', view: 'DRAFT', productItemId: '' },

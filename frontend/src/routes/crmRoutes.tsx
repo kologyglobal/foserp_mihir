@@ -33,6 +33,21 @@ import {
   CrmLinkedMasterPage,
 } from '@/modules/crm/masters/CrmMasterPages'
 import { quotationRouteChildren } from './quotationRoutes'
+import { IndiaMartLayout } from '@/modules/crm/integrations/indiamart/IndiaMartLayout'
+import { IndiaMartDashboardPage } from '@/modules/crm/integrations/indiamart/IndiaMartDashboardPage'
+import { IndiaMartInboxPage } from '@/modules/crm/integrations/indiamart/IndiaMartInboxPage'
+import { IndiaMartImportedLeadsPage } from '@/modules/crm/integrations/indiamart/IndiaMartImportedLeadsPage'
+import { IndiaMartProductMappingsPage } from '@/modules/crm/integrations/indiamart/IndiaMartProductMappingsPage'
+import { IndiaMartSyncHistoryPage } from '@/modules/crm/integrations/indiamart/IndiaMartSyncHistoryPage'
+import { IndiaMartSettingsPage } from '@/modules/crm/integrations/indiamart/IndiaMartSettingsPage'
+import {
+  CrmInvoiceListPage,
+  CrmInvoiceDetailPage,
+  CrmInvoiceCreatePage,
+  CrmPaymentAllocationPage,
+  CrmReceiptDetailPage,
+  ProformaReceivePaymentPage,
+} from '@/modules/crm/commercial/CrmCommercialPages'
 
 export const crmRouteChildren: RouteObject[] = [
   { index: true, element: <CrmDashboardPage /> },
@@ -60,6 +75,12 @@ export const crmRouteChildren: RouteObject[] = [
   { path: 'sales-orders', element: <CrmSalesOrderListPage /> },
   { path: 'sales-orders/:id/print', element: <SalesOrderPrintPage /> },
   { path: 'sales-orders/:id', element: <SalesOrder360Page /> },
+  { path: 'commercial/invoices', element: <CrmInvoiceListPage /> },
+  { path: 'commercial/invoices/new', element: <CrmInvoiceCreatePage /> },
+  { path: 'commercial/invoices/:id', element: <CrmInvoiceDetailPage /> },
+  { path: 'commercial/payment-allocation', element: <CrmPaymentAllocationPage /> },
+  { path: 'commercial/receipts/:id', element: <CrmReceiptDetailPage /> },
+  { path: 'commercial/proforma/:id/receive-payment', element: <ProformaReceivePaymentPage /> },
   { path: 'reports', element: <CrmReportsIndexPage /> },
   { path: 'reports/:reportId', element: <CrmReportPage /> },
   { path: 'masters', element: <CrmMastersHubPage /> },
@@ -85,6 +106,19 @@ export const crmRouteChildren: RouteObject[] = [
   { path: 'masters/:kind/new', element: <CrmMasterFormPage /> },
   { path: 'masters/:kind/:id/edit', element: <CrmMasterFormPage /> },
   { path: 'masters/:kind/:id', element: <CrmMasterDetailPage /> },
+  {
+    path: 'integrations/indiamart',
+    element: <IndiaMartLayout />,
+    children: [
+      { index: true, element: <Navigate to="dashboard" replace /> },
+      { path: 'dashboard', element: <IndiaMartDashboardPage /> },
+      { path: 'inbox', element: <IndiaMartInboxPage /> },
+      { path: 'leads', element: <IndiaMartImportedLeadsPage /> },
+      { path: 'product-mappings', element: <IndiaMartProductMappingsPage /> },
+      { path: 'sync-history', element: <IndiaMartSyncHistoryPage /> },
+      { path: 'settings', element: <IndiaMartSettingsPage /> },
+    ],
+  },
   { path: '*', element: <PageNotFoundPage scope="crm" /> },
 ]
 

@@ -8,4 +8,6 @@ export {
 export const QUOTATION_TEMPLATE_KEEP_CODES = [
   'ISO-TANK-26KL',
   'ISO-DRY-BULK-25CBM',
+  'FLOUR-BULKER-42M3',
+  'TIPPER-30FE-M3',
 ] as const

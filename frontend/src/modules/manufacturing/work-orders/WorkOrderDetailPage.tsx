@@ -4,9 +4,11 @@ import {
   Ban,
   CheckCircle2,
   ClipboardCheck,
+  Download,
   Pause,
   Play,
   Package,
+  Printer,
   ShieldCheck,
   ShoppingCart,
   XCircle,
@@ -413,6 +415,8 @@ export function WorkOrderDetailPage() {
           sticky
           primaryAction={primaryAction}
           secondaryActions={[
+            { id: 'print', label: 'Print', icon: Printer, onClick: () => navigate(`/manufacturing/work-orders/${wo.id}/print`), pin: true },
+            { id: 'download-pdf', label: 'Download PDF', icon: Download, onClick: () => navigate(`/manufacturing/work-orders/${wo.id}/print?autoprint=1`), pin: true },
             ...(canCheck
               ? [{ id: 'check', label: 'Check Materials', icon: ClipboardCheck, onClick: () => setDialog('check'), disabled: busy }]
               : []),

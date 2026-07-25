@@ -29,7 +29,7 @@ DROP INDEX `master_items_hsnId_fkey` ON `master_items`;
 DROP INDEX `master_items_purchaseUomId_fkey` ON `master_items`;
 
 -- AlterTable
-ALTER TABLE `master_items` MODIFY `itemDescription` TEXT NOT NULL DEFAULT '';
+ALTER TABLE `master_items` MODIFY `itemDescription` TEXT NOT NULL DEFAULT ('');
 
 -- CreateTable
 CREATE TABLE `crm_quotations` (

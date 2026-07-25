@@ -1,17 +1,12 @@
-import {
-  COMPANY_ADDRESS,
-  COMPANY_GSTIN,
-  COMPANY_NAME,
-  COMPANY_PAN,
-  COMPANY_STATE,
-} from '../../types/invoice'
+import { QUOTATION_COMPANY } from '../../utils/quotationEngine/companyProfile'
 import type { SalesOrder, SalesOrderLine } from '../../types/mrp'
-import type { Customer, Product } from '../../types/master'
+import type { Customer, Location, Product } from '../../types/master'
 import { formatCurrency, formatNumber } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { salesOrderStatusLabel } from '../../utils/salesOrderStatus'
 import { formatCustomerBillingAddress, resolveCustomerShippingAddress } from '../../utils/customerUtils'
 import { amountInWords } from '../../utils/amountInWords'
+import { resolveSalesOrderDeliveryLocationLabel } from '../../utils/locationUtils'
 import { resolveSalesOrderValue } from './SalesOrder360Sections'
 import { cn } from '../../utils/cn'
 
@@ -32,21 +27,27 @@ export type SalesOrderPrintLine = {
 export function buildSalesOrderPrintLines(
   order: SalesOrder,
   product?: Product | null,
+  products: Product[] = [],
 ): SalesOrderPrintLine[] {
   if (order.lines && order.lines.length > 0) {
-    return order.lines.map((l: SalesOrderLine, idx) => ({
-      lineNo: l.lineNo || idx + 1,
-      description: l.description || l.productOrItem || product?.productName || '—',
-      hsn: product?.hsnCode ?? '—',
-      qty: l.qty,
-      uom: l.uom || 'Nos',
-      unitPrice: l.unitPrice,
-      discountPct: l.discountPct,
-      taxPct: l.taxPct,
-      taxableValue: l.taxableValue,
-      gstAmount: l.gstAmount,
-      lineTotal: l.lineTotal,
-    }))
+    return order.lines.map((l: SalesOrderLine, idx) => {
+      const lineProduct = l.productId
+        ? products.find((p) => p.id === l.productId)
+        : undefined
+      return {
+        lineNo: l.lineNo || idx + 1,
+        description: l.description || l.productOrItem || lineProduct?.productName || product?.productName || '—',
+        hsn: lineProduct?.hsnCode ?? product?.hsnCode ?? '—',
+        qty: l.qty,
+        uom: l.uom || 'Nos',
+        unitPrice: l.unitPrice,
+        discountPct: l.discountPct,
+        taxPct: l.taxPct,
+        taxableValue: l.taxableValue,
+        gstAmount: l.gstAmount,
+        lineTotal: l.lineTotal,
+      }
+    })
   }
 
   const qty = order.qty || 1
@@ -78,6 +79,8 @@ interface SalesOrderPrintDocumentProps {
   order: SalesOrder
   customer?: Customer | null
   product?: Product | null
+  products?: Product[]
+  locations?: Location[]
   className?: string
 }
 
@@ -85,9 +88,11 @@ export function SalesOrderPrintDocument({
   order,
   customer,
   product,
+  products = [],
+  locations = [],
   className,
 }: SalesOrderPrintDocumentProps) {
-  const lines = buildSalesOrderPrintLines(order, product)
+  const lines = buildSalesOrderPrintLines(order, product, products)
   const taxable = lines.reduce((s, l) => s + l.taxableValue, 0)
   const gst = order.gstAmount ?? lines.reduce((s, l) => s + l.gstAmount, 0)
   const grand =
@@ -102,58 +107,100 @@ export function SalesOrderPrintDocument({
     order.shippingAddress?.trim() ||
     (customer ? resolveCustomerShippingAddress(customer) : billTo)
 
+  const company = QUOTATION_COMPANY
+  const deliveryLocationLabel = resolveSalesOrderDeliveryLocationLabel(order, locations)
+
   return (
-    <article className={cn('po-print-doc', className)}>
-      <header className="po-print-header">
-        <div>
-          <h1 className="po-print-header__company">{COMPANY_NAME}</h1>
-          <p className="po-print-header__address">{COMPANY_ADDRESS}</p>
-          <p className="po-print-header__gst">
-            GSTIN: {COMPANY_GSTIN} · PAN: {COMPANY_PAN} · {COMPANY_STATE}
-          </p>
+    <article className={cn('so-print-doc', className)}>
+      <div className="so-print-doc__accent" aria-hidden />
+
+      <header className="so-print-header">
+        <div className="so-print-header__brand">
+          <div className="so-print-header__logo-wrap">
+            <img
+              className="so-print-header__logo"
+              src={company.logoUrl}
+              alt={company.brandName}
+            />
+          </div>
+          <div className="so-print-header__identity">
+            <h1 className="so-print-header__company">{company.legalName}</h1>
+            <p className="so-print-header__tagline">{company.tagline}</p>
+            <p className="so-print-header__address">{company.address}</p>
+            <p className="so-print-header__contact">
+              {company.phone} · {company.email}
+              {company.website ? ` · ${company.website}` : ''}
+            </p>
+            <p className="so-print-header__gstin">GSTIN: {company.gstin}</p>
+          </div>
         </div>
-        <div className="po-print-header__meta">
-          <p className="po-print-title">SALES ORDER</p>
-          <p>
-            <strong>{order.salesOrderNo}</strong>
-          </p>
-          <p>Date: {formatDate(order.orderDate ?? order.createdAt)}</p>
-          <p>Required: {formatDate(order.requiredDate)}</p>
-          <p>Status: {salesOrderStatusLabel(order.status)}</p>
+        <div className="so-print-header__badge">
+          <p className="so-print-header__doc-type">Sales Order</p>
+          <p className="so-print-header__doc-no">{order.salesOrderNo}</p>
+          <dl className="so-print-header__meta">
+            <div>
+              <dt>Order date</dt>
+              <dd>{formatDate(order.orderDate ?? order.createdAt)}</dd>
+            </div>
+            <div>
+              <dt>Required by</dt>
+              <dd>{formatDate(order.requiredDate || order.expectedDeliveryDate)}</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd>{salesOrderStatusLabel(order.status)}</dd>
+            </div>
+          </dl>
         </div>
       </header>
 
-      <div className="po-print-grid">
-        <section className="po-print-box">
-          <p className="po-print-box__label">Bill to</p>
-          <p className="po-print-box__name">{customer?.customerName ?? '—'}</p>
-          <p>Code: {order.customerCode ?? customer?.customerCode ?? '—'}</p>
-          <p>GSTIN: {customer?.gstin || '—'}</p>
-          <p>{billTo}</p>
-          <p>State: {customer?.state ?? '—'}</p>
+      <div className="so-print-parties">
+        <section className="so-print-party">
+          <p className="so-print-party__label">Bill to</p>
+          <p className="so-print-party__name">{customer?.customerName ?? '—'}</p>
+          <p className="so-print-party__line">Code: {order.customerCode ?? customer?.customerCode ?? '—'}</p>
+          <p className="so-print-party__line">GSTIN: {customer?.gstin || '—'}</p>
+          <p className="so-print-party__line">{billTo}</p>
+          <p className="so-print-party__line">State: {customer?.state ?? '—'}</p>
         </section>
-        <section className="po-print-box">
-          <p className="po-print-box__label">Order details</p>
-          <p>Payment: {order.paymentTerms || '—'}</p>
-          <p>Delivery: {order.deliveryTerms || '—'}</p>
-          <p>Customer PO: {order.customerPoNumber || '—'}</p>
-          <p>PO Date: {order.customerPoDate ? formatDate(order.customerPoDate) : '—'}</p>
-          <p>Quotation: {order.quotationNo ? `${order.quotationNo} Rev ${order.quotationRevisionNo ?? 1}` : '—'}</p>
-          <p>Owner: {order.salesOwnerName || '—'}</p>
-          <p>Ship to: {shipTo}</p>
+        <section className="so-print-party">
+          <p className="so-print-party__label">Ship to</p>
+          <p className="so-print-party__name">{customer?.customerName ?? '—'}</p>
+          <p className="so-print-party__line">{shipTo}</p>
+          {deliveryLocationLabel ? (
+            <p className="so-print-party__line">Location: {deliveryLocationLabel}</p>
+          ) : null}
+        </section>
+        <section className="so-print-party so-print-party--meta">
+          <p className="so-print-party__label">Commercial</p>
+          <p className="so-print-party__line"><span>Payment</span> {order.paymentTerms || '—'}</p>
+          <p className="so-print-party__line"><span>Delivery terms</span> {order.deliveryTerms || '—'}</p>
+          <p className="so-print-party__line">
+            <span>Delivery Time / Lead Time</span> {order.deliveryTime || '—'}
+          </p>
+          <p className="so-print-party__line"><span>Customer PO</span> {order.customerPoNumber || '—'}</p>
+          <p className="so-print-party__line">
+            <span>PO date</span> {order.customerPoDate ? formatDate(order.customerPoDate) : '—'}
+          </p>
+          <p className="so-print-party__line">
+            <span>Quotation Number (Reference)</span>{' '}
+            {order.quotationNo ? `${order.quotationNo} Rev ${order.quotationRevisionNo ?? 1}` : '—'}
+          </p>
+          <p className="so-print-party__line"><span>Owner</span> {order.salesOwnerName || '—'}</p>
         </section>
       </div>
 
-      <table className="po-print-table">
+      <table className="so-print-table">
         <thead>
           <tr>
-            <th>#</th>
+            <th className="num">#</th>
             <th>Description</th>
             <th>HSN</th>
             <th className="num">Qty</th>
             <th>UOM</th>
             <th className="num">Rate</th>
             <th className="num">Disc %</th>
+            <th className="num">Tax %</th>
             <th className="num">Taxable</th>
             <th className="num">GST</th>
             <th className="num">Total</th>
@@ -169,6 +216,7 @@ export function SalesOrderPrintDocument({
               <td>{l.uom}</td>
               <td className="num">{formatCurrency(l.unitPrice)}</td>
               <td className="num">{formatNumber(l.discountPct)}</td>
+              <td className="num">{formatNumber(l.taxPct)}</td>
               <td className="num">{formatCurrency(l.taxableValue)}</td>
               <td className="num">{formatCurrency(l.gstAmount)}</td>
               <td className="num">{formatCurrency(l.lineTotal)}</td>
@@ -177,42 +225,58 @@ export function SalesOrderPrintDocument({
         </tbody>
       </table>
 
-      <div className="po-print-summary">
-        <div className="po-print-summary__row">
-          <span>Taxable amount</span>
-          <span>{formatCurrency(order.basicAmount ?? taxable)}</span>
+      <div className="so-print-footer-grid">
+        <div className="so-print-words">
+          <p className="so-print-words__label">Amount in words</p>
+          <p className="so-print-words__value">{amountInWords(grand)}</p>
+          {(order.commercialNotes || order.technicalNotes || order.remarks || order.warrantyTerms) && (
+            <div className="so-print-notes">
+              <p className="so-print-notes__title">Notes &amp; terms</p>
+              <ul>
+                {order.warrantyTerms ? <li>Warranty: {order.warrantyTerms}</li> : null}
+                {order.commercialNotes ? <li>{order.commercialNotes}</li> : null}
+                {order.technicalNotes ? <li>{order.technicalNotes}</li> : null}
+                {order.remarks ? <li>{order.remarks}</li> : null}
+              </ul>
+            </div>
+          )}
         </div>
-        <div className="po-print-summary__row">
-          <span>GST</span>
-          <span>{formatCurrency(gst)}</span>
-        </div>
-        <div className="po-print-summary__row po-print-summary__row--total">
-          <span>Grand Total</span>
-          <span>{formatCurrency(grand)}</span>
+        <div className="so-print-totals">
+          <div className="so-print-totals__row">
+            <span>Taxable amount</span>
+            <span>{formatCurrency(order.basicAmount ?? taxable)}</span>
+          </div>
+          <div className="so-print-totals__row">
+            <span>GST</span>
+            <span>{formatCurrency(gst)}</span>
+          </div>
+          <div className="so-print-totals__row so-print-totals__row--grand">
+            <span>Grand total</span>
+            <span>{formatCurrency(grand)}</span>
+          </div>
         </div>
       </div>
 
-      <p className="po-print-words">
-        <strong>Amount in words:</strong> {amountInWords(grand)}
-      </p>
-
-      {(order.commercialNotes || order.technicalNotes || order.remarks || order.warrantyTerms) && (
-        <section className="po-print-terms">
-          <p className="po-print-terms__title">Notes &amp; terms</p>
-          <ul className="po-print-terms__list">
-            {order.warrantyTerms ? <li>Warranty: {order.warrantyTerms}</li> : null}
-            {order.commercialNotes ? <li>{order.commercialNotes}</li> : null}
-            {order.technicalNotes ? <li>{order.technicalNotes}</li> : null}
-            {order.remarks ? <li>{order.remarks}</li> : null}
-          </ul>
-        </section>
-      )}
-
-      <div className="po-print-signatures">
-        <div className="po-print-signatures__line">Prepared by</div>
-        <div className="po-print-signatures__line">Checked by</div>
-        <div className="po-print-signatures__line">Authorised signatory</div>
+      <div className="so-print-signatures">
+        <div className="so-print-signatures__block">
+          <div className="so-print-signatures__line" />
+          <p>Prepared by</p>
+        </div>
+        <div className="so-print-signatures__block">
+          <div className="so-print-signatures__line" />
+          <p>Checked by</p>
+        </div>
+        <div className="so-print-signatures__block">
+          <div className="so-print-signatures__line" />
+          <p>{company.authorizedPerson}</p>
+          <p className="so-print-signatures__role">{company.designation}</p>
+        </div>
       </div>
+
+      <footer className="so-print-doc__footer">
+        <span>{company.legalName}</span>
+        <span>This is a computer-generated sales order</span>
+      </footer>
     </article>
   )
 }

@@ -18,6 +18,7 @@ import { WorkOrderDetailPage } from '@/modules/manufacturing/work-orders/WorkOrd
 import { ApiWorkOrderRegisterPage } from '@/modules/manufacturing/work-orders/ApiWorkOrderRegisterPage'
 import { ApiWorkOrderCreatePage } from '@/modules/manufacturing/work-orders/ApiWorkOrderCreatePage'
 import { ApiWorkOrderDetailPage } from '@/modules/manufacturing/work-orders/ApiWorkOrderDetailPage'
+import { WorkOrderPrintPage } from '@/modules/manufacturing/work-orders/WorkOrderPrintPage'
 import { TodayPage } from '@/modules/manufacturing/today/TodayPage'
 import { MyWorkPage } from '@/modules/manufacturing/operator/MyWorkPage'
 import { DailyUpdatePage } from '@/modules/manufacturing/daily-update/DailyUpdatePage'
@@ -102,6 +103,10 @@ export const manufacturingRouteChildren: RouteObject[] = [
   {
     path: 'manufacturing/work-orders/:workOrderId/edit',
     element: isApiMode() ? <ApiModeWorkOrderEditRedirect /> : <WorkOrderFormPage />,
+  },
+  {
+    path: 'manufacturing/work-orders/:workOrderId/print',
+    element: <WorkOrderPrintPage />,
   },
   {
     path: 'manufacturing/work-orders/:workOrderId',

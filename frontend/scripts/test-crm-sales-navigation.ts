@@ -117,7 +117,7 @@ if (customer && product) {
   }
 }
 if (openOpp) {
-  const convResult = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-iso-tank', 2100000)
+  const convResult = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-iso-dry-bulk-25cbm', 2100000)
   const documentId = convResult.documentId
   if (documentId && convResult.ok) {
     crm.approveQuotationDocument(documentId, 'Nav test approved')

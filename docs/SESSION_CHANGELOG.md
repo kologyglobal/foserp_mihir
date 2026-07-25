@@ -1,4 +1,121 @@
-﻿## 2026-07-23 — Manufacturing Accounting permission sync + UAT checklist
+﻿## 2026-07-24 — CRM-only user (API mode RBAC)
+
+### Shipped
+
+- Backend role **`CRM User`** — CRM + commercial + IndiaMART enquiry view + master lookup/product/item read; no purchase, manufacturing, inventory, finance, or admin permissions.
+- Seed user **`crm.user@vasant-trailers.com`** / **`CrmUser@123`** on tenant `vasant-trailers` (also `backend/scripts/seed-crm-user.ts` for idempotent upsert).
+- Frontend sidebar filters all module categories via `canAccessModuleCategory()`; route guard unchanged (`canRoute` + backend JWT permissions). Settings chrome hidden when `settings.view` missing; brand link lands on `/crm` for CRM-only users.
+
+### Verification
+
+- `cd backend && npm run db:seed` (or `npx tsx scripts/seed-crm-user.ts`)
+- Login API mode; sidebar shows CRM only; deep-link `/purchase` → access denied.
+
+---
+
+## 2026-07-24 — CRM Commercial API + Payment Allocation fix
+
+### Shipped
+
+- **Bugfix:** `/crm/commercial/payment-allocation` infinite re-render — Zustand selectors returned new arrays every render; switched to stable store slices + `useMemo`.
+- **DB:** migration `20260724160000_crm_commercial_receivables` — `crm_payment_receipts`, `crm_tax_invoices`, `crm_tax_invoice_lines`, `crm_payment_allocations`.
+- **API:** `/api/v1/t/:slug/crm/commercial/*` (receipts, invoices post/cancel, allocations + reverse, sync bundle) gated by `crm.commercial.*`.
+- **FE bridge:** `crmCommercialApiBridge` hydrates via CRM sync; pages call API in `VITE_USE_API=true`.
+
+### Verification
+
+- `npx tsx scripts/prisma-cli.ts migrate deploy` — applied
+- `npm run test:crm-commercial` — 20/20 PASS
+
+---
+
+## 2026-07-24 — CRM Commercial & Receivables Workflow (demo)
+
+### Shipped
+
+- Lightweight CRM commercial layer (no Accounting module navigation required):
+  - **Proforma Receive Payment** — receipt number auto, mode/UTR/amount/remarks/attachment; Unpaid / Partially Paid / Fully Paid; multi-receipt history on PI detail.
+  - **Create Invoice** from Sales Order, Proforma, and Customer 360; draft → post / cancel draft; partial + multiple invoices per SO.
+  - **Payment Allocation Workspace** at `/crm/commercial/payment-allocation` (one↔many, partial, reverse + audit).
+  - Customer 360 tabs: Quotations, Sales Orders, Proforma Invoices, Invoices, Payment Receipts, Payment Allocations, Outstanding Summary, Customer Ledger (+ commercial timeline).
+- Store: `crmCommercialStore` (receipts, tax invoices, allocations, audit log, timeline).
+- Permissions: `crm.commercial.*` on backend role packs (CRM Admin / Sales Manager / Sales Executive).
+- Nav: CRM → Tax Invoices, Payment Allocation.
+- Tests: `npm run test:crm-commercial` — 20/20 PASS.
+
+### Scope note
+
+- Demo/Zustand persistence (same pattern as Proforma). Not yet AR API-backed / Prisma tables for CRM commercial docs.
+- Accounting Money In AR remains the API-mode ledger of record when finance posts invoices/receipts.
+
+### Remaining
+
+- Optional: persist Proforma + CRM commercial docs to API; bridge to `receivablesApiBridge` for dual-mode parity.
+
+---
+
+## 2026-07-24 — Restore 76 — 26 KL ISO Tank quotation template
+
+### Shipped
+
+- Restored live catalog template `ISO-TANK-26KL` / `qtpl-iso-tank` from Word source `76. 26 KL ISO Tank.docx` (archived as `docs/quotation-template-sources/76-26KL-ISO-Tank.docx`).
+- Frontend: back in `DEFAULT_QUOTATION_TEMPLATES`; removed from retired built-ins; `isIsoTankQuotationTemplate` restored; allowed codes / letterhead set updated.
+- Backend: seed row + keep codes (`ISO-TANK-26KL` + dry bulk + flour bulker + tipper); `quotation-template.iso-tank-26kl.ts` v9.
+- Docs: `quotation-template-sources/README.md` lists 76 as live again.
+
+### Remaining
+
+- Re-run `npx tsx scripts/cleanup-quotation-templates.ts` on each environment DB so soft-deleted rows are restored.
+
+---
+
+## 2026-07-24 — IndiaMART Phase 5 (Push webhook, charts, SLA alerts, product mapping UI)
+
+### Shipped
+
+- Push webhook: public `POST /api/v1/webhooks/indiamart/:tenantSlug/:webhookToken` (rate-limited, hashed token, HTTP 200 ack); enable/rotate/disable under settings.
+- Migration `20260724140000_indiamart_push_alerts`: webhook columns, `PUSH` sync trigger, `IndiaMartAlert`.
+- Shared ingest path for Pull + Push; SLA refresh + alert upserts (overdue / sync failure / duplicates).
+- Dashboard: KPI strip + Recharts (by day / product / city / funnel) + alerts panel.
+- Product Mapping admin page + suggest-from-enquiries.
+- Docs: `docs/crm/INDIAMART_INTEGRATION.md` updated.
+- Tests: `tests/indiamart-push-alerts.test.ts` (payload extract, SLA, webhook token helpers).
+
+### Verification
+
+- `npx vitest run tests/indiamart-push-alerts.test.ts tests/indiamart-normalizer.test.ts`
+
+### Remaining
+
+- Lead 360 FactBox deep-link; live UAT with IndiaMART Push registration.
+
+---
+
+## 2026-07-24 — IndiaMART CRM Lead Integration (Phases 1–4 foundation)
+
+### Shipped
+
+- Tenant-scoped IndiaMART Pull API v2 connector: encrypted credentials, SSRF host allowlist, configurable endpoint/auth/field map.
+- Models + migration `20260724120000_indiamart_lead_integration`: connection, enquiry (raw payload), sync run, product mapping; `CrmLead` external source fields.
+- Sync service (manual + scheduled in-process scheduler), dedupe/match, lead import into existing `CrmLead`, assignment, optional follow-up, audit.
+- APIs under `/crm/integrations/indiamart/*` + permissions `crm.indiamart.*`.
+- Frontend: Inbox, Imported Leads, Sync History, Settings at `/crm/integrations/indiamart/*` (API mode).
+- Docs: `docs/crm/INDIAMART_INTEGRATION.md`.
+- Unit tests: `tests/indiamart-normalizer.test.ts` (10/10).
+
+### Verification
+
+- `npx prisma validate` (with DATABASE_URL)
+- `npx vitest run tests/indiamart-normalizer.test.ts` — 10/10 PASS
+- Backend/frontend typecheck: no new IndiaMART errors
+
+### Known limitations
+
+- Push webhook not shipped; dashboard is KPI cards only; screenshots need live key UAT.
+
+---
+
+## 2026-07-23 — Manufacturing Accounting permission sync + UAT checklist
 
 ### Shipped
 

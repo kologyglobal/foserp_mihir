@@ -67,6 +67,7 @@ import { cloneTemplateSections } from '../utils/quotationEngine/cloneSections'
 import {
   applyCommercialMastersToSections,
   resolveDefaultCommercialTerm,
+  resolveDefaultDeliveryTime,
   resolveCommercialTermSelectValue,
 } from '../utils/quotationTermUtils'
 import { mergeBuiltinQuotationTemplates } from '../utils/quotationEngine/builtinTemplateSync'
@@ -75,8 +76,6 @@ import {
   injectIsoTankShowcase,
   ISO_TANK_SHOWCASE_DOCUMENT_ID,
   ISO_TANK_SHOWCASE_OPPORTUNITY_ID,
-  ISO_TANK_TEMPLATE_ID,
-  isoTankSamplePriceLines,
 } from '../data/crm/isoTankShowcase'
 import { validateFollowUpAt } from '../utils/validation/crmDatePolicy'
 
@@ -280,6 +279,7 @@ interface CrmState {
     extras?: {
       paymentTerms?: string
       deliveryTerms?: string
+      deliveryTime?: string
       validityDate?: string
       locationId?: string | null
     },
@@ -294,6 +294,7 @@ interface CrmState {
       scopeNotes?: string
       paymentTerms?: string
       deliveryTerms?: string
+      deliveryTime?: string
       validityDate?: string
     },
   ) => StoreAction<StoreActionResult & { quotationId?: string; documentId?: string }>
@@ -972,13 +973,8 @@ export const useCrmStore = create<CrmState>()(
         const sections = applyCommercialMastersToSections(cloneTemplateSections(tpl.sections, genId), {
           replaceTemplateContent: true,
         })
-        const priceLines =
-          templateId === ISO_TANK_TEMPLATE_ID || tpl.code === 'ISO-TANK-26KL' || tpl.productFamily === 'ISO Tank'
-            ? isoTankSamplePriceLines()
-            : []
-        const total = priceLines.length
-          ? priceLines.reduce((s, l) => s + l.lineTotal, 0)
-          : 0
+        const priceLines: QuotationDocument['priceLines'] = []
+        const total = 0
         const doc: QuotationDocument = {
           id: genId('qdoc'),
           quotationId,
@@ -1446,6 +1442,7 @@ export const useCrmStore = create<CrmState>()(
         const deliveryTerms = extras?.deliveryTerms?.trim()
           || resolveCommercialTermSelectValue('delivery-terms', deliveryDefault.text)
           || deliveryDefault.text
+        const deliveryTime = extras?.deliveryTime?.trim() || resolveDefaultDeliveryTime()
         const validityDate = extras?.validityDate?.trim() || undefined
         // Human-readable requirement — never the encoded <!--fos-lead-lines--> payload.
         const requirementText = opportunityRequirementDisplay(opp.productRequirement)
@@ -1492,6 +1489,7 @@ export const useCrmStore = create<CrmState>()(
               terms: commercialNotes,
               paymentTerms,
               deliveryTerms,
+              deliveryTime,
               validityDate,
               locationId: extras?.locationId !== undefined ? extras.locationId : (opp.locationId ?? null),
               contactId: opp.contactId,
@@ -1518,6 +1516,7 @@ export const useCrmStore = create<CrmState>()(
           terms: commercialNotes,
           paymentTerms,
           deliveryTerms,
+          deliveryTime,
           validityDate,
           locationId: extras?.locationId !== undefined ? extras.locationId : (opp.locationId ?? null),
         }) as StoreActionResult & { quotationId?: string }
@@ -1627,6 +1626,7 @@ export const useCrmStore = create<CrmState>()(
         const deliveryTerms = extras?.deliveryTerms?.trim()
           || resolveCommercialTermSelectValue('delivery-terms', deliveryDefault.text)
           || deliveryDefault.text
+        const deliveryTime = extras?.deliveryTime?.trim() || resolveDefaultDeliveryTime()
         const validityDate = extras?.validityDate?.trim() || undefined
         const commercialNotes = extras?.scopeNotes?.trim() || undefined
         const qty = resolvedLines[0]?.qty ?? 1
@@ -1661,6 +1661,7 @@ export const useCrmStore = create<CrmState>()(
               terms: commercialNotes,
               paymentTerms,
               deliveryTerms,
+              deliveryTime,
               validityDate,
               locationId,
               templateId,
@@ -1683,6 +1684,7 @@ export const useCrmStore = create<CrmState>()(
           terms: commercialNotes,
           paymentTerms,
           deliveryTerms,
+          deliveryTime,
           validityDate,
           locationId,
         }) as StoreActionResult & { quotationId?: string }
@@ -1819,6 +1821,7 @@ export const useCrmStore = create<CrmState>()(
           discountPct: line?.discountPct ?? 0,
           paymentTerms: sectionContent(doc, 'payment') || salesQuo?.paymentTerms,
           deliveryTerms: sectionContent(doc, 'delivery') || salesQuo?.deliveryTerms,
+          deliveryTime: (salesQuo as { deliveryTime?: string } | undefined)?.deliveryTime,
           warrantyTerms: sectionContent(doc, 'warranty') || undefined,
           commercialNotes: doc.commercialNotes ?? sectionContent(doc, 'commercial'),
           technicalNotes: doc.technicalNotes ?? sectionContent(doc, 'technical'),

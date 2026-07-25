@@ -10,10 +10,7 @@ import {
   Paperclip,
 } from 'lucide-react'
 import {
-  ErpAdditionalInfoToggle,
-  ErpAdditionalInfoPanel,
   ErpAdditionalSectionNav,
-  useErpAdditionalInfo,
 } from '../../components/erp/card-form'
 import { CrmCardFormShell, ENTERPRISE_FORM_CLASS } from '@/components/crm/CrmCardFormShell'
 import { Quotation360RecordHeader } from '@/components/quotations/Quotation360RecordHeader'
@@ -205,26 +202,6 @@ export function Quotation360Page() {
 
   const lineCount = doc?.priceLines.length ?? 0
   const commercialDone = Boolean(doc && doc.totalAmount > 0 && quotation?.validityDate)
-  const hasOptionalDetailData = Boolean(
-    lineCount > 0
-    || quotationAttachments.length > 0
-    || quoActivities.length > 0
-    || quoFollowUps.length > 0
-    || quoDocs.length > 1
-    || commercialDone
-    || (doc?.sections.length ?? 0) > 0
-    || (doc?.approvalHistory.length ?? 0) > 0,
-  )
-
-  const {
-    open: showAdditionalDetails,
-    setOpen: setShowAdditionalDetails,
-    toggle: toggleAdditionalDetails,
-    panelId: additionalPanelId,
-  } = useErpAdditionalInfo({
-    preferOpen: hasOptionalDetailData,
-  })
-
   const additionalSectionItems = useMemo(() => {
     if (!doc) return []
     return [
@@ -482,7 +459,6 @@ export function Quotation360Page() {
           : sectionId === 'attachments' ? 'documents'
             : sectionId
     setActiveAdditionalSection(normalized)
-    if (!showAdditionalDetails) setShowAdditionalDetails(true)
     window.setTimeout(() => {
       document
         .getElementById(`erp-additional-panel-${normalized}`)
@@ -747,15 +723,7 @@ export function Quotation360Page() {
             onNotesChange={setEntityNotes}
           />
 
-          <ErpAdditionalInfoToggle
-            open={showAdditionalDetails}
-            onToggle={() => toggleAdditionalDetails()}
-            panelId={additionalPanelId}
-            sectionCount={additionalSectionItems.length}
-            attentionCount={additionalSectionItems.filter((s) => s.tone === 'missing').length}
-          />
 
-          <ErpAdditionalInfoPanel open={showAdditionalDetails} id={additionalPanelId} scrollOnOpen={false}>
             <ErpAdditionalSectionNav
               layout="responsive"
               sections={additionalSectionItems}
@@ -882,7 +850,8 @@ export function Quotation360Page() {
                 ),
               }}
             />
-          </ErpAdditionalInfoPanel>
+          
+
         </div>
       </CrmCardFormShell>
 

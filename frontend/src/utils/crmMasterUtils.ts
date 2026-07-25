@@ -314,7 +314,7 @@ export function slugToKind(slug: string): CrmMasterKind | null {
     'lead-sources', 'industries', 'territories', 'designations', 'departments', 'lead-stages', 'lead-priorities',
     'lead-reasons', 'opportunity-stages', 'opportunity-priorities', 'activity-types',
     'product-interests', 'lost-reasons', 'commercial-terms',
-    'payment-terms', 'delivery-terms', 'warranty-terms', 'approval-rules', 'document-types',
+    'payment-terms', 'delivery-terms', 'delivery-time', 'warranty-terms', 'approval-rules', 'document-types',
   ]
   return valid.includes(slug as CrmMasterKind) ? (slug as CrmMasterKind) : null
 }

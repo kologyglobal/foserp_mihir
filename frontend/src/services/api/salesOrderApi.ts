@@ -32,6 +32,7 @@ export type CreateSalesOrderBody = {
   customerPoDate?: string | null
   paymentTerms: string
   deliveryTerms: string
+  deliveryTime: string
   warrantyTerms?: string | null
   commercialNotes?: string | null
   technicalNotes?: string | null
@@ -81,6 +82,7 @@ export type UpdateSalesOrderBody = Partial<
     | 'remarks'
     | 'paymentTerms'
     | 'deliveryTerms'
+    | 'deliveryTime'
     | 'warrantyTerms'
     | 'commercialNotes'
     | 'technicalNotes'

@@ -10,6 +10,7 @@ import { useTenantModulesStore } from '../../store/tenantModulesStore'
 import { ModuleNavigationBadge } from '../premium/ModuleNavigationBadge'
 import { useSidebarLiveCounts } from '../../hooks/useSidebarLiveCounts'
 import { canAccessAdminShell, canAccessPurchaseShell, isSuperAdminUser } from '../../utils/permissions'
+import { canAccessModuleCategory } from '../../utils/permissions/moduleCategoryAccess'
 
 function IconMenuItem({
   categoryId,
@@ -80,7 +81,7 @@ export function Sidebar() {
           if (item.categoryId === 'platform') return isSuperAdminUser()
           // Soft UI gate only — purchase API must re-enforce when it ships
           if (item.categoryId === 'purchase') return canAccessPurchaseShell() && isModuleEnabled(item.categoryId)
-          return isModuleEnabled(item.categoryId)
+          return canAccessModuleCategory(item.categoryId) && isModuleEnabled(item.categoryId)
         })
         .map((item) => ({
           ...item,

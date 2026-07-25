@@ -8,7 +8,7 @@ import { QuotationPrintDocument } from './QuotationPrintDocument'
 import { ErpButton } from '../erp/ErpButton'
 import { ConvertQuotationToSOAction } from './ConvertQuotationToSOAction'
 import { validateQuotationForPrint } from '../../utils/quotationEngine/validation'
-import { printQuotationDocument, saveQuotationPdfToDms } from '../../utils/quotationEngine/pdfExport'
+import { printQuotationDocument, downloadQuotationPdf, saveQuotationPdfToDms, quotationPdfFileName } from '../../utils/quotationEngine/pdfExport'
 import { resolveQuotationPrintLayout } from '../../utils/quotationEngine/printLayout'
 import { notify } from '../../store/toastStore'
 
@@ -50,6 +50,16 @@ export function QuotationPreview({ documentId }: QuotationPreviewProps) {
     if (r.ok) notify.success('Saved to DMS')
   }
 
+  async function handleDownloadPdf() {
+    if (!quotation || !doc) return
+    notify.info('Preparing PDF…')
+    const result = await downloadQuotationPdf({
+      fileName: quotationPdfFileName(quotation.quotationNo, doc.revisionNo),
+    })
+    if (result.ok) notify.success(`Downloaded ${result.fileName}`)
+    else notify.error(result.error)
+  }
+
   return (
     <div className="quo-preview-shell">
       <div className="quo-preview-toolbar print:hidden">
@@ -57,8 +67,22 @@ export function QuotationPreview({ documentId }: QuotationPreviewProps) {
           <ErpButton variant="secondary" size="sm" icon={ArrowLeft}>Back to editor</ErpButton>
         </Link>
         <div className="quo-preview-toolbar__actions">
-          <ErpButton variant="secondary" size="sm" icon={Printer} onClick={printQuotationDocument}>Print</ErpButton>
-          <ErpButton variant="secondary" size="sm" icon={Download} onClick={printQuotationDocument}>Download PDF</ErpButton>
+          <ErpButton
+            variant="secondary"
+            size="sm"
+            icon={Printer}
+            onClick={() => printQuotationDocument({ fileName: quotationPdfFileName(quotation.quotationNo, doc.revisionNo) })}
+          >
+            Print
+          </ErpButton>
+          <ErpButton
+            variant="secondary"
+            size="sm"
+            icon={Download}
+            onClick={() => void handleDownloadPdf()}
+          >
+            Download PDF
+          </ErpButton>
           <ErpButton variant="secondary" size="sm" icon={Send} onClick={handleDmsSave}>Save to DMS</ErpButton>
           <ConvertQuotationToSOAction documentId={documentId} variant="card-action" />
           <ErpButton variant="primary" size="sm" icon={Eye} onClick={() => navigate(`/crm/quotations/${doc.quotationId}`)}>Quote 360</ErpButton>

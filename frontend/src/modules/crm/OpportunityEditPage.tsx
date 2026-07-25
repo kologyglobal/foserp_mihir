@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Activity,
@@ -7,7 +7,6 @@ import {
   Banknote,
   Building2,
   CheckCircle2,
-  ClipboardList,
   Copy,
   FileText,
   History,
@@ -21,12 +20,13 @@ import {
 } from 'lucide-react'
 import { ErpCardSection, ErpFieldRow, ErpStickySaveBar, ErpViewField } from '../../components/erp/card-form'
 import { ErpCardCommandBar } from '../../components/erp/card-form/ErpCardCommandBar'
-import { ErpLineItemsGrid } from '../../components/erp/ErpLineItemsGrid'
+import { ErpProductPricingSection } from '../../components/erp/ErpProductPricingSection'
 import { CrmTypedDocumentUpload } from '../../components/crm/CrmTypedDocumentUpload'
 import { EntityAttachmentsPanel } from '../../components/crm/shared/EntityAttachmentsPanel'
 import { LostDealFields } from '../../components/crm'
 import { CrmDeleteConfirmModal } from '../../components/crm/CrmDeleteConfirmModal'
 import { Input, Select, Textarea } from '../../components/forms/Inputs'
+import { SELECT_PLACEHOLDER } from '../../components/forms/selectStandards'
 import { ErpButton, ErpButtonGroup } from '../../components/erp/ErpButton'
 import { useApiMode } from '../../hooks/useApiMode'
 import { formatCrmCurrency } from '../../utils/crmMetrics'
@@ -38,11 +38,7 @@ import { isEncodedLeadRequirementPayload } from '../../utils/leadRequirementLine
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
 import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
 import { crmBreadcrumbs } from '../../utils/crmNavigation'
-import {
-  ENTERPRISE_FORM_CLASS,
-  EnterpriseFormMetrics,
-  EnterpriseFormSectionNav,
-} from '../../design-system/workspace'
+import { ENTERPRISE_FORM_CLASS } from '../../design-system/workspace'
 import {
   buildOpportunityAiInsight,
   buildOpportunityKeyDetails,
@@ -105,8 +101,6 @@ export function OpportunityEditPage() {
     detailsPath,
   } = editor
 
-  const [activeSection, setActiveSection] = useState('general')
-
   const {
     opportunityName,
     setOpportunityName,
@@ -139,20 +133,6 @@ export function OpportunityEditPage() {
 
   const completionPercent = Math.round((completionItems.filter((i) => i.done).length / completionItems.length) * 100)
 
-  const sectionNavItems = useMemo(() => [
-    { id: 'general', label: 'General', icon: User, done: completionItems.find((i) => i.id === 'general')?.done },
-    { id: 'products', label: 'Products', icon: ClipboardList, done: completionItems.find((i) => i.id === 'products')?.done },
-    { id: 'commercial', label: 'Commercial', icon: Banknote, done: completionItems.find((i) => i.id === 'commercial')?.done },
-    { id: 'documents', label: 'Attachments', icon: Paperclip, done: completionItems.find((i) => i.id === 'documents')?.done },
-  ], [completionItems])
-
-  const formMetrics = useMemo(() => [
-    { label: 'Completion', value: `${completionPercent}%`, accent: 'blue' as const, hint: `${completionItems.filter((i) => i.done).length} of ${completionItems.length} sections` },
-    { label: 'Final Quoted', value: formatCrmCurrency(dealValue), accent: 'green' as const, hint: `${lines.length} line${lines.length === 1 ? '' : 's'} · from products` },
-    { label: 'Weighted Forecast', value: formatCrmCurrency(weighted), accent: 'violet' as const, hint: `${probability}% × Final Quoted` },
-    { label: 'Expected Close', value: expectedCloseDate ? formatDate(expectedCloseDate) : '—', accent: 'amber' as const, hint: opportunity ? opportunityStageLabel(opportunity.stage) : '—' },
-  ], [completionPercent, completionItems, dealValue, lines.length, weighted, probability, expectedCloseDate, opportunity])
-
   if (!id || !opportunity) {
     return (
       <div className="erp-page flex flex-col items-center justify-center gap-3 p-12 text-center">
@@ -175,7 +155,6 @@ export function OpportunityEditPage() {
   const oppId = id
 
   function scrollToSection(sectionId: string) {
-    setActiveSection(sectionId)
     document.getElementById(`opp-section-${sectionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
@@ -384,37 +363,28 @@ export function OpportunityEditPage() {
           />
         )}
       >
-        <EnterpriseFormSectionNav
-          sections={sectionNavItems}
-          activeId={activeSection}
-          onSelect={scrollToSection}
-        />
-
-        <EnterpriseFormMetrics metrics={formMetrics} />
-
         <ErpCardSection
           id="opp-section-general"
           title="General"
           subtitle="Customer account, contact, and opportunity identity."
           icon={User}
           accent="blue"
+          columns={3}
           collapsible
           defaultOpen
         >
           <ErpViewField label="Customer" value={customer?.customerName ?? opp.customerId} />
           <ErpFieldRow label="Contact">
             <Select native value={contactId} onChange={(e) => setContactId(e.target.value)} className="erp-input">
-              <option value="">—</option>
+              <option value="">{SELECT_PLACEHOLDER}</option>
               {customerContacts.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}{c.designation ? ` · ${c.designation}` : ''}</option>
               ))}
             </Select>
           </ErpFieldRow>
-          <LocationFieldRow value={locationId} onChange={(locId) => setLocationId(locId)} usage="sales" />
           <ErpFieldRow
             label="Opportunity Name"
             required
-            colSpan={2}
             dataField="opportunityName"
             fieldState={validationErrors.some((e) => /name/i.test(e)) ? 'error' : 'idle'}
             fieldError={validationErrors.find((e) => /name/i.test(e))}
@@ -441,31 +411,23 @@ export function OpportunityEditPage() {
               ))}
             </Select>
           </ErpFieldRow>
+          <LocationFieldRow value={locationId} onChange={(locId) => setLocationId(locId)} usage="sales" />
         </ErpCardSection>
 
-        <ErpCardSection
-          id="opp-section-products"
+        <ErpProductPricingSection
+          sectionId="opp-section-products"
           nbaTarget="products"
-          title="Product / Item Lines"
-          subtitle="Pick products and set qty, price, and tax per line."
-          icon={ClipboardList}
-          accent="teal"
-          collapsible
-          defaultOpen
           forceOpenKey={forceOpenProductsKey || undefined}
+          title="Product & Pricing"
+          subtitle="Build line items, then review adjustments and the live order total."
+          accent="blue"
+          lines={lines}
+          onChange={setLines}
+          productOptions={productOptions}
+          productPickMap={productPickMap}
+          rowErrors={rowErrors}
         >
-          <div className="col-span-3">
-            <ErpLineItemsGrid
-              lines={lines}
-              onChange={setLines}
-              productOptions={productOptions}
-              productPickMap={productPickMap}
-              rowErrors={rowErrors}
-              probability={Number(probability) || 0}
-              variant="opportunity"
-            />
-          </div>
-          <div className="col-span-3 opp-scope-notes">
+          <div className="opp-scope-notes mt-4">
             <ErpFieldRow label="Scope Notes" colSpan={3} horizontal={false}>
               <Textarea
                 rows={3}
@@ -479,7 +441,7 @@ export function OpportunityEditPage() {
               />
             </ErpFieldRow>
           </div>
-        </ErpCardSection>
+        </ErpProductPricingSection>
 
         <ErpCardSection
           id="opp-section-commercial"

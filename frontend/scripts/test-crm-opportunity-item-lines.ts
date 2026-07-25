@@ -62,9 +62,9 @@ const oppTable = read('src/components/crm/CrmOpportunitiesTable.tsx')
 const crmStoreSrc = read('src/store/crmStore.ts')
 const pkg = read('package.json')
 
-check(1, 'New Opportunity page shows Product / Item Lines section', newPage.includes('Product / Item Lines') && newPage.includes('ErpLineItemsGrid'))
-check(2, 'Add Row in ErpLineItemsGrid', read('src/components/erp/ErpLineItemsGrid.tsx').includes('Add blank line') || read('src/components/erp/ErpLineItemsGrid.tsx').includes('Add Row'))
-check(2.1, 'Product card picker removed from line grid', !read('src/components/erp/ErpLineItemsGrid.tsx').includes('OpportunityProductAddPanel'))
+check(1, 'New Opportunity page shows Product & Pricing section', newPage.includes('Product & Pricing') && newPage.includes('ErpProductPricingSection'))
+check(2, 'Add product line in ErpProductPricingSection', read('src/components/erp/ErpProductPricingSection.tsx').includes('Add product line'))
+check(2.1, 'Product card picker removed from pricing section', !read('src/components/erp/ErpProductPricingSection.tsx').includes('OpportunityProductAddPanel'))
 check(3, 'ErpSmartSelect component exists', read('src/components/erp/ErpSmartSelect.tsx').includes('ErpSmartSelect'))
 check(4, 'Product master options builder', read('src/utils/opportunityProductOptions.ts').includes('buildProductMasterOptions'))
 
@@ -161,7 +161,7 @@ if (product) {
   check(21, 'Quotation receives opportunity item lines', qLines.length > 0)
 }
 
-check(22, 'Opportunity edit page uses line grid', editPage.includes('ErpLineItemsGrid'))
+check(22, 'Opportunity edit page uses product pricing section', editPage.includes('ErpProductPricingSection'))
 check(23, 'OpportunityLine type on Opportunity', read('src/types/crm.ts').includes('lines: OpportunityLine[]'))
 check(24, 'Store createOpportunity syncs lines', crmStoreSrc.includes('syncOpportunityLines'))
 check(25, 'npm script test:crm-opportunity-item-lines', pkg.includes('test:crm-opportunity-item-lines'))

@@ -9,6 +9,7 @@ import {
   Truck,
   ExternalLink,
   Pencil,
+  Receipt,
   LayoutGrid,
   Banknote,
   Printer,
@@ -77,6 +78,8 @@ import {
 } from '../../components/accounting/commercial'
 import { useSalesOrderCommercialPosition } from '../../hooks/useCommercialPosition'
 import { useInvoiceStore } from '../../store/invoiceStore'
+import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
+import { buildProformaNewUrl } from '../../utils/proformaInvoicePrefill'
 import {
   SalesOrderConfirmDialog,
   type SalesOrderConfirmValues,
@@ -146,6 +149,12 @@ export function SalesOrder360Page() {
   const dispatches = useDispatchStore((s) => s.dispatches)
   const customers = useMasterStore((s) => s.customers)
   const products = useMasterStore((s) => s.products)
+  const proformaInvoices = useProformaInvoiceStore((s) => s.proformaInvoices)
+  const linkedProformas = useMemo(
+    () => (id ? proformaInvoices.filter((p) => p.salesOrderId === id) : []),
+    [proformaInvoices, id],
+  )
+  const activeProforma = linkedProformas.find((p) => p.status !== 'cancelled')
 
   const [tab, setTab] = useState<SoTab>('overview')
   const [activeSection, setActiveSection] = useState<SoTab>('overview')
@@ -313,6 +322,7 @@ export function SalesOrder360Page() {
         customerPoDate: values.customerPoDate || null,
         paymentTerms: values.paymentTerms.trim(),
         deliveryTerms: values.deliveryTerms.trim(),
+        deliveryTime: values.deliveryTime.trim(),
         requiredDate: values.requiredDate || order.requiredDate,
         expectedDeliveryDate: values.requiredDate || order.expectedDeliveryDate,
         directSoReason: values.directSoReason.trim() || null,
@@ -437,6 +447,8 @@ export function SalesOrder360Page() {
     { label: 'Work Orders', value: String(orderWos.length) },
   ]
 
+  const printPath = resolveSalesOrderPrintPath(so.id, pathname)
+
   const commandBar = (
     <ErpCardCommandBar
       inline
@@ -448,10 +460,21 @@ export function SalesOrder360Page() {
         ...(!crmMode && so.status === 'confirmed'
           ? [{ id: 'plan', label: 'Production Plan', icon: Play, onClick: () => navigate('/manufacturing/production-plan') }]
           : []),
+        ...(so.status !== 'open' && !activeProforma ? [{ id: 'proforma', label: 'Create Proforma', icon: Receipt, onClick: () => navigate(buildProformaNewUrl(so.id)) }] : []),
+        ...(so.status !== 'open' && canCrmPermission('crm.commercial.invoice.create')
+          ? [{ id: 'invoice', label: 'Create Invoice', icon: Banknote, onClick: () => navigate(`/crm/commercial/invoices/new?salesOrderId=${so.id}`) }]
+          : []),
+        { id: 'preview', label: 'Preview', icon: Printer, pin: true, onClick: () => navigate(printPath) },
+        {
+          id: 'download-pdf',
+          label: 'Download PDF',
+          icon: Download,
+          pin: true,
+          onClick: () => navigate(`${printPath}?download=1`),
+        },
       ]}
       moreActions={[
-        { id: 'print', label: 'Print', icon: Printer, onClick: () => navigate(resolveSalesOrderPrintPath(so.id, pathname)) },
-        { id: 'pdf', label: 'Download PDF', icon: Download, onClick: () => navigate(resolveSalesOrderPrintPath(so.id, pathname)) },
+        ...(activeProforma ? [{ id: 'view-proforma', label: `Proforma ${activeProforma.proformaNo}`, icon: Receipt, onClick: () => navigate(`/sales/proforma-invoices/${activeProforma.id}`) }] : []),
         ...(quo ? [{ id: 'quotation', label: 'Quotation', icon: FileText, onClick: () => navigate(crmQuotationPath(quo.id)) }] : []),
         ...(crmDoc ? [{ id: 'quote-360', label: 'CRM Quote 360', icon: ExternalLink, onClick: () => navigate(`/crm/quotations/${so.quotationId}`) }] : []),
         { id: 'production', label: 'Work Orders', icon: Factory, onClick: () => selectSection('production') },

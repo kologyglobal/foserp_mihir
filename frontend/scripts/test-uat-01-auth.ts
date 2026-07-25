@@ -60,14 +60,22 @@ const loginPage = read('src/modules/auth/LoginPage.tsx')
 const apiGate = read('src/modules/auth/ApiAuthGate.tsx')
 const appShell = read('src/components/layout/AppShell.tsx')
 const protectedRoute = read('src/components/auth/ProtectedRoute.tsx')
-const mainTsx = read('src/main.tsx')
+const authRootLayout = read('src/components/auth/AuthRootLayout.tsx')
 
 check('UAT-01.1', 'Login/logout', 'Public /login route registered', authRoutes.includes("path: '/login'") && authRoutes.includes('LoginPage'))
 check('UAT-01.2', 'Protected-route access', 'ApiAuthGate wraps authenticated layout', routesIndex.includes('ApiAuthGate') && routesIndex.includes('ERPLayout'))
 check('UAT-01.3', 'Protected-route access', 'ApiAuthGate bypasses when not API mode', apiGate.includes('if (!isApiMode())'))
 check('UAT-01.4', 'Protected-route access', 'Unauthenticated users redirected to /login', apiGate.includes('Navigate to="/login"'))
 check('UAT-01.5', 'Protected-route access', 'ProtectedOutlet guards page content', appShell.includes('ProtectedOutlet'))
-check('UAT-01.6', 'Login/logout', 'AuthProvider wraps application', mainTsx.includes('AuthProvider'))
+check(
+  'UAT-01.6',
+  'Login/logout',
+  'AuthProvider wraps all routes including /login',
+  authRootLayout.includes('AuthProvider') &&
+    authRootLayout.includes('Outlet') &&
+    routesIndex.includes('AuthRootLayout') &&
+    routesIndex.includes('authRoute'),
+)
 check('UAT-01.7', 'Login/logout', 'Login page supports sign-in + forgot + reset views', loginPage.includes("'signin'") && loginPage.includes("'forgot'") && loginPage.includes("'reset'"))
 check('UAT-01.8', 'Login/logout', 'Logout API wired in AuthProvider', read('src/context/AuthProvider.tsx').includes('authApi.logout'))
 

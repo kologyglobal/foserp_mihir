@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import {
-  Building2, Eye, EyeOff, Lock, Mail, ShieldCheck, Sparkles, Truck, Users,
-} from 'lucide-react'
+import { Building2, Eye, EyeOff, Lock, Mail, Users } from 'lucide-react'
 import { useAuth } from '@/context/AuthProvider'
 import { API_CONFIG } from '@/config/apiConfig'
 import { forgotPassword, fetchLoginDirectory, type LoginDirectoryUser } from '@/services/api/authApi'
 
 const REMEMBER_KEY = 'fos_erp_login_remember'
+const VASANT_LOGO = '/brand/vasant-fabricators-logo.png'
 
 type LoginView = 'signin' | 'forgot' | 'reset' | 'accept-invite'
 
@@ -147,11 +146,6 @@ function mergeDirectoryUsers(apiUsers: LoginDirectoryUser[]): LoginDirectoryUser
   return Array.from(byEmail.values()).sort((a, b) => a.email.localeCompare(b.email))
 }
 
-const FEATURES = [
-  { icon: Users, title: 'CRM & pipeline', desc: 'Leads, opportunities, and 360° customer views' },
-  { icon: Truck, title: 'Trailer manufacturing', desc: 'Quotations, production, and inventory in one place' },
-  { icon: ShieldCheck, title: 'Enterprise security', desc: 'Role-based access with multi-tenant isolation' },
-] as const
 
 export function LoginPage() {
   const { login, isAuthenticated } = useAuth()
@@ -194,7 +188,7 @@ export function LoginPage() {
   }
 
   useEffect(() => {
-    document.title = 'Sign in — FOS ERP'
+    document.title = 'Sign in — Vasant Fabricators'
   }, [])
 
   useEffect(() => {
@@ -333,57 +327,83 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen bg-white">
-      {/* Left — brand & value prop (Dynamics / Fiori style) */}
-      <aside className="relative hidden w-[46%] flex-col justify-between overflow-hidden bg-gradient-to-br from-[#0f2b5b] via-[#123d7a] to-[#1a5fad] px-12 py-14 text-white lg:flex">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-16 left-1/3 h-64 w-64 rounded-full bg-cyan-400/20 blur-3xl" />
+      {/* Left — Vasant brand panel */}
+      <aside className="login-brand-panel relative hidden w-[48%] overflow-hidden px-12 py-10 text-white lg:grid xl:px-16">
+        <div className="login-brand-panel__glow login-brand-panel__glow--top" aria-hidden />
+        <div className="login-brand-panel__glow login-brand-panel__glow--bottom" aria-hidden />
+        <div className="login-brand-panel__grid" aria-hidden />
 
-        <div className="relative z-10">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 backdrop-blur">
-              <Sparkles className="h-6 w-6 text-cyan-200" />
+        <header className="login-brand-panel__header relative z-10">
+          <div className="login-brand-panel__brand">
+            <div className="login-brand-panel__logo-mark-wrap">
+              <img
+                src={VASANT_LOGO}
+                alt=""
+                aria-hidden
+                className="login-brand-panel__logo-mark"
+              />
             </div>
-            <div>
-              <p className="text-lg font-semibold tracking-tight">FOS ERP</p>
-              <p className="text-xs text-white/70">Manufacturing intelligence platform</p>
+            <p className="login-brand-panel__company-name">Vasant Fabricators Pvt. Ltd.</p>
+          </div>
+          <p className="login-brand-panel__tagline">ISO Tank · Special Purpose Vehicles</p>
+          <div className="login-brand-panel__rule" aria-hidden />
+        </header>
+
+        <div className="login-brand-panel__copy relative z-10 flex flex-col justify-center">
+          <div className="login-brand-panel__intro">
+            <h1 className="login-brand-panel__headline">
+              <span className="login-brand-panel__headline-lead">Welcome to</span>
+              <span className="login-brand-panel__headline-brand">Vasant Fabrication</span>
+            </h1>
+            <div className="login-brand-panel__powered-by">
+              <span className="login-brand-panel__powered-by-accent" aria-hidden />
+              <p className="login-brand-panel__powered-by-text">
+                Powered by FOS ERP (Factory Operating System)
+              </p>
             </div>
           </div>
 
-          <h1 className="mt-16 max-w-md text-4xl font-semibold leading-tight tracking-tight">
-            Run your trailer business with clarity and control
-          </h1>
-          <p className="mt-4 max-w-sm text-[15px] leading-relaxed text-white/75">
-            Unified CRM, quotations, production, and finance — designed for enterprise teams.
+          <div className="login-brand-panel__body" aria-label="Platform overview">
+            <p className="login-brand-panel__copy-text">
+              Manage leads, quotations, production, inventory, dispatch, and invoicing from one secure
+              platform.
+            </p>
+            <p className="login-brand-panel__copy-text login-brand-panel__copy-text--continued">
+              FOS ERP provides complete visibility across your factory operations—helping your team
+              work smarter, faster, and together.
+            </p>
+          </div>
+
+          <p className="login-brand-panel__closer">
+            <span className="login-brand-panel__closer-bar" aria-hidden />
+            One Factory. One System. Complete Control.
           </p>
         </div>
 
-        <ul className="relative z-10 space-y-5">
-          {FEATURES.map(({ icon: Icon, title, desc }) => (
-            <li key={title} className="flex gap-4">
-              <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
-                <Icon className="h-5 w-5 text-cyan-200" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold">{title}</p>
-                <p className="mt-0.5 text-sm text-white/65">{desc}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-
-        <p className="relative z-10 text-xs text-white/50">
-          © {new Date().getFullYear()} FOS ERP · Secure multi-tenant access
-        </p>
+        <footer className="login-brand-panel__footer relative z-10">
+          <div className="login-brand-panel__footer-divider" aria-hidden />
+          <p className="login-brand-panel__footer-tagline">
+            <span className="login-brand-panel__footer-sanskrit">सरलम् एव श्रेष्ठम्</span>
+            <span className="login-brand-panel__footer-sep" aria-hidden>
+              —
+            </span>
+            <span className="login-brand-panel__footer-english">Simplicity is Excellence</span>
+          </p>
+          <p className="login-brand-panel__footer-copy">
+            © {new Date().getFullYear()} Vasant Fabricators Pvt. Ltd.
+          </p>
+        </footer>
       </aside>
 
       {/* Right — sign-in panel */}
       <main className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-12 lg:px-16 xl:px-20">
         <div className={`mx-auto w-full ${view === 'signin' ? 'max-w-[920px]' : 'max-w-[420px]'}`}>
           <div className="mb-8 lg:hidden">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-6 w-6 text-erp-primary" />
-              <span className="text-lg font-semibold text-erp-text">FOS ERP</span>
-            </div>
+            <img
+              src={VASANT_LOGO}
+              alt="Vasant Fabricators Pvt. Ltd."
+              className="h-10 w-auto max-w-[220px] object-contain object-left"
+            />
           </div>
 
           <div className="mb-8">

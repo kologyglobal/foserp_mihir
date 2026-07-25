@@ -98,6 +98,9 @@ export function assertConfirmable(order: CrmSalesOrder): void {
   if (!order.paymentTerms?.trim() || !order.deliveryTerms?.trim()) {
     throw new ValidationError('Payment and delivery terms are required before confirmation')
   }
+  if (!order.deliveryTime?.trim()) {
+    throw new ValidationError('Delivery time / lead time is required before confirmation')
+  }
   const grand = order.grandTotal != null ? Number(order.grandTotal) : 0
   if (!(grand > 0)) {
     throw new ValidationError('Grand total must be greater than zero before confirmation')

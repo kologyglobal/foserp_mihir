@@ -106,6 +106,7 @@ export async function createSalesOrder(tenantId: string, userId: string, input: 
     gstAmount: summary.gstAmount,
     paymentTerms: input.paymentTerms,
     deliveryTerms: input.deliveryTerms,
+    deliveryTime: input.deliveryTime,
     warrantyTerms: input.warrantyTerms ?? null,
     commercialNotes: input.commercialNotes ?? null,
     technicalNotes: input.technicalNotes ?? null,
@@ -148,6 +149,7 @@ export async function updateSalesOrder(tenantId: string, id: string, userId: str
   if (input.remarks !== undefined) data.remarks = input.remarks
   if (input.paymentTerms !== undefined) data.paymentTerms = input.paymentTerms
   if (input.deliveryTerms !== undefined) data.deliveryTerms = input.deliveryTerms
+  if (input.deliveryTime !== undefined) data.deliveryTime = input.deliveryTime
   if (input.warrantyTerms !== undefined) data.warrantyTerms = input.warrantyTerms
   if (input.commercialNotes !== undefined) data.commercialNotes = input.commercialNotes
   if (input.technicalNotes !== undefined) data.technicalNotes = input.technicalNotes

@@ -136,11 +136,15 @@ export function validateQuotationForSoConversion(ctx: QuotationSoConversionConte
 
   const paymentTerms = sectionContent(document, 'payment') || salesQuotation?.paymentTerms
   const deliveryTerms = sectionContent(document, 'delivery') || salesQuotation?.deliveryTerms
+  const deliveryTime = (salesQuotation as { deliveryTime?: string } | undefined)?.deliveryTime
   if (!paymentTerms?.trim()) {
     issues.push({ id: 'no-payment', message: 'Payment terms are required.', blocking: true })
   }
   if (!deliveryTerms?.trim()) {
     issues.push({ id: 'no-delivery', message: 'Delivery terms are required.', blocking: true })
+  }
+  if (!deliveryTime?.trim()) {
+    issues.push({ id: 'no-delivery-time', message: 'Delivery time / lead time is required on the quotation.', blocking: true })
   }
   if (!salesQuotation?.validityDate) {
     issues.push({ id: 'no-validity', message: 'Quotation validity date is required.', blocking: true })
@@ -176,6 +180,7 @@ export function buildSoConversionPreview(ctx: QuotationSoConversionContext) {
     grandTotal: priced.summary.grandTotal,
     paymentTerms: sectionContent(document, 'payment') || salesQuotation?.paymentTerms || '—',
     deliveryTerms: sectionContent(document, 'delivery') || salesQuotation?.deliveryTerms || '—',
+    deliveryTime: (salesQuotation as { deliveryTime?: string } | undefined)?.deliveryTime || '—',
     validTill: salesQuotation?.validityDate ?? '—',
     salesOwner: document.salesOwnerName ?? '—',
     lines: priced.lines.map((l) => ({

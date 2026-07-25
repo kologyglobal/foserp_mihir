@@ -13,11 +13,13 @@ export interface SalesOrderCreateValidationInput {
   customerPoNumber: string
   paymentTerms: string
   deliveryTerms: string
+  deliveryTime: string
 }
 
 export interface SalesOrderDraftValidationInput {
   paymentTerms: string
   deliveryTerms: string
+  deliveryTime: string
   expectedDeliveryDate?: string
   customerPoDate?: string
 }
@@ -76,6 +78,10 @@ export function validateSalesOrderCreate(input: SalesOrderCreateValidationInput)
     fieldErrors.deliveryTerms = 'Delivery terms are required.'
     messages.push(fieldErrors.deliveryTerms)
   }
+  if (!input.deliveryTime.trim()) {
+    fieldErrors.deliveryTime = 'Select delivery time / lead time.'
+    messages.push(fieldErrors.deliveryTime)
+  }
 
   return { fieldErrors, messages }
 }
@@ -95,6 +101,10 @@ export function validateSalesOrderDraft(input: SalesOrderDraftValidationInput): 
   if (!input.deliveryTerms.trim()) {
     fieldErrors.deliveryTerms = 'Delivery terms are required.'
     messages.push(fieldErrors.deliveryTerms)
+  }
+  if (!input.deliveryTime.trim()) {
+    fieldErrors.deliveryTime = 'Select delivery time / lead time.'
+    messages.push(fieldErrors.deliveryTime)
   }
   if (input.expectedDeliveryDate) {
     const err = validateCrmCalendarDate(input.expectedDeliveryDate, { label: 'Expected delivery date' })

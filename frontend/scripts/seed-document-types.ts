@@ -9,7 +9,7 @@ const PASSWORD = process.env.SEED_PASSWORD ?? 'Admin@123'
 
 const DOCUMENT_TYPES = [
   { code: 'general', name: 'General Document', sortOrder: 1, attributes: { requiredFor: 'Any', fileTypes: 'pdf,jpg,png,doc,docx', maxSizeMb: 10 } },
-  { code: 'customer_po', name: 'Customer PO', sortOrder: 2, attributes: { requiredFor: 'Sales Order', fileTypes: 'pdf,jpg,png', maxSizeMb: 10 } },
+  { code: 'customer_po', name: 'Customer PO', sortOrder: 2, attributes: { fileTypes: 'pdf,jpg,png', maxSizeMb: 10 } },
   { code: 'customer_requirement', name: 'Customer Requirement', sortOrder: 3, attributes: { requiredFor: 'Quotation', fileTypes: 'pdf,doc,docx', maxSizeMb: 15 } },
   { code: 'drawing', name: 'Drawing', sortOrder: 4, attributes: { requiredFor: 'Quotation', fileTypes: 'pdf,dwg', maxSizeMb: 25 } },
   { code: 'technical_spec', name: 'Technical Specification', sortOrder: 5, attributes: { requiredFor: 'Quotation', fileTypes: 'pdf,doc,docx', maxSizeMb: 15 } },

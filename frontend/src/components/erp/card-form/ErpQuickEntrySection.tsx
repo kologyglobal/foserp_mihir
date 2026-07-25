@@ -20,7 +20,7 @@ export interface ErpQuickEntrySectionProps {
 
 /**
  * Standard Quick Entry FastTab — mandatory + high-frequency fields only.
- * Always uses the shared 3-column dense grid by default.
+ * Uses the shared 4-column dense grid by default (tablet/mobile collapse via CSS).
  */
 export function ErpQuickEntrySection({
   id = 'form-section-quick',
@@ -29,7 +29,7 @@ export function ErpQuickEntrySection({
   collapsedSummary,
   icon = Zap,
   children,
-  columns = 3,
+  columns = 4,
   className,
   collapsible = true,
   defaultOpen = true,

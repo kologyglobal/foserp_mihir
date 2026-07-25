@@ -30,6 +30,7 @@ import {
   ProformaInvoicePrintPage,
 } from '@/modules/sales/ProformaInvoicePages'
 import { ProformaInvoiceFormPage } from '@/modules/sales/ProformaInvoiceFormPage'
+import { ProformaReceivePaymentPage } from '@/modules/crm/commercial/CrmCommercialPages'
 
 /** Sales Phase 1 (SO) + CRM redirects + demo proforma print/PDF. */
 export const salesRouteChildren: RouteObject[] = [
@@ -64,5 +65,6 @@ export const salesRouteChildren: RouteObject[] = [
   { path: 'sales/proforma-invoices', element: <ProformaInvoiceListPage /> },
   { path: 'sales/proforma-invoices/new', element: <ProformaInvoiceFormPage /> },
   { path: 'sales/proforma-invoices/:id/print', element: <ProformaInvoicePrintPage /> },
+  { path: 'sales/proforma-invoices/:id/receive-payment', element: <ProformaReceivePaymentPage /> },
   { path: 'sales/proforma-invoices/:id', element: <ProformaInvoiceDetailPage /> },
 ]

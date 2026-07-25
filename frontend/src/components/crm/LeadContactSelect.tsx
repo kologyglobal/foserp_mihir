@@ -29,20 +29,38 @@ export function LeadContactSelect({
   const { canCreate } = useQuickCreate()
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  const options = useMemo<ErpSmartSelectOption[]>(
-    () =>
-      contacts.map((c) => ({
-        value: c.id,
-        label: c.name,
-        searchText: [c.name, c.designation, c.phone, c.email].filter(Boolean).join(' ').toLowerCase(),
-        meta: (
-          <span className="erp-dropdown-option__meta">
-            {[c.designation, c.phone, c.email].filter(Boolean).join(' · ') || 'No contact details'}
-          </span>
-        ),
-      })),
-    [contacts],
-  )
+  const options = useMemo<ErpSmartSelectOption[]>(() => {
+    const opts = contacts.map((c) => ({
+      value: c.id,
+      label: c.name,
+      searchText: [c.name, c.designation, c.phone, c.email].filter(Boolean).join(' ').toLowerCase(),
+      meta: (
+        <span className="erp-dropdown-option__meta">
+          {[c.designation, c.phone, c.email].filter(Boolean).join(' · ') || 'No contact details'}
+        </span>
+      ),
+    }))
+    if (contactId && !opts.some((o) => o.value === contactId)) {
+      const current = getContact(contactId)
+      if (current) {
+        opts.unshift({
+          value: current.id,
+          label: current.name,
+          searchText: [current.name, current.designation, current.phone, current.email]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase(),
+          meta: (
+            <span className="erp-dropdown-option__meta">
+              {[current.designation, current.phone, current.email].filter(Boolean).join(' · ') ||
+                'Linked contact'}
+            </span>
+          ),
+        })
+      }
+    }
+    return opts
+  }, [contacts, contactId, getContact])
 
   const canAdd = Boolean(customerId) && canCreate('contact') && !disabled
 
@@ -73,6 +91,7 @@ export function LeadContactSelect({
             allowEmpty
             appearance="combo"
             emptyMessage={customerId ? 'No contacts for this company' : 'Link a company to pick contacts'}
+            resolveOrphanLabel={(id) => getContact(id)?.name}
           />
         </div>
         <ErpButton
@@ -81,11 +100,11 @@ export function LeadContactSelect({
           size="sm"
           icon={Plus}
           disabled={!canAdd}
-          title={!customerId ? 'Select a company first' : undefined}
+          title={!customerId ? 'Select a company first' : 'Add New Contact'}
+          aria-label="Add New Contact"
+          className="crm-company-prospect__add"
           onClick={() => setDrawerOpen(true)}
-        >
-          Add New Contact
-        </ErpButton>
+        />
       </div>
 
       {contactId ? (

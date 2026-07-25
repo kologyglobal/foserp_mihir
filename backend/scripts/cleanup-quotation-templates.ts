@@ -1,13 +1,15 @@
 /**
- * Reduce the quotation template catalog to the two VF ISO product templates
+ * Reduce the quotation template catalog to the VF Word product templates
  * (matches prisma/quotationTemplateSeedData.ts and frontend DEFAULT_QUOTATION_TEMPLATES):
- *   - ISO-TANK-26KL        (26 KL ISO Tank Container Quotation)
- *   - ISO-DRY-BULK-25CBM   (25 m³ ISO Tank Container Quotation)
+ *   - ISO-TANK-26KL         (26 KL ISO Tank Container Quotation)
+ *   - ISO-DRY-BULK-25CBM    (25 m³ ISO Tank Container Quotation)
+ *   - FLOUR-BULKER-42M3     (42 m³ Hopper Type Flour Bulker Quotation)
+ *   - TIPPER-30FE-M3        (30 m³ Tipper FE Type Quotation)
  *
  * For every non-deleted tenant:
  *   1. Soft-deletes (deletedAt + isActive=false) all other templates — existing
  *      quotations are untouched; templates are catalog-only.
- *   2. Upserts / restores the two keep templates from the seed rows.
+ *   2. Upserts / restores the keep templates from the seed rows.
  *
  * Idempotent — safe to re-run. Usage (from backend/):
  *   npx tsx scripts/cleanup-quotation-templates.ts             # apply

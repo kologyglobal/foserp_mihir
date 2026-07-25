@@ -3,6 +3,7 @@ import type { CrmActivity, CrmActivityType, CrmContact, FollowUp, Opportunity, O
 import { syncQuotationsFromApi } from './quotationApiBridge'
 import { syncQuotationTemplatesFromApi } from './quotationTemplateApiBridge'
 import { syncSalesOrdersFromApi } from './salesOrderApiBridge'
+import { syncCommercialFromApi } from './crmCommercialApiBridge'
 import type { Customer } from '../../types/master'
 import { formatApiError, stageMissingFieldsFromApiError } from '../api/apiErrors'
 import { getStoredSession } from '../api/client'
@@ -200,6 +201,7 @@ export async function syncAllCrmFromApi(): Promise<void> {
       syncQuotationTemplatesFromApi(),
     ])
   await syncSalesOrdersFromApi()
+  await syncCommercialFromApi()
   useSalesStore.setState({
     leads: leads.map((l) => normalizeLead(l)),
     quotations: quotationData.quotationHeaders,

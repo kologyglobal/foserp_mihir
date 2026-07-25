@@ -29,13 +29,13 @@ async function mapWithNames(tenantId: string, row: NonNullable<Awaited<ReturnTyp
 function assertCatalogUnlockedForWrite() {
   if (isQuotationTemplateCatalogLocked()) {
     throw new ValidationError(
-      'Quotation template catalog is locked to the two ISO templates (26 KL and 25 m³). Creating or duplicating templates is disabled on live.',
+      'Quotation template catalog is locked to the VF Word product templates (109 ISO dry bulk, 152 flour bulker, 146 tipper). Creating or duplicating templates is disabled on live.',
     )
   }
 }
 
 export async function listQuotationTemplates(tenantId: string, query: ListQuotationTemplatesQuery) {
-  // Always create/restore the two ISO templates if missing — live often only had ISO-TANK-26KL.
+  // Always create/restore keep-catalog quotation templates if missing.
   await repo.ensureKeptQuotationTemplates(
     tenantId,
     QUOTATION_TEMPLATE_SEED_ROWS.map((row) => ({
@@ -144,7 +144,7 @@ export async function deleteQuotationTemplate(tenantId: string, id: string, user
   const existing = await repo.findQuotationTemplateById(tenantId, id)
   if (!existing) throw new NotFoundError('Quotation template not found')
   if (isQuotationTemplateCatalogLocked() && quotationTemplateKeepCodes().includes(existing.code)) {
-    throw new ValidationError('The two ISO quotation templates cannot be deleted on live.')
+    throw new ValidationError('The VF Word quotation templates cannot be deleted on live.')
   }
   await repo.softDeleteQuotationTemplate(tenantId, id, userId)
 }

@@ -14,8 +14,6 @@ import {
   ENTERPRISE_FORM_CLASS,
   EnterpriseBusinessFactBox,
   EnterpriseFormContextPanel,
-  EnterpriseFormMetrics,
-  EnterpriseFormSectionNav,
 } from '../../design-system/workspace'
 import { SalesCardFormShell } from './SalesCardFormShell'
 import { salesBreadcrumbs } from '../../utils/salesNavigation'
@@ -27,7 +25,9 @@ import {
   resolveSalesOrderDetailPath,
 } from '../../utils/crmSalesOrderNavigation'
 import { CommercialTermSelect } from '../../components/masters/GeographySelects'
-import { Input, Textarea } from '../../components/forms/Inputs'
+import { Input, Textarea, Select } from '../../components/forms/Inputs'
+import { SELECT_PLACEHOLDER } from '../../components/forms/selectStandards'
+import { useDeliveryTimeOptions } from '../../hooks/useCrmMasters'
 import { AppLink } from '../../components/ui/AppLink'
 import { notify } from '../../store/toastStore'
 import { validateSalesOrderDraft } from '../../utils/validation/crmSchemas/salesOrderSchema'
@@ -61,7 +61,6 @@ export function SalesOrderEditPage() {
   const locations = useMasterStore((s) => s.locations)
   const [validationErrors, setValidationErrors] = useState<FieldErrorMap>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [activeSection, setActiveSection] = useState('context')
 
   const [customerPoNumber, setCustomerPoNumber] = useState('')
   const [customerPoDate, setCustomerPoDate] = useState('')
@@ -69,7 +68,9 @@ export function SalesOrderEditPage() {
   const [deliveryLocation, setDeliveryLocation] = useState('')
   const [paymentTerms, setPaymentTerms] = useState('')
   const [deliveryTerms, setDeliveryTerms] = useState('')
+  const [deliveryTime, setDeliveryTime] = useState('')
   const [internalRemarks, setInternalRemarks] = useState('')
+  const deliveryTimeOptions = useDeliveryTimeOptions()
   const { locationId, setLocationId } = useDocumentLocation('sales', so?.locationId)
 
   useEffect(() => {
@@ -80,6 +81,7 @@ export function SalesOrderEditPage() {
     setDeliveryLocation(so.deliveryLocation ?? '')
     setPaymentTerms(so.paymentTerms?.trim() || '30% advance, balance before dispatch')
     setDeliveryTerms(so.deliveryTerms?.trim() || 'Ex-works Pune')
+    setDeliveryTime(so.deliveryTime?.trim() ?? '')
     setInternalRemarks(so.internalRemarks ?? '')
     if (so.locationId) setLocationId(so.locationId)
   }, [so, setLocationId])
@@ -97,7 +99,7 @@ export function SalesOrderEditPage() {
 
   const poDone = Boolean(customerPoNumber.trim())
   const deliveryDone = Boolean(expectedDeliveryDate)
-  const commercialDone = Boolean(paymentTerms.trim() && deliveryTerms.trim())
+  const commercialDone = Boolean(paymentTerms.trim() && deliveryTerms.trim() && deliveryTime.trim())
 
   const completionItems = useMemo(() => [
     { id: 'context', label: 'Order Context', done: Boolean(so?.customerId && so?.productId) },
@@ -106,24 +108,6 @@ export function SalesOrderEditPage() {
   ], [so?.customerId, so?.productId, poDone, deliveryDone, commercialDone])
 
   const completionPercent = Math.round((completionItems.filter((i) => i.done).length / completionItems.length) * 100)
-
-  const sectionNavItems = useMemo(() => [
-    { id: 'context', label: 'Order Context', icon: Building2, done: completionItems.find((i) => i.id === 'context')?.done },
-    { id: 'po', label: 'PO & Delivery', icon: MapPin, done: completionItems.find((i) => i.id === 'po')?.done },
-    { id: 'commercial', label: 'Commercial', icon: Banknote, done: completionItems.find((i) => i.id === 'commercial')?.done },
-  ], [completionItems])
-
-  const formMetrics = useMemo(() => [
-    { label: 'Completion', value: `${completionPercent}%`, accent: 'blue' as const, hint: `${completionItems.filter((i) => i.done).length} of ${completionItems.length} sections` },
-    { label: 'Customer', value: customer?.customerName?.slice(0, 20) ?? '—', accent: customer ? 'green' as const : 'amber' as const, hint: customer?.customerCode ?? 'Locked' },
-    { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', accent: 'violet' as const, hint: `${formatNumber(so?.qty ?? 0)} × ${product?.productName ?? 'Product'}` },
-    { label: 'Delivery', value: expectedDeliveryDate ? formatDate(expectedDeliveryDate) : '—', accent: 'amber' as const, hint: so ? formatStatus(so.status === 'open' ? 'draft' : so.status) : 'Draft' },
-  ], [completionPercent, completionItems, customer, displayValue, so, product, expectedDeliveryDate])
-
-  function scrollToSection(sectionId: string) {
-    setActiveSection(sectionId)
-    document.getElementById(`so-edit-section-${sectionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
 
   if (!id || !so) {
     return (
@@ -156,6 +140,7 @@ export function SalesOrderEditPage() {
     return validateSalesOrderDraft({
       paymentTerms,
       deliveryTerms,
+      deliveryTime,
       expectedDeliveryDate,
       customerPoDate,
     }).fieldErrors
@@ -166,7 +151,7 @@ export function SalesOrderEditPage() {
     if (Object.keys(errors).length) {
       handleInvalidSubmit({
         errors,
-        fieldOrder: ['paymentTerms', 'deliveryTerms', 'expectedDeliveryDate', 'customerPoDate'],
+        fieldOrder: ['paymentTerms', 'deliveryTerms', 'deliveryTime', 'expectedDeliveryDate', 'customerPoDate'],
         onFieldErrors: setValidationErrors,
       })
       return
@@ -183,6 +168,7 @@ export function SalesOrderEditPage() {
       locationId: locationId || null,
       paymentTerms: paymentTerms.trim() || undefined,
       deliveryTerms: deliveryTerms.trim() || undefined,
+      deliveryTime: deliveryTime.trim(),
       internalRemarks: internalRemarks.trim() || null,
       requiredDate: expectedDeliveryDate || draftSo.requiredDate,
     }
@@ -212,7 +198,10 @@ export function SalesOrderEditPage() {
     { label: 'Qty', value: formatNumber(so.qty) },
     { label: 'Order Value', value: displayValue > 0 ? formatCurrency(displayValue) : '—', highlight: displayValue > 0 },
     { label: 'Customer PO', value: customerPoNumber.trim() || '—' },
-    { label: 'Quotation', value: so.quotationNo ? `${so.quotationNo} Rev ${so.quotationRevisionNo ?? 1}` : '—' },
+    {
+      label: 'Quotation Number (Reference)',
+      value: so.quotationNo ? `${so.quotationNo} Rev ${so.quotationRevisionNo ?? 1}` : '—',
+    },
   ]
 
   /** Secondary nav only — Save / Cancel live in the sticky footer (same as New Lead). */
@@ -326,14 +315,6 @@ export function SalesOrderEditPage() {
           />
         )}
       >
-        <EnterpriseFormSectionNav
-          sections={sectionNavItems}
-          activeId={activeSection}
-          onSelect={scrollToSection}
-        />
-
-        <EnterpriseFormMetrics metrics={formMetrics} />
-
         <ErpCardSection
           id="so-edit-section-context"
           title="Order Context"
@@ -359,7 +340,7 @@ export function SalesOrderEditPage() {
             <Input value={formatCurrency(displayValue)} readOnly className="erp-input" />
           </ErpFieldRow>
           {so.quotationNo ? (
-            <ErpFieldRow label="Quotation Reference" readOnly colSpan={2}>
+            <ErpFieldRow label="Quotation Number (Reference)" readOnly colSpan={2}>
               <Input value={`${so.quotationNo} · Rev ${so.quotationRevisionNo ?? 1}`} readOnly className="erp-input" />
             </ErpFieldRow>
           ) : null}
@@ -400,7 +381,7 @@ export function SalesOrderEditPage() {
         <ErpCardSection
           id="so-edit-section-commercial"
           title="Commercial Terms"
-          subtitle="Payment, delivery terms, and internal notes."
+          subtitle="Payment, delivery terms, lead time, and internal notes."
           icon={Banknote}
           accent="green"
           collapsible
@@ -411,6 +392,23 @@ export function SalesOrderEditPage() {
           </ErpFieldRow>
           <ErpFieldRow label="Delivery Terms" required dataField="deliveryTerms" fieldError={validationErrors.deliveryTerms}>
             <CommercialTermSelect termType="delivery" value={deliveryTerms} onChange={setDeliveryTerms} />
+          </ErpFieldRow>
+          <ErpFieldRow
+            label="Delivery Time / Lead Time"
+            required
+            dataField="deliveryTime"
+            fieldError={validationErrors.deliveryTime}
+          >
+            <Select
+              value={deliveryTime}
+              onChange={(e) => setDeliveryTime(e.target.value)}
+              error={Boolean(validationErrors.deliveryTime)}
+            >
+              <option value="">{SELECT_PLACEHOLDER}</option>
+              {deliveryTimeOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </Select>
           </ErpFieldRow>
           <ErpFieldRow label="Internal Remarks" colSpan={2} horizontal={false}>
             <Textarea rows={3} value={internalRemarks} onChange={(e) => setInternalRemarks(e.target.value)} className="erp-input" />

@@ -65,10 +65,6 @@ export function validateLeadForm(input: LeadFormValidationInput): FieldErrorMap 
     if (mobileError) errors.mobile = mobileError
   }
 
-  if (!input.remarks.trim()) {
-    errors.remarks = 'Notes are required'
-  }
-
   // Lead stage must never make optional / collapsed fields mandatory.
   // Invalid entered optional dates still surface errors below.
 

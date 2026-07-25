@@ -92,6 +92,13 @@ export function resolveDefaultCommercialTerm(kind: QuotationCommercialTermKind):
   return { code: preferred.code, text: buildCommercialTermText(kind, preferred.code) }
 }
 
+/** Default delivery lead time from Delivery Time master (stores display name). */
+export function resolveDefaultDeliveryTime(): string {
+  const entries = getCrmMasterEntries('delivery-time', true)
+  const preferred = entries.find((e) => e.code === '6_weeks') ?? entries[0]
+  return preferred?.name ?? ''
+}
+
 export function inferSectionMasterCode(section: QuotationSection): string | null {
   if (section.masterCode) return section.masterCode
   const kind = commercialTermKindForSection(section.sectionType)

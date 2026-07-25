@@ -34,10 +34,9 @@ import { formatCrmCurrency } from '../../utils/crmMetrics'
 import { contactViewBreadcrumbs } from '../../utils/crmContactNavigation'
 import { opportunityStageLabel } from '../../utils/opportunityUtils'
 import { buildUnifiedFeed } from '../../utils/crmUnifiedFeed'
-import { formatDate, formatRelativeTime } from '../../utils/dates/format'
+import { formatDate } from '../../utils/dates/format'
 import { canCrmPermission } from '../../utils/permissions/crm'
 import {
-  EnterpriseFormMetrics,
   EnterpriseFormSectionNav,
 } from '../../design-system/workspace'
 import { Enterprise360Documents } from '../../design-system/workspace360'
@@ -183,27 +182,6 @@ export function Contact360Page() {
       </CrmCardFormShell>
     )
   }
-
-  const metrics = [
-    {
-      label: 'Open Opportunities',
-      value: String(contactOpportunities.length),
-      accent: 'blue' as const,
-      hint: contactOpportunities.length > 0 ? 'Active pipeline' : 'No open deals',
-    },
-    {
-      label: 'Last Activity',
-      value: lastActivity ? formatRelativeTime(lastActivity.activityDate) : '—',
-      accent: 'violet' as const,
-      hint: lastActivity?.subject ?? 'No activity logged',
-    },
-    {
-      label: 'Next Follow-up',
-      value: nextFollowUp ? formatDate(nextFollowUp.dueDate) : '—',
-      accent: nextFollowUp?.status === 'overdue' ? ('amber' as const) : ('green' as const),
-      hint: nextFollowUp?.assignedToName ?? 'Not scheduled',
-    },
-  ]
 
   const sectionNavItems = [
     { id: 'profile', label: 'Summary', icon: User },
@@ -363,8 +341,6 @@ export function Contact360Page() {
           activeId={activeSection}
           onSelect={scrollToSection}
         />
-
-        <EnterpriseFormMetrics metrics={metrics} />
 
         <ContactSummaryCard
           contact={contact}

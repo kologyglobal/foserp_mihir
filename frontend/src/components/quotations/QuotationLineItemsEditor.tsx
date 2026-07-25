@@ -1,14 +1,12 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { QuotationPriceLine } from '../../types/crm'
-import { ErpLineItemsGrid } from '../erp/ErpLineItemsGrid'
-import { FormattedCurrencyInput } from '../forms/FormattedCurrencyInput'
+import { ErpProductPricingPanel } from '../erp/ErpProductPricingSection'
 import { useMasterStore } from '../../store/masterStore'
-import { formatCrmCurrency } from '../../utils/crmMetrics'
-import { calcPriceSummary } from '../../utils/crmQuotationCalc'
 import {
   opportunityLinesToQuotationPriceLines,
   quotationPriceLinesToOpportunityLines,
   syncOpportunityLines,
+  type OrderDiscountMode,
 } from '../../utils/opportunityLineCalc'
 import { useProductMasterOptionMap } from '../../utils/opportunityProductOptions'
 
@@ -38,7 +36,6 @@ export function QuotationLineItemsEditor({
   freightAmount = 0,
   installationAmount = 0,
   customCharges = 0,
-  probability = 0,
   readOnly,
   scopeNotes,
   onScopeNotesChange,
@@ -65,11 +62,10 @@ export function QuotationLineItemsEditor({
     [priceLines],
   )
 
+  const [orderDiscountMode, setOrderDiscountMode] = useState<OrderDiscountMode>('flat')
+  const [orderDiscountInput, setOrderDiscountInput] = useState(0)
+
   const extras: QuotationLineExtras = { freightAmount, installationAmount, customCharges }
-  const quoteSummary = useMemo(
-    () => calcPriceSummary(priceLines, freightAmount, installationAmount, customCharges),
-    [priceLines, freightAmount, installationAmount, customCharges],
-  )
 
   function handleLinesChange(nextOppLines: ReturnType<typeof syncOpportunityLines>) {
     if (!onChange) return
@@ -83,75 +79,37 @@ export function QuotationLineItemsEditor({
 
   return (
     <div className="quotation-line-items-editor space-y-4">
-      <ErpLineItemsGrid
+      <ErpProductPricingPanel
         lines={oppLines}
         onChange={handleLinesChange}
         productOptions={productOptions}
         productPickMap={pickMap}
         rowErrors={rowErrors}
-        probability={probability}
         readOnly={readOnly}
-        variant="opportunity"
+        showAdjustments
+        freightAmount={freightAmount}
+        onFreightChange={
+          onChange && !readOnly
+            ? (next) => handleExtrasChange({ freightAmount: next })
+            : undefined
+        }
+        orderDiscountMode={orderDiscountMode}
+        onOrderDiscountModeChange={readOnly ? undefined : setOrderDiscountMode}
+        orderDiscountInput={orderDiscountInput}
+        onOrderDiscountInputChange={readOnly ? undefined : setOrderDiscountInput}
+        installationAmount={installationAmount}
+        onInstallationChange={
+          showFreightExtras && onChange && !readOnly
+            ? (next) => handleExtrasChange({ installationAmount: next })
+            : undefined
+        }
+        customCharges={customCharges}
+        onCustomChargesChange={
+          showFreightExtras && onChange && !readOnly
+            ? (next) => handleExtrasChange({ customCharges: next })
+            : undefined
+        }
       />
-
-      {showFreightExtras && !readOnly ? (
-        <div className="quotation-line-items-editor__extras grid gap-3 sm:grid-cols-3">
-          <label className="block text-sm">
-            <span className="font-medium text-erp-text">Freight</span>
-            <FormattedCurrencyInput
-              value={freightAmount}
-              onValueChange={(next) => handleExtrasChange({ freightAmount: Math.max(0, next) })}
-              className="erp-input mt-1 text-right tabular-nums"
-              aria-label="Freight"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-erp-text">Installation</span>
-            <FormattedCurrencyInput
-              value={installationAmount}
-              onValueChange={(next) => handleExtrasChange({ installationAmount: Math.max(0, next) })}
-              className="erp-input mt-1 text-right tabular-nums"
-              aria-label="Installation"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-erp-text">Other charges</span>
-            <FormattedCurrencyInput
-              value={customCharges}
-              onValueChange={(next) => handleExtrasChange({ customCharges: Math.max(0, next) })}
-              className="erp-input mt-1 text-right tabular-nums"
-              aria-label="Other charges"
-            />
-          </label>
-        </div>
-      ) : null}
-
-      {showFreightExtras && readOnly && (freightAmount > 0 || installationAmount > 0 || customCharges > 0) ? (
-        <div className="quo-editor-price__summary">
-          {freightAmount > 0 ? (
-            <div className="quo-editor-price__summary-row">
-              <span>Freight</span>
-              <span className="tabular-nums text-right">{formatCrmCurrency(freightAmount)}</span>
-            </div>
-          ) : null}
-          {installationAmount > 0 ? (
-            <div className="quo-editor-price__summary-row">
-              <span>Installation</span>
-              <span className="tabular-nums text-right">{formatCrmCurrency(installationAmount)}</span>
-            </div>
-          ) : null}
-          {customCharges > 0 ? (
-            <div className="quo-editor-price__summary-row">
-              <span>Other charges</span>
-              <span className="tabular-nums text-right">{formatCrmCurrency(customCharges)}</span>
-            </div>
-          ) : null}
-          <div className="quo-editor-price__summary-row quo-editor-price__summary-row--total">
-            <span>Grand total (incl. extras)</span>
-            <span className="tabular-nums text-right">{formatCrmCurrency(quoteSummary.grandTotal)}</span>
-          </div>
-        </div>
-      ) : null}
 
       {scopeNotes !== undefined || onScopeNotesChange ? (
         <label className="block">

@@ -104,6 +104,7 @@ export interface QuotationDto {
   terms: string
   paymentTerms: string
   deliveryTerms: string
+  deliveryTime: string
   validityDate: string
   pricing: QuotationPricingDto
   changeHistory: QuotationChangeRecordDto[]

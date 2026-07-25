@@ -228,6 +228,7 @@ function isCrmShellPath(pathname: string): boolean {
 export function canRoute(pathname: string): boolean {
   if (isCrmShellPath(pathname)) {
     if (isApiMode()) {
+      if (hasWorkspaceAdminRole()) return true
       const perms = getStoredSession()?.user.permissions ?? []
       return CRM_SHELL_VIEW_PERMS.some((p) => perms.includes(p))
     }
@@ -379,3 +380,8 @@ import {
   canManufacturingRoute,
   isManufacturingPath,
 } from './manufacturing'
+
+export {
+  canAccessModuleCategory,
+  getUserLandingPath,
+} from './moduleCategoryAccess'

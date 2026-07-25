@@ -555,6 +555,11 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .enterprise-workspace .erp-quick-entry .erp-card-section__grid--cols-3,
+  .enterprise-workspace .erp-quick-entry .erp-card-section__grid--cols-4 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .enterprise-workspace--dynamics-form .erp-field-row--horizontal {
     display: flex;
     flex-direction: column;
@@ -1666,10 +1671,32 @@
   box-shadow: 0 0 0 1px #0078d4;
 }
 
-.enterprise-workspace--dynamics-form .erp-smart-select__input {
-  font-size: var(--dyn-form-field-font-size);
+/* Inner input must stay borderless — only the anchor is the visible field. */
+.enterprise-workspace--dynamics-form .erp-smart-select__input,
+.enterprise-workspace .erp-smart-select__input {
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  font-size: var(--dyn-form-field-font-size, 13px);
   color: #323130;
   line-height: 1.25;
+  width: 100%;
+}
+
+.enterprise-workspace--dynamics-form .erp-smart-select__input:focus,
+.enterprise-workspace--dynamics-form .erp-smart-select__input:focus-visible,
+.enterprise-workspace .erp-smart-select__input:focus,
+.enterprise-workspace .erp-smart-select__input:focus-visible {
+  border: 0;
+  outline: none;
+  box-shadow: none;
 }
 
 .enterprise-workspace--dynamics-form .erp-smart-select__chevron {
@@ -1681,7 +1708,7 @@
 .enterprise-workspace--dynamics-form input.erp-input:not([type='checkbox']):not([type='radio']):not(textarea):not(.erp-search-field__input),
 .enterprise-workspace--dynamics-form select.erp-input,
 .enterprise-workspace--dynamics-form .erp-select,
-.enterprise-workspace--dynamics-form .erp-field-row input:not([type='checkbox']):not([type='radio']):not(.erp-search-field__input),
+.enterprise-workspace--dynamics-form .erp-field-row input:not([type='checkbox']):not([type='radio']):not(.erp-search-field__input):not(.erp-smart-select__input),
 .enterprise-workspace--dynamics-form .erp-field-row select {
   height: var(--dyn-form-field-height);
   min-height: var(--dyn-form-field-height);

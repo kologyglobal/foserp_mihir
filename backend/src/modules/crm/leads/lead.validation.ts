@@ -53,12 +53,7 @@ const createLeadBaseSchema = z.object({
 })
 
 export const createLeadSchema = createLeadBaseSchema.superRefine((data, ctx) => {
-  const remarks = (data.remarks ?? '').trim()
-  if (!remarks) {
-    ctx.addIssue({ code: 'custom', message: 'Notes are required', path: ['remarks'] })
-  }
-
-  // Lead stage must not mandate contact / product / reason fields.
+  // Lead stage must not mandate contact / product / reason / notes fields.
   // Entered email/mobile are validated by optionalEmailSchema / optionalNullablePhoneSchema.
 
   if (!data.priority) {

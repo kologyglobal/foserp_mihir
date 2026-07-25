@@ -66,6 +66,8 @@ export interface Quotation extends AuditTrail {
   terms: string
   paymentTerms: string
   deliveryTerms: string
+  /** Lead-time commitment from Delivery Time master (e.g. "6 weeks") */
+  deliveryTime?: string
   validityDate: string
   pricing: QuotationPricing
   changeHistory: QuotationChangeRecord[]

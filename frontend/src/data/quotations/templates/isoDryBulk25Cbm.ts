@@ -8,18 +8,15 @@ function specRow(sectionNo: string, label: string, value: string, required = tru
 
 /**
  * 20' ISO Dry Bulk Tanker (≈25 CBM) — mapped from VF/QUO/26-27/109
- * Source: `109.25m3 ISO Tank Container.docx` (cement / dry bulk, rail impact tested).
+ * Source: `109.25m3 ISO Tank Container.docx` / PDF (cement / dry bulk, rail impact tested).
+ * Dynamic merge fields: {{quotation_no}}, {{customer_*}}, {{product_*}}, {{payment_terms}}, etc.
  */
 export const ISO_DRY_BULK_25CBM_SECTIONS: TemplateSection[] = [
   {
     sectionType: 'cover',
     title: 'Quotation',
     content: [
-      'QUOTATION',
-      '',
-      'Quotation No.: {{quotation_no}}',
       'Ref. No.: {{reference_no}}',
-      'Date: {{quotation_date}}',
       '',
       "Sub: Quotation for supply of 25 m³ ISO Tank Container",
       "20' ISO Dry Bulk Tanker — Model 25 CBM (rail / sea / road, CSC)",
@@ -52,9 +49,9 @@ export const ISO_DRY_BULK_25CBM_SECTIONS: TemplateSection[] = [
     content: [
       'Dear Sir,',
       '',
-      'We appreciate your interest in our products and are delighted to provide the following price for your requirement of 25 m³ ISO Tank Container (Model 25 CBM dry bulk).',
+      'We appreciate your interest in our products and are delighted to provide the following price for {{product_name}}.',
       '',
-      'We trust that our offer will meet your technical and commercial expectations and look forward to your valued enquiry/order.',
+      'Quantity: {{quantity}}',
     ].join('\n'),
     sequenceNo: 3,
     editable: true,
@@ -83,27 +80,27 @@ export const ISO_DRY_BULK_25CBM_SECTIONS: TemplateSection[] = [
         'Tanker: ASME VIII Div. 1 and IS 2825, where applicable | Frame: ISO 1496-3, ISO 6346, ISO 668 and ISO 1161 | Rail Impact Tested',
       ),
       specRow('1.3', 'Frame Dimensions', '6058 mm long × 2438 mm width × 2896 mm height'),
-      specRow('1.3a', 'Shell Calculated Thickness', '4 mm taken'),
-      specRow('1.3b', 'Shell Corrosion Allowance', '0.5 mm'),
-      specRow('1.3c', 'Head Corrosion Allowance', '0.5 mm'),
-      specRow('1.3d', 'Head After Forming Min.', '4.5 mm'),
+      specRow('1.3.1', 'Shell Calculated Thickness', '4 mm taken'),
+      specRow('1.3.2', 'Shell Corrosion Allowance', '0.5 mm'),
+      specRow('1.3.3', 'Head Corrosion Allowance', '0.5 mm'),
+      specRow('1.3.4', 'Head After Forming Min.', '4.5 mm'),
       specRow('1.4', 'Application', 'Cement'),
       specRow('1.5', 'Diagonal Difference — Roof, Bottom & Side', '13 mm'),
-      specRow('1.5a', 'Diagonal Difference — Front & Rear', '10 mm'),
+      specRow('1.5.1', 'Diagonal Difference — Front & Rear', '10 mm'),
       specRow('1.6', 'Tare (Nominal ±3%)', 'Approx. 4,300 kg'),
-      specRow('1.6a', 'Max. Payload', '31,700 kg'),
-      specRow('1.6b', 'Max. Gross', '36,000 kg'),
-      specRow('1.6c', 'Stacking', '213,000 kg'),
+      specRow('1.6.1', 'Max. Payload', '31,700 kg'),
+      specRow('1.6.2', 'Max. Gross', '36,000 kg'),
+      specRow('1.6.3', 'Stacking', '213,000 kg'),
       specRow(
         '1.7',
         'Unloading Time',
         'Maximum 50 minutes at pressure of 1 bar for unloading of 31,000 kg cement with discharge pipeline of 30 meters',
       ),
-      specRow('1.7a', 'Remnant Ratio % Cement', '≤ 0.7'),
+      specRow('1.7.1', 'Remnant Ratio % Cement', '≤ 0.7'),
       specRow('1.8', 'Tank M.A.W.P.', '2.2 Bar'),
-      specRow('1.8a', 'Tank Test Pressure', '3.3 bar'),
-      specRow('1.8b', 'Tank Design Temperature', '−19°C to +120°C'),
-      specRow('1.8c', 'Ambient Temperature', '−6°C to 80°C'),
+      specRow('1.8.1', 'Tank Test Pressure', '3.3 bar'),
+      specRow('1.8.2', 'Tank Design Temperature', '−19°C to +120°C'),
+      specRow('1.8.3', 'Ambient Temperature', '−6°C to 80°C'),
     ],
   },
   {
@@ -120,8 +117,8 @@ export const ISO_DRY_BULK_25CBM_SECTIONS: TemplateSection[] = [
       specRow('2.4', 'Framework', 'Hollow Pipe Sections YS 310 or Higher'),
       specRow('2.5', 'Corner Castings', 'ISO Standard 1161 — Top & Bottom standard ISO castings'),
       specRow('2.6', 'Radiography — Shell', 'Spot radiography on shell including all T-joints'),
-      specRow('2.6a', 'Radiography — Dished Ends', '100% full'),
-      specRow('2.6b', 'Joint Efficiencies', '0.85 for Shell, 1.0 for Dished Ends'),
+      specRow('2.6.1', 'Radiography — Dished Ends', '100% full'),
+      specRow('2.6.2', 'Joint Efficiencies', '0.85 for Shell, 1.0 for Dished Ends'),
     ],
   },
   {
@@ -133,8 +130,8 @@ export const ISO_DRY_BULK_25CBM_SECTIONS: TemplateSection[] = [
     contentFormat: 'spec_table',
     specRows: [
       specRow('3.1', 'Shell Surface Finish', 'Hot Rolled Steel'),
-      specRow('3.1a', 'Dished Ends', 'Hot Rolled Steel'),
-      specRow('3.1b', 'Longitudinal / Circumferential / Internal Nozzle Welds', 'As welded'),
+      specRow('3.1.1', 'Dished Ends', 'Hot Rolled Steel'),
+      specRow('3.1.2', 'Longitudinal / Circumferential / Internal Nozzle Welds', 'As welded'),
       specRow(
         '3.2',
         'Cleaning',
@@ -175,8 +172,16 @@ export const ISO_DRY_BULK_25CBM_SECTIONS: TemplateSection[] = [
         'Material Discharge Line',
         '5" (DN125) × 1 side discharge only — SA106 seamless pipeline with 4 nos. manual butterfly valves (aluminium die-cast body with SS disc); Gasket: EPDM rubber',
       ),
-      specRow('4.6', 'Top Longitudinal Member', 'Top longitudinal rectangular members connecting front and rear end frame top corner castings'),
-      specRow('4.7', 'Bottom Longitudinal Member', 'Bottom longitudinal pipe members connecting front and rear end frames above bottom corner castings'),
+      specRow(
+        '4.6',
+        'Top Longitudinal Member',
+        'Top longitudinal rectangular members connecting front and rear end frame top corner castings',
+      ),
+      specRow(
+        '4.7',
+        'Bottom Longitudinal Member',
+        'Bottom longitudinal pipe members connecting front and rear end frames above bottom corner castings',
+      ),
       specRow(
         '4.8',
         'Walkway',
@@ -201,13 +206,13 @@ export const ISO_DRY_BULK_25CBM_SECTIONS: TemplateSection[] = [
     specRows: [
       specRow('5.1', 'Framework Treatment', 'All carbon steel frame parts blast cleaned in accordance with SA 2½'),
       specRow('5.2', 'Frame & Tank — Primer', 'Epoxy zinc rich primer — 30 microns DFT'),
-      specRow('5.2a', 'Frame & Tank — Intermediate', 'Epoxy primer — 40 microns DFT'),
-      specRow('5.2b', 'Frame & Tank — Top Coat', 'Polyurethane — 50 microns DFT'),
-      specRow('5.2c', 'Frame & Tank — Total DFT', '120 microns DFT'),
-      specRow('5.2d', 'Colour', 'Suit to customer'),
+      specRow('5.2.1', 'Frame & Tank — Intermediate', 'Epoxy primer — 40 microns DFT'),
+      specRow('5.2.2', 'Frame & Tank — Top Coat', 'Polyurethane — 50 microns DFT'),
+      specRow('5.2.3', 'Frame & Tank — Total DFT', '120 microns DFT'),
+      specRow('5.2.4', 'Colour', 'Suit to customer'),
       specRow('5.3', 'Internal Painting — Primer', 'Epoxy zinc rich primer — 30 microns DFT'),
-      specRow('5.3a', 'Internal Painting — Top Coat', 'Synthetic Enamel — 50 microns DFT'),
-      specRow('5.3b', 'Internal Painting — Total DFT', '80 microns DFT'),
+      specRow('5.3.1', 'Internal Painting — Top Coat', 'Synthetic Enamel — 50 microns DFT'),
+      specRow('5.3.2', 'Internal Painting — Total DFT', '80 microns DFT'),
       specRow('5.4', 'Earthing Connections', 'At least one lug with 20 mm hole located near tank adjacent to bottom discharge'),
     ],
   },
@@ -231,9 +236,7 @@ export const ISO_DRY_BULK_25CBM_SECTIONS: TemplateSection[] = [
   {
     sectionType: 'custom',
     title: 'Test and Approvals',
-    content: [
-      '• Frame test as per IS 1496-3 with rail impact test and type approval of tank design.',
-    ].join('\n'),
+    content: '• Frame test as per IS 1496-3 with rail impact test and type approval of tank design.',
     sequenceNo: 11,
     editable: true,
     contentFormat: 'richtext',
@@ -255,10 +258,9 @@ export const ISO_DRY_BULK_25CBM_SECTIONS: TemplateSection[] = [
     sectionType: 'scope',
     title: 'Scope of Work',
     content: [
-      'We will make the ISO tanker as per the above specifications. This is standard equipment.',
-      'Any changes requested by the customer will be subject to revised rates.',
-      '',
-      'NDE / radiography as mentioned above is included.',
+      '1. We will make ISO tanker as per above specifications and this is standard equipment.',
+      "   If any other changes from the customer's end will be subject to revised rates.",
+      '2. NDE or radiography as mentioned above is included.',
     ].join('\n'),
     sequenceNo: 13,
     editable: true,
@@ -318,4 +320,4 @@ export const ISO_DRY_BULK_25CBM_SECTIONS: TemplateSection[] = [
 ]
 
 export const ISO_DRY_BULK_TEMPLATE_ID = 'qtpl-iso-dry-bulk-25cbm'
-export const ISO_DRY_BULK_TEMPLATE_VERSION = 4
+export const ISO_DRY_BULK_TEMPLATE_VERSION = 7

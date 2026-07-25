@@ -1,9 +1,40 @@
 import { useDmsStore } from '../../store/dmsStore'
-import { triggerPrintPdf } from '../documentPrint'
+import { downloadPrintDocumentPdf, type DocumentPdfResult } from '../documentPdfDownload'
 
-/** Browser print → PDF (customer-facing layout uses @media print styles) */
-export function printQuotationDocument(): void {
-  triggerPrintPdf()
+/** Browser print dialog (Save as PDF still available from the system print UI). */
+export function printQuotationDocument(options?: { fileName?: string }): void {
+  const previousTitle = document.title
+  if (options?.fileName?.trim()) {
+    document.title = options.fileName.trim().replace(/\.pdf$/i, '')
+  }
+
+  window.requestAnimationFrame(() => {
+    window.setTimeout(() => {
+      try {
+        window.print()
+      } finally {
+        window.setTimeout(() => {
+          document.title = previousTitle
+        }, 800)
+      }
+    }, 120)
+  })
+}
+
+/** Suggested PDF file name for print / download dialogs. */
+export function quotationPdfFileName(quotationNo: string, revisionNo?: number): string {
+  const rev = revisionNo != null ? `-R${revisionNo}` : ''
+  return `${quotationNo}${rev}.pdf`
+}
+
+/** Download a real PDF that matches the on-screen quotation letterhead preview. */
+export async function downloadQuotationPdf(options: {
+  fileName: string
+}): Promise<DocumentPdfResult> {
+  return downloadPrintDocumentPdf({
+    fileName: options.fileName,
+    selectors: ['.quo-print-doc', '.quo-preview-canvas .quo-print-doc'],
+  })
 }
 
 export function saveQuotationPdfToDms(input: {
@@ -18,7 +49,7 @@ export function saveQuotationPdfToDms(input: {
     `Quotation: ${input.quotationNo}`,
     `Revision: R${input.revisionNo}`,
     `Generated: ${new Date().toISOString()}`,
-    'Use Print → Save as PDF for full formatted output.',
+    'Use Download PDF on the quotation preview for the formatted customer document.',
   ].join('\n')
 
   const entityLinks = input.customerId
@@ -27,7 +58,7 @@ export function saveQuotationPdfToDms(input: {
 
   return useDmsStore.getState().uploadDocument({
     title: `${input.quotationNo} Rev ${input.revisionNo}`,
-    fileName: `${input.quotationNo}-R${input.revisionNo}.pdf`,
+    fileName: quotationPdfFileName(input.quotationNo, input.revisionNo),
     category: 'sales_attachment',
     mimeType: 'application/pdf',
     fileContent: content,

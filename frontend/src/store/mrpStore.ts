@@ -59,6 +59,7 @@ interface MrpState {
     grandTotal: number
     paymentTerms?: string | null
     deliveryTerms?: string | null
+    deliveryTime?: string | null
     warrantyTerms?: string | null
     commercialNotes?: string | null
     technicalNotes?: string | null
@@ -84,7 +85,7 @@ interface MrpState {
     patch: Partial<Pick<SalesOrder,
       | 'customerPoNumber' | 'customerPoDate' | 'expectedDeliveryDate' | 'deliveryLocation'
       | 'locationId'
-      | 'internalRemarks' | 'paymentTerms' | 'deliveryTerms' | 'warrantyTerms'
+      | 'internalRemarks' | 'paymentTerms' | 'deliveryTerms' | 'deliveryTime' | 'warrantyTerms'
       | 'commercialNotes' | 'technicalNotes' | 'remarks' | 'requiredDate' | 'qty' | 'grandTotal'
     >>,
   ) => { ok: boolean; error?: string }
@@ -211,6 +212,7 @@ export const useMrpStore = create<MrpState>()(
       grandTotal: input.grandTotal,
       paymentTerms: input.paymentTerms ?? null,
       deliveryTerms: input.deliveryTerms ?? null,
+      deliveryTime: input.deliveryTime ?? null,
       warrantyTerms: input.warrantyTerms ?? null,
       commercialNotes: input.commercialNotes ?? null,
       technicalNotes: input.technicalNotes ?? null,
@@ -288,6 +290,9 @@ export const useMrpStore = create<MrpState>()(
     }
     if (!so.paymentTerms?.trim() || !so.deliveryTerms?.trim()) {
       return { ok: false, error: 'Payment and delivery terms are required before confirmation' }
+    }
+    if (!so.deliveryTime?.trim()) {
+      return { ok: false, error: 'Delivery time / lead time is required before confirmation' }
     }
     const grand = so.grandTotal != null ? Number(so.grandTotal) : 0
     const lineValue = so.qty * (so.unitPrice ?? 0)

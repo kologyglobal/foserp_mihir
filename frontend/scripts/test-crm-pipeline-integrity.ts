@@ -119,7 +119,7 @@ if (leadR.ok && leadR.leadId) {
   check(8, 'Lead convertLeadToInquiry is disabled', !sales.convertLeadToInquiry(leadR.leadId, productId, 2, '2026-10-01').ok)
 
   if (oppR.ok && oppR.opportunityId) {
-    const quoR = crm.createQuotationFromOpportunity(oppR.opportunityId, 'qtpl-iso-tank', 2100000)
+    const quoR = crm.createQuotationFromOpportunity(oppR.opportunityId, 'qtpl-iso-dry-bulk-25cbm', 2100000)
     check(9, 'Quotation created from opportunity', quoR.ok, quoR.quotationId)
 
     const quo = quoR.quotationId ? useSalesStore.getState().getQuotation(quoR.quotationId) : undefined

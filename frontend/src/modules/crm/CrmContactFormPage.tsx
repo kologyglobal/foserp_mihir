@@ -9,17 +9,14 @@ import {
   Phone,
   Save,
   User,
-  UserCircle,
 } from 'lucide-react'
 import { Input, Checkbox, Select, MobileInput } from '../../components/forms/Inputs'
 import { ErpSmartSelect } from '../../components/erp/ErpSmartSelect'
-import { ErpCardSection, ErpFieldRow, ErpStickySaveBar, ErpQuickEntrySection, ErpAdditionalInfoToggle, ErpAdditionalInfoPanel, useErpAdditionalInfo } from '../../components/erp/card-form'
+import { ErpCardSection, ErpFieldRow, ErpStickySaveBar, ErpQuickEntrySection } from '../../components/erp/card-form'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
 import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
 import {
   ENTERPRISE_FORM_CLASS,
-  EnterpriseFormMetrics,
-  EnterpriseFormSectionNav,
 } from '../../design-system/workspace'
 import { useCrmStore } from '../../store/crmStore'
 import { resolveStoreAction } from '../../store/storeAction'
@@ -82,8 +79,6 @@ export function CrmContactFormPage() {
   const formRootRef = useRef<HTMLDivElement | null>(null)
   const [sectionForceOpenKey, setSectionForceOpenKey] = useState(0)
   const phoneCountryRef = useRef<string>(DEFAULT_CUSTOMER_COUNTRY)
-
-  const [activeSection, setActiveSection] = useState('quick')
 
   const attachmentScopeId = id ?? 'draft:new-contact'
   const setContactAttachments = useContactAttachmentStore((s) => s.setForContact)
@@ -157,54 +152,9 @@ export function CrmContactFormPage() {
 
   const profileDone = Boolean(watched.name?.trim())
   const companyDone = Boolean(watched.customerId?.trim())
-  const communicationDone = Boolean(watched.phone?.trim() || watched.email?.trim())
-
-  const completionItems = useMemo(() => [
-    { id: 'profile', label: 'Profile', done: profileDone },
-    { id: 'company', label: 'Company', done: companyDone },
-    { id: 'communication', label: 'Communication', done: communicationDone },
-    { id: 'documents', label: 'Attachments', done: attachments.length > 0 },
-  ], [profileDone, companyDone, communicationDone, attachments.length])
 
   const requiredComplete = [profileDone, companyDone].filter(Boolean).length
   const completionPercent = Math.round((requiredComplete / 2) * 100)
-
-  const hasOptionalContactData = Boolean(
-    watched.contactCode?.trim()
-    || watched.department?.trim()
-    || attachments.length > 0
-    || watched.isActive === false,
-  )
-  const {
-    open: showAdditionalDetails,
-    setOpen: setShowAdditionalDetails,
-    toggle: toggleAdditionalDetails,
-    panelId: additionalPanelId,
-  } = useErpAdditionalInfo({
-    preferOpen: isEdit && hasOptionalContactData,
-  })
-  const additionalSectionCount = 2
-  const additionalAttentionCount = [
-    !(watched.contactCode?.trim() || watched.department?.trim()),
-    attachments.length === 0,
-  ].filter(Boolean).length
-
-  const sectionNavItems = useMemo(() => {
-    const quick = { id: 'quick', label: 'Quick', icon: UserCircle, done: Boolean(profileDone && companyDone) }
-    if (!showAdditionalDetails) return [quick]
-    return [
-      quick,
-      { id: 'details', label: 'Details', icon: Building2, done: Boolean(watched.contactCode?.trim()) },
-      { id: 'documents', label: 'Attachments', icon: Paperclip, done: completionItems.find((i) => i.id === 'documents')?.done },
-    ]
-  }, [profileDone, companyDone, showAdditionalDetails, watched.contactCode, completionItems])
-
-  const formMetrics = useMemo(() => [
-    { label: 'Completion', value: `${completionPercent}%`, accent: 'blue' as const, hint: `${requiredComplete} of 2 required sections` },
-    { label: 'Company', value: customer?.customerName?.slice(0, 18) || 'Pending', accent: customer ? ('green' as const) : ('amber' as const), hint: customer?.customerCode ?? 'Link to a company' },
-    { label: 'Primary', value: watched.isPrimary ? 'Yes' : 'No', accent: watched.isPrimary ? ('violet' as const) : ('amber' as const), hint: watched.isPrimary ? 'Default on company card' : 'Secondary contact' },
-    { label: 'Status', value: watched.isActive ? 'Active' : 'Inactive', accent: watched.isActive ? ('green' as const) : ('amber' as const), hint: watched.designation?.trim() || 'No designation' },
-  ], [completionPercent, requiredComplete, customer, watched.isPrimary, watched.isActive, watched.designation])
 
   const documentStrip = [
     { label: 'Contact', value: watched.name?.trim() || 'New', highlight: Boolean(watched.name?.trim()) },
@@ -219,13 +169,9 @@ export function CrmContactFormPage() {
   ]
 
   function scrollToSection(sectionId: string) {
-    const additionalIds = new Set(['details', 'documents'])
-    const needsExpand = additionalIds.has(sectionId) && !showAdditionalDetails
-    if (needsExpand) setShowAdditionalDetails(true)
-    setActiveSection(sectionId)
     window.setTimeout(() => {
       document.getElementById(`contact-section-${sectionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, needsExpand ? 300 : 0)
+    }, 0)
   }
 
   function showToast(message: string, variant: 'success' | 'error' | 'warning' | 'info' = 'info') {
@@ -246,11 +192,7 @@ export function CrmContactFormPage() {
       fieldOrder: [...CONTACT_FIELD_ORDER],
       sectionByField: CONTACT_SECTION_BY_FIELD,
       root: formRootRef.current,
-      expandSection: (sectionId) => {
-        if (sectionId === 'contact-section-details' && !showAdditionalDetails) {
-          setShowAdditionalDetails(true)
-        }
-        setActiveSection(sectionId === 'contact-section-details' ? 'details' : 'quick')
+      expandSection: () => {
         setSectionForceOpenKey((k) => k + 1)
       },
     })
@@ -323,7 +265,6 @@ export function CrmContactFormPage() {
           isActive: true,
         })
         setFormInstanceKey((k) => k + 1)
-        setActiveSection('profile')
         showToast('Contact created — form cleared for next entry', 'success')
         navigate('/crm/contacts/new', { replace: true })
         return
@@ -480,14 +421,6 @@ export function CrmContactFormPage() {
           />
         )}
       >
-        <EnterpriseFormSectionNav
-          sections={sectionNavItems}
-          activeId={activeSection}
-          onSelect={scrollToSection}
-        />
-
-        <EnterpriseFormMetrics metrics={formMetrics} />
-
         <div ref={formRootRef} className="erp-form-body">
         <ErpQuickEntrySection
           id="contact-section-quick"
@@ -580,18 +513,7 @@ export function CrmContactFormPage() {
           </ErpFieldRow>
         </ErpQuickEntrySection>
 
-        <ErpAdditionalInfoToggle
-          open={showAdditionalDetails}
-          onToggle={() => {
-            if (showAdditionalDetails) setActiveSection('quick')
-            toggleAdditionalDetails()
-          }}
-          panelId={additionalPanelId}
-          sectionCount={additionalSectionCount}
-          attentionCount={additionalAttentionCount}
-        />
 
-        <ErpAdditionalInfoPanel open={showAdditionalDetails} id={additionalPanelId}>
         <ErpCardSection
           id="contact-section-details"
           title="Additional details"
@@ -657,7 +579,8 @@ export function CrmContactFormPage() {
             onChange={setAttachments}
           />
         </ErpCardSection>
-        </ErpAdditionalInfoPanel>
+        
+
         </div>
       </CrmCardFormShell>
     </>

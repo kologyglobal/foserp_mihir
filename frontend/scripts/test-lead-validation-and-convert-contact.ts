@@ -37,27 +37,11 @@ function baseValid(overrides: Record<string, unknown> = {}) {
   }
 }
 
-// Empty notes must fail
+// Empty notes must pass (optional)
 {
   const errors = validateLeadForm(baseValid({ remarks: '   ' }))
-  assert.equal(errors.remarks, 'Notes are required')
-}
-
-// Company link alone must not skip contact reachability
-{
-  const errors = validateLeadForm(baseValid({
-    customerId: '11111111-1111-1111-1111-111111111111',
-    mobile: '',
-    email: '',
-    contactPerson: 'Someone',
-  }))
-  assert.equal(errors.mobile, 'Provide a mobile number or email')
-}
-
-// Missing primary contact name/id must fail
-{
-  const errors = validateLeadForm(baseValid({ contactPerson: '', contactId: null }))
-  assert.equal(errors.contactPerson, 'Primary Contact is required')
+  assert.equal(errors.remarks, undefined)
+  assert.deepEqual(errors, {})
 }
 
 // Valid payload passes
@@ -66,18 +50,18 @@ function baseValid(overrides: Record<string, unknown> = {}) {
   assert.deepEqual(errors, {})
 }
 
-// Store/bridge guard rejects incomplete create
+// Store/bridge guard rejects incomplete create (missing priority)
 {
   const err = getLeadCreateValidationError({
     prospectName: 'X',
     leadOwnerId: 'user-1',
-    priority: 'medium',
     createdDate: today,
     stage: 'new',
   })
   assert.ok(err)
 }
 
+// Blank notes must not block create guard
 {
   const err = getLeadCreateValidationError({
     prospectName: 'X',
@@ -85,9 +69,7 @@ function baseValid(overrides: Record<string, unknown> = {}) {
     priority: 'medium',
     createdDate: today,
     stage: 'new',
-    remarks: 'Notes',
-    contactPerson: 'A',
-    mobile: '9876543210',
+    remarks: '',
   })
   assert.equal(err, null)
 }

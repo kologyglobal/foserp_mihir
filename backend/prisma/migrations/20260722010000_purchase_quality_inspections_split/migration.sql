@@ -96,12 +96,7 @@ CREATE TABLE IF NOT EXISTS `purchase_quality_inspection_lines` (
   PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-ALTER TABLE `purchase_quality_inspections`
-  ADD CONSTRAINT `pqi_tenant_fkey`
-    FOREIGN KEY (`tenantId`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
-ALTER TABLE `purchase_quality_inspection_lines`
-  ADD CONSTRAINT `pqi_lines_tenant_fkey`
-    FOREIGN KEY (`tenantId`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  ADD CONSTRAINT `pqi_lines_qi_fkey`
-    FOREIGN KEY (`qualityInspectionId`) REFERENCES `purchase_quality_inspections`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- FKs are created in 20260721120000_purchase_setup_full_persistence when
+-- purchase_quality_* tables are created there. Keep idempotent for DBs that
+-- only got empty tables from an older split-only path.
+-- ALTER TABLE skipped here to avoid duplicate constraint errors on fresh installs.

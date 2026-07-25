@@ -42,6 +42,7 @@ import operationalExceptionRoutes from './modules/ops-reports/exceptions/excepti
 import roleRoutes from './modules/roles/role.routes.js'
 import tenantRoutes from './modules/tenants/tenant.routes.js'
 import userRoutes from './modules/users/user.routes.js'
+import indiaMartWebhookRoutes from './modules/crm/integrations/indiamart/indiamart.webhook.routes.js'
 import { sendError, sendSuccess } from './utils/response.js'
 import { swaggerSpec } from './config/swagger.js'
 
@@ -118,6 +119,9 @@ export function createApp() {
   }
 
   app.use('/api/v1/auth', authLimiter, authRoutes)
+
+  // Public IndiaMART Push webhook (no JWT) — before tenant-auth CRM routes
+  app.use('/api/v1/webhooks/indiamart', indiaMartWebhookRoutes)
 
   app.use('/api/v1/tenants', tenantRoutes)
   app.use('/api/v1/tenants/:tenantId/users', userRoutes)

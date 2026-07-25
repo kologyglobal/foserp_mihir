@@ -16,7 +16,7 @@ import type { QuotationPrintLayout, QuotationSection, QuotationTemplateSection }
 import type { Customer } from '../../types/master'
 import { cloneTemplateSections } from '../../utils/quotationEngine/cloneSections'
 import { DEFAULT_QUOTATION_PRINT_LAYOUT, resolveQuotationPrintLayout } from '../../utils/quotationEngine/printLayout'
-import { printQuotationDocument } from '../../utils/quotationEngine/pdfExport'
+import { printQuotationDocument, downloadQuotationPdf } from '../../utils/quotationEngine/pdfExport'
 import { EnterpriseDocumentStrip } from '../../design-system/workspace'
 import { cn } from '../../utils/cn'
 import { crmBreadcrumbs } from '../../utils/crmNavigation'
@@ -218,6 +218,14 @@ export function QuotationTemplateDesigner({ templateId, previewMode }: Quotation
     sectionRefs.current[sectionId]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  async function handleDownloadPdf() {
+    const fileName = `${meta.templateName || 'quotation-template'}.pdf`
+    notify.info('Preparing PDF…')
+    const result = await downloadQuotationPdf({ fileName })
+    if (result.ok) notify.success(`Downloaded ${result.fileName}`)
+    else notify.error(result.error)
+  }
+
   const specTableCount = sorted.filter((s) => s.contentFormat === 'spec_table').length
 
   if (previewMode) {
@@ -241,8 +249,18 @@ export function QuotationTemplateDesigner({ templateId, previewMode }: Quotation
               onClick: () => navigate(`/crm/quotation-templates/${templateId}/editor`),
             }}
             secondaryActions={[
-              { id: 'print', label: 'Print', icon: Printer, onClick: printQuotationDocument },
-              { id: 'pdf', label: 'Export PDF', icon: Download, onClick: printQuotationDocument },
+              {
+                id: 'print',
+                label: 'Print',
+                icon: Printer,
+                onClick: () => printQuotationDocument({ fileName: `${meta.templateName || 'quotation-template'}.pdf` }),
+              },
+              {
+                id: 'pdf',
+                label: 'Download PDF',
+                icon: Download,
+                onClick: () => void handleDownloadPdf(),
+              },
             ]}
             moreActions={[
               { id: 'templates', label: 'All Templates', icon: Bookmark, onClick: () => navigate('/crm/quotation-templates') },
@@ -314,15 +332,15 @@ export function QuotationTemplateDesigner({ templateId, previewMode }: Quotation
                 })
               },
             },
-            { id: 'print', label: 'Print', icon: Printer, onClick: printQuotationDocument },
+            { id: 'print', label: 'Print', icon: Printer, onClick: () => printQuotationDocument({ fileName: `${meta.templateName || 'quotation-template'}.pdf` }) },
             {
               id: 'pdf',
-              label: 'Export PDF',
+              label: 'Download PDF',
               icon: Download,
               disabled: isSubmitting,
               onClick: () => {
                 void saveTemplate().then((ok) => {
-                  if (ok) printQuotationDocument()
+                  if (ok) void handleDownloadPdf()
                 })
               },
             },

@@ -6,10 +6,12 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  Download,
   Info,
   Package,
   Pause,
   Play,
+  Printer,
   RotateCcw,
   Scissors,
   ShieldAlert,
@@ -1485,6 +1487,8 @@ export function ApiWorkOrderDetailPage() {
                   }
                 : null
 
+  const printPath = `/manufacturing/work-orders/${wo.id}/print`
+
   const moreActions: ErpCommandAction[] = [
     ...(perms.canAssign && phase2b.canManageAssignments && !readOnly
       ? [{ id: 'assign', label: t('assignment.assignWork'), icon: UserPlus, onClick: () => setAssignOpen(true) }]
@@ -1531,8 +1535,8 @@ export function ApiWorkOrderDetailPage() {
           inline
           sticky
           primaryAction={primaryAction}
-          secondaryActions={
-            perms.canCreateMaterialRequirement && perms.canViewMaterials
+          secondaryActions={[
+            ...(perms.canCreateMaterialRequirement && perms.canViewMaterials
               ? [
                   {
                     id: 'shortage-pr',
@@ -1543,8 +1547,10 @@ export function ApiWorkOrderDetailPage() {
                     disabledReason: shortagePrGate.disabledReason,
                   },
                 ]
-              : []
-          }
+              : []),
+            { id: 'print', label: 'Print', icon: Printer, onClick: () => navigate(printPath), pin: true },
+            { id: 'download-pdf', label: 'Download PDF', icon: Download, onClick: () => navigate(`${printPath}?autoprint=1`), pin: true },
+          ]}
           moreActions={moreActions}
           moreActionsLabel="More"
         />

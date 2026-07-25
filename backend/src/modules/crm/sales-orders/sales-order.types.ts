@@ -40,6 +40,7 @@ export interface SalesOrderDto {
   grandTotal: number | null
   paymentTerms: string | null
   deliveryTerms: string | null
+  deliveryTime: string | null
   warrantyTerms: string | null
   commercialNotes: string | null
   technicalNotes: string | null
@@ -93,6 +94,7 @@ export function mapSalesOrderToDto(order: CrmSalesOrder, names?: AuditUserNames)
     grandTotal: order.grandTotal != null ? decimalToNumber(order.grandTotal) : null,
     paymentTerms: order.paymentTerms,
     deliveryTerms: order.deliveryTerms,
+    deliveryTime: order.deliveryTime ?? null,
     warrantyTerms: order.warrantyTerms,
     commercialNotes: order.commercialNotes,
     technicalNotes: order.technicalNotes,

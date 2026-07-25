@@ -11,6 +11,15 @@ export { ErpSmartSelect } from './ErpSmartSelect'
 export type { ErpSmartSelectOption } from './ErpSmartSelect'
 export { ErpLineItemsGrid } from './ErpLineItemsGrid'
 export {
+  ErpProductPricingPanel,
+  ErpProductPricingSection,
+  PRODUCT_PRICING_GST_RATES,
+} from './ErpProductPricingSection'
+export type {
+  ErpProductPricingPanelProps,
+  ErpProductPricingSectionProps,
+} from './ErpProductPricingSection'
+export {
   ErpDocumentUpload,
 } from './ErpDocumentUpload'
 export type {

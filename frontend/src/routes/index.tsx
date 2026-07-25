@@ -1,4 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom'
+import { AuthRootLayout } from '@/components/auth/AuthRootLayout'
 import { ERPLayout } from '@/components/layout/ERPLayout'
 import { RouteErrorBoundary } from '@/components/system/RouteErrorBoundary'
 import { PageNotFoundPage } from '@/components/system/PageNotFoundPage'
@@ -25,36 +26,42 @@ import { adminRouteChildren } from './adminRoutes'
 import { organisationRouteChildren } from './organisationRoutes'
 
 export const router = createBrowserRouter([
-  authRoute,
-  mobileRouteTree,
-  gateOperatorRouteTree,
   {
-    path: '/',
-    element: (
-      <ApiAuthGate>
-        <ERPLayout />
-      </ApiAuthGate>
-    ),
+    element: <AuthRootLayout />,
     errorElement: <RouteErrorBoundary />,
     children: [
-      ...homeRouteChildren,
-      ...masterRouteChildren,
-      ...platformRouteChildren,
-      ...inventoryRouteChildren,
-      ...salesRouteChildren,
-      crmRouteTree,
-      purchaseRouteTree,
-      ...manufacturingRouteChildren,
-      ...productionRouteChildren,
-      ...qualityRouteChildren,
-      ...logisticsRouteChildren,
-      ...dispatchFinanceRouteChildren,
-      ...gateRouteChildren,
-      ...reportsRouteChildren,
-      ...accountingRouteChildren,
-      ...organisationRouteChildren,
-      ...adminRouteChildren,
-      { path: '*', element: <PageNotFoundPage /> },
+      authRoute,
+      mobileRouteTree,
+      gateOperatorRouteTree,
+      {
+        path: '/',
+        element: (
+          <ApiAuthGate>
+            <ERPLayout />
+          </ApiAuthGate>
+        ),
+        errorElement: <RouteErrorBoundary />,
+        children: [
+          ...homeRouteChildren,
+          ...masterRouteChildren,
+          ...platformRouteChildren,
+          ...inventoryRouteChildren,
+          ...salesRouteChildren,
+          crmRouteTree,
+          purchaseRouteTree,
+          ...manufacturingRouteChildren,
+          ...productionRouteChildren,
+          ...qualityRouteChildren,
+          ...logisticsRouteChildren,
+          ...dispatchFinanceRouteChildren,
+          ...gateRouteChildren,
+          ...reportsRouteChildren,
+          ...accountingRouteChildren,
+          ...organisationRouteChildren,
+          ...adminRouteChildren,
+          { path: '*', element: <PageNotFoundPage /> },
+        ],
+      },
     ],
   },
 ])

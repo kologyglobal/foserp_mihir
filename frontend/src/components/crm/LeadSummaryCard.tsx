@@ -127,6 +127,26 @@ export function LeadSummaryCard({
           <ErpViewField label="Lead Source" value={formatStatus(lead.source)} emptyLabel={EMPTY} />
           <ErpViewField label="Priority" value={leadPriorityLabel(lead.priority)} emptyLabel={EMPTY} />
           <ErpViewField label="Created Date" value={formatDate(lead.createdDate)} emptyLabel={EMPTY} />
+          {lead.externalSource === 'INDIAMART' && (
+            <>
+              <ErpViewField label="IndiaMART Enquiry ID" value={lead.externalSourceId} emptyLabel={EMPTY} />
+              <ErpViewField
+                label="Enquiry Received"
+                value={lead.sourceEnquiryDate ? formatDate(lead.sourceEnquiryDate) : null}
+                emptyLabel={EMPTY}
+              />
+              {lead.integrationEnquiryId && (
+                <ErpViewField label="Integration Inbox" emptyLabel={EMPTY}>
+                  <a
+                    className="text-erp-primary underline"
+                    href={`/crm/integrations/indiamart/inbox`}
+                  >
+                    Open IndiaMART inbox
+                  </a>
+                </ErpViewField>
+              )}
+            </>
+          )}
         </SummaryGroup>
 
         <SummaryGroup title="Status" icon={CalendarClock}>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useActiveLocations } from './useMasterLists'
 import {
+  filterLocationsByUsage,
   getDefaultLocationId,
   resolveInheritedLocationId,
   resolveLocationWarehouseId,
@@ -24,10 +25,11 @@ export function useDocumentLocation(
     if (!initialId) return
     setLocationId((prev) => {
       if (!prev) return initialId
-      if (locations.length > 0 && !locations.some((l) => l.id === prev && l.isActive)) return initialId
+      const allowed = filterLocationsByUsage(locations, usage)
+      if (locations.length > 0 && !allowed.some((l) => l.id === prev)) return initialId
       return prev
     })
-  }, [initialId, locations])
+  }, [initialId, locations, usage])
 
   const warehouseId = useMemo(
     () => resolveLocationWarehouseId(locationId, locations) ?? '',

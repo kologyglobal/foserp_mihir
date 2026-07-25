@@ -1,8 +1,11 @@
 import type { GstBreakdown } from './invoice'
+import type { ProformaPaymentStatus } from './crmCommercial'
 
 export type ProformaInvoiceStatus = 'draft' | 'issued' | 'cancelled'
 
 export type ProformaInvoiceSource = 'direct' | 'sales_order'
+
+export type { ProformaPaymentStatus }
 
 export interface ProformaInvoiceLine {
   id: string

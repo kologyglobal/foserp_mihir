@@ -86,22 +86,23 @@ check('PI list BC columns', pagesSrc.includes('ProformaInvoiceTable') && pagesSr
 check('PI nav wired', (await import('node:fs')).readFileSync(new URL('../src/config/navigation.ts', import.meta.url), 'utf8').includes('/sales/proforma-invoices'))
 const { readAllRouteSources } = await import('./routeSource')
 check('PI routes wired', readAllRouteSources(ROOT).includes('ProformaInvoiceListPage'))
-check('PI list uses DataTable', pagesSrc.includes('DataTable') && pagesSrc.includes('exportFileName="proforma-invoices"'))
+check('PI list uses DataTable', pagesSrc.includes('ErpDataGrid') && pagesSrc.includes('exportFileName="proforma-invoices"'))
+check('PI list register filters', pagesSrc.includes('CrmListFilterBar') && pagesSrc.includes('CrmFilterDrawer') && pagesSrc.includes('useSavedViews'))
+check('PI list enterprise shell', pagesSrc.includes('EnterpriseRegisterTableShell'))
 if (fromSoPi) {
   check('PI GST breakdown', fromSoPi.gst.grandTotal > 0 && fromSoPi.gst.taxableAmount > 0)
   check('PI line totals', fromSoPi.lines.every((l) => l.lineTotal > 0))
   const cancelled = useProformaInvoiceStore.getState().cancel(fromSo.id!)
   check('Cancel issued PI blocked', !cancelled.ok)
+  const tsv = exportUtil.exportProformaExcelTsv(fromSoPi)
+  check('Excel TSV has header', tsv.includes('Proforma Invoice') && tsv.includes(fromSoPi.proformaNo))
+  const html = exportUtil.buildProformaPrintHtml(fromSoPi)
+  check('Print HTML ready', html.includes('Proforma Invoice') && html.includes(fromSoPi.proformaNo))
 }
 if (direct.id) {
   const draftCancel = useProformaInvoiceStore.getState().cancel(direct.id)
   check('Cancel draft PI', draftCancel.ok)
   check('Cancelled status', useProformaInvoiceStore.getState().getProforma(direct.id)?.status === 'cancelled')
-}
-  const tsv = exportUtil.exportProformaExcelTsv(fromSoPi)
-  check('Excel TSV has header', tsv.includes('Proforma Invoice') && tsv.includes(fromSoPi.proformaNo))
-  const html = exportUtil.buildProformaPrintHtml(fromSoPi)
-  check('Print HTML ready', html.includes('PROFORMA INVOICE') && html.includes(fromSoPi.proformaNo))
 }
 
 resetSessionUserForTests()

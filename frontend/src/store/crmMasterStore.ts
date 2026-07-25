@@ -95,6 +95,14 @@ function normalizeMasterEntries(entries: CrmMasterEntry[]): CrmMasterEntry[] {
   return mergeLegacyFollowUpMasterEntries(entries)
 }
 
+/** Merge canonical seed rows that are missing from persisted / hydrated entries (new kinds). */
+function ensureCanonicalSeedEntries(entries: CrmMasterEntry[]): CrmMasterEntry[] {
+  const existing = new Set(entries.map((e) => `${e.kind}::${e.code}`))
+  const missing = CRM_MASTERS_SEED.filter((seed) => !existing.has(`${seed.kind}::${seed.code}`))
+  if (missing.length === 0) return entries
+  return [...entries, ...missing.map((e) => ({ ...e }))]
+}
+
 export const useCrmMasterStore = create<CrmMasterState>()(
   persist(
     (set, get) => ({
@@ -269,7 +277,9 @@ export const useCrmMasterStore = create<CrmMasterState>()(
       partialize: (s) => ({ entries: s.entries }),
       merge: (persisted, current) => {
         const state = persisted as Partial<CrmMasterState> | undefined
-        const entries = normalizeMasterEntries(state?.entries ?? current.entries)
+        const entries = normalizeMasterEntries(
+          ensureCanonicalSeedEntries(state?.entries ?? current.entries),
+        )
         return { ...current, ...state, entries }
       },
     },

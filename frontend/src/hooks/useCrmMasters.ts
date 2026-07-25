@@ -162,6 +162,15 @@ export function useDeliveryTermOptions() {
   return useCrmMasterOptions('delivery-terms', true)
 }
 
+/** Delivery time options use display name as value (stored on quotation.deliveryTime). */
+export function useDeliveryTimeOptions() {
+  const entries = useCrmMasterEntriesByKind('delivery-time', true)
+  return useMemo<MasterOption[]>(
+    () => entries.map((e) => ({ value: e.name, label: e.name })),
+    [entries],
+  )
+}
+
 export function useWarrantyTermOptions() {
   return useCrmMasterOptions('warranty-terms', true)
 }

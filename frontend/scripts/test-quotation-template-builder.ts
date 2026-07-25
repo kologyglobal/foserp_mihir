@@ -28,7 +28,7 @@ const { validateQuotationForPrint, sectionCompletionStatus } = await import('../
 const { cloneTemplateSections } = await import('../src/utils/quotationEngine/cloneSections')
 const { saveQuotationPdfToDms } = await import('../src/utils/quotationEngine/pdfExport')
 const { calcPriceSummary, syncLineTotals } = await import('../src/utils/crmQuotationCalc')
-const { ISO_TANK_26KL_SECTIONS } = await import('../src/data/quotations/templates/isoTank26Kl')
+const { ISO_DRY_BULK_25CBM_SECTIONS } = await import('../src/data/quotations/templates/isoDryBulk25Cbm')
 const { resolveQuotationPrintLayout, DEFAULT_QUOTATION_PRINT_LAYOUT } = await import('../src/utils/quotationEngine/printLayout')
 
 let pass = 0
@@ -66,12 +66,12 @@ const crm = useCrmStore.getState()
 const sales = useSalesStore.getState()
 const customers = useMasterStore.getState().customers
 
-check(1, 'Quotation template list loads', crm.quotationTemplates.length >= 9, `${crm.quotationTemplates.length} templates`)
+check(1, 'Quotation template list loads', crm.quotationTemplates.length >= 2, `${crm.quotationTemplates.length} templates`)
 
 const newTpl = crm.createQuotationTemplate({
   templateName: 'Test Builder Template',
   productFamily: 'Test',
-  sourceTemplateId: 'qtpl-iso-tank',
+  sourceTemplateId: 'qtpl-iso-dry-bulk-25cbm',
 })
 check(2, 'New template can be created', newTpl.ok && !!newTpl.templateId)
 
@@ -92,13 +92,13 @@ const withCustom = [
 crm.updateQuotationTemplate(tplId, { sections: withCustom })
 check(3, 'Template sections can be added, edited, reordered and deleted', useCrmStore.getState().getTemplate(tplId)!.sections.length > tpl.sections.length)
 
-const isoTpl = crm.getTemplate('qtpl-iso-tank')
+const isoTpl = crm.getTemplate('qtpl-iso-dry-bulk-25cbm')
 check(4, 'ISO Tank 26 KL template mapped with spec rows', (isoTpl?.sections.filter((s) => s.contentFormat === 'spec_table').length ?? 0) >= 8)
 
 const openOpp = crm.opportunities.find((o) => !o.quotationId && o.productId)
 let docId: string | undefined
 if (openOpp) {
-  const q = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-iso-tank', 2500000)
+  const q = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-iso-dry-bulk-25cbm', 2500000)
   check(5, 'Quotation can be created from opportunity', q.ok)
   docId = q.documentId
 } else {
@@ -127,7 +127,7 @@ if (doc && quotation) {
   check(11, 'Amount in words generates correctly', amountInWordsINR(sum.grandTotal).includes('Rupees'))
 
   const specSec = doc.sections.find((s) => s.contentFormat === 'spec_table')
-  check(12, 'Technical specification editor supports spec_table sections', !!specSec?.specRows?.length || ISO_TANK_26KL_SECTIONS.some((s) => s.specRows?.length))
+  check(12, 'Technical specification editor supports spec_table sections', !!specSec?.specRows?.length || ISO_DRY_BULK_25CBM_SECTIONS.some((s) => s.specRows?.length))
 
   crm.updateQuotationDocumentSections(doc.id, doc.sections)
   check(13, 'Quotation draft saves', !!useCrmStore.getState().getQuotationDocument(doc.id))
@@ -181,10 +181,10 @@ const pkg = readFileSync(path.join(ROOT, 'package.json'), 'utf8')
 check(27, 'test:quotation-template-builder wired into package.json', pkg.includes('test:quotation-template-builder'))
 
 const layout = resolveQuotationPrintLayout(isoTpl)
-crm.updateQuotationTemplate('qtpl-iso-tank', {
+crm.updateQuotationTemplate('qtpl-iso-dry-bulk-25cbm', {
   printLayout: { ...DEFAULT_QUOTATION_PRINT_LAYOUT, pageSize: 'Letter', marginMm: 15, fontScale: 0.95 },
 })
-const savedLayout = resolveQuotationPrintLayout(useCrmStore.getState().getTemplate('qtpl-iso-tank'))
+const savedLayout = resolveQuotationPrintLayout(useCrmStore.getState().getTemplate('qtpl-iso-dry-bulk-25cbm'))
 check(28, 'Print layout model resolves defaults', layout.pageSize === 'A4' && layout.marginMm === 12)
 check(29, 'Template print layout can be saved', savedLayout.pageSize === 'Letter' && savedLayout.marginMm === 15)
 check(30, 'Document designer component exists', fileExists('src/components/quotations/QuotationTemplateDesigner.tsx'))

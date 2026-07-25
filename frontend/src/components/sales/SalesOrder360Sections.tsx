@@ -407,7 +407,12 @@ export function OrderLinkageStrip({
       ? { label: 'Opportunity', path: `/crm/opportunities/${order.opportunityId}` }
       : null,
     order.quotationId
-      ? { label: order.quotationNo ? `Quote ${order.quotationNo}` : 'Quotation', path: `/crm/quotations/${order.quotationId}` }
+      ? {
+          label: order.quotationNo
+            ? `Quotation No. (Ref) ${order.quotationNo}`
+            : 'Quotation Number (Reference)',
+          path: `/crm/quotations/${order.quotationId}`,
+        }
       : null,
   ].filter(Boolean) as { label: string; path: string }[]
 
@@ -453,6 +458,13 @@ export function OrderCommercialSummary({
     ...(gst != null ? [{ label: 'GST', value: formatCurrency(gst) }] : []),
     { label: 'Payment terms', value: order.paymentTerms ?? '—' },
     { label: 'Delivery terms', value: order.deliveryTerms ?? '—' },
+    { label: 'Delivery time / lead time', value: order.deliveryTime ?? '—' },
+    {
+      label: 'Quotation Number (Reference)',
+      value: order.quotationNo
+        ? `${order.quotationNo} Rev ${order.quotationRevisionNo ?? 1}`
+        : '—',
+    },
     { label: 'Warranty', value: order.warrantyTerms ?? '—' },
   ]
 
@@ -480,6 +492,9 @@ export function OrderDeliveryCard({ order }: { order: SalesOrder }) {
   const loc = order.locationId ? locations.find((l) => l.id === order.locationId) : null
   const rows = [
     { label: 'Required date', value: formatDate(order.requiredDate), icon: Calendar },
+    ...(order.deliveryTime
+      ? [{ label: 'Delivery time / lead time', value: order.deliveryTime, icon: Truck }]
+      : []),
     ...(order.expectedDeliveryDate
       ? [{ label: 'Expected delivery', value: formatDate(order.expectedDeliveryDate), icon: Calendar }]
       : []),

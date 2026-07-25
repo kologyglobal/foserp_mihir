@@ -39,6 +39,11 @@ export interface LeadDto {
   contactId?: string | null
   qualificationStatus?: string | null
   temperature?: string | null
+  externalSource?: string | null
+  externalSourceId?: string | null
+  externalSourceReference?: string | null
+  sourceEnquiryDate?: string | null
+  integrationEnquiryId?: string | null
   createdById: string
   createdByName: string
   createdAt: string
@@ -91,6 +96,11 @@ export function mapLeadToDto(lead: CrmLead, names?: AuditUserNames): LeadDto {
     contactId: lead.contactId,
     qualificationStatus: lead.qualificationStatus,
     temperature: lead.temperature,
+    externalSource: lead.externalSource,
+    externalSourceId: lead.externalSourceId,
+    externalSourceReference: lead.externalSourceReference,
+    sourceEnquiryDate: toIso(lead.sourceEnquiryDate),
+    integrationEnquiryId: lead.integrationEnquiryId,
     ...mapAuditFields(lead, names),
   }
 }

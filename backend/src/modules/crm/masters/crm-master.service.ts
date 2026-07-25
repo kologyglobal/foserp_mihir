@@ -162,6 +162,7 @@ export async function listAllMastersForSync(tenantId: string) {
   const ensureKinds = [
     'payment-terms',
     'delivery-terms',
+    'delivery-time',
     'warranty-terms',
     'industries',
     'opportunity-stages',

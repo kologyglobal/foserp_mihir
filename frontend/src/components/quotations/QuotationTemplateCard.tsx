@@ -98,7 +98,7 @@ export function QuotationTemplateEmptyState({ onCreate }: { onCreate?: () => voi
       </div>
       <p className="crm-template-empty__title">No templates match your filters</p>
       <p className="crm-template-empty__hint">
-        Catalog is limited to the two ISO quotation templates (26 KL and 25 m³).
+        Catalog is limited to the VF Word product templates (109 ISO dry bulk, 152 flour bulker, 146 tipper).
       </p>
       {onCreate ? (
         <button type="button" className="crm-card-action crm-card-action--primary" onClick={onCreate}>

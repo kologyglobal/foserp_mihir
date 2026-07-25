@@ -47,6 +47,10 @@ export function canCrmPermission(permission: string): boolean {
     || permission.includes('.close')
     || permission.includes('.complete')
     || permission.includes('.confirm')
+    || permission.includes('.post')
+    || permission.includes('.cancel')
+    || permission.includes('.reverse')
+    || permission.includes('.receive')
   ) {
     return canPermission('sales', 'edit')
   }

@@ -12,6 +12,7 @@ export interface QuotationCreateValidationInput {
   validUntil: string
   paymentTerms: string
   deliveryTerms: string
+  deliveryTime: string
   lines: OpportunityLine[]
   ownerId: string
   stage: string
@@ -58,8 +59,12 @@ export function validateQuotationCreate(input: QuotationCreateValidationInput): 
     messages.push(fieldErrors.paymentTerms)
   }
   if (!input.deliveryTerms.trim()) {
-    fieldErrors.deliveryTerms = 'Select delivery terms / timeline.'
+    fieldErrors.deliveryTerms = 'Select delivery terms.'
     messages.push(fieldErrors.deliveryTerms)
+  }
+  if (!input.deliveryTime.trim()) {
+    fieldErrors.deliveryTime = 'Select delivery time.'
+    messages.push(fieldErrors.deliveryTime)
   }
 
   const lineValidation = validateOpportunityLines(input.lines, {

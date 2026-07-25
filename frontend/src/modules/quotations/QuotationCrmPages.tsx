@@ -36,6 +36,7 @@ import { QuickFollowUpDrawer } from '@/components/crm'
 import { useCrmRecordLoadState } from '@/components/crm/CrmRecordLoadGate'
 import { PageLoadingFallback } from '@/components/system/PageLoadingFallback'
 import { resolveQuotationPrintLayout } from '../../utils/quotationEngine/printLayout'
+import { downloadQuotationPdf, quotationPdfFileName } from '../../utils/quotationEngine/pdfExport'
 import { filterAllowedQuotationTemplates } from '../../utils/quotationEngine/builtinTemplateSync'
 import { QuotationPrintDocument } from '@/components/quotations/QuotationPrintDocument'
 import { DocumentPrintShell } from '@/components/print/DocumentPrintShell'
@@ -745,6 +746,7 @@ export function CrmQuotationPrintPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const docId = params.get('doc')
+  const autoPrint = params.get('autoprint') === '1' || params.get('download') === '1' || params.get('autodownload') === '1'
   const getLatest = useCrmStore((s) => s.getLatestQuotationDocument)
   const getDoc = useCrmStore((s) => s.getQuotationDocument)
   const opportunities = useCrmStore((s) => s.opportunities)
@@ -756,6 +758,21 @@ export function CrmQuotationPrintPage() {
   const opportunity = doc?.opportunityId ? opportunities.find((o) => o.id === doc.opportunityId) : undefined
   const template = doc?.templateId ? useCrmStore.getState().getTemplate(doc.templateId) : undefined
   const printLayout = resolveQuotationPrintLayout(template)
+
+  useEffect(() => {
+    if (!autoPrint || !doc || !quotation) return
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        notify.info('Preparing PDF…')
+        const result = await downloadQuotationPdf({
+          fileName: quotationPdfFileName(quotation.quotationNo, doc.revisionNo),
+        })
+        if (result.ok) notify.success(`Downloaded ${result.fileName}`)
+        else notify.error(result.error)
+      })()
+    }, 450)
+    return () => window.clearTimeout(timer)
+  }, [autoPrint, doc, quotation])
 
   if (!doc || !quotation) {
     return <div className="p-6">Print view not available.</div>
@@ -1097,14 +1114,14 @@ export function CrmQuotationTemplateNewPage() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Catalog locked to the two ISO Word templates — no blank/copy creation.
+    // Catalog locked to the VF Word product templates — no blank/copy creation.
     navigate('/crm/quotation-templates', { replace: true })
   }, [navigate])
 
   return (
     <OperationalPageShell
       title="Quotation Templates"
-      description="Catalog is locked to the two ISO templates (26 KL and 25 m³)."
+      description="Catalog is locked to the VF Word product templates (109, 152, 146)."
       badge="CRM"
       variant="dynamics"
       breadcrumbs={crmChildBreadcrumbs('Quotation Templates', '/crm/quotation-templates', 'Catalog')}

@@ -66,6 +66,8 @@ export interface SalesOrder {
   grandTotal?: number | null
   paymentTerms?: string | null
   deliveryTerms?: string | null
+  /** Lead time / delivery timeline (e.g. 8–10 weeks) */
+  deliveryTime?: string | null
   warrantyTerms?: string | null
   commercialNotes?: string | null
   technicalNotes?: string | null

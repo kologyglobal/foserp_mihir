@@ -64,6 +64,70 @@ export function calcOpportunityLinesSummary(lines: OpportunityLine[]): Opportuni
   }
 }
 
+export type OrderDiscountMode = 'flat' | 'percent'
+
+export interface ProductPricingAdjustments {
+  freightAmount?: number
+  orderDiscountMode?: OrderDiscountMode
+  orderDiscountInput?: number
+  /** Quotation extras that add to grand total (legacy charges). */
+  installationAmount?: number
+  customCharges?: number
+}
+
+export interface ProductPricingSummary extends OpportunityLinesSummary {
+  subtotal: number
+  totalLineDiscount: number
+  gstByRate: Map<number, number>
+  totalGst: number
+  freightAmount: number
+  orderDiscountAmount: number
+  installationAmount: number
+  customCharges: number
+}
+
+function round2(n: number) {
+  return Math.round(n * 100) / 100
+}
+
+/** Line totals + freight / order discount / optional quotation extras (Sales Order–style). */
+export function calcProductPricingSummary(
+  lines: OpportunityLine[],
+  adjustments: ProductPricingAdjustments = {},
+): ProductPricingSummary {
+  const base = calcOpportunityLinesSummary(lines)
+  const synced = syncOpportunityLines(lines)
+  const gstByRate = new Map<number, number>()
+  for (const line of synced) {
+    gstByRate.set(line.taxPct, round2((gstByRate.get(line.taxPct) ?? 0) + line.gstAmount))
+  }
+  const freightAmount = Math.max(0, adjustments.freightAmount ?? 0)
+  const installationAmount = Math.max(0, adjustments.installationAmount ?? 0)
+  const customCharges = Math.max(0, adjustments.customCharges ?? 0)
+  const mode = adjustments.orderDiscountMode ?? 'flat'
+  const discountInput = Math.max(0, adjustments.orderDiscountInput ?? 0)
+  const discountBase = round2(base.taxableAmount + base.gstAmount)
+  const orderDiscountAmount =
+    mode === 'percent'
+      ? round2(discountBase * (Math.min(100, discountInput) / 100))
+      : round2(Math.min(discountInput, discountBase + freightAmount + installationAmount + customCharges))
+  const grandTotal = round2(
+    base.taxableAmount + base.gstAmount + freightAmount + installationAmount + customCharges - orderDiscountAmount,
+  )
+  return {
+    ...base,
+    subtotal: base.taxableAmount,
+    totalLineDiscount: base.totalDiscount,
+    gstByRate,
+    totalGst: base.gstAmount,
+    freightAmount,
+    orderDiscountAmount,
+    installationAmount,
+    customCharges,
+    grandTotal,
+  }
+}
+
 export function calcWeightedValue(grandTotal: number, probability: number) {
   return Math.round(grandTotal * (probability / 100) * 100) / 100
 }

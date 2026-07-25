@@ -31,6 +31,7 @@ import { sectionCompletionStatus, validateQuotationForPrint } from '../../utils/
 import { saveQuotationPdfToDms } from '../../utils/quotationEngine/pdfExport'
 import { commercialTermsNeedApproval, extractCommercialTermsFromSections, resolveCommercialTermSelectValue, syncCommercialTermsIntoSections } from '../../utils/quotationTermUtils'
 import { opportunityRequirementDisplay } from '../../utils/leadRequirementLines'
+import { useDeliveryTimeOptions } from '../../hooks/useCrmMasters'
 import { useCrmRecordLoadState } from '../crm/CrmRecordLoadGate'
 import { PageLoadingFallback } from '../system/PageLoadingFallback'
 import type { QuotationPriceLine, QuotationSection } from '../../types/crm'
@@ -73,6 +74,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
   const quotation = useSalesStore((s) => (doc ? s.getQuotation(doc.quotationId) : undefined))
   const customers = useMasterStore((s) => s.customers)
   const allDocs = useCrmStore((s) => s.quotationDocuments)
+  const deliveryTimeOptions = useDeliveryTimeOptions()
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
   const [savedFlash, setSavedFlash] = useState(false)
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({})
@@ -238,7 +240,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
   })()
 
   function patchCommercial(
-    patch: Partial<{ paymentTerms: string; deliveryTerms: string; validityDate: string }>,
+    patch: Partial<{ paymentTerms: string; deliveryTerms: string; deliveryTime: string; validityDate: string }>,
   ) {
     if (!canEdit || !doc) return
     void resolveStoreAction(updateQuotationDraft(doc.quotationId, patch))
@@ -283,7 +285,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
   }
 
   function handleGeneratePdf() {
-    navigate(`/crm/quotations/${doc!.quotationId}/print?doc=${documentId}`)
+    navigate(`/crm/quotations/${doc!.quotationId}/print?doc=${documentId}&download=1`)
   }
 
   async function handleSubmitApprovalClick() {
@@ -477,7 +479,7 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
                     disabled={!canEdit}
                   />
                 </ErpFieldRow>
-                <ErpFieldRow label="Delivery timeline" required colSpan={2}>
+                <ErpFieldRow label="Delivery Terms" required>
                   <CommercialTermSelect
                     termType="delivery"
                     value={resolveCommercialTermSelectValue('delivery-terms', quotation.deliveryTerms)}
@@ -485,6 +487,19 @@ export function QuotationBuilder({ documentId }: QuotationBuilderProps) {
                     placeholder="Select delivery terms"
                     disabled={!canEdit}
                   />
+                </ErpFieldRow>
+                <ErpFieldRow label="Delivery time" required>
+                  <Select
+                    value={quotation.deliveryTime ?? ''}
+                    onChange={(e) => patchCommercial({ deliveryTime: e.target.value })}
+                    disabled={!canEdit}
+                    className="erp-input"
+                  >
+                    <option value="">— Select —</option>
+                    {deliveryTimeOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </Select>
                 </ErpFieldRow>
               </ErpFormGrid>
             </section>

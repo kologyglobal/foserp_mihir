@@ -47,6 +47,7 @@ export const CRM_KIND_ENTITY_TYPE: Record<CrmMasterKind, CodeSeriesEntityType> =
   'commercial-terms': 'commercial_term',
   'payment-terms': 'payment_terms',
   'delivery-terms': 'delivery_term',
+  'delivery-time': 'delivery_time',
   'warranty-terms': 'warranty_term',
   'approval-rules': 'approval_rule',
   'document-types': 'document_type',

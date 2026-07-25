@@ -16,8 +16,9 @@
     "resolveJsonModule": true,
 
     "declaration": true,
-    "declarationMap": true,
+    "declarationMap": false,
     "sourceMap": true,
+    "incremental": true,
 
     "noUnusedLocals": true,
     "noUnusedParameters": true,

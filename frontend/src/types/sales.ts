@@ -121,6 +121,12 @@ export interface Lead extends AuditTrail {
   followUpNotes: string | null
   /** BC-style fulfilment / stock location */
   locationId: string | null
+  /** External connector (e.g. INDIAMART) */
+  externalSource?: string | null
+  externalSourceId?: string | null
+  externalSourceReference?: string | null
+  sourceEnquiryDate?: string | null
+  integrationEnquiryId?: string | null
 }
 
 export interface Inquiry extends AuditTrail {

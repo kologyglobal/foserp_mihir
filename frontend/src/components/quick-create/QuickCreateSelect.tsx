@@ -1,15 +1,16 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Input } from '../forms/Inputs'
 import { ErpSmartSelect } from '../erp/ErpSmartSelect'
+import { QuickCompanyCreateModal } from '../crm/QuickCompanyCreateModal'
 import { useQuickCreate } from '../../hooks/useQuickCreate'
 import { useMasterStore } from '../../store/masterStore'
 import {
   QUICK_CREATE_ADD_LABELS,
   QUICK_CREATE_EMPTY_LABELS,
 } from '../../types/quickCreate'
-import type { QuickCreateEntityType } from '../../types/quickCreate'
+import type { QuickCreateEntityType, QuickCreateResult } from '../../types/quickCreate'
 
 export interface QuickCreateOption {
   id: string
@@ -42,6 +43,7 @@ export function QuickCreateSelect({
   className,
 }: QuickCreateSelectProps) {
   const { openDrawer, canCreate, getDenialReason } = useQuickCreate()
+  const [companyModalOpen, setCompanyModalOpen] = useState(false)
   const allowed = canCreate(entityType)
   const denialReason = getDenialReason(entityType)
 
@@ -57,17 +59,34 @@ export function QuickCreateSelect({
     [options, allowEmpty, emptyOptionLabel],
   )
 
+  const addLabel = QUICK_CREATE_ADD_LABELS[entityType] || 'Add New'
+  const companyDefaultName =
+    typeof context?.customerName === 'string'
+      ? context.customerName
+      : typeof context?.defaultName === 'string'
+        ? context.defaultName
+        : ''
+
   function handleAdd() {
     if (!allowed) return
+    // CRM company create: same Lead popup (QuickCompanyCreateModal), not the generic drawer.
+    if (entityType === 'customer') {
+      setCompanyModalOpen(true)
+      return
+    }
     openDrawer(entityType, {
       defaultValues: context,
       onCreated: (result) => onChange(result.id),
     })
   }
 
+  function handleCompanyCreated(result: QuickCreateResult) {
+    if (result.id) onChange(result.id)
+  }
+
   return (
-    <div className={`space-y-2 ${className ?? ''}`}>
-      <div className="flex gap-2">
+    <div className={`qc-select space-y-2 ${className ?? ''}`}>
+      <div className="qc-select__row flex gap-2">
         <ErpSmartSelect
           className="flex-1 min-w-0"
           options={smartOptions}
@@ -80,14 +99,15 @@ export function QuickCreateSelect({
         />
         <Button
           type="button"
-          size="sm"
+          size="icon"
           variant="secondary"
+          className="qc-select__add"
           onClick={handleAdd}
           disabled={disabled || !allowed}
-          title={!allowed ? denialReason : undefined}
+          aria-label={addLabel}
+          title={!allowed ? denialReason : addLabel}
         >
-          <Plus className="mr-1 h-3.5 w-3.5" />
-          Add New
+          <Plus className="h-4 w-4" aria-hidden />
         </Button>
       </div>
       {smartOptions.length <= (allowEmpty ? 1 : 0) && (
@@ -100,15 +120,23 @@ export function QuickCreateSelect({
             className="mt-2"
             onClick={handleAdd}
             disabled={disabled || !allowed}
-            title={!allowed ? denialReason : undefined}
+            title={!allowed ? denialReason : addLabel}
           >
-            {QUICK_CREATE_ADD_LABELS[entityType]}
+            {addLabel}
           </Button>
           {!allowed && denialReason && (
             <p className="mt-2 text-xs text-amber-700">{denialReason}</p>
           )}
         </div>
       )}
+      {entityType === 'customer' ? (
+        <QuickCompanyCreateModal
+          open={companyModalOpen}
+          defaultName={companyDefaultName}
+          onClose={() => setCompanyModalOpen(false)}
+          onCreated={handleCompanyCreated}
+        />
+      ) : null}
     </div>
   )
 }

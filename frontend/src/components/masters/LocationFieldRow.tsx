@@ -12,6 +12,7 @@ type LocationFieldRowProps = {
   readOnly?: boolean
   colSpan?: 1 | 2 | 3
   hint?: string
+  horizontal?: boolean
 }
 
 /** Standard Location Code row for enterprise card forms (Lead → Opportunity → Quotation → SO). */
@@ -24,12 +25,20 @@ export function LocationFieldRow({
   readOnly,
   colSpan,
   hint = 'Inventory location for fulfilment and stock posting',
+  horizontal,
 }: LocationFieldRowProps) {
   const locations = useMasterStore((s) => s.locations)
   const getLocationName = useMasterStore((s) => s.getLocationName)
 
   return (
-    <ErpFieldRow label={label} required={required} readOnly={readOnly} colSpan={colSpan} hint={hint}>
+    <ErpFieldRow
+      label={label}
+      required={required}
+      readOnly={readOnly}
+      colSpan={colSpan}
+      hint={hint}
+      horizontal={horizontal}
+    >
       {readOnly ? (
         <span className="text-sm text-erp-text">{value ? getLocationName(value) : '—'}</span>
       ) : (

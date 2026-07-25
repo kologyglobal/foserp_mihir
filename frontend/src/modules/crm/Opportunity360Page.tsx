@@ -14,10 +14,7 @@ import { CrmCardFormShell, ENTERPRISE_FORM_CLASS } from '@/components/crm/CrmCar
 import { useCrmRecordLoadState } from '@/components/crm/CrmRecordLoadGate'
 import { PageLoadingFallback } from '@/components/system/PageLoadingFallback'
 import {
-  ErpAdditionalInfoToggle,
-  ErpAdditionalInfoPanel,
   ErpAdditionalSectionNav,
-  useErpAdditionalInfo,
 } from '../../components/erp/card-form'
 import { ErpButton } from '../../components/erp/ErpButton'
 import { ErpLineItemsGrid } from '../../components/erp/ErpLineItemsGrid'
@@ -225,24 +222,6 @@ export function Opportunity360Page() {
   }, [opportunity, products])
 
   const commercialDone = Boolean(opportunity && opportunity.value > 0 && opportunity.expectedCloseDate)
-  const hasOptionalDetailData = Boolean(
-    productLineCount > 0
-    || opportunityAttachments.length > 0
-    || oppActivities.length > 0
-    || oppFollowUps.length > 0
-    || oppDocs.length > 0
-    || commercialDone,
-  )
-
-  const {
-    open: showAdditionalDetails,
-    setOpen: setShowAdditionalDetails,
-    toggle: toggleAdditionalDetails,
-    panelId: additionalPanelId,
-  } = useErpAdditionalInfo({
-    preferOpen: hasOptionalDetailData,
-  })
-
   const additionalSectionItems = useMemo(() => {
     if (!opportunity) return []
     return [
@@ -468,7 +447,6 @@ export function Opportunity360Page() {
           ? 'products'
           : sectionId
     setActiveAdditionalSection(normalized)
-    if (!showAdditionalDetails) setShowAdditionalDetails(true)
     window.setTimeout(() => {
       document
         .getElementById(`erp-additional-panel-${normalized}`)
@@ -704,15 +682,7 @@ export function Opportunity360Page() {
             onNotesChange={setEntityNotes}
           />
 
-          <ErpAdditionalInfoToggle
-            open={showAdditionalDetails}
-            onToggle={() => toggleAdditionalDetails()}
-            panelId={additionalPanelId}
-            sectionCount={additionalSectionItems.length}
-            attentionCount={additionalSectionItems.filter((s) => s.tone === 'missing').length}
-          />
 
-          <ErpAdditionalInfoPanel open={showAdditionalDetails} id={additionalPanelId} scrollOnOpen={false}>
             <ErpAdditionalSectionNav
               layout="responsive"
               sections={additionalSectionItems}
@@ -852,7 +822,8 @@ export function Opportunity360Page() {
                 ),
               }}
             />
-          </ErpAdditionalInfoPanel>
+          
+
         </div>
       </CrmCardFormShell>
 

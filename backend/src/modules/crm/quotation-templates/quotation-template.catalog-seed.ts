@@ -1,4 +1,21 @@
-/** Canonical seed for the two VF ISO quotation templates (76 + 109 Word docs). */
+/** Canonical seed for the VF Word quotation templates (76 + 109 + 152 + 146). */
+
+import {
+  ISO_TANK_26KL_SEED_SECTIONS,
+  ISO_TANK_26KL_SEED_VERSION,
+} from './quotation-template.iso-tank-26kl.js'
+import {
+  ISO_DRY_BULK_25CBM_SEED_SECTIONS,
+  ISO_DRY_BULK_25CBM_SEED_VERSION,
+} from './quotation-template.iso-dry-bulk-25cbm.js'
+import {
+  FLOUR_BULKER_42M3_SEED_SECTIONS,
+  FLOUR_BULKER_42M3_SEED_VERSION,
+} from './quotation-template.flour-bulker-42m3.js'
+import {
+  TIPPER_30FE_M3_SEED_SECTIONS,
+  TIPPER_30FE_M3_SEED_VERSION,
+} from './quotation-template.tipper-30fe-m3.js'
 
 export interface QuotationTemplateSeedRow {
   code: string
@@ -125,37 +142,64 @@ export const QUOTATION_TEMPLATE_SEED_ROWS: QuotationTemplateSeedRow[] = [
     code: 'ISO-TANK-26KL',
     templateName: '76 — 26 KL ISO Tank Container Quotation',
     productFamily: 'ISO Tank',
-    version: 7,
-    defaultTerms: 'Ex works Chhapi, Banaskantha, North Gujarat. GST @ 18% extra. Validity 60 days. Subject to Chhapi jurisdiction.',
-    defaultWarranty: '12 months against defective material and workmanship. Bought-out items carry OEM warranty.',
-    defaultExclusions: 'Freight, insurance, extra connections/flanges, and statutory registrations excluded unless specified.',
-    sections: isoShellSections(
-      '26 KL ISO Tank Container',
-      'Quotation for supply of 26 KL ISO Tank Container',
-    ),
+    version: ISO_TANK_26KL_SEED_VERSION,
+    defaultTerms:
+      'Ex works Chhapi, Banaskantha, North Gujarat. 30% advance with PO; balance against PI. Validity 60 days. Subject to Chhapi jurisdiction.',
+    defaultWarranty:
+      '12 months against defective material and workmanship. Bought-out items carry OEM warranty. No warranty on hydraulic equipment.',
+    defaultExclusions:
+      'Freight, insurance, site unloading, and statutory registrations excluded unless specified.',
+    sections: ISO_TANK_26KL_SEED_SECTIONS,
   },
   {
     code: 'ISO-DRY-BULK-25CBM',
     templateName: '109 — 25 m³ ISO Tank Container Quotation',
     productFamily: 'ISO Dry Bulk',
-    version: 4,
-    defaultTerms: 'Ex works Chhapi, Banaskantha, North Gujarat. GST extra. Validity 20 days. Advance non-refundable on cancellation. Subject to Chhapi jurisdiction.',
-    defaultWarranty: '12 months against defective material and workmanship. Bought-out items carry OEM warranty.',
-    defaultExclusions: 'Freight, insurance, site unloading, and statutory registrations excluded unless specified.',
-    sections: isoShellSections(
-      '25 m³ ISO Tank Container',
-      "Quotation for supply of 25 m³ ISO Tank Container (20' dry bulk / Model 25 CBM)",
-    ),
+    version: ISO_DRY_BULK_25CBM_SEED_VERSION,
+    defaultTerms:
+      'Ex works Chhapi, Banaskantha, North Gujarat. GST extra. Validity 20 days. Advance non-refundable on cancellation. Subject to Chhapi jurisdiction.',
+    defaultWarranty:
+      '12 months against defective material and workmanship. Bought-out items carry OEM warranty.',
+    defaultExclusions:
+      'Freight, insurance, site unloading, and statutory registrations excluded unless specified.',
+    // Full Word/PDF-mapped sections (dynamic {{placeholders}} + spec tables).
+    sections: ISO_DRY_BULK_25CBM_SEED_SECTIONS,
+  },
+  {
+    code: 'FLOUR-BULKER-42M3',
+    templateName: '152 — 42 m³ Hopper Type Flour Bulker Quotation',
+    productFamily: 'Flour Bulker',
+    version: FLOUR_BULKER_42M3_SEED_VERSION,
+    defaultTerms:
+      'Ex-works Chhapi, Banaskantha, North Gujarat. GST @ 18% extra. Validity 20 days. Subject to Chhapi jurisdiction.',
+    defaultWarranty:
+      '12 months against defective material and workmanship. Bought-out items carry OEM warranty. No warranty on hydraulic equipment.',
+    defaultExclusions:
+      'Freight, insurance, RTO/registration, cabin supports, U-bolts, chassis extras, and statutory charges excluded unless specified.',
+    sections: FLOUR_BULKER_42M3_SEED_SECTIONS,
+  },
+  {
+    code: 'TIPPER-30FE-M3',
+    templateName: '146 — 30 m³ Tipper FE Type Quotation',
+    productFamily: 'Tipper',
+    version: TIPPER_30FE_M3_SEED_VERSION,
+    defaultTerms:
+      'Ex-works Chhapi, Banaskantha, North Gujarat. GST @ 18% extra. Validity 20 days. 40% advance with PO; balance against PI. Advance non-refundable on cancellation. Subject to Chhapi jurisdiction.',
+    defaultWarranty:
+      '12 months against defective material and workmanship. Bought-out items carry OEM warranty. No warranty on hydraulic equipment and parts.',
+    defaultExclusions:
+      'Freight, insurance, RTO/registration, cabin supports, U-bolts, chassis extras, pump/PTO, and statutory charges excluded unless specified.',
+    sections: TIPPER_30FE_M3_SEED_SECTIONS,
   },
 ]
 
 export const VF_WORD_PRINT_LAYOUT_SEED = {
   pageSize: 'A4',
-  marginMm: 18,
+  marginMm: 14,
   fontScale: 1,
-  headerStyle: 'minimal',
-  showLogo: false,
-  showCompanyHeader: false,
+  headerStyle: 'standard',
+  showLogo: true,
+  showCompanyHeader: true,
   showCustomerBlock: false,
   showPageFooter: true,
   showSignatureBlock: true,

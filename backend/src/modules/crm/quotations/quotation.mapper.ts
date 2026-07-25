@@ -88,6 +88,7 @@ export function mapQuotationToDto(
     terms: quotation.terms ?? '',
     paymentTerms: quotation.paymentTerms ?? '',
     deliveryTerms: quotation.deliveryTerms ?? '',
+    deliveryTime: quotation.deliveryTime ?? '',
     validityDate: toIso(quotation.validityDate)?.slice(0, 10) ?? '',
     pricing,
     changeHistory: parseJsonArray<QuotationChangeRecordDto>(quotation.changeHistory),

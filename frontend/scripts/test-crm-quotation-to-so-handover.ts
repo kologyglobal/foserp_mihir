@@ -90,7 +90,7 @@ let quotationId: string | undefined
 let oldRevisionDocId: string | undefined
 
 if (openOpp) {
-  const r = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-iso-tank', 2100000)
+  const r = crm.createQuotationFromOpportunity(openOpp.id, 'qtpl-iso-dry-bulk-25cbm', 2100000)
   quotationId = r.quotationId
   documentId = r.documentId
 

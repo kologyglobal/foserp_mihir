@@ -126,6 +126,7 @@ interface CreateQuotationInput {
   terms?: string
   paymentTerms?: string
   deliveryTerms?: string
+  deliveryTime?: string
   validityDate?: string
   locationId?: string | null
 }
@@ -140,6 +141,7 @@ export interface CrmSalesOrderContext {
   discountPct?: number
   paymentTerms?: string
   deliveryTerms?: string
+  deliveryTime?: string
   warrantyTerms?: string
   commercialNotes?: string
   technicalNotes?: string
@@ -201,7 +203,7 @@ interface SalesState {
   /** @deprecated Use createQuotationFromOpportunity */
   createQuotationFromInquiry: (input: CreateQuotationInput & { inquiryId: string }) => StoreAction<StoreActionResult & { quotationId?: string }>
   createQuotationRevision: (quotationId: string, changes: { unitPrice?: number; discountPct?: number; summary: string }) => { ok: boolean; error?: string; quotationId?: string }
-  updateQuotationDraft: (id: string, patch: Partial<Pick<Quotation, 'terms' | 'paymentTerms' | 'deliveryTerms' | 'validityDate'>> & { unitPrice?: number; discountPct?: number }) => StoreAction<StoreActionResult>
+  updateQuotationDraft: (id: string, patch: Partial<Pick<Quotation, 'terms' | 'paymentTerms' | 'deliveryTerms' | 'deliveryTime' | 'validityDate'>> & { unitPrice?: number; discountPct?: number }) => StoreAction<StoreActionResult>
   submitQuotationForApproval: (id: string) => { ok: boolean; error?: string }
   /** Internal approval — header → approved; customerApproval stays pending until after send. */
   approveQuotationInternally: (id: string) => { ok: boolean; error?: string }
@@ -220,6 +222,7 @@ interface SalesState {
     customerPoNumber: string
     paymentTerms: string
     deliveryTerms: string
+    deliveryTime: string
     directSoReason: string
     expectedDeliveryDate?: string
     deliveryLocation?: string
@@ -582,6 +585,7 @@ export const useSalesStore = create<SalesState>()(
           terms: input.terms ?? 'Standard manufacturing terms apply.',
           paymentTerms: input.paymentTerms ?? '30% advance, 70% before dispatch',
           deliveryTerms: input.deliveryTerms ?? 'Ex-works Nashik',
+          deliveryTime: input.deliveryTime ?? '',
           validityDate,
           pricing,
           changeHistory: [
@@ -619,6 +623,7 @@ export const useSalesStore = create<SalesState>()(
               terms: input.terms,
               paymentTerms: input.paymentTerms,
               deliveryTerms: input.deliveryTerms,
+              deliveryTime: input.deliveryTime,
               validityDate: input.validityDate,
               locationId: input.locationId ?? null,
               summary: 'Initial quotation created for customer (direct)',
@@ -653,6 +658,7 @@ export const useSalesStore = create<SalesState>()(
           terms: input.terms ?? 'Standard manufacturing terms apply.',
           paymentTerms: input.paymentTerms ?? '30% advance, 70% before dispatch',
           deliveryTerms: input.deliveryTerms ?? 'Ex-works Nashik',
+          deliveryTime: input.deliveryTime ?? '',
           validityDate,
           pricing,
           changeHistory: [
@@ -994,6 +1000,7 @@ export const useSalesStore = create<SalesState>()(
           grandTotal,
           paymentTerms: crm?.paymentTerms ?? quo.paymentTerms,
           deliveryTerms: crm?.deliveryTerms ?? quo.deliveryTerms,
+          deliveryTime: crm?.deliveryTime ?? quo.deliveryTime ?? null,
           warrantyTerms: crm?.warrantyTerms ?? null,
           commercialNotes: crm?.commercialNotes ?? quo.terms,
           technicalNotes: crm?.technicalNotes ?? null,
@@ -1106,6 +1113,7 @@ export const useSalesStore = create<SalesState>()(
           grandTotal,
           paymentTerms: input.paymentTerms,
           deliveryTerms: input.deliveryTerms,
+          deliveryTime: input.deliveryTime,
           customerCode: customer.customerCode,
           customerPoNumber: input.customerPoNumber,
           customerPoDate: input.customerPoDate,

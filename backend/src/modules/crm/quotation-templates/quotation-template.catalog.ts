@@ -1,10 +1,15 @@
 import { env } from '../../../config/env.js'
 
 /** Only these catalog codes stay active — must match prisma/quotationTemplateSeedData.ts */
-export const QUOTATION_TEMPLATE_KEEP_CODES = ['ISO-TANK-26KL', 'ISO-DRY-BULK-25CBM'] as const
+export const QUOTATION_TEMPLATE_KEEP_CODES = [
+  'ISO-TANK-26KL',
+  'ISO-DRY-BULK-25CBM',
+  'FLOUR-BULKER-42M3',
+  'TIPPER-30FE-M3',
+] as const
 
 /**
- * Live catalog lock: only the two VF ISO Word templates are visible / creatable.
+ * Live catalog lock: only the VF Word product templates are visible / creatable.
  * - production → locked by default
  * - CRM_LOCK_QUOTATION_TEMPLATE_CATALOG=true|false overrides
  * - test → unlocked so e2e can create temporary templates

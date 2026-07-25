@@ -164,14 +164,7 @@ export function ErpLineItemsGrid({
                   'text-right',
                   isOpportunity ? 'erp-line-items-grid__col-discount erp-line-items-grid__col--desktop' : 'erp-line-items-grid__col-pct',
                 )}>
-                  {isOpportunity ? (
-                    <span className="erp-line-items-grid__th-stack">
-                      <span>Discount</span>
-                      <span className="erp-line-items-grid__th-sub">% · amount</span>
-                    </span>
-                  ) : (
-                    'Disc %'
-                  )}
+                  Disc %
                 </th>
                 {!isOpportunity ? <th className="text-right">Disc Amt</th> : null}
                 {!isOpportunity ? <th className="text-right">Taxable</th> : null}
@@ -179,14 +172,7 @@ export function ErpLineItemsGrid({
                   'text-right',
                   isOpportunity ? 'erp-line-items-grid__col-tax erp-line-items-grid__col--desktop' : 'erp-line-items-grid__col-pct',
                 )}>
-                  {isOpportunity ? (
-                    <span className="erp-line-items-grid__th-stack">
-                      <span>Tax</span>
-                      <span className="erp-line-items-grid__th-sub">GST % · amount</span>
-                    </span>
-                  ) : (
-                    'GST %'
-                  )}
+                  GST %
                 </th>
                 {!isOpportunity ? <th className="text-right">GST Amt</th> : null}
                 <th className="text-right erp-line-items-grid__col-total">
@@ -417,113 +403,134 @@ export function ErpLineItemsGrid({
                     {isOpportunity && expanded ? (
                       <tr className="erp-line-items-grid__detail-row">
                         <td colSpan={colSpan}>
-                          <div className="erp-line-items-grid__detail-grid">
-                            <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
-                              <span>Description</span>
-                              {readOnly ? (
-                                <p>{line.description || '—'}</p>
-                              ) : (
-                                <input
-                                  className="quo-editor-price__input"
-                                  value={line.description}
-                                  onChange={(e) => updateLine(line.id, { description: e.target.value })}
-                                  placeholder="Description"
-                                />
-                              )}
-                            </label>
-                            <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
-                              <span>Unit</span>
-                              <p>{line.uom || '—'}</p>
-                            </label>
-                            <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
-                              <span>Discount</span>
-                              {readOnly ? (
-                                <p>{line.discountPct}% (−{formatCrmCurrency(line.discountAmount)})</p>
-                              ) : (
-                                <div className="erp-line-items-grid__detail-inline">
+                          <div className="erp-line-items-grid__detail-panel">
+                            <div className="erp-line-items-grid__detail-grid">
+                              <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
+                                <span>Description</span>
+                                {readOnly ? (
+                                  <p>{line.description || '—'}</p>
+                                ) : (
                                   <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    className="erp-line-items-grid__input-num"
-                                    value={line.discountPct}
-                                    onChange={(e) => updateLine(line.id, { discountPct: Number(e.target.value) })}
-                                    aria-label="Discount percent"
+                                    className="quo-editor-price__input"
+                                    value={line.description}
+                                    onChange={(e) => updateLine(line.id, { description: e.target.value })}
+                                    placeholder="Description"
                                   />
-                                  <span className="erp-line-items-grid__money-hint">−{formatCrmCurrency(line.discountAmount)}</span>
-                                </div>
-                              )}
-                            </label>
-                            <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
-                              <span>Tax (GST)</span>
-                              {readOnly ? (
-                                <p>{line.taxPct}% (+{formatCrmCurrency(line.gstAmount)})</p>
-                              ) : (
-                                <div className="erp-line-items-grid__detail-inline">
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    className="erp-line-items-grid__input-num"
-                                    value={line.taxPct}
-                                    onChange={(e) => updateLine(line.id, { taxPct: Number(e.target.value) })}
-                                    aria-label="Tax / GST percent"
-                                  />
-                                  <span className="erp-line-items-grid__money-hint">+{formatCrmCurrency(line.gstAmount)}</span>
-                                </div>
-                              )}
-                            </label>
+                                )}
+                              </label>
+                              <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
+                                <span>Unit</span>
+                                <p>{line.uom || '—'}</p>
+                              </label>
+                              <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
+                                <span>Discount</span>
+                                {readOnly ? (
+                                  <p>{line.discountPct}% (−{formatCrmCurrency(line.discountAmount)})</p>
+                                ) : (
+                                  <div className="erp-line-items-grid__detail-inline">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      className="erp-line-items-grid__input-num"
+                                      value={line.discountPct}
+                                      onChange={(e) => updateLine(line.id, { discountPct: Number(e.target.value) })}
+                                      aria-label="Discount percent"
+                                    />
+                                    <span className="erp-line-items-grid__money-hint">−{formatCrmCurrency(line.discountAmount)}</span>
+                                  </div>
+                                )}
+                              </label>
+                              <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--compact-only">
+                                <span>Tax (GST)</span>
+                                {readOnly ? (
+                                  <p>{line.taxPct}% (+{formatCrmCurrency(line.gstAmount)})</p>
+                                ) : (
+                                  <div className="erp-line-items-grid__detail-inline">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      className="erp-line-items-grid__input-num"
+                                      value={line.taxPct}
+                                      onChange={(e) => updateLine(line.id, { taxPct: Number(e.target.value) })}
+                                      aria-label="Tax / GST percent"
+                                    />
+                                    <span className="erp-line-items-grid__money-hint">+{formatCrmCurrency(line.gstAmount)}</span>
+                                  </div>
+                                )}
+                              </label>
 
-                            <div className="erp-line-items-grid__detail-field">
-                              <span>HSN / SAC</span>
-                              <p>{hsn || '—'}</p>
+                              <div className="erp-line-items-grid__detail-row-fields">
+                                <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--delivery">
+                                  <span>Delivery date</span>
+                                  {readOnly ? (
+                                    <p>{line.expectedDeliveryDate ?? '—'}</p>
+                                  ) : (
+                                    <input
+                                      type="date"
+                                      className="erp-line-items-grid__input-date"
+                                      value={line.expectedDeliveryDate ?? ''}
+                                      onChange={(e) => updateLine(line.id, { expectedDeliveryDate: e.target.value || null })}
+                                    />
+                                  )}
+                                </label>
+                                <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--notes">
+                                  <span>Product notes</span>
+                                  {readOnly ? (
+                                    <p>{line.remarks || '—'}</p>
+                                  ) : (
+                                    <input
+                                      className="quo-editor-price__input"
+                                      value={line.remarks}
+                                      onChange={(e) => updateLine(line.id, { remarks: e.target.value })}
+                                      placeholder="Line notes"
+                                    />
+                                  )}
+                                </label>
+                              </div>
+                              {hsn ? (
+                                <div className="erp-line-items-grid__detail-field">
+                                  <span>HSN / SAC</span>
+                                  <p>{hsn}</p>
+                                </div>
+                              ) : null}
+                              {line.itemCode ? (
+                                <div className="erp-line-items-grid__detail-field">
+                                  <span>Item code</span>
+                                  <p className="tabular-nums">{line.itemCode}</p>
+                                </div>
+                              ) : null}
+                              {(warehouseName || line.productFamily || pick?.stockQty != null) ? (
+                                <div className="erp-line-items-grid__detail-field">
+                                  <span>Warehouse / location</span>
+                                  <p>
+                                    {[
+                                      warehouseName || null,
+                                      line.productFamily || null,
+                                      pick?.stockQty != null ? `Stock ${pick.stockQty}` : null,
+                                    ].filter(Boolean).join(' · ')}
+                                  </p>
+                                </div>
+                              ) : null}
+                              {techSpecs ? (
+                                <div className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--wide">
+                                  <span>Technical specifications</span>
+                                  <p className="erp-line-items-grid__detail-specs">{techSpecs}</p>
+                                </div>
+                              ) : null}
                             </div>
-                            <label className="erp-line-items-grid__detail-field">
-                              <span>Delivery details</span>
-                              {readOnly ? (
-                                <p>{line.expectedDeliveryDate ?? '—'}</p>
-                              ) : (
-                                <input
-                                  type="date"
-                                  className="erp-line-items-grid__input-date"
-                                  value={line.expectedDeliveryDate ?? ''}
-                                  onChange={(e) => updateLine(line.id, { expectedDeliveryDate: e.target.value || null })}
-                                />
-                              )}
-                            </label>
-                            <label className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--wide">
-                              <span>Product notes</span>
-                              {readOnly ? (
-                                <p>{line.remarks || '—'}</p>
-                              ) : (
-                                <input
-                                  className="quo-editor-price__input"
-                                  value={line.remarks}
-                                  onChange={(e) => updateLine(line.id, { remarks: e.target.value })}
-                                  placeholder="Line notes"
-                                />
-                              )}
-                            </label>
-                            <div className="erp-line-items-grid__detail-field erp-line-items-grid__detail-field--wide">
-                              <span>Technical specifications</span>
-                              <p className="erp-line-items-grid__detail-specs">{techSpecs || '—'}</p>
-                            </div>
-                            <div className="erp-line-items-grid__detail-field">
-                              <span>Warehouse / location</span>
-                              <p>
-                                {[
-                                  warehouseName || null,
-                                  line.productFamily || null,
-                                  pick?.stockQty != null ? `Stock ${pick.stockQty}` : null,
-                                ].filter(Boolean).join(' · ') || '—'}
-                              </p>
-                            </div>
-                            <div className="erp-line-items-grid__detail-metrics">
-                              <span>Taxable {formatCrmCurrency(line.taxableValue)}</span>
-                              <span>Discount {formatCrmCurrency(line.discountAmount)}</span>
-                              <span>GST {formatCrmCurrency(line.gstAmount)} ({line.taxPct}%)</span>
-                              <span>Line total {formatCrmCurrency(line.lineTotal)}</span>
-                              {line.itemCode ? <span>Code {line.itemCode}</span> : null}
+
+                            <div className="erp-line-items-grid__detail-metrics" aria-label="Line amounts">
+                              <div className="erp-line-items-grid__detail-metrics-row">
+                                <span>Taxable <strong>{formatCrmCurrency(line.taxableValue)}</strong></span>
+                                <span>Discount <strong>{formatCrmCurrency(line.discountAmount)}</strong></span>
+                                <span>GST <strong>{formatCrmCurrency(line.gstAmount)}</strong> ({line.taxPct}%)</span>
+                              </div>
+                              <div className="erp-line-items-grid__detail-metrics-total">
+                                <span>Line total</span>
+                                <strong className="tabular-nums">{formatCrmCurrency(line.lineTotal)}</strong>
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -566,9 +573,12 @@ export function ErpLineItemsGrid({
                   </>
                 ) : null}
               </p>
-              <span className="erp-line-items-grid__totals-item erp-line-items-grid__totals-item--total" title="Final Quoted Value = product subtotal − discount + tax">
-                Final Quoted <strong>{formatCrmCurrency(summary.grandTotal)}</strong>
-              </span>
+              <div className="erp-line-items-grid__totals-row erp-line-items-grid__totals-row--grand">
+                <span className="erp-line-items-grid__totals-spacer" aria-hidden />
+                <span className="erp-line-items-grid__totals-item erp-line-items-grid__totals-item--total" title="Final Quoted Value = product subtotal − discount + tax">
+                  Final Quoted <strong>{formatCrmCurrency(summary.grandTotal)}</strong>
+                </span>
+              </div>
             </div>
           ) : (
             <>

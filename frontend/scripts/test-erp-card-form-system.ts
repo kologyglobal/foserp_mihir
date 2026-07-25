@@ -83,12 +83,12 @@ check('Opportunity FactBox', opp.includes('ErpFactBoxPanel'))
 
 const oppNew = read('src/modules/crm/OpportunityNewPage.tsx')
 check('Opportunity new page route module', oppNew.includes('OpportunityNewPage') && oppNew.includes('CrmCardFormShell'))
-check('Opportunity new item line grid', oppNew.includes('ErpLineItemsGrid') && oppNew.includes('Product / Item Lines'))
+check('Opportunity new product pricing section', oppNew.includes('ErpProductPricingSection') && oppNew.includes('Product & Pricing'))
 check('Opportunity new CRM route', read('src/routes/crmRoutes.tsx').includes("path: 'opportunities/new'"))
 
-const quoNew = read('src/modules/crm/CrmQuotationNewPage.tsx')
+const quoNew = read('src/modules/quotations/CrmQuotationNewPage.tsx')
 check('Quotation new uses CrmCardFormShell', quoNew.includes('CrmCardFormShell') && quoNew.includes('CrmQuotationNewPage'))
-check('Quotation new section navigation', quoNew.includes('sectionNavItems'))
+check('Quotation new form sections', quoNew.includes('ErpQuickEntrySection') && quoNew.includes('quote-section-products'))
 
 const company = read('src/modules/masters/customer/CustomerPages.tsx')
 check('Company master status strip', company.includes('ErpFormStatusStrip'))

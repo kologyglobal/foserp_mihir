@@ -1,18 +1,13 @@
 import { useMemo, useState, useEffect } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
-  Bookmark,
-  Building2,
   ClipboardList,
-  ExternalLink,
   FileText,
   Handshake,
-  MapPin,
   Paperclip,
   PenLine,
 } from 'lucide-react'
-import { DynamicsStatusChip } from '../../components/dynamics/DynamicsStatusChip'
 import { OpportunitySelectPicker } from '../../components/crm/OpportunitySelectPicker'
 import { QuotationTemplateSelector } from '@/components/quotations/QuotationTemplateSelector'
 import { QuotationLineItemsEditor } from '@/components/quotations/QuotationLineItemsEditor'
@@ -23,9 +18,8 @@ import {
   ErpQuickEntrySection,
   ErpStickySaveBar,
 } from '../../components/erp/card-form'
-import { ErpSmartSelect } from '../../components/erp/ErpSmartSelect'
 import { Input, Select } from '../../components/forms/Inputs'
-import { AppLink } from '../../components/ui/AppLink'
+import { QuickCreateSelect } from '../../components/quick-create/QuickCreateSelect'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
 import { QuotationCreateModeChooser } from '../../components/quotations/QuotationCreateModeChooser'
 import { resolveStoreAction } from '../../store/storeAction'
@@ -42,7 +36,6 @@ import type { Opportunity, OpportunityLine } from '../../types/crm'
 import type { Product } from '../../types/master'
 import {
   calcOpportunityLinesSummary,
-  calcWeightedValue,
   createEmptyOpportunityLine,
   opportunityLinesToQuotationPriceLines,
   quotationPriceLinesToOpportunityLines,
@@ -57,9 +50,7 @@ import {
   decodeLeadRequirementLines,
   hasLeadRequirementLines,
   isEncodedLeadRequirementPayload,
-  opportunityRequirementDisplay,
   sanitizeOpportunityScopeNotes,
-  summarizeLeadRequirementLines,
 } from '../../utils/leadRequirementLines'
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { CommercialTermSelect } from '../../components/masters/GeographySelects'
@@ -69,13 +60,8 @@ import { crmChildBreadcrumbs } from '../../utils/crmNavigation'
 import { CrmTypedDocumentUpload } from '../../components/crm/CrmTypedDocumentUpload'
 import { useQuotationAttachmentStore } from '../../store/quotationAttachmentStore'
 import type { CrmTypedAttachment } from '../../types/crmDocuments'
-import {
-  ENTERPRISE_FORM_CLASS,
-  EnterpriseFormMetrics,
-  EnterpriseFormSectionNav,
-} from '../../design-system/workspace'
+import { ENTERPRISE_FORM_CLASS } from '../../design-system/workspace'
 import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
-import { resolveCompany360Path } from '../../config/entity360Routes'
 import {
   buildQuotationAiInsight,
   buildQuotationFormSectionCompletion,
@@ -87,7 +73,10 @@ import {
   quotationOverviewTitle,
   resolveQuotationNextBestAction,
 } from '../../utils/quotationSmartOverview'
-import { resolveDefaultCommercialTerm } from '../../utils/quotationTermUtils'
+import { resolveDefaultCommercialTerm, resolveDefaultDeliveryTime } from '../../utils/quotationTermUtils'
+import { useDeliveryTimeOptions } from '../../hooks/useCrmMasters'
+import { SELECT_PLACEHOLDER } from '../../components/forms/selectStandards'
+import { cn } from '../../utils/cn'
 
 type QuoteCreateMode = 'opportunity' | 'direct'
 
@@ -122,7 +111,6 @@ function todayIsoDate(): string {
 
 export function CrmQuotationNewPage() {
   const navigate = useNavigate()
-  const { pathname } = useLocation()
   const [searchParams] = useSearchParams()
   const quotationTemplates = useCrmStore((s) => s.quotationTemplates)
   const templates = useMemo(
@@ -134,6 +122,7 @@ export function CrmQuotationNewPage() {
   const products = useMasterStore((s) => s.products) ?? []
   const createFromOpp = useCrmStore((s) => s.createQuotationFromOpportunity)
   const createDirect = useCrmStore((s) => s.createQuotationDirect)
+  const updatePriceTable = useCrmStore((s) => s.updateQuotationDocumentPriceTable)
   const updateOpportunity = useCrmStore((s) => s.updateOpportunity)
 
   const prefillOppId = searchParams.get('opportunityId') ?? ''
@@ -164,7 +153,6 @@ export function CrmQuotationNewPage() {
 
   const [createMode, setCreateMode] = useState<QuoteCreateMode>(initialMode)
   const [modeChosen, setModeChosen] = useState(skipModeChooser)
-  const [activeSection, setActiveSection] = useState('quick')
   const [opportunityId, setOpportunityId] = useState(defaultOppId)
   const [customerId, setCustomerId] = useState(() => {
     if (prefillCustomerId) return prefillCustomerId
@@ -183,9 +171,8 @@ export function CrmQuotationNewPage() {
   })
   const [scopeNotes, setScopeNotes] = useState('')
   const [quotationDate, setQuotationDate] = useState(todayIsoDate)
-  /** Empty until set — missing validity must surface as Required, not Complete. */
-  const [validUntil, setValidUntil] = useState('')
   const [validityPeriodDays, setValidityPeriodDays] = useState<number | 'custom'>(DEFAULT_VALIDITY_DAYS)
+  const [validUntil, setValidUntil] = useState(() => addDays(todayIsoDate(), DEFAULT_VALIDITY_DAYS))
   const [paymentTerms, setPaymentTerms] = useState(() =>
     defaultOppId || prefillCustomerId
       ? resolveDefaultCommercialTerm('payment-terms').text
@@ -196,11 +183,16 @@ export function CrmQuotationNewPage() {
       ? resolveDefaultCommercialTerm('delivery-terms').text
       : '',
   )
+  const [deliveryTime, setDeliveryTime] = useState(() =>
+    defaultOppId || prefillCustomerId ? resolveDefaultDeliveryTime() : '',
+  )
+  const deliveryTimeOptions = useDeliveryTimeOptions()
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [rowErrors, setRowErrors] = useState<Record<string, string[]>>({})
   const [forceOpenProductsKey, setForceOpenProductsKey] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [saveAttempted, setSaveAttempted] = useState(false)
+  const [freightAmount, setFreightAmount] = useState(0)
 
   function handleQuotationDateChange(value: string) {
     setQuotationDate(value)
@@ -250,12 +242,11 @@ export function CrmQuotationNewPage() {
   }
 
   const customerOptions = useMemo(
-    () => customers.map((c) => ({
-      value: c.id,
-      label: `${c.customerCode} · ${c.customerName}`,
-      searchText: `${c.customerCode} ${c.customerName} ${c.city ?? ''}`.toLowerCase(),
-      meta: c.city,
-    })),
+    () =>
+      customers.map((c) => ({
+        id: c.id,
+        label: `${c.customerCode} · ${c.customerName}${c.city ? ` · ${c.city}` : ''}`,
+      })),
     [customers],
   )
 
@@ -270,14 +261,10 @@ export function CrmQuotationNewPage() {
     ? customers.find((c) => c.id === effectiveCustomerId)
     : undefined
   const selectedTemplate = templates.find((t) => t.id === templateId)
-  const selectedProduct = selectedOpp?.productId
-    ? products.find((p) => p.id === selectedOpp.productId)
-    : undefined
 
   const syncedLines = syncOpportunityLines(lines)
   const lineSummary = calcOpportunityLinesSummary(syncedLines)
   const probability = selectedOpp?.probability ?? 0
-  const weighted = calcWeightedValue(lineSummary.grandTotal, probability)
   const priceLines = useMemo(() => opportunityLinesToQuotationPriceLines(syncedLines), [syncedLines])
 
   function handleCreateModeChange(mode: QuoteCreateMode) {
@@ -311,7 +298,6 @@ export function CrmQuotationNewPage() {
     handleCreateModeChange(mode)
     setCreateMode(mode)
     setModeChosen(true)
-    setActiveSection('quick')
   }
 
   function reopenModeChooser() {
@@ -343,6 +329,7 @@ export function CrmQuotationNewPage() {
       validUntil,
       paymentTerms,
       deliveryTerms,
+      deliveryTime,
       lines: syncedLines,
       ownerId: selectedOpp?.ownerId ?? '',
       stage: selectedOpp?.stage ?? 'new_lead',
@@ -371,6 +358,7 @@ export function CrmQuotationNewPage() {
         validUntil: 'Valid until',
         paymentTerms: 'Payment terms',
         deliveryTerms: 'Delivery terms',
+        deliveryTime: 'Delivery time',
         lines: 'Line items',
       }
       const sectionByField: Record<string, string> = {
@@ -380,6 +368,7 @@ export function CrmQuotationNewPage() {
         validUntil: 'quote-section-commercial',
         paymentTerms: 'quote-section-commercial',
         deliveryTerms: 'quote-section-commercial',
+        deliveryTime: 'quote-section-commercial',
         lines: 'quote-section-products',
       }
       for (const key of keys) {
@@ -414,6 +403,7 @@ export function CrmQuotationNewPage() {
     const commercialExtras = {
       paymentTerms: paymentTerms.trim(),
       deliveryTerms: deliveryTerms.trim(),
+      deliveryTime: deliveryTime.trim(),
       validityDate: validUntil,
     }
 
@@ -448,15 +438,24 @@ export function CrmQuotationNewPage() {
 
     bindDraftAttachments(attachmentScopeId, r.quotationId)
     setQuotationAttachments(r.quotationId, attachments.map((a) => ({ ...a, quotationId: r.quotationId })))
+    if (r.documentId && freightAmount > 0) {
+      await resolveStoreAction(
+        updatePriceTable(r.documentId, priceLines, {
+          freightAmount,
+          installationAmount: 0,
+          customCharges: 0,
+        }),
+      )
+    }
     notify.success('Quotation created successfully')
 
     if (mode === 'new') {
       setAttachments([])
       setLines([createEmptyOpportunityLine(1)])
       setScopeNotes('')
+      setFreightAmount(0)
       setValidationErrors([])
       setRowErrors({})
-      setActiveSection('source')
       if (createMode === 'direct') {
         setCustomerId('')
       }
@@ -476,8 +475,10 @@ export function CrmQuotationNewPage() {
   }
 
   function scrollToSection(sectionId: string) {
-    const mapped = sectionId === 'source' || sectionId === 'customer' ? 'quick' : sectionId
-    setActiveSection(mapped)
+    const mapped =
+      sectionId === 'source' || sectionId === 'customer' || sectionId === 'template'
+        ? 'quick'
+        : sectionId
     document.getElementById(`quote-section-${mapped}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
@@ -519,6 +520,7 @@ export function CrmQuotationNewPage() {
       validUntil: validUntil || null,
       paymentTerms,
       deliveryTerms,
+      deliveryTime,
       attachmentCount: attachments.length,
       errorSectionIds,
     }),
@@ -533,80 +535,18 @@ export function CrmQuotationNewPage() {
       validUntil,
       paymentTerms,
       deliveryTerms,
+      deliveryTime,
       attachments.length,
       errorSectionIds,
     ],
   )
   const completionPercent = computeQuotationFormCompletionPercent(completionItems)
-  const mandatoryDoneCount = completionItems.filter((i) => i.mandatory && i.done).length
-  const mandatoryTotal = completionItems.filter((i) => i.mandatory).length
-
-  const sectionNavItems = useMemo(() => {
-    const sourceStatus = completionItems.find((i) => i.id === 'source')?.status
-    const customerStatus = completionItems.find((i) => i.id === 'customer')?.status
-    const quickStatus =
-      sourceStatus === 'error' || customerStatus === 'error'
-        ? 'error' as const
-        : sourceStatus === 'complete' && customerStatus === 'complete'
-          ? 'complete' as const
-          : sourceStatus === 'in_progress' || customerStatus === 'in_progress'
-            ? 'in_progress' as const
-            : 'required' as const
-    return [
-      {
-        id: 'quick',
-        label: 'Quick',
-        icon: createMode === 'opportunity' ? Handshake : Building2,
-        status: quickStatus,
-      },
-      {
-        id: 'template',
-        label: 'Template',
-        icon: Bookmark,
-        status: completionItems.find((i) => i.id === 'template')?.status,
-      },
-      {
-        id: 'products',
-        label: 'Products',
-        icon: ClipboardList,
-        status: completionItems.find((i) => i.id === 'products')?.status,
-      },
-      {
-        id: 'commercial',
-        label: 'Commercial',
-        icon: Banknote,
-        status: completionItems.find((i) => i.id === 'commercial')?.status,
-      },
-      {
-        id: 'documents',
-        label: 'Review',
-        icon: Paperclip,
-        status: completionItems.find((i) => i.id === 'documents')?.status,
-      },
-    ]
-  }, [completionItems, createMode])
-
-  const formMetrics = useMemo(() => [
-    {
-      label: 'Completion',
-      value: `${completionPercent}%`,
-      accent: 'blue' as const,
-      hint: `${mandatoryDoneCount} of ${mandatoryTotal} required sections`,
-    },
-    { label: 'Line Items', value: String(syncedLines.length), accent: 'green' as const, hint: hasValidLine ? formatCrmCurrency(lineSummary.grandTotal) : 'Add products' },
-    { label: 'Grand Total', value: lineSummary.grandTotal > 0 ? formatCrmCurrency(lineSummary.grandTotal) : '—', accent: 'violet' as const, hint: createMode === 'opportunity' ? `${probability}% probability` : 'Direct quote' },
-    { label: 'Weighted', value: weighted > 0 ? formatCrmCurrency(weighted) : '—', accent: 'amber' as const, hint: selectedOpp?.opportunityNo ?? (createMode === 'direct' ? 'No deal linked' : 'No deal') },
-  ], [completionPercent, mandatoryDoneCount, mandatoryTotal, syncedLines.length, hasValidLine, lineSummary.grandTotal, probability, weighted, selectedOpp?.opportunityNo, createMode])
 
   const documentStrip = [
-    { label: 'Quotation No.', value: 'Auto on save', highlight: false },
     { label: 'Status', value: 'Draft' },
     { label: 'Customer', value: selectedCustomer?.customerName ?? '—', highlight: Boolean(selectedCustomer) },
-    { label: 'Opportunity', value: selectedOpp?.opportunityNo ?? (createMode === 'direct' ? 'Direct' : '—'), highlight: Boolean(selectedOpp) },
-    { label: 'Template', value: selectedTemplate?.templateName ?? '—', highlight: Boolean(selectedTemplate) },
-    { label: 'Lines', value: String(syncedLines.length), highlight: syncedLines.length > 0 },
-    { label: 'Grand Total', value: lineSummary.grandTotal > 0 ? formatCrmCurrency(lineSummary.grandTotal) : '—', highlight: lineSummary.grandTotal > 0 },
-    { label: 'Owner', value: selectedOpp?.ownerName ?? '—' },
+    { label: 'Path', value: selectedOpp?.opportunityNo ?? (createMode === 'direct' ? 'Direct' : '—'), highlight: Boolean(selectedOpp) || createMode === 'direct' },
+    { label: 'Total', value: lineSummary.grandTotal > 0 ? formatCrmCurrency(lineSummary.grandTotal) : '—', highlight: lineSummary.grandTotal > 0 },
   ]
 
   const smartOverviewInput = useMemo(() => ({
@@ -663,12 +603,6 @@ export function CrmQuotationNewPage() {
           label: 'All Quotations',
           icon: FileText,
           onClick: () => navigate('/crm/quotations'),
-        },
-        {
-          id: 'templates',
-          label: 'Manage Templates',
-          icon: Bookmark,
-          onClick: () => navigate('/crm/quotation-templates'),
         },
       ]}
       keyDetails={buildQuotationKeyDetails(smartOverviewInput)}
@@ -746,15 +680,30 @@ export function CrmQuotationNewPage() {
         />
       )}
     >
-      <EnterpriseFormSectionNav
-        sections={sectionNavItems}
-        activeId={activeSection}
-        onSelect={scrollToSection}
-      />
-
-      <EnterpriseFormMetrics metrics={formMetrics} />
-
       <div className="erp-form-body crm-quote-create-body">
+      <div className="quote-create-steps" aria-label="Quotation entry steps">
+        <div className={cn('quote-create-steps__item', (opportunityId || customerId) && 'is-done', !(opportunityId || customerId) && 'is-current')}>
+          <span className="quote-create-steps__index">1</span>
+          <span className="quote-create-steps__label">Customer</span>
+        </div>
+        <div className={cn('quote-create-steps__item', hasValidLine && 'is-done', (opportunityId || customerId) && !hasValidLine && 'is-current')}>
+          <span className="quote-create-steps__index">2</span>
+          <span className="quote-create-steps__label">Lines</span>
+        </div>
+        <div className={cn(
+          'quote-create-steps__item',
+          Boolean(validUntil && paymentTerms.trim() && deliveryTerms.trim() && deliveryTime.trim()) && 'is-done',
+          hasValidLine && !(validUntil && paymentTerms.trim() && deliveryTerms.trim() && deliveryTime.trim()) && 'is-current',
+        )}>
+          <span className="quote-create-steps__index">3</span>
+          <span className="quote-create-steps__label">Terms</span>
+        </div>
+        <div className="quote-create-steps__progress" aria-hidden>
+          <span style={{ width: `${completionPercent}%` }} />
+        </div>
+        <span className="quote-create-steps__pct tabular-nums">{completionPercent}%</span>
+      </div>
+
       {selectedOpp && lineSummary.grandTotal > 0 ? (
         <OpportunityQuotationValueMismatchBanner
           opportunityId={selectedOpp.id}
@@ -775,12 +724,10 @@ export function CrmQuotationNewPage() {
       <ErpQuickEntrySection
         id="quote-section-quick"
         title="Quick Entry"
-        subtitle="Create path, customer, and fulfilment location."
-        icon={createMode === 'opportunity' ? Handshake : Building2}
+        subtitle="Set the customer path, template, and location first."
+        icon={createMode === 'opportunity' ? Handshake : PenLine}
         collapsible
         defaultOpen
-        columns={1}
-        className="!max-w-none"
         collapsedSummary={
           selectedCustomer
             ? `${createMode === 'opportunity' ? 'From opportunity' : 'Direct'} · ${selectedCustomer.customerName}`
@@ -789,332 +736,255 @@ export function CrmQuotationNewPage() {
               : 'Direct quote · select a client'
         }
       >
-        <div className="so-create-path-chip" role="status">
-          <span className="so-create-path-chip__mode" aria-hidden>
-            {createMode === 'opportunity' ? <Handshake className="h-3.5 w-3.5" /> : <PenLine className="h-3.5 w-3.5" />}
-          </span>
-          <span className="so-create-path-chip__label">Creating</span>
-          <span className="so-create-path-chip__value">
-            {createMode === 'opportunity' ? 'From opportunity' : 'Direct quotation'}
-          </span>
-          {!skipModeChooser ? (
-            <button type="button" className="so-create-path-chip__change" onClick={reopenModeChooser}>
-              Change path
-            </button>
-          ) : null}
-        </div>
-
-        <ErpFieldGroup
-          label={createMode === 'direct' ? 'Client' : undefined}
-          className="so-qe-customer-group"
-        >
-          {createMode === 'opportunity' ? (
-            <>
-              <ErpFieldRow label="Opportunity" required colSpan={3}>
-                <OpportunitySelectPicker
-                  opportunities={openOpps}
-                  customers={customers}
-                  products={products}
-                  value={opportunityId}
-                  onChange={handleOpportunityChange}
-                />
-              </ErpFieldRow>
-              {selectedOpp ? (
-                <aside className="crm-so-handover" aria-label="Linked opportunity">
-                  <div className="crm-quotation-new__opp-summary">
-                    <div>
-                      <p className="crm-quotation-new__opp-label">Deal no.</p>
-                      <p className="crm-quotation-new__opp-value">{selectedOpp.opportunityNo}</p>
-                    </div>
-                    <div>
-                      <p className="crm-quotation-new__opp-label">Product</p>
-                      <p className="crm-quotation-new__opp-value">
-                        {(selectedProduct?.productName
-                          || summarizeLeadRequirementLines(syncedLines)
-                          || opportunityRequirementDisplay(selectedOpp.productRequirement)
-                        ) || '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="crm-quotation-new__opp-label">Deal value</p>
-                      <p className="crm-quotation-new__opp-value">{formatCrmCurrency(selectedOpp.value)}</p>
-                    </div>
-                    <div>
-                      <p className="crm-quotation-new__opp-label">Owner</p>
-                      <p className="crm-quotation-new__opp-value">{selectedOpp.ownerName}</p>
-                    </div>
-                    <div>
-                      <p className="crm-quotation-new__opp-label">Stage</p>
-                      <DynamicsStatusChip label={opportunityStageLabel(selectedOpp.stage)} tone="info" />
-                    </div>
-                  </div>
-                </aside>
-              ) : (
-                <p className="text-sm text-erp-muted">
-                  {prefillCustomerId && openOpps.length === 0
-                    ? 'No open opportunities for this customer — change path to Direct, or create a deal from the pipeline.'
-                    : 'Select an open opportunity to load the customer and product lines.'}
-                </p>
-              )}
-            </>
-          ) : null}
-        </ErpFieldGroup>
-
-        <ErpFieldGroup label="Bill-to customer" className="so-qe-customer-group">
-          {createMode === 'direct' ? (
-            <ErpFieldRow label="Client / Company" required colSpan={3} dataField="customerId" hint="Required for a direct quotation">
-              <ErpSmartSelect
-                options={customerOptions}
-                value={customerId}
-                onChange={(v) => setCustomerId(v)}
-                placeholder="Search customer code, name, or city…"
-                appearance="dropdown"
-              />
-            </ErpFieldRow>
-          ) : null}
-
-          {selectedCustomer ? (
-            <aside className="so-customer-card" aria-label="Selected customer">
-              <div className="so-customer-card__header">
-                <div className="so-customer-card__avatar" aria-hidden>
-                  {selectedCustomer.customerName
-                    .split(/\s+/)
-                    .slice(0, 2)
-                    .map((w) => w[0])
-                    .join('')
-                    .toUpperCase()}
-                </div>
-                <div className="so-customer-card__identity">
-                  <div className="so-customer-card__title-row">
-                    <h3 className="so-customer-card__name">{selectedCustomer.customerName}</h3>
-                    <span className="so-customer-card__code">{selectedCustomer.customerCode}</span>
-                  </div>
-                  <p className="so-customer-card__location">
-                    <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    <span>
-                      {[selectedCustomer.city, selectedCustomer.state, selectedCustomer.pincode]
-                        .filter(Boolean)
-                        .join(', ') || 'Location not set'}
-                    </span>
-                  </p>
-                </div>
-                <AppLink
-                  to={resolveCompany360Path(selectedCustomer.id, pathname)}
-                  className="so-customer-card__360"
-                >
-                  View 360
-                  <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-                </AppLink>
-              </div>
-              <dl className="so-customer-card__facts">
-                <div className="so-customer-card__fact">
-                  <dt>GSTIN</dt>
-                  <dd className="tabular-nums">{selectedCustomer.gstin?.trim() || '—'}</dd>
-                </div>
-                <div className="so-customer-card__fact">
-                  <dt>Credit days</dt>
-                  <dd className="tabular-nums">{selectedCustomer.creditDays} days</dd>
-                </div>
-                <div className="so-customer-card__fact">
-                  <dt>Credit limit</dt>
-                  <dd className="tabular-nums">
-                    {selectedCustomer.creditLimit != null && selectedCustomer.creditLimit > 0
-                      ? formatCrmCurrency(selectedCustomer.creditLimit)
-                      : 'No limit'}
-                  </dd>
-                </div>
-                {selectedCustomer.contactPerson ? (
-                  <div className="so-customer-card__fact so-customer-card__fact--wide">
-                    <dt>Primary contact</dt>
-                    <dd>
-                      {selectedCustomer.contactPerson}
-                      {selectedCustomer.contactPhone ? (
-                        <span className="so-customer-card__contact-meta"> · {selectedCustomer.contactPhone}</span>
-                      ) : null}
-                    </dd>
-                  </div>
-                ) : null}
-              </dl>
-            </aside>
-          ) : (
-            <div className="so-customer-card so-customer-card--empty" role="status">
-              <div className="so-customer-card__empty-icon" aria-hidden>
-                <Building2 className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="so-customer-card__empty-title">No customer selected</p>
-                <p className="so-customer-card__empty-copy">
-                  {createMode === 'opportunity'
-                    ? 'Link an opportunity to load the bill-to company, GSTIN, and credit terms.'
-                    : 'Search and select a client to load GSTIN, credit terms, and contact details.'}
-                </p>
-              </div>
+        <ErpFieldRow label="Create path" colSpan={2}>
+          <div className="quote-create-path" role="group" aria-label="Create path">
+            <div className="quote-create-path__segment">
+              <button
+                type="button"
+                className={cn('quote-create-path__btn', createMode === 'opportunity' && 'is-active')}
+                onClick={() => handleCreateModeChange('opportunity')}
+              >
+                <Handshake className="h-3.5 w-3.5" aria-hidden />
+                Opportunity
+              </button>
+              <button
+                type="button"
+                className={cn('quote-create-path__btn', createMode === 'direct' && 'is-active')}
+                onClick={() => handleCreateModeChange('direct')}
+              >
+                <PenLine className="h-3.5 w-3.5" aria-hidden />
+                Direct
+              </button>
             </div>
-          )}
-        </ErpFieldGroup>
+            {!skipModeChooser ? (
+              <button type="button" className="quote-create-path__reset" onClick={reopenModeChooser}>
+                Start over
+              </button>
+            ) : null}
+          </div>
+        </ErpFieldRow>
 
-        <ErpFieldGroup label="Fulfilment" className="so-qe-po-group">
-          <LocationFieldRow
-            value={locationId}
-            onChange={(locId) => setLocationId(locId)}
-            usage="sales"
-            colSpan={3}
-            label="Sales location"
-            hint="Where goods will ship from — inherited from the opportunity when available"
-          />
-        </ErpFieldGroup>
-      </ErpQuickEntrySection>
+        {createMode === 'opportunity' ? (
+          <ErpFieldRow label="Opportunity" required colSpan={2} dataField="opportunityId">
+            <OpportunitySelectPicker
+              opportunities={openOpps}
+              customers={customers}
+              products={products}
+              value={opportunityId}
+              onChange={handleOpportunityChange}
+            />
+          </ErpFieldRow>
+        ) : (
+          <ErpFieldRow label="Customer" required colSpan={2} dataField="customerId">
+            <QuickCreateSelect
+              entityType="customer"
+              value={customerId}
+              onChange={setCustomerId}
+              options={customerOptions}
+              placeholder="Search by code, name, or city…"
+              allowEmpty
+              emptyOptionLabel={SELECT_PLACEHOLDER}
+            />
+          </ErpFieldRow>
+        )}
 
-      <ErpCardSection
-        id="quote-section-template"
-        title="Quotation Template"
-        subtitle="Technical-commercial document structure and section layout."
-        icon={Bookmark}
-        accent="teal"
-        collapsible
-        defaultOpen
-      >
-        <div className="col-span-2 crm-quotation-new">
+        <ErpFieldRow label="Template" required colSpan={2} dataField="templateId">
           <QuotationTemplateSelector
             templates={templates}
             value={templateId}
             onChange={setTemplateId}
-            variant="rich"
+            variant="select"
+            label=""
           />
-        </div>
-      </ErpCardSection>
+        </ErpFieldRow>
+
+        <LocationFieldRow
+          value={locationId}
+          onChange={(locId) => setLocationId(locId)}
+          usage="sales"
+          colSpan={2}
+          label="Sales location"
+        />
+
+        {(selectedOpp || selectedCustomer) ? (
+          <div className="quote-create-context" role="status" aria-label="Selected record summary">
+            {selectedOpp ? (
+              <>
+                <span className="quote-create-context__chip">
+                  <span className="quote-create-context__k">Deal</span>
+                  <span className="quote-create-context__v">{selectedOpp.opportunityNo}</span>
+                </span>
+                <span className="quote-create-context__chip">
+                  <span className="quote-create-context__k">Stage</span>
+                  <span className="quote-create-context__v">{opportunityStageLabel(selectedOpp.stage)}</span>
+                </span>
+                <span className="quote-create-context__chip">
+                  <span className="quote-create-context__k">Owner</span>
+                  <span className="quote-create-context__v">{selectedOpp.ownerName}</span>
+                </span>
+                <span className="quote-create-context__chip">
+                  <span className="quote-create-context__k">Value</span>
+                  <span className="quote-create-context__v tabular-nums">{formatCrmCurrency(selectedOpp.value)}</span>
+                </span>
+              </>
+            ) : null}
+            {selectedCustomer ? (
+              <>
+                <span className="quote-create-context__chip quote-create-context__chip--primary">
+                  <span className="quote-create-context__k">Customer</span>
+                  <span className="quote-create-context__v">
+                    {selectedCustomer.customerName}
+                    {selectedCustomer.customerCode ? ` · ${selectedCustomer.customerCode}` : ''}
+                  </span>
+                </span>
+                {selectedCustomer.city ? (
+                  <span className="quote-create-context__chip">
+                    <span className="quote-create-context__k">City</span>
+                    <span className="quote-create-context__v">{selectedCustomer.city}</span>
+                  </span>
+                ) : null}
+                {selectedCustomer.gstin?.trim() ? (
+                  <span className="quote-create-context__chip">
+                    <span className="quote-create-context__k">GSTIN</span>
+                    <span className="quote-create-context__v tabular-nums">{selectedCustomer.gstin}</span>
+                  </span>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+        ) : (
+          <p className="quote-create-context quote-create-context--hint">
+            {createMode === 'opportunity'
+              ? (prefillCustomerId && openOpps.length === 0
+                ? 'No open opportunities for this customer — switch to Direct, or create a deal first.'
+                : 'Select an opportunity to load the customer and product lines.')
+              : 'Select a customer to continue.'}
+          </p>
+        )}
+      </ErpQuickEntrySection>
 
       <ErpCardSection
         id="quote-section-products"
         nbaTarget="products"
         forceOpenKey={forceOpenProductsKey || undefined}
         title="Product & Pricing"
-        subtitle="Build line items, then review the live quotation total."
+        subtitle="Build line items, then review adjustments and the live order total."
         icon={ClipboardList}
-        accent="violet"
+        accent="blue"
         collapsible
         defaultOpen
-        className="!max-w-none so-pricing-section"
+        className="!max-w-none so-pricing-section quote-create-pricing"
         columns={1}
       >
-        <div className="so-pricing-panel so-pricing-panel--pro">
-          <div className="so-pricing-table-wrap quote-pricing-lines">
+        <div className="quote-create-pricing__panel">
+          <div className="quote-create-pricing__lines">
             <QuotationLineItemsEditor
               priceLines={priceLines}
-              onChange={(nextLines) => setLines(quotationPriceLinesToOpportunityLines(nextLines))}
+              freightAmount={freightAmount}
+              onChange={(nextLines, extras) => {
+                setLines(quotationPriceLinesToOpportunityLines(nextLines))
+                setFreightAmount(extras.freightAmount)
+              }}
               probability={probability}
               scopeNotes={scopeNotes}
               onScopeNotesChange={setScopeNotes}
               rowErrors={rowErrors}
             />
           </div>
-          <div className="so-pricing-totals quote-pricing-totals">
-            <div className="quote-pricing-totals__spacer" aria-hidden />
-            <aside className="so-pricing-summary" aria-label="Quotation totals">
-              <p className="so-pricing-summary__title">Quote summary</p>
-              <div className="so-pricing-summary__rows">
-                <div className="so-pricing-summary__row">
-                  <span>Lines</span>
-                  <span className="tabular-nums">{syncedLines.length}</span>
-                </div>
-                <div className="so-pricing-summary__row">
-                  <span>Taxable</span>
-                  <span className="tabular-nums">{formatCrmCurrency(lineSummary.taxableAmount)}</span>
-                </div>
-                <div className="so-pricing-summary__row">
-                  <span>GST</span>
-                  <span className="tabular-nums">{formatCrmCurrency(lineSummary.gstAmount)}</span>
-                </div>
-                {createMode === 'opportunity' ? (
-                  <div className="so-pricing-summary__row">
-                    <span>Weighted ({probability}%)</span>
-                    <span className="tabular-nums">{formatCrmCurrency(weighted)}</span>
-                  </div>
-                ) : null}
-              </div>
-              <div className="so-pricing-summary__grand">
-                <span>Grand total</span>
-                <strong className="tabular-nums">{formatCrmCurrency(lineSummary.grandTotal)}</strong>
-              </div>
-            </aside>
-          </div>
         </div>
       </ErpCardSection>
 
       <ErpCardSection
         id="quote-section-commercial"
-        title="Commercial & Validity"
-        subtitle="Validity window, payment and delivery terms."
+        title="Commercial terms"
+        subtitle="Validity, payment, and delivery."
         icon={Banknote}
-        accent="green"
         collapsible
         defaultOpen
-        className="!max-w-none so-commercial-section"
+        className="!max-w-none quote-create-commercial"
         columns={1}
       >
-        <div className="so-commercial-body">
-          <ErpFieldGroup label="Validity" className="so-commercial-group" columns={3}>
-            <ErpFieldRow label="Quotation date" required hint="Issue date used to derive validity period">
-              <Input
-                type="date"
-                value={quotationDate}
-                onChange={(e) => handleQuotationDateChange(e.target.value)}
-                className="erp-input"
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Valid until" required dataField="validUntil" hint="Critical — quotation expires after this date">
-              <Input
-                type="date"
-                value={validUntil}
-                onChange={(e) => handleValidUntilChange(e.target.value)}
-                className="erp-input"
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Validity period" hint="Updates valid-until from quotation date">
-              <Select
-                native
-                value={validityPeriodDays === 'custom' ? 'custom' : String(validityPeriodDays)}
-                onChange={(e) => handleValidityPeriodChange(e.target.value)}
-                className="erp-input"
-              >
-                {VALIDITY_PERIOD_OPTIONS.map((d) => (
-                  <option key={d} value={d}>{d} days</option>
-                ))}
-                <option value="custom">Custom (from dates)</option>
-              </Select>
-            </ErpFieldRow>
-            <ErpFieldRow label="Currency" readOnly hint="Tenant / document currency (INR)">
-              <Input value="INR" readOnly className="erp-input" />
-            </ErpFieldRow>
-          </ErpFieldGroup>
-
-          <ErpFieldGroup label="Commercial terms" className="so-commercial-group" columns={2}>
-            <ErpFieldRow label="Payment terms" required dataField="paymentTerms">
-              <CommercialTermSelect
-                termType="payment"
-                value={paymentTerms}
-                onChange={setPaymentTerms}
-                placeholder="Select payment terms"
-              />
-            </ErpFieldRow>
-            <ErpFieldRow label="Delivery timeline" required dataField="deliveryTerms" hint="Delivery terms / lead-time commitment">
-              <CommercialTermSelect
-                termType="delivery"
-                value={deliveryTerms}
-                onChange={setDeliveryTerms}
-                placeholder="Select delivery terms"
-              />
-            </ErpFieldRow>
-          </ErpFieldGroup>
-        </div>
+        <ErpFieldGroup label="Validity" columns={4}>
+          <ErpFieldRow label="Quotation date" required>
+            <Input
+              type="date"
+              value={quotationDate}
+              onChange={(e) => handleQuotationDateChange(e.target.value)}
+              className="erp-input"
+            />
+          </ErpFieldRow>
+          <ErpFieldRow label="Validity period" required>
+            <Select
+              native
+              value={validityPeriodDays === 'custom' ? 'custom' : String(validityPeriodDays)}
+              onChange={(e) => handleValidityPeriodChange(e.target.value)}
+              className="erp-input"
+            >
+              {VALIDITY_PERIOD_OPTIONS.map((d) => (
+                <option key={d} value={d}>{d} days</option>
+              ))}
+              <option value="custom">Custom date</option>
+            </Select>
+          </ErpFieldRow>
+          <ErpFieldRow
+            label="Valid until"
+            required
+            dataField="validUntil"
+            hint={
+              validityPeriodDays === 'custom'
+                ? 'Pick an expiry date'
+                : `Quotation date + ${validityPeriodDays} days`
+            }
+          >
+            <Input
+              type="date"
+              value={validUntil}
+              onChange={(e) => handleValidUntilChange(e.target.value)}
+              readOnly={validityPeriodDays !== 'custom'}
+              className="erp-input"
+            />
+          </ErpFieldRow>
+          <ErpFieldRow label="Currency" readOnly>
+            <Input value="INR" readOnly className="erp-input" />
+          </ErpFieldRow>
+        </ErpFieldGroup>
+        <ErpFieldGroup label="Commercial" columns={3}>
+          <ErpFieldRow label="Payment terms" required dataField="paymentTerms">
+            <CommercialTermSelect
+              termType="payment"
+              value={paymentTerms}
+              onChange={setPaymentTerms}
+              placeholder={SELECT_PLACEHOLDER}
+            />
+          </ErpFieldRow>
+          <ErpFieldRow label="Delivery terms" required dataField="deliveryTerms">
+            <CommercialTermSelect
+              termType="delivery"
+              value={deliveryTerms}
+              onChange={setDeliveryTerms}
+              placeholder={SELECT_PLACEHOLDER}
+            />
+          </ErpFieldRow>
+          <ErpFieldRow label="Delivery time" required dataField="deliveryTime">
+            <Select
+              value={deliveryTime}
+              onChange={(e) => setDeliveryTime(e.target.value)}
+              error={saveAttempted && !deliveryTime.trim()}
+            >
+              <option value="">{SELECT_PLACEHOLDER}</option>
+              {deliveryTimeOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </Select>
+          </ErpFieldRow>
+        </ErpFieldGroup>
       </ErpCardSection>
 
       <ErpCardSection
         id="quote-section-documents"
-        title="Attachments & Review"
-        subtitle="Optional supporting files — then create the quotation draft."
+        title="Attachments"
+        subtitle="Optional supporting files."
         icon={Paperclip}
-        accent="slate"
         collapsible
         defaultOpen={attachments.length > 0}
       >

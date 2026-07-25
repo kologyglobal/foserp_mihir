@@ -16,16 +16,16 @@ export const DEFAULT_QUOTATION_PRINT_LAYOUT: QuotationPrintLayout = {
 }
 
 /**
- * Letter-style print layout for VF ISO tank / dry-bulk quotations (sans-serif).
- * Customer & cover text come from template sections (not the ERP chrome blocks).
+ * Letter-style print layout for VF ISO tank / dry-bulk quotations.
+ * Shows company letterhead (logo + details); customer block comes from template sections.
  */
 export const VF_WORD_PRINT_LAYOUT: QuotationPrintLayout = {
   pageSize: 'A4',
-  marginMm: 18,
+  marginMm: 14,
   fontScale: 1,
-  headerStyle: 'minimal',
-  showLogo: false,
-  showCompanyHeader: false,
+  headerStyle: 'standard',
+  showLogo: true,
+  showCompanyHeader: true,
   showCustomerBlock: false,
   showPageFooter: true,
   showSignatureBlock: true,
@@ -57,16 +57,19 @@ export const PRINT_LAYOUT_SECTION_OPTIONS: { id: QuotationSectionType; label: st
 export function resolveQuotationPrintLayout(
   template?: Pick<QuotationTemplate, 'printLayout' | 'productFamily'> | null,
 ): QuotationPrintLayout {
-  const isIsoProduct =
-    template?.productFamily === 'ISO Tank' || template?.productFamily === 'ISO Dry Bulk'
-  const fallback = isIsoProduct ? VF_WORD_PRINT_LAYOUT : DEFAULT_QUOTATION_PRINT_LAYOUT
+  const isVfWordProduct =
+    template?.productFamily === 'ISO Tank'
+    || template?.productFamily === 'ISO Dry Bulk'
+    || template?.productFamily === 'Flour Bulker'
+    || template?.productFamily === 'Tipper'
+  const fallback = isVfWordProduct ? VF_WORD_PRINT_LAYOUT : DEFAULT_QUOTATION_PRINT_LAYOUT
   if (!template?.printLayout) return { ...fallback }
   return {
     ...fallback,
     ...template.printLayout,
     pageBreakBefore: template.printLayout.pageBreakBefore ?? fallback.pageBreakBefore,
-    // ISO Word templates always render with the sans-serif letter skin.
-    printSkin: isIsoProduct ? 'vf_word' : (template.printLayout.printSkin ?? fallback.printSkin),
+    // VF Word product templates always render with the professional letter skin.
+    printSkin: isVfWordProduct ? 'vf_word' : (template.printLayout.printSkin ?? fallback.printSkin),
   }
 }
 

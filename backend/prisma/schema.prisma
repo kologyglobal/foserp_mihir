@@ -160,6 +160,14 @@ model Tenant {
   crmQuotationDocuments                  CrmQuotationDocument[]
   crmQuotationTemplates                  CrmQuotationTemplate[]
   crmSalesOrders                         CrmSalesOrder[]
+  crmPaymentReceipts                     CrmPaymentReceipt[]
+  crmTaxInvoices                         CrmTaxInvoice[]
+  crmPaymentAllocations                  CrmPaymentAllocation[]
+  indiaMartConnection                    IndiaMartConnection?
+  indiaMartEnquiries                     IndiaMartEnquiry[]
+  indiaMartSyncRuns                      IndiaMartSyncRun[]
+  indiaMartProductMappings               IndiaMartProductMapping[]
+  indiaMartAlerts                        IndiaMartAlert[]
   masterCountries                        MasterCountry[]
   masterStates                           MasterState[]
   masterCities                           MasterCity[]
@@ -873,6 +881,9 @@ model CrmCompany {
   opportunities CrmOpportunity[]
   quotations    CrmQuotation[]
   salesOrders   CrmSalesOrder[]
+  paymentReceipts CrmPaymentReceipt[]
+  taxInvoices     CrmTaxInvoice[]
+  paymentAllocations CrmPaymentAllocation[]
 
   @@unique([tenantId, companyCode])
   @@index([tenantId])
@@ -963,6 +974,13 @@ model CrmLead {
   convertedAt         DateTime?
   isArchived          Boolean   @default(false)
   locationId          String?
+  /// External connector source code, e.g. INDIAMART
+  externalSource            String?   @db.VarChar(64)
+  /// External enquiry/lead id from the source system (UNIQUE_QUERY_ID for IndiaMART)
+  externalSourceId          String?   @db.VarChar(128)
+  externalSourceReference   String?   @db.VarChar(255)
+  sourceEnquiryDate         DateTime?
+  integrationEnquiryId      String?
   createdBy           String?
   updatedBy           String?
   createdAt           DateTime  @default(now())
@@ -975,14 +993,19 @@ model CrmLead {
   activities    CrmActivity[]
   statusHistory CrmLeadStatusHistory[]
   assignments   CrmLeadAssignment[]
+  indiaMartEnquiries IndiaMartEnquiry[] @relation("IndiaMartEnquiryCreatedLead")
+  indiaMartMatchedEnquiries IndiaMartEnquiry[] @relation("IndiaMartEnquiryMatchedLead")
 
   @@unique([tenantId, leadCode])
+  @@unique([tenantId, externalSource, externalSourceId])
   @@index([tenantId])
   @@index([tenantId, stage])
   @@index([tenantId, assignedTo])
   @@index([tenantId, ownerId])
   @@index([tenantId, createdAt])
   @@index([tenantId, deletedAt])
+  @@index([tenantId, externalSource, externalSourceId])
+  @@index([tenantId, integrationEnquiryId])
   @@map("crm_leads")
 }
 
@@ -1253,6 +1276,333 @@ model CrmMaster {
   @@map("crm_masters")
 }
 
+// ─── IndiaMART Lead Integration ─────────────────────────────────────────────
+
+enum IndiaMartAuthenticationType {
+  QUERY_PARAMETER
+  API_KEY_HEADER
+  BEARER_TOKEN
+  CUSTOM
+}
+
+enum IndiaMartConnectionStatus {
+  NOT_CONFIGURED
+  CONNECTED
+  CONNECTION_FAILED
+  DISABLED
+  EXPIRED
+}
+
+enum IndiaMartEnquiryProcessingStatus {
+  NEW
+  NORMALIZED
+  VALIDATION_FAILED
+  READY
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
+enum IndiaMartMatchStatus {
+  NOT_CHECKED
+  NO_MATCH
+  EXISTING_LEAD
+  EXISTING_COMPANY
+  EXISTING_CONTACT
+  POSSIBLE_DUPLICATE
+  EXACT_DUPLICATE
+}
+
+enum IndiaMartImportStatus {
+  NOT_IMPORTED
+  AUTO_IMPORTED
+  MANUALLY_IMPORTED
+  LINKED_TO_EXISTING
+  DUPLICATE_SKIPPED
+  IGNORED
+  IMPORT_FAILED
+}
+
+enum IndiaMartSyncTriggerType {
+  MANUAL
+  SCHEDULED
+  RETRY
+  INITIAL_IMPORT
+  PUSH
+}
+
+enum IndiaMartSyncRunStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
+  CANCELLED
+}
+
+enum IndiaMartProductMappingStatus {
+  UNMAPPED
+  SUGGESTED
+  MAPPED
+  IGNORED
+}
+
+enum IndiaMartDuplicateBehaviour {
+  CREATE_NEW_LEAD
+  UPDATE_EXISTING_LEAD
+  CREATE_ACTIVITY_ON_EXISTING_LEAD
+  SEND_TO_REVIEW
+}
+
+enum IndiaMartAssignmentMode {
+  DEFAULT_OWNER
+  ROUND_ROBIN
+  PRODUCT_BASED
+  TERRITORY_BASED
+  CITY_STATE_BASED
+  MANUAL
+}
+
+enum IndiaMartSlaStatus {
+  WITHIN_SLA
+  DUE_SOON
+  OVERDUE
+  CONTACTED
+  CLOSED
+}
+
+enum IndiaMartAlertType {
+  NEW_ENQUIRY_ASSIGNED
+  HIGH_VALUE_ENQUIRY
+  SLA_DUE_SOON
+  SLA_OVERDUE
+  SYNC_FAILED
+  CREDENTIALS_EXPIRED
+  DUPLICATE_NEEDS_REVIEW
+}
+
+enum IndiaMartAlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+model IndiaMartConnection {
+  id                     String                     @id @default(uuid())
+  tenantId               String                     @unique
+  companyId              String?
+  accountName            String?                    @db.VarChar(200)
+  registeredMobileMasked String?                    @db.VarChar(32)
+  registeredEmailMasked  String?                    @db.VarChar(255)
+  apiBaseUrl             String                     @default("https://mapi.indiamart.com") @db.VarChar(500)
+  leadFetchEndpoint      String                     @default("/wservce/crm/crmListing/v2/") @db.VarChar(500)
+  authenticationType     IndiaMartAuthenticationType @default(QUERY_PARAMETER)
+  encryptedCredentials   String                     @db.Text
+  configurationJson      Json?
+  status                 IndiaMartConnectionStatus  @default(NOT_CONFIGURED)
+  syncEnabled            Boolean                    @default(false)
+  autoCreateLead         Boolean                    @default(true)
+  defaultLeadSourceId    String?
+  defaultLeadOwnerId     String?
+  defaultTerritoryId     String?
+  defaultPriority        String?                    @db.VarChar(32)
+  defaultIndustryId      String?
+  duplicateBehaviour     IndiaMartDuplicateBehaviour @default(CREATE_ACTIVITY_ON_EXISTING_LEAD)
+  assignmentMode         IndiaMartAssignmentMode    @default(DEFAULT_OWNER)
+  syncIntervalMinutes    Int                        @default(15)
+  initialLookbackDays    Int                        @default(7)
+  maxRecordsPerRun       Int                        @default(500)
+  lastSuccessfulSyncAt   DateTime?
+  lastAttemptedSyncAt    DateTime?
+  nextScheduledSyncAt    DateTime?
+  lastCursor             String?                    @db.VarChar(255)
+  lastExternalTimestamp  DateTime?
+  syncLockUntil          DateTime?
+  syncLockToken          String?                    @db.VarChar(64)
+  pushWebhookEnabled     Boolean                    @default(false)
+  pushWebhookTokenHash   String?                    @unique @db.VarChar(128)
+  pushWebhookTokenPrefix String?                    @db.VarChar(12)
+  createdById            String?
+  updatedById            String?
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+
+  tenant     Tenant             @relation(fields: [tenantId], references: [id])
+  enquiries  IndiaMartEnquiry[]
+  syncRuns   IndiaMartSyncRun[]
+  alerts     IndiaMartAlert[]
+
+  @@index([tenantId, status])
+  @@index([syncEnabled, nextScheduledSyncAt])
+  @@map("indiamart_connections")
+}
+
+model IndiaMartEnquiry {
+  id                     String                          @id @default(uuid())
+  tenantId               String
+  connectionId           String
+  externalEnquiryId      String                          @db.VarChar(128)
+  externalUniqueKey      String?                         @db.VarChar(255)
+  enquiryDate            DateTime?
+  receivedAt             DateTime?
+  fetchedAt              DateTime                        @default(now())
+  buyerName              String?                         @db.VarChar(300)
+  buyerCompanyName       String?                         @db.VarChar(300)
+  buyerMobile            String?                         @db.VarChar(40)
+  buyerAlternateMobile   String?                         @db.VarChar(40)
+  buyerEmail             String?                         @db.VarChar(255)
+  buyerAddress           String?                         @db.Text
+  buyerCity              String?                         @db.VarChar(120)
+  buyerState             String?                         @db.VarChar(120)
+  buyerCountry           String?                         @db.VarChar(120)
+  buyerPincode           String?                         @db.VarChar(20)
+  subject                String?                         @db.VarChar(500)
+  requirementText        String?                         @db.Text
+  productName            String?                         @db.VarChar(500)
+  productCategory        String?                         @db.VarChar(255)
+  quantityText           String?                         @db.VarChar(120)
+  quantityValue          Decimal?                        @db.Decimal(18, 6)
+  quantityUom            String?                         @db.VarChar(32)
+  estimatedOrderValue    Decimal?                        @db.Decimal(18, 2)
+  sourceType             String?                         @db.VarChar(64)
+  sourceUrl              String?                         @db.VarChar(500)
+  senderIp               String?                         @db.VarChar(64)
+  normalizedMobile       String?                         @db.VarChar(32)
+  normalizedEmail        String?                         @db.VarChar(255)
+  normalizedCompanyName  String?                         @db.VarChar(300)
+  dedupeFingerprint      String?                         @db.VarChar(255)
+  processingStatus       IndiaMartEnquiryProcessingStatus @default(NEW)
+  matchStatus            IndiaMartMatchStatus            @default(NOT_CHECKED)
+  importStatus           IndiaMartImportStatus           @default(NOT_IMPORTED)
+  matchedLeadId          String?
+  matchedCompanyId       String?
+  matchedContactId       String?
+  createdLeadId          String?
+  assignedUserId         String?
+  assignedAt             DateTime?
+  duplicateOfEnquiryId   String?
+  duplicateReason        String?                         @db.VarChar(255)
+  validationErrors       Json?
+  matchDetails           Json?
+  rawPayload             Json
+  syncRunId              String?
+  firstSeenAt            DateTime                        @default(now())
+  lastSeenAt             DateTime                        @default(now())
+  processedAt            DateTime?
+  importedAt             DateTime?
+  ignoredAt              DateTime?
+  ignoredById            String?
+  ignoreReason           String?                         @db.Text
+  firstContactedAt       DateTime?
+  slaStatus              IndiaMartSlaStatus?
+  failureCode            String?                         @db.VarChar(64)
+  failureMessage         String?                         @db.Text
+  createdAt              DateTime                        @default(now())
+  updatedAt              DateTime                        @updatedAt
+
+  tenant     Tenant              @relation(fields: [tenantId], references: [id])
+  connection IndiaMartConnection @relation(fields: [connectionId], references: [id])
+  syncRun    IndiaMartSyncRun?   @relation(fields: [syncRunId], references: [id])
+  createdLead CrmLead?           @relation("IndiaMartEnquiryCreatedLead", fields: [createdLeadId], references: [id])
+  matchedLead CrmLead?           @relation("IndiaMartEnquiryMatchedLead", fields: [matchedLeadId], references: [id])
+
+  @@unique([tenantId, externalEnquiryId])
+  @@index([tenantId, processingStatus, enquiryDate])
+  @@index([tenantId, normalizedMobile])
+  @@index([tenantId, normalizedEmail])
+  @@index([tenantId, dedupeFingerprint])
+  @@index([tenantId, createdLeadId])
+  @@index([tenantId, importStatus])
+  @@index([tenantId, matchStatus])
+  @@index([tenantId, assignedUserId])
+  @@index([connectionId, fetchedAt])
+  @@map("indiamart_enquiries")
+}
+
+model IndiaMartSyncRun {
+  id                String                   @id @default(uuid())
+  tenantId          String
+  connectionId      String
+  triggerType       IndiaMartSyncTriggerType
+  status            IndiaMartSyncRunStatus   @default(QUEUED)
+  requestedFrom     DateTime?
+  requestedTo       DateTime?
+  cursorBefore      String?                  @db.VarChar(255)
+  cursorAfter       String?                  @db.VarChar(255)
+  recordsFetched    Int                      @default(0)
+  recordsInserted   Int                      @default(0)
+  recordsUpdated    Int                      @default(0)
+  recordsDuplicated Int                      @default(0)
+  leadsCreated      Int                      @default(0)
+  leadsLinked       Int                      @default(0)
+  recordsFailed     Int                      @default(0)
+  startedAt         DateTime                 @default(now())
+  completedAt       DateTime?
+  durationMs        Int?
+  errorCode         String?                  @db.VarChar(64)
+  errorMessage      String?                  @db.Text
+  errorDetails      Json?
+  triggeredById     String?
+  createdAt         DateTime                 @default(now())
+
+  tenant     Tenant              @relation(fields: [tenantId], references: [id])
+  connection IndiaMartConnection @relation(fields: [connectionId], references: [id])
+  enquiries  IndiaMartEnquiry[]
+
+  @@index([tenantId, startedAt])
+  @@index([connectionId, status])
+  @@map("indiamart_sync_runs")
+}
+
+model IndiaMartProductMapping {
+  id                    String                        @id @default(uuid())
+  tenantId              String
+  externalProductKey    String?                       @db.VarChar(255)
+  externalProductName   String                        @db.VarChar(500)
+  normalizedProductName String                        @db.VarChar(500)
+  itemId                String?
+  itemCategoryId        String?
+  mappingStatus         IndiaMartProductMappingStatus @default(UNMAPPED)
+  confidenceScore       Decimal?                      @db.Decimal(5, 2)
+  createdById           String?
+  updatedById           String?
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, normalizedProductName])
+  @@index([tenantId, mappingStatus])
+  @@map("indiamart_product_mappings")
+}
+
+model IndiaMartAlert {
+  id           String                 @id @default(uuid())
+  tenantId     String
+  connectionId String?
+  enquiryId    String?
+  syncRunId    String?
+  alertType    IndiaMartAlertType
+  severity     IndiaMartAlertSeverity @default(INFO)
+  title        String                 @db.VarChar(255)
+  message      String                 @db.Text
+  href         String?                @db.VarChar(500)
+  isRead       Boolean                @default(false)
+  readAt       DateTime?
+  readById     String?
+  dedupeKey    String?                @db.VarChar(191)
+  metadata     Json?
+  createdAt    DateTime               @default(now())
+
+  tenant     Tenant               @relation(fields: [tenantId], references: [id])
+  connection IndiaMartConnection? @relation(fields: [connectionId], references: [id])
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, isRead, createdAt])
+  @@index([tenantId, alertType])
+  @@map("indiamart_alerts")
+}
+
 model CrmNote {
   id         String        @id @default(uuid())
   tenantId   String
@@ -1378,6 +1728,7 @@ model CrmQuotation {
   terms                   String?   @db.Text
   paymentTerms            String?   @db.VarChar(500)
   deliveryTerms           String?   @db.VarChar(500)
+  deliveryTime            String?   @db.VarChar(100)
   locationId              String?
   pricing                 Json      @default("{}")
   changeHistory           Json      @default("[]")
@@ -1507,6 +1858,8 @@ model CrmSalesOrder {
   gstAmount                   Decimal?  @db.Decimal(18, 2)
   paymentTerms                String?   @db.VarChar(500)
   deliveryTerms               String?   @db.VarChar(500)
+  /// Lead time / delivery timeline (e.g. 8–10 weeks)
+  deliveryTime                String?   @db.VarChar(100)
   warrantyTerms               String?   @db.VarChar(500)
   commercialNotes             String?   @db.Text
   technicalNotes              String?   @db.Text
@@ -1548,6 +1901,192 @@ model CrmSalesOrder {
   @@index([tenantId, status])
   @@index([tenantId, deletedAt])
   @@map("crm_sales_orders")
+}
+
+// ─── CRM Commercial (receipts / tax invoices / allocation) ───────────────────
+
+enum CrmCommercialPaymentMode {
+  cash
+  bank
+  upi
+  cheque
+  neft
+  rtgs
+}
+
+enum CrmTaxInvoiceStatus {
+  draft
+  posted
+  partially_paid
+  paid
+  cancelled
+}
+
+enum CrmInvoicePaymentStatus {
+  unpaid
+  partially_paid
+  paid
+}
+
+enum CrmCommercialSource {
+  sales_order
+  proforma
+  direct
+  customer
+}
+
+model CrmPaymentReceipt {
+  id                   String                    @id @default(uuid())
+  tenantId             String
+  receiptNo            String                    @db.VarChar(64)
+  receiptDate          DateTime                  @db.Date
+  companyId            String
+  customerNameSnapshot String                    @db.VarChar(300)
+  /// Soft link to demo/API proforma (no FK — proforma may be local-only).
+  proformaInvoiceId    String?
+  proformaNo           String?                   @db.VarChar(64)
+  paymentMode          CrmCommercialPaymentMode
+  transactionRef       String?                   @db.VarChar(120)
+  amount               Decimal                   @db.Decimal(18, 2)
+  unallocatedAmount    Decimal                   @db.Decimal(18, 2)
+  remarks              String?                   @db.Text
+  attachmentName       String?                   @db.VarChar(255)
+  createdBy            String?
+  updatedBy            String?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  deletedAt            DateTime?
+
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id])
+  company     CrmCompany             @relation(fields: [companyId], references: [id])
+  allocations CrmPaymentAllocation[]
+
+  @@unique([tenantId, receiptNo])
+  @@index([tenantId])
+  @@index([tenantId, companyId])
+  @@index([tenantId, proformaInvoiceId])
+  @@index([tenantId, deletedAt])
+  @@map("crm_payment_receipts")
+}
+
+model CrmTaxInvoice {
+  id                   String                  @id @default(uuid())
+  tenantId             String
+  invoiceNo            String                  @db.VarChar(64)
+  invoiceDate          DateTime                @db.Date
+  dueDate              DateTime                @db.Date
+  status               CrmTaxInvoiceStatus     @default(draft)
+  paymentStatus        CrmInvoicePaymentStatus @default(unpaid)
+  source               CrmCommercialSource     @default(direct)
+  companyId            String
+  customerNameSnapshot String                  @db.VarChar(300)
+  customerGstin        String?                 @db.VarChar(20)
+  customerState        String?                 @db.VarChar(100)
+  customerAddress      String?                 @db.Text
+  placeOfSupply        String?                 @db.VarChar(100)
+  billingAddress       String?                 @db.Text
+  shippingAddress      String?                 @db.Text
+  deliveryTerms        String?                 @db.VarChar(500)
+  paymentTerms         String?                 @db.VarChar(500)
+  customerPoNumber     String?                 @db.VarChar(100)
+  salesOrderId         String?
+  salesOrderNo         String?                 @db.VarChar(64)
+  quotationId          String?
+  quotationNo          String?                 @db.VarChar(64)
+  proformaInvoiceId    String?
+  proformaNo           String?                 @db.VarChar(64)
+  remarks              String?                 @db.Text
+  taxableAmount        Decimal                 @db.Decimal(18, 2)
+  cgstAmount           Decimal                 @default(0) @db.Decimal(18, 2)
+  sgstAmount           Decimal                 @default(0) @db.Decimal(18, 2)
+  igstAmount           Decimal                 @default(0) @db.Decimal(18, 2)
+  totalTaxAmount       Decimal                 @db.Decimal(18, 2)
+  grandTotal           Decimal                 @db.Decimal(18, 2)
+  amountPaid           Decimal                 @default(0) @db.Decimal(18, 2)
+  balanceDue           Decimal                 @db.Decimal(18, 2)
+  gstScheme            String                  @default("cgst_sgst") @db.VarChar(16)
+  postedAt             DateTime?
+  cancelledAt          DateTime?
+  createdBy            String?
+  updatedBy            String?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  deletedAt            DateTime?
+
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id])
+  company     CrmCompany             @relation(fields: [companyId], references: [id])
+  lines       CrmTaxInvoiceLine[]
+  allocations CrmPaymentAllocation[]
+
+  @@unique([tenantId, invoiceNo])
+  @@index([tenantId])
+  @@index([tenantId, companyId])
+  @@index([tenantId, salesOrderId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("crm_tax_invoices")
+}
+
+model CrmTaxInvoiceLine {
+  id            String   @id @default(uuid())
+  tenantId      String
+  invoiceId     String
+  lineNo        Int
+  productId     String?
+  itemCode      String   @db.VarChar(64)
+  description   String   @db.VarChar(500)
+  hsnCode       String?  @db.VarChar(16)
+  qty           Decimal  @db.Decimal(18, 4)
+  uom           String   @default("NOS") @db.VarChar(16)
+  unitPrice     Decimal  @db.Decimal(18, 2)
+  discountPct   Decimal  @default(0) @db.Decimal(5, 2)
+  taxPct        Decimal  @default(18) @db.Decimal(5, 2)
+  taxableValue  Decimal  @db.Decimal(18, 2)
+  gstAmount     Decimal  @db.Decimal(18, 2)
+  lineTotal     Decimal  @db.Decimal(18, 2)
+  sourceLineId  String?
+  maxQty        Decimal? @db.Decimal(18, 4)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  invoice CrmTaxInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([invoiceId])
+  @@map("crm_tax_invoice_lines")
+}
+
+model CrmPaymentAllocation {
+  id             String    @id @default(uuid())
+  tenantId       String
+  receiptId      String
+  invoiceId      String
+  receiptNo      String    @db.VarChar(64)
+  invoiceNo      String    @db.VarChar(64)
+  companyId      String
+  customerName  String    @db.VarChar(300)
+  amount         Decimal   @db.Decimal(18, 2)
+  allocationDate DateTime  @db.Date
+  remarks        String?   @db.Text
+  reversedAt     DateTime?
+  reversedBy     String?
+  createdBy      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  tenant  Tenant            @relation(fields: [tenantId], references: [id])
+  company CrmCompany        @relation(fields: [companyId], references: [id])
+  receipt CrmPaymentReceipt @relation(fields: [receiptId], references: [id])
+  invoice CrmTaxInvoice     @relation(fields: [invoiceId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, companyId])
+  @@index([tenantId, receiptId])
+  @@index([tenantId, invoiceId])
+  @@index([tenantId, deletedAt])
+  @@map("crm_payment_allocations")
 }
 
 // ─── Master data ─────────────────────────────────────────────────────────────

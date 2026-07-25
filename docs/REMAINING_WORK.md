@@ -92,6 +92,28 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## P1 — CRM Integrations
+
+### CRM Commercial & Receivables (lightweight)
+
+| Field | Value |
+|-------|-------|
+| Module | CRM / Commercial |
+| Description | Proforma payment receipts, CRM tax invoices, payment allocation workspace, Customer 360 commercial tabs |
+| Status | **partial** (2026-07-24) — UI + DB + API shipped; Proforma document itself still demo/local; live UAT pending |
+| Next step | Optional: persist Proforma invoices to API; live UAT of commercial sync |
+
+### IndiaMART Lead Integration
+
+| Field | Value |
+|-------|-------|
+| Module | CRM / Integrations / IndiaMART |
+| Description | Pull + Push sync → enquiry inbox → dedupe → CrmLead |
+| Status | **partial** (2026-07-24) — Phases 1–5 code shipped (Pull, Push webhook, charts, SLA alerts, product mapping UI); live UAT + Lead 360 FactBox remain |
+| Next step | Apply migrations `…120000` + `…140000`; set `FIELD_ENCRYPTION_KEY`; configure Pull key + optional Push URL; UAT |
+
+---
+
 ## P0 — Critical (blocks API-mode production CRM)
 
 ### P0-ADMIN: Admin Panel (IAM / org / security UX)

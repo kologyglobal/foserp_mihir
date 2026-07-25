@@ -121,6 +121,7 @@ export const seedCodeSeries: CodeSeries[] = [
   series('LOST', 'Lost Reason', 'crm', 'lost_reason', { prefix: 'LOST', runningNumberLength: 3, currentNumber: 3 }),
   series('CTRM', 'Commercial Term', 'crm', 'commercial_term', { prefix: 'CTRM', runningNumberLength: 3, currentNumber: 3 }),
   series('DTRM', 'Delivery Term', 'crm', 'delivery_term', { prefix: 'DTRM', runningNumberLength: 3, currentNumber: 3 }),
+  series('DTIME', 'Delivery Time', 'crm', 'delivery_time', { prefix: 'DTIME', runningNumberLength: 3, currentNumber: 10 }),
   series('WTRM', 'Warranty Term', 'crm', 'warranty_term', { prefix: 'WTRM', runningNumberLength: 3, currentNumber: 2 }),
   series('APRL', 'Approval Rule', 'crm', 'approval_rule', { prefix: 'APRL', runningNumberLength: 3, currentNumber: 2 }),
   series('DTYP', 'Document Type', 'crm', 'document_type', { prefix: 'DTYP', runningNumberLength: 3, currentNumber: 4 }),

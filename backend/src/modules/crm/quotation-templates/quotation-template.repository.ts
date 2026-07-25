@@ -165,7 +165,7 @@ export async function ensureKeptQuotationTemplates(
   for (const row of rows) {
     const existing = await prisma.crmQuotationTemplate.findFirst({
       where: { tenantId, code: row.code },
-      select: { id: true, deletedAt: true, isActive: true },
+      select: { id: true, deletedAt: true, isActive: true, version: true },
     })
     if (!existing) {
       await prisma.crmQuotationTemplate.create({
@@ -186,7 +186,9 @@ export async function ensureKeptQuotationTemplates(
       changed = true
       continue
     }
-    if (existing.deletedAt != null || !existing.isActive) {
+    const needsRestore = existing.deletedAt != null || !existing.isActive
+    const needsVersionSync = existing.version < row.version
+    if (needsRestore || needsVersionSync) {
       await prisma.crmQuotationTemplate.update({
         where: { id: existing.id },
         data: {

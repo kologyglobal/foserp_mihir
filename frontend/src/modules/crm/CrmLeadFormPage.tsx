@@ -1,23 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  Banknote,
-  Building2,
   Calendar,
-  ClipboardList,
   Copy,
   ExternalLink,
   FileText,
   Handshake,
   Mail,
   MessageCircle,
-  Paperclip,
   Phone,
-  Zap,
 } from 'lucide-react'
 import { Input, MobileInput, Select, Textarea } from '../../components/forms/Inputs'
 import { ErpSmartSelect } from '../../components/erp/ErpSmartSelect'
-import { ErpLineItemsGrid } from '../../components/erp/ErpLineItemsGrid'
+import { ErpProductPricingSection } from '../../components/erp/ErpProductPricingSection'
 import { LeadSaveNextActionsPanel } from '../../components/crm/LeadSaveNextActionsPanel'
 import { CrmLeadPriorityChips } from '../../components/crm/CrmLeadPriorityChips'
 import { CrmTypedDocumentUpload } from '../../components/crm/CrmTypedDocumentUpload'
@@ -81,10 +76,9 @@ import type {
 import type { OpportunityLine } from '../../types/crm'
 import { formatStatus } from '../../components/ui/Badge'
 import { formatDate } from '../../utils/dates/format'
-import { ErpCardSection, ErpFieldRow, ErpQuickEntrySection, ErpFieldGroup, ErpAdditionalInfoToggle, ErpAdditionalInfoPanel, ErpAdditionalSectionNav, useErpAdditionalInfo, ErpCardCommandBar } from '../../components/erp/card-form'
+import { ErpFieldRow, ErpFieldGroup, ErpCardCommandBar } from '../../components/erp/card-form'
 import { FormActionBar } from '../../components/erp/FormActionBar'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
-import { EnterpriseFormSectionNav } from '../../design-system/workspace'
 import { useFormDraftAutosave } from '../../hooks/useFormDraftAutosave'
 import { useInlineFormValidation } from '../../hooks/useInlineFormValidation'
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard'
@@ -178,7 +172,6 @@ export function CrmLeadFormPage() {
 
   const [validationErrors, setValidationErrors] = useState<FieldErrorMap>({})
   const [saveAttempted, setSaveAttempted] = useState(false)
-  const [sectionForceOpenKey, setSectionForceOpenKey] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [savedLeadId, setSavedLeadId] = useState<string | null>(null)
   const [savedLeadNo, setSavedLeadNo] = useState<string | null>(null)
@@ -231,8 +224,6 @@ export function CrmLeadFormPage() {
   const [nextFollowUpDate, setNextFollowUpDate] = useState(existing?.nextFollowUpDate ?? '')
   const [followUpType, setFollowUpType] = useState(existing?.followUpType ?? 'call')
   const [followUpNotes, setFollowUpNotes] = useState(existing?.followUpNotes ?? '')
-  const [activeSection, setActiveSection] = useState('quick')
-  const [activeAdditionalSection, setActiveAdditionalSection] = useState('requirement')
   const formRootRef = useRef<HTMLDivElement>(null)
   const { locationId, setLocationId, defaultLocationId } = useDocumentLocation('sales', existing?.locationId)
 
@@ -251,42 +242,6 @@ export function CrmLeadFormPage() {
     setAttachmentsState(next)
     setLeadAttachments(attachmentScopeId, next)
   }
-
-  const needsAdditionalForStage =
-    leadStage === 'requirement_collected'
-    || leadStage === 'qualified'
-    || leadStage === 'not_qualified'
-    || leadStage === 'closed'
-    || activityStatus === 'inactive'
-
-  const hasOptionalDetailData = Boolean(
-    email.trim()
-    || source !== 'other'
-    || (locationId && locationId !== defaultLocationId)
-    || hasLeadRequirementLines(requirementLines)
-    || industry.trim()
-    || expectedValue > 0
-    || expectedCloseDate
-    || nextFollowUpDate
-    || followUpNotes.trim()
-    || attachments.length > 0
-    || internalNotes.trim()
-    || reference.trim()
-    || inactiveReason
-    || notQualifiedReason
-    || closedReason
-    || closedDate,
-  )
-
-  const {
-    open: showAdditionalDetails,
-    setOpen: setShowAdditionalDetails,
-    toggle: toggleAdditionalDetails,
-    panelId: additionalPanelId,
-  } = useErpAdditionalInfo({
-    forceOpen: needsAdditionalForStage,
-    preferOpen: isEdit && hasOptionalDetailData,
-  })
 
   useEffect(() => {
     if (!duplicateSource || id) return
@@ -490,8 +445,6 @@ export function CrmLeadFormPage() {
     setSavedLeadId(null)
     setSavedLeadNo(null)
     setValidationErrors({})
-    setShowAdditionalDetails(false)
-    setActiveSection('quick')
     if (searchParams.toString()) {
       navigate(routes.new, { replace: true })
     }
@@ -660,117 +613,19 @@ export function CrmLeadFormPage() {
   ], [company.prospectName, company.customerId, leadOwnerId, requirementText, requirementLines, remarks, email, mobile, expectedValue, expectedCloseDate, nextFollowUpDate, attachments.length, activityStatus, inactiveReason])
 
   const completionPercent = useMemo(() => {
-    const visible = showAdditionalDetails
-      ? completionItems
-      : completionItems.filter((i) => i.id === 'quick')
-    if (visible.length === 0) return 0
-    return Math.round((visible.filter((i) => i.done).length / visible.length) * 100)
-  }, [completionItems, showAdditionalDetails])
-
-  const productLineCount = useMemo(
-    () => requirementLines.filter((l) => l.productOrItem?.trim()).length,
-    [requirementLines],
-  )
-
-  const additionalSectionItems = useMemo(() => {
-    const commercialDone = expectedValue > 0 && Boolean(expectedCloseDate)
-    const notesFilled = Boolean(internalNotes.trim() || reference.trim())
-    return [
-      {
-        id: 'requirement',
-        label: 'Products',
-        status: productLineCount > 0
-          ? `${productLineCount} item${productLineCount === 1 ? '' : 's'}`
-          : 'Needs input',
-        tone: productLineCount > 0 ? 'ok' as const : 'missing' as const,
-        icon: ClipboardList,
-      },
-      {
-        id: 'commercial',
-        label: 'Commercial',
-        status: commercialDone ? 'Complete' : 'Needs input',
-        tone: commercialDone ? 'ok' as const : 'missing' as const,
-        icon: Banknote,
-      },
-      {
-        id: 'followup',
-        label: 'Follow-up',
-        status: nextFollowUpDate ? 'Scheduled' : 'Needs input',
-        tone: nextFollowUpDate ? 'ok' as const : 'missing' as const,
-        icon: Calendar,
-      },
-      {
-        id: 'notes',
-        label: 'Notes',
-        status: notesFilled ? 'Added' : 'None',
-        tone: 'neutral' as const,
-        icon: FileText,
-      },
-      {
-        id: 'documents',
-        label: 'Attachments',
-        status: attachments.length > 0
-          ? `${attachments.length} file${attachments.length === 1 ? '' : 's'}`
-          : 'No files',
-        tone: 'neutral' as const,
-        icon: Paperclip,
-      },
-      {
-        id: 'status',
-        label: 'Status',
-        status: formatStatus(activityStatus),
-        tone: activityStatus === 'active' ? 'ok' as const : 'neutral' as const,
-        icon: Building2,
-      },
-    ]
-  }, [
-    productLineCount, expectedValue, expectedCloseDate, nextFollowUpDate,
-    internalNotes, reference, attachments.length, activityStatus,
-  ])
-
-  const sectionNavItems = useMemo(() => {
-    const quick = { id: 'quick', label: 'Quick', icon: Zap, done: completionItems.find((i) => i.id === 'quick')?.done }
-    if (!showAdditionalDetails) return [quick]
-    const active = additionalSectionItems.find((s) => s.id === activeAdditionalSection)
-    return [
-      quick,
-      {
-        id: activeAdditionalSection,
-        label: active?.label ?? 'More',
-        icon: active?.icon ?? ClipboardList,
-        done: completionItems.find((i) => i.id === activeAdditionalSection)?.done
-          ?? (activeAdditionalSection === 'notes' ? Boolean(internalNotes.trim() || reference.trim()) : undefined),
-      },
-    ]
-  }, [completionItems, showAdditionalDetails, activeAdditionalSection, additionalSectionItems, internalNotes, reference])
-
-  function selectAdditionalSection(sectionId: string) {
-    setActiveAdditionalSection(sectionId)
-    setActiveSection(sectionId)
-    window.setTimeout(() => {
-      document.getElementById(`lead-section-${sectionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    }, 40)
-  }
+    if (completionItems.length === 0) return 0
+    return Math.round((completionItems.filter((i) => i.done).length / completionItems.length) * 100)
+  }, [completionItems])
 
   function scrollToSection(sectionId: string) {
     const mapped = sectionId === 'communication' ? 'status' : sectionId
-    const additionalIds = new Set(additionalSectionItems.map((s) => s.id))
-    if (mapped === 'quick') {
-      setActiveSection('quick')
-      document.getElementById('lead-section-quick')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      return
-    }
-    if (mapped === 'notes' || mapped === 'enquiry-notes') {
-      setActiveSection('enquiry-notes')
-      document.getElementById('lead-section-enquiry-notes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      return
-    }
-    if (additionalIds.has(mapped)) {
-      if (!showAdditionalDetails) setShowAdditionalDetails(true)
-      selectAdditionalSection(mapped)
-      return
-    }
-    setActiveSection(mapped)
+    const targetId =
+      mapped === 'quick'
+        ? 'lead-section-quick'
+        : mapped === 'notes' || mapped === 'enquiry-notes'
+          ? 'lead-section-enquiry-notes'
+          : `lead-section-${mapped}`
+    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   const quoteOpportunityId = useMemo(
@@ -985,22 +840,8 @@ export function CrmLeadFormPage() {
     })
   }
 
-  function expandLeadSectionForField(sectionId: string) {
-    const needsAdditional =
-      sectionId === 'lead-section-requirement'
-      || sectionId === 'lead-section-status'
-      || sectionId === 'lead-section-commercial'
-      || sectionId === 'lead-section-followup'
-      || sectionId === 'lead-section-notes'
-      || sectionId === 'lead-section-documents'
-    if (needsAdditional && !showAdditionalDetails) setShowAdditionalDetails(true)
-    if (sectionId === 'lead-section-status') setActiveAdditionalSection('status')
-    else if (sectionId === 'lead-section-requirement') setActiveAdditionalSection('requirement')
-    else if (sectionId === 'lead-section-commercial') setActiveAdditionalSection('commercial')
-    else if (sectionId === 'lead-section-followup') setActiveAdditionalSection('followup')
-    else if (sectionId === 'lead-section-notes') setActiveAdditionalSection('notes')
-    else if (sectionId === 'lead-section-documents') setActiveAdditionalSection('documents')
-    setSectionForceOpenKey((k) => k + 1)
+  function expandLeadSectionForField(_sectionId: string) {
+    // Continuous plain form — all blocks are visible; focus/scroll is handled by handleInvalidSubmit.
   }
 
   function buildPayload() {
@@ -1366,7 +1207,7 @@ export function CrmLeadFormPage() {
       <CrmCardFormShell
         title={isEdit ? 'Edit Lead' : 'New Lead'}
         badge="CRM"
-        className="crm-lead-form-page enterprise-workspace--dynamics-form enterprise-workspace--crm-smart-overview"
+        className="crm-lead-form-page crm-lead-form-page--plain enterprise-workspace--dynamics-form enterprise-workspace--crm-smart-overview"
         recordNo={existing?.leadNo ?? 'New'}
         recordTitle={company.prospectName.trim() || (isEdit ? existing?.prospectName : 'New Lead') || 'New Lead'}
         status={formatStatus(lifecycleStatus)}
@@ -1432,20 +1273,9 @@ export function CrmLeadFormPage() {
           />
         ) : null}
 
-        <EnterpriseFormSectionNav
-          sections={sectionNavItems}
-          activeId={activeSection}
-          onSelect={scrollToSection}
-        />
-
-        <ErpQuickEntrySection
-          id="lead-section-quick"
-          title="Quick Entry"
-          subtitle="Company, contact, and ownership — expand only when you need more."
-          columns={3}
-          className="crm-lead-quick-entry"
-        >
-          <ErpFieldGroup columns={3}>
+        <div className="crm-lead-form-flow">
+        <div id="lead-section-quick" className="crm-lead-quick-entry">
+          <ErpFieldGroup label="Prospect" columns={3}>
             <ErpFieldRow
               label="Company / Prospect"
               required
@@ -1590,7 +1420,7 @@ export function CrmLeadFormPage() {
             </ErpFieldRow>
           </ErpFieldGroup>
 
-          <ErpFieldGroup label="Ownership & status" columns={3}>
+          <ErpFieldGroup label="Ownership" columns={3}>
             <ErpFieldRow
               label="Lead Owner"
               required
@@ -1649,7 +1479,7 @@ export function CrmLeadFormPage() {
             </ErpFieldRow>
           </ErpFieldGroup>
 
-          <ErpFieldGroup columns={3}>
+          <ErpFieldGroup label="Stage & timing" columns={3}>
             <ErpFieldRow label="Lead Stage" required horizontal={false}>
               <ErpSmartSelect
                 options={leadStageSelectOptions}
@@ -1698,317 +1528,252 @@ export function CrmLeadFormPage() {
               />
             </ErpFieldRow>
           </ErpFieldGroup>
-        </ErpQuickEntrySection>
+        </div>
 
-        <ErpCardSection
-          id="lead-section-enquiry-notes"
-          title="Notes"
-          subtitle="Enquiry context and conversation notes — use a full text area, not a single line."
-          icon={FileText}
-          accent="slate"
-          columns={1}
-          className="crm-lead-notes-card"
-          collapsible
-          defaultOpen
-          forceOpenKey={sectionForceOpenKey}
-        >
-          <ErpFieldRow
-            label="Notes"
-            required
-            colSpan={3}
-            horizontal={false}
-            dataField="remarks"
-            fieldState={
-              (inlineValidation.fieldError('remarks') ?? validationErrors.remarks)
-                ? 'error'
-                : inlineValidation.fieldState('remarks')
-            }
-            fieldError={inlineValidation.fieldError('remarks') ?? validationErrors.remarks}
-            hint="Capture call summaries, requirements, and next steps."
-          >
-            <Textarea
-              rows={5}
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              onBlur={() => inlineValidation.touch('remarks')}
-              placeholder="Context from first call or enquiry…"
-              className="erp-input"
-              error={Boolean(inlineValidation.fieldError('remarks') ?? validationErrors.remarks)}
-              disabled={fieldLocked('remarks')}
-            />
-          </ErpFieldRow>
-        </ErpCardSection>
-
-        <ErpAdditionalInfoToggle
-          open={showAdditionalDetails}
-          onToggle={() => {
-            if (showAdditionalDetails) setActiveSection('quick')
-            toggleAdditionalDetails()
-          }}
-          panelId={additionalPanelId}
-          sectionCount={additionalSectionItems.length}
-          attentionCount={additionalSectionItems.filter((s) => s.tone === 'missing').length}
-        />
-
-        <ErpAdditionalInfoPanel open={showAdditionalDetails} id={additionalPanelId}>
-          <ErpAdditionalSectionNav
-            sections={additionalSectionItems}
-            activeId={activeAdditionalSection}
-            onSelect={selectAdditionalSection}
-            title=""
-          />
-
-          {activeAdditionalSection === 'requirement' ? (
-            <ErpCardSection
-              id="lead-section-requirement"
-              title="Products"
-              subtitle="Search products, set qty and pricing — totals roll up to commercial value."
-              icon={ClipboardList}
-              accent="teal"
-              columns={4}
-              forceOpenKey={sectionForceOpenKey}
-            >
-              <div className="col-span-full" data-field="productRequirement">
-                <ErpLineItemsGrid
-                  lines={requirementLines}
-                  onChange={(next) => {
-                    handleRequirementLinesChange(next)
-                  }}
-                  productOptions={productOptions}
-                  productPickMap={pickMap}
-                  probability={Number(probability) || 0}
-                  variant="opportunity"
-                />
-                {validationErrors.productRequirement ? (
-                  <p className="erp-field-row__error mt-2">
-                    {validationErrors.productRequirement}
-                  </p>
-                ) : null}
-              </div>
-              <ErpFieldRow label="Industry" colSpan={3}>
-                <Input value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="Industry segment" className="erp-input" />
-              </ErpFieldRow>
-            </ErpCardSection>
-          ) : null}
-
-          {activeAdditionalSection === 'commercial' ? (
-            <ErpCardSection
-              id="lead-section-commercial"
-              title="Commercial"
-              subtitle={
-                requirementLineSummary.grandTotal > 0
-                  ? 'Expected revenue rolls up from product lines — adjust probability and close date.'
-                  : 'Revenue estimation and forecasting.'
+        <div id="lead-section-enquiry-notes">
+          <ErpFieldGroup label="Enquiry notes" columns={1}>
+            <ErpFieldRow
+              label="Notes"
+              required
+              colSpan={3}
+              horizontal={false}
+              dataField="remarks"
+              fieldState={
+                (inlineValidation.fieldError('remarks') ?? validationErrors.remarks)
+                  ? 'error'
+                  : inlineValidation.fieldState('remarks')
               }
-              icon={Banknote}
-              accent="green"
-              columns={4}
+              fieldError={inlineValidation.fieldError('remarks') ?? validationErrors.remarks}
+              hint="Capture call summaries, requirements, and next steps."
             >
-              <ErpFieldRow label="Expected Revenue (₹)" dataField="expectedValue" fieldState={inlineValidation.fieldState('expectedValue')}>
-                <Input
-                  type="number"
-                  min={0}
-                  value={expectedValue}
-                  onChange={(e) => { setExpectedValue(Number(e.target.value)); inlineValidation.touch('expectedValue') }}
-                  placeholder="Expected revenue"
-                  className="erp-input"
-                  readOnly={requirementLineSummary.grandTotal > 0}
-                />
-              </ErpFieldRow>
-              <ErpFieldRow label="Probability">
-                <div className="dyn-probability-field">
-                  <div className="dyn-probability-field__track">
-                    <input
-                      type="range"
-                      className="dyn-probability-field__range"
-                      min={0}
-                      max={100}
-                      step={5}
-                      value={probability}
-                      onChange={(e) => setProbability(Number(e.target.value))}
-                      aria-label="Win probability"
-                    />
-                    <span className="dyn-probability-field__value">{probability}%</span>
-                  </div>
+              <Textarea
+                rows={5}
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                onBlur={() => inlineValidation.touch('remarks')}
+                placeholder="Context from first call or enquiry…"
+                className="erp-input"
+                error={Boolean(inlineValidation.fieldError('remarks') ?? validationErrors.remarks)}
+                disabled={fieldLocked('remarks')}
+              />
+            </ErpFieldRow>
+          </ErpFieldGroup>
+        </div>
+
+        <div id="lead-section-requirement">
+          <ErpProductPricingSection
+            sectionId="lead-section-requirement-pricing"
+            nbaTarget="requirement"
+            title="Product & Pricing"
+            subtitle="Build line items, then review adjustments and the live order total."
+            accent="blue"
+            lines={requirementLines}
+            onChange={(next) => {
+              handleRequirementLinesChange(next)
+            }}
+            productOptions={productOptions}
+            productPickMap={pickMap}
+          >
+            {validationErrors.productRequirement ? (
+              <p className="erp-field-row__error mt-2" data-field="productRequirement">
+                {validationErrors.productRequirement}
+              </p>
+            ) : null}
+            <div className="mt-4">
+              <ErpFieldGroup label="Industry" columns={3}>
+                <ErpFieldRow label="Industry" colSpan={3} horizontal={false}>
+                  <Input value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="Industry segment" className="erp-input" />
+                </ErpFieldRow>
+              </ErpFieldGroup>
+            </div>
+          </ErpProductPricingSection>
+        </div>
+
+        <div id="lead-section-commercial">
+          <ErpFieldGroup label="Commercial" columns={3}>
+            <ErpFieldRow label="Expected Revenue (₹)" horizontal={false} dataField="expectedValue" fieldState={inlineValidation.fieldState('expectedValue')}>
+              <Input
+                type="number"
+                min={0}
+                value={expectedValue}
+                onChange={(e) => { setExpectedValue(Number(e.target.value)); inlineValidation.touch('expectedValue') }}
+                placeholder="Expected revenue"
+                className="erp-input"
+                readOnly={requirementLineSummary.grandTotal > 0}
+              />
+            </ErpFieldRow>
+            <ErpFieldRow label="Probability" horizontal={false}>
+              <div className="dyn-probability-field">
+                <div className="dyn-probability-field__track">
+                  <input
+                    type="range"
+                    className="dyn-probability-field__range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={probability}
+                    onChange={(e) => setProbability(Number(e.target.value))}
+                    aria-label="Win probability"
+                  />
+                  <span className="dyn-probability-field__value">{probability}%</span>
                 </div>
-              </ErpFieldRow>
+              </div>
+            </ErpFieldRow>
+            <ErpFieldRow
+              label="Expected Closing Date"
+              horizontal={false}
+              dataField="expectedCloseDate"
+              fieldState={validationErrors.expectedCloseDate ? 'error' : 'idle'}
+              fieldError={validationErrors.expectedCloseDate}
+            >
+              <Input
+                type="date"
+                value={expectedCloseDate}
+                min={isEdit ? getCrmDateInputMin() : getDateInputMin()}
+                max={getCrmDateInputMax()}
+                onChange={(e) => setExpectedCloseDate(e.target.value)}
+                className="erp-input"
+              />
+            </ErpFieldRow>
+            <ErpFieldRow label="Currency" readOnly horizontal={false}>
+              <Input value="INR (₹)" readOnly className="erp-input" />
+            </ErpFieldRow>
+          </ErpFieldGroup>
+        </div>
+
+        <div id="lead-section-followup">
+          <ErpFieldGroup label="Follow-up" columns={3}>
+            <ErpFieldRow label="Follow-up Type" horizontal={false}>
+              <ErpSmartSelect
+                options={followUpSelectOptions}
+                value={followUpType}
+                onChange={(v) => v && setFollowUpType(v)}
+                placeholder="Select type…"
+                appearance="dropdown"
+              />
+            </ErpFieldRow>
+            <ErpFieldRow label="Assigned To" readOnly horizontal={false}>
+              <Input value={selectedOwner?.name ?? '—'} readOnly className="erp-input" />
+            </ErpFieldRow>
+            <ErpFieldRow label="Remarks" colSpan={3} horizontal={false}>
+              <Textarea rows={2} value={followUpNotes} onChange={(e) => setFollowUpNotes(e.target.value)} placeholder="Follow-up notes" className="erp-input" />
+            </ErpFieldRow>
+          </ErpFieldGroup>
+        </div>
+
+        <div id="lead-section-notes">
+          <ErpFieldGroup label="Internal notes" columns={3}>
+            <ErpFieldRow label="Internal Notes" colSpan={3} horizontal={false}>
+              <Textarea rows={5} value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} placeholder="Internal team notes" className="erp-input" />
+            </ErpFieldRow>
+            <ErpFieldRow label="Reference" colSpan={3} horizontal={false}>
+              <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Campaign / RFQ ref" className="erp-input" />
+            </ErpFieldRow>
+          </ErpFieldGroup>
+        </div>
+
+        <div id="lead-section-documents">
+          <ErpFieldGroup label="Attachments" columns={1}>
+            <CrmTypedDocumentUpload
+              attachments={attachments}
+              onChange={setAttachments}
+            />
+          </ErpFieldGroup>
+        </div>
+
+        <div id="lead-section-status">
+          <ErpFieldGroup label="Status & location" columns={3}>
+            <ErpFieldRow label="Territory" readOnly horizontal={false}>
+              <Input value={territory} readOnly className="erp-input" />
+            </ErpFieldRow>
+            <LocationFieldRow
+              value={locationId}
+              onChange={(locId) => setLocationId(locId)}
+              usage="sales"
+              horizontal={false}
+            />
+            <ErpFieldRow label="Lead Status" horizontal={false}>
+              <Select native value={activityStatus} onChange={(e) => setActivityStatus(e.target.value as LeadActivityStatus)} className="erp-input">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </Select>
+            </ErpFieldRow>
+            <ErpFieldRow label="Lifecycle" readOnly horizontal={false}>
+              <Input value={formatStatus(lifecycleStatus)} readOnly className="erp-input" />
+            </ErpFieldRow>
+            {activityStatus === 'inactive' ? (
               <ErpFieldRow
-                label="Expected Closing Date"
-                dataField="expectedCloseDate"
-                fieldState={validationErrors.expectedCloseDate ? 'error' : 'idle'}
-                fieldError={validationErrors.expectedCloseDate}
+                label="Inactive Reason"
+                colSpan={3}
+                horizontal={false}
+                dataField="inactiveReason"
+                fieldState={validationErrors.inactiveReason ? 'error' : 'idle'}
+                fieldError={validationErrors.inactiveReason}
               >
-                <Input
-                  type="date"
-                  value={expectedCloseDate}
-                  min={isEdit ? getCrmDateInputMin() : getDateInputMin()}
-                  max={getCrmDateInputMax()}
-                  onChange={(e) => setExpectedCloseDate(e.target.value)}
-                  className="erp-input"
-                />
-              </ErpFieldRow>
-              <ErpFieldRow label="Currency" readOnly>
-                <Input value="INR (₹)" readOnly className="erp-input" />
-              </ErpFieldRow>
-            </ErpCardSection>
-          ) : null}
-
-          {activeAdditionalSection === 'followup' ? (
-            <ErpCardSection
-              id="lead-section-followup"
-              title="Follow-up"
-              subtitle="Schedule next action on save."
-              icon={Calendar}
-              accent="amber"
-              columns={4}
-            >
-              <ErpFieldRow label="Follow-up Type" horizontal={false}>
-                <ErpSmartSelect
-                  options={followUpSelectOptions}
-                  value={followUpType}
-                  onChange={(v) => v && setFollowUpType(v)}
-                  placeholder="Select type…"
-                  appearance="dropdown"
-                />
-              </ErpFieldRow>
-              <ErpFieldRow label="Assigned To" readOnly horizontal={false}>
-                <Input value={selectedOwner?.name ?? '—'} readOnly className="erp-input" />
-              </ErpFieldRow>
-              <ErpFieldRow label="Remarks" colSpan={3} horizontal={false}>
-                <Textarea rows={2} value={followUpNotes} onChange={(e) => setFollowUpNotes(e.target.value)} placeholder="Follow-up notes" className="erp-input" />
-              </ErpFieldRow>
-            </ErpCardSection>
-          ) : null}
-
-          {activeAdditionalSection === 'notes' ? (
-            <ErpCardSection
-              id="lead-section-notes"
-              title="Internal notes"
-              subtitle="Internal notes and reference tags."
-              icon={FileText}
-              accent="slate"
-              columns={4}
-            >
-              <ErpFieldRow label="Internal Notes" colSpan={3} horizontal={false}>
-                <Textarea rows={5} value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} placeholder="Internal team notes" className="erp-input" />
-              </ErpFieldRow>
-              <ErpFieldRow label="Reference" colSpan={3}>
-                <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Campaign / RFQ ref" className="erp-input" />
-              </ErpFieldRow>
-            </ErpCardSection>
-          ) : null}
-
-          {activeAdditionalSection === 'documents' ? (
-            <ErpCardSection
-              id="lead-section-documents"
-              title="Attachments"
-              subtitle="Choose document type, then upload supporting files."
-              icon={Paperclip}
-              accent="slate"
-              columns={1}
-            >
-              <CrmTypedDocumentUpload
-                attachments={attachments}
-                onChange={setAttachments}
-              />
-            </ErpCardSection>
-          ) : null}
-
-          {activeAdditionalSection === 'status' ? (
-            <ErpCardSection
-              id="lead-section-status"
-              title="Status & location"
-              subtitle="Territory, branch, and lifecycle."
-              icon={Building2}
-              accent="violet"
-              columns={4}
-              forceOpenKey={sectionForceOpenKey}
-            >
-              <ErpFieldRow label="Territory" readOnly>
-                <Input value={territory} readOnly className="erp-input" />
-              </ErpFieldRow>
-              <LocationFieldRow
-                value={locationId}
-                onChange={(locId) => setLocationId(locId)}
-                usage="sales"
-              />
-              <ErpFieldRow label="Lead Status">
-                <Select native value={activityStatus} onChange={(e) => setActivityStatus(e.target.value as LeadActivityStatus)} className="erp-input">
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
+                <Select native value={inactiveReason} onChange={(e) => setInactiveReason(e.target.value)} className="erp-input">
+                  <option value="">— Select reason —</option>
+                  {inactiveReasons.map((r) => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
                 </Select>
               </ErpFieldRow>
-              <ErpFieldRow label="Lifecycle" readOnly>
-                <Input value={formatStatus(lifecycleStatus)} readOnly className="erp-input" />
+            ) : null}
+            {leadStage === 'not_qualified' ? (
+              <ErpFieldRow
+                label="Not Qualified Reason"
+                colSpan={3}
+                horizontal={false}
+                dataField="notQualifiedReason"
+                fieldState={validationErrors.notQualifiedReason ? 'error' : 'idle'}
+                fieldError={validationErrors.notQualifiedReason}
+              >
+                <Select native value={notQualifiedReason} onChange={(e) => setNotQualifiedReason(e.target.value)} className="erp-input">
+                  <option value="">— Select reason —</option>
+                  {notQualifiedReasons.map((r) => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </Select>
               </ErpFieldRow>
-              {activityStatus === 'inactive' ? (
+            ) : null}
+            {leadStage === 'closed' ? (
+              <>
                 <ErpFieldRow
-                  label="Inactive Reason"
-                  colSpan={3}
-                  dataField="inactiveReason"
-                  fieldState={validationErrors.inactiveReason ? 'error' : 'idle'}
-                  fieldError={validationErrors.inactiveReason}
+                  label="Closed Date"
+                  horizontal={false}
+                  dataField="closedDate"
+                  fieldState={validationErrors.closedDate ? 'error' : 'idle'}
+                  fieldError={validationErrors.closedDate}
                 >
-                  <Select native value={inactiveReason} onChange={(e) => setInactiveReason(e.target.value)} className="erp-input">
+                  <Input
+                    type="date"
+                    value={closedDate}
+                    min={createdDate.trim() || getCrmDateInputMin()}
+                    max={getDateInputMin()}
+                    onChange={(e) => setClosedDate(e.target.value)}
+                    className="erp-input"
+                  />
+                </ErpFieldRow>
+                <ErpFieldRow
+                  label="Closed Reason"
+                  colSpan={2}
+                  horizontal={false}
+                  dataField="closedReason"
+                  fieldState={validationErrors.closedReason ? 'error' : 'idle'}
+                  fieldError={validationErrors.closedReason}
+                >
+                  <Select native value={closedReason} onChange={(e) => setClosedReason(e.target.value)} className="erp-input">
                     <option value="">— Select reason —</option>
-                    {inactiveReasons.map((r) => (
+                    {closedReasons.map((r) => (
                       <option key={r.value} value={r.value}>{r.label}</option>
                     ))}
                   </Select>
                 </ErpFieldRow>
-              ) : null}
-              {leadStage === 'not_qualified' ? (
-                <ErpFieldRow
-                  label="Not Qualified Reason"
-                  colSpan={3}
-                  dataField="notQualifiedReason"
-                  fieldState={validationErrors.notQualifiedReason ? 'error' : 'idle'}
-                  fieldError={validationErrors.notQualifiedReason}
-                >
-                  <Select native value={notQualifiedReason} onChange={(e) => setNotQualifiedReason(e.target.value)} className="erp-input">
-                    <option value="">— Select reason —</option>
-                    {notQualifiedReasons.map((r) => (
-                      <option key={r.value} value={r.value}>{r.label}</option>
-                    ))}
-                  </Select>
-                </ErpFieldRow>
-              ) : null}
-              {leadStage === 'closed' ? (
-                <>
-                  <ErpFieldRow
-                    label="Closed Date"
-                    dataField="closedDate"
-                    fieldState={validationErrors.closedDate ? 'error' : 'idle'}
-                    fieldError={validationErrors.closedDate}
-                  >
-                    <Input
-                      type="date"
-                      value={closedDate}
-                      min={createdDate.trim() || getCrmDateInputMin()}
-                      max={getDateInputMin()}
-                      onChange={(e) => setClosedDate(e.target.value)}
-                      className="erp-input"
-                    />
-                  </ErpFieldRow>
-                  <ErpFieldRow
-                    label="Closed Reason"
-                    colSpan={2}
-                    dataField="closedReason"
-                    fieldState={validationErrors.closedReason ? 'error' : 'idle'}
-                    fieldError={validationErrors.closedReason}
-                  >
-                    <Select native value={closedReason} onChange={(e) => setClosedReason(e.target.value)} className="erp-input">
-                      <option value="">— Select reason —</option>
-                      {closedReasons.map((r) => (
-                        <option key={r.value} value={r.value}>{r.label}</option>
-                      ))}
-                    </Select>
-                  </ErpFieldRow>
-                </>
-              ) : null}
-            </ErpCardSection>
-          ) : null}
-        </ErpAdditionalInfoPanel>
+              </>
+            ) : null}
+          </ErpFieldGroup>
+        </div>
+        </div>
+
         </div>
       </CrmCardFormShell>
       {isEdit && existing ? (

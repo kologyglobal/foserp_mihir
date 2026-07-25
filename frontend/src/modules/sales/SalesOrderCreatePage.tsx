@@ -27,17 +27,16 @@ import {
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
 import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
 import { DynamicsStatusChip } from '../../components/dynamics/DynamicsStatusChip'
-import {
-  ENTERPRISE_FORM_CLASS,
-  EnterpriseFormMetrics,
-  EnterpriseFormSectionNav,
-} from '../../design-system/workspace'
+import { ENTERPRISE_FORM_CLASS } from '../../design-system/workspace'
 import { salesChildBreadcrumbs } from '../../utils/salesNavigation'
 import { crmChildBreadcrumbs } from '../../utils/crmNavigation'
 import { ErpSmartSelect } from '../../components/erp/ErpSmartSelect'
 import { CommercialTermSelect } from '../../components/masters/GeographySelects'
 import { QuickCreateSelect } from '../../components/quick-create/QuickCreateSelect'
-import { Input, Textarea } from '../../components/forms/Inputs'
+import { Input, Textarea, Select } from '../../components/forms/Inputs'
+import { SELECT_PLACEHOLDER } from '../../components/forms/selectStandards'
+import { useDeliveryTimeOptions } from '../../hooks/useCrmMasters'
+import { resolveDefaultDeliveryTime } from '../../utils/quotationTermUtils'
 import { AppLink } from '../../components/ui/AppLink'
 import { resolveCompany360Path } from '../../config/entity360Routes'
 import { notify } from '../../store/toastStore'
@@ -186,7 +185,6 @@ export function SalesOrderNewPage() {
   const getProduct = useMasterStore((s) => s.getProduct)
   const locations = useMasterStore((s) => s.locations)
 
-  const [activeSection, setActiveSection] = useState('quick')
   const [createMode, setCreateMode] = useState<SoCreateMode>(initialCreateMode)
   const [modeChosen, setModeChosen] = useState(skipModeChooser)
   const [validationErrors, setValidationErrors] = useState<FieldErrorMap>({})
@@ -210,6 +208,10 @@ export function SalesOrderNewPage() {
   const [customerPoDate, setCustomerPoDate] = useState('')
   const [paymentTerms, setPaymentTerms] = useState(opportunityPrefill?.paymentTerms ?? '')
   const [deliveryTerms, setDeliveryTerms] = useState(opportunityPrefill?.deliveryTerms ?? '')
+  const [deliveryTime, setDeliveryTime] = useState(
+    () => (opportunityPrefill as { deliveryTime?: string } | undefined)?.deliveryTime ?? '',
+  )
+  const deliveryTimeOptions = useDeliveryTimeOptions()
   const [directSoReason, setDirectSoReason] = useState(opportunityPrefill?.directSoReason ?? '')
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState(
     opportunityPrefill?.expectedDeliveryDate ?? '',
@@ -348,6 +350,7 @@ export function SalesOrderNewPage() {
     if (salesQuo) setCustomerId(salesQuo.customerId)
     setPaymentTerms(salesQuo?.paymentTerms ?? paymentTerms)
     setDeliveryTerms(salesQuo?.deliveryTerms ?? deliveryTerms)
+    setDeliveryTime(salesQuo?.deliveryTime?.trim() || deliveryTime || resolveDefaultDeliveryTime())
     setFreightAmount(doc.freightAmount ?? 0)
     const built = buildSalesOrderLinesFromQuotationDocument({
       document: doc,
@@ -393,7 +396,6 @@ export function SalesOrderNewPage() {
   function chooseCreateMode(mode: SoCreateMode) {
     handleCreateModeChange(mode)
     setModeChosen(true)
-    setActiveSection('quick')
   }
 
   function reopenModeChooser() {
@@ -441,6 +443,7 @@ export function SalesOrderNewPage() {
       customerPoNumber,
       paymentTerms,
       deliveryTerms,
+      deliveryTime,
     }).fieldErrors
 
     for (const line of lines) {
@@ -466,6 +469,7 @@ export function SalesOrderNewPage() {
           'customerPoNumber',
           'paymentTerms',
           'deliveryTerms',
+          'deliveryTime',
         ],
         onFieldErrors: setValidationErrors,
       })
@@ -532,6 +536,7 @@ export function SalesOrderNewPage() {
           customerPoNumber: customerPoNumber.trim(),
           paymentTerms: paymentTerms.trim(),
           deliveryTerms: deliveryTerms.trim(),
+          deliveryTime: deliveryTime.trim(),
           directSoReason: directSoReason.trim() || null,
           expectedDeliveryDate: expectedDeliveryDate || null,
           deliveryLocation: handover.deliveryLocation ?? null,
@@ -555,6 +560,7 @@ export function SalesOrderNewPage() {
           customerPoNumber: customerPoNumber.trim(),
           paymentTerms: paymentTerms.trim(),
           deliveryTerms: deliveryTerms.trim(),
+          deliveryTime: deliveryTime.trim(),
           directSoReason: directSoReason.trim(),
           expectedDeliveryDate: expectedDeliveryDate || undefined,
           deliveryLocation: handover.deliveryLocation,
@@ -594,7 +600,6 @@ export function SalesOrderNewPage() {
         setCustomerPoNumber('')
         setCustomerPoDate('')
         setAttachments([])
-        setActiveSection('quick')
         return
       }
       if (saveMode === 'save_close') {
@@ -635,7 +640,7 @@ export function SalesOrderNewPage() {
     {
       id: 'commercial',
       label: 'Commercial',
-      done: Boolean(paymentTerms.trim() && deliveryTerms.trim()),
+      done: Boolean(paymentTerms.trim() && deliveryTerms.trim() && deliveryTime.trim()),
     },
     { id: 'documents', label: 'Documents', done: attachments.length > 0 },
   ], [
@@ -647,14 +652,13 @@ export function SalesOrderNewPage() {
     hasValidLines,
     paymentTerms,
     deliveryTerms,
+    deliveryTime,
     attachments.length,
   ])
 
   const completionPercent = Math.round((completionItems.filter((i) => i.done).length / completionItems.length) * 100)
 
   function scrollToSection(sectionId: string) {
-    const navId = sectionId === 'customer' ? 'quick' : sectionId
-    setActiveSection(navId)
     window.requestAnimationFrame(() => {
       const elId = (sectionId === 'customer' || sectionId === 'quick')
         ? 'so-section-quick'
@@ -662,25 +666,6 @@ export function SalesOrderNewPage() {
       document.getElementById(elId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
   }
-
-  const sectionNavItems = useMemo(() => [
-    {
-      id: 'quick',
-      label: 'Quick',
-      icon: Building2,
-      done: completionItems.find((i) => i.id === 'quick')?.done,
-    },
-    { id: 'lines', label: 'Products', icon: ClipboardList, done: completionItems.find((i) => i.id === 'lines')?.done },
-    { id: 'commercial', label: 'Commercial', icon: Banknote, done: completionItems.find((i) => i.id === 'commercial')?.done },
-    { id: 'documents', label: 'Documents', icon: Paperclip, done: completionItems.find((i) => i.id === 'documents')?.done },
-  ], [completionItems])
-
-  const formMetrics = useMemo(() => [
-    { label: 'Completion', value: `${completionPercent}%`, accent: 'blue' as const, hint: `${completionItems.filter((i) => i.done).length} of ${completionItems.length} sections` },
-    { label: 'Line Items', value: String(lines.length), accent: 'green' as const, hint: hasValidLines ? formatCurrency(orderSummary.grandTotal) : 'Add products' },
-    { label: 'Grand Total', value: orderSummary.grandTotal > 0 ? formatCurrency(orderSummary.grandTotal) : '—', accent: 'violet' as const, hint: `GST ${formatCurrency(orderSummary.totalGst)}` },
-    { label: 'Delivery', value: expectedDeliveryDate ? formatDate(expectedDeliveryDate) : '—', accent: 'amber' as const, hint: customer?.customerName ?? 'Select customer' },
-  ], [completionPercent, completionItems, lines.length, hasValidLines, orderSummary.grandTotal, orderSummary.totalGst, expectedDeliveryDate, customer?.customerName])
 
   const linkedQuotation = quotationDocumentId ? getQuotationDocument(quotationDocumentId) : undefined
   const linkedQuotationNo = linkedQuotation ? getQuotation(linkedQuotation.quotationId)?.quotationNo : undefined
@@ -756,13 +741,17 @@ export function SalesOrderNewPage() {
               focusField: 'lines',
               sectionId: 'lines',
             }
-          : !paymentTerms.trim() || !deliveryTerms.trim()
+          : !paymentTerms.trim() || !deliveryTerms.trim() || !deliveryTime.trim()
             ? {
                 id: 'commercial',
                 title: 'Set commercial terms',
-                description: 'Choose payment and delivery terms before saving.',
+                description: 'Choose payment terms, delivery terms, and delivery time before saving.',
                 ctaLabel: 'Commercial terms',
-                focusField: !paymentTerms.trim() ? 'paymentTerms' : 'deliveryTerms',
+                focusField: !paymentTerms.trim()
+                  ? 'paymentTerms'
+                  : !deliveryTerms.trim()
+                    ? 'deliveryTerms'
+                    : 'deliveryTime',
                 sectionId: 'commercial',
               }
             : {
@@ -1168,7 +1157,7 @@ export function SalesOrderNewPage() {
 
       {createMode === 'quotation' ? (
         <ErpFieldRow
-          label="Quotation Number"
+          label="Quotation Number (Reference)"
           required
           colSpan={3}
           dataField="quotationDocumentId"
@@ -1248,17 +1237,15 @@ export function SalesOrderNewPage() {
                     : 'No limit'}
                 </dd>
               </div>
-              {customer.contactPerson ? (
-                <div className="so-customer-card__fact so-customer-card__fact--wide">
-                  <dt>Primary contact</dt>
-                  <dd>
-                    {customer.contactPerson}
-                    {customer.contactPhone ? (
-                      <span className="so-customer-card__contact-meta"> · {customer.contactPhone}</span>
-                    ) : null}
-                  </dd>
-                </div>
-              ) : null}
+              <div className="so-customer-card__fact">
+                <dt>Primary contact</dt>
+                <dd>
+                  {customer.contactPerson?.trim() || '—'}
+                  {customer.contactPerson && customer.contactPhone ? (
+                    <span className="so-customer-card__contact-meta"> · {customer.contactPhone}</span>
+                  ) : null}
+                </dd>
+              </div>
             </dl>
           </aside>
         ) : (
@@ -1276,7 +1263,7 @@ export function SalesOrderNewPage() {
         )}
       </ErpFieldGroup>
 
-      <ErpFieldGroup label="Customer purchase order" className="so-qe-po-group">
+      <ErpFieldGroup label="Customer purchase order" className="so-qe-po-group" columns={4}>
         <ErpFieldRow label="Customer PO Number" required dataField="customerPoNumber" fieldError={validationErrors.customerPoNumber}>
           <Input
             value={customerPoNumber}
@@ -1328,7 +1315,7 @@ export function SalesOrderNewPage() {
       columns={1}
     >
       <div className="so-commercial-body">
-        <ErpFieldGroup label="Commercial terms" className="so-commercial-group" columns={2}>
+        <ErpFieldGroup label="Commercial terms" className="so-commercial-group" columns={3}>
           <ErpFieldRow label="Payment Terms" required dataField="paymentTerms" fieldError={validationErrors.paymentTerms}>
             <CommercialTermSelect
               termType="payment"
@@ -1344,6 +1331,24 @@ export function SalesOrderNewPage() {
               onChange={setDeliveryTerms}
               placeholder="Select delivery terms"
             />
+          </ErpFieldRow>
+          <ErpFieldRow
+            label="Delivery Time / Lead Time"
+            required
+            dataField="deliveryTime"
+            fieldError={validationErrors.deliveryTime}
+            hint="Commitment shown on print and PDF"
+          >
+            <Select
+              value={deliveryTime}
+              onChange={(e) => setDeliveryTime(e.target.value)}
+              error={Boolean(validationErrors.deliveryTime)}
+            >
+              <option value="">{SELECT_PLACEHOLDER}</option>
+              {deliveryTimeOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </Select>
           </ErpFieldRow>
         </ErpFieldGroup>
 
@@ -1603,14 +1608,6 @@ export function SalesOrderNewPage() {
           />
         )}
       >
-        <EnterpriseFormSectionNav
-          sections={sectionNavItems}
-          activeId={activeSection}
-          onSelect={scrollToSection}
-        />
-
-        <EnterpriseFormMetrics metrics={formMetrics} />
-
         {formBody}
       </CrmCardFormShell>
     </>

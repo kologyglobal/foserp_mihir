@@ -3,15 +3,15 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
   Building2,
-  ClipboardList,
   FileText,
   Paperclip,
-  User,
 } from 'lucide-react'
-import { ErpCardSection, ErpFieldRow, ErpStickySaveBar, ErpQuickEntrySection, ErpAdditionalInfoToggle, ErpAdditionalInfoPanel, useErpAdditionalInfo, ErpViewField } from '../../components/erp/card-form'
-import { ErpLineItemsGrid } from '../../components/erp/ErpLineItemsGrid'
+import { ErpCardSection, ErpFieldRow, ErpStickySaveBar, ErpQuickEntrySection, ErpViewField } from '../../components/erp/card-form'
+import { ErpProductPricingSection } from '../../components/erp/ErpProductPricingSection'
 import { CrmTypedDocumentUpload } from '../../components/crm/CrmTypedDocumentUpload'
 import { Input, Select, Textarea } from '../../components/forms/Inputs'
+import { SELECT_PLACEHOLDER } from '../../components/forms/selectStandards'
+import { QuickCreateSelect } from '../../components/quick-create/QuickCreateSelect'
 import { useCrmStore } from '../../store/crmStore'
 import { resolveStoreAction } from '../../store/storeAction'
 import { notify } from '../../store/toastStore'
@@ -62,8 +62,6 @@ import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
 import { crmChildBreadcrumbs } from '../../utils/crmNavigation'
 import {
   ENTERPRISE_FORM_CLASS,
-  EnterpriseFormMetrics,
-  EnterpriseFormSectionNav,
 } from '../../design-system/workspace'
 import {
   buildOpportunityAiInsight,
@@ -141,7 +139,6 @@ export function OpportunityNewPage() {
   const initialStage: OpportunityStage = 'new_lead'
   const initialProbability = String(getStageProbability(initialStage) || 30)
 
-  const [activeSection, setActiveSection] = useState('quick')
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [rowErrors, setRowErrors] = useState<Record<string, string[]>>({})
   const [forceOpenProductsKey, setForceOpenProductsKey] = useState(0)
@@ -195,6 +192,16 @@ export function OpportunityNewPage() {
     },
   )
 
+  const customerOptions = useMemo(
+    () =>
+      customers
+        .filter((c) => c.isActive)
+        .map((c) => ({
+          id: c.id,
+          label: `${c.customerName}${c.city ? ` · ${c.city}` : ''}`,
+        })),
+    [customers],
+  )
   const customer = customers.find((c) => c.id === customerId)
   const customerContacts = contacts.filter((c) => c.customerId === customerId)
   const primaryProductName = useMemo(() => {
@@ -240,19 +247,26 @@ export function OpportunityNewPage() {
     if (!valid) setOwnerId(ownerOptions[0]!.value)
   }, [ownerOptions, ownerId, user.id])
 
-  // Prefill contact: lead.contactId → name match → company primary → first contact
+  // Default Contact when Customer changes: keep valid selection, else lead match → primary → first
   useEffect(() => {
-    if (!prefillLeadId || !customerId || contactId) return
-    if (lead?.contactId && customerContacts.some((c) => c.id === lead.contactId)) {
-      setContactId(lead.contactId)
+    if (!customerId) {
+      setContactId((prev) => (prev ? '' : prev))
       return
     }
-    const byName = lead?.contactPerson
-      ? customerContacts.find((c) => c.name.trim().toLowerCase() === lead.contactPerson!.trim().toLowerCase())
-      : undefined
-    const next = byName ?? customerContacts.find((c) => c.isPrimary) ?? customerContacts[0]
-    if (next) setContactId(next.id)
-  }, [prefillLeadId, lead?.contactId, lead?.contactPerson, customerId, customerContacts, contactId])
+    const list = contacts.filter((c) => c.customerId === customerId)
+    setContactId((prev) => {
+      if (prev && list.some((c) => c.id === prev)) return prev
+      if (prefillLeadId && lead?.contactId && list.some((c) => c.id === lead.contactId)) {
+        return lead.contactId
+      }
+      const byName =
+        prefillLeadId && lead?.contactPerson
+          ? list.find((c) => c.name.trim().toLowerCase() === lead.contactPerson!.trim().toLowerCase())
+          : undefined
+      const next = byName ?? list.find((c) => c.isPrimary) ?? list[0]
+      return next?.id ?? ''
+    })
+  }, [customerId, contacts, prefillLeadId, lead?.contactId, lead?.contactPerson])
 
   useEffect(() => {
     setAttachmentsState(useOpportunityAttachmentStore.getState().getForOpportunity(attachmentScopeId))
@@ -329,8 +343,6 @@ export function OpportunityNewPage() {
     leadErrors.forEach((msg, i) => { merged[`_lead_${i}`] = msg })
     setRowErrors(rErr)
     if (Object.keys(merged).length || Object.keys(rErr).length) {
-      const needsMore = Object.keys(rErr).length > 0 || Object.keys(merged).some((k) => k.startsWith('unitPrice-') || k.startsWith('qty-') || k.startsWith('product-'))
-      if (needsMore) setShowAdditionalDetails(true)
       const fieldMap = merged
       const lineKeys = Object.keys(fieldMap).filter(
         (k) => k.startsWith('unitPrice-') || k.startsWith('qty-') || k.startsWith('product-') || k.startsWith('taxPct-'),
@@ -362,12 +374,9 @@ export function OpportunityNewPage() {
         fieldLabels,
         sectionByField,
         expandSection: (sectionId) => {
-          if (sectionId !== 'opp-section-quick') setShowAdditionalDetails(true)
           if (sectionId === 'opp-section-products') {
             setForceOpenProductsKey((k) => k + 1)
-            setShowAdditionalDetails(true)
           }
-          setActiveSection(sectionId.replace(/^opp-section-/, ''))
         },
         onFieldErrors: (map) => setValidationErrors(fieldErrorsToMessages(map, fieldOrder)),
         delayMs: 120,
@@ -426,8 +435,6 @@ export function OpportunityNewPage() {
         }
         if (mode === 'new') {
           resetForm()
-          setActiveSection('quick')
-          setShowAdditionalDetails(false)
           // Drop lead/customer query so the next entry stays blank
           if (searchParams.toString()) {
             navigate('/crm/opportunities/new', { replace: true })
@@ -464,55 +471,10 @@ export function OpportunityNewPage() {
 
   const completionPercent = Math.round((completionItems.filter((i) => i.done).length / completionItems.length) * 100)
 
-  const hasOptionalOppData = Boolean(
-    lead
-    || hasValidLine
-    || productRequirement.trim()
-    || attachments.length > 0,
-  )
-  const {
-    open: showAdditionalDetails,
-    setOpen: setShowAdditionalDetails,
-    toggle: toggleAdditionalDetails,
-    panelId: additionalPanelId,
-  } = useErpAdditionalInfo({
-    preferOpen: hasOptionalOppData,
-  })
-  const additionalSectionCount = 4
-  const additionalAttentionCount = [
-    !hasValidLine,
-    dealValue <= 0,
-    attachments.length === 0,
-  ].filter(Boolean).length
-
   function scrollToSection(sectionId: string) {
-    const additionalIds = new Set(['products', 'commercial', 'documents', 'location'])
-    const needsExpand = additionalIds.has(sectionId) && !showAdditionalDetails
-    if (needsExpand) setShowAdditionalDetails(true)
-    setActiveSection(sectionId === 'general' ? 'quick' : sectionId)
-    window.setTimeout(() => {
-      const id = sectionId === 'general' ? 'opp-section-quick' : `opp-section-${sectionId}`
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, needsExpand ? 300 : 0)
+    const id = sectionId === 'general' ? 'opp-section-quick' : `opp-section-${sectionId}`
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
-
-  const sectionNavItems = useMemo(() => {
-    const quick = { id: 'quick', label: 'Quick', icon: User, done: completionItems.find((i) => i.id === 'quick')?.done }
-    if (!showAdditionalDetails) return [quick]
-    return [
-      quick,
-      { id: 'products', label: 'Products', icon: ClipboardList, done: completionItems.find((i) => i.id === 'products')?.done },
-      { id: 'commercial', label: 'Commercial', icon: Banknote, done: completionItems.find((i) => i.id === 'commercial')?.done },
-      { id: 'documents', label: 'Attachments', icon: Paperclip, done: completionItems.find((i) => i.id === 'documents')?.done },
-    ]
-  }, [completionItems, showAdditionalDetails])
-
-  const formMetrics = useMemo(() => [
-    { label: 'Completion', value: `${completionPercent}%`, accent: 'blue' as const, hint: `${completionItems.filter((i) => i.done).length} of ${completionItems.length} sections` },
-    { label: 'Deal Value', value: formatCrmCurrency(dealValue), accent: 'green' as const, hint: `${lines.length} line${lines.length === 1 ? '' : 's'}` },
-    { label: 'Weighted Forecast', value: formatCrmCurrency(weighted), accent: 'violet' as const, hint: `${probability}% probability` },
-    { label: 'Expected Close', value: expectedCloseDate ? formatDate(expectedCloseDate) : '—', accent: 'amber' as const, hint: opportunityStageLabel(stage) },
-  ], [completionPercent, completionItems, dealValue, lines.length, weighted, probability, expectedCloseDate, stage])
 
   const documentStrip = [
     { label: 'Opportunity No.', value: 'Auto on save', highlight: false },
@@ -626,14 +588,6 @@ export function OpportunityNewPage() {
         />
       )}
     >
-      <EnterpriseFormSectionNav
-        sections={sectionNavItems}
-        activeId={activeSection}
-        onSelect={scrollToSection}
-      />
-
-      <EnterpriseFormMetrics metrics={formMetrics} />
-
       <div className="erp-form-body">
       <ErpQuickEntrySection
         id="opp-section-quick"
@@ -654,26 +608,23 @@ export function OpportunityNewPage() {
             ?? validationErrors.find((e) => /company|customer/i.test(e))
           }
         >
-          <Select
+          <QuickCreateSelect
+            entityType="customer"
             value={customerId}
-            onChange={(e) => {
-              setCustomerId(e.target.value)
+            onChange={(id) => {
+              setCustomerId(id)
               setContactId('')
               inline.touch('customerId')
             }}
-            onBlur={() => inline.touch('customerId')}
-            required
-            className="erp-input"
-          >
-            <option value="">Select customer…</option>
-            {customers.filter((c) => c.isActive).map((c) => (
-              <option key={c.id} value={c.id}>{c.customerName} · {c.city}</option>
-            ))}
-          </Select>
+            options={customerOptions}
+            placeholder="Select customer…"
+            allowEmpty
+            emptyOptionLabel={SELECT_PLACEHOLDER}
+          />
         </ErpFieldRow>
         <ErpFieldRow label="Contact">
           <Select native value={contactId} onChange={(e) => setContactId(e.target.value)} disabled={!customerId} className="erp-input">
-            <option value="">—</option>
+            <option value="">{SELECT_PLACEHOLDER}</option>
             {customerContacts.map((c) => (
               <option key={c.id} value={c.id}>{c.name}{c.designation ? ` · ${c.designation}` : ''}</option>
             ))}
@@ -785,18 +736,7 @@ export function OpportunityNewPage() {
         ) : null}
       </ErpQuickEntrySection>
 
-      <ErpAdditionalInfoToggle
-        open={showAdditionalDetails}
-        onToggle={() => {
-          if (showAdditionalDetails) setActiveSection('quick')
-          toggleAdditionalDetails()
-        }}
-        panelId={additionalPanelId}
-        sectionCount={additionalSectionCount}
-        attentionCount={additionalAttentionCount}
-      />
 
-      <ErpAdditionalInfoPanel open={showAdditionalDetails} id={additionalPanelId}>
       <ErpCardSection
         id="opp-section-location"
         title="Location"
@@ -810,29 +750,20 @@ export function OpportunityNewPage() {
         <LocationFieldRow value={locationId} onChange={(locId) => setLocationId(locId)} usage="sales" />
       </ErpCardSection>
 
-      <ErpCardSection
-        id="opp-section-products"
+      <ErpProductPricingSection
+        sectionId="opp-section-products"
         nbaTarget="products"
-        title="Product / Item Lines"
-        subtitle="Pick products and set qty, price, and tax per line."
-        icon={ClipboardList}
-        accent="teal"
-        collapsible
-        defaultOpen
         forceOpenKey={forceOpenProductsKey || undefined}
+        title="Product & Pricing"
+        subtitle="Build line items, then review adjustments and the live order total."
+        accent="blue"
+        lines={lines}
+        onChange={setLines}
+        productOptions={productOptions}
+        productPickMap={pickMap}
+        rowErrors={rowErrors}
       >
-        <div className="col-span-3">
-          <ErpLineItemsGrid
-            lines={lines}
-            onChange={setLines}
-            productOptions={productOptions}
-            productPickMap={pickMap}
-            rowErrors={rowErrors}
-            probability={Number(probability) || 0}
-            variant="opportunity"
-          />
-        </div>
-        <div className="col-span-3 opp-scope-notes">
+        <div className="opp-scope-notes mt-4">
           <ErpFieldRow label="Scope Notes" colSpan={3} horizontal={false}>
             <Textarea
               rows={3}
@@ -846,7 +777,7 @@ export function OpportunityNewPage() {
             />
           </ErpFieldRow>
         </div>
-      </ErpCardSection>
+      </ErpProductPricingSection>
 
       <ErpCardSection
         id="opp-section-commercial"
@@ -901,7 +832,8 @@ export function OpportunityNewPage() {
           onChange={setAttachments}
         />
       </ErpCardSection>
-      </ErpAdditionalInfoPanel>
+      
+
       </div>
     </CrmCardFormShell>
   )

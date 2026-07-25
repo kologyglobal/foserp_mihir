@@ -81,7 +81,8 @@ Related: [`master-module-audit.md`](master-module-audit.md) · [`master-api-map.
 | Kind | Register path | Consumers |
 |------|---------------|-----------|
 | Payment Terms | `/masters/payment-terms` | Quotation, SO `CommercialTermSelect`, Purchase PO, quick-create, search |
-| Delivery Terms | `/crm/masters/delivery-terms` | Same |
+| Delivery Terms | `/crm/masters/delivery-terms` | Same (incoterms / delivery basis) |
+| Delivery Time | `/crm/masters/delivery-time` | Quotation commercial lead time (weeks) |
 | Warranty Terms | `/crm/masters/warranty-terms` | Quotation |
 | Commercial Terms (clauses) | `/crm/masters/commercial-terms` | Quotation clause catalogue |
 

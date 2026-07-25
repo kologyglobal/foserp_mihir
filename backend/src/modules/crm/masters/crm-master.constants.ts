@@ -14,6 +14,7 @@ export const CRM_MASTER_KINDS = [
   'commercial-terms',
   'payment-terms',
   'delivery-terms',
+  'delivery-time',
   'warranty-terms',
   'approval-rules',
   'document-types',

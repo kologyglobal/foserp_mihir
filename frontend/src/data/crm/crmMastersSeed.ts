@@ -266,6 +266,17 @@ export const CRM_MASTERS_SEED: CrmMasterEntry[] = [
   entry('delivery-terms', 'freight_extra', 'Freight Extra', 4, { defaultDeliveryTime: '6-8 weeks', approvalRequired: false }),
   entry('delivery-terms', 'freight_included', 'Freight Included', 5, { defaultDeliveryTime: '8-10 weeks', approvalRequired: true }),
 
+  entry('delivery-time', '4_weeks', '4 weeks', 1, { weeks: 4 }),
+  entry('delivery-time', '6_weeks', '6 weeks', 2, { weeks: 6 }),
+  entry('delivery-time', '8_weeks', '8 weeks', 3, { weeks: 8 }),
+  entry('delivery-time', '10_weeks', '10 weeks', 4, { weeks: 10 }),
+  entry('delivery-time', '12_weeks', '12 weeks', 5, { weeks: 12 }),
+  entry('delivery-time', '14_weeks', '14 weeks', 6, { weeks: 14 }),
+  entry('delivery-time', '16_weeks', '16 weeks', 7, { weeks: 16 }),
+  entry('delivery-time', '18_weeks', '18 weeks', 8, { weeks: 18 }),
+  entry('delivery-time', '20_weeks', '20 weeks', 9, { weeks: 20 }),
+  entry('delivery-time', '24_weeks', '24 weeks', 10, { weeks: 24 }),
+
   entry('warranty-terms', 'std_12m', '12 months against manufacturing defect', 1, { warrantyDuration: '12 months', approvalRequired: false }),
   entry('warranty-terms', 'no_hydraulic', 'No warranty on hydraulic parts', 2, { warrantyDuration: '12 months', approvalRequired: false }),
   entry('warranty-terms', 'oem_brought_out', 'Brought-out items as per OEM warranty', 3, { warrantyDuration: 'As per OEM', approvalRequired: false }),
@@ -277,7 +288,7 @@ export const CRM_MASTERS_SEED: CrmMasterEntry[] = [
   entry('approval-rules', 'low_margin', 'Low margin quotation', 4, { module: 'Quotation', triggerField: 'marginPct', condition: '< 15', approvalRole: 'CEO' }),
 
   entry('document-types', 'general', 'General Document', 1, { requiredFor: 'Any', fileTypes: 'pdf,doc,docx', maxSizeMb: 10 }),
-  entry('document-types', 'customer_po', 'Customer PO', 2, { requiredFor: 'Sales Order', fileTypes: 'pdf,jpg,jpeg,png', maxSizeMb: 10 }),
+  entry('document-types', 'customer_po', 'Customer PO', 2, { fileTypes: 'pdf,jpg,jpeg,png', maxSizeMb: 10 }),
   entry('document-types', 'customer_requirement', 'Customer Requirement', 3, { requiredFor: 'Quotation', fileTypes: 'pdf,doc,docx', maxSizeMb: 15 }),
   entry('document-types', 'drawing', 'Drawing', 4, { requiredFor: 'Quotation', fileTypes: 'pdf,dwg,dxf,jpg,png', maxSizeMb: 25 }),
   entry('document-types', 'technical_spec', 'Technical Specification', 5, { requiredFor: 'Quotation', fileTypes: 'pdf,doc,docx', maxSizeMb: 15 }),

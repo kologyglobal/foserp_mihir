@@ -186,6 +186,7 @@ export async function convertQuotationToSalesOrder(
 
   const paymentTerms = sectionContent(doc.sections, 'payment') || quotation.paymentTerms?.trim()
   const deliveryTerms = sectionContent(doc.sections, 'delivery') || quotation.deliveryTerms?.trim()
+  const deliveryTime = quotation.deliveryTime?.trim() || null
   if (!paymentTerms) throw new ValidationError('Payment terms are required')
   if (!deliveryTerms) throw new ValidationError('Delivery terms are required')
   if (!quotation.validityDate) throw new ValidationError('Quotation validity date is required')
@@ -261,6 +262,7 @@ export async function convertQuotationToSalesOrder(
           gstAmount: summary.gstAmount,
           paymentTerms,
           deliveryTerms,
+          deliveryTime,
           warrantyTerms,
           commercialNotes: doc.commercialNotes ?? (sectionContent(doc.sections, 'commercial') || null),
           technicalNotes: doc.technicalNotes ?? (sectionContent(doc.sections, 'technical') || null),

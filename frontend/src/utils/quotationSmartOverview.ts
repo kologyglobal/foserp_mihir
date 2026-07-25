@@ -63,6 +63,7 @@ export interface QuotationFormCompletionInput {
   validUntil: string | null | undefined
   paymentTerms?: string | null
   deliveryTerms?: string | null
+  deliveryTime?: string | null
   attachmentCount: number
   /** Section ids that currently have blocking validation messages. */
   errorSectionIds?: Iterable<string>
@@ -92,14 +93,15 @@ export function buildQuotationFormSectionCompletion(
   const hasTemplate = Boolean(input.templateId)
   const hasPayment = Boolean(input.paymentTerms?.trim())
   const hasDelivery = Boolean(input.deliveryTerms?.trim())
+  const hasDeliveryTime = Boolean(input.deliveryTime?.trim())
   const sourceComplete =
     input.createMode === 'opportunity' ? input.opportunitySelected : true
   // Customer section = linked company only. Validity / terms live under Commercial.
   const customerComplete = hasCustomer
   const commercialComplete =
-    input.grandTotal > 0 && hasValidity && hasPayment && hasDelivery
+    input.grandTotal > 0 && hasValidity && hasPayment && hasDelivery && hasDeliveryTime
   const commercialStarted =
-    input.grandTotal > 0 || hasValidity || hasPayment || hasDelivery
+    input.grandTotal > 0 || hasValidity || hasPayment || hasDelivery || hasDeliveryTime
   const productsStarted = input.lineCount > 0 || input.hasValidLine
 
   const sections: QuotationFormSectionCompletion[] = [

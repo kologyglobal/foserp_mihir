@@ -282,6 +282,7 @@ export async function apiCreateQuotationFromOpportunity(input: {
   terms?: string
   paymentTerms?: string
   deliveryTerms?: string
+  deliveryTime?: string
   validityDate?: string
   locationId?: string | null
   contactId?: string | null
@@ -307,6 +308,7 @@ export async function apiCreateQuotationFromOpportunity(input: {
     terms: input.terms,
     paymentTerms: input.paymentTerms,
     deliveryTerms: input.deliveryTerms,
+    deliveryTime: input.deliveryTime,
     validityDate: input.validityDate,
     locationId: input.locationId,
     contactId: input.contactId,

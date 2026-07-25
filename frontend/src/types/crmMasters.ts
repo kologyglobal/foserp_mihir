@@ -20,6 +20,7 @@ export type CrmMasterKind =
   | 'commercial-terms'
   | 'payment-terms'
   | 'delivery-terms'
+  | 'delivery-time'
   | 'warranty-terms'
   | 'approval-rules'
   | 'document-types'

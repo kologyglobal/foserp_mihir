@@ -110,6 +110,7 @@ async function main(): Promise<void> {
   await seedRole('Finance Executive', permissionMap, tenant.id, true)
   await seedRole('Dispatch Manager', permissionMap, tenant.id, true)
   await seedRole('Dispatch User', permissionMap, tenant.id, true)
+  const crmUserRoleId = await seedRole('CRM User', permissionMap, tenant.id, true)
   await seedRole('Viewer', permissionMap, tenant.id, true)
 
   // Rebuild Tenant Admin / Admin / Administrator grants on every tenant so catalog
@@ -264,6 +265,34 @@ async function main(): Promise<void> {
 
   void superAdmin
   void tenantAdmin
+
+  const crmUserPassword = await hashPassword('CrmUser@123')
+  const crmUser = await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: tenant.id, email: 'crm.user@vasant-trailers.com' } },
+    create: {
+      tenantId: tenant.id,
+      firstName: 'CRM',
+      lastName: 'User',
+      email: 'crm.user@vasant-trailers.com',
+      mobile: '9876543211',
+      passwordHash: crmUserPassword,
+      status: 'ACTIVE',
+      emailVerified: true,
+      designation: 'Sales Executive',
+      department: 'Sales',
+    },
+    update: {
+      passwordHash: crmUserPassword,
+      status: 'ACTIVE',
+      deletedAt: null,
+    },
+  })
+
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: crmUser.id, roleId: crmUserRoleId } },
+    create: { userId: crmUser.id, roleId: crmUserRoleId, tenantId: tenant.id },
+    update: {},
+  })
 
   const pipeline = await prisma.crmPipeline.upsert({
     where: { id: '00000000-0000-4000-8000-000000000001' },
@@ -942,6 +971,8 @@ async function main(): Promise<void> {
   console.log('  Sales:       sales@vasant-trailers.com   / Sales@123      → Sales Manager')
   console.log('  Quality:     quality@vasant-trailers.com  / Quality@123    → Quality Inspector')
   console.log('  Accounts:    accounts@vasant-trailers.com / Accounts@123   → Finance Manager')
+  console.log('  CRM User (CRM-only): crm.user@vasant-trailers.com / CrmUser@123')
+  console.log(`\nLogin with tenantSlug: "${tenant.slug}"`)
 }
 
 main()

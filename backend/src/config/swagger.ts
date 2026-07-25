@@ -73,6 +73,7 @@ const CRM_MASTER_KIND_ENUM = [
   'commercial-terms',
   'payment-terms',
   'delivery-terms',
+  'delivery-time',
   'warranty-terms',
   'approval-rules',
   'document-types',

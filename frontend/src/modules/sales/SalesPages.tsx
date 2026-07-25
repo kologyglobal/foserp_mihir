@@ -43,7 +43,6 @@ import { Toast } from '../../components/ui/Toast'
 import { useSalesStore } from '../../store/salesStore'
 import { useCrmStore } from '../../store/crmStore'
 import { useMrpStore } from '../../store/mrpStore'
-import { useWorkOrderStore } from '../../store/workOrderStore'
 import { useMasterStore } from '../../store/masterStore'
 import { formatNumber, formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
@@ -62,7 +61,7 @@ import { SalesOrdersTable } from '../../components/sales/SalesOrdersTable'
 import type { Quotation } from '../../types/sales'
 import type { SalesOrder } from '../../types/mrp'
 import { resolveSalesOrderValue } from '../../components/sales/SalesOrder360Sections'
-import { getSalesOrderFulfillmentLabel, sortSalesOrders, type SalesOrderSortKey } from '../../utils/salesDashboardMetrics'
+import { sortSalesOrders, type SalesOrderSortKey } from '../../utils/salesDashboardMetrics'
 import { crmModuleBreadcrumbs } from '../../utils/crmNavigation'
 import { salesModuleBreadcrumbs } from '../../utils/salesNavigation'
 import {
@@ -84,7 +83,8 @@ import {
   listPendingQuotationSoHandovers,
   PENDING_SO_STATUS,
 } from '../../utils/pendingSalesOrderHandover'
-import { salesOrderStatusLabel } from '../../utils/salesOrderStatus'
+import { buildProformaNewUrl } from '../../utils/proformaInvoicePrefill'
+import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
 import { systemConfirm } from '../../utils/systemConfirm'
 import { QuickCreateSelect } from '../../components/quick-create/QuickCreateSelect'
 import { useQuickCreate } from '../../hooks/useQuickCreate'
@@ -775,7 +775,6 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
   const deleteSalesOrderDraft = useMrpStore((s) => s.deleteSalesOrderDraft)
   const triggerProduction = useSalesStore((s) => s.triggerProductionForOrder)
   const quotations = useSalesStore((s) => s.quotations) ?? []
-  const workOrders = useWorkOrderStore((s) => s.workOrders)
   const quotationDocuments = useCrmStore((s) => s.quotationDocuments) ?? []
   const opportunities = useCrmStore((s) => s.opportunities) ?? []
   const { customerName, productName, products } = useMasterLabels()
@@ -977,51 +976,8 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
       })
       return
     }
-    const product = products.find((p) => p.id === so.productId)
-    const value = resolveSalesOrderValue(so, product)
-    const woCount = workOrders.filter((w) => w.salesOrderId === so.id).length
-    openDetailPanel({
-      title: so.salesOrderNo,
-      subtitle: customerName(so.customerId),
-      fields: [
-        { label: 'Status', value: salesOrderStatusLabel(so.status) },
-        { label: 'Fulfillment', value: getSalesOrderFulfillmentLabel(so, workOrders) },
-        { label: 'Company', value: customerName(so.customerId) },
-        { label: 'Product', value: productName(so.productId) },
-        { label: 'Qty', value: formatNumber(so.qty) },
-        { label: 'Required', value: formatDate(so.requiredDate) },
-        { label: 'SO Date', value: formatDate(so.orderDate ?? so.createdAt) },
-        { label: 'Value', value: value > 0 ? formatCurrency(value) : '—' },
-        { label: 'Source', value: so.quotationId ? 'Quotation' : so.source === 'direct' ? 'Direct' : '—' },
-        { label: 'Quotation', value: so.quotationNo ? `${so.quotationNo} Rev ${so.quotationRevisionNo ?? 1}` : '—' },
-        { label: 'Customer PO', value: so.customerPoNumber ?? '—' },
-        { label: 'Work orders', value: String(woCount) },
-      ],
-      links: [
-        { label: crmMode ? 'Open CRM Sales Order' : 'Open Sales Order 360', href: resolveSalesOrderDetailPath(so.id, crmMode) },
-        ...(so.quotationId
-          ? [{
-              label: crmMode ? 'CRM Quotation' : 'Quotation',
-              href: crmQuotationPath(so.quotationId),
-            }]
-          : []),
-      ],
-      timeline: [
-        {
-          id: 'status',
-          label: salesOrderStatusLabel(so.status),
-          time: formatDate(so.requiredDate),
-          status: 'current',
-        },
-      ],
-      aiSummary: `${so.salesOrderNo} for ${customerName(so.customerId)} is ${salesOrderStatusLabel(so.status).toLowerCase()} worth ${value > 0 ? formatCurrency(value) : 'TBD'}. Fulfillment: ${getSalesOrderFulfillmentLabel(so, workOrders).toLowerCase()}.`,
-      actions: [
-        { label: 'Open 360', onClick: () => navigate(resolveSalesOrderDetailPath(so.id, crmMode)), primary: true },
-        ...(so.status === 'open'
-          ? [{ label: 'Edit', onClick: () => navigate(buildSalesOrderEditUrl(so.id, { fromCrm: crmMode })) }]
-          : []),
-      ],
-    })
+    // Document preview = branded print layout (same page as Print).
+    navigate(resolveSalesOrderPrintPath(so.id, crmMode))
   }
 
   function handleDeleteSalesOrder(so: SalesOrder) {
@@ -1054,6 +1010,29 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
       return
     }
     navigate(resolveSalesOrderPrintPath(so.id, crmMode))
+  }
+
+  function handleCreateProforma(so: SalesOrder) {
+    if (isPendingSalesOrderHandover(so)) {
+      setToast('Create the sales order from this quotation before raising a proforma.')
+      return
+    }
+    const active = useProformaInvoiceStore
+      .getState()
+      .proformaInvoices.find((p) => p.salesOrderId === so.id && p.status !== 'cancelled')
+    if (active) {
+      navigate(`/sales/proforma-invoices/${active.id}`)
+      return
+    }
+    if (so.status === 'open') {
+      setToast('Confirm the sales order before creating a proforma invoice.')
+      return
+    }
+    if (so.status === 'closed') {
+      setToast('Cannot create proforma for a closed sales order.')
+      return
+    }
+    navigate(buildProformaNewUrl(so.id))
   }
 
   function handleConvertSalesOrder(so: SalesOrder) {
@@ -1262,6 +1241,7 @@ export function SalesOrderListPage({ crmMode = false }: { crmMode?: boolean } = 
           onBulkExport={exportSelectedSalesOrders}
           onDelete={handleDeleteSalesOrder}
           onPrint={handlePrintSalesOrder}
+          onCreateProforma={handleCreateProforma}
           onConvert={handleConvertSalesOrder}
           onDuplicate={handleDuplicateSalesOrder}
         />

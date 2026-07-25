@@ -4,6 +4,8 @@ import { type ColumnDef } from '@tanstack/react-table'
 import {
   Activity,
   ArrowLeft,
+  ArrowLeftRight,
+  Banknote,
   BarChart3,
   Calendar,
   Clock,
@@ -12,6 +14,7 @@ import {
   LayoutDashboard,
   Pencil,
   Plus,
+  Receipt,
   ShieldCheck,
   ShoppingCart,
   Target,
@@ -63,7 +66,6 @@ import { useWorkOrderStore } from '../../store/workOrderStore'
 import { CrmCardFormShell, ENTERPRISE_FORM_DETAIL_CLASS } from '@/components/crm/CrmCardFormShell'
 import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
 import {
-  EnterpriseFormMetrics,
   EnterpriseFormSectionNav,
 } from '../../design-system/workspace'
 import { ErpCardSection } from '../../components/erp/card-form'
@@ -80,8 +82,33 @@ import type { SalesOrder } from '../../types/mrp'
 import type { WorkOrder } from '../../types/workorder'
 import type { DispatchPlan } from '../../types/dispatch'
 import type { SalesInvoice } from '../../types/invoice'
+import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
+import { useCrmCommercialStore } from '../../store/crmCommercialStore'
+import {
+  CRM_TAX_INVOICE_STATUS_LABELS,
+  CRM_PAYMENT_MODE_LABELS,
+  PROFORMA_PAYMENT_STATUS_LABELS,
+} from '../../types/crmCommercial'
+import { PROFORMA_STATUS_LABELS } from '../../types/proformaInvoice'
 
-type Tab = 'overview' | 'pipeline' | 'crm' | 'sales' | 'production' | 'dispatch' | 'financial' | 'quality' | 'documents' | 'timeline'
+type Tab =
+  | 'overview'
+  | 'pipeline'
+  | 'crm'
+  | 'sales'
+  | 'quotations'
+  | 'proformas'
+  | 'invoices'
+  | 'receipts'
+  | 'allocations'
+  | 'outstanding'
+  | 'ledger'
+  | 'production'
+  | 'dispatch'
+  | 'financial'
+  | 'quality'
+  | 'documents'
+  | 'timeline'
 
 export function Customer360Page() {
   const { id } = useParams()
@@ -156,6 +183,76 @@ export function Customer360Page() {
     return crmQuotationDocs.filter((d) => quoIds.has(d.quotationId))
   }, [crmQuotationDocs, data])
 
+  const allProformas = useProformaInvoiceStore((s) => s.proformaInvoices)
+  const customerProformas = useMemo(
+    () => (id ? allProformas.filter((p) => p.customerId === id) : []),
+    [allProformas, id],
+  )
+  const allCommercialInvoices = useCrmCommercialStore((s) => s.invoices)
+  const allCommercialReceipts = useCrmCommercialStore((s) => s.receipts)
+  const allCommercialAllocations = useCrmCommercialStore((s) => s.allocations)
+  const allCommercialTimeline = useCrmCommercialStore((s) => s.timeline)
+  const commercialInvoices = useMemo(
+    () => (id ? allCommercialInvoices.filter((i) => i.customerId === id) : []),
+    [allCommercialInvoices, id],
+  )
+  const commercialReceipts = useMemo(
+    () => (id ? allCommercialReceipts.filter((r) => r.customerId === id) : []),
+    [allCommercialReceipts, id],
+  )
+  const commercialAllocations = useMemo(
+    () => (id ? allCommercialAllocations.filter((a) => a.customerId === id) : []),
+    [allCommercialAllocations, id],
+  )
+  const commercialOutstanding = useMemo(() => {
+    const invs = commercialInvoices.filter((i) => i.status !== 'draft' && i.status !== 'cancelled')
+    return {
+      invoiceTotal: invs.reduce((s, i) => s + i.gst.grandTotal, 0),
+      amountPaid: invs.reduce((s, i) => s + i.amountPaid, 0),
+      outstanding: invs.reduce((s, i) => s + i.balanceDue, 0),
+      openInvoiceCount: invs.filter((i) => i.balanceDue > 0.009).length,
+    }
+  }, [commercialInvoices])
+  const commercialLedger = useMemo(() => {
+    if (!id) return []
+    type Row = { id: string; date: string; type: string; reference: string; debit: number; credit: number }
+    const rows: Row[] = []
+    for (const inv of commercialInvoices.filter((i) => i.status !== 'draft' && i.status !== 'cancelled')) {
+      rows.push({
+        id: inv.id,
+        date: inv.invoiceDate,
+        type: 'Tax Invoice',
+        reference: inv.invoiceNo,
+        debit: inv.gst.grandTotal,
+        credit: 0,
+      })
+    }
+    for (const r of commercialReceipts) {
+      rows.push({
+        id: r.id,
+        date: r.receiptDate,
+        type: r.proformaNo ? 'PI Receipt' : 'Payment Receipt',
+        reference: r.receiptNo,
+        debit: 0,
+        credit: r.amount,
+      })
+    }
+    rows.sort((a, b) => a.date.localeCompare(b.date) || a.reference.localeCompare(b.reference))
+    let balance = 0
+    return rows.map((row) => {
+      balance += row.debit - row.credit
+      return { ...row, balance }
+    })
+  }, [id, commercialInvoices, commercialReceipts])
+  const commercialTimeline = useMemo(
+    () =>
+      id
+        ? [...allCommercialTimeline.filter((t) => t.customerId === id)].sort((a, b) => b.at.localeCompare(a.at))
+        : [],
+    [allCommercialTimeline, id],
+  )
+  const getProformaPaymentSummary = useCrmCommercialStore((s) => s.getProformaPaymentSummary)
+
   const crmQuotationPath = (quotationId: string | null | undefined) => {
     if (!quotationId) return null
     const doc = crmQuotationDocs.find((d) => d.quotationId === quotationId)
@@ -188,7 +285,14 @@ export function Customer360Page() {
       { id: 'overview', label: 'Overview', icon: LayoutDashboard },
       { id: 'crm', label: 'CRM', icon: Activity },
       { id: 'pipeline', label: 'Pipeline', icon: Target },
+      { id: 'quotations', label: 'Quotations', icon: FileText },
       { id: 'sales', label: 'Sales Orders', icon: ShoppingCart },
+      { id: 'proformas', label: 'Proforma Invoices', icon: Receipt },
+      { id: 'invoices', label: 'Invoices', icon: Banknote },
+      { id: 'receipts', label: 'Payment Receipts', icon: Wallet },
+      { id: 'allocations', label: 'Payment Allocations', icon: ArrowLeftRight },
+      { id: 'outstanding', label: 'Outstanding Summary', icon: BarChart3 },
+      { id: 'ledger', label: 'Customer Ledger', icon: FileText },
       { id: 'production', label: 'Production', icon: Factory },
       { id: 'dispatch', label: 'Dispatch', icon: Truck },
       { id: 'financial', label: 'Finance', icon: Wallet },
@@ -341,49 +445,6 @@ export function Customer360Page() {
           { label: customer.customerName },
         ]
 
-  const metrics = [
-    {
-      label: 'Open Orders',
-      value: String(data.openSo.length),
-      accent: 'blue' as const,
-      hint: 'Active sales orders',
-    },
-    {
-      label: 'Order Value',
-      value: formatCurrency(financeOrdered),
-      accent: 'green' as const,
-      hint: 'Lifetime booked',
-    },
-    {
-      label: 'Outstanding AR',
-      value: financeMoneyVisible ? formatCurrency(financeOutstanding) : '—',
-      accent: financeOutstanding > 0 ? ('amber' as const) : ('green' as const),
-      hint: financeMoneyVisible
-        ? financeOutstanding > 0
-          ? 'Receivables due'
-          : 'Fully collected'
-        : 'Requires finance AR view',
-    },
-    {
-      label: 'Dispatch Pending',
-      value: String(data.pendingDispatch.length),
-      accent: 'blue' as const,
-      hint: 'Awaiting delivery',
-    },
-    {
-      label: 'Active WO',
-      value: String(data.activeWo.length),
-      accent: 'violet' as const,
-      hint: 'In production',
-    },
-    {
-      label: 'Open Pipeline',
-      value: formatCrmCurrency(crmSummary?.pipelineValue ?? 0),
-      accent: 'blue' as const,
-      hint: `${crmSummary?.openOpportunities ?? 0} opportunities`,
-    },
-  ]
-
   const heroStats = [
     {
       label: 'Open SO',
@@ -439,6 +500,14 @@ export function Customer360Page() {
           icon: Calendar,
           onClick: () => setFollowUpOpen(true),
         },
+        ...(canCrmPermission('crm.commercial.invoice.create')
+          ? [{
+              id: 'create-invoice',
+              label: 'Create Invoice',
+              icon: Banknote,
+              onClick: () => navigate(`/crm/commercial/invoices/new?customerId=${customer.id}`),
+            }]
+          : []),
       ]}
       moreActions={[
         {
@@ -451,7 +520,7 @@ export function Customer360Page() {
           id: 'quotation',
           label: 'Quotations',
           icon: FileText,
-          onClick: () => navigate('/crm/quotations'),
+          onClick: () => setTab('quotations'),
         },
         {
           id: 'so',
@@ -466,10 +535,16 @@ export function Customer360Page() {
           onClick: () => setTab('dispatch'),
         },
         {
+          id: 'alloc',
+          label: 'Payment Allocation',
+          icon: ArrowLeftRight,
+          onClick: () => navigate(`/crm/commercial/payment-allocation?customerId=${customer.id}`),
+        },
+        {
           id: 'finance',
-          label: 'Finance',
+          label: 'Outstanding',
           icon: BarChart3,
-          onClick: () => setTab('financial'),
+          onClick: () => setTab('outstanding'),
         },
       ]}
     />
@@ -584,8 +659,6 @@ export function Customer360Page() {
             activeId={tab}
             onSelect={(t) => setTab(t as Tab)}
           />
-
-          <EnterpriseFormMetrics metrics={metrics} />
 
           <div className="customer-360-tab-panel">
             <div className="customer-360-tab-body">
@@ -949,6 +1022,302 @@ export function Customer360Page() {
             <DataGrid data={data.closedSo} columns={soColumns} compact emptyMessage="No closed sales orders." />
           </Entity360Panel>
         </div>
+      )}
+
+      {tab === 'quotations' && (
+        <Entity360Panel title="Quotations">
+          <DataGrid
+            data={data.customerQuotations}
+            columns={[
+              {
+                accessorKey: 'quotationNo',
+                header: 'Quote',
+                cell: ({ row }) => {
+                  const path = crmQuotationPath(row.original.id)
+                  return path ? <TableLink to={path}>{row.original.quotationNo}</TableLink> : row.original.quotationNo
+                },
+              },
+              { accessorKey: 'status', header: 'Status', cell: ({ row }) => <StatusBadge status={row.original.status} /> },
+              { accessorKey: 'validityDate', header: 'Valid Until', cell: ({ row }) => formatDate(row.original.validityDate) },
+              {
+                id: 'value',
+                header: 'Value',
+                cell: ({ row }) => formatCurrency(row.original.pricing?.grandTotal ?? 0),
+              },
+            ]}
+            compact
+            emptyMessage="No quotations for this customer."
+          />
+        </Entity360Panel>
+      )}
+
+      {tab === 'proformas' && (
+        <Entity360Panel title="Proforma Invoices">
+          <DataGrid
+            data={customerProformas}
+            columns={[
+              {
+                accessorKey: 'proformaNo',
+                header: 'Proforma',
+                cell: ({ row }) => (
+                  <TableLink to={`/sales/proforma-invoices/${row.original.id}`}>{row.original.proformaNo}</TableLink>
+                ),
+              },
+              {
+                accessorKey: 'status',
+                header: 'Status',
+                cell: ({ row }) => PROFORMA_STATUS_LABELS[row.original.status],
+              },
+              {
+                id: 'payment',
+                header: 'Payment',
+                cell: ({ row }) => {
+                  const summary = getProformaPaymentSummary(row.original.id)
+                  return summary ? PROFORMA_PAYMENT_STATUS_LABELS[summary.paymentStatus] : '—'
+                },
+              },
+              {
+                id: 'total',
+                header: 'Amount',
+                cell: ({ row }) => formatCurrency(row.original.gst.grandTotal),
+              },
+              {
+                accessorKey: 'proformaDate',
+                header: 'Date',
+                cell: ({ row }) => formatDate(row.original.proformaDate),
+              },
+            ]}
+            compact
+            emptyMessage="No proforma invoices for this customer."
+          />
+        </Entity360Panel>
+      )}
+
+      {tab === 'invoices' && (
+        <Entity360Panel title="Tax Invoices">
+          {canCrmPermission('crm.commercial.invoice.create') ? (
+            <div className="mb-3">
+              <ErpButton
+                variant="secondary"
+                icon={Plus}
+                onClick={() => navigate(`/crm/commercial/invoices/new?customerId=${customer.id}`)}
+              >
+                Create Invoice
+              </ErpButton>
+            </div>
+          ) : null}
+          <DataGrid
+            data={commercialInvoices}
+            columns={[
+              {
+                accessorKey: 'invoiceNo',
+                header: 'Invoice',
+                cell: ({ row }) => (
+                  <TableLink to={`/crm/commercial/invoices/${row.original.id}`}>{row.original.invoiceNo}</TableLink>
+                ),
+              },
+              {
+                accessorKey: 'status',
+                header: 'Status',
+                cell: ({ row }) => CRM_TAX_INVOICE_STATUS_LABELS[row.original.status],
+              },
+              {
+                id: 'total',
+                header: 'Amount',
+                cell: ({ row }) => formatCurrency(row.original.gst.grandTotal),
+              },
+              {
+                id: 'balance',
+                header: 'Balance',
+                cell: ({ row }) => formatCurrency(row.original.balanceDue),
+              },
+              {
+                accessorKey: 'invoiceDate',
+                header: 'Date',
+                cell: ({ row }) => formatDate(row.original.invoiceDate),
+              },
+            ]}
+            compact
+            emptyMessage="No CRM tax invoices yet."
+          />
+        </Entity360Panel>
+      )}
+
+      {tab === 'receipts' && (
+        <Entity360Panel title="Payment Receipts">
+          <DataGrid
+            data={commercialReceipts}
+            columns={[
+              {
+                accessorKey: 'receiptNo',
+                header: 'Receipt',
+                cell: ({ row }) => (
+                  <TableLink to={`/crm/commercial/receipts/${row.original.id}`}>{row.original.receiptNo}</TableLink>
+                ),
+              },
+              {
+                accessorKey: 'paymentMode',
+                header: 'Mode',
+                cell: ({ row }) => CRM_PAYMENT_MODE_LABELS[row.original.paymentMode],
+              },
+              {
+                id: 'amount',
+                header: 'Amount',
+                cell: ({ row }) => formatCurrency(row.original.amount),
+              },
+              {
+                id: 'unalloc',
+                header: 'Unallocated',
+                cell: ({ row }) => formatCurrency(row.original.unallocatedAmount),
+              },
+              {
+                id: 'pi',
+                header: 'Proforma',
+                cell: ({ row }) =>
+                  row.original.proformaInvoiceId ? (
+                    <TableLink to={`/sales/proforma-invoices/${row.original.proformaInvoiceId}`}>
+                      {row.original.proformaNo}
+                    </TableLink>
+                  ) : (
+                    '—'
+                  ),
+              },
+              {
+                accessorKey: 'receiptDate',
+                header: 'Date',
+                cell: ({ row }) => formatDate(row.original.receiptDate),
+              },
+            ]}
+            compact
+            emptyMessage="No payment receipts recorded."
+          />
+        </Entity360Panel>
+      )}
+
+      {tab === 'allocations' && (
+        <Entity360Panel title="Payment Allocations">
+          <div className="mb-3">
+            <ErpButton
+              variant="secondary"
+              icon={ArrowLeftRight}
+              onClick={() => navigate(`/crm/commercial/payment-allocation?customerId=${customer.id}`)}
+            >
+              Open Allocation Workspace
+            </ErpButton>
+          </div>
+          <DataGrid
+            data={commercialAllocations}
+            columns={[
+              {
+                accessorKey: 'allocationDate',
+                header: 'Date',
+                cell: ({ row }) => formatDate(row.original.allocationDate),
+              },
+              { accessorKey: 'receiptNo', header: 'Receipt' },
+              { accessorKey: 'invoiceNo', header: 'Invoice' },
+              {
+                id: 'amount',
+                header: 'Allocated',
+                cell: ({ row }) => formatCurrency(row.original.amount),
+              },
+              {
+                id: 'status',
+                header: 'Status',
+                cell: ({ row }) => (row.original.reversedAt ? 'Reversed' : 'Posted'),
+              },
+            ]}
+            compact
+            emptyMessage="No payment allocations yet."
+          />
+        </Entity360Panel>
+      )}
+
+      {tab === 'outstanding' && (
+        <Entity360Panel title="Outstanding Summary">
+          <DynamicsKpiRow columns={4}>
+            <DynamicsKpiTile label="Invoice Total" value={formatCurrency(commercialOutstanding.invoiceTotal)} tone="primary" />
+            <DynamicsKpiTile label="Amount Paid" value={formatCurrency(commercialOutstanding.amountPaid)} tone="success" />
+            <DynamicsKpiTile label="Outstanding" value={formatCurrency(commercialOutstanding.outstanding)} tone="warning" />
+            <DynamicsKpiTile label="Open Invoices" value={commercialOutstanding.openInvoiceCount} tone="primary" />
+          </DynamicsKpiRow>
+          <DataGrid
+            data={commercialInvoices.filter((i) => i.status !== 'draft' && i.status !== 'cancelled' && i.balanceDue > 0)}
+            columns={[
+              {
+                accessorKey: 'invoiceNo',
+                header: 'Invoice',
+                cell: ({ row }) => (
+                  <TableLink to={`/crm/commercial/invoices/${row.original.id}`}>{row.original.invoiceNo}</TableLink>
+                ),
+              },
+              {
+                id: 'total',
+                header: 'Invoice Amount',
+                cell: ({ row }) => formatCurrency(row.original.gst.grandTotal),
+              },
+              {
+                id: 'paid',
+                header: 'Allocated',
+                cell: ({ row }) => formatCurrency(row.original.amountPaid),
+              },
+              {
+                id: 'balance',
+                header: 'Balance Outstanding',
+                cell: ({ row }) => formatCurrency(row.original.balanceDue),
+              },
+            ]}
+            compact
+            emptyMessage="No outstanding invoices."
+          />
+        </Entity360Panel>
+      )}
+
+      {tab === 'ledger' && (
+        <Entity360Panel title="Customer Ledger">
+          <DataGrid
+            data={commercialLedger}
+            columns={[
+              {
+                accessorKey: 'date',
+                header: 'Date',
+                cell: ({ row }) => formatDate(row.original.date),
+              },
+              { accessorKey: 'type', header: 'Type' },
+              { accessorKey: 'reference', header: 'Reference' },
+              {
+                id: 'debit',
+                header: 'Debit',
+                cell: ({ row }) => (row.original.debit ? formatCurrency(row.original.debit) : '—'),
+              },
+              {
+                id: 'credit',
+                header: 'Credit',
+                cell: ({ row }) => (row.original.credit ? formatCurrency(row.original.credit) : '—'),
+              },
+              {
+                id: 'balance',
+                header: 'Balance',
+                cell: ({ row }) => formatCurrency(row.original.balance),
+              },
+            ]}
+            compact
+            emptyMessage="Ledger is empty — invoices and receipts will appear here."
+          />
+          {commercialTimeline.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-erp-muted">Commercial timeline</p>
+              {commercialTimeline.slice(0, 12).map((ev) => (
+                <div key={ev.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-erp-border px-3 py-2 text-[13px]">
+                  <div>
+                    {ev.refPath ? <TableLink to={ev.refPath}>{ev.title}</TableLink> : ev.title}
+                    <div className="text-[12px] text-erp-muted">{ev.subtitle}</div>
+                  </div>
+                  <span>{ev.amount != null ? formatCurrency(ev.amount) : formatDate(ev.at.slice(0, 10))}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </Entity360Panel>
       )}
 
       {tab === 'production' && (
