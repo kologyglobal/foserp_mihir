@@ -38,6 +38,34 @@ export function formatApiError(err: unknown): string {
   return err instanceof Error ? err.message : 'Request failed'
 }
 
+/** True for HTTP 403 / PERMISSION_DENIED API failures (and matching message text). */
+export function isPermissionDeniedError(err: unknown): boolean {
+  if (err instanceof ApiError) {
+    return err.statusCode === 403 || err.code === 'PERMISSION_DENIED'
+  }
+  if (typeof err === 'string') {
+    return /permission_denied|missing permission/i.test(err)
+  }
+  if (err instanceof Error) {
+    return /permission_denied|missing permission/i.test(err.message)
+  }
+  return false
+}
+
+/** Extract `tenant.view` from messages like `Missing permission: tenant.view`. */
+export function parseMissingPermissionKey(err: unknown): string | null {
+  const message =
+    err instanceof ApiError
+      ? err.message
+      : typeof err === 'string'
+        ? err
+        : err instanceof Error
+          ? err.message
+          : ''
+  const match = message.match(/Missing permission:\s*([a-z0-9_.]+)/i)
+  return match?.[1] ?? null
+}
+
 /** Map API stage-gate payload into completeness missing rows. */
 export function stageMissingFieldsFromApiError(
   err: unknown,
