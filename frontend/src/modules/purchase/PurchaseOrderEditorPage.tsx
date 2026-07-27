@@ -115,6 +115,7 @@ import { purchaseUserMessage } from '@/utils/purchase/purchaseErrorMessages'
 import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 import { useOptionalAuth } from '@/context/AuthProvider'
 import { isApiMode } from '@/config/apiConfig'
+import { useMasterStore } from '@/store/masterStore'
 
 type LocationOption = { id: string; code: string; name: string; state: string; city: string }
 const EMPTY_LOCATION: LocationOption = { id: '', code: '', name: '', state: '', city: '' }
@@ -166,6 +167,10 @@ function emptyLine(partial?: Partial<PurchaseOrderLine>): PoEditorLine {
     hsnCode: '',
     sacCode: null,
     quantity: 1,
+    uomQuantity: 1,
+    uomConversionFactor: 1,
+    uomId: null,
+    unitCostPrimary: 0,
     rate: 0,
     discountPct: 0,
     discountAmount: 0,
@@ -199,9 +204,14 @@ function emptyLine(partial?: Partial<PurchaseOrderLine>): PoEditorLine {
 }
 
 function computeLine(line: PoEditorLine, isInterstate: boolean): PoEditorLine {
-  const qty = Number(line.quantity) || 0
+  const factor = Number(line.uomConversionFactor) > 0 ? Number(line.uomConversionFactor) : 1
+  const uomQuantity = Number(
+    line.uomQuantity !== undefined && line.uomQuantity !== null ? line.uomQuantity : line.quantity,
+  ) || 0
+  const primaryQty = Number((uomQuantity / factor).toFixed(4))
   const rate = Number(line.rate) || 0
-  const basic = Number((qty * rate).toFixed(2))
+  const unitCostPrimary = Number((rate * factor).toFixed(4))
+  const basic = Number((uomQuantity * rate).toFixed(2))
   const discountAmount =
     line.discountPct > 0
       ? Number(((basic * (Number(line.discountPct) || 0)) / 100).toFixed(2))
@@ -212,17 +222,21 @@ function computeLine(line: PoEditorLine, isInterstate: boolean): PoEditorLine {
   const half = Number((taxAmount / 2).toFixed(2))
   const lineTotal = Number((taxableAmount + taxAmount).toFixed(2))
   const receivedQty = Number(line.receivedQty) || 0
-  const pendingQty = Math.max(0, Number((qty - receivedQty).toFixed(2)))
+  const pendingQty = Math.max(0, Number((primaryQty - receivedQty).toFixed(4)))
   const lineStatus: PurchaseOrderLine['lineStatus'] =
     line.lineStatus === 'cancelled'
       ? 'cancelled'
       : receivedQty <= 0
         ? 'open'
-        : receivedQty >= qty
+        : receivedQty >= primaryQty
           ? 'received'
           : 'partial'
   return {
     ...line,
+    uomQuantity,
+    quantity: primaryQty,
+    uomConversionFactor: factor,
+    unitCostPrimary,
     discountAmount,
     taxableAmount,
     taxAmount,
@@ -726,7 +740,17 @@ export function PurchaseOrderEditorPage() {
   }
 
   const patchLine = (key: string, patch: Partial<PurchaseOrderLine>) => {
-    setLinesDirty(lines.map((l) => (l.key === key ? { ...l, ...patch } : l)))
+    const nextPatch =
+      'uomQuantity' in patch
+        ? patch
+        : 'quantity' in patch
+          ? { ...patch, uomQuantity: Number(patch.quantity) || 0 }
+          : patch
+    setLinesDirty(
+      lines.map((l) =>
+        l.key === key ? computeLine({ ...l, ...nextPatch }, header.isInterstate) : l,
+      ),
+    )
   }
 
   const applyVendor = (vendorId: string) => {
@@ -751,6 +775,15 @@ export function PurchaseOrderEditorPage() {
   const applyItemCatalog = (key: string, itemId: string) => {
     const item = catalogItems.find((i) => i.id === itemId)
     if (!item) return
+    const master = useMasterStore.getState().items.find((i) => i.id === itemId)
+    const factor =
+      master?.purchaseUomId && master.purchaseUomId !== master.baseUomId
+        ? Number(master.uomConversionFactor ?? master.purchaseQtyPerUom ?? 1) || 1
+        : 1
+    const purchaseUomId = master?.purchaseUomId ?? master?.baseUomId ?? null
+    const purchaseUomCode =
+      (purchaseUomId && useMasterStore.getState().uoms.find((u) => u.id === purchaseUomId)?.uomCode) ||
+      item.uom
     patchLine(key, {
       itemId: item.id,
       itemCode: item.itemCode,
@@ -758,7 +791,9 @@ export function PurchaseOrderEditorPage() {
       description: item.itemName,
       category: item.category,
       itemType: (item.category === 'job_work' ? 'job_work' : item.category) as PurchaseOrderLineItemType,
-      uom: item.uom,
+      uom: purchaseUomCode,
+      uomId: purchaseUomId,
+      uomConversionFactor: factor,
       hsnCode: item.hsnCode,
       sacCode: item.sacCode,
       rate: item.standardRate,

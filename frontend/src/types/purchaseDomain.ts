@@ -1780,7 +1780,15 @@ export interface PurchaseOrderLine {
   uom: string
   hsnCode: string
   sacCode: string | null
+  /** Primary / stock UOM quantity. */
   quantity: number
+  /** Vendor / purchase UOM quantity (what user typically enters). */
+  uomQuantity: number
+  /** Vendor units per 1 primary unit (snapshot). */
+  uomConversionFactor: number
+  uomId?: string | null
+  /** Cost per primary unit. */
+  unitCostPrimary?: number
   rate: number
   discountPct: number
   discountAmount: number
@@ -1984,7 +1992,12 @@ export interface GoodsReceiptLine {
   orderedQty: number
   previouslyReceivedQty: number
   pendingQty: number
+  /** Primary / stock received qty. */
   receivedQty: number
+  /** Vendor UOM received qty. */
+  receivedUomQty?: number
+  uomConversionFactor?: number
+  unitCostPrimary?: number
   acceptedQty: number
   rejectedQty: number
   shortQty: number

@@ -1046,8 +1046,13 @@ export function GrnEditorPage() {
                     <Input
                       type="number"
                       className="w-24"
-                      value={l.receivedQty}
-                      onChange={(e) => updateLine(i, { receivedQty: Number(e.target.value) })}
+                      value={l.receivedUomQty ?? l.receivedQty}
+                      onChange={(e) =>
+                        updateLine(i, {
+                          receivedUomQty: Number(e.target.value),
+                          receivedQty: Number(e.target.value),
+                        })
+                      }
                     />
                     {fieldErrors[`line-${i}-qty`] || fieldErrors[`line-${i}-excess`] ? (
                       <p className="mt-1 text-xs text-red-600">

@@ -70,7 +70,8 @@ const schema = z.object({
   baseUomId: z.string().min(1),
   quantityPerUom: z.coerce.number().min(0),
   purchaseUomId: z.string().nullable().optional(),
-  purchaseQtyPerUom: z.coerce.number().min(0),
+  purchaseQtyPerUom: z.coerce.number().positive().default(1),
+  uomConversionFactor: z.coerce.number().positive().optional(),
   hsnId: z.string().nullable().optional(),
   hsnCode: z.string(),
   gstGroupId: z.string().nullable().optional(),
@@ -263,7 +264,8 @@ export function ItemFormPage() {
           isBlocked: existing.isBlocked ?? false,
           qcRequired: existing.qcRequired ?? false,
           quantityPerUom: existing.quantityPerUom ?? 1,
-          purchaseQtyPerUom: existing.purchaseQtyPerUom ?? 1,
+          purchaseQtyPerUom: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
+          uomConversionFactor: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
           salesDescription: existing.salesDescription ?? '',
           salesUomId: existing.salesUomId ?? existing.baseUomId,
           defaultSalesRate: existing.defaultSalesRate ?? 0,
@@ -289,6 +291,7 @@ export function ItemFormPage() {
           qualityTestGroupCode: '',
           quantityPerUom: 1,
           purchaseQtyPerUom: 1,
+          uomConversionFactor: 1,
           reorderLevel: 0,
           reorderQty: 0,
           standardRate: 0,
@@ -487,8 +490,23 @@ export function ItemFormPage() {
           <FormField label="Purchase Unit of Measure">
             <UomMasterSelect value={watch('purchaseUomId') ?? ''} onChange={(v) => setValue('purchaseUomId', v)} />
           </FormField>
-          <FormField label="Purchase Qty per UOM">
-            <Input type="number" step="0.001" {...register('purchaseQtyPerUom')} />
+          <FormField
+            label="UOM Conversion Factor"
+            error={errors.uomConversionFactor?.message ?? errors.purchaseQtyPerUom?.message}
+          >
+            <Input
+              type="number"
+              step="0.001"
+              {...register('uomConversionFactor')}
+              onChange={(e) => {
+                const v = e.target.value
+                setValue('uomConversionFactor', Number(v) as never, { shouldValidate: true })
+                setValue('purchaseQtyPerUom', Number(v) as never, { shouldValidate: true })
+              }}
+            />
+            <p className="mt-1 text-xs text-erp-muted">
+              Vendor units per 1 stock unit (e.g. 3 Meter = 1 NOS). Use 1 when purchase UOM equals base UOM.
+            </p>
           </FormField>
           <FormField label="Material Grade">
             <Input {...register('materialGrade')} />

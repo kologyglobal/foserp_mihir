@@ -1118,8 +1118,11 @@ function mapApiPoOrigin(origin: string, hasPr: boolean): PurchaseOrderOrigin {
 
 function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): PurchaseOrderLine {
   const qty = Number(line.quantity) || 0
+  const uomQuantity = Number((line as { uomQuantity?: number }).uomQuantity ?? qty) || qty
+  const factor = Number((line as { uomConversionFactor?: number }).uomConversionFactor ?? 1) || 1
   const rate = Number(line.rate) || 0
-  const amount = Number(line.amount) || qty * rate
+  const unitCostPrimary = Number((line as { unitCostPrimary?: number }).unitCostPrimary ?? rate * factor) || 0
+  const amount = Number(line.amount) || uomQuantity * rate
   const received = Number(line.receivedQuantity) || 0
   const requiredDate = line.requiredDate ?? new Date().toISOString().slice(0, 10)
   return {
@@ -1136,6 +1139,10 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
     hsnCode: '',
     sacCode: null,
     quantity: qty,
+    uomQuantity,
+    uomConversionFactor: factor,
+    uomId: line.uomId ?? null,
+    unitCostPrimary,
     rate,
     discountPct: 0,
     discountAmount: 0,
@@ -1349,19 +1356,25 @@ export function mapDomainPoInputToApiPayload(
     deliveryWarehouseId: uuidOrNull(input.deliveryLocation?.id ?? null),
     freightAmount: input.freight ?? undefined,
     remarks: input.remarks ?? null,
-    lines: (input.lines ?? []).map((line, index) => ({
-      id: uuidOrNull(line.id ?? null) ?? undefined,
-      lineNumber: line.lineNo ?? index + 1,
-      itemId: uuidOrNull(line.itemId ?? null),
-      itemCode: line.itemCode ?? null,
-      itemName: line.itemName ?? null,
-      description: line.description ?? null,
-      quantity: Number(line.quantity) || 0,
-      rate: Number(line.rate) || 0,
-      requiredDate: line.requiredDate ?? null,
-      remarks: line.remarks ?? null,
-      purchaseRequisitionLineId: uuidOrNull(line.prLineId ?? null),
-    })),
+    lines: (input.lines ?? []).map((line, index) => {
+      const factor = Number(line.uomConversionFactor ?? 1) || 1
+      const uomQuantity = Number(line.uomQuantity ?? line.quantity) || 0
+      return {
+        id: uuidOrNull(line.id ?? null) ?? undefined,
+        lineNumber: line.lineNo ?? index + 1,
+        itemId: uuidOrNull(line.itemId ?? null),
+        itemCode: line.itemCode ?? null,
+        itemName: line.itemName ?? null,
+        description: line.description ?? null,
+        uomQuantity,
+        uomConversionFactor: factor,
+        uomId: uuidOrNull(line.uomId ?? null),
+        rate: Number(line.rate) || 0,
+        requiredDate: line.requiredDate ?? null,
+        remarks: line.remarks ?? null,
+        purchaseRequisitionLineId: uuidOrNull(line.prLineId ?? null),
+      }
+    }),
   }
 }
 
@@ -2108,7 +2121,8 @@ export function mapDomainGrnInputToApiPayload(input: GrnInput): Record<string, u
     remarks: input.remarks ?? null,
     lines: input.lines.map((line) => ({
       purchaseOrderLineId: line.purchaseOrderLineId,
-      receivedQuantity: Number(line.receivedQty) || 0,
+      /** Vendor UOM qty — backend converts to primary receivedQuantity. */
+      receivedUomQuantity: Number(line.receivedUomQty ?? line.receivedQty) || 0,
       damagedQuantity: Number(line.damagedQty) || 0,
       shortQuantity: Number(line.shortQty) || 0,
       excessQuantity: Number(line.excessQty) || 0,

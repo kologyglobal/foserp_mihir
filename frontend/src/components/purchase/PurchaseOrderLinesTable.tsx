@@ -49,7 +49,7 @@ export type PurchaseOrderLinesTableProps = {
 
 function missingMandatory(line: PoLinesEditorLine) {
   const missingItem = !line.itemId && !line.itemCode.trim()
-  const missingQty = !(Number(line.quantity) > 0)
+  const missingQty = !(Number(line.uomQuantity ?? line.quantity) > 0)
   const missingRate = !(Number(line.rate) > 0)
   return { missingItem, missingQty, missingRate, any: missingItem || missingQty || missingRate }
 }
@@ -340,9 +340,20 @@ export function PurchaseOrderLinesTable({
                           qtyErr && 'border-erp-danger-fg',
                         )}
                         disabled={!editable}
-                        value={line.quantity}
-                        onChange={(e) => onPatchLine(line.key, { quantity: Number(e.target.value) })}
+                        title="UOM Quantity (vendor unit)"
+                        value={line.uomQuantity ?? line.quantity}
+                        onChange={(e) =>
+                          onPatchLine(line.key, {
+                            uomQuantity: Number(e.target.value),
+                            quantity: Number(e.target.value),
+                          })
+                        }
                       />
+                      {Number(line.uomConversionFactor ?? 1) !== 1 ? (
+                        <p className="mt-0.5 text-[10px] text-erp-muted">
+                          → {Number(line.quantity).toLocaleString()} stock
+                        </p>
+                      ) : null}
                       {qtyErr ? (
                         <p className="mt-0.5 text-[10px] text-erp-danger-fg">{qtyErr}</p>
                       ) : null}
