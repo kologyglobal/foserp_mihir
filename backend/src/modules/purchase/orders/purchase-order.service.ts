@@ -177,6 +177,43 @@ async function fillItemSnapshots(
   return lines
 }
 
+/**
+ * Default purchase UOM + conversion factor from item master onto line inputs
+ * before normalizeLineInputs (client may omit factor / send base UOM).
+ */
+async function enrichLinesWithItemUom(
+  tenantId: string,
+  lines: CreatePurchaseOrderInput['lines'],
+): Promise<CreatePurchaseOrderInput['lines']> {
+  const itemIds = [...new Set(lines.map((l) => l.itemId).filter((v): v is string => Boolean(v)))]
+  if (!itemIds.length) return lines
+  const items = await prisma.masterItem.findMany({
+    where: { tenantId, id: { in: itemIds }, deletedAt: null },
+    select: {
+      id: true,
+      baseUomId: true,
+      purchaseUomId: true,
+      uomConversionFactor: true,
+      purchaseQtyPerUom: true,
+    },
+  })
+  const byId = new Map(items.map((i) => [i.id, i]))
+  return lines.map((line) => {
+    if (!line.itemId) return line
+    const item = byId.get(line.itemId)
+    if (!item) return line
+    const purchaseUomId = item.purchaseUomId ?? item.baseUomId
+    const sameUom = !item.purchaseUomId || item.purchaseUomId === item.baseUomId
+    const factorRaw = Number(item.uomConversionFactor ?? item.purchaseQtyPerUom ?? 1)
+    const factor = sameUom ? 1 : factorRaw > 0 ? factorRaw : 1
+    return {
+      ...line,
+      uomId: line.uomId ?? purchaseUomId,
+      uomConversionFactor: line.uomConversionFactor ?? factor,
+    }
+  })
+}
+
 function computeTotals(
   lines: Array<{ amount: number }>,
   taxAmount: number,
@@ -229,7 +266,8 @@ export async function createPurchaseOrder(
   input: CreatePurchaseOrderInput,
 ) {
   await assertVendorActive(tenantId, input.vendorId)
-  const lines = await fillItemSnapshots(tenantId, normalizeLineInputs(input.lines))
+  const enrichedLines = await enrichLinesWithItemUom(tenantId, input.lines)
+  const lines = await fillItemSnapshots(tenantId, normalizeLineInputs(enrichedLines))
   await assertLineMastersActive(tenantId, lines)
 
   const sourceWarehouseId = await resolveSourceWarehouseId(tenantId, input.purchaseRequisitionId)
@@ -337,7 +375,8 @@ export async function updatePurchaseOrder(
 
   let lines: ReturnType<typeof normalizeLineInputs> | null = null
   if (input.lines !== undefined) {
-    lines = await fillItemSnapshots(tenantId, normalizeLineInputs(input.lines))
+    const enrichedLines = await enrichLinesWithItemUom(tenantId, input.lines)
+    lines = await fillItemSnapshots(tenantId, normalizeLineInputs(enrichedLines))
     await assertLineMastersActive(tenantId, lines)
     // Preserve PR/Planning references when the client resends existing lines by id.
     const existingById = new Map(existing.lines.map((l) => [l.id, l]))

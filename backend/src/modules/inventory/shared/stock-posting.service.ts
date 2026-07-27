@@ -57,6 +57,10 @@ export interface PostStockMovementInput {
   expiryDate?: Date
   serialId?: string
   serialNumber?: string
+  /** Vendor UOM audit snapshot (optional). */
+  uomQuantity?: DecimalInput
+  uomId?: string
+  uomConversionFactor?: DecimalInput
 }
 
 export interface TransferStockStatusInput {
@@ -608,6 +612,10 @@ export async function postStockMovement(
         rate,
         value,
         balanceAfter,
+        uomQuantity: input.uomQuantity != null ? toDecimal(input.uomQuantity) : null,
+        uomId: input.uomId ?? null,
+        uomConversionFactor:
+          input.uomConversionFactor != null ? toDecimal(input.uomConversionFactor) : null,
         itemId: input.itemId,
         warehouseId: input.warehouseId,
         workOrderId: input.workOrderId ?? null,

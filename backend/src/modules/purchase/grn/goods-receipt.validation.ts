@@ -25,7 +25,10 @@ export const listGoodsReceiptsQuerySchema = paginationSchema.extend({
 export const goodsReceiptLineInputSchema = z.object({
   purchaseOrderLineId: z.string().uuid(),
   challanQuantity: z.coerce.number().min(0).optional(),
-  receivedQuantity: z.coerce.number().positive(),
+  /** Primary qty — computed when receivedUomQuantity provided. */
+  receivedQuantity: z.coerce.number().positive().optional(),
+  /** Vendor UOM received qty (preferred input). */
+  receivedUomQuantity: z.coerce.number().positive().optional(),
   damagedQuantity: z.coerce.number().min(0).optional(),
   shortQuantity: z.coerce.number().min(0).optional(),
   excessQuantity: z.coerce.number().min(0).optional(),
@@ -41,6 +44,14 @@ export const goodsReceiptLineInputSchema = z.object({
   expiryDate: z.string().trim().optional().nullable(),
   qcRequired: z.boolean().optional(),
   remarks: z.string().trim().max(2000).optional().nullable(),
+}).superRefine((line, ctx) => {
+  if (line.receivedUomQuantity == null && line.receivedQuantity == null) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Either receivedUomQuantity or receivedQuantity is required',
+      path: ['receivedUomQuantity'],
+    })
+  }
 })
 
 export const createGoodsReceiptSchema = z.object({

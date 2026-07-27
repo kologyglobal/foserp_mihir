@@ -14,6 +14,13 @@ import {
 } from '../shared/purchase-inventory-posting.js'
 import { tryRecordInventoryAccountingEventsForMovements } from '../../inventory/accounting/inventory-accounting-event.service.js'
 import {
+  lineAmountFromVendor,
+  resolveDualQuantities,
+  toPrimaryUnitCost,
+  toUomQuantity,
+  UomConversionError,
+} from '../shared/uom-conversion.js'
+import {
   nextPurchaseDocumentNumber,
   previewPurchaseDocumentNumber,
 } from '../shared/purchase-document-number.js'
@@ -170,15 +177,41 @@ async function buildLineCreates(
         [{ field: `lines[${i}].purchaseOrderLineId`, message: purchaseMessage(PURCHASE_ERROR_CODE.GRN_LINE_PO_MISMATCH) }],
       )
     }
-    const received = qty(input.receivedQuantity)
+    const factor = (() => {
+      const fromPo = Number(
+        (poLine as { uomConversionFactor?: unknown }).uomConversionFactor ?? 1,
+      )
+      return fromPo > 0 ? fromPo : 1
+    })()
+
+    let receivedUom: number
+    let received: number
+    try {
+      const dual = resolveDualQuantities({
+        uomQuantity: input.receivedUomQuantity,
+        quantity: input.receivedQuantity,
+        uomConversionFactor: factor,
+      })
+      receivedUom = dual.uomQuantity
+      received = dual.quantity
+    } catch (err) {
+      if (err instanceof UomConversionError) {
+        throw new GoodsReceiptValidationError(err.message, PURCHASE_ERROR_CODE.GRN_QTY_INVALID, [
+          { field: `lines[${i}].receivedUomQuantity`, message: err.message },
+        ])
+      }
+      throw err
+    }
+
     if (!(received > 0)) {
       throw new GoodsReceiptValidationError(
         purchaseMessage(PURCHASE_ERROR_CODE.GRN_QTY_INVALID),
         PURCHASE_ERROR_CODE.GRN_QTY_INVALID,
-        [{ field: `lines[${i}].receivedQuantity`, message: purchaseMessage(PURCHASE_ERROR_CODE.GRN_QTY_INVALID) }],
+        [{ field: `lines[${i}].receivedUomQuantity`, message: purchaseMessage(PURCHASE_ERROR_CODE.GRN_QTY_INVALID) }],
       )
     }
     const ordered = qty(poLine.quantity)
+    const orderedUom = qty((poLine as { uomQuantity?: unknown }).uomQuantity) || toUomQuantity(ordered, factor)
     const previously = qty(poLine.receivedQuantity)
     const open = Math.max(0, ordered - previously)
     const excess = Math.max(0, received - open)
@@ -187,7 +220,7 @@ async function buildLineCreates(
       throw new GoodsReceiptValidationError(
         purchaseMessage(PURCHASE_ERROR_CODE.GRN_QTY_EXCEEDS),
         PURCHASE_ERROR_CODE.GRN_QTY_EXCEEDS,
-        [{ field: `lines[${i}].receivedQuantity`, message: purchaseMessage(PURCHASE_ERROR_CODE.GRN_QTY_EXCEEDS) }],
+        [{ field: `lines[${i}].receivedUomQuantity`, message: purchaseMessage(PURCHASE_ERROR_CODE.GRN_QTY_EXCEEDS) }],
       )
     }
 
@@ -197,6 +230,8 @@ async function buildLineCreates(
     const bin = await resolveBin(tenantId, lineWarehouseId, lineStorageId, input.binId)
 
     const rate = qty(poLine.rate)
+    const unitCostPrimary =
+      qty((poLine as { unitCostPrimary?: unknown }).unitCostPrimary) || toPrimaryUnitCost(rate, factor)
     const damaged = qty(input.damagedQuantity)
     const short = qty(input.shortQuantity) || Math.max(0, open - received)
     const excessQty = qty(input.excessQuantity) || excess
@@ -204,6 +239,8 @@ async function buildLineCreates(
     const acceptedForQc = qty(input.acceptedForQcQuantity) || (qcRequired ? Math.max(0, received - damaged) : 0)
     const accepted = qcRequired ? 0 : Math.max(0, received - damaged)
     const rejected = damaged
+    const acceptedUom = toUomQuantity(accepted || acceptedForQc, factor)
+    const rejectedUom = toUomQuantity(rejected, factor)
 
     result.push({
       lineNumber: i + 1,
@@ -214,6 +251,8 @@ async function buildLineCreates(
       description: poLine.description,
       uomId: poLine.uomId,
       uomCodeSnapshot: poLine.uomId ? (uomCode.get(poLine.uomId) ?? '') : '',
+      uomConversionFactor: factor,
+      unitCostPrimary,
       orderedQuantity: ordered,
       previouslyReceivedQuantity: previously,
       openQuantity: open,
@@ -225,8 +264,12 @@ async function buildLineCreates(
       acceptedForQcQuantity: acceptedForQc,
       acceptedQuantity: accepted,
       rejectedQuantity: rejected,
+      orderedUomQuantity: orderedUom,
+      receivedUomQuantity: receivedUom,
+      acceptedUomQuantity: acceptedUom,
+      rejectedUomQuantity: rejectedUom,
       rate,
-      amount: money(received * rate),
+      amount: money(lineAmountFromVendor(rate, receivedUom)),
       warehouseId: lineWarehouseId,
       storageLocationId: lineStorageId,
       binId: bin?.id ?? null,

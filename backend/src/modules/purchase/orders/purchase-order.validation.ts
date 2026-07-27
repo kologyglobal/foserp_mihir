@@ -38,13 +38,28 @@ export const purchaseOrderLineInputSchema = z.object({
   itemCode: z.string().max(64).nullable().optional(),
   itemName: z.string().max(300).nullable().optional(),
   description: z.string().max(2000).nullable().optional(),
-  quantity: z.coerce.number().positive('Quantity must be greater than zero'),
+  /** Primary/stock qty — computed server-side when uomQuantity provided. */
+  quantity: z.coerce.number().positive('Quantity must be greater than zero').optional(),
+  /** Vendor/purchase UOM qty (preferred input). */
+  uomQuantity: z.coerce.number().positive().optional(),
+  /** Vendor units per 1 primary unit (snapshot; defaults from item). */
+  uomConversionFactor: z.coerce.number().positive().optional(),
   uomId: z.string().uuid().nullable().optional(),
+  /** Vendor unit cost. */
   rate: z.coerce.number().min(0).optional().default(0),
+  unitCostPrimary: z.coerce.number().min(0).optional(),
   requiredDate: dateString.nullable().optional(),
   remarks: z.string().max(2000).nullable().optional(),
   purchaseRequisitionLineId: z.string().uuid().nullable().optional(),
   purchasePlanningRowId: z.string().uuid().nullable().optional(),
+}).superRefine((line, ctx) => {
+  if (line.uomQuantity == null && line.quantity == null) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Either uomQuantity or quantity is required',
+      path: ['uomQuantity'],
+    })
+  }
 })
 
 export type PurchaseOrderLineInput = z.infer<typeof purchaseOrderLineInputSchema>
