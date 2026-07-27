@@ -92,6 +92,9 @@ export function mapPurchaseOrderToDto(
         uomConversionFactor: num((line as { uomConversionFactor?: unknown }).uomConversionFactor ?? 1) || 1,
         unitCostPrimary: num((line as { unitCostPrimary?: unknown }).unitCostPrimary ?? line.rate),
         uomId: line.uomId,
+        uomCode:
+          (line as { uom?: { code?: string | null } | null }).uom?.code ??
+          null,
         rate: num(line.rate),
         amount: num(line.amount),
         receivedQuantity: received,

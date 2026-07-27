@@ -424,7 +424,12 @@ export interface ApiPurchaseOrderLine {
   itemName: string
   description: string | null
   quantity: number
+  uomQuantity?: number
+  uomConversionFactor?: number
+  unitCostPrimary?: number
   uomId: string | null
+  /** Vendor/purchase UOM code from MasterUom when relation is loaded. */
+  uomCode?: string | null
   rate: number
   amount: number
   receivedQuantity?: number

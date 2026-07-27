@@ -1,5 +1,5 @@
-import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { MoreHorizontal, PanelRight, Package, Plus, Trash2, type LucideIcon } from 'lucide-react'
+import { useMemo, type KeyboardEvent, type ReactNode } from 'react'
+import { MoreHorizontal, Package, Plus, Trash2, type LucideIcon } from 'lucide-react'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { PurchaseTableToolbar } from '@/components/purchase/purchaseCardFormShared'
 import {
@@ -7,13 +7,21 @@ import {
   type PurchaseItemCodeCatalogOption,
 } from '@/components/purchase/PurchaseItemCodeCell'
 import { PurchaseDocumentLineCards } from '@/components/purchase/PurchaseDocumentLineCards'
-import { PurchaseLineDetailsDrawer, PurchaseLineDrawerSection, PurchaseLineDrawerStat } from '@/components/purchase/PurchaseLineDetailsDrawer'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { CommandBarOverflowMenu } from '@/components/ui/CommandBar'
-import { Input, Textarea } from '@/components/forms/Inputs'
-import { ErpFieldRow } from '@/components/erp/card-form'
 import { MQ_BELOW_LG, useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/utils/cn'
+import { filterPurchaseCatalogByProductType } from '@/utils/purchaseCatalogFilter'
+import {
+  mapEngineeringProductTypeToPurchaseCategory,
+  normalizeEngineeringProductType,
+} from '@/utils/purchaseProductType'
+import { getPurchaseLineUomOptions } from '@/utils/purchaseLineUom'
+import {
+  ENGINEERING_PRODUCT_TYPES,
+  ENGINEERING_PRODUCT_TYPE_LABELS,
+  type EngineeringProductType,
+} from '@/types/taxMaster'
 import type { PurchaseOrderLine } from '@/types/purchaseDomain'
 
 export type PoLinesEditorLine = PurchaseOrderLine & { key: string }
@@ -51,7 +59,20 @@ function missingMandatory(line: PoLinesEditorLine) {
   const missingItem = !line.itemId && !line.itemCode.trim()
   const missingQty = !(Number(line.uomQuantity ?? line.quantity) > 0)
   const missingRate = !(Number(line.rate) > 0)
-  return { missingItem, missingQty, missingRate, any: missingItem || missingQty || missingRate }
+  const started = Boolean(
+    line.productType ||
+      line.itemId ||
+      line.itemCode.trim() ||
+      line.itemName.trim() ||
+      Number(line.rate) > 0 ||
+      Number(line.uomQuantity ?? line.quantity) > 0,
+  )
+  return {
+    missingItem,
+    missingQty,
+    missingRate,
+    any: started && (missingItem || missingQty || missingRate),
+  }
 }
 
 function focusNextCell(e: KeyboardEvent<HTMLElement>, advanceRow = false) {
@@ -105,15 +126,15 @@ function onCellKeyDown(e: KeyboardEvent<HTMLElement>) {
 }
 
 /**
- * PO Item Lines grid — primary visible columns + row-details drawer for secondary fields.
- * Sticky Line/Item columns, sticky header, totals footer, no auto-blank line.
+ * PO Item Lines grid — primary visible columns, sticky Line/Item columns,
+ * sticky header, totals footer. Blank seed rows are ignored until filled.
  */
 export function PurchaseOrderLinesTable({
   lines,
   catalogItems,
-  warehouseOptions,
+  warehouseOptions: _warehouseOptions,
   editable,
-  isInterstate,
+  isInterstate: _isInterstate,
   dirty,
   formatCurrency,
   onAddLine,
@@ -125,8 +146,6 @@ export function PurchaseOrderLinesTable({
   secondaryActions = [],
   toolbarExtra,
 }: PurchaseOrderLinesTableProps) {
-  const [detailsKey, setDetailsKey] = useState<string | null>(null)
-  const detailsLine = lines.find((l) => l.key === detailsKey) ?? null
   const collapseSecondary = useMediaQuery(MQ_BELOW_LG)
 
   const totals = useMemo(() => {
@@ -141,8 +160,67 @@ export function PurchaseOrderLinesTable({
     )
   }, [lines])
 
-  const openDetails = (key: string) => setDetailsKey(key)
-  const closeDetails = () => setDetailsKey(null)
+  const catalogForLine = (
+    productType: EngineeringProductType | '' | null | undefined,
+    selectedItemId?: string,
+  ) => {
+    const filtered = filterPurchaseCatalogByProductType(catalogItems, productType)
+    if (!selectedItemId) return filtered
+    if (filtered.some((i) => i.id === selectedItemId)) return filtered
+    const selected = catalogItems.find((i) => i.id === selectedItemId)
+    return selected ? [selected, ...filtered] : filtered
+  }
+
+  const setRowProductType = (line: PoLinesEditorLine, productType: EngineeringProductType | '') => {
+    const category = mapEngineeringProductTypeToPurchaseCategory(productType)
+    if (!productType) {
+      onPatchLine(line.key, {
+        productType: '',
+        category: 'raw_material',
+        itemId: '',
+        itemCode: '',
+        itemName: '',
+        description: '',
+        uomId: null,
+        uom: 'NOS',
+        hsnCode: '',
+        sacCode: null,
+        rate: 0,
+        quantity: 0,
+        uomQuantity: 0,
+      })
+      return
+    }
+    const matched = line.itemId
+      ? catalogItems.find(
+          (i) =>
+            i.id === line.itemId &&
+            normalizeEngineeringProductType(i.productType) === productType,
+        )
+      : undefined
+    if (matched) {
+      onPatchLine(line.key, {
+        productType,
+        category: category || line.category,
+      })
+      return
+    }
+    onPatchLine(line.key, {
+      productType,
+      category: category || 'raw_material',
+      itemId: '',
+      itemCode: '',
+      itemName: '',
+      description: '',
+      uomId: null,
+      uom: 'NOS',
+      hsnCode: '',
+      sacCode: null,
+      rate: 0,
+      quantity: 0,
+      uomQuantity: 0,
+    })
+  }
 
   const secondaryOverflow = secondaryActions.map((a) => ({
     id: a.id,
@@ -222,7 +300,7 @@ export function PurchaseOrderLinesTable({
               onPatchLine={onPatchLine}
               onRemoveLine={onRemoveLine}
               onSelectCatalogItem={onSelectCatalogItem}
-              onOpenDetails={openDetails}
+              onSetProductType={setRowProductType}
               requireOneLine={false}
             />
           </div>
@@ -233,6 +311,7 @@ export function PurchaseOrderLinesTable({
             <thead>
               <tr>
                 <th className="purchase-doc-lines-grid__sticky-line">#</th>
+                <th className="purchase-doc-lines-grid__sticky-type">Product Type</th>
                 <th className="purchase-doc-lines-grid__sticky-item">Item</th>
                 <th className="min-w-[11rem]">Description</th>
                 <th className="min-w-[9rem]">Specification</th>
@@ -253,24 +332,34 @@ export function PurchaseOrderLinesTable({
                 const qtyErr = showErrors ? lineErrors[`${line.key}:quantity`] : undefined
                 const rateErr = showErrors ? lineErrors[`${line.key}:rate`] : undefined
                 const hasSubmitError = Boolean(itemErr || qtyErr || rateErr)
+                const rowCatalog = catalogForLine(line.productType, line.itemId)
                 return (
                   <tr
                     key={line.key}
                     className={cn(
-                      'cursor-pointer',
                       hasSubmitError
                         ? 'bg-red-50/40'
                         : miss.any && 'bg-amber-50/50',
-                      detailsKey === line.key && 'bg-sky-50/60',
                     )}
-                    onClick={(e) => {
-                      const tag = (e.target as HTMLElement).tagName
-                      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'BUTTON' || tag === 'TEXTAREA') return
-                      if ((e.target as HTMLElement).closest('button, input, select, textarea, a')) return
-                      openDetails(line.key)
-                    }}
                   >
                     <td className="purchase-doc-lines-grid__sticky-line tabular-nums">{line.lineNo}</td>
+                    <td className="purchase-doc-lines-grid__sticky-type" onKeyDown={onCellKeyDown}>
+                      <select
+                        className="erp-input h-8 w-full min-w-0 text-[11px]"
+                        disabled={!editable}
+                        value={line.productType ?? ''}
+                        onChange={(e) =>
+                          setRowProductType(line, e.target.value as EngineeringProductType | '')
+                        }
+                      >
+                        <option value="">— Select —</option>
+                        {ENGINEERING_PRODUCT_TYPES.map((pt) => (
+                          <option key={pt} value={pt}>
+                            {ENGINEERING_PRODUCT_TYPE_LABELS[pt]}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
                     <td
                       id={`purchase-line-${line.key}-item`}
                       className={cn(
@@ -284,9 +373,14 @@ export function PurchaseOrderLinesTable({
                       <PurchaseItemCodeCell
                         itemId={line.itemId}
                         itemCode={line.itemCode}
-                        catalogItems={catalogItems}
+                        catalogItems={rowCatalog}
                         disabled={!editable}
                         textClassName="text-[11px]"
+                        emptyCatalogHint={
+                          line.productType
+                            ? 'No Item Master rows for this product type'
+                            : 'No purchasable items from Item Master'
+                        }
                         onSelectItem={(id) => onSelectCatalogItem(line.key, id)}
                         onClearCatalog={() => onPatchLine(line.key, { itemId: '', itemCode: '' })}
                         onManualCodeChange={(code) => onPatchLine(line.key, { itemCode: code })}
@@ -314,12 +408,54 @@ export function PurchaseOrderLinesTable({
                       />
                     </td>
                     <td onKeyDown={onCellKeyDown}>
-                      <input
-                        className="erp-input h-8 w-16 text-[11px]"
-                        disabled={!editable}
-                        value={line.uom}
-                        onChange={(e) => onPatchLine(line.key, { uom: e.target.value })}
-                      />
+                      {(() => {
+                        const uomOptions = getPurchaseLineUomOptions(line.itemId)
+                        const multi = uomOptions.length > 1
+                        if (!editable || !line.itemId) {
+                          return (
+                            <input
+                              className="erp-input h-8 w-16 text-[11px]"
+                              disabled
+                              readOnly
+                              value={line.uom || '—'}
+                              title="Unit comes from Item Master"
+                            />
+                          )
+                        }
+                        if (multi) {
+                          return (
+                            <select
+                              className="erp-input h-8 w-[4.5rem] text-[11px]"
+                              value={line.uomId || uomOptions[0]?.id || ''}
+                              title="Select purchase unit from Item Master"
+                              onChange={(e) => {
+                                const opt = uomOptions.find((o) => o.id === e.target.value)
+                                if (!opt) return
+                                onPatchLine(line.key, {
+                                  uomId: opt.id,
+                                  uom: opt.code,
+                                  uomConversionFactor: opt.factor,
+                                })
+                              }}
+                            >
+                              {uomOptions.map((o) => (
+                                <option key={o.id} value={o.id}>
+                                  {o.code}
+                                </option>
+                              ))}
+                            </select>
+                          )
+                        }
+                        return (
+                          <input
+                            className="erp-input h-8 w-16 text-[11px]"
+                            disabled
+                            readOnly
+                            value={uomOptions[0]?.code || line.uom || '—'}
+                            title="Unit locked from Item Master"
+                          />
+                        )
+                      })()}
                     </td>
                     <td
                       id={`purchase-line-${line.key}-quantity`}
@@ -345,7 +481,6 @@ export function PurchaseOrderLinesTable({
                         onChange={(e) =>
                           onPatchLine(line.key, {
                             uomQuantity: Number(e.target.value),
-                            quantity: Number(e.target.value),
                           })
                         }
                       />
@@ -411,15 +546,6 @@ export function PurchaseOrderLinesTable({
                       <div className="flex items-center justify-center gap-0.5">
                         <button
                           type="button"
-                          className="rounded p-1 text-erp-muted hover:bg-erp-surface-alt hover:text-erp-text"
-                          onClick={() => openDetails(line.key)}
-                          title="Line details"
-                          aria-label="Line details"
-                        >
-                          <PanelRight className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
                           className="rounded p-1 text-erp-danger-fg hover:bg-red-50 disabled:opacity-40"
                           disabled={!editable}
                           onClick={() => onRemoveLine(line.key)}
@@ -436,9 +562,9 @@ export function PurchaseOrderLinesTable({
             </tbody>
             <tfoot>
               <tr className="purchase-doc-lines-grid__totals bg-erp-surface-alt font-semibold">
-                <td className="purchase-doc-lines-grid__sticky-line" colSpan={2}>
-                  Total
-                </td>
+                <td className="purchase-doc-lines-grid__sticky-line">Total</td>
+                <td className="purchase-doc-lines-grid__sticky-type" />
+                <td className="purchase-doc-lines-grid__sticky-item" />
                 <td colSpan={3} />
                 <td className="num tabular-nums">{totals.qty}</td>
                 <td className="num" colSpan={2} />
@@ -455,135 +581,6 @@ export function PurchaseOrderLinesTable({
         </>
       )}
 
-      <PurchaseLineDetailsDrawer
-        open={Boolean(detailsLine)}
-        onClose={closeDetails}
-        title={
-          detailsLine
-            ? `Line ${detailsLine.lineNo}${detailsLine.itemCode ? ` · ${detailsLine.itemCode}` : ''}`
-            : 'Line details'
-        }
-        subtitle={detailsLine?.itemName || detailsLine?.description || undefined}
-        footer={
-          <ErpButton type="button" size="sm" variant="primary" onClick={closeDetails}>
-            Done
-          </ErpButton>
-        }
-      >
-        {detailsLine ? (
-          <div className="space-y-4">
-            <div className={cn('grid gap-3', isInterstate ? 'grid-cols-1' : 'grid-cols-2')}>
-              {isInterstate ? (
-                <PurchaseLineDrawerStat label="IGST" value={formatCurrency(detailsLine.igst)} />
-              ) : (
-                <>
-                  <PurchaseLineDrawerStat label="CGST" value={formatCurrency(detailsLine.cgst)} />
-                  <PurchaseLineDrawerStat label="SGST" value={formatCurrency(detailsLine.sgst)} />
-                </>
-              )}
-            </div>
-
-            <PurchaseLineDrawerSection
-              title="Delivery"
-              description="Warehouse and schedule for this line."
-            >
-              <ErpFieldRow label="Required delivery date" horizontal={false}>
-                <Input
-                  type="date"
-                  disabled={!editable}
-                  value={detailsLine.requiredDate}
-                  onChange={(e) =>
-                    onPatchLine(detailsLine.key, {
-                      requiredDate: e.target.value,
-                      expectedDeliveryDate: e.target.value,
-                    })
-                  }
-                />
-              </ErpFieldRow>
-              <ErpFieldRow label="Warehouse" horizontal={false}>
-                <select
-                  className="erp-input h-9 w-full text-[13px]"
-                  disabled={!editable}
-                  value={detailsLine.warehouseId}
-                  title={detailsLine.warehouseName || undefined}
-                  onChange={(e) => {
-                    const loc = warehouseOptions.find((l) => l.id === e.target.value)
-                    onPatchLine(detailsLine.key, {
-                      warehouseId: loc?.id ?? e.target.value,
-                      warehouseName: loc?.name ?? '',
-                      locationId: loc?.id ?? e.target.value,
-                      locationName: loc?.name ?? '',
-                    })
-                  }}
-                >
-                  {warehouseOptions.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </select>
-              </ErpFieldRow>
-              <ErpFieldRow label="Delivery schedule" horizontal={false}>
-                <Input
-                  disabled={!editable}
-                  value={detailsLine.deliverySchedule}
-                  onChange={(e) => onPatchLine(detailsLine.key, { deliverySchedule: e.target.value })}
-                  placeholder="e.g. Week 30 / staggered"
-                />
-              </ErpFieldRow>
-            </PurchaseLineDrawerSection>
-
-            <PurchaseLineDrawerSection title="Accounting & tax">
-              <ErpFieldRow label="HSN / SAC" horizontal={false}>
-                <Input
-                  className="font-mono"
-                  disabled={!editable}
-                  value={detailsLine.hsnCode || detailsLine.sacCode || ''}
-                  onChange={(e) => onPatchLine(detailsLine.key, { hsnCode: e.target.value })}
-                />
-              </ErpFieldRow>
-              <ErpFieldRow label="Cost centre" horizontal={false}>
-                <Input
-                  disabled={!editable}
-                  value={detailsLine.costCentre}
-                  onChange={(e) => onPatchLine(detailsLine.key, { costCentre: e.target.value })}
-                />
-              </ErpFieldRow>
-              <ErpFieldRow label="Project" horizontal={false}>
-                <Input
-                  disabled={!editable}
-                  value={detailsLine.project}
-                  onChange={(e) => onPatchLine(detailsLine.key, { project: e.target.value })}
-                />
-              </ErpFieldRow>
-              <ErpFieldRow label="Production order" horizontal={false}>
-                <Input
-                  disabled={!editable}
-                  value={detailsLine.productionOrder}
-                  onChange={(e) => onPatchLine(detailsLine.key, { productionOrder: e.target.value })}
-                />
-              </ErpFieldRow>
-            </PurchaseLineDrawerSection>
-
-            <PurchaseLineDrawerSection title="Notes">
-              <ErpFieldRow label="Remarks" horizontal={false}>
-                <Textarea
-                  disabled={!editable}
-                  value={detailsLine.remarks}
-                  onChange={(e) => onPatchLine(detailsLine.key, { remarks: e.target.value })}
-                  rows={3}
-                  placeholder="Optional line remarks"
-                />
-              </ErpFieldRow>
-              <p className="text-[12px] text-erp-muted">
-                Line-level file uploads are not configured in demo mode. Use document attachments on Terms &amp;
-                Notes.
-              </p>
-            </PurchaseLineDrawerSection>
-          </div>
-        ) : null}
-      </PurchaseLineDetailsDrawer>
-
       <style>{`
         .purchase-doc-lines-grid thead th {
           position: sticky;
@@ -594,7 +591,7 @@ export function PurchaseOrderLinesTable({
         .purchase-doc-lines-grid__sticky-line {
           position: sticky;
           left: 0;
-          z-index: 12;
+          z-index: 13;
           min-width: 2.5rem;
           width: 2.5rem;
           background: #fff;
@@ -605,9 +602,25 @@ export function PurchaseOrderLinesTable({
           z-index: 22;
           background: var(--erp-surface-alt, #f8fafc);
         }
-        .purchase-doc-lines-grid__sticky-item {
+        .purchase-doc-lines-grid__sticky-type {
           position: sticky;
           left: 2.5rem;
+          z-index: 12;
+          width: 9.5rem;
+          min-width: 9.5rem;
+          max-width: 9.5rem;
+          box-sizing: border-box;
+          background: #fff;
+          box-shadow: 2px 0 4px rgb(15 23 42 / 0.04);
+        }
+        .purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-type,
+        .purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-type {
+          z-index: 21;
+          background: var(--erp-surface-alt, #f8fafc);
+        }
+        .purchase-doc-lines-grid__sticky-item {
+          position: sticky;
+          left: 12rem;
           z-index: 11;
           min-width: 10.5rem;
           max-width: 14rem;
@@ -624,8 +637,8 @@ export function PurchaseOrderLinesTable({
           position: sticky;
           right: 0;
           z-index: 12;
-          min-width: 4.5rem;
-          width: 4.5rem;
+          min-width: 2.75rem;
+          width: 2.75rem;
           text-align: center;
           background: #fff;
           box-shadow: -4px 0 8px rgb(15 23 42 / 0.06);
@@ -636,6 +649,7 @@ export function PurchaseOrderLinesTable({
           background: var(--erp-surface-alt, #f8fafc);
         }
         .purchase-doc-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-line,
+        .purchase-doc-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-type,
         .purchase-doc-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-item,
         .purchase-doc-lines-grid tbody tr:hover .purchase-doc-lines-grid__sticky-actions {
           background: #f0f7ff;

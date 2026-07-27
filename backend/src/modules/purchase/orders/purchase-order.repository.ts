@@ -4,7 +4,12 @@ import { tenantActiveFilter } from '../../../shared/index.js'
 import type { ListPurchaseOrdersQuery } from './purchase-order.validation.js'
 
 const includeOrder = {
-  lines: { orderBy: { lineNumber: 'asc' as const } },
+  lines: {
+    orderBy: { lineNumber: 'asc' as const },
+    include: {
+      uom: { select: { id: true, code: true, name: true } },
+    },
+  },
   vendor: {
     select: {
       id: true,

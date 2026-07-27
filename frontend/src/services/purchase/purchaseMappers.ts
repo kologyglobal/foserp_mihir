@@ -2,6 +2,7 @@ import { formatApiError, ApiError } from '../api/apiErrors'
 import { mapPurchaseErrorMessage, isTechnicalPurchaseMessage } from '../../utils/purchase/purchaseErrorMessages'
 import { getStoredSession } from '../api/client'
 import { useMasterStore } from '../../store/masterStore'
+import { resolveUomCode } from '../../utils/purchaseLineUom'
 import type {
   ApiPurchaseOrder,
   ApiPurchasePlanningRow,
@@ -1116,6 +1117,16 @@ function mapApiPoOrigin(origin: string, hasPr: boolean): PurchaseOrderOrigin {
   return 'manual'
 }
 
+function resolveApiUomCode(
+  line: { uomId?: string | null; uomCode?: string | null },
+  fallback = 'NOS',
+): string {
+  const fromApi = (line.uomCode ?? '').trim()
+  if (fromApi) return fromApi
+  const fromStore = resolveUomCode(line.uomId ?? null, '')
+  return fromStore || fallback
+}
+
 function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): PurchaseOrderLine {
   const qty = Number(line.quantity) || 0
   const uomQuantity = Number((line as { uomQuantity?: number }).uomQuantity ?? qty) || qty
@@ -1135,7 +1146,7 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
     description: line.description ?? '',
     specification: '',
     category: 'raw_material',
-    uom: 'NOS',
+    uom: resolveApiUomCode(line),
     hsnCode: '',
     sacCode: null,
     quantity: qty,

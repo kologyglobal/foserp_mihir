@@ -9,6 +9,7 @@
 import { isApiMode } from '../../config/apiConfig'
 import { useMasterStore } from '../../store/masterStore'
 import type { Item as MasterItem, Vendor as MasterVendor } from '../../types/master'
+import { normalizeEngineeringProductType } from '../../utils/purchaseProductType'
 import type {
   PurchaseApprovalDocumentType,
   PurchaseApprovalQueueFilters,
@@ -1866,7 +1867,8 @@ function mapItemTypeToCategory(itemType: MasterItem['itemType']): PurchaseItemCa
 
 /** Prefer engineering productType when present — aligns PR Product Type with Item Master. */
 function mapMasterItemToPurchaseCategory(item: MasterItem): PurchaseItemCategory {
-  switch (item.productType) {
+  const productType = normalizeEngineeringProductType(item.productType)
+  switch (productType) {
     case 'raw_material':
     case 'scrap':
       return 'raw_material'
@@ -1889,7 +1891,14 @@ function mapMasterItemToPurchaseItem(item: MasterItem): PurchaseItem {
     useMasterStore.getState().uoms.find((u) => u.id === item.baseUomId)?.uomCode ??
     useMasterStore.getState().uoms.find((u) => u.id === item.baseUomId)?.uomName ??
     'NOS'
-  const productType = item.productType ?? null
+  const productType =
+    normalizeEngineeringProductType(item.productType) ||
+    (item.itemType === 'finished_good' ? 'finish_product' : null) ||
+    (item.itemType === 'bought_out' ? 'boi' : null) ||
+    (item.itemType === 'raw' ? 'raw_material' : null) ||
+    (item.itemType === 'sub_assembly' ? 'sub_assembly' : null) ||
+    (item.itemType === 'service' ? 'service' : null) ||
+    (item.itemType === 'scrap' ? 'scrap' : null)
   return {
     id: item.id,
     itemCode: item.itemCode,
@@ -1931,10 +1940,12 @@ function mapMasterVendorToPurchaseVendor(v: MasterVendor): Vendor {
     contactPhone: v.contactPhone ?? '',
     contactEmail: v.email ?? '',
     address: v.address ?? '',
+    address2: v.address2 ?? '',
     city: v.city ?? '',
     state: v.state ?? '',
     stateCode: '',
     pincode: v.pincode ?? '',
+    country: v.country ?? '',
     gstin: v.gstin ?? '',
     pan: v.pan ?? '',
     isInterstate: false,
@@ -1954,23 +1965,44 @@ function mapMasterVendorToPurchaseVendor(v: MasterVendor): Vendor {
   }
 }
 
-/** Items for PR/PO pickers — master store in API mode, demo seed otherwise. */
-export async function getPurchaseItems(): Promise<PurchaseItem[]> {
+/** Items for PR/PO pickers — Item Master via API in API mode, demo seed otherwise. */
+export async function getPurchaseItems(options?: {
+  forceRefresh?: boolean
+  /**
+   * When true (default), only items with Allow purchase.
+   * PO editors pass false so Product Type filters include Finish Product / Sub Assembly
+   * rows that exist in Item Master but are marked non-purchasable for manufacturing.
+   */
+  purchasableOnly?: boolean
+}): Promise<PurchaseItem[]> {
   if (!isApiMode()) return demo.getPurchaseItems()
   let items = useMasterStore.getState().items
-  // Always refresh when store is empty OR stale after master edits in another tab/session.
-  // Prefer live store (kept current by masterBatchApiBridge upserts after create/update).
-  if (!items.length) {
+  // Refresh from Item Master API when empty or when the caller asks for a live snapshot.
+  if (!items.length || options?.forceRefresh) {
     try {
-      const { syncBatchMastersFromApi } = await import('../bridges/masterBatchApiBridge')
-      await syncBatchMastersFromApi()
+      const api = await import('../api/masterBatchApi')
+      const rows = await api.fetchItems()
+      useMasterStore.setState({ items: rows.map(api.mapItemDto) })
       items = useMasterStore.getState().items
     } catch {
-      /* keep empty — UI shows no matching items */
+      if (!items.length) {
+        try {
+          const { syncBatchMastersFromApi } = await import('../bridges/masterBatchApiBridge')
+          await syncBatchMastersFromApi()
+          items = useMasterStore.getState().items
+        } catch {
+          /* keep empty — UI shows no matching items */
+        }
+      }
     }
   }
+  const purchasableOnly = options?.purchasableOnly !== false
   return items
-    .filter((i) => i.isActive !== false && i.isBlocked !== true && i.isPurchasable !== false)
+    .filter((i) => {
+      if (i.isActive === false || i.isBlocked === true) return false
+      if (purchasableOnly && i.isPurchasable === false) return false
+      return true
+    })
     .map(mapMasterItemToPurchaseItem)
 }
 

@@ -665,7 +665,14 @@ export function PurchaseOrderDetailPage() {
                         <div className="text-[12px] text-erp-muted">{l.itemName}</div>
                       </td>
                       <td>{l.uom}</td>
-                      <td className="num tabular-nums">{l.quantity}</td>
+                      <td className="num tabular-nums">
+                        <div>{Number(l.uomQuantity ?? l.quantity)}</div>
+                        {Number(l.uomConversionFactor ?? 1) !== 1 ? (
+                          <div className="text-[10px] text-erp-muted">
+                            → {Number(l.quantity).toLocaleString()} stock
+                          </div>
+                        ) : null}
+                      </td>
                       <td className="num tabular-nums">{formatCurrency(l.rate)}</td>
                       <td className="num tabular-nums">{formatCurrency(l.taxableAmount)}</td>
                       <td className="num tabular-nums">{formatCurrency(l.cgst)}</td>

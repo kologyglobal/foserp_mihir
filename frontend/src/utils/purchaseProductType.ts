@@ -1,11 +1,40 @@
-import type { EngineeringProductType } from '../types/taxMaster'
+import {
+  ENGINEERING_PRODUCT_TYPES,
+  type EngineeringProductType,
+} from '../types/taxMaster'
 import type { PurchaseItemCategory } from '../types/purchaseDomain'
+
+/**
+ * Normalize legacy / alternate Item Master productType values to the
+ * engineering enum used by purchase Product Type filters.
+ */
+export function normalizeEngineeringProductType(
+  value: string | null | undefined,
+): EngineeringProductType | '' {
+  if (!value) return ''
+  if ((ENGINEERING_PRODUCT_TYPES as readonly string[]).includes(value)) {
+    return value as EngineeringProductType
+  }
+  switch (value) {
+    case 'bought_out':
+      return 'boi'
+    case 'finished_good':
+    case 'finished_goods':
+    case 'finish_goods':
+      return 'finish_product'
+    case 'semi_finished':
+    case 'semi_finish':
+      return 'sub_assembly'
+    default:
+      return ''
+  }
+}
 
 /** Map Item Master product type → purchase line category (API / domain). */
 export function mapEngineeringProductTypeToPurchaseCategory(
   productType: EngineeringProductType | '' | null | undefined,
 ): PurchaseItemCategory | '' {
-  switch (productType) {
+  switch (normalizeEngineeringProductType(productType) || productType) {
     case 'raw_material':
     case 'scrap':
       return 'raw_material'

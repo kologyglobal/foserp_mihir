@@ -46,7 +46,13 @@ import {
 } from '@/components/erp/card-form'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { FormActionBar } from '@/components/erp/FormActionBar'
-import { Input, Select } from '@/components/forms/Inputs'
+import { Input, Select, Textarea } from '@/components/forms/Inputs'
+import { formatVendorAddress } from '@/utils/vendorAddress'
+import {
+  mapEngineeringProductTypeToPurchaseCategory,
+  mapPurchaseCategoryToEngineeringProductType,
+  normalizeEngineeringProductType,
+} from '@/utils/purchaseProductType'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import {
@@ -163,11 +169,12 @@ function emptyLine(partial?: Partial<PurchaseOrderLine>): PoEditorLine {
     description: '',
     specification: '',
     category: 'raw_material',
+    productType: '',
     uom: 'NOS',
     hsnCode: '',
     sacCode: null,
-    quantity: 1,
-    uomQuantity: 1,
+    quantity: 0,
+    uomQuantity: 0,
     uomConversionFactor: 1,
     uomId: null,
     unitCostPrimary: 0,
@@ -201,6 +208,11 @@ function emptyLine(partial?: Partial<PurchaseOrderLine>): PoEditorLine {
     remarks: '',
     ...partial,
   }
+}
+
+/** Blank seed rows for new POs — ignored by save/validation until the user fills an item. */
+function createBlankPoLines(count = 3): PoEditorLine[] {
+  return Array.from({ length: count }, (_, i) => emptyLine({ lineNo: i + 1 }))
 }
 
 function computeLine(line: PoEditorLine, isInterstate: boolean): PoEditorLine {
@@ -371,7 +383,14 @@ function headerFromPo(po: PurchaseOrder): PoEditorHeader {
     vendorId: po.vendor.id,
     vendorGstin: po.vendor.gstin,
     vendorState: po.vendor.state,
-    vendorAddress: po.vendor.address,
+    vendorAddress: formatVendorAddress({
+      address: po.vendor.address,
+      address2: undefined,
+      city: po.vendor.city ?? '',
+      state: po.vendor.state ?? '',
+      pincode: undefined,
+      country: undefined,
+    }) || po.vendor.address,
     isInterstate: po.vendor.isInterstate,
     placeOfSupply: po.placeOfSupply,
     purchaseLocationId: po.purchaseLocation.id,
@@ -405,7 +424,16 @@ function headerFromPo(po: PurchaseOrder): PoEditorHeader {
 }
 
 function linesFromPo(po: PurchaseOrder): PoEditorLine[] {
-  return po.lines.map((l) => ({ ...l, key: l.id || crypto.randomUUID() }))
+  return po.lines.map((l) => {
+    const productType =
+      l.productType || mapPurchaseCategoryToEngineeringProductType(l.category) || ''
+    return {
+      ...l,
+      key: l.id || crypto.randomUUID(),
+      productType,
+      category: l.category || mapEngineeringProductTypeToPurchaseCategory(productType) || 'raw_material',
+    }
+  })
 }
 
 export function PurchaseOrderEditorPage() {
@@ -439,7 +467,7 @@ export function PurchaseOrderEditorPage() {
   const [updatedMeta, setUpdatedMeta] = useState({ by: '', at: '' })
 
   const [header, setHeader] = useState<PoEditorHeader>(defaultHeader)
-  const [lines, setLines] = useState<PoEditorLine[]>([])
+  const [lines, setLines] = useState<PoEditorLine[]>(() => (isNew ? createBlankPoLines(3) : []))
   const [attachments, setAttachments] = useState<PurchaseDocumentAttachmentRow[]>([])
   const [, setActiveSection] = useState('general')
   const [attemptedMode, setAttemptedMode] = useState<'draft' | 'submit' | null>(null)
@@ -505,10 +533,9 @@ export function PurchaseOrderEditorPage() {
         ...item,
         preferredVendorName:
           vendors.find((v) => v.id === item.preferredVendorId)?.vendorName ?? null,
+        // Rate comes from Item Master standardRate — no fabricated stock/rate proxies.
         lastPurchaseRate: item.standardRate,
-        availableStock: item.isStockable
-          ? Math.max(0, Math.round(item.reorderLevel * 1.4))
-          : null,
+        availableStock: null,
       })),
     [catalogItems, vendors],
   )
@@ -764,7 +791,7 @@ export function PurchaseOrderEditorPage() {
       vendorId: vendor.id,
       vendorGstin: vendor.gstin,
       vendorState: vendor.state,
-      vendorAddress: vendor.address,
+      vendorAddress: formatVendorAddress(vendor),
       placeOfSupply,
       isInterstate: deriveIsInterstate(vendor.state, placeOfSupply, vendor.isInterstate),
       paymentTerms: header.paymentTerms || vendor.paymentTerms,
@@ -773,9 +800,22 @@ export function PurchaseOrderEditorPage() {
   }
 
   const applyItemCatalog = (key: string, itemId: string) => {
+    const line = lines.find((l) => l.key === key)
     const item = catalogItems.find((i) => i.id === itemId)
-    if (!item) return
+    if (!item || !item.isActive) return
+    // Guard: Product Type filter is strict — do not accept cross-type picks.
+    if (
+      line?.productType &&
+      item.productType &&
+      normalizeEngineeringProductType(item.productType) !==
+        normalizeEngineeringProductType(line.productType)
+    ) {
+      return
+    }
     const master = useMasterStore.getState().items.find((i) => i.id === itemId)
+    if (master && (master.isBlocked === true || master.isActive === false)) {
+      return
+    }
     const factor =
       master?.purchaseUomId && master.purchaseUomId !== master.baseUomId
         ? Number(master.uomConversionFactor ?? master.purchaseQtyPerUom ?? 1) || 1
@@ -784,13 +824,25 @@ export function PurchaseOrderEditorPage() {
     const purchaseUomCode =
       (purchaseUomId && useMasterStore.getState().uoms.find((u) => u.id === purchaseUomId)?.uomCode) ||
       item.uom
+    // Prefer Item Master product type; if master has none, keep the filter the user already chose.
+    const productType =
+      normalizeEngineeringProductType(item.productType) ||
+      line?.productType ||
+      mapPurchaseCategoryToEngineeringProductType(item.category) ||
+      ''
+    const category =
+      item.category ||
+      mapEngineeringProductTypeToPurchaseCategory(productType) ||
+      line?.category ||
+      'raw_material'
     patchLine(key, {
       itemId: item.id,
       itemCode: item.itemCode,
       itemName: item.itemName,
       description: item.itemName,
-      category: item.category,
-      itemType: (item.category === 'job_work' ? 'job_work' : item.category) as PurchaseOrderLineItemType,
+      productType,
+      category,
+      itemType: (category === 'job_work' ? 'job_work' : category) as PurchaseOrderLineItemType,
       uom: purchaseUomCode,
       uomId: purchaseUomId,
       uomConversionFactor: factor,
@@ -804,13 +856,14 @@ export function PurchaseOrderEditorPage() {
   useEffect(() => {
     void Promise.all([
       getVendors(),
-      getPurchaseItems(),
+      getPurchaseItems({ forceRefresh: true, purchasableOnly: false }),
       getPurchaseRequisitions(),
       getVendorQuotations(),
       getRFQs(),
       getBlanketOrders(),
       getPurchaseSetup(),
       getPurchaseWarehouses(),
+      import('@/services/bridges/masterApiBridge').then((m) => m.syncCoreMastersFromApi()).catch(() => undefined),
     ]).then(async ([vendorRows, items, prs, vqs, rfqs, blankets, setup, warehouses]) => {
       setVendors(vendorRows.filter((v) => v.isActive))
       setCatalogItems(items)
@@ -955,7 +1008,12 @@ export function PurchaseOrderEditorPage() {
       discount: totals.lineDiscount + (Number(header.tradeDiscount) || 0),
       lines: computedLines
         .filter((l) => l.itemId || l.itemCode.trim() || l.itemName.trim())
-        .map(({ key: _key, ...rest }) => rest),
+        .map(({ key: _key, productType: _productType, ...rest }) => ({
+          ...rest,
+          category: (rest.category ||
+            mapEngineeringProductTypeToPurchaseCategory(_productType) ||
+            'raw_material') as PurchaseItemCategory,
+        })),
     }
   }, [attachmentIds, computedLines, header, totals.lineDiscount, locationOptions, ACTOR])
 
@@ -1531,9 +1589,6 @@ export function PurchaseOrderEditorPage() {
                 ))}
               </Select>
             </ErpFieldRow>
-            <ErpFieldRow label="Vendor Address" readOnly>
-              <Input value={header.vendorAddress || selectedVendor?.address || ''} readOnly className="bg-erp-surface-alt" />
-            </ErpFieldRow>
             <ErpFieldRow label="Vendor GST Number" readOnly>
               <Input value={header.vendorGstin} readOnly className="bg-erp-surface-alt font-mono" />
             </ErpFieldRow>
@@ -1554,6 +1609,21 @@ export function PurchaseOrderEditorPage() {
                 }}
               />
             </ErpFieldRow>
+            <ErpFormSpan span={3}>
+              <ErpFieldRow label="Vendor Address" readOnly>
+                <Textarea
+                  value={
+                    header.vendorAddress ||
+                    formatVendorAddress(selectedVendor) ||
+                    ''
+                  }
+                  readOnly
+                  rows={3}
+                  className="bg-erp-surface-alt resize-none whitespace-pre-wrap"
+                  placeholder="Select a vendor to show the full address"
+                />
+              </ErpFieldRow>
+            </ErpFormSpan>
             <ErpFormSpan span={3}>
               <div className="mt-1 min-h-[4.75rem] rounded-md border border-erp-border bg-erp-surface-alt/60 px-3 py-2.5 text-[12px]">
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
@@ -1842,7 +1912,7 @@ export function PurchaseOrderEditorPage() {
                     label: 'Clear lines',
                     icon: Eraser,
                     disabled: !editable || lines.length === 0,
-                    onClick: () => setLinesDirty([]),
+                    onClick: () => setLinesDirty(createBlankPoLines(3)),
                   },
                 ]}
               />

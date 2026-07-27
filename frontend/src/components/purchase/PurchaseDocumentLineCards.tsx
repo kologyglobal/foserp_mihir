@@ -4,7 +4,15 @@ import {
   PurchaseItemCodeCell,
   type PurchaseItemCodeCatalogOption,
 } from '@/components/purchase/PurchaseItemCodeCell'
+import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
+import { filterPurchaseCatalogByProductType } from '@/utils/purchaseCatalogFilter'
+import { getPurchaseLineUomOptions } from '@/utils/purchaseLineUom'
 import { cn } from '@/utils/cn'
+import {
+  ENGINEERING_PRODUCT_TYPES,
+  ENGINEERING_PRODUCT_TYPE_LABELS,
+  type EngineeringProductType,
+} from '@/types/taxMaster'
 import type { PurchaseOrderLine } from '@/types/purchaseDomain'
 
 export type PurchaseDocumentLineCardRow = PurchaseOrderLine & { key: string }
@@ -17,6 +25,8 @@ export type PurchaseDocumentLineCardsProps = {
   onPatchLine: (key: string, patch: Partial<PurchaseOrderLine>) => void
   onRemoveLine: (key: string) => void
   onSelectCatalogItem: (key: string, itemId: string) => void
+  /** When set, shows Product Type and filters the item picker to Item Master matches only. */
+  onSetProductType?: (line: PurchaseDocumentLineCardRow, productType: EngineeringProductType | '') => void
   onOpenDetails?: (key: string) => void
   /** When true, require at least one line (PO starts with a blank row). */
   requireOneLine?: boolean
@@ -34,6 +44,7 @@ export function PurchaseDocumentLineCards({
   onPatchLine,
   onRemoveLine,
   onSelectCatalogItem,
+  onSetProductType,
   onOpenDetails,
   requireOneLine = true,
 }: PurchaseDocumentLineCardsProps) {
@@ -48,6 +59,12 @@ export function PurchaseDocumentLineCards({
       {lines.map((line) => {
         const open = Boolean(expanded[line.key])
         const title = line.itemName || line.itemCode || `Line ${line.lineNo}`
+        const rowCatalog = (() => {
+          const filtered = filterPurchaseCatalogByProductType(catalogItems, line.productType)
+          if (!line.itemId || filtered.some((i) => i.id === line.itemId)) return filtered
+          const selected = catalogItems.find((i) => i.id === line.itemId)
+          return selected ? [selected, ...filtered] : filtered
+        })()
         return (
           <li
             key={line.key}
@@ -75,7 +92,8 @@ export function PurchaseDocumentLineCards({
                   </p>
                 </div>
                 <p className="mt-0.5 text-[11px] tabular-nums text-erp-muted">
-                  Qty {line.quantity || 0} · Rate {formatCurrency(line.rate)} · Tax {line.gstRatePct}%
+                  Qty {Number(line.uomQuantity ?? line.quantity) || 0} · Rate {formatCurrency(line.rate)} ·
+                  Tax {line.gstRatePct}%
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-0.5">
@@ -105,14 +123,39 @@ export function PurchaseDocumentLineCards({
 
             {open ? (
               <div className="space-y-2 border-t border-erp-border px-3 py-3">
+                {onSetProductType ? (
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] font-medium text-erp-muted">Product Type</span>
+                    <select
+                      className="erp-input h-9 w-full text-[13px]"
+                      disabled={!editable}
+                      value={line.productType ?? ''}
+                      onChange={(e) =>
+                        onSetProductType(line, e.target.value as EngineeringProductType | '')
+                      }
+                    >
+                      <option value="">{SELECT_PLACEHOLDER}</option>
+                      {ENGINEERING_PRODUCT_TYPES.map((pt) => (
+                        <option key={pt} value={pt}>
+                          {ENGINEERING_PRODUCT_TYPE_LABELS[pt]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
                 <label className="block">
                   <span className="mb-1 block text-[11px] font-medium text-erp-muted">Item</span>
                   <PurchaseItemCodeCell
                     itemId={line.itemId}
                     itemCode={line.itemCode}
-                    catalogItems={catalogItems}
+                    catalogItems={rowCatalog}
                     disabled={!editable}
                     textClassName="text-[12px]"
+                    emptyCatalogHint={
+                      line.productType
+                        ? 'No Item Master rows for this product type'
+                        : 'No purchasable items from Item Master'
+                    }
                     onSelectItem={(id) => onSelectCatalogItem(line.key, id)}
                     onClearCatalog={() => onPatchLine(line.key, { itemId: '', itemCode: '' })}
                     onManualCodeChange={(code) => onPatchLine(line.key, { itemCode: code })}
@@ -138,18 +181,53 @@ export function PurchaseDocumentLineCards({
                       step="any"
                       className="erp-input h-9 w-full text-right text-[13px]"
                       disabled={!editable}
-                      value={line.quantity}
-                      onChange={(e) => onPatchLine(line.key, { quantity: Number(e.target.value) })}
+                      value={line.uomQuantity ?? line.quantity}
+                      onChange={(e) =>
+                        onPatchLine(line.key, {
+                          uomQuantity: Number(e.target.value),
+                          quantity: Number(e.target.value),
+                        })
+                      }
                     />
                   </label>
                   <label className="block">
                     <span className="mb-1 block text-[11px] font-medium text-erp-muted">UOM</span>
-                    <input
-                      className="erp-input h-9 w-full text-[13px]"
-                      disabled={!editable}
-                      value={line.uom}
-                      onChange={(e) => onPatchLine(line.key, { uom: e.target.value })}
-                    />
+                    {(() => {
+                      const uomOptions = getPurchaseLineUomOptions(line.itemId)
+                      const multi = uomOptions.length > 1
+                      if (!editable || !line.itemId || !multi) {
+                        return (
+                          <input
+                            className="erp-input h-9 w-full text-[13px]"
+                            disabled
+                            readOnly
+                            value={uomOptions[0]?.code || line.uom || '—'}
+                            title="Unit locked from Item Master"
+                          />
+                        )
+                      }
+                      return (
+                        <select
+                          className="erp-input h-9 w-full text-[13px]"
+                          value={line.uomId || uomOptions[0]?.id || ''}
+                          onChange={(e) => {
+                            const opt = uomOptions.find((o) => o.id === e.target.value)
+                            if (!opt) return
+                            onPatchLine(line.key, {
+                              uomId: opt.id,
+                              uom: opt.code,
+                              uomConversionFactor: opt.factor,
+                            })
+                          }}
+                        >
+                          {uomOptions.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.code}
+                            </option>
+                          ))}
+                        </select>
+                      )
+                    })()}
                   </label>
                   <label className="block">
                     <span className="mb-1 block text-[11px] font-medium text-erp-muted">Rate</span>

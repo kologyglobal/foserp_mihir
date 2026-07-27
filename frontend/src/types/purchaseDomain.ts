@@ -600,10 +600,12 @@ export interface Vendor {
   contactPhone: string
   contactEmail: string
   address: string
+  address2?: string
   city: string
   state: string
   stateCode: string
   pincode: string
+  country?: string
   gstin: string
   pan: string
   /** true = supply from outside company GST state (IGST). */
@@ -1777,6 +1779,8 @@ export interface PurchaseOrderLine {
   description: string
   specification: string
   category: PurchaseItemCategory
+  /** Item Master product type — used to filter the item picker (editor UX). */
+  productType?: EngineeringProductType | '' | null
   uom: string
   hsnCode: string
   sacCode: string | null
