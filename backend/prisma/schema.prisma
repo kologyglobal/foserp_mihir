@@ -2605,7 +2605,10 @@ model MasterItem {
   serialTracked        Boolean            @default(false)
   quantityPerUom       Decimal            @default(1) @db.Decimal(18, 4)
   purchaseUomId        String?
+  /// @deprecated Prefer uomConversionFactor — kept in sync for one release.
   purchaseQtyPerUom    Decimal            @default(1) @db.Decimal(18, 4)
+  /// Vendor units per 1 primary/base unit (e.g. 3 meters = 1 NOS).
+  uomConversionFactor  Decimal            @default(1) @db.Decimal(18, 4)
   /// CRM / Sales commercial description (distinct from engineering itemDescription).
   salesDescription           String?                     @db.Text
   /// Optional sales UOM; falls back to baseUom when null.
@@ -5709,8 +5712,17 @@ model PurchaseOrderLine {
   itemCodeSnapshot          String    @default("") @db.VarChar(64)
   itemNameSnapshot          String    @default("") @db.VarChar(300)
   description               String?   @db.Text
+  /// Primary / stock UOM quantity.
   quantity                  Decimal   @default(0) @db.Decimal(18, 4)
+  /// Vendor / purchase UOM quantity.
+  uomQuantity               Decimal   @default(0) @db.Decimal(18, 4)
+  /// Snapshot: vendor units per 1 primary unit at line create/edit.
+  uomConversionFactor       Decimal   @default(1) @db.Decimal(18, 4)
+  /// Cost per primary unit (rate × uomConversionFactor).
+  unitCostPrimary           Decimal   @default(0) @db.Decimal(18, 4)
+  /// Vendor / purchase UOM.
   uomId                     String?
+  /// Vendor unit cost (per uomId).
   rate                      Decimal   @default(0) @db.Decimal(18, 2)
   amount                    Decimal   @default(0) @db.Decimal(18, 2)
   receivedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
@@ -5823,6 +5835,11 @@ model GoodsReceiptLine {
   description                String?   @db.Text
   uomId                      String?
   uomCodeSnapshot            String    @default("") @db.VarChar(32)
+  /// Snapshot: vendor units per 1 primary unit.
+  uomConversionFactor        Decimal   @default(1) @db.Decimal(18, 4)
+  /// Cost per primary unit used for stock valuation.
+  unitCostPrimary            Decimal   @default(0) @db.Decimal(18, 4)
+  /// Primary/stock quantities below.
   orderedQuantity            Decimal   @default(0) @db.Decimal(18, 4)
   previouslyReceivedQuantity Decimal   @default(0) @db.Decimal(18, 4)
   openQuantity               Decimal   @default(0) @db.Decimal(18, 4)
@@ -5834,6 +5851,12 @@ model GoodsReceiptLine {
   acceptedForQcQuantity      Decimal   @default(0) @db.Decimal(18, 4)
   acceptedQuantity           Decimal   @default(0) @db.Decimal(18, 4)
   rejectedQuantity           Decimal   @default(0) @db.Decimal(18, 4)
+  /// Vendor UOM quantities (entered / invoiced).
+  orderedUomQuantity         Decimal   @default(0) @db.Decimal(18, 4)
+  receivedUomQuantity        Decimal   @default(0) @db.Decimal(18, 4)
+  acceptedUomQuantity        Decimal   @default(0) @db.Decimal(18, 4)
+  rejectedUomQuantity        Decimal   @default(0) @db.Decimal(18, 4)
+  /// Vendor unit cost (per uomId).
   rate                       Decimal   @default(0) @db.Decimal(18, 2)
   amount                     Decimal   @default(0) @db.Decimal(18, 2)
   warehouseId                String?
@@ -11441,11 +11464,15 @@ model InventoryStockMovement {
   movementDate         DateTime               @db.Date
   movementType         InventoryMovementType
   referenceType        InventoryReferenceType
-  /// Signed quantity: inward/opening positive; issue negative; adjustment either sign.
+  /// Signed quantity in primary/stock UOM: inward/opening positive; issue negative; adjustment either sign.
   quantity             Decimal                @db.Decimal(18, 4)
   rate                 Decimal                @default(0) @db.Decimal(18, 2)
   value                Decimal                @default(0) @db.Decimal(18, 2)
   balanceAfter         Decimal                @db.Decimal(18, 4)
+  /// Optional vendor-UOM audit snapshot (not used for balance).
+  uomQuantity          Decimal?               @db.Decimal(18, 4)
+  uomId                String?
+  uomConversionFactor  Decimal?               @db.Decimal(18, 4)
   itemId               String
   warehouseId          String
   /// Soft Production Order reference until Production materials FKs land in Phase 3C.
