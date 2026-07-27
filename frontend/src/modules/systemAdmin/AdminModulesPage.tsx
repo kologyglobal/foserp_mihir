@@ -22,11 +22,15 @@ import {
   setAdminModuleFlagApi,
   type AdminModuleStatus,
 } from '../../services/api/adminApi'
-import { formatApiError } from '../../services/api/apiErrors'
+import { formatApiError, isPermissionDeniedError } from '../../services/api/apiErrors'
 import { notify } from '../../store/toastStore'
 import { useAdminStore } from '../../store/adminStore'
 import { canAdminPermission } from '../../utils/permissions'
 import { useTenantModulesStore } from '../../store/tenantModulesStore'
+import {
+  PermissionDeniedPage,
+  permissionDeniedPropsFromError,
+} from '../../components/system/PermissionDeniedPage'
 
 export function AdminModulesPage() {
   const navigate = useNavigate()
@@ -137,6 +141,27 @@ export function AdminModulesPage() {
   const enabled = rows.filter((r) => r.isEnabled).length
   const adminCount = rows.reduce((n, r) => n + (r.administrators?.length ?? 0), 0)
 
+  if (!canView) {
+    return (
+      <PermissionDeniedPage
+        pageName="Module Access"
+        requiredPermission="module.view"
+        reason="Missing permission: module.view"
+      />
+    )
+  }
+
+  if (error && isPermissionDeniedError(error)) {
+    return (
+      <PermissionDeniedPage
+        {...(permissionDeniedPropsFromError(error, 'Module Access') ?? {
+          pageName: 'Module Access',
+          reason: error,
+        })}
+      />
+    )
+  }
+
   return (
     <AdminWorkspaceShell
       title="Module Access"
@@ -171,9 +196,7 @@ export function AdminModulesPage() {
         />
       }
     >
-      {!canView ? (
-        <AdminEmptyState title="No access" description="You need module.view to manage module enablement." />
-      ) : loading ? (
+      {loading ? (
         <AdminSkeleton rows={5} />
       ) : error ? (
         <AdminErrorState title="Could not load modules" description={error} />

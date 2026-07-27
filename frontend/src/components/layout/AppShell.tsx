@@ -11,10 +11,7 @@ import { RecordDetailPanel } from '../design-system/RecordDetailPanel'
 import { RightDrawer } from '../design-system/RightDrawer'
 import { CrmQuickCreateHost } from '../crm/quick-create/CrmQuickCreateHost'
 import { AppErrorBoundary } from '../system/AppErrorBoundary'
-import {
-  ApiHydrationErrorBanner,
-  ApiHydrationErrorScreen,
-} from '../system/ApiHydrationErrorScreen'
+import { ApiHydrationErrorScreen } from '../system/ApiHydrationErrorScreen'
 import { PermissionDeniedPage } from '../system/PermissionDeniedPage'
 import { ScrollToTop } from '../routing/ScrollToTop'
 import { BackToTopButton } from './BackToTopButton'
@@ -42,7 +39,6 @@ export function AppShell() {
   const { status: masterSyncStatus, error: masterSyncError } = useMasterApiSync()
   const { status: adminSyncStatus, error: adminSyncError } = useAdminApiSync()
   const [continueDespiteSyncError, setContinueDespiteSyncError] = useState(false)
-  const [hideSyncErrorBanner, setHideSyncErrorBanner] = useState(false)
 
   useEffect(() => {
     if (!mobileNavOpen) return
@@ -80,10 +76,7 @@ export function AppShell() {
           <PermissionDeniedPage
             requiredPermission={parseMissingPermissionKey(syncErrorDetail)}
             pageName="this workspace area"
-            onGoHome={() => {
-              setContinueDespiteSyncError(true)
-              setHideSyncErrorBanner(true)
-            }}
+            onGoHome={() => setContinueDespiteSyncError(true)}
           />
         </div>
       )
@@ -92,10 +85,7 @@ export function AppShell() {
       <ApiHydrationErrorScreen
         detail={syncErrorDetail}
         looksLikeOffline={looksLikeOffline}
-        onContinueHome={() => {
-          setContinueDespiteSyncError(true)
-          setHideSyncErrorBanner(false)
-        }}
+        onContinueHome={() => setContinueDespiteSyncError(true)}
       />
     )
   }
@@ -107,14 +97,6 @@ export function AppShell() {
       <PageTracker />
       <KeyboardShortcuts />
       <DynamicsSuiteBar />
-
-      {syncFailed && !hideSyncErrorBanner ? (
-        <ApiHydrationErrorBanner
-          detail={syncErrorDetail}
-          onRetry={() => window.location.reload()}
-          onDismiss={() => setHideSyncErrorBanner(true)}
-        />
-      ) : null}
 
       {mobileNavOpen && (
         <button
