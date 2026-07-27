@@ -195,7 +195,12 @@ html {
 
   /* ── App shell ── */
   .d365-app {
-    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
     background: var(--d365-workspace-bg);
     font-size: var(--d365-font-base);
     font-weight: var(--d365-fw-regular);
@@ -205,13 +210,11 @@ html {
 
   .d365-body {
     display: flex;
-    /* border-box: height must fill viewport so padding-top (suite bar) does not
-       shrink the shell and leave a dead strip above the Windows taskbar */
-    height: 100vh;
-    height: 100dvh;
+    flex: 1 1 auto;
     min-height: 0;
     min-width: 0;
-    padding-top: calc(var(--d365-suite-height) + var(--dyn-live-strip-height));
+    /* Suite bar is in normal flow above this — do not add suite-height padding (was causing a gap above page headers). */
+    padding-top: 0;
     box-sizing: border-box;
     overflow: hidden;
   }
@@ -228,10 +231,8 @@ html {
 
   /* ── Suite bar (full-width navy header) ── */
   .d365-suite-bar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+    position: relative;
+    flex-shrink: 0;
     z-index: 40;
     display: flex;
     align-items: center;
@@ -539,8 +540,9 @@ html {
 
   /* ── Sidebar (Dynamics nav pane) ── */
   .erp-sidebar.d365-nav-pane {
-    top: calc(var(--d365-suite-height) + var(--dyn-live-strip-height));
-    height: calc(100vh - var(--d365-suite-height) - var(--dyn-live-strip-height));
+    top: var(--d365-suite-height);
+    height: calc(100vh - var(--d365-suite-height));
+    height: calc(100dvh - var(--d365-suite-height));
     background: var(--d365-nav-bg);
     border-right: 1px solid var(--d365-border);
     box-shadow: none;
