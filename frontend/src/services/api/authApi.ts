@@ -112,6 +112,7 @@ export async function updateProfile(input: {
   return res
 }
 
+/** Authenticated change-password — revokes all refresh tokens server-side. */
 export async function changePassword(input: {
   currentPassword: string
   newPassword: string

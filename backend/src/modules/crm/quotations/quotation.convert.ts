@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '../../../config/database.js'
 import { ConflictError, InvalidStateError, ValidationError } from '../../../utils/errors.js'
 import { findWonStage } from '../opportunities/opportunity.repository.js'
+import { normalizeSalesLineForWrite } from '../shared/crm-item-resolver.js'
 import { includeRelations } from './quotation.repository.js'
 import { calcDocumentTotal, syncLineTotals } from './quotation.workflow.js'
 import type { ConvertQuotationToSalesOrderInput } from '../sales-orders/sales-order.validation.js'
@@ -28,15 +29,16 @@ function todayDateOnly(): Date {
   return new Date(new Date().toISOString().slice(0, 10))
 }
 
-function buildSoLines(
+async function buildSoLines(
+  tenantId: string,
   priceLines: QuotationPriceLineDto[],
   freightAmount: number,
   installationAmount: number,
   customCharges: number,
-): { lines: SalesOrderLineDto[]; summary: { taxableValue: number; gstAmount: number; grandTotal: number } } {
+): Promise<{ lines: SalesOrderLineDto[]; summary: { taxableValue: number; gstAmount: number; grandTotal: number } }> {
   const synced = syncLineTotals(priceLines.filter((l) => !l.isOptional))
   let lineNo = 0
-  const lines: SalesOrderLineDto[] = synced.map((line) => {
+  const linesRaw: SalesOrderLineDto[] = synced.map((line) => {
     lineNo += 1
     const discountPct = line.discountPct ?? 0
     const taxPct = line.taxPct ?? 0
@@ -48,7 +50,9 @@ function buildSoLines(
       lineNo,
       productOrItem: line.productOrItem,
       description: line.description ?? '',
-      productId: line.productId ?? null,
+      itemId: line.itemId ?? null,
+      itemCodeSnapshot: line.itemCodeSnapshot ?? null,
+      itemNameSnapshot: line.itemNameSnapshot ?? null,
       qty: line.qty,
       uom: line.uom ?? 'NOS',
       unitPrice: line.unitPrice,
@@ -59,6 +63,7 @@ function buildSoLines(
       lineTotal: Math.round(lineTotal * 100) / 100,
     }
   })
+  const lines = await Promise.all(linesRaw.map((line) => normalizeSalesLineForWrite(tenantId, line)))
 
   const taxableValue = lines.reduce((s, l) => s + l.taxableValue, 0)
   const gstAmount = lines.reduce((s, l) => s + l.gstAmount, 0)
@@ -91,24 +96,26 @@ function assertConvertible(quotation: CrmQuotation, doc: CrmQuotationDocument, l
       quotation.salesOrderNo ?? doc.salesOrderNo,
     )
   }
-  // Lifecycle: must be sent to customer and customer-approved before SO conversion.
-  if (doc.status !== 'sent') {
+  // Send / internal approval / customer approval are optional — direct convert is allowed
+  // whenever commercial content is ready (validated separately via lines/terms).
+  if (doc.status === 'superseded') {
+    throw new InvalidStateError('Superseded quotation revisions cannot be converted to a sales order')
+  }
+  if (doc.status === 'rejected') {
     throw new InvalidStateError(
-      `Quotation must be sent to the customer before creating a sales order — current status is ${doc.status}`,
+      'Internally rejected quotations cannot be converted — recall to draft or create a new revision first',
     )
   }
-  if (quotation.customerApproval !== 'approved') {
-    throw new InvalidStateError('Customer must approve the quotation before creating a sales order')
+  if (quotation.customerApproval === 'rejected') {
+    throw new InvalidStateError(
+      'Customer-rejected quotations cannot be converted — create a new revision first',
+    )
   }
   if (latestDoc && latestDoc.id !== doc.id) {
     throw new InvalidStateError('Only the latest quotation revision can be converted to a sales order')
   }
   if (quotation.validityDate && quotation.validityDate < todayDateOnly()) {
     throw new ValidationError('Quotation validity has expired')
-  }
-  const history = Array.isArray(doc.approvalHistory) ? doc.approvalHistory : []
-  if (!history.some((e) => (e as { action?: string }).action === 'approved')) {
-    throw new ValidationError('Quotation internal approval must be completed')
   }
 }
 
@@ -209,7 +216,7 @@ export async function convertQuotationToSalesOrder(
   const installationAmount = Number(doc.installationAmount)
   const customCharges = Number(doc.customCharges)
   // Server-side totals only — never trust FE totals.
-  const { lines, summary } = buildSoLines(activeLines, freightAmount, installationAmount, customCharges)
+  const { lines, summary } = await buildSoLines(tenantId, activeLines, freightAmount, installationAmount, customCharges)
   if (summary.grandTotal <= 0) throw new ValidationError('Grand total must be greater than zero')
 
   const primaryLine = lines[0]
@@ -235,12 +242,17 @@ export async function convertQuotationToSalesOrder(
       const remarks = `${quotation.quotationCode} Rev ${quotation.revisionNo} — CRM doc Rev ${doc.revisionNo}`
       const now = new Date()
 
+      const soItemId = primaryLine.itemId ?? quotation.itemId
+      if (!soItemId) {
+        throw new ValidationError('Quotation lines must have an Item before converting to a sales order')
+      }
+
       const salesOrder = await tx.crmSalesOrder.create({
         data: {
           tenantId,
           salesOrderNo,
           companyId: quotation.companyId,
-          productId: primaryLine.productId ?? quotation.productId,
+          itemId: soItemId,
           qty: totalQty,
           status: 'open',
           source: 'quotation',
@@ -290,6 +302,8 @@ export async function convertQuotationToSalesOrder(
           salesOwnerName: doc.salesOwnerName ?? quotation.salesOwnerName,
           internalRemarks: input.internalRemarks ?? null,
           locationId: input.locationId ?? doc.locationId ?? quotation.locationId,
+          legalEntityId: quotation.legalEntityId,
+          branchId: quotation.branchId,
           lines: lines as unknown as Prisma.InputJsonValue,
           createdBy: userId,
           updatedBy: userId,

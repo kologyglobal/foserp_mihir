@@ -1,6 +1,6 @@
 import { useMasterStore } from '../store/masterStore'
 import { useMrpStore } from '../store/mrpStore'
-import type { Customer, Product } from '../types/master'
+import type { Customer, Item } from '../types/master'
 import type { SalesOrder } from '../types/mrp'
 import type { ProformaInvoiceLine } from '../types/proformaInvoice'
 import { buildProformaLinesFromSalesOrder } from './proformaInvoiceLines'
@@ -34,8 +34,8 @@ export function resolveSalesOrderProformaPrefill(salesOrderId: string): Proforma
 
   const masters = useMasterStore.getState()
   const customer = masters.getCustomer(so.customerId)
-  const products = masters.products as Product[]
-  const lines = buildProformaLinesFromSalesOrder(so, products)
+  const items = masters.items as Item[]
+  const lines = buildProformaLinesFromSalesOrder(so, items)
 
   return {
     salesOrderId: so.id,

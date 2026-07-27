@@ -35,6 +35,22 @@ describe.skipIf(!dbAvailable)('Purchase quality inspection lifecycle (live HTTP)
   const auth = (t = token) => ({ Authorization: `Bearer ${t}` })
 
   async function freshQcPendingGrn() {
+    const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`
+    const item = await prisma.masterItem.create({
+      data: {
+        tenantId,
+        code: `QI${suffix}`.slice(-24),
+        name: 'QI Live Item',
+        categoryId: (
+          await prisma.masterItemCategory.findFirstOrThrow({ where: { tenantId, deletedAt: null } })
+        ).id,
+        baseUomId: masters.uomId,
+        itemType: 'raw_material',
+        isPurchasable: true,
+        isStockable: true,
+        status: 'ACTIVE',
+      },
+    })
     const { poId, poLineId } = await createSentPo(app, {
       slug,
       token,
@@ -43,9 +59,10 @@ describe.skipIf(!dbAvailable)('Purchase quality inspection lifecycle (live HTTP)
       uomId: masters.uomId,
       warehouseId: masters.warehouseId,
       qty: 10,
-      itemCode: `QI-${Date.now()}`,
+      itemId: item.id,
+      itemCode: item.code,
     })
-    return createSubmittedGrn(app, {
+    const grn = await createSubmittedGrn(app, {
       slug,
       token,
       poId,
@@ -57,6 +74,7 @@ describe.skipIf(!dbAvailable)('Purchase quality inspection lifecycle (live HTTP)
       receivedQuantity: 10,
       inspectionRequired: true,
     })
+    return { ...grn, itemId: item.id }
   }
 
   beforeAll(async () => {
@@ -106,8 +124,12 @@ describe.skipIf(!dbAvailable)('Purchase quality inspection lifecycle (live HTTP)
   it('creates a QI from a QC_PENDING GRN', async () => {
     const grn = await freshQcPendingGrn()
     expect(grn.status).toBe('QC_PENDING')
+    const grnLine = await prisma.goodsReceiptLine.findFirstOrThrow({
+      where: { id: grn.grnLineId, tenantId },
+    })
+    expect(grnLine.itemId).toBe(grn.itemId)
     const held = await prisma.inventoryStockBalance.findFirstOrThrow({
-      where: { tenantId, itemId: grn.grn.lines[0].itemId, warehouseId: masters.warehouseId },
+      where: { tenantId, itemId: grn.itemId, warehouseId: masters.warehouseId },
     })
     expect(held.onHandQty.toString()).toBe('10')
     expect(held.qcHoldQty.toString()).toBe('10')
@@ -118,7 +140,7 @@ describe.skipIf(!dbAvailable)('Purchase quality inspection lifecycle (live HTTP)
       .send({ goodsReceiptId: grn.grnId })
     expect(res.status).toBe(201)
     expect(res.body.data.status).toBe('DRAFT')
-    expect(res.body.data.inspectionNumber).toMatch(/^PQI-/)
+    expect(res.body.data.inspectionNumber).toMatch(/^QI-/)
     expect(res.body.data.lines.length).toBeGreaterThan(0)
     const row = await prisma.purchaseQualityInspection.findFirst({
       where: { id: res.body.data.id, tenantId },
@@ -145,13 +167,21 @@ describe.skipIf(!dbAvailable)('Purchase quality inspection lifecycle (live HTTP)
     const grnRow = await prisma.goodsReceipt.findFirst({
       where: { id: grn.grnId, tenantId },
     })
-    expect(['FULLY_ACCEPTED', 'INVENTORY_POSTED']).toContain(grnRow?.status)
+    expect(grnRow?.status).toBe('INVENTORY_POSTED')
     const released = await prisma.inventoryStockBalance.findFirstOrThrow({
-      where: { tenantId, itemId: grn.grn.lines[0].itemId, warehouseId: masters.warehouseId },
+      where: { tenantId, itemId: grn.itemId, warehouseId: masters.warehouseId },
     })
     expect(released.onHandQty.toString()).toBe('10')
     expect(released.qcHoldQty.toString()).toBe('0')
     expect(released.rejectedQty.toString()).toBe('0')
+
+    const releaseMoves = await prisma.inventoryStockMovement.findMany({
+      where: {
+        tenantId,
+        idempotencyKey: { startsWith: `qi-release:${qiId}` },
+      },
+    })
+    expect(releaseMoves.length).toBeGreaterThan(0)
   })
 
   it('denies create without permission', async () => {

@@ -133,8 +133,8 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
   const [opportunityName, setOpportunityName] = useState(opportunity?.opportunityName ?? '')
   const [contactId, setContactId] = useState(opportunity?.contactId ?? '')
   const [lines, setLines] = useState<OpportunityLine[]>(initialLines)
-  const retainProductIds = useMemo(
-    () => [...lines.map((l) => l.productId), opportunity?.productId],
+  const retainItemIds = useMemo(
+    () => [...lines.map((l) => l.itemId), opportunity?.productId],
     [lines, opportunity?.productId],
   )
   const { options: productOptions, pickMap } = useProductMasterOptionMap(
@@ -142,7 +142,7 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
     items,
     uoms,
     undefined,
-    retainProductIds,
+    retainItemIds,
   )
   const [probability, setProbability] = useState(String(opportunity?.probability ?? 0))
   const [expectedCloseDate, setExpectedCloseDate] = useState(opportunity?.expectedCloseDate?.slice(0, 10) ?? '')
@@ -371,8 +371,8 @@ export function useOpportunityEditor(opportunityId: string | undefined) {
         updateOpportunity(opportunityId, {
           opportunityName: opportunityName.trim(),
           contactId: contactId || null,
-          lines: syncedLines,
-          productId: syncedLines[0]?.productId ?? opportunity.productId,
+          lines: syncedLines.map((l) => ({ ...l, productId: null })),
+          productId: null,
           value: calcOpportunityLinesSummary(syncedLines).grandTotal,
           probability: Number(probability) || 0,
           expectedCloseDate,

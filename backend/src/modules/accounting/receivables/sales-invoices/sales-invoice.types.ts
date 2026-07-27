@@ -152,6 +152,7 @@ export interface ListSalesInvoicesQuery {
   customerId?: string
   status?: SalesInvoiceStatus
   sourceType?: SalesInvoiceSourceType
+  sourceDocumentId?: string
   currencyCode?: string
   createdBy?: string
   invoiceDateFrom?: string

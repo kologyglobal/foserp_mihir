@@ -82,7 +82,7 @@ export function resolveTaxInvoiceFromSalesOrder(
   const customer = master.getCustomer(so.customerId)
   if (!customer) return { ok: false, error: 'Customer not found for this sales order.' }
 
-  const baseLines = buildProformaLinesFromSalesOrder(so, master.products)
+  const baseLines = buildProformaLinesFromSalesOrder(so, master.items)
   const existing = useCrmCommercialStore.getState().getInvoicesBySalesOrder(salesOrderId)
   const invoicedQtyBySource = new Map<string, number>()
   for (const inv of existing) {
@@ -102,7 +102,7 @@ export function resolveTaxInvoiceFromSalesOrder(
       withTotals(
         {
           id: bl.id,
-          productId: bl.productId,
+          itemId: bl.itemId,
           itemCode: bl.itemCode,
           description: bl.description,
           hsnCode: bl.hsnCode,
@@ -166,7 +166,7 @@ export function resolveTaxInvoiceFromProforma(
     withTotals(
       {
         id: l.id,
-        productId: l.productId,
+        itemId: l.itemId,
         itemCode: l.itemCode,
         description: l.description,
         hsnCode: l.hsnCode,

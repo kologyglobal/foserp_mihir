@@ -15,7 +15,7 @@ function d(value: Prisma.Decimal | number | string): number {
 export interface SalesOrderLineFulfilmentDto {
   salesOrderLineId: string
   lineNo: number
-  productId: string | null
+  itemId: string | null
   productOrItem: string
   orderedQty: number
   cancelledQty: number
@@ -106,7 +106,7 @@ export async function getSalesOrderFulfilment(
     return {
       salesOrderLineId: line.id,
       lineNo: line.lineNo,
-      productId: line.productId ?? null,
+      itemId: line.itemId ?? null,
       productOrItem: line.productOrItem,
       orderedQty,
       cancelledQty,

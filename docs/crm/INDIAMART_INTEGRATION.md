@@ -71,6 +71,6 @@ In-process `setInterval` (60s tick) calling `runIndiaMartSync` for due connectio
 
 ## Recommended next phase
 
-1. Lead 360 FactBox deep-link panel for IndiaMART fields  
-2. Queue-backed scheduler / multi-instance sync lock hardening  
-3. Live UAT with IndiaMART Push registration + Pull overlap verification  
+1. Live UAT — see [`INDIAMART_GOLIVE.md`](./INDIAMART_GOLIVE.md) (`FIELD_ENCRYPTION_KEY` → Pull key → Test connection → sync)
+2. Lead 360 FactBox deep-link panel for IndiaMART fields  
+3. Queue-backed scheduler / multi-instance sync lock hardening  

@@ -70,7 +70,7 @@ export function runVendorAdjustmentFrontendTests() {
   check('API listVendorAdjustments', apiSrc.includes('listVendorAdjustments'))
   check('API reverseVendorPayment', apiSrc.includes('reverseVendorPayment'))
   check('API reversePayableAllocation', apiSrc.includes('reversePayableAllocation'))
-  check('API listApReversalHistory stub', apiSrc.includes('listApReversalHistory'))
+  check('API listApReversalHistory', apiSrc.includes("'/accounting/payables/reversals'"))
 
   const detailSrc = read('src/modules/accounting/money-out/vendor-payments/VendorPaymentDetailPage.tsx')
   check('Payment detail reverse navigation', detailSrc.includes('/accounting/money-out/reversals/payment/'))

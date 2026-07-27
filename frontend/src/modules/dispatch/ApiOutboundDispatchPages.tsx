@@ -8,6 +8,7 @@ import {
   Ban,
   CheckCircle2,
   ClipboardList,
+  FilePlus2,
   FileText,
   Package,
   RefreshCw,
@@ -41,18 +42,37 @@ import {
   listDeliveryChallans,
   listDispatchPickLists,
   listOutboundDispatches,
+  listOutboundReversals,
   postOutboundDispatch,
   reverseOutboundDispatch,
   getOutboundReversalDependencies,
+  submitDispatchReversal,
+  approveDispatchReversal,
+  rejectDispatchReversal,
+  cancelDispatchReversal,
+  applyDispatchReversal,
+  type DispatchReversalRow,
   type OutboundDispatch,
   type OutboundDispatchStatus,
 } from '@/services/api/dispatchApi'
+import { getStoredSession } from '@/services/api/client'
+import { isApiMode } from '@/config/apiConfig'
+import { hasWorkspaceAdminRole } from '@/utils/permissions/workspaceAdmin'
 import { getFulfilmentAutoMode, setFulfilmentAutoMode } from '@/modules/manufacturing/ui'
 import {
   advanceAfterReserve,
 } from '@/modules/dispatch/fulfilmentAutoAdvance'
 import { formatDate } from '@/utils/dates/format'
 import { cn } from '@/utils/cn'
+import {
+  listInvoiceReadyDispatchLines,
+  listSalesInvoices,
+  prefillInvoiceFromDispatch,
+} from '@/services/bridges/receivablesApiBridge'
+import { moneyInPath, parseDecimal } from '@/modules/accounting/money-in/moneyInUi'
+import { mergeAllowedAction, useMoneyInPermissions } from '@/utils/permissions/moneyIn'
+import type { DispatchInvoicePrefillState } from '@/modules/accounting/money-in/invoices/invoicePrefillState'
+import type { SalesInvoiceDto } from '@/types/moneyIn'
 
 function errMsg(e: unknown): string {
   return formatApiError(e) || (e instanceof Error ? e.message : 'Request failed')
@@ -62,6 +82,15 @@ function shortId(id: string | null | undefined): string {
   if (!id) return '—'
   return id.length > 12 ? `${id.slice(0, 8)}…` : id
 }
+
+function canDispatchPerm(...names: string[]): boolean {
+  if (isApiMode() && hasWorkspaceAdminRole()) return true
+  const perms = getStoredSession()?.user.permissions ?? []
+  if (perms.includes('tenant.manage')) return true
+  return names.some((n) => perms.includes(n))
+}
+
+const OPEN_REVERSAL_STATUSES = new Set(['DRAFT_REQUEST', 'SUBMITTED', 'APPROVED'])
 
 function statusTone(status: OutboundDispatchStatus): 'neutral' | 'info' | 'success' | 'warning' | 'critical' {
   switch (status) {
@@ -357,12 +386,18 @@ export function ApiOutboundDispatchDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const moneyInPerms = useMoneyInPermissions()
   const [detail, setDetail] = useState<OutboundDispatch | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [reserveOpen, setReserveOpen] = useState(false)
   const [emergencyOpen, setEmergencyOpen] = useState(false)
+  const [invoiceReadyQty, setInvoiceReadyQty] = useState(0)
+  const [linkedInvoice, setLinkedInvoice] = useState<Pick<SalesInvoiceDto, 'id' | 'status' | 'draftReference' | 'invoiceNumber'> | null>(
+    null,
+  )
+  const [reversals, setReversals] = useState<DispatchReversalRow[]>([])
   const [readiness, setReadiness] = useState<{
     hardBlockers?: Array<{ code: string; message: string }>
     warnings?: Array<{ code: string; message: string }>
@@ -381,6 +416,51 @@ export function ApiOutboundDispatchDetailPage() {
     }
   } | null>(null)
 
+  async function loadInvoiceContext(dispatchId: string) {
+    if (!moneyInPerms.canViewInvoice) {
+      setInvoiceReadyQty(0)
+      setLinkedInvoice(null)
+      return
+    }
+    try {
+      const ready = await listInvoiceReadyDispatchLines({
+        outboundDispatchId: dispatchId,
+        readyOnly: false,
+        limit: 100,
+      })
+      const readySum = ready.reduce((sum, row) => sum + parseDecimal(row.invoiceReadyQty), 0)
+      setInvoiceReadyQty(readySum)
+      const invoices = await listSalesInvoices({
+        sourceType: 'OUTBOUND_DISPATCH',
+        sourceDocumentId: dispatchId,
+        limit: 10,
+      })
+      const active = invoices.find((inv) => inv.status !== 'CANCELLED' && inv.status !== 'REVERSED') ?? null
+      setLinkedInvoice(
+        active
+          ? {
+              id: active.id,
+              status: active.status,
+              draftReference: active.draftReference,
+              invoiceNumber: active.invoiceNumber,
+            }
+          : null,
+      )
+    } catch {
+      setInvoiceReadyQty(0)
+      setLinkedInvoice(null)
+    }
+  }
+
+  async function loadReversals(dispatchId: string) {
+    try {
+      const rows = await listOutboundReversals(dispatchId)
+      setReversals(Array.isArray(rows) ? rows : [])
+    } catch {
+      setReversals([])
+    }
+  }
+
   async function reload() {
     if (!id) return
     setLoading(true)
@@ -388,7 +468,7 @@ export function ApiOutboundDispatchDetailPage() {
     try {
       const row = await getOutboundDispatch(id)
       setDetail(row)
-      if (row.planningSource === 'WORKBENCH_7C1' || row.status === 'DRAFT') {
+      if (row.planningSource === 'WORKBENCH_7C1' || row.status === 'DRAFT' || row.status === 'CONFIRMED') {
         try {
           setReadiness(await getOutboundPostingReadiness(id, 'post'))
         } catch {
@@ -397,10 +477,20 @@ export function ApiOutboundDispatchDetailPage() {
       } else {
         setReadiness(null)
       }
+      if (row.status === 'CONFIRMED') {
+        await Promise.all([loadInvoiceContext(id), loadReversals(id)])
+      } else {
+        setInvoiceReadyQty(0)
+        setLinkedInvoice(null)
+        setReversals([])
+      }
     } catch (e) {
       setError(errMsg(e))
       setDetail(null)
       setReadiness(null)
+      setInvoiceReadyQty(0)
+      setLinkedInvoice(null)
+      setReversals([])
     } finally {
       setLoading(false)
     }
@@ -623,41 +713,122 @@ export function ApiOutboundDispatchDetailPage() {
 
   async function onReverse() {
     if (!id || !detail) return
+    if (!canDispatchPerm('dispatch.post', 'dispatch.reverse.request', 'dispatch.reverse.apply', 'dispatch.override')) {
+      notify.error('Missing permission to reverse dispatch')
+      return
+    }
+    let force = false
     try {
       const depRes = await getOutboundReversalDependencies(id)
       const deps = depRes.dependencies ?? []
       if (deps.length) {
         const summary = deps.map((d) => `${d.code}: ${d.message}`).join('\n')
-        setError(summary)
-        notify.error('Reversal blocked — clear linked Sales Invoice / posted COGS first')
-        return
+        const canForce = canDispatchPerm('dispatch.override')
+        if (!canForce) {
+          setError(summary)
+          notify.error('Reversal blocked — clear linked Sales Invoice / posted COGS first (or use dispatch.override)')
+          return
+        }
+        const ok = await appConfirm({
+          title: 'Force reversal with downstream dependencies?',
+          description: `${summary}\n\nRequires dispatch.override. Compensating inventory still posts; linked invoices may need finance follow-up.`,
+          confirmLabel: 'Force reverse',
+          tone: 'danger',
+        })
+        if (!ok) return
+        force = true
       }
     } catch (e) {
-      // Soft: if preflight fails, still allow prompt — server enforces hard block.
       notify.error(errMsg(e))
     }
+    const requestOnly = canDispatchPerm('dispatch.reverse.request') &&
+      !canDispatchPerm('dispatch.reverse.apply', 'dispatch.post', 'dispatch.override')
     const note = await appPromptNote({
       title: 'Request Dispatch Reversal',
       description:
         'Posted Dispatches are immutable. Reversal creates compensating Inventory and fulfilment transactions — it does not delete the original posting.',
-      confirmLabel: 'Apply Reversal',
+      confirmLabel: requestOnly ? 'Submit for approval' : 'Apply Reversal',
       tone: 'danger',
       note: { required: true, label: 'Reason', placeholder: 'Why reverse this dispatch?' },
     })
     if (note == null) return
     setBusy(true)
     try {
-      const result = await reverseOutboundDispatch(id, { reason: note })
+      const result = await reverseOutboundDispatch(id, {
+        reason: note,
+        force: force || undefined,
+        requestOnly: requestOnly || undefined,
+      })
       if (result.awaitingApproval) {
-        notify.success(
-          `Reversal ${result.reversal.reversalNumber} submitted for approval`,
-        )
+        notify.success(`Reversal ${result.reversal.reversalNumber} submitted for approval`)
       } else {
         notify.success(`Reversed ${detail.dispatchNo}`)
       }
       await reload()
     } catch (e) {
       setError(errMsg(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onReversalAction(
+    reversal: DispatchReversalRow,
+    action: 'submit' | 'approve' | 'reject' | 'cancel' | 'apply',
+  ) {
+    setBusy(true)
+    setError(null)
+    try {
+      if (action === 'submit') await submitDispatchReversal(reversal.id)
+      else if (action === 'approve') await approveDispatchReversal(reversal.id)
+      else if (action === 'apply') await applyDispatchReversal(reversal.id)
+      else if (action === 'cancel') await cancelDispatchReversal(reversal.id)
+      else if (action === 'reject') {
+        const reason = await appPromptNote({
+          title: 'Reject reversal',
+          description: `Reject ${reversal.reversalNumber}?`,
+          confirmLabel: 'Reject',
+          tone: 'danger',
+          note: { required: false, label: 'Reason', placeholder: 'Optional' },
+        })
+        if (reason == null) return
+        await rejectDispatchReversal(reversal.id, reason || undefined)
+      }
+      notify.success(`${reversal.reversalNumber} → ${action}`)
+      await reload()
+    } catch (e) {
+      setError(errMsg(e))
+      notify.error(errMsg(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onCreateSalesInvoice() {
+    if (!id || !detail || busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const ready = await listInvoiceReadyDispatchLines({
+        outboundDispatchId: id,
+        readyOnly: true,
+        limit: 100,
+      })
+      if (!ready.length) {
+        notify.info('No invoice-ready quantity — open Invoice Ready or view the linked invoice')
+        if (linkedInvoice) {
+          navigate(moneyInPath(`invoices/${linkedInvoice.id}`))
+        } else {
+          navigate(`${moneyInPath('invoice-ready')}?outboundDispatchId=${encodeURIComponent(id)}`)
+        }
+        return
+      }
+      const prefill = await prefillInvoiceFromDispatch(ready.map((r) => r.outboundDispatchLineId))
+      const state: DispatchInvoicePrefillState = { dispatchPrefill: prefill }
+      navigate(moneyInPath('invoices/new'), { state })
+    } catch (e) {
+      setError(errMsg(e))
+      notify.error(errMsg(e))
     } finally {
       setBusy(false)
     }
@@ -681,18 +852,40 @@ export function ApiOutboundDispatchDetailPage() {
   const canStartPacking = isDraft
   const backendAllowsPost = readiness?.allowedActions?.includes('POST') === true
   const readinessLoaded = readiness != null
-  const canPost = isDraft && isWorkbench && readinessLoaded && backendAllowsPost
-  const canReverse = status === 'CONFIRMED'
+  const canPost =
+    isDraft &&
+    isWorkbench &&
+    readinessLoaded &&
+    backendAllowsPost &&
+    canDispatchPerm('dispatch.post', 'dispatch.override')
+  const reversibleQty = Number(readiness?.quantity?.reversibleQty ?? 0)
+  const canReverse =
+    status === 'CONFIRMED' &&
+    canDispatchPerm('dispatch.post', 'dispatch.reverse.request', 'dispatch.reverse.apply', 'dispatch.override') &&
+    (readiness?.allowedActions?.includes('REVERSE') !== false) &&
+    (reversibleQty > 0 || !readinessLoaded)
+  const openReversals = reversals.filter((r) => OPEN_REVERSAL_STATUSES.has(r.status))
+  const canCreateInvoice =
+    status === 'CONFIRMED' &&
+    invoiceReadyQty > 0 &&
+    mergeAllowedAction(moneyInPerms.canCreateInvoice)
+  const canViewInvoice = status === 'CONFIRMED' && linkedInvoice != null && moneyInPerms.canViewInvoice
+  const canOpenInvoiceReady = status === 'CONFIRMED' && moneyInPerms.canViewInvoice
   const postBlocked = isDraft && isWorkbench && readinessLoaded && !backendAllowsPost
   const postBlockers = readiness?.hardBlockers ?? []
   const emergencyMeta = readiness?.emergencyOverride
   const canEmergencyOverride =
     postBlocked &&
+    canDispatchPerm('dispatch.override') &&
     (emergencyMeta?.canRequest === true ||
       (emergencyMeta?.neverOverridableBlockers?.length === 0 &&
         (emergencyMeta?.overridableBlockers?.length ?? 0) > 0))
-  const showEmergencyDrawerEntry = postBlocked
+  const showEmergencyDrawerEntry = canEmergencyOverride
   const awaitingReadiness = isDraft && isWorkbench && !readinessLoaded && !error
+  const canApproveReversal = canDispatchPerm('dispatch.reverse.approve', 'dispatch.approve', 'dispatch.override')
+  const canApplyReversal = canDispatchPerm('dispatch.reverse.apply', 'dispatch.post', 'dispatch.override')
+  const canRequestReversal = canDispatchPerm('dispatch.reverse.request', 'dispatch.post', 'dispatch.override')
+  const canCancelReversal = canDispatchPerm('dispatch.reverse.request', 'dispatch.post', 'dispatch.cancel', 'dispatch.override')
 
   const lineColumns = useMemo(
     () => [
@@ -860,6 +1053,33 @@ export function ApiOutboundDispatchDetailPage() {
                 disabled={busy}
               />
             ) : null}
+            {canCreateInvoice ? (
+              <CommandBarButton
+                icon={FilePlus2}
+                label="Create Invoice"
+                primary
+                onClick={() => void onCreateSalesInvoice()}
+                disabled={busy}
+              />
+            ) : null}
+            {canViewInvoice && linkedInvoice ? (
+              <CommandBarButton
+                icon={FileText}
+                label={linkedInvoice.status === 'POSTED' ? 'View Invoice' : 'Open Invoice Draft'}
+                onClick={() => navigate(moneyInPath(`invoices/${linkedInvoice.id}`))}
+                disabled={busy}
+              />
+            ) : null}
+            {canOpenInvoiceReady ? (
+              <CommandBarButton
+                icon={FileText}
+                label="Invoice Ready"
+                onClick={() =>
+                  navigate(`${moneyInPath('invoice-ready')}?outboundDispatchId=${encodeURIComponent(id)}`)
+                }
+                disabled={busy}
+              />
+            ) : null}
           </CommandBarGroup>
         </CommandBar>
       }
@@ -899,6 +1119,75 @@ export function ApiOutboundDispatchDetailPage() {
       ) : null}
 
       <DispatchLifecycleStrip status={status} />
+
+      {status === 'CONFIRMED' && openReversals.length > 0 ? (
+        <DetailSection title="Open reversals (7C5)">
+          <ul className="space-y-3 text-[13px]">
+            {openReversals.map((rev) => (
+              <li key={rev.id} className="rounded border border-erp-border bg-erp-surface px-3 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="font-semibold">{rev.reversalNumber}</span>
+                    <span className="ml-2 text-erp-muted">{rev.status.replace(/_/g, ' ')}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {rev.status === 'DRAFT_REQUEST' && canRequestReversal ? (
+                      <button
+                        type="button"
+                        className="rounded border px-2 py-1 text-[12px] font-semibold disabled:opacity-50"
+                        disabled={busy}
+                        onClick={() => void onReversalAction(rev, 'submit')}
+                      >
+                        Submit
+                      </button>
+                    ) : null}
+                    {rev.status === 'SUBMITTED' && canApproveReversal ? (
+                      <>
+                        <button
+                          type="button"
+                          className="rounded border px-2 py-1 text-[12px] font-semibold disabled:opacity-50"
+                          disabled={busy}
+                          onClick={() => void onReversalAction(rev, 'approve')}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded border border-rose-200 px-2 py-1 text-[12px] font-semibold text-rose-700 disabled:opacity-50"
+                          disabled={busy}
+                          onClick={() => void onReversalAction(rev, 'reject')}
+                        >
+                          Reject
+                        </button>
+                      </>
+                    ) : null}
+                    {rev.status === 'APPROVED' && canApplyReversal ? (
+                      <button
+                        type="button"
+                        className="rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-[12px] font-semibold text-emerald-900 disabled:opacity-50"
+                        disabled={busy}
+                        onClick={() => void onReversalAction(rev, 'apply')}
+                      >
+                        Apply
+                      </button>
+                    ) : null}
+                    {(rev.status === 'DRAFT_REQUEST' || rev.status === 'SUBMITTED') && canCancelReversal ? (
+                      <button
+                        type="button"
+                        className="rounded border px-2 py-1 text-[12px] font-semibold text-erp-muted disabled:opacity-50"
+                        disabled={busy}
+                        onClick={() => void onReversalAction(rev, 'cancel')}
+                      >
+                        Cancel
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </DetailSection>
+      ) : null}
 
       {isWorkbench && isDraft && readiness ? (
         <div id="dispatch-7c5-coach">
@@ -994,7 +1283,31 @@ export function ApiOutboundDispatchDetailPage() {
         >
           Workbench
         </Link>
+        {status === 'CONFIRMED' ? (
+          <Link
+            to="/inventory/costing/entries"
+            className="rounded border border-erp-border px-2.5 py-1.5 font-semibold text-erp-primary hover:bg-erp-surface"
+            title="Cost relief postings from stock-out (future COGS)"
+          >
+            Cost relief →
+          </Link>
+        ) : null}
       </div>
+
+      {status === 'CONFIRMED' ? (
+        <DetailSection title="Cost relief">
+          <p className="text-[13px] text-erp-muted">
+            Confirm stock-out posts inventory issue cost entries (valuation relief). COGS GL vouchers remain deferred
+            until inventory accounting mappings are enabled — review relief under Costing.
+          </p>
+          <Link
+            to="/inventory/costing"
+            className="mt-2 inline-block text-[13px] font-semibold text-erp-primary hover:underline"
+          >
+            Open Inventory Costing →
+          </Link>
+        </DetailSection>
+      ) : null}
 
       <DetailSection title="Summary">
         <dl className="grid gap-3 text-[13px] sm:grid-cols-2 lg:grid-cols-3">

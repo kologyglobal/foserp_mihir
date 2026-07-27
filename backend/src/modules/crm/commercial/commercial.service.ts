@@ -7,15 +7,19 @@ import {
   invoiceStatusFromPayment,
   mapAllocationDto,
   mapInvoiceDto,
+  mapProformaDto,
   mapReceiptDto,
 } from './commercial.types.js'
 import type {
   AllocatePaymentsInput,
   CreateInvoiceInput,
+  CreateProformaInput,
   CreateReceiptInput,
   ListAllocationsQuery,
   ListInvoicesQuery,
+  ListProformasQuery,
   ListReceiptsQuery,
+  UpdateProformaInput,
 } from './commercial.validation.js'
 
 const COMPANY_STATE = 'Maharashtra'
@@ -30,7 +34,7 @@ function addDays(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-function computeLine(input: CreateInvoiceInput['lines'][number], lineNo: number) {
+function computeLine(input: CreateInvoiceInput['lines'][number] | CreateProformaInput['lines'][number], lineNo: number) {
   const discountPct = input.discountPct ?? 0
   const taxPct = input.taxPct ?? 18
   const gross = input.qty * input.unitPrice
@@ -42,7 +46,7 @@ function computeLine(input: CreateInvoiceInput['lines'][number], lineNo: number)
   }
   return {
     lineNo,
-    productId: input.productId ?? null,
+    itemId: input.itemId,
     itemCode: input.itemCode,
     description: input.description,
     hsnCode: input.hsnCode ?? null,
@@ -109,11 +113,24 @@ export async function createReceipt(
   const company = await repo.findCompany(tenantId, input.companyId)
   if (!company) throw new NotFoundError('Customer not found')
 
-  if (input.proformaInvoiceId && input.proformaGrandTotal != null) {
-    const received = await repo.sumProformaReceipts(tenantId, input.proformaInvoiceId)
-    const balance = Math.max(0, input.proformaGrandTotal - received)
-    if (input.amount > balance + 0.009) {
-      throw new ValidationError(`Amount exceeds proforma balance of ${balance.toFixed(2)}`)
+  if (input.proformaInvoiceId) {
+    const proforma = await repo.findProformaById(tenantId, input.proformaInvoiceId)
+    if (proforma) {
+      if (proforma.status !== 'issued') {
+        throw new ValidationError('Payments can only be received against issued proformas')
+      }
+      const grandTotal = Number(proforma.grandTotal)
+      const received = await repo.sumProformaReceipts(tenantId, input.proformaInvoiceId)
+      const balance = Math.max(0, grandTotal - received)
+      if (input.amount > balance + 0.009) {
+        throw new ValidationError(`Amount exceeds proforma balance of ${balance.toFixed(2)}`)
+      }
+    } else if (input.proformaGrandTotal != null) {
+      const received = await repo.sumProformaReceipts(tenantId, input.proformaInvoiceId)
+      const balance = Math.max(0, input.proformaGrandTotal - received)
+      if (input.amount > balance + 0.009) {
+        throw new ValidationError(`Amount exceeds proforma balance of ${balance.toFixed(2)}`)
+      }
     }
   }
 
@@ -146,6 +163,282 @@ export async function createReceipt(
   })
 
   return mapReceiptDto(row)
+}
+
+export async function listProformas(tenantId: string, query: ListProformasQuery) {
+  const result = await repo.findProformas(tenantId, query)
+  return { ...result, items: result.items.map(mapProformaDto) }
+}
+
+export async function getProforma(tenantId: string, id: string) {
+  const row = await repo.findProformaById(tenantId, id)
+  if (!row) throw new NotFoundError('Proforma invoice not found')
+  return mapProformaDto(row)
+}
+
+async function buildProformaPayload(
+  tenantId: string,
+  input: CreateProformaInput | UpdateProformaInput,
+  existing?: Awaited<ReturnType<typeof repo.findProformaById>>,
+) {
+  const companyId = input.companyId ?? existing?.companyId
+  if (!companyId) throw new ValidationError('Customer is required')
+  const company = await repo.findCompany(tenantId, companyId)
+  if (!company) throw new NotFoundError('Customer not found')
+
+  const linesInput = input.lines ?? []
+  if (!linesInput.length && !existing) throw new ValidationError('At least one line is required')
+
+  const computedLines = linesInput.length
+    ? linesInput.map((l, idx) => computeLine(l, idx + 1))
+    : (existing?.lines ?? []).map((l, idx) => ({
+        lineNo: idx + 1,
+        itemId: l.itemId,
+        itemCode: l.itemCode,
+        description: l.description,
+        hsnCode: l.hsnCode,
+        qty: l.qty,
+        uom: l.uom,
+        unitPrice: l.unitPrice,
+        discountPct: l.discountPct,
+        taxPct: l.taxPct,
+        taxableValue: l.taxableValue,
+        gstAmount: l.gstAmount,
+        lineTotal: l.lineTotal,
+        sourceLineId: l.sourceLineId,
+        maxQty: l.maxQty,
+        taxableNumber: Number(l.taxableValue),
+        gstNumber: Number(l.gstAmount),
+        taxPctNumber: Number(l.taxPct),
+      }))
+
+  const customerState = input.customerState ?? company.state ?? COMPANY_STATE
+  const gst = buildGst(customerState, computedLines)
+  const address = [company.addressLine1, company.city, company.state, company.pincode].filter(Boolean).join(', ')
+  const proformaDate = (input.proformaDate ?? existing?.proformaDate.toISOString().slice(0, 10) ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
+  const validUntil = (input.validUntil ?? existing?.validUntil.toISOString().slice(0, 10) ?? addDays(proformaDate, 30)).slice(0, 10)
+
+  let salesOrderId = input.salesOrderId ?? existing?.salesOrderId ?? null
+  let salesOrderNo = input.salesOrderNo ?? existing?.salesOrderNo ?? null
+  let quotationId = input.quotationId ?? existing?.quotationId ?? null
+  let quotationNo = input.quotationNo ?? existing?.quotationNo ?? null
+  let source = input.source ?? existing?.source ?? 'direct'
+
+  if (salesOrderId) {
+    const so = await repo.findSalesOrder(tenantId, salesOrderId)
+    if (!so) throw new NotFoundError('Sales order not found')
+    if (['closed', 'cancelled'].includes(so.status)) {
+      throw new ValidationError('Cannot create proforma for a closed sales order')
+    }
+    source = 'sales_order'
+    salesOrderNo = salesOrderNo ?? so.salesOrderNo
+    quotationId = quotationId ?? so.quotationId
+    quotationNo = quotationNo ?? so.quotationNo
+  }
+
+  return {
+    company,
+    customerState,
+    gst,
+    address,
+    proformaDate,
+    validUntil,
+    salesOrderId,
+    salesOrderNo,
+    quotationId,
+    quotationNo,
+    source,
+    computedLines,
+  }
+}
+
+export async function createProforma(
+  tenantId: string,
+  userId: string,
+  input: CreateProformaInput,
+  audit?: { ipAddress?: string | null; userAgent?: string | null },
+) {
+  if (input.salesOrderId) {
+    const existing = await repo.findActiveProformaForSalesOrder(tenantId, input.salesOrderId)
+    if (existing) {
+      throw new ValidationError(`Active proforma ${existing.proformaNo} already exists for this sales order`)
+    }
+  }
+
+  const payload = await buildProformaPayload(tenantId, input)
+  const proformaNo = await repo.nextDocumentNo(tenantId, 'PI-', 'proforma')
+
+  const row = await repo.createProformaWithLines(
+    tenantId,
+    userId,
+    {
+      proformaNo,
+      proformaDate: parseDate(payload.proformaDate),
+      validUntil: parseDate(payload.validUntil),
+      status: 'draft',
+      source: payload.source,
+      companyId: payload.company.id,
+      customerNameSnapshot: payload.company.name,
+      customerGstin: payload.company.gstin,
+      customerState: payload.customerState,
+      customerAddress: payload.address,
+      placeOfSupply: payload.customerState,
+      billingAddress: input.billingAddress ?? payload.address,
+      shippingAddress: input.shippingAddress ?? payload.address,
+      deliveryTerms: input.deliveryTerms ?? null,
+      paymentTerms: input.paymentTerms ?? null,
+      customerPoNumber: input.customerPoNumber ?? null,
+      salesOrderId: payload.salesOrderId,
+      salesOrderNo: payload.salesOrderNo,
+      quotationId: payload.quotationId,
+      quotationNo: payload.quotationNo,
+      locationId: input.locationId ?? null,
+      remarks: input.remarks ?? null,
+      taxableAmount: new Prisma.Decimal(payload.gst.taxableAmount),
+      cgstAmount: new Prisma.Decimal(payload.gst.cgstAmount),
+      sgstAmount: new Prisma.Decimal(payload.gst.sgstAmount),
+      igstAmount: new Prisma.Decimal(payload.gst.igstAmount),
+      totalTaxAmount: new Prisma.Decimal(payload.gst.totalTaxAmount),
+      grandTotal: new Prisma.Decimal(payload.gst.grandTotal),
+      gstScheme: payload.gst.gstScheme,
+    },
+    payload.computedLines.map(({ taxableNumber: _t, gstNumber: _g, taxPctNumber: _p, ...line }) => line),
+  )
+
+  await createAuditLog({
+    tenantId,
+    userId,
+    module: 'crm',
+    entity: 'crmProformaInvoice',
+    entityId: row.id,
+    action: 'CREATE',
+    newValues: { proformaNo: row.proformaNo, grandTotal: payload.gst.grandTotal, source: payload.source },
+    ipAddress: audit?.ipAddress,
+    userAgent: audit?.userAgent,
+  })
+
+  return mapProformaDto(row)
+}
+
+export async function updateProforma(
+  tenantId: string,
+  id: string,
+  userId: string,
+  input: UpdateProformaInput,
+  audit?: { ipAddress?: string | null; userAgent?: string | null },
+) {
+  const existing = await repo.findProformaById(tenantId, id)
+  if (!existing) throw new NotFoundError('Proforma invoice not found')
+  if (existing.status !== 'draft') throw new ValidationError('Only draft proforma invoices can be edited')
+
+  const payload = await buildProformaPayload(tenantId, input, existing)
+  const row = await repo.updateProformaWithLines(
+    tenantId,
+    id,
+    userId,
+    {
+      proformaDate: parseDate(payload.proformaDate),
+      validUntil: parseDate(payload.validUntil),
+      companyId: payload.company.id,
+      customerNameSnapshot: payload.company.name,
+      customerGstin: payload.company.gstin,
+      customerState: payload.customerState,
+      customerAddress: payload.address,
+      placeOfSupply: payload.customerState,
+      billingAddress: input.billingAddress ?? existing.billingAddress ?? payload.address,
+      shippingAddress: input.shippingAddress ?? existing.shippingAddress ?? payload.address,
+      deliveryTerms: input.deliveryTerms ?? existing.deliveryTerms,
+      paymentTerms: input.paymentTerms ?? existing.paymentTerms,
+      customerPoNumber: input.customerPoNumber ?? existing.customerPoNumber,
+      salesOrderId: payload.salesOrderId,
+      salesOrderNo: payload.salesOrderNo,
+      quotationId: payload.quotationId,
+      quotationNo: payload.quotationNo,
+      locationId: input.locationId !== undefined ? input.locationId : existing.locationId,
+      remarks: input.remarks ?? existing.remarks,
+      source: payload.source,
+      taxableAmount: new Prisma.Decimal(payload.gst.taxableAmount),
+      cgstAmount: new Prisma.Decimal(payload.gst.cgstAmount),
+      sgstAmount: new Prisma.Decimal(payload.gst.sgstAmount),
+      igstAmount: new Prisma.Decimal(payload.gst.igstAmount),
+      totalTaxAmount: new Prisma.Decimal(payload.gst.totalTaxAmount),
+      grandTotal: new Prisma.Decimal(payload.gst.grandTotal),
+      gstScheme: payload.gst.gstScheme,
+    },
+    input.lines
+      ? payload.computedLines.map(({ taxableNumber: _t, gstNumber: _g, taxPctNumber: _p, ...line }) => line)
+      : undefined,
+  )
+
+  await createAuditLog({
+    tenantId,
+    userId,
+    module: 'crm',
+    entity: 'crmProformaInvoice',
+    entityId: id,
+    action: 'UPDATE',
+    newValues: { proformaNo: existing.proformaNo },
+    ipAddress: audit?.ipAddress,
+    userAgent: audit?.userAgent,
+  })
+
+  return mapProformaDto(row)
+}
+
+export async function issueProforma(
+  tenantId: string,
+  id: string,
+  userId: string,
+  audit?: { ipAddress?: string | null; userAgent?: string | null },
+) {
+  const row = await repo.findProformaById(tenantId, id)
+  if (!row) throw new NotFoundError('Proforma invoice not found')
+  if (row.status !== 'draft') throw new ValidationError('Only draft proforma invoices can be issued')
+
+  const updated = await repo.updateProforma(tenantId, id, userId, {
+    status: 'issued',
+    issuedAt: new Date(),
+  })
+  await createAuditLog({
+    tenantId,
+    userId,
+    module: 'crm',
+    entity: 'crmProformaInvoice',
+    entityId: id,
+    action: 'ISSUE',
+    newValues: { proformaNo: row.proformaNo },
+    ipAddress: audit?.ipAddress,
+    userAgent: audit?.userAgent,
+  })
+  return mapProformaDto(updated!)
+}
+
+export async function cancelProforma(
+  tenantId: string,
+  id: string,
+  userId: string,
+  audit?: { ipAddress?: string | null; userAgent?: string | null },
+) {
+  const row = await repo.findProformaById(tenantId, id)
+  if (!row) throw new NotFoundError('Proforma invoice not found')
+  if (row.status === 'cancelled') throw new ValidationError('Proforma invoice is already cancelled')
+
+  const updated = await repo.updateProforma(tenantId, id, userId, {
+    status: 'cancelled',
+    cancelledAt: new Date(),
+  })
+  await createAuditLog({
+    tenantId,
+    userId,
+    module: 'crm',
+    entity: 'crmProformaInvoice',
+    entityId: id,
+    action: 'CANCEL',
+    newValues: { proformaNo: row.proformaNo },
+    ipAddress: audit?.ipAddress,
+    userAgent: audit?.userAgent,
+  })
+  return mapProformaDto(updated!)
 }
 
 export async function listInvoices(tenantId: string, query: ListInvoicesQuery) {
@@ -451,7 +744,7 @@ export async function reverseAllocation(
 }
 
 export async function syncBundle(tenantId: string, companyId?: string) {
-  const [receipts, invoices, allocations] = await Promise.all([
+  const [receipts, invoices, allocations, proformas] = await Promise.all([
     repo.findReceipts(tenantId, { page: 1, limit: 500, companyId, sortOrder: 'desc' }),
     repo.findInvoices(tenantId, { page: 1, limit: 500, companyId, sortOrder: 'desc' }),
     repo.findAllocations(tenantId, {
@@ -461,10 +754,12 @@ export async function syncBundle(tenantId: string, companyId?: string) {
       includeReversed: true,
       sortOrder: 'desc',
     }),
+    repo.findProformas(tenantId, { page: 1, limit: 500, companyId, sortOrder: 'desc' }),
   ])
   return {
     receipts: receipts.items.map(mapReceiptDto),
     invoices: invoices.items.map(mapInvoiceDto),
     allocations: allocations.items.map(mapAllocationDto),
+    proformas: proformas.items.map(mapProformaDto),
   }
 }

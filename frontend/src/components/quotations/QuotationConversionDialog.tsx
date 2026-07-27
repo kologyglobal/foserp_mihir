@@ -28,8 +28,11 @@ export function QuotationConversionDialog({
     conversionError,
     preview,
     warnings,
+    validation,
     success,
   } = conversion
+
+  const blockingIssues = validation?.issues.filter((i) => i.blocking) ?? []
 
   const handleSuccessClose = () => {
     dismissConversion()
@@ -79,7 +82,7 @@ export function QuotationConversionDialog({
         onClose={closeConversionModal}
         closeDisabled={isConverting}
         title="Convert to Sales Order"
-        description="Create an Open sales order from this approved quotation. The linked opportunity will be marked Won."
+        description="Create an Open sales order from this quotation. Send and customer approval are optional. The linked opportunity will be marked Won."
         size="md"
         footer={
           <ErpButtonGroup className="justify-end">
@@ -95,7 +98,12 @@ export function QuotationConversionDialog({
               type="button"
               variant="primary"
               onClick={() => void confirmConversion()}
-              disabled={isConverting}
+              disabled={isConverting || blockingIssues.length > 0}
+              disabledReason={
+                blockingIssues.length > 0
+                  ? (blockingIssues[0]?.message ?? 'Complete commercial details first')
+                  : undefined
+              }
             >
               {isConverting ? 'Converting…' : 'Convert to Sales Order'}
             </ErpButton>
@@ -144,6 +152,20 @@ export function QuotationConversionDialog({
                 </dd>
               </div>
             </dl>
+
+            {blockingIssues.length > 0 ? (
+              <div
+                role="alert"
+                className="mt-3 flex items-start gap-2 rounded-lg border border-red-300/50 bg-red-50 px-3 py-2 text-[12px] text-red-800"
+              >
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                <ul className="min-w-0 list-disc space-y-1 pl-5">
+                  {blockingIssues.map((w) => (
+                    <li key={w.id}>{w.message}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             {warnings.length > 0 ? (
               <div

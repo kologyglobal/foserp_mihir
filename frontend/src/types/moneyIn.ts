@@ -218,6 +218,8 @@ export interface DispatchLineInvoiceReadyDto {
   deliveryChallanId: string | null
   deliveryChallanNumber: string | null
   deliveryChallanLineId: string | null
+  podStatus?: string | null
+  podBlocksInvoice?: boolean
 }
 
 export interface InvoicePrefillFromDispatchDto {
@@ -327,6 +329,7 @@ export interface ListSalesInvoicesQuery {
   customerId?: string
   status?: SalesInvoiceStatus
   sourceType?: SalesInvoiceSourceType
+  sourceDocumentId?: string
   search?: string
   invoiceDateFrom?: string
   invoiceDateTo?: string

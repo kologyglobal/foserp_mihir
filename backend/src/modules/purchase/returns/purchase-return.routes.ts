@@ -10,6 +10,7 @@ router.post('/', requirePermission('purchase.return.create'), validateBody(creat
 router.get('/:id', requirePermission('purchase.return.view'), validateParams(uuidParamSchema), controller.getPurchaseReturn)
 router.patch('/:id', requirePermission('purchase.return.edit'), validateParams(uuidParamSchema), validateBody(updatePurchaseReturnSchema), controller.updatePurchaseReturn)
 router.post('/:id/submit', requirePermission('purchase.return.submit'), validateParams(uuidParamSchema), validateBody(purchaseReturnRemarksSchema), controller.submitPurchaseReturn)
+router.post('/:id/approve', requirePermission('purchase.return.complete'), validateParams(uuidParamSchema), validateBody(purchaseReturnRemarksSchema), controller.approvePurchaseReturn)
 router.post('/:id/complete', requirePermission('purchase.return.complete'), validateParams(uuidParamSchema), validateBody(purchaseReturnRemarksSchema), controller.completePurchaseReturn)
 router.post('/:id/cancel', requirePermission('purchase.return.cancel'), validateParams(uuidParamSchema), validateBody(purchaseReturnRemarksSchema), controller.cancelPurchaseReturn)
 export default router

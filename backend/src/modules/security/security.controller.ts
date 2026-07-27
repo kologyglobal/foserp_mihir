@@ -2,9 +2,14 @@ import type { Request, Response } from 'express'
 import { auditFromRequest, listAuditLogs } from '../../services/audit.service.js'
 import { getContext, getRouteParam, getTenantId } from '../../types/request-context.js'
 import { sendPaginated, sendSuccess } from '../../utils/response.js'
-import { ADMIN_AUDIT_MODULES, MAX_FAILED_LOGINS, PASSWORD_MIN_LENGTH } from './security.constants.js'
+import * as securityPolicyService from './security-policy.service.js'
 import * as securityService from './security.service.js'
-import type { ListAuditLogsQuery, ListLoginActivityQuery, ListSessionsQuery } from './security.validation.js'
+import type {
+  ListAuditLogsQuery,
+  ListLoginActivityQuery,
+  ListSessionsQuery,
+  UpdateSecurityPolicyInput,
+} from './security.validation.js'
 
 function auditMeta(req: Request) {
   const ctx = getContext(req)
@@ -59,13 +64,18 @@ export async function unlockUser(req: Request, res: Response): Promise<void> {
   sendSuccess(res, 'User unlocked', user)
 }
 
-export async function getPolicy(_req: Request, res: Response): Promise<void> {
-  sendSuccess(res, 'Security policy retrieved', {
-    maxFailedLogins: MAX_FAILED_LOGINS,
-    passwordMinLength: PASSWORD_MIN_LENGTH,
-    mfa: 'not_configured' as const,
-    adminAuditModules: [...ADMIN_AUDIT_MODULES],
-  })
+export async function getPolicy(req: Request, res: Response): Promise<void> {
+  const policy = await securityPolicyService.getSecurityPolicy(getTenantId(req))
+  sendSuccess(res, 'Security policy retrieved', policy)
+}
+
+export async function updatePolicy(req: Request, res: Response): Promise<void> {
+  const policy = await securityPolicyService.updateSecurityPolicy(
+    getTenantId(req),
+    req.body as UpdateSecurityPolicyInput,
+    auditMeta(req),
+  )
+  sendSuccess(res, 'Security policy updated', policy)
 }
 
 export async function listAudit(req: Request, res: Response): Promise<void> {

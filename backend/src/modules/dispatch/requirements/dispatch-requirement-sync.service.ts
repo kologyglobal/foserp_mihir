@@ -77,7 +77,6 @@ export async function synchroniseDispatchRequirements(
         shipToKey,
         shipToAddress: pos.shipToAddress,
         itemId: pos.itemId,
-        productId: pos.productId,
         uomCode: pos.uom,
         orderedQuantitySnapshot: pos.orderedQty,
         cancelledQuantitySnapshot: pos.cancelledQty,

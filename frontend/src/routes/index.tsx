@@ -24,6 +24,7 @@ import { purchaseRouteTree } from './purchaseRoutes'
 import { accountingRouteChildren } from './accountingRoutes'
 import { adminRouteChildren } from './adminRoutes'
 import { organisationRouteChildren } from './organisationRoutes'
+import { operationsRouteChildren } from './operationsRoutes'
 
 export const router = createBrowserRouter([
   {
@@ -55,6 +56,7 @@ export const router = createBrowserRouter([
           ...logisticsRouteChildren,
           ...dispatchFinanceRouteChildren,
           ...gateRouteChildren,
+          ...operationsRouteChildren,
           ...reportsRouteChildren,
           ...accountingRouteChildren,
           ...organisationRouteChildren,

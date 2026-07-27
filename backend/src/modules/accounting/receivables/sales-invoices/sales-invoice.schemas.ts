@@ -75,6 +75,21 @@ export const salesInvoiceLineRequestSchema = z
 
 export type SalesInvoiceLineRequest = z.infer<typeof salesInvoiceLineRequestSchema>
 
+const salesInvoiceSourceLinkRequestSchema = z.object({
+  sourceType: z.enum(['SALES_ORDER', 'OUTBOUND_DISPATCH', 'DELIVERY_CHALLAN']),
+  sourceDocumentId: z.string().uuid(),
+  sourceLineId: z.string().uuid().nullable().optional(),
+  salesOrderId: z.string().uuid().nullable().optional(),
+  salesOrderLineId: z.string().uuid().nullable().optional(),
+  deliveryChallanId: z.string().uuid().nullable().optional(),
+  deliveryChallanLineId: z.string().uuid().nullable().optional(),
+  quantity: decimalQuantitySchema,
+  itemId: z.string().uuid().nullable().optional(),
+  itemCodeSnapshot: z.string().max(64).nullable().optional(),
+  itemNameSnapshot: z.string().max(300).nullable().optional(),
+  sourceDocumentNumberSnapshot: z.string().max(64).nullable().optional(),
+})
+
 const salesInvoiceDraftFieldsSchema = z.object({
   legalEntityId: z.string().uuid(),
   branchId: z.string().uuid().nullable().optional(),
@@ -108,6 +123,7 @@ const salesInvoiceDraftFieldsSchema = z.object({
   narration: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   lines: z.array(salesInvoiceLineRequestSchema).min(1),
+  sourceLinks: z.array(salesInvoiceSourceLinkRequestSchema).optional(),
 })
 
 type DraftFields = z.infer<typeof salesInvoiceDraftFieldsSchema>
@@ -234,6 +250,7 @@ export const listSalesInvoicesQuerySchema = z.object({
   customerId: z.string().uuid().optional(),
   status: salesInvoiceStatusSchema.optional(),
   sourceType: salesInvoiceSourceTypeSchema.optional(),
+  sourceDocumentId: z.string().uuid().optional(),
   currencyCode: z.string().max(8).optional(),
   createdBy: z.string().uuid().optional(),
   invoiceDateFrom: z.string().optional(),
@@ -251,6 +268,30 @@ export const listSalesInvoicesQuerySchema = z.object({
 })
 
 export type ListSalesInvoicesQueryInput = z.infer<typeof listSalesInvoicesQuerySchema>
+
+export const listInvoiceReadyQuerySchema = z.object({
+  customerId: z.string().uuid().optional(),
+  salesOrderId: z.string().uuid().optional(),
+  outboundDispatchId: z.string().uuid().optional(),
+  search: z.string().max(200).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+  readyOnly: z
+    .union([z.literal('true'), z.literal('false'), z.boolean()])
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined
+      return v === true || v === 'true'
+    }),
+})
+
+export type ListInvoiceReadyQueryInput = z.infer<typeof listInvoiceReadyQuerySchema>
+
+export const prefillFromDispatchSchema = z.object({
+  outboundDispatchLineIds: z.array(z.string().uuid()).min(1).max(200),
+})
+
+export type PrefillFromDispatchInput = z.infer<typeof prefillFromDispatchSchema>
 
 export const salesInvoiceIdParamSchema = z.object({
   id: z.string().uuid(),

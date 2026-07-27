@@ -10,11 +10,13 @@ import phase7c2Routes from './phase7c2/phase7c2.routes.js'
 import phase7c3Routes from './phase7c3/phase7c3.routes.js'
 import phase7c4Routes from './phase7c4/phase7c4.routes.js'
 import postingRoutes from './posting/dispatch-posting.routes.js'
+import settingsRoutes from './settings/dispatch-settings.routes.js'
 
 const router = Router({ mergeParams: true })
 
 router.use(authenticate, attachRequestContext, validateParams(tenantRouteParamSchema), resolveTenant, requireTenantAccess)
 
+router.use('/settings', settingsRoutes)
 router.use('/outbound', outboundRoutes)
 router.use('/', postingRoutes)
 router.use('/', phase7c1Routes)

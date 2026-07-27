@@ -7,7 +7,6 @@ import type {
   SalesInvoiceSettlementStatus,
   SalesInvoiceStatus,
 } from '@/types/moneyIn'
-import { isApiMode } from '../../../config/apiConfig'
 
 export const MONEY_IN_STATUS_LABELS: Record<SalesInvoiceStatus, string> = {
   DRAFT: 'Draft',
@@ -76,9 +75,9 @@ export function resolveSettlementStatus(
   return pastDue ? 'OVERDUE' : 'UNPAID'
 }
 
-/** Canonical AR workspace base path for the active mode. */
+/** Canonical AR workspace base path — always money-in (receivables/* redirects drop subpaths). */
 export function moneyInBasePath(): string {
-  return isApiMode() ? '/accounting/receivables' : '/accounting/money-in'
+  return '/accounting/money-in'
 }
 
 export function moneyInPath(subpath: string): string {
@@ -271,8 +270,10 @@ export function receiptDisplayNumber(receipt: { receiptNumber: string | null; dr
 export const MONEY_IN_WORKSPACE_TABS = [
   { label: 'Overview', path: '/accounting/money-in' },
   { label: 'Invoices', path: '/accounting/money-in/invoices' },
+  { label: 'Invoice Ready', path: '/accounting/money-in/invoice-ready' },
   { label: 'Receipts', path: '/accounting/money-in/receipts' },
   { label: 'Credit Notes', path: '/accounting/money-in/credit-notes' },
+  { label: 'Corrections', path: '/accounting/money-in/corrections' },
   { label: 'Outstanding', path: '/accounting/money-in/outstanding' },
   { label: 'Customers', path: '/accounting/money-in/customers' },
   { label: 'Ageing', path: '/accounting/money-in/ageing' },

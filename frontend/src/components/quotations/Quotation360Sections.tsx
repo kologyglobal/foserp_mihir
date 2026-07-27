@@ -245,6 +245,11 @@ export function QuotationWorkflowStepper({
                   ? 'Converted to Sales Order'
                   : `${currentLabel} · Step ${idx + 1} of ${WORKFLOW_STEPS.length}`}
           </p>
+          {!isConverted && !isInternalRejected && !isCustomerRejected ? (
+            <p className="mt-1 text-[11px] text-erp-muted">
+              Approval and send are optional — you can convert to a sales order once commercial details are ready.
+            </p>
+          ) : null}
         </div>
         <LiveStatusBadge label={quotationStatusLabel(status)} tone={quotationStatusTone(status)} pulse={false} />
       </div>

@@ -222,8 +222,16 @@ export async function submitPurchaseReturn(tenantId: string, id: string, actorId
   await transitionReturn(tenantId, existing, actorId, 'SUBMITTED', 'RETURN_SUBMITTED', body.remarks, { submittedAt: new Date() })
   return toReturnDto(tenantId, await loadOrThrow(tenantId, id))
 }
+
+export async function approvePurchaseReturn(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
+  const existing = await loadOrThrow(tenantId, id)
+  assertReturnStatus(existing.status, ['SUBMITTED'], 'approved')
+  await transitionReturn(tenantId, existing, actorId, 'APPROVED', 'RETURN_APPROVED', body.remarks)
+  return toReturnDto(tenantId, await loadOrThrow(tenantId, id))
+}
+
 export async function completePurchaseReturn(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
-  const existing = await loadOrThrow(tenantId, id); assertReturnStatus(existing.status, ['SUBMITTED', 'APPROVED', 'SHIPPED'], 'completed')
+  const existing = await loadOrThrow(tenantId, id); assertReturnStatus(existing.status, ['APPROVED', 'SHIPPED'], 'completed')
   const warehouseId = existing.warehouseId
   if (!warehouseId) throw new PurchaseReturnValidationError('Warehouse is required to complete a purchase return.')
   const returnMovements = await prisma.$transaction(async (tx) => {

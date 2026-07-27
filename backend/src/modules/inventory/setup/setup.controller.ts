@@ -2,6 +2,7 @@ import type { Request, Response } from 'express'
 import { getContext, getTenantId } from '../../../types/request-context.js'
 import { asyncHandler } from '../../../utils/asyncHandler.js'
 import { sendSuccess } from '../../../utils/response.js'
+import { migrateFifoOpeningStock } from '../costing/fifo-opening-stock-migration.service.js'
 import * as service from './setup.service.js'
 import * as lookup from './lookup.service.js'
 
@@ -20,4 +21,16 @@ export const lookupInventoryCode = asyncHandler(async (req: Request, res: Respon
   const warehouseId = req.query.warehouseId ? String(req.query.warehouseId) : undefined
   const data = await lookup.lookupInventoryCode(getTenantId(req), code, warehouseId)
   sendSuccess(res, 'Inventory lookup completed', data)
+})
+
+export const postFifoOpeningMigration = asyncHandler(async (req: Request, res: Response) => {
+  const data = await migrateFifoOpeningStock({
+    tenantId: getTenantId(req),
+    dryRun: Boolean(req.body?.dryRun),
+    force: Boolean(req.body?.force),
+    itemIds: req.body?.itemIds,
+    warehouseIds: req.body?.warehouseIds,
+    createdBy: getContext(req).userId,
+  })
+  sendSuccess(res, data.dryRun ? 'FIFO opening-stock migration preview' : 'FIFO opening-stock migration completed', data)
 })

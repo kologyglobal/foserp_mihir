@@ -177,10 +177,6 @@ export async function revokeAdminUserSessionsApi(userId: string) {
   })
 }
 
-export async function fetchAdminUserEffectiveAccessApi(userId: string) {
-  return apiRequest<AdminEffectiveAccess>(tenantPath(`/users/${userId}/effective-access`))
-}
-
 // ─── Roles & Permissions ───────────────────────────────────────────────────
 
 export async function fetchAdminRolesApi() {
@@ -485,12 +481,40 @@ export interface AdminEffectiveAccessReport {
   modules: Array<{ module: string; count: number; sensitiveCount: number }>
   scopes: AdminUserDataScope
   responsibilities: AdminUserResponsibility[]
+  moduleAdministrations: string[]
   explain: { summary: string; notes: string[] }
   generatedAt: string
 }
 
 export async function fetchAdminEffectiveAccessApi(userId: string) {
   return apiRequest<AdminEffectiveAccessReport>(tenantPath(`/users/${userId}/effective-access`))
+}
+
+/** Maps Phase 7 detailed report to the compact A4 store shape. */
+export async function fetchAdminUserEffectiveAccessApi(userId: string) {
+  const res = await fetchAdminEffectiveAccessApi(userId)
+  const report = res.data
+  const permissions = report.permissions.map((p) => p.name)
+  const roles = report.roles.map((r) => ({
+    id: r.id,
+    name: r.name,
+    description: null as string | null,
+    isSystem: r.isSystem,
+  }))
+  const data: AdminEffectiveAccess = {
+    userId: report.user.id,
+    tenantId: '',
+    roles,
+    permissions,
+    permissionCount: report.permissionCount,
+    isSuperAdmin: permissions.includes('tenant.manage'),
+    isTenantAdmin:
+      permissions.includes('tenant.manage') ||
+      roles.some((r) =>
+        ['Super Admin', 'Tenant Admin', 'Admin', 'Administrator', 'CEO'].includes(r.name),
+      ),
+  }
+  return { ...res, data }
 }
 
 export interface AdminAccessReviewItem {
@@ -605,6 +629,17 @@ export interface AdminModuleStatus {
   isEnabled: boolean
   configured: boolean
   blockedBy: string[]
+  administrators: AdminModuleAdministrator[]
+}
+
+export interface AdminModuleAdministrator {
+  id: string
+  userId: string
+  moduleKey: string
+  email: string
+  firstName: string
+  lastName: string
+  status: string
 }
 
 export async function fetchAdminModulesApi() {
@@ -618,17 +653,46 @@ export async function setAdminModuleFlagApi(moduleKey: string, payload: { isEnab
   })
 }
 
+export async function fetchAdminModuleAdministratorsApi(moduleKey?: string) {
+  const path = moduleKey
+    ? tenantPath(`/modules/${moduleKey}/administrators`)
+    : tenantPath('/modules/administrators')
+  return apiRequest<AdminModuleAdministrator[]>(path)
+}
+
+export async function replaceAdminModuleAdministratorsApi(moduleKey: string, userIds: string[]) {
+  return apiRequest<AdminModuleAdministrator[]>(tenantPath(`/modules/${moduleKey}/administrators`), {
+    method: 'PUT',
+    body: JSON.stringify({ userIds }),
+  })
+}
+
 // ─── Security policy + Admin Audit (Phase 10) ────────────────────────────────
 
 export interface AdminSecurityPolicy {
   maxFailedLogins: number
   passwordMinLength: number
+  requireComplexity?: boolean
+  mfaMode?: 'off' | 'optional' | 'required'
+  mfaEnrollmentAvailable?: boolean
   mfa: 'not_configured' | string
   adminAuditModules: string[]
 }
 
 export async function fetchAdminSecurityPolicyApi() {
   return apiRequest<AdminSecurityPolicy>(tenantPath('/security/policy'))
+}
+
+export async function updateAdminSecurityPolicyApi(body: {
+  passwordMinLength?: number
+  maxFailedLogins?: number
+  requireComplexity?: boolean
+  mfaMode?: 'off' | 'optional' | 'required'
+}) {
+  return apiRequest<AdminSecurityPolicy>(tenantPath('/security/policy'), {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
 }
 
 export interface AdminAuditLogRow {

@@ -62,6 +62,13 @@ export async function rejectQualityInspectionApi(id: string, payload: Record<str
   })
 }
 
+export async function holdQualityInspectionApi(id: string, payload: Record<string, unknown> = {}) {
+  return apiRequest<ApiQualityInspection>(`${base()}/${id}/hold`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
 export async function cancelQualityInspectionApi(id: string, payload: Record<string, unknown> = {}) {
   return apiRequest<ApiQualityInspection>(`${base()}/${id}/cancel`, {
     method: 'POST',

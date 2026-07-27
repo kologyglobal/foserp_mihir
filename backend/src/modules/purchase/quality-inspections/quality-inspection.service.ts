@@ -273,114 +273,136 @@ export async function completeQualityInspection(
     }
   })
 
-  // Complete QI / GRN first so purchase UAT is not blocked when inventory tables are missing.
-  await prisma.$transaction(async (tx) => {
-    await repo.replaceQualityInspectionLines(
-      tenantId,
-      id,
-      linesForPersist.map(({ id: _lineId, ...line }) => line),
-      tx,
-    )
-    await repo.updateQualityInspection(tenantId, id, {
-      status, completedAt: new Date(), updatedById: actorId,
-      remarks: body.remarks?.trim() || existing.remarks,
-      deviationRemarks: body.deviationRemarks?.trim() || existing.deviationRemarks,
-    }, tx)
-    for (const line of linesForPersist.filter((item) => item.goodsReceiptLineId)) {
-      await tx.goodsReceiptLine.updateMany({ where: { id: line.goodsReceiptLineId!, tenantId }, data: {
-        acceptedQuantity: line.acceptedQuantity + (defaults.allowAcceptanceUnderDeviation ? line.deviationQuantity : 0),
-        rejectedQuantity: line.rejectedQuantity,
-      } })
-    }
-    if (existing.goodsReceiptId) await tx.goodsReceipt.updateMany({ where: { id: existing.goodsReceiptId, tenantId, deletedAt: null }, data: {
-      status: 'INVENTORY_POSTED',
-      updatedById: actorId,
-    } })
-    await repo.addQiHistory(tenantId, id, existing.inspectionNumber, 'QI_COMPLETED', existing.status, status, actorId, body.remarks, tx)
-  })
-
-  if (grn) {
-    try {
-      const qiInwardMovements = await prisma.$transaction(async (tx) => {
-        const inwardLines = grn.lines.map((gl) => {
-          const qiLine = linesForPersist.find((l) => l.goodsReceiptLineId === gl.id)
-          const holdQty = qiLine
-            ? qiLine.inspectedQuantity
-            : qiQty(gl.acceptedForQcQuantity) || qiQty(gl.receivedQuantity)
-          return {
-            ...gl,
-            acceptedForQcQuantity: holdQty,
-            acceptedQuantity: holdQty,
-          }
-        })
-        const inwardMovements = await postGrnStockInward({
-          tenantId,
-          grnId: grn.id,
-          grnNumber: grn.grnNumber,
-          warehouseId: grn.warehouseId,
-          lines: inwardLines,
-          useAcceptedQuantity: true,
-          actorId,
-          tx,
-        })
-        for (const line of linesForPersist) {
-          if (!line.goodsReceiptLineId || !line.itemId) continue
-          const source = grnLineById.get(line.goodsReceiptLineId)
-          if (!source) continue
-          const acceptedQty =
-            line.acceptedQuantity +
-            (defaults.allowAcceptanceUnderDeviation ? line.deviationQuantity : 0)
-          if (acceptedQty > 0) {
-            await InventoryPostingService.transferStatus({
-              tenantId,
-              itemId: line.itemId,
-              warehouseId: grn.warehouseId,
-              fromStockStatus: 'QC_HOLD',
-              stockStatus: 'UNRESTRICTED',
-              quantity: acceptedQty,
-              referenceType: 'QUALITY_RELEASE',
-              referenceNo: existing.inspectionNumber,
-              remarks: `QI accepted from ${grn.grnNumber}`,
-              idempotencyKey: `qi-release:${id}:${line.goodsReceiptLineId}`,
-              batchNumber: source.batchNumber ?? undefined,
-              serialNumber: source.serialNumber ?? undefined,
-              createdBy: actorId,
-            }, tx)
-          }
-          if (line.rejectedQuantity > 0) {
-            await InventoryPostingService.transferStatus({
-              tenantId,
-              itemId: line.itemId,
-              warehouseId: grn.warehouseId,
-              fromStockStatus: 'QC_HOLD',
-              stockStatus: 'REJECTED',
-              quantity: line.rejectedQuantity,
-              referenceType: 'QUALITY_REJECT',
-              referenceNo: existing.inspectionNumber,
-              remarks: `QI rejected from ${grn.grnNumber}`,
-              idempotencyKey: `qi-reject:${id}:${line.goodsReceiptLineId}`,
-              batchNumber: source.batchNumber ?? undefined,
-              serialNumber: source.serialNumber ?? undefined,
-              createdBy: actorId,
-            }, tx)
-          }
-        }
-        return inwardMovements
-      })
-      await tryRecordInventoryAccountingEventsForMovements(null, tenantId, qiInwardMovements, {
-        sourceDocumentType: 'GOODS_RECEIPT',
-        sourceDocumentId: grn.id,
-        narration: `GRN inward ${grn.grnNumber} (via QI ${existing.inspectionNumber})`,
-        userId: actorId,
-      })
-    } catch (err) {
-      logger.warn('QI inventory posting deferred (purchase completion kept)', {
-        qualityInspectionId: id,
-        goodsReceiptId: grn.id,
-        error: err instanceof Error ? err.message : String(err),
-      })
-    }
+  // Fail closed: QI completion, GRN line qtys, stock release, and GRN INVENTORY_POSTED
+  // commit together — never mark inventory posted if stock movements fail.
+  if (!grn) {
+    await prisma.$transaction(async (tx) => {
+      await repo.replaceQualityInspectionLines(
+        tenantId,
+        id,
+        linesForPersist.map(({ id: _lineId, ...line }) => line),
+        tx,
+      )
+      await repo.updateQualityInspection(tenantId, id, {
+        status, completedAt: new Date(), updatedById: actorId,
+        remarks: body.remarks?.trim() || existing.remarks,
+        deviationRemarks: body.deviationRemarks?.trim() || existing.deviationRemarks,
+      }, tx)
+      await repo.addQiHistory(tenantId, id, existing.inspectionNumber, 'QI_COMPLETED', existing.status, status, actorId, body.remarks, tx)
+    })
+    return toQiDto(tenantId, await loadOrThrow(tenantId, id))
   }
+
+  let qiInwardMovements: Awaited<ReturnType<typeof postGrnStockInward>> = []
+  try {
+    qiInwardMovements = await prisma.$transaction(async (tx) => {
+      await repo.replaceQualityInspectionLines(
+        tenantId,
+        id,
+        linesForPersist.map(({ id: _lineId, ...line }) => line),
+        tx,
+      )
+      await repo.updateQualityInspection(tenantId, id, {
+        status, completedAt: new Date(), updatedById: actorId,
+        remarks: body.remarks?.trim() || existing.remarks,
+        deviationRemarks: body.deviationRemarks?.trim() || existing.deviationRemarks,
+      }, tx)
+      for (const line of linesForPersist.filter((item) => item.goodsReceiptLineId)) {
+        await tx.goodsReceiptLine.updateMany({ where: { id: line.goodsReceiptLineId!, tenantId }, data: {
+          acceptedQuantity: line.acceptedQuantity + (defaults.allowAcceptanceUnderDeviation ? line.deviationQuantity : 0),
+          rejectedQuantity: line.rejectedQuantity,
+        } })
+      }
+
+      const inwardLines = grn.lines.map((gl) => {
+        const qiLine = linesForPersist.find((l) => l.goodsReceiptLineId === gl.id)
+        const holdQty = qiLine
+          ? qiLine.inspectedQuantity
+          : qiQty(gl.acceptedForQcQuantity) || qiQty(gl.receivedQuantity)
+        return {
+          ...gl,
+          acceptedForQcQuantity: holdQty,
+          acceptedQuantity: holdQty,
+        }
+      })
+      const inwardMovements = await postGrnStockInward({
+        tenantId,
+        grnId: grn.id,
+        grnNumber: grn.grnNumber,
+        warehouseId: grn.warehouseId,
+        lines: inwardLines,
+        useAcceptedQuantity: true,
+        actorId,
+        tx,
+      })
+      for (const line of linesForPersist) {
+        if (!line.goodsReceiptLineId || !line.itemId) continue
+        const source = grnLineById.get(line.goodsReceiptLineId)
+        if (!source) continue
+        const acceptedQty =
+          line.acceptedQuantity +
+          (defaults.allowAcceptanceUnderDeviation ? line.deviationQuantity : 0)
+        if (acceptedQty > 0) {
+          await InventoryPostingService.transferStatus({
+            tenantId,
+            itemId: line.itemId,
+            warehouseId: grn.warehouseId,
+            fromStockStatus: 'QC_HOLD',
+            stockStatus: 'UNRESTRICTED',
+            quantity: acceptedQty,
+            referenceType: 'QUALITY_RELEASE',
+            referenceNo: existing.inspectionNumber,
+            remarks: `QI accepted from ${grn.grnNumber}`,
+            idempotencyKey: `qi-release:${id}:${line.goodsReceiptLineId}`,
+            batchNumber: source.batchNumber ?? undefined,
+            serialNumber: source.serialNumber ?? undefined,
+            createdBy: actorId,
+          }, tx)
+        }
+        if (line.rejectedQuantity > 0) {
+          await InventoryPostingService.transferStatus({
+            tenantId,
+            itemId: line.itemId,
+            warehouseId: grn.warehouseId,
+            fromStockStatus: 'QC_HOLD',
+            stockStatus: 'REJECTED',
+            quantity: line.rejectedQuantity,
+            referenceType: 'QUALITY_REJECT',
+            referenceNo: existing.inspectionNumber,
+            remarks: `QI rejected from ${grn.grnNumber}`,
+            idempotencyKey: `qi-reject:${id}:${line.goodsReceiptLineId}`,
+            batchNumber: source.batchNumber ?? undefined,
+            serialNumber: source.serialNumber ?? undefined,
+            createdBy: actorId,
+          }, tx)
+        }
+      }
+
+      await tx.goodsReceipt.updateMany({
+        where: { id: existing.goodsReceiptId!, tenantId, deletedAt: null },
+        data: { status: 'INVENTORY_POSTED', updatedById: actorId },
+      })
+      await repo.addQiHistory(tenantId, id, existing.inspectionNumber, 'QI_COMPLETED', existing.status, status, actorId, body.remarks, tx)
+      return inwardMovements
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    logger.error('QI inventory posting failed — purchase completion rolled back', {
+      qualityInspectionId: id,
+      goodsReceiptId: grn.id,
+      error: message,
+    })
+    throw new QualityInspectionWorkflowError(
+      `Quality inspection could not release stock to inventory: ${message}`,
+    )
+  }
+
+  await tryRecordInventoryAccountingEventsForMovements(null, tenantId, qiInwardMovements, {
+    sourceDocumentType: 'GOODS_RECEIPT',
+    sourceDocumentId: grn.id,
+    narration: `GRN inward ${grn.grnNumber} (via QI ${existing.inspectionNumber})`,
+    userId: actorId,
+  })
   return toQiDto(tenantId, await loadOrThrow(tenantId, id))
 }
 
@@ -390,8 +412,27 @@ async function transitionQi(tenantId: string, existing: Awaited<ReturnType<typeo
     await repo.addQiHistory(tenantId, existing.id, existing.inspectionNumber, action, existing.status, status, actorId, remarks, tx)
   })
 }
+export async function holdQualityInspection(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
+  const existing = await loadOrThrow(tenantId, id)
+  if (!['DRAFT', 'PENDING', 'IN_PROGRESS'].includes(existing.status)) {
+    throw new QualityInspectionWorkflowError(`Quality inspection cannot be put on hold from ${existing.status}.`)
+  }
+  await transitionQi(
+    tenantId,
+    existing,
+    actorId,
+    'DEVIATION_PENDING',
+    'QI_HOLD',
+    body.remarks?.trim() || existing.remarks || 'Held pending review',
+  )
+  return toQiDto(tenantId, await loadOrThrow(tenantId, id))
+}
+
 export async function cancelQualityInspection(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
-  const existing = await loadOrThrow(tenantId, id); assertQiEditable(existing.status)
+  const existing = await loadOrThrow(tenantId, id)
+  if (!['DRAFT', 'PENDING', 'IN_PROGRESS', 'DEVIATION_PENDING'].includes(existing.status)) {
+    throw new QualityInspectionWorkflowError(`Quality inspection cannot be cancelled from ${existing.status}.`)
+  }
   await transitionQi(tenantId, existing, actorId, 'CANCELLED', 'QI_CANCELLED', body.remarks)
   return toQiDto(tenantId, await loadOrThrow(tenantId, id))
 }

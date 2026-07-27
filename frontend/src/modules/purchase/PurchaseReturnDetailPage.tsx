@@ -41,6 +41,7 @@ import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { usePurchasePermissions } from '@/utils/permissions'
+import { isApiMode } from '@/config/apiConfig'
 
 export function PurchaseReturnDetailPage() {
   const { id } = useParams()
@@ -106,12 +107,16 @@ export function PurchaseReturnDetailPage() {
 
   const canEdit = doc.status === 'draft' || doc.status === 'pending_approval'
   const canSubmit = doc.status === 'draft'
-  const canApprove = doc.status === 'pending_approval' || doc.status === 'draft'
+  const canApprove = doc.status === 'pending_approval'
   const canPost = doc.status === 'approved'
   const canDebit =
-    (doc.status === 'approved' || doc.status === 'posted') && !doc.linkedDebitNoteId
+    !isApiMode()
+    && (doc.status === 'approved' || doc.status === 'posted')
+    && !doc.linkedDebitNoteId
   const canReplacement =
-    (doc.status === 'approved' || doc.status === 'posted') && !doc.linkedReplacementPoId
+    !isApiMode()
+    && (doc.status === 'approved' || doc.status === 'posted')
+    && !doc.linkedReplacementPoId
   const canCancel = !['posted', 'closed', 'cancelled'].includes(doc.status)
 
   const documentFactBox = (
@@ -189,7 +194,7 @@ export function PurchaseReturnDetailPage() {
               },
               {
                 id: 'submit',
-                label: 'Submit for Approval',
+                label: isApiMode() ? 'Submit' : 'Submit for Approval',
                 icon: Send,
                 onClick: () => void runAction(() => submitPurchaseReturn(doc.id), 'Submitted'),
                 hidden: !perms.canCreateReturn || !canSubmit,
@@ -200,14 +205,18 @@ export function PurchaseReturnDetailPage() {
                 label: 'Approve',
                 icon: CheckCircle2,
                 onClick: () => void runAction(() => approvePurchaseReturn(doc.id), 'Approved'),
-                hidden: !perms.canCreateReturn || !canApprove,
+                hidden: !(perms.canPostReturn || perms.canCreateReturn) || !canApprove,
                 disabled: busy,
               },
               {
                 id: 'post',
-                label: 'Post Return',
+                label: isApiMode() ? 'Complete Return' : 'Post Return',
                 icon: Truck,
-                onClick: () => void runAction(() => postPurchaseReturn(doc.id), 'Return posted'),
+                onClick: () =>
+                  void runAction(
+                    () => postPurchaseReturn(doc.id),
+                    isApiMode() ? 'Return completed — stock issued' : 'Return posted',
+                  ),
                 hidden: !perms.canPostReturn || !canPost,
                 disabled: busy,
               },

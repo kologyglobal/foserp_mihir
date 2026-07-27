@@ -6,7 +6,7 @@ import { resolveTenant, requireTenantAccess } from '../../../middleware/tenant.m
 import { validateBody, validateParams, validateQuery } from '../../../middleware/validation.middleware.js'
 import { tenantRouteParamSchema } from '../../../utils/pagination.js'
 import * as controller from './setup.controller.js'
-import { inventorySetupBodySchema, lookupQuerySchema } from './setup.schemas.js'
+import { fifoOpeningMigrationBodySchema, inventorySetupBodySchema, lookupQuerySchema } from './setup.schemas.js'
 
 const router = Router({ mergeParams: true })
 
@@ -36,6 +36,13 @@ router.get(
   ),
   validateQuery(lookupQuerySchema),
   controller.lookupInventoryCode,
+)
+
+router.post(
+  '/fifo-opening-migration',
+  requirePermission('inventory.setup.manage'),
+  validateBody(fifoOpeningMigrationBodySchema),
+  controller.postFifoOpeningMigration,
 )
 
 export default router

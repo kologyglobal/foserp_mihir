@@ -21,7 +21,6 @@ userEffectiveAccessRoutes.use(
 
 userEffectiveAccessRoutes.get(
   '/:userId/effective-access',
-  requirePermission('access.view'),
   validateParams(effectiveAccessUserParamSchema),
   asyncHandler(controller.getEffectiveAccess),
 )

@@ -7,7 +7,11 @@ import type { UpdateQuotationDocumentInput, UpdateQuotationInput } from './quota
  * Quotation document lifecycle (enforced):
  * draft → pending_approval → approved → sent → (customerApproval) → converted
  *
+ * Send / internal approval / customer approval are optional. Convert-to-SO may run
+ * from draft onward once commercial content is valid (see quotation.convert.ts).
+ *
  * customerApproval is independent of document status and is set only via
+ * dedicated customer-approve / customer-reject routes when that optional path is used.
  * customer-approve / customer-reject after the document is sent.
  */
 

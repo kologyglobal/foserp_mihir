@@ -1,4 +1,71 @@
-﻿# 2026-07-23 — ISO tank child MAKE SA WO depth
+﻿# 2026-07-27 — Dispatch O2C invoice-ready → allocate
+
+- Suite: `backend/tests/dispatch-o2c-invoice-allocate.test.ts` — **1/1 PASS** (live MySQL).
+- Covers: hardened post → `GET invoice-ready` → `POST prefill-from-dispatch` → create SI with `sourceLinks` → mark-ready → post → receipt → allocate to zero open amount.
+- Auto-draft SI released before manual create so ready qty is re-exercised.
+
+---
+
+# 2026-07-27 — Inventory Costing Phase 1 UI (browser walk)
+
+- `VITE_USE_API=true` live walk as Tenant Admin (`vasant-trailers`)
+- Valuation Summary: **PASS** (43 cost entries; open FIFO layers 0; recon mismatches 0)
+- Cost Entries: **PASS** (43 rows — `FG_DISPATCH`, `FG_RECEIPT`, `ISSUE_TO_WO`, opening)
+- FIFO Layers: **PASS** (empty state — expected under non-FIFO active method; EmptyState icon crash fixed)
+- Valuation Reconciliation: **PASS** (page loads; Method Moving average · Rows 0 · Mismatches 0)
+- GRN register: empty in UI (no posted GRN to click through; receipt cost still visible via Cost Entries sources)
+- Fix: `DispatchSettingsPage` bad `@/store/authStore` import blocked Vite — switched to `getStoredSession`
+- Note: backend `tsx watch` restarts from concurrent purchase edits caused intermittent session drops during walk
+
+# 2026-07-27 — Inventory Costing Phase C
+
+- Migration `20260727200000_inventory_costing_phasec_standard_specific_recon` applied (local)
+- `npx vitest run tests/inventory-costing-phasec.test.ts` — **PASS** (2/2)
+  - Standard receipt @100 with actual 120 → variance 200; method-change to FIFO + opening migrate → recon MATCHED
+- Regression: FIFO layers + RETURN_FROM_WO restore — **PASS**
+
+---
+
+# 2026-07-27 — FIFO RETURN_FROM_WO layer restore
+
+- `npx vitest run tests/inventory-fifo-return-restore.test.ts` — **PASS** (1/1)
+  - Issue 8@10 → return 5 with caller rate 99 → movement valued @10 / 50; oldest layer remaining 2→7; negative consumption audit row
+- Regression: `tests/inventory-fifo-layers.test.ts` — **PASS**
+
+---
+
+# 2026-07-27 — FIFO opening-stock migration
+
+- `npx vitest run tests/inventory-fifo-opening-migration.test.ts` — **PASS** (1/1)
+  - Seed avg stock 20 (avgRate 15) with no layers → set FIFO → issue blocked → migrate creates OPEN 20@15 without qty change → issue 5 @15 succeeds
+- Regression: `tests/inventory-fifo-layers.test.ts` — **PASS**
+
+---
+
+# 2026-07-27 — Inventory Costing Phase B FIFO verification
+
+- Migrations applied on local MySQL `fos_erp`:
+  - `20260727183000_inventory_costing_phasea_foundation`
+  - `20260727190000_inventory_costing_phaseb_fifo_layers`
+  - (also applied pending) `20260727194500_admin_security_policy_crm_org_scope`
+- Prisma client regenerated (`npx tsx scripts/prisma-cli.ts generate`)
+- Focused verification: `npx vitest run tests/inventory-fifo-layers.test.ts` — **PASS** (1/1)
+  - Receipts create OPEN `InventoryCostLayer` rows (10@10 then 10@20)
+  - Issue 5 consumes oldest layer only → movement rate/value `10` / `50`
+  - Issue 8 crosses layers (5@10 + 3@20) → rate/value `13.75` / `110`; oldest layer CONSUMED
+- Regression: `tests/inventory-moving-average.test.ts` — **PASS** (1/1) with cost-entry cleanup order fixed in manufacturing fixture
+
+---
+
+# 2026-07-27 — Inventory Costing Phase A foundation
+
+- Scope shipped: additive `InventoryCostEntry` schema + migration, valuation strategy scaffold, stock-posting hook for cost entry creation.
+- Follow-up (2026-07-27): migrations applied + FIFO Phase B verified (see entry above).
+- Remaining: cost-entry/layer read APIs, opening-stock migration for existing balances, return reversal lineage, Std/Specific engines.
+
+---
+
+# 2026-07-23 — ISO tank child MAKE SA WO depth
 
 - `npx tsx scripts/test-iso-tank-child-sa-wo.ts` (vasant-trailers) — **PASS** (exit 0)
   - Parent **WO-000037** → 5 child WOs; executed **WO-000042** (`SA-LADDER`)
@@ -422,6 +489,14 @@ See [`PURCHASE_FORM_FOOTER_AUDIT.md`](PURCHASE_FORM_FOOTER_AUDIT.md).
 ---
 
 # Testing Status
+
+## 2026-07-27 — Dispatch O2C invoice-ready → allocate
+
+- Suite: `backend/tests/dispatch-o2c-invoice-allocate.test.ts` — **1/1 PASS** (live MySQL).
+- Covers: hardened post → `GET invoice-ready` → `POST prefill-from-dispatch` → create SI with `sourceLinks` → mark-ready → post → receipt → allocate to zero open amount.
+- Auto-draft SI released before manual create so ready qty is re-exercised.
+
+---
 
 ### 2026-07-21 — Self-approval policy (maker-checker override)
 

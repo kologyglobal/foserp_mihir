@@ -2,6 +2,7 @@ import { prisma } from '../../config/database.js'
 import { NotFoundError } from '../../utils/errors.js'
 import { listUserResponsibilities } from '../responsibilities/responsibility.service.js'
 import { loadUserDataScope, type UserDataScope } from '../access-scopes/scope.service.js'
+import { listUserModuleAdministrations } from '../modules/module.service.js'
 import { isSensitivePermission } from './sensitive-permissions.js'
 
 export interface EffectivePermissionGrant {
@@ -30,6 +31,8 @@ export interface EffectiveAccessReport {
   modules: Array<{ module: string; count: number; sensitiveCount: number }>
   scopes: UserDataScope
   responsibilities: Awaited<ReturnType<typeof listUserResponsibilities>>
+  /** Catalog keys where this user is a designated module administrator */
+  moduleAdministrations: string[]
   explain: {
     summary: string
     notes: string[]
@@ -107,9 +110,10 @@ export async function getEffectiveAccess(tenantId: string, userId: string): Prom
     .map(([module, v]) => ({ module, ...v }))
     .sort((a, b) => a.module.localeCompare(b.module))
 
-  const [scopes, responsibilities] = await Promise.all([
+  const [scopes, responsibilities, moduleAdministrations] = await Promise.all([
     loadUserDataScope(tenantId, userId),
     listUserResponsibilities(tenantId, userId),
+    listUserModuleAdministrations(tenantId, userId),
   ])
 
   const notes: string[] = [
@@ -129,6 +133,13 @@ export async function getEffectiveAccess(tenantId: string, userId: string): Prom
   } else {
     notes.push(`${responsibilities.length} responsibility assignment(s) (labels only — do not replace approval engines).`)
   }
+  if (moduleAdministrations.length === 0) {
+    notes.push('Not designated as a module administrator for any catalog module.')
+  } else {
+    notes.push(
+      `Module administrator for: ${moduleAdministrations.join(', ')} (designation only — does not grant module.manage).`,
+    )
+  }
 
   const summary = [
     `${user.firstName} ${user.lastName}`,
@@ -136,6 +147,7 @@ export async function getEffectiveAccess(tenantId: string, userId: string): Prom
     `${permissions.length} permission(s)`,
     scopes.unrestricted ? 'unrestricted scope' : 'scoped',
     `${responsibilities.length} responsibility(ies)`,
+    `${moduleAdministrations.length} module admin designation(s)`,
   ].join(' · ')
 
   return {
@@ -155,6 +167,7 @@ export async function getEffectiveAccess(tenantId: string, userId: string): Prom
     modules,
     scopes,
     responsibilities,
+    moduleAdministrations,
     explain: { summary, notes },
     generatedAt: new Date().toISOString(),
   }

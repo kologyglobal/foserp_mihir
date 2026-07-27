@@ -72,6 +72,16 @@ export interface ApiPurchaseApprovalTier {
   documentType: string
 }
 
+export interface ApiPurchaseApproverLimit {
+  id: string
+  userId: string
+  userName: string
+  maxAmountInr: number
+  documentType: string
+  isActive: boolean
+  sortOrder: number
+}
+
 export interface ApiPurchaseSetupTax {
   defaultGstScheme: ApiGstScheme
   placeOfSupplyState: string
@@ -157,6 +167,7 @@ export interface ApiPurchaseSetup {
   requisition: ApiPurchaseSetupRequisition
   numberSeries: ApiPurchaseSetupNumberSeries
   approvalMatrix: ApiPurchaseApprovalTier[]
+  approverLimits: ApiPurchaseApproverLimit[]
   tax: ApiPurchaseSetupTax
   invoiceMatchTolerances: ApiPurchaseInvoiceMatchTolerances
   allowDirectInvoice: boolean
@@ -181,6 +192,15 @@ export interface ApiPurchaseApprovalTierInput {
   documentType?: string
 }
 
+export interface ApiPurchaseApproverLimitInput {
+  id?: string
+  userId: string
+  maxAmountInr: number
+  documentType?: string
+  isActive?: boolean
+  sortOrder?: number
+}
+
 export type ApiPurchaseNumberSeriesInput = Partial<
   Record<ApiPurchaseNumberSeriesKey, { prefix: string; padLength: number }>
 >
@@ -193,6 +213,7 @@ export interface ApiPurchaseSetupInput {
   requisition?: Partial<ApiPurchaseSetupRequisition>
   numberSeries?: ApiPurchaseNumberSeriesInput
   approvalMatrix?: ApiPurchaseApprovalTierInput[]
+  approverLimits?: ApiPurchaseApproverLimitInput[]
   tax?: Partial<ApiPurchaseSetupTax>
   invoiceMatchTolerances?: Partial<ApiPurchaseInvoiceMatchTolerances>
   allowDirectInvoice?: boolean

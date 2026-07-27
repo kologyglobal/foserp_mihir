@@ -1893,6 +1893,7 @@ export function mapDomainQualityInspectionInputToApiPayload(
 function mapApiReturnStatus(status: string): PurchaseReturnDomainStatus {
   switch (status.toUpperCase()) {
     case 'SUBMITTED':
+      return 'pending_approval'
     case 'APPROVED':
     case 'SHIPPED':
       return 'approved'

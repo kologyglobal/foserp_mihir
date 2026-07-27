@@ -3,6 +3,7 @@ import type { Item, Product } from '../types/master'
 import type { TaxCategory } from '../types/productMaster'
 import { PRODUCT_FAMILY_LABELS } from '../types/productMaster'
 import { useMasterStore } from '../store/masterStore'
+import { canUseItemInSales } from './opportunityItemOptions'
 import { assertProductSellableForSales } from './productMaster'
 
 export function taxCategoryToPct(tax: TaxCategory | string | undefined): number {
@@ -258,6 +259,23 @@ export function buildOpportunityLineFromProduct(
   })
 }
 
+/** Primary CRM path — build opportunity line from MasterItem (salesAllowed). */
+export function buildOpportunityLineFromItem(item: Item, uomName: string, lineNo: number): OpportunityLine {
+  return createEmptyOpportunityLine(lineNo, {
+    productId: null,
+    itemId: item.id,
+    itemCode: item.itemCode,
+    productOrItem: item.itemName,
+    description: (item.salesDescription ?? item.itemDescription ?? '').trim(),
+    productFamily: item.productType ?? item.itemType,
+    itemType: item.itemType,
+    uom: uomName,
+    unitPrice: item.defaultSalesRate ?? item.standardRate ?? 0,
+    taxPct: 18,
+    qty: 1,
+  })
+}
+
 export interface OpportunityLineValidation {
   errors: string[]
   rowErrors: Record<string, string[]>
@@ -300,18 +318,22 @@ export function validateOpportunityLines(
   const requireCommercialLines = Boolean(header.stage && !earlyStages.has(header.stage))
 
   const meaningfulLines = lines.filter(
-    (l) => l.productId || l.productOrItem.trim() || (l.unitPrice != null && l.unitPrice > 0),
+    (l) => l.itemId || l.productId || l.productOrItem.trim() || (l.unitPrice != null && l.unitPrice > 0),
   )
 
   if (requireCommercialLines && meaningfulLines.length === 0) {
-    errors.push('At least one product / item line is required.')
+    errors.push('At least one item line is required.')
   }
 
   const getProduct = useMasterStore.getState().getProduct
   for (const line of meaningfulLines.length ? meaningfulLines : requireCommercialLines ? lines : []) {
     const row: string[] = []
-    if (!line.productId && !line.productOrItem.trim()) row.push('Product / item is required.')
-    if (line.productId) {
+    if (!line.itemId && !line.productId && !line.productOrItem.trim()) row.push('Item is required.')
+    if (line.itemId) {
+      const sellable = canUseItemInSales(line.itemId)
+      if (!sellable.ok) row.push(sellable.error ?? 'Item is not allowed for sales.')
+    } else if (line.productId) {
+      // Legacy dual-read: productId still accepted until Phase 9.
       const sellable = assertProductSellableForSales(getProduct(line.productId))
       if (!sellable.ok) row.push(sellable.error)
     }
@@ -370,7 +392,10 @@ export function opportunityLinesToQuotationPriceLines(lines: OpportunityLine[]) 
     id: `pl-${l.id}`,
     productOrItem: l.productOrItem,
     description: l.description,
-    productId: l.productId,
+    productId: null,
+    itemId: l.itemId,
+    itemCodeSnapshot: l.itemCode || null,
+    itemNameSnapshot: l.productOrItem || null,
     qty: l.qty,
     uom: l.uom,
     unitPrice: l.unitPrice,
@@ -387,9 +412,9 @@ export function quotationPriceLinesToOpportunityLines(priceLines: QuotationPrice
     priceLines.map((l, idx) => ({
       id: l.id.startsWith('pl-') ? l.id.slice(3) : `qpl-${l.id}`,
       lineNo: idx + 1,
-      productId: l.productId ?? null,
-      itemId: null,
-      itemCode: '',
+      productId: null,
+      itemId: l.itemId ?? null,
+      itemCode: l.itemCodeSnapshot ?? '',
       productOrItem: l.productOrItem,
       description: l.description,
       productFamily: '',

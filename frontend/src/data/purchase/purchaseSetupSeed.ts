@@ -82,6 +82,7 @@ export const DEFAULT_PURCHASE_SETUP: PurchaseSetup = {
       documentType: 'all',
     },
   ],
+  approverLimits: [],
   // Demo-only: shown on the approval review drawer; not persisted via API.
   availableBudgetPlaceholderInr: 2_500_000,
   tax: {

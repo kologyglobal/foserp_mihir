@@ -39,8 +39,10 @@ async function mapOpportunityWithNames(
   })
 }
 
-export async function listOpportunities(tenantId: string, query: ListOpportunitiesQuery) {
-  const result = await repo.findOpportunities(tenantId, query)
+export async function listOpportunities(tenantId: string, query: ListOpportunitiesQuery, userId?: string) {
+  const { loadCrmOrgScopeWhere } = await import('../shared/crm-org-scope.js')
+  const orgScope = await loadCrmOrgScopeWhere(tenantId, userId)
+  const result = await repo.findOpportunities(tenantId, query, orgScope as never)
   const nameMap = await resolveUserNames(
     result.items.flatMap((o) => [o.createdBy, o.updatedBy, o.ownerId]),
     tenantId,

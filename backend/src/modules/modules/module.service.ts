@@ -20,6 +20,17 @@ export type ModuleStatusRow = {
   /** Explicit row exists in DB */
   configured: boolean
   blockedBy: string[]
+  administrators: ModuleAdministratorRef[]
+}
+
+export type ModuleAdministratorRef = {
+  id: string
+  userId: string
+  moduleKey: string
+  email: string
+  firstName: string
+  lastName: string
+  status: string
 }
 
 /**
@@ -68,7 +79,32 @@ export async function listModuleStatus(tenantId: string): Promise<{
   const tenant = await prisma.tenant.findFirst({ where: { id: tenantId, deletedAt: null } })
   if (!tenant) throw new NotFoundError('Tenant not found')
 
-  const flagMap = await loadFlagMap(tenantId)
+  const [flagMap, adminRows] = await Promise.all([
+    loadFlagMap(tenantId),
+    prisma.moduleAdministrator.findMany({
+      where: { tenantId, deletedAt: null },
+      include: {
+        user: { select: { id: true, email: true, firstName: true, lastName: true, status: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+  ])
+
+  const adminsByModule = new Map<string, ModuleAdministratorRef[]>()
+  for (const row of adminRows) {
+    const list = adminsByModule.get(row.moduleKey) ?? []
+    list.push({
+      id: row.id,
+      userId: row.userId,
+      moduleKey: row.moduleKey,
+      email: row.user.email,
+      firstName: row.user.firstName,
+      lastName: row.user.lastName,
+      status: row.user.status,
+    })
+    adminsByModule.set(row.moduleKey, list)
+  }
+
   const modules: ModuleStatusRow[] = TENANT_MODULE_CATALOG.map((def) => {
     const isEnabled = effectiveEnabled(def.key, flagMap)
     const blockedBy = def.dependsOn.filter((dep) => !effectiveEnabled(dep, flagMap))
@@ -81,6 +117,7 @@ export async function listModuleStatus(tenantId: string): Promise<{
       isEnabled,
       configured: flagMap.has(def.key),
       blockedBy,
+      administrators: adminsByModule.get(def.key) ?? [],
     }
   })
 
@@ -161,4 +198,124 @@ export async function setModuleFlag(
   const row = status.modules.find((m) => m.key === moduleKey)
   if (!row) throw new NotFoundError('Module status not found after update')
   return row
+}
+
+export async function listModuleAdministrators(
+  tenantId: string,
+  moduleKey?: string,
+): Promise<ModuleAdministratorRef[]> {
+  if (moduleKey) {
+    const def = getModuleDef(moduleKey)
+    if (!def) throw new NotFoundError(`Unknown module: ${moduleKey}`)
+  }
+
+  const rows = await prisma.moduleAdministrator.findMany({
+    where: {
+      tenantId,
+      deletedAt: null,
+      ...(moduleKey ? { moduleKey } : {}),
+    },
+    include: {
+      user: { select: { id: true, email: true, firstName: true, lastName: true, status: true } },
+    },
+    orderBy: [{ moduleKey: 'asc' }, { createdAt: 'asc' }],
+  })
+
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.userId,
+    moduleKey: row.moduleKey,
+    email: row.user.email,
+    firstName: row.user.firstName,
+    lastName: row.user.lastName,
+    status: row.user.status,
+  }))
+}
+
+export async function listUserModuleAdministrations(
+  tenantId: string,
+  userId: string,
+): Promise<string[]> {
+  const rows = await prisma.moduleAdministrator.findMany({
+    where: { tenantId, userId, deletedAt: null },
+    select: { moduleKey: true },
+    orderBy: { moduleKey: 'asc' },
+  })
+  return rows.map((r) => r.moduleKey)
+}
+
+/**
+ * Replace designated administrators for a module. Empty userIds clears all.
+ * Does not grant module.manage — ownership/contact register only.
+ */
+export async function replaceModuleAdministrators(
+  tenantId: string,
+  moduleKey: string,
+  userIds: string[],
+  audit?: AuditMeta,
+): Promise<ModuleAdministratorRef[]> {
+  const def = getModuleDef(moduleKey)
+  if (!def) throw new NotFoundError(`Unknown module: ${moduleKey}`)
+
+  const uniqueIds = [...new Set(userIds)]
+  if (uniqueIds.length) {
+    const users = await prisma.user.findMany({
+      where: { tenantId, id: { in: uniqueIds }, deletedAt: null },
+      select: { id: true },
+    })
+    if (users.length !== uniqueIds.length) {
+      const found = new Set(users.map((u) => u.id))
+      const missing = uniqueIds.filter((id) => !found.has(id))
+      throw new ValidationError(
+        'One or more users not found in this tenant',
+        missing.map((id) => ({ field: 'userIds', message: id })),
+      )
+    }
+  }
+
+  const now = new Date()
+  await prisma.$transaction(async (tx) => {
+    await tx.moduleAdministrator.updateMany({
+      where: { tenantId, moduleKey, deletedAt: null },
+      data: { deletedAt: now, updatedBy: audit?.userId },
+    })
+
+    for (const userId of uniqueIds) {
+      const existing = await tx.moduleAdministrator.findUnique({
+        where: {
+          tenantId_userId_moduleKey: { tenantId, userId, moduleKey },
+        },
+      })
+      if (existing) {
+        await tx.moduleAdministrator.update({
+          where: { id: existing.id },
+          data: { deletedAt: null, updatedBy: audit?.userId },
+        })
+      } else {
+        await tx.moduleAdministrator.create({
+          data: {
+            tenantId,
+            userId,
+            moduleKey,
+            createdBy: audit?.userId,
+            updatedBy: audit?.userId,
+          },
+        })
+      }
+    }
+  })
+
+  await createAuditLog({
+    tenantId,
+    userId: audit?.userId ?? null,
+    module: 'module',
+    entity: 'ModuleAdministrator',
+    entityId: moduleKey,
+    action: 'UPDATE',
+    newValues: { moduleKey, userIds: uniqueIds },
+    ipAddress: audit?.ipAddress,
+    userAgent: audit?.userAgent,
+  })
+
+  return listModuleAdministrators(tenantId, moduleKey)
 }

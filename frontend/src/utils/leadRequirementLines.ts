@@ -17,7 +17,7 @@ export function summarizeLeadRequirementLines(lines: OpportunityLine[]): string 
 
 export function hasLeadRequirementLines(lines: OpportunityLine[]): boolean {
   return syncOpportunityLines(lines).some(
-    (l) => Boolean(l.productId || l.productOrItem.trim() || l.description.trim() || (l.qty > 0 && l.unitPrice > 0)),
+    (l) => Boolean(l.itemId || l.productId || l.productOrItem.trim() || l.description.trim() || (l.qty > 0 && l.unitPrice > 0)),
   )
 }
 

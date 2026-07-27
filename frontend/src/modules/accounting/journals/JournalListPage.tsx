@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { BookOpen, Plus, RefreshCw } from 'lucide-react'
 import { ErpButton } from '@/components/erp/ErpButton'
+import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { Input, Select } from '@/components/forms/Inputs'
 import { LoadingState } from '@/design-system/components/LoadingState'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { DynamicsStatusChip } from '@/components/dynamics/DynamicsStatusChip'
 import { listJournals, postJournal } from '@/services/bridges/journalApiBridge'
 import { resolveLegalEntityId } from '@/services/bridges/financeApiBridge'
 import type { Journal, JournalStatus } from '@/types/journals'
 import { useFinancePermissions } from '@/utils/permissions/finance'
 import { notify } from '@/store/toastStore'
+import { cn } from '@/utils/cn'
 import { JournalsWorkspaceShell } from './JournalsWorkspaceShell'
 
 const STATUS_OPTIONS: Array<{ value: '' | JournalStatus; label: string }> = [
@@ -21,20 +25,21 @@ const STATUS_OPTIONS: Array<{ value: '' | JournalStatus; label: string }> = [
   { value: 'CANCELLED', label: 'Cancelled' },
 ]
 
-function statusTone(status: JournalStatus) {
+function statusTone(status: JournalStatus): 'neutral' | 'warning' | 'success' | 'info' | 'critical' {
   switch (status) {
     case 'DRAFT':
-      return 'bg-slate-100 text-slate-700'
+      return 'neutral'
     case 'PENDING_APPROVAL':
-      return 'bg-amber-100 text-amber-800'
+    case 'SENT_BACK':
+      return 'warning'
     case 'APPROVED':
-      return 'bg-emerald-100 text-emerald-800'
+      return 'success'
     case 'POSTED':
-      return 'bg-sky-100 text-sky-800'
+      return 'info'
     case 'CANCELLED':
-      return 'bg-rose-100 text-rose-800'
+      return 'critical'
     default:
-      return 'bg-slate-100 text-slate-700'
+      return 'neutral'
   }
 }
 
@@ -51,7 +56,6 @@ export function JournalListPage() {
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState<'' | JournalStatus>('')
   const [search, setSearch] = useState('')
-
   const [postingId, setPostingId] = useState<string | null>(null)
 
   const handleQuickPost = async (journalId: string) => {
@@ -94,13 +98,16 @@ export function JournalListPage() {
       draft: rows.filter((r) => r.status === 'DRAFT').length,
       pending: rows.filter((r) => r.status === 'PENDING_APPROVAL').length,
       approved: rows.filter((r) => r.status === 'APPROVED').length,
+      posted: rows.filter((r) => r.status === 'POSTED').length,
     }
   }, [rows])
 
   if (!perms.canViewVouchers) {
     return (
       <JournalsWorkspaceShell title="Journals">
-        <p className="text-[13px] text-erp-muted">You do not have permission to view journals.</p>
+        <div className="p-6">
+          <p className="text-[13px] text-erp-muted">You do not have permission to view journals.</p>
+        </div>
       </JournalsWorkspaceShell>
     )
   }
@@ -116,8 +123,20 @@ export function JournalListPage() {
         ) : null
       }
       commandBar={
+        <ErpCommandBar
+          inline
+          sticky={false}
+          secondaryActions={[{ id: 'refresh', label: 'Refresh', icon: RefreshCw, onClick: () => void load() }]}
+        />
+      }
+    >
+      <div className="border-b border-erp-border bg-erp-surface/40 px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
-          <Select className="h-9 min-w-[160px] text-[12px]" value={status} onChange={(e) => setStatus(e.target.value as '' | JournalStatus)}>
+          <Select
+            className="h-9 min-w-[160px] text-[12px]"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as '' | JournalStatus)}
+          >
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value || 'all'} value={o.value}>
                 {o.label}
@@ -125,78 +144,114 @@ export function JournalListPage() {
             ))}
           </Select>
           <Input
-            className="h-9 min-w-[220px] text-[12px]"
+            className="h-9 min-w-[220px] flex-1 text-[12px]"
             placeholder="Search reference or narration"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <ErpButton variant="secondary" onClick={() => void load()}>
-            Refresh
-          </ErpButton>
         </div>
-      }
-    >
-      <div className="mb-3 flex flex-wrap gap-2">
-        {[
-          { label: 'Draft', value: summary.draft, tone: 'border-slate-200 bg-slate-50' },
-          { label: 'Pending approval', value: summary.pending, tone: 'border-amber-200 bg-amber-50' },
-          { label: 'Approved (ready to post)', value: summary.approved, tone: 'border-emerald-200 bg-emerald-50' },
-          { label: 'Posted', value: rows.filter((r) => r.status === 'POSTED').length, tone: 'border-sky-200 bg-sky-50' },
-        ].map((chip) => (
-          <div key={chip.label} className={`rounded border px-3 py-2 text-[12px] ${chip.tone}`}>
-            <span className="font-medium">{chip.label}</span>
-            <span className="ml-2 tabular-nums">{chip.value}</span>
-          </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 border-b border-erp-border px-3 py-2.5">
+        {(
+          [
+            { label: 'Draft', value: summary.draft, filter: 'DRAFT' as const, tone: 'border-slate-200 bg-slate-50' },
+            {
+              label: 'Pending',
+              value: summary.pending,
+              filter: 'PENDING_APPROVAL' as const,
+              tone: 'border-amber-200 bg-amber-50',
+            },
+            {
+              label: 'Ready to post',
+              value: summary.approved,
+              filter: 'APPROVED' as const,
+              tone: 'border-emerald-200 bg-emerald-50',
+            },
+            { label: 'Posted', value: summary.posted, filter: 'POSTED' as const, tone: 'border-sky-200 bg-sky-50' },
+          ] as const
+        ).map((chip) => (
+          <button
+            key={chip.label}
+            type="button"
+            onClick={() => setStatus((prev) => (prev === chip.filter ? '' : chip.filter))}
+            className={cn(
+              'rounded-md border px-3 py-1.5 text-left text-[12px] transition-colors hover:border-erp-primary/40',
+              chip.tone,
+              status === chip.filter && 'ring-2 ring-erp-primary/30',
+            )}
+          >
+            <span className="font-medium text-erp-text">{chip.label}</span>
+            <span className="ml-2 tabular-nums font-semibold text-erp-text">{chip.value}</span>
+          </button>
         ))}
       </div>
 
       {loading ? (
-        <LoadingState variant="table" rows={8} />
-      ) : rows.length === 0 ? (
-        <div className="py-10 text-center text-[13px] text-erp-muted">
-          No journals found. {perms.canCreateVoucher ? 'Create your first manual journal to get started.' : ''}
+        <div className="p-3">
+          <LoadingState variant="table" rows={8} />
         </div>
+      ) : rows.length === 0 ? (
+        <EmptyState
+          icon={BookOpen}
+          title="No journals found"
+          description={
+            perms.canCreateVoucher
+              ? 'Create a manual journal to record adjustments, accruals, or corrections.'
+              : 'No journals match the current filters.'
+          }
+          action={
+            perms.canCreateVoucher ? (
+              <ErpButton variant="primary" icon={Plus} onClick={() => navigate('/accounting/entries/journals/new')}>
+                Create Journal
+              </ErpButton>
+            ) : undefined
+          }
+        />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[880px] border-collapse text-[12px]">
+        <div className="erp-table-wrap overflow-x-auto">
+          <table className="erp-table w-full min-w-[880px] text-left text-[12px]">
             <thead>
-              <tr className="border-b border-erp-border text-left text-erp-muted">
-                <th className="px-2 py-2 font-medium">Reference</th>
-                <th className="px-2 py-2 font-medium">Posting date</th>
-                <th className="px-2 py-2 font-medium">Status</th>
-                <th className="px-2 py-2 font-medium text-right">Debit</th>
-                <th className="px-2 py-2 font-medium text-right">Credit</th>
-                <th className="px-2 py-2 font-medium">Narration</th>
-                <th className="px-2 py-2 font-medium">Actions</th>
+              <tr>
+                <th>Reference</th>
+                <th>Posting date</th>
+                <th>Status</th>
+                <th className="text-right">Debit</th>
+                <th className="text-right">Credit</th>
+                <th>Narration</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.id} className="border-b border-erp-border/70 hover:bg-slate-50">
-                  <td className="px-2 py-2">
-                    <Link className="font-medium text-sky-700 hover:underline" to={`/accounting/entries/journals/${row.id}`}>
+                <tr key={row.id}>
+                  <td>
+                    <Link
+                      className="font-semibold text-erp-primary hover:underline"
+                      to={`/accounting/entries/journals/${row.id}`}
+                    >
                       {row.referenceNumber ?? row.draftReference ?? row.id.slice(0, 8)}
                     </Link>
                   </td>
-                  <td className="px-2 py-2">{row.postingDate}</td>
-                  <td className="px-2 py-2">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${statusTone(row.status)}`}>{statusLabel(row.status)}</span>
+                  <td className="whitespace-nowrap tabular-nums">{row.postingDate}</td>
+                  <td>
+                    <DynamicsStatusChip label={statusLabel(row.status)} tone={statusTone(row.status)} />
                   </td>
-                  <td className="px-2 py-2 text-right tabular-nums">{row.totalDebit}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{row.totalCredit}</td>
-                  <td className="max-w-[280px] truncate px-2 py-2">{row.narration ?? '—'}</td>
-                  <td className="px-2 py-2">
+                  <td className="text-right tabular-nums">{row.totalDebit}</td>
+                  <td className="text-right tabular-nums">{row.totalCredit}</td>
+                  <td className="max-w-[280px] truncate text-erp-muted">{row.narration ?? '—'}</td>
+                  <td>
                     {row.status === 'APPROVED' && !row.voucherNumber && perms.canPostVoucher ? (
                       <button
                         type="button"
-                        className="text-sky-700 hover:underline disabled:opacity-50"
+                        className="font-semibold text-erp-primary hover:underline disabled:opacity-50"
                         disabled={postingId === row.id}
                         onClick={() => void handleQuickPost(row.id)}
                       >
                         {postingId === row.id ? 'Posting…' : 'Post'}
                       </button>
                     ) : (
-                      '—'
+                      <span className="text-erp-muted">—</span>
                     )}
                   </td>
                 </tr>

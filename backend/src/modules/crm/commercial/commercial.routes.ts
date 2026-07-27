@@ -6,15 +6,25 @@ import * as controller from './commercial.controller.js'
 import {
   allocatePaymentsSchema,
   createInvoiceSchema,
+  createProformaSchema,
   createReceiptSchema,
   listAllocationsQuerySchema,
   listInvoicesQuerySchema,
+  listProformasQuerySchema,
   listReceiptsQuerySchema,
+  updateProformaSchema,
 } from './commercial.validation.js'
 
 const router = Router({ mergeParams: true })
 
 router.get('/sync', requirePermission('crm.commercial.view'), controller.syncBundle)
+
+router.get('/proformas', requirePermission('crm.commercial.view'), validateQuery(listProformasQuerySchema), controller.listProformas)
+router.post('/proformas', requirePermission('crm.commercial.invoice.create'), validateBody(createProformaSchema), controller.createProforma)
+router.get('/proformas/:id', requirePermission('crm.commercial.view'), validateParams(uuidParamSchema), controller.getProforma)
+router.patch('/proformas/:id', requirePermission('crm.commercial.invoice.create'), validateParams(uuidParamSchema), validateBody(updateProformaSchema), controller.updateProforma)
+router.post('/proformas/:id/issue', requirePermission('crm.commercial.invoice.create'), validateParams(uuidParamSchema), controller.issueProforma)
+router.post('/proformas/:id/cancel', requirePermission('crm.commercial.invoice.cancel'), validateParams(uuidParamSchema), controller.cancelProforma)
 
 router.get('/receipts', requirePermission('crm.commercial.receipt.view'), validateQuery(listReceiptsQuerySchema), controller.listReceipts)
 router.post('/receipts', requirePermission('crm.commercial.receipt.create'), validateBody(createReceiptSchema), controller.createReceipt)

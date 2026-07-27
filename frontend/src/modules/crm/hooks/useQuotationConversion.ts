@@ -30,20 +30,21 @@ export function useQuotationConversion() {
   const salesQuotation = useSalesStore((s) =>
     doc ? s.getQuotation(doc.quotationId) : undefined,
   )
-  const customer = useMasterStore((s) =>
-    salesQuotation ? s.getCustomer(salesQuotation.customerId) : undefined,
-  )
-  const contact = useCrmStore((s) => (doc?.contactId ? s.getContact(doc.contactId) : undefined))
   const opportunity = useCrmStore((s) =>
     doc?.opportunityId ? s.getOpportunity(doc.opportunityId) : undefined,
   )
+  const customer = useMasterStore((s) => {
+    const id = salesQuotation?.customerId ?? opportunity?.customerId
+    return id ? s.getCustomer(id) : undefined
+  })
+  const contact = useCrmStore((s) => (doc?.contactId ? s.getContact(doc.contactId) : undefined))
   const product = useMasterStore((s) =>
     salesQuotation?.productId ? s.getProduct(salesQuotation.productId) : undefined,
   )
 
   const gate = useMemo(
     () => (documentId ? resolveCreateSalesOrderGateForQuotationDocument(documentId) : null),
-    [documentId, doc?.status, doc?.salesOrderId, opportunity?.status],
+    [documentId, doc?.status, doc?.salesOrderId, opportunity?.status, salesQuotation?.customerApproval],
   )
 
   const validation = useMemo(() => {
@@ -53,6 +54,7 @@ export function useQuotationConversion() {
       latestDocument: latestDoc,
       salesQuotation,
       customer,
+      customerId: salesQuotation?.customerId ?? opportunity?.customerId,
       contactName: contact?.name,
       opportunityName: opportunity?.opportunityName,
       productName: product?.productName,
@@ -150,6 +152,10 @@ export function useQuotationConversion() {
     gate,
     success,
     clearSuccess: () => setSuccess(null),
-    canConvert: Boolean(gate?.enabled && canConvertQuotationToSalesOrderPermission()),
+    canConvert: Boolean(
+      (gate?.enabled || gate?.showCreate)
+      && canConvertQuotationToSalesOrderPermission()
+      && !gate?.salesOrderId
+    ),
   }
 }

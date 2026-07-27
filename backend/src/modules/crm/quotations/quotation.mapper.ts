@@ -74,7 +74,7 @@ export function mapQuotationToDto(
     opportunityId: quotation.opportunityId,
     opportunityNo: quotation.opportunity?.opportunityCode ?? null,
     customerId: quotation.companyId,
-    productId: quotation.productId,
+    itemId: quotation.itemId,
     qty: decimalToNumber(quotation.qty),
     revisionNo: quotation.revisionNo,
     rootQuotationId: quotation.id,

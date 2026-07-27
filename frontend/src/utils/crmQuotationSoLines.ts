@@ -1,10 +1,11 @@
 import type { Opportunity, OpportunityLine, QuotationDocument, QuotationPriceLine } from '../types/crm'
-import type { Product } from '../types/master'
+import type { Item, Product } from '../types/master'
 import type { SalesOrderLine } from '../types/mrp'
 import type { Quotation } from '../types/sales'
 import { calcPriceSummary, syncLineTotals } from './crmQuotationCalc'
 import { sectionContent } from './crmIntegration'
 import { resolveOpportunityLines, syncOpportunityLines } from './opportunityLineCalc'
+import { isItemSellable } from './opportunityItemOptions'
 
 function normalizeLabel(value: string): string {
   return value.trim().toLowerCase()
@@ -28,6 +29,30 @@ export function lookupProductIdByLabel(label: string, products: Product[]): stri
   return partial?.id ?? null
 }
 
+/** Resolve a sellable item from quotation line label (name or code). */
+export function lookupItemIdByLabel(label: string, items: Item[]): string | null {
+  const norm = normalizeLabel(label)
+  if (!norm) return null
+
+  const sellable = items.filter(isItemSellable)
+  const exact = sellable.find(
+    (i) => normalizeLabel(i.itemName) === norm || normalizeLabel(i.itemCode) === norm,
+  )
+  if (exact) return exact.id
+
+  const partial = sellable.find((i) => {
+    const name = normalizeLabel(i.itemName)
+    return norm.includes(name) || name.includes(norm)
+  })
+  return partial?.id ?? null
+}
+
+function itemIdFromProductId(productId: string | null | undefined, products: Product[]): string | null {
+  if (!productId) return null
+  return products.find((p) => p.id === productId)?.fgItemId ?? null
+}
+
+/** @deprecated Prefer resolveQuotationPriceLineItemId — kept for dual-read / legacy tests */
 export function resolveQuotationPriceLineProductId(
   priceLine: Pick<QuotationPriceLine, 'id' | 'productOrItem' | 'productId' | 'description'>,
   idx: number,
@@ -56,6 +81,40 @@ export function resolveQuotationPriceLineProductId(
   return multiLine ? null : fallbackProductId
 }
 
+export function resolveQuotationPriceLineItemId(
+  priceLine: Pick<QuotationPriceLine, 'id' | 'productOrItem' | 'productId' | 'itemId' | 'description'>,
+  idx: number,
+  oppLines: OpportunityLine[],
+  items: Item[],
+  products: Product[],
+  fallbackItemId: string | null,
+  multiLine: boolean,
+): string | null {
+  if (priceLine.itemId) return priceLine.itemId
+
+  const fromProduct = itemIdFromProductId(priceLine.productId, products)
+  if (fromProduct) return fromProduct
+
+  const linkedOppLineId = priceLine.id.startsWith('pl-') ? priceLine.id.slice(3) : null
+  const oppLine =
+    (linkedOppLineId ? oppLines.find((l) => l.id === linkedOppLineId) : undefined) ??
+    oppLines[idx] ??
+    oppLines.find((l) => l.productOrItem === priceLine.productOrItem)
+  if (oppLine?.itemId) return oppLine.itemId
+  const fromOppProduct = itemIdFromProductId(oppLine?.productId, products)
+  if (fromOppProduct) return fromOppProduct
+
+  const fromLabel = lookupItemIdByLabel(priceLine.productOrItem, items)
+  if (fromLabel) return fromLabel
+
+  if (priceLine.description) {
+    const fromDescription = lookupItemIdByLabel(priceLine.description, items)
+    if (fromDescription) return fromDescription
+  }
+
+  return multiLine ? null : fallbackItemId
+}
+
 export function quotationPriceLinesForSo(document: QuotationDocument): QuotationPriceLine[] {
   return syncLineTotals(document.priceLines).filter((l) => !l.isOptional)
 }
@@ -65,18 +124,38 @@ export function buildSalesOrderLinesFromQuotationDocument(input: {
   opportunity?: Opportunity | null
   salesQuotation?: Quotation | null
   products: Product[]
+  items?: Item[]
   defaultProduct?: Product | null
+  defaultItem?: Item | null
 }): SalesOrderLine[] {
-  const { document, opportunity, salesQuotation, products, defaultProduct } = input
+  const { document, opportunity, salesQuotation, products, defaultProduct, defaultItem } = input
+  const items = input.items ?? []
   const lines = quotationPriceLinesForSo(document)
   const multiLine = lines.length > 1
   const oppLines = opportunity ? syncOpportunityLines(resolveOpportunityLines(opportunity)) : []
   const technicalScope = sectionContent(document, 'technical') || document.technicalNotes
+  const fallbackItemId =
+    defaultItem?.id
+    ?? salesQuotation?.itemId
+    ?? itemIdFromProductId(salesQuotation?.productId, products)
+    ?? itemIdFromProductId(defaultProduct?.id, products)
+    ?? defaultProduct?.fgItemId
+    ?? null
 
   return lines.map((l, idx) => {
     const base = l.qty * l.unitPrice * (1 - l.discountPct / 100)
     const gst = base * (l.taxPct / 100)
-    const lineProductId = resolveQuotationPriceLineProductId(
+    const lineItemId = resolveQuotationPriceLineItemId(
+      l,
+      idx,
+      oppLines,
+      items,
+      products,
+      fallbackItemId,
+      multiLine,
+    )
+    const matchedItem = lineItemId ? items.find((i) => i.id === lineItemId) : undefined
+    const legacyProductId = resolveQuotationPriceLineProductId(
       l,
       idx,
       oppLines,
@@ -84,14 +163,21 @@ export function buildSalesOrderLinesFromQuotationDocument(input: {
       salesQuotation?.productId ?? defaultProduct?.id ?? null,
       multiLine,
     )
-    const matchedProduct = lineProductId ? products.find((p) => p.id === lineProductId) : undefined
+    const matchedProduct = legacyProductId ? products.find((p) => p.id === legacyProductId) : undefined
 
     return {
       id: `sol-${document.id}-${idx + 1}`,
       lineNo: idx + 1,
-      productOrItem: l.productOrItem || matchedProduct?.productName || defaultProduct?.productName || 'Item',
-      description: l.description || matchedProduct?.productName || '',
-      productId: lineProductId,
+      productOrItem:
+        l.productOrItem
+        || matchedItem?.itemName
+        || matchedProduct?.productName
+        || defaultItem?.itemName
+        || defaultProduct?.productName
+        || 'Item',
+      description: l.description || matchedItem?.itemName || matchedProduct?.productName || '',
+      productId: null,
+      itemId: lineItemId,
       qty: l.qty,
       uom: l.uom || 'Nos',
       unitPrice: l.unitPrice,

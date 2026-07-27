@@ -6,7 +6,11 @@ import { validateBody, validateParams } from '../../middleware/validation.middle
 import { asyncHandler } from '../../utils/asyncHandler.js'
 import { tenantRouteParamSchema } from '../../utils/pagination.js'
 import * as moduleController from './module.controller.js'
-import { moduleKeyParamSchema, setModuleFlagSchema } from './module.validation.js'
+import {
+  moduleKeyParamSchema,
+  replaceModuleAdministratorsSchema,
+  setModuleFlagSchema,
+} from './module.validation.js'
 
 const router = Router({ mergeParams: true })
 
@@ -20,6 +24,27 @@ router.use(
 
 /** Any authenticated tenant user — powers sidebar module gating (fail-open if call fails). */
 router.get('/', asyncHandler(moduleController.list))
+
+router.get(
+  '/administrators',
+  requirePermission('module.view'),
+  asyncHandler(moduleController.listAllAdministrators),
+)
+
+router.get(
+  '/:moduleKey/administrators',
+  requirePermission('module.view'),
+  validateParams(moduleKeyParamSchema),
+  asyncHandler(moduleController.listAdministrators),
+)
+
+router.put(
+  '/:moduleKey/administrators',
+  requirePermission('module.manage'),
+  validateParams(moduleKeyParamSchema),
+  validateBody(replaceModuleAdministratorsSchema),
+  asyncHandler(moduleController.replaceAdministrators),
+)
 
 router.put(
   '/:moduleKey',

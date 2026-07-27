@@ -81,6 +81,12 @@ export async function createDraftSalesInvoiceFromDispatchPosting(
     return { status: 'skipped', reason: 'ENABLE_AUTO_SALES_INVOICE_FROM_DISPATCH is off' }
   }
 
+  const { shouldAutoCreateSalesInvoice } = await import('../settings/dispatch-commercial-enforcement.js')
+  const modeGate = await shouldAutoCreateSalesInvoice(tenantId)
+  if (!modeGate.allowed) {
+    return { status: 'skipped', reason: modeGate.reason ?? 'invoiceMode disables auto SI' }
+  }
+
   const existing = await findExistingAutoInvoice(tenantId, postingId)
   if (existing) {
     return {
@@ -121,9 +127,9 @@ export async function createDraftSalesInvoiceFromDispatchPosting(
     return { status: 'skipped', reason: 'Outbound dispatch reversed' }
   }
 
-  const { getDispatchPostingPolicy } = await import('./dispatch-policy.js')
+  const { resolveDispatchPostingPolicy } = await import('./dispatch-policy.js')
   const { isPodStatusInvoiceReady } = await import('../pod/dispatch-pod.service.js')
-  const policy = getDispatchPostingPolicy({ forceHardened: true })
+  const policy = await resolveDispatchPostingPolicy(tenantId, { forceHardened: true })
   if (policy.requirePodBeforeInvoice) {
     const pod = await prisma.dispatchProofOfDelivery.findFirst({
       where: { tenantId, outboundDispatchId: posting.outboundDispatchId },

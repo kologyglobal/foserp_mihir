@@ -34,6 +34,7 @@ import {
 } from '@/services/purchase'
 import type {
   PurchaseApprovalMatrixTier,
+  PurchaseApproverLimit,
   PurchaseApprovalRole,
   PurchaseGstRoundOffRule,
   PurchaseGstScheme,
@@ -277,6 +278,9 @@ export function PurchaseSetupPage() {
       }
 
       await loadWarehouseLocations(nextSetup.general.defaultWarehouseId)
+      if (!nextSetup.approverLimits) {
+        nextSetup.approverLimits = []
+      }
       resetDirty()
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : formatApiError(err))
@@ -1020,6 +1024,171 @@ export function PurchaseSetupPage() {
                       </div>
                     ))}
                 </div>
+              </SectionCard>
+              <SectionCard
+                id="approver-limits"
+                title="Approver limits"
+                description="Optional per-user INR ceilings. When set, the user cannot approve a PR/PO above their limit even if their matrix role matches. Users without a row are unrestricted (matrix only)."
+              >
+                <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+                  <ErpButton
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    icon={Plus}
+                    onClick={() => {
+                      touch()
+                      const firstUser = buyerUserOptions[0]
+                      setSetup((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              approverLimits: [
+                                ...prev.approverLimits,
+                                {
+                                  id: `pal-${Date.now()}`,
+                                  userId: firstUser?.id ?? '',
+                                  userName: firstUser?.label ?? '',
+                                  maxAmountInr: 50_000,
+                                  documentType: 'all',
+                                  isActive: true,
+                                  sortOrder: prev.approverLimits.length + 1,
+                                } satisfies PurchaseApproverLimit,
+                              ],
+                            }
+                          : prev,
+                      )
+                    }}
+                  >
+                    Add limit
+                  </ErpButton>
+                </div>
+                {setup.approverLimits.length === 0 ? (
+                  <p className="text-sm text-erp-muted">No personal limits configured.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {setup.approverLimits.map((lim) => (
+                      <div
+                        key={lim.id}
+                        className="grid gap-3 rounded-md border border-erp-border bg-erp-surface-alt/30 p-3 lg:grid-cols-[1fr_7rem_7rem_5rem_auto]"
+                      >
+                        <Select
+                          value={lim.userId}
+                          onChange={(e) => {
+                            touch()
+                            const userId = e.target.value
+                            const opt = buyerUserOptions.find((u) => u.id === userId)
+                            setSetup((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    approverLimits: prev.approverLimits.map((row) =>
+                                      row.id === lim.id
+                                        ? {
+                                            ...row,
+                                            userId,
+                                            userName: opt?.label ?? row.userName,
+                                          }
+                                        : row,
+                                    ),
+                                  }
+                                : prev,
+                            )
+                          }}
+                        >
+                          <option value="">{SELECT_PLACEHOLDER}</option>
+                          {buyerUserOptions.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.label}
+                            </option>
+                          ))}
+                        </Select>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={lim.maxAmountInr}
+                          onChange={(e) => {
+                            touch()
+                            const maxAmountInr = Number(e.target.value) || 0
+                            setSetup((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    approverLimits: prev.approverLimits.map((row) =>
+                                      row.id === lim.id ? { ...row, maxAmountInr } : row,
+                                    ),
+                                  }
+                                : prev,
+                            )
+                          }}
+                          aria-label="Max amount INR"
+                        />
+                        <Select
+                          value={lim.documentType}
+                          onChange={(e) => {
+                            touch()
+                            const documentType = e.target
+                              .value as PurchaseApproverLimit['documentType']
+                            setSetup((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    approverLimits: prev.approverLimits.map((row) =>
+                                      row.id === lim.id ? { ...row, documentType } : row,
+                                    ),
+                                  }
+                                : prev,
+                            )
+                          }}
+                        >
+                          {Object.entries(PURCHASE_APPROVAL_DOCUMENT_TYPE_LABELS).map(([k, label]) => (
+                            <option key={k} value={k}>
+                              {label}
+                            </option>
+                          ))}
+                        </Select>
+                        <label className="flex items-center gap-2 text-sm">
+                          <Checkbox
+                            checked={lim.isActive}
+                            onChange={(e) => {
+                              touch()
+                              const isActive = e.target.checked
+                              setSetup((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      approverLimits: prev.approverLimits.map((row) =>
+                                        row.id === lim.id ? { ...row, isActive } : row,
+                                      ),
+                                    }
+                                  : prev,
+                              )
+                            }}
+                          />
+                          Active
+                        </label>
+                        <button
+                          type="button"
+                          className="justify-self-end text-erp-muted hover:text-erp-danger"
+                          aria-label="Remove limit"
+                          onClick={() => {
+                            touch()
+                            setSetup((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    approverLimits: prev.approverLimits.filter((r) => r.id !== lim.id),
+                                  }
+                                : prev,
+                            )
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </SectionCard>
             </div>
           )}

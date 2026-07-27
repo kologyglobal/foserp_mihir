@@ -248,6 +248,14 @@ export async function postFinishedGoodsReceipt(
   }
 
   // Inventory post outside nested tx (postFgReceipt manages its own posting); then persist document.
+  // Serial-tracked FG inventory requires qty=1 + serialNumber — pass through when provided.
+  const serials = input.serialNumbers ?? []
+  if (serials.length > 0 && (!quantity.equals(1) || serials.length !== 1)) {
+    throw new FgReceiptValidationError(
+      'Serial FG receipt must be posted one unit at a time (quantity=1 with one serialNumber)',
+    )
+  }
+
   const receiptNumber = await nextCode(tenantId, 'PRODUCTION_FG_RECEIPT')
   const movement = await postFgReceipt(req, tenantId, {
     itemId: eligibility.itemId,
@@ -260,6 +268,7 @@ export async function postFinishedGoodsReceipt(
     referenceNo: eligibility.orderNumber,
     batchNumber: input.batchOrLotNumber,
     lotNumber: input.batchOrLotNumber,
+    serialNumber: serials[0],
     remarks: input.remarks ?? `FG receipt for WO ${eligibility.orderNumber}`,
     movementDate: receiptDate,
   })

@@ -20,6 +20,7 @@ import approvalRoutes from './approvals/purchase-approval.routes.js'
 import setupRoutes from './setup/purchase-setup.routes.js'
 import * as grnController from './grn/goods-receipt.controller.js'
 import timelineRoutes from './timeline/purchase-timeline.routes.js'
+import reportRoutes from './reports/purchase-report.routes.js'
 
 const router = Router({ mergeParams: true })
 
@@ -51,5 +52,6 @@ router.use('/invoices', invoiceRoutes)
 router.use('/quality-inspections', qualityInspectionRoutes)
 router.use('/returns', returnRoutes)
 router.use('/timeline', timelineRoutes)
+router.use('/reports', reportRoutes)
 
 export default router

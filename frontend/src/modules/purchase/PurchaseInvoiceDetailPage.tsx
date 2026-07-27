@@ -41,6 +41,7 @@ import {
   approvePurchaseInvoice,
   computeInvoiceMatching,
   createDebitNoteFromInvoice,
+  getPurchaseInvoiceApHandoffPreview,
   getPurchaseInvoiceById,
   holdPurchaseInvoice,
   postPurchaseInvoice,
@@ -58,6 +59,7 @@ import { usePurchasePermissions } from '@/utils/permissions'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { cn } from '@/utils/cn'
+import { isApiMode } from '@/config/apiConfig'
 
 function matchColor(
   status: InvoiceMatchingResult['overallStatus'],
@@ -86,6 +88,8 @@ export function PurchaseInvoiceDetailPage() {
   const [matchOpen, setMatchOpen] = useState(false)
   const [holdOpen, setHoldOpen] = useState(false)
   const [holdReason, setHoldReason] = useState('')
+  const [apPreview, setApPreview] = useState<Record<string, unknown> | null>(null)
+  const [apPreviewError, setApPreviewError] = useState<string | null>(null)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
 
@@ -101,6 +105,18 @@ export function PurchaseInvoiceDetailPage() {
       }
       setInv(row)
       setMatching(await computeInvoiceMatching(row.id))
+      if (isApiMode() && ['approved', 'posted', 'matched', 'paid'].includes(row.status)) {
+        try {
+          setApPreview(await getPurchaseInvoiceApHandoffPreview(row.id))
+          setApPreviewError(null)
+        } catch (err) {
+          setApPreview(null)
+          setApPreviewError(err instanceof PurchaseServiceError ? err.message : 'AP preview unavailable')
+        }
+      } else {
+        setApPreview(null)
+        setApPreviewError(null)
+      }
     } finally {
       setLoading(false)
     }
@@ -158,17 +174,22 @@ export function PurchaseInvoiceDetailPage() {
   const canPost = ['approved', 'matched', 'mismatch'].includes(inv.status)
   const canHold = !['posted', 'paid', 'cancelled'].includes(inv.status)
   const canDebit = ['posted', 'approved', 'matched', 'mismatch', 'paid'].includes(inv.status)
+  const showException =
+    !isApiMode()
+    && perms.canApproveInvoice
+    && Boolean(matching?.exceedsTolerance)
+    && !inv.matchingExceptionApproved
+  const apiMode = isApiMode()
+  const showHold = !apiMode && perms.canVerifyInvoice && canHold
+  const showDebit = !apiMode && canDebit
   const postBlocked =
-    Boolean(matching?.exceedsTolerance) && !inv.matchingExceptionApproved
-
+    !apiMode
+    && Boolean(matching?.exceedsTolerance)
+    && !inv.matchingExceptionApproved
   const showVerify = perms.canVerifyInvoice && canVerify
   const showSubmit = perms.canCreateInvoice && canSubmit
   const showApprove = perms.canApproveInvoice && canApprove
   const showPost = perms.canPostInvoice && canPost
-  const showException =
-    perms.canApproveInvoice
-    && Boolean(matching?.exceedsTolerance)
-    && !inv.matchingExceptionApproved
 
   const primaryAction =
     showApprove
@@ -352,7 +373,7 @@ export function PurchaseInvoiceDetailPage() {
                 label: 'Put on Hold',
                 icon: PauseCircle,
                 onClick: () => setHoldOpen(true),
-                hidden: !perms.canVerifyInvoice || !canHold,
+                hidden: !showHold,
                 disabled: busy,
               },
               {
@@ -374,7 +395,9 @@ export function PurchaseInvoiceDetailPage() {
                 onClick: () =>
                   void run(
                     () => postPurchaseInvoice(inv.id),
-                    'Invoice posted (AP/GL deferred — demo confirmation only)',
+                    apiMode
+                      ? 'Invoice posted'
+                      : 'Invoice posted (AP/GL deferred — demo confirmation only)',
                   ),
                 hidden: !showPost || primaryAction?.id === 'post',
                 disabled: busy || postBlocked,
@@ -398,7 +421,7 @@ export function PurchaseInvoiceDetailPage() {
                     setBusy(false)
                   }
                 },
-                hidden: !canDebit,
+                hidden: !showDebit,
                 disabled: busy,
               },
               {
@@ -697,6 +720,48 @@ export function PurchaseInvoiceDetailPage() {
             </div>
           )}
         </ErpCardSection>
+
+        {apiMode && (apPreview || apPreviewError) ? (
+          <ErpCardSection
+            title="AP handoff preview"
+            subtitle="Vendor invoice draft mapping"
+            icon={Building2}
+            columns={1}
+            collapsible
+            defaultOpen={Boolean(apPreviewError)}
+          >
+            {apPreviewError ? (
+              <p className="text-sm text-erp-muted">{apPreviewError}</p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+                <ErpViewField
+                  label="Vendor invoice no."
+                  value={String(apPreview?.vendorInvoiceNumber ?? apPreview?.invoiceNumber ?? '—')}
+                />
+                <ErpViewField
+                  label="Grand total"
+                  value={
+                    apPreview?.grandTotal != null
+                      ? formatCurrency(Number(apPreview.grandTotal))
+                      : apPreview?.totalAmount != null
+                        ? formatCurrency(Number(apPreview.totalAmount))
+                        : '—'
+                  }
+                />
+                <ErpViewField
+                  label="Legal entity"
+                  value={String(apPreview?.legalEntityId ?? apPreview?.legalEntityName ?? '—')}
+                />
+                <ErpViewField
+                  label="Lines"
+                  value={String(
+                    Array.isArray(apPreview?.lines) ? apPreview.lines.length : '—',
+                  )}
+                />
+              </div>
+            )}
+          </ErpCardSection>
+        ) : null}
 
         <ErpCardSection
           title="Item Lines"

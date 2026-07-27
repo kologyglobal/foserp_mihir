@@ -1,14 +1,32 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Eye, Pencil, ShieldCheck, Trash2 } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  Pencil,
+  Search,
+  ShieldAlert,
+  ShieldCheck,
+  Trash2,
+  Users,
+} from 'lucide-react'
 import { MasterRegisterTable } from '../../components/masters/MasterRegisterTable'
 import { MasterListShell } from '../../components/masters/MasterListShell'
 import { DetailLayout, DetailSection, DetailGrid, DetailField, FormLayout, FormSection, MasterNotFound } from '../../components/masters/MasterLayouts'
 import { Badge } from '../../components/ui/Badge'
 import { FormField } from '../../components/forms/FormField'
 import { Input, Textarea, Checkbox } from '../../components/forms/Inputs'
+import { ErpButton } from '../../components/erp/ErpButton'
 import { ErpCardSection } from '../../components/erp/card-form'
+import { AdminSkeleton } from '../../components/admin'
+import {
+  adminModuleLabel,
+  adminPermissionDisplayLabel,
+  isAdminSensitivePermission,
+} from '../../components/admin/AdminPermissionMatrix'
+import { AdminSensitivePermissionBadge } from '../../components/admin/AdminStatusBadge'
 import { EnterpriseRowActionsMenu, type RowActionItem } from '../../design-system/enterprise/EnterpriseTablePrimitives'
 import { MasterLifecycleDialog } from '../../components/masters/MasterLifecycleDialog'
 import { useMasterLifecycle } from '../../hooks/useMasterLifecycle'
@@ -22,7 +40,8 @@ import {
   ROLE_PERMISSION_PRESETS,
   resolvePresetPermissionNames,
 } from '../../utils/permissions/rolePresets'
-import type { AdminPermission, AdminRoleSummary } from '../../types/admin'
+import type { AdminPermission, AdminRoleDetail, AdminRoleSummary } from '../../types/admin'
+import { cn } from '../../utils/cn'
 
 function groupPermissionsByModule(catalog: AdminPermission[]): Array<{ module: string; permissions: AdminPermission[] }> {
   const groups = new Map<string, AdminPermission[]>()
@@ -392,56 +411,437 @@ export function RoleAdminFormPage() {
 
 export function RoleAdminDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const detail = useAdminStore((s) => (id ? s.getRoleDetail(id) : undefined))
   const loadRoleDetail = useAdminStore((s) => s.loadRoleDetail)
   const permissionCatalog = useAdminStore((s) => s.permissionCatalog)
   const canEdit = canAdminPermission('role.update')
   const [attempted, setAttempted] = useState(false)
+  const [search, setSearch] = useState('')
+  const [showAllCatalog, setShowAllCatalog] = useState(false)
+  const [openModules, setOpenModules] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!id) return
     void loadRoleDetail(id).finally(() => setAttempted(true))
   }, [id, loadRoleDetail])
 
+  const granted = useMemo(() => new Set(detail?.permissions ?? []), [detail?.permissions])
+
+  const moduleGroups = useMemo(() => {
+    if (!detail) return []
+    return buildRolePermissionModules(detail, permissionCatalog, {
+      search,
+      showAllCatalog,
+    })
+  }, [detail, permissionCatalog, search, showAllCatalog])
+
+  useEffect(() => {
+    if (!detail) return
+    const defaults = buildRolePermissionModules(detail, permissionCatalog, {
+      search: '',
+      showAllCatalog: false,
+    })
+      .filter((g) => g.grantedCount > 0)
+      .map((g) => g.module)
+      .slice(0, 6)
+    setOpenModules(new Set(defaults))
+    setSearch('')
+    setShowAllCatalog(false)
+  }, [detail?.id, detail, permissionCatalog])
+
   if (!attempted && !detail) {
-    return <p className="p-6 text-sm text-erp-muted">Loading role…</p>
+    return (
+      <div className="p-6">
+        <AdminSkeleton rows={6} />
+      </div>
+    )
   }
   if (!detail) return <MasterNotFound message="Role not found." />
 
-  const selected = new Set(detail.permissions)
+  const sensitiveGranted = detail.permissions.filter(isAdminSensitivePermission)
+  const modulesWithAccess = moduleGroups.filter((g) => g.grantedCount > 0).length
+  const canEditRole = canEdit && !detail.isSystem
+  const scopeLabel = detail.isSystem
+    ? 'System (built-in)'
+    : detail.tenantId
+      ? 'Tenant custom role'
+      : 'Platform role'
+
+  const toggleModuleOpen = (module: string) => {
+    setOpenModules((prev) => {
+      const next = new Set(prev)
+      if (next.has(module)) next.delete(module)
+      else next.add(module)
+      return next
+    })
+  }
+
+  const expandAll = () => setOpenModules(new Set(moduleGroups.map((g) => g.module)))
+  const collapseAll = () => setOpenModules(new Set())
 
   return (
     <DetailLayout
       backTo="/admin/roles"
       backLabel="Back to Roles"
       title={detail.name}
-      subtitle={detail.description ?? undefined}
-      editTo={canEdit && !detail.isSystem ? `/admin/roles/${detail.id}/edit` : undefined}
-      breadcrumbs={[{ label: 'Administration', to: '/admin' }, { label: 'Roles', to: '/admin/roles' }, { label: detail.name }]}
-      badges={<RoleScopeBadge tenantId={detail.tenantId} isSystem={detail.isSystem} />}
+      subtitle={detail.description?.trim() || 'Role permissions control what users can see and do in FOS ERP.'}
+      editTo={canEditRole ? `/admin/roles/${detail.id}/edit` : undefined}
+      favoritePath={`/admin/roles/${detail.id}`}
+      breadcrumbs={[
+        { label: 'Administration', to: '/admin' },
+        { label: 'Roles', to: '/admin/roles' },
+        { label: detail.name },
+      ]}
+      badges={
+        <div className="flex flex-wrap items-center gap-2">
+          <RoleScopeBadge tenantId={detail.tenantId} isSystem={detail.isSystem} />
+          {sensitiveGranted.length > 0 ? <AdminSensitivePermissionBadge /> : null}
+        </div>
+      }
+      documentStrip={[
+        { label: 'Role', value: detail.name, highlight: true },
+        { label: 'Scope', value: detail.isSystem ? 'System' : detail.tenantId ? 'Tenant' : 'Platform' },
+        { label: 'Users', value: String(detail.userCount) },
+        { label: 'Permissions', value: String(detail.permissions.length) },
+      ]}
+      formMetrics={[
+        { label: 'Users assigned', value: String(detail.userCount), accent: 'blue' },
+        { label: 'Permissions', value: String(detail.permissions.length), accent: 'green' },
+        { label: 'Modules with access', value: String(modulesWithAccess) },
+        {
+          label: 'Sensitive',
+          value: String(sensitiveGranted.length),
+          accent: sensitiveGranted.length > 0 ? 'amber' : 'slate',
+        },
+      ]}
+      factBoxTitle="At a glance"
+      factBoxSummary={[
+        { label: 'Type', value: scopeLabel },
+        { label: 'Users', value: `${detail.userCount}` },
+        { label: 'Access', value: `${detail.permissions.length} permissions` },
+        {
+          label: 'Updated',
+          value: detail.updatedAt ? new Date(detail.updatedAt).toLocaleDateString() : '—',
+        },
+      ]}
+      sectionNavItems={[
+        { id: 'overview', label: 'Overview' },
+        { id: 'permissions', label: 'Permissions' },
+      ]}
+      extraCommandActions={
+        canEditRole
+          ? [
+              {
+                id: 'edit-perms',
+                label: 'Edit permissions',
+                icon: Pencil,
+                onClick: () => navigate(`/admin/roles/${detail.id}/edit`),
+              },
+            ]
+          : undefined
+      }
     >
       <div className="space-y-6">
-        <DetailSection title="Role Details">
+        {detail.isSystem ? (
+          <div className="flex gap-3 rounded-xl border border-violet-200 bg-violet-50/80 px-4 py-3">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-violet-700" />
+            <div>
+              <p className="text-sm font-semibold text-violet-900">Built-in system role</p>
+              <p className="mt-0.5 text-sm text-violet-800/90">
+                Permissions are managed by the product. You can review them here, but you cannot edit or delete this
+                role. Assign it to users from the Users page.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        {sensitiveGranted.length > 0 ? (
+          <div className="flex gap-3 rounded-xl border border-red-200 bg-red-50/80 px-4 py-3">
+            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
+            <div>
+              <p className="text-sm font-semibold text-red-900">
+                Includes {sensitiveGranted.length} sensitive permission
+                {sensitiveGranted.length === 1 ? '' : 's'}
+              </p>
+              <p className="mt-0.5 text-sm text-red-800/90">
+                This role can change security, posting, or platform settings. Only assign it to trusted administrators.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        <DetailSection
+          title="Overview"
+          subtitle="What this role is for, and who it affects."
+          sectionId="overview"
+        >
           <DetailGrid>
-            <DetailField label="Users Assigned" value={detail.userCount} />
-            <DetailField label="Permission Count" value={detail.permissions.length} />
-            <DetailField label="Scope" value={detail.isSystem ? 'System (built-in)' : detail.tenantId ? 'Tenant' : 'Platform'} />
+            <DetailField label="Role name" value={detail.name} />
+            <DetailField label="Scope" value={scopeLabel} />
+            <DetailField
+              label="Users with this role"
+              value={
+                <Link
+                  to="/admin/users"
+                  className="inline-flex items-center gap-1.5 text-erp-primary hover:underline"
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  {detail.userCount} user{detail.userCount === 1 ? '' : 's'}
+                </Link>
+              }
+            />
+            <DetailField label="Permissions granted" value={detail.permissions.length} />
+            <DetailField label="Modules with access" value={modulesWithAccess} />
+            <DetailField
+              label="Last updated"
+              value={detail.updatedAt ? new Date(detail.updatedAt).toLocaleString() : '—'}
+            />
           </DetailGrid>
+
+          <div className="mt-4 rounded-lg border border-erp-border bg-erp-surface-alt/50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-erp-muted">Description</p>
+            <p className="mt-1 text-sm text-erp-text">
+              {detail.description?.trim() ||
+                'No description yet. Add one when you edit the role so other admins know when to use it.'}
+            </p>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {canEditRole ? (
+              <ErpButton
+                size="sm"
+                icon={Pencil}
+                onClick={() => navigate(`/admin/roles/${detail.id}/edit`)}
+              >
+                Edit role &amp; permissions
+              </ErpButton>
+            ) : null}
+            <ErpButton size="sm" variant="secondary" onClick={() => navigate('/admin/users')}>
+              Manage user assignments
+            </ErpButton>
+            <ErpButton size="sm" variant="ghost" onClick={() => navigate('/admin/roles')}>
+              Back to roles list
+            </ErpButton>
+          </div>
         </DetailSection>
 
-        <DetailSection title="Permissions">
-          <div className="flex items-center gap-2 pb-2 text-xs text-erp-muted">
-            <ShieldCheck className="h-3.5 w-3.5" /> {detail.permissions.length} permissions granted
+        <DetailSection
+          title="Permissions"
+          subtitle="Grouped by area of the product. Plain labels first; technical keys underneath."
+          sectionId="permissions"
+        >
+          <div className="mb-4 flex flex-wrap items-end gap-3">
+            <div className="min-w-[240px] flex-1">
+              <label className="mb-1 block text-xs font-medium text-erp-muted">Search permissions</label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-erp-muted" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="e.g. create lead, invoice, security…"
+                  className="pl-8"
+                  aria-label="Search permissions"
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <ErpButton
+                size="sm"
+                variant={showAllCatalog ? 'secondary' : 'primary'}
+                type="button"
+                onClick={() => setShowAllCatalog(false)}
+              >
+                Granted only
+              </ErpButton>
+              <ErpButton
+                size="sm"
+                variant={showAllCatalog ? 'primary' : 'secondary'}
+                type="button"
+                onClick={() => setShowAllCatalog(true)}
+              >
+                Full catalog
+              </ErpButton>
+              <ErpButton size="sm" variant="ghost" type="button" onClick={expandAll}>
+                Expand all
+              </ErpButton>
+              <ErpButton size="sm" variant="ghost" type="button" onClick={collapseAll}>
+                Collapse all
+              </ErpButton>
+            </div>
           </div>
-          <PermissionMatrixEditor
-            catalog={permissionCatalog}
-            selected={selected}
-            onToggle={() => {}}
-            onToggleModule={() => {}}
-            readOnly
-          />
+
+          <p className="mb-3 text-xs text-erp-muted">
+            {showAllCatalog
+              ? 'Showing all permissions in the catalog. Green rows are granted to this role.'
+              : `Showing ${detail.permissions.length} granted permission${detail.permissions.length === 1 ? '' : 's'} across ${modulesWithAccess} module${modulesWithAccess === 1 ? '' : 's'}.`}
+          </p>
+
+          {moduleGroups.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-erp-border px-4 py-10 text-center text-sm text-erp-muted">
+              {search.trim()
+                ? 'No permissions match your search.'
+                : showAllCatalog
+                  ? 'Permission catalog is empty. Hydrate Admin roles/permissions and try again.'
+                  : 'This role has no permissions granted yet.'}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {moduleGroups.map((group) => {
+                const open = openModules.has(group.module)
+                return (
+                  <div
+                    key={group.module}
+                    className="overflow-hidden rounded-xl border border-erp-border bg-white"
+                  >
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-erp-surface-alt/60"
+                      onClick={() => toggleModuleOpen(group.module)}
+                      aria-expanded={open}
+                    >
+                      {open ? (
+                        <ChevronDown className="h-4 w-4 shrink-0 text-erp-muted" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 shrink-0 text-erp-muted" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-erp-text">{group.label}</span>
+                          <Badge color={group.grantedCount > 0 ? 'green' : 'gray'}>
+                            {group.grantedCount} granted
+                          </Badge>
+                          {group.sensitiveCount > 0 ? (
+                            <Badge color="red">{group.sensitiveCount} sensitive</Badge>
+                          ) : null}
+                          {showAllCatalog ? (
+                            <span className="text-xs text-erp-muted">
+                              of {group.totalCount} in catalog
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </button>
+                    {open ? (
+                      <ul className="divide-y divide-erp-border border-t border-erp-border">
+                        {group.permissions.map((perm) => {
+                          const isGranted = granted.has(perm.name)
+                          if (!showAllCatalog && !isGranted) return null
+                          const sensitive = isAdminSensitivePermission(perm.name)
+                          return (
+                            <li
+                              key={perm.id || perm.name}
+                              className={cn(
+                                'flex items-start gap-3 px-4 py-2.5',
+                                isGranted ? 'bg-emerald-50/40' : 'bg-white',
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  'mt-1 h-2 w-2 shrink-0 rounded-full',
+                                  isGranted ? 'bg-emerald-500' : 'bg-erp-border',
+                                )}
+                                aria-hidden
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="text-sm font-medium text-erp-text">
+                                    {adminPermissionDisplayLabel(perm.name, perm.description)}
+                                  </span>
+                                  {isGranted ? <Badge color="green">Granted</Badge> : <Badge color="gray">Not granted</Badge>}
+                                  {sensitive ? <AdminSensitivePermissionBadge /> : null}
+                                </div>
+                                {perm.description?.trim() ? (
+                                  <p className="mt-0.5 text-xs text-erp-muted">{perm.description}</p>
+                                ) : null}
+                                <p className="mt-0.5 font-mono text-[11px] text-erp-muted">{perm.name}</p>
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </DetailSection>
       </div>
     </DetailLayout>
   )
+}
+
+type RolePermissionModuleGroup = {
+  module: string
+  label: string
+  permissions: AdminPermission[]
+  grantedCount: number
+  sensitiveCount: number
+  totalCount: number
+}
+
+function buildRolePermissionModules(
+  detail: AdminRoleDetail,
+  catalog: AdminPermission[],
+  opts: { search: string; showAllCatalog: boolean },
+): RolePermissionModuleGroup[] {
+  const granted = new Set(detail.permissions)
+  const byName = new Map(catalog.map((p) => [p.name, p]))
+
+  // Ensure granted permissions appear even if catalog hydration lagged
+  for (const name of detail.permissions) {
+    if (!byName.has(name)) {
+      const module = name.split('.')[0] || 'other'
+      byName.set(name, {
+        id: name,
+        name,
+        module,
+        description: null,
+      })
+    }
+  }
+
+  const source = opts.showAllCatalog
+    ? [...byName.values()]
+    : detail.permissions
+        .map((name) => byName.get(name))
+        .filter((p): p is AdminPermission => Boolean(p))
+
+  const q = opts.search.trim().toLowerCase()
+  const filtered = q
+    ? source.filter((p) => {
+        const label = adminPermissionDisplayLabel(p.name, p.description).toLowerCase()
+        const moduleLabel = adminModuleLabel(p.module).toLowerCase()
+        return (
+          p.name.toLowerCase().includes(q) ||
+          label.includes(q) ||
+          moduleLabel.includes(q) ||
+          (p.description ?? '').toLowerCase().includes(q)
+        )
+      })
+    : source
+
+  const groups = new Map<string, AdminPermission[]>()
+  for (const perm of filtered) {
+    const list = groups.get(perm.module) ?? []
+    list.push(perm)
+    groups.set(perm.module, list)
+  }
+
+  return [...groups.entries()]
+    .map(([module, permissions]) => {
+      const sorted = permissions.slice().sort((a, b) => a.name.localeCompare(b.name))
+      const grantedCount = sorted.filter((p) => granted.has(p.name)).length
+      return {
+        module,
+        label: adminModuleLabel(module),
+        permissions: sorted,
+        grantedCount,
+        sensitiveCount: sorted.filter((p) => granted.has(p.name) && isAdminSensitivePermission(p.name)).length,
+        totalCount: sorted.length,
+      }
+    })
+    .filter((g) => (opts.showAllCatalog ? true : g.grantedCount > 0))
+    .sort((a, b) => a.label.localeCompare(b.label))
 }

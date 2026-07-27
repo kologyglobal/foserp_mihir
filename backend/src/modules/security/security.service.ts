@@ -6,6 +6,7 @@ import { sanitizeUser } from '../users/user.service.js'
 import * as userRepository from '../users/user.repository.js'
 import { revokeUserSessions } from '../users/user-invitation.service.js'
 import { MAX_FAILED_LOGINS } from './security.constants.js'
+import { getSecurityPolicy } from './security-policy.service.js'
 import type { ListLoginActivityQuery, ListSessionsQuery } from './security.validation.js'
 
 interface AuditMeta {
@@ -56,7 +57,9 @@ export async function listLoginActivity(tenantId: string, query: ListLoginActivi
         : null,
     })),
     meta: buildPaginationMeta(total, query.page, query.limit),
-    policy: { maxFailedLogins: MAX_FAILED_LOGINS },
+    policy: {
+      maxFailedLogins: (await getSecurityPolicy(tenantId)).maxFailedLogins,
+    },
   }
 }
 
@@ -128,15 +131,18 @@ export async function revokeSession(tenantId: string, sessionId: string, audit?:
 }
 
 export async function listLockedAccounts(tenantId: string) {
-  const users = await prisma.user.findMany({
-    where: { tenantId, deletedAt: null, status: 'BLOCKED' },
-    orderBy: { lockedAt: 'desc' },
-    include: {
-      userRoles: {
-        include: { role: { select: { id: true, name: true, description: true, isSystem: true } } },
+  const [users, policy] = await Promise.all([
+    prisma.user.findMany({
+      where: { tenantId, deletedAt: null, status: 'BLOCKED' },
+      orderBy: { lockedAt: 'desc' },
+      include: {
+        userRoles: {
+          include: { role: { select: { id: true, name: true, description: true, isSystem: true } } },
+        },
       },
-    },
-  })
+    }),
+    getSecurityPolicy(tenantId),
+  ])
 
   return {
     items: users.map((u) => ({
@@ -144,7 +150,13 @@ export async function listLockedAccounts(tenantId: string) {
       failedLoginCount: u.failedLoginCount,
       lockedAt: u.lockedAt,
     })),
-    policy: { maxFailedLogins: MAX_FAILED_LOGINS },
+    policy: {
+      maxFailedLogins: policy.maxFailedLogins,
+      passwordMinLength: policy.passwordMinLength,
+      requireComplexity: policy.requireComplexity,
+      mfa: policy.mfa,
+      mfaMode: policy.mfaMode,
+    },
   }
 }
 
@@ -198,6 +210,8 @@ export async function unlockUser(tenantId: string, userId: string, audit?: Audit
       status: 'ACTIVE',
       failedLoginCount: 0,
       lockedAt: null,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
       updatedBy: audit?.userId,
     },
     include: {

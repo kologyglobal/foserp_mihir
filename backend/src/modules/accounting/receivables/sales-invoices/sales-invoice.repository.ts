@@ -412,6 +412,7 @@ export async function listSalesInvoiceRecords(
     ...(query.status ? { status: query.status } : {}),
     ...(query.customerId ? { customerId: query.customerId } : {}),
     ...(query.sourceType ? { sourceType: query.sourceType } : {}),
+    ...(query.sourceDocumentId ? { sourceDocumentId: query.sourceDocumentId } : {}),
     ...(query.currencyCode ? { currencyCode: query.currencyCode } : {}),
     ...(query.createdBy ? { createdBy: query.createdBy } : {}),
     ...(query.invoiceDateFrom || query.invoiceDateTo

@@ -32,6 +32,8 @@ export const PURCHASE_ERROR_CODE = {
   APPROVAL_SELF_ACTION_NOT_ALLOWED: 'APPROVAL_SELF_ACTION_NOT_ALLOWED',
   APPROVAL_DELEGATE_INVALID: 'APPROVAL_DELEGATE_INVALID',
   APPROVAL_ASSIGNED_TO_ANOTHER_USER: 'APPROVAL_ASSIGNED_TO_ANOTHER_USER',
+  APPROVAL_MATRIX_ROLE_REQUIRED: 'APPROVAL_MATRIX_ROLE_REQUIRED',
+  APPROVAL_USER_LIMIT_EXCEEDED: 'APPROVAL_USER_LIMIT_EXCEEDED',
 
   // Planning
   PPS_NOT_FOUND: 'PPS_NOT_FOUND',
@@ -149,6 +151,10 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
     'Select another active user who has permission to approve this document.',
   [PURCHASE_ERROR_CODE.APPROVAL_ASSIGNED_TO_ANOTHER_USER]:
     'This approval is assigned to another user.',
+  [PURCHASE_ERROR_CODE.APPROVAL_MATRIX_ROLE_REQUIRED]:
+    'Your role does not match the approval matrix role required for this level.',
+  [PURCHASE_ERROR_CODE.APPROVAL_USER_LIMIT_EXCEEDED]:
+    'Document amount exceeds your personal approval limit configured in Purchase Setup.',
 
   [PURCHASE_ERROR_CODE.PPS_NOT_FOUND]: 'Planning sheet row not found.',
   [PURCHASE_ERROR_CODE.PPS_DUPLICATE_LINE]: 'Planning row already exists for this requisition line.',

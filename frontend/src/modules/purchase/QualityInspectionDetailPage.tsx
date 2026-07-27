@@ -21,6 +21,7 @@ import { Modal } from '@/design-system/components/Modal'
 import { ErpButton } from '@/components/erp/ErpButton'
 import {
   acceptQualityInspection,
+  cancelQualityInspection,
   createPurchaseReturnFromGrn,
   getQualityInspectionById,
   holdQualityInspection,
@@ -42,6 +43,8 @@ import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { usePurchasePermissions } from '@/utils/permissions'
+import { isApiMode } from '@/config/apiConfig'
+import { appConfirm } from '@/store/confirmDialogStore'
 
 function editable(status: QualityInspection['status']) {
   return status === 'pending' || status === 'in_progress' || status === 'hold'
@@ -262,6 +265,28 @@ export function QualityInspectionDetailPage() {
               disabled: saving,
             },
             {
+              id: 'cancel',
+              label: 'Cancel Inspection',
+              icon: XCircle,
+              onClick: () => {
+                void (async () => {
+                  const ok = await appConfirm({
+                    title: 'Cancel quality inspection?',
+                    description: 'This cancels the inspection. You can create a new one from the GRN if needed.',
+                    confirmLabel: 'Cancel inspection',
+                    tone: 'danger',
+                  })
+                  if (!ok) return
+                  await runAction(
+                    () => cancelQualityInspection(qi.id, remarks || 'Cancelled'),
+                    'Inspection cancelled',
+                  )
+                })()
+              },
+              hidden: !isApiMode() || !perms.canCancelQuality || !canEdit,
+              disabled: saving,
+            },
+            {
               id: 'deviation',
               label: 'Request Deviation Approval',
               icon: ShieldAlert,
@@ -376,7 +401,12 @@ export function QualityInspectionDetailPage() {
         </div>
       </ErpCardSection>
 
-      <ErpCardSection title="Parameters" defaultOpen>
+      <ErpCardSection title="Parameters" defaultOpen={!isApiMode()}>
+        {isApiMode() && parameters.length === 0 ? (
+          <p className="text-sm text-erp-muted">
+            Parameter checklists are not persisted on the API yet. Record observations in Remarks.
+          </p>
+        ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="border-b text-xs text-erp-muted">
@@ -397,7 +427,7 @@ export function QualityInspectionDetailPage() {
                   <td className="px-2 py-2">{p.parameter}</td>
                   <td className="px-2 py-2">{p.specification}</td>
                   <td className="px-2 py-2">
-                    {canEdit ? (
+                    {canEdit && !isApiMode() ? (
                       <Input
                         type="number"
                         className="w-20"
@@ -416,7 +446,7 @@ export function QualityInspectionDetailPage() {
                     )}
                   </td>
                   <td className="px-2 py-2">
-                    {canEdit ? (
+                    {canEdit && !isApiMode() ? (
                       <Input
                         type="number"
                         className="w-20"
@@ -495,6 +525,7 @@ export function QualityInspectionDetailPage() {
             </tbody>
           </table>
         </div>
+        )}
       </ErpCardSection>
 
       <Modal

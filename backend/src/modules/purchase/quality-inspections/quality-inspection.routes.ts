@@ -15,5 +15,6 @@ router.patch('/:id', requirePermission('purchase.qi.edit'), validateParams(uuidP
 router.post('/:id/complete', requirePermission('purchase.qi.complete'), validateParams(uuidParamSchema), validateBody(completeQualityInspectionSchema), controller.completeQualityInspection)
 router.post('/:id/accept', requirePermission('purchase.qi.complete'), validateParams(uuidParamSchema), validateBody(qualityInspectionRemarksSchema), controller.acceptQualityInspection)
 router.post('/:id/reject', requirePermission('purchase.qi.complete'), validateParams(uuidParamSchema), validateBody(qualityInspectionRemarksSchema), controller.rejectQualityInspection)
+router.post('/:id/hold', requirePermission('purchase.qi.edit'), validateParams(uuidParamSchema), validateBody(qualityInspectionRemarksSchema), controller.holdQualityInspection)
 router.post('/:id/cancel', requirePermission('purchase.qi.cancel'), validateParams(uuidParamSchema), validateBody(qualityInspectionRemarksSchema), controller.cancelQualityInspection)
 export default router

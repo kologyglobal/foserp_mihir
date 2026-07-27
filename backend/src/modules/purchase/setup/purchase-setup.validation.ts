@@ -56,6 +56,15 @@ const approvalTierSchema = z.object({
   documentType: z.enum(APPROVAL_DOCUMENT_TYPES).optional().default('all'),
 })
 
+const approverLimitSchema = z.object({
+  id: z.string().uuid().optional(),
+  userId: z.string().uuid(),
+  maxAmountInr: nonNeg,
+  documentType: z.enum(APPROVAL_DOCUMENT_TYPES).optional().default('all'),
+  isActive: z.boolean().optional().default(true),
+  sortOrder: z.coerce.number().int().min(1).optional().default(1),
+})
+
 const generalSchema = z.object({
   defaultPlantId: z.string().uuid().nullable().optional().or(z.literal('')),
   defaultWarehouseId: z.string().uuid().nullable().optional().or(z.literal('')),
@@ -159,6 +168,7 @@ export const upsertPurchaseSetupSchema = z.object({
   requisition: requisitionSchema.optional(),
   numberSeries: numberSeriesSchema.optional(),
   approvalMatrix: z.array(approvalTierSchema).optional(),
+  approverLimits: z.array(approverLimitSchema).optional(),
   tax: taxSchema.optional(),
   invoiceMatchTolerances: invoiceMatchSchema.optional(),
   allowDirectInvoice: z.boolean().optional(),

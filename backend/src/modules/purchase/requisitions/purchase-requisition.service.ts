@@ -53,16 +53,45 @@ async function assertApprovalAssignedToActor(
   tenantId: string,
   purchaseRequisitionId: string,
   actorId: string,
+  actorPermissions: readonly string[] = [],
 ) {
   const approval = await prisma.purchaseApproval.findFirst({
     where: { tenantId, purchaseRequisitionId, status: 'PENDING' },
-    select: { approverId: true },
+    select: { approverId: true, approverRole: true },
   })
   if (approval?.approverId && approval.approverId !== actorId) {
     throw new PurchaseRequisitionNotApprovableError(
       purchaseMessage(PURCHASE_ERROR_CODE.APPROVAL_ASSIGNED_TO_ANOTHER_USER),
       PURCHASE_ERROR_CODE.APPROVAL_ASSIGNED_TO_ANOTHER_USER,
     )
+  }
+  if (approval) {
+    const { assertActorMatchesApproverRole } = await import('../shared/purchase-matrix-role.js')
+    await assertActorMatchesApproverRole(
+      tenantId,
+      actorId,
+      approval.approverRole,
+      actorPermissions,
+      (message) =>
+        new PurchaseRequisitionNotApprovableError(
+          message,
+          PURCHASE_ERROR_CODE.APPROVAL_MATRIX_ROLE_REQUIRED,
+        ),
+    )
+  }
+  const pr = await prisma.purchaseRequisition.findFirst({
+    where: { id: purchaseRequisitionId, tenantId },
+    select: { estimatedAmount: true },
+  })
+  if (pr) {
+    const { assertActorWithinApproverLimit } = await import('../shared/purchase-approver-limit.js')
+    await assertActorWithinApproverLimit({
+      tenantId,
+      actorId,
+      documentAmount: Number(pr.estimatedAmount),
+      documentType: 'PURCHASE_REQUISITION',
+      makeError: (message, code) => new PurchaseRequisitionNotApprovableError(message, code),
+    })
   }
 }
 
@@ -419,7 +448,7 @@ export async function approvePurchaseRequisition(
     ? await isSelfApprovalAllowed(tenantId, actorPermissions)
     : false
   assertApprovable(existing, actorId, { allowSelfApproval })
-  await assertApprovalAssignedToActor(tenantId, id, actorId)
+  await assertApprovalAssignedToActor(tenantId, id, actorId, actorPermissions)
 
   const estimatedTotal = existing.lines.reduce(
     (sum, line) => sum + Number(line.estimatedAmount),

@@ -51,7 +51,7 @@ import {
   sectionContent,
 } from '../utils/crmIntegration'
 import { useMasterStore } from './masterStore'
-import { assertProductSellableForSales } from '../utils/productMaster'
+import { canUseItemInSales } from '../utils/opportunityItemOptions'
 import { resolveQuotationRevisionPolicy } from '../utils/quotationRevisionPolicy'
 import { nextDocumentNo } from '../utils/documentNumbers'
 import { assertPermission } from '../utils/permissions'
@@ -83,15 +83,14 @@ function genId(prefix: string) {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`
 }
 
-/** Block unreleased / inactive products at the first CRM write — not only at SO convert. */
-function assertSellableProductIds(
-  productIds: Array<string | null | undefined>,
+/** Block non-sales items at the first CRM write — not only at SO convert. */
+function assertSellableItemIds(
+  itemIds: Array<string | null | undefined>,
 ): { ok: true } | { ok: false; error: string } {
-  const master = useMasterStore.getState()
-  for (const id of productIds) {
+  for (const id of itemIds) {
     if (!id) continue
-    const check = assertProductSellableForSales(master.getProduct(id))
-    if (!check.ok) return check
+    const check = canUseItemInSales(id)
+    if (!check.ok) return { ok: false, error: check.error ?? 'Item is not allowed for sales' }
   }
   return { ok: true }
 }
@@ -507,10 +506,10 @@ export const useCrmStore = create<CrmState>()(
         const audit = stampCreated()
         const syncedLines = syncOpportunityLines(input.lines ?? [])
         const summary = calcOpportunityLinesSummary(syncedLines)
-        const primaryProductId = syncedLines[0]?.productId ?? input.productId ?? null
-        const sellable = assertSellableProductIds([
-          primaryProductId,
-          ...syncedLines.map((l) => l.productId),
+        const primaryItemId = syncedLines[0]?.itemId ?? null
+        const sellable = assertSellableItemIds([
+          primaryItemId,
+          ...syncedLines.map((l) => l.itemId),
         ])
         if (!sellable.ok) return sellable
         const computedValue = summary.grandTotal > 0 ? summary.grandTotal : input.value
@@ -520,8 +519,8 @@ export const useCrmStore = create<CrmState>()(
           ...input,
           leadId: input.leadId ?? null,
           inquiryId: null,
-          lines: syncedLines,
-          productId: primaryProductId,
+          lines: syncedLines.map((l) => ({ ...l, productId: null })),
+          productId: null,
           value: computedValue,
           healthScore: 60,
           lastActivityAt: audit.createdAt,
@@ -738,14 +737,13 @@ export const useCrmStore = create<CrmState>()(
           const syncedLines = syncOpportunityLines(patch.lines)
           nextPatch = {
             ...nextPatch,
-            lines: syncedLines,
-            productId: syncedLines[0]?.productId ?? patch.productId ?? opp.productId,
+            lines: syncedLines.map((l) => ({ ...l, productId: null })),
+            productId: null,
             value: calcOpportunityLinesSummary(syncedLines).grandTotal,
           }
         }
-        const sellable = assertSellableProductIds([
-          nextPatch.productId ?? (patch.productId !== undefined ? patch.productId : null),
-          ...((nextPatch.lines ?? patch.lines ?? []) as { productId?: string | null }[]).map((l) => l.productId),
+        const sellable = assertSellableItemIds([
+          ...((nextPatch.lines ?? patch.lines ?? []) as { itemId?: string | null }[]).map((l) => l.itemId),
         ])
         if (!sellable.ok) return sellable
         set((s) => ({
@@ -1026,7 +1024,7 @@ export const useCrmStore = create<CrmState>()(
       updateQuotationDocumentPriceTable: (documentId, priceLines, extras) => {
         const doc = get().getQuotationDocument(documentId)
         if (!doc) return { ok: false, error: 'Document not found' }
-        const sellable = assertSellableProductIds(priceLines.map((l) => l.productId))
+        const sellable = assertSellableItemIds(priceLines.map((l) => l.itemId))
         if (!sellable.ok) return sellable
         if (isApiMode()) {
           const lines = syncLineTotals(priceLines)
@@ -1414,20 +1412,21 @@ export const useCrmStore = create<CrmState>()(
         if (!opp) return { ok: false, error: 'Opportunity not found' }
         const master = useMasterStore.getState()
         const product = opp.productId ? master.getProduct(opp.productId) : undefined
-        const resolvedLines = customLines?.length
+        const resolvedLines = (customLines?.length
           ? syncOpportunityLines(customLines)
           : resolveOpportunityLines(opp, product)
+        ).map((l) => ({ ...l, productId: null as string | null }))
         const effectiveUnitPrice = unitPrice > 0 ? unitPrice : (resolvedLines[0]?.unitPrice ?? 0)
-        const primaryProductId = resolvedLines[0]?.productId ?? opp.productId
-        if (!primaryProductId && resolvedLines.length === 0) {
-          return { ok: false, error: 'Opportunity needs at least one product line' }
+        const primaryItemId = resolvedLines[0]?.itemId ?? null
+        if (!primaryItemId && resolvedLines.length === 0) {
+          return { ok: false, error: 'Opportunity needs at least one item line' }
         }
         if (!effectiveUnitPrice || effectiveUnitPrice <= 0) {
           return { ok: false, error: 'Unit price must be greater than zero' }
         }
-        const sellable = assertSellableProductIds([
-          primaryProductId,
-          ...resolvedLines.map((l) => l.productId),
+        const sellable = assertSellableItemIds([
+          primaryItemId,
+          ...resolvedLines.map((l) => l.itemId),
         ])
         if (!sellable.ok) return sellable
 
@@ -1483,7 +1482,8 @@ export const useCrmStore = create<CrmState>()(
               opportunityId: opp.id,
               opportunityNo: opp.opportunityNo,
               customerId: opp.customerId,
-              productId: primaryProductId!,
+              productId: null,
+              itemId: primaryItemId,
               qty,
               unitPrice: effectiveUnitPrice,
               terms: commercialNotes,
@@ -1509,7 +1509,7 @@ export const useCrmStore = create<CrmState>()(
           opportunityId: opp.id,
           opportunityNo: opp.opportunityNo,
           customerId: opp.customerId,
-          productId: primaryProductId!,
+          productId: primaryItemId ?? '',
           qty,
           unitPrice: effectiveUnitPrice,
           discountPct: 0,
@@ -1544,7 +1544,8 @@ export const useCrmStore = create<CrmState>()(
               id: genId('pl'),
               productOrItem: product?.productName ?? requirementText,
               description: tpl?.productFamily ?? 'Supply',
-              productId: primaryProductId,
+              productId: null,
+              itemId: primaryItemId,
               qty,
               uom: 'Nos',
               unitPrice: effectiveUnitPrice,
@@ -1602,18 +1603,19 @@ export const useCrmStore = create<CrmState>()(
         const customer = master.getCustomer(customerId)
         if (!customer) return { ok: false, error: 'Customer not found' }
 
-        const resolvedLines = customLines?.length ? syncOpportunityLines(customLines) : []
+        const resolvedLines = (customLines?.length ? syncOpportunityLines(customLines) : [])
+          .map((l) => ({ ...l, productId: null as string | null }))
         const effectiveUnitPrice = unitPrice > 0 ? unitPrice : (resolvedLines[0]?.unitPrice ?? 0)
-        const primaryProductId = resolvedLines[0]?.productId ?? null
+        const primaryItemId = resolvedLines[0]?.itemId ?? null
         if (resolvedLines.length === 0) {
-          return { ok: false, error: 'Add at least one product line' }
+          return { ok: false, error: 'Add at least one item line' }
         }
         if (!effectiveUnitPrice || effectiveUnitPrice <= 0) {
           return { ok: false, error: 'Unit price must be greater than zero' }
         }
-        const sellable = assertSellableProductIds([
-          primaryProductId,
-          ...resolvedLines.map((l) => l.productId),
+        const sellable = assertSellableItemIds([
+          primaryItemId,
+          ...resolvedLines.map((l) => l.itemId),
         ])
         if (!sellable.ok) return sellable
 
@@ -1655,7 +1657,8 @@ export const useCrmStore = create<CrmState>()(
             m.apiCreateQuotation({
               customerId,
               opportunityId: null,
-              productId: primaryProductId,
+              productId: null,
+              itemId: primaryItemId,
               qty,
               unitPrice: effectiveUnitPrice,
               terms: commercialNotes,
@@ -1677,7 +1680,7 @@ export const useCrmStore = create<CrmState>()(
         const sales = useSalesStore.getState()
         const quo = sales.createQuotationDirect({
           customerId,
-          productId: primaryProductId ?? undefined,
+          productId: primaryItemId ?? undefined,
           qty,
           unitPrice: effectiveUnitPrice,
           discountPct: 0,
@@ -1762,9 +1765,11 @@ export const useCrmStore = create<CrmState>()(
         const salesState = useSalesStore.getState()
         const salesQuo = salesState.getQuotation(doc.quotationId)
         const masters = useMasterStore.getState()
-        const customer = salesQuo ? masters.getCustomer(salesQuo.customerId) : undefined
-        const contact = doc.contactId ? get().getContact(doc.contactId) : undefined
         const opportunity = doc.opportunityId ? get().getOpportunity(doc.opportunityId) : undefined
+        const customer = masters.getCustomer(
+          salesQuo?.customerId ?? opportunity?.customerId ?? '',
+        )
+        const contact = doc.contactId ? get().getContact(doc.contactId) : undefined
         const product = salesQuo ? masters.getProduct(salesQuo.productId) : undefined
 
         if (!doc.opportunityId || !opportunity) {
@@ -1782,6 +1787,7 @@ export const useCrmStore = create<CrmState>()(
           latestDocument: latestDoc,
           salesQuotation: salesQuo,
           customer,
+          customerId: salesQuo?.customerId ?? opportunity.customerId,
           contactName: contact?.name,
           opportunityName: opportunity?.opportunityName,
           productName: product?.productName,
@@ -1808,7 +1814,9 @@ export const useCrmStore = create<CrmState>()(
           opportunity,
           salesQuotation: salesQuo,
           products: masters.products,
+          items: masters.items,
           defaultProduct: product,
+          defaultItem: product?.fgItemId ? masters.getItem(product.fgItemId) : undefined,
         })
 
         const result = salesState.createSalesOrderFromQuotation(doc.quotationId, {

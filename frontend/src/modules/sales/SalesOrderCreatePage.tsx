@@ -42,14 +42,18 @@ import { resolveCompany360Path } from '../../config/entity360Routes'
 import { notify } from '../../store/toastStore'
 import { validateSalesOrderCreate } from '../../utils/validation/crmSchemas/salesOrderSchema'
 import { handleInvalidSubmit, type FieldErrorMap } from '../../utils/formValidation'
-import { assertProductSellableForSales, isProductSellable, productNotSellableForSalesMessage } from '../../utils/productMaster'
-import { PRODUCT_STATUS_LABELS } from '../../types/productMaster'
+import {
+  canUseItemInSales,
+  isItemSellable,
+  itemNotSellableForSalesMessage,
+  useSalesItemOptionMap,
+} from '../../utils/opportunityItemOptions'
 import { useSalesStore } from '../../store/salesStore'
 import { useCrmStore } from '../../store/crmStore'
 import { useMasterStore } from '../../store/masterStore'
 import { isApiMode } from '../../config/apiConfig'
 import { apiCreateSalesOrder } from '../../services/bridges/salesOrderApiBridge'
-import { useActiveCustomers, useSellableProducts } from '../../hooks/useMasterLists'
+import { useActiveCustomers, useSellableItems } from '../../hooks/useMasterLists'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import {
@@ -78,7 +82,7 @@ type SoCreateMode = SalesOrderCreateMode
 
 interface SoLineDraft {
   key: string
-  productId: string
+  itemId: string
   qty: number
   unitPrice: number
   discountPct: number
@@ -102,10 +106,10 @@ function computeLineTotals(line: SoLineDraft) {
   return { taxableValue, gstAmount, lineTotal: round2(taxableValue + gstAmount) }
 }
 
-function newLineDraft(productId = '', unitPrice = 0): SoLineDraft {
+function newLineDraft(itemId = '', unitPrice = 0): SoLineDraft {
   return {
     key: crypto.randomUUID(),
-    productId,
+    itemId,
     qty: 1,
     unitPrice,
     discountPct: 0,
@@ -140,7 +144,13 @@ export function SalesOrderNewPage() {
   const fromCrm = isFromCrmSearchParam(searchParams.get('fromCrm'))
   const listPath = fromCrm ? CRM_SALES_ORDERS_PATH : '/sales/orders'
   const duplicateCustomerId = searchParams.get('customerId')
-  const duplicateProductId = searchParams.get('productId')
+  const duplicateItemId =
+    searchParams.get('itemId')
+    ?? (() => {
+      const productId = searchParams.get('productId')
+      if (!productId) return null
+      return useMasterStore.getState().getProduct(productId)?.fgItemId ?? null
+    })()
   const duplicateQty = Number(searchParams.get('qty') ?? '0')
 
   const opportunityPrefill = useMemo(
@@ -168,7 +178,7 @@ export function SalesOrderNewPage() {
     opportunityIdParam
     || quotationDocumentIdParam
     || duplicateCustomerId
-    || duplicateProductId,
+    || duplicateItemId,
   )
 
   const createDirect = useSalesStore((s) => s.createDirectSalesOrder)
@@ -179,10 +189,11 @@ export function SalesOrderNewPage() {
   const getOpportunity = useCrmStore((s) => s.getOpportunity)
   const getQuotation = useSalesStore((s) => s.getQuotation)
   const customers = useActiveCustomers()
-  const sellableProducts = useSellableProducts()
-  const allProducts = useMasterStore((s) => s.products)
+  const sellableItems = useSellableItems()
+  const allItems = useMasterStore((s) => s.items)
+  const uoms = useMasterStore((s) => s.uoms)
   const getCustomer = useMasterStore((s) => s.getCustomer)
-  const getProduct = useMasterStore((s) => s.getProduct)
+  const getItem = useMasterStore((s) => s.getItem)
   const locations = useMasterStore((s) => s.locations)
 
   const [createMode, setCreateMode] = useState<SoCreateMode>(initialCreateMode)
@@ -195,14 +206,21 @@ export function SalesOrderNewPage() {
   )
   const [quotationDocumentId, setQuotationDocumentId] = useState(opportunityPrefill?.quotationDocumentId ?? '')
   const [lines, setLines] = useState<SoLineDraft[]>(() => {
-    const fromUpstream = Boolean(opportunityPrefill || duplicateProductId)
+    const fromUpstream = Boolean(opportunityPrefill || duplicateItemId)
     if (!fromUpstream) {
       return [{ ...newLineDraft('', 0), qty: 1 }]
     }
-    const productId = opportunityPrefill?.productId ?? duplicateProductId ?? ''
-    const unitPrice = opportunityPrefill?.unitPrice ?? (productId ? getProduct(productId)?.standardPrice ?? 0 : 0)
+    const itemId = opportunityPrefill?.itemId
+      || duplicateItemId
+      || (opportunityPrefill?.productId
+        ? useMasterStore.getState().getProduct(opportunityPrefill.productId)?.fgItemId ?? ''
+        : '')
+      || ''
+    const item = itemId ? useMasterStore.getState().getItem(itemId) : undefined
+    const unitPrice = opportunityPrefill?.unitPrice
+      ?? (item?.defaultSalesRate ?? item?.standardRate ?? 0)
     const qty = opportunityPrefill?.qty ?? (duplicateQty > 0 ? duplicateQty : 1)
-    return [{ ...newLineDraft(productId, unitPrice), qty }]
+    return [{ ...newLineDraft(itemId, unitPrice), qty }]
   })
   const [customerPoNumber, setCustomerPoNumber] = useState('')
   const [customerPoDate, setCustomerPoDate] = useState('')
@@ -283,34 +301,22 @@ export function SalesOrderNewPage() {
     [customers],
   )
 
-  const productSmartOptions = useMemo(() => {
-    const retainIds = new Set(lines.map((l) => l.productId).filter(Boolean))
-    const sellableOpts = sellableProducts.map((p) => ({
-      value: p.id,
-      label: `${p.productCode} · ${p.productName}`,
-      searchText: `${p.productCode} ${p.productName}`.toLowerCase(),
-    }))
-    const retained = allProducts
-      .filter((p) => retainIds.has(p.id) && !isProductSellable(p))
-      .map((p) => ({
-        value: p.id,
-        label: `${p.productCode} · ${p.productName}`,
-        searchText: `${p.productCode} ${p.productName} not released`.toLowerCase(),
-        badge: `Not released · ${PRODUCT_STATUS_LABELS[p.status] ?? p.status}`,
-        subtitle: productNotSellableForSalesMessage(p),
-      }))
-    return [...sellableOpts, ...retained]
-  }, [sellableProducts, allProducts, lines])
+  const { options: itemSmartOptions } = useSalesItemOptionMap(
+    allItems,
+    uoms,
+    undefined,
+    lines.map((l) => l.itemId),
+  )
 
-  const products = sellableProducts
+  const items = sellableItems
 
   const computedLines = useMemo(
     () => lines.map((line) => {
       const totals = computeLineTotals(line)
-      const product = line.productId ? getProduct(line.productId) : undefined
-      return { ...line, ...totals, productName: product?.productName ?? '—' }
+      const item = line.itemId ? getItem(line.itemId) : undefined
+      return { ...line, ...totals, productName: item?.itemName ?? '—' }
     }),
-    [lines, getProduct],
+    [lines, getItem],
   )
 
   const orderSummary = useMemo(() => {
@@ -356,13 +362,14 @@ export function SalesOrderNewPage() {
       document: doc,
       opportunity: opp,
       salesQuotation: salesQuo,
-      products,
-      defaultProduct: products[0] ?? null,
+      products: useMasterStore.getState().products,
+      items: allItems,
+      defaultItem: items[0] ?? null,
     })
     if (built.length > 0) {
       setLines(built.map((l) => ({
         key: crypto.randomUUID(),
-        productId: l.productId ?? products[0]?.id ?? '',
+        itemId: l.itemId ?? items[0]?.id ?? '',
         qty: l.qty,
         unitPrice: l.unitPrice,
         discountPct: l.discountPct,
@@ -447,10 +454,10 @@ export function SalesOrderNewPage() {
     }).fieldErrors
 
     for (const line of lines) {
-      if (!line.productId) continue
-      const sellable = assertProductSellableForSales(getProduct(line.productId))
+      if (!line.itemId) continue
+      const sellable = canUseItemInSales(line.itemId)
       if (!sellable.ok) {
-        fieldErrors.lines = sellable.error
+        fieldErrors.lines = sellable.error ?? 'Item is not allowed for sales'
         break
       }
     }
@@ -513,11 +520,11 @@ export function SalesOrderNewPage() {
         : linkedDoc?.contactId ?? null
       const quotationId = linkedQuo?.id ?? opportunityPrefill?.quotationId ?? null
       const linePayload = lines.map((l) => {
-        const product = getProduct(l.productId)
+        const item = getItem(l.itemId)
         return {
-          productOrItem: product?.productName ?? l.productId,
-          description: product?.productName ?? '',
-          productId: l.productId,
+          productOrItem: item?.itemName ?? l.itemId,
+          description: item?.itemName ?? '',
+          itemId: l.itemId,
           qty: l.qty,
           uom: 'NOS',
           unitPrice: l.unitPrice,
@@ -530,7 +537,7 @@ export function SalesOrderNewPage() {
         r = await apiCreateSalesOrder({
           customerId,
           source: quotationId || opportunityId ? 'quotation' : 'direct',
-          productId: primary.productId,
+          itemId: primary.itemId,
           qty: lines.reduce((s, l) => s + l.qty, 0),
           unitPrice: primary.unitPrice,
           customerPoNumber: customerPoNumber.trim(),
@@ -554,7 +561,8 @@ export function SalesOrderNewPage() {
       } else {
         r = createDirect({
           customerId,
-          productId: primary.productId,
+          productId: primary.itemId,
+          itemId: primary.itemId,
           qty: lines.reduce((s, l) => s + l.qty, 0),
           unitPrice: primary.unitPrice,
           customerPoNumber: customerPoNumber.trim(),
@@ -576,7 +584,7 @@ export function SalesOrderNewPage() {
           freightAmount,
           orderDiscountAmount: orderSummary.orderDiscountAmount,
           lines: lines.map((l) => ({
-            productId: l.productId,
+            itemId: l.itemId,
             qty: l.qty,
             unitPrice: l.unitPrice,
             discountPct: l.discountPct,
@@ -624,7 +632,7 @@ export function SalesOrderNewPage() {
   const modeBadgeLabel = createMode === 'quotation'
     ? (opportunityPrefill?.canConvertQuotation ? 'Quote handover' : 'From quotation')
     : 'Direct SO'
-  const hasValidLines = lines.length > 0 && lines.every((l) => l.productId && l.qty >= 1 && l.unitPrice > 0)
+  const hasValidLines = lines.length > 0 && lines.every((l) => l.itemId && l.qty >= 1 && l.unitPrice > 0)
 
   const completionItems = useMemo(() => [
     {
@@ -891,7 +899,7 @@ export function SalesOrderNewPage() {
             {computedLines.map((line, idx) => {
               const draft = lines[idx]
               if (!draft) return null
-              const product = draft.productId ? getProduct(draft.productId) : undefined
+              const item = draft.itemId ? getItem(draft.itemId) : undefined
               return (
                 <tr key={line.key} className="so-pricing-row">
                   <td className="so-pricing-td so-pricing-td--center tabular-nums text-erp-muted">
@@ -899,29 +907,29 @@ export function SalesOrderNewPage() {
                   </td>
                   <td className="so-pricing-td so-pricing-td--product">
                     <ErpSmartSelect
-                      options={productSmartOptions}
-                      value={draft.productId}
+                      options={itemSmartOptions}
+                      value={draft.itemId}
                       onChange={(id) => {
                         if (!id) return
-                        const nextProduct = getProduct(id)
-                        const sellable = assertProductSellableForSales(nextProduct)
+                        const nextItem = getItem(id)
+                        const sellable = canUseItemInSales(id)
                         if (!sellable.ok) {
-                          notify.warning(sellable.error)
+                          notify.warning(sellable.error ?? 'Item is not allowed for sales')
                           return
                         }
                         updateLine(line.key, {
-                          productId: id,
-                          unitPrice: nextProduct?.standardPrice ?? draft.unitPrice,
+                          itemId: id,
+                          unitPrice: nextItem?.defaultSalesRate ?? nextItem?.standardRate ?? draft.unitPrice,
                         })
                       }}
-                      placeholder="Select released product…"
+                      placeholder="Select sellable item…"
                       appearance="dropdown"
                       dropdownMinWidth={360}
-                      emptyMessage="No released products match. Only products released for sale can be selected."
+                      emptyMessage="No sellable items match. Only items allowed for sales can be selected."
                     />
-                    {product && !isProductSellable(product) ? (
+                    {item && !isItemSellable(item) ? (
                       <p className="so-pricing-warn">
-                        <ShieldAlert className="h-3 w-3" /> {productNotSellableForSalesMessage(product)}
+                        <ShieldAlert className="h-3 w-3" /> {itemNotSellableForSalesMessage(item)}
                       </p>
                     ) : null}
                   </td>

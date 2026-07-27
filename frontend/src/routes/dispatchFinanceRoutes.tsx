@@ -27,6 +27,7 @@ import {
 } from '@/modules/dispatch/DispatchChallanPages'
 import { DispatchReportsPage } from '@/modules/dispatch/DispatchProductionPages'
 import { ApiDispatchReportsPage } from '@/modules/dispatch/ApiDispatchReportsPage'
+import { DispatchSettingsPage } from '@/modules/dispatch/DispatchSettingsPage'
 
 /** Live dispatch only — demo scan/plan/gate-pass/invoices/costing removed. */
 export const dispatchFinanceRouteChildren: RouteObject[] = [
@@ -39,6 +40,7 @@ export const dispatchFinanceRouteChildren: RouteObject[] = [
     path: 'dispatch/register',
     element: isApiMode() ? <ApiOutboundDispatchRegisterPage /> : <DispatchDashboardPage />,
   },
+  { path: 'dispatch/settings', element: <DispatchSettingsPage /> },
   { path: 'dispatch/pick-lists', element: <DispatchPickListRegisterPage /> },
   { path: 'dispatch/pick-lists/:id/pick', element: <DispatchPickListPickModePage /> },
   { path: 'dispatch/pick-lists/:id', element: <DispatchPickListDetailPage /> },

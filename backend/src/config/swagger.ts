@@ -2,7 +2,7 @@
  * OpenAPI 3.0 spec for Swagger UI at `/api/docs` (development).
  * Hand-written paths below are authoritative; missing routes are filled from
  * `swagger.generated-paths.ts` (run `npm run swagger:generate`).
- * Last aligned: 2026-07-22 — OpenAPI 1.4.0 + auto stubs for manufacturing/purchase/quality/dispatch/inventory/accounting gaps.
+ * Last aligned: 2026-07-27 — OpenAPI 1.5.0 + inventory costing + expanded auto stubs (admin/security/gate/executive).
  */
 
 import { generatedSwaggerPaths, generatedSwaggerTags } from './swagger.generated-paths.js'
@@ -275,22 +275,22 @@ const swaggerSpecDraft = {
   openapi: '3.0.3',
   info: {
     title: 'FOS ERP API',
-    version: '1.4.0',
+    version: '1.5.0',
     description: [
-      'Multi-tenant ERP backend — Auth, RBAC, CRM, masters, lookups, imports/exports, finance, manufacturing, purchase, inventory, quality, dispatch, and ops reports.',
+      'Multi-tenant ERP backend — Auth, RBAC, CRM, masters, lookups, imports/exports, finance, manufacturing, purchase, inventory (incl. valuation costing), quality, dispatch, gate, executive, and ops reports.',
       '',
       '**Tenant routes:** prefer `/api/v1/t/{tenantSlug}/…` (frontend default). Equivalent UUID form: `/api/v1/tenants/{tenantId}/…`.',
       '',
       '**Auth:** `Authorization: Bearer <accessToken>`. Never send `tenantId` in request bodies.',
       '',
-      '**Shipped (API):** Auth, users/roles, CRM (+ quotations/templates/sales orders), masters, finance (journals, AR/AP, bank & cash),',
-      'manufacturing (setup → WO → materials → job work → corrections → plans → costing flag-gated), inventory, purchase (PR→PO→GRN→invoice),',
-      'quality inspections/plans, dispatch fulfilment/pick/pack/challan, ops reports / exceptions.',
+      '**Shipped (API):** Auth, users/roles/security/modules, CRM (+ quotations/templates/sales orders/commercial), masters, finance (journals, AR/AP, bank & cash),',
+      'manufacturing (setup → WO → materials → job work → corrections → plans → costing flag-gated), inventory + inventory costing (FIFO/average/standard/specific), purchase (PR→PO→GRN→invoice),',
+      'quality inspections/plans, dispatch fulfilment/pick/pack/challan, gate, executive dashboard, ops reports / exceptions.',
       '',
       '**Docs note:** Paths with description “Auto-generated stub…” were produced from Express route modules.',
       'Hand-written entries in this file override stubs for the same method+path. Regenerate stubs with `npm run swagger:generate`.',
       '',
-      '**Aligned:** 2026-07-22 — OpenAPI 1.4.0 merges hand-written coverage with generated stubs for remaining modules.',
+      '**Aligned:** 2026-07-27 — OpenAPI 1.5.0 merges hand-written coverage (incl. Inventory Costing) with regenerated stubs for remaining modules.',
     ].join('\n'),
   },
   servers: [{ url: '/api/v1', description: 'API v1' }],
@@ -300,6 +300,8 @@ const swaggerSpecDraft = {
     { name: 'Tenants' },
     { name: 'Users' },
     { name: 'Roles' },
+    { name: 'Security' },
+    { name: 'Modules' },
     { name: 'CRM Companies' },
     { name: 'CRM Contacts' },
     { name: 'CRM Leads' },
@@ -343,6 +345,8 @@ const swaggerSpecDraft = {
     { name: 'Production Dashboards' },
     { name: 'Inventory Stock' },
     { name: 'Inventory Reservations' },
+    { name: 'Inventory Costing' },
+    { name: 'Inventory Setup' },
     { name: 'Purchase Requisitions' },
   ],
   components: {
@@ -3985,6 +3989,226 @@ const swaggerSpecDraft = {
         summary: 'Cancel an active reservation',
         parameters: [tenantSlugParam, idParam],
         responses: { 200: { description: 'Reservation cancelled' } },
+      },
+    },
+
+    // ─── Inventory Costing (valuation engine Phase A–C) ─────────────────────────
+    '/t/{tenantSlug}/inventory/costing/cost-entries': {
+      get: {
+        tags: ['Inventory Costing'],
+        summary: 'List inventory cost entries',
+        description:
+          'Valuation postings linked to stock movements. Permissions: `inventory.view_cost` (or stock/ledger/view).',
+        parameters: [
+          tenantSlugParam,
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
+          { name: 'itemId', in: 'query', schema: { type: 'string', format: 'uuid' } },
+          { name: 'warehouseId', in: 'query', schema: { type: 'string', format: 'uuid' } },
+          {
+            name: 'valuationMethod',
+            in: 'query',
+            schema: {
+              type: 'string',
+              enum: ['FIFO', 'MOVING_WEIGHTED_AVERAGE', 'STANDARD_COST', 'SPECIFIC_IDENTIFICATION'],
+            },
+          },
+          {
+            name: 'entryType',
+            in: 'query',
+            schema: { type: 'string', enum: ['RECEIPT', 'ISSUE', 'ADJUSTMENT', 'OPENING'] },
+          },
+          { name: 'workOrderId', in: 'query', schema: { type: 'string', format: 'uuid' } },
+          { name: 'inventoryMovementId', in: 'query', schema: { type: 'string', format: 'uuid' } },
+          { name: 'fromDate', in: 'query', schema: { type: 'string', format: 'date-time' } },
+          { name: 'toDate', in: 'query', schema: { type: 'string', format: 'date-time' } },
+        ],
+        responses: { 200: { description: 'Paginated cost entries' } },
+      },
+    },
+    '/t/{tenantSlug}/inventory/costing/cost-entries/{id}': {
+      get: {
+        tags: ['Inventory Costing'],
+        summary: 'Get inventory cost entry',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Cost entry with layer consumptions when present' }, 404: { description: 'Not found' } },
+      },
+    },
+    '/t/{tenantSlug}/inventory/costing/cost-layers': {
+      get: {
+        tags: ['Inventory Costing'],
+        summary: 'List FIFO / specific-identification cost layers',
+        parameters: [
+          tenantSlugParam,
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
+          { name: 'itemId', in: 'query', schema: { type: 'string', format: 'uuid' } },
+          { name: 'warehouseId', in: 'query', schema: { type: 'string', format: 'uuid' } },
+          {
+            name: 'status',
+            in: 'query',
+            schema: { type: 'string', enum: ['OPEN', 'CONSUMED', 'REVERSED', 'ADJUSTED'] },
+          },
+          { name: 'openOnly', in: 'query', schema: { type: 'boolean' } },
+          { name: 'serialId', in: 'query', schema: { type: 'string', format: 'uuid' } },
+          { name: 'lotId', in: 'query', schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { 200: { description: 'Paginated cost layers' } },
+      },
+    },
+    '/t/{tenantSlug}/inventory/costing/cost-layers/{id}': {
+      get: {
+        tags: ['Inventory Costing'],
+        summary: 'Get cost layer with consumptions',
+        parameters: [tenantSlugParam, idParam],
+        responses: { 200: { description: 'Cost layer' }, 404: { description: 'Not found' } },
+      },
+    },
+    '/t/{tenantSlug}/inventory/costing/valuation-reconciliation': {
+      get: {
+        tags: ['Inventory Costing'],
+        summary: 'Reconcile on-hand stock vs OPEN layer remaining',
+        description: 'Permissions: `inventory.view_cost` / stock / ledger / view / `inventory.view_audit`.',
+        parameters: [
+          tenantSlugParam,
+          { name: 'itemId', in: 'query', schema: { type: 'string', format: 'uuid' } },
+          { name: 'warehouseId', in: 'query', schema: { type: 'string', format: 'uuid' } },
+          { name: 'mismatchesOnly', in: 'query', schema: { type: 'boolean', default: false } },
+        ],
+        responses: { 200: { description: 'Reconciliation summary + item/warehouse rows' } },
+      },
+    },
+    '/t/{tenantSlug}/inventory/costing/cost-variances': {
+      get: {
+        tags: ['Inventory Costing'],
+        summary: 'List standard-cost variances',
+        parameters: [
+          tenantSlugParam,
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
+          { name: 'itemId', in: 'query', schema: { type: 'string', format: 'uuid' } },
+          { name: 'fromDate', in: 'query', schema: { type: 'string', format: 'date-time' } },
+          { name: 'toDate', in: 'query', schema: { type: 'string', format: 'date-time' } },
+          {
+            name: 'varianceType',
+            in: 'query',
+            schema: {
+              type: 'string',
+              enum: ['PURCHASE_PRICE', 'STANDARD_ISSUE', 'STANDARD_RECEIPT', 'REVALUATION', 'OTHER'],
+            },
+          },
+        ],
+        responses: { 200: { description: 'Paginated variances' } },
+      },
+    },
+    '/t/{tenantSlug}/inventory/costing/standard-costs': {
+      post: {
+        tags: ['Inventory Costing'],
+        summary: 'Create / activate item standard cost version',
+        description: 'Permission: `inventory.setup.manage`.',
+        parameters: [tenantSlugParam],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['itemId', 'unitCost', 'effectiveFrom'],
+                properties: {
+                  itemId: { type: 'string', format: 'uuid' },
+                  unitCost: { type: 'number', minimum: 0 },
+                  effectiveFrom: { type: 'string', format: 'date-time' },
+                  remarks: { type: 'string', maxLength: 2000 },
+                  activate: { type: 'boolean', default: true },
+                },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'Standard cost version saved' }, 403: { description: 'Forbidden' } },
+      },
+    },
+    '/t/{tenantSlug}/inventory/costing/method-change': {
+      post: {
+        tags: ['Inventory Costing'],
+        summary: 'Change tenant default valuation method',
+        description:
+          'Permission: `inventory.setup.manage`. Optionally runs FIFO opening-stock migration when switching to FIFO.',
+        parameters: [tenantSlugParam],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['toMethod', 'reason'],
+                properties: {
+                  toMethod: { type: 'string', enum: ['standard', 'average', 'fifo', 'specific'] },
+                  effectiveDate: { type: 'string', format: 'date-time' },
+                  reason: { type: 'string', minLength: 3, maxLength: 2000 },
+                  force: { type: 'boolean', default: false },
+                  runOpeningMigration: { type: 'boolean', default: true },
+                },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'Method change recorded (+ migration summary when run)' } },
+      },
+    },
+    '/t/{tenantSlug}/inventory/setup': {
+      get: {
+        tags: ['Inventory Setup'],
+        summary: 'Get inventory setup (incl. default costing method)',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Setup document' } },
+      },
+      put: {
+        tags: ['Inventory Setup'],
+        summary: 'Update inventory setup',
+        description: 'Permission: `inventory.setup.manage`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Setup updated' } },
+      },
+    },
+    '/t/{tenantSlug}/inventory/setup/fifo-opening-migration': {
+      post: {
+        tags: ['Inventory Setup'],
+        summary: 'Run FIFO opening-stock layer migration',
+        description: 'Permission: `inventory.setup.manage`. Creates synthetic OPN layers for on-hand gaps.',
+        parameters: [tenantSlugParam],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  dryRun: { type: 'boolean' },
+                  force: { type: 'boolean' },
+                },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'Migration result' } },
+      },
+    },
+    '/t/{tenantSlug}/users/{userId}/effective-access': {
+      get: {
+        tags: ['Users'],
+        summary: 'Get effective access for a user',
+        description: 'Merged roles, permissions, and org/security scope.',
+        parameters: [tenantSlugParam, userIdParam],
+        responses: { 200: { description: 'Effective access payload' } },
+      },
+    },
+    '/t/{tenantSlug}/access-review': {
+      get: {
+        tags: ['Users'],
+        summary: 'Access review snapshot',
+        description: 'Permission: `access.review`.',
+        parameters: [tenantSlugParam],
+        responses: { 200: { description: 'Access review rows' } },
       },
     },
 

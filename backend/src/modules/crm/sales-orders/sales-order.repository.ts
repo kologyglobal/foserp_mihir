@@ -3,12 +3,17 @@ import { prisma } from '../../../config/database.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import type { ListSalesOrdersQuery } from './sales-order.validation.js'
 
-export async function findSalesOrders(tenantId: string, query: ListSalesOrdersQuery) {
+export async function findSalesOrders(
+  tenantId: string,
+  query: ListSalesOrdersQuery,
+  orgScope: Prisma.CrmSalesOrderWhereInput = {},
+) {
   const { getPagination } = await import('../../../utils/pagination.js')
   const { skip, take } = getPagination(query)
 
   const where: Prisma.CrmSalesOrderWhereInput = {
     ...tenantActiveFilter(tenantId),
+    ...orgScope,
     ...(query.customerId ? { companyId: query.customerId } : {}),
     ...(query.quotationId ? { quotationId: query.quotationId } : {}),
     ...(query.opportunityId ? { opportunityId: query.opportunityId } : {}),

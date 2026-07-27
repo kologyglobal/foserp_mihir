@@ -44,6 +44,28 @@ async function resolveFgReceiptRate(
 ): Promise<number> {
   if (requestedRate && requestedRate > 0) return requestedRate
   try {
+    const settings = await prisma.inventorySettings.findUnique({
+      where: { tenantId },
+      select: { settings: true },
+    })
+    const manufacturingCostSource =
+      settings?.settings && typeof settings.settings === 'object'
+        ? (() => {
+            const root = settings.settings as Record<string, unknown>
+            const general = root.general
+            if (typeof general === 'object' && general !== null) {
+              const src = (general as Record<string, unknown>).manufacturingCostSource
+              if (src === 'standard') return 'standard' as const
+            }
+            const costing = root.costing
+            if (typeof costing === 'object' && costing !== null) {
+              const src = (costing as Record<string, unknown>).manufacturingCostSource
+              if (src === 'standard') return 'standard' as const
+            }
+            return 'actual_work_order' as const
+          })()
+        : ('actual_work_order' as const)
+
     const [snapshot, item] = await Promise.all([
       workOrderId
         ? prisma.workOrderCostSnapshot.findFirst({
@@ -57,10 +79,18 @@ async function resolveFgReceiptRate(
         select: { standardRate: true },
       }),
     ])
-    const snapshotRate = Number(snapshot?.unitActualCost ?? 0) > 0
-      ? Number(snapshot!.unitActualCost)
-      : Number(snapshot?.unitPlannedCost ?? 0)
-    return snapshotRate > 0 ? snapshotRate : Number(item?.standardRate ?? 0)
+
+    const standardRate = Number(item?.standardRate ?? 0)
+    if (manufacturingCostSource === 'standard') {
+      return standardRate > 0 ? standardRate : 0
+    }
+
+    // Default: ACTUAL_WORK_ORDER_COST — prefer unitActualCost, then planned, then item standard.
+    const actual = Number(snapshot?.unitActualCost ?? 0)
+    if (actual > 0) return actual
+    const planned = Number(snapshot?.unitPlannedCost ?? 0)
+    if (planned > 0) return planned
+    return standardRate > 0 ? standardRate : 0
   } catch {
     return 0
   }

@@ -5,8 +5,8 @@ import { useCrmStore } from '../../../store/crmStore'
 import { resolveStoreAction } from '../../../store/storeAction'
 import { formatApiError } from '../../../services/api/apiErrors'
 import { notify } from '../../../store/toastStore'
-import { useActiveCustomers, useSellableProducts } from '../../../hooks/useMasterLists'
-import { buildOpportunityLineFromProduct } from '../../../utils/opportunityLineCalc'
+import { useActiveCustomers, useSellableItems } from '../../../hooks/useMasterLists'
+import { buildOpportunityLineFromItem } from '../../../utils/opportunityLineCalc'
 import { useMasterStore } from '../../../store/masterStore'
 import { crmQuotationEditorPath, crmQuotationPath } from '../../../utils/crmQuotationNavigation'
 import { filterAllowedQuotationTemplates } from '../../../utils/quotationEngine/builtinTemplateSync'
@@ -15,6 +15,7 @@ import { FormField } from '../../forms/FormField'
 import { Input, Select } from '../../forms/Inputs'
 import { Button } from '../../ui/Button'
 import { ErpButton, ErpButtonGroup } from '../../erp/ErpButton'
+import { SELECT_PLACEHOLDER } from '../../forms/selectStandards'
 
 interface QuickQuotationDrawerProps {
   open: boolean
@@ -36,13 +37,13 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
     [quotationTemplates],
   )
   const customers = useActiveCustomers()
-  const products = useSellableProducts()
-  const getProduct = useMasterStore((s) => s.getProduct)
-  const items = useMasterStore((s) => s.items)
+  const sellableItems = useSellableItems()
+  const getItem = useMasterStore((s) => s.getItem)
+  const getUomName = useMasterStore((s) => s.getUomName)
 
   const defaultTemplateId = templates[0]?.id ?? ''
   const [customerId, setCustomerId] = useState('')
-  const [productId, setProductId] = useState('')
+  const [itemId, setItemId] = useState('')
   const [qty, setQty] = useState('1')
   const [unitPrice, setUnitPrice] = useState('')
   const [validityDate, setValidityDate] = useState(defaultValidityDate())
@@ -54,23 +55,21 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
   useEffect(() => {
     if (!open) return
     setCustomerId(customers[0]?.id ?? '')
-    const firstProduct = products[0]
-    setProductId(firstProduct?.id ?? '')
+    const firstItem = sellableItems[0]
+    setItemId(firstItem?.id ?? '')
     setQty('1')
-    setUnitPrice(firstProduct ? String(firstProduct.standardPrice || '') : '')
+    setUnitPrice(firstItem ? String(firstItem.defaultSalesRate ?? firstItem.standardRate ?? '') : '')
     setValidityDate(defaultValidityDate())
     setTemplateId(templates[0]?.id ?? '')
     setSubmitting(false)
     setError(null)
     setSavedIds(null)
-  }, [open, customers, products, templates])
+  }, [open, customers, sellableItems, templates])
 
-  const productOptions = products
-
-  function handleProductChange(id: string) {
-    setProductId(id)
-    const p = getProduct(id)
-    if (p?.standardPrice) setUnitPrice(String(p.standardPrice))
+  function handleItemChange(id: string) {
+    setItemId(id)
+    const item = getItem(id)
+    if (item) setUnitPrice(String(item.defaultSalesRate ?? item.standardRate ?? ''))
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -81,9 +80,9 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
       notify.warning('Select a customer.')
       return
     }
-    if (!productId) {
-      setError('Select a released product. Unreleased products cannot be used in quotations.')
-      notify.warning('Select a released product.')
+    if (!itemId) {
+      setError('Select a sellable item.')
+      notify.warning('Select a sellable item.')
       return
     }
     const price = Number(unitPrice)
@@ -98,14 +97,14 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
       notify.warning('No quotation template available — open the full quotation form.')
       return
     }
-    const product = getProduct(productId)
-    if (!product) {
-      setError('Product not found.')
-      notify.warning('Product not found.')
+    const item = getItem(itemId)
+    if (!item) {
+      setError('Item not found.')
+      notify.warning('Item not found.')
       return
     }
-    const item = items.find((i) => i.id === product.fgItemId) ?? items.find((i) => i.id === productId)
-    const line = buildOpportunityLineFromProduct(product, item, 'Nos', 1)
+    const uomName = item.baseUomId ? getUomName(item.baseUomId).split(' ')[0] : 'Nos'
+    const line = buildOpportunityLineFromItem(item, uomName || 'Nos', 1)
     line.qty = quantity
     line.unitPrice = price
 
@@ -181,17 +180,17 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
           <FormField label="Customer" required>
             <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)} required>
-              <option value="">Select customer…</option>
+              <option value="">{SELECT_PLACEHOLDER}</option>
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>{c.customerName}</option>
               ))}
             </Select>
           </FormField>
-          <FormField label="Product" required hint="Only products released for sale are listed.">
-            <Select value={productId} onChange={(e) => handleProductChange(e.target.value)} required>
-              <option value="">Select released product…</option>
-              {productOptions.map((p) => (
-                <option key={p.id} value={p.id}>{p.productName}</option>
+          <FormField label="Item" required hint="Only items allowed for sales are listed.">
+            <Select value={itemId} onChange={(e) => handleItemChange(e.target.value)} required>
+              <option value="">{SELECT_PLACEHOLDER}</option>
+              {sellableItems.map((item) => (
+                <option key={item.id} value={item.id}>{item.itemCode} — {item.itemName}</option>
               ))}
             </Select>
           </FormField>
@@ -220,7 +219,10 @@ export function QuickQuotationDrawer({ open, onClose }: QuickQuotationDrawerProp
             <button
               type="button"
               className="font-semibold text-erp-primary hover:underline"
-              onClick={() => { onClose(); navigate('/crm/quotations/new') }}
+              onClick={() => {
+                onClose()
+                navigate('/crm/quotations/new')
+              }}
             >
               Open full form
             </button>

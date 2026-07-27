@@ -39,6 +39,7 @@ import dispatchRoutes from './modules/dispatch/dispatch.routes.js'
 import gateRoutes from './modules/gate/gate.routes.js'
 import opsReportsRoutes from './modules/ops-reports/ops-reports.routes.js'
 import operationalExceptionRoutes from './modules/ops-reports/exceptions/exception.routes.js'
+import executiveRoutes from './modules/executive/dashboard.routes.js'
 import roleRoutes from './modules/roles/role.routes.js'
 import tenantRoutes from './modules/tenants/tenant.routes.js'
 import userRoutes from './modules/users/user.routes.js'
@@ -162,6 +163,7 @@ export function createApp() {
   // Phase 7D — reporting foundation (manufacturing/quality/dispatch reports, saved views, exception centre)
   app.use('/api/v1/tenants/:tenantId/reports', opsReportsRoutes)
   app.use('/api/v1/tenants/:tenantId/operations/exceptions', operationalExceptionRoutes)
+  app.use('/api/v1/tenants/:tenantId/executive', executiveRoutes)
 
   // Tenant slug aliases
   app.use('/api/v1/t/:tenantSlug/users', userRoutes)
@@ -195,6 +197,7 @@ export function createApp() {
   app.use('/api/v1/t/:tenantSlug/gate', gateRoutes)
   app.use('/api/v1/t/:tenantSlug/reports', opsReportsRoutes)
   app.use('/api/v1/t/:tenantSlug/operations/exceptions', operationalExceptionRoutes)
+  app.use('/api/v1/t/:tenantSlug/executive', executiveRoutes)
 
   // Unknown API routes must return JSON 404 — never Express default HTML and
   // never the SPA shell (Phase 8C Wave 1 / 8B-R-015 SPA gate).

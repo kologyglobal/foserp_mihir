@@ -5,8 +5,7 @@ import { STATUS_TO_FRONTEND } from './opportunity.constants.js'
 export interface OpportunityLineDto {
   id: string
   lineNo: number
-  productId: string | null
-  itemId: string | null
+  itemId: string
   itemCode: string
   productOrItem: string
   description: string
@@ -30,7 +29,6 @@ export interface OpportunityDto {
   opportunityNo: string
   customerId: string
   contactId: string | null
-  productId: string | null
   opportunityName: string
   productRequirement: string
   lines: OpportunityLineDto[]
@@ -70,7 +68,6 @@ export function mapOpportunityLineToDto(line: CrmOpportunityLine): OpportunityLi
   return {
     id: line.id,
     lineNo: line.lineNo,
-    productId: line.productId,
     itemId: line.itemId,
     itemCode: line.itemCode,
     productOrItem: line.productOrItem,
@@ -101,7 +98,6 @@ export function mapOpportunityToDto(
     opportunityNo: opportunity.opportunityCode,
     customerId: opportunity.companyId,
     contactId: opportunity.contactId,
-    productId: null,
     opportunityName: opportunity.name,
     productRequirement: opportunity.requirement ?? '',
     lines: (opportunity.lines ?? []).map(mapOpportunityLineToDto),

@@ -487,7 +487,7 @@ export function Quotation360Page() {
       return
     }
     if (!soGate.enabled) {
-      notify.error(soGate.disabledReason ?? 'Available after customer approval.')
+      notify.error(soGate.disabledReason ?? 'Complete commercial details on the quotation to convert.')
       return
     }
     conversion.openConversionModal(quoDoc.id)
@@ -507,6 +507,7 @@ export function Quotation360Page() {
     salesOrderId: quo.salesOrderId ?? quoDoc.salesOrderId ?? null,
     ownerName: quoDoc.salesOwnerName ?? undefined,
     lastSavedLabel: quoDoc.modifiedAt ? `Last updated ${formatDate(quoDoc.modifiedAt)}` : undefined,
+    canConvertDirect: soGate.enabled,
   }
 
   const commandBar = (

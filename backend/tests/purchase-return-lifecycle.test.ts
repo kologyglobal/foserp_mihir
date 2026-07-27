@@ -93,7 +93,8 @@ describe.skipIf(!dbAvailable)('Purchase return lifecycle (live HTTP)', () => {
       uomId,
       warehouseId,
       qty: 10,
-      itemCode: 'RET-ITM-1',
+      itemId: masters.itemId,
+      itemCode: masters.itemCode,
     })
     poId = po.poId
     poLineId = po.poLineId
@@ -161,6 +162,13 @@ describe.skipIf(!dbAvailable)('Purchase return lifecycle (live HTTP)', () => {
     expect(submit.status).toBe(200)
     expect(submit.body.data.status).toBe('SUBMITTED')
 
+    const approve = await request(app)
+      .post(`${returnBase()}/${returnId}/approve`)
+      .set(auth())
+      .send({})
+    expect(approve.status).toBe(200)
+    expect(approve.body.data.status).toBe('APPROVED')
+
     const complete = await request(app)
       .post(`${returnBase()}/${returnId}/complete`)
       .set(auth())
@@ -172,6 +180,19 @@ describe.skipIf(!dbAvailable)('Purchase return lifecycle (live HTTP)', () => {
       where: { id: poLineId, tenantId },
     })
     expect(Number(poLine?.returnedQuantity)).toBeGreaterThanOrEqual(2)
+
+    const byKey = await prisma.inventoryStockMovement.findMany({
+      where: {
+        tenantId,
+        OR: [
+          { idempotencyKey: { startsWith: `prt-out:${returnId}` } },
+          { referenceNo: complete.body.data.returnNumber },
+        ],
+      },
+    })
+    expect(byKey.length).toBeGreaterThan(0)
+    const qtyOut = byKey.reduce((s, m) => s + Math.abs(Number(m.quantity)), 0)
+    expect(qtyOut).toBeGreaterThanOrEqual(2)
   })
 
   it('denies create without permission', async () => {

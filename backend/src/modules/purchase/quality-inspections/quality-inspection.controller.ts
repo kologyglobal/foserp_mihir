@@ -21,5 +21,7 @@ export const acceptQualityInspection = asyncHandler(async (req: Request, res: Re
   sendSuccess(res, 'Quality inspection accepted', await service.completeQualityInspection(getTenantId(req), getRouteParam(req, 'id'), actor(req), { ...req.body, outcome: 'ACCEPT' })))
 export const rejectQualityInspection = asyncHandler(async (req: Request, res: Response) =>
   sendSuccess(res, 'Quality inspection rejected', await service.completeQualityInspection(getTenantId(req), getRouteParam(req, 'id'), actor(req), { ...req.body, outcome: 'REJECT' })))
+export const holdQualityInspection = asyncHandler(async (req: Request, res: Response) =>
+  sendSuccess(res, 'Quality inspection held', await service.holdQualityInspection(getTenantId(req), getRouteParam(req, 'id'), actor(req), req.body ?? {})))
 export const cancelQualityInspection = asyncHandler(async (req: Request, res: Response) =>
   sendSuccess(res, 'Quality inspection cancelled', await service.cancelQualityInspection(getTenantId(req), getRouteParam(req, 'id'), actor(req), req.body ?? {})))

@@ -677,14 +677,18 @@ export async function getOutboundReversalDependencies(id: string) {
 }
 
 /** Phase 7C5 reverse — partial lines + approval workflow; may return awaitingApproval. */
+export type DispatchReversalRow = {
+  id: string
+  reversalNumber: string
+  status: string
+  reason?: string | null
+  reasonCode?: string | null
+  lines: Array<{ id: string; quantity: number; originalPostingLineId?: string; outboundDispatchLineId?: string }>
+}
+
 export type DispatchReversalResult = {
   awaitingApproval: boolean
-  reversal: {
-    id: string
-    reversalNumber: string
-    status: string
-    lines: Array<{ id: string; quantity: number; originalPostingLineId: string }>
-  }
+  reversal: DispatchReversalRow
   outbound?: OutboundDispatch | null
 }
 
@@ -708,9 +712,7 @@ export async function reverseOutboundDispatch(
 }
 
 export async function listOutboundReversals(outboundId: string) {
-  return fetchData<DispatchReversalResult['reversal'][]>(
-    tenantPath(`${DISPATCH}/outbound/${outboundId}/reversals`),
-  )
+  return fetchData<DispatchReversalRow[]>(tenantPath(`${DISPATCH}/outbound/${outboundId}/reversals`))
 }
 
 export async function createOutboundReversal(
@@ -718,35 +720,50 @@ export async function createOutboundReversal(
   body?: {
     reason?: string
     reasonCode?: string
+    force?: boolean
     lines?: Array<{ outboundDispatchLineId?: string; postingLineId?: string; quantity: number }>
     idempotencyKey?: string
   },
 ) {
-  return fetchData<DispatchReversalResult['reversal']>(
-    tenantPath(`${DISPATCH}/outbound/${outboundId}/reversals`),
-    { method: 'POST', body: JSON.stringify(body ?? {}) },
-  )
+  return fetchData<DispatchReversalRow>(tenantPath(`${DISPATCH}/outbound/${outboundId}/reversals`), {
+    method: 'POST',
+    body: JSON.stringify(body ?? {}),
+  })
 }
 
 export async function submitDispatchReversal(reversalId: string) {
-  return fetchData<DispatchReversalResult['reversal']>(
-    tenantPath(`${DISPATCH}/reversals/${reversalId}/submit`),
-    { method: 'POST', body: '{}' },
-  )
+  return fetchData<DispatchReversalRow>(tenantPath(`${DISPATCH}/reversals/${reversalId}/submit`), {
+    method: 'POST',
+    body: '{}',
+  })
 }
 
 export async function approveDispatchReversal(reversalId: string) {
-  return fetchData<DispatchReversalResult['reversal']>(
-    tenantPath(`${DISPATCH}/reversals/${reversalId}/approve`),
-    { method: 'POST', body: '{}' },
-  )
+  return fetchData<DispatchReversalRow>(tenantPath(`${DISPATCH}/reversals/${reversalId}/approve`), {
+    method: 'POST',
+    body: '{}',
+  })
 }
 
-export async function applyDispatchReversal(reversalId: string) {
-  return fetchData<DispatchReversalResult['reversal']>(
-    tenantPath(`${DISPATCH}/reversals/${reversalId}/apply`),
-    { method: 'POST', body: '{}' },
-  )
+export async function rejectDispatchReversal(reversalId: string, reason?: string) {
+  return fetchData<DispatchReversalRow>(tenantPath(`${DISPATCH}/reversals/${reversalId}/reject`), {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+}
+
+export async function cancelDispatchReversal(reversalId: string) {
+  return fetchData<DispatchReversalRow>(tenantPath(`${DISPATCH}/reversals/${reversalId}/cancel`), {
+    method: 'POST',
+    body: '{}',
+  })
+}
+
+export async function applyDispatchReversal(reversalId: string, body?: { force?: boolean }) {
+  return fetchData<DispatchReversalRow>(tenantPath(`${DISPATCH}/reversals/${reversalId}/apply`), {
+    method: 'POST',
+    body: JSON.stringify(body ?? {}),
+  })
 }
 
 export async function getSalesOrderFulfilment(salesOrderId: string) {
@@ -1211,4 +1228,48 @@ export async function listWorkbenchChallansIssued() {
 
 export async function listWorkbenchReadyForDispatch() {
   return fetchData<DeliveryChallanRow[]>(tenantPath(`${DISPATCH}/workbench/ready-for-dispatch`))
+}
+
+// ─── Commercial policy settings ───────────────────────────────────────────────
+
+export type DispatchInvoiceMode = 'ONE_PER_DISPATCH' | 'CONSOLIDATED' | 'MANUAL_ONLY'
+
+export type DispatchCommercialSettings = {
+  version: number
+  allowPartialDispatch: boolean
+  allowMultipleDispatches: boolean
+  allowOverDispatch: boolean
+  invoiceMode: DispatchInvoiceMode
+  requirePodBeforeInvoice: boolean
+  effectivePolicy?: {
+    allowPartialDispatch: boolean
+    allowMultipleDispatches: boolean
+    allowOverDispatch: boolean
+    invoiceMode: DispatchInvoiceMode
+    requirePodBeforeInvoice: boolean
+  }
+  updatedAt: string | null
+  updatedBy: string | null
+}
+
+export type UpdateDispatchCommercialSettingsInput = {
+  version: number
+  allowPartialDispatch: boolean
+  allowMultipleDispatches: boolean
+  allowOverDispatch: boolean
+  invoiceMode: DispatchInvoiceMode
+  requirePodBeforeInvoice: boolean
+}
+
+export async function getDispatchSettings(): Promise<DispatchCommercialSettings> {
+  return fetchData<DispatchCommercialSettings>(tenantPath(`${DISPATCH}/settings`))
+}
+
+export async function updateDispatchSettings(
+  body: UpdateDispatchCommercialSettingsInput,
+): Promise<DispatchCommercialSettings> {
+  return fetchData<DispatchCommercialSettings>(tenantPath(`${DISPATCH}/settings`), {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
 }

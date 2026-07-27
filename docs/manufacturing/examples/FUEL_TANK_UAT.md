@@ -1,5 +1,10 @@
 # Fuel Tank — UAT Checklist
 
+## Model
+
+**LOGICAL SFG under ONE FG WO** — `childProductionOrdersEnabled=false`, `wipTrackingMethod=LOGICAL_WIP`.  
+SFG Job Cards (JC-SHELL … JC-TEST-FINISH) live on the parent FG work order. No SFG child WOs.
+
 ## Prerequisites
 
 ```bash
@@ -11,7 +16,26 @@ npx tsx scripts/test-fuel-tank-wo-execution.ts
 
 Login: `admin@vasant-trailers.com` · Tenant: `vasant-trailers` · `VITE_USE_API=true`
 
-## Automated evidence (2026-07-23)
+## Factory golden path evidence (2026-07-27)
+
+**Command:** `npx tsx scripts/test-fuel-tank-wo-execution.ts`  
+**WO:** `WO-000009` · **Serial:** `FT-5000L-43550266` · **FG warehouse:** `FG-MAIN`  
+**Material cost (inventory ISSUE_TO_WO):** ₹111,020.00 · **WO actual total:** ₹111,020.00 · **FG receipt rate/value:** ₹111,020.00  
+
+| # | Criterion | Result | Evidence |
+|---|-----------|--------|----------|
+| 1 | One FG WO only | **PASS** | `WO-000009`; SFG WO create rejected (no profile); `generate-child-orders` → childCount=0 |
+| 2 | SFG Job Cards generated correctly | **PASS** | 6 LOGICAL JCs on FG WO: JC-SHELL, JC-DISHED-END, JC-SADDLE, JC-NOZZLE, JC-FINAL-ASSEMBLY, JC-TEST-FINISH (15 ops) |
+| 3 | Route Card tracking | **PASS** | Routing snapshot + stage/op progress through all JCs; opsWithWC=15/15 |
+| 4 | Work Centre/Machine assignment | **PASS** | Assignment on OP-10 with WC + machine; accept/start |
+| 5 | Material cost from Inventory Costing | **PASS** | 21 ISSUE_TO_WO movements valued; 21 `InventoryCostEntry` rows; materialCost=111020.00 (from stock rates, not invented) |
+| 6 | QC gate (+ rework) | **PASS** | In-process QC PASS on all JCs; **REWORK then PASS** on JC-SHELL (`QI-000001`); Final QC `QI-000007` PASSED |
+| 7 | Serial-numbered FG receipt | **PASS** | `FG-000001` serial `FT-5000L-43550266` → InventorySerial AVAILABLE @ FG-MAIN |
+| 8 | WO actual cost | **PASS** | `POST …/cost/calculate` persist → actualMaterial=111020 total=111020 unit=111020 |
+| 9 | FG valuation | **PASS** | FG_RECEIPT movement rate/value = WO `unitActualCost` (111020) |
+| 10 | Closure | **PASS** | Close readiness COMPLETE ready; `POST …/complete` → status **COMPLETED** (operational close) |
+
+### Setup / prior criteria (still green)
 
 | # | Criterion | Result |
 |---|-----------|--------|
@@ -23,8 +47,8 @@ Login: `admin@vasant-trailers.com` · Tenant: `vasant-trailers` · `VITE_USE_API
 | 21–24 | Profile + warehouses + readiness + active | PASS |
 | 25–27 | FG WO only; SFG WO blocked; no child WOs | PASS |
 | 28–32 | JC snapshot 6×15; parallel JC progress | PASS |
-| 33–37 | QC gates / material issue / FG receipt / close | PARTIAL — issue+QC_PENDING verified; full FG serial receipt & close continue in UI |
-| 38–40 | Tenant isolation / permissions / API data | PASS (tenant-scoped seed + JWT API) |
+| 33–37 | QC / material / FG serial receipt / close | **PASS** (was PARTIAL; now covered by golden-path script) |
+| 38–40 | Tenant isolation / permissions / API data | PASS |
 
 ## Manual UI spots
 
@@ -34,14 +58,14 @@ Login: `admin@vasant-trailers.com` · Tenant: `vasant-trailers` · `VITE_USE_API
 | BOM | `/manufacturing/setup/boms` → `BOM-FUEL-TANK-5000L` |
 | Route | `/manufacturing/setup/routings` → `RT-000001` |
 | Profile | `/manufacturing/setup/profiles` → `MP-FUEL-TANK-5000L` |
-| WO | `/manufacturing/work-orders` → latest FG fuel tank WO |
+| WO | `/manufacturing/work-orders` → `WO-000009` (or latest FG fuel tank WO) |
 
-## Suggested FG receipt serial
+## Notes
 
-`FT-5000L-2026-0001` @ `FG-MAIN` after JC-TEST-FINISH + final QC PASS.
+- Opening stock for UAT is posted at each item’s `standardRate` so ISSUE_TO_WO inherits inventory costing rates/layers (no fake WO costs).
+- FG serial receipt posts inventory with `serialNumber` (qty=1) so serial-tracked FG stock is created.
+- Operational closure is status **COMPLETED** via `/complete` (enum `CLOSED` is reserved for later financial close paths).
 
 ## Decision
 
-**FUEL TANK MANUFACTURING SETUP — READY FOR INTERNAL UAT**
-
-Conditions: full FG serial receipt + WO close path exercised in UI (or extended E2E); wait times are documented notes only.
+**FUEL TANK FACTORY GOLDEN PATH — PASS (READY FOR INTERNAL UAT)**

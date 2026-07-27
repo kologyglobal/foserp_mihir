@@ -56,7 +56,7 @@ export const ERP_STORAGE_KEYS = {
   mobileStockCount: 'vasant-erp-mobile-stockcount-v1',
   crm: 'vasant-erp-crm-v1',
   purchaseMasters: 'vasant-erp-purchase-masters-v1',
-  proformaInvoice: 'vasant-erp-proforma-v1',
+  proformaInvoice: 'vasant-erp-proforma-v2',
   crmCommercial: 'vasant-erp-crm-commercial-v1',
   codeSeries: 'vasant-erp-code-series-v1',
   accounting: 'vasant-erp-accounting-v1',

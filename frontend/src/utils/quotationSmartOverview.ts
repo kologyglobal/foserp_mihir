@@ -23,6 +23,8 @@ export interface QuotationSmartOverviewInput {
   salesOrderId?: string | null
   ownerName?: string
   lastSavedLabel?: string
+  /** When true, commercial checks pass and Convert to SO is enabled (send/approval optional). */
+  canConvertDirect?: boolean
 }
 
 export function computeQuotationCompleteness(input: QuotationSmartOverviewInput): number {
@@ -248,11 +250,24 @@ export function resolveQuotationNextBestAction(input: QuotationSmartOverviewInpu
   const status = input.status.toLowerCase().replace(/\s+/g, '_')
   const customerApproval = input.customerApproval ?? 'pending'
 
+  // Direct convert is available whenever commercial readiness passes — approval/send are optional.
+  if (input.canConvertDirect && status !== 'converted' && status !== 'rejected') {
+    return {
+      id: 'convert_so',
+      title: 'Convert to Sales Order',
+      description:
+        customerApproval === 'approved'
+          ? 'Customer approved — convert to an Open sales order (marks the opportunity Won).'
+          : 'Commercial details are ready. Convert now, or continue optional Send / Customer Approve first.',
+      ctaLabel: 'Convert to Sales Order',
+    }
+  }
+
   if (status === 'draft' || status === 'rejected') {
     return {
       id: 'submit_approval',
       title: 'Submit for Internal Approval',
-      description: 'Submit this quotation for internal approval before sending it to the customer.',
+      description: 'Optional path — submit for internal approval, or finish commercial details and convert directly.',
       ctaLabel: 'Submit for Approval',
     }
   }
@@ -260,7 +275,7 @@ export function resolveQuotationNextBestAction(input: QuotationSmartOverviewInpu
     return {
       id: 'approve',
       title: 'Approve Quotation',
-      description: 'Pending internal approval — approve or reject this quotation.',
+      description: 'Pending internal approval — approve or reject this quotation (optional before convert).',
       ctaLabel: 'Approve',
     }
   }
@@ -268,7 +283,7 @@ export function resolveQuotationNextBestAction(input: QuotationSmartOverviewInpu
     return {
       id: 'send',
       title: 'Send to Customer',
-      description: 'Internally approved — send this quotation to the customer next.',
+      description: 'Internally approved — send to the customer, or convert directly to a sales order.',
       ctaLabel: 'Send to Customer',
     }
   }
@@ -276,7 +291,7 @@ export function resolveQuotationNextBestAction(input: QuotationSmartOverviewInpu
     return {
       id: 'customer_approve',
       title: 'Customer Approve',
-      description: 'Quotation is with the customer — record their approval before converting to a sales order.',
+      description: 'Optional — record customer approval, or convert directly to a sales order.',
       ctaLabel: 'Customer Approve',
     }
   }
@@ -300,7 +315,7 @@ export function resolveQuotationNextBestAction(input: QuotationSmartOverviewInpu
   return {
     id: 'review',
     title: 'Review Quotation',
-    description: 'Continue the lifecycle: Submit → Approve → Send → Customer Approve → Convert.',
+    description: 'Approval and send are optional. Convert when commercial details are ready.',
     ctaLabel: 'Review Quotation',
   }
 }
@@ -310,10 +325,13 @@ export function buildQuotationAiInsight(input: QuotationSmartOverviewInput): str
   if (!input.hasValidLine) return 'Customer is set. Add line items to build a sendable commercial offer.'
   if (!input.validUntil) return 'Lines look good. Set a validity date before sharing the quotation.'
   if (input.salesOrderId) return 'This quotation already has a sales order. Use Order 360 for execution.'
+  if (input.canConvertDirect) {
+    return 'Ready to convert — Send and Customer Approve are optional if you want a direct sales order.'
+  }
   const status = input.status.toLowerCase().replace(/\s+/g, '_')
-  if (status === 'approved') return 'Approved internally. Send to the customer before conversion.'
+  if (status === 'approved') return 'Approved internally. Send to the customer, or convert directly when ready.'
   if (status === 'sent' && (input.customerApproval ?? 'pending') === 'pending') {
-    return 'Sent to customer. Record customer approval to unlock Convert to Sales Order.'
+    return 'Sent to customer. Record approval, or convert directly to a sales order.'
   }
   return null
 }

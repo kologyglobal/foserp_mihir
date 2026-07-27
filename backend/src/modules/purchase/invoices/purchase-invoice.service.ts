@@ -2,7 +2,7 @@ import type { Prisma, PurchaseInvoiceStatus } from '@prisma/client'
 import { prisma } from '../../../config/database.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
-import { resolveEffectivePurchaseDefaults } from '../shared/purchase-defaults.js'
+import { resolveApprovalRolesFromDefaults, resolveEffectivePurchaseDefaults } from '../shared/purchase-defaults.js'
 import { PurchaseInvoiceNotFoundError, PurchaseInvoiceValidationError } from './purchase-invoice.errors.js'
 import { mapPurchaseInvoice, type PurchaseInvoiceEnrichment } from './purchase-invoice.mapper.js'
 import * as repo from './purchase-invoice.repository.js'
@@ -293,9 +293,32 @@ async function transition(
   })
 }
 
-export async function approvePurchaseInvoice(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {
-  const existing = await loadOrThrow(tenantId, id); assertInvoiceStatus(existing.status, ['PENDING_APPROVAL'], 'approved')
-  await transition(tenantId, existing, actorId, 'APPROVED', 'INVOICE_APPROVED', body.remarks, { approvedAt: new Date() })
+export async function approvePurchaseInvoice(
+  tenantId: string,
+  id: string,
+  actorId: string,
+  body: { remarks?: string } = {},
+  actorPermissions: readonly string[] = [],
+) {
+  const existing = await loadOrThrow(tenantId, id)
+  assertInvoiceStatus(existing.status, ['PENDING_APPROVAL'], 'approved')
+  const defaults = await resolveEffectivePurchaseDefaults(tenantId)
+  const amount = Number(existing.totalAmount ?? 0)
+  const roles = resolveApprovalRolesFromDefaults(defaults, amount, 'PURCHASE_ORDER')
+  const { assertActorMatchesApproverRole, matrixEnumToApi } = await import(
+    '../shared/purchase-matrix-role.js'
+  )
+  const requiredRole = roles.length ? matrixEnumToApi(roles[roles.length - 1]!) : 'purchase_head'
+  await assertActorMatchesApproverRole(
+    tenantId,
+    actorId,
+    requiredRole,
+    actorPermissions,
+    (message) => new PurchaseInvoiceValidationError(message),
+  )
+  await transition(tenantId, existing, actorId, 'APPROVED', 'INVOICE_APPROVED', body.remarks, {
+    approvedAt: new Date(),
+  })
   return toInvoiceDto(tenantId, await loadOrThrow(tenantId, id))
 }
 export async function rejectPurchaseInvoice(tenantId: string, id: string, actorId: string, body: { remarks?: string } = {}) {

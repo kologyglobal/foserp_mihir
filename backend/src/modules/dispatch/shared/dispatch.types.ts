@@ -19,7 +19,6 @@ export interface SalesOrderLineFulfilmentPosition {
   customerName: string | null
   shipToKey: string | null
   shipToAddress: string | null
-  productId: string | null
   itemId: string | null
   itemCode: string | null
   itemName: string | null

@@ -1,9 +1,10 @@
 /**
  * Purchase Reports — catalog + run against dual-mode getters.
- * PR / RFQ / items / vendors use the API facade when `VITE_USE_API=true`.
- * PO / GRN / invoice use empty in-memory store in API mode (backends not mounted).
+ * PR / RFQ / PO / GRN / invoice / items / vendors use the API facade when `VITE_USE_API=true`.
  */
 import {
+  getGRNs,
+  getPurchaseInvoices,
   getPurchaseItems,
   getPurchaseOrders,
   getPurchaseRequisitions,
@@ -11,10 +12,6 @@ import {
   getVendorQuotations,
   getVendors,
 } from './purchaseApiFacade'
-import {
-  getGRNs,
-  getPurchaseInvoices,
-} from './purchaseService'
 import type {
   GoodsReceiptNote,
   PurchaseInvoice,
@@ -78,6 +75,7 @@ const CATALOG: PurchaseReportCatalogEntry[] = [
   { id: 'grn-shortage-excess', title: 'Shortage and Excess Report', description: 'Receipt quantity variances vs PO pending.', categoryId: 'receipt_quality', categoryLabel: 'Receipt and Quality Reports' },
   { id: 'grn-batch-receipt', title: 'Batch Receipt Report', description: 'Batch / lot numbers received on GRN lines.', categoryId: 'receipt_quality', categoryLabel: 'Receipt and Quality Reports' },
   { id: 'grn-quality-performance', title: 'Quality Performance Report', description: 'Acceptance vs rejection performance by vendor / item.', categoryId: 'receipt_quality', categoryLabel: 'Receipt and Quality Reports' },
+  { id: 'grn-grni', title: 'GRNI Reconciliation', description: 'Goods received not fully invoiced — open qty/value by GRN line (GR/IR qty recon).', categoryId: 'receipt_quality', categoryLabel: 'Receipt and Quality Reports' },
   { id: 'inv-register', title: 'Purchase Invoice Register', description: 'Vendor invoices with match and approval status.', categoryId: 'invoice', categoryLabel: 'Invoice Reports' },
   { id: 'inv-matching', title: 'Invoice Matching Report', description: 'Three-way match status for purchase invoices.', categoryId: 'invoice', categoryLabel: 'Invoice Reports' },
   { id: 'inv-pending-approval', title: 'Pending Invoice Approval', description: 'Invoices waiting for verification or approval.', categoryId: 'invoice', categoryLabel: 'Invoice Reports' },
@@ -354,6 +352,8 @@ export async function runPurchaseReport(
     case 'grn-quality-performance':
     case 'vendor-quality':
       return buildGrnQualityPerformance(filters, entry)
+    case 'grn-grni':
+      return buildGrniReconciliation(filters, entry)
     case 'inv-register':
       return buildInvRegister(filters, entry)
     case 'inv-matching':
@@ -1180,6 +1180,75 @@ async function buildGrnQualityPerformance(filters: PurchaseReportFilters, entry:
     { key: 'rejectedQty', label: 'Rejected', align: 'right', format: 'number' },
     { key: 'acceptanceRate', label: 'Acceptance %', align: 'right', format: 'number' },
   ], rows)
+}
+
+async function buildGrniReconciliation(filters: PurchaseReportFilters, entry: PurchaseReportCatalogEntry) {
+  const invoices = await getPurchaseInvoices()
+  const invoicedByGrnLine = new Map<string, number>()
+  for (const inv of invoices) {
+    if (inv.status === 'draft' || inv.status === 'cancelled') continue
+    for (const line of inv.lines) {
+      if (!line.goodsReceiptLineId) continue
+      invoicedByGrnLine.set(
+        line.goodsReceiptLineId,
+        (invoicedByGrnLine.get(line.goodsReceiptLineId) ?? 0) + line.quantity,
+      )
+    }
+  }
+
+  const today = todayIso()
+  const rows: PurchaseReportRow[] = []
+  for (const grn of await filteredGrns(filters)) {
+    if (grn.status === 'draft' || grn.status === 'cancelled') continue
+    for (const line of grn.lines) {
+      if (filters.itemId && line.itemId !== filters.itemId) continue
+      const accepted = line.acceptedQty > 0 ? line.acceptedQty : line.receivedQty
+      if (accepted <= 0) continue
+      const invoicedQty = invoicedByGrnLine.get(line.id) ?? 0
+      const openQty = round2(accepted - invoicedQty)
+      if (openQty <= 0.0001) continue
+      const openValue = money(openQty * line.rate)
+      rows.push({
+        documentNumber: grn.documentNumber,
+        documentHref: `/purchase/grn/${grn.id}`,
+        documentDate: grn.documentDate,
+        ageDays: daysBetween(grn.documentDate, today),
+        poNumber: grn.purchaseOrderNumber,
+        poHref: `/purchase/orders/${grn.purchaseOrderId}`,
+        vendorName: grn.vendor.name,
+        vendorHref: masterVendorHref(grn.vendor.id),
+        itemCode: line.itemCode,
+        itemName: line.itemName,
+        acceptedQty: round2(accepted),
+        invoicedQty: round2(invoicedQty),
+        openQty,
+        openValue,
+        status: GRN_DOMAIN_STATUS_LABELS[grn.status],
+      })
+    }
+  }
+
+  const openValueTotal = money(rows.reduce((s, r) => s + Number(r.openValue ?? 0), 0))
+  return resultOf(
+    entry,
+    filters,
+    [
+      { key: 'documentNumber', label: 'GRN No', hrefKey: 'documentHref' },
+      { key: 'documentDate', label: 'Receipt date', format: 'date' },
+      { key: 'ageDays', label: 'Age (days)', align: 'right', format: 'number' },
+      { key: 'poNumber', label: 'PO', hrefKey: 'poHref' },
+      { key: 'vendorName', label: 'Vendor', hrefKey: 'vendorHref' },
+      { key: 'itemCode', label: 'Item' },
+      { key: 'itemName', label: 'Description' },
+      { key: 'acceptedQty', label: 'Accepted', align: 'right', format: 'number' },
+      { key: 'invoicedQty', label: 'Invoiced', align: 'right', format: 'number' },
+      { key: 'openQty', label: 'GRNI qty', align: 'right', format: 'number' },
+      { key: 'openValue', label: 'GRNI value', align: 'right', format: 'currency' },
+      { key: 'status', label: 'GRN status' },
+    ],
+    rows,
+    summarizeCount(rows, 'Open GRNI lines', [{ label: 'Open value (INR)', value: openValueTotal }]),
+  )
 }
 
 /* ---- Invoice ---- */

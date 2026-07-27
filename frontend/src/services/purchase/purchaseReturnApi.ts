@@ -45,6 +45,13 @@ export async function submitPurchaseReturnApi(id: string, payload: Record<string
   })
 }
 
+export async function approvePurchaseReturnApi(id: string, payload: Record<string, unknown> = {}) {
+  return apiRequest<ApiPurchaseReturn>(`${base()}/${id}/approve`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
 export async function completePurchaseReturnApi(id: string, payload: Record<string, unknown> = {}) {
   return apiRequest<ApiPurchaseReturn>(`${base()}/${id}/complete`, {
     method: 'POST',

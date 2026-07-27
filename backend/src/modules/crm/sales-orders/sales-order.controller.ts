@@ -7,7 +7,8 @@ import * as service from './sales-order.service.js'
 
 export const listSalesOrders = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
-  const result = await service.listSalesOrders(tenantId, req.query as never)
+  const { userId } = getContext(req)
+  const result = await service.listSalesOrders(tenantId, req.query as never, userId)
   sendPaginated(res, 'Sales orders retrieved', result.items, buildPaginationMeta(result.total, result.page, result.limit))
 })
 

@@ -42,6 +42,7 @@ export type PurchaseReportId =
   | 'grn-shortage-excess'
   | 'grn-batch-receipt'
   | 'grn-quality-performance'
+  | 'grn-grni'
   /* Invoice */
   | 'inv-register'
   | 'inv-matching'

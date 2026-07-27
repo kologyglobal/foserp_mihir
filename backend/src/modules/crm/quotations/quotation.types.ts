@@ -18,7 +18,9 @@ export interface QuotationPriceLineDto {
   id: string
   productOrItem: string
   description: string
-  productId?: string | null
+  itemId?: string | null
+  itemCodeSnapshot?: string | null
+  itemNameSnapshot?: string | null
   qty: number
   uom: string
   unitPrice: number
@@ -90,7 +92,7 @@ export interface QuotationDto {
   opportunityId: string | null
   opportunityNo: string | null
   customerId: string
-  productId: string | null
+  itemId: string
   qty: number
   revisionNo: number
   rootQuotationId: string

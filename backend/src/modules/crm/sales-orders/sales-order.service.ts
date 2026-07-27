@@ -6,6 +6,7 @@ import { InvalidStateError, NotFoundError, ValidationError } from '../../../util
 import * as companyRepo from '../companies/company.repository.js'
 import * as repo from './sales-order.repository.js'
 import { mapSalesOrderToDto } from './sales-order.types.js'
+import { normalizeSalesLineForWrite } from '../shared/crm-item-resolver.js'
 import {
   assertCloseable,
   assertConfirmable,
@@ -32,8 +33,10 @@ function formatAddress(parts: Array<string | null | undefined>): string {
   return parts.filter((p) => p?.trim()).join(', ')
 }
 
-export async function listSalesOrders(tenantId: string, query: ListSalesOrdersQuery) {
-  const result = await repo.findSalesOrders(tenantId, query)
+export async function listSalesOrders(tenantId: string, query: ListSalesOrdersQuery, userId?: string) {
+  const { loadCrmOrgScopeWhere } = await import('../shared/crm-org-scope.js')
+  const orgScope = await loadCrmOrgScopeWhere(tenantId, userId)
+  const result = await repo.findSalesOrders(tenantId, query, orgScope as never)
   const nameMap = await resolveUserNames(
     result.items.flatMap((o) => [o.createdBy, o.updatedBy]),
     tenantId,
@@ -67,7 +70,18 @@ export async function createSalesOrder(tenantId: string, userId: string, input: 
     if (existing) throw new InvalidStateError('Sales order already exists for this quotation — use convert endpoint')
   }
 
-  const { lines, summary } = buildLinesFromInput(input)
+  const lineBundle = buildLinesFromInput(input)
+  const lines = await Promise.all(lineBundle.lines.map((line) => normalizeSalesLineForWrite(tenantId, line)))
+  const headerItemId = lines[0]?.itemId
+  if (!headerItemId) throw new ValidationError('Sales order requires at least one line with an Item')
+  const summary = {
+    qty: lines.reduce((s, l) => s + l.qty, 0),
+    unitPrice: lines[0]?.unitPrice ?? 0,
+    discountPct: lines[0]?.discountPct ?? 0,
+    basicAmount: Math.round(lines.reduce((s, l) => s + l.taxableValue, 0) * 100) / 100,
+    gstAmount: Math.round(lines.reduce((s, l) => s + l.gstAmount, 0) * 100) / 100,
+    grandTotal: Math.round(lines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100,
+  }
   const salesOrderNo = await nextCode(tenantId, 'SALES_ORDER')
   const orderDate = parseDateInput(input.orderDate) ?? new Date()
   const expectedDeliveryDate = parseDateInput(input.expectedDeliveryDate) ?? null
@@ -81,11 +95,14 @@ export async function createSalesOrder(tenantId: string, userId: string, input: 
     input.remarks?.trim() ||
     (directSoReason ? `Direct SO — ${directSoReason}` : null)
 
+  const { defaultOrgDimsForUser } = await import('../shared/crm-org-scope.js')
+  const org = await defaultOrgDimsForUser(tenantId, userId)
+
   const created = await repo.createSalesOrder({
     tenant: { connect: { id: tenantId } },
     company: { connect: { id: company.id } },
     salesOrderNo,
-    productId: lines[0]?.productId ?? input.productId ?? null,
+    itemId: headerItemId,
     qty: summary.qty,
     status: 'open',
     source: input.source,
@@ -121,6 +138,8 @@ export async function createSalesOrder(tenantId: string, userId: string, input: 
     internalRemarks: input.internalRemarks ?? null,
     directSoReason,
     locationId: input.locationId ?? null,
+    legalEntityId: org.legalEntityId ?? null,
+    branchId: org.branchId ?? null,
     lines: lines as unknown as Prisma.InputJsonValue,
     createdBy: userId,
     updatedBy: userId,
@@ -164,14 +183,15 @@ export async function updateSalesOrder(tenantId: string, id: string, userId: str
   if (input.discountPct !== undefined && !lineBundle) data.discountPct = input.discountPct
 
   if (lineBundle) {
-    data.lines = lineBundle.lines as unknown as Prisma.InputJsonValue
-    data.qty = lineBundle.summary.qty
-    data.unitPrice = lineBundle.summary.unitPrice
-    data.discountPct = lineBundle.summary.discountPct
-    data.basicAmount = lineBundle.summary.basicAmount
-    data.gstAmount = lineBundle.summary.gstAmount
-    data.grandTotal = lineBundle.summary.grandTotal
-    data.productId = lineBundle.lines[0]?.productId ?? existing.productId
+    const normalizedLines = await Promise.all(lineBundle.lines.map((line) => normalizeSalesLineForWrite(tenantId, line)))
+    data.lines = normalizedLines as unknown as Prisma.InputJsonValue
+    data.qty = normalizedLines.reduce((s, l) => s + l.qty, 0)
+    data.unitPrice = normalizedLines[0]?.unitPrice ?? 0
+    data.discountPct = normalizedLines[0]?.discountPct ?? 0
+    data.basicAmount = Math.round(normalizedLines.reduce((s, l) => s + l.taxableValue, 0) * 100) / 100
+    data.gstAmount = Math.round(normalizedLines.reduce((s, l) => s + l.gstAmount, 0) * 100) / 100
+    data.grandTotal = Math.round(normalizedLines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100
+    data.itemId = normalizedLines[0]?.itemId ?? existing.itemId
   }
 
   const updated = await repo.updateSalesOrder(tenantId, id, data)

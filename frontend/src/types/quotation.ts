@@ -53,6 +53,7 @@ export interface Quotation extends AuditTrail {
   opportunityNo?: string | null
   customerId: string
   productId: string
+  itemId?: string | null
   qty: number
   revisionNo: number
   rootQuotationId: string
@@ -122,7 +123,11 @@ export interface QuotationPriceLine {
   id: string
   productOrItem: string
   description: string
-  /** Linked product master — set from opportunity lines or product picker */
+  /** Linked item master — primary CRM/Sales reference */
+  itemId?: string | null
+  itemCodeSnapshot?: string | null
+  itemNameSnapshot?: string | null
+  /** @deprecated Legacy product link — dual-read only */
   productId?: string | null
   qty: number
   uom: string

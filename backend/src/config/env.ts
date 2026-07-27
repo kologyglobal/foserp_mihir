@@ -28,6 +28,16 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+  /** Optional SMTP — when unset, invite/reset emails are skipped (token returned in dev/test). */
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
+  SMTP_SECURE: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
   CRM_UPLOAD_DIR: z.string().optional(),
   /** Phase 5A2 — directory for uploaded bank statement import files. */
   TREASURY_STATEMENT_UPLOAD_DIR: z.string().optional(),

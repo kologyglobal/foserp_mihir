@@ -20,12 +20,12 @@ interface RouteOp {
 }
 
 const METHODS = new Set(['get', 'post', 'put', 'patch', 'delete'])
-const HTTP_RE = /\b(?:router|app)\.(get|post|put|patch|delete)\(\s*([`'"])([\s\S]*?)\2/g
+/** Match Express route registrations on router / *Router / *Routes bindings. */
+const HTTP_RE =
+  /\b(?:router|app|[A-Za-z_][\w]*(?:Router|Routes))\.(get|post|put|patch|delete)\(\s*([`'"])([\s\S]*?)\2/g
 const USE_RE = /\b(?:router|app)\.use\(\s*([`'"])(\/[^`'"]*)\1\s*,\s*([A-Za-z_][\w]*)/g
 const IMPORT_RE =
   /import\s+(?:(\w+)\s*,\s*)?(?:\{\s*([^}]+)\s*\}\s*,?\s*)?(?:(\w+)\s*)?from\s+['"]([^'"]+)['"]/g
-
-// ... later in collectNestedMounts, replace the import loop:
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SRC = path.resolve(__dirname, '../src')
@@ -33,8 +33,14 @@ const SRC = path.resolve(__dirname, '../src')
 /** Mount prefixes applied in app.ts for tenant slug form (canonical for docs). */
 const APP_MOUNTS: Array<{ prefix: string; importHint: string }> = [
   { prefix: '/auth', importHint: 'auth.routes' },
+  { prefix: '/webhooks/indiamart', importHint: 'indiamart.webhook.routes' },
   { prefix: '/tenants', importHint: 'tenant.routes' },
   { prefix: '/t/{tenantSlug}/users', importHint: 'user.routes' },
+  { prefix: '/t/{tenantSlug}/users', importHint: 'scope.routes' },
+  { prefix: '/t/{tenantSlug}/departments', importHint: 'department.routes' },
+  { prefix: '/t/{tenantSlug}/responsibilities', importHint: 'responsibility.routes' },
+  { prefix: '/t/{tenantSlug}/security', importHint: 'security.routes' },
+  { prefix: '/t/{tenantSlug}/modules', importHint: 'module.routes' },
   { prefix: '/t/{tenantSlug}/roles', importHint: 'role.routes' },
   { prefix: '/t/{tenantSlug}/crm', importHint: 'crm.routes' },
   { prefix: '/t/{tenantSlug}/masters/items', importHint: 'item.routes' },
@@ -48,12 +54,15 @@ const APP_MOUNTS: Array<{ prefix: string; importHint: string }> = [
   { prefix: '/t/{tenantSlug}/lookups/vendors', importHint: 'vendor.routes' },
   { prefix: '/t/{tenantSlug}/lookups', importHint: 'lookups.routes' },
   { prefix: '/t/{tenantSlug}/accounting', importHint: 'accounting.routes' },
+  { prefix: '/t/{tenantSlug}/organisation', importHint: 'organisation.routes' },
   { prefix: '/t/{tenantSlug}/manufacturing', importHint: 'manufacturing.routes' },
   { prefix: '/t/{tenantSlug}/purchase', importHint: 'purchase.routes' },
   { prefix: '/t/{tenantSlug}/quality', importHint: 'quality.routes' },
   { prefix: '/t/{tenantSlug}/dispatch', importHint: 'dispatch.routes' },
+  { prefix: '/t/{tenantSlug}/gate', importHint: 'gate.routes' },
   { prefix: '/t/{tenantSlug}/reports', importHint: 'ops-reports.routes' },
   { prefix: '/t/{tenantSlug}/operations/exceptions', importHint: 'exception.routes' },
+  { prefix: '/t/{tenantSlug}/executive', importHint: 'dashboard.routes' },
 ]
 
 function toOpenApiSegment(expressPath: string): string {

@@ -703,11 +703,29 @@ export const canViewShopfloorLive = (uiRole?: ManufacturingUiRole) =>
 export const canViewTraceability = (uiRole?: ManufacturingUiRole) =>
   canManufacturingPermission('manufacturing.traceability.view', uiRole)
   || canManufacturingPermission('manufacturing.work_orders.view', uiRole)
-export const canViewExceptions = (uiRole?: ManufacturingUiRole) =>
-  canManufacturingPermission('manufacturing.exceptions.view', uiRole)
-  || canManufacturingPermission('manufacturing.view', uiRole)
-export const canAcknowledgeException = (uiRole?: ManufacturingUiRole) =>
-  canManufacturingPermission('manufacturing.exceptions.acknowledge', uiRole)
+export const canViewExceptions = (uiRole?: ManufacturingUiRole) => {
+  if (isApiMode()) {
+    const perms = getStoredSession()?.user.permissions ?? []
+    if (
+      perms.includes('operations.exceptions.view')
+      || perms.includes('operations.exceptions.manage')
+      || hasWorkspaceAdminRole()
+    ) {
+      return true
+    }
+  }
+  return (
+    canManufacturingPermission('manufacturing.exceptions.view', uiRole)
+    || canManufacturingPermission('manufacturing.view', uiRole)
+  )
+}
+export const canAcknowledgeException = (uiRole?: ManufacturingUiRole) => {
+  if (isApiMode()) {
+    const perms = getStoredSession()?.user.permissions ?? []
+    if (perms.includes('operations.exceptions.manage') || hasWorkspaceAdminRole()) return true
+  }
+  return canManufacturingPermission('manufacturing.exceptions.acknowledge', uiRole)
+}
 
 const CORRECTION_TYPE_REVERSE_KEYS: Record<string, CorrectionPermission> = {
   PROGRESS: 'manufacturing.correction.reverse.progress',

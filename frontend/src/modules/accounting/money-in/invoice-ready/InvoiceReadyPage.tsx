@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { FilePlus2, RefreshCw } from 'lucide-react'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { Input } from '@/components/forms/Inputs'
@@ -18,6 +18,8 @@ import type { DispatchInvoicePrefillState } from '../invoices/invoicePrefillStat
 
 export function InvoiceReadyPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const outboundDispatchIdFilter = searchParams.get('outboundDispatchId') ?? undefined
   const perms = useMoneyInPermissions()
   const [rows, setRows] = useState<DispatchLineInvoiceReadyDto[]>([])
   const [loading, setLoading] = useState(true)
@@ -32,6 +34,7 @@ export function InvoiceReadyPage() {
         readyOnly: true,
         limit: 200,
         ...(search.trim() ? { search: search.trim() } : {}),
+        ...(outboundDispatchIdFilter ? { outboundDispatchId: outboundDispatchIdFilter } : {}),
       })
       setRows(data)
       setSelected((prev) => {
@@ -46,7 +49,7 @@ export function InvoiceReadyPage() {
     } finally {
       setLoading(false)
     }
-  }, [search])
+  }, [search, outboundDispatchIdFilter])
 
   useEffect(() => {
     if (perms.canViewInvoice) void load()
@@ -108,7 +111,7 @@ export function InvoiceReadyPage() {
   return (
     <MoneyInWorkspaceShell
       title="Invoice Ready"
-      description="Confirmed outbound dispatch lines with quantity available to invoice."
+      description="Confirmed outbound dispatch lines with quantity available to invoice. When POD-before-invoice is enabled, lines wait until delivery is captured."
       actions={
         mergeAllowedAction(perms.canCreateInvoice) ? (
           <ErpButton
@@ -129,6 +132,12 @@ export function InvoiceReadyPage() {
         </div>
       )}
 
+      {isApiMode() && (
+        <div className="mb-3 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-[12px] text-sky-900">
+          Create Invoice links selected dispatch lines to a Sales Invoice draft. Manual create and auto-invoice both respect
+          tenant <strong>require POD before invoice</strong> when enabled (POD must be Delivered or Partially delivered).
+        </div>
+      )}
       <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-erp-border bg-erp-surface/40 px-3 py-2">
         <Input
           className="h-9 w-full max-w-xs text-[12px]"

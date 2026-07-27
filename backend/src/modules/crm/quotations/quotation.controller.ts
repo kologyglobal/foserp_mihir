@@ -7,7 +7,8 @@ import * as service from './quotation.service.js'
 
 export const listQuotations = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
-  const result = await service.listQuotations(tenantId, req.query as never)
+  const { userId } = getContext(req)
+  const result = await service.listQuotations(tenantId, req.query as never, userId)
   sendPaginated(res, 'Quotations retrieved', result.items, buildPaginationMeta(result.total, result.page, result.limit))
 })
 

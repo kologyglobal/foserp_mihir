@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../../config/database.js'
 import { tenantActiveFilter } from '../../../shared/prisma/helpers.js'
-import type { ListAllocationsQuery, ListInvoicesQuery, ListReceiptsQuery } from './commercial.validation.js'
+import type { ListAllocationsQuery, ListInvoicesQuery, ListProformasQuery, ListReceiptsQuery } from './commercial.validation.js'
 
 export async function findCompany(tenantId: string, companyId: string) {
   return prisma.crmCompany.findFirst({
@@ -9,7 +9,7 @@ export async function findCompany(tenantId: string, companyId: string) {
   })
 }
 
-export async function nextDocumentNo(tenantId: string, prefix: string, table: 'receipt' | 'invoice') {
+export async function nextDocumentNo(tenantId: string, prefix: string, table: 'receipt' | 'invoice' | 'proforma') {
   const rows =
     table === 'receipt'
       ? await prisma.crmPaymentReceipt.findMany({
@@ -18,15 +18,22 @@ export async function nextDocumentNo(tenantId: string, prefix: string, table: 'r
           orderBy: { createdAt: 'desc' },
           take: 50,
         })
-      : await prisma.crmTaxInvoice.findMany({
-          where: { tenantId, invoiceNo: { startsWith: prefix } },
-          select: { invoiceNo: true },
-          orderBy: { createdAt: 'desc' },
-          take: 50,
-        })
+      : table === 'proforma'
+        ? await prisma.crmProformaInvoice.findMany({
+            where: { tenantId, proformaNo: { startsWith: prefix } },
+            select: { proformaNo: true },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+          })
+        : await prisma.crmTaxInvoice.findMany({
+            where: { tenantId, invoiceNo: { startsWith: prefix } },
+            select: { invoiceNo: true },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+          })
   const nums = rows
     .map((r) => {
-      const no = 'receiptNo' in r ? r.receiptNo : r.invoiceNo
+      const no = 'receiptNo' in r ? r.receiptNo : 'proformaNo' in r ? r.proformaNo : r.invoiceNo
       const m = no.match(/(\d+)$/)
       return m ? Number(m[1]) : 0
     })
@@ -81,6 +88,121 @@ export async function createReceipt(
   return prisma.crmPaymentReceipt.create({
     data: { ...data, tenantId, createdBy: userId, updatedBy: userId },
   })
+}
+
+export async function findSalesOrder(tenantId: string, salesOrderId: string) {
+  return prisma.crmSalesOrder.findFirst({
+    where: { id: salesOrderId, ...tenantActiveFilter(tenantId) },
+  })
+}
+
+export async function findActiveProformaForSalesOrder(tenantId: string, salesOrderId: string) {
+  return prisma.crmProformaInvoice.findFirst({
+    where: {
+      ...tenantActiveFilter(tenantId),
+      salesOrderId,
+      status: { not: 'cancelled' },
+    },
+  })
+}
+
+export async function findProformas(tenantId: string, query: ListProformasQuery) {
+  const page = query.page ?? 1
+  const limit = query.limit ?? 50
+  const where: Prisma.CrmProformaInvoiceWhereInput = {
+    ...tenantActiveFilter(tenantId),
+    ...(query.companyId ? { companyId: query.companyId } : {}),
+    ...(query.salesOrderId ? { salesOrderId: query.salesOrderId } : {}),
+    ...(query.status ? { status: query.status } : {}),
+  }
+  const [total, items] = await Promise.all([
+    prisma.crmProformaInvoice.count({ where }),
+    prisma.crmProformaInvoice.findMany({
+      where,
+      include: { lines: { where: { deletedAt: null }, orderBy: { lineNo: 'asc' } } },
+      orderBy: [{ proformaDate: 'desc' }, { createdAt: 'desc' }],
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+  ])
+  return { total, page, limit, items }
+}
+
+export async function findProformaById(tenantId: string, id: string) {
+  return prisma.crmProformaInvoice.findFirst({
+    where: { id, ...tenantActiveFilter(tenantId) },
+    include: { lines: { where: { deletedAt: null }, orderBy: { lineNo: 'asc' } } },
+  })
+}
+
+type ProformaCreateData = Omit<
+  Prisma.CrmProformaInvoiceUncheckedCreateInput,
+  'tenantId' | 'createdBy' | 'updatedBy'
+>
+
+export async function createProformaWithLines(
+  tenantId: string,
+  userId: string,
+  proforma: ProformaCreateData,
+  lines: Array<Omit<Prisma.CrmProformaInvoiceLineUncheckedCreateInput, 'tenantId' | 'proformaId'>>,
+) {
+  return prisma.$transaction(async (tx) => {
+    const created = await tx.crmProformaInvoice.create({
+      data: { ...proforma, tenantId, createdBy: userId, updatedBy: userId },
+    })
+    if (lines.length) {
+      await tx.crmProformaInvoiceLine.createMany({
+        data: lines.map((l) => ({ ...l, tenantId, proformaId: created.id })),
+      })
+    }
+    return tx.crmProformaInvoice.findFirstOrThrow({
+      where: { id: created.id },
+      include: { lines: { where: { deletedAt: null }, orderBy: { lineNo: 'asc' } } },
+    })
+  })
+}
+
+export async function updateProformaWithLines(
+  tenantId: string,
+  id: string,
+  userId: string,
+  proforma: Prisma.CrmProformaInvoiceUncheckedUpdateInput,
+  lines?: Array<Omit<Prisma.CrmProformaInvoiceLineUncheckedCreateInput, 'tenantId' | 'proformaId'>>,
+) {
+  return prisma.$transaction(async (tx) => {
+    await tx.crmProformaInvoice.updateMany({
+      where: { id, tenantId, deletedAt: null },
+      data: { ...proforma, updatedBy: userId },
+    })
+    if (lines) {
+      await tx.crmProformaInvoiceLine.updateMany({
+        where: { proformaId: id, tenantId, deletedAt: null },
+        data: { deletedAt: new Date() },
+      })
+      if (lines.length) {
+        await tx.crmProformaInvoiceLine.createMany({
+          data: lines.map((l) => ({ ...l, tenantId, proformaId: id })),
+        })
+      }
+    }
+    return tx.crmProformaInvoice.findFirstOrThrow({
+      where: { id },
+      include: { lines: { where: { deletedAt: null }, orderBy: { lineNo: 'asc' } } },
+    })
+  })
+}
+
+export async function updateProforma(
+  tenantId: string,
+  id: string,
+  userId: string,
+  data: Prisma.CrmProformaInvoiceUncheckedUpdateInput,
+) {
+  await prisma.crmProformaInvoice.updateMany({
+    where: { id, tenantId, deletedAt: null },
+    data: { ...data, updatedBy: userId },
+  })
+  return findProformaById(tenantId, id)
 }
 
 export async function findInvoices(tenantId: string, query: ListInvoicesQuery) {

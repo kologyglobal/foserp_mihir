@@ -31,7 +31,7 @@ const CEO: RoleExperienceDefinition = {
   title: 'CEO Command Center',
   tagline: 'Order book, cash, delivery risk, and plant health at a glance.',
   deepDashboardPath: CONTROL_TOWER_ROUTES.executive,
-  deepDashboardLabel: 'Executive Dashboard',
+  deepDashboardLabel: 'CEO Dashboard',
   inboxModules: [],
   approvalModules: [],
   kpiIds: ['orderBook', 'invoiceValue', 'outstanding', 'delayedOrders', 'openNcr', 'dispatchPending'],

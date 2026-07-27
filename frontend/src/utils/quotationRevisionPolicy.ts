@@ -62,7 +62,7 @@ export function resolveQuotationRevisionPolicy(
       guidance: [
         'Direct edit allowed — update sections and line items on this document.',
         'Revision not required while the quotation is still in draft.',
-        'Submit for Internal Approval when commercial content is ready.',
+        'Optional: Submit for Internal Approval, or convert directly when commercial details are ready.',
       ],
       disabledReason: 'Revision is not required in Draft — edit this document directly.',
     }
@@ -101,7 +101,7 @@ export function resolveQuotationRevisionPolicy(
       stageTitle: 'Approved',
       guidance: [
         'New Revision available if commercial terms must change before send.',
-        'Otherwise Send to Customer to continue the workflow.',
+        'Optional: Send to Customer, or convert directly to a sales order.',
       ],
       disabledReason: null,
     }
@@ -137,7 +137,7 @@ export function resolveQuotationRevisionPolicy(
       stageTitle: 'Sent',
       guidance: [
         'New Revision available if the customer requests changes before approval.',
-        'Record Customer Approved when the customer confirms.',
+        'Optional: record Customer Approved, or convert directly to a sales order.',
       ],
       disabledReason: null,
     }

@@ -26,24 +26,26 @@ import {
 import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
 import { useMrpStore } from '../../store/mrpStore'
 import { useMasterStore } from '../../store/masterStore'
-import { useActiveCustomers, useSellableProducts } from '../../hooks/useMasterLists'
+import { useActiveCustomers, useSellableItems } from '../../hooks/useMasterLists'
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { computeProformaLineTotals } from '../../utils/proformaInvoiceLines'
 import { resolveSalesOrderProformaPrefill } from '../../utils/proformaInvoicePrefill'
 import type { ProformaInvoiceLine } from '../../types/proformaInvoice'
 import { computeGst, gstSchemeLabel } from '../../utils/gstEngine'
-import { isProductSellable, productNotSellableForSalesMessage } from '../../utils/productMaster'
+import { canUseItemInSales } from '../../utils/opportunityItemOptions'
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { useDocumentLocation } from '../../hooks/useDocumentLocation'
 import { SalesCardFormShell } from './SalesCardFormShell'
 import { salesChildBreadcrumbs } from '../../utils/salesNavigation'
+import { isApiMode } from '../../config/apiConfig'
+import { apiCreateProforma } from '../../services/bridges/crmCommercialApiBridge'
 
 type PiCreateMode = 'direct' | 'sales_order'
 
 type PiLineRow = {
   key: string
-  productId: string
+  itemId: string
   qty: string
   unitPrice: string
   discountPct: string
@@ -59,7 +61,7 @@ function round2(n: number) {
 function toLineRows(lines: ProformaInvoiceLine[]): PiLineRow[] {
   return lines.map((l) => ({
     key: l.id,
-    productId: l.productId,
+    itemId: l.itemId ?? '',
     qty: String(l.qty),
     unitPrice: String(l.unitPrice),
     discountPct: String(l.discountPct),
@@ -67,11 +69,11 @@ function toLineRows(lines: ProformaInvoiceLine[]): PiLineRow[] {
   }))
 }
 
-function buildLinesFromRows(rows: PiLineRow[], products: ReturnType<typeof useMasterStore.getState>['products']): ProformaInvoiceLine[] {
+function buildLinesFromRows(rows: PiLineRow[], items: ReturnType<typeof useMasterStore.getState>['items']): ProformaInvoiceLine[] {
   return rows
-    .filter((r) => r.productId && Number(r.qty) > 0)
+    .filter((r) => r.itemId && Number(r.qty) > 0)
     .map((row, idx) => {
-      const product = products.find((p) => p.id === row.productId)
+      const item = items.find((i) => i.id === row.itemId)
       const qty = Number(row.qty) || 0
       const unitPrice = Number(row.unitPrice) || 0
       const discountPct = Number(row.discountPct) || 0
@@ -80,10 +82,10 @@ function buildLinesFromRows(rows: PiLineRow[], products: ReturnType<typeof useMa
       return {
         id: row.key,
         lineNo: idx + 1,
-        productId: row.productId,
-        itemCode: product?.productCode ?? '',
-        description: product?.productName ?? '',
-        hsnCode: product?.hsnCode ?? '',
+        itemId: row.itemId,
+        itemCode: item?.itemCode ?? '',
+        description: item?.itemName ?? '',
+        hsnCode: item?.hsnCode ?? '',
         qty,
         uom: 'Nos',
         unitPrice,
@@ -103,9 +105,9 @@ export function ProformaInvoiceFormPage() {
   const createDirect = useProformaInvoiceStore((s) => s.createDirect)
   const createFromSalesOrder = useProformaInvoiceStore((s) => s.createFromSalesOrder)
   const customers = useActiveCustomers()
-  const products = useSellableProducts()
+  const items = useSellableItems()
   const getCustomer = useMasterStore((s) => s.getCustomer)
-  const getProduct = useMasterStore((s) => s.getProduct)
+  const getItem = useMasterStore((s) => s.getItem)
 
   const today = new Date().toISOString().slice(0, 10)
   const [activeSection, setActiveSection] = useState('source')
@@ -139,7 +141,7 @@ export function ProformaInvoiceFormPage() {
     if (prefill?.lines.length) return toLineRows(prefill.lines)
     return [{
       key: crypto.randomUUID(),
-      productId: '',
+      itemId: '',
       qty: '1',
       unitPrice: '0',
       discountPct: '0',
@@ -178,17 +180,17 @@ export function ProformaInvoiceFormPage() {
     [customers],
   )
 
-  const productOptions = useMemo(
-    () => products.map((p) => ({
-      value: p.id,
-      label: `${p.productCode} · ${p.productName}`,
-      searchText: `${p.productCode} ${p.productName}`.toLowerCase(),
+  const itemOptions = useMemo(
+    () => items.map((i) => ({
+      value: i.id,
+      label: `${i.itemCode} · ${i.itemName}`,
+      searchText: `${i.itemCode} ${i.itemName}`.toLowerCase(),
     })),
-    [products],
+    [items],
   )
 
   const customer = customerId ? getCustomer(customerId) : undefined
-  const lines = useMemo(() => buildLinesFromRows(lineRows, products), [lineRows, products])
+  const lines = useMemo(() => buildLinesFromRows(lineRows, items), [lineRows, items])
   const taxable = useMemo(() => lines.reduce((s, l) => s + l.taxableValue, 0), [lines])
   const gstPreview = useMemo(
     () => (customer ? computeGst(taxable, customer.state) : null),
@@ -209,7 +211,7 @@ export function ProformaInvoiceFormPage() {
     return { totalQty, basicAmount, subtotal, totalLineDiscount, gstByRate, lineGst, grandTotal }
   }, [lines, taxable, gstPreview])
 
-  const hasValidLines = lines.length > 0 && lines.every((l) => l.productId && l.qty > 0 && l.unitPrice > 0)
+  const hasValidLines = lines.length > 0 && lines.every((l) => l.itemId && l.qty > 0 && l.unitPrice > 0)
 
   function show(msg: string) {
     setToast(msg)
@@ -245,7 +247,7 @@ export function ProformaInvoiceFormPage() {
       ...lineRows,
       {
         key: crypto.randomUUID(),
-        productId: '',
+        itemId: '',
         qty: '1',
         unitPrice: '0',
         discountPct: '0',
@@ -269,7 +271,7 @@ export function ProformaInvoiceFormPage() {
     return errs
   }
 
-  function saveProforma() {
+  async function saveProforma() {
     const errs = validate()
     setErrors(errs)
     if (errs.length) return
@@ -287,9 +289,22 @@ export function ProformaInvoiceFormPage() {
       lines,
     }
 
-    const r = mode === 'sales_order' && salesOrderId
-      ? createFromSalesOrder(salesOrderId, payload)
-      : createDirect({ ...payload, salesOrderId: mode === 'sales_order' ? salesOrderId : null })
+    const linkedSo = salesOrderId ? salesOrders.find((s) => s.id === salesOrderId) : undefined
+    let r: { ok: boolean; error?: string; id?: string }
+    if (isApiMode()) {
+      r = await apiCreateProforma({
+        ...payload,
+        salesOrderId: mode === 'sales_order' ? salesOrderId || null : null,
+        salesOrderNo: linkedSo?.salesOrderNo ?? null,
+        source: mode === 'sales_order' ? 'sales_order' : 'direct',
+      })
+    } else {
+      r = await Promise.resolve(
+        mode === 'sales_order' && salesOrderId
+          ? createFromSalesOrder(salesOrderId, payload)
+          : createDirect({ ...payload, salesOrderId: mode === 'sales_order' ? salesOrderId : null }),
+      )
+    }
 
     setIsSubmitting(false)
     if (r.ok && r.id) navigate(`/sales/proforma-invoices/${r.id}`)
@@ -324,7 +339,7 @@ export function ProformaInvoiceFormPage() {
 
   const formMetrics = useMemo(() => [
     { label: 'Completion', value: `${completionPercent}%`, accent: 'blue' as const, hint: `${completionItems.filter((i) => i.done).length} of ${completionItems.length} sections` },
-    { label: 'Line Items', value: String(lines.length), accent: 'green' as const, hint: hasValidLines ? formatCurrency(pricingSummary.grandTotal) : 'Add products' },
+    { label: 'Line Items', value: String(lines.length), accent: 'green' as const, hint: hasValidLines ? formatCurrency(pricingSummary.grandTotal) : 'Add items' },
     { label: 'Grand Total', value: pricingSummary.grandTotal > 0 ? formatCurrency(pricingSummary.grandTotal) : '—', accent: 'violet' as const, hint: gstPreview ? gstSchemeLabel(gstPreview.scheme) : 'Select customer' },
     { label: 'Valid Until', value: validUntil ? formatDate(validUntil) : '—', accent: 'amber' as const, hint: customer?.customerName ?? 'Select customer' },
   ], [completionPercent, completionItems, lines.length, hasValidLines, pricingSummary.grandTotal, gstPreview, validUntil, customer?.customerName])
@@ -433,26 +448,30 @@ export function ProformaInvoiceFormPage() {
         </thead>
         <tbody>
           {lineRows.map((row, idx) => {
-            const built = buildLinesFromRows([row], products)[0]
+            const built = buildLinesFromRows([row], items)[0]
             return (
               <tr key={row.key} className="border-b border-erp-border/60">
                 <td className="px-2 py-2 tabular-nums text-erp-muted erp-line-items-grid__sticky-sr">{idx + 1}</td>
                 <td className="px-2 py-2 min-w-[220px] erp-line-items-grid__sticky-product">
                   <ErpSmartSelect
-                    options={productOptions}
-                    value={row.productId}
+                    options={itemOptions}
+                    value={row.itemId}
                     onChange={(v) => {
                       if (!v) return
-                      const p = getProduct(v)
-                      if (p && !isProductSellable(p)) {
-                        setErrors([productNotSellableForSalesMessage(p)])
+                      const item = getItem(v)
+                      const check = canUseItemInSales(v)
+                      if (!check.ok) {
+                        setErrors([check.error ?? 'Item is not allowed for sales'])
                         return
                       }
-                      patchLine(row.key, { productId: v, unitPrice: String(p?.standardPrice ?? row.unitPrice) })
+                      patchLine(row.key, {
+                        itemId: v,
+                        unitPrice: String(item?.defaultSalesRate ?? item?.standardRate ?? row.unitPrice),
+                      })
                     }}
-                    placeholder="Select released product…"
+                    placeholder="Select sellable item…"
                     appearance="dropdown"
-                    emptyMessage="Only products released for sale can be selected."
+                    emptyMessage="Only items allowed for sales can be selected."
                   />
                 </td>
                 <td className="px-2 py-2">
@@ -501,7 +520,7 @@ export function ProformaInvoiceFormPage() {
         className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-erp-primary hover:underline"
         onClick={addLine}
       >
-        <Plus className="h-3.5 w-3.5" /> Add product line
+        <Plus className="h-3.5 w-3.5" /> Add item line
       </button>
     </div>
   )

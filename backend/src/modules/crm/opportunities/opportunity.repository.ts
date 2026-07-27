@@ -1,6 +1,7 @@
 import type { OpportunityStatus, Prisma } from '@prisma/client'
 import { prisma } from '../../../config/database.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
+import { ValidationError } from '../../../utils/errors.js'
 import { FRONTEND_STATUS_TO_DB } from './opportunity.constants.js'
 import type {
   CreateOpportunityInput,
@@ -28,12 +29,17 @@ function parseDate(value: string | null | undefined): Date | null | undefined {
   return new Date(value)
 }
 
-export async function findOpportunities(tenantId: string, query: ListOpportunitiesQuery) {
+export async function findOpportunities(
+  tenantId: string,
+  query: ListOpportunitiesQuery,
+  orgScope: Prisma.CrmOpportunityWhereInput = {},
+) {
   const { getPagination } = await import('../../../utils/pagination.js')
   const { skip, take } = getPagination(query)
 
   const where: Prisma.CrmOpportunityWhereInput = {
     ...tenantActiveFilter(tenantId),
+    ...orgScope,
     ...(query.customerId ? { companyId: query.customerId } : {}),
     ...(query.leadId ? { leadId: query.leadId } : {}),
     ...(query.ownerId ? { ownerId: query.ownerId } : {}),
@@ -97,6 +103,8 @@ export async function createOpportunity(
   userId: string,
   data: CreateOpportunityInput & { opportunityCode: string; stageId: string },
 ) {
+  const { defaultOrgDimsForUser } = await import('../shared/crm-org-scope.js')
+  const org = await defaultOrgDimsForUser(tenantId, userId)
   return prisma.$transaction(async (tx) => {
     const opportunity = await tx.crmOpportunity.create({
       data: {
@@ -118,6 +126,8 @@ export async function createOpportunity(
         healthScore: data.healthScore ?? 60,
         locationId: data.locationId,
         competitor: data.competitor,
+        legalEntityId: org.legalEntityId ?? null,
+        branchId: org.branchId ?? null,
         createdBy: userId,
         updatedBy: userId,
       },
@@ -177,12 +187,14 @@ export async function createOpportunityLines(
   lines: LineInput[],
 ) {
   for (const [index, line] of lines.entries()) {
+    if (!line.itemId?.trim()) {
+      throw new ValidationError('Opportunity line requires an Item')
+    }
     await tx.crmOpportunityLine.create({
       data: {
         tenantId,
         opportunityId,
         lineNo: line.lineNo ?? index + 1,
-        productId: line.productId,
         itemId: line.itemId,
         itemCode: line.itemCode ?? '',
         productOrItem: line.productOrItem,

@@ -9,6 +9,8 @@ import { prisma } from '../../../../config/database.js'
 import { getPagination } from '../../../../utils/pagination.js'
 import { AppError } from '../../../../utils/errors.js'
 import { add, compare, formatForPersistence, subtract as sub, toDecimal } from '../../shared/finance-decimal.js'
+import { resolveDispatchPostingPolicy } from '../../../dispatch/posting/dispatch-policy.js'
+import { assertPodAllowsInvoice, isPodStatusInvoiceReady } from '../../../dispatch/pod/dispatch-pod.service.js'
 
 export class InvoiceReadyQuantityExceededError extends AppError {
   constructor(message: string) {
@@ -36,6 +38,9 @@ export interface DispatchLineInvoiceReady {
   deliveryChallanId: string | null
   deliveryChallanNumber: string | null
   deliveryChallanLineId: string | null
+  /** Present when tenant requirePodBeforeInvoice — blocks Create Invoice until DELIVERED/PARTIALLY_DELIVERED. */
+  podStatus: string | null
+  podBlocksInvoice: boolean
 }
 
 export interface InvoiceReadyListQuery {
@@ -213,7 +218,8 @@ export async function listInvoiceReadyDispatchLines(
   ])
 
   const lineIds = lines.map((l) => l.id)
-  const [consumed, postingLines] = await Promise.all([
+  const dispatchIds = [...new Set(lines.map((l) => l.outboundDispatch.id))]
+  const [consumed, postingLines, pods, policy] = await Promise.all([
     lineIds.length === 0
       ? Promise.resolve([])
       : prisma.salesInvoiceSourceLink.groupBy({
@@ -232,6 +238,13 @@ export async function listInvoiceReadyDispatchLines(
           where: { tenantId, outboundDispatchLineId: { in: lineIds } },
           select: { outboundDispatchLineId: true, reversedQuantity: true },
         }),
+    dispatchIds.length === 0
+      ? Promise.resolve([])
+      : prisma.dispatchProofOfDelivery.findMany({
+          where: { tenantId, outboundDispatchId: { in: dispatchIds } },
+          select: { outboundDispatchId: true, status: true },
+        }),
+    resolveDispatchPostingPolicy(tenantId, { forceHardened: true }),
   ])
   const consumedMap = new Map(
     consumed.map((c) => [c.sourceLineId ?? '', d(c._sum.quantity ?? 0)]),
@@ -239,6 +252,8 @@ export async function listInvoiceReadyDispatchLines(
   const reversedMap = new Map(
     postingLines.map((p) => [p.outboundDispatchLineId, d(p.reversedQuantity)]),
   )
+  const podMap = new Map(pods.map((p) => [p.outboundDispatchId, p.status]))
+  const requirePod = policy.requirePodBeforeInvoice
 
   const mapped: DispatchLineInvoiceReady[] = []
   for (const line of lines) {
@@ -251,6 +266,9 @@ export async function listInvoiceReadyDispatchLines(
     const challanLine = challan?.lines.find((cl) => cl.outboundDispatchLineId === line.id) ?? null
     const customerId = line.outboundDispatch.customerId ?? line.outboundDispatch.salesOrder?.companyId ?? null
     const customerName = line.outboundDispatch.salesOrder?.company?.name ?? null
+    const podStatus = podMap.get(line.outboundDispatch.id) ?? null
+    const podBlocksInvoice = requirePod && !isPodStatusInvoiceReady(podStatus)
+    if (query.readyOnly !== false && podBlocksInvoice) continue
 
     mapped.push({
       outboundDispatchId: line.outboundDispatch.id,
@@ -272,6 +290,8 @@ export async function listInvoiceReadyDispatchLines(
       deliveryChallanId: challan?.id ?? null,
       deliveryChallanNumber: challan?.challanNumber ?? null,
       deliveryChallanLineId: challanLine?.id ?? null,
+      podStatus,
+      podBlocksInvoice,
     })
   }
 
@@ -335,6 +355,10 @@ export async function buildInvoicePrefillFromDispatchLines(
     throw new AppError(400, 'At least one dispatch line is required', 'DISPATCH_LINES_REQUIRED')
   }
 
+  const { assertDispatchInvoiceCommercialPolicy } = await import(
+    '../../../dispatch/settings/dispatch-commercial-enforcement.js'
+  )
+
   const ready = await listInvoiceReadyDispatchLines(tenantId, {
     readyOnly: true,
     limit: 500,
@@ -362,11 +386,20 @@ export async function buildInvoicePrefillFromDispatchLines(
     }
   }
 
+  await assertDispatchInvoiceCommercialPolicy(
+    tenantId,
+    selected.map((s) => s.outboundDispatchId),
+  )
+
   const customerIds = new Set(selected.map((s) => s.customerId).filter(Boolean))
   if (customerIds.size !== 1) {
     throw new AppError(422, 'Selected dispatch lines must belong to a single customer', 'MULTI_CUSTOMER_DISPATCH')
   }
   const customerId = [...customerIds][0]!
+
+  for (const dispatchId of new Set(selected.map((s) => s.outboundDispatchId))) {
+    await assertPodAllowsInvoice(tenantId, dispatchId)
+  }
 
   const salesOrderIds = new Set(selected.map((s) => s.salesOrderId).filter(Boolean))
   const primarySoId = salesOrderIds.size === 1 ? [...salesOrderIds][0]! : selected[0]!.salesOrderId

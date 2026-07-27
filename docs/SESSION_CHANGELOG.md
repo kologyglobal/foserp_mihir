@@ -1,3 +1,397 @@
+## 2026-07-27 — Inventory valuation methods hardened (all 4)
+
+### Fixes
+- **Moving average:** issues always use current avg rate (ignore caller rate).
+- **Standard cost:** fail-closed when active standard / item standardRate ≤ 0.
+- **FIFO / Specific:** WO return layer restore + audit trail for both layer methods.
+- **Specific ID:** prefer serial/lot layers; allow unassigned opening-pool layers after migration; persist `lotId` on cost entries; new lot on issue is identity-only (no negative on-hand).
+- **Method change:** opening-stock layer migration runs for FIFO **and** Specific; FE copy updated.
+
+### Verified
+- `npx vitest run` MA + FIFO + opening + return + Phase C + **new** `inventory-specific-identification.test.ts` — **10/10 PASS**
+
+---
+
+## 2026-07-27 — Close Money In / Money Out user-flow gaps
+
+### Shipped
+- **AP reversal history:** `GET /accounting/payables/reversals` (invoices/payments/adjustments + allocation reversal batches); FE `ReversalHistoryPage` + Corrections history tab wired.
+- **Payable allocation history:** reverse action + corrected copy (subledger reverse is live).
+- **Money In Corrections hub:** `/accounting/money-in/corrections` (receipt / CN / allocation / journal reverse entry points).
+- **Dispatch → SI POD gate:** `assertPodAllowsInvoice` uses tenant `DispatchSettings`; enforced on SI source-link validate + invoice prefill; invoice-ready list hides POD-blocked lines when policy on.
+
+### Already live (confirmed — not rebuilt)
+- Money In: Sales Invoice, Receipt, Allocation, Credit Note, document/allocation reverse on detail pages; Journal reverse on journal detail.
+- Money Out: Vendor Invoice → Payment → Allocation → Adjustment → Reversal preview/history workspace.
+
+### Open
+- Dispatch partial / multi / consolidated invoice **policy UI** polish.
+
+---
+
+## 2026-07-27 — Fuel Tank factory golden path UAT (Phase 3 close)
+
+### Shipped
+- Extended `backend/scripts/test-fuel-tank-wo-execution.ts` to assert full checklist: one FG WO, LOGICAL SFG Job Cards, route snapshot, WC/machine assignment, valued material issue (Inventory Costing), QC + rework, Final QC, WO actual cost, FG serial receipt, FG valuation, close readiness, WO COMPLETED.
+- Minimal fix: FG receipt passes `serialNumber` into inventory for qty=1 serial-tracked FG (`fg-receipt.service.ts`).
+- Docs: `FUEL_TANK_UAT.md` evidence table; `REMAINING_WORK.md` Fuel Tank entry → PASS.
+
+### Verified (live, tenant `vasant-trailers`)
+- `npx tsx scripts/seed-fuel-tank-pilot-items.ts` + `seed-fuel-tank-mfg-setup.ts`
+- `npx tsx scripts/test-fuel-tank-wo-execution.ts` — **PASS**
+- Evidence: `WO-000009`, serial `FT-5000L-43550266`, material/WO/FG cost ₹111,020.00
+
+---
+
+## 2026-07-27 — Dispatch commercial O2C policy (UI + enforcement)
+
+### Shipped
+- Prisma `DispatchSettings` + `DispatchInvoiceMode`; migration `20260727143000_dispatch_commercial_policy`.
+- `GET/PUT /dispatch/settings` with optimistic `version`; permissions `dispatch.settings.view|manage`.
+- Enforcement: partial / multiple dispatches on draft+7C0 create; invoice mode on auto SI + Invoice Ready / SI source links; POD gate via `resolveDispatchPostingPolicy`.
+- FE `/dispatch/settings` (partial, multi, one-per / consolidated / manual, POD). **No live e-Way.**
+
+### Proof
+- Existing: Confirmed SO → FG → requirement → reserve → pick → pack → challan → post → stock → fulfilment → invoice ready (`dispatch-phase7c5`, `dispatch-o2c-invoice-allocate`).
+- New: `tests/dispatch-commercial-policy.test.ts`.
+
+### Docs
+- `docs/dispatch/DISPATCH_POLICY_SETTINGS.md` updated.
+
+---
+
+## 2026-07-27 — Manufacturing Accounting sequencing lock
+
+### Decision
+- Live Manufacturing Accounting GL (Issue / FG Receipt / Variance) **only after**: Inventory Costing + WO actual cost + FG valuation + Dispatch cost relief + Finance mappings are stable.
+- Journal model unchanged: Dr WIP / Cr RM · Dr FG / Cr WIP · Dr/Cr Production Variance.
+- Existing readiness / enablement gate remains the protection model (`MANUFACTURING_ACCOUNTING` stays OFF until prerequisites + gate pass).
+- Captured in `docs/REMAINING_WORK.md` as blocked item.
+
+---
+
+## 2026-07-27 — API docs OpenAPI 1.5.0 (full route refresh)
+
+### Shipped
+- Regenerated `swagger.generated-paths.ts` (`npm run swagger:generate`) — 1411 ops scanned; expanded mounts (gate, executive, security, modules, organisation, departments, IndiaMART webhook).
+- Generator: match `*Router` / `*Routes` registrations (not only `router.`).
+- Hand-documented **Inventory Costing** + setup FIFO migration + effective-access / access-review in `swagger.ts`.
+- `docs/API_CONVENTIONS.md` bumped to 1.5.0 + inventory costing table.
+
+### Verified
+- `npm run swagger:generate` — Added stubs: 265; skipped already documented: 1146
+
+---
+
+## 2026-07-27 — Inventory Costing UI (Phase 1 — close stock value)
+
+### Shipped
+- FE dual-mode **Inventory → Costing** workspace (`/inventory/costing/*`):
+  - Valuation Summary, Cost Entries (+ detail), FIFO Layers (+ detail), Average Cost History, Standard Cost (+ variances), Specific Identification, Valuation Reconciliation, Method Change wizard
+- API client `inventoryCostingApi.ts` → `/inventory/costing/*`
+- Nav + `inventory.view_cost` route gate; setup-manage for standard/method writes
+- Context links: GRN (Receipt Cost / Valuation), inward receipt detail, WO Costing tab → cost entries, Dispatch confirmed → cost relief
+
+### Verified
+- Frontend `tsc --noEmit` — clean (costing paths)
+
+---
+
+## 2026-07-27 — Purchase reports / GRNI / per-user approval limits
+
+### Shipped
+- **Reports polish:** GRN/invoice reports read via `purchaseApiFacade` (no demo-store dead-end in API mode).
+- **GRNI:** Catalog report `grn-grni` + BE `GET /purchase/reports/grni` (accepted/received − invoiced open qty/value by GRN line).
+- **Per-user ₹ limits:** `PurchaseApproverLimit` table + Setup Approval tab grid; enforced on PR/PO approve after matrix role check.
+
+### Verified
+- Migration `20260727180000_purchase_approver_limits` applied
+- `purchase-approver-limit.test.ts` — **PASS**
+- `purchase-grni-report.test.ts` — **PASS**
+- `purchase-matrix-role.test.ts` — **PASS**
+
+---
+
+## 2026-07-27 — Close Purchase paths (QI → Invoice → Return parity)
+
+### Shipped
+- **QI parity:** BE `POST …/hold` → `DEVIATION_PENDING`; cancel wired; reject qty patched before complete; FE cancel action; `purchase.qi.*` permission aliases.
+- **Invoice parity:** hide Hold/debit/exception stubs in API mode; matching enriched from PO/GRN; AP handoff preview; PO linked GRN/invoice/return lists.
+- **Return parity:** Submit → Approve → Complete; debit/replacement hidden in API mode; lifecycle asserts stock ISSUE (`prt-out:`).
+- **Valuation:** QI complete fail-closed — QI + stock release + GRN `INVENTORY_POSTED` in one transaction (no silent defer).
+- **Approvals:** matrix role binding on PR/PO pending approvals; invoice approve checks amount-band highest role; return approve gate before stock complete.
+
+### Verified
+- `purchase-matrix-role.test.ts` — **PASS**
+- `purchase-qi-lifecycle.test.ts` — **PASS** (QC hold → accept → `INVENTORY_POSTED` + `qi-release:` movements)
+- `purchase-return-lifecycle.test.ts` — **PASS** (submit → approve → complete + `prt-out:` stock ISSUE)
+- `purchase-invoice-lifecycle-live.test.ts` — **PASS**
+- Fixture `seedPurchaseMasters` seeds `MasterItem`; `createSentPo` passes `itemId` so inventory posts run
+
+---
+
+## 2026-07-27 — Commercial proforma/tax lines: itemId (drop productId)
+
+### Shipped
+- Migration `20260727210000_crm_commercial_item_id`: add `itemId`, backfill from `productId→fgItemId` / `itemCode` / tenant fallback, NOT NULL, DROP `productId` on `crm_proforma_invoice_lines` + `crm_tax_invoice_lines`.
+- BE: Zod requires `itemId`; `computeLine` + DTO mappers persist/return `itemId`.
+- FE: commercial/proforma types, bridges, SO→PI line builder use `MasterItem` / `itemId` only.
+- UAT script `test-crm-commercial-uat.ts` creates lines from sellable `masterItem`.
+
+### Verified
+- `npx tsx scripts/prisma-cli.ts migrate deploy` — applied
+- `npx tsx scripts/test-crm-commercial-uat.ts vasant-trailers` — **PASS**
+- Frontend `tsc` (commercial/proforma paths) — clean
+
+---
+
+## 2026-07-27 — Inventory Costing Phase C (read APIs + standard/specific/WO/recon)
+
+### Shipped
+- **Read APIs** under `/inventory/costing`:
+  - `GET /cost-entries`, `GET /cost-entries/:id`
+  - `GET /cost-layers`, `GET /cost-layers/:id`
+  - `GET /valuation-reconciliation` (on-hand/value vs OPEN layer remaining)
+  - `GET /cost-variances`
+  - `POST /standard-costs` (`inventory.setup.manage`)
+  - `POST /method-change` (policy gate + optional FIFO opening migration)
+- **STANDARD_COST:** versioned `InventoryItemStandardCostVersion`; receipts/issues valued at standard; `InventoryCostVariance` for actual vs standard.
+- **SPECIFIC_IDENTIFICATION:** requires serial or lot; issues consume identity-scoped cost layers.
+- **Actual WO cost:** FG receipt rate prefers `WorkOrderCostSnapshot.unitActualCost` when `manufacturingCostSource=actual_work_order` (default); `standard` uses item standard.
+- **Method-change audit:** `InventoryValuationMethodChange` + settings stamp.
+
+### Verified
+- `npx vitest run tests/inventory-costing-phasec.test.ts` — **PASS** (2/2)
+- FIFO layers + return restore regression — **PASS**
+
+---
+
+## 2026-07-27 — FIFO RETURN_FROM_WO layer restore
+
+### Shipped
+- **`fifo-return-restore.service.ts`:** plans LIFO restore against original `ISSUE_TO_WO` layer consumptions (WO-scoped or pinned via `reversalOfMovementId`).
+- **`postStockMovement`:** for FIFO + `RETURN_FROM_WO`, restores original layer remaining qty/value (re-OPEN if needed), sets movement `rate/value` from restored costs (ignores wrong caller rate), writes negative `InventoryCostLayerConsumption` audit rows; remainder without issue history falls back to a new OPEN layer.
+- **Material issue correction:** passes `reversalOfMovementId` so compensating returns restore that issue’s layers.
+
+### Verified
+- `npx vitest run tests/inventory-fifo-return-restore.test.ts` — **PASS** (caller rate 99 ignored; restore @10; layer 2→7 remaining)
+- `tests/inventory-fifo-layers.test.ts` — **PASS**
+
+### Pass With Conditions
+- WO-level returns without `reversalOfMovementId` use LIFO across all WO issues for the item/warehouse.
+- Unmatched remainder (no issue consumption history) still creates a new layer at input/avg rate.
+
+---
+
+## 2026-07-27 — Dispatch 7C5 infrastructure fix (no rebuild)
+
+### Fixed (posting/reversal already existed)
+- Compat `POST …/outbound/:id/reverse` accepts `dispatch.reverse.request|apply|post|override` (was `dispatch.post` only).
+- Readiness `reversibleQty` nets posting line `quantity − reversedQuantity`.
+- API outbound detail: reverse force path for `dispatch.override`; open-reversal Submit/Approve/Reject/Cancel/Apply panel; Post/Reverse/Emergency gated by session perms; Emergency command-bar only when override is actually allowed.
+- `dispatchApi`: reject/cancel helpers; typed reversal rows.
+- `.env.example`: `DISPATCH_HARDENED_POSTING_ENABLED` note.
+
+### Not rebuilt
+- Canonical `DispatchPostingService` / ledger / apply path unchanged.
+
+---
+
+## 2026-07-27 — IndiaMART go-live prep (not a rebuild)
+
+### Shipped / local prep
+- `FIELD_ENCRYPTION_KEY` added to local `backend/.env` (AES-256-GCM for Pull credentials).
+- Go-live runbook: `docs/crm/INDIAMART_GOLIVE.md`.
+- Readiness script: `backend/scripts/indiamart-golive-check.ts`.
+- Clearer 503 when saving Pull key without encryption configured.
+- `.env.example` documents IndiaMART need for `FIELD_ENCRYPTION_KEY`.
+
+### Still needs operator
+- Restart API to load encryption key.
+- Paste live IndiaMART `glusr_crm_key` → Save → **Test connection**.
+- Initial import / Sync → UAT checklist in go-live doc.
+
+---
+
+### Shipped
+- **HTTP:** `GET …/receivables/invoices/invoice-ready`, `POST …/prefill-from-dispatch` (before `/:id`).
+- **Create SI:** Zod accepts `sourceLinks`; draft service validates/enriches and persists ACTIVE consumption links.
+- **List SI:** optional `sourceDocumentId` filter (View Invoice from outbound).
+- **FE:** Money In `/accounting/money-in/invoice-ready` routed + tab; `moneyInPath` always `/accounting/money-in`.
+- **FE:** API outbound detail (`CONFIRMED`) — Create Invoice / Open Invoice Draft / Invoice Ready.
+- **Live test:** `backend/tests/dispatch-o2c-invoice-allocate.test.ts` — post → ready → prefill → create → post SI → allocate (**PASS**).
+
+### Not in this slice
+- Partial / multi-dispatch / consolidated policy UI; POD gate on manual create; rebuild of 7C5 posting.
+
+---
+
+## 2026-07-27 — CEO Dashboard Builder (plug-and-play)
+
+### Shipped
+- **Frontend:** `/executive` is now a configurable CEO Dashboard — Customize mode, widget library (CRM/Sales/Purchase/Inventory/Manufacturing/Quality/Dispatch/Finance), drag/resize via `react-grid-layout`, templates (CEO/Sales/Factory/Finance), multi-dashboard create/rename/duplicate/set-default/delete, global date preset, per-widget visualization config, drill-down links.
+- **Demo mode:** local persist + `queryWidgetDemo` over existing analytics/stores (no invented API-mode finance figures).
+- **API mode:** client + store hydrate against `/executive/*`; falls back to local builder if API not ready.
+- **Backend foundation:** Prisma `ExecutiveDashboard` / `ExecutiveDashboardWidget`, migration `20260727150000_executive_dashboards`, widget registry + permissions `executive.dashboard.*` (service/routes completing).
+
+### How to try
+1. Open **Executive → CEO Dashboard** (`/executive`)
+2. **Customize Dashboard** → **Add Widget** → pick module widgets → drag/resize → **Save**
+3. **New Dashboard** from a template if desired
+
+---
+
+
+### Shipped
+- **Service:** `fifo-opening-stock-migration.service.ts` seeds OPEN `InventoryCostLayer` rows for on-hand gaps (`onHand − Σ OPEN remaining`) without changing physical `InventoryStockBalance` qty.
+- Creates synthetic `OPENING`/`OPN` movement (valuation seed only; `balanceAfter` = current on-hand) + cost entry (`sourceType=FIFO_OPENING_MIGRATION`).
+- Values full covering gap from `stockValue` / `avgRate` (collapsed opening layer — does not reconstruct historical receipt layers).
+- **CLI:** `npx tsx scripts/migrate-fifo-opening-stock.ts --tenant=<slug> [--dry-run] [--force]`
+- **API:** `POST /inventory/setup/fifo-opening-migration` (`inventory.setup.manage`) with `{ dryRun?, force?, itemIds?, warehouseIds? }`
+- Stamps `InventorySettings.settings.costing.fifoOpeningStockMigration` on apply.
+
+### Verified
+- `npx vitest run tests/inventory-fifo-opening-migration.test.ts` — **PASS**
+  - Average receipts create on-hand with no layers → switch to FIFO → issue fails → migrate seeds 20@15 → issue succeeds @15; qty unchanged
+- `tests/inventory-fifo-layers.test.ts` — **PASS**
+
+### Pass With Conditions
+- Over-allocated OPEN layers (layers > on-hand) are reported as exceptions; no auto-fix.
+- Historical multi-layer reconstruction from past receipts is out of scope (opening collapse to current valuation).
+
+---
+
+## 2026-07-27 — CRM Product→Item Phase 10 (drop CRM productId)
+
+### Shipped
+
+- Migration `20260727190000_crm_product_to_item_phase10_drop_product_id`:
+  - DROP `productId` from `crm_opportunity_lines`, `crm_quotations`, `crm_sales_orders`, `dispatch_requirements`
+  - **Kept** `master_products` (engineering Product Master)
+  - Commercial proforma/tax `productId` cleared later via `20260727210000_crm_commercial_item_id` (see entry above)
+- Backend DTOs/validation/write paths for opp/quote/SO/dispatch no longer expose or persist CRM `productId`
+- Funnel UAT re-run: **29/29 PASS** (`test-crm-item-funnel-uat.ts`)
+
+---
+
+## 2026-07-27 — CRM Product→Item Phase 9 + funnel UAT
+
+### Evidence
+
+- **Exceptions:** backfill dry-run `0`; global null-`itemId` audit `0` line blockers (after soft-deleting one leftover dispatch test SO).
+- **API smoke UAT:** `npx tsx scripts/test-crm-item-funnel-uat.ts vasant-trailers` — **26/26 PASS** (Lead→Opp→Quote→SO→confirm→MFG demand; asserts `itemId` / `productId: null`).
+- **Bugfix:** `crm-org-scope.ts` import path corrected (`../../access-scopes`).
+
+### Phase 9 shipped
+
+- Write resolver no longer accepts `productId` → `fgItemId` fallback.
+- Zod: opp lines / quote price lines / SO lines require `itemId`.
+- MFG SO→demand convert requires line `itemId`.
+- Migration `20260727180000_crm_product_to_item_phase9_not_null` — `itemId` NOT NULL on opp lines, quotations, sales orders.
+- Scripts: funnel UAT, null audits, Phase 9 cleanup helpers.
+
+### Next
+
+- Phase 10: drop CRM `productId` columns after product sign-off (keep Product Master for engineering).
+
+---
+
+## 2026-07-27 — CRM Product→Item Phases 6–8 frontend close-out
+
+### Shipped
+
+- **Sales Order create** switched to sellable Item pickers (`SoLineDraft.itemId`, `useSellableItems` / `canUseItemInSales`); create payloads send `itemId` and `productId: null`.
+- **Quotation→SO line builder** resolves `itemId` first (price line / opp line / product `fgItemId` / label); writes `productId: null` on SO lines.
+- **Opportunity SO prefill** includes `itemId`; duplicate deep-link accepts `itemId` or maps legacy `productId` → `fgItemId`.
+- **API types** — `CreateSalesOrderBody` accepts header/line `itemId`.
+
+### Next
+
+- API-mode smoke UAT: Lead → Opp → Quote → SO → confirm → MFG demand.
+- Phase 9: enforce non-null `itemId` when exceptions = 0.
+
+---
+
+## 2026-07-27 — Inventory Costing Phase A foundation (Option A)
+
+### Shipped
+
+- **Repository audit completed:** added `docs/inventory/INVENTORY_COSTING_EXISTING_ARCHITECTURE_AUDIT.md` covering current physical-stock SoT, valuation behavior, manufacturing costing flows, and finance posting ownership boundaries.
+- **Costing foundation schema (additive):**
+  - Added Prisma enums `InventoryValuationMethod` and `InventoryCostEntryType`.
+  - Added Prisma model `InventoryCostEntry` linked to `InventoryStockMovement` (1:1 per tenant+movement), with references to tenant/legal entity/item/warehouse/lot/serial and valuation metadata.
+  - Added migration `backend/prisma/migrations/20260727183000_inventory_costing_phasea_foundation/migration.sql`.
+- **Valuation strategy scaffolding:**
+  - Added `backend/src/modules/inventory/costing/inventory-valuation.strategy.ts` with domain strategy interface.
+  - Option A behavior lock: strategy resolver currently keeps movement valuation equivalent to existing moving-average behavior (no physical posting behavior change).
+- **Cost entry writer:**
+  - Added `backend/src/modules/inventory/costing/inventory-cost-entry.service.ts`.
+  - New `recordInventoryCostEntryInTx(...)` resolves configured inventory method from `InventorySettings.general.defaultCostingMethod`, maps to canonical valuation enum, and upserts one cost entry per stock movement idempotently.
+- **Posting integration:**
+  - Wired stock movement posting to create `InventoryCostEntry` in the same DB transaction via `postStockMovement` (`stock-posting.service.ts`), preserving existing quantity/rate/value calculations.
+
+### Pass With Conditions
+
+- Migration not applied in this session (no DB deploy command executed here).
+- Backend/frontend typecheck and full test suite for this phase still pending.
+- This phase introduces the cost-entry foundation only; FIFO layers, moving-average state tables, standard-cost versions, specific-identification costing, and method-change lifecycle are not yet implemented.
+
+### Next
+
+- Apply migration and regenerate Prisma client.
+- Add Phase A API read surface for cost entries (`/inventory/cost-entries`) and readiness.
+- Implement valuation orchestrator service and begin FIFO cost-layer phase without changing physical stock ledger ownership.
+
+---
+## 2026-07-27 — Inventory Costing Phase B FIFO layers
+
+### Shipped
+- **FIFO layer tables:** added Prisma models + migration for `InventoryCostLayer` and `InventoryCostLayerConsumption` (additive; physical ledger unchanged).
+- **FIFO valuation on stock posting:** `postStockMovement` (for `InventorySettings.general.defaultCostingMethod=fifo`) now creates OPEN layers on receipts and consumes oldest OPEN layers on issues, updating movement `rate/value` and writing layer consumption allocations.
+
+### Pass With Conditions
+- FIFO issues require OPEN cost layers to exist (opening-stock migration not implemented yet).
+- Return cost restoration accuracy depends on caller-provided `rate` (phase B scope focuses on layer math + issue consumption).
+
+### Verified (2026-07-27)
+- Migrations deployed + Prisma client regenerated on local MySQL.
+- `npx vitest run tests/inventory-fifo-layers.test.ts` — **PASS** (oldest-layer consume + cross-layer issue math).
+- `npx vitest run tests/inventory-moving-average.test.ts` — **PASS** (non-FIFO path unchanged; cleanup FK order fixed).
+---
+
+## 2026-07-27 — Admin A3–A9 completion
+
+### Shipped
+
+- **Effective Access route ownership:** Removed compact A4 `GET …/users/:id/effective-access` from `user.routes`; Phase 7 detailed report owns the path (`access.view` OR `user.view` OR self). FE bridge maps detailed → compact for store consumers. HTTP proof in `admin-effective-access-phase7.test.ts`.
+- **Module Administrators:** `ModuleAdministrator` model + migration `20260727160000_admin_module_administrators`; `GET/PUT …/modules/:key/administrators`; designation register on `/admin/modules` (does **not** grant `module.manage` or hard-gate domain APIs). Surfaced on Effective Access as `moduleAdministrations`.
+- **Unlock fix:** Admin unlock clears A1 `lockedUntil` / `failedLoginAttempts` as well as Phase 8 `lockedAt` / `failedLoginCount`.
+- **Surfaces verified wired:** Invitations, User LE/Branch scopes panel, Sessions, Login Activity, Responsibilities, Access Review (routes + nav + API clients).
+- **Regression:** `backend/tests/admin-security-regression.test.ts` — **6/6 pass** (invite/accept/deactivate, scopes, effective access + review, lock/unlock/sessions, module admins, 403/404). `admin-module-administrators` **2/2**; phase7 effective-access **2/2**.
+
+### PASS WITH CONDITION
+
+- Invite SMTP still stub (dev/test returns token).
+- LE/branch/warehouse **assignment** shipped; **query enforcement** across CRM/SO still deferred (fail-open when empty).
+- Module admins are ownership contacts only — not blanket API module gating.
+
+### Next
+
+- Phase A A6 MasterItem sales / A7 CRM Product→Item / A9 deployment readiness gate (separate tracks).
+- Optional: editable password/MFA Admin settings; profile session list.
+
+---
+
+## 2026-07-27 — CRM Commercial Proforma API
+
+### Shipped
+
+- **Backend:** `CrmProformaInvoice` + `CrmProformaInvoiceLine` models; migration `20260727120000_crm_proforma_invoices`; FK from `CrmPaymentReceipt.proformaInvoiceId`; routes under `/crm/commercial/proformas` (CRUD + issue/cancel); proformas included in commercial sync bundle; receipt validation against persisted proforma grand total.
+- **Frontend:** `crmCommercialApi` + bridge proforma functions; `proformaInvoiceStore` delegates to API in `VITE_USE_API=true` (no localStorage persist); form/detail pages async-aware.
+- **UAT:** `backend/scripts/test-crm-commercial-uat.ts` — Proforma → issue → receipts → invoice → post → allocate.
+
+---
+
 ## 2026-07-27 — Phase A2: Admin / Organization foundation
 
 ### Shipped
@@ -13,12 +407,10 @@
 
 - Tenant Profile status/subscription not editable here (platform Tenants CRUD / Super Admin).
 - No new Company model; LE/Branch remain Accounting masters (linked, not duplicated).
-- User↔branch assignment / invitations → **A3**. Security / Login Activity → **A5**.
 
-### Not started / unchanged
+### Follow-on (completed 2026-07-27)
 
-- A3 Users drawer & invitations; A5 sessions; A6–A9.
-
+- A3 invitations + User↔LE/Branch assignment; A5 sessions / login activity — see Admin A3–A9 completion entry.
 ---
 
 ## 2026-07-27 — Phase A1 Authentication hardening

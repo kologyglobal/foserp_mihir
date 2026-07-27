@@ -92,6 +92,9 @@ export const materialIssueHandler: CorrectionHandler = {
         remarks: ctx.reason,
         idempotencyKey: `MAT_ISSUE_REV:${movement.id}:${qty.toString()}:${newIdempotencySuffix()}`,
         createdBy: ctx.userId,
+        // Pin FIFO restore to this issue's original layer consumptions (ignore caller rate).
+        reversalOfMovementId: movement.id,
+        rate: movement.rate,
       },
       tx,
     )

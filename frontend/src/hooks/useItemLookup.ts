@@ -55,6 +55,8 @@ export function useItemLookup(options?: {
   /** Prefer over itemType when multiple manufacturable types are needed. */
   itemTypes?: string[]
   activeOnly?: boolean
+  /** When true, only items with salesAllowed (CRM/Sales pickers). */
+  salesAllowed?: boolean
   selectedId?: string
   initialQuery?: string
   /** Max rows when not fetching all. Ignored when fetchAll is true. */
@@ -66,6 +68,7 @@ export function useItemLookup(options?: {
   const getItem = useMasterStore((s) => s.getItem)
   const getUomName = useMasterStore((s) => s.getUomName)
   const activeOnly = options?.activeOnly ?? true
+  const salesAllowed = options?.salesAllowed
   const itemType = options?.itemType
   const itemTypes = options?.itemTypes
   const itemTypesKey = itemTypes?.join(',') ?? ''
@@ -94,6 +97,7 @@ export function useItemLookup(options?: {
         const needle = q.trim().toLowerCase()
         const filtered = storeItems
           .filter((i) => (activeOnly ? i.isActive : true))
+          .filter((i) => (salesAllowed === undefined ? true : Boolean(i.salesAllowed) === salesAllowed))
           .filter((i) => matchesType(i.itemType))
           .filter(
             (i) =>
@@ -115,6 +119,7 @@ export function useItemLookup(options?: {
           itemType: itemTypes && itemTypes.length > 0 ? undefined : itemType,
           itemTypes,
           activeOnly,
+          salesAllowed,
           limit,
           fetchAll,
         })
@@ -131,7 +136,7 @@ export function useItemLookup(options?: {
         setLoading(false)
       }
     },
-    [storeItems, getUomName, activeOnly, itemType, itemTypes, itemTypesKey, matchesType, fetchAll, limit],
+    [storeItems, getUomName, activeOnly, salesAllowed, itemType, itemTypes, itemTypesKey, matchesType, fetchAll, limit],
   )
 
   useEffect(() => {

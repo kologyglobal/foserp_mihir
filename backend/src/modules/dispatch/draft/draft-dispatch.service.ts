@@ -7,6 +7,10 @@ import { mapOutboundDispatch } from '../outbound/outbound-dispatch.mappers.js'
 import * as reqRepo from '../requirements/dispatch-requirement.repository.js'
 import { synchroniseDispatchRequirements } from '../requirements/dispatch-requirement-sync.service.js'
 import { roundQty } from '../shared/dispatch-qty.js'
+import {
+  assertMultipleDispatchesAllowed,
+  assertPartialDispatchAllowed,
+} from '../settings/dispatch-commercial-enforcement.js'
 
 export interface CreateDraftFromRequirementsInput {
   requirementIds: string[]
@@ -113,6 +117,13 @@ export async function createDraftFromRequirements(
         `Requested qty ${qty} exceeds remaining ${position.remainingToDispatchQty} for ${requirement.requirementNumber}`,
       )
     }
+    await assertPartialDispatchAllowed(
+      tenantId,
+      qty,
+      position.remainingToDispatchQty,
+      requirement.requirementNumber,
+    )
+    await assertMultipleDispatchesAllowed(tenantId, requirement.salesOrderLineId)
     const allowPlanBeforeStock = Boolean(input.planBeforeStockAllowed)
     if (!allowPlanBeforeStock && qty > position.readyQty + 1e-9) {
       throw new ValidationError(

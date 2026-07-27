@@ -16,6 +16,7 @@ import { AdminAccessReviewPage } from '@/modules/systemAdmin/AdminAccessReviewPa
 import { AdminLoginActivityPage } from '@/modules/systemAdmin/AdminLoginActivityPage'
 import { AdminSecuritySessionsPage } from '@/modules/systemAdmin/AdminSecuritySessionsPage'
 import { AdminLockedAccountsPage } from '@/modules/systemAdmin/AdminLockedAccountsPage'
+import { AdminSecurityPolicyPage } from '@/modules/systemAdmin/AdminSecurityPolicyPage'
 import { AdminModulesPage } from '@/modules/systemAdmin/AdminModulesPage'
 import { AdminOrgStructurePage } from '@/modules/systemAdmin/AdminOrgStructurePage'
 import { AdminAuditLogPage } from '@/modules/systemAdmin/AdminAuditLogPage'

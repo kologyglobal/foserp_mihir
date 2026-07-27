@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { prisma } from '../../config/database.js'
 import { env } from '../../config/env.js'
 import { createAuditLog } from '../../services/audit.service.js'
+import { isMailConfigured, sendInvitationEmail } from '../../services/mail.service.js'
 import { ConflictError, InvalidStateError, NotFoundError } from '../../utils/errors.js'
 import { buildPaginationMeta, getPagination } from '../../utils/pagination.js'
 import { hashPassword, hashToken, verifyTokenHash } from '../../utils/password.js'
@@ -104,7 +105,12 @@ export async function inviteUser(
   tenantId: string,
   input: InviteUserInput,
   audit?: AuditMeta,
-): Promise<{ user: ReturnType<typeof sanitizeUser>; invitation: SafeInvitation; inviteToken?: string }> {
+): Promise<{
+  user: ReturnType<typeof sanitizeUser>
+  invitation: SafeInvitation
+  inviteToken?: string
+  emailSent: boolean
+}> {
   const existing = await userRepository.findUserByEmail(tenantId, input.email)
   if (existing) {
     throw new ConflictError('User with this email already exists')
@@ -153,6 +159,18 @@ export async function inviteUser(
     },
   }
 
+  const tenant = await prisma.tenant.findFirst({
+    where: { id: tenantId, deletedAt: null },
+    select: { name: true },
+  })
+  const mail = await sendInvitationEmail({
+    to: user.email,
+    firstName: user.firstName,
+    tenantName: tenant?.name ?? 'your organisation',
+    rawToken,
+    expiresAt: invitation.expiresAt,
+  })
+
   await createAuditLog({
     tenantId,
     userId: audit?.userId ?? null,
@@ -160,15 +178,24 @@ export async function inviteUser(
     entity: 'UserInvitation',
     entityId: invitation.id,
     action: 'INVITE',
-    newValues: { userId: user.id, email: user.email, invitationId: invitation.id },
+    newValues: {
+      userId: user.id,
+      email: user.email,
+      invitationId: invitation.id,
+      emailSent: mail.sent,
+      emailSkipReason: mail.skippedReason ?? null,
+    },
     ipAddress: audit?.ipAddress,
     userAgent: audit?.userAgent,
   })
 
+  const exposeToken = env.isDev || env.isTest || !isMailConfigured() || !mail.sent
+
   return {
     user: safeUser,
     invitation: safeInvitation,
-    ...(env.isDev || env.isTest ? { inviteToken: rawToken } : {}),
+    emailSent: mail.sent,
+    ...(exposeToken ? { inviteToken: rawToken } : {}),
   }
 }
 
@@ -176,7 +203,7 @@ export async function resendInvitation(
   tenantId: string,
   userId: string,
   audit?: AuditMeta,
-): Promise<{ invitation: SafeInvitation; inviteToken?: string }> {
+): Promise<{ invitation: SafeInvitation; inviteToken?: string; emailSent: boolean }> {
   const user = await userRepository.findUserById(tenantId, userId)
   if (!user) {
     throw new NotFoundError('User not found')
@@ -205,6 +232,18 @@ export async function resendInvitation(
     },
   }
 
+  const tenant = await prisma.tenant.findFirst({
+    where: { id: tenantId, deletedAt: null },
+    select: { name: true },
+  })
+  const mail = await sendInvitationEmail({
+    to: user.email,
+    firstName: user.firstName,
+    tenantName: tenant?.name ?? 'your organisation',
+    rawToken,
+    expiresAt: invitation.expiresAt,
+  })
+
   await createAuditLog({
     tenantId,
     userId: audit?.userId ?? null,
@@ -212,14 +251,22 @@ export async function resendInvitation(
     entity: 'UserInvitation',
     entityId: invitation.id,
     action: 'RESEND_INVITE',
-    newValues: { userId, invitationId: invitation.id },
+    newValues: {
+      userId,
+      invitationId: invitation.id,
+      emailSent: mail.sent,
+      emailSkipReason: mail.skippedReason ?? null,
+    },
     ipAddress: audit?.ipAddress,
     userAgent: audit?.userAgent,
   })
 
+  const exposeToken = env.isDev || env.isTest || !isMailConfigured() || !mail.sent
+
   return {
     invitation: safeInvitation,
-    ...(env.isDev || env.isTest ? { inviteToken: rawToken } : {}),
+    emailSent: mail.sent,
+    ...(exposeToken ? { inviteToken: rawToken } : {}),
   }
 }
 
@@ -403,6 +450,9 @@ export async function acceptInvitationByToken(token: string, password: string): 
   if (matched.user.status !== 'INVITED') {
     throw new InvalidStateError('Invitation is no longer valid for this user')
   }
+
+  const { assertPasswordMeetsPolicy } = await import('../security/security-policy.service.js')
+  await assertPasswordMeetsPolicy(matched.user.tenantId, password)
 
   const passwordHash = await hashPassword(password)
 

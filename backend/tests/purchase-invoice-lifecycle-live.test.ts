@@ -113,7 +113,8 @@ describe.skipIf(!dbAvailable)('Purchase invoice lifecycle (live HTTP)', () => {
       uomId,
       warehouseId,
       qty: 10,
-      itemCode: 'PI-ITM-1',
+      itemId: masters.itemId,
+      itemCode: masters.itemCode,
     })
     poId = po.poId
     poLineId = po.poLineId

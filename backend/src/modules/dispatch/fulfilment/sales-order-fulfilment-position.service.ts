@@ -3,7 +3,6 @@ import type { DispatchReadinessStatus } from '@prisma/client'
 import { prisma } from '../../../config/database.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import type { SalesOrderLineDto } from '../../crm/sales-orders/sales-order.types.js'
-import { resolveManufacturedProductItem } from '../../manufacturing/shared/manufacturing.helpers.js'
 import { collectQualityBlockers } from '../../quality/shared/blockers.service.js'
 import { getFgAvailabilityByItemIds } from '../availability/dispatch-availability.service.js'
 import { fingerprint, n, overdueDays, roundQty, shipToKeyFromAddress, startOfTenantDay } from '../shared/dispatch-qty.js'
@@ -14,14 +13,9 @@ function parseLines(value: unknown): SalesOrderLineDto[] {
   return Array.isArray(value) ? (value as SalesOrderLineDto[]) : []
 }
 
-async function resolveItemId(tenantId: string, productId: string | null | undefined): Promise<string | null> {
-  if (!productId) return null
-  try {
-    const item = await resolveManufacturedProductItem(tenantId, productId)
-    return item.id
-  } catch {
-    return null
-  }
+async function resolveLineItemId(_tenantId: string, line: SalesOrderLineDto): Promise<string | null> {
+  if (line.itemId?.trim()) return line.itemId.trim()
+  return null
 }
 
 export async function getSalesOrderFulfilmentPositions(
@@ -130,7 +124,7 @@ export async function getSalesOrderFulfilmentPositions(
   const itemIds: string[] = []
   const lineItemMap = new Map<string, string | null>()
   for (const line of lines) {
-    const itemId = await resolveItemId(tenantId, line.productId ?? null)
+    const itemId = await resolveLineItemId(tenantId, line)
     lineItemMap.set(line.id, itemId)
     if (itemId) itemIds.push(itemId)
   }
@@ -383,7 +377,6 @@ export async function getSalesOrderFulfilmentPositions(
       customerName: order.company?.name ?? null,
       shipToKey,
       shipToAddress: order.shippingAddress ?? order.deliveryLocation ?? null,
-      productId: line.productId ?? null,
       itemId,
       itemCode: itemMeta?.code ?? null,
       itemName: itemMeta?.name ?? null,

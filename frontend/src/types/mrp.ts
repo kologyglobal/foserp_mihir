@@ -29,6 +29,7 @@ export interface SalesOrderLine {
   productOrItem: string
   description: string
   productId?: string | null
+  itemId?: string | null
   qty: number
   uom: string
   unitPrice: number
@@ -45,6 +46,7 @@ export interface SalesOrder {
   salesOrderNo: string
   customerId: string
   productId: string
+  itemId?: string | null
   qty: number
   requiredDate: string
   status: SalesOrderStatus

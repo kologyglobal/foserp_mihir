@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { authenticate } from '../../middleware/auth.middleware.js'
 import { attachRequestContext, requirePermission } from '../../middleware/request-context.middleware.js'
 import { requireTenantAccess, resolveTenant } from '../../middleware/tenant.middleware.js'
-import { validateParams, validateQuery } from '../../middleware/validation.middleware.js'
+import { validateBody, validateParams, validateQuery } from '../../middleware/validation.middleware.js'
 import { asyncHandler } from '../../utils/asyncHandler.js'
 import { tenantRouteParamSchema } from '../../utils/pagination.js'
 import * as securityController from './security.controller.js'
@@ -12,6 +12,7 @@ import {
   listSessionsQuerySchema,
   lockUserParamSchema,
   sessionIdParamSchema,
+  updateSecurityPolicySchema,
 } from './security.validation.js'
 
 const securityRouter = Router({ mergeParams: true })
@@ -52,6 +53,13 @@ securityRouter.get(
 )
 
 securityRouter.get('/policy', requirePermission('security.view'), asyncHandler(securityController.getPolicy))
+
+securityRouter.put(
+  '/policy',
+  requirePermission('security.manage'),
+  validateBody(updateSecurityPolicySchema),
+  asyncHandler(securityController.updatePolicy),
+)
 
 securityRouter.get(
   '/audit-logs',

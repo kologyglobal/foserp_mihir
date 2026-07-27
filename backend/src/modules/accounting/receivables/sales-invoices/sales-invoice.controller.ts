@@ -3,11 +3,20 @@ import { getRouteParam, getTenantId } from '../../../../types/request-context.js
 import { asyncHandler } from '../../../../utils/asyncHandler.js'
 import { buildPaginationMeta } from '../../../../utils/pagination.js'
 import { sendCreated, sendPaginated, sendSuccess } from '../../../../utils/response.js'
-import type { ListSalesInvoicesQueryInput, ReverseSalesInvoiceBody } from './sales-invoice.schemas.js'
+import type {
+  ListInvoiceReadyQueryInput,
+  ListSalesInvoicesQueryInput,
+  PrefillFromDispatchInput,
+  ReverseSalesInvoiceBody,
+} from './sales-invoice.schemas.js'
 import * as draftService from './sales-invoice-draft.service.js'
 import * as readService from './sales-invoice-read.service.js'
 import * as postingService from '../posting/sales-invoice-posting.service.js'
 import * as reverseService from '../posting/sales-invoice-reverse.service.js'
+import {
+  buildInvoicePrefillFromDispatchLines,
+  listInvoiceReadyDispatchLines,
+} from '../source/invoice-ready.service.js'
 
 export const listSalesInvoices = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
@@ -17,6 +26,25 @@ export const listSalesInvoices = asyncHandler(async (req: Request, res: Response
     limit: query.limit ?? query.pageSize,
   })
   return sendPaginated(res, 'sales invoices listed', result.items, buildPaginationMeta(result.total, result.page, result.limit))
+})
+
+export const listInvoiceReady = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const query = req.query as unknown as ListInvoiceReadyQueryInput
+  const result = await listInvoiceReadyDispatchLines(tenantId, query)
+  return sendPaginated(
+    res,
+    'invoice-ready dispatch lines listed',
+    result.items,
+    buildPaginationMeta(result.total, result.page, result.limit),
+  )
+})
+
+export const prefillFromDispatch = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const body = req.body as PrefillFromDispatchInput
+  const prefill = await buildInvoicePrefillFromDispatchLines(tenantId, body.outboundDispatchLineIds)
+  return sendSuccess(res, 'invoice prefill from dispatch', prefill)
 })
 
 export const getSalesInvoice = asyncHandler(async (req: Request, res: Response) => {

@@ -11,25 +11,28 @@ import {
 
 export { canConvertQuotationToSalesOrderPermission }
 
-export const CREATE_SALES_ORDER_LOCKED_REASON = 'Available after customer approval.'
+export const CREATE_SALES_ORDER_LOCKED_REASON = 'Complete commercial details on the quotation to convert.'
 
-const REASON_NO_QUOTATION = 'Create and approve a quotation before creating a sales order.'
-const REASON_NOT_APPROVED = 'Send the quotation and record customer approval before creating a sales order.'
-const REASON_DRAFT = 'Draft quotations cannot be converted — submit, approve, send, then get customer approval.'
-const REASON_PENDING = 'Quotation is not ready for conversion — complete approve → send → customer approve first.'
-const REASON_NOT_SENT = 'Send the quotation to the customer before creating a sales order.'
+const REASON_NO_QUOTATION = 'Create a quotation before converting to a sales order.'
+const REASON_NOT_APPROVED = 'Optional approvals are incomplete — you can still convert when commercial details are ready.'
+const REASON_DRAFT = 'Finish commercial details (lines, terms, validity) to convert directly from draft.'
+const REASON_PENDING = 'Finish commercial details to convert — internal approval / send remain optional.'
+const REASON_NOT_SENT = 'Send and customer approval are optional — convert when commercial details are ready.'
 const REASON_EXPIRED = 'Quotation validity has expired.'
 const REASON_NO_OPPORTUNITY = 'Link this quotation to an opportunity before creating a sales order.'
 const REASON_COMMERCIAL = 'Complete commercial requirements on the quotation first.'
 const REASON_LOST = 'Lost or cancelled opportunities cannot be converted to a sales order.'
 const REASON_PERMISSION = 'You do not have permission to convert quotations to sales orders.'
+const REASON_REJECTED = 'Rejected quotations cannot be converted — create a new revision first.'
 
 export interface OpportunitySalesOrderPrefill {
   opportunityId: string
   opportunityNo: string
   opportunityName: string
   customerId: string
+  /** @deprecated Prefer itemId — dual-read only */
   productId: string
+  itemId: string
   qty: number
   unitPrice: number
   expectedDeliveryDate: string
@@ -77,7 +80,8 @@ export function isOpportunitySalesOrderStage(
 /**
  * Convert Quotation → Sales Order is allowed when:
  * - user has crm.quotation.convert + crm.sales_order.create (not owner-gated)
- * - quotation exists, sent + customer accepted, commercial checks pass
+ * - quotation exists and commercial checks pass (lines, terms, validity, customer)
+ * - send / internal approval / customer approval are optional (not required)
  * - opportunity linked and not Lost/Archived (Won is OK — convert links SO)
  * - no sales order linked yet
  *
@@ -171,35 +175,30 @@ export function resolveOpportunityCreateSalesOrderGate(
   const customerAccepted = salesQuo?.customerApproval === 'approved'
   const commercialComplete = Boolean(prefill.canConvertQuotation)
   const stageReady = isOpportunitySalesOrderStage(opportunity.stage, opportunity.status)
+  const rejected =
+    doc?.status === 'rejected'
+    || doc?.status === 'superseded'
+    || salesQuo?.customerApproval === 'rejected'
+  const expired = isQuotationExpired(salesQuo)
 
-  const enabled =
-    hasQuotation
-    && quotationSent
-    && customerAccepted
-    && commercialComplete
+  // Allow opening convert anytime (send/approval optional). Commercial gaps are enforced on confirm.
+  const canAttempt = hasQuotation && !rejected && !expired
+  const enabled = canAttempt
 
   let disabledReason: string | null = null
   if (!enabled) {
-    const docStatus = doc?.status ?? salesQuo?.status
     if (!hasQuotation) {
       disabledReason = REASON_NO_QUOTATION
-    } else if (docStatus === 'draft') {
-      disabledReason = REASON_DRAFT
-    } else if (docStatus === 'pending_approval') {
-      disabledReason = REASON_PENDING
-    } else if (docStatus === 'approved') {
-      disabledReason = REASON_NOT_SENT
-    } else if (docStatus === 'sent' && !customerAccepted) {
-      disabledReason = REASON_NOT_APPROVED
-    } else if (isQuotationExpired(salesQuo)) {
+    } else if (rejected) {
+      disabledReason = REASON_REJECTED
+    } else if (expired) {
       disabledReason = REASON_EXPIRED
-    } else if (!quotationApproved || !customerAccepted || !quotationSent) {
-      disabledReason = REASON_NOT_APPROVED
-    } else if (!commercialComplete) {
-      disabledReason = prefill.convertDisabledReason?.trim() || REASON_COMMERCIAL
     } else {
       disabledReason = CREATE_SALES_ORDER_LOCKED_REASON
     }
+  } else if (!commercialComplete) {
+    // Soft hint — button stays enabled for direct convert attempt.
+    disabledReason = prefill.convertDisabledReason?.trim() || null
   }
 
   return {
@@ -261,6 +260,7 @@ export function resolveOpportunitySalesOrderPrefill(
   const sales = useSalesStore.getState()
   const customer = masters.getCustomer(opportunity.customerId)
   const product = opportunity.productId ? masters.getProduct(opportunity.productId) : undefined
+  const primaryOppLine = opportunity.lines?.find((l) => l.itemId || l.productId) ?? opportunity.lines?.[0]
 
   const doc = docFromParam
     ?? (opportunity.quotationId ? crm.getLatestQuotationDocument(opportunity.quotationId) : undefined)
@@ -272,21 +272,30 @@ export function resolveOpportunitySalesOrderPrefill(
       : undefined
 
   const quoProduct = salesQuo?.productId ? masters.getProduct(salesQuo.productId) : undefined
+  const quoItem = salesQuo?.itemId ? masters.getItem(salesQuo.itemId) : undefined
   const resolvedProductId = salesQuo?.productId ?? opportunity.productId ?? product?.id ?? ''
+  const resolvedItemId =
+    salesQuo?.itemId
+    ?? primaryOppLine?.itemId
+    ?? quoProduct?.fgItemId
+    ?? product?.fgItemId
+    ?? (primaryOppLine?.productId ? masters.getProduct(primaryOppLine.productId)?.fgItemId : null)
+    ?? ''
   const quotationSummary = doc ? summarizeQuotationLinesForSo(doc) : null
   const qty = quotationSummary?.totalQty ?? salesQuo?.qty ?? 1
   const unitPrice = salesQuo?.pricing.unitPrice
     ?? (qty > 0 ? Math.round((opportunity.value / 1.18) / qty) : opportunity.value)
 
-  const validation = doc && salesQuo
+  const validation = doc
     ? validateQuotationForSoConversion({
         document: doc,
         latestDocument: crm.getLatestQuotationDocument(doc.quotationId),
         salesQuotation: salesQuo,
         customer,
+        customerId: salesQuo?.customerId ?? opportunity.customerId,
         contactName: doc.contactId ? crm.getContact(doc.contactId)?.name : undefined,
         opportunityName: opportunity.opportunityName,
-        productName: quoProduct?.productName,
+        productName: quoItem?.itemName ?? quoProduct?.productName,
       })
     : null
 
@@ -313,6 +322,7 @@ export function resolveOpportunitySalesOrderPrefill(
     opportunityName: opportunity.opportunityName,
     customerId: opportunity.customerId,
     productId: resolvedProductId,
+    itemId: resolvedItemId,
     qty,
     unitPrice,
     expectedDeliveryDate: opportunity.expectedCloseDate?.slice(0, 10) || addDays(new Date().toISOString(), 60),

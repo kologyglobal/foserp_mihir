@@ -44,7 +44,7 @@ export type CrmCommercialSource = 'sales_order' | 'proforma' | 'direct' | 'custo
 export interface CrmCommercialLine {
   id: string
   lineNo: number
-  productId: string
+  itemId: string
   itemCode: string
   description: string
   hsnCode: string

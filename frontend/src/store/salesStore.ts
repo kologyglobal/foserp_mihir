@@ -27,7 +27,7 @@ import { useMrpStore } from './mrpStore'
 import { useMasterStore } from './masterStore'
 import { useCrmStore } from './crmStore'
 import { formatCustomerBillingAddress, resolveCustomerShippingAddress } from '../utils/customerUtils'
-import { useProductMasterStore } from './productMasterStore'
+import { canUseItemInSales } from '../utils/opportunityItemOptions'
 import { normalizeLead, mapLifecycleToStage, mapStageToLifecycle, deriveLifecycleFromStage, leadStageLabel } from '../utils/leadUtils'
 import { filterLeadPatchForPolicy, resolveLeadEditPolicy } from '../utils/leadEditPolicy'
 import { getLeadUser } from '../data/crm/leadUsers'
@@ -217,6 +217,7 @@ interface SalesState {
   createDirectSalesOrder: (input: {
     customerId: string
     productId: string
+    itemId?: string | null
     qty: number
     unitPrice: number
     customerPoNumber: string
@@ -238,7 +239,8 @@ interface SalesState {
     freightAmount?: number
     orderDiscountAmount?: number
     lines?: Array<{
-      productId: string
+      productId?: string | null
+      itemId?: string | null
       qty: number
       unitPrice: number
       discountPct?: number
@@ -950,26 +952,30 @@ export const useSalesStore = create<SalesState>()(
 
         const quo = get().getQuotation(quotationId)
         if (!quo) return { ok: false, error: 'Quotation not found' }
-        if (quo.customerApproval !== 'approved' || quo.status !== 'sent') {
-          return { ok: false, error: 'Sales order requires a sent, customer-approved quotation' }
+        if (quo.customerApproval === 'rejected' || quo.status === 'rejected' || quo.status === 'superseded') {
+          return { ok: false, error: 'Rejected or superseded quotations cannot be converted — create a new revision first' }
         }
         if (!quo.isLatestRevision) {
-          return { ok: false, error: 'Convert from the latest approved revision only' }
+          return { ok: false, error: 'Convert from the latest revision only' }
         }
         if (quo.salesOrderId) return { ok: false, error: 'Sales order already created for this quotation' }
 
-        const productCheck = useProductMasterStore.getState().canUseProductInSales(quo.productId)
-        if (!productCheck.ok) return productCheck
+        const masters = useMasterStore.getState()
+        const resolveLineItemId = (itemId?: string | null, productId?: string | null) =>
+          itemId ?? (productId ? masters.getProduct(productId)?.fgItemId ?? null : null)
 
-        const lineProductId = crm?.lines?.find((l) => l.productId)?.productId ?? quo.productId
+        const itemCheck = canUseItemInSales(resolveLineItemId(quo.itemId, quo.productId) ?? '')
+        if (!itemCheck.ok) return itemCheck
+
+        const firstLine = crm?.lines?.find((l) => l.itemId || l.productId)
+        const lineItemId =
+          resolveLineItemId(firstLine?.itemId, firstLine?.productId)
+          ?? resolveLineItemId(quo.itemId, quo.productId)
         const lineQty = crm?.lines?.length ? crm.lines.reduce((s, l) => s + l.qty, 0) : quo.qty
-        if (lineProductId !== quo.productId) {
-          const altCheck = useProductMasterStore.getState().canUseProductInSales(lineProductId)
-          if (!altCheck.ok) return altCheck
-        }
         for (const soLine of crm?.lines ?? []) {
-          if (!soLine.productId || soLine.productId === lineProductId) continue
-          const extraCheck = useProductMasterStore.getState().canUseProductInSales(soLine.productId)
+          const id = resolveLineItemId(soLine.itemId, soLine.productId)
+          if (!id || id === lineItemId) continue
+          const extraCheck = canUseItemInSales(id)
           if (!extraCheck.ok) return extraCheck
         }
 
@@ -979,11 +985,11 @@ export const useSalesStore = create<SalesState>()(
         const inquiry = quo.inquiryId ? get().getInquiry(quo.inquiryId) : undefined
 
         const mrp = useMrpStore.getState()
-        const masters = useMasterStore.getState()
         const customer = masters.getCustomer(quo.customerId)
         const addResult = mrp.addSalesOrderFromQuotation({
           customerId: quo.customerId,
-          productId: lineProductId,
+          productId: lineItemId ?? '',
+          itemId: lineItemId ?? null,
           qty: lineQty,
           requiredDate: crm?.expectedDeliveryDate ?? inquiry?.deliveryExpectation ?? quo.validityDate,
           remarks: `${quo.quotationNo} Rev ${quo.revisionNo} — CRM doc Rev ${crm?.quotationDocumentRevisionNo ?? 0}`,
@@ -1053,6 +1059,7 @@ export const useSalesStore = create<SalesState>()(
         const lineInputs = input.lines?.length
           ? input.lines
           : [{
+              itemId: input.itemId ?? input.productId,
               productId: input.productId,
               qty: input.qty,
               unitPrice: input.unitPrice,
@@ -1061,19 +1068,22 @@ export const useSalesStore = create<SalesState>()(
             }]
 
         for (const line of lineInputs) {
-          const productCheck = useProductMasterStore.getState().canUseProductInSales(line.productId)
-          if (!productCheck.ok) return productCheck
+          const itemId = line.itemId ?? (line.productId ? masters.getProduct(line.productId)?.fgItemId : null)
+          const itemCheck = canUseItemInSales(itemId ?? '')
+          if (!itemCheck.ok) return itemCheck
         }
 
         const builtLines: SalesOrderLine[] = lineInputs.map((l, idx) => {
           const pricing = computePricing(l.qty, l.unitPrice, l.discountPct ?? 0, l.taxPct ?? DEFAULT_GST_PCT)
-          const product = masters.getProduct(l.productId)
+          const itemId = l.itemId ?? (l.productId ? masters.getProduct(l.productId)?.fgItemId ?? null : null)
+          const item = itemId ? masters.getItem(itemId) : undefined
           return {
             id: genId('sol'),
             lineNo: idx + 1,
-            productOrItem: product?.productName ?? l.productId,
-            description: l.description || product?.productName || 'SO line',
-            productId: l.productId,
+            productOrItem: item?.itemName ?? l.productId ?? 'SO line',
+            description: l.description || item?.itemName || 'SO line',
+            productId: null,
+            itemId: itemId ?? null,
             qty: l.qty,
             uom: 'Nos',
             unitPrice: l.unitPrice,
@@ -1086,7 +1096,7 @@ export const useSalesStore = create<SalesState>()(
         })
 
         const primary = builtLines[0]
-        if (!primary?.productId) return { ok: false, error: 'At least one product line is required' }
+        if (!primary?.itemId) return { ok: false, error: 'At least one item line is required' }
 
         const basicAmount = Math.round(builtLines.reduce((s, l) => s + l.taxableValue, 0) * 100) / 100
         const gstAmount = Math.round(builtLines.reduce((s, l) => s + l.gstAmount, 0) * 100) / 100
@@ -1098,7 +1108,8 @@ export const useSalesStore = create<SalesState>()(
         const mrp = useMrpStore.getState()
         return mrp.addSalesOrderFromQuotation({
           customerId: input.customerId,
-          productId: primary.productId,
+          productId: primary.itemId ?? '',
+          itemId: primary.itemId ?? null,
           qty: totalQty,
           requiredDate: input.expectedDeliveryDate ?? addDays(new Date().toISOString(), 60),
           remarks: `Direct SO — ${input.directSoReason}`,

@@ -133,6 +133,21 @@ export function AdminEffectiveAccessPanel({ userId, userName }: { userId: string
         </div>
       ) : null}
 
+      {report.moduleAdministrations?.length ? (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-erp-muted">
+            Module administrator
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {report.moduleAdministrations.map((key) => (
+              <Link key={key} to="/admin/modules" className="inline-flex">
+                <Badge color="blue">{key}</Badge>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div>
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-erp-muted">

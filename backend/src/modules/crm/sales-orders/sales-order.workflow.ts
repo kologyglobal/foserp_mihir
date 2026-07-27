@@ -11,16 +11,32 @@ export function parseDateInput(value: string | null | undefined): Date | null | 
 }
 
 export function buildLinesFromInput(
-  input: Pick<CreateSalesOrderInput, 'lines' | 'productId' | 'qty' | 'unitPrice' | 'discountPct'>,
+  input: Pick<CreateSalesOrderInput, 'lines' | 'itemId' | 'qty' | 'unitPrice' | 'discountPct'>,
 ): { lines: SalesOrderLineDto[]; summary: { qty: number; unitPrice: number; discountPct: number; basicAmount: number; gstAmount: number; grandTotal: number } } {
-  const raw =
+  type LineDraft = {
+    id?: string
+    lineNo?: number
+    productOrItem: string
+    description?: string
+    itemId?: string | null
+    itemCodeSnapshot?: string | null
+    itemNameSnapshot?: string | null
+    qty: number
+    uom?: string
+    unitPrice: number
+    discountPct?: number
+    taxPct?: number
+    technicalScopeRef?: string | null
+  }
+
+  const raw: LineDraft[] =
     input.lines?.length
       ? input.lines
       : [
           {
             productOrItem: 'Sales order line',
             description: '',
-            productId: input.productId ?? null,
+            itemId: input.itemId ?? null,
             qty: input.qty ?? 1,
             uom: 'NOS',
             unitPrice: input.unitPrice ?? 0,
@@ -30,6 +46,9 @@ export function buildLinesFromInput(
         ]
 
   const lines: SalesOrderLineDto[] = raw.map((line, idx) => {
+    if (!line.itemId?.trim()) {
+      throw new ValidationError('Sales order line requires an Item')
+    }
     const discountPct = line.discountPct ?? 0
     const taxPct = line.taxPct ?? 18
     const taxableValue = line.qty * line.unitPrice * (1 - discountPct / 100)
@@ -40,7 +59,9 @@ export function buildLinesFromInput(
       lineNo: line.lineNo ?? idx + 1,
       productOrItem: line.productOrItem,
       description: line.description ?? '',
-      productId: line.productId ?? null,
+      itemId: line.itemId,
+      itemCodeSnapshot: line.itemCodeSnapshot ?? null,
+      itemNameSnapshot: line.itemNameSnapshot ?? null,
       qty: line.qty,
       uom: line.uom ?? 'NOS',
       unitPrice: line.unitPrice,

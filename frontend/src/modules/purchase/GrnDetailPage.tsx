@@ -263,6 +263,13 @@ export function GrnDetailPage() {
               onClick: () => navigate(`/purchase/grn/${grn.id}/print`),
             },
             {
+              id: 'valuation',
+              label: 'Receipt Cost',
+              icon: Package,
+              onClick: () => navigate('/inventory/costing/entries'),
+              hidden: grn.status !== 'posted',
+            },
+            {
               id: 'return',
               label: 'Create Purchase Return',
               icon: RotateCcw,
@@ -428,6 +435,15 @@ export function GrnDetailPage() {
               }}
             >
               View Stock
+            </ErpButton>
+            <ErpButton
+              variant="secondary"
+              onClick={() => {
+                setInventoryMsgOpen(false)
+                navigate('/inventory/costing')
+              }}
+            >
+              Valuation
             </ErpButton>
           </div>
         }

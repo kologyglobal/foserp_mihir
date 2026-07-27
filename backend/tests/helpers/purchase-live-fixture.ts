@@ -99,15 +99,21 @@ export async function cleanupPurchaseTenant(tenantId: string) {
   await prisma.purchasePlantSettings.deleteMany({ where: { tenantId } })
   await prisma.purchaseSettings.deleteMany({ where: { tenantId } })
   await prisma.purchaseApproval.deleteMany({ where: { tenantId } })
+  await prisma.inventoryCostVariance.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.inventoryCostEntry.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.inventoryCostLayerConsumption.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.inventoryCostLayer.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.inventoryStockMovement.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.inventoryStockBalance.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.inventoryStockReservation.deleteMany({ where: { tenantId } }).catch(() => {})
-  await prisma.masterBin.deleteMany({ where: { tenantId } })
-  await prisma.masterLocation.deleteMany({ where: { tenantId } })
-  await prisma.masterWarehouse.deleteMany({ where: { tenantId } })
-  await prisma.masterPlant.deleteMany({ where: { tenantId } })
-  await prisma.masterVendor.deleteMany({ where: { tenantId } })
-  await prisma.masterUom.deleteMany({ where: { tenantId } })
+  await prisma.masterItem.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.masterItemCategory.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.masterBin.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.masterLocation.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.masterWarehouse.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.masterPlant.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.masterVendor.deleteMany({ where: { tenantId } }).catch(() => {})
+  await prisma.masterUom.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.accountingPeriod.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.financialYear.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.financeSettings.deleteMany({ where: { tenantId } }).catch(() => {})
@@ -127,38 +133,63 @@ export type PurchaseMasterIds = {
   warehouseId: string
   locationId: string
   binId: string
+  itemId: string
+  itemCode: string
 }
 
 export async function seedPurchaseMasters(tenantId: string): Promise<PurchaseMasterIds> {
+  const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`
   const vendor = await prisma.masterVendor.create({
-    data: { tenantId, code: `V-${Date.now()}`, name: 'Live Vendor', status: 'ACTIVE' },
+    data: { tenantId, code: `V-${suffix}`.slice(-16), name: 'Live Vendor', status: 'ACTIVE' },
   })
   const uom = await prisma.masterUom.create({
-    data: { tenantId, code: 'NOS', name: 'Numbers', uomType: 'integer', status: 'ACTIVE' },
+    data: { tenantId, code: `NOS${suffix}`.slice(-16), name: 'Numbers', uomType: 'integer', status: 'ACTIVE' },
   })
   const plant = await prisma.masterPlant.create({
-    data: { tenantId, code: 'PL-L', name: 'Live Plant', status: 'ACTIVE' },
+    data: { tenantId, code: `PL${suffix}`.slice(-16), name: 'Live Plant', status: 'ACTIVE' },
   })
   const wh = await prisma.masterWarehouse.create({
     data: {
       tenantId,
       plantId: plant.id,
-      code: 'WH-L',
+      code: `WH${suffix}`.slice(-16),
       name: 'Live WH',
       warehouseType: 'receiving',
       status: 'ACTIVE',
     },
   })
   const loc = await prisma.masterLocation.create({
-    data: { tenantId, warehouseId: wh.id, code: 'SL-L', name: 'Dock', status: 'ACTIVE' },
+    data: { tenantId, warehouseId: wh.id, code: `SL${suffix}`.slice(-16), name: 'Dock', status: 'ACTIVE' },
   })
   const bin = await prisma.masterBin.create({
     data: {
       tenantId,
       warehouseId: wh.id,
       storageLocationId: loc.id,
-      code: 'B-L',
+      code: `B${suffix}`.slice(-16),
       name: 'Bin L',
+      status: 'ACTIVE',
+    },
+  })
+  const category = await prisma.masterItemCategory.create({
+    data: {
+      tenantId,
+      code: `CAT${suffix}`.slice(-16),
+      name: 'Purchase Live Category',
+      status: 'ACTIVE',
+    },
+  })
+  const itemCode = `ITM${suffix}`.slice(-24)
+  const item = await prisma.masterItem.create({
+    data: {
+      tenantId,
+      code: itemCode,
+      name: 'Live Purchase Item',
+      categoryId: category.id,
+      baseUomId: uom.id,
+      itemType: 'raw_material',
+      isPurchasable: true,
+      isStockable: true,
       status: 'ACTIVE',
     },
   })
@@ -168,6 +199,8 @@ export async function seedPurchaseMasters(tenantId: string): Promise<PurchaseMas
     warehouseId: wh.id,
     locationId: loc.id,
     binId: bin.id,
+    itemId: item.id,
+    itemCode,
   }
 }
 
@@ -241,6 +274,8 @@ export async function createSentPo(
     warehouseId?: string
     qty?: number
     itemCode?: string
+    itemId?: string
+    itemName?: string
   },
 ) {
   const poBase = `/api/v1/t/${opts.slug}/purchase/orders`
@@ -254,14 +289,16 @@ export async function createSentPo(
       deliveryWarehouseId: opts.warehouseId,
       lines: [
         {
+          itemId: opts.itemId,
           itemCode: opts.itemCode ?? `ITM-${Date.now()}`,
-          itemName: 'Live Item',
+          itemName: opts.itemName ?? 'Live Item',
           quantity: opts.qty ?? 10,
           uomId: opts.uomId,
           rate: 100,
         },
       ],
     })
+  expectCreatePoOk(createPo)
   const poId = createPo.body.data.id as string
   const poLineId = createPo.body.data.lines[0].id as string
   await request(app).post(`${poBase}/${poId}/submit`).set(auth).send({})
@@ -271,6 +308,14 @@ export async function createSentPo(
     .send({})
   await request(app).post(`${poBase}/${poId}/send-to-vendor`).set(auth).send({})
   return { poId, poLineId }
+}
+
+function expectCreatePoOk(createPo: { status: number; body: { data?: { id?: string }; error?: unknown } }) {
+  if (createPo.status >= 400 || !createPo.body?.data?.id) {
+    throw new Error(
+      `createSentPo failed: status=${createPo.status} body=${JSON.stringify(createPo.body)}`,
+    )
+  }
 }
 
 export async function createSubmittedGrn(
