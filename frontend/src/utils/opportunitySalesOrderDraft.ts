@@ -14,13 +14,8 @@ export { canConvertQuotationToSalesOrderPermission }
 export const CREATE_SALES_ORDER_LOCKED_REASON = 'Complete commercial details on the quotation to convert.'
 
 const REASON_NO_QUOTATION = 'Create a quotation before converting to a sales order.'
-const REASON_NOT_APPROVED = 'Optional approvals are incomplete — you can still convert when commercial details are ready.'
-const REASON_DRAFT = 'Finish commercial details (lines, terms, validity) to convert directly from draft.'
-const REASON_PENDING = 'Finish commercial details to convert — internal approval / send remain optional.'
-const REASON_NOT_SENT = 'Send and customer approval are optional — convert when commercial details are ready.'
 const REASON_EXPIRED = 'Quotation validity has expired.'
 const REASON_NO_OPPORTUNITY = 'Link this quotation to an opportunity before creating a sales order.'
-const REASON_COMMERCIAL = 'Complete commercial requirements on the quotation first.'
 const REASON_LOST = 'Lost or cancelled opportunities cannot be converted to a sales order.'
 const REASON_PERMISSION = 'You do not have permission to convert quotations to sales orders.'
 const REASON_REJECTED = 'Rejected quotations cannot be converted — create a new revision first.'
@@ -165,12 +160,6 @@ export function resolveOpportunityCreateSalesOrderGate(
   const quotationSent = Boolean(
     (doc && (doc.status === 'sent' || doc.status === 'converted'))
     || (salesQuo && (salesQuo.status === 'sent' || salesQuo.status === 'converted')),
-  )
-  const quotationApproved = Boolean(
-    quotationSent
-    || (doc && doc.status === 'approved')
-    || (salesQuo && salesQuo.status === 'approved')
-    || (doc?.approvalHistory ?? []).some((a) => a.action === 'approved')
   )
   const customerAccepted = salesQuo?.customerApproval === 'approved'
   const commercialComplete = Boolean(prefill.canConvertQuotation)

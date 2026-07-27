@@ -5,7 +5,6 @@ import { buildPaginationMeta, getPagination } from '../../utils/pagination.js'
 import { sanitizeUser } from '../users/user.service.js'
 import * as userRepository from '../users/user.repository.js'
 import { revokeUserSessions } from '../users/user-invitation.service.js'
-import { MAX_FAILED_LOGINS } from './security.constants.js'
 import { getSecurityPolicy } from './security-policy.service.js'
 import type { ListLoginActivityQuery, ListSessionsQuery } from './security.validation.js'
 

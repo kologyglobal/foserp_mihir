@@ -4,7 +4,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { Prisma } from '@prisma/client'
 import { nextCode } from '../../../services/codeSeries.service.js'
-import type { DispatchPostingPolicy } from './dispatch-policy.js'
+import { DISPATCH_POSTING_POLICY_LEGACY_SOFT, type DispatchPostingPolicy } from './dispatch-policy.js'
 import { n, roundQty } from '../shared/dispatch-qty.js'
 
 export function fingerprintDispatchPostRequest(input: {
@@ -139,24 +139,7 @@ export async function ensureDispatchPostingForOutbound(
     tenantId,
     outbound,
     mode: 'legacy',
-    policy: {
-      requireReservationBeforePosting: false,
-      requirePickBeforePosting: false,
-      requirePackBeforePosting: false,
-      requireIssuedChallanBeforePosting: false,
-      requireQualityClearance: false,
-      allowPartialDispatch: true,
-      allowOverDispatch: false,
-      allowNegativeStock: false,
-      requireSerialAllocation: false,
-      requireLotAllocation: false,
-      requireSupervisorApprovalForOverride: true,
-      allowDirectEmergencyDispatch: false,
-      reversalApprovalRequired: true,
-      blockReversalWhenInvoiced: true,
-      blockReversalWhenCogsPosted: true,
-      requirePodBeforeInvoice: false,
-    },
+    policy: DISPATCH_POSTING_POLICY_LEGACY_SOFT,
     postedBy: outbound.confirmedBy,
     movementsByLineId,
     status: outbound.status === 'REVERSED' ? 'REVERSED' : 'LEGACY_POSTED',

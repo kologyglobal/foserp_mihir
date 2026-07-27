@@ -98,7 +98,7 @@ export const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: Permissio
   { prefix: '/home', permission: 'reports.view', pageName: 'Home' },
   { prefix: '/executive', permission: 'reports.view', pageName: 'CEO Dashboard' },
   { prefix: '/inbox', permission: 'reports.view', pageName: 'Inbox' },
-  { prefix: '/operations/exceptions', permission: 'operations.exceptions.view', pageName: 'Exception Centre' },
+  { prefix: '/operations/exceptions', permission: 'reports.view', pageName: 'Exception Centre' },
   { prefix: '/inbox', permission: 'reports.view', pageName: 'Inbox' },
   { prefix: '/home', permission: 'reports.view', pageName: 'Home' },
 ]

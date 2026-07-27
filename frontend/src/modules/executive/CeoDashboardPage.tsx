@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import GridLayout, { type Layout } from 'react-grid-layout'
+import GridLayout, { type Layout } from 'react-grid-layout/legacy'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 import {
@@ -78,13 +78,13 @@ export function CeoDashboardPage() {
   const active = getActive()
   const widgets = active?.widgets ?? []
 
-  const layout: Layout[] = useMemo(
+  const layout: Layout = useMemo(
     () => widgets.map((w) => ({ i: w.id, x: w.x, y: w.y, w: w.w, h: w.h, minW: 2, minH: 2 })),
     [widgets],
   )
 
   const onLayoutChange = useCallback(
-    (next: Layout[]) => {
+    (next: Layout) => {
       if (!editing) return
       updateWidgetLayout(next.map((l) => ({ i: l.i, x: l.x, y: l.y, w: l.w, h: l.h })))
     },

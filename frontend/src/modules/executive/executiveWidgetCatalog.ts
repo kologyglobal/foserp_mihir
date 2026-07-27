@@ -1,4 +1,4 @@
-import type { DashboardTemplateKey, DashboardWidgetDefinition, DashboardWidgetLayout, WidgetVisualization } from '../types/executiveDashboard'
+import type { DashboardTemplateKey, DashboardWidgetDefinition, DashboardWidgetLayout, WidgetVisualization } from '../../types/executiveDashboard'
 
 /** Frontend catalog mirrors backend registry for demo mode + library UI. */
 export const EXECUTIVE_WIDGET_CATALOG: DashboardWidgetDefinition[] = [

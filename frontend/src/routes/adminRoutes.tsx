@@ -53,6 +53,7 @@ export const adminRouteChildren: RouteObject[] = [
   { path: 'admin/security/login-activity', element: <AdminLoginActivityPage /> },
   { path: 'admin/security/sessions', element: <AdminSecuritySessionsPage /> },
   { path: 'admin/security/locked-accounts', element: <AdminLockedAccountsPage /> },
+  { path: 'admin/security/policy', element: <AdminSecurityPolicyPage /> },
   { path: 'admin/security/audit', element: <AdminAuditLogPage /> },
   { path: 'admin/tenant-profile', element: <AdminTenantProfilePage /> },
   { path: 'admin/companies', element: <AdminCompaniesPage /> },

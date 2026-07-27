@@ -236,7 +236,7 @@ export function DispatchSettingsPage() {
         </ErpCardSection>
 
         <ErpCardSection title="Invoicing">
-          <FormField label="Invoice mode" htmlFor="dispatch-invoice-mode">
+          <FormField label="Invoice mode">
             <Select
               id="dispatch-invoice-mode"
               value={settings.invoiceMode}
