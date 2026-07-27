@@ -86,7 +86,10 @@ const itemBaseSchema = z.object({
   isBlocked: z.boolean().optional(),
   quantityPerUom: z.coerce.number().min(0).default(1),
   purchaseUomId: z.string().uuid().nullable().optional(),
-  purchaseQtyPerUom: z.coerce.number().min(0).default(1),
+  /** @deprecated Prefer uomConversionFactor — mirrored on write. */
+  purchaseQtyPerUom: z.coerce.number().positive().default(1),
+  /** Vendor units per 1 primary/base unit. */
+  uomConversionFactor: z.coerce.number().positive().optional(),
   salesDescription: z.string().trim().max(5000).nullable().optional(),
   salesUomId: z.string().uuid().nullable().optional(),
   defaultSalesRate: z.coerce.number().min(0).optional(),
@@ -108,6 +111,14 @@ const itemBaseSchema = z.object({
 function validateItemRules(data: z.infer<typeof itemBaseSchema>, ctx: z.RefinementCtx): void {
   if (data.itemType === 'sub_assembly' && !data.subAssemblyRule) {
     ctx.addIssue({ code: 'custom', message: 'Sub-assembly rule required', path: ['subAssemblyRule'] })
+  }
+  const factor = data.uomConversionFactor ?? data.purchaseQtyPerUom
+  if (factor !== undefined && !(Number(factor) > 0)) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'uomConversionFactor must be greater than zero',
+      path: ['uomConversionFactor'],
+    })
   }
 }
 
