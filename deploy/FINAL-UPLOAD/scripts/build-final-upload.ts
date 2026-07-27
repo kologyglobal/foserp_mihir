@@ -197,6 +197,8 @@ function main() {
   rmrf(path.join(OUT, 'node_modules'))
   mustRun('npm', ['ci', '--omit=dev'], OUT)
   mustRun('npx', ['prisma', 'generate'], OUT)
+  console.log('=== Compiling backend dist/ for Hostinger ===')
+  mustRun('npm', ['run', 'build'], OUT)
 
   writeReadme(usedDocker ? 'docker-full' : 'preinstalled-npm')
 
