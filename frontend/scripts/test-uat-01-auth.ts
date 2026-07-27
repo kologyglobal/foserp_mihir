@@ -156,7 +156,8 @@ check(
   'UAT-01.20',
   'Direct URL without permission',
   'AccessDeniedPage shows role + required permission',
-  protectedRoute.includes('AccessDeniedPage') && protectedRoute.includes('Required permission'),
+  protectedRoute.includes('PermissionDeniedPage') &&
+    read('src/components/system/PermissionDeniedPage.tsx').includes('Required permission'),
 )
 
 // ─── Live API (optional) ───────────────────────────────────────────────────────

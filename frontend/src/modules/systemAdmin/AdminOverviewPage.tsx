@@ -1,264 +1,253 @@
-import { useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Building2,
-  FolderTree,
-  ScrollText,
+  GitBranch,
+  LayoutDashboard,
   ShieldCheck,
-  SlidersHorizontal,
-  UserPlus,
   Users,
+  ArrowRight,
 } from 'lucide-react'
-import {
-  ADMIN_NAV_GROUPS,
-  AdminNeedsAttention,
-  type AdminAttentionItem,
-} from '@/components/admin'
-import { AdminWorkspaceShell } from '@/modules/systemAdmin/AdminWorkspaceShell'
-import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
+import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
+import { Badge } from '@/components/ui/Badge'
 import { useAdminStore } from '@/store/adminStore'
+import { isApiMode } from '@/config/apiConfig'
+import { getStoredSession } from '@/services/api/client'
+import { syncCurrentTenantProfile } from '@/services/bridges/adminApiBridge'
 import { canAdminPermission, isSuperAdminUser } from '@/utils/permissions'
-import type { EnterpriseKpiItem } from '@/design-system/enterprise/enterpriseKpiTypes'
+import type { AdminTenant, AdminTenantStatus } from '@/types/admin'
+
+const STATUS_COLOR: Record<AdminTenantStatus, 'green' | 'gray' | 'yellow' | 'red'> = {
+  ACTIVE: 'green',
+  TRIAL: 'yellow',
+  INACTIVE: 'gray',
+  SUSPENDED: 'red',
+  ARCHIVED: 'gray',
+}
+
+const DEMO_TENANT_ID = 'demo-tenant'
+
+function resolveCurrentTenantId(): string | null {
+  if (isApiMode()) return getStoredSession()?.tenantId ?? null
+  return DEMO_TENANT_ID
+}
+
+function KpiCard({
+  label,
+  value,
+  hint,
+  to,
+  icon: Icon,
+}: {
+  label: string
+  value: string | number
+  hint?: string
+  to: string
+  icon: typeof Users
+}) {
+  return (
+    <Link
+      to={to}
+      className="flex flex-col gap-3 rounded-lg border border-erp-border bg-white p-4 shadow-sm transition hover:border-erp-primary/40 hover:shadow-md"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-erp-muted">{label}</p>
+          <p className="mt-1 text-2xl font-semibold text-erp-text">{value}</p>
+          {hint ? <p className="mt-1 text-xs text-erp-muted">{hint}</p> : null}
+        </div>
+        <span className="rounded-md bg-slate-50 p-2 text-erp-primary">
+          <Icon className="h-5 w-5" />
+        </span>
+      </div>
+      <span className="inline-flex items-center gap-1 text-xs font-semibold text-erp-primary">
+        Open <ArrowRight className="h-3.5 w-3.5" />
+      </span>
+    </Link>
+  )
+}
+
+function QuickLink({
+  to,
+  title,
+  description,
+  icon: Icon,
+}: {
+  to: string
+  title: string
+  description: string
+  icon: typeof Users
+}) {
+  return (
+    <Link
+      to={to}
+      className="flex items-start gap-3 rounded-lg border border-erp-border bg-white p-4 transition hover:border-erp-primary/40 hover:bg-slate-50/60"
+    >
+      <span className="rounded-md bg-slate-50 p-2 text-erp-primary">
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-erp-text">{title}</span>
+        <span className="mt-0.5 block text-xs text-erp-muted">{description}</span>
+      </span>
+      <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-erp-muted" />
+    </Link>
+  )
+}
 
 export function AdminOverviewPage() {
-  const navigate = useNavigate()
   const users = useAdminStore((s) => s.users)
   const roles = useAdminStore((s) => s.roles)
-  const canInvite = canAdminPermission('user.create')
-  const showTenants = isSuperAdminUser()
+  const tenants = useAdminStore((s) => s.tenants)
+  const getTenant = useAdminStore((s) => s.getTenant)
+  const [profileTenant, setProfileTenant] = useState<AdminTenant | undefined>()
+  const [loadingTenant, setLoadingTenant] = useState(false)
+  const isSuperAdmin = isSuperAdminUser()
+  const canUsers = canAdminPermission('user.view')
+  const canRoles = canAdminPermission('role.view')
 
-  const stats = useMemo(() => {
-    const activeUsers = users.filter((u) => u.status === 'ACTIVE').length
-    const invited = users.filter((u) => u.status === 'INVITED').length
-    const locked = users.filter((u) => u.status === 'BLOCKED').length
-    const noRole = users.filter((u) => u.status !== 'ARCHIVED' && u.roles.length === 0).length
-    const neverLogin = users.filter((u) => u.status === 'ACTIVE' && !u.lastLoginAt).length
-    return { activeUsers, invited, locked, noRole, neverLogin, roleCount: roles.length }
-  }, [users, roles])
+  const tenantId = resolveCurrentTenantId()
 
-  const attention = useMemo((): AdminAttentionItem[] => {
-    const items: AdminAttentionItem[] = []
-    if (stats.noRole > 0) {
-      items.push({
-        id: 'no-role',
-        title: `${stats.noRole} user${stats.noRole === 1 ? '' : 's'} have no active role`,
-        detail: 'Assign a role before they can use ERP modules.',
-        severity: 'warning',
-        to: '/admin/users',
-      })
+  useEffect(() => {
+    let cancelled = false
+    if (!tenantId) {
+      setProfileTenant(undefined)
+      return
     }
-    if (stats.invited > 0) {
-      items.push({
-        id: 'invited',
-        title: `${stats.invited} invited user${stats.invited === 1 ? '' : 's'} pending`,
-        detail: 'Resend from Invitations or the user detail page.',
-        severity: 'info',
-        to: '/admin/invitations',
-      })
-    }
-    if (stats.locked > 0) {
-      items.push({
-        id: 'locked',
-        title: `${stats.locked} locked account${stats.locked === 1 ? '' : 's'}`,
-        detail: 'Review and unlock from Locked Accounts.',
-        severity: 'critical',
-        to: '/admin/security/locked-accounts',
-      })
-    }
-    if (stats.neverLogin > 0) {
-      items.push({
-        id: 'never-login',
-        title: `${stats.neverLogin} active user${stats.neverLogin === 1 ? '' : 's'} never logged in`,
-        detail: 'Confirm invitations reached the right people.',
-        severity: 'info',
-        to: '/admin/users',
-      })
-    }
-    return items
-  }, [stats])
+    const cached = getTenant(tenantId) ?? tenants.find((t) => t.id === tenantId || t.slug === getStoredSession()?.tenantSlug)
+    if (cached) setProfileTenant(cached)
 
-  const kpiStrip: EnterpriseKpiItem[] = useMemo(
-    () => [
-      {
-        id: 'active',
-        label: 'Active users',
-        value: String(stats.activeUsers),
-        helper: `${users.length} total`,
-        accent: 'green',
-        onClick: () => navigate('/admin/users'),
-      },
-      {
-        id: 'invited',
-        label: 'Invited',
-        value: String(stats.invited),
-        accent: 'amber',
-        onClick: () => navigate('/admin/invitations'),
-      },
-      {
-        id: 'roles',
-        label: 'Active roles',
-        value: String(stats.roleCount),
-        accent: 'blue',
-        onClick: () => navigate('/admin/roles'),
-      },
-      {
-        id: 'locked',
-        label: 'Locked',
-        value: String(stats.locked),
-        accent: stats.locked > 0 ? 'red' : 'slate',
-        onClick: () => navigate('/admin/security/locked-accounts'),
-      },
-    ],
-    [stats, users.length, navigate],
-  )
+    if (!isApiMode()) {
+      setProfileTenant(getTenant(tenantId) ?? tenants.find((t) => t.id === tenantId))
+      return
+    }
+
+    setLoadingTenant(true)
+    void syncCurrentTenantProfile().then((tenant) => {
+      if (cancelled) return
+      setProfileTenant(tenant ?? undefined)
+      setLoadingTenant(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [tenantId, getTenant, tenants])
+
+  const activeUsers = useMemo(() => users.filter((u) => u.status === 'ACTIVE').length, [users])
+  const tenantStatus = profileTenant?.status
 
   return (
-    <AdminWorkspaceShell
-      title="Administration"
-      description="Users, roles, organisation, and security — same Dynamics chrome as CRM and Accounting."
-      workspace="overview"
-      showTabs={false}
+    <OperationalPageShell
+      variant="dynamics"
+      layout="enterprise"
+      badge="Administration"
+      title="Administration Overview"
+      description="Users, roles, and organization settings for this workspace."
+      showDescription
       favoritePath="/admin"
       breadcrumbs={[{ label: 'Administration' }]}
-      kpiStrip={kpiStrip}
-      pageGuide={{
-        purpose: 'Administration hub — people, access, organisation, and security.',
-        nextStep: 'Invite a user or open Roles to review module permissions.',
-      }}
-      commandBar={
-        <ErpCommandBar
-          inline
-          sticky={false}
-          primaryAction={
-            canInvite
-              ? {
-                  id: 'invite',
-                  label: 'Invite User',
-                  icon: UserPlus,
-                  onClick: () => navigate('/admin/invitations'),
-                }
-              : {
-                  id: 'users',
-                  label: 'Users',
-                  icon: Users,
-                  onClick: () => navigate('/admin/users'),
-                }
-          }
-          secondaryActions={[
-            {
-              id: 'roles',
-              label: 'Manage Roles',
-              icon: ShieldCheck,
-              onClick: () => navigate('/admin/roles'),
-            },
-            {
-              id: 'org-structure',
-              label: 'Org Structure',
-              icon: FolderTree,
-              onClick: () => navigate('/admin/org-structure'),
-            },
-            {
-              id: 'companies',
-              label: 'Companies',
-              icon: Building2,
-              onClick: () => navigate('/admin/companies'),
-            },
-          ]}
-        />
-      }
+      autoBreadcrumbs={false}
     >
-      <div className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Link
-            to="/admin/org-structure"
-            className="rounded border border-erp-border p-3 hover:bg-erp-surface-alt"
-          >
-            <FolderTree className="mb-1 h-4 w-4 text-erp-primary" />
-            <p className="text-sm font-medium text-erp-text">Organization Structure</p>
-            <p className="text-xs text-erp-muted">LE → Branch map</p>
-          </Link>
-          <Link to="/admin/modules" className="rounded border border-erp-border p-3 hover:bg-erp-surface-alt">
-            <SlidersHorizontal className="mb-1 h-4 w-4 text-erp-primary" />
-            <p className="text-sm font-medium text-erp-text">Module Access</p>
-            <p className="text-xs text-erp-muted">Enable tenant modules</p>
-          </Link>
-          <Link
-            to="/admin/security/audit"
-            className="rounded border border-erp-border p-3 hover:bg-erp-surface-alt"
-          >
-            <ScrollText className="mb-1 h-4 w-4 text-erp-primary" />
-            <p className="text-sm font-medium text-erp-text">Admin Audit</p>
-            <p className="text-xs text-erp-muted">IAM change history</p>
-          </Link>
-          <Link
-            to="/admin/security/locked-accounts"
-            className="rounded border border-erp-border p-3 hover:bg-erp-surface-alt"
-          >
-            <ShieldCheck className="mb-1 h-4 w-4 text-erp-primary" />
-            <p className="text-sm font-medium text-erp-text">Security policy</p>
-            <p className="text-xs text-erp-muted">Lockout defaults (read-only)</p>
-          </Link>
+      <div className="flex flex-col gap-6">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <KpiCard
+            label="Users"
+            value={canUsers ? users.length : '—'}
+            hint={canUsers ? `${activeUsers} active` : 'Requires user.view'}
+            to="/admin/users"
+            icon={Users}
+          />
+          <KpiCard
+            label="Roles"
+            value={canRoles ? roles.length : '—'}
+            hint={canRoles ? `${roles.filter((r) => r.isSystem).length} system` : 'Requires role.view'}
+            to="/admin/roles"
+            icon={ShieldCheck}
+          />
+          <KpiCard
+            label="Tenant status"
+            value={loadingTenant && !tenantStatus ? '…' : tenantStatus ?? '—'}
+            hint={profileTenant?.name ?? (isApiMode() ? 'Current workspace' : 'Demo tenant')}
+            to="/admin/organization/tenant"
+            icon={Building2}
+          />
+          <KpiCard
+            label="Organization"
+            value="LE / Branch"
+            hint="Company = Legal Entity"
+            to="/admin/organization"
+            icon={GitBranch}
+          />
         </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
-        <AdminNeedsAttention items={attention} />
-
-        <aside className="space-y-3">
-          <section className="rounded border border-erp-border bg-erp-surface/40">
-            <header className="border-b border-erp-border px-3 py-2.5">
-              <h2 className="text-[12px] font-semibold uppercase tracking-[0.04em] text-erp-muted">
-                Admin areas
-              </h2>
-              <p className="mt-0.5 text-[12px] text-erp-muted">People, organisation, and security.</p>
-            </header>
-            <div className="space-y-3 p-3">
-              {ADMIN_NAV_GROUPS.map((group) => (
-                <div key={group.id}>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
-                    {group.title}
-                  </p>
-                  <ul className="mt-1 space-y-0.5">
-                    {group.items.map((item) => (
-                      <li key={item.id}>
-                        {item.available ? (
-                          <Link
-                            to={item.path}
-                            className="flex items-center gap-2 rounded px-2 py-1.5 text-[13px] text-erp-text hover:bg-erp-surface-alt"
-                          >
-                            <item.icon className="h-4 w-4 text-erp-muted" strokeWidth={1.75} />
-                            <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                          </Link>
-                        ) : (
-                          <div
-                            className="flex items-center gap-2 rounded px-2 py-1.5 text-[13px] text-erp-muted"
-                            title={item.description}
-                          >
-                            <item.icon className="h-4 w-4 opacity-50" strokeWidth={1.75} />
-                            <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                            <span className="shrink-0 text-[10px] uppercase tracking-wide opacity-70">
-                              Soon
-                            </span>
-                          </div>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-              {showTenants ? (
-                <Link
-                  to="/platform/tenants"
-                  className="flex items-center gap-2 rounded px-2 py-1.5 text-[13px] text-erp-text hover:bg-erp-surface-alt"
-                >
-                  <Building2 className="h-4 w-4 text-erp-muted" strokeWidth={1.75} />
-                  Tenants (platform)
-                </Link>
-              ) : null}
+        <section className="rounded-lg border border-erp-border bg-white p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <LayoutDashboard className="h-4 w-4 text-erp-primary" />
+              <h2 className="text-sm font-semibold text-erp-text">Workspace</h2>
             </div>
-          </section>
-        </aside>
+            {tenantStatus ? <Badge color={STATUS_COLOR[tenantStatus]}>{tenantStatus}</Badge> : null}
+          </div>
+          <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <dt className="text-xs text-erp-muted">Name</dt>
+              <dd className="text-sm font-medium text-erp-text">{profileTenant?.name ?? '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-erp-muted">Slug</dt>
+              <dd className="text-sm font-medium text-erp-text">{profileTenant?.slug ?? getStoredSession()?.tenantSlug ?? '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-erp-muted">Plan</dt>
+              <dd className="text-sm font-medium text-erp-text">{profileTenant?.subscriptionPlan ?? '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-erp-muted">Currency / TZ</dt>
+              <dd className="text-sm font-medium text-erp-text">
+                {profileTenant ? `${profileTenant.currency} · ${profileTenant.timezone}` : '—'}
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-sm font-semibold text-erp-text">Quick links</h2>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <QuickLink
+              to="/admin/users"
+              title="Users"
+              description="Invite, activate, and assign roles"
+              icon={Users}
+            />
+            <QuickLink
+              to="/admin/roles"
+              title="Roles & permissions"
+              description="Role builder and Effective Access"
+              icon={ShieldCheck}
+            />
+            <QuickLink
+              to="/admin/organization/tenant"
+              title="Tenant Profile"
+              description="Name, slug, status, and basic settings"
+              icon={Building2}
+            />
+            <QuickLink
+              to="/admin/organization"
+              title="Organization"
+              description="Legal Entities and Branches (no duplicate Company model)"
+              icon={GitBranch}
+            />
+            {isSuperAdmin ? (
+              <QuickLink
+                to="/admin/tenants"
+                title="Platform Tenants"
+                description="Super Admin multi-tenant workspace CRUD"
+                icon={Building2}
+              />
+            ) : null}
+          </div>
+        </section>
       </div>
-      </div>
-    </AdminWorkspaceShell>
+    </OperationalPageShell>
   )
 }

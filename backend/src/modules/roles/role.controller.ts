@@ -10,6 +10,15 @@ function auditMeta(req: Request) {
   return { ...auditFromRequest(req), userId: ctx.userId }
 }
 
+function actorAccess(req: Request): roleService.ActorAccess {
+  const ctx = getContext(req)
+  return {
+    userId: ctx.userId,
+    roles: ctx.roles,
+    permissions: ctx.permissions,
+  }
+}
+
 export async function list(req: Request, res: Response): Promise<void> {
   const roles = await roleService.listRolesForTenant(getTenantId(req))
   sendSuccess(res, 'Roles retrieved', roles)
@@ -26,7 +35,12 @@ export async function listPermissions(_req: Request, res: Response): Promise<voi
 }
 
 export async function create(req: Request, res: Response): Promise<void> {
-  const role = await roleService.createRole(getTenantId(req), req.body as CreateRoleInput, auditMeta(req))
+  const role = await roleService.createRole(
+    getTenantId(req),
+    req.body as CreateRoleInput,
+    auditMeta(req),
+    actorAccess(req),
+  )
   sendCreated(res, 'Role created', role)
 }
 
@@ -36,6 +50,7 @@ export async function update(req: Request, res: Response): Promise<void> {
     getRouteParam(req, 'roleId'),
     req.body as UpdateRoleInput,
     auditMeta(req),
+    actorAccess(req),
   )
   sendSuccess(res, 'Role updated', role)
 }

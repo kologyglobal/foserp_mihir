@@ -14,6 +14,12 @@ import {
   verifyRefreshToken,
 } from '../../utils/jwt.js'
 import { hashPassword, hashToken, verifyPassword, verifyTokenHash } from '../../utils/password.js'
+import {
+  AUTH_CODE,
+  AUTH_MSG,
+  LOGIN_LOCKOUT_MS,
+  LOGIN_LOCKOUT_THRESHOLD,
+} from './auth.messages.js'
 import type {
   AcceptInvitationInput,
   ChangePasswordInput,
@@ -73,6 +79,8 @@ const userSelect = {
   failedLoginCount: true,
   lockedAt: true,
   passwordHash: true,
+  failedLoginAttempts: true,
+  lockedUntil: true,
 } as const
 
 export async function loadUserPermissions(userId: string, tenantId: string): Promise<UserPermissions> {
@@ -182,6 +190,45 @@ async function recordLoginActivity(input: {
   })
 }
 
+function isLocked(lockedUntil: Date | null | undefined): boolean {
+  return Boolean(lockedUntil && lockedUntil.getTime() > Date.now())
+}
+
+async function recordFailedLogin(
+  userId: string,
+  tenantId: string,
+  previousAttempts: number,
+  previousCount: number,
+): Promise<{ locked: boolean }> {
+  const nextAttempts = previousAttempts + 1
+  const nextCount = previousCount + 1
+  const data: {
+    failedLoginAttempts: number
+    failedLoginCount: number
+    lockedUntil?: Date
+    status?: 'BLOCKED'
+    lockedAt?: Date
+  } = {
+    failedLoginAttempts: nextAttempts,
+    failedLoginCount: nextCount,
+  }
+  if (nextAttempts >= LOGIN_LOCKOUT_THRESHOLD) {
+    data.lockedUntil = new Date(Date.now() + LOGIN_LOCKOUT_MS)
+  }
+  if (nextCount >= MAX_FAILED_LOGINS) {
+    data.status = 'BLOCKED'
+    data.lockedAt = new Date()
+    await prisma.refreshToken.updateMany({
+      where: { userId, tenantId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
+  }
+  await prisma.user.update({ where: { id: userId }, data })
+  return {
+    locked: nextAttempts >= LOGIN_LOCKOUT_THRESHOLD || nextCount >= MAX_FAILED_LOGINS,
+  }
+}
+
 export async function login(
   input: LoginInput,
   meta?: { userAgent?: string | null; ipAddress?: string | null },
@@ -198,7 +245,19 @@ export async function login(
       ipAddress: meta?.ipAddress,
       userAgent: meta?.userAgent,
     })
-    throw new AuthenticationError('Invalid tenant, email, or password')
+    throw new AuthenticationError(AUTH_MSG.INVALID_CREDENTIALS, AUTH_CODE.INVALID_CREDENTIALS)
+  }
+
+  if (tenant.status === 'SUSPENDED' || tenant.status === 'INACTIVE') {
+    await recordLoginActivity({
+      tenantId: tenant.id,
+      email: input.email,
+      success: false,
+      reason: 'INVALID_CREDENTIALS',
+      ipAddress: meta?.ipAddress,
+      userAgent: meta?.userAgent,
+    })
+    throw new AuthenticationError(AUTH_MSG.TENANT_SUSPENDED, AUTH_CODE.TENANT_SUSPENDED)
   }
 
   const user = await prisma.user.findFirst({
@@ -216,45 +275,35 @@ export async function login(
       ipAddress: meta?.ipAddress,
       userAgent: meta?.userAgent,
     })
-    throw new AuthenticationError(
-      reason === 'BLOCKED' || reason === 'LOCKED_OUT'
-        ? 'Account is locked'
-        : reason === 'INACTIVE'
-          ? 'Account is not active'
-          : 'Invalid tenant, email, or password',
-    )
+    if (reason === 'BLOCKED' || reason === 'LOCKED_OUT') {
+      throw new AuthenticationError(AUTH_MSG.ACCOUNT_LOCKED, AUTH_CODE.ACCOUNT_LOCKED)
+    }
+    if (reason === 'INACTIVE') {
+      throw new AuthenticationError(AUTH_MSG.ACCOUNT_INACTIVE, AUTH_CODE.ACCOUNT_INACTIVE)
+    }
+    throw new AuthenticationError(AUTH_MSG.INVALID_CREDENTIALS, AUTH_CODE.INVALID_CREDENTIALS)
   }
 
   if (!user) {
     return await fail('INVALID_CREDENTIALS')
   }
 
-  if (!(await verifyPassword(input.password, user.passwordHash))) {
-    const nextCount = user.failedLoginCount + 1
-    if (nextCount >= MAX_FAILED_LOGINS) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          failedLoginCount: nextCount,
-          status: 'BLOCKED',
-          lockedAt: new Date(),
-        },
-      })
-      await prisma.refreshToken.updateMany({
-        where: { userId: user.id, tenantId: tenant.id, revokedAt: null },
-        data: { revokedAt: new Date() },
-      })
-      return await fail('LOCKED_OUT', user.id)
-    }
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { failedLoginCount: nextCount },
-    })
-    return await fail('INVALID_CREDENTIALS', user.id)
+  if (isLocked(user.lockedUntil) || user.status === 'BLOCKED') {
+    return await fail(user.status === 'BLOCKED' ? 'BLOCKED' : 'LOCKED_OUT', user.id)
   }
 
-  if (user.status === 'BLOCKED') {
-    return await fail('BLOCKED', user.id)
+  const passwordOk = await verifyPassword(input.password, user.passwordHash)
+  if (!passwordOk) {
+    const { locked } = await recordFailedLogin(
+      user.id,
+      tenant.id,
+      user.failedLoginAttempts,
+      user.failedLoginCount,
+    )
+    if (locked) {
+      return await fail('LOCKED_OUT', user.id)
+    }
+    return await fail('INVALID_CREDENTIALS', user.id)
   }
 
   if (user.status !== 'ACTIVE') {
@@ -266,7 +315,13 @@ export async function login(
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { lastLoginAt: new Date(), failedLoginCount: 0, lockedAt: null },
+    data: {
+      lastLoginAt: new Date(),
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+      failedLoginCount: 0,
+      lockedAt: null,
+    },
   })
 
   await recordLoginActivity({
@@ -279,7 +334,14 @@ export async function login(
     userAgent: meta?.userAgent,
   })
 
-  const { passwordHash: _, failedLoginCount: __, lockedAt: ___, ...safeUser } = user
+  const {
+    passwordHash: _,
+    failedLoginAttempts: _a,
+    lockedUntil: _l,
+    failedLoginCount: __,
+    lockedAt: ___,
+    ...safeUser
+  } = user
 
   return {
     ...tokens,
@@ -360,7 +422,7 @@ export async function getMe(userId: string, tenantId: string): Promise<AuthUser 
   }
 
   const userPermissions = await loadUserPermissions(userId, tenantId)
-  const { passwordHash: _, tenant, ...safeUser } = user
+  const { passwordHash: _, failedLoginAttempts: _a, lockedUntil: _l, tenant, ...safeUser } = user
 
   return {
     ...toAuthUser(safeUser, userPermissions),
@@ -374,7 +436,11 @@ export async function forgotPassword(input: ForgotPasswordInput): Promise<{ mess
   })
 
   if (!tenant) {
-    return { message: 'If the account exists, a password reset link has been sent' }
+    return { message: AUTH_MSG.RESET_GENERIC }
+  }
+
+  if (tenant.status === 'SUSPENDED' || tenant.status === 'INACTIVE' || tenant.status === 'ARCHIVED') {
+    return { message: AUTH_MSG.RESET_GENERIC }
   }
 
   const user = await prisma.user.findFirst({
@@ -382,7 +448,7 @@ export async function forgotPassword(input: ForgotPasswordInput): Promise<{ mess
   })
 
   if (!user) {
-    return { message: 'If the account exists, a password reset link has been sent' }
+    return { message: AUTH_MSG.RESET_GENERIC }
   }
 
   const rawToken = uuidv4()
@@ -398,7 +464,7 @@ export async function forgotPassword(input: ForgotPasswordInput): Promise<{ mess
   })
 
   const result: { message: string; resetToken?: string } = {
-    message: 'If the account exists, a password reset link has been sent',
+    message: AUTH_MSG.RESET_GENERIC,
   }
 
   if (env.isDev) {
@@ -428,7 +494,7 @@ export async function resetPassword(input: ResetPasswordInput): Promise<void> {
   }
 
   if (!matched || matched.user.deletedAt || matched.user.status !== 'ACTIVE') {
-    throw new InvalidStateError('Invalid or expired reset token')
+    throw new InvalidStateError(AUTH_MSG.RESET_TOKEN_INVALID)
   }
 
   const passwordHash = await hashPassword(input.password)
@@ -436,7 +502,13 @@ export async function resetPassword(input: ResetPasswordInput): Promise<void> {
   await prisma.$transaction([
     prisma.user.update({
       where: { id: matched.userId },
-      data: { passwordHash },
+      data: {
+        passwordHash,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        failedLoginCount: 0,
+        lockedAt: null,
+      },
     }),
     prisma.passwordResetToken.update({
       where: { id: matched.id },
@@ -469,11 +541,11 @@ export async function changePassword(
   }
 
   if (user.status !== 'ACTIVE') {
-    throw new InvalidStateError('Account is not active')
+    throw new InvalidStateError(AUTH_MSG.ACCOUNT_INACTIVE)
   }
 
   if (!(await verifyPassword(input.currentPassword, user.passwordHash))) {
-    throw new AuthenticationError('Current password is incorrect')
+    throw new AuthenticationError(AUTH_MSG.CURRENT_PASSWORD_INCORRECT, AUTH_CODE.CURRENT_PASSWORD_INCORRECT)
   }
 
   const passwordHash = await hashPassword(input.newPassword)
@@ -481,7 +553,13 @@ export async function changePassword(
   await prisma.$transaction([
     prisma.user.update({
       where: { id: userId },
-      data: { passwordHash },
+      data: {
+        passwordHash,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        failedLoginCount: 0,
+        lockedAt: null,
+      },
     }),
     prisma.refreshToken.updateMany({
       where: { userId, tenantId, revokedAt: null },

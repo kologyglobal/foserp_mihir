@@ -465,10 +465,14 @@ model User {
   status        UserStatus @default(INVITED)
   emailVerified Boolean    @default(false)
   lastLoginAt   DateTime?
-  /// Consecutive failed password attempts; reset on successful login / unlock.
+  /// Consecutive failed password attempts; reset on successful login / unlock (Phase 8 admin).
   failedLoginCount Int       @default(0)
   /// When auto-lockout or admin lock set status to BLOCKED (informational).
   lockedAt      DateTime?
+  /// Consecutive failed password attempts (reset on successful login) — A1 temp lockout.
+  failedLoginAttempts Int       @default(0)
+  /// When set and in the future, login is rejected until this time.
+  lockedUntil         DateTime?
   createdBy     String?
   updatedBy     String?
   createdAt     DateTime   @default(now())

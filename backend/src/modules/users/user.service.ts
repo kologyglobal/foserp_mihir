@@ -3,6 +3,11 @@ import { prisma } from '../../config/database.js'
 import { ConflictError, NotFoundError } from '../../utils/errors.js'
 import { buildPaginationMeta } from '../../utils/pagination.js'
 import { hashPassword } from '../../utils/password.js'
+import {
+  getEffectiveAccess,
+  wouldRemoveLastTenantAdmin,
+  type EffectiveAccess,
+} from '../roles/effective-access.service.js'
 import * as invitationService from './user-invitation.service.js'
 import * as userRepository from './user.repository.js'
 import type { UserWithRoles } from './user.repository.js'
@@ -66,6 +71,21 @@ interface AuditMeta {
   userAgent?: string | null
 }
 
+const INELIGIBLE_ADMIN_STATUSES = new Set(['INACTIVE', 'BLOCKED', 'ARCHIVED'])
+
+async function assertNotLastAdminLockout(
+  tenantId: string,
+  userId: string,
+  options: { removingFromEligiblePool?: boolean; remainingRoleIds?: string[] },
+): Promise<void> {
+  const wouldLock = await wouldRemoveLastTenantAdmin(tenantId, userId, options)
+  if (wouldLock) {
+    throw new ConflictError(
+      'Cannot remove or deactivate the last Tenant Administrator for this tenant',
+    )
+  }
+}
+
 export async function listUsers(tenantId: string, query: ListUsersQuery) {
   const { items, total } = await userRepository.findUsers(tenantId, query)
   return {
@@ -80,6 +100,13 @@ export async function getUserById(tenantId: string, userId: string): Promise<Saf
     throw new NotFoundError('User not found')
   }
   return sanitizeUser(user)
+}
+
+export async function getUserEffectiveAccess(
+  tenantId: string,
+  userId: string,
+): Promise<EffectiveAccess> {
+  return getEffectiveAccess(tenantId, userId)
 }
 
 export async function createUser(
@@ -138,6 +165,13 @@ export async function updateUser(
     }
   }
 
+  if (input.status && INELIGIBLE_ADMIN_STATUSES.has(input.status)) {
+    const wasEligible = existing.status === 'ACTIVE' || existing.status === 'INVITED'
+    if (wasEligible) {
+      await assertNotLastAdminLockout(tenantId, userId, { removingFromEligiblePool: true })
+    }
+  }
+
   const user = await userRepository.updateUser(tenantId, userId, input, audit?.userId)
   const safeUser = sanitizeUser(user)
 
@@ -166,6 +200,8 @@ export async function deleteUser(tenantId: string, userId: string, audit?: Audit
   if (!existing) {
     throw new NotFoundError('User not found')
   }
+
+  await assertNotLastAdminLockout(tenantId, userId, { removingFromEligiblePool: true })
 
   const user = await userRepository.softDeleteUser(tenantId, userId, audit?.userId)
   await invitationService.revokeUserSessions(userId, tenantId)
@@ -244,6 +280,12 @@ export async function removeRole(
   if (!existingAssignment) {
     throw new NotFoundError('Role assignment not found')
   }
+
+  const remainingRoleIds = user.userRoles
+    .map((ur) => ur.role.id)
+    .filter((id) => id !== roleId)
+
+  await assertNotLastAdminLockout(tenantId, userId, { remainingRoleIds })
 
   const updated = await userRepository.removeRole(tenantId, userId, roleId)
   const safeUser = sanitizeUser(updated)

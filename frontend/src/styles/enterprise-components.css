@@ -731,12 +731,122 @@
 
 /* ── Enterprise controls (CRM/Sales/dynamics pages) ── */
 .dyn-page-shell .erp-btn,
-.dyn-page-shell .erp-command-btn-primary,
-.dyn-page-shell .erp-command-bar button,
 .erp-page--enterprise .erp-btn {
-  min-height: 40px;
+  min-height: 36px;
   border-radius: var(--ent-radius-button);
-  font-size: 14px;
+  font-size: 13px;
+}
+
+/* Command-bar actions: fixed 36px height system-wide (overrides uneven padding/wrap) */
+.erp-command-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0;
+}
+
+.erp-command-group,
+.erp-command-group__actions,
+.erp-command-bar--inline .erp-command-group,
+.erp-command-bar--inline .erp-command-group__actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.erp-command-btn,
+.erp-command-bar .erp-command-btn,
+.dyn-page-shell .erp-command-bar .erp-command-btn,
+.dyn-page-shell .erp-command-btn-primary,
+.d365-workspace-unified-actions .erp-command-bar .erp-command-btn,
+.erp-page--enterprise .erp-command-bar .erp-command-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  padding: 0 12px;
+  margin: 0;
+  border-radius: var(--ent-radius-button, 8px);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.erp-command-btn__icon,
+.erp-command-bar .erp-command-btn .lucide,
+.dyn-page-shell .erp-command-bar .erp-command-btn .lucide,
+.d365-workspace-unified-actions .erp-command-bar .erp-command-btn .lucide {
+  width: 16px !important;
+  height: 16px !important;
+  flex-shrink: 0;
+}
+
+.erp-command-btn-wrap,
+.erp-command-more {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  vertical-align: middle;
+}
+
+.erp-command-more__icon-btn {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+}
+
+.d365-workspace-unified-actions {
+  display: flex;
+  flex-shrink: 1;
+  align-self: center;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
+  min-height: 36px;
+  min-width: 0;
+  padding: 3px 2px;
+  max-width: min(100%, calc(100% - 10rem));
+  direction: ltr;
+  overflow: visible;
+}
+
+.d365-workspace-unified-actions .erp-command-bar,
+.d365-workspace-unified-actions .erp-command-bar--inline {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: none;
+}
+
+.d365-workspace-unified-actions .erp-command-bar::-webkit-scrollbar,
+.d365-workspace-unified-actions .erp-command-bar--inline::-webkit-scrollbar {
+  display: none;
+}
+
+.d365-workspace-unified-actions .erp-command-group,
+.d365-workspace-unified-actions .erp-command-group__actions,
+.d365-workspace-unified-actions .erp-command-bar--inline .flex.items-center.gap-1,
+.d365-workspace-unified-actions .erp-command-bar--inline .flex.items-center.gap-1\.5 {
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  border-right: none;
+  padding: 0;
+  overflow: visible;
 }
 
 .dyn-page-shell:not(:has(.enterprise-workspace--dynamics-form)) .erp-input:not(.erp-search-field__input),
@@ -832,7 +942,9 @@
   box-shadow: none;
 }
 
-.erp-command-bar--inline .flex.items-center.gap-1 {
+.erp-command-bar--inline .erp-command-group,
+.erp-command-bar--inline .flex.items-center.gap-1,
+.erp-command-bar--inline .flex.items-center.gap-1\.5 {
   border-right: none;
   padding: 0;
 }
@@ -1141,11 +1253,27 @@
 }
 
 .crm-sticky-record-header__actions .erp-btn,
-.crm-sticky-record-header__actions button {
+.crm-sticky-record-header__actions button,
+.crm-sticky-record-header__actions .erp-command-btn {
   white-space: nowrap;
+  box-sizing: border-box;
   min-height: 28px;
   height: 28px;
+  max-height: 28px;
+  padding: 0 10px;
   font-size: 12px;
+  line-height: 1;
+}
+
+.crm-sticky-record-header__actions .erp-command-btn .lucide,
+.crm-sticky-record-header__actions .erp-command-btn__icon {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.crm-sticky-record-header__actions .erp-command-more,
+.crm-sticky-record-header__actions .erp-command-btn-wrap {
+  height: 28px;
 }
 
 .crm-sticky-record-header__meta .dyn-status-chip {
@@ -1355,18 +1483,35 @@
 
 .d365-workspace-unified-actions {
   display: flex;
-  flex-shrink: 0;
+  flex-shrink: 1;
   align-self: center;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
   margin-left: auto;
+  min-height: 36px;
+  min-width: 0;
+  padding: 3px 2px;
+  max-width: min(100%, calc(100% - 10rem));
+  direction: ltr;
+  overflow: visible;
 }
 
 .d365-workspace-unified-actions .erp-command-bar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: none;
+}
+
+.d365-workspace-unified-actions .erp-command-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .d365-workspace-unified-actions .erp-command-bar--inline {
@@ -1374,9 +1519,24 @@
   background: transparent;
   border: none;
   box-shadow: none;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
-.d365-workspace-unified-actions .erp-card-form-command-bar > .flex.items-center.gap-1 {
+.d365-workspace-unified-actions .erp-command-group,
+.d365-workspace-unified-actions .erp-command-group__actions {
+  border-right: none;
+  padding-left: 0;
+  padding-right: 0;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  overflow: visible;
+}
+
+.d365-workspace-unified-actions .erp-card-form-command-bar > .flex.items-center.gap-1,
+.d365-workspace-unified-actions .erp-card-form-command-bar > .erp-command-group {
   border-right: none;
   padding-left: 0;
   padding-right: 0;
@@ -1425,5 +1585,7 @@
     flex: 1 1 100%;
     align-self: stretch;
     justify-content: flex-end;
+    max-width: 100%;
+    direction: ltr;
   }
 }

@@ -372,10 +372,10 @@ export function CrmCustomersPage({
             secondaryActions={[
               { id: 'new-opp', label: 'New Opportunity', icon: Target, onClick: () => navigate('/crm/opportunities/new') },
               { id: 'quick-fu', label: 'Quick Follow-up', icon: Calendar, onClick: () => setQuickFollowUpOpen(true) },
-              { id: 'import', label: 'Import', icon: Upload, onClick: openCompanyImport },
-              { id: 'export', label: 'Export', icon: Download, onClick: exportAllCompanies },
             ]}
             moreActions={[
+              { id: 'import', label: 'Import', icon: Upload, onClick: openCompanyImport },
+              { id: 'export', label: 'Export', icon: Download, onClick: exportAllCompanies },
               { id: 'save-view', label: 'Save View', icon: Save, onClick: savedViews.openSaveDialog },
             ]}
           />

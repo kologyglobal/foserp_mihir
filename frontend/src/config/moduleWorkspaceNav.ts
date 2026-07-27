@@ -9,6 +9,7 @@ import {
 } from './navigation'
 import { canViewPurchaseNavItem } from '../utils/permissions/purchase'
 import { canViewInventoryNavItem } from '../utils/permissions/inventory'
+import { canViewAdminNavItem } from '../utils/permissions/admin'
 
 /** Default landing route for a module category */
 export function getCategoryWorkspacePath(category: NavCategory): string {
@@ -16,6 +17,7 @@ export function getCategoryWorkspacePath(category: NavCategory): string {
     if (item.disabled) return false
     if (category.id === 'purchase') return canViewPurchaseNavItem(item.path)
     if (category.id === 'inventory') return canViewInventoryNavItem(item.path)
+    if (category.id === 'admin') return canViewAdminNavItem(item.path)
     return true
   })
   const workspace = visibleItems.find((item) => item.workspace)
@@ -54,6 +56,7 @@ export function getModuleSubNavForPath(pathname: string): {
       // Soft UI gate — backend must enforce when purchase API exists
       if (category.id === 'purchase') return canViewPurchaseNavItem(item.path)
       if (category.id === 'inventory') return canViewInventoryNavItem(item.path)
+      if (category.id === 'admin') return canViewAdminNavItem(item.path)
       return true
     })
     .map((item) => ({

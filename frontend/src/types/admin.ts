@@ -67,6 +67,17 @@ export interface AdminPermission {
   description: string | null
 }
 
+/** Effective access payload from GET …/users/:userId/effective-access */
+export interface AdminEffectiveAccess {
+  userId: string
+  tenantId: string
+  roles: AdminUserRoleRef[]
+  permissions: string[]
+  permissionCount: number
+  isSuperAdmin: boolean
+  isTenantAdmin: boolean
+}
+
 export type AdminTenantStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'TRIAL' | 'ARCHIVED'
 
 export interface AdminTenant {

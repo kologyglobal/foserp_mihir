@@ -452,9 +452,15 @@ export async function reverseAllocation(
 
 export async function syncBundle(tenantId: string, companyId?: string) {
   const [receipts, invoices, allocations] = await Promise.all([
-    repo.findReceipts(tenantId, { page: 1, limit: 500, companyId }),
-    repo.findInvoices(tenantId, { page: 1, limit: 500, companyId }),
-    repo.findAllocations(tenantId, { page: 1, limit: 500, companyId, includeReversed: true }),
+    repo.findReceipts(tenantId, { page: 1, limit: 500, companyId, sortOrder: 'desc' }),
+    repo.findInvoices(tenantId, { page: 1, limit: 500, companyId, sortOrder: 'desc' }),
+    repo.findAllocations(tenantId, {
+      page: 1,
+      limit: 500,
+      companyId,
+      includeReversed: true,
+      sortOrder: 'desc',
+    }),
   ])
   return {
     receipts: receipts.items.map(mapReceiptDto),

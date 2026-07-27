@@ -4,7 +4,7 @@ import { ERPLayout } from '@/components/layout/ERPLayout'
 import { RouteErrorBoundary } from '@/components/system/RouteErrorBoundary'
 import { PageNotFoundPage } from '@/components/system/PageNotFoundPage'
 import { ApiAuthGate } from '@/modules/auth/ApiAuthGate'
-import { authRoute } from './authRoutes'
+import { authRoute, accountRouteChildren } from './authRoutes'
 import { homeRouteChildren } from './homeRoutes'
 import { masterRouteChildren } from './masterRoutes'
 import { platformRouteChildren } from './platformRoutes'
@@ -59,6 +59,7 @@ export const router = createBrowserRouter([
           ...accountingRouteChildren,
           ...organisationRouteChildren,
           ...adminRouteChildren,
+          ...accountRouteChildren,
           { path: '*', element: <PageNotFoundPage /> },
         ],
       },

@@ -4,7 +4,6 @@ import { type ColumnDef } from '@tanstack/react-table'
 import {
   AlertTriangle,
   Factory,
-  Gauge,
   ShoppingCart,
   Truck,
   FileText,
@@ -355,7 +354,6 @@ export function SalesOrderStatusPage() {
         <CommandBar>
           <CommandBarGroup label="Navigate">
             <CommandBarButton icon={ShoppingCart} label="Sales Orders" onClick={() => navigate('/sales/orders')} primary />
-            <CommandBarButton icon={Gauge} label="Run MRP" onClick={() => navigate('/mrp/run')} />
             <CommandBarButton icon={Factory} label="Work Orders" onClick={() => navigate('/work-orders')} />
             <CommandBarButton icon={Truck} label="Dispatch" onClick={() => navigate('/dispatch/register')} />
           </CommandBarGroup>

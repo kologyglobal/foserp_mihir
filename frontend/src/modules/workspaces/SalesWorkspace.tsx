@@ -271,7 +271,7 @@ export function SalesWorkspacePage() {
       { id: 'status', label: 'Sales Orders', href: '/sales/orders' },
       { id: 'crm', label: 'CRM Pipeline', href: '/crm' },
     ],
-    [m.ordersPendingMrp, metrics],
+    [metrics],
   )
 
   const subtitle =
@@ -408,7 +408,7 @@ export function SalesWorkspacePage() {
               <DynamicsCommandButton icon={<Gauge className="h-4 w-4" />} onClick={() => navigate('/manufacturing/production-plan')}>
                 Production Plan
               </DynamicsCommandButton>
-              <DynamicsCommandButton icon={<FileText className="h-4 w-4" />} onClick={() => navigate('/sales/orders')}>
+              <DynamicsCommandButton icon={<FileText className="h-4 w-4" />} onClick={() => navigate('/sales/order-status')}>
                 Order Status
               </DynamicsCommandButton>
             </>

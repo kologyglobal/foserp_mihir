@@ -35,12 +35,38 @@ export interface AuthSession {
 
 const TOKEN_KEY = 'fos-erp-auth'
 const AUTH_SESSION_EVENT = 'fos-erp-auth-session'
+const AUTH_NOTICE_KEY = 'fos-erp-auth-notice'
 /** Refresh slightly before real expiry to avoid mid-request 401 storms. */
 const ACCESS_EXPIRY_SKEW_MS = 60_000
 const DEFAULT_ACCESS_TTL_MS = 15 * 60_000
+export const SESSION_EXPIRED_NOTICE = 'Session expired. Please sign in again.'
 
 type AuthSessionListener = (session: AuthSession | null) => void
 const sessionListeners = new Set<AuthSessionListener>()
+
+/** One-shot notice shown on the login page after session clear (refresh failure, etc.). */
+export function setAuthNotice(message: string): void {
+  try {
+    sessionStorage.setItem(AUTH_NOTICE_KEY, message)
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+export function consumeAuthNotice(): string | null {
+  try {
+    const value = sessionStorage.getItem(AUTH_NOTICE_KEY)
+    if (value) sessionStorage.removeItem(AUTH_NOTICE_KEY)
+    return value
+  } catch {
+    return null
+  }
+}
+
+function clearSessionWithNotice(message = SESSION_EXPIRED_NOTICE): void {
+  setAuthNotice(message)
+  setStoredSession(null)
+}
 
 export function subscribeAuthSession(listener: AuthSessionListener): () => void {
   sessionListeners.add(listener)
@@ -134,11 +160,12 @@ async function refreshAccessToken(): Promise<string | null> {
       body: JSON.stringify({ refreshToken: session.refreshToken }),
     })
   } catch {
+    clearSessionWithNotice()
     return null
   }
 
   if (!res.ok) {
-    setStoredSession(null)
+    clearSessionWithNotice()
     return null
   }
 
@@ -150,12 +177,12 @@ async function refreshAccessToken(): Promise<string | null> {
       expiresIn?: number
     }>
   } catch {
-    setStoredSession(null)
+    clearSessionWithNotice()
     return null
   }
 
   if (!body.success || !body.data?.accessToken || !body.data?.refreshToken) {
-    setStoredSession(null)
+    clearSessionWithNotice()
     return null
   }
 
@@ -171,7 +198,10 @@ async function refreshAccessToken(): Promise<string | null> {
   return updated.accessToken
 }
 
-/** Single-flight refresh used by apiRequest and proactive refresh. */
+/**
+ * Single-flight refresh used by apiRequest and proactive refresh.
+ * Concurrent callers share one in-flight refreshPromise (no parallel refresh races).
+ */
 export async function ensureFreshAccessToken(): Promise<string | null> {
   const session = getStoredSession()
   if (!session?.accessToken) return null
@@ -180,15 +210,26 @@ export async function ensureFreshAccessToken(): Promise<string | null> {
     return session.accessToken
   }
 
-  if (!session.refreshToken) return session.accessToken
+  if (!session.refreshToken) {
+    clearSessionWithNotice()
+    return null
+  }
 
   if (!refreshPromise) {
     refreshPromise = refreshAccessToken().finally(() => {
       refreshPromise = null
     })
   }
-  const token = await refreshPromise
-  return token ?? getStoredSession()?.accessToken ?? null
+  return refreshPromise
+}
+
+async function refreshAfterUnauthorized(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = refreshAccessToken().finally(() => {
+      refreshPromise = null
+    })
+  }
+  return refreshPromise
 }
 
 function looksLikeHtml(text: string): boolean {
@@ -247,10 +288,13 @@ export async function apiRequest<T>(
     headers.set('Content-Type', 'application/json')
   }
 
-  let accessToken = session?.accessToken
+  let accessToken: string | undefined = session?.accessToken
   if (session && accessTokenNeedsRefresh(session)) {
-    accessToken = (await ensureFreshAccessToken()) ?? accessToken
+    accessToken = (await ensureFreshAccessToken()) ?? undefined
     session = getStoredSession()
+    if (!accessToken) {
+      throw new ApiError(SESSION_EXPIRED_NOTICE, 401)
+    }
   }
 
   if (accessToken) {
@@ -260,27 +304,20 @@ export async function apiRequest<T>(
   let res = await fetch(`${API_CONFIG.baseUrl}${path}`, { ...options, headers })
 
   if (res.status === 401 && session?.refreshToken) {
-    if (!refreshPromise) {
-      refreshPromise = refreshAccessToken().finally(() => {
-        refreshPromise = null
-      })
-    }
-    const newToken = await refreshPromise
+    const newToken = await refreshAfterUnauthorized()
     if (newToken) {
       headers.set('Authorization', `Bearer ${newToken}`)
       res = await fetch(`${API_CONFIG.baseUrl}${path}`, { ...options, headers })
     } else {
-      throw new ApiError('Session expired. Please sign in again.', 401)
+      throw new ApiError(SESSION_EXPIRED_NOTICE, 401)
     }
   }
 
   if (res.status === 401) {
-    setStoredSession(null)
+    clearSessionWithNotice()
     const err = await parseErrorBody(res)
     throw new ApiError(
-      err.message === 'Invalid or expired access token'
-        ? 'Session expired. Please sign in again.'
-        : err.message,
+      err.message === 'Invalid or expired access token' ? SESSION_EXPIRED_NOTICE : err.message,
       401,
       err.errors ?? undefined,
       err.code ?? undefined,
@@ -312,10 +349,13 @@ export async function apiDownloadBlob(path: string): Promise<{ blob: Blob; filen
   let session = getStoredSession()
   const headers = new Headers()
 
-  let accessToken = session?.accessToken
+  let accessToken: string | undefined = session?.accessToken
   if (session && accessTokenNeedsRefresh(session)) {
-    accessToken = (await ensureFreshAccessToken()) ?? accessToken
+    accessToken = (await ensureFreshAccessToken()) ?? undefined
     session = getStoredSession()
+    if (!accessToken) {
+      throw new ApiError(SESSION_EXPIRED_NOTICE, 401)
+    }
   }
   if (accessToken) {
     headers.set('Authorization', `Bearer ${accessToken}`)
@@ -324,30 +364,23 @@ export async function apiDownloadBlob(path: string): Promise<{ blob: Blob; filen
   let res = await fetch(`${API_CONFIG.baseUrl}${path}`, { headers })
 
   if (res.status === 401 && session?.refreshToken) {
-    if (!refreshPromise) {
-      refreshPromise = refreshAccessToken().finally(() => {
-        refreshPromise = null
-      })
-    }
-    const newToken = await refreshPromise
+    const newToken = await refreshAfterUnauthorized()
     if (newToken) {
       headers.set('Authorization', `Bearer ${newToken}`)
       res = await fetch(`${API_CONFIG.baseUrl}${path}`, { headers })
     } else {
-      throw new ApiError('Session expired. Please sign in again.', 401)
+      throw new ApiError(SESSION_EXPIRED_NOTICE, 401)
     }
   }
 
   if (!res.ok) {
-    if (res.status === 401) setStoredSession(null)
+    if (res.status === 401) clearSessionWithNotice()
     let message = `Download failed (${res.status})`
     try {
       const body = (await res.json()) as ApiResponse<unknown>
       if (body.message) {
         message =
-          body.message === 'Invalid or expired access token'
-            ? 'Session expired. Please sign in again.'
-            : body.message
+          body.message === 'Invalid or expired access token' ? SESSION_EXPIRED_NOTICE : body.message
       }
     } catch {
       // non-JSON error body
@@ -369,10 +402,13 @@ export async function apiPostDownloadBlob(
   let session = getStoredSession()
   const headers = new Headers({ 'Content-Type': 'application/json' })
 
-  let accessToken = session?.accessToken
+  let accessToken: string | undefined = session?.accessToken
   if (session && accessTokenNeedsRefresh(session)) {
-    accessToken = (await ensureFreshAccessToken()) ?? accessToken
+    accessToken = (await ensureFreshAccessToken()) ?? undefined
     session = getStoredSession()
+    if (!accessToken) {
+      throw new ApiError(SESSION_EXPIRED_NOTICE, 401)
+    }
   }
   if (accessToken) {
     headers.set('Authorization', `Bearer ${accessToken}`)
@@ -382,30 +418,23 @@ export async function apiPostDownloadBlob(
   let res = await fetch(`${API_CONFIG.baseUrl}${path}`, init)
 
   if (res.status === 401 && session?.refreshToken) {
-    if (!refreshPromise) {
-      refreshPromise = refreshAccessToken().finally(() => {
-        refreshPromise = null
-      })
-    }
-    const newToken = await refreshPromise
+    const newToken = await refreshAfterUnauthorized()
     if (newToken) {
       headers.set('Authorization', `Bearer ${newToken}`)
       res = await fetch(`${API_CONFIG.baseUrl}${path}`, { ...init, headers })
     } else {
-      throw new ApiError('Session expired. Please sign in again.', 401)
+      throw new ApiError(SESSION_EXPIRED_NOTICE, 401)
     }
   }
 
   if (!res.ok) {
-    if (res.status === 401) setStoredSession(null)
+    if (res.status === 401) clearSessionWithNotice()
     let message = `Export failed (${res.status})`
     try {
       const body2 = (await res.json()) as ApiResponse<unknown>
       if (body2.message) {
         message =
-          body2.message === 'Invalid or expired access token'
-            ? 'Session expired. Please sign in again.'
-            : body2.message
+          body2.message === 'Invalid or expired access token' ? SESSION_EXPIRED_NOTICE : body2.message
       }
     } catch {
       // non-JSON error body

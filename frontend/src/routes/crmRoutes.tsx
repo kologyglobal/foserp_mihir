@@ -21,6 +21,7 @@ import { CrmContactFormPage } from '@/modules/crm/CrmContactFormPage'
 import { CrmSalesOrderListPage } from '@/modules/crm/CrmSalesOrderListPage'
 import { SalesOrder360Page } from '@/modules/sales/SalesOrder360Page'
 import { SalesOrderPrintPage } from '@/components/sales/SalesOrderPrintPage'
+import { PaymentReceiptPrintPage } from '@/components/sales/PaymentReceiptPrintPage'
 import { LeadListPage } from '@/modules/crm/CrmLeadListPage'
 import { LeadFormPage } from '@/modules/crm/CrmLeadFormPage'
 import { Lead360Workspace } from '@/components/crm/Lead360Workspace'
@@ -41,13 +42,13 @@ import { IndiaMartProductMappingsPage } from '@/modules/crm/integrations/indiama
 import { IndiaMartSyncHistoryPage } from '@/modules/crm/integrations/indiamart/IndiaMartSyncHistoryPage'
 import { IndiaMartSettingsPage } from '@/modules/crm/integrations/indiamart/IndiaMartSettingsPage'
 import {
-  CrmInvoiceListPage,
   CrmInvoiceDetailPage,
   CrmInvoiceCreatePage,
-  CrmPaymentAllocationPage,
   CrmReceiptDetailPage,
   ProformaReceivePaymentPage,
 } from '@/modules/crm/commercial/CrmCommercialPages'
+import { SalesTaxInvoiceListPage } from '@/modules/sales/SalesTaxInvoiceListPage'
+import { SalesPaymentAllocationPage } from '@/modules/sales/SalesPaymentAllocationPage'
 
 export const crmRouteChildren: RouteObject[] = [
   { index: true, element: <CrmDashboardPage /> },
@@ -75,10 +76,12 @@ export const crmRouteChildren: RouteObject[] = [
   { path: 'sales-orders', element: <CrmSalesOrderListPage /> },
   { path: 'sales-orders/:id/print', element: <SalesOrderPrintPage /> },
   { path: 'sales-orders/:id', element: <SalesOrder360Page /> },
-  { path: 'commercial/invoices', element: <CrmInvoiceListPage /> },
+  /** Legacy CRM URLs — canonical nav is under /sales/invoices and /sales/payment-allocation */
+  { path: 'commercial/invoices', element: <SalesTaxInvoiceListPage /> },
   { path: 'commercial/invoices/new', element: <CrmInvoiceCreatePage /> },
   { path: 'commercial/invoices/:id', element: <CrmInvoiceDetailPage /> },
-  { path: 'commercial/payment-allocation', element: <CrmPaymentAllocationPage /> },
+  { path: 'commercial/payment-allocation', element: <SalesPaymentAllocationPage /> },
+  { path: 'commercial/receipts/:id/print', element: <PaymentReceiptPrintPage /> },
   { path: 'commercial/receipts/:id', element: <CrmReceiptDetailPage /> },
   { path: 'commercial/proforma/:id/receive-payment', element: <ProformaReceivePaymentPage /> },
   { path: 'reports', element: <CrmReportsIndexPage /> },

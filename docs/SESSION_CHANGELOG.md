@@ -1,4 +1,200 @@
-﻿## 2026-07-24 — CRM-only user (API mode RBAC)
+## 2026-07-27 — Phase A2: Admin / Organization foundation
+
+### Shipped
+
+- **Admin shell IA:** Overview landing at `/admin` (no longer redirects to Users). Nav groups: Organization (Tenant Profile, Legal Entities & Branches), People & Access (Users, Roles), Platform Tenants (Super Admin / `tenant.manage` only).
+- **Overview:** KPI cards for users, roles, tenant status; quick links into Users / Roles / Tenant Profile / Organization.
+- **Tenant Profile:** Current-tenant page at `/admin/organization/tenant` — name, slug, status, locale; edits safe fields via existing `PATCH /tenants/:id` when actor has `tenant.update` (Tenant Admin). Status / subscription remain read-only.
+- **Organization hub:** `/admin/organization` links to Accounting Legal Entities & Branches; documents Company = Legal Entity; User↔branch deferred to A3.
+- **Gates:** `canRoute('/admin…')` uses `canAccessAdminShell()`; `/admin/tenants*` requires `isSuperAdminUser()`; nav filtered via `canViewAdminNavItem`.
+- **Bridge:** `syncCurrentTenantProfile()` so non–Super Admins still hydrate current tenant without list access.
+
+### PASS WITH CONDITION
+
+- Tenant Profile status/subscription not editable here (platform Tenants CRUD / Super Admin).
+- No new Company model; LE/Branch remain Accounting masters (linked, not duplicated).
+- User↔branch assignment / invitations → **A3**. Security / Login Activity → **A5**.
+
+### Not started / unchanged
+
+- A3 Users drawer & invitations; A5 sessions; A6–A9.
+
+---
+
+## 2026-07-27 — Phase A1 Authentication hardening
+
+### Shipped
+
+- **Login messages:** BE rejects `SUSPENDED`/`INACTIVE` tenants with org-suspended copy; inactive accounts and lockouts get distinct messages; bad email/password stay generic (`AUTH_MSG` + codes). FE `mapLoginErrorMessage` + rate-limit copy.
+- **Change password:** `authApi.changePassword` → `POST /auth/change-password`; `/account/change-password` page; user-menu entry (API mode); success signs out and returns to login.
+- **Token refresh:** Single-flight refresh hardened (no stale-token fallback); failed refresh clears session + `setAuthNotice` for login banner. FE proof: `scripts/test-auth-refresh-singleflight.ts`.
+- **Guards:** Unauthenticated → `/login` (`ApiAuthGate`); no permission → `PermissionDeniedPage` (403), distinct from `PageNotFoundPage` (404); `RequirePermission` alias.
+- **Lockout foundation:** Prisma `failedLoginAttempts` / `lockedUntil` on `users` (migration `20260727120000_auth_login_lockout`); 5 failures → 15 min lock; success/reset/change-password clear counters. IP rate limiter retained (friendlier message).
+- **Tests:** `backend/tests/auth-hardening.test.ts`.
+
+### PASS WITH CONDITION
+
+- **Forgot/reset email delivery:** Still stub — generic “if account exists…” response; **dev** returns `resetToken` in payload (no SMTP). Prod needs mailer or out-of-band token delivery (A5 / ops).
+
+---
+
+## 2026-07-27 — Phase B0: Purchase → GRN → Incoming QC → Inventory audit (read-only)
+
+### Shipped
+
+- **Audit doc:** `docs/PHASE_B_PURCHASE_GRN_QC_INVENTORY_AUDIT.md` — code-first audit of Purchase/GRN/Incoming QC/Inventory/AP-handoff. No source code changed.
+- **Headline finding:** `PROJECT_STATUS.md`/`REMAINING_WORK.md`/`fos-erp-project.mdc` §16 call this area "deferred by design, demo-only" — **code says otherwise**. GRN lifecycle, incoming QC (`PurchaseQualityInspection`), GRN→Inventory posting (single-writer `InventoryPostingService`), Purchase Return (GRN/QC-sourced), and Purchase Invoice→Vendor Invoice AP handoff are all real, tenant-scoped, permissioned, and covered by lifecycle tests. Frontend is dual-mode (`VITE_USE_API=true`) for GRN/QI/Return/Inventory, not demo-only.
+- **Top gaps identified:** (1) no incoming-QC ↔ NCR linkage (`QualityNcr` only FKs manufacturing inspections); (2) no end-to-end test asserting `InventoryStockMovement`/`InventoryStockBalance` after a GRN/QI flow; (3) `completeQualityInspection` swallows inventory-posting failures (log-and-continue, no compensating state); (4) no GRNI/GR-IR reconciliation report; (5) permission naming (`purchase.grn.*`, `purchase.quality.*`) differs from master-instruction vocabulary (`quality.incoming.*`, `inventory.purchase_receipt.*`) — naming only, not a functional gap; dormant `inventory.quality.*` permissions found unused.
+- **Recommendation:** Treat B1–B10 as hardening/closing gaps in a real system, not building from zero. Do not duplicate `InventoryPostingService` (`stock-posting.service.ts`), `purchase-inventory-posting.ts`, or the GRN/QI/Return/Invoice models — see the doc's "Do not duplicate" section.
+
+### Not started / unchanged
+
+- No code changes. `PROJECT_STATUS.md`/`REMAINING_WORK.md` update deferred to a follow-up session once the audit is accepted.
+
+---
+
+## 2026-07-27 — Phase A4: Roles / Permissions / Effective Access
+
+### Shipped
+
+- **Role builder UX:** full catalog module labels; presets (CRM User, Sales Viewer, Admin); mutate → auto-include `.view`.
+- **Effective Access:** `EffectiveAccessService` + `GET /api/v1/t/:tenantSlug/users/:userId/effective-access` (`user.view` or self); User detail section (API + demo).
+- **Safeguards (A4.6):** system roles immutable (403); last Tenant Admin protection (deactivate/delete/remove-role/strip role grants); non-admin actors can only assign permissions they hold.
+- **Tests:** `backend/tests/a4-roles-effective-access.test.ts`.
+
+### PASS WITH CONDITION (A4.4 data scope)
+
+- OWN / BRANCH / COMPANY scope enums **deferred** — no UserBranch model and no CRM/SO list filters this session.
+- Phase A ships **permission-only RBAC + EffectiveAccess**; branch ACL after A3 Users / post-A4.
+- **No fake scope picker** in UI.
+
+### Not started / unchanged
+
+- Phase A overall DoD; A3; A5–A9; A6/A7. (A1 auth + A2 Admin shell + A4 RBAC shipped.)
+
+---
+
+## 2026-07-27 — Sales tax invoice create prefill
+
+### Shipped
+
+- `/sales/invoices/new` (`CrmInvoiceCreatePage`): selecting Sales Order / Proforma / Customer now **auto-loads** customer, lines, addresses, commercial terms, and tax totals into the form.
+- **Create Draft Invoice** stays disabled until a source loads successfully with at least one invoiceable qty; partial qty edits still supported.
+- Shared prefill helper: `frontend/src/utils/taxInvoicePrefill.ts` (remaining SO qty respected).
+
+---
+
+## 2026-07-25 — Sales Payment Allocation UX redesign
+
+### Shipped
+
+- Extracted `SalesPaymentAllocationPage` under `frontend/src/modules/sales/` (Dynamics shell, Sales badge, `salesModuleBreadcrumbs`, KPI strip, two-panel workspace).
+- Command bar: Allocate (disabled when invalid), Tax Invoices / Sales Orders / Proforma links, Clear; Suggest allocate + live remaining validation.
+- Open-invoice table with StatusDot, overdue highlighting, receipt summary tiles, empty-state CTAs; allocate/reverse logic unchanged (`apiAllocatePayments` / store).
+- Routes: `/sales/payment-allocation` + legacy `/crm/commercial/payment-allocation`; `CrmPaymentAllocationPage` re-exports the new page (receipt Print/PDF untouched).
+
+---
+
+## 2026-07-25 — 184 34 m³ Tip Trailer quotation template
+
+### Shipped
+
+- New VF Word catalog template **`TIP-TRAILER-34M3`** / `qtpl-tip-trailer-34m3` from `184.34m3 Tip Trailer.docx` (archived `docs/quotation-template-sources/184-34m3-Tip-Trailer.docx`).
+- Sections: VFTT-34T tip semi trailer specs, body dimensions, BSK 46 construction, Hyva FC-191 tipping kit, York running gear, paint, optional/chargeable, terms (8 weeks / 40% advance).
+- Keep codes + seed + demo builtins updated; local seeded; live SQL `backend/scripts/seed-tip-trailer-34m3.sql`.
+
+---
+
+## 2026-07-25 — 183 31 m³ Tipping Tank quotation template
+
+### Shipped
+
+- New VF Word catalog template **`TIPPING-TANK-31M3`** / `qtpl-tipping-tank-31m3` from `183.31m3 Tipping Tank.docx` (archived `docs/quotation-template-sources/183-31m3-Tipping-Tank.docx`).
+- Sections: VFTT-31 SS 316L tipping tanker specs, chassis, pipeline/aeration/discharge (DN 300), tipping kit FC169/170, paint, optional/chargeable, terms (12 weeks / 30% advance).
+- Keep codes + seed + demo builtins updated; local seeded; live SQL `backend/scripts/seed-tipping-tank-31m3.sql`.
+
+---
+
+## 2026-07-25 — 178 16 KL Chemical Tanker quotation template
+
+### Shipped
+
+- New VF Word catalog template **`CHEM-TANKER-16KL`** / `qtpl-chem-tanker-16kl` from `178.16KL Chemical Tanker.docx` (archived `docs/quotation-template-sources/178-16KL-Chemical-Tanker.docx`).
+- Sections: VFT-16 aluminum circular tanker specs, nozzles/discharge (CF8M + PFA), catwalk/accessories, paint, optional/chargeable, terms (14 weeks / 30% advance).
+- Keep codes + seed + demo builtins updated; local seeded; live SQL `backend/scripts/seed-chem-tanker-16kl.sql`.
+
+---
+
+## 2026-07-25 — 165 40 ft Walking Floor quotation template
+
+### Shipped
+
+- New VF Word catalog template **`WALKING-FLOOR-40FT`** / `qtpl-walking-floor-40ft` from `165.40ft  Walking Floor.docx` (archived `docs/quotation-template-sources/165-40ft-Walking-Floor.docx`).
+- Sections: cover, customer, frame/structure, panels, dimensions, ratings, walking-floor attachments, surface protection/paint, scope, terms (3 months / 35% advance), signature.
+- Keep codes + seed + demo builtins updated; local seeded; live SQL `backend/scripts/seed-walking-floor-40ft.sql`.
+
+---
+
+## 2026-07-25 — 175 23 m³ Bulker quotation template
+
+### Shipped
+
+- New VF Word catalog template **`BULKER-23M3`** / `qtpl-bulker-23m3` from `175.23m3 Bulker.docx` (archived `docs/quotation-template-sources/175-23m3-Bulker.docx`).
+- Sections: VFB-23 specs (35 GVW), pipeline/discharge, manhole/safety/access, paint, optional/chargeable, terms (8 weeks / 30% advance).
+- Keep codes + seed + demo builtins updated; local seeded; live SQL `backend/scripts/seed-bulker-23m3.sql`.
+
+---
+
+## 2026-07-25 — 164 30.5 KL Chemical Tanker Trailer quotation template
+
+### Shipped
+
+- New VF Word catalog template **`CHEM-TANKER-30-5KL`** / `qtpl-chem-tanker-30-5kl` from `164.30.5 KL Chemical Tanker Trailer.docx` (archived `docs/quotation-template-sources/164-30.5KL-Chemical-Tanker-Trailer.docx`).
+- Sections: SS 304L elliptical tanker specs, connections/discharge, electrical/paint, York running gear + EBS, terms (30% advance / balance against delivery; 40–80 day batch note).
+- Keep codes + seed + demo builtins updated; local seeded; live SQL `backend/scripts/seed-chem-tanker-30-5kl.sql`.
+
+---
+
+## 2026-07-25 — 156 34′ × 5′ Side Wall Trailer quotation template
+
+### Shipped
+
+- New VF Word catalog template **`SIDEWALL-34FT-5FT`** / `qtpl-sidewall-34ft-5ft` from `156.34FT x5ft Side Wall Trailer.docx` (archived `docs/quotation-template-sources/156-34FT-x5ft-Side-Wall-Trailer.docx`).
+- Sections: specs (VFFT-34T), dimensions, body construction, running gear, electrical/paint/accessories, terms (10 weeks / 30% advance).
+- Keep codes + seed + demo builtins updated; local seeded; live SQL `backend/scripts/seed-sidewall-34ft-5ft.sql`.
+
+---
+
+## 2026-07-25 — 154 45 m³ Bulker Trailer quotation template
+
+### Shipped
+
+- New VF Word catalog template **`BULKER-TRAILER-45M3`** / `qtpl-bulker-trailer-45m3` from `154. 45m3 Bulker Trailer.docx` (archived `docs/quotation-template-sources/154-45m3-Bulker-Trailer.docx`).
+- Full sections: cover, customer, specs, dimensions, pipeline/discharge, safety, electrical, paint, **running gear** (York axles/air suspension/EBS), terms (12 weeks / 30% advance), signature.
+- Keep codes + seed + demo builtins updated (76/109/152/146/**154**).
+- Local DB seeded; live SQL: `backend/scripts/seed-bulker-trailer-45m3.sql` (`npx tsx scripts/seed-bulker-trailer-45m3.ts --emit-sql`).
+
+### Verification
+
+- Local `vasant-trailers`: `BULKER-TRAILER-45M3` active
+- Seed script idempotent create across tenants
+
+---
+
+## 2026-07-27 — Phase A A0: Deployment Hardening Audit
+
+### Shipped
+
+- Code-verified audit document [`docs/PHASE_A_DEPLOYMENT_HARDENING_AUDIT.md`](PHASE_A_DEPLOYMENT_HARDENING_AUDIT.md) covering Platform, Auth, Admin, MasterItem sales gaps, and CRM Product→Item `productId` inventory.
+- Locked delivery sequence A1→A9; A7 blocked until A6; no Phase B / MRP / FIFO / Purchase rewrite started.
+
+### Next
+
+- A1 Authentication hardening (messages, refresh proof, guards, change-password FE, lockout foundation).
+
+---
+
+## 2026-07-24 — CRM-only user (API mode RBAC)
 
 ### Shipped
 

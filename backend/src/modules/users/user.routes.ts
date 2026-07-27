@@ -50,6 +50,12 @@ router.post(
 )
 
 router.get(
+  '/:userId/effective-access',
+  validateParams(userIdParamSchema),
+  asyncHandler(userController.getEffectiveAccess),
+)
+
+router.get(
   '/:userId',
   requirePermission('user.view'),
   validateParams(userIdParamSchema),

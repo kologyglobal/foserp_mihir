@@ -9,12 +9,20 @@ export const ALLOWED_QUOTATION_TEMPLATE_IDS = new Set(
   DEFAULT_QUOTATION_TEMPLATES.map((t) => t.id),
 )
 
-/** API seed codes for the same Word-mapped templates (76 + 109 + 152 + 146). */
+/** API seed codes for the same Word-mapped templates (76 + 109 + 152 + 146 + 154 + 156 + 164 + 165 + 175 + 178 + 183 + 184). */
 export const ALLOWED_QUOTATION_TEMPLATE_CODES = new Set([
   'ISO-TANK-26KL',
   'ISO-DRY-BULK-25CBM',
   'FLOUR-BULKER-42M3',
   'TIPPER-30FE-M3',
+  'BULKER-TRAILER-45M3',
+  'SIDEWALL-34FT-5FT',
+  'CHEM-TANKER-30-5KL',
+  'WALKING-FLOOR-40FT',
+  'BULKER-23M3',
+  'CHEM-TANKER-16KL',
+  'TIPPING-TANK-31M3',
+  'TIP-TRAILER-34M3',
 ])
 
 const RETIRED_IDS = new Set<string>(RETIRED_BUILTIN_QUOTATION_TEMPLATE_IDS)
@@ -24,6 +32,14 @@ const VF_LETTERHEAD_TEMPLATE_IDS = new Set([
   'qtpl-iso-dry-bulk-25cbm',
   'qtpl-flour-bulker-42m3',
   'qtpl-tipper-30fe-m3',
+  'qtpl-bulker-trailer-45m3',
+  'qtpl-sidewall-34ft-5ft',
+  'qtpl-chem-tanker-30-5kl',
+  'qtpl-walking-floor-40ft',
+  'qtpl-bulker-23m3',
+  'qtpl-chem-tanker-16kl',
+  'qtpl-tipping-tank-31m3',
+  'qtpl-tip-trailer-34m3',
 ])
 
 export function isAllowedQuotationTemplate(

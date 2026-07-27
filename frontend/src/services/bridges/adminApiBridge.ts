@@ -83,8 +83,28 @@ export async function syncAdminTenantsFromApi(): Promise<void> {
   }
 }
 
+/**
+ * Load the session's current tenant into the admin store (GET /tenants/:id).
+ * Works for Tenant Admins with tenant.view — does not require Super Admin list access.
+ */
+export async function syncCurrentTenantProfile(): Promise<AdminTenant | null> {
+  const { getStoredSession } = await import('../api/client')
+  const session = getStoredSession()
+  const tenantId = session?.tenantId
+  if (!tenantId) return null
+  try {
+    const res = await api.fetchAdminTenantApi(tenantId)
+    upsertTenant(res.data)
+    return res.data
+  } catch {
+    return useAdminStore.getState().tenants.find((t) => t.id === tenantId) ?? null
+  }
+}
+
 export async function syncAdminFromApi(): Promise<void> {
   await Promise.all([syncAdminUsersFromApi(), syncAdminRolesFromApi(), syncAdminTenantsFromApi()])
+  // Best-effort current-tenant profile for Overview / Tenant Profile when list is empty
+  await syncCurrentTenantProfile()
   useAdminStore.setState({ hydrated: true })
 }
 
@@ -188,6 +208,10 @@ export async function apiRemoveAdminUserRole(userId: string, roleId: string): Pr
       return fail(err)
     }
   })
+}
+
+export async function apiFetchAdminUserEffectiveAccess(userId: string) {
+  return api.fetchAdminUserEffectiveAccessApi(userId)
 }
 
 // ─── Roles ──────────────────────────────────────────────────────────────────

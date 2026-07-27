@@ -25,7 +25,11 @@ const authAttemptLimiter = rateLimit({
   max: env.isDev || env.isTest ? 2000 : 30,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: 'Too many authentication attempts' },
+  message: {
+    success: false,
+    message: 'Too many sign-in attempts. Please wait a few minutes and try again.',
+    code: 'AUTH_RATE_LIMITED',
+  },
 })
 
 router.post('/login', authAttemptLimiter, validateBody(loginSchema), asyncHandler(authController.login))

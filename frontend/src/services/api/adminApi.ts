@@ -1,6 +1,7 @@
 import { apiRequest, tenantPath } from './client'
 import type {
   AdminDepartment,
+  AdminEffectiveAccess,
   AdminPermission,
   AdminRoleDetail,
   AdminRoleSummary,
@@ -174,6 +175,10 @@ export async function revokeAdminUserSessionsApi(userId: string) {
     method: 'POST',
     body: '{}',
   })
+}
+
+export async function fetchAdminUserEffectiveAccessApi(userId: string) {
+  return apiRequest<AdminEffectiveAccess>(tenantPath(`/users/${userId}/effective-access`))
 }
 
 // ─── Roles & Permissions ───────────────────────────────────────────────────

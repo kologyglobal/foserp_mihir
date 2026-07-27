@@ -99,5 +99,9 @@ export function ErpIconButton({
 }
 
 export function ErpButtonGroup({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('flex flex-wrap items-center gap-2', className)}>{children}</div>
+  return (
+    <div className={cn('erp-btn-group flex flex-wrap items-center gap-2', className)}>
+      {children}
+    </div>
+  )
 }

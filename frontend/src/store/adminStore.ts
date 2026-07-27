@@ -1,8 +1,16 @@
 import { create } from 'zustand'
-import type { AdminPermission, AdminRoleDetail, AdminRoleSummary, AdminTenant, AdminUser } from '../types/admin'
+import type {
+  AdminEffectiveAccess,
+  AdminPermission,
+  AdminRoleDetail,
+  AdminRoleSummary,
+  AdminTenant,
+  AdminUser,
+} from '../types/admin'
 import { seedAdminUsers, seedPermissionCatalog, seedRoleDetails, seedRoles, seedTenants } from '../data/admin/seed'
 import { isApiMode } from '../config/apiConfig'
 import type { StoreActionResult, MaybePromise } from './storeAction'
+import { userHasTenantAdminAccess } from '../utils/permissions/tenantAdmin'
 
 function genId(prefix: string) {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`
@@ -10,6 +18,22 @@ function genId(prefix: string) {
 
 function nowIso() {
   return new Date().toISOString()
+}
+
+function demoEligibleAdmins(users: AdminUser[]): AdminUser[] {
+  return users.filter(
+    (u) =>
+      (u.status === 'ACTIVE' || u.status === 'INVITED') &&
+      userHasTenantAdminAccess(u.roles),
+  )
+}
+
+function demoWouldRemoveLastAdmin(users: AdminUser[], userId: string, remainingRoles?: AdminUser['roles']): boolean {
+  const admins = demoEligibleAdmins(users)
+  const current = admins.find((u) => u.id === userId)
+  if (!current || admins.length > 1) return false
+  if (remainingRoles === undefined) return true
+  return !userHasTenantAdminAccess(remainingRoles)
 }
 
 interface AdminState {
@@ -40,6 +64,7 @@ interface AdminState {
   deactivateUser: (id: string) => MaybePromise<StoreActionResult>
   assignUserRole: (userId: string, roleId: string) => MaybePromise<StoreActionResult>
   removeUserRole: (userId: string, roleId: string) => MaybePromise<StoreActionResult>
+  getEffectiveAccess: (userId: string) => Promise<AdminEffectiveAccess | undefined>
 
   // Roles
   getRole: (id: string) => AdminRoleSummary | undefined
@@ -112,6 +137,16 @@ export const useAdminStore = create<AdminState>()((set, get) => ({
 
   updateUser: (id, data) => {
     if (isApiMode()) return import('../services/bridges/adminApiBridge').then((m) => m.apiUpdateAdminUser(id, data))
+    const existing = get().users.find((u) => u.id === id)
+    if (!existing) return { ok: false, error: 'User not found' }
+    if (
+      data.status &&
+      (data.status === 'INACTIVE' || data.status === 'BLOCKED' || data.status === 'ARCHIVED') &&
+      (existing.status === 'ACTIVE' || existing.status === 'INVITED') &&
+      demoWouldRemoveLastAdmin(get().users, id)
+    ) {
+      return { ok: false, error: 'Cannot remove or deactivate the last Tenant Administrator for this tenant' }
+    }
     set((s) => ({
       users: s.users.map((u) => (u.id === id ? { ...u, ...data, updatedAt: nowIso() } : u)),
     }))
@@ -120,6 +155,9 @@ export const useAdminStore = create<AdminState>()((set, get) => ({
 
   deleteUser: (id) => {
     if (isApiMode()) return import('../services/bridges/adminApiBridge').then((m) => m.apiDeleteAdminUser(id))
+    if (demoWouldRemoveLastAdmin(get().users, id)) {
+      return { ok: false, error: 'Cannot remove or deactivate the last Tenant Administrator for this tenant' }
+    }
     set((s) => ({
       users: s.users.map((u) => (u.id === id ? { ...u, status: 'ARCHIVED', updatedAt: nowIso() } : u)),
     }))
@@ -155,12 +193,46 @@ export const useAdminStore = create<AdminState>()((set, get) => ({
 
   removeUserRole: (userId, roleId) => {
     if (isApiMode()) return import('../services/bridges/adminApiBridge').then((m) => m.apiRemoveAdminUserRole(userId, roleId))
+    const user = get().users.find((u) => u.id === userId)
+    if (!user) return { ok: false, error: 'User not found' }
+    const remaining = user.roles.filter((r) => r.id !== roleId)
+    if (demoWouldRemoveLastAdmin(get().users, userId, remaining)) {
+      return { ok: false, error: 'Cannot remove or deactivate the last Tenant Administrator for this tenant' }
+    }
     set((s) => ({
       users: s.users.map((u) =>
         u.id === userId ? { ...u, roles: u.roles.filter((r) => r.id !== roleId), updatedAt: nowIso() } : u,
       ),
     }))
     return { ok: true }
+  },
+
+  getEffectiveAccess: async (userId) => {
+    if (isApiMode()) {
+      try {
+        const m = await import('../services/bridges/adminApiBridge')
+        const res = await m.apiFetchAdminUserEffectiveAccess(userId)
+        return res.data
+      } catch {
+        return undefined
+      }
+    }
+    const user = get().users.find((u) => u.id === userId)
+    if (!user) return undefined
+    const permissions = [
+      ...new Set(
+        user.roles.flatMap((r) => get().roleDetails.find((d) => d.id === r.id)?.permissions ?? []),
+      ),
+    ].sort()
+    return {
+      userId: user.id,
+      tenantId: user.tenantId,
+      roles: user.roles,
+      permissions,
+      permissionCount: permissions.length,
+      isSuperAdmin: permissions.includes('tenant.manage'),
+      isTenantAdmin: userHasTenantAdminAccess(user.roles, permissions),
+    }
   },
 
   getRole: (id) => get().roles.find((r) => r.id === id),

@@ -4,6 +4,8 @@ import { Building2, Eye, EyeOff, Lock, Mail, Users } from 'lucide-react'
 import { useAuth } from '@/context/AuthProvider'
 import { API_CONFIG } from '@/config/apiConfig'
 import { forgotPassword, fetchLoginDirectory, type LoginDirectoryUser } from '@/services/api/authApi'
+import { consumeAuthNotice } from '@/services/api/client'
+import { mapLoginErrorMessage } from '@/modules/auth/authMessages'
 
 const REMEMBER_KEY = 'fos_erp_login_remember'
 const VASANT_LOGO = '/brand/vasant-fabricators-logo.png'
@@ -189,6 +191,8 @@ export function LoginPage() {
 
   useEffect(() => {
     document.title = 'Sign in — Vasant Fabricators'
+    const notice = consumeAuthNotice()
+    if (notice) setInfo(notice)
   }, [])
 
   useEffect(() => {
@@ -254,12 +258,13 @@ export function LoginPage() {
       navigate(from, { replace: true })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Login failed'
-      if (message.toLowerCase().includes('invalid tenant') && email.includes('kologyerp')) {
+      const friendly = mapLoginErrorMessage(message)
+      if (friendly.toLowerCase().includes('invalid') && email.includes('kologyerp')) {
         setError(
-          `${message} — use admin@vasant-trailers.com (not admin@kologyerp.com), or pick a user below.`,
+          `${friendly} — use admin@vasant-trailers.com (not admin@kologyerp.com), or pick a user below.`,
         )
       } else {
-        setError(message)
+        setError(friendly)
       }
     } finally {
       setLoading(false)
@@ -418,8 +423,9 @@ export function LoginPage() {
                 (fromRaw !== '/crm'
                   ? 'Sign in to continue to the page you requested.'
                   : 'Sign in to your organization workspace — pick any user on the right')}
-              {view === 'forgot' && 'We will send reset instructions to your email'}
-              {view === 'reset' && 'Enter the token from your email and a new password'}
+              {view === 'forgot' &&
+                'Enter your organization and work email. If an account exists, reset instructions will be provided (development may show a reset token when email delivery is not configured).'}
+              {view === 'reset' && 'Enter the token from your email (or the development token) and a new password'}
               {view === 'accept-invite' && 'Set a password to activate your workspace account'}
             </p>
           </div>

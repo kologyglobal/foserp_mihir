@@ -1,7 +1,17 @@
 import { prisma } from '../../config/database.js'
 import { createAuditLog } from '../../services/audit.service.js'
-import { ConflictError, NotFoundError, ValidationError } from '../../utils/errors.js'
+import {
+  AuthorizationError,
+  ConflictError,
+  NotFoundError,
+  ValidationError,
+} from '../../utils/errors.js'
 import type { CreateRoleInput, UpdateRoleInput } from './role.validation.js'
+import {
+  ensureViewDependencies,
+  filterAssignablePermissions,
+  tenantWouldRetainAdminAfterRoleChange,
+} from './effective-access.service.js'
 
 export interface RoleSummary {
   id: string
@@ -37,6 +47,12 @@ interface AuditMeta {
   userAgent?: string | null
 }
 
+export interface ActorAccess {
+  userId: string
+  roles: string[]
+  permissions: string[]
+}
+
 const roleDetailInclude = {
   rolePermissions: { include: { permission: true } },
   _count: { select: { userRoles: true } },
@@ -64,6 +80,63 @@ function toRoleDetail(role: {
     createdAt: role.createdAt,
     updatedAt: role.updatedAt,
   }
+}
+
+function assertNotSystemRole(isSystem: boolean, action: 'modified' | 'deleted'): void {
+  if (isSystem) {
+    throw new AuthorizationError(`System roles cannot be ${action}`)
+  }
+}
+
+async function resolvePermissionIds(permissionNames: string[]): Promise<string[]> {
+  if (!permissionNames.length) return []
+  const permissions = await prisma.permission.findMany({
+    where: { name: { in: permissionNames } },
+  })
+  if (permissions.length !== permissionNames.length) {
+    const found = new Set(permissions.map((p) => p.name))
+    const missing = permissionNames.filter((name) => !found.has(name))
+    throw new ValidationError(
+      'Unknown permission name(s)',
+      missing.map((field) => ({ field, message: 'Unknown permission' })),
+    )
+  }
+  return permissions.map((p) => p.id)
+}
+
+async function preparePermissionNames(
+  requested: readonly string[],
+  actor?: ActorAccess,
+): Promise<string[]> {
+  const expanded = ensureViewDependencies(requested)
+  const known = await prisma.permission.findMany({
+    where: { name: { in: expanded } },
+    select: { name: true },
+  })
+  const knownSet = new Set(known.map((p) => p.name))
+  const missingRequested = requested.filter((name) => !knownSet.has(name))
+  if (missingRequested.length) {
+    throw new ValidationError(
+      'Unknown permission name(s)',
+      missingRequested.map((field) => ({ field, message: 'Unknown permission' })),
+    )
+  }
+  // Keep requested names + only those auto-view deps that exist in the catalog.
+  const withExistingViews = expanded.filter((name) => knownSet.has(name))
+
+  if (!actor) return withExistingViews
+
+  const { allowed, rejected } = filterAssignablePermissions(
+    withExistingViews,
+    actor.permissions,
+    actor.roles,
+  )
+  if (rejected.length) {
+    throw new AuthorizationError(
+      `Cannot assign permissions you do not hold: ${rejected.slice(0, 8).join(', ')}${rejected.length > 8 ? '…' : ''}`,
+    )
+  }
+  return allowed
 }
 
 export async function listRolesForTenant(tenantId: string): Promise<RoleSummary[]> {
@@ -103,29 +176,29 @@ export async function listPermissionCatalog(): Promise<PermissionCatalogEntry[]>
   const permissions = await prisma.permission.findMany({
     orderBy: [{ module: 'asc' }, { name: 'asc' }],
   })
-  return permissions.map((p) => ({ id: p.id, name: p.name, module: p.module, description: p.description }))
+  return permissions.map((p) => ({
+    id: p.id,
+    name: p.name,
+    module: p.module,
+    description: p.description,
+  }))
 }
 
-async function resolvePermissionIds(permissionNames: string[]): Promise<string[]> {
-  if (!permissionNames.length) return []
-  const permissions = await prisma.permission.findMany({
-    where: { name: { in: permissionNames } },
+export async function createRole(
+  tenantId: string,
+  input: CreateRoleInput,
+  audit?: AuditMeta,
+  actor?: ActorAccess,
+): Promise<RoleDetail> {
+  const existing = await prisma.role.findFirst({
+    where: { tenantId, name: input.name, deletedAt: null },
   })
-  if (permissions.length !== permissionNames.length) {
-    const found = new Set(permissions.map((p) => p.name))
-    const missing = permissionNames.filter((name) => !found.has(name))
-    throw new ValidationError('Unknown permission name(s)', missing.map((field) => ({ field, message: 'Unknown permission' })))
-  }
-  return permissions.map((p) => p.id)
-}
-
-export async function createRole(tenantId: string, input: CreateRoleInput, audit?: AuditMeta): Promise<RoleDetail> {
-  const existing = await prisma.role.findFirst({ where: { tenantId, name: input.name, deletedAt: null } })
   if (existing) {
     throw new ConflictError('Role with this name already exists')
   }
 
-  const permissionIds = await resolvePermissionIds(input.permissionNames)
+  const permissionNames = await preparePermissionNames(input.permissionNames, actor)
+  const permissionIds = await resolvePermissionIds(permissionNames)
 
   const role = await prisma.role.create({
     data: {
@@ -163,6 +236,7 @@ export async function updateRole(
   roleId: string,
   input: UpdateRoleInput,
   audit?: AuditMeta,
+  actor?: ActorAccess,
 ): Promise<RoleDetail> {
   const existing = await prisma.role.findFirst({
     where: { id: roleId, tenantId, deletedAt: null },
@@ -171,19 +245,33 @@ export async function updateRole(
   if (!existing) {
     throw new NotFoundError('Role not found')
   }
-  if (existing.isSystem) {
-    throw new ConflictError('System roles cannot be modified')
-  }
+  assertNotSystemRole(existing.isSystem, 'modified')
 
   if (input.name && input.name !== existing.name) {
-    const duplicate = await prisma.role.findFirst({ where: { tenantId, name: input.name, deletedAt: null } })
+    const duplicate = await prisma.role.findFirst({
+      where: { tenantId, name: input.name, deletedAt: null },
+    })
     if (duplicate && duplicate.id !== roleId) {
       throw new ConflictError('Role with this name already exists')
     }
   }
 
-  const permissionIds =
-    input.permissionNames !== undefined ? await resolvePermissionIds(input.permissionNames) : undefined
+  let permissionIds: string[] | undefined
+  let nextPermissionNames: string[] | undefined
+  if (input.permissionNames !== undefined) {
+    nextPermissionNames = await preparePermissionNames(input.permissionNames, actor)
+    const retainsAdmin = await tenantWouldRetainAdminAfterRoleChange(
+      tenantId,
+      roleId,
+      nextPermissionNames,
+    )
+    if (!retainsAdmin) {
+      throw new ConflictError(
+        'Cannot strip permissions that would leave the tenant without an administrator',
+      )
+    }
+    permissionIds = await resolvePermissionIds(nextPermissionNames)
+  }
 
   const role = await prisma.role.update({
     where: { id: roleId },
@@ -221,7 +309,11 @@ export async function updateRole(
   return detail
 }
 
-export async function deleteRole(tenantId: string, roleId: string, audit?: AuditMeta): Promise<RoleDetail> {
+export async function deleteRole(
+  tenantId: string,
+  roleId: string,
+  audit?: AuditMeta,
+): Promise<RoleDetail> {
   const existing = await prisma.role.findFirst({
     where: { id: roleId, tenantId, deletedAt: null },
     include: roleDetailInclude,
@@ -229,11 +321,16 @@ export async function deleteRole(tenantId: string, roleId: string, audit?: Audit
   if (!existing) {
     throw new NotFoundError('Role not found')
   }
-  if (existing.isSystem) {
-    throw new ConflictError('System roles cannot be deleted')
-  }
+  assertNotSystemRole(existing.isSystem, 'deleted')
   if (existing._count.userRoles > 0) {
     throw new ConflictError('Role is assigned to users; unassign before deleting')
+  }
+
+  const retainsAdmin = await tenantWouldRetainAdminAfterRoleChange(tenantId, roleId, null)
+  if (!retainsAdmin) {
+    throw new ConflictError(
+      'Cannot delete a role that would leave the tenant without an administrator',
+    )
   }
 
   const role = await prisma.role.update({

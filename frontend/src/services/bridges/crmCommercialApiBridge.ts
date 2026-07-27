@@ -1,5 +1,5 @@
 import { isApiMode } from '../../config/apiConfig'
-import { formatApiError } from '../api/apiErrors'
+import { ApiError, formatApiError } from '../api/apiErrors'
 import * as api from '../api/crmCommercialApi'
 import { useCrmCommercialStore } from '../../store/crmCommercialStore'
 import type {
@@ -30,15 +30,33 @@ function upsertAllocations(rows: CrmPaymentAllocation[]) {
   })
 }
 
+/**
+ * Hydrate commercial receivables. Requires `crm.commercial.view`.
+ * Swallow 403 so CRM AppShell hydration still succeeds for sales users
+ * without commercial rights (quotation templates, pipeline, etc.).
+ */
 export async function syncCommercialFromApi(): Promise<void> {
   if (!isApiMode()) return
-  const res = await api.fetchCommercialSync()
-  const data = res.data
-  useCrmCommercialStore.setState({
-    receipts: data.receipts ?? [],
-    invoices: data.invoices ?? [],
-    allocations: data.allocations ?? [],
-  })
+  try {
+    const res = await api.fetchCommercialSync()
+    const data = res.data
+    useCrmCommercialStore.setState({
+      receipts: data.receipts ?? [],
+      invoices: data.invoices ?? [],
+      allocations: data.allocations ?? [],
+    })
+  } catch (err) {
+    const status = err instanceof ApiError ? err.statusCode : 0
+    if (status === 403) {
+      useCrmCommercialStore.setState({
+        receipts: [],
+        invoices: [],
+        allocations: [],
+      })
+      return
+    }
+    throw err
+  }
 }
 
 export async function apiReceiveProformaPayment(

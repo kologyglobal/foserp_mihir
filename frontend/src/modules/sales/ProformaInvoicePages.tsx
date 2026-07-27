@@ -179,6 +179,11 @@ function ProformaInvoiceTable({
   emptyAction,
   onRowView,
   onRowPrint,
+  onCreateInvoice,
+  onReceivePayment,
+  canCreateInvoice = false,
+  canReceivePayment = false,
+  getProformaReceivedAmount,
   onBulkExport,
 }: {
   data: ProformaInvoice[]
@@ -192,6 +197,11 @@ function ProformaInvoiceTable({
   emptyAction?: React.ReactNode
   onRowView?: (row: ProformaInvoice) => void
   onRowPrint?: (row: ProformaInvoice) => void
+  onCreateInvoice?: (row: ProformaInvoice) => void
+  onReceivePayment?: (row: ProformaInvoice) => void
+  canCreateInvoice?: boolean
+  canReceivePayment?: boolean
+  getProformaReceivedAmount?: (proformaId: string) => number
   onBulkExport?: (rows: ProformaInvoice[]) => void
 }) {
   const densityClass = useDensityClass()
@@ -403,27 +413,60 @@ function ProformaInvoiceTable({
         enableSorting: false,
         enableHiding: false,
         meta: { columnLabel: 'Actions' },
-        cell: ({ row }) => (
-          <EnterpriseRowActionsMenu
-            actions={[
-              {
-                id: 'view',
-                label: 'View',
-                icon: Eye,
-                onClick: () => onRowView?.(row.original),
-              },
-              {
-                id: 'print',
-                label: 'Print / PDF',
-                icon: Printer,
-                onClick: () => onRowPrint?.(row.original),
-              },
-            ]}
-          />
-        ),
+        cell: ({ row }) => {
+          const pi = row.original
+          const issued = pi.status === 'issued'
+          const received = getProformaReceivedAmount?.(pi.id) ?? 0
+          const balance = Math.max(0, pi.gst.grandTotal - received)
+          const showCreateInvoice = issued && canCreateInvoice
+          const showReceivePayment = issued && canReceivePayment && balance > 0.009
+          return (
+            <EnterpriseRowActionsMenu
+              actions={[
+                {
+                  id: 'view',
+                  label: 'View',
+                  icon: Eye,
+                  onClick: () => onRowView?.(pi),
+                },
+                ...(showCreateInvoice
+                  ? [{
+                      id: 'create-invoice',
+                      label: 'Create Tax Invoice',
+                      icon: Receipt,
+                      onClick: () => onCreateInvoice?.(pi),
+                    }]
+                  : []),
+                ...(showReceivePayment
+                  ? [{
+                      id: 'receive-payment',
+                      label: 'Receive Payment',
+                      icon: Banknote,
+                      onClick: () => onReceivePayment?.(pi),
+                    }]
+                  : []),
+                {
+                  id: 'print',
+                  label: 'Print / PDF',
+                  icon: Printer,
+                  onClick: () => onRowPrint?.(pi),
+                },
+              ]}
+            />
+          )
+        },
       },
     ],
-    [getCustomer, onRowView, onRowPrint],
+    [
+      getCustomer,
+      onRowView,
+      onRowPrint,
+      onCreateInvoice,
+      onReceivePayment,
+      canCreateInvoice,
+      canReceivePayment,
+      getProformaReceivedAmount,
+    ],
   )
 
   const selectedRows = useMemo(
@@ -488,6 +531,21 @@ export function ProformaInvoiceListPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const proformas = useProformaInvoiceStore((s) => s.proformaInvoices)
   const getCustomer = useMasterStore((s) => s.getCustomer)
+  const receipts = useCrmCommercialStore((s) => s.receipts)
+  const canCreateInvoice = canCrmPermission('crm.commercial.invoice.create')
+  const canReceivePayment = canCrmPermission('crm.commercial.receipt.create')
+  const receivedAmountByProformaId = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const receipt of receipts) {
+      if (!receipt.proformaInvoiceId) continue
+      map.set(receipt.proformaInvoiceId, (map.get(receipt.proformaInvoiceId) ?? 0) + receipt.amount)
+    }
+    return map
+  }, [receipts])
+  const getProformaReceivedAmount = useCallback(
+    (proformaId: string) => receivedAmountByProformaId.get(proformaId) ?? 0,
+    [receivedAmountByProformaId],
+  )
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<ProformaInvoiceStatus | ''>('')
@@ -801,6 +859,11 @@ export function ProformaInvoiceListPage() {
             }
             onRowView={(row) => navigate(`/sales/proforma-invoices/${row.id}`)}
             onRowPrint={(row) => navigate(`/sales/proforma-invoices/${row.id}/print`)}
+            onCreateInvoice={(row) => navigate(`/sales/invoices/new?proformaId=${row.id}`)}
+            onReceivePayment={(row) => navigate(`/sales/proforma-invoices/${row.id}/receive-payment`)}
+            canCreateInvoice={canCreateInvoice}
+            canReceivePayment={canReceivePayment}
+            getProformaReceivedAmount={getProformaReceivedAmount}
             onBulkExport={exportProformas}
           />
         </EnterpriseRegisterTableShell>
@@ -904,7 +967,7 @@ export function ProformaInvoiceDetailPage() {
                     id: 'invoice',
                     label: 'Create Invoice',
                     icon: Receipt,
-                    onClick: () => navigate(`/crm/commercial/invoices/new?proformaId=${proforma.id}`),
+                    onClick: () => navigate(`/sales/invoices/new?proformaId=${proforma.id}`),
                   }]
                 : []),
               { id: 'print', label: 'Print', icon: Printer, onClick: () => navigate(`/sales/proforma-invoices/${proforma.id}/print`) },
@@ -942,7 +1005,7 @@ export function ProformaInvoiceDetailPage() {
                     paymentHistory.map((r) => (
                       <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-erp-border px-3 py-2 text-[13px]">
                         <div>
-                          <TableLink to={`/crm/commercial/receipts/${r.id}`}>{r.receiptNo}</TableLink>
+                          <TableLink to={`/sales/receipts/${r.id}`}>{r.receiptNo}</TableLink>
                           <span className="ml-2 text-erp-muted">
                             {formatDate(r.receiptDate)} · {r.paymentMode.toUpperCase()}
                             {r.transactionRef ? ` · ${r.transactionRef}` : ''}
@@ -958,7 +1021,7 @@ export function ProformaInvoiceDetailPage() {
           </div>
           <aside className="space-y-4">
             {paymentSummary ? (
-              <ErpCardSection title="Payment summary">
+              <ErpCardSection title="Payment summary" columns={1}>
                 <ErpFieldRow label="Proforma Amount" readOnly>{formatCurrency(paymentSummary.totalAmount)}</ErpFieldRow>
                 <ErpFieldRow label="Amount Received" readOnly>{formatCurrency(paymentSummary.amountReceived)}</ErpFieldRow>
                 <ErpFieldRow label="Balance Amount" readOnly>{formatCurrency(paymentSummary.balanceAmount)}</ErpFieldRow>
@@ -967,7 +1030,7 @@ export function ProformaInvoiceDetailPage() {
                 </ErpFieldRow>
               </ErpCardSection>
             ) : null}
-            <ErpCardSection title="Document links">
+            <ErpCardSection title="Document links" columns={1}>
               {proforma.salesOrderId ? (
                 <ErpFieldRow label="Sales Order">
                   <TableLink to={`/sales/orders/${proforma.salesOrderId}`}>{proforma.salesOrderNo}</TableLink>
@@ -982,8 +1045,8 @@ export function ProformaInvoiceDetailPage() {
                 <TableLink to={salesCustomer360Path(proforma.customerId)}>{proforma.customerName}</TableLink>
               </ErpFieldRow>
             </ErpCardSection>
-            <ErpCardSection title="Export">
-              <div className="col-span-2 flex flex-wrap gap-2">
+            <ErpCardSection title="Export" columns={1}>
+              <div className="flex flex-wrap gap-2">
                 <ErpButton variant="secondary" icon={Printer} onClick={() => navigate(`/sales/proforma-invoices/${proforma.id}/print`)}>
                   Print
                 </ErpButton>
@@ -995,7 +1058,7 @@ export function ProformaInvoiceDetailPage() {
                 </ErpButton>
               </div>
             </ErpCardSection>
-            <ErpCardSection title="Commercial">
+            <ErpCardSection title="Commercial" columns={1}>
               <ErpFieldRow label="Payment Terms" readOnly>{proforma.paymentTerms}</ErpFieldRow>
               <ErpFieldRow label="Delivery Terms" readOnly>{proforma.deliveryTerms}</ErpFieldRow>
               {proforma.customerPoNumber ? <ErpFieldRow label="Customer PO" readOnly>{proforma.customerPoNumber}</ErpFieldRow> : null}

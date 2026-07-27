@@ -170,7 +170,7 @@ export function normalizeIndiaMartEnquiry(
   const map: FieldMap = { ...DEFAULT_RESPONSE_FIELD_MAP }
   if (fieldMap) {
     for (const [k, v] of Object.entries(fieldMap)) {
-      if (v?.length) (map as Record<string, string[]>)[k] = v
+      if (v?.length) (map as unknown as Record<string, string[]>)[k] = v
     }
   }
 

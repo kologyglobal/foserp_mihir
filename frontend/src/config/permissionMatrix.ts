@@ -56,7 +56,9 @@ function mod(module: PermissionModule, actions: PermissionAction[]): PermissionK
 
 /** Route prefix → required view permission (longest match wins) */
 export const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: PermissionKey; pageName: string }> = [
-  { prefix: '/admin', permission: 'settings.view', pageName: 'Administration' },
+  { prefix: '/admin', permission: 'settings.view', pageName: 'Administration' }, // canRoute overrides with canAccessAdminShell()
+  { prefix: '/masters/approval-workflows', permission: 'approval.view', pageName: 'Approval Workflow' },
+  { prefix: '/masters/approval-matrix', permission: 'approval.view', pageName: 'Approval Workflow' },
   { prefix: '/masters/role-permissions', permission: 'settings.view', pageName: 'Role Permission Matrix' },
   { prefix: '/masters/permissions', permission: 'settings.view', pageName: 'Role Permission Matrix' },
   { prefix: '/masters/roles', permission: 'settings.view', pageName: 'Role Master' },

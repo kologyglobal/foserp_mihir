@@ -377,7 +377,7 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
             subtitle: `Against ${pi.proformaNo} · ${receipt.paymentMode.toUpperCase()}`,
             amount: receipt.amount,
             refId: receipt.id,
-            refPath: `/crm/commercial/receipts/${receipt.id}`,
+            refPath: `/sales/receipts/${receipt.id}`,
             at: ts,
           }),
         }))
@@ -461,7 +461,7 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
             subtitle: record.salesOrderNo ? `From ${record.salesOrderNo}` : 'Direct / CRM',
             amount: record.gst.grandTotal,
             refId: record.id,
-            refPath: `/crm/commercial/invoices/${record.id}`,
+            refPath: `/sales/invoices/${record.id}`,
             at: ts,
           }),
         }))
@@ -602,7 +602,7 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
             subtitle: 'Awaiting payment allocation',
             amount: inv.gst.grandTotal,
             refId: inv.id,
-            refPath: `/crm/commercial/invoices/${inv.id}`,
+            refPath: `/sales/invoices/${inv.id}`,
             at: ts,
           }),
         }))
@@ -734,7 +734,7 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
               subtitle: `From receipt ${alloc.receiptNo}`,
               amount: alloc.amount,
               refId: alloc.id,
-              refPath: '/crm/commercial/payment-allocation',
+              refPath: '/sales/payment-allocation',
               at: ts,
             })
           }

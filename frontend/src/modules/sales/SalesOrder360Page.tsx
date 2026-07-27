@@ -462,7 +462,7 @@ export function SalesOrder360Page() {
           : []),
         ...(so.status !== 'open' && !activeProforma ? [{ id: 'proforma', label: 'Create Proforma', icon: Receipt, onClick: () => navigate(buildProformaNewUrl(so.id)) }] : []),
         ...(so.status !== 'open' && canCrmPermission('crm.commercial.invoice.create')
-          ? [{ id: 'invoice', label: 'Create Invoice', icon: Banknote, onClick: () => navigate(`/crm/commercial/invoices/new?salesOrderId=${so.id}`) }]
+          ? [{ id: 'invoice', label: 'Create Invoice', icon: Banknote, onClick: () => navigate(`/sales/invoices/new?salesOrderId=${so.id}`) }]
           : []),
         { id: 'preview', label: 'Preview', icon: Printer, pin: true, onClick: () => navigate(printPath) },
         {

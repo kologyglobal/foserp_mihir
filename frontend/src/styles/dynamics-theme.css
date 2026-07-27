@@ -1072,34 +1072,49 @@ html {
 
   .d365-workspace-unified-actions {
     display: flex;
-    flex-shrink: 0;
+    flex-shrink: 1;
     flex-wrap: nowrap;
     align-self: center;
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
     margin-left: auto;
-    padding-top: 0;
-    max-width: min(720px, 58%);
-    overflow-x: auto;
-    scrollbar-width: none;
+    padding: 3px 2px;
+    max-width: min(100%, calc(100% - 10rem));
+    min-width: 0;
+    direction: ltr;
+    /* Do not scroll the outer strip — that clips the primary CTA on the left */
+    overflow: visible;
   }
 
-  .d365-workspace-unified-actions::-webkit-scrollbar {
-    display: none;
-  }
-
+  .d365-workspace-unified-actions .erp-command-bar,
   .d365-workspace-unified-actions .erp-command-bar--inline {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    width: auto;
+    justify-content: flex-start;
+    width: max-content;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none;
   }
 
-  .d365-workspace-unified-actions .erp-command-bar--inline .flex.items-center.gap-1 {
-    justify-content: flex-end;
+  .d365-workspace-unified-actions .erp-command-bar::-webkit-scrollbar,
+  .d365-workspace-unified-actions .erp-command-bar--inline::-webkit-scrollbar {
+    display: none;
+  }
+
+  .d365-workspace-unified-actions .erp-command-bar--inline .erp-command-group,
+  .d365-workspace-unified-actions .erp-command-bar--inline .erp-command-group__actions,
+  .d365-workspace-unified-actions .erp-command-bar--inline .flex.items-center.gap-1,
+  .d365-workspace-unified-actions .erp-command-bar--inline .flex.items-center.gap-1\.5 {
+    justify-content: flex-start;
     flex-wrap: nowrap;
     align-items: center;
+    gap: 6px;
+    overflow: visible;
   }
 
   @media (max-width: 1279px) {

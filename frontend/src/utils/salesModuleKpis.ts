@@ -1,11 +1,13 @@
 import {
   AlertTriangle,
+  ArrowLeftRight,
   CheckCircle2,
   Clock,
   Factory,
   FileText,
   ShoppingCart,
   Truck,
+  Wallet,
 } from 'lucide-react'
 import type { EnterpriseKpiItem } from '../design-system/enterprise/enterpriseKpiTypes'
 import { KPI_ICON_PRESETS, percentOf } from '../design-system/enterprise/enterpriseKpiUtils'
@@ -263,6 +265,133 @@ export function buildProformaRegisterKpis(
       icon: KPI_ICON_PRESETS.revenue,
       accent: 'slate',
       context: 'Excl. cancelled',
+      updatedAt: now(),
+    },
+  ]
+}
+
+export function buildTaxInvoiceRegisterKpis(
+  counts: {
+    total: number
+    draft: number
+    openBalance: number
+    overdue: number
+    openValue: number
+  },
+  statusFilter: string,
+  onStatusFilter: (status: string) => void,
+): EnterpriseKpiItem[] {
+  const { total, draft, openBalance, overdue, openValue } = counts
+
+  return [
+    {
+      id: 'total',
+      label: 'Tax Invoices',
+      value: total,
+      icon: KPI_ICON_PRESETS.open,
+      accent: 'blue',
+      context: 'GST tax invoices',
+      updatedAt: now(),
+    },
+    {
+      id: 'draft',
+      label: 'Draft',
+      value: draft,
+      icon: FileText,
+      accent: 'amber',
+      context: 'Ready to post',
+      active: statusFilter === 'draft',
+      onClick: () => onStatusFilter(statusFilter === 'draft' ? '' : 'draft'),
+      updatedAt: now(),
+    },
+    {
+      id: 'open',
+      label: 'Open Balance',
+      value: openBalance,
+      icon: Clock,
+      accent: openBalance > 0 ? 'amber' : 'green',
+      context: openBalance > 0 ? 'Awaiting collection' : 'All clear',
+      active: statusFilter === 'open',
+      onClick: () => onStatusFilter(statusFilter === 'open' ? '' : 'open'),
+      updatedAt: now(),
+    },
+    {
+      id: 'overdue',
+      label: 'Overdue',
+      value: overdue,
+      icon: AlertTriangle,
+      accent: overdue > 0 ? 'red' : 'slate',
+      context: overdue > 0 ? 'Past due date' : 'None overdue',
+      active: statusFilter === 'overdue',
+      onClick: () => onStatusFilter(statusFilter === 'overdue' ? '' : 'overdue'),
+      updatedAt: now(),
+    },
+    {
+      id: 'value',
+      label: 'Outstanding',
+      value: formatCompactCurrency(openValue),
+      icon: KPI_ICON_PRESETS.revenue,
+      accent: 'slate',
+      context: 'Balance due',
+      updatedAt: now(),
+    },
+  ]
+}
+
+/** Workspace KPIs for Sales Payment Allocation (customer + receipt context). */
+export function buildPaymentAllocationWorkspaceKpis(input: {
+  receiptUnallocated: number
+  openInvoiceCount: number
+  selectedTotal: number
+  remaining: number | null
+  hasReceipt: boolean
+}): EnterpriseKpiItem[] {
+  const { receiptUnallocated, openInvoiceCount, selectedTotal, remaining, hasReceipt } = input
+  const remainingAccent =
+    remaining == null ? 'slate' : remaining < -0.009 ? 'red' : remaining < 0.009 ? 'green' : 'amber'
+
+  return [
+    {
+      id: 'unallocated',
+      label: 'Receipt Unallocated',
+      value: hasReceipt ? formatCompactCurrency(receiptUnallocated) : '—',
+      icon: Wallet,
+      accent: hasReceipt && receiptUnallocated > 0.009 ? 'amber' : 'green',
+      context: hasReceipt ? 'Available to apply' : 'Select a receipt',
+      updatedAt: now(),
+    },
+    {
+      id: 'open-invoices',
+      label: 'Open Invoices',
+      value: openInvoiceCount,
+      icon: FileText,
+      accent: openInvoiceCount > 0 ? 'blue' : 'slate',
+      context: openInvoiceCount > 0 ? 'With balance due' : 'None open',
+      updatedAt: now(),
+    },
+    {
+      id: 'selected',
+      label: 'Allocating Now',
+      value: formatCompactCurrency(selectedTotal),
+      icon: ArrowLeftRight,
+      accent: selectedTotal > 0.009 ? 'blue' : 'slate',
+      context: 'Sum of amounts entered',
+      updatedAt: now(),
+    },
+    {
+      id: 'remaining',
+      label: 'Remaining',
+      value: remaining == null ? '—' : formatCompactCurrency(remaining),
+      icon: Clock,
+      accent: remainingAccent,
+      context:
+        remaining == null
+          ? 'Select receipt first'
+          : remaining < -0.009
+            ? 'Over receipt balance'
+            : remaining < 0.009
+              ? 'Fully applied'
+              : 'Still unallocated',
       updatedAt: now(),
     },
   ]

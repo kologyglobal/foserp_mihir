@@ -28,13 +28,13 @@ export function CommandBar({ children, className }: CommandBarProps) {
 
 export function CommandBarGroup({ children, label }: { children: ReactNode; label?: string }) {
   return (
-    <div className="flex items-center gap-1 border-r border-erp-border px-2 py-0.5 last:border-r-0">
+    <div className="erp-command-group flex items-center gap-1.5 border-r border-erp-border px-2 py-0 last:border-r-0">
       {label && (
         <span className="erp-command-group-label mr-1 hidden sm:inline">
           {label}
         </span>
       )}
-      <div className="flex flex-wrap items-center gap-1">{children}</div>
+      <div className="erp-command-group__actions flex flex-nowrap items-center gap-1.5">{children}</div>
     </div>
   )
 }
@@ -105,11 +105,12 @@ export function CommandBarButton({
       onFocus={onFocus}
       onBlur={onBlur}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold',
-        'transition-[transform,box-shadow,background,border-color,filter] duration-150',
+        'erp-command-btn',
+        'inline-flex h-9 min-h-9 max-h-9 shrink-0 items-center justify-center gap-1.5',
+        'box-border whitespace-nowrap rounded-lg px-3 py-0 text-[13px] font-semibold leading-none',
+        'transition-[box-shadow,background,border-color,filter] duration-150',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-erp-primary/30 focus-visible:ring-offset-1',
         'disabled:cursor-not-allowed disabled:opacity-40',
-        'enabled:hover:-translate-y-px enabled:active:translate-y-px enabled:active:scale-[0.98]',
         primary && 'erp-command-btn-primary text-white',
         accent && !primary && 'erp-command-btn-accent',
         !primary && !accent && 'border border-erp-border bg-erp-surface text-erp-text shadow-sm enabled:hover:border-erp-primary/35 enabled:hover:bg-erp-primary-soft enabled:hover:shadow-md',
@@ -119,12 +120,12 @@ export function CommandBarButton({
     >
       <Icon
         className={cn(
-          'h-4 w-4 shrink-0',
+          'erp-command-btn__icon h-4 w-4 shrink-0',
           primary ? 'text-white' : accent ? 'text-teal-700' : 'text-erp-primary',
         )}
         strokeWidth={1.75}
       />
-      <span>{label}</span>
+      <span className="erp-command-btn__label">{label}</span>
     </button>
   )
 
@@ -133,7 +134,7 @@ export function CommandBarButton({
   if (!disabledTooltip) return button
   return (
     <span
-      className="inline-flex"
+      className="erp-command-btn-wrap inline-flex h-9 items-center"
       onMouseEnter={(e) => setTipAnchor(e.currentTarget)}
       onMouseLeave={() => setTipAnchor(null)}
     >
@@ -213,6 +214,7 @@ export function CommandBarOverflowMenu({
         <CommandBarButton
           icon={TriggerIcon}
           label={label}
+          accent
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-haspopup="menu"

@@ -1,4 +1,10 @@
-import type { IndiaMartAlertSeverity, IndiaMartAlertType, IndiaMartConnection, IndiaMartEnquiry } from '@prisma/client'
+import type {
+  IndiaMartAlertSeverity,
+  IndiaMartAlertType,
+  IndiaMartConnection,
+  IndiaMartEnquiry,
+  Prisma,
+} from '@prisma/client'
 import { prisma } from '../../../../config/database.js'
 import type { IndiaMartConfigurationJson } from './indiamart.types.js'
 import { computeSlaStatus } from './indiamart.ingest.js'
@@ -31,7 +37,7 @@ export async function upsertAlert(input: {
       message: input.message,
       href: input.href ?? null,
       dedupeKey: input.dedupeKey,
-      metadata: input.metadata,
+      metadata: input.metadata as Prisma.InputJsonValue | undefined,
     },
     update: {
       title: input.title,
@@ -40,7 +46,7 @@ export async function upsertAlert(input: {
       href: input.href ?? null,
       isRead: false,
       readAt: null,
-      metadata: input.metadata,
+      metadata: input.metadata as Prisma.InputJsonValue | undefined,
     },
   })
 }

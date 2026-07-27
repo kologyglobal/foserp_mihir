@@ -1,6 +1,7 @@
 import type { AuthSession } from '../api/client'
 import { API_CONFIG } from '../../config/apiConfig'
 import { setStoredSession, withAccessExpiry } from '../api/client'
+import { mapForgotResetErrorMessage, mapLoginErrorMessage } from '../../modules/auth/authMessages'
 
 export async function login(email: string, password: string, tenantSlug?: string): Promise<AuthSession> {
   let res: Response
@@ -15,31 +16,39 @@ export async function login(email: string, password: string, tenantSlug?: string
       'Cannot reach the API server. Start the backend on port 5000 and use the same host for frontend (localhost or 127.0.0.1).',
     )
   }
-  const body = await res.json()
+  const body = await res.json().catch(() => ({} as { success?: boolean; message?: string; data?: AuthSession & { expiresIn?: number; user: AuthSession['user'] & { tenantId: string } } }))
   if (!res.ok || !body.success) {
-    throw new Error(body.message ?? 'Login failed')
+    throw new Error(mapLoginErrorMessage((body as { message?: string }).message ?? 'Login failed', res.status))
   }
+
+  const data = (body as { data: {
+    accessToken: string
+    refreshToken: string
+    expiresIn?: number
+    user: AuthSession['user'] & { tenantId: string }
+  } }).data
 
   const session = withAccessExpiry(
     {
-      accessToken: body.data.accessToken,
-      refreshToken: body.data.refreshToken,
-      tenantId: body.data.user.tenantId,
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+      tenantId: data.user.tenantId,
       tenantSlug: tenantSlug ?? API_CONFIG.tenantSlug,
       user: {
-        id: body.data.user.id,
-        firstName: body.data.user.firstName,
-        lastName: body.data.user.lastName,
-        email: body.data.user.email,
-        roles: body.data.user.roles,
-        permissions: body.data.user.permissions,
+        id: data.user.id,
+        firstName: data.user.firstName,
+        lastName: data.user.lastName,
+        email: data.user.email,
+        roles: data.user.roles,
+        permissions: data.user.permissions,
       },
     },
-    typeof body.data.expiresIn === 'number' ? body.data.expiresIn : undefined,
+    typeof data.expiresIn === 'number' ? data.expiresIn : undefined,
   )
   setStoredSession(session)
   return session
 }
+
 export async function logout(): Promise<void> {
   const { getStoredSession } = await import('../api/client')
   const session = getStoredSession()
@@ -128,9 +137,9 @@ export async function forgotPassword(
   } catch {
     throw new Error('Cannot reach the API server. Ensure the backend is running on port 5000.')
   }
-  const body = await res.json()
+  const body = await res.json().catch(() => ({} as { success?: boolean; message?: string; data?: { resetToken?: string } }))
   if (!res.ok || !body.success) {
-    throw new Error(body.message ?? 'Could not process password reset')
+    throw new Error(mapForgotResetErrorMessage(body.message ?? 'Could not process password reset', res.status))
   }
   return {
     message: body.message ?? 'If the account exists, a password reset link has been sent',
@@ -149,10 +158,19 @@ export async function resetPassword(token: string, password: string): Promise<vo
   } catch {
     throw new Error('Cannot reach the API server. Ensure the backend is running on port 5000.')
   }
-  const body = await res.json()
+  const body = await res.json().catch(() => ({} as { success?: boolean; message?: string }))
   if (!res.ok || !body.success) {
-    throw new Error(body.message ?? 'Password reset failed')
+    throw new Error(mapForgotResetErrorMessage(body.message ?? 'Password reset failed', res.status))
   }
+}
+
+/** Authenticated change-password — revokes all refresh tokens server-side. */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const { apiRequest } = await import('../api/client')
+  await apiRequest<null>('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  })
 }
 
 export async function acceptInvitation(token: string, password: string): Promise<void> {

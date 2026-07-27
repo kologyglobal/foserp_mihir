@@ -1,28 +1,39 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { type ColumnDef } from '@tanstack/react-table'
 import {
   Banknote,
+  Building2,
+  ChevronRight,
+  ClipboardList,
+  Download,
   FileText,
+  MapPin,
+  PenLine,
   Plus,
+  Printer,
+  Receipt,
   Send,
+  ShoppingBag,
   XCircle,
   ArrowLeftRight,
-  ShoppingCart,
 } from 'lucide-react'
 import { OperationalPageShell } from '../../../components/design-system/OperationalPageShell'
-import { SmartFilterBar } from '../../../components/design-system/SmartFilterBar'
-import { StatusDot } from '../../../components/design-system/StatusDot'
-import { DataTable } from '../../../components/tables/DataTable'
 import { ErpCommandBar } from '../../../components/erp/ErpCommandBar'
-import { ErpButton } from '../../../components/erp/ErpButton'
-import { ErpCardSection, ErpFieldRow } from '../../../components/erp/card-form'
-import { SearchInput } from '../../../components/ui/SearchInput'
+import { ErpCardSection, ErpFieldRow, ErpStickySaveBar } from '../../../components/erp/card-form'
+import { ErpSegmentedControl } from '../../../components/erp/ErpSegmentedControl'
+import { ErpSmartSelect } from '../../../components/erp/ErpSmartSelect'
 import { Select, Input, Textarea } from '../../../components/forms/Inputs'
 import { TableLink } from '../../../components/ui/AppLink'
 import { Toast } from '../../../components/ui/Toast'
 import { SELECT_PLACEHOLDER } from '../../../components/forms/selectStandards'
 import { salesCustomer360Path } from '../../../config/entity360Routes'
+import {
+  ENTERPRISE_FORM_CLASS,
+  EnterpriseBusinessFactBox,
+  EnterpriseFormContextPanel,
+} from '../../../design-system/workspace'
+import { SalesCardFormShell } from '../../sales/SalesCardFormShell'
+import { salesChildBreadcrumbs } from '../../../utils/salesNavigation'
 import { useCrmCommercialStore } from '../../../store/crmCommercialStore'
 import { useMasterStore } from '../../../store/masterStore'
 import { useMrpStore } from '../../../store/mrpStore'
@@ -30,158 +41,35 @@ import { useProformaInvoiceStore } from '../../../store/proformaInvoiceStore'
 import { formatCurrency } from '../../../utils/formatters/currency'
 import { formatDate } from '../../../utils/dates/format'
 import { canCrmPermission } from '../../../utils/permissions/crm'
+import { downloadPaymentReceiptPdf } from '../../../utils/paymentReceiptExport'
 import { notify } from '../../../store/toastStore'
 import { isApiMode } from '../../../config/apiConfig'
 import {
-  apiAllocatePayments,
   apiCancelDraftInvoice,
   apiCreateInvoice,
   apiPostInvoice,
   apiReceiveProformaPayment,
-  apiReverseAllocation,
 } from '../../../services/bridges/crmCommercialApiBridge'
-import type { CrmPaymentMode, CrmTaxInvoice, CrmTaxInvoiceStatus } from '../../../types/crmCommercial'
+import type { CrmPaymentMode } from '../../../types/crmCommercial'
 import {
   CRM_PAYMENT_MODE_LABELS,
   CRM_TAX_INVOICE_STATUS_LABELS,
   CRM_INVOICE_PAYMENT_STATUS_LABELS,
 } from '../../../types/crmCommercial'
-import type { StatusDotTone } from '../../../components/design-system/StatusDot'
-import { cn } from '../../../utils/cn'
+import { computeProformaLineTotals } from '../../../utils/proformaInvoiceLines'
+import { computeGst, gstSchemeLabel } from '../../../utils/gstEngine'
+import {
+  resolveTaxInvoiceFromProforma,
+  resolveTaxInvoiceFromSalesOrder,
+  type TaxInvoicePrefill,
+} from '../../../utils/taxInvoicePrefill'
+import { SalesTaxInvoiceListPage } from '../../sales/SalesTaxInvoiceListPage'
 
-function invoiceTone(status: CrmTaxInvoiceStatus): StatusDotTone {
-  if (status === 'paid') return 'success'
-  if (status === 'partially_paid' || status === 'posted') return 'warning'
-  if (status === 'cancelled') return 'danger'
-  return 'neutral'
-}
+type InvoiceCreateSource = 'sales_order' | 'proforma' | 'customer'
 
+/** @deprecated Use SalesTaxInvoiceListPage — kept for older imports. */
 export function CrmInvoiceListPage() {
-  const navigate = useNavigate()
-  const invoices = useCrmCommercialStore((s) => s.invoices)
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<CrmTaxInvoiceStatus | ''>('')
-  const canCreate = canCrmPermission('crm.commercial.invoice.create')
-
-  const filtered = useMemo(() => {
-    let list = [...invoices]
-    if (statusFilter) list = list.filter((i) => i.status === statusFilter)
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (i) =>
-          i.invoiceNo.toLowerCase().includes(q)
-          || i.customerName.toLowerCase().includes(q)
-          || (i.salesOrderNo ?? '').toLowerCase().includes(q)
-          || (i.proformaNo ?? '').toLowerCase().includes(q),
-      )
-    }
-    return list.sort((a, b) => b.invoiceDate.localeCompare(a.invoiceDate))
-  }, [invoices, search, statusFilter])
-
-  const columns = useMemo<ColumnDef<CrmTaxInvoice, unknown>[]>(
-    () => [
-      {
-        accessorKey: 'invoiceNo',
-        header: 'Invoice No.',
-        cell: ({ row }) => (
-          <TableLink to={`/crm/commercial/invoices/${row.original.id}`}>{row.original.invoiceNo}</TableLink>
-        ),
-      },
-      {
-        accessorKey: 'status',
-        header: 'Status',
-        cell: ({ row }) => (
-          <StatusDot label={CRM_TAX_INVOICE_STATUS_LABELS[row.original.status]} tone={invoiceTone(row.original.status)} />
-        ),
-      },
-      {
-        accessorKey: 'customerName',
-        header: 'Customer',
-        cell: ({ row }) => (
-          <TableLink to={salesCustomer360Path(row.original.customerId)}>{row.original.customerName}</TableLink>
-        ),
-      },
-      {
-        accessorKey: 'invoiceDate',
-        header: 'Date',
-        cell: ({ row }) => formatDate(row.original.invoiceDate),
-      },
-      {
-        id: 'total',
-        header: 'Amount',
-        cell: ({ row }) => formatCurrency(row.original.gst.grandTotal),
-      },
-      {
-        id: 'balance',
-        header: 'Balance',
-        cell: ({ row }) => formatCurrency(row.original.balanceDue),
-      },
-      {
-        id: 'so',
-        header: 'SO',
-        cell: ({ row }) =>
-          row.original.salesOrderId ? (
-            <TableLink to={`/crm/sales-orders/${row.original.salesOrderId}`}>{row.original.salesOrderNo}</TableLink>
-          ) : (
-            '—'
-          ),
-      },
-    ],
-    [],
-  )
-
-  return (
-    <OperationalPageShell
-      variant="dynamics"
-      badge="CRM Commercial"
-      title="Tax Invoices"
-      description="Create and track tax invoices from sales orders and proformas — without leaving CRM"
-      breadcrumbs={[
-        { label: 'CRM', to: '/crm' },
-        { label: 'Tax Invoices' },
-      ]}
-      favoritePath="/crm/commercial/invoices"
-      commandBar={(
-        <ErpCommandBar
-          sticky={false}
-          primaryAction={
-            canCreate
-              ? { id: 'new', label: 'Create Invoice', icon: Plus, onClick: () => navigate('/crm/commercial/invoices/new') }
-              : undefined
-          }
-          secondaryActions={[
-            { id: 'alloc', label: 'Payment Allocation', icon: ArrowLeftRight, onClick: () => navigate('/crm/commercial/payment-allocation') },
-          ]}
-        />
-      )}
-      filterBar={(
-        <SmartFilterBar resultCount={filtered.length}>
-          <SearchInput value={search} onChange={setSearch} placeholder="Search invoice, customer, SO…" className="w-72" />
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as CrmTaxInvoiceStatus | '')} className="h-9 w-40 text-[13px]">
-            <option value="">All statuses</option>
-            {(Object.keys(CRM_TAX_INVOICE_STATUS_LABELS) as CrmTaxInvoiceStatus[]).map((s) => (
-              <option key={s} value={s}>{CRM_TAX_INVOICE_STATUS_LABELS[s]}</option>
-            ))}
-          </Select>
-        </SmartFilterBar>
-      )}
-    >
-      <DataTable
-        data={filtered}
-        columns={columns}
-        stickyFirstColumn
-        zebra
-        toolbar="compact"
-        showCompactSearch={false}
-        pageSize={50}
-        showPagination
-        getRowId={(row) => row.id}
-        onRowView={(row) => navigate(`/crm/commercial/invoices/${row.id}`)}
-        emptyMessage="No tax invoices yet. Create one from a sales order, proforma, or customer."
-      />
-    </OperationalPageShell>
-  )
+  return <SalesTaxInvoiceListPage />
 }
 
 export function CrmInvoiceDetailPage() {
@@ -199,8 +87,8 @@ export function CrmInvoiceDetailPage() {
 
   if (!invoice) {
     return (
-      <OperationalPageShell title="Invoice not found" breadcrumbs={[{ label: 'CRM', to: '/crm' }, { label: 'Not found' }]}>
-        <Link to="/crm/commercial/invoices" className="text-sm font-semibold text-erp-primary">Back to invoices</Link>
+      <OperationalPageShell title="Invoice not found" breadcrumbs={[{ label: 'Sales', to: '/sales' }, { label: 'Not found' }]}>
+        <Link to="/sales/invoices" className="text-sm font-semibold text-erp-primary">Back to invoices</Link>
       </OperationalPageShell>
     )
   }
@@ -216,15 +104,15 @@ export function CrmInvoiceDetailPage() {
       <Toast message={toast} />
       <OperationalPageShell
         variant="dynamics"
-        badge="CRM Commercial"
+        badge="Sales"
         title={invoice.invoiceNo}
         description={`${invoice.customerName} · ${CRM_TAX_INVOICE_STATUS_LABELS[invoice.status]}`}
         breadcrumbs={[
-          { label: 'CRM', to: '/crm' },
-          { label: 'Tax Invoices', to: '/crm/commercial/invoices' },
+          { label: 'Sales', to: '/sales' },
+          { label: 'Tax Invoices', to: '/sales/invoices' },
           { label: invoice.invoiceNo },
         ]}
-        favoritePath={`/crm/commercial/invoices/${invoice.id}`}
+        favoritePath={`/sales/invoices/${invoice.id}`}
         commandBar={(
           <ErpCommandBar
             sticky={false}
@@ -244,7 +132,7 @@ export function CrmInvoiceDetailPage() {
                       id: 'alloc',
                       label: 'Allocate Payment',
                       icon: ArrowLeftRight,
-                      onClick: () => navigate(`/crm/commercial/payment-allocation?customerId=${invoice.customerId}&invoiceId=${invoice.id}`),
+                      onClick: () => navigate(`/sales/payment-allocation?customerId=${invoice.customerId}&invoiceId=${invoice.id}`),
                     }
                   : undefined
             }
@@ -353,6 +241,26 @@ export function CrmInvoiceDetailPage() {
   )
 }
 
+function patchPrefillLineQty(prefill: TaxInvoicePrefill, lineId: string, qtyRaw: string): TaxInvoicePrefill {
+  const qty = Number(qtyRaw)
+  const lines = prefill.lines.map((line) => {
+    if (line.id !== lineId) return line
+    const capped = Number.isFinite(qty)
+      ? Math.min(Math.max(0, qty), line.maxQty ?? line.qty)
+      : 0
+    const totals = computeProformaLineTotals({ ...line, qty: capped })
+    return { ...line, qty: capped, ...totals }
+  })
+  const withNos = lines.map((line, idx) => ({ ...line, lineNo: idx + 1 }))
+  const taxable = withNos.reduce((s, l) => s + l.taxableValue, 0)
+  const avgRate = withNos.length ? withNos.reduce((s, l) => s + l.taxPct, 0) / withNos.length : 18
+  return {
+    ...prefill,
+    lines: withNos,
+    gst: computeGst(taxable, prefill.customerState, avgRate),
+  }
+}
+
 export function CrmInvoiceCreatePage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -360,226 +268,649 @@ export function CrmInvoiceCreatePage() {
   const proformaId = params.get('proformaId')
   const customerIdParam = params.get('customerId')
 
-  const createFromSo = useCrmCommercialStore((s) => s.createInvoiceFromSalesOrder)
-  const createFromPi = useCrmCommercialStore((s) => s.createInvoiceFromProforma)
+  const createInvoice = useCrmCommercialStore((s) => s.createInvoice)
   const salesOrders = useMrpStore((s) => s.salesOrders)
   const proformas = useProformaInvoiceStore((s) => s.proformaInvoices)
   const customers = useMasterStore((s) => s.customers)
   const getCustomer = useMasterStore((s) => s.getCustomer)
 
-  const [sourceType, setSourceType] = useState<'sales_order' | 'proforma' | 'customer'>(
+  const [sourceType, setSourceType] = useState<InvoiceCreateSource>(
     salesOrderId ? 'sales_order' : proformaId ? 'proforma' : 'customer',
   )
   const [selectedSo, setSelectedSo] = useState(salesOrderId ?? '')
   const [selectedPi, setSelectedPi] = useState(proformaId ?? '')
   const [selectedCustomer, setSelectedCustomer] = useState(customerIdParam ?? '')
+  const [prefill, setPrefill] = useState<TaxInvoicePrefill | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+
+  const confirmedSos = useMemo(
+    () => salesOrders.filter((s) => s.status !== 'open' && s.status !== 'closed'),
+    [salesOrders],
+  )
+  const issuedPis = useMemo(() => proformas.filter((p) => p.status === 'issued'), [proformas])
+
+  const soOptions = useMemo(
+    () =>
+      confirmedSos.map((so) => ({
+        value: so.id,
+        label: `${so.salesOrderNo} — ${getCustomer(so.customerId)?.customerName ?? so.customerId}`,
+        searchText: `${so.salesOrderNo} ${getCustomer(so.customerId)?.customerName ?? ''}`.toLowerCase(),
+      })),
+    [confirmedSos, getCustomer],
+  )
+  const piOptions = useMemo(
+    () =>
+      issuedPis.map((pi) => ({
+        value: pi.id,
+        label: `${pi.proformaNo} — ${pi.customerName}`,
+        searchText: `${pi.proformaNo} ${pi.customerName}`.toLowerCase(),
+      })),
+    [issuedPis],
+  )
+  const customerOptions = useMemo(
+    () =>
+      customers
+        .filter((c) => c.isActive)
+        .map((c) => ({
+          value: c.id,
+          label: c.customerName,
+          searchText: `${c.customerName} ${c.customerCode ?? ''}`.toLowerCase(),
+        })),
+    [customers],
+  )
+
+  const activeLines = useMemo(
+    () => (prefill ? prefill.lines.filter((l) => l.qty > 0) : []),
+    [prefill],
+  )
+  const canCreate = Boolean(prefill && activeLines.length > 0 && !creating)
+
+  const sourceDone = Boolean(
+    (sourceType === 'sales_order' && selectedSo && prefill) ||
+      (sourceType === 'proforma' && selectedPi && prefill) ||
+      (sourceType === 'customer' && selectedCustomer && prefill),
+  )
+  const linesDone = activeLines.length > 0
+  const completionItems = useMemo(
+    () => [
+      { id: 'source', label: 'Source document', done: sourceDone },
+      { id: 'lines', label: 'Invoice lines', done: linesDone },
+      { id: 'review', label: 'Ready to create', done: canCreate },
+    ],
+    [sourceDone, linesDone, canCreate],
+  )
+  const completionPercent = Math.round(
+    (completionItems.filter((i) => i.done).length / completionItems.length) * 100,
+  )
+
+  function clearLoaded() {
+    setPrefill(null)
+  }
+
+  function loadFromSalesOrder(soId: string) {
+    if (!soId) {
+      clearLoaded()
+      setError(null)
+      return
+    }
+    const result = resolveTaxInvoiceFromSalesOrder(soId)
+    if (!result.ok) {
+      clearLoaded()
+      setError(result.error)
+      return
+    }
+    setPrefill(result.data)
+    setError(null)
+  }
+
+  function loadFromProforma(piId: string) {
+    if (!piId) {
+      clearLoaded()
+      setError(null)
+      return
+    }
+    const result = resolveTaxInvoiceFromProforma(piId)
+    if (!result.ok) {
+      clearLoaded()
+      setError(result.error)
+      return
+    }
+    setPrefill(result.data)
+    setError(null)
+  }
+
+  function loadFromCustomer(customerId: string) {
+    if (!customerId) {
+      clearLoaded()
+      setError(null)
+      return
+    }
+    const so = confirmedSos.find((s) => s.customerId === customerId)
+    if (!so) {
+      clearLoaded()
+      setError('No confirmed sales order found for this customer. Create an invoice from an SO or proforma instead.')
+      return
+    }
+    setSelectedSo(so.id)
+    loadFromSalesOrder(so.id)
+  }
+
+  function switchSourceType(next: InvoiceCreateSource) {
+    setSourceType(next)
+    clearLoaded()
+    setError(null)
+    if (next !== 'sales_order') setSelectedSo('')
+    if (next !== 'proforma') setSelectedPi('')
+    if (next !== 'customer') setSelectedCustomer('')
+  }
+
+  useEffect(() => {
+    if (salesOrderId) loadFromSalesOrder(salesOrderId)
+    else if (proformaId) loadFromProforma(proformaId)
+    else if (customerIdParam) loadFromCustomer(customerIdParam)
+    // Initial deep-link preload only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function persistDraft(
+    localCreate: () => { ok: boolean; error?: string; id?: string },
+  ): Promise<{ ok: boolean; error?: string; id?: string }> {
+    if (!isApiMode()) return localCreate()
+
+    const local = localCreate()
+    if (!local.ok || !local.id) return local
+    const draft = useCrmCommercialStore.getState().getInvoice(local.id)
+    useCrmCommercialStore.setState((s) => ({
+      invoices: s.invoices.filter((i) => i.id !== local.id),
+    }))
+    if (!draft) return { ok: false, error: 'Draft invoice missing after create' }
+    return apiCreateInvoice({
+      customerId: draft.customerId,
+      source: draft.source,
+      salesOrderId: draft.salesOrderId,
+      salesOrderNo: draft.salesOrderNo,
+      proformaInvoiceId: draft.proformaInvoiceId,
+      proformaNo: draft.proformaNo,
+      quotationId: draft.quotationId,
+      quotationNo: draft.quotationNo,
+      paymentTerms: draft.paymentTerms,
+      deliveryTerms: draft.deliveryTerms,
+      customerPoNumber: draft.customerPoNumber,
+      billingAddress: draft.billingAddress,
+      shippingAddress: draft.shippingAddress,
+      remarks: draft.remarks,
+      customerState: draft.customerState,
+      lines: draft.lines,
+    })
+  }
 
   async function handleCreate() {
     setError(null)
-    let result: { ok: boolean; error?: string; id?: string }
-    if (sourceType === 'sales_order') {
-      if (!selectedSo) {
-        setError('Select a sales order.')
-        return
-      }
-      if (isApiMode()) {
-        const local = createFromSo(selectedSo)
-        if (!local.ok || !local.id) {
-          setError(local.error ?? 'Could not create invoice')
-          return
-        }
-        const draft = useCrmCommercialStore.getState().getInvoice(local.id)
-        if (!draft) {
-          setError('Draft invoice missing after create')
-          return
-        }
-        // Remove local-only draft and persist via API
-        useCrmCommercialStore.setState((s) => ({
-          invoices: s.invoices.filter((i) => i.id !== local.id),
-        }))
-        result = await apiCreateInvoice({
-          customerId: draft.customerId,
-          source: draft.source,
-          salesOrderId: draft.salesOrderId,
-          salesOrderNo: draft.salesOrderNo,
-          quotationId: draft.quotationId,
-          quotationNo: draft.quotationNo,
-          paymentTerms: draft.paymentTerms,
-          deliveryTerms: draft.deliveryTerms,
-          customerPoNumber: draft.customerPoNumber,
-          billingAddress: draft.billingAddress,
-          shippingAddress: draft.shippingAddress,
-          remarks: draft.remarks,
-          customerState: draft.customerState,
-          lines: draft.lines,
-        })
-      } else {
-        result = createFromSo(selectedSo)
-      }
-    } else if (sourceType === 'proforma') {
-      if (!selectedPi) {
-        setError('Select a proforma invoice.')
-        return
-      }
-      if (isApiMode()) {
-        const local = createFromPi(selectedPi)
-        if (!local.ok || !local.id) {
-          setError(local.error ?? 'Could not create invoice')
-          return
-        }
-        const draft = useCrmCommercialStore.getState().getInvoice(local.id)
-        useCrmCommercialStore.setState((s) => ({
-          invoices: s.invoices.filter((i) => i.id !== local.id),
-        }))
-        if (!draft) {
-          setError('Draft invoice missing after create')
-          return
-        }
-        result = await apiCreateInvoice({
-          customerId: draft.customerId,
-          source: draft.source,
-          salesOrderId: draft.salesOrderId,
-          salesOrderNo: draft.salesOrderNo,
-          proformaInvoiceId: draft.proformaInvoiceId,
-          proformaNo: draft.proformaNo,
-          quotationId: draft.quotationId,
-          quotationNo: draft.quotationNo,
-          paymentTerms: draft.paymentTerms,
-          deliveryTerms: draft.deliveryTerms,
-          customerPoNumber: draft.customerPoNumber,
-          billingAddress: draft.billingAddress,
-          shippingAddress: draft.shippingAddress,
-          remarks: draft.remarks,
-          customerState: draft.customerState,
-          lines: draft.lines,
-        })
-      } else {
-        result = createFromPi(selectedPi)
-      }
-    } else {
-      if (!selectedCustomer) {
-        setError('Select a customer.')
-        return
-      }
-      const so = salesOrders.find((s) => s.customerId === selectedCustomer && s.status !== 'open')
-      if (so) {
-        if (isApiMode()) {
-          const local = createFromSo(so.id)
-          if (!local.ok || !local.id) {
-            setError(local.error ?? 'Could not create invoice')
-            return
-          }
-          const draft = useCrmCommercialStore.getState().getInvoice(local.id)
-          useCrmCommercialStore.setState((s) => ({
-            invoices: s.invoices.filter((i) => i.id !== local.id),
-          }))
-          if (!draft) {
-            setError('Draft invoice missing after create')
-            return
-          }
-          result = await apiCreateInvoice({
-            customerId: draft.customerId,
-            source: draft.source,
-            salesOrderId: draft.salesOrderId,
-            salesOrderNo: draft.salesOrderNo,
-            quotationId: draft.quotationId,
-            quotationNo: draft.quotationNo,
-            paymentTerms: draft.paymentTerms,
-            deliveryTerms: draft.deliveryTerms,
-            customerPoNumber: draft.customerPoNumber,
-            billingAddress: draft.billingAddress,
-            shippingAddress: draft.shippingAddress,
-            remarks: draft.remarks,
-            customerState: draft.customerState,
-            lines: draft.lines,
-          })
-        } else {
-          result = createFromSo(so.id)
-        }
-      } else {
-        setError('No confirmed sales order found for this customer. Create an invoice from an SO or proforma instead.')
-        return
-      }
+    if (!prefill || activeLines.length === 0) {
+      setError('Select a source document to load the invoice first.')
+      return
     }
+
+    setCreating(true)
+    const result = await persistDraft(() =>
+      createInvoice({
+        customerId: prefill.customerId,
+        source: prefill.source,
+        salesOrderId: prefill.salesOrderId,
+        proformaInvoiceId: prefill.proformaInvoiceId,
+        quotationId: prefill.quotationId,
+        quotationNo: prefill.quotationNo,
+        paymentTerms: prefill.paymentTerms,
+        deliveryTerms: prefill.deliveryTerms,
+        customerPoNumber: prefill.customerPoNumber,
+        billingAddress: prefill.billingAddress,
+        shippingAddress: prefill.shippingAddress,
+        remarks: prefill.remarks,
+        lines: activeLines,
+      }),
+    )
+
+    setCreating(false)
     if (!result.ok || !result.id) {
       setError(result.error ?? 'Could not create invoice')
       return
     }
     notify.success('Draft invoice created')
-    navigate(`/crm/commercial/invoices/${result.id}`)
+    navigate(`/sales/invoices/${result.id}`)
   }
 
-  const confirmedSos = salesOrders.filter((s) => s.status !== 'open' && s.status !== 'closed')
-  const issuedPis = proformas.filter((p) => p.status === 'issued')
+  const documentStrip = [
+    { label: 'Invoice', value: 'New draft', highlight: true },
+    { label: 'Status', value: 'Not created' },
+    {
+      label: 'Source',
+      value:
+        sourceType === 'sales_order'
+          ? 'Sales Order'
+          : sourceType === 'proforma'
+            ? 'Proforma'
+            : 'Customer',
+    },
+    {
+      label: 'Customer',
+      value: prefill?.customerName ?? '—',
+      highlight: Boolean(prefill?.customerName),
+    },
+    {
+      label: 'Lines',
+      value: prefill ? String(activeLines.length) : '—',
+    },
+    {
+      label: 'Grand Total',
+      value: prefill ? formatCurrency(prefill.gst.grandTotal) : '—',
+      highlight: Boolean(prefill),
+    },
+  ]
+
+  const factBox = (
+    <EnterpriseBusinessFactBox
+      completion={{ percent: completionPercent, items: completionItems }}
+      aiInsights={[
+        {
+          id: 'ready',
+          label: 'Readiness',
+          value: canCreate ? 'Ready to create draft' : sourceDone ? 'Review lines & totals' : 'Select a source',
+          tone: canCreate ? ('success' as const) : ('warning' as const),
+        },
+        {
+          id: 'next',
+          label: 'Suggested Next',
+          value: !sourceDone
+            ? 'Choose SO, proforma, or customer'
+            : !linesDone
+              ? 'Set at least one line qty > 0'
+              : 'Create draft invoice',
+          tone: 'info' as const,
+        },
+      ]}
+    >
+      <EnterpriseFormContextPanel
+        summaryTitle="Invoice preview"
+        actionsTitle="Quick actions"
+        summary={[
+          { label: 'Customer', value: prefill?.customerName ?? '—' },
+          {
+            label: 'Document',
+            value: prefill?.salesOrderNo ?? prefill?.proformaNo ?? '—',
+          },
+          { label: 'Active lines', value: String(activeLines.length) },
+          {
+            label: 'Grand total',
+            value: prefill ? formatCurrency(prefill.gst.grandTotal) : '—',
+            highlight: true,
+          },
+          {
+            label: 'Tax scheme',
+            value: prefill ? gstSchemeLabel(prefill.gst.scheme) : '—',
+          },
+        ]}
+        actions={[
+          {
+            id: 'create',
+            label: creating ? 'Creating…' : 'Create Draft Invoice',
+            icon: canCreate ? ChevronRight : Plus,
+            primary: true,
+            onClick: () => void handleCreate(),
+            disabled: !canCreate,
+          },
+          {
+            id: 'list',
+            label: 'Tax Invoice Register',
+            icon: ClipboardList,
+            onClick: () => navigate('/sales/invoices'),
+          },
+        ]}
+      />
+      <p className="mt-3 rounded-lg border border-erp-border bg-erp-surface-alt/60 p-3 text-[12px] text-erp-muted">
+        Partial invoices are supported — remaining SO quantity stays available for another invoice.
+        Drafts can be cancelled before posting.
+      </p>
+    </EnterpriseBusinessFactBox>
+  )
 
   return (
-    <OperationalPageShell
-      variant="dynamics"
-      badge="CRM Commercial"
+    <SalesCardFormShell
       title="Create Tax Invoice"
-      description="Auto-fills customer, items, taxes, and delivery details from the source document"
-      breadcrumbs={[
-        { label: 'CRM', to: '/crm' },
-        { label: 'Tax Invoices', to: '/crm/commercial/invoices' },
-        { label: 'New' },
-      ]}
-      commandBar={(
-        <ErpCommandBar
-          sticky={false}
-          primaryAction={{ id: 'create', label: 'Create Draft Invoice', icon: Plus, onClick: handleCreate }}
-          secondaryActions={[{ id: 'back', label: 'Cancel', onClick: () => navigate('/crm/commercial/invoices') }]}
+      badge="Sales"
+      className={ENTERPRISE_FORM_CLASS}
+      recordNo="New"
+      recordTitle={prefill?.customerName ?? 'Tax Invoice'}
+      status="Draft"
+      statusTone="info"
+      stage={
+        sourceType === 'sales_order'
+          ? 'From Sales Order'
+          : sourceType === 'proforma'
+            ? 'From Proforma'
+            : 'From Customer'
+      }
+      createdDate={formatDate(new Date().toISOString().slice(0, 10))}
+      company={prefill?.customerName}
+      favoritePath="/sales/invoices/new"
+      breadcrumbs={salesChildBreadcrumbs('Tax Invoices', '/sales/invoices', 'New Invoice')}
+      documentStrip={documentStrip}
+      validationErrors={error ? [error] : undefined}
+      factBox={factBox}
+      collapsibleFactBox
+      factBoxLabel="Smart Context"
+      stickyFooter
+      onSubmit={(e) => {
+        e.preventDefault()
+        void handleCreate()
+      }}
+      onSaveShortcut={() => void handleCreate()}
+      footer={(
+        <ErpStickySaveBar
+          sticky
+          cancelTo="/sales/invoices"
+          submitLabel={creating ? 'Creating…' : 'Create Draft Invoice'}
+          isSubmitting={creating}
+          onSave={() => void handleCreate()}
+          hint={(
+            <span className="text-[12px] text-erp-muted">
+              {completionPercent}% complete
+              {prefill ? ` · ${formatCurrency(prefill.gst.grandTotal)} grand total` : ' · Select a source to continue'}
+            </span>
+          )}
         />
       )}
     >
-      <ErpCardSection title="Source document">
-        <ErpFieldRow label="Create from">
-          <Select value={sourceType} onChange={(e) => setSourceType(e.target.value as typeof sourceType)}>
-            <option value="sales_order">Sales Order</option>
-            <option value="proforma">Proforma Invoice</option>
-            <option value="customer">Customer (latest SO)</option>
-          </Select>
+      <ErpCardSection
+        id="ti-section-source"
+        title="Source document"
+        subtitle="Load customer, commercial terms, and lines from a confirmed sales order, issued proforma, or customer."
+        icon={FileText}
+        accent="blue"
+        collapsible
+        defaultOpen
+      >
+        <ErpFieldRow label="Create from" colSpan={2}>
+          <ErpSegmentedControl<InvoiceCreateSource>
+            name="Tax invoice create source"
+            value={sourceType}
+            onChange={switchSourceType}
+            options={[
+              {
+                value: 'sales_order',
+                label: 'Sales Order',
+                description: 'Pull remaining qty and terms from a confirmed SO.',
+                icon: ShoppingBag,
+              },
+              {
+                value: 'proforma',
+                label: 'Proforma',
+                description: 'Convert an issued proforma into a tax invoice.',
+                icon: Receipt,
+              },
+              {
+                value: 'customer',
+                label: 'Customer',
+                description: 'Use the latest confirmed SO for the bill-to customer.',
+                icon: Building2,
+              },
+            ]}
+          />
         </ErpFieldRow>
+
         {sourceType === 'sales_order' ? (
-          <ErpFieldRow label="Sales Order" required>
-            <Select value={selectedSo} onChange={(e) => setSelectedSo(e.target.value)}>
-              <option value="">{SELECT_PLACEHOLDER}</option>
-              {confirmedSos.map((so) => (
-                <option key={so.id} value={so.id}>
-                  {so.salesOrderNo} — {getCustomer(so.customerId)?.customerName ?? so.customerId}
-                </option>
-              ))}
-            </Select>
+          <ErpFieldRow
+            label="Sales Order"
+            required
+            colSpan={2}
+            hint="Confirmed sales orders only — open drafts are excluded"
+          >
+            <ErpSmartSelect
+              options={soOptions}
+              value={selectedSo}
+              onChange={(v) => {
+                const id = v ?? ''
+                setSelectedSo(id)
+                loadFromSalesOrder(id)
+              }}
+              placeholder="Search sales order no, customer…"
+              appearance="dropdown"
+              emptyMessage="No confirmed sales orders available."
+            />
           </ErpFieldRow>
         ) : null}
+
         {sourceType === 'proforma' ? (
-          <ErpFieldRow label="Proforma" required>
-            <Select value={selectedPi} onChange={(e) => setSelectedPi(e.target.value)}>
-              <option value="">{SELECT_PLACEHOLDER}</option>
-              {issuedPis.map((pi) => (
-                <option key={pi.id} value={pi.id}>
-                  {pi.proformaNo} — {pi.customerName}
-                </option>
-              ))}
-            </Select>
+          <ErpFieldRow
+            label="Proforma Invoice"
+            required
+            colSpan={2}
+            hint="Issued proformas only"
+          >
+            <ErpSmartSelect
+              options={piOptions}
+              value={selectedPi}
+              onChange={(v) => {
+                const id = v ?? ''
+                setSelectedPi(id)
+                loadFromProforma(id)
+              }}
+              placeholder="Search proforma no, customer…"
+              appearance="dropdown"
+              emptyMessage="No issued proformas available."
+            />
           </ErpFieldRow>
         ) : null}
+
         {sourceType === 'customer' ? (
-          <ErpFieldRow label="Customer" required>
-            <Select value={selectedCustomer} onChange={(e) => setSelectedCustomer(e.target.value)}>
-              <option value="">{SELECT_PLACEHOLDER}</option>
-              {customers.filter((c) => c.isActive).map((c) => (
-                <option key={c.id} value={c.id}>{c.customerName}</option>
-              ))}
-            </Select>
+          <ErpFieldRow
+            label="Customer"
+            required
+            colSpan={2}
+            hint="Loads the latest confirmed sales order for this customer"
+          >
+            <ErpSmartSelect
+              options={customerOptions}
+              value={selectedCustomer}
+              onChange={(v) => {
+                const id = v ?? ''
+                setSelectedCustomer(id)
+                loadFromCustomer(id)
+              }}
+              placeholder="Search customers…"
+              appearance="dropdown"
+            />
           </ErpFieldRow>
         ) : null}
-        {error ? <p className="col-span-2 text-[13px] text-erp-danger">{error}</p> : null}
-        <p className="col-span-2 text-[12px] text-erp-muted">
-          Partial invoices are supported: remaining SO quantity stays available for another invoice. Draft invoices can be cancelled before posting.
-        </p>
+
+        {!prefill && !error ? (
+          <div className="col-span-2">
+            <p className="pi-create-mode-hint">
+              <PenLine className="h-4 w-4 shrink-0" aria-hidden />
+              Select a source above to auto-load customer, taxes, addresses, and invoice lines.
+            </p>
+          </div>
+        ) : null}
       </ErpCardSection>
-    </OperationalPageShell>
+
+      {prefill ? (
+        <>
+          <ErpCardSection
+            id="ti-section-customer"
+            title="Customer & commercial"
+            subtitle="Bill-to account and commercial terms inherited from the source document."
+            icon={Building2}
+            accent="teal"
+            collapsible
+            defaultOpen
+          >
+            <aside className="so-customer-card col-span-2" aria-label="Selected customer">
+              <div className="so-customer-card__header">
+                <div className="so-customer-card__avatar" aria-hidden>
+                  {prefill.customerName
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((w) => w[0])
+                    .join('')
+                    .toUpperCase()}
+                </div>
+                <div className="so-customer-card__identity">
+                  <div className="so-customer-card__title-row">
+                    <h3 className="so-customer-card__name">{prefill.customerName}</h3>
+                    <TableLink
+                      to={salesCustomer360Path(prefill.customerId)}
+                      className="so-customer-card__360"
+                    >
+                      Customer 360
+                    </TableLink>
+                  </div>
+                  <dl className="so-customer-card__facts">
+                    <div className="so-customer-card__fact">
+                      <dt>GSTIN</dt>
+                      <dd>{prefill.customerGstin || '—'}</dd>
+                    </div>
+                    <div className="so-customer-card__fact">
+                      <dt>Place of supply</dt>
+                      <dd>{prefill.customerState || '—'}</dd>
+                    </div>
+                    <div className="so-customer-card__fact">
+                      <dt>Customer PO</dt>
+                      <dd>{prefill.customerPoNumber || '—'}</dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+            </aside>
+
+            <ErpFieldRow label="Payment terms" readOnly>{prefill.paymentTerms || '—'}</ErpFieldRow>
+            <ErpFieldRow label="Delivery terms" readOnly>{prefill.deliveryTerms || '—'}</ErpFieldRow>
+            {prefill.salesOrderNo ? (
+              <ErpFieldRow label="Sales Order" readOnly>
+                <TableLink to={`/sales/orders/${prefill.salesOrderId}`}>{prefill.salesOrderNo}</TableLink>
+              </ErpFieldRow>
+            ) : null}
+            {prefill.proformaNo ? (
+              <ErpFieldRow label="Proforma" readOnly>
+                <TableLink to={`/sales/proforma-invoices/${prefill.proformaInvoiceId}`}>{prefill.proformaNo}</TableLink>
+              </ErpFieldRow>
+            ) : null}
+            {prefill.quotationNo ? (
+              <ErpFieldRow label="Quotation Number (Reference)" readOnly>
+                {prefill.quotationNo}
+              </ErpFieldRow>
+            ) : null}
+          </ErpCardSection>
+
+          <ErpCardSection
+            id="ti-section-addresses"
+            title="Addresses"
+            subtitle="Billing and shipping addresses from the source document."
+            icon={MapPin}
+            accent="slate"
+            collapsible
+            defaultOpen
+          >
+            <ErpFieldRow label="Billing" readOnly colSpan={2} horizontal={false}>
+              <p className="rounded-lg border border-erp-border bg-erp-surface-alt/40 px-3 py-2.5 text-[13px] text-erp-text whitespace-pre-wrap">
+                {prefill.billingAddress || prefill.customerAddress || '—'}
+              </p>
+            </ErpFieldRow>
+            <ErpFieldRow label="Shipping" readOnly colSpan={2} horizontal={false}>
+              <p className="rounded-lg border border-erp-border bg-erp-surface-alt/40 px-3 py-2.5 text-[13px] text-erp-text whitespace-pre-wrap">
+                {prefill.shippingAddress || '—'}
+              </p>
+            </ErpFieldRow>
+          </ErpCardSection>
+
+          <ErpCardSection
+            id="ti-section-lines"
+            title="Invoice lines"
+            subtitle="Adjust quantity for a partial invoice (capped at remaining)."
+            icon={ClipboardList}
+            accent="green"
+            collapsible
+            defaultOpen
+            className="!max-w-none"
+            columns={1}
+          >
+            <div className="col-span-full overflow-x-auto erp-line-items-grid">
+              <table className="w-full min-w-[720px] text-[12px] erp-line-items-grid__table">
+                <thead>
+                  <tr className="border-b border-erp-border bg-erp-surface-alt/60 text-left text-[11px] uppercase tracking-wide text-erp-muted">
+                    <th className="px-2 py-2">Item</th>
+                    <th className="px-2 py-2 text-right">Qty</th>
+                    <th className="px-2 py-2 text-right">Max</th>
+                    <th className="px-2 py-2 text-right">Rate</th>
+                    <th className="px-2 py-2">Tax %</th>
+                    <th className="px-2 py-2 text-right">Line total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {prefill.lines.map((line) => (
+                    <tr key={line.id} className="border-b border-erp-border/60">
+                      <td className="px-2 py-2">
+                        <div className="font-medium text-erp-text">{line.itemCode || '—'}</div>
+                        <div className="text-[11px] text-erp-muted">{line.description}</div>
+                      </td>
+                      <td className="px-2 py-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={line.maxQty ?? undefined}
+                          step="1"
+                          className="ml-auto w-24 text-right"
+                          value={String(line.qty)}
+                          onChange={(e) => setPrefill(patchPrefillLineQty(prefill, line.id, e.target.value))}
+                        />
+                      </td>
+                      <td className="py-2 px-2 text-right tabular-nums text-erp-muted">
+                        {line.maxQty ?? line.qty} {line.uom}
+                      </td>
+                      <td className="py-2 px-2 text-right tabular-nums">{formatCurrency(line.unitPrice)}</td>
+                      <td className="py-2 px-2">{line.taxPct}%</td>
+                      <td className="py-2 px-2 text-right font-semibold tabular-nums text-erp-primary">
+                        {formatCurrency(line.lineTotal)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </ErpCardSection>
+
+          <ErpCardSection
+            id="ti-section-totals"
+            title="Tax & totals"
+            subtitle="GST breakdown and grand total for the quantities above."
+            icon={Banknote}
+            accent="amber"
+            collapsible
+            defaultOpen
+          >
+            <ErpFieldRow label="Taxable" readOnly>{formatCurrency(prefill.gst.taxableAmount)}</ErpFieldRow>
+            <ErpFieldRow label="Scheme" readOnly>{gstSchemeLabel(prefill.gst.scheme)}</ErpFieldRow>
+            {prefill.gst.scheme === 'cgst_sgst' ? (
+              <>
+                <ErpFieldRow label="CGST" readOnly>{formatCurrency(prefill.gst.cgstAmount)}</ErpFieldRow>
+                <ErpFieldRow label="SGST" readOnly>{formatCurrency(prefill.gst.sgstAmount)}</ErpFieldRow>
+              </>
+            ) : (
+              <ErpFieldRow label="IGST" readOnly>{formatCurrency(prefill.gst.igstAmount)}</ErpFieldRow>
+            )}
+            <ErpFieldRow label="Grand total" readOnly>
+              <span className="text-base font-semibold text-erp-primary">
+                {formatCurrency(prefill.gst.grandTotal)}
+              </span>
+            </ErpFieldRow>
+            {prefill.remarks ? (
+              <ErpFieldRow label="Remarks" readOnly colSpan={2} horizontal={false}>
+                <p className="text-[13px] text-erp-text whitespace-pre-wrap">{prefill.remarks}</p>
+              </ErpFieldRow>
+            ) : null}
+          </ErpCardSection>
+        </>
+      ) : null}
+    </SalesCardFormShell>
   )
 }
 
@@ -664,7 +995,7 @@ export function ProformaReceivePaymentPage() {
   return (
     <OperationalPageShell
       variant="dynamics"
-      badge="CRM Commercial"
+      badge="Sales"
       title="Receive Payment"
       description={`Against ${proforma.proformaNo} · Balance ${formatCurrency(summary.balanceAmount)}`}
       breadcrumbs={[
@@ -729,239 +1060,8 @@ export function ProformaReceivePaymentPage() {
   )
 }
 
-export function CrmPaymentAllocationPage() {
-  const [params] = useSearchParams()
-  const navigate = useNavigate()
-  const customers = useMasterStore((s) => s.customers)
-  const [customerId, setCustomerId] = useState(params.get('customerId') ?? '')
-  const [selectedReceiptId, setSelectedReceiptId] = useState('')
-  const [amounts, setAmounts] = useState<Record<string, string>>({})
-  const [allocationDate, setAllocationDate] = useState(new Date().toISOString().slice(0, 10))
-  const [remarks, setRemarks] = useState('')
-  const [error, setError] = useState<string | null>(null)
-
-  // Select stable store slices only — derived filters must be memoized
-  // (inline .filter() / [] in Zustand selectors causes infinite re-renders).
-  const invoices = useCrmCommercialStore((s) => s.invoices)
-  const receipts = useCrmCommercialStore((s) => s.receipts)
-  const allocations = useCrmCommercialStore((s) => s.allocations)
-  const allocatePayments = useCrmCommercialStore((s) => s.allocatePayments)
-  const reverseAllocation = useCrmCommercialStore((s) => s.reverseAllocation)
-
-  const openInvoices = useMemo(
-    () =>
-      customerId
-        ? invoices.filter(
-            (i) =>
-              i.customerId === customerId
-              && i.status !== 'draft'
-              && i.status !== 'cancelled'
-              && i.balanceDue > 0.009,
-          )
-        : [],
-    [customerId, invoices],
-  )
-  const availableReceipts = useMemo(
-    () =>
-      customerId
-        ? receipts.filter((r) => r.customerId === customerId && r.unallocatedAmount > 0.009)
-        : [],
-    [customerId, receipts],
-  )
-  const history = useMemo(
-    () => (customerId ? allocations.filter((a) => a.customerId === customerId) : []),
-    [customerId, allocations],
-  )
-  const selectedReceipt = useMemo(
-    () => (selectedReceiptId ? receipts.find((r) => r.id === selectedReceiptId) : undefined),
-    [selectedReceiptId, receipts],
-  )
-
-  const preInvoiceId = params.get('invoiceId')
-
-  async function submit() {
-    setError(null)
-    if (!selectedReceiptId) {
-      setError('Select a receipt to allocate.')
-      return
-    }
-    const allocationsPayload = Object.entries(amounts)
-      .map(([invoiceId, raw]) => ({ invoiceId, amount: Number(raw) }))
-      .filter((row) => Number.isFinite(row.amount) && row.amount > 0)
-    if (!allocationsPayload.length) {
-      setError('Enter at least one allocation amount.')
-      return
-    }
-    const payload = {
-      receiptId: selectedReceiptId,
-      allocations: allocationsPayload,
-      allocationDate,
-      remarks,
-    }
-    const result = isApiMode()
-      ? await apiAllocatePayments(payload)
-      : allocatePayments(payload)
-    if (!result.ok) {
-      setError(result.error ?? 'Allocation failed')
-      return
-    }
-    notify.success('Payment allocated')
-    setAmounts({})
-  }
-
-  return (
-    <OperationalPageShell
-      variant="dynamics"
-      badge="CRM Commercial"
-      title="Payment Allocation"
-      description="Allocate customer receipts against one or more open invoices"
-      breadcrumbs={[
-        { label: 'CRM', to: '/crm' },
-        { label: 'Payment Allocation' },
-      ]}
-      favoritePath="/crm/commercial/payment-allocation"
-      commandBar={(
-        <ErpCommandBar
-          sticky={false}
-          primaryAction={
-            canCrmPermission('crm.commercial.allocation.create')
-              ? { id: 'alloc', label: 'Allocate', icon: ArrowLeftRight, onClick: submit }
-              : undefined
-          }
-          secondaryActions={[
-            { id: 'invoices', label: 'Invoices', icon: FileText, onClick: () => navigate('/crm/commercial/invoices') },
-            { id: 'orders', label: 'Sales Orders', icon: ShoppingCart, onClick: () => navigate('/crm/sales-orders') },
-          ]}
-        />
-      )}
-    >
-      <div className="grid gap-6 xl:grid-cols-2">
-        <ErpCardSection title="Select customer & receipt">
-          <ErpFieldRow label="Customer" required>
-            <Select value={customerId} onChange={(e) => { setCustomerId(e.target.value); setSelectedReceiptId(''); setAmounts({}) }}>
-              <option value="">{SELECT_PLACEHOLDER}</option>
-              {customers.filter((c) => c.isActive).map((c) => (
-                <option key={c.id} value={c.id}>{c.customerName}</option>
-              ))}
-            </Select>
-          </ErpFieldRow>
-          <ErpFieldRow label="Available receipt">
-            <Select value={selectedReceiptId} onChange={(e) => setSelectedReceiptId(e.target.value)}>
-              <option value="">{SELECT_PLACEHOLDER}</option>
-              {availableReceipts.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.receiptNo} · unallocated {formatCurrency(r.unallocatedAmount)}
-                  {r.proformaNo ? ` · ${r.proformaNo}` : ''}
-                </option>
-              ))}
-            </Select>
-          </ErpFieldRow>
-          {selectedReceipt ? (
-            <ErpFieldRow label="Unallocated" readOnly>{formatCurrency(selectedReceipt.unallocatedAmount)}</ErpFieldRow>
-          ) : null}
-          <ErpFieldRow label="Allocation date">
-            <Input type="date" value={allocationDate} onChange={(e) => setAllocationDate(e.target.value)} />
-          </ErpFieldRow>
-          <ErpFieldRow label="Remarks">
-            <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2} />
-          </ErpFieldRow>
-          {error ? <p className="col-span-2 text-[13px] text-erp-danger">{error}</p> : null}
-        </ErpCardSection>
-
-        <ErpCardSection title="Open invoices">
-          <div className="col-span-2 space-y-2">
-            {!customerId ? (
-              <p className="text-[13px] text-erp-muted">Select a customer to see open invoices.</p>
-            ) : openInvoices.length === 0 ? (
-              <p className="text-[13px] text-erp-muted">No open invoices for this customer.</p>
-            ) : (
-              openInvoices.map((inv) => (
-                <div
-                  key={inv.id}
-                  className={cn(
-                    'rounded border border-erp-border p-3 text-[13px]',
-                    preInvoiceId === inv.id && 'border-erp-primary bg-erp-primary/5',
-                  )}
-                >
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <TableLink to={`/crm/commercial/invoices/${inv.id}`}>{inv.invoiceNo}</TableLink>
-                    <StatusDot label={CRM_TAX_INVOICE_STATUS_LABELS[inv.status]} tone={invoiceTone(inv.status)} />
-                  </div>
-                  <div className="mb-2 grid grid-cols-3 gap-2 text-[12px] text-erp-muted">
-                    <span>Invoice {formatCurrency(inv.gst.grandTotal)}</span>
-                    <span>Allocated {formatCurrency(inv.amountPaid)}</span>
-                    <span>Balance {formatCurrency(inv.balanceDue)}</span>
-                  </div>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder={`Allocate up to ${inv.balanceDue}`}
-                    value={amounts[inv.id] ?? ''}
-                    onChange={(e) => setAmounts((prev) => ({ ...prev, [inv.id]: e.target.value }))}
-                  />
-                </div>
-              ))
-            )}
-          </div>
-        </ErpCardSection>
-      </div>
-
-      <ErpCardSection title="Allocation history" className="mt-6">
-        <div className="col-span-2 overflow-x-auto">
-          {history.length === 0 ? (
-            <p className="text-[13px] text-erp-muted">No allocations yet for this customer.</p>
-          ) : (
-            <table className="w-full text-left text-[13px]">
-              <thead>
-                <tr className="border-b border-erp-border text-erp-muted">
-                  <th className="py-2 pr-3">Date</th>
-                  <th className="py-2 pr-3">Receipt</th>
-                  <th className="py-2 pr-3">Invoice</th>
-                  <th className="py-2 pr-3">Amount</th>
-                  <th className="py-2">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((a) => (
-                  <tr key={a.id} className="border-b border-erp-border/60">
-                    <td className="py-2 pr-3">{formatDate(a.allocationDate)}</td>
-                    <td className="py-2 pr-3">{a.receiptNo}</td>
-                    <td className="py-2 pr-3">{a.invoiceNo}</td>
-                    <td className="py-2 pr-3">
-                      {formatCurrency(a.amount)}
-                      {a.reversedAt ? <span className="ml-1 text-erp-danger">(Reversed)</span> : null}
-                    </td>
-                    <td className="py-2">
-                      {!a.reversedAt && canCrmPermission('crm.commercial.allocation.reverse') ? (
-                        <ErpButton
-                          variant="ghost"
-                          onClick={() => {
-                            void (async () => {
-                              const r = isApiMode()
-                                ? await apiReverseAllocation(a.id)
-                                : reverseAllocation(a.id)
-                              if (!r.ok) notify.error(r.error ?? 'Reverse failed')
-                              else notify.success('Allocation reversed')
-                            })()
-                          }}
-                        >
-                          Reverse
-                        </ErpButton>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </ErpCardSection>
-    </OperationalPageShell>
-  )
-}
+/** @deprecated Use SalesPaymentAllocationPage — kept for older imports / CRM legacy routes. */
+export { SalesPaymentAllocationPage as CrmPaymentAllocationPage } from '../../sales/SalesPaymentAllocationPage'
 
 export function CrmReceiptDetailPage() {
   const { id } = useParams()
@@ -971,12 +1071,40 @@ export function CrmReceiptDetailPage() {
     () => (id ? allAllocations.filter((a) => a.receiptId === id && !a.reversedAt) : []),
     [allAllocations, id],
   )
+  const customer = useMasterStore((s) =>
+    receipt ? s.customers.find((c) => c.id === receipt.customerId) : undefined,
+  )
   const navigate = useNavigate()
+
+  async function handleDownloadPdf() {
+    if (!receipt) return
+    notify.info('Preparing PDF…')
+    const party = customer
+      ? {
+          address: [
+            customer.addressLine1,
+            customer.addressLine2,
+            [customer.city, customer.state, customer.pincode].filter(Boolean).join(', '),
+          ]
+            .filter(Boolean)
+            .join('\n') || undefined,
+          gstin: customer.gstin || undefined,
+          state: customer.state || undefined,
+        }
+      : null
+    const result = await downloadPaymentReceiptPdf({
+      receipt,
+      allocations,
+      customer: party,
+    })
+    if (result.ok) notify.success(`Downloaded ${result.fileName}`)
+    else notify.error(result.error)
+  }
 
   if (!receipt) {
     return (
       <OperationalPageShell title="Receipt not found">
-        <Link to="/crm/commercial/payment-allocation" className="text-sm font-semibold text-erp-primary">Back</Link>
+        <Link to="/sales/payment-allocation" className="text-sm font-semibold text-erp-primary">Back</Link>
       </OperationalPageShell>
     )
   }
@@ -984,12 +1112,12 @@ export function CrmReceiptDetailPage() {
   return (
     <OperationalPageShell
       variant="dynamics"
-      badge="CRM Commercial"
+      badge="Sales"
       title={receipt.receiptNo}
       description={`${receipt.customerName} · ${CRM_PAYMENT_MODE_LABELS[receipt.paymentMode]}`}
       breadcrumbs={[
-        { label: 'CRM', to: '/crm' },
-        { label: 'Payment Allocation', to: '/crm/commercial/payment-allocation' },
+        { label: 'Sales', to: '/sales' },
+        { label: 'Payment Allocation', to: '/sales/payment-allocation' },
         { label: receipt.receiptNo },
       ]}
       commandBar={(
@@ -999,8 +1127,24 @@ export function CrmReceiptDetailPage() {
             id: 'alloc',
             label: 'Allocate',
             icon: ArrowLeftRight,
-            onClick: () => navigate(`/crm/commercial/payment-allocation?customerId=${receipt.customerId}`),
+            onClick: () => navigate(`/sales/payment-allocation?customerId=${receipt.customerId}`),
           }}
+          secondaryActions={[
+            {
+              id: 'print',
+              label: 'Print',
+              icon: Printer,
+              pin: true,
+              onClick: () => navigate(`/sales/receipts/${receipt.id}/print`),
+            },
+            {
+              id: 'pdf',
+              label: 'Download PDF',
+              icon: Download,
+              pin: true,
+              onClick: () => void handleDownloadPdf(),
+            },
+          ]}
         />
       )}
       insights={[

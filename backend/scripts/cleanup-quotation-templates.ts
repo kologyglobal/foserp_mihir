@@ -5,6 +5,14 @@
  *   - ISO-DRY-BULK-25CBM    (25 m³ ISO Tank Container Quotation)
  *   - FLOUR-BULKER-42M3     (42 m³ Hopper Type Flour Bulker Quotation)
  *   - TIPPER-30FE-M3        (30 m³ Tipper FE Type Quotation)
+ *   - BULKER-TRAILER-45M3   (45 m³ Bulker Trailer Quotation)
+ *   - SIDEWALL-34FT-5FT     (34′ × 5′ Side Wall Trailer Quotation)
+ *   - CHEM-TANKER-30-5KL    (30.5 KL Chemical Tanker Trailer Quotation)
+ *   - BULKER-23M3           (23 m³ Bulker Quotation)
+ *   - WALKING-FLOOR-40FT    (40 ft Walking Floor Quotation)
+ *   - CHEM-TANKER-16KL      (16 KL Chemical Tanker Quotation)
+ *   - TIPPING-TANK-31M3     (31 m³ Tipping Tank Quotation)
+ *   - TIP-TRAILER-34M3      (34 m³ Tip Trailer Quotation)
  *
  * For every non-deleted tenant:
  *   1. Soft-deletes (deletedAt + isActive=false) all other templates — existing

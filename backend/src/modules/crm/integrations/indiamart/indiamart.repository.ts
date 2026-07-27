@@ -2,12 +2,10 @@ import type {
   IndiaMartAssignmentMode,
   IndiaMartConnection,
   IndiaMartDuplicateBehaviour,
-  IndiaMartEnquiry,
   IndiaMartEnquiryProcessingStatus,
   IndiaMartImportStatus,
   IndiaMartMatchStatus,
   IndiaMartProductMapping,
-  IndiaMartSyncRun,
   IndiaMartSyncRunStatus,
   IndiaMartSyncTriggerType,
   Prisma,
@@ -172,7 +170,7 @@ export async function createSyncRun(input: {
 
 export async function completeSyncRun(
   id: string,
-  data: Partial<IndiaMartSyncRun> & { status: IndiaMartSyncRunStatus },
+  data: Prisma.IndiaMartSyncRunUpdateInput & { status: IndiaMartSyncRunStatus },
 ) {
   return prisma.indiaMartSyncRun.update({ where: { id }, data })
 }
@@ -272,7 +270,7 @@ export async function insertEnquiry(data: Prisma.IndiaMartEnquiryCreateInput) {
 export async function updateEnquiry(
   tenantId: string,
   id: string,
-  data: Prisma.IndiaMartEnquiryUpdateInput,
+  data: Prisma.IndiaMartEnquiryUncheckedUpdateInput,
 ) {
   return prisma.indiaMartEnquiry.update({ where: { id }, data: { ...data } }).then(async (row) => {
     if (row.tenantId !== tenantId) throw new Error('Tenant mismatch')

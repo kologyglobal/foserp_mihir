@@ -31,3 +31,19 @@ export function canAccessAdminShell(): boolean {
     || isSuperAdminUser()
   )
 }
+
+/** Soft UI gate for Administration sub-nav items (backend still enforces). */
+export function canViewAdminNavItem(path: string): boolean {
+  if (!canAccessAdminShell()) return false
+  if (path === '/admin/tenants' || path.startsWith('/admin/tenants/')) {
+    return isSuperAdminUser()
+  }
+  if (path === '/admin/users' || path.startsWith('/admin/users/')) {
+    return canAdminPermission('user.view')
+  }
+  if (path === '/admin/roles' || path.startsWith('/admin/roles/')) {
+    return canAdminPermission('role.view')
+  }
+  // Overview, Organization, Tenant Profile — any admin-shell access
+  return true
+}

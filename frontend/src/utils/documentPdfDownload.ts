@@ -50,6 +50,7 @@ export function findPrintDocumentElement(
   selectors: string | string[] = [
     '.quo-print-doc',
     '.so-print-doc',
+    '.rcpt-print-doc',
     '.pi-print-doc',
     '.wo-print-doc',
     '.po-print-doc',
@@ -90,6 +91,7 @@ export async function downloadElementAsPdf(
       onclone: (clonedDoc) => {
         const cloned =
           clonedDoc.querySelector('.so-print-doc') ??
+          clonedDoc.querySelector('.rcpt-print-doc') ??
           clonedDoc.querySelector('.pi-print-doc') ??
           clonedDoc.querySelector('.quo-print-doc') ??
           clonedDoc.querySelector('.wo-print-doc') ??

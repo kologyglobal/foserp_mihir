@@ -1,4 +1,4 @@
-/** Canonical seed for the VF Word quotation templates (76 + 109 + 152 + 146). */
+/** Canonical seed for the VF Word quotation templates (76 + 109 + 152 + 146 + 154 + 156 + 164 + 165 + 175 + 178 + 183 + 184). */
 
 import {
   ISO_TANK_26KL_SEED_SECTIONS,
@@ -16,6 +16,38 @@ import {
   TIPPER_30FE_M3_SEED_SECTIONS,
   TIPPER_30FE_M3_SEED_VERSION,
 } from './quotation-template.tipper-30fe-m3.js'
+import {
+  BULKER_TRAILER_45M3_SEED_SECTIONS,
+  BULKER_TRAILER_45M3_SEED_VERSION,
+} from './quotation-template.bulker-trailer-45m3.js'
+import {
+  SIDEWALL_34FT_5FT_SEED_SECTIONS,
+  SIDEWALL_34FT_5FT_SEED_VERSION,
+} from './quotation-template.sidewall-34ft-5ft.js'
+import {
+  CHEM_TANKER_30_5KL_SEED_SECTIONS,
+  CHEM_TANKER_30_5KL_SEED_VERSION,
+} from './quotation-template.chem-tanker-30-5kl.js'
+import {
+  WALKING_FLOOR_40FT_SEED_SECTIONS,
+  WALKING_FLOOR_40FT_SEED_VERSION,
+} from './quotation-template.walking-floor-40ft.js'
+import {
+  BULKER_23M3_SEED_SECTIONS,
+  BULKER_23M3_SEED_VERSION,
+} from './quotation-template.bulker-23m3.js'
+import {
+  CHEM_TANKER_16KL_SEED_SECTIONS,
+  CHEM_TANKER_16KL_SEED_VERSION,
+} from './quotation-template.chem-tanker-16kl.js'
+import {
+  TIPPING_TANK_31M3_SEED_SECTIONS,
+  TIPPING_TANK_31M3_SEED_VERSION,
+} from './quotation-template.tipping-tank-31m3.js'
+import {
+  TIP_TRAILER_34M3_SEED_SECTIONS,
+  TIP_TRAILER_34M3_SEED_VERSION,
+} from './quotation-template.tip-trailer-34m3.js'
 
 export interface QuotationTemplateSeedRow {
   code: string
@@ -26,115 +58,6 @@ export interface QuotationTemplateSeedRow {
   defaultWarranty: string
   defaultExclusions: string
   sections: Array<Record<string, unknown>>
-}
-
-function isoShellSections(title: string, subject: string): Array<Record<string, unknown>> {
-  return [
-    {
-      sectionType: 'cover',
-      title: 'Quotation',
-      content: ['QUOTATION', '', `Sub: ${subject}`].join('\n'),
-      sequenceNo: 1,
-      editable: true,
-      contentFormat: 'richtext',
-    },
-    {
-      sectionType: 'customer_details',
-      title: 'Customer Details',
-      content: 'To,\n{{customer_name}}\n{{customer_address}}\n\nKind Attn: {{contact_person}}',
-      sequenceNo: 2,
-      editable: true,
-      contentFormat: 'richtext',
-    },
-    {
-      sectionType: 'introduction',
-      title: 'Introduction',
-      content: `We thank you for your enquiry and are pleased to submit our offer for ${title}.`,
-      sequenceNo: 3,
-      editable: true,
-      contentFormat: 'richtext',
-    },
-    {
-      sectionType: 'scope',
-      title: 'Scope of Supply',
-      content: `Supply of ${title} as per agreed specifications.`,
-      sequenceNo: 4,
-      editable: true,
-      contentFormat: 'richtext',
-    },
-    {
-      sectionType: 'specification',
-      title: 'Technical Specification',
-      content: 'As per attached / agreed technical data sheet.',
-      sequenceNo: 5,
-      editable: true,
-      contentFormat: 'spec_table',
-      specRows: [],
-    },
-    {
-      sectionType: 'commercial',
-      title: 'Commercial Offer',
-      content: 'Pricing as per price table. GST extra as applicable.',
-      sequenceNo: 6,
-      editable: true,
-      contentFormat: 'richtext',
-    },
-    {
-      sectionType: 'price_table',
-      title: 'Price Table',
-      content: '',
-      sequenceNo: 7,
-      editable: true,
-    },
-    {
-      sectionType: 'delivery',
-      title: 'Delivery Terms',
-      content: 'Ex works Chhapi, Banaskantha, North Gujarat unless otherwise agreed.',
-      sequenceNo: 8,
-      editable: true,
-      contentFormat: 'richtext',
-    },
-    {
-      sectionType: 'payment',
-      title: 'Payment Terms',
-      content: 'As per commercial offer / advance against order.',
-      sequenceNo: 9,
-      editable: true,
-      contentFormat: 'richtext',
-    },
-    {
-      sectionType: 'warranty',
-      title: 'Warranty',
-      content: '12 months against defective material and workmanship. Bought-out items carry OEM warranty.',
-      sequenceNo: 10,
-      editable: true,
-      contentFormat: 'richtext',
-    },
-    {
-      sectionType: 'exclusions',
-      title: 'Exclusions',
-      content: 'Freight, insurance, and statutory registrations excluded unless specified.',
-      sequenceNo: 11,
-      editable: true,
-      contentFormat: 'richtext',
-    },
-    {
-      sectionType: 'terms',
-      title: 'Terms & Conditions',
-      content: 'Subject to Chhapi jurisdiction.',
-      sequenceNo: 12,
-      editable: true,
-      contentFormat: 'richtext',
-    },
-    {
-      sectionType: 'signature',
-      title: 'Signature Block',
-      content: 'Authorized signatory — Sales & Marketing',
-      sequenceNo: 13,
-      editable: true,
-      contentFormat: 'richtext',
-    },
-  ]
 }
 
 export const QUOTATION_TEMPLATE_SEED_ROWS: QuotationTemplateSeedRow[] = [
@@ -190,6 +113,110 @@ export const QUOTATION_TEMPLATE_SEED_ROWS: QuotationTemplateSeedRow[] = [
     defaultExclusions:
       'Freight, insurance, RTO/registration, cabin supports, U-bolts, chassis extras, pump/PTO, and statutory charges excluded unless specified.',
     sections: TIPPER_30FE_M3_SEED_SECTIONS,
+  },
+  {
+    code: 'BULKER-TRAILER-45M3',
+    templateName: '154 — 45 m³ Bulker Trailer Quotation',
+    productFamily: 'Bulker Trailer',
+    version: BULKER_TRAILER_45M3_SEED_VERSION,
+    defaultTerms:
+      'Ex-works Chhapi, Banaskantha, North Gujarat. GST @ 18% extra. Validity 20 days. 30% advance with PO; balance against PI. Advance non-refundable on cancellation. Subject to Chhapi jurisdiction.',
+    defaultWarranty:
+      '12 months against defective material and workmanship. Bought-out items carry OEM warranty. No warranty on hydraulic equipment and parts.',
+    defaultExclusions:
+      'Freight, insurance, RTO/registration, cabin supports, U-bolts, chassis extras, male coupler, and statutory charges excluded unless specified. Quoted without tyres.',
+    sections: BULKER_TRAILER_45M3_SEED_SECTIONS,
+  },
+  {
+    code: 'SIDEWALL-34FT-5FT',
+    templateName: '156 — 34′ × 5′ Side Wall Trailer Quotation',
+    productFamily: 'Side Wall Trailer',
+    version: SIDEWALL_34FT_5FT_SEED_VERSION,
+    defaultTerms:
+      'Ex-works Chhapi, Banaskantha, North Gujarat. GST @ 18% extra. Validity 20 days. 30% advance with PO; balance against PI. Advance non-refundable on cancellation. Subject to Chhapi jurisdiction.',
+    defaultWarranty:
+      '12 months against defective material and workmanship. Bought-out items carry OEM warranty. No warranty on hydraulic equipment and parts.',
+    defaultExclusions:
+      'Freight, insurance, RTO/registration, tyres, rims, and statutory charges excluded unless specified. Quoted without tyres and rims.',
+    sections: SIDEWALL_34FT_5FT_SEED_SECTIONS,
+  },
+  {
+    code: 'CHEM-TANKER-30-5KL',
+    templateName: '164 — 30.5 KL Chemical Tanker Trailer Quotation',
+    productFamily: 'Chemical Tanker',
+    version: CHEM_TANKER_30_5KL_SEED_VERSION,
+    defaultTerms:
+      'Ex-works Chhapi, Banaskantha, North Gujarat. GST @ 18% extra. Validity 20 days. 30% advance with PO; balance against delivery. Advance non-refundable on cancellation. Subject to Chhapi jurisdiction.',
+    defaultWarranty:
+      '12 months against defective material and workmanship. Bought-out items carry OEM warranty. No warranty on hydraulic equipment and parts.',
+    defaultExclusions:
+      'Freight, insurance, RTO/registration, tyres, and statutory charges excluded unless specified. Quoted without tyres. Extra connections/flanges chargeable.',
+    sections: CHEM_TANKER_30_5KL_SEED_SECTIONS,
+  },
+  {
+    code: 'WALKING-FLOOR-40FT',
+    templateName: '165 — 40 ft Walking Floor Quotation',
+    productFamily: 'Walking Floor',
+    version: WALKING_FLOOR_40FT_SEED_VERSION,
+    defaultTerms:
+      'Ex-works Chhapi, Banaskantha, North Gujarat. GST @ 18% extra. Validity 20 days. 35% advance with PO; balance against delivery. Advance non-refundable on cancellation. Subject to Chhapi jurisdiction.',
+    defaultWarranty:
+      '12 months against defective material and workmanship. Bought-out items carry OEM warranty. No warranty on hydraulic equipment and parts.',
+    defaultExclusions:
+      'Freight, insurance, and statutory charges excluded unless specified. Walking floor supply and installation not in VFPL scope.',
+    sections: WALKING_FLOOR_40FT_SEED_SECTIONS,
+  },
+  {
+    code: 'BULKER-23M3',
+    templateName: '175 — 23 m³ Bulker Quotation',
+    productFamily: 'Bulker',
+    version: BULKER_23M3_SEED_VERSION,
+    defaultTerms:
+      'Ex-works Chhapi, Banaskantha, North Gujarat. GST @ 18% extra. Validity 20 days. 30% advance with PO; balance against PI. Advance non-refundable on cancellation. Subject to Chhapi jurisdiction.',
+    defaultWarranty:
+      '12 months against defective material and workmanship. Bought-out items carry OEM warranty. No warranty on hydraulic equipment and parts.',
+    defaultExclusions:
+      'Freight, insurance, RTO/registration, cabin supports, U-bolts, chassis extras, male coupler, and statutory charges excluded unless specified.',
+    sections: BULKER_23M3_SEED_SECTIONS,
+  },
+  {
+    code: 'CHEM-TANKER-16KL',
+    templateName: '178 — 16 KL Chemical Tanker Quotation',
+    productFamily: 'Chemical Tanker',
+    version: CHEM_TANKER_16KL_SEED_VERSION,
+    defaultTerms:
+      'Ex-works Chhapi, Banaskantha, Gujarat. GST @ 18% extra. Validity 20 days. 30% advance with PO; balance against delivery. Advance non-refundable on cancellation. Subject to Chhapi jurisdiction.',
+    defaultWarranty:
+      '12 months against defective material and workmanship. Bought-out items carry OEM warranty. No warranty on hydraulic equipment and parts.',
+    defaultExclusions:
+      'Freight, insurance, RTO/registration, and statutory charges excluded unless specified. Extra connections/flanges chargeable.',
+    sections: CHEM_TANKER_16KL_SEED_SECTIONS,
+  },
+  {
+    code: 'TIPPING-TANK-31M3',
+    templateName: '183 — 31 m³ Tipping Tank Quotation',
+    productFamily: 'Tipping Tank',
+    version: TIPPING_TANK_31M3_SEED_VERSION,
+    defaultTerms:
+      'Ex-works Chhapi, Banaskantha, North Gujarat. GST @ 18% extra. Validity 20 days. 30% advance with PO; balance against PI. Advance non-refundable on cancellation. Subject to Chhapi jurisdiction.',
+    defaultWarranty:
+      '12 months against defective material and workmanship. Bought-out items carry OEM warranty. No warranty on hydraulic equipment and parts.',
+    defaultExclusions:
+      'Freight, insurance, RTO/registration, cabin supports, U-bolts, chassis extras, male coupler, and statutory charges excluded unless specified. Extra connections/flanges chargeable.',
+    sections: TIPPING_TANK_31M3_SEED_SECTIONS,
+  },
+  {
+    code: 'TIP-TRAILER-34M3',
+    templateName: '184 — 34 m³ Tip Trailer Quotation',
+    productFamily: 'Tip Trailer',
+    version: TIP_TRAILER_34M3_SEED_VERSION,
+    defaultTerms:
+      'Ex-works Chhapi, Banaskantha, North Gujarat. GST @ 18% extra. Validity 20 days. 40% advance with PO; balance against PI. Advance non-refundable on cancellation. Subject to Chhapi jurisdiction.',
+    defaultWarranty:
+      '12 months against defective material and workmanship. Bought-out items carry OEM warranty. No warranty on hydraulic equipment and parts.',
+    defaultExclusions:
+      'Freight, insurance, RTO/registration, cabin supports, U-bolts, chassis extras, male coupler, and statutory charges excluded unless specified. Extra connections/flanges chargeable.',
+    sections: TIP_TRAILER_34M3_SEED_SECTIONS,
   },
 ]
 

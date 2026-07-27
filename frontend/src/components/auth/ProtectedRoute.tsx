@@ -8,6 +8,11 @@ import {
 
 export { AccessDeniedPage, PermissionDeniedPage }
 
+/**
+ * ApiAuthGate redirects unauthenticated users to /login (API mode).
+ * This outlet enforces route permissions for authenticated sessions.
+ * Missing permission → PermissionDeniedPage (403), never PageNotFoundPage (404).
+ */
 export function ProtectedOutlet({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   if (!canRoute(location.pathname)) {
@@ -50,4 +55,20 @@ export function ActionGuard({
   if (!allowed && hideWhenDenied) return null
   const reason = allowed ? undefined : disabledTitle ?? getPermissionDenialReason(module, action)
   return <>{children({ disabled: !allowed, title: reason })}</>
+}
+
+/** Named alias — authenticated + permission for a module/action. */
+export function RequirePermission({
+  module,
+  action,
+  children,
+}: {
+  module: PermissionModule
+  action: PermissionAction
+  children: React.ReactNode
+}) {
+  if (!canPermission(module, action)) {
+    return <PermissionDeniedPage requiredPermission={`${module}.${action}`} />
+  }
+  return <>{children}</>
 }

@@ -30,7 +30,15 @@ import {
   ProformaInvoicePrintPage,
 } from '@/modules/sales/ProformaInvoicePages'
 import { ProformaInvoiceFormPage } from '@/modules/sales/ProformaInvoiceFormPage'
-import { ProformaReceivePaymentPage } from '@/modules/crm/commercial/CrmCommercialPages'
+import {
+  ProformaReceivePaymentPage,
+  CrmInvoiceCreatePage,
+  CrmInvoiceDetailPage,
+  CrmReceiptDetailPage,
+} from '@/modules/crm/commercial/CrmCommercialPages'
+import { SalesTaxInvoiceListPage } from '@/modules/sales/SalesTaxInvoiceListPage'
+import { SalesPaymentAllocationPage } from '@/modules/sales/SalesPaymentAllocationPage'
+import { PaymentReceiptPrintPage } from '@/components/sales/PaymentReceiptPrintPage'
 
 /** Sales Phase 1 (SO) + CRM redirects + demo proforma print/PDF. */
 export const salesRouteChildren: RouteObject[] = [
@@ -67,4 +75,10 @@ export const salesRouteChildren: RouteObject[] = [
   { path: 'sales/proforma-invoices/:id/print', element: <ProformaInvoicePrintPage /> },
   { path: 'sales/proforma-invoices/:id/receive-payment', element: <ProformaReceivePaymentPage /> },
   { path: 'sales/proforma-invoices/:id', element: <ProformaInvoiceDetailPage /> },
+  { path: 'sales/invoices', element: <SalesTaxInvoiceListPage /> },
+  { path: 'sales/invoices/new', element: <CrmInvoiceCreatePage /> },
+  { path: 'sales/invoices/:id', element: <CrmInvoiceDetailPage /> },
+  { path: 'sales/payment-allocation', element: <SalesPaymentAllocationPage /> },
+  { path: 'sales/receipts/:id/print', element: <PaymentReceiptPrintPage /> },
+  { path: 'sales/receipts/:id', element: <CrmReceiptDetailPage /> },
 ]

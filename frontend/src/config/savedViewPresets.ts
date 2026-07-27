@@ -64,6 +64,16 @@ export const PROFORMA_REGISTER_PRESETS: Record<string, Record<string, string>> =
   'From SO': { search: '', status: '', source: 'sales_order', expired: '', sortBy: 'proformaDate' },
 }
 
+export const TAX_INVOICE_REGISTER_PRESETS: Record<string, Record<string, string>> = {
+  'My View': { search: '', status: '', source: '', paymentStatus: '', sortBy: 'invoiceDate' },
+  Draft: { search: '', status: 'draft', source: '', paymentStatus: '', sortBy: 'invoiceDate' },
+  'Open Balance': { search: '', status: 'open', source: '', paymentStatus: '', sortBy: 'dueDate' },
+  Overdue: { search: '', status: 'overdue', source: '', paymentStatus: '', sortBy: 'dueDate' },
+  Paid: { search: '', status: 'paid', source: '', paymentStatus: '', sortBy: 'invoiceDate' },
+  'From SO': { search: '', status: '', source: 'sales_order', paymentStatus: '', sortBy: 'invoiceDate' },
+  'From Proforma': { search: '', status: '', source: 'proforma', paymentStatus: '', sortBy: 'invoiceDate' },
+}
+
 export const WORK_ORDER_REGISTER_PRESETS: Record<string, Record<string, string>> = {
   'My View': { search: '', view: '', productItemId: '' },
   Draft: { search: '', view: 'DRAFT', productItemId: '' },

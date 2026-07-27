@@ -505,7 +505,7 @@ export function Customer360Page() {
               id: 'create-invoice',
               label: 'Create Invoice',
               icon: Banknote,
-              onClick: () => navigate(`/crm/commercial/invoices/new?customerId=${customer.id}`),
+              onClick: () => navigate(`/sales/invoices/new?customerId=${customer.id}`),
             }]
           : []),
       ]}
@@ -538,7 +538,7 @@ export function Customer360Page() {
           id: 'alloc',
           label: 'Payment Allocation',
           icon: ArrowLeftRight,
-          onClick: () => navigate(`/crm/commercial/payment-allocation?customerId=${customer.id}`),
+          onClick: () => navigate(`/sales/payment-allocation?customerId=${customer.id}`),
         },
         {
           id: 'finance',
@@ -1100,7 +1100,7 @@ export function Customer360Page() {
               <ErpButton
                 variant="secondary"
                 icon={Plus}
-                onClick={() => navigate(`/crm/commercial/invoices/new?customerId=${customer.id}`)}
+                onClick={() => navigate(`/sales/invoices/new?customerId=${customer.id}`)}
               >
                 Create Invoice
               </ErpButton>
@@ -1113,7 +1113,7 @@ export function Customer360Page() {
                 accessorKey: 'invoiceNo',
                 header: 'Invoice',
                 cell: ({ row }) => (
-                  <TableLink to={`/crm/commercial/invoices/${row.original.id}`}>{row.original.invoiceNo}</TableLink>
+                  <TableLink to={`/sales/invoices/${row.original.id}`}>{row.original.invoiceNo}</TableLink>
                 ),
               },
               {
@@ -1152,7 +1152,7 @@ export function Customer360Page() {
                 accessorKey: 'receiptNo',
                 header: 'Receipt',
                 cell: ({ row }) => (
-                  <TableLink to={`/crm/commercial/receipts/${row.original.id}`}>{row.original.receiptNo}</TableLink>
+                  <TableLink to={`/sales/receipts/${row.original.id}`}>{row.original.receiptNo}</TableLink>
                 ),
               },
               {
@@ -1200,7 +1200,7 @@ export function Customer360Page() {
             <ErpButton
               variant="secondary"
               icon={ArrowLeftRight}
-              onClick={() => navigate(`/crm/commercial/payment-allocation?customerId=${customer.id}`)}
+              onClick={() => navigate(`/sales/payment-allocation?customerId=${customer.id}`)}
             >
               Open Allocation Workspace
             </ErpButton>
@@ -1247,7 +1247,7 @@ export function Customer360Page() {
                 accessorKey: 'invoiceNo',
                 header: 'Invoice',
                 cell: ({ row }) => (
-                  <TableLink to={`/crm/commercial/invoices/${row.original.id}`}>{row.original.invoiceNo}</TableLink>
+                  <TableLink to={`/sales/invoices/${row.original.id}`}>{row.original.invoiceNo}</TableLink>
                 ),
               },
               {

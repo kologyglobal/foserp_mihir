@@ -234,6 +234,13 @@ export function canRoute(pathname: string): boolean {
     }
     return canPermission('sales', 'view')
   }
+  // Admin shell — align with canAccessAdminShell (not coarse settings.view alone)
+  if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+    if (pathname === '/admin/tenants' || pathname.startsWith('/admin/tenants/')) {
+      return isSuperAdminUser()
+    }
+    return canAccessAdminShell()
+  }
   // Fine-grained purchase view keys (UI soft-guard; backend must enforce when API exists)
   if (isPurchasePath(pathname)) {
     return canPurchaseRoute(pathname)
@@ -333,7 +340,7 @@ export {
   type BudgetingPermission,
 } from './budgeting'
 export { canAccessCrmShell, canCrmPermission } from './crm'
-export { canAccessAdminShell, canAdminPermission, isSuperAdminUser } from './admin'
+export { canAccessAdminShell, canAdminPermission, canViewAdminNavItem, isSuperAdminUser } from './admin'
 export {
   canAccessPurchaseShell,
   canPurchase,
@@ -380,6 +387,10 @@ import {
   canManufacturingRoute,
   isManufacturingPath,
 } from './manufacturing'
+import {
+  canAccessAdminShell,
+  isSuperAdminUser,
+} from './admin'
 
 export {
   canAccessModuleCategory,

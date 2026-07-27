@@ -1,8 +1,12 @@
 import type { RouteObject } from 'react-router-dom'
 import { UserAdminListPage, UserAdminFormPage, UserAdminDetailPage } from '@/modules/systemAdmin/UserAdminPages'
 import { RoleAdminListPage, RoleAdminFormPage, RoleAdminDetailPage } from '@/modules/systemAdmin/RoleAdminPages'
+import { TenantAdminListPage, TenantAdminFormPage, TenantAdminDetailPage } from '@/modules/systemAdmin/TenantAdminPages'
 import { AdminOverviewPage } from '@/modules/systemAdmin/AdminOverviewPage'
-import { AdminTenantProfilePage } from '@/modules/systemAdmin/AdminTenantProfilePage'
+import {
+  AdminOrganizationPage,
+  AdminTenantProfilePage,
+} from '@/modules/systemAdmin/AdminOrganizationPages'
 import { AdminCompaniesPage } from '@/modules/systemAdmin/AdminCompaniesPage'
 import { AdminBranchesPage } from '@/modules/systemAdmin/AdminBranchesPage'
 import { AdminInvitationsPage } from '@/modules/systemAdmin/AdminInvitationsPage'
@@ -17,11 +21,14 @@ import { AdminOrgStructurePage } from '@/modules/systemAdmin/AdminOrgStructurePa
 import { AdminAuditLogPage } from '@/modules/systemAdmin/AdminAuditLogPage'
 
 /**
- * System administration routes — overview, people, org hubs, modules, security.
- * Platform tenants live under `/platform/tenants` (Super Admin).
+ * System administration routes — overview, organization, people, security, and platform tenants.
+ * Shell gated by `canAccessAdminShell()` (see permissions/index canRoute).
  */
 export const adminRouteChildren: RouteObject[] = [
   { path: 'admin', element: <AdminOverviewPage /> },
+
+  { path: 'admin/organization', element: <AdminOrganizationPage /> },
+  { path: 'admin/organization/tenant', element: <AdminTenantProfilePage /> },
 
   { path: 'admin/users', element: <UserAdminListPage /> },
   { path: 'admin/users/new', element: <UserAdminFormPage /> },
@@ -32,6 +39,11 @@ export const adminRouteChildren: RouteObject[] = [
   { path: 'admin/roles/new', element: <RoleAdminFormPage /> },
   { path: 'admin/roles/:id', element: <RoleAdminDetailPage /> },
   { path: 'admin/roles/:id/edit', element: <RoleAdminFormPage /> },
+
+  { path: 'admin/tenants', element: <TenantAdminListPage /> },
+  { path: 'admin/tenants/new', element: <TenantAdminFormPage /> },
+  { path: 'admin/tenants/:id', element: <TenantAdminDetailPage /> },
+  { path: 'admin/tenants/:id/edit', element: <TenantAdminFormPage /> },
 
   { path: 'admin/invitations', element: <AdminInvitationsPage /> },
   { path: 'admin/departments', element: <AdminDepartmentsPage /> },

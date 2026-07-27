@@ -652,8 +652,8 @@ export function UserAdminDetailPage() {
               {user.roles.map((role) => (
                 <span key={role.id} className="inline-flex items-center gap-1.5 rounded-md bg-erp-badge-soft-info px-2.5 py-1 text-xs font-semibold erp-badge-soft-info">
                   {role.name}
-                  {canAssign && !role.isSystem && (
-                    <button type="button" onClick={() => void handleRemove(role.id)} disabled={busy} className="text-erp-muted hover:text-erp-danger-fg">
+                  {canAssign && (
+                    <button type="button" onClick={() => void handleRemove(role.id)} disabled={busy} className="text-erp-muted hover:text-erp-danger-fg" title="Remove role">
                       <X className="h-3 w-3" />
                     </button>
                   )}

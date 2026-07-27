@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, LogOut, Settings, User, UserRound } from 'lucide-react'
+import { ChevronDown, KeyRound, LogOut, Settings, User, UserRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth, useOptionalAuth } from '../../context/AuthProvider'
 import { isApiMode } from '../../config/apiConfig'
@@ -39,6 +39,7 @@ export function UserMenuDropdown({
 
   const { name, email, roleLabel } = profile
   const showSettings = canPermission('settings', 'view')
+  const showChangePassword = isApiMode() && Boolean(auth?.isAuthenticated)
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -167,6 +168,21 @@ export function UserMenuDropdown({
             <UserRound className="h-4 w-4 shrink-0 text-erp-muted" />
             Edit profile
           </button>
+
+          {showChangePassword ? (
+            <button
+              type="button"
+              role="menuitem"
+              className={cn(isSuite ? 'd365-user-menu-item' : 'flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-erp-text hover:bg-erp-surface-alt')}
+              onClick={() => {
+                setOpen(false)
+                navigate('/account/change-password')
+              }}
+            >
+              <KeyRound className="h-4 w-4 shrink-0 text-erp-muted" />
+              Change password
+            </button>
+          ) : null}
 
           {showSettings ? (
             <button

@@ -1,0 +1,304 @@
+import type { QuotationTemplateSection, QuotationSpecRow } from '../../../types/crm'
+
+type TemplateSection = QuotationTemplateSection
+
+function specRow(sectionNo: string, label: string, value: string, required = true): Omit<QuotationSpecRow, 'id'> {
+  return { sectionNo, label, value, required }
+}
+
+/**
+ * 45 m³ Triple Axle Bulker Semi Trailer — mapped from VF/QUO/26-27/154
+ * Source: `154. 45m3 Bulker Trailer.docx`
+ * Dynamic merge fields: {{quotation_no}}, {{customer_*}}, {{product_*}}, etc.
+ */
+export const BULKER_TRAILER_45M3_SECTIONS: TemplateSection[] = [
+  {
+    sectionType: 'cover',
+    title: 'Quotation',
+    content: [
+      'Ref. No.: {{reference_no}}',
+      '',
+      'Sub: Quotation for supply of 45 m³ Triple Axle Bulker Semi Trailer',
+      'Model VFBT-45T — Triple axle bulker semi trailer (without tyres)',
+      'Pneumatic discharge with dry / oil-free air',
+    ].join('\n'),
+    sequenceNo: 1,
+    editable: true,
+    contentFormat: 'richtext',
+  },
+  {
+    sectionType: 'customer_details',
+    title: 'Customer Details',
+    content: [
+      'To,',
+      '{{customer_name}}',
+      '{{customer_address}}',
+      '',
+      'Kind Attn: {{contact_person}}',
+      'Mobile: {{contact_mobile}}',
+      'Email: {{contact_email}}',
+    ].join('\n'),
+    sequenceNo: 2,
+    editable: true,
+    contentFormat: 'richtext',
+  },
+  {
+    sectionType: 'introduction',
+    title: 'Opening Paragraph',
+    content: [
+      'Dear Sir,',
+      '',
+      'We appreciate your interest in our products and are delighted to provide the following price for {{product_name}}.',
+      '',
+      'Quantity: {{quantity}}',
+      'Approx. weight — 8,300 kg',
+      'Vehicle — 4 × 2, 6 Wheeler',
+    ].join('\n'),
+    sequenceNo: 3,
+    editable: true,
+    contentFormat: 'richtext',
+  },
+  {
+    sectionType: 'price_table',
+    title: 'Commercial Price',
+    content: '',
+    sequenceNo: 4,
+    editable: true,
+    contentFormat: 'richtext',
+  },
+  {
+    sectionType: 'specification',
+    title: 'Technical Specifications',
+    content: '',
+    sequenceNo: 5,
+    editable: true,
+    contentFormat: 'spec_table',
+    specRows: [
+      specRow('1.1', 'Model No.', 'VFBT-45T'),
+      specRow('1.2', 'Type', '45 m³ Triple Axle Bulker Semi Trailer'),
+      specRow('1.3', 'Commercial Scope', 'Without tyres (as quoted)'),
+      specRow('1.4', 'Construction', 'Self-supported pressure vessel made of Mild Steel'),
+      specRow('1.5', 'Shell', 'IS 2062 E350 — 4 mm and 5 mm thick'),
+      specRow('1.6', 'Dish End', 'IS 2062 E250 — 5 mm thick'),
+      specRow(
+        '1.7',
+        'Chassis & Leg Support',
+        'High Tensile Steel, 5 mm thick — welded with adequate cross members',
+      ),
+      specRow('1.8', 'Approx. Weight', '8,300 kg'),
+    ],
+  },
+  {
+    sectionType: 'technical',
+    title: 'Dimensions',
+    content: '',
+    sequenceNo: 6,
+    editable: true,
+    contentFormat: 'spec_table',
+    specRows: [
+      specRow('2.1', 'Overall Length', '11,850 mm'),
+      specRow('2.2', 'Width', '2,560 mm'),
+      specRow('2.3', 'Height', '4,120 mm'),
+    ],
+  },
+  {
+    sectionType: 'custom',
+    title: 'Pipeline & Discharge',
+    content: '',
+    sequenceNo: 7,
+    editable: true,
+    contentFormat: 'spec_table',
+    specRows: [
+      specRow('3.1', 'Air Inlet Pipeline', '3" connection for air inlet with pressure relief valve'),
+      specRow(
+        '3.2',
+        'Material Outlet Pipeline',
+        '5" connection for material outlet at rear end of the tanker',
+      ),
+      specRow('3.3', 'Discharge Method', 'By means of pneumatic pressure with dry and oil-free air'),
+      specRow('3.4', 'Material Outlet', 'DN 125 with butterfly valve under 1.95 kg/cm² pressure'),
+      specRow(
+        '3.5',
+        'Aeration Cloth',
+        'Synthetic aeration cloth inside tanker for better fluidization and long life',
+      ),
+    ],
+  },
+  {
+    sectionType: 'custom',
+    title: 'Manhole, Safety & Access',
+    content: '',
+    sequenceNo: 8,
+    editable: true,
+    contentFormat: 'spec_table',
+    specRows: [
+      specRow('4.1', 'Manhole', 'DN 600 × 3 Nos.'),
+      specRow('4.2', 'Pressure Relief Valve', 'Pressure relief valve on vessel'),
+      specRow('4.3', 'Inlet Safety Valve', '1" ball valve on inlet pipe to maintain pressure'),
+      specRow('4.4', 'Vessel Connection', 'One 3" connection with butterfly valve on vessel'),
+      specRow('4.5', 'Catwalk', 'M.S. catwalk on one side — 300 mm wide with handrail and ladder'),
+      specRow(
+        '4.6',
+        'Accessories',
+        'Female coupler with cam locks at inlet and outlet, mud guards, 4" pressure gauge with limit marker',
+      ),
+    ],
+  },
+  {
+    sectionType: 'custom',
+    title: 'Electrical',
+    content: '',
+    sequenceNo: 9,
+    editable: true,
+    contentFormat: 'spec_table',
+    specRows: [
+      specRow(
+        '5.1',
+        'Electrical System',
+        '24 volt electrical system with 7-pin electrical connector; parking, brake and indicator lights',
+      ),
+    ],
+  },
+  {
+    sectionType: 'custom',
+    title: 'Painting',
+    content: '',
+    sequenceNo: 10,
+    editable: true,
+    contentFormat: 'spec_table',
+    specRows: [
+      specRow('6.1', 'Surface Preparation', 'Completely shot blasted'),
+      specRow(
+        '6.2',
+        'External Primer',
+        'Two layers of anti-corrosive metal primer (heavy duty — zinc phosphate)',
+      ),
+      specRow('6.3', 'External Finish', 'Two coats of synthetic paint (without lettering)'),
+      specRow('6.4', 'Internal Finish', 'Enamel paint'),
+    ],
+  },
+  {
+    sectionType: 'custom',
+    title: 'Running Gear',
+    content: '',
+    sequenceNo: 11,
+    editable: true,
+    contentFormat: 'spec_table',
+    specRows: [
+      specRow(
+        '7.1',
+        'Axles',
+        '02 Nos. York square beam axle with lift (Model-6625) + 01 No. York square beam axle (Model-6625)',
+      ),
+      specRow('7.2', 'Axle Capacity', '13.0 tons per axle at 105 km/hr'),
+      specRow('7.3', 'Axle Beam', '6 inch square axle beam'),
+      specRow('7.4', 'Track Width', '1,950 mm'),
+      specRow('7.5', 'King Pin', '50.4 mm YORK make — bolted on 12 mm steel plate'),
+      specRow(
+        '7.6',
+        'Suspension',
+        'York Tecair 1 HD air suspension, 14 MT capacity — 2 auto lift axle system',
+      ),
+      specRow('7.7', 'Tyres (spec reference)', '10.00×R20, 12 Nos. — Vikant A511 (quoted without tyres)'),
+      specRow('7.8', 'Wheel Rims', '7.5" × 20", 10 holes, 12 Nos. — Wheels India'),
+      specRow(
+        '7.9',
+        'Landing Legs',
+        'York 2 Speed — static capacity 64 Tons per pair (lift capacity per York rating)',
+      ),
+      specRow(
+        '7.10',
+        'Brakes',
+        '2-line air brake system with three air tanks (120 L), mechanical slack adjusters, EBS',
+      ),
+      specRow(
+        '7.11',
+        'Relay Valve',
+        'RE 6 Emergency relay valve M332930 (Webco Ltd) — M22×1.5 reservoir, M14×1.5 service, M16×1.5 emergency, 4 delivery ports',
+      ),
+      specRow('7.12', 'Brake Chamber', 'Type 24, port size M16×1.5 — 6 Nos.'),
+      specRow('7.13', 'Other Accessories', 'SUPD, mud-guards and bumper'),
+    ],
+  },
+  {
+    sectionType: 'custom',
+    title: 'Optional / Chargeable Items',
+    content: [
+      'Extra cabin supports, extra “U” bolts, flat-belt, chassis support, truck bumper, and male coupler are chargeable if required.',
+      'Any other connections and flanges required will be on chargeable basis.',
+      'RTO registration tax & other charges, insurance will be extra.',
+    ].join('\n'),
+    sequenceNo: 12,
+    editable: true,
+    contentFormat: 'richtext',
+  },
+  {
+    sectionType: 'scope',
+    title: 'Scope of Work',
+    content: [
+      '1. We will manufacture the 45 m³ Triple Axle Bulker Semi Trailer as per the above specifications.',
+      '2. This is standard equipment; any changes requested by the customer will be subject to revised rates.',
+      '3. Major maintenance will be done at our works. Owner has to send the vehicle by own arrangement; all expenses on owner’s account.',
+      '4. RTO registration tax & other charges, insurance will be extra.',
+    ].join('\n'),
+    sequenceNo: 13,
+    editable: true,
+    contentFormat: 'richtext',
+  },
+  {
+    sectionType: 'terms',
+    title: 'General Sales Terms',
+    content: '',
+    sequenceNo: 14,
+    editable: true,
+    contentFormat: 'spec_table',
+    specRows: [
+      specRow('T.1', 'Jurisdiction', 'Subject to Chhapi Jurisdiction'),
+      specRow('T.2', 'Terms of Delivery', 'Ex-works Chhapi, Banaskantha, North Gujarat'),
+      specRow(
+        'T.3',
+        'Payment Terms',
+        '30% advance and balance against proforma invoice. Advance is non-refundable on cancellation.',
+      ),
+      specRow('T.4', 'Delivery Time', '12 weeks from receipt of confirmed order with advance'),
+      specRow(
+        'T.5',
+        'Warranty',
+        '12 months against defective material and workmanship. Not responsible for mishandling, accident damage, or consequential loss. No warranty on hydraulic equipment and parts; bought-out items carry OEM warranty.',
+      ),
+      specRow('T.6', 'Validity', 'Up to 20 days from quotation date'),
+    ],
+  },
+  {
+    sectionType: 'introduction',
+    title: 'Closing Paragraph',
+    content: [
+      'We believe and hope that our affordable rate and other details will be acceptable to you.',
+      '',
+      'We anticipate accepting your esteemed buy request.',
+      '',
+      'Thanking you.',
+      'Yours faithfully,',
+    ].join('\n'),
+    sequenceNo: 15,
+    editable: true,
+    contentFormat: 'richtext',
+  },
+  {
+    sectionType: 'signature',
+    title: 'Authorized Signatory',
+    content: [
+      'For, {{company_name}}',
+      '',
+      '',
+      '{{authorized_person}}',
+      '{{designation}}',
+    ].join('\n'),
+    sequenceNo: 16,
+    editable: true,
+    contentFormat: 'richtext',
+  },
+]
+
+export const BULKER_TRAILER_45M3_TEMPLATE_ID = 'qtpl-bulker-trailer-45m3'
+export const BULKER_TRAILER_45M3_TEMPLATE_VERSION = 1

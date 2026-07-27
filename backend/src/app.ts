@@ -84,10 +84,14 @@ export function createApp() {
   // Prod: skip session endpoints so only credential attempts consume the quota.
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: env.isDev || env.isTest ? 2000 : 60,
+    max: env.isDev || env.isTest ? 500 : 30,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { success: false, message: 'Too many authentication attempts' },
+    message: {
+      success: false,
+      message: 'Too many sign-in attempts. Please wait a few minutes and try again.',
+      code: 'AUTH_RATE_LIMITED',
+    },
     skip: (req) => {
       if (env.isDev || env.isTest) return false
       const path = req.path.replace(/\/+$/, '') || '/'

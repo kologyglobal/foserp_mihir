@@ -68,10 +68,15 @@ export async function sumProformaReceipts(tenantId: string, proformaInvoiceId: s
   return Number(agg._sum.amount ?? 0)
 }
 
+type ReceiptCreateData = Omit<
+  Prisma.CrmPaymentReceiptUncheckedCreateInput,
+  'tenantId' | 'createdBy' | 'updatedBy'
+>
+
 export async function createReceipt(
   tenantId: string,
   userId: string,
-  data: Prisma.CrmPaymentReceiptUncheckedCreateInput,
+  data: ReceiptCreateData,
 ) {
   return prisma.crmPaymentReceipt.create({
     data: { ...data, tenantId, createdBy: userId, updatedBy: userId },
@@ -113,10 +118,15 @@ export async function findInvoiceById(tenantId: string, id: string) {
   })
 }
 
+type InvoiceCreateData = Omit<
+  Prisma.CrmTaxInvoiceUncheckedCreateInput,
+  'tenantId' | 'createdBy' | 'updatedBy'
+>
+
 export async function createInvoiceWithLines(
   tenantId: string,
   userId: string,
-  invoice: Prisma.CrmTaxInvoiceUncheckedCreateInput,
+  invoice: InvoiceCreateData,
   lines: Array<Omit<Prisma.CrmTaxInvoiceLineUncheckedCreateInput, 'tenantId' | 'invoiceId'>>,
 ) {
   return prisma.$transaction(async (tx) => {
@@ -180,7 +190,9 @@ export async function allocateInTransaction(input: {
   receiptId: string
   remainingUnallocated: number
   invoicePatches: Array<{ invoiceId: string; amountPaid: number; balanceDue: number; paymentStatus: 'unpaid' | 'partially_paid' | 'paid'; status: 'posted' | 'partially_paid' | 'paid' }>
-  allocations: Array<Prisma.CrmPaymentAllocationUncheckedCreateInput>
+  allocations: Array<
+    Omit<Prisma.CrmPaymentAllocationUncheckedCreateInput, 'tenantId' | 'createdBy'>
+  >
 }) {
   return prisma.$transaction(async (tx) => {
     await tx.crmPaymentReceipt.update({
