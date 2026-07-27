@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { ShieldX, Eye, Pencil, Power, PowerOff, Trash2 } from 'lucide-react'
+import { Eye, Pencil, Power, PowerOff, Trash2 } from 'lucide-react'
 import { MasterRegisterTable } from '../../components/masters/MasterRegisterTable'
 import { MasterListShell, STATUS_FILTER_OPTIONS } from '../../components/masters/MasterListShell'
 import { DetailLayout, DetailSection, DetailGrid, DetailField, FormLayout, FormSection, MasterNotFound } from '../../components/masters/MasterLayouts'
@@ -16,18 +16,16 @@ import { resolveStoreAction, type MaybePromise, type StoreActionResult } from '.
 import { formatApiError } from '../../services/api/apiErrors'
 import { notify } from '../../store/toastStore'
 import { isSuperAdminUser } from '../../utils/permissions'
+import { PermissionDeniedPage } from '../../components/system/PermissionDeniedPage'
 import type { AdminTenantStatus } from '../../types/admin'
 
-function SuperAdminOnlyNotice() {
+function SuperAdminOnlyNotice({ pageName = 'Tenants' }: { pageName?: string }) {
   return (
-    <div className="mx-auto flex max-w-lg flex-col items-center gap-4 px-6 py-24 text-center">
-      <ShieldX className="h-14 w-14 text-rose-500" />
-      <h1 className="text-xl font-semibold text-slate-900">Super Admin Required</h1>
-      <p className="text-sm text-slate-600">
-        Tenant / workspace administration is available to platform Super Admins only. Contact your platform
-        administrator if you need access.
-      </p>
-    </div>
+    <PermissionDeniedPage
+      pageName={pageName}
+      requiredPermission="tenant.manage"
+      reason="Super Admin access required"
+    />
   )
 }
 

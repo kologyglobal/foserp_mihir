@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import { Building2, LayoutDashboard } from 'lucide-react'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
 import {
-  AdminEmptyState,
   AdminSummaryCard,
   AdminSummaryStrip,
 } from '../../components/admin'
@@ -10,6 +9,7 @@ import { ErpButton } from '../../components/erp/ErpButton'
 import { ErpCardSection } from '../../components/erp/card-form'
 import { isSuperAdminUser } from '../../utils/permissions'
 import { useAdminStore } from '../../store/adminStore'
+import { PermissionDeniedPage } from '../../components/system/PermissionDeniedPage'
 
 /**
  * Platform Admin home — Super Admin only. Tenant IAM stays under /admin.
@@ -20,12 +20,11 @@ export function PlatformOverviewPage() {
 
   if (!isSuperAdmin) {
     return (
-      <OperationalPageShell title="Platform" breadcrumbs={[{ label: 'Platform' }]}>
-        <AdminEmptyState
-          title="Super Admin required"
-          description="The Platform Admin tree is limited to users with tenant.manage."
-        />
-      </OperationalPageShell>
+      <PermissionDeniedPage
+        pageName="Platform Admin"
+        requiredPermission="tenant.manage"
+        reason="Super Admin access required"
+      />
     )
   }
 
