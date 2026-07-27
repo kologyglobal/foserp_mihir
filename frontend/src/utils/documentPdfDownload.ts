@@ -88,7 +88,7 @@ export async function downloadElementAsPdf(
       scrollY: -window.scrollY,
       windowWidth: element.scrollWidth,
       windowHeight: element.scrollHeight,
-      onclone: (clonedDoc) => {
+      onclone: (clonedDoc: Document) => {
         const cloned =
           clonedDoc.querySelector('.so-print-doc') ??
           clonedDoc.querySelector('.rcpt-print-doc') ??

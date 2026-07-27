@@ -164,15 +164,6 @@ export async function resetPassword(token: string, password: string): Promise<vo
   }
 }
 
-/** Authenticated change-password — revokes all refresh tokens server-side. */
-export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
-  const { apiRequest } = await import('../api/client')
-  await apiRequest<null>('/auth/change-password', {
-    method: 'POST',
-    body: JSON.stringify({ currentPassword, newPassword }),
-  })
-}
-
 export async function acceptInvitation(token: string, password: string): Promise<void> {
   let res: Response
   try {

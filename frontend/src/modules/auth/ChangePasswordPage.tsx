@@ -49,7 +49,7 @@ export function ChangePasswordPage() {
 
     setLoading(true)
     try {
-      await changePassword(currentPassword, newPassword)
+      await changePassword({ currentPassword, newPassword })
       setAuthNotice('Password changed. Please sign in with your new password.')
       await logout()
       navigate('/login', { replace: true })
