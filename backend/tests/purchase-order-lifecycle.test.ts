@@ -494,9 +494,11 @@ describe.skipIf(!dbAvailable)('Purchase order lifecycle (Phase 1)', () => {
       .put(setupBase())
       .set(auth())
       .send({
-        defaultWarehouseId: warehouseId,
-        requirePoWarehouse: false,
         version: current.body.data.version,
+        general: {
+          defaultWarehouseId: warehouseId,
+          requirePoWarehouse: false,
+        },
       })
     expect(setup.status).toBe(200)
 
@@ -511,9 +513,11 @@ describe.skipIf(!dbAvailable)('Purchase order lifecycle (Phase 1)', () => {
       .put(setupBase())
       .set(auth())
       .send({
-        defaultWarehouseId: null,
-        requirePoWarehouse: true,
         version: current.body.data.version,
+        general: {
+          defaultWarehouseId: null,
+          requirePoWarehouse: true,
+        },
       })
 
     const res = await request(app).post(poBase()).set(auth()).send(draftPayload())
@@ -541,9 +545,11 @@ describe.skipIf(!dbAvailable)('Purchase order lifecycle (Phase 1)', () => {
       .put(setupBase())
       .set(auth())
       .send({
-        defaultWarehouseId: warehouse2Id,
-        requirePoWarehouse: false,
         version: current.body.data.version,
+        general: {
+          defaultWarehouseId: warehouse2Id,
+          requirePoWarehouse: false,
+        },
       })
 
     const detail = await request(app).get(`${poBase()}/${poId}`).set(auth())

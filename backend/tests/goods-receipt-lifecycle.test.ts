@@ -136,13 +136,47 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
   const setupBase = (s = slug) => `/api/v1/t/${s}/purchase/setup`
   const auth = (t = token) => ({ Authorization: `Bearer ${t}` })
 
+  /** Purchase Setup PUT is nested (`general` / `receiving`); map flat test keys. */
   async function putSetup(body: Record<string, unknown>) {
     const current = await request(app).get(setupBase()).set(auth())
     const version = current.body.data?.version ?? 0
+    if (body.general != null || body.receiving != null) {
+      return request(app)
+        .put(setupBase())
+        .set(auth())
+        .send({ ...body, version })
+    }
+    const generalKeys = new Set([
+      'defaultWarehouseId',
+      'requirePoWarehouse',
+      'allowOverReceipt',
+      'overReceiptTolerancePct',
+      'allowShortClose',
+      'allowDirectPo',
+    ])
+    const receivingKeys = new Set([
+      'requireVendorChallan',
+      'requireVehicleNumber',
+      'requireGateEntry',
+      'requireBatch',
+      'requireSerial',
+      'duplicateChallanPolicy',
+    ])
+    const general: Record<string, unknown> = {}
+    const receiving: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(body)) {
+      if (key === 'version') continue
+      if (generalKeys.has(key)) general[key] = value
+      else if (receivingKeys.has(key)) receiving[key] = value
+    }
     return request(app)
       .put(setupBase())
       .set(auth())
-      .send({ ...body, version })
+      .send({
+        version,
+        ...(Object.keys(general).length > 0 ? { general } : {}),
+        ...(Object.keys(receiving).length > 0 ? { receiving } : {}),
+      })
   }
 
   async function createReceivablePo(qty = 100): Promise<{ poId: string; lineId: string }> {
@@ -489,7 +523,8 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
     const grnId = created.body.data.id
     const res = await request(app).post(`${grnBase()}/${grnId}/submit`).set(auth()).send({})
     expect(res.status).toBe(200)
-    expect(res.body.data.status).toBe('SUBMITTED')
+    // No-QC GRNs auto-post inventory on submit → INVENTORY_POSTED (not stuck on SUBMITTED).
+    expect(res.body.data.status).toBe('INVENTORY_POSTED')
 
     const po = await prisma.purchaseOrder.findFirst({
       where: { id: poId, tenantId },
