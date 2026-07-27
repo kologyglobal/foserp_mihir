@@ -1,5 +1,6 @@
-import { Link, useLocation } from 'react-router-dom'
-import { ShieldX } from 'lucide-react'
+import { useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { Home, LogOut, ShieldX } from 'lucide-react'
 import {
   getSessionUser,
   getSessionUserRoleLabel,
@@ -8,20 +9,31 @@ import {
 } from '../../utils/permissions'
 import { resolveRoutePermission, resolveRoutePageName } from '../../config/permissionMatrix'
 import { Button } from '../ui/Button'
+import { useOptionalAuth } from '../../context/AuthProvider'
+import { isApiMode } from '../../config/apiConfig'
 
 interface PermissionDeniedPageProps {
   /** Override required permission key when known from a route/API error */
   requiredPermission?: string | null
   /** Override page label */
   pageName?: string | null
+  /**
+   * When set (e.g. AppShell hydration recovery), call this instead of a normal
+   * client-side navigation so the shell can soft-continue into home.
+   */
+  onGoHome?: () => void
 }
 
 /** Canonical permission-denied UI — shows role + required permission from the matrix. */
 export function PermissionDeniedPage({
   requiredPermission,
   pageName: pageNameProp,
+  onGoHome,
 }: PermissionDeniedPageProps = {}) {
   const location = useLocation()
+  const navigate = useNavigate()
+  const auth = useOptionalAuth()
+  const [signingOut, setSigningOut] = useState(false)
   const user = getSessionUser()
   const roleLabel = getSessionUserRoleLabel()
   const purchaseResolved = isPurchasePath(location.pathname)
@@ -32,13 +44,32 @@ export function PermissionDeniedPage({
   const pageName =
     pageNameProp ?? purchaseResolved?.pageName ?? resolveRoutePageName(location.pathname)
 
+  async function handleSignOut() {
+    setSigningOut(true)
+    try {
+      if (isApiMode() && auth?.logout) {
+        await auth.logout()
+      }
+      navigate('/login', { replace: true })
+    } finally {
+      setSigningOut(false)
+    }
+  }
+
+  function handleGoHome() {
+    onGoHome?.()
+    navigate('/home', { replace: true })
+  }
+
   return (
     <div className="mx-auto flex max-w-lg flex-col items-center gap-4 px-6 py-24 text-center">
       <ShieldX className="h-14 w-14 text-rose-500" aria-hidden />
-      <p className="text-xs font-semibold uppercase tracking-wide text-erp-muted">403</p>
-      <h1 className="text-xl font-semibold text-erp-text">Permission denied</h1>
+      <p className="text-xs font-semibold uppercase tracking-wide text-erp-muted">403 · Access denied</p>
+      <h1 className="text-xl font-semibold text-erp-text">You do not have access to this page</h1>
       <p className="text-sm text-erp-muted">
-        You do not have permission to access <strong className="text-erp-text">{pageName}</strong>.
+        Your account is signed in, but it does not have permission to open{' '}
+        <strong className="text-erp-text">{pageName}</strong>. Go back to the home page or ask an
+        administrator to update your role.
       </p>
       <div className="w-full space-y-2 rounded-lg border border-erp-border bg-erp-surface p-4 text-left text-sm">
         <p>
@@ -65,16 +96,20 @@ export function PermissionDeniedPage({
         ) : null}
       </div>
       <div className="flex flex-wrap justify-center gap-3">
-        <Link to="/home">
-          <Button type="button" size="sm">
-            Go to Dashboard
+        <Button type="button" size="sm" onClick={handleGoHome}>
+          <Home className="h-4 w-4" /> Go to home page
+        </Button>
+        {isApiMode() && auth?.isAuthenticated ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={signingOut}
+            onClick={() => void handleSignOut()}
+          >
+            <LogOut className="h-4 w-4" /> {signingOut ? 'Signing out…' : 'Sign out'}
           </Button>
-        </Link>
-        <Link to="/crm">
-          <Button type="button" size="sm" variant="secondary">
-            Go to CRM
-          </Button>
-        </Link>
+        ) : null}
       </div>
     </div>
   )
