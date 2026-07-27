@@ -14555,14 +14555,14 @@ a.crm-companies-table__name:hover {
 
 @media (min-width: 1280px) {
   .erp-card-form-page__layout--with-factbox {
-    grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr);
-    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
   }
 }
 
 @media (min-width: 1440px) {
   .erp-card-form-page__layout--with-factbox {
-    grid-template-columns: minmax(0, 68fr) minmax(340px, 32fr);
+    grid-template-columns: minmax(0, 1fr) 340px;
   }
 }
 
