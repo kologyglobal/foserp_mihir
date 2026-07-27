@@ -1,3 +1,22 @@
+## 2026-07-27 — Purchase multi-unit UOM conversion (vendor → primary)
+
+### Shipped
+
+- **Contract:** `quantity` = primary/stock UOM; `uomQuantity` = vendor/purchase UOM; `uomConversionFactor` = vendor units per 1 primary (e.g. 3 m = 1 NOS). Helper: `backend/src/modules/purchase/shared/uom-conversion.ts`.
+- **Item Master:** `MasterItem.uomConversionFactor` (mirrored with deprecated `purchaseQtyPerUom`); UI label **UOM Conversion Factor**.
+- **PO lines:** `uomQuantity`, `uomConversionFactor`, `unitCostPrimary`; amount = vendor rate × `uomQuantity`; stock/open qty uses primary `quantity`.
+- **GRN:** `receivedUomQuantity` (+ ordered/accepted/rejected UOM qty); inventory posting uses primary qty + `unitCostPrimary`.
+- **Inventory:** balances stay primary-only; list API adds computed `uomQuantity` / factor for display; movements optionally snapshot vendor UOM.
+- **Hostinger:** `backend/scripts/purchase-multi-unit-uom-hostinger.sql` + migration `20260727180000_purchase_multi_unit_uom`.
+- **Tests:** `backend/tests/purchase/uom-conversion.test.ts`.
+
+### Notes
+
+- Safe backfill: existing docs assumed factor `1` (`uomQuantity = quantity`). Do not rewrite historical stock with guessed conversions.
+- Production issue/consumption remains primary qty (unchanged API).
+
+---
+
 ## 2026-07-27 — Phase A2: Admin / Organization foundation
 
 ### Shipped

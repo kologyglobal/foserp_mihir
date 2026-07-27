@@ -4,6 +4,12 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Done recently — Purchase multi-unit UOM (2026-07-27)
+
+- Vendor → primary conversion across Item Master / PO / GRN / inventory posting.
+- Fields: `quantity` (primary), `uomQuantity` (vendor), `uomConversionFactor`.
+- Docs: `docs/PURCHASE_MULTI_UNIT_UOM.md`; Hostinger SQL: `backend/scripts/purchase-multi-unit-uom-hostinger.sql`.
+
 ## Done recently — Bank & Cash UAT readiness (2026-07-23)
 
 | Field | Value |
@@ -381,7 +387,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 |-------|-------|
 | Module | Purchase |
 | Description | PR/PO/GRN API |
-| Reason | **Partial** — PO lifecycle + inventory masters + GRN + Approvals + **Purchase Setup full persistence** (all editable tabs + enforcement) + Invoice/QI/Return APIs shipped 2026-07-21. Remaining gaps: richer inventory posting, reports, and fuller FE wiring for invoice/QI/return beyond Setup enforcement. |
+| Reason | **Partial** — PO lifecycle + GRN + Approvals + Setup + Invoice/QI/Return APIs. **Multi-unit UOM** (vendor → primary) shipped 2026-07-27 for Item/PO/GRN/inventory posting. Remaining: richer reports FE, fuller invoice/QI/return dual-UOM display, Hostinger migrate deploy of `20260727180000_purchase_multi_unit_uom`. |
 | Dependencies | Items, vendors (done); PR schema Phase 03 (done); PO lifecycle (done); Approvals queue (done); Setup 1A (done) |
 | Next step | Quality inspections / invoice / returns backends when prioritized. **Approvals next iteration:** backend Approval Matrix enforcement (amount bands → role chain, currently demo-only frontend config) + per-user Approval Limits, layered on the existing RBAC + self-approval policy. |
 | Test required | Setup **13/13**; PO lifecycle (warehouse resolution); GRN **15/15** (Setup policies); approvals 11/11 + flow 4/4. Continue quality/invoice suites next. |
