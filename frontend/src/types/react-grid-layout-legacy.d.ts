@@ -4,7 +4,7 @@
  * resolutions fail to pick them up, which breaks `tsc -b`.
  */
 declare module 'react-grid-layout/legacy' {
-  import type { ComponentType, CSSProperties, ReactElement, ReactNode, Ref } from 'react'
+  import type { ComponentType, CSSProperties, ReactElement, ReactNode } from 'react'
 
   export type LayoutItem = {
     i: string
@@ -51,7 +51,7 @@ declare module 'react-grid-layout/legacy' {
     onLayoutChange?: (layout: Layout) => void
   }
 
-  declare function ReactGridLayout(props: LegacyReactGridLayoutProps): ReactElement
+  function ReactGridLayout(props: LegacyReactGridLayoutProps): ReactElement
   export default ReactGridLayout
 
   export function WidthProvider<P>(
