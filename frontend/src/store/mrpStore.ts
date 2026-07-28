@@ -43,6 +43,7 @@ interface MrpState {
   addSalesOrderFromQuotation: (input: {
     customerId: string
     productId: string
+    itemId?: string | null
     qty: number
     requiredDate: string
     remarks: string
@@ -193,6 +194,7 @@ export const useMrpStore = create<MrpState>()(
       salesOrderNo,
       customerId: input.customerId,
       productId: input.productId,
+      itemId: input.itemId ?? null,
       qty: input.qty,
       requiredDate: input.expectedDeliveryDate ?? input.requiredDate,
       status: 'open',

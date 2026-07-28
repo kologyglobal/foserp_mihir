@@ -456,14 +456,11 @@ export async function reversePayableAllocation(allocationId: string, body: {
   })
 }
 
-/** No dedicated history endpoint yet — returns empty list gracefully. */
-export async function listApReversalHistory(_params: { legalEntityId?: string; page?: number; limit?: number } = {}) {
-  return {
-    success: true as const,
-    message: 'AP reversal history endpoint not available',
-    data: [] as ApReversalHistoryRow[],
-    meta: { page: 1, limit: 20, total: 0, totalPages: 0 },
-  }
+/** Aggregated AP document + allocation reversal history. */
+export async function listApReversalHistory(params: { legalEntityId?: string; page?: number; limit?: number } = {}) {
+  return apiRequest<ApReversalHistoryRow[]>(
+    `${tenantPath('/accounting/payables/reversals')}${buildQuery(params)}`,
+  )
 }
 
 // ─── AP reporting (Phase 4D1) ───────────────────────────────────────────────

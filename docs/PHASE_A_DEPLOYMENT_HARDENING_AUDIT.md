@@ -14,7 +14,7 @@
 |-------|-----------|---------------|
 | **Authentication** | Ready (A1) | Prod email reset (**PASS WITH CONDITION**); auth event audit → A5 |
 | **Admin / Org / RBAC** | Stronger after A2+A4 | Branch ACL; login activity; sessions UI; invitations; data scope **PASS WITH CONDITION**; live UAT |
-| **MasterItem sales** | Not ready | Missing `salesAllowed`, sales UOM/rate/lead days, fulfilment method; CRM still picks MasterProduct |
+| **MasterItem sales** | Ready (A6 foundation) | Sales fields + defaults + API sales lookup shipped; CRM pickers still Product-based until A7 |
 | **CRM Product → Item** | Not ready | SO/Quote keyed on `productId`; dual-resolve via `fgItemId` only; large backfill + dual-read required |
 | **API-mode gate** | Incomplete | Admin unverified; Product→Item unfinished; no Phase A regression pack |
 
@@ -29,12 +29,12 @@
 | A0 | Architecture audit (this doc) | **In progress → complete when signed** |
 | A1 | Authentication hardening | **Shipped 2026-07-27** (lockout + change-password FE + messages; reset email **PASS WITH CONDITION**) |
 | A2 | Admin / Organization foundation | **Shipped 2026-07-27** (shell IA + Overview + Tenant Profile + Org LE/Branch links; Tenants Super-Admin-only; User↔branch → A3) |
-| A3 | Users | Not started (partial UI exists) |
-| A4 | Roles / Permissions / Data Scope | **Partial — shipped 2026-07-27** (RBAC + EffectiveAccess + safeguards; data scope **PASS WITH CONDITION**) |
-| A5 | Login Activity / Sessions / Security | Not started |
-| A6 | MasterItem sales readiness | Not started |
+| A3 | Users | **Shipped 2026-07-27** (invitations + User↔LE/Branch assignment UI; invite SMTP **PASS WITH CONDITION**) |
+| A4 | Roles / Permissions / Data Scope | **Partial — shipped 2026-07-27** (RBAC + EffectiveAccess + safeguards; data scope **assignment** shipped, **enforcement** PASS WITH CONDITION) |
+| A5 | Login Activity / Sessions / Security | **Shipped 2026-07-27** (LoginActivity + sessions UI + unlock clears A1 lock fields; admin security regression pack) |
+| A6 | MasterItem sales readiness | Shipped 2026-07-23 (foundation) |
 | A7 | CRM Product → Item migration | Not started — **blocked on A6 + productId inventory** |
-| A8 | API-mode permission regression | Not started |
+| A8 | API-mode permission regression | **Partial** — Admin security HTTP regression shipped; broader CRM/Admin demo-mix pack still open |
 | A9 | Deployment readiness gate doc | Not started |
 
 ---
@@ -52,10 +52,10 @@ Legend: ✅ present · ⚠️ partial · ❌ missing
 | **DB status** | ✅ Soft delete; User status `INVITED/ACTIVE/INACTIVE/BLOCKED/ARCHIVED`; Tenant status includes `SUSPENDED` |
 | **FE status** | ✅ `/admin` Overview; Organization hub + Tenant Profile; Users/Roles dual-mode; Tenants Super Admin–gated |
 | **Permission status** | ✅ Route + middleware; Super Admin = `tenant.manage`; Tenant Admin pack seeded; `/admin` → `canAccessAdminShell()` |
-| **Known gaps** | No branch/LE user ACL; invitations email; ~~Desired Admin IA~~ ✅ A2 shell; ~~no EffectiveAccess API~~ ✅ A4; no data-scope model (**PASS WITH CONDITION**) |
-| **Required work** | A3: Users drawer + invitations + UserBranch (or defer); A4 ✅ permission RBAC + EffectiveAccess + safeguards; scope enums deferred per A4.4 condition |
-| **Risk** | **Medium–High** multi-branch tenants without ACL; **Medium** unverified admin UI |
-| **Tests** | Indirect CRM/finance live tests; ✅ A4 unit helpers; ❌ dedicated users/roles live suite |
+| **Known gaps** | Invite SMTP; ~~Desired Admin IA~~ ✅ A2 shell; ~~EffectiveAccess API~~ ✅ A4/A7; scope **assignment** ✅ A3/A6 Admin — **query enforcement** still PASS WITH CONDITION; Module Administrators designation ✅ |
+| **Required work** | Scope enforcement on CRM/SO lists (post-A3); invite email for prod |
+| **Risk** | **Medium** multi-branch without query ACL; **Low** admin UI after A3–A5 ship |
+| **Tests** | ✅ `admin-security-regression.test.ts`; ✅ A4 unit helpers; phase 4/6/7/8 service tests |
 
 ### 2. Branch / Legal Entity / Org hierarchy
 
@@ -63,13 +63,13 @@ Legend: ✅ present · ⚠️ partial · ❌ missing
 |-------|-------|
 | **Current implementation** | `LegalEntity`, `Branch` under Accounting (`finance.legal_entity.*`, `finance.branch.*`). Hierarchy intended: Tenant → LE → Branch → Department → User. |
 | **API status** | ✅ Accounting LE/Branch APIs |
-| **DB status** | ✅ LE + Branch; ❌ `UserBranch` / department-user assignment models |
-| **FE status** | ✅ Admin Organization hub links to Accounting LE/Branch; Company = Legal Entity (documented) |
-| **Permission status** | Finance-scoped masters; Admin shell links only |
-| **Known gaps** | No enforceable branch scope on CRM/SO queries; User↔branch assignment → A3 |
-| **Required work** | A3: user↔company/branch assignment; A4.4: scope enforcement or document **PASS WITH CONDITION** if deferred |
-| **Risk** | **High** if multi-plant client goes live without branch scope |
-| **Tests** | Finance LE/branch tests only |
+| **DB status** | ✅ LE + Branch; ✅ `UserLegalEntityAccess` / `UserBranchAccess` / `UserWarehouseAccess` (empty = unrestricted) |
+| **FE status** | ✅ Admin Organization hub links to Accounting LE/Branch; Company = Legal Entity; user detail scope panel |
+| **Permission status** | Finance-scoped masters; Admin shell links; `scope.view` / `scope.manage` |
+| **Known gaps** | No enforceable branch scope on CRM/SO queries (assignment-only) |
+| **Required work** | Opt-in `loadUserDataScope` / `scopeAllows` on domain list queries — or keep PASS WITH CONDITION |
+| **Risk** | **Medium–High** if multi-plant client goes live without query ACL |
+| **Tests** | Finance LE/branch + `admin-scopes-responsibilities-phase6` + security regression scopes |
 
 ### 3. Sessions / Refresh tokens
 
@@ -78,12 +78,12 @@ Legend: ✅ present · ⚠️ partial · ❌ missing
 | **Current implementation** | `RefreshToken` (hashed, expiry, revoke, UA/IP). Auth service rotates refresh on refresh. FE `client.ts` single-flight refresh + 401 retry. |
 | **API status** | ✅ login, refresh-token, logout (one/all) |
 | **DB status** | ✅ `refresh_tokens`; ❌ dedicated Session entity (refresh row = session) |
-| **FE status** | ✅ Auto refresh; ❌ Active Sessions admin UI; ❌ profile session list |
-| **Permission status** | N/A for own session; admin revoke needs new perms |
-| **Known gaps** | No admin session browser; logout-all from Admin; revoked-session UX messaging standardization |
-| **Required work** | A1.1 verify no refresh loops; A5.2 Active Sessions UI + revoke; profile `/profile/security` |
-| **Risk** | **Low** for rotation mechanics; **Medium** ops without revoke UI |
-| **Tests** | ❌ Dedicated refresh/logout/revocation suite |
+| **FE status** | ✅ Auto refresh; ✅ Active Sessions admin UI (`/admin/security/sessions`); ❌ profile session list |
+| **Permission status** | `security.view` / `security.manage`; per-user revoke via `user.update` |
+| **Known gaps** | Profile `/profile/security` session list; pagination on tenant sessions |
+| **Required work** | Optional profile session list |
+| **Risk** | **Low** |
+| **Tests** | ✅ `admin-security-phase8` + `admin-security-regression` |
 
 ### 4. Audit events
 
@@ -184,14 +184,14 @@ Legend: ✅ present · ⚠️ partial · ❌ missing
 | Field | Value |
 |-------|-------|
 | **Current implementation** | `MasterItem`: code, name, category, base/purchase UOM, HSN, GST, stockable, purchasable, production/QC flags, `standardRate`, blocked/status. APIs `/items`, `/lookups/items`. FE purchase `ItemLookupSelect`. |
-| **API status** | ✅ Item CRUD + lookup; ❌ sales filters (`salesAllowed`) |
-| **DB status** | ❌ `salesAllowed`, `salesDescription`, `salesUomId`, `defaultSalesRate`, `salesLeadDays`, `defaultFulfilmentMethod` |
+| **API status** | ✅ Item CRUD + lookup + sales filters (`salesAllowed`) |
+| **DB status** | ✅ `salesAllowed`, `salesDescription`, `salesUomId`, `defaultSalesRate`, `salesLeadDays`, `defaultFulfilmentMethod` |
 | **FE status** | Item master UI for inventory/purchase; CRM does **not** use item picker for sales |
 | **Permission status** | `master.item.*`, `master.lookup.view`; CRM sales roles oriented to `master.product.view` |
-| **Known gaps** | All Phase A sales fields; sales Item picker; role packs for CRM→item view |
-| **Required work** | **A6 before A7** — additive migration + Zod + lookup filters + `<ItemMasterPicker mode="sales" />` |
+| **Known gaps** | sales Item picker; role packs for CRM→item view; CRM pickers remain Product-based until A7 |
+| **Required work** | A7 — CRM Product → Item migration (dual-read/backfill + `itemId` persistence + picker/gate enforcement) |
 | **Risk** | **Medium** schema; **High** if CRM cut over without fields |
-| **Tests** | Item CRUD/import; ❌ sales-item tests |
+| **Tests** | Item CRUD/import; ✅ `item-sales-defaults` + sales field defaults |
 
 ### 10. MasterProduct / CRM commercial identity
 
@@ -310,4 +310,4 @@ Legend: ✅ present · ⚠️ partial · ❌ missing
 | Engineering | | | A0 complete — proceed A1 |
 | Product / Client readiness | | | |
 
-**Next action:** Proceed **A2–A3** Admin / Organization / Users (A1 auth hardening shipped 2026-07-27). Do **not** start A7 until A6 sales fields land and this productId inventory is used for dual-write design.
+**Next action:** Admin A3–A5 complete (2026-07-27). Proceed **A6** MasterItem sales readiness, then A7 CRM Product→Item. Do **not** start A7 until A6 sales fields land and the productId inventory is used for dual-write design. A9 deployment readiness gate after A6–A8.

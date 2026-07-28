@@ -589,6 +589,7 @@ export function VendorPaymentDetailPage() {
             {perms.canViewAllocation ? (
               <PayableAllocationHistoryTable
                 rows={history}
+                canReverse={perms.canReverseAllocation}
                 emptyLabel={
                   payment.status === 'POSTED'
                     ? 'This payment has not been allocated to any invoices yet.'

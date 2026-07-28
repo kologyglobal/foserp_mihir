@@ -65,6 +65,11 @@ export const PURCHASE_PERMISSIONS = [
   'purchase.grn.post',
   'purchase.quality.view',
   'purchase.quality.inspect',
+  'purchase.qi.view',
+  'purchase.qi.create',
+  'purchase.qi.edit',
+  'purchase.qi.complete',
+  'purchase.qi.cancel',
   'purchase.invoice.view',
   'purchase.invoice.create',
   'purchase.invoice.verify',
@@ -96,6 +101,8 @@ const PURCHASE_PERMISSION_ALIASES: Record<string, PurchasePermission> = {
   'purchase.order.approve': 'purchase.po.approve',
   'purchase.order.release': 'purchase.po.send',
   'purchase.order.cancel': 'purchase.po.cancel',
+  'purchase.quality.view': 'purchase.qi.view',
+  'purchase.quality.inspect': 'purchase.qi.complete',
 }
 
 const ALL = [...PURCHASE_PERMISSIONS]
@@ -267,7 +274,7 @@ export const PURCHASE_ROUTE_VIEW_PERMISSIONS: Array<{
   { prefix: '/purchase/invoices', permission: 'purchase.invoice.view', pageName: 'Purchase Invoices' },
   { prefix: '/purchase/grn', permission: 'purchase.grn.view', pageName: 'Gate Entry & GRN' },
   { prefix: '/purchase/grns', permission: 'purchase.grn.view', pageName: 'Gate Entry & GRN' },
-  { prefix: '/purchase/quality-inspections', permission: 'purchase.quality.view', pageName: 'Quality Inspections' },
+  { prefix: '/purchase/quality-inspections', permission: 'purchase.qi.view', pageName: 'Quality Inspections' },
   { prefix: '/purchase/returns', permission: 'purchase.return.view', pageName: 'Purchase Returns' },
   { prefix: '/purchase/vendor-performance', permission: 'purchase.reports.view', pageName: 'Vendor Performance' },
   { prefix: '/purchase/reports', permission: 'purchase.reports.view', pageName: 'Purchase Reports' },
@@ -287,7 +294,7 @@ export const PURCHASE_NAV_ITEM_PERMISSIONS: Record<string, PurchasePermission> =
   '/purchase/orders': 'purchase.po.view',
   '/purchase/invoices': 'purchase.invoice.view',
   '/purchase/grn': 'purchase.grn.view',
-  '/purchase/quality-inspections': 'purchase.quality.view',
+  '/purchase/quality-inspections': 'purchase.qi.view',
   '/purchase/returns': 'purchase.return.view',
   '/purchase/vendor-performance': 'purchase.reports.view',
   '/purchase/reports': 'purchase.reports.view',
@@ -341,6 +348,7 @@ export function canAccessPurchaseShell(): boolean {
     || canPurchasePermission('purchase.po.view')
     || canPurchasePermission('purchase.planning.view')
     || canPurchasePermission('purchase.grn.view')
+    || canPurchasePermission('purchase.qi.view')
     || canPurchasePermission('purchase.quality.view')
     || canPurchasePermission('purchase.invoice.view')
     || canPurchasePermission('purchase.return.view')
@@ -495,8 +503,12 @@ export function usePurchasePermissions() {
       canViewGrn: can('purchase.grn.view'),
       canCreateGrn: can('purchase.grn.create'),
       canPostGrn: can('purchase.grn.post'),
-      canViewQuality: can('purchase.quality.view'),
-      canInspectQuality: can('purchase.quality.inspect'),
+      canViewQuality: can('purchase.qi.view') || can('purchase.quality.view'),
+      canInspectQuality:
+        can('purchase.qi.complete')
+        || can('purchase.qi.edit')
+        || can('purchase.quality.inspect'),
+      canCancelQuality: can('purchase.qi.cancel') || can('purchase.qi.complete'),
       canViewInvoice: can('purchase.invoice.view'),
       canCreateInvoice: can('purchase.invoice.create'),
       canVerifyInvoice: can('purchase.invoice.verify'),

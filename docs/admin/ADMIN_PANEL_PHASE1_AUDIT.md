@@ -491,10 +491,13 @@ Before Phase 3 schema work: confirm product decision —
 | Chrome | Overview quick cards; security/org tabs; tenants workspace removed (Platform nav) |
 | Test | `backend/tests/admin-polish-phase10.test.ts` |
 
-**Explicit hold:** Editable password policy / MFA Admin settings; first-class Module Administrators; Warehouse under LE; hard-gating every domain API.
+**Explicit hold:** Editable password policy / MFA Admin settings; Warehouse under LE; hard-gating every domain API.
+
+**Module Administrators (shipped 2026-07-27):** `ModuleAdministrator` designation register on Module Access — ownership contacts only; does not grant `module.manage` or blanket-gate APIs.
 
 **Definition of done (Phase 10):**
 - [x] Org structure + Admin Audit + read-only policy
 - [x] Modules/Overview chrome + requireModule proof
 - [x] Live service test
 - [x] P0-ADMIN program closed with holds documented
+- [x] Module Administrators designation (post–Phase 10 close-out)

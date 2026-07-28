@@ -6,7 +6,7 @@ import { ErpCardSection } from './card-form/ErpCardSection'
 import { Input } from '../forms/Inputs'
 import { formatCurrency } from '../../utils/formatters/currency'
 import {
-  buildOpportunityLineFromProduct,
+  buildOpportunityLineFromItem,
   calcProductPricingSummary,
   createEmptyOpportunityLine,
   opportunityLineUnitPriceDomId,
@@ -17,7 +17,7 @@ import {
   type ProductPricingAdjustments,
 } from '../../utils/opportunityLineCalc'
 import type { ProductMasterPick } from '../../utils/opportunityProductOptions'
-import { isProductSellable, productNotSellableForSalesMessage } from '../../utils/productMaster'
+import { isItemSellable, itemNotSellableForSalesMessage } from '../../utils/opportunityItemOptions'
 import { notify } from '../../store/toastStore'
 import { cn } from '../../utils/cn'
 
@@ -146,16 +146,16 @@ export function ErpProductPricingPanel({
     commit(synced.filter((l) => l.id !== id))
   }
 
-  function selectProduct(lineId: string, productId: string) {
-    if (!productId) return
-    const pick = productPickMap.get(productId)
+  function selectItem(lineId: string, itemId: string) {
+    if (!itemId) return
+    const pick = productPickMap.get(itemId)
     if (!pick) return
-    if (!isProductSellable(pick.product)) {
-      notify.warning(productNotSellableForSalesMessage(pick.product))
+    if (!isItemSellable(pick.item)) {
+      notify.warning(itemNotSellableForSalesMessage(pick.item))
       return
     }
     const idx = synced.findIndex((l) => l.id === lineId)
-    const built = buildOpportunityLineFromProduct(pick.product, pick.item, pick.uomName, idx + 1)
+    const built = buildOpportunityLineFromItem(pick.item, pick.uomName, idx + 1)
     updateLine(lineId, built)
   }
 
@@ -183,7 +183,7 @@ export function ErpProductPricingPanel({
           <thead>
             <tr>
               <th className="so-pricing-th so-pricing-th--center">#</th>
-              <th className="so-pricing-th">Product</th>
+              <th className="so-pricing-th">Item</th>
               <th className="so-pricing-th so-pricing-th--right">Qty</th>
               <th className="so-pricing-th so-pricing-th--right">Unit price</th>
               <th className="so-pricing-th so-pricing-th--right">Disc %</th>
@@ -200,8 +200,8 @@ export function ErpProductPricingPanel({
               const unitPriceError = errs.find((e) => /unit price/i.test(e))
                 ?? (errs.some((e) => e === UNIT_PRICE_REQUIRED_MESSAGE) ? UNIT_PRICE_REQUIRED_MESSAGE : undefined)
               const productColumnErrors = errs.filter((e) => !/unit price/i.test(e))
-              const pick = line.productId ? productPickMap.get(line.productId) : undefined
-              const product = pick?.product
+              const pick = line.itemId ? productPickMap.get(line.itemId) : undefined
+              const item = pick?.item
               return (
                 <tr key={line.id} className="so-pricing-row">
                   <td className="so-pricing-td so-pricing-td--center tabular-nums text-erp-muted">
@@ -213,17 +213,17 @@ export function ErpProductPricingPanel({
                     ) : (
                       <ErpSmartSelect
                         options={productOptions}
-                        value={line.productId ?? ''}
-                        onChange={(id) => selectProduct(line.id, id)}
-                        placeholder="Select released product…"
+                        value={line.itemId ?? ''}
+                        onChange={(id) => selectItem(line.id, id)}
+                        placeholder="Select sellable item…"
                         appearance="dropdown"
                         dropdownMinWidth={360}
-                        emptyMessage="No released products match. Only products released for sale can be selected."
+                        emptyMessage="No sellable items match. Enable Sales allowed on the Item master."
                       />
                     )}
-                    {product && !isProductSellable(product) ? (
+                    {item && !isItemSellable(item) ? (
                       <p className="so-pricing-warn">
-                        <ShieldAlert className="h-3 w-3" /> {productNotSellableForSalesMessage(product)}
+                        <ShieldAlert className="h-3 w-3" /> {itemNotSellableForSalesMessage(item)}
                       </p>
                     ) : null}
                     {productColumnErrors.length ? (

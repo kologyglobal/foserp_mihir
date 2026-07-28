@@ -8,6 +8,7 @@ export const DEFAULT_INVENTORY_SETTINGS = {
     defaultReceiptLocationId: null as string | null,
     defaultIssueLocationId: null as string | null,
     defaultCostingMethod: 'standard' as const,
+    manufacturingCostSource: 'actual_work_order' as const,
     allowNegativeStock: false,
     requirePostingDate: true,
     requireSourceDocument: true,

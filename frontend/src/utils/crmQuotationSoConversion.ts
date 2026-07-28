@@ -5,7 +5,7 @@ import { calcPriceSummary, syncLineTotals } from './crmQuotationCalc'
 import { sectionContent } from './crmIntegration'
 import { quotationLineItemsSummary, summarizeQuotationLinesForSo } from './crmQuotationSoLines'
 import { useMasterStore } from '../store/masterStore'
-import { assertProductSellableForSales } from './productMaster'
+import { canUseItemInSales } from './opportunityItemOptions'
 
 export interface CrmSalesOrderHandoverInput {
   customerPoNumber?: string
@@ -21,6 +21,8 @@ export interface QuotationSoConversionContext {
   latestDocument?: QuotationDocument
   salesQuotation?: Quotation
   customer?: Customer
+  /** Fallback when sales quotation header is not hydrated (API list). */
+  customerId?: string | null
   contactName?: string | null
   opportunityName?: string | null
   productName?: string | null
@@ -39,7 +41,7 @@ export interface QuotationSoValidationResult {
   issues: QuotationSoValidationIssue[]
 }
 
-const DISABLED_NOT_LATEST = 'Only latest approved quotation revision can be converted to Sales Order.'
+const DISABLED_NOT_LATEST = 'Only the latest quotation revision can be converted to a Sales Order.'
 
 export function isQuotationExpired(salesQuotation?: Quotation): boolean {
   if (!salesQuotation?.validityDate) return false
@@ -51,21 +53,55 @@ export function canShowConvertButton(ctx: QuotationSoConversionContext): boolean
   if (document.status === 'converted' || document.salesOrderId || salesQuotation?.salesOrderId) {
     return false
   }
-  return document.status === 'approved' && latestDocument?.id === document.id
+  if (document.status === 'superseded' || document.status === 'rejected') return false
+  if (salesQuotation?.customerApproval === 'rejected') return false
+  return latestDocument?.id === document.id
 }
 
 export function validateQuotationForSoConversion(ctx: QuotationSoConversionContext): QuotationSoValidationResult {
-  const { document, latestDocument, salesQuotation, customer, contactName } = ctx
+  const { document, latestDocument, salesQuotation, customer, contactName, customerId: fallbackCustomerId } = ctx
   const issues: QuotationSoValidationIssue[] = []
 
   if (document.status === 'converted' || document.salesOrderId || salesQuotation?.salesOrderId) {
     issues.push({ id: 'already-converted', message: 'Quotation is already converted to a Sales Order.', blocking: true })
   }
+  if (document.status === 'superseded') {
+    issues.push({ id: 'superseded', message: 'Superseded revisions cannot be converted.', blocking: true })
+  }
+  if (document.status === 'rejected') {
+    issues.push({
+      id: 'internally-rejected',
+      message: 'Internally rejected quotations cannot be converted — recall to draft or create a new revision.',
+      blocking: true,
+    })
+  }
+  if (salesQuotation?.customerApproval === 'rejected') {
+    issues.push({
+      id: 'customer-rejected',
+      message: 'Customer-rejected quotations cannot be converted — create a new revision first.',
+      blocking: true,
+    })
+  }
+  // Send / internal approval / customer approval remain optional (non-blocking tips).
   if (document.status !== 'sent' && document.status !== 'converted') {
     issues.push({
       id: 'not-sent',
-      message: `Quotation must be sent to the customer before conversion — current status is ${document.status.replace(/_/g, ' ')}.`,
-      blocking: true,
+      message: 'Optional: send to customer and record approval before converting (not required for a direct sales order).',
+      blocking: false,
+    })
+  }
+  if (!document.approvalHistory.some((a) => a.action === 'approved')) {
+    issues.push({
+      id: 'no-approval',
+      message: 'Optional: internal approval has not been completed yet.',
+      blocking: false,
+    })
+  }
+  if (salesQuotation && salesQuotation.customerApproval !== 'approved' && salesQuotation.customerApproval !== 'rejected') {
+    issues.push({
+      id: 'not-customer-accepted',
+      message: 'Optional: customer approval has not been recorded yet.',
+      blocking: false,
     })
   }
   if (latestDocument && latestDocument.id !== document.id) {
@@ -74,7 +110,8 @@ export function validateQuotationForSoConversion(ctx: QuotationSoConversionConte
   if (isQuotationExpired(salesQuotation)) {
     issues.push({ id: 'expired', message: 'Quotation validity has expired.', blocking: true })
   }
-  if (!salesQuotation?.customerId) {
+  const resolvedCustomerId = salesQuotation?.customerId || fallbackCustomerId || customer?.id || null
+  if (!resolvedCustomerId) {
     issues.push({ id: 'no-customer', message: 'Customer must be selected on the quotation.', blocking: true })
   }
   if (customer && !customer.addressLine1?.trim()) {
@@ -83,22 +120,11 @@ export function validateQuotationForSoConversion(ctx: QuotationSoConversionConte
   if (!document.contactId && !contactName && !customer?.contactPerson) {
     issues.push({ id: 'no-contact', message: 'Contact person is required.', blocking: true })
   }
-  if (!document.approvalHistory.some((a) => a.action === 'approved')) {
-    issues.push({ id: 'no-approval', message: 'Quotation internal approval must be completed.', blocking: true })
-  }
-  if (salesQuotation && salesQuotation.customerApproval !== 'approved') {
-    issues.push({
-      id: 'not-customer-accepted',
-      message: 'Customer must approve the quotation before creating a sales order.',
-      blocking: true,
-    })
-  }
 
   const lines = syncLineTotals(document.priceLines).filter((l) => !l.isOptional)
   if (!lines.length) {
     issues.push({ id: 'no-lines', message: 'At least one product / price line is required.', blocking: true })
   } else {
-    const masters = useMasterStore.getState()
     const checkedIds = new Set<string>()
     for (const line of lines) {
       if (!line.qty || line.qty <= 0) {
@@ -107,21 +133,25 @@ export function validateQuotationForSoConversion(ctx: QuotationSoConversionConte
       if (!line.unitPrice || line.unitPrice <= 0) {
         issues.push({ id: `price-${line.id}`, message: `Unit price required for ${line.description || 'line item'}.`, blocking: true })
       }
-      const productId = line.productId ?? salesQuotation?.productId ?? null
-      if (productId && !checkedIds.has(productId)) {
-        checkedIds.add(productId)
-        const product = masters.getProduct(productId)
-        const sellable = assertProductSellableForSales(product)
-        if (!sellable.ok) {
-          issues.push({ id: `product-not-released-${productId}`, message: sellable.error, blocking: true })
-        }
+      let lineItemId: string | null = line.itemId ?? null
+      if (!lineItemId && line.productId) {
+        lineItemId = useMasterStore.getState().getProduct(line.productId)?.fgItemId ?? null
       }
-    }
-    if (salesQuotation?.productId && !checkedIds.has(salesQuotation.productId)) {
-      const product = masters.getProduct(salesQuotation.productId)
-      const sellable = assertProductSellableForSales(product)
-      if (!sellable.ok) {
-        issues.push({ id: `product-not-released-${salesQuotation.productId}`, message: sellable.error, blocking: true })
+      if (!lineItemId) {
+        lineItemId = salesQuotation?.itemId ?? null
+      }
+      if (lineItemId && !checkedIds.has(lineItemId)) {
+        checkedIds.add(lineItemId)
+        const sellable = canUseItemInSales(lineItemId)
+        if (!sellable.ok) {
+          issues.push({ id: `item-not-sellable-${lineItemId}`, message: sellable.error ?? 'Item is not allowed for sales', blocking: true })
+        }
+      } else if (!lineItemId && (line.productOrItem || line.description)) {
+        issues.push({
+          id: `item-missing-${line.id}`,
+          message: `Select an Item for ${line.description || line.productOrItem || 'line item'}.`,
+          blocking: true,
+        })
       }
     }
   }
@@ -144,7 +174,11 @@ export function validateQuotationForSoConversion(ctx: QuotationSoConversionConte
     issues.push({ id: 'no-delivery', message: 'Delivery terms are required.', blocking: true })
   }
   if (!deliveryTime?.trim()) {
-    issues.push({ id: 'no-delivery-time', message: 'Delivery time / lead time is required on the quotation.', blocking: true })
+    issues.push({
+      id: 'no-delivery-time',
+      message: 'Optional: set delivery time / lead time on the quotation header.',
+      blocking: false,
+    })
   }
   if (!salesQuotation?.validityDate) {
     issues.push({ id: 'no-validity', message: 'Quotation validity date is required.', blocking: true })

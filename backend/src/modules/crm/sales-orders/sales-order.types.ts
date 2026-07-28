@@ -6,7 +6,9 @@ export interface SalesOrderLineDto {
   lineNo: number
   productOrItem: string
   description: string
-  productId?: string | null
+  itemId?: string | null
+  itemCodeSnapshot?: string | null
+  itemNameSnapshot?: string | null
   qty: number
   uom: string
   unitPrice: number
@@ -22,7 +24,7 @@ export interface SalesOrderDto {
   id: string
   salesOrderNo: string
   customerId: string
-  productId: string | null
+  itemId: string
   qty: number
   requiredDate: string | null
   status: string
@@ -77,7 +79,7 @@ export function mapSalesOrderToDto(order: CrmSalesOrder, names?: AuditUserNames)
     id: order.id,
     salesOrderNo: order.salesOrderNo,
     customerId: order.companyId,
-    productId: order.productId,
+    itemId: order.itemId,
     qty: decimalToNumber(order.qty),
     requiredDate: toIso(order.requiredDate)?.slice(0, 10) ?? null,
     status: order.status,

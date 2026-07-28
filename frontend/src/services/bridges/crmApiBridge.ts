@@ -725,7 +725,7 @@ function mapOpportunityLinesForApi(lines: NonNullable<Opportunity['lines']> | un
   if (!lines) return undefined
   return lines.map((line) => ({
     lineNo: line.lineNo,
-    productId: isUuid(line.productId ?? undefined) ? line.productId : null,
+    productId: null,
     itemId: isUuid(line.itemId ?? undefined) ? line.itemId : null,
     itemCode: line.itemCode,
     productOrItem: line.productOrItem,

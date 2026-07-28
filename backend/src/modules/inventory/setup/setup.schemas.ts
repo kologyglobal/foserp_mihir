@@ -6,6 +6,15 @@ const numberSeriesSchema = z.object({
   padding: z.number().int().min(1).max(10),
 })
 
+export const fifoOpeningMigrationBodySchema = z.object({
+  dryRun: z.boolean().optional().default(false),
+  force: z.boolean().optional().default(false),
+  itemIds: z.array(z.string().uuid()).optional(),
+  warehouseIds: z.array(z.string().uuid()).optional(),
+})
+
+export type FifoOpeningMigrationBody = z.infer<typeof fifoOpeningMigrationBodySchema>
+
 export const inventorySetupBodySchema = z.object({
   general: z
     .object({
@@ -13,6 +22,7 @@ export const inventorySetupBodySchema = z.object({
       defaultReceiptLocationId: z.string().uuid().nullable().optional(),
       defaultIssueLocationId: z.string().uuid().nullable().optional(),
       defaultCostingMethod: z.enum(['standard', 'average', 'fifo', 'specific']).optional(),
+      manufacturingCostSource: z.enum(['actual_work_order', 'standard']).optional(),
       allowNegativeStock: z.boolean().optional(),
       requirePostingDate: z.boolean().optional(),
       requireSourceDocument: z.boolean().optional(),

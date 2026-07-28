@@ -43,7 +43,8 @@ export function ReversalHistoryPage() {
         <LoadingState variant="card" />
       ) : rows.length === 0 ? (
         <div className="rounded border border-erp-border bg-slate-50 p-4 text-[13px] text-erp-muted">
-          No reversal history is available yet. The backend history list endpoint is not wired — reversals are recorded on each document and allocation batch.
+          No reversals recorded yet. After you reverse a posted invoice, payment, adjustment, or allocation
+          batch, it appears here.
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -63,8 +64,8 @@ export function ReversalHistoryPage() {
                   <td className="py-2 pr-3">{AP_REVERSAL_TYPE_LABELS[row.documentType] ?? row.documentType}</td>
                   <td className="py-2 pr-3">{row.documentNumber ?? row.documentId}</td>
                   <td className="py-2 pr-3 tabular-nums">{row.reversalDate}</td>
-                  <td className="py-2 pr-3">{row.reason}</td>
-                  <td className="py-2">{row.reversalVoucherNumber ?? '—'}</td>
+                  <td className="py-2 pr-3">{row.reason || '—'}</td>
+                  <td className="py-2">{row.reversalVoucherNumber ?? (row.documentType === 'allocation' ? '— (subledger)' : '—')}</td>
                 </tr>
               ))}
             </tbody>

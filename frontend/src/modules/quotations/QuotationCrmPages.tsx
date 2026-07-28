@@ -538,16 +538,25 @@ export function CrmQuotationListPage() {
           onRevise={(item) => void reviseQuotation(item)}
           onPreview={openQuotationPreview}
           onCreateSalesOrder={(item) => {
-            const gate = resolveCreateSalesOrderGateForQuotationDocument(item.document.id)
-            if (gate.salesOrderId) {
-              navigate(resolveSalesOrderDetailPath(gate.salesOrderId, true))
-              return
-            }
-            if (!gate.enabled) {
-              notify.error(gate.disabledReason ?? 'Available after quotation approval.')
-              return
-            }
-            conversion.openConversionModal(item.document.id)
+            void (async () => {
+              if (isApiMode()) {
+                try {
+                  await syncQuotationsFromApi()
+                } catch {
+                  /* use in-memory docs */
+                }
+              }
+              const gate = resolveCreateSalesOrderGateForQuotationDocument(item.document.id)
+              if (gate.salesOrderId) {
+                navigate(resolveSalesOrderDetailPath(gate.salesOrderId, true))
+                return
+              }
+              if (!gate.enabled) {
+                notify.error(gate.disabledReason ?? 'Cannot convert this quotation to a sales order.')
+                return
+              }
+              conversion.openConversionModal(item.document.id)
+            })()
           }}
           onPrint={(item) => navigate(`/crm/quotations/${item.document.quotationId}/print?doc=${item.document.id}`)}
           onSubmitApproval={(item) => {

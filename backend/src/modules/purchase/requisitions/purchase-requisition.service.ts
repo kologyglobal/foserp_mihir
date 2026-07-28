@@ -53,10 +53,11 @@ async function assertApprovalAssignedToActor(
   tenantId: string,
   purchaseRequisitionId: string,
   actorId: string,
+  actorPermissions: readonly string[] = [],
 ) {
   const approval = await prisma.purchaseApproval.findFirst({
     where: { tenantId, purchaseRequisitionId, status: 'PENDING' },
-    select: { approverId: true },
+    select: { approverId: true, approverRole: true },
   })
   if (approval?.approverId && approval.approverId !== actorId) {
     throw new PurchaseRequisitionNotApprovableError(
@@ -64,6 +65,33 @@ async function assertApprovalAssignedToActor(
       PURCHASE_ERROR_CODE.APPROVAL_ASSIGNED_TO_ANOTHER_USER,
     )
   }
+  if (approval) {
+    const { assertActorMatchesApproverRole } = await import('../shared/purchase-matrix-role.js')
+    await assertActorMatchesApproverRole(
+      tenantId,
+      actorId,
+      approval.approverRole,
+      actorPermissions,
+      (message) =>
+        new PurchaseRequisitionNotApprovableError(
+          message,
+          PURCHASE_ERROR_CODE.APPROVAL_MATRIX_ROLE_REQUIRED,
+        ),
+    )
+  }
+  const prAmount = await prisma.purchaseRequisitionLine.aggregate({
+    where: { purchaseRequisitionId, tenantId },
+    _sum: { estimatedAmount: true },
+  })
+  const documentAmount = Number(prAmount._sum.estimatedAmount ?? 0)
+  const { assertActorWithinApproverLimit } = await import('../shared/purchase-approver-limit.js')
+  await assertActorWithinApproverLimit({
+    tenantId,
+    actorId,
+    documentAmount,
+    documentType: 'PURCHASE_REQUISITION',
+    makeError: (message, code) => new PurchaseRequisitionNotApprovableError(message, code),
+  })
 }
 
 export async function listPurchaseRequisitions(tenantId: string, query: ListPurchaseRequisitionsQuery) {
@@ -419,7 +447,7 @@ export async function approvePurchaseRequisition(
     ? await isSelfApprovalAllowed(tenantId, actorPermissions)
     : false
   assertApprovable(existing, actorId, { allowSelfApproval })
-  await assertApprovalAssignedToActor(tenantId, id, actorId)
+  await assertApprovalAssignedToActor(tenantId, id, actorId, actorPermissions)
 
   const estimatedTotal = existing.lines.reduce(
     (sum, line) => sum + Number(line.estimatedAmount),

@@ -1,8 +1,6 @@
 import type { Request, Response } from 'express'
-import { permissionSetIncludes } from '../../constants/permissions.js'
 import { auditFromRequest } from '../../services/audit.service.js'
 import { getContext, getRouteParam, getTenantId } from '../../types/request-context.js'
-import { AuthorizationError } from '../../utils/errors.js'
 import { sendCreated, sendPaginated, sendSuccess } from '../../utils/response.js'
 import * as invitationService from './user-invitation.service.js'
 import * as userService from './user.service.js'
@@ -28,17 +26,6 @@ export async function list(req: Request, res: Response): Promise<void> {
 export async function getById(req: Request, res: Response): Promise<void> {
   const user = await userService.getUserById(getTenantId(req), getRouteParam(req, 'userId'))
   sendSuccess(res, 'User retrieved', user)
-}
-
-export async function getEffectiveAccess(req: Request, res: Response): Promise<void> {
-  const ctx = getContext(req)
-  const userId = getRouteParam(req, 'userId')
-  const isSelf = ctx.userId === userId
-  if (!isSelf && !permissionSetIncludes(ctx.permissions, 'user.view')) {
-    throw new AuthorizationError('Missing permission: user.view')
-  }
-  const access = await userService.getUserEffectiveAccess(getTenantId(req), userId)
-  sendSuccess(res, 'Effective access retrieved', access)
 }
 
 export async function create(req: Request, res: Response): Promise<void> {

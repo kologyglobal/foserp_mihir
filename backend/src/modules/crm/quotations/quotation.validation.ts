@@ -32,7 +32,9 @@ const priceLineSchema = z
   id: z.string().optional(),
   productOrItem: z.string().trim().min(1),
   description: z.string().trim().optional(),
-  productId: z.string().uuid().optional().nullable(),
+  itemId: z.string().uuid().optional().nullable(),
+  itemCodeSnapshot: z.string().trim().max(64).optional().nullable(),
+  itemNameSnapshot: z.string().trim().max(300).optional().nullable(),
   qty: z.coerce.number().min(0),
   uom: z.string().trim().max(16).optional(),
   unitPrice: z.coerce.number().min(0),
@@ -44,6 +46,9 @@ const priceLineSchema = z
   .superRefine((line, ctx) => {
     if (line.unitPrice == null || line.unitPrice <= 0) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Unit Price is required', path: ['unitPrice'] })
+    }
+    if (!line.isOptional && !line.itemId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Item is required', path: ['itemId'] })
     }
   })
 
@@ -59,7 +64,7 @@ export const createQuotationSchema = z.object({
   quotationNo: z.string().trim().max(32).optional(),
   customerId: z.string().uuid(),
   opportunityId: optionalUuid,
-  productId: optionalUuid,
+  itemId: optionalUuid,
   qty: z.coerce.number().min(0).optional(),
   unitPrice: z.coerce.number().min(0).optional(),
   discountPct: z.coerce.number().min(0).max(100).optional(),

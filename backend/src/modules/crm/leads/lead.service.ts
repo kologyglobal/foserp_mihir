@@ -57,8 +57,10 @@ async function mapLeadWithNames(tenantId: string, lead: Awaited<ReturnType<typeo
   })
 }
 
-export async function listLeads(tenantId: string, query: ListLeadsQuery) {
-  const result = await repo.findLeads(tenantId, query)
+export async function listLeads(tenantId: string, query: ListLeadsQuery, userId?: string) {
+  const { loadCrmOrgScopeWhere } = await import('../shared/crm-org-scope.js')
+  const orgScope = await loadCrmOrgScopeWhere(tenantId, userId)
+  const result = await repo.findLeads(tenantId, query, orgScope as never)
   const nameMap = await resolveUserNames(
     result.items.flatMap((l) => [l.createdBy, l.updatedBy, l.assignedTo, l.ownerId]),
     tenantId,

@@ -51,8 +51,10 @@ async function getUserName(tenantId: string, userId: string): Promise<string> {
   return nameMap.get(userId) ?? 'User'
 }
 
-export async function listQuotations(tenantId: string, query: ListQuotationsQuery) {
-  const result = await repo.findQuotations(tenantId, query)
+export async function listQuotations(tenantId: string, query: ListQuotationsQuery, userId?: string) {
+  const { loadCrmOrgScopeWhere } = await import('../shared/crm-org-scope.js')
+  const orgScope = await loadCrmOrgScopeWhere(tenantId, userId)
+  const result = await repo.findQuotations(tenantId, query, orgScope as never)
   const nameMap = await resolveUserNames(
     result.items.flatMap((q) => [q.createdBy, q.updatedBy, q.salesOwnerId]),
     tenantId,

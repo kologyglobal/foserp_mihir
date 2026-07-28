@@ -9,6 +9,7 @@ import { getSessionUser } from '../../utils/permissions'
 import type { CrmActivity, CrmActivityType, OpportunityPriority, OpportunityStage } from '../../types/crm'
 import { useCrmOwnerOptions, useOpportunityPriorityOptions, useActivityTypeOptions, useDesignationOptions, useDepartmentOptions } from '../../hooks/useCrmMasters'
 import { resolveOpportunityPriorityOptions, buildHubSpotStyleOpportunityName } from '../../utils/opportunityUtils'
+import { buildOpportunityLineFromItem } from '../../utils/opportunityLineCalc'
 import { CrmDrawerShell } from './CrmDrawerShell'
 import { FormField } from '../forms/FormField'
 import { Input, Select, Textarea, MobileInput } from '../forms/Inputs'
@@ -218,12 +219,12 @@ export function NewOpportunityDrawer({
   const navigate = useNavigate()
   const createOpportunity = useCrmStore((s) => s.createOpportunity)
   const customers = useMasterStore((s) => s.customers)
-  const products = useMasterStore((s) => s.products)
+  const items = useMasterStore((s) => s.items)
   const contacts = useCrmStore((s) => s.contacts)
   const user = getSessionUser()
   const [customerId, setCustomerId] = useState(defaultCustomerId ?? '')
   const [contactId, setContactId] = useState('')
-  const [productId, setProductId] = useState('')
+  const [itemId, setItemId] = useState('')
   const [opportunityName, setOpportunityName] = useState('')
   const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
   const [productRequirement, setProductRequirement] = useState('')
@@ -250,14 +251,14 @@ export function NewOpportunityDrawer({
   const customerContacts = contacts.filter((c) => c.customerId === customerId)
   const owner = ownerOptions.find((o) => o.value === ownerId) ?? { value: user.id, label: user.name }
   const customer = customers.find((c) => c.id === customerId)
-  const productName = products.find((p) => p.id === productId)?.productName
+  const itemName = items.find((i) => i.id === itemId)?.itemName
   const contactName = customerContacts.find((c) => c.id === contactId)?.name
 
   useEffect(() => {
     if (!open) return
     setCustomerId(defaultCustomerId ?? '')
     setContactId('')
-    setProductId('')
+    setItemId('')
     setOpportunityName('')
     setNameManuallyEdited(false)
     setProductRequirement('')
@@ -273,12 +274,12 @@ export function NewOpportunityDrawer({
     if (nameManuallyEdited) return
     const next = buildHubSpotStyleOpportunityName({
       companyName: customer?.customerName,
-      productName,
+      productName: itemName,
       contactName,
     })
     if (!next) return
     setOpportunityName((prev) => (prev === next ? prev : next))
-  }, [customer?.customerName, productName, contactName, nameManuallyEdited])
+  }, [customer?.customerName, itemName, contactName, nameManuallyEdited])
 
   function handleOpportunityNameChange(value: string) {
     setOpportunityName(value)
@@ -288,7 +289,7 @@ export function NewOpportunityDrawer({
     }
     const nextAuto = buildHubSpotStyleOpportunityName({
       companyName: customer?.customerName,
-      productName,
+      productName: itemName,
       contactName,
     })
     setNameManuallyEdited(value.trim() !== nextAuto)
@@ -297,11 +298,15 @@ export function NewOpportunityDrawer({
   function submit(e: React.FormEvent) {
     e.preventDefault()
     void (async () => {
+      const selectedItem = itemId ? items.find((i) => i.id === itemId) : undefined
+      const lines = selectedItem
+        ? [buildOpportunityLineFromItem(selectedItem, 'Nos', 1)]
+        : []
       const r = await resolveStoreAction(
         createOpportunity({
           customerId,
           contactId: contactId || null,
-          productId: productId || null,
+          productId: null,
           opportunityName,
           productRequirement: productRequirement || opportunityName,
           stage: 'new_lead' as OpportunityStage,
@@ -318,7 +323,7 @@ export function NewOpportunityDrawer({
           salesOrderId: null,
           leadId: null,
           nextFollowUpDate: null,
-          lines: [],
+          lines,
         }),
       )
       if (!r.ok) {
@@ -374,7 +379,7 @@ export function NewOpportunityDrawer({
         <FormField
           label="Opportunity name"
           required
-          hint={nameManuallyEdited ? 'Custom name — clear to resume auto-naming' : 'Auto-filled from company / product'}
+          hint={nameManuallyEdited ? 'Custom name — clear to resume auto-naming' : 'Auto-filled from company / item'}
         >
           <Input
             value={opportunityName}
@@ -399,14 +404,14 @@ export function NewOpportunityDrawer({
         </button>
         {showMore ? (
           <>
-            <FormField label="Product requirement">
+            <FormField label="Requirement">
               <Textarea value={productRequirement} onChange={(e) => setProductRequirement(e.target.value)} rows={3} />
             </FormField>
-            <FormField label="Product">
-              <Select value={productId} onChange={(e) => setProductId(e.target.value)}>
+            <FormField label="Item" hint="Only items allowed for sales are listed.">
+              <Select value={itemId} onChange={(e) => setItemId(e.target.value)}>
                 <option value="">—</option>
-                {products.filter((p) => p.isActive).map((p) => (
-                  <option key={p.id} value={p.id}>{p.productName}</option>
+                {items.filter((i) => i.isActive && i.salesAllowed).map((i) => (
+                  <option key={i.id} value={i.id}>{i.itemCode} — {i.itemName}</option>
                 ))}
               </Select>
             </FormField>

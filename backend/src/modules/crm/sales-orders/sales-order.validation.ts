@@ -24,7 +24,9 @@ const salesOrderLineSchema = z.object({
   lineNo: z.number().int().positive().optional(),
   productOrItem: z.string().trim().min(1),
   description: z.string().trim().optional().default(''),
-  productId: optionalUuid,
+  itemId: z.string().uuid(),
+  itemCodeSnapshot: z.string().trim().max(64).optional().nullable(),
+  itemNameSnapshot: z.string().trim().max(300).optional().nullable(),
   qty: z.number().positive(),
   uom: z.string().trim().min(1).default('NOS'),
   unitPrice: z.number().nonnegative(),
@@ -55,7 +57,7 @@ export const createSalesOrderSchema = z
   .object({
     customerId: z.string().uuid(),
     source: z.enum(SALES_ORDER_SOURCES).default('direct'),
-    productId: optionalUuid,
+    itemId: optionalUuid,
     qty: z.number().positive().optional(),
     unitPrice: z.number().nonnegative().optional(),
     discountPct: z.number().min(0).max(100).optional().nullable(),
@@ -89,11 +91,18 @@ export const createSalesOrderSchema = z
   })
   .superRefine((data, ctx) => {
     const hasLines = Boolean(data.lines?.length)
-    if (!hasLines && (!data.productId || data.qty == null || data.unitPrice == null)) {
+    if (!hasLines && !data.itemId && (data.qty == null || data.unitPrice == null)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Provide lines[] or productId + qty + unitPrice',
+        message: 'Provide lines[] or itemId + qty + unitPrice',
         path: ['lines'],
+      })
+    }
+    if (!hasLines && !data.itemId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'itemId is required when lines[] is omitted',
+        path: ['itemId'],
       })
     }
     if (data.source === 'direct' && !data.directSoReason?.trim()) {

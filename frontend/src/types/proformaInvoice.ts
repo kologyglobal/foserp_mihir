@@ -10,7 +10,7 @@ export type { ProformaPaymentStatus }
 export interface ProformaInvoiceLine {
   id: string
   lineNo: number
-  productId: string
+  itemId: string
   itemCode: string
   description: string
   hsnCode: string

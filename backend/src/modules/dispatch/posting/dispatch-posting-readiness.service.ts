@@ -242,6 +242,26 @@ export async function getOutboundPostingReadiness(
     pushBlocker(hardBlockers, 'NOT_DRAFT', `Status is ${dispatch.status}`)
   }
 
+  let reversibleQty = 0
+  if (isConfirmed) {
+    const posting = await prisma.dispatchPosting.findFirst({
+      where: {
+        tenantId,
+        outboundDispatchId: dispatchId,
+        status: { in: ['POSTED', 'PARTIALLY_REVERSED', 'LEGACY_POSTED'] },
+      },
+      include: { lines: { select: { quantity: true, reversedQuantity: true } } },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (posting?.lines.length) {
+      reversibleQty = roundQty(
+        posting.lines.reduce((sum, pl) => sum + Math.max(0, n(pl.quantity) - n(pl.reversedQuantity)), 0),
+      )
+    } else {
+      reversibleQty = requestedQty
+    }
+  }
+
   const allowedActions: DispatchPostingReadiness['allowedActions'] = []
   if (isDraft && dispatch.planningSource === 'BASIC_7C0') allowedActions.push('CONFIRM')
   if (isDraft && postingReady && (dispatch.planningSource === 'WORKBENCH_7C1' || mode === 'post')) {
@@ -257,7 +277,7 @@ export async function getOutboundPostingReadiness(
   if (isDraft) {
     allowedActions.push('CANCEL', 'RESERVE', 'PICK', 'PACK', 'CHALLAN')
   }
-  if (isConfirmed) allowedActions.push('REVERSE')
+  if (isConfirmed && reversibleQty > 0) allowedActions.push('REVERSE')
 
   let lifecycleStatus: string = dispatch.status
   if (isDraft) {
@@ -305,7 +325,7 @@ export async function getOutboundPostingReadiness(
       postingQty: isDraft ? requestedQty : 0,
       salesOrderRemainingQty: soRemaining,
       inventoryAvailableQty,
-      reversibleQty: isConfirmed ? requestedQty : 0,
+      reversibleQty,
     },
     hardBlockers,
     warnings,
@@ -331,8 +351,12 @@ export async function getOutboundPostingReadiness(
         detail: postingReady ? 'Ready to post' : 'Dispatch cannot be posted',
       },
       reversal: {
-        ready: isConfirmed,
-        detail: isConfirmed ? 'Full header reverse available' : 'Only CONFIRMED outbound can be reversed',
+        ready: isConfirmed && reversibleQty > 0,
+        detail: isConfirmed
+          ? reversibleQty > 0
+            ? `Reversible qty ${reversibleQty}`
+            : 'No remaining reversible quantity'
+          : 'Only CONFIRMED outbound can be reversed',
       },
     },
   }

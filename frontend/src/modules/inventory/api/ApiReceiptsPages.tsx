@@ -624,6 +624,16 @@ export function ApiReceiptDetailPage() {
                 View stock balances →
               </Link>
             </li>
+            {perms.canViewCost ? (
+              <li>
+                <Link
+                  to={`/inventory/costing/entries?movementId=${encodeURIComponent(row.id)}`}
+                  className="font-semibold text-erp-primary hover:underline"
+                >
+                  Receipt cost / valuation →
+                </Link>
+              </li>
+            ) : null}
           </ul>
         </SectionCard>
       </div>

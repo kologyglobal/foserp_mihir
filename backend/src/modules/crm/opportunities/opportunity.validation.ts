@@ -6,7 +6,6 @@ import { OPPORTUNITY_PRIORITIES, OPPORTUNITY_STAGES, OPPORTUNITY_STATUSES } from
 const lineInputSchema = z
   .object({
   lineNo: z.coerce.number().int().min(1).optional(),
-  productId: z.string().uuid().optional().nullable(),
   itemId: z.string().uuid().optional().nullable(),
   itemCode: z.string().trim().max(64).optional(),
   productOrItem: z.string().trim().min(1).max(300),
@@ -32,6 +31,9 @@ const lineInputSchema = z
     }
     if (hasProduct && (line.qty == null || line.qty <= 0)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Quantity must be greater than zero', path: ['qty'] })
+    }
+    if (hasProduct && !line.itemId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Item is required', path: ['itemId'] })
     }
   })
 

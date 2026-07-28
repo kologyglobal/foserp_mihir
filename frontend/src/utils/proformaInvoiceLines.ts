@@ -1,4 +1,4 @@
-import type { Product } from '../types/master'
+import type { Item } from '../types/master'
 import type { SalesOrder, SalesOrderLine } from '../types/mrp'
 import type { ProformaInvoiceLine } from '../types/proformaInvoice'
 
@@ -12,15 +12,15 @@ function genLineId(prefix = 'pil'): string {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`
 }
 
-function mapSoLineToPiLine(line: SalesOrderLine, products: Product[]): ProformaInvoiceLine {
-  const product = line.productId ? products.find((p) => p.id === line.productId) : undefined
+function mapSoLineToPiLine(line: SalesOrderLine, items: Item[]): ProformaInvoiceLine {
+  const item = line.itemId ? items.find((i) => i.id === line.itemId) : undefined
   return {
     id: genLineId(),
     lineNo: line.lineNo,
-    productId: line.productId ?? product?.id ?? '',
-    itemCode: product?.productCode ?? '',
-    description: line.description || line.productOrItem || product?.productName || '',
-    hsnCode: product?.hsnCode ?? '',
+    itemId: line.itemId ?? item?.id ?? '',
+    itemCode: item?.itemCode ?? '',
+    description: line.description || line.productOrItem || item?.itemName || '',
+    hsnCode: item?.hsnCode ?? '',
     qty: line.qty,
     uom: line.uom || 'Nos',
     unitPrice: line.unitPrice,
@@ -32,13 +32,13 @@ function mapSoLineToPiLine(line: SalesOrderLine, products: Product[]): ProformaI
   }
 }
 
-export function buildProformaLinesFromSalesOrder(so: SalesOrder, products: Product[]): ProformaInvoiceLine[] {
+export function buildProformaLinesFromSalesOrder(so: SalesOrder, items: Item[]): ProformaInvoiceLine[] {
   if (so.lines && so.lines.length > 0) {
-    return so.lines.map((line) => mapSoLineToPiLine(line, products))
+    return so.lines.map((line) => mapSoLineToPiLine(line, items))
   }
 
-  const product = products.find((p) => p.id === so.productId)
-  const unitPrice = so.unitPrice ?? product?.standardPrice ?? 0
+  const item = so.itemId ? items.find((i) => i.id === so.itemId) : undefined
+  const unitPrice = so.unitPrice ?? item?.defaultSalesRate ?? item?.standardRate ?? 0
   const discountPct = so.discountPct ?? 0
   const taxable = round2(so.qty * unitPrice * (1 - discountPct / 100))
   const taxPct = DEFAULT_TAX_PCT
@@ -47,10 +47,10 @@ export function buildProformaLinesFromSalesOrder(so: SalesOrder, products: Produ
   return [{
     id: genLineId(),
     lineNo: 1,
-    productId: so.productId,
-    itemCode: product?.productCode ?? '',
-    description: product?.productName ?? 'Sales order line',
-    hsnCode: product?.hsnCode ?? '',
+    itemId: so.itemId ?? item?.id ?? '',
+    itemCode: item?.itemCode ?? '',
+    description: item?.itemName ?? 'Sales order line',
+    hsnCode: item?.hsnCode ?? '',
     qty: so.qty,
     uom: 'Nos',
     unitPrice,

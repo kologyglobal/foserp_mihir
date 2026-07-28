@@ -116,6 +116,33 @@ checkFileContains(
   'useMasterApiSync gates on isApiMode()',
 )
 
+// Admin / Auth hydration guards (A8 demo/api mix pack)
+checkFileContains(
+  'src/services/bridges/adminApiBridge.ts',
+  /useAdminStore\.setState\(\{\s*users\s*\}\)/,
+  'adminApiBridge replaces admin users from API',
+)
+checkFileContains(
+  'src/services/bridges/adminApiBridge.ts',
+  /useAdminStore\.setState\(\{\s*roles\s*:/,
+  'adminApiBridge replaces admin roles from API',
+)
+checkFileContains(
+  'src/services/bridges/adminApiBridge.ts',
+  /useAdminStore\.setState\(\{\s*tenants\s*\}\)/,
+  'adminApiBridge replaces admin tenants from API',
+)
+checkFileContains(
+  'src/hooks/useAdminApiSync.ts',
+  /if\s*\(\s*!isApiMode\s*\(\s*\)\s*\)/,
+  'useAdminApiSync gates on isApiMode()',
+)
+checkFileContains(
+  'src/modules/auth/ApiAuthGate.tsx',
+  /if\s*\(\s*!isApiMode\s*\(\s*\)\s*\)\s*return/,
+  'ApiAuthGate short-circuits in demo',
+)
+
 console.log('\n=== Demo / API Isolation Gate ===\n')
 
 if (violations.length === 0) {

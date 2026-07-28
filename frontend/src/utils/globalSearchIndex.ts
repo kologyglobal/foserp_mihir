@@ -211,6 +211,20 @@ export function buildMasterSearchIndex(
       },
       [item.itemCode, item.itemName, item.itemDescription, item.hsnCode, item.materialGrade, item.itemType],
     )
+    if (item.salesAllowed) {
+      pushEntry(
+        out,
+        {
+          id: `${item.id}-crm-sales`,
+          type: 'Sales Item',
+          label: item.itemCode,
+          sublabel: item.itemName,
+          href: `/masters/items/${item.id}`,
+          group: 'master',
+        },
+        [item.itemCode, item.itemName, item.itemDescription, item.hsnCode, item.itemType, 'sales'],
+      )
+    }
   }
 
   for (const customer of sources.customers) {

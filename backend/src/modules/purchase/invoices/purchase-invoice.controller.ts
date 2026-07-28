@@ -20,13 +20,43 @@ export const updatePurchaseInvoice = asyncHandler(async (req: Request, res: Resp
 
 const lifecycle = (fn: typeof service.approvePurchaseInvoice, message: string) =>
   asyncHandler(async (req: Request, res: Response) =>
-    sendSuccess(res, message, await fn(getTenantId(req), getRouteParam(req, 'id'), actor(req), req.body ?? {})))
+    sendSuccess(
+      res,
+      message,
+      await fn(
+        getTenantId(req),
+        getRouteParam(req, 'id'),
+        actor(req),
+        req.body ?? {},
+        getContext(req).permissions,
+      ),
+    ))
 
-export const submitPurchaseInvoice = lifecycle(service.submitPurchaseInvoice, 'Purchase invoice submitted')
+export const submitPurchaseInvoice = asyncHandler(async (req: Request, res: Response) =>
+  sendSuccess(
+    res,
+    'Purchase invoice submitted',
+    await service.submitPurchaseInvoice(getTenantId(req), getRouteParam(req, 'id'), actor(req), req.body ?? {}),
+  ))
 export const approvePurchaseInvoice = lifecycle(service.approvePurchaseInvoice, 'Purchase invoice approved')
-export const rejectPurchaseInvoice = lifecycle(service.rejectPurchaseInvoice, 'Purchase invoice rejected')
-export const postPurchaseInvoice = lifecycle(service.postPurchaseInvoice, 'Purchase invoice posted')
-export const cancelPurchaseInvoice = lifecycle(service.cancelPurchaseInvoice, 'Purchase invoice cancelled')
+export const rejectPurchaseInvoice = asyncHandler(async (req: Request, res: Response) =>
+  sendSuccess(
+    res,
+    'Purchase invoice rejected',
+    await service.rejectPurchaseInvoice(getTenantId(req), getRouteParam(req, 'id'), actor(req), req.body ?? {}),
+  ))
+export const postPurchaseInvoice = asyncHandler(async (req: Request, res: Response) =>
+  sendSuccess(
+    res,
+    'Purchase invoice posted',
+    await service.postPurchaseInvoice(getTenantId(req), getRouteParam(req, 'id'), actor(req), req.body ?? {}),
+  ))
+export const cancelPurchaseInvoice = asyncHandler(async (req: Request, res: Response) =>
+  sendSuccess(
+    res,
+    'Purchase invoice cancelled',
+    await service.cancelPurchaseInvoice(getTenantId(req), getRouteParam(req, 'id'), actor(req), req.body ?? {}),
+  ))
 export const previewPurchaseInvoiceApHandoff = asyncHandler(async (req: Request, res: Response) =>
   sendSuccess(
     res,

@@ -18,7 +18,7 @@ import {
   getAttachmentExtension,
   saveDispatchPodFile,
 } from '../../../services/fileStorage.service.js'
-import { getDispatchPostingPolicy } from '../posting/dispatch-policy.js'
+import { resolveDispatchPostingPolicy } from '../posting/dispatch-policy.js'
 import type {
   CapturePodInput,
   MarkInTransitInput,
@@ -58,7 +58,7 @@ export function isPodStatusInvoiceReady(status: DispatchPodStatus | null | undef
 }
 
 export async function assertPodAllowsInvoice(tenantId: string, outboundDispatchId: string): Promise<void> {
-  const policy = getDispatchPostingPolicy({ forceHardened: true })
+  const policy = await resolveDispatchPostingPolicy(tenantId, { forceHardened: true })
   if (!policy.requirePodBeforeInvoice) return
   const pod = await prisma.dispatchProofOfDelivery.findFirst({
     where: { tenantId, outboundDispatchId },

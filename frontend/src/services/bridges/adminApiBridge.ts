@@ -211,7 +211,26 @@ export async function apiRemoveAdminUserRole(userId: string, roleId: string): Pr
 }
 
 export async function apiFetchAdminUserEffectiveAccess(userId: string) {
-  return api.fetchAdminUserEffectiveAccessApi(userId)
+  const res = await api.fetchAdminEffectiveAccessApi(userId)
+  const report = res.data
+  const permissions = report.permissions.map((p) => p.name)
+  const roles = report.roles.map((r) => ({
+    id: r.id,
+    name: r.name,
+    description: null as string | null,
+    isSystem: r.isSystem,
+  }))
+  const { userHasTenantAdminAccess } = await import('../../utils/permissions/tenantAdmin')
+  const compact: import('../../types/admin').AdminEffectiveAccess = {
+    userId: report.user.id,
+    tenantId: useAdminStore.getState().users.find((u) => u.id === userId)?.tenantId ?? '',
+    roles,
+    permissions,
+    permissionCount: report.permissionCount,
+    isSuperAdmin: permissions.includes('tenant.manage'),
+    isTenantAdmin: userHasTenantAdminAccess(roles, permissions),
+  }
+  return { ...res, data: compact }
 }
 
 // ─── Roles ──────────────────────────────────────────────────────────────────

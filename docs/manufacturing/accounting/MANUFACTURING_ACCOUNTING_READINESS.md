@@ -5,6 +5,26 @@ API: `GET /api/v1/t/:tenantSlug/manufacturing/accounting/readiness`
 
 Read-only enablement readiness. **No posting. No feature-flag mutation.**
 
+## Product sequencing (do not skip)
+
+Enable live GL **only after** these are stable:
+
+1. Inventory Costing
+2. WO actual cost
+3. FG valuation
+4. Dispatch cost relief
+5. Finance mappings (WIP / FG / RM / Production Variance)
+
+This readiness gate is the protection model for enablement; do not bypass it with ad-hoc posting.
+
+Canonical journals (builder already matches):
+
+| Event | Debit | Credit |
+|-------|-------|--------|
+| Material Issue | WIP | RM Inventory |
+| FG Receipt | FG Inventory | WIP |
+| Variance | Production Variance ↔ WIP (sign flips) |
+
 ## Query
 
 | Param | Required | Notes |

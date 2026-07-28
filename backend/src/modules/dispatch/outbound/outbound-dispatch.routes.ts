@@ -57,11 +57,16 @@ router.post(
   controller.post,
 )
 
-/** Phase 7C5 reverse — compensating FG_DISPATCH inward, status → REVERSED. */
+/** Phase 7C5 reverse — compensating FG_DISPATCH inward; may await approval. */
 router.post(
   '/:id/reverse',
   validateParams(uuidParamSchema),
-  requirePermission('dispatch.post'),
+  requireAnyPermission(
+    'dispatch.reverse.request',
+    'dispatch.reverse.apply',
+    'dispatch.post',
+    'dispatch.override',
+  ),
   validateBody(reverseOutboundDispatchSchema),
   controller.reverse,
 )

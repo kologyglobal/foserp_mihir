@@ -14,6 +14,7 @@ import {
   Inbox,
   KeyRound,
   Landmark,
+  Calculator,
   LayoutDashboard,
   Lock,
   Network,
@@ -77,7 +78,8 @@ export const moduleCategories: NavCategory[] = [
     title: 'Executive',
     items: [
       { label: 'My Home', path: '/home', icon: LayoutDashboard, end: true, workspace: true },
-      { label: 'Executive', path: '/executive', icon: BarChart3 },
+      { label: 'CEO Dashboard', path: '/executive', icon: BarChart3 },
+      { label: 'Exception Centre', path: '/operations/exceptions', icon: ShieldAlert },
       { label: 'Inbox', path: '/inbox', icon: Inbox },
       { label: 'Role Inbox', path: '/home/inbox', icon: Inbox },
     ],
@@ -136,6 +138,7 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Stock Count', path: '/inventory/stock-count', icon: ClipboardList },
       { label: 'Reorder Planning', path: '/inventory/planning', icon: Target },
       { label: 'Accounting', path: '/inventory/accounting', icon: Landmark },
+      { label: 'Costing', path: '/inventory/costing', icon: Calculator },
       { label: 'Reports', path: '/inventory/reports', icon: BarChart3 },
       { label: 'Setup', path: '/inventory/setup', icon: Settings2 },
       /** Legacy routes — kept for bookmarks / deep links; hidden from workspace tabs */
@@ -209,6 +212,7 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Dispatch Workspace', path: '/dispatch', icon: LayoutDashboard, end: true, workspace: true },
       { label: 'Dispatch Register', path: '/dispatch/register', icon: ClipboardList },
       { label: 'Reports', path: '/dispatch/reports', icon: BarChart3 },
+      { label: 'Settings', path: '/dispatch/settings', icon: Settings2 },
     ],
   },
   {

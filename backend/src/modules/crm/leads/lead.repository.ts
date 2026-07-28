@@ -50,12 +50,17 @@ function buildLeadData(input: CreateLeadInput | UpdateLeadInput) {
   }
 }
 
-export async function findLeads(tenantId: string, query: ListLeadsQuery) {
+export async function findLeads(
+  tenantId: string,
+  query: ListLeadsQuery,
+  orgScope: Prisma.CrmLeadWhereInput = {},
+) {
   const { getPagination } = await import('../../../utils/pagination.js')
   const { skip, take } = getPagination(query)
 
   const where: Prisma.CrmLeadWhereInput = {
     ...tenantActiveFilter(tenantId),
+    ...orgScope,
     ...(query.stage ? { stage: query.stage } : {}),
     ...(query.priority ? { priority: query.priority } : {}),
     ...(query.lifecycleStatus ? { lifecycleStatus: query.lifecycleStatus } : {}),
@@ -93,6 +98,8 @@ export async function createLead(
   userId: string,
   data: CreateLeadInput & { leadCode: string },
 ) {
+  const { defaultOrgDimsForUser } = await import('../shared/crm-org-scope.js')
+  const org = await defaultOrgDimsForUser(tenantId, userId)
   return prisma.crmLead.create({
     data: {
       tenantId,
@@ -102,6 +109,8 @@ export async function createLead(
       priority: data.priority ?? DEFAULT_LEAD_PRIORITY,
       lifecycleStatus: data.lifecycleStatus ?? 'open',
       activityStatus: data.activityStatus ?? 'active',
+      legalEntityId: org.legalEntityId ?? null,
+      branchId: org.branchId ?? null,
       ...buildLeadData(data),
       createdBy: userId,
       updatedBy: userId,

@@ -281,6 +281,12 @@ export function WorkOrderCostingPanel({ workOrderId }: { workOrderId: string }) 
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link
+            to={`/inventory/costing/entries?workOrderId=${encodeURIComponent(workOrderId)}`}
+            className="inline-flex items-center rounded-md border border-erp-border px-2.5 py-1.5 text-[12px] font-semibold text-erp-primary hover:bg-erp-surface"
+          >
+            Inventory cost entries →
+          </Link>
           {canCalculateCost() ? (
             <Button size="sm" disabled={busy} onClick={() => void handleCalculate()}>
               {notCalculated ? 'Calculate Cost' : 'Recalculate Cost'}

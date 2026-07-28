@@ -9,7 +9,7 @@ export interface SalesOrderCreateValidationInput {
   quotationDocumentId: string | null
   opportunityPrefillQuotationDocumentId?: string | null
   customerId: string
-  lines: Array<{ productId: string; qty: number; unitPrice: number }>
+  lines: Array<{ itemId?: string | null; productId?: string | null; qty: number; unitPrice: number }>
   customerPoNumber: string
   paymentTerms: string
   deliveryTerms: string
@@ -50,11 +50,11 @@ export function validateSalesOrderCreate(input: SalesOrderCreateValidationInput)
     messages.push(fieldErrors.customerId)
   }
   if (!input.lines.length) {
-    fieldErrors.lines = 'Add at least one product line.'
+    fieldErrors.lines = 'Add at least one item line.'
     messages.push(fieldErrors.lines)
   } else {
-    if (input.lines.some((l) => !l.productId)) {
-      fieldErrors.lines = 'Every line needs a product.'
+    if (input.lines.some((l) => !l.itemId && !l.productId)) {
+      fieldErrors.lines = 'Every line needs an item.'
       messages.push(fieldErrors.lines)
     }
     if (input.lines.some((l) => !l.qty || l.qty < 1)) {

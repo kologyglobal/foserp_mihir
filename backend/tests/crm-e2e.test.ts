@@ -11,6 +11,8 @@ const BASE = `/api/v1/t/${TENANT_SLUG}/crm`
 let dbAvailable = false
 let token = ''
 let userId = ''
+let sellableItemId = ''
+let sellableItemName = ''
 
 const runLive = process.env.RUN_CRM_E2E === 'true'
 
@@ -66,6 +68,21 @@ beforeAll(async () => {
   expect(login.status).toBe(200)
   token = login.body.data.accessToken
   userId = login.body.data.user.id
+
+  const tenant = await prisma.tenant.findUnique({ where: { slug: TENANT_SLUG } })
+  const item = await prisma.masterItem.findFirst({
+    where: {
+      tenantId: tenant!.id,
+      deletedAt: null,
+      salesAllowed: true,
+      isBlocked: false,
+      status: 'ACTIVE',
+    },
+    orderBy: { code: 'asc' },
+  })
+  if (!item) throw new Error('No sellable MasterItem for CRM e2e')
+  sellableItemId = item.id
+  sellableItemName = item.name
 })
 
 function authGet(path: string) {
@@ -461,6 +478,7 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
       priceLines: [
         {
           productOrItem: 'Flatbed Trailer',
+          itemId: sellableItemId,
           description: 'Supply',
           qty: 2,
           uom: 'NOS',
@@ -676,6 +694,7 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
       priceLines: [
         {
           productOrItem: 'Flatbed Trailer',
+          itemId: sellableItemId,
           description: 'Supply updated',
           qty: 2,
           uom: 'NOS',
@@ -824,6 +843,7 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
       priceLines: [
         {
           productOrItem: 'Funnel Trailer',
+          itemId: sellableItemId,
           description: 'Continuous funnel line',
           qty: 1,
           uom: 'NOS',
@@ -896,6 +916,11 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
   })
 
   it('creates confirms updates and closes a direct sales order', async () => {
+    const item = await prisma.masterItem.findFirst({
+      where: { tenantId: (await prisma.tenant.findUnique({ where: { slug: TENANT_SLUG } }))!.id, deletedAt: null, salesAllowed: true },
+      select: { id: true, name: true },
+    })
+    expect(item).toBeTruthy()
     const createRes = await authPost(`${BASE}/sales-orders`, {
       customerId: companyId,
       source: 'direct',
@@ -903,13 +928,15 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
       customerPoNumber: 'PO-DIRECT-E2E',
       paymentTerms: '30% advance',
       deliveryTerms: 'Ex-works',
-      productId: null,
+      deliveryTime: '6 weeks',
+      itemId: item!.id,
       qty: 1,
       unitPrice: 1500000,
       lines: [
         {
-          productOrItem: 'Direct Frame',
+          productOrItem: item!.name,
           description: 'E2E line',
+          itemId: item!.id,
           qty: 1,
           uom: 'NOS',
           unitPrice: 1500000,
@@ -953,9 +980,12 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
       customerPoNumber: 'PO-DEL-E2E',
       paymentTerms: 'Net 30',
       deliveryTerms: 'Ex-works',
+      deliveryTime: '4 weeks',
+      itemId: sellableItemId,
       lines: [
         {
           productOrItem: 'Delete Line',
+          itemId: sellableItemId,
           description: '',
           qty: 1,
           uom: 'NOS',
@@ -999,6 +1029,7 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
       priceLines: [
         {
           productOrItem: 'Lost Opp Trailer',
+          itemId: sellableItemId,
           description: 'Supply',
           qty: 1,
           uom: 'NOS',
@@ -1074,6 +1105,7 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
       priceLines: [
         {
           productOrItem: 'High-value Trailer',
+          itemId: sellableItemId,
           description: 'Above auto-approve threshold',
           qty: 2,
           uom: 'NOS',
@@ -1150,6 +1182,7 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
       priceLines: [
         {
           productOrItem: 'Draft Delete Target',
+          itemId: sellableItemId,
           description: 'Supply',
           qty: 1,
           uom: 'NOS',
@@ -1265,3 +1298,4 @@ describe.skipIf(!runLive)('CRM end-to-end operations', () => {
     await authDelete(`${BASE}/companies/${id}`)
   })
 })
+

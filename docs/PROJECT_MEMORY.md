@@ -1,6 +1,6 @@
 # FOS ERP — Project Memory
 
-> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-23** (CRM Item Phase 2; Dispatch **7C0–7C5** controlled UAT; Bank & Cash **live API for internal UAT / controlled pilot** — AIS/FX/intercompany deferred; Fuel Tank mfg master; Fixed Assets Phase 4). Next: CRM Item Phase 3 (`itemId` shapes) — do not switch CRM Product pickers until Phases 3–5.
+> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-27** (Inventory Costing Phase A–C backend + **Phase 1 Costing UI** under Inventory → Costing). Prior: CRM Item Phase 2/3; Dispatch 7C0–7C5; Bank & Cash live API for internal UAT.
 
 ---
 

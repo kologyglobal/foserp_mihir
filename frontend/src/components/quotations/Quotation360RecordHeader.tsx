@@ -245,19 +245,13 @@ export function Quotation360RecordHeader({
 
       <div className="crm-sticky-record-header__actions" role="toolbar" aria-label="Quotation actions">
         {canEdit ? (
-          <ErpButton size="sm" variant="primary" icon={Pencil} onClick={onEdit}>
-            Edit
-          </ErpButton>
-        ) : null}
-
-        {!narrow && lifecyclePrimary ? (
           <ErpButton
             size="sm"
-            variant={canEdit ? 'outline' : 'primary'}
-            icon={lifecyclePrimary.icon}
-            onClick={lifecyclePrimary.onClick}
+            variant={canCreateSalesOrder && !salesOrderId ? 'outline' : 'primary'}
+            icon={Pencil}
+            onClick={onEdit}
           >
-            {lifecyclePrimary.label}
+            Edit
           </ErpButton>
         ) : null}
 
@@ -269,7 +263,7 @@ export function Quotation360RecordHeader({
           ) : (
             <ErpButton
               size="sm"
-              variant="outline"
+              variant={canCreateSalesOrder ? 'primary' : 'outline'}
               icon={ShoppingCart}
               onClick={onCreateSalesOrder}
               disabled={!canCreateSalesOrder}
@@ -278,6 +272,28 @@ export function Quotation360RecordHeader({
               Convert to Sales Order
             </ErpButton>
           )
+        ) : null}
+
+        {!narrow && lifecyclePrimary && !(showCreateSalesOrder && canCreateSalesOrder) ? (
+          <ErpButton
+            size="sm"
+            variant={canEdit ? 'outline' : 'primary'}
+            icon={lifecyclePrimary.icon}
+            onClick={lifecyclePrimary.onClick}
+          >
+            {lifecyclePrimary.label}
+          </ErpButton>
+        ) : null}
+
+        {!narrow && lifecyclePrimary && showCreateSalesOrder && canCreateSalesOrder ? (
+          <ErpButton
+            size="sm"
+            variant="outline"
+            icon={lifecyclePrimary.icon}
+            onClick={lifecyclePrimary.onClick}
+          >
+            {lifecyclePrimary.label}
+          </ErpButton>
         ) : null}
 
         <CommandBarOverflowMenu

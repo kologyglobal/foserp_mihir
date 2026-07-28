@@ -939,7 +939,11 @@ export async function getPurchaseOrderLinkedDocuments(
   if (!po) {
     throw new PurchaseServiceError('PO_NOT_FOUND', `Purchase order not found: ${id}`)
   }
-  // GRN / invoice / return links not mounted yet — return PR/RFQ refs from the PO only.
+  const [grnRes, invRes, retRes] = await Promise.all([
+    grnApi.listGoodsReceiptsApi({ page: 1, pageSize: 100, purchaseOrderId: id, sortOrder: 'desc' }),
+    invoiceApi.listPurchaseInvoicesApi({ page: 1, limit: 100, purchaseOrderId: id, sortOrder: 'desc' }),
+    returnApi.listPurchaseReturnsApi({ page: 1, limit: 100, purchaseOrderId: id, sortOrder: 'desc' }),
+  ])
   return {
     purchaseRequisition: po.purchaseRequisitionId
       ? {
@@ -961,9 +965,33 @@ export async function getPurchaseOrderLinkedDocuments(
         }
       : null,
     blanketOrder: null,
-    grns: [],
-    invoices: [],
-    returns: [],
+    grns: grnRes.data.map((g) => {
+      const mapped = mapApiGoodsReceiptToListRow(g)
+      return {
+        id: mapped.id,
+        documentNumber: mapped.documentNumber,
+        status: mapped.status,
+        documentDate: mapped.documentDate,
+      }
+    }),
+    invoices: invRes.data.map((i) => {
+      const mapped = mapApiPurchaseInvoiceToListRow(i)
+      return {
+        id: mapped.id,
+        documentNumber: mapped.documentNumber,
+        status: mapped.status,
+        documentDate: mapped.documentDate,
+      }
+    }),
+    returns: retRes.data.map((r) => {
+      const mapped = mapApiPurchaseReturnToListRow(r)
+      return {
+        id: mapped.id,
+        documentNumber: mapped.documentNumber,
+        status: mapped.status,
+        documentDate: mapped.documentDate,
+      }
+    }),
   }
 }
 
@@ -2201,6 +2229,16 @@ function mapApiSetupToDomain(api: setupApi.ApiPurchaseSetup): PurchaseSetup {
         (tier.documentType as NonNullable<PurchaseSetup['approvalMatrix'][number]['documentType']>) ||
         'all',
     })),
+    approverLimits: (api.approverLimits ?? []).map((lim) => ({
+      id: lim.id,
+      userId: lim.userId,
+      userName: lim.userName,
+      maxAmountInr: Number(lim.maxAmountInr ?? 0),
+      documentType:
+        (lim.documentType as PurchaseSetup['approverLimits'][number]['documentType']) || 'all',
+      isActive: lim.isActive,
+      sortOrder: lim.sortOrder,
+    })),
     tax: {
       defaultGstScheme: api.tax.defaultGstScheme,
       placeOfSupplyState: api.tax.placeOfSupplyState ?? '',
@@ -2308,6 +2346,13 @@ function mapDomainSetupToApiPayload(setup: PurchaseSetup): setupApi.ApiPurchaseS
       label: tier.label,
       documentType: tier.documentType ?? 'all',
     })),
+    approverLimits: setup.approverLimits.map((lim) => ({
+      userId: lim.userId,
+      maxAmountInr: lim.maxAmountInr,
+      documentType: lim.documentType ?? 'all',
+      isActive: lim.isActive,
+      sortOrder: lim.sortOrder,
+    })),
     tax: { ...setup.tax },
     invoiceMatchTolerances: { ...setup.invoiceMatchTolerances },
     allowDirectInvoice: setup.allowDirectInvoice,
@@ -2373,6 +2418,7 @@ export async function updatePurchaseSetup(
         return acc
       }, {} as PurchaseSetup['numberSeries']),
       approvalMatrix: patch.approvalMatrix ?? current.approvalMatrix,
+      approverLimits: patch.approverLimits ?? current.approverLimits,
       tax: { ...current.tax, ...(patch.tax ?? {}) },
       invoiceMatchTolerances: {
         ...current.invoiceMatchTolerances,
@@ -2646,48 +2692,88 @@ export async function updatePurchaseInvoice(
 }
 
 /**
- * API mode has no standalone matching computation — matching happens on submit.
- * Synthesise a result from the persisted header so the detail page can render.
+ * API mode: matching is computed on submit and stored on the invoice.
+ * Enrich with linked PO/GRN quantities when available for the detail panel.
  */
 export async function computeInvoiceMatching(id: string): Promise<InvoiceMatchingResult> {
   if (!isApiMode()) return demo.computeInvoiceMatching(id)
   const inv = await getPurchaseInvoiceById(id)
   if (!inv) throw new PurchaseServiceError('INV_NOT_FOUND', `Invoice not found: ${id}`)
   const overallStatus = inv.matchingResultStatus
-  return {
-    overallStatus,
-    overallStatusLabel: INVOICE_MATCHING_RESULT_STATUS_LABELS[overallStatus],
-    exceedsTolerance: false,
-    isDuplicateVendorInvoice: false,
-    missingGrn: !inv.goodsReceiptId,
-    lines: inv.lines.map((l) => ({
+  const exceedsTolerance =
+    overallStatus === 'amount_mismatch'
+    || overallStatus === 'quantity_mismatch'
+    || overallStatus === 'rate_mismatch'
+    || overallStatus === 'tax_mismatch'
+    || overallStatus === 'missing_grn'
+    || inv.matchStatus === 'mismatch'
+
+  const po = inv.purchaseOrderId ? await getPurchaseOrderById(inv.purchaseOrderId) : null
+  const grn = inv.goodsReceiptId ? await getGRNById(inv.goodsReceiptId) : null
+  const poLines = po?.lines ?? []
+  const grnLines = grn?.lines ?? []
+
+  const lines = inv.lines.map((l) => {
+    const poLine =
+      (l.purchaseOrderLineId
+        ? poLines.find((pl) => pl.id === l.purchaseOrderLineId)
+        : undefined)
+      ?? poLines.find((pl) => pl.itemId === l.itemId || pl.itemCode === l.itemCode)
+    const grnLine =
+      (l.goodsReceiptLineId
+        ? grnLines.find((gl) => gl.id === l.goodsReceiptLineId)
+        : undefined)
+      ?? grnLines.find((gl) => gl.itemId === l.itemId || gl.itemCode === l.itemCode)
+    const poQty = poLine?.quantity ?? null
+    const grnQty = grnLine?.receivedQty ?? grnLine?.acceptedQty ?? null
+    const poRate = poLine?.rate ?? null
+    const flags: InvoiceMatchingResult['lines'][number]['flags'] = []
+    let withinTolerance = true
+    if (poQty != null && Math.abs(poQty - l.quantity) > 1e-6) {
+      flags.push('quantity_mismatch')
+      withinTolerance = false
+    }
+    if (poRate != null && Math.abs(poRate - l.rate) > 0.01) {
+      flags.push('rate_mismatch')
+      withinTolerance = false
+    }
+    return {
       lineNo: l.lineNo,
       itemCode: l.itemCode,
       itemName: l.itemName,
-      poQty: null,
-      grnReceivedQty: null,
+      poQty,
+      grnReceivedQty: grnQty,
       invoiceQty: l.quantity,
-      poRate: null,
+      poRate,
       invoiceRate: l.rate,
-      poTaxPct: null,
+      poTaxPct: poLine?.gstRatePct ?? null,
       invoiceTaxPct: l.gstRatePct,
-      poLineTotal: null,
+      poLineTotal: poLine?.lineTotal ?? null,
       invoiceLineTotal: l.lineTotal,
-      flags: [],
-      withinTolerance: true,
-    })),
+      flags,
+      withinTolerance: withinTolerance && !exceedsTolerance,
+    }
+  })
+
+  return {
+    overallStatus,
+    overallStatusLabel: INVOICE_MATCHING_RESULT_STATUS_LABELS[overallStatus],
+    exceedsTolerance: exceedsTolerance || lines.some((l) => !l.withinTolerance),
+    isDuplicateVendorInvoice: false,
+    missingGrn: !inv.goodsReceiptId,
+    lines,
     summary: {
-      poQty: 0,
-      grnQty: 0,
+      poQty: poLines.reduce((s, l) => s + (l.quantity ?? 0), 0),
+      grnQty: grnLines.reduce((s, l) => s + (l.receivedQty ?? l.acceptedQty ?? 0), 0),
       invoiceQty: inv.lines.reduce((s, l) => s + l.quantity, 0),
-      poTotal: 0,
+      poTotal: po?.totalAmount ?? 0,
       invoiceTotal: inv.totalAmount,
-      poTax: 0,
+      poTax: po ? (po.cgst ?? 0) + (po.sgst ?? 0) + (po.igst ?? 0) : 0,
       invoiceTax: inv.cgst + inv.sgst + inv.igst,
     },
     tolerancesApplied: {
-      requirePoMatch: false,
-      requireGrnMatch: false,
+      requirePoMatch: Boolean(inv.purchaseOrderId),
+      requireGrnMatch: Boolean(inv.goodsReceiptId),
       quantityTolerancePct: 0,
       rateTolerancePct: 0,
       amountToleranceInr: 0,
@@ -2735,6 +2821,20 @@ export async function rejectPurchaseInvoice(id: string, remarks: string): Promis
   try {
     const res = await invoiceApi.rejectPurchaseInvoiceApi(id, remarks ? { remarks } : {})
     return mapApiPurchaseInvoiceToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function getPurchaseInvoiceApHandoffPreview(
+  id: string,
+): Promise<Record<string, unknown>> {
+  if (!isApiMode()) {
+    throw new PurchaseServiceError('NOT_SUPPORTED', 'AP handoff preview requires API mode.')
+  }
+  try {
+    const res = await invoiceApi.previewPurchaseInvoiceApHandoffApi(id)
+    return res.data
   } catch (err) {
     throwApi(err)
   }
@@ -2922,11 +3022,12 @@ export async function acceptQualityInspection(
 ): Promise<QualityInspection> {
   if (!isApiMode()) return demo.acceptQualityInspection(id, acceptedQty, rejectedQty)
   try {
-    if (rejectedQty > 0) {
-      // Partial acceptance: persist split quantities, then complete with outcome derived per line.
+    if (acceptedQty != null || rejectedQty > 0) {
       await patchQualityInspectionApi(id, { acceptedQty, rejectedQty })
-      const res = await qiApi.completeQualityInspectionApi(id, { outcome: 'AUTO' })
-      return mapApiQualityInspectionToDomain(res.data)
+      if (rejectedQty > 0) {
+        const res = await qiApi.completeQualityInspectionApi(id, { outcome: 'AUTO' })
+        return mapApiQualityInspectionToDomain(res.data)
+      }
     }
     const res = await qiApi.acceptQualityInspectionApi(id, {})
     return mapApiQualityInspectionToDomain(res.data)
@@ -2941,6 +3042,12 @@ export async function rejectQualityInspection(
 ): Promise<QualityInspection> {
   if (!isApiMode()) return demo.rejectQualityInspection(id, rejectedQty)
   try {
+    if (rejectedQty != null && rejectedQty >= 0) {
+      // Persist split before complete — REJECT outcome would force full inspected qty.
+      await patchQualityInspectionApi(id, { acceptedQty: 0, rejectedQty })
+      const res = await qiApi.completeQualityInspectionApi(id, { outcome: 'AUTO' })
+      return mapApiQualityInspectionToDomain(res.data)
+    }
     const res = await qiApi.rejectQualityInspectionApi(id, {})
     return mapApiQualityInspectionToDomain(res.data)
   } catch (err) {
@@ -2950,7 +3057,27 @@ export async function rejectQualityInspection(
 
 export async function holdQualityInspection(id: string, remarks = ''): Promise<QualityInspection> {
   if (!isApiMode()) return demo.holdQualityInspection(id, remarks)
-  notSupportedInApiMode('Quality inspection hold')
+  try {
+    const res = await qiApi.holdQualityInspectionApi(id, { remarks: remarks || undefined })
+    return mapApiQualityInspectionToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function cancelQualityInspection(
+  id: string,
+  remarks = '',
+): Promise<QualityInspection> {
+  if (!isApiMode()) {
+    throw new PurchaseServiceError('NOT_SUPPORTED', 'Cancel quality inspection is only available in API mode.')
+  }
+  try {
+    const res = await qiApi.cancelQualityInspectionApi(id, { remarks: remarks || undefined })
+    return mapApiQualityInspectionToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
 }
 
 export async function requestDeviationApproval(
@@ -3166,13 +3293,13 @@ export async function submitPurchaseReturn(id: string): Promise<PurchaseReturn> 
 }
 
 /**
- * API mode has no separate approval step — submit moves the return straight to
- * the approved/actionable state, so Approve performs submit for drafts.
+ * API mode: submit moves DRAFT → SUBMITTED (pending approval).
+ * Approve advances SUBMITTED → APPROVED.
  */
 export async function approvePurchaseReturn(id: string, remarks = ''): Promise<PurchaseReturn> {
   if (!isApiMode()) return demo.approvePurchaseReturn(id, remarks)
   try {
-    const res = await returnApi.submitPurchaseReturnApi(id, remarks ? { remarks } : {})
+    const res = await returnApi.approvePurchaseReturnApi(id, remarks ? { remarks } : {})
     return mapApiPurchaseReturnToDomain(res.data)
   } catch (err) {
     throwApi(err)

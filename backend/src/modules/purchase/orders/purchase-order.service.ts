@@ -64,16 +64,42 @@ async function assertApprovalAssignedToActor(
   tenantId: string,
   purchaseOrderId: string,
   actorId: string,
+  actorPermissions: readonly string[] = [],
 ) {
   const approval = await prisma.purchaseApproval.findFirst({
     where: { tenantId, purchaseOrderId, status: 'PENDING' },
-    select: { approverId: true },
+    select: { approverId: true, approverRole: true },
   })
   if (approval?.approverId && approval.approverId !== actorId) {
     throw new PurchaseOrderWorkflowError(
       purchaseMessage(PURCHASE_ERROR_CODE.APPROVAL_ASSIGNED_TO_ANOTHER_USER),
       PURCHASE_ERROR_CODE.APPROVAL_ASSIGNED_TO_ANOTHER_USER,
     )
+  }
+  if (approval) {
+    const { assertActorMatchesApproverRole } = await import('../shared/purchase-matrix-role.js')
+    await assertActorMatchesApproverRole(
+      tenantId,
+      actorId,
+      approval.approverRole,
+      actorPermissions,
+      (message) =>
+        new PurchaseOrderWorkflowError(message, PURCHASE_ERROR_CODE.APPROVAL_MATRIX_ROLE_REQUIRED),
+    )
+  }
+  const order = await prisma.purchaseOrder.findFirst({
+    where: { id: purchaseOrderId, tenantId },
+    select: { totalAmount: true },
+  })
+  if (order) {
+    const { assertActorWithinApproverLimit } = await import('../shared/purchase-approver-limit.js')
+    await assertActorWithinApproverLimit({
+      tenantId,
+      actorId,
+      documentAmount: Number(order.totalAmount),
+      documentType: 'PURCHASE_ORDER',
+      makeError: (message, code) => new PurchaseOrderWorkflowError(message, code),
+    })
   }
 }
 
@@ -708,7 +734,7 @@ export async function approvePurchaseOrder(
     ? await isSelfApprovalAllowed(tenantId, actorPermissions)
     : false
   assertApprovable(existing, actorId, { allowSelfApproval })
-  await assertApprovalAssignedToActor(tenantId, id, actorId)
+  await assertApprovalAssignedToActor(tenantId, id, actorId, actorPermissions)
   return applyLifecycleTransition(tenantId, actorId, existing, {
     action: 'APPROVED',
     auditAction: PURCHASE_AUDIT_ACTION.PO_APPROVED,
@@ -728,7 +754,7 @@ export async function rejectPurchaseOrder(
 ) {
   const existing = await loadOrThrow(tenantId, id)
   assertRejectable(existing)
-  await assertApprovalAssignedToActor(tenantId, id, actorId)
+  await assertApprovalAssignedToActor(tenantId, id, actorId, [])
   const reason = assertReasonPresent(
     input.reason ?? input.remarks,
     PURCHASE_ERROR_CODE.PO_REJECTION_REASON_REQUIRED,
@@ -750,7 +776,7 @@ export async function sendBackPurchaseOrder(
 ) {
   const existing = await loadOrThrow(tenantId, id)
   assertSendBackable(existing)
-  await assertApprovalAssignedToActor(tenantId, id, actorId)
+  await assertApprovalAssignedToActor(tenantId, id, actorId, [])
   const reason = assertReasonPresent(
     input.reason ?? input.remarks,
     PURCHASE_ERROR_CODE.PO_SEND_BACK_REASON_REQUIRED,

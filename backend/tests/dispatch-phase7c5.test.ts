@@ -133,6 +133,11 @@ describe.skipIf(!dbAvailable)('Dispatch Phase 7C5 — hardened posting governanc
     })
     token = admin.token
 
+    await prisma.masterItem.update({
+      where: { id: fx.itemId },
+      data: { salesAllowed: true },
+    })
+
     await prisma.legalEntity.create({
       data: {
         tenantId: tenant.id,

@@ -320,6 +320,38 @@ async function validateSetupRefs(
     }
   }
 
+  if (input.approverLimits?.length) {
+    const userIds = [...new Set(input.approverLimits.map((l) => l.userId))]
+    const activeUsers = await prisma.user.findMany({
+      where: { id: { in: userIds }, tenantId, deletedAt: null, status: 'ACTIVE' },
+      select: { id: true },
+    })
+    if (activeUsers.length !== userIds.length) {
+      throw new PurchaseSetupValidationError(
+        purchaseMessage(PURCHASE_ERROR_CODE.SETUP_VALIDATION_FAILED),
+        PURCHASE_ERROR_CODE.SETUP_VALIDATION_FAILED,
+        [{ field: 'approverLimits', message: 'One or more approver users are missing or inactive' }],
+      )
+    }
+    const keys = new Set<string>()
+    for (const lim of input.approverLimits) {
+      const key = `${lim.userId}:${lim.documentType ?? 'all'}`
+      if (keys.has(key)) {
+        throw new PurchaseSetupValidationError(
+          purchaseMessage(PURCHASE_ERROR_CODE.SETUP_VALIDATION_FAILED),
+          PURCHASE_ERROR_CODE.SETUP_VALIDATION_FAILED,
+          [
+            {
+              field: 'approverLimits',
+              message: 'Duplicate user + document type in approver limits',
+            },
+          ],
+        )
+      }
+      keys.add(key)
+    }
+  }
+
   if (input.approvalMatrix) validateApprovalBands(input.approvalMatrix)
 }
 
@@ -604,6 +636,20 @@ export async function upsertPurchaseSetup(
           tx,
         )
       }
+      if (input.approverLimits) {
+        await repo.replaceApproverLimits(
+          tenantId,
+          row.id,
+          input.approverLimits.map((l, idx) => ({
+            userId: l.userId,
+            maxAmountInr: l.maxAmountInr,
+            documentType: docTypeFromApi(l.documentType),
+            isActive: l.isActive ?? true,
+            sortOrder: l.sortOrder ?? idx + 1,
+          })),
+          tx,
+        )
+      }
       if (input.quality?.inspectionRequiredCategories) {
         await repo.replaceInspectionCategories(
           tenantId,
@@ -653,6 +699,20 @@ export async function upsertPurchaseSetup(
           label: t.label,
           documentType: docTypeFromApi(t.documentType),
           roles: t.requiredRoles.map(roleFromApi),
+        })),
+        tx,
+      )
+    }
+    if (input.approverLimits) {
+      await repo.replaceApproverLimits(
+        tenantId,
+        row.id,
+        input.approverLimits.map((l, idx) => ({
+          userId: l.userId,
+          maxAmountInr: l.maxAmountInr,
+          documentType: docTypeFromApi(l.documentType),
+          isActive: l.isActive ?? true,
+          sortOrder: l.sortOrder ?? idx + 1,
         })),
         tx,
       )

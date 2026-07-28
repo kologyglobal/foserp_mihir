@@ -529,7 +529,7 @@ export function OpportunityPipelinePage() {
                     return
                   }
                   if (!gate.enabled) {
-                    notify.error(gate.disabledReason ?? 'Available after customer approval.')
+                    notify.error(gate.disabledReason ?? 'Complete commercial details on the quotation to convert.')
                     return
                   }
                   navigate(buildSalesOrderNewUrl(row.id, gate.quotationDocumentId, { fromCrm: true }))

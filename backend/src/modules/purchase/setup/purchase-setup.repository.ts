@@ -28,6 +28,15 @@ export type PurchaseSettingsWithRelations = PurchaseSettings & {
     roles: Array<{ role: PurchaseApprovalMatrixRole; sortOrder: number }>
   }>
   inspectionCategories: Array<{ categoryCode: string }>
+  approverLimits: Array<{
+    id: string
+    userId: string
+    maxAmountInr: Prisma.Decimal
+    documentType: PurchaseApprovalTierDocumentType
+    isActive: boolean
+    sortOrder: number
+    user: { id: string; firstName: string; lastName: string; email: string }
+  }>
 }
 
 export const SERVER_DEFAULT_SETUP = {
@@ -103,6 +112,12 @@ const settingsInclude = {
     orderBy: { sortOrder: 'asc' as const },
   },
   inspectionCategories: true,
+  approverLimits: {
+    include: {
+      user: { select: { id: true, firstName: true, lastName: true, email: true } },
+    },
+    orderBy: { sortOrder: 'asc' as const },
+  },
 } satisfies Prisma.PurchaseSettingsInclude
 
 export async function findPurchaseSettings(
@@ -120,7 +135,7 @@ export async function createPurchaseSettings(
   actorId: string,
   data: Omit<
     Prisma.PurchaseSettingsUncheckedCreateInput,
-    'tenantId' | 'createdById' | 'updatedById' | 'version' | 'approvalTiers' | 'inspectionCategories'
+    'tenantId' | 'createdById' | 'updatedById' | 'version' | 'approvalTiers' | 'inspectionCategories' | 'approverLimits'
   >,
   tx: Prisma.TransactionClient = prisma,
 ) {
@@ -197,6 +212,33 @@ export async function replaceApprovalTiers(
       },
     })
   }
+}
+
+export async function replaceApproverLimits(
+  tenantId: string,
+  purchaseSettingsId: string,
+  limits: Array<{
+    userId: string
+    maxAmountInr: number
+    documentType: PurchaseApprovalTierDocumentType
+    isActive: boolean
+    sortOrder: number
+  }>,
+  tx: Prisma.TransactionClient = prisma,
+) {
+  await tx.purchaseApproverLimit.deleteMany({ where: { tenantId, purchaseSettingsId } })
+  if (limits.length === 0) return
+  await tx.purchaseApproverLimit.createMany({
+    data: limits.map((row) => ({
+      tenantId,
+      purchaseSettingsId,
+      userId: row.userId,
+      maxAmountInr: row.maxAmountInr,
+      documentType: row.documentType,
+      isActive: row.isActive,
+      sortOrder: row.sortOrder,
+    })),
+  })
 }
 
 export async function replaceInspectionCategories(

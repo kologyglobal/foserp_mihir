@@ -723,6 +723,9 @@ export const PERMISSIONS = [
   'dispatch.reverse.apply',
   'dispatch.reconciliation.view',
   'dispatch.reconciliation.export',
+  // Commercial O2C policy (partial / multi / invoice mode / POD)
+  'dispatch.settings.view',
+  'dispatch.settings.manage',
   // Phase 7C1 — requirements / readiness / draft orders
   'dispatch.requirement.view',
   'dispatch.requirement.synchronise',
@@ -860,6 +863,11 @@ export const PERMISSIONS = [
   'reports.view', 'reports.create', 'reports.edit', 'reports.submit', 'reports.approve',
   'reports.release', 'reports.post', 'reports.cancel', 'reports.close', 'reports.print',
   'reports.export', 'reports.override',
+
+  // CEO Executive Dashboard Builder
+  'executive.dashboard.view',
+  'executive.dashboard.configure',
+  'executive.dashboard.share',
 
   'traceability.view', 'traceability.create', 'traceability.edit', 'traceability.submit',
   'traceability.approve', 'traceability.release', 'traceability.post', 'traceability.cancel',
@@ -1155,6 +1163,8 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'organisation.view',
     'organisation.create',
     'organisation.update',
+    'executive.dashboard.view',
+    'executive.dashboard.configure',
     'purchase.view',
     'purchase.dashboard.view',
     'purchase.po.view',
@@ -1193,6 +1203,9 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'manufacturing.cost_reports.export',
   ],
   Management: [
+    'executive.dashboard.view',
+    'executive.dashboard.configure',
+    'executive.dashboard.share',
     'purchase.view',
     'purchase.dashboard.view',
     'purchase.pr.view',
@@ -1363,6 +1376,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'crm.import.view', 'crm.import.execute',
     'crm.master.view', 'crm.master.create', 'crm.master.update', 'crm.master.delete',
     'crm.dashboard.view', 'crm.report.view', 'crm.search.view', 'crm.export.view', 'crm.export.execute',
+    'executive.dashboard.view',
     'crm.note.view', 'crm.note.create', 'crm.note.update', 'crm.note.delete',
     'crm.attachment.view', 'crm.attachment.create', 'crm.attachment.delete',
     'crm.indiamart.view',

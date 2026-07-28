@@ -75,6 +75,7 @@ export const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: Permissio
   { prefix: '/production', permission: 'production.view', pageName: 'Production' },
   { prefix: '/quality', permission: 'quality.view', pageName: 'Quality' },
   { prefix: '/logistics', permission: 'dispatch.view', pageName: 'Logistics' },
+  { prefix: '/dispatch/settings', permission: 'dispatch.view', pageName: 'Dispatch Settings' },
   { prefix: '/dispatch', permission: 'dispatch.view', pageName: 'Dispatch' },
   // Gate & Security — route-level shell; fine-grained gate.* checks live in utils/permissions/gate.ts
   { prefix: '/gate', permission: 'dispatch.view', pageName: 'Gate & Security' },
@@ -94,9 +95,9 @@ export const ROUTE_PERMISSION_MAP: Array<{ prefix: string; permission: Permissio
   { prefix: '/m/material-return', permission: 'inventory.post', pageName: 'Mobile Material Return' },
   { prefix: '/m/warehouse-transfer', permission: 'inventory.post', pageName: 'Mobile Warehouse Transfer' },
   { prefix: '/m/stock-count', permission: 'inventory.view', pageName: 'Mobile Stock Count' },
-  { prefix: '/executive', permission: 'reports.view', pageName: 'Executive Dashboard' },
+  { prefix: '/executive', permission: 'reports.view', pageName: 'CEO Dashboard' },
   { prefix: '/inbox', permission: 'reports.view', pageName: 'Inbox' },
-  { prefix: '/home', permission: 'reports.view', pageName: 'Home' },
+  { prefix: '/operations/exceptions', permission: 'reports.view', pageName: 'Exception Centre' },
 ]
 
 const PURCHASE_USER: PermissionKey[] = mod('purchase', ['view', 'create', 'edit', 'submit', 'print'])
@@ -290,8 +291,11 @@ export const ROLE_PERMISSION_MATRIX: Record<ErpRole, PermissionKey[] | '*'> = {
 }
 
 export function resolveRoutePermission(pathname: string): PermissionKey | null {
-  // Own profile is available to every authenticated user.
+  // Own profile + role home are available to every authenticated user.
   if (pathname === '/settings/profile' || pathname.startsWith('/settings/profile/')) {
+    return null
+  }
+  if (pathname === '/' || pathname === '/home' || pathname.startsWith('/home/')) {
     return null
   }
   const sorted = [...ROUTE_PERMISSION_MAP].sort((a, b) => b.prefix.length - a.prefix.length)
@@ -306,6 +310,9 @@ export function resolveRoutePermission(pathname: string): PermissionKey | null {
 export function resolveRoutePageName(pathname: string): string {
   if (pathname === '/settings/profile' || pathname.startsWith('/settings/profile/')) {
     return 'My Profile'
+  }
+  if (pathname === '/' || pathname === '/home' || pathname.startsWith('/home/')) {
+    return 'Home'
   }
   const sorted = [...ROUTE_PERMISSION_MAP].sort((a, b) => b.prefix.length - a.prefix.length)
   for (const entry of sorted) {

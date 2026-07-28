@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified against codebase: **2026-07-23** (Fuel Tank manufacturing master UAT example on `vasant-trailers`; Purchase Setup + prior accounting/dispatch notes).
+Last verified against codebase: **2026-07-27** (Money In/Out reverse + AP reversal history + Dispatch→SI POD gate; Fuel Tank / Inventory Costing / prior notes).
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
@@ -23,12 +23,12 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Category | Modules |
 |----------|---------|
-| **Completed (API mode)** | … **AR reporting Phase 3A5**; **Money In AR frontend Phase 3A6**; **AR receipt DB foundation Phase 3B1**; **AR receipt calculation/validation Phase 3B2**; **AR receipt draft workflow Phase 3B3**; **AR atomic receipt posting Phase 3B4**; **AR atomic receipt allocation Phase 3B5** (preview + allocate + history + customer-credits; no GL; no frontend); **customer credit notes Phase 3C1–3C4** (draft, minimal approval, atomic GL/open-item posting); **AR atomic credit-note allocation Phase 3C5** (preview + allocate + history, unified with receipt allocation history/customer-credits; no GL; no frontend) |
-| **Partially completed** | Auth UI; mobile CRM (API hydrate, no offline); sales-order fulfilment beyond confirm/close; **user/role/tenant admin UI (frontend wired 2026-07-15, not test-verified)** |
-| **Not started** | Login activity module |
-| **Scaffolding (not shipped)** | — (Accounting: some CoA/voucher/AR demo surfaces; Period Close **P1 + hardening** live for lock/readiness — year-end/accruals still demo; **Finance Settings** at `/accounting/settings` is Phase 1 dual-mode) |
+| **Completed (API mode)** | … **AR 3A–3C** (invoice/receipt/CN + allocation) + **3B6/3C6 Money In UI** + receipt/CN/allocation/journal reverse + corrections hub; **AP Money Out UI** + corrections + AP reversal history; Dispatch→SI invoice-ready + POD gate on manual create |
+| **Not started** | — |
+| **Partially completed** | Auth UI; mobile CRM (API hydrate, no offline); sales-order fulfilment beyond confirm/close; **user/role/tenant admin UI** (API wired; product UAT open); **Admin A8** broader demo-mix pack beyond security regression |
+| **Scaffolding (not shipped)** | — (Accounting: some CoA/voucher demo surfaces; Period Close **P1 + hardening** live for lock/readiness — year-end/accruals still demo; **Finance Settings** at `/accounting/settings` is Phase 1 dual-mode) |
 | **Blocked** | — (none currently) |
-| **Deferred by design** | Purchase backends beyond RFQ award→draft PO (full PO lifecycle, GRN); inventory / production / quality / maintenance; finance **Phase 3B6 receipt UI + Phase 3C6 credit-note UI + receipt/allocation/credit-note reversal**; SO MRP / dispatch |
+| **Deferred by design** | Purchase backends beyond RFQ award→draft PO (full PO lifecycle, GRN); inventory / production / quality / maintenance beyond shipped slices; finance **Dispatch partial/multi/consolidated invoice policy UI polish**; SO MRP / dispatch client production hardening |
 
 ---
 
@@ -40,6 +40,7 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | Local API-mode empty data | Backend must listen on `:5000`; not a demo/API mix bug |
 | DB cleanup scripts | `cleanup-leads.ts`, `cleanup-opp-quotations.ts`, `cleanup-sales-orders.ts` — local one-offs; do not run on prod without intent |
 | Accounting orphan UI | **Resolved 2026-07-15** — all `/accounting/*` deep links from the dashboard now resolve (dashboard live; other screens are placeholders, not 404s) |
+| Inventory costing rollout | **Phase C BE + Phase 1 FE UI shipped (2026-07-27)** — costing workspace under Inventory → Costing; variance GL / full inventory↔GL trial balance still deferred. |
 
 ---
 
@@ -62,14 +63,14 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ❌ | No login activity page |
-| Backend | ⚠️ | `lastLoginAt` updated on login only |
-| DB | ⚠️ | Field on `users`; no `login_events` table |
-| API | ❌ | No list/export endpoint |
-| Tests | ❌ | — |
-| Demo mode | 🔒 | N/A |
-| API mode | ⚠️ | Timestamp only |
-| Remaining gap | Full audit trail module if required |
+| Frontend | ✅ | `/admin/security/login-activity` (API mode) |
+| Backend | ✅ | `LoginActivity` writes on success/fail; list API |
+| DB | ✅ | `login_activities` + user lock fields |
+| API | ✅ | `GET /security/login-activity` (`security.view`) |
+| Tests | ✅ | phase8 + `admin-security-regression` |
+| Demo mode | 🔒 | API mode required empty state |
+| API mode | ✅ | Register + lockout policy hint |
+| Remaining gap | Export / richer filters optional |
 
 ### Tenants
 
@@ -374,14 +375,14 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ⚠️ | Domain UI rich; PR/Planning/RFQ/PO/GRN/Approvals/Setup dual-mode API-backed; **Purchase Setup** full nested API persistence (all editable tabs). Notifications ON_HOLD read-only. Registered editors use **Cancel \| Save**. Invoice/returns/QI UI still partially demo-oriented for some screens. **FE typecheck PASS** (2026-07-21). |
-| Backend | ⚠️ | PR + Planning + RFQ/VQ/comparison + PO + GRN + **Quality Inspection + Purchase Invoice + Purchase Return** lifecycles + Approvals + **Purchase Setup full persistence** with workflow enforcement. |
-| DB | ⚠️ | Purchase schema + PO + inventory masters + GRN + Setup migrations (deploy on all envs) |
-| API | ⚠️ | Existing routes plus `/purchase/invoices`, `/purchase/quality-inspections`, and `/purchase/returns` with explicit lifecycle actions. |
-| Tests | ⚠️ | Invoice policy/lifecycle unit coverage **4/4**; backend typecheck pass. Existing setup, PO, GRN, approvals, Phase 15, and inventory-master suites remain. |
+| Frontend | ✅ | Domain UI; PR→Return dual-mode via `purchaseApiFacade` (QI/Invoice/Return parity + GRNI report + approver limits 2026-07-27). |
+| Backend | ✅ | PR + Planning + RFQ/VQ + PO + GRN + QI + Invoice + Return + Approvals + Setup; QI fail-closed inventory; matrix role + per-user ₹ limits; GRNI report. |
+| DB | ✅ | Purchase schema + GRN/QI/Invoice/Return migrations |
+| API | ✅ | `/purchase/invoices`, `/quality-inspections`, `/returns` with lifecycle actions incl. QI hold + return approve |
+| Tests | ✅ | Lifecycle suites + matrix role unit; QI/return stock movement asserts with seeded `itemId` |
 | Demo mode | ✅ | Full RFQ→VQ→comparison→award→PO + Planning→PO paths; Setup via `purchaseService` |
-| API mode | ⚠️ | Backend APIs now cover PR through PO/GRN/QI/invoice/return; frontend hydration remains to be wired for QI/invoice/return. |
-| Remaining gap | Inventory posting on GRN; QI/invoice/return frontend wiring; Setup deferred tabs; dashboard KPIs; reports |
+| API mode | ✅ | Facade wired for QI/Invoice/Return; stub actions hidden |
+| Remaining gap | ITC / vendor-outstanding placeholders; formal GR/IR clearing GL (qty GRNI report shipped); QI parameter checklist persistence |
 
 ### Inventory / Production / Quality / Maintenance / Finance (invoices)
 
@@ -396,18 +397,18 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | API mode | ❌ | |
 | Remaining gap | Manufacturing backend when prioritized |
 
-### Accounting (finance setup Phase 1 live; operational screens mostly demo FE)
+### Accounting (Money In / Money Out API-mode flows live; some period-close / AIS still open)
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ⚠️ | **2026-07-17:** Finance Settings Phase 1 + **Journals + Approvals** workspaces (`/accounting/entries/journals`, `/accounting/entries/approvals`, dual-mode). Post + GL drill-down on journal detail. **Bank & Cash:** live API for internal UAT / controlled pilot; AIS / FX / intercompany deferred — `docs/accounting/BANK_CASH_STATUS.md`. Other operational workspaces still UI/mock |
-| Backend | ⚠️ | Phase 1 setup + 2A ledger + 2B posting engine + **2C1 journals** + **2C2A approval** + **2C2B posting** + **3A1–3A5 AR sales invoice** + **3B1–3B5 customer receipt/allocation** + **3C1–3C4 customer credit notes** (draft, minimal approval, atomic GL/open-item posting) + **3C5 credit-note allocation** (subledger-only, unified with receipt allocation read APIs) |
+| Frontend | ⚠️ | **2026-07-27:** Money In (invoices, invoice-ready, receipts, credit notes, allocate, corrections/reversals) + Money Out (vendor invoices/payments/adjustments, allocate, corrections, reversal history) live in API mode. Journals + Approvals + Bank & Cash UAT. |
+| Backend | ⚠️ | Phase 1–5D + AR 3A–3C + AP 4A–4D + journal reverse + receipt/CN/allocation reverse + AP reversal history list + Dispatch→SI source links + POD gate on manual SI |
 | DB | ⚠️ | Setup + ledger + approval tables + manual journals on `AccountingVoucher`; GL via existing-voucher post path; `ReceivableOpenItem` DEBIT (invoice) / CREDIT (receipt/credit-note) rows on post; `CustomerCreditNoteAllocationBatch` / `CustomerCreditNoteAllocation` subledger tables (no GL) |
-| API | ⚠️ | Setup + `/accounting/journals` (+ `post`, `ledger`) + `/accounting/approvals` + approve/send-back/reject; read-only voucher/GL/posting-event GET; `/accounting/receivables/invoices/:id/post`; `/accounting/receivables/receipts/:id/post`; `/accounting/receivables/credit-notes/:id/allocations` (+ `/preview`) |
-| Tests | ⚠️ | finance-setup 8 + ledger 11 + posting-engine 13 + journals 11 + approvals 9 + journal-posting 8 + ar-foundation 18 + receipt-drafts 12 + receipt-posting 12 + receipt-allocation 11 + credit-note-foundation 3 + credit-note-posting 5 + **credit-note-allocation (new) 11/11** — see `TESTING_STATUS.md` for latest run counts |
-| Demo mode | ✅ | Settings + journals + approvals + demo journal posting |
-| API mode | ⚠️ | Journals workflow + multi-level approval + post approved journal to GL (same voucher id); AR invoice/receipt/credit-note atomic posting to GL; receipt + credit-note subledger allocation to invoice open items |
-| Remaining gap | Phase **2C3** journal reversal; **3B6** receipt UI; **3C6** credit-note UI; receipt/allocation/credit-note reversal |
+| API | ⚠️ | Setup + journals (+ reverse) + AR invoice/receipt/credit-note post/allocate/reverse + AP vendor docs/payments/adjustments/allocations/reversals + `GET /accounting/payables/reversals` |
+| Tests | ⚠️ | finance suites + money-in/money-out FE scripts — see `TESTING_STATUS.md` |
+| Demo mode | ✅ | Settings + journals + approvals + demo journal posting; Money In/Out prefer API mode for full reverse flows |
+| API mode | ⚠️ | Full Money In/Out user flows + journal reverse + Dispatch invoice-ready → SI (POD when policy on) |
+| Remaining gap | Dispatch partial/multi/consolidated invoice **policy UI** polish; period close year-end; AIS/FX/intercompany |
 
 ### Mobile CRM
 

@@ -17,7 +17,7 @@ export interface SalesOrderLineDto {
   lineNo?: number
   productOrItem?: string
   description?: string
-  productId?: string | null
+  itemId?: string | null
   qty: number
   uom?: string
 }
@@ -126,13 +126,14 @@ export async function getSalesOrderLineEligibility(tenantId: string, salesOrderI
       }
 
       let resolvedItem: { id: string; code: string; name: string } | null = null
-      if (!line.productId) {
-        reasons.push('Line has no productId to resolve a manufactured item')
+      const lineRef = line.itemId
+      if (!lineRef) {
+        reasons.push('Line has no itemId to resolve a manufactured item')
       } else {
         try {
-          resolvedItem = await resolveManufacturedProductItem(tenantId, line.productId)
+          resolvedItem = await resolveManufacturedProductItem(tenantId, lineRef)
         } catch (err) {
-          reasons.push(err instanceof Error ? err.message : 'Could not resolve line product to a manufactured item')
+          reasons.push(err instanceof Error ? err.message : 'Could not resolve line item for production')
         }
       }
 
@@ -165,7 +166,7 @@ export async function getSalesOrderLineEligibility(tenantId: string, salesOrderI
 
       return {
         lineId: line.id,
-        productId: line.productId ?? null,
+        itemId: line.itemId ?? null,
         productOrItem: line.productOrItem ?? null,
         description: line.description ?? null,
         qty: line.qty,
@@ -224,9 +225,10 @@ export async function convertSalesOrderLine(
   const lines = parseLines(salesOrder.lines)
   const line = lines.find((candidate) => candidate.id === lineRef)
   if (!line) throw new NotFoundError(`Sales order line not found: ${lineRef}`)
-  if (!line.productId) throw new ValidationError('Sales order line has no productId to resolve a manufactured item')
+  const lineItemRef = line.itemId
+  if (!lineItemRef) throw new ValidationError('Sales order line has no itemId to resolve a manufactured item')
 
-  const resolvedItem = await resolveManufacturedProductItem(tenantId, line.productId)
+  const resolvedItem = await resolveManufacturedProductItem(tenantId, lineItemRef)
   const sourceLineKey = `${salesOrderId}:${lineRef}`
   const quantity = toDecimal(input.quantity)
 
@@ -391,14 +393,15 @@ export async function syncConfirmedSalesOrderDemands(
   for (const salesOrder of orders) {
     const lines = parseLines(salesOrder.lines)
     for (const line of lines) {
-      if (!line.productId || !(line.qty > 0)) {
+      const lineItemRef = line.itemId
+      if (!lineItemRef || !(line.qty > 0)) {
         skipped += 1
         continue
       }
 
       let resolvedItem: Awaited<ReturnType<typeof resolveManufacturedProductItem>>
       try {
-        resolvedItem = await resolveManufacturedProductItem(tenantId, line.productId)
+        resolvedItem = await resolveManufacturedProductItem(tenantId, lineItemRef)
       } catch {
         skipped += 1
         continue

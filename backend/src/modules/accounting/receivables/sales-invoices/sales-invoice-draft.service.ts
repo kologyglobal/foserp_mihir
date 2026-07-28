@@ -20,6 +20,7 @@ import {
   buildCalculationInputFromStoredInvoice,
   parseCalculationContext,
 } from './sales-invoice-validation.service.js'
+import { validateAndEnrichSalesInvoiceSourceLinks } from './sales-invoice-source-validation.service.js'
 import { serializeSalesInvoiceDetail } from './sales-invoice-read.service.js'
 
 function auditMeta(req: Request) {
@@ -81,6 +82,15 @@ export async function createSalesInvoiceDraft(req: Request, tenantId: string, in
     metaWarnings = source.warnings
   }
 
+  const enrichedLinks = await validateAndEnrichSalesInvoiceSourceLinks({
+    tenantId,
+    customerId: input.customerId,
+    sourceType: input.sourceType,
+    sourceDocumentId: input.sourceDocumentId,
+    sourceLinks: input.sourceLinks,
+  })
+  metaWarnings = [...metaWarnings, ...enrichedLinks.warnings]
+
   const calcInput = buildCalculationInputFromRequest(input, legalEntity.stateCode)
   const calc = calculateSalesInvoice(calcInput)
   throwOnCalcFailure(calc)
@@ -88,11 +98,13 @@ export async function createSalesInvoiceDraft(req: Request, tenantId: string, in
   const userId = req.context?.userId
   const invoice = await repo.createSalesInvoiceDraft(tenantId, input, calc, party, userId, {
     sourceDocumentSnapshot: sourceSnapshot,
+    sourceLinks: enrichedLinks.sourceLinks,
   })
 
   await writeAudit(req, tenantId, invoice.id, 'SALES_INVOICE_DRAFT_CREATED', undefined, {
     draftReference: invoice.draftReference,
     status: invoice.status,
+    sourceLinkCount: enrichedLinks.sourceLinks.length,
   })
 
   const detail = await serializeSalesInvoiceDetail(req, invoice)

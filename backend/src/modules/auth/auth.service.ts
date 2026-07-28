@@ -32,6 +32,8 @@ import type {
   UpdateProfileInput,
 } from './auth.validation.js'
 import { MAX_FAILED_LOGINS, type LoginActivityReason } from '../security/security.constants.js'
+import { assertPasswordMeetsPolicy, getSecurityPolicy } from '../security/security-policy.service.js'
+import { isMailConfigured, sendPasswordResetEmail } from '../../services/mail.service.js'
 
 export interface UserPermissions {
   roles: string[]
@@ -199,6 +201,7 @@ async function recordFailedLogin(
   tenantId: string,
   previousAttempts: number,
   previousCount: number,
+  maxFailedLogins: number,
 ): Promise<{ locked: boolean }> {
   const nextAttempts = previousAttempts + 1
   const nextCount = previousCount + 1
@@ -215,7 +218,7 @@ async function recordFailedLogin(
   if (nextAttempts >= LOGIN_LOCKOUT_THRESHOLD) {
     data.lockedUntil = new Date(Date.now() + LOGIN_LOCKOUT_MS)
   }
-  if (nextCount >= MAX_FAILED_LOGINS) {
+  if (nextCount >= maxFailedLogins) {
     data.status = 'BLOCKED'
     data.lockedAt = new Date()
     await prisma.refreshToken.updateMany({
@@ -225,7 +228,7 @@ async function recordFailedLogin(
   }
   await prisma.user.update({ where: { id: userId }, data })
   return {
-    locked: nextAttempts >= LOGIN_LOCKOUT_THRESHOLD || nextCount >= MAX_FAILED_LOGINS,
+    locked: nextAttempts >= LOGIN_LOCKOUT_THRESHOLD || nextCount >= maxFailedLogins,
   }
 }
 
@@ -294,11 +297,13 @@ export async function login(
 
   const passwordOk = await verifyPassword(input.password, user.passwordHash)
   if (!passwordOk) {
+    const policy = await getSecurityPolicy(tenant.id)
     const { locked } = await recordFailedLogin(
       user.id,
       tenant.id,
       user.failedLoginAttempts,
       user.failedLoginCount,
+      policy.maxFailedLogins || MAX_FAILED_LOGINS,
     )
     if (locked) {
       return await fail('LOCKED_OUT', user.id)
@@ -430,7 +435,7 @@ export async function getMe(userId: string, tenantId: string): Promise<AuthUser 
   }
 }
 
-export async function forgotPassword(input: ForgotPasswordInput): Promise<{ message: string; resetToken?: string }> {
+export async function forgotPassword(input: ForgotPasswordInput): Promise<{ message: string; resetToken?: string; emailSent?: boolean }> {
   const tenant = await prisma.tenant.findFirst({
     where: { slug: input.tenantSlug, deletedAt: null },
   })
@@ -463,11 +468,20 @@ export async function forgotPassword(input: ForgotPasswordInput): Promise<{ mess
     },
   })
 
-  const result: { message: string; resetToken?: string } = {
+  const mail = await sendPasswordResetEmail({
+    to: user.email,
+    firstName: user.firstName,
+    rawToken,
+    expiresAt,
+  })
+
+  const result: { message: string; resetToken?: string; emailSent?: boolean } = {
     message: AUTH_MSG.RESET_GENERIC,
+    emailSent: mail.sent,
   }
 
-  if (env.isDev) {
+  // Expose token in dev, or when SMTP is not configured so UAT can complete reset without mail.
+  if (env.isDev || !isMailConfigured() || !mail.sent) {
     result.resetToken = rawToken
   }
 
@@ -496,6 +510,8 @@ export async function resetPassword(input: ResetPasswordInput): Promise<void> {
   if (!matched || matched.user.deletedAt || matched.user.status !== 'ACTIVE') {
     throw new InvalidStateError(AUTH_MSG.RESET_TOKEN_INVALID)
   }
+
+  await assertPasswordMeetsPolicy(matched.user.tenantId, input.password)
 
   const passwordHash = await hashPassword(input.password)
 
@@ -547,6 +563,8 @@ export async function changePassword(
   if (!(await verifyPassword(input.currentPassword, user.passwordHash))) {
     throw new AuthenticationError(AUTH_MSG.CURRENT_PASSWORD_INCORRECT, AUTH_CODE.CURRENT_PASSWORD_INCORRECT)
   }
+
+  await assertPasswordMeetsPolicy(tenantId, input.newPassword)
 
   const passwordHash = await hashPassword(input.newPassword)
 

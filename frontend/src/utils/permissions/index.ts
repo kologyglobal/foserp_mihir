@@ -248,6 +248,9 @@ export function canRoute(pathname: string): boolean {
   if (isManufacturingPath(pathname)) {
     return canManufacturingRoute(pathname)
   }
+  if (pathname === '/operations/exceptions' || pathname.startsWith('/operations/exceptions/')) {
+    return canViewExceptions()
+  }
   const required = resolveRoutePermission(pathname)
   if (!required) return true
   const [module, action] = required.split('.') as [PermissionModule, PermissionAction]
@@ -385,6 +388,7 @@ import {
 } from './purchase'
 import {
   canManufacturingRoute,
+  canViewExceptions,
   isManufacturingPath,
 } from './manufacturing'
 import {

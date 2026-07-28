@@ -7,7 +7,8 @@ import * as service from './opportunity.service.js'
 
 export const listOpportunities = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
-  const result = await service.listOpportunities(tenantId, req.query as never)
+  const { userId } = getContext(req)
+  const result = await service.listOpportunities(tenantId, req.query as never, userId)
   sendPaginated(res, 'Opportunities retrieved', result.items, buildPaginationMeta(result.total, result.page, result.limit))
 })
 

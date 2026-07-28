@@ -66,6 +66,10 @@ export async function postPurchaseInvoiceApi(id: string, payload: Record<string,
   })
 }
 
+export async function previewPurchaseInvoiceApHandoffApi(id: string) {
+  return apiRequest<Record<string, unknown>>(`${base()}/${id}/ap-handoff-preview`)
+}
+
 export async function cancelPurchaseInvoiceApi(id: string, payload: Record<string, unknown> = {}) {
   return apiRequest<ApiPurchaseInvoice>(`${base()}/${id}/cancel`, {
     method: 'POST',

@@ -732,6 +732,17 @@ export interface PurchaseApprovalMatrixTier {
   documentType?: 'all' | PurchaseApprovalDocumentType
 }
 
+/** Per-user INR approval ceiling (Purchase Setup → Approval). */
+export interface PurchaseApproverLimit {
+  id: string
+  userId: string
+  userName: string
+  maxAmountInr: number
+  documentType: 'all' | PurchaseApprovalDocumentType
+  isActive: boolean
+  sortOrder: number
+}
+
 export interface PurchaseNumberSeriesConfig {
   prefix: string
   nextNumber: number
@@ -923,6 +934,8 @@ export interface PurchaseSetup {
   numberSeries: PurchaseSetupNumberSeries
   /** Amount-band matrix consumed by `purchaseApprovalMatrix` / approvals service. */
   approvalMatrix: PurchaseApprovalMatrixTier[]
+  /** Per-user INR ceilings enforced on PR/PO approve (in addition to matrix roles). */
+  approverLimits: PurchaseApproverLimit[]
   /** @deprecated Demo-only budget figure on approval review; not persisted via API. */
   availableBudgetPlaceholderInr?: number
   tax: PurchaseSetupTax

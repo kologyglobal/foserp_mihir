@@ -470,7 +470,11 @@ export function VendorAdjustmentDetailPage() {
       )}
 
       {tab === 'allocation' && (
-        <PayableAllocationHistoryTable rows={history} emptyLabel="No debit note allocations yet." />
+        <PayableAllocationHistoryTable
+          rows={history}
+          canReverse={perms.canReverseAllocation}
+          emptyLabel="No debit note allocations yet."
+        />
       )}
 
       {postResult && (

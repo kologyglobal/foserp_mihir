@@ -42,10 +42,8 @@ export function JournalsWorkspaceShell({
       layout="enterprise"
       badge="Accounting"
       title={title}
-      description={
-        description ??
-        'Create, validate, submit, and approve manual journal entries — posting is deferred to Phase 2C2B.'
-      }
+      description={description}
+      showDescription={Boolean(description)}
       breadcrumbs={[
         { label: 'Accounting', to: '/accounting' },
         { label: 'Entries', to: '/accounting/entries/journals' },
@@ -56,13 +54,16 @@ export function JournalsWorkspaceShell({
       commandBar={commandBar}
       actions={
         <>
-          <FinanceLegalEntitySwitcher />
+          <div className="flex items-center gap-2 text-[12px] text-erp-muted">
+            <span className="hidden sm:inline">Company</span>
+            <FinanceLegalEntitySwitcher />
+          </div>
           {actions}
         </>
       }
       mergeHeaderWithWorkspace
     >
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         <DynamicsTabs
           items={TABS}
           activePath={activePath}
@@ -70,7 +71,9 @@ export function JournalsWorkspaceShell({
             if (shouldNavigate(pathname, path)) navigate(path)
           }}
         />
-        <div className="min-w-0 rounded border border-erp-border bg-white p-3">{children}</div>
+        <div className="min-w-0 overflow-hidden rounded-md border border-erp-border bg-white shadow-sm">
+          {children}
+        </div>
       </div>
     </OperationalPageShell>
   )

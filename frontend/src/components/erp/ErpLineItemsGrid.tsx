@@ -15,10 +15,10 @@ import {
   UNIT_PRICE_REQUIRED_MESSAGE,
 } from '../../utils/opportunityLineCalc'
 import type { ProductMasterPick } from '../../utils/opportunityProductOptions'
-import { buildOpportunityLineFromProduct } from '../../utils/opportunityLineCalc'
+import { buildOpportunityLineFromItem } from '../../utils/opportunityLineCalc'
 import { useMasterStore } from '../../store/masterStore'
 import { cn } from '../../utils/cn'
-import { isProductSellable, productNotSellableForSalesMessage } from '../../utils/productMaster'
+import { isItemSellable, itemNotSellableForSalesMessage } from '../../utils/opportunityItemOptions'
 import { notify } from '../../store/toastStore'
 
 interface ErpLineItemsGridProps {
@@ -34,12 +34,11 @@ interface ErpLineItemsGridProps {
 }
 
 function lineHsn(pick: ProductMasterPick | undefined): string {
-  if (!pick) return ''
-  return (pick.product.hsnCode || pick.item?.hsnCode || '').trim()
+  return (pick?.item.hsnCode || '').trim()
 }
 
 function lineTechSpecs(pick: ProductMasterPick | undefined): string {
-  return pick?.product.specifications?.trim() || ''
+  return (pick?.item.salesDescription ?? pick?.item.itemDescription ?? '').trim()
 }
 
 export function ErpLineItemsGrid({
@@ -94,19 +93,19 @@ export function ErpLineItemsGrid({
     setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }))
   }
 
-  function selectProduct(lineId: string, productId: string) {
-    const pick = productPickMap.get(productId)
+  function selectItem(lineId: string, itemId: string) {
+    const pick = productPickMap.get(itemId)
     if (!pick) return
-    if (!isProductSellable(pick.product)) {
-      notify.warning(productNotSellableForSalesMessage(pick.product))
+    if (!isItemSellable(pick.item)) {
+      notify.warning(itemNotSellableForSalesMessage(pick.item))
       return
     }
     const idx = synced.findIndex((l) => l.id === lineId)
-    const built = buildOpportunityLineFromProduct(pick.product, pick.item, pick.uomName, idx + 1)
+    const built = buildOpportunityLineFromItem(pick.item, pick.uomName, idx + 1)
     updateLine(lineId, built)
   }
 
-  const productCount = synced.filter((l) => Boolean(l.productOrItem?.trim() || l.productId)).length
+  const productCount = synced.filter((l) => Boolean(l.productOrItem?.trim() || l.itemId)).length
   const displayProductCount = productCount > 0 ? productCount : synced.length
   const multiItem = displayProductCount > 1
 
@@ -131,7 +130,7 @@ export function ErpLineItemsGrid({
 
       {synced.length === 0 ? (
         <div className="erp-line-items-grid__empty">
-          <p>No line items yet. Add a blank line and select a product from the grid.</p>
+          <p>No line items yet. Add a blank line and select an item from the grid.</p>
         </div>
       ) : (
         <div className="quo-editor-price__table-wrap erp-line-items-grid__wrap">
@@ -144,7 +143,7 @@ export function ErpLineItemsGrid({
                 {isOpportunity ? <th className="w-8 erp-line-items-grid__sticky-expand" aria-label="Expand" /> : null}
                 <th className="erp-line-items-grid__sticky-sr">#</th>
                 <th className="erp-line-items-grid__sticky-product">
-                  {isOpportunity ? 'Product / Item' : 'Product'}
+                  {isOpportunity ? 'Item' : 'Item'}
                 </th>
                 {isOpportunity ? (
                   <th className="erp-line-items-grid__col-desc erp-line-items-grid__col--desktop">Description</th>
@@ -190,7 +189,7 @@ export function ErpLineItemsGrid({
                   ?? (errs.some((e) => e === UNIT_PRICE_REQUIRED_MESSAGE) ? UNIT_PRICE_REQUIRED_MESSAGE : undefined)
                 const productColumnErrors = errs.filter((e) => !/unit price/i.test(e))
                 const expanded = expandedRows[line.id]
-                const pick = line.productId ? productPickMap.get(line.productId) : undefined
+                const pick = line.itemId ? productPickMap.get(line.itemId) : undefined
                 const hsn = lineHsn(pick)
                 const techSpecs = lineTechSpecs(pick)
                 const warehouseName = (() => {
@@ -230,11 +229,11 @@ export function ErpLineItemsGrid({
                           ) : (
                             <ErpSmartSelect
                               options={productOptions}
-                              value={line.productId ?? ''}
-                              onChange={(pid) => selectProduct(line.id, pid)}
-                              placeholder="Select released product…"
+                              value={line.itemId ?? ''}
+                              onChange={(itemId) => selectItem(line.id, itemId)}
+                              placeholder="Select sellable item…"
                               appearance="dropdown"
-                              emptyMessage="Only products released for sale are listed."
+                              emptyMessage="Only items allowed for sales are listed."
                             />
                           )}
                           {line.itemCode ? (

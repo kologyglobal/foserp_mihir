@@ -1,8 +1,10 @@
 /**
  * Validate + enrich Sales Invoice source links (O2C).
  * Hard remaining-qty guard for OUTBOUND_DISPATCH links.
+ * When tenant policy requirePodBeforeInvoice, POD must be DELIVERED / PARTIALLY_DELIVERED.
  */
 import type { Prisma } from '@prisma/client'
+import { assertPodAllowsInvoice } from '../../../dispatch/pod/dispatch-pod.service.js'
 import {
   assertDispatchLineInvoiceReadyQty,
   lockDispatchLineConsumption,
@@ -89,9 +91,39 @@ export async function validateAndEnrichSalesInvoiceSourceLinks(input: {
     await lockDispatchLineConsumption(input.tx, input.tenantId, dispatchLineIds)
   }
 
+  const outboundDispatchIds = [
+    ...new Set(
+      links.filter((l) => l.sourceType === 'OUTBOUND_DISPATCH').map((l) => l.sourceDocumentId).filter(Boolean),
+    ),
+  ]
+  if (outboundDispatchIds.length > 0) {
+    const { assertDispatchInvoiceCommercialPolicy } = await import(
+      '../../../dispatch/settings/dispatch-commercial-enforcement.js'
+    )
+    try {
+      await assertDispatchInvoiceCommercialPolicy(input.tenantId, outboundDispatchIds)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Dispatch invoice policy rejected'
+      const code =
+        err && typeof err === 'object' && 'code' in err && typeof (err as { code: unknown }).code === 'string'
+          ? (err as { code: string }).code
+          : 'DISPATCH_INVOICE_POLICY'
+      throw new SalesInvoiceValidationFailedError(message, [
+        { field: 'sourceLinks', message: code },
+      ])
+    }
+  }
+
   const enriched: CreateSalesInvoiceSourceLinkInput[] = []
   let primarySalesOrderId: string | null =
     input.sourceType === 'SALES_ORDER' ? (input.sourceDocumentId ?? null) : null
+
+  for (const dispatchId of outboundDispatchIds) {
+    await assertPodAllowsInvoice(input.tenantId, dispatchId)
+  }
+  if (input.sourceType === 'OUTBOUND_DISPATCH' && input.sourceDocumentId) {
+    await assertPodAllowsInvoice(input.tenantId, input.sourceDocumentId)
+  }
 
   for (const link of links) {
     if (link.sourceType === 'OUTBOUND_DISPATCH') {

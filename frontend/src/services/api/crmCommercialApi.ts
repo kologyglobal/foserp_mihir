@@ -4,6 +4,7 @@ import type {
   CrmPaymentReceipt,
   CrmTaxInvoice,
 } from '@/types/crmCommercial'
+import type { ProformaInvoice } from '@/types/proformaInvoice'
 
 function buildQuery(params?: Record<string, string | number | boolean | undefined>): string {
   if (!params) return ''
@@ -19,12 +20,43 @@ export type CommercialSyncBundle = {
   receipts: CrmPaymentReceipt[]
   invoices: CrmTaxInvoice[]
   allocations: CrmPaymentAllocation[]
+  proformas: ProformaInvoice[]
 }
 
 export async function fetchCommercialSync(companyId?: string) {
   return apiRequest<CommercialSyncBundle>(
     `${tenantPath('/crm/commercial/sync')}${buildQuery({ companyId })}`,
   )
+}
+
+export async function fetchCommercialProformas(params?: Record<string, string | undefined>) {
+  return apiRequest<ProformaInvoice[]>(`${tenantPath('/crm/commercial/proformas')}${buildQuery(params)}`)
+}
+
+export async function fetchCommercialProforma(id: string) {
+  return apiRequest<ProformaInvoice>(tenantPath(`/crm/commercial/proformas/${id}`))
+}
+
+export async function createCommercialProforma(body: Record<string, unknown>) {
+  return apiRequest<ProformaInvoice>(tenantPath('/crm/commercial/proformas'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function updateCommercialProforma(id: string, body: Record<string, unknown>) {
+  return apiRequest<ProformaInvoice>(tenantPath(`/crm/commercial/proformas/${id}`), {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function issueCommercialProforma(id: string) {
+  return apiRequest<ProformaInvoice>(tenantPath(`/crm/commercial/proformas/${id}/issue`), { method: 'POST' })
+}
+
+export async function cancelCommercialProforma(id: string) {
+  return apiRequest<ProformaInvoice>(tenantPath(`/crm/commercial/proformas/${id}/cancel`), { method: 'POST' })
 }
 
 export async function fetchCommercialReceipts(params?: Record<string, string | undefined>) {

@@ -261,7 +261,7 @@ export function CrmHotOpportunitiesPanel({
                       <span className="crm-hot-value">{formatCrmCurrency(o.value)}</span>
                     </div>
                     <p className="crm-helper-text">
-                      {lookup.customerName(o.customerId)} · {o.productId ? lookup.productName(o.productId) : 'Product TBD'} · {o.ownerName}
+                      {lookup.customerName(o.customerId)} · {o.lines?.[0]?.productOrItem || 'Item TBD'} · {o.ownerName}
                     </p>
                     <div className="crm-hot-row-meta">
                       <DynamicsStatusChip label={opportunityStageLabel(o.stage)} tone="info" />

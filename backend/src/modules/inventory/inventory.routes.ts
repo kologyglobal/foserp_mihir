@@ -11,6 +11,7 @@ import { lotRoutes, serialRoutes } from './tracking-masters/tracking-master.rout
 import storeWorkbenchRoutes from './store-workbench/store-workbench.routes.js'
 import accountingRoutes from './accounting/inventory-accounting.routes.js'
 import setupRoutes from './setup/setup.routes.js'
+import costingRoutes from './costing/costing.routes.js'
 
 const router = Router({ mergeParams: true })
 
@@ -30,5 +31,7 @@ router.use('/store-workbench', storeWorkbenchRoutes)
 router.use('/accounting', accountingRoutes)
 // Tenant inventory setup + scan code lookup.
 router.use('/setup', setupRoutes)
+// Cost entries / layers / valuation reconciliation / method change.
+router.use('/costing', costingRoutes)
 
 export default router

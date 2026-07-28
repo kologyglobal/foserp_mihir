@@ -45,6 +45,8 @@ import { buildProformaNewUrl } from '../../utils/proformaInvoicePrefill'
 import { downloadProformaExcel, downloadProformaPdf, printProformaDocument } from '../../utils/proformaInvoiceExport'
 import { notify } from '../../store/toastStore'
 import { canCrmPermission } from '../../utils/permissions/crm'
+import { isApiMode } from '../../config/apiConfig'
+import { apiIssueProforma, apiCancelProforma } from '../../services/bridges/crmCommercialApiBridge'
 import type { StatusDotTone } from '../../components/design-system/StatusDot'
 import { salesModuleBreadcrumbs, salesChildBreadcrumbs } from '../../utils/salesNavigation'
 
@@ -925,8 +927,8 @@ export function ProformaInvoiceDetailPage() {
     )
   }
 
-  function act(label: string, fn: () => { ok: boolean; error?: string }) {
-    const r = fn()
+  async function act(label: string, fn: () => { ok: boolean; error?: string } | Promise<{ ok: boolean; error?: string }>) {
+    const r = await Promise.resolve(fn())
     setToast(r.ok ? label : (r.error ?? 'Action failed'))
   }
 
@@ -951,7 +953,7 @@ export function ProformaInvoiceDetailPage() {
             sticky={false}
             primaryAction={
               proforma.status === 'draft'
-                ? { id: 'issue', label: 'Issue Proforma', icon: Send, onClick: () => act('Proforma issued', () => issue(proforma.id)) }
+                ? { id: 'issue', label: 'Issue Proforma', icon: Send, onClick: () => act('Proforma issued', () => (isApiMode() ? apiIssueProforma(proforma.id) : issue(proforma.id))) }
                 : canReceive
                   ? {
                       id: 'receive',
@@ -974,7 +976,7 @@ export function ProformaInvoiceDetailPage() {
               { id: 'pdf', label: 'Download PDF', icon: Download, onClick: () => void handleProformaPdfDownload(proforma) },
               { id: 'excel', label: 'Export Excel', icon: FileSpreadsheet, onClick: () => downloadProformaExcel(proforma) },
               ...(proforma.status !== 'cancelled'
-                ? [{ id: 'cancel', label: 'Cancel', icon: XCircle, onClick: () => act('Proforma cancelled', () => cancel(proforma.id)) }]
+                ? [{ id: 'cancel', label: 'Cancel', icon: XCircle, onClick: () => act('Proforma cancelled', () => (isApiMode() ? apiCancelProforma(proforma.id) : cancel(proforma.id))) }]
                 : []),
               ...(proforma.salesOrderId
                 ? [{ id: 'so', label: 'Sales Order', icon: FileText, onClick: () => navigate(`/sales/orders/${proforma.salesOrderId}`) }]

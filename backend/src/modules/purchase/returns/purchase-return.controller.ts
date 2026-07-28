@@ -17,6 +17,8 @@ export const updatePurchaseReturn = asyncHandler(async (req: Request, res: Respo
   sendSuccess(res, 'Purchase return updated', await service.updatePurchaseReturn(getTenantId(req), getRouteParam(req, 'id'), actor(req), req.body)))
 export const submitPurchaseReturn = asyncHandler(async (req: Request, res: Response) =>
   sendSuccess(res, 'Purchase return submitted', await service.submitPurchaseReturn(getTenantId(req), getRouteParam(req, 'id'), actor(req), req.body ?? {})))
+export const approvePurchaseReturn = asyncHandler(async (req: Request, res: Response) =>
+  sendSuccess(res, 'Purchase return approved', await service.approvePurchaseReturn(getTenantId(req), getRouteParam(req, 'id'), actor(req), req.body ?? {})))
 export const completePurchaseReturn = asyncHandler(async (req: Request, res: Response) =>
   sendSuccess(res, 'Purchase return completed', await service.completePurchaseReturn(getTenantId(req), getRouteParam(req, 'id'), actor(req), req.body ?? {})))
 export const cancelPurchaseReturn = asyncHandler(async (req: Request, res: Response) =>

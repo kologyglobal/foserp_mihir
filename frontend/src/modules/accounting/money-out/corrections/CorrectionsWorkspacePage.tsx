@@ -25,7 +25,7 @@ const TABS: Array<{ id: CorrectionsTab; label: string; description: string }> = 
   {
     id: 'history',
     label: 'History',
-    description: 'Audit trail of AP reversals when the history API is available.',
+    description: 'Audit trail of AP document and allocation reversals.',
   },
 ]
 
@@ -118,7 +118,7 @@ export function CorrectionsWorkspacePage() {
       {activeTab === 'history' && (
         <div className="space-y-3">
           <p className="text-[12px] text-erp-muted">
-            Dedicated AP reversal history API is not yet exposed. Use the reversal history page for an empty-state placeholder, or inspect document detail for reversal metadata.
+            Aggregated trail of reversed vendor invoices, payments, adjustments, and allocation batches.
           </p>
           <Link to="/accounting/money-out/reversals">
             <ErpButton variant="secondary">Open reversal history</ErpButton>

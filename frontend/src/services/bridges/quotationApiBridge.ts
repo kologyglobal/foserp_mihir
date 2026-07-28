@@ -56,9 +56,11 @@ function toApiDateTime(value: string | null | undefined): string | null | undefi
 
 function sanitizeQuotationPayload(input: Record<string, unknown>): Record<string, unknown> {
   const payload = { ...input }
-  for (const key of ['locationId', 'opportunityId', 'productId', 'contactId', 'templateId'] as const) {
+  for (const key of ['locationId', 'opportunityId', 'productId', 'itemId', 'contactId', 'templateId'] as const) {
     if (key in payload) payload[key] = optionalUuid(payload[key])
   }
+  // New writes: itemId primary; never persist productId as the commercial key.
+  if (payload.itemId) payload.productId = null
   if ('salesOwnerId' in payload) {
     payload.salesOwnerId = resolveOwnerId(payload.salesOwnerId as string | null | undefined) ?? null
   }
@@ -68,7 +70,8 @@ function sanitizeQuotationPayload(input: Record<string, unknown>): Record<string
   if (Array.isArray(payload.priceLines)) {
     payload.priceLines = (payload.priceLines as Array<Record<string, unknown>>).map((line) => ({
       ...line,
-      productId: optionalUuid(line.productId),
+      itemId: optionalUuid(line.itemId),
+      productId: null,
     }))
   }
   return payload
@@ -274,7 +277,8 @@ export async function apiCreateQuotationFromOpportunity(input: {
   opportunityId: string
   opportunityNo: string
   customerId: string
-  productId: string
+  productId?: string | null
+  itemId?: string | null
   qty: number
   unitPrice: number
   discountPct?: number
@@ -300,7 +304,8 @@ export async function apiCreateQuotationFromOpportunity(input: {
   return apiCreateQuotation({
     customerId: input.customerId,
     opportunityId: input.opportunityId,
-    productId: input.productId,
+    productId: null,
+    itemId: input.itemId ?? null,
     qty: input.qty,
     unitPrice: input.unitPrice,
     discountPct: input.discountPct ?? 0,

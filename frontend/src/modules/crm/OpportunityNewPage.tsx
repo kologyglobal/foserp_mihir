@@ -155,13 +155,13 @@ export function OpportunityNewPage() {
   const [lines, setLines] = useState<OpportunityLine[]>(() =>
     initialLinesFromLead(lead?.productRequirement, lead?.remarks),
   )
-  const retainProductIds = useMemo(() => lines.map((l) => l.productId), [lines])
+  const retainItemIds = useMemo(() => lines.map((l) => l.itemId ?? l.productId), [lines])
   const { options: productOptions, pickMap } = useProductMasterOptionMap(
     products,
     items,
     uoms,
     undefined,
-    retainProductIds,
+    retainItemIds,
   )
   const [probability, setProbability] = useState(initialProbability)
   const [expectedCloseDate, setExpectedCloseDate] = useState(lead?.expectedCloseDate?.slice(0, 10) || defaultCloseDate())
@@ -390,17 +390,16 @@ export function OpportunityNewPage() {
     void (async () => {
       try {
         const syncedLines = syncOpportunityLines(lines)
-        const primaryProductId = syncedLines[0]?.productId ?? null
         const r = await resolveStoreAction(
           createOpportunity({
             customerId,
             contactId: contactId || null,
-            productId: primaryProductId,
+            productId: null,
             opportunityName: opportunityName.trim(),
             productRequirement: sanitizeOpportunityScopeNotes(productRequirement)
               || syncedLines.map((l) => l.productOrItem).filter(Boolean).join('; ')
               || opportunityName.trim(),
-            lines: syncedLines,
+            lines: syncedLines.map((l) => ({ ...l, productId: null })),
             stage,
             value: summary.grandTotal,
             probability: Number(probability) || 0,

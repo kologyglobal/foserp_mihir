@@ -62,12 +62,21 @@ export function useActiveProducts() {
   return useMemo(() => products.filter((p) => p.isActive), [products])
 }
 
-/** Released + active products only — for CRM / quotation / sales order pickers. */
+/** Released + active products only — for engineering / Product Master forms. */
 export function useSellableProducts() {
   const products = useMasterStore((s) => s.products)
   return useMemo(
     () => products.filter((p) => p.isActive && p.status === 'released'),
     [products],
+  )
+}
+
+/** Sales-allowed items — primary CRM / quotation / sales order pickers. */
+export function useSellableItems() {
+  const items = useMasterStore((s) => s.items)
+  return useMemo(
+    () => items.filter((i) => i.isActive && !i.isBlocked && i.salesAllowed),
+    [items],
   )
 }
 

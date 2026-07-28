@@ -30,7 +30,9 @@ export function MoneyInWorkspaceShell({
       ? `${arBase}/receipts`
       : pathname.startsWith(`${arBase}/credit-notes`)
         ? `${arBase}/credit-notes`
-        : MONEY_IN_WORKSPACE_TABS.map((t) => ({
+        : pathname.startsWith(`${arBase}/corrections`)
+          ? `${arBase}/corrections`
+          : MONEY_IN_WORKSPACE_TABS.map((t) => ({
             ...t,
             path: t.path.replace('/accounting/money-in', arBase),
           })).find(
@@ -38,6 +40,7 @@ export function MoneyInWorkspaceShell({
               t.path !== `${arBase}/invoices` &&
               t.path !== `${arBase}/receipts` &&
               t.path !== `${arBase}/credit-notes` &&
+              t.path !== `${arBase}/corrections` &&
               (pathname === t.path || pathname.startsWith(`${t.path}/`)),
           )?.path ?? arBase
 
@@ -84,7 +87,7 @@ export function MoneyInWorkspaceShell({
         />
         <div className="min-w-0 rounded border border-erp-border bg-white p-3">{children}</div>
         <p className="text-[11px] text-erp-muted px-1">
-          Receipts — available · Credit Notes — available
+          Receipts · Credit Notes · Corrections (reversals) — available in API mode
         </p>
       </div>
     </OperationalPageShell>

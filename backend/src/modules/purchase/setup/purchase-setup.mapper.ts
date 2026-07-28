@@ -192,6 +192,15 @@ export function mapPurchaseSettingsToDto(
         label: string
         documentType: string
       }>,
+      approverLimits: [] as Array<{
+        id: string
+        userId: string
+        userName: string
+        maxAmountInr: number
+        documentType: string
+        isActive: boolean
+        sortOrder: number
+      }>,
       tax: {
         defaultGstScheme: gstToApi(d.defaultGstScheme),
         placeOfSupplyState: d.placeOfSupplyState ?? '',
@@ -299,6 +308,15 @@ export function mapPurchaseSettingsToDto(
       isActive: tier.isActive,
       label: tier.label,
       documentType: docTypeToApi(tier.documentType),
+    })),
+    approverLimits: row.approverLimits.map((lim) => ({
+      id: lim.id,
+      userId: lim.userId,
+      userName: `${lim.user.firstName} ${lim.user.lastName}`.trim() || lim.user.email,
+      maxAmountInr: num(lim.maxAmountInr),
+      documentType: docTypeToApi(lim.documentType),
+      isActive: lim.isActive,
+      sortOrder: lim.sortOrder,
     })),
     tax: {
       defaultGstScheme: gstToApi(row.defaultGstScheme),

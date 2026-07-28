@@ -33,6 +33,9 @@ describe.skipIf(!dbAvailable)('Inventory moving-average valuation', () => {
 
   afterAll(async () => {
     if (!fx?.tenantId) return
+    await prisma.inventoryCostLayerConsumption.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
+    await prisma.inventoryCostEntry.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
+    await prisma.inventoryCostLayer.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
     await prisma.inventoryStockMovement.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
     await prisma.inventoryStockBalance.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
     await prisma.codeSeries.deleteMany({
@@ -90,5 +93,30 @@ describe.skipIf(!dbAvailable)('Inventory moving-average valuation', () => {
     expect(remaining.onHandQty.toString()).toBe('15')
     expect(remaining.avgRate.toString()).toBe('15')
     expect(remaining.stockValue.toString()).toBe('225')
+  })
+
+  it('ignores a wrong caller rate on issues and keeps the moving average', async () => {
+    const issue = await postStockMovement({
+      tenantId: fx.tenantId,
+      itemId: fx.componentItemId,
+      warehouseId: fx.warehouseId,
+      movementType: 'ISSUE',
+      referenceType: 'ISS',
+      quantity: 5,
+      rate: 99,
+      idempotencyKey: `ma-ignore-rate-${fx.tenantId}`,
+    })
+    const remaining = await prisma.inventoryStockBalance.findFirstOrThrow({
+      where: {
+        tenantId: fx.tenantId,
+        itemId: fx.componentItemId,
+        warehouseId: fx.warehouseId,
+      },
+    })
+    expect(issue.rate.toString()).toBe('15')
+    expect(issue.value.toString()).toBe('75')
+    expect(remaining.onHandQty.toString()).toBe('10')
+    expect(remaining.avgRate.toString()).toBe('15')
+    expect(remaining.stockValue.toString()).toBe('150')
   })
 })

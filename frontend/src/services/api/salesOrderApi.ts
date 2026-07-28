@@ -24,7 +24,7 @@ export async function fetchSalesOrder(id: string) {
 export type CreateSalesOrderBody = {
   customerId: string
   source?: 'quotation' | 'direct'
-  productId?: string | null
+  itemId?: string | null
   qty?: number
   unitPrice?: number
   discountPct?: number | null
@@ -59,7 +59,7 @@ export type CreateSalesOrderBody = {
     lineNo?: number
     productOrItem: string
     description?: string
-    productId?: string | null
+    itemId?: string | null
     qty: number
     uom?: string
     unitPrice: number

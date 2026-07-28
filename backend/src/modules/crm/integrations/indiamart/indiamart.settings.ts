@@ -35,15 +35,21 @@ export async function updateSettings(
   let encryptedCredentials = existing?.encryptedCredentials ?? ''
   let credentialsChanged = false
   if (input.apiKey) {
-    assertFieldEncryptionConfigured()
-    const prev = existing ? undefined : undefined
+    try {
+      assertFieldEncryptionConfigured()
+    } catch {
+      throw new IndiaMartError(
+        'NOT_CONFIGURED',
+        'FIELD_ENCRYPTION_KEY is not configured on the server. Set it in backend/.env and restart the API before saving the Pull key.',
+        503,
+      )
+    }
     encryptedCredentials = encryptCredentials({
       apiKey: input.apiKey,
       registeredMobile: input.registeredMobile ?? undefined,
       registeredEmail: input.registeredEmail || undefined,
     })
     credentialsChanged = true
-    void prev
   } else if (input.registeredMobile != null || input.registeredEmail != null) {
     // Update masked identity without rotating key when key not provided
   }

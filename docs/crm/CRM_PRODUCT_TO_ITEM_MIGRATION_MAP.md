@@ -236,14 +236,14 @@ Also join CRM usage counts on soft `productId` in:
 |-------|------|--------|
 | **1** | Audit + this map | **Done (this doc)** |
 | **2** | MasterItem sales fields + pricing interim | **Done** — `docs/crm/CRM_ITEM_PHASE2_SALES_FIELDS.md` |
-| **3** | Nullable `itemId` columns / JSON shapes / indexes; keep `productId` | Not started |
-| **4** | Backfill + exception admin page | Not started |
-| **5** | Backend dual-read; forbid new Product-only CRM writes | Not started |
-| **6** | Frontend CRM/Sales switch (Lead→SO, Guided, Mobile, search, reports) | Not started |
-| **7** | Fulfilment / MFG / Purchase / Inv / Dispatch / AR | Not started |
-| **8** | Remove CRM Product stores/pickers/nav usage | Not started |
-| **9** | Enforce non-null `itemId`; remove Product fallback | Blocked on exceptions = 0 |
-| **10** | Drop obsolete CRM Product columns / archive tools | Sign-off only |
+| **3** | Nullable `itemId` columns / JSON shapes / indexes; keep `productId` | **Done** — migration `20260727140000_crm_product_to_item_phase3` |
+| **4** | Backfill + exception admin page | **Script done** — `scripts/crm-product-to-item-backfill.ts`; admin UI deferred |
+| **5** | Backend dual-read; forbid new Product-only CRM writes | **Done** — `crm-item-resolver.ts`; opp/quote/SO/create paths |
+| **6** | Frontend CRM/Sales switch (Lead→SO, Guided, Mobile, search, reports) | **Done** — item pickers, `opportunityItemOptions`, salesStore/crmStore, Quick Create, **SalesOrderCreatePage** |
+| **7** | Fulfilment / MFG / Purchase / Inv / Dispatch / AR | **Done** — SO→demand, dispatch fulfilment prefer `itemId` |
+| **8** | Remove CRM Product stores/pickers/nav usage | **Done** — CRM pickers/item-native; SO create uses `useSellableItems`; Product Master remains under `/masters/products` for engineering |
+| **9** | Enforce non-null `itemId`; remove Product fallback | **Done** — write resolver rejects productId; Zod requires `itemId`; migration `20260727180000_crm_product_to_item_phase9_not_null`; funnel UAT 26/26 |
+| **10** | Drop obsolete CRM Product columns / archive tools | **Done** — DROP `productId` on opp lines / quote / SO / dispatch_requirements (`20260727190000_…_phase10_drop_product_id`); commercial proforma/tax lines → `itemId` (`20260727210000_crm_commercial_item_id`); **Product Master retained** for engineering |
 
 **Explicit non-start:** Do not replace frontend Product pickers until Phase 2–5 foundations exist and backfill exceptions are measurable.
 

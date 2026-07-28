@@ -2,7 +2,7 @@
 
 Authoritative patterns from `backend/src/app.ts` and module routes. Base URL: **`/api/v1`**.
 
-**Live OpenAPI (dev):** http://localhost:5000/api/docs — OpenAPI **1.4.0**. Hand-written entries live in `backend/src/config/swagger.ts`; remaining Express routes are filled by auto-generated stubs in `swagger.generated-paths.ts`. Regenerate stubs after adding routes:
+**Live OpenAPI (dev):** http://localhost:5000/api/docs — OpenAPI **1.5.0**. Hand-written entries live in `backend/src/config/swagger.ts`; remaining Express routes are filled by auto-generated stubs in `swagger.generated-paths.ts`. Regenerate stubs after adding routes:
 
 ```bash
 cd backend && npm run swagger:generate
@@ -563,6 +563,24 @@ Lightweight read-only lists under `/t/:tenantSlug/lookups/`:
 | `/lookups/vendors` | Dedicated vendor dropdown lookup |
 
 Used by transactional forms (`useItemLookup`, `useVendorLookup`). Cached via `lookupCache.ts`.
+
+## Inventory costing (`/inventory/costing`)
+
+Valuation engine (additive to physical stock ledger). Prefer `inventory.view_cost` for reads; `inventory.setup.manage` for writes.
+
+| Method | Path | Permission | Notes |
+|--------|------|------------|-------|
+| GET | `/cost-entries` | `inventory.view_cost` (+ stock/ledger/view) | Filters: item, warehouse, method, entryType, workOrderId, movementId, dates |
+| GET | `/cost-entries/:id` | same | Includes layer consumptions when present |
+| GET | `/cost-layers` | same | FIFO / specific ID layers; `openOnly`, serial/lot filters |
+| GET | `/cost-layers/:id` | same | Layer + consumptions |
+| GET | `/valuation-reconciliation` | same / `inventory.view_audit` | On-hand vs OPEN layer remaining |
+| GET | `/cost-variances` | same | Standard-cost variances |
+| POST | `/standard-costs` | `inventory.setup.manage` | Upsert/activate standard cost version |
+| POST | `/method-change` | `inventory.setup.manage` | Change default method; optional FIFO opening migration |
+| POST | `/setup/fifo-opening-migration` | `inventory.setup.manage` | Under `/inventory/setup` — seed OPEN layers for on-hand gaps |
+
+OpenAPI tag: **Inventory Costing** (hand-documented in `swagger.ts` 1.5.0).
 
 ## Frontend client usage
 

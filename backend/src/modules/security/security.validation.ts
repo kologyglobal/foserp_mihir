@@ -33,6 +33,14 @@ export const listAuditLogsQuerySchema = paginationSchema.extend({
   modules: z.string().trim().max(500).optional().default(ADMIN_AUDIT_MODULES.join(',')),
 })
 
+export const updateSecurityPolicySchema = z.object({
+  passwordMinLength: z.coerce.number().int().min(8).max(128).optional(),
+  maxFailedLogins: z.coerce.number().int().min(3).max(50).optional(),
+  requireComplexity: z.boolean().optional(),
+  mfaMode: z.enum(['off', 'optional', 'required']).optional(),
+})
+
 export type ListLoginActivityQuery = z.infer<typeof listLoginActivityQuerySchema>
 export type ListSessionsQuery = z.infer<typeof listSessionsQuerySchema>
 export type ListAuditLogsQuery = z.infer<typeof listAuditLogsQuerySchema>
+export type UpdateSecurityPolicyInput = z.infer<typeof updateSecurityPolicySchema>

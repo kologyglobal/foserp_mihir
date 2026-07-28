@@ -48,7 +48,7 @@ export const OPPORTUNITY_STAGE_FIELD_LABELS: Record<string, string> = {
   customerId: 'Customer',
   contactId: 'Contact',
   ownerId: 'Owner',
-  productId: 'Product',
+  itemId: 'Item',
   productRequirement: 'Requirement',
   lines: 'Item Lines',
   value: 'Deal Value',
@@ -142,13 +142,11 @@ export function isStageFieldFilled(value: unknown): boolean {
       const line = row as {
         productOrItem?: string
         itemCode?: string
-        productId?: string | null
         itemId?: string | null
       }
       return Boolean(
         line.productOrItem?.trim()
         || line.itemCode?.trim()
-        || line.productId?.trim()
         || line.itemId?.trim(),
       )
     })

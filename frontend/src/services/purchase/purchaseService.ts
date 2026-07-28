@@ -6334,6 +6334,9 @@ export async function updatePurchaseSetup(
     }
     state.setup.approvalMatrix = structuredClone(sorted)
   }
+  if (patch.approverLimits) {
+    state.setup.approverLimits = structuredClone(patch.approverLimits)
+  }
   if (patch.availableBudgetPlaceholderInr != null) {
     state.setup.availableBudgetPlaceholderInr = Math.max(0, patch.availableBudgetPlaceholderInr)
   }

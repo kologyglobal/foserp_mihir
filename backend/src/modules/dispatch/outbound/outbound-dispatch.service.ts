@@ -7,6 +7,11 @@ import {
 } from '../../crm/sales-orders/fulfilment/sales-order-dispatch-guard.service.js'
 import { assertDispatchQtyAllowed } from '../../crm/sales-orders/fulfilment/sales-order-fulfilment.service.js'
 import { synchroniseDispatchRequirements } from '../requirements/dispatch-requirement-sync.service.js'
+import {
+  assertMultipleDispatchesAllowed,
+  assertPartialDispatchAllowed,
+} from '../settings/dispatch-commercial-enforcement.js'
+import { getLineFulfilmentPosition } from '../fulfilment/sales-order-fulfilment-position.service.js'
 import { mapOutboundDispatch } from './outbound-dispatch.mappers.js'
 import * as repo from './outbound-dispatch.repository.js'
 import type {
@@ -52,6 +57,7 @@ async function validateLinesForCreate(
   tenantId: string,
   headerSalesOrderId: string | undefined,
   lines: CreateOutboundDispatchInput['lines'],
+  options?: { excludeOutboundDispatchId?: string },
 ): Promise<void> {
   const checkedSalesOrders = new Set<string>()
   for (const line of lines) {
@@ -65,6 +71,16 @@ async function validateLinesForCreate(
         throw new ValidationError('salesOrderId is required when salesOrderLineId is set')
       }
       await assertDispatchQtyAllowed(tenantId, soId, line.salesOrderLineId, line.quantity)
+      const position = await getLineFulfilmentPosition(tenantId, soId, line.salesOrderLineId)
+      await assertPartialDispatchAllowed(
+        tenantId,
+        line.quantity,
+        position.remainingToDispatchQty,
+        line.salesOrderLineId,
+      )
+      await assertMultipleDispatchesAllowed(tenantId, line.salesOrderLineId, {
+        excludeOutboundDispatchId: options?.excludeOutboundDispatchId,
+      })
     }
   }
 }
@@ -150,7 +166,9 @@ export async function updateOutboundDispatch(
   }
 
   if (input.lines) {
-    await validateLinesForCreate(tenantId, existing.salesOrderId ?? undefined, input.lines)
+    await validateLinesForCreate(tenantId, existing.salesOrderId ?? undefined, input.lines, {
+      excludeOutboundDispatchId: id,
+    })
   }
 
   const row = await prisma.$transaction(async (tx) => {

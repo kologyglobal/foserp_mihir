@@ -7,6 +7,7 @@ import { nextDocumentNo } from '../utils/documentNumbers'
 import { buildProformaLinesFromSalesOrder, computeProformaLineTotals, sumProformaTaxable } from '../utils/proformaInvoiceLines'
 import { useMasterStore } from './masterStore'
 import { useMrpStore } from './mrpStore'
+import { isApiMode } from '../config/apiConfig'
 import { erpStorage, ERP_PERSIST_VERSION, ERP_STORAGE_KEYS } from './persistConfig'
 import { assertPermission } from '../utils/permissions'
 import { resolveCustomerShippingAddress } from '../utils/customerUtils'
@@ -73,17 +74,17 @@ interface ProformaInvoiceState {
   proformaInvoices: ProformaInvoice[]
   getProforma: (id: string) => ProformaInvoice | undefined
   getBySalesOrder: (salesOrderId: string) => ProformaInvoice[]
-  createDirect: (input: ProformaInvoiceInput) => { ok: boolean; error?: string; id?: string }
-  createFromSalesOrder: (salesOrderId: string, patch?: Partial<ProformaInvoiceInput>) => { ok: boolean; error?: string; id?: string }
-  updateDraft: (id: string, patch: Partial<ProformaInvoiceInput>) => { ok: boolean; error?: string }
-  issue: (id: string) => { ok: boolean; error?: string }
-  cancel: (id: string) => { ok: boolean; error?: string }
+  createDirect: (input: ProformaInvoiceInput) => { ok: boolean; error?: string; id?: string } | Promise<{ ok: boolean; error?: string; id?: string }>
+  createFromSalesOrder: (salesOrderId: string, patch?: Partial<ProformaInvoiceInput>) => { ok: boolean; error?: string; id?: string } | Promise<{ ok: boolean; error?: string; id?: string }>
+  updateDraft: (id: string, patch: Partial<ProformaInvoiceInput>) => { ok: boolean; error?: string } | Promise<{ ok: boolean; error?: string }>
+  issue: (id: string) => { ok: boolean; error?: string } | Promise<{ ok: boolean; error?: string }>
+  cancel: (id: string) => { ok: boolean; error?: string } | Promise<{ ok: boolean; error?: string }>
 }
 
 export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
   persist(
     (set, get) => ({
-      proformaInvoices: [],
+      proformaInvoices: isApiMode() ? [] : [],
 
       getProforma: (id) => get().proformaInvoices.find((p) => p.id === id),
 
@@ -91,6 +92,11 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
         get().proformaInvoices.filter((p) => p.salesOrderId === salesOrderId),
 
       createDirect: (input) => {
+        if (isApiMode()) {
+          return import('../services/bridges/crmCommercialApiBridge').then((m) =>
+            m.apiCreateProforma({ ...input, source: input.source ?? 'direct' }),
+          )
+        }
         const perm = assertPermission('sales', 'create')
         if (!perm.ok) return perm
         if (!input.lines.length) return { ok: false, error: 'At least one line is required.' }
@@ -138,6 +144,30 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
       },
 
       createFromSalesOrder: (salesOrderId, patch) => {
+        if (isApiMode()) {
+          const so = useMrpStore.getState().getSalesOrder(salesOrderId)
+          if (!so) return Promise.resolve({ ok: false, error: 'Sales order not found.' })
+          const master = useMasterStore.getState()
+          const lines = normalizeLines(patch?.lines ?? buildProformaLinesFromSalesOrder(so, master.items))
+          return import('../services/bridges/crmCommercialApiBridge').then((m) =>
+            m.apiCreateProforma({
+              customerId: so.customerId,
+              proformaDate: patch?.proformaDate,
+              validUntil: patch?.validUntil,
+              paymentTerms: patch?.paymentTerms ?? so.paymentTerms ?? '30% advance, balance before dispatch',
+              deliveryTerms: patch?.deliveryTerms ?? so.deliveryTerms ?? 'Ex-works Pune',
+              customerPoNumber: patch?.customerPoNumber ?? so.customerPoNumber ?? null,
+              billingAddress: patch?.billingAddress ?? so.billingAddress,
+              shippingAddress: patch?.shippingAddress ?? so.shippingAddress,
+              remarks: patch?.remarks ?? so.internalRemarks ?? '',
+              locationId: patch?.locationId ?? so.locationId ?? null,
+              lines,
+              salesOrderId: so.id,
+              salesOrderNo: so.salesOrderNo,
+              source: 'sales_order',
+            }),
+          )
+        }
         const perm = assertPermission('sales', 'create')
         if (!perm.ok) return perm
 
@@ -158,7 +188,7 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
         const customer = master.getCustomer(so.customerId)
         if (!customer) return { ok: false, error: 'Customer not found.' }
 
-        const lines = normalizeLines(patch?.lines ?? buildProformaLinesFromSalesOrder(so, master.products))
+        const lines = normalizeLines(patch?.lines ?? buildProformaLinesFromSalesOrder(so, master.items))
         const ts = nowIso()
         const proformaDate = patch?.proformaDate ?? ts.slice(0, 10)
 
@@ -198,6 +228,9 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
       },
 
       updateDraft: (id, patch) => {
+        if (isApiMode()) {
+          return import('../services/bridges/crmCommercialApiBridge').then((m) => m.apiUpdateProforma(id, patch))
+        }
         const perm = assertPermission('sales', 'edit')
         if (!perm.ok) return perm
         const existing = get().getProforma(id)
@@ -243,6 +276,9 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
       },
 
       issue: (id) => {
+        if (isApiMode()) {
+          return import('../services/bridges/crmCommercialApiBridge').then((m) => m.apiIssueProforma(id))
+        }
         const perm = assertPermission('sales', 'post')
         if (!perm.ok) return perm
         const existing = get().getProforma(id)
@@ -259,6 +295,9 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
       },
 
       cancel: (id) => {
+        if (isApiMode()) {
+          return import('../services/bridges/crmCommercialApiBridge').then((m) => m.apiCancelProforma(id))
+        }
         const perm = assertPermission('sales', 'edit')
         if (!perm.ok) return perm
         const existing = get().getProforma(id)
@@ -277,7 +316,10 @@ export const useProformaInvoiceStore = create<ProformaInvoiceState>()(
       name: ERP_STORAGE_KEYS.proformaInvoice,
       storage: erpStorage,
       version: ERP_PERSIST_VERSION,
-      partialize: (s) => ({ proformaInvoices: s.proformaInvoices }),
+      partialize: (s) =>
+        isApiMode()
+          ? { proformaInvoices: [] }
+          : { proformaInvoices: s.proformaInvoices },
     },
   ),
 )

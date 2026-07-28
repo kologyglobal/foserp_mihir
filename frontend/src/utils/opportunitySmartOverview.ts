@@ -306,7 +306,7 @@ export function resolveOpportunityNextBestAction(input: OpportunitySmartOverview
       id: 'await_so',
       title: 'Sales Order Blocked',
       description: input.createSalesOrderLockedReason
-        ?? 'Create Sales Order becomes available after Send → Customer Approve.',
+        ?? 'Create Sales Order when commercial quotation details are ready (Send / Customer Approve optional).',
       ctaLabel: 'Review Deal',
     }
   }

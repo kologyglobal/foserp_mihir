@@ -282,7 +282,15 @@ export async function createConfirmedSalesOrderWithLine(
   const company = await auth(
     request(app)
       .post(`${cb}/companies`)
-      .send({ customerName: `Production Test Customer ${suffix}`, customerType: 'corporate', isActive: true }),
+      .send({
+        customerName: `Production Test Customer ${suffix}`,
+        customerType: 'corporate',
+        isActive: true,
+        addressLine1: 'Plot 1, MIDC',
+        city: 'Pune',
+        state: 'Maharashtra',
+        pincode: '411001',
+      }),
   )
   if (company.status !== 201) throw new Error(`Failed to create CRM company: ${JSON.stringify(company.body)}`)
   const companyId = company.body.data.id as string
@@ -297,11 +305,13 @@ export async function createConfirmedSalesOrderWithLine(
         customerPoNumber: `PO-PROD-${suffix}`,
         paymentTerms: 'Net 30',
         deliveryTerms: 'Ex-works',
+        deliveryTime: '4 weeks',
+        itemId: opts.productId,
         lines: [
           {
             productOrItem: 'Manufactured Item',
             description: 'Line for production demand conversion',
-            productId: opts.productId,
+            itemId: opts.productId,
             qty: opts.qty,
             uom: 'NOS',
             unitPrice: opts.unitPrice ?? 10000,
@@ -334,7 +344,15 @@ export async function createOpenSalesOrderWithLine(
   const company = await auth(
     request(app)
       .post(`${cb}/companies`)
-      .send({ customerName: `Production Test Customer (Open) ${suffix}`, customerType: 'corporate', isActive: true }),
+      .send({
+        customerName: `Production Test Customer (Open) ${suffix}`,
+        customerType: 'corporate',
+        isActive: true,
+        addressLine1: 'Plot 1, MIDC',
+        city: 'Pune',
+        state: 'Maharashtra',
+        pincode: '411001',
+      }),
   )
   if (company.status !== 201) throw new Error(`Failed to create CRM company: ${JSON.stringify(company.body)}`)
   const companyId = company.body.data.id as string
@@ -349,11 +367,13 @@ export async function createOpenSalesOrderWithLine(
         customerPoNumber: `PO-PROD-OPEN-${suffix}`,
         paymentTerms: 'Net 30',
         deliveryTerms: 'Ex-works',
+        deliveryTime: '4 weeks',
+        itemId: opts.productId,
         lines: [
           {
             productOrItem: 'Manufactured Item',
             description: 'Line for production demand conversion (unconfirmed)',
-            productId: opts.productId,
+            itemId: opts.productId,
             qty: opts.qty,
             uom: 'NOS',
             unitPrice: opts.unitPrice ?? 10000,

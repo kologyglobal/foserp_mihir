@@ -8,7 +8,9 @@ import { tenantRouteParamSchema, uuidParamSchema } from '../../../../utils/pagin
 import {
   cancelSalesInvoiceSchema,
   createSalesInvoiceSchema,
+  listInvoiceReadyQuerySchema,
   listSalesInvoicesQuerySchema,
+  prefillFromDispatchSchema,
   reverseSalesInvoiceSchema,
   updateSalesInvoiceSchema,
 } from './sales-invoice.schemas.js'
@@ -29,6 +31,18 @@ router.get(
   requirePermission('finance.ar.invoice.view'),
   validateQuery(listSalesInvoicesQuerySchema),
   controller.listSalesInvoices,
+)
+router.get(
+  '/invoice-ready',
+  requirePermission('finance.ar.invoice.view'),
+  validateQuery(listInvoiceReadyQuerySchema),
+  controller.listInvoiceReady,
+)
+router.post(
+  '/prefill-from-dispatch',
+  requirePermission('finance.ar.invoice.create'),
+  validateBody(prefillFromDispatchSchema),
+  controller.prefillFromDispatch,
 )
 router.post(
   '/',

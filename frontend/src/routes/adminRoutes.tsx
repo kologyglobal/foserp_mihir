@@ -16,6 +16,7 @@ import { AdminAccessReviewPage } from '@/modules/systemAdmin/AdminAccessReviewPa
 import { AdminLoginActivityPage } from '@/modules/systemAdmin/AdminLoginActivityPage'
 import { AdminSecuritySessionsPage } from '@/modules/systemAdmin/AdminSecuritySessionsPage'
 import { AdminLockedAccountsPage } from '@/modules/systemAdmin/AdminLockedAccountsPage'
+import { AdminSecurityPolicyPage } from '@/modules/systemAdmin/AdminSecurityPolicyPage'
 import { AdminModulesPage } from '@/modules/systemAdmin/AdminModulesPage'
 import { AdminOrgStructurePage } from '@/modules/systemAdmin/AdminOrgStructurePage'
 import { AdminAuditLogPage } from '@/modules/systemAdmin/AdminAuditLogPage'
@@ -52,6 +53,7 @@ export const adminRouteChildren: RouteObject[] = [
   { path: 'admin/security/login-activity', element: <AdminLoginActivityPage /> },
   { path: 'admin/security/sessions', element: <AdminSecuritySessionsPage /> },
   { path: 'admin/security/locked-accounts', element: <AdminLockedAccountsPage /> },
+  { path: 'admin/security/policy', element: <AdminSecurityPolicyPage /> },
   { path: 'admin/security/audit', element: <AdminAuditLogPage /> },
   { path: 'admin/tenant-profile', element: <AdminTenantProfilePage /> },
   { path: 'admin/companies', element: <AdminCompaniesPage /> },

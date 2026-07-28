@@ -15,4 +15,9 @@ export const moduleKeyParamSchema = z.object({
     .regex(/^[a-z][a-z0-9_]*$/),
 })
 
+export const replaceModuleAdministratorsSchema = z.object({
+  userIds: z.array(z.string().uuid()).max(50),
+})
+
 export type SetModuleFlagInput = z.infer<typeof setModuleFlagSchema>
+export type ReplaceModuleAdministratorsInput = z.infer<typeof replaceModuleAdministratorsSchema>

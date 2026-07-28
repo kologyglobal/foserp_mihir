@@ -81,7 +81,7 @@ function toCommercialLinesFromProforma(lines: ProformaInvoiceLine[]): CrmCommerc
   return lines.map((l) => ({
     id: genId('cil'),
     lineNo: l.lineNo,
-    productId: l.productId,
+    itemId: l.itemId,
     itemCode: l.itemCode,
     description: l.description,
     hsnCode: l.hsnCode,
@@ -474,7 +474,7 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
         if (so.status === 'open') return { ok: false, error: 'Confirm the sales order before creating an invoice.' }
 
         const master = useMasterStore.getState()
-        const baseLines = buildProformaLinesFromSalesOrder(so, master.products)
+        const baseLines = buildProformaLinesFromSalesOrder(so, master.items)
         const existing = get().getInvoicesBySalesOrder(salesOrderId)
         const invoicedQtyBySource = new Map<string, number>()
         for (const inv of existing) {
@@ -497,7 +497,7 @@ export const useCrmCommercialStore = create<CrmCommercialState>()(
           lines.push({
             id: scaled.id,
             lineNo: lines.length + 1,
-            productId: bl.productId,
+            itemId: bl.itemId,
             itemCode: bl.itemCode,
             description: bl.description,
             hsnCode: bl.hsnCode,

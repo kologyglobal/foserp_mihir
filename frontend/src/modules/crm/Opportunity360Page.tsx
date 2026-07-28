@@ -525,7 +525,7 @@ export function Opportunity360Page() {
       onCreateQuotation={openCreateQuotation}
       onCreateSalesOrder={() => {
         if (!soGate.enabled) {
-          notify.error(soGate.disabledReason ?? 'Available after customer approval.')
+          notify.error(soGate.disabledReason ?? 'Complete commercial details on the quotation to convert.')
           return
         }
         navigate(buildSalesOrderNewUrl(opportunity.id, soGate.quotationDocumentId, { fromCrm: true }))
@@ -547,7 +547,7 @@ export function Opportunity360Page() {
       onCreateQuotation={openCreateQuotation}
       onCreateSalesOrder={() => {
         if (!soGate.enabled) {
-          notify.error(soGate.disabledReason ?? 'Available after customer approval.')
+          notify.error(soGate.disabledReason ?? 'Complete commercial details on the quotation to convert.')
           return
         }
         navigate(buildSalesOrderNewUrl(opportunity.id, soGate.quotationDocumentId, { fromCrm: true }))

@@ -48,3 +48,6 @@ Never auto-**post** the invoice in this release.
 
 - Reverse is hard-blocked only when a **POSTED** SI source-links the outbound.
 - On reverse apply, linked **DRAFT / READY_TO_POST** outbound SIs have links released and status set to **CANCELLED** (so reverse still works after auto-draft).
+- Manual path (API mode): confirmed outbound detail → **Create Invoice** / **Invoice Ready** → Money In SI form (`sourceLinks` persisted).
+- HTTP: `GET …/invoices/invoice-ready`, `POST …/invoices/prefill-from-dispatch`.
+- Live coverage: `backend/tests/dispatch-o2c-invoice-allocate.test.ts` (post → ready → create → post SI → allocate).

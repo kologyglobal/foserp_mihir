@@ -225,12 +225,23 @@ export function IndiaMartSettingsPage() {
         )}
         <div className="flex flex-wrap gap-2">
           {canManage && (
-            <button type="button" className="rounded bg-erp-primary px-3 py-1.5 text-sm text-white disabled:opacity-50" disabled={saving} onClick={() => void onSave()}>
+            <button
+              type="button"
+              className="rounded bg-erp-primary px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              disabled={saving || (Boolean(apiKey) && !settings.fieldEncryptionConfigured)}
+              onClick={() => void onSave()}
+            >
               Save settings
             </button>
           )}
           {canCreds && (
-            <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={() => void onTest()}>
+            <button
+              type="button"
+              className="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
+              disabled={!settings.hasCredentials && !apiKey.trim()}
+              onClick={() => void onTest()}
+              title={!settings.hasCredentials && !apiKey.trim() ? 'Save a Pull API key first' : undefined}
+            >
               Test connection
             </button>
           )}

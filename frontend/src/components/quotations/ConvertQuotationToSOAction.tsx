@@ -67,8 +67,8 @@ export function ConvertQuotationToSOAction({
       {showHandoverNote ? (
         <p className={gate.enabled ? 'mb-2 text-[12px] text-emerald-700' : 'mb-2 text-[12px] text-erp-muted'}>
           {gate.enabled
-            ? 'Customer-approved quotation ready — convert to an Open sales order.'
-            : (gate.disabledReason ?? 'Complete Send → Customer Approve before converting.')}
+            ? 'Commercial details ready — convert to an Open sales order (Send / Customer Approve optional).'
+            : (gate.disabledReason ?? 'Complete commercial details to convert. Send and approval are optional.')}
         </p>
       ) : null}
       <ErpButton

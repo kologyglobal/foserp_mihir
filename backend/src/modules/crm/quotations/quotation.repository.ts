@@ -1,6 +1,8 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../../config/database.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
+import { ValidationError } from '../../../utils/errors.js'
+import { normalizeSalesLineForWrite } from '../shared/crm-item-resolver.js'
 import { DEFAULT_GST_PCT } from './quotation.constants.js'
 import { calcDocumentTotal, syncLineTotals } from './quotation.workflow.js'
 import type {
@@ -24,12 +26,17 @@ function parseDate(value: string | null | undefined): Date | null | undefined {
   return new Date(value)
 }
 
-export async function findQuotations(tenantId: string, query: ListQuotationsQuery) {
+export async function findQuotations(
+  tenantId: string,
+  query: ListQuotationsQuery,
+  orgScope: Prisma.CrmQuotationWhereInput = {},
+) {
   const { getPagination } = await import('../../../utils/pagination.js')
   const { skip, take } = getPagination(query)
 
   const where: Prisma.CrmQuotationWhereInput = {
     ...tenantActiveFilter(tenantId),
+    ...orgScope,
     ...(query.customerId ? { companyId: query.customerId } : {}),
     ...(query.opportunityId ? { opportunityId: query.opportunityId } : {}),
     ...(query.ownerId ? { salesOwnerId: query.ownerId } : {}),
@@ -82,7 +89,12 @@ export async function createQuotation(
   const discountPct = data.discountPct ?? 0
   const gstPct = data.gstPct ?? DEFAULT_GST_PCT
   const pricing = computePricing(qty, unitPrice, discountPct, gstPct)
-  const priceLines = syncLineTotals(data.priceLines ?? [])
+  const priceLinesRaw = syncLineTotals(data.priceLines ?? [])
+  const priceLines = await Promise.all(priceLinesRaw.map((line) => normalizeSalesLineForWrite(tenantId, line)))
+  const headerItemId = data.itemId?.trim() || priceLines[0]?.itemId
+  if (!headerItemId) {
+    throw new ValidationError('Quotation requires an Item (header itemId or price line itemId)')
+  }
   const freightAmount = data.freightAmount ?? 0
   const installationAmount = data.installationAmount ?? 0
   const customCharges = data.customCharges ?? 0
@@ -91,13 +103,15 @@ export async function createQuotation(
     : pricing.grandTotal
 
   return prisma.$transaction(async (tx) => {
+    const { defaultOrgDimsForUser } = await import('../shared/crm-org-scope.js')
+    const org = await defaultOrgDimsForUser(tenantId, userId)
     const quotation = await tx.crmQuotation.create({
       data: {
         tenantId,
         quotationCode: data.quotationCode,
         companyId: data.customerId,
         opportunityId: data.opportunityId ?? null,
-        productId: data.productId ?? null,
+        itemId: headerItemId,
         qty,
         validityDate: parseDate(data.validityDate),
         salesOwnerId: data.salesOwnerId ?? userId,
@@ -110,6 +124,8 @@ export async function createQuotation(
         deliveryTerms: data.deliveryTerms ?? '',
         deliveryTime: data.deliveryTime ?? '',
         locationId: data.locationId ?? null,
+        legalEntityId: org.legalEntityId ?? null,
+        branchId: org.branchId ?? null,
         pricing: pricing as unknown as Prisma.InputJsonValue,
         changeHistory: [
           {
@@ -181,7 +197,7 @@ export async function updateQuotation(tenantId: string, id: string, userId: stri
     const updateData: Prisma.CrmQuotationUpdateInput = {
       ...(data.customerId !== undefined ? { company: { connect: { id: data.customerId } } } : {}),
       ...(data.opportunityId !== undefined ? { opportunityId: data.opportunityId } : {}),
-      ...(data.productId !== undefined ? { productId: data.productId } : {}),
+      ...(data.itemId !== undefined && data.itemId !== null ? { itemId: data.itemId } : {}),
       ...(data.qty !== undefined ? { qty: data.qty } : {}),
       ...(data.validityDate !== undefined ? { validityDate: parseDate(data.validityDate) } : {}),
       ...(data.salesOwnerId !== undefined ? { salesOwnerId: data.salesOwnerId } : {}),
@@ -221,7 +237,9 @@ export async function updateQuotationDocument(
     })
     if (!doc) throw new Error('Not found')
 
-    const priceLines = data.priceLines ? syncLineTotals(data.priceLines) : undefined
+    const priceLines = data.priceLines
+      ? await Promise.all(syncLineTotals(data.priceLines).map((line) => normalizeSalesLineForWrite(tenantId, line)))
+      : undefined
     const freightAmount = data.freightAmount ?? Number(doc.freightAmount)
     const installationAmount = data.installationAmount ?? Number(doc.installationAmount)
     const customCharges = data.customCharges ?? Number(doc.customCharges)

@@ -10,6 +10,41 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 - Fields: `quantity` (primary), `uomQuantity` (vendor), `uomConversionFactor`.
 - Docs: `docs/PURCHASE_MULTI_UNIT_UOM.md`; Hostinger SQL: `backend/scripts/purchase-multi-unit-uom-hostinger.sql`.
 
+---
+
+## Done recently — Dispatch commercial policy UI + enforcement (2026-07-27)
+
+| Field | Value |
+|-------|-------|
+| Module | Dispatch / O2C |
+| Description | Tenant `DispatchSettings` + `/dispatch/settings` UI; enforce partial / multiple / invoice mode / POD on draft + Invoice Ready + auto SI |
+| Test | `backend/tests/dispatch-commercial-policy.test.ts` (+ existing 7C5 / O2C allocate proofs) |
+| Status | **done** for base commercial policy — **open**: live e-Way (blocked until base flow sign-off) |
+
+---
+
+## Done recently — Close Money In/Out UI gaps (2026-07-27)
+
+| Field | Value |
+|-------|-------|
+| Module | Accounting Money In / Money Out |
+| Description | Receipt/CN/journal reverse already on detail pages; AP reversal history API + FE; allocation reverse links; Money In Corrections hub; POD gate on manual SI create + invoice-ready filter |
+| Status | **done** for high-priority reverse + Dispatch→SI POD — commercial policy UI shipped 2026-07-27 |
+
+---
+
+## Done recently — Dispatch → AR Invoice O2C slice 1 (2026-07-27)
+
+| Field | Value |
+|-------|-------|
+| Module | Dispatch / Money In |
+| Description | HTTP invoice-ready + prefill; SI create persists `sourceLinks`; API outbound detail Create/View Invoice; Money In Invoice Ready route; live post→invoice→allocate |
+| Test | `backend/tests/dispatch-o2c-invoice-allocate.test.ts` **PASS** |
+| Status | **done** for manual close path + commercial policy — live e-Way deferred until base flow sign-off |
+
+---
+
+
 ## Done recently — Bank & Cash UAT readiness (2026-07-23)
 
 | Field | Value |
@@ -50,7 +85,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Module | Dispatch |
 | Description | Canonical `DispatchPostingService`, policy gates, readiness API, reverse, reconciliation; emergency override API; serial/lot + concurrency stress; live **17/17** |
 | Doc | `docs/dispatch/PHASE7C5_HARDENED_POSTING.md` |
-| Status | **done** for controlled UAT foundation — **open** for client production (manual UAT sign-off); emergency override FE drawer + audit register shipped |
+| Status | **done** for controlled UAT foundation — FE reverse approval panel + perm gates + reversibleQty fixed 2026-07-27; **open** for client production (manual UAT sign-off); emergency override HTTP audit register still thin |
 
 ---
 
@@ -61,7 +96,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Module | Dispatch |
 | Description | `DISPATCH_POSTED` / `SALES_ORDER_INVOICE_READY` (+ fulfilment / reverse) enqueue + drain to PUBLISHED; list/process/retry APIs |
 | Doc | `docs/dispatch/DISPATCH_DOMAIN_EVENTS.md` |
-| Status | **done** (auto-invoice consumer still deferred) |
+| Status | **done** (auto-invoice consumer shipped; see `DISPATCH_AUTO_SALES_INVOICE.md`) |
 
 ---
 
@@ -72,7 +107,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Module | Dispatch |
 | Description | Hard-block reverse on posted/open SI links + posted inv-acct COGS; force requires override; FE preflight |
 | Doc | `docs/dispatch/DISPATCH_REVERSAL_DEPENDENCIES.md` |
-| Status | **done** (auto Dispatch→Invoice creation still deferred) |
+| Status | **done** (auto Dispatch→Invoice + manual invoice-ready path shipped 2026-07-27) |
 
 ---
 
@@ -87,6 +122,16 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Done recently — Fuel Tank factory golden path (2026-07-27)
+
+| Field | Value |
+|-------|-------|
+| Module | Manufacturing |
+| Description | Controlled UAT: ONE FG WO + LOGICAL SFG Job Cards → reserve/issue → route/QC/rework → WC/machine assignment → FG serial receipt → WO actual cost (inventory costing) → FG valuation → close readiness → COMPLETED |
+| Evidence | `WO-000009`, serial `FT-5000L-43550266`, material/WO/FG cost ₹111,020; script `npx tsx scripts/test-fuel-tank-wo-execution.ts` |
+| Doc | `docs/manufacturing/examples/FUEL_TANK_UAT.md` |
+| Status | **PASS** — factory golden path closed (no new mfg features) |
+
 ## Done recently — Fuel Tank mfg master (2026-07-23)
 
 | Field | Value |
@@ -94,7 +139,32 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Module | Manufacturing / Masters |
 | Description | 5000 L Fuel Tank live seed: multilevel BOM, PARALLEL route RT-000001, profile MP-FUEL-TANK-5000L, LOGICAL SFG Job Cards under FG WO |
 | Doc | `docs/manufacturing/examples/FUEL_TANK_MASTER_SETUP.md` |
-| Status | **done** (READY FOR INTERNAL UAT) — full FG serial receipt + WO close remain manual/extendable E2E |
+| Status | **done** — superseded for close-path by 2026-07-27 golden path UAT above |
+
+---
+
+## In progress — Inventory costing engine (2026-07-27)
+
+| Field | Value |
+|-------|-------|
+| Module | Inventory / Manufacturing / Finance integration |
+| Description | Costing engine Phase A–C BE + **Phase 1 FE Costing UI** + **all 4 valuation methods hardened** (MA issue rate, standard fail-closed, FIFO/Specific return restore, Specific lot/pool + method-change migration). |
+| Status | **in_progress** (engines + UI + method fixes shipped; live UAT + variance GL / inventory↔GL TB still open) |
+| Next step | Controlled UAT with `VITE_USE_API=true` (FIFO + standard/specific + WO actual FG + recon + method change). **Do not** expand live Manufacturing Accounting GL until the gate below clears. |
+
+---
+
+## Blocked — Manufacturing Accounting live GL (after costing stack stable)
+
+| Field | Value |
+|-------|-------|
+| Module | Manufacturing / Finance |
+| Description | Live GL for Material Issue / FG Receipt / Production Variance. Event builder + flag-gated posting already exist; **enable only after** prerequisites below are stable. |
+| Protection | Existing readiness gate (`GET …/manufacturing/accounting/readiness` + enablement sign-offs) — **do not replace**; keep flag OFF until gate + prerequisites pass. |
+| Journal model (already in builder) | **Issue:** Dr WIP / Cr RM · **FG receipt:** Dr FG / Cr WIP · **Variance:** Dr/Cr Production Variance (sign flips debit/credit) |
+| Prerequisites (all must be stable) | 1. Inventory Costing · 2. WO actual cost · 3. FG valuation · 4. Dispatch cost relief (COGS) · 5. Finance mappings (WIP/FG/RM/variance) |
+| Status | **blocked** — not started for live enablement; scaffolding + readiness already shipped |
+| Next step | Finish Inventory Costing UAT → prove WO actual + FG valuation → prove Dispatch COGS relief → map accounts → then enable via readiness gate |
 
 ---
 
@@ -105,9 +175,9 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Field | Value |
 |-------|-------|
 | Module | CRM / Commercial |
-| Description | Proforma payment receipts, CRM tax invoices, payment allocation workspace, Customer 360 commercial tabs |
-| Status | **partial** (2026-07-24) — UI + DB + API shipped; Proforma document itself still demo/local; live UAT pending |
-| Next step | Optional: persist Proforma invoices to API; live UAT of commercial sync |
+| Description | Proforma invoices (API), payment receipts, CRM tax invoices, payment allocation workspace, Customer 360 commercial tabs |
+| Status | **done** (2026-07-27) — Proforma API + sync shipped; live UAT script `backend/scripts/test-crm-commercial-uat.ts` |
+| Next step | Manual UI sign-off on vasant-trailers API mode |
 
 ### IndiaMART Lead Integration
 
@@ -115,8 +185,9 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 |-------|-------|
 | Module | CRM / Integrations / IndiaMART |
 | Description | Pull + Push sync → enquiry inbox → dedupe → CrmLead |
-| Status | **partial** (2026-07-24) — Phases 1–5 code shipped (Pull, Push webhook, charts, SLA alerts, product mapping UI); live UAT + Lead 360 FactBox remain |
-| Next step | Apply migrations `…120000` + `…140000`; set `FIELD_ENCRYPTION_KEY`; configure Pull key + optional Push URL; UAT |
+| Status | **partial** — Phases 1–5 shipped; local go-live prep: `FIELD_ENCRYPTION_KEY` set; migrations present; Pull key + Test connection + UAT remain |
+| Doc | `docs/crm/INDIAMART_GOLIVE.md` |
+| Next step | Restart API → paste live `glusr_crm_key` in Settings → Test connection → Initial import / Sync → UAT checklist |
 
 ---
 
@@ -129,8 +200,8 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Module | Admin / Platform |
 | Description | Production Admin Panel over existing User/Role/Tenant/LegalEntity/Branch/Auth — no duplicate company or permission systems |
 | Doc | `docs/admin/ADMIN_PANEL_PHASE1_AUDIT.md` |
-| Status | **done** — Phases 1–10 complete (close-out polish); holds: editable password/MFA, ModuleAdmin entity, blanket API module gates |
-| Next step | Product UAT of Admin Panel; optional later: editable security settings / Module Admins if signed off |
+| Status | **done** — Phases 1–10 + A3–A9 completion (Module Administrators designation, Effective Access route fix, admin security regression). Holds: editable password/MFA; blanket API module gates; LE/branch **query** enforcement |
+| Next step | Product UAT of Admin Panel; optional later: editable security settings / scope enforcement on CRM lists |
 
 ### P0-CRM-ITEM: CRM/Sales Product Master → Item Master migration
 
@@ -139,8 +210,8 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Module | CRM / Sales / Masters |
 | Description | Architectural cut-over: CRM & Sales lines use `MasterItem` only; dual-read legacy `productId→fgItemId` during transition; do not drop `master_products` until Phase 10 |
 | Doc | `docs/crm/CRM_PRODUCT_TO_ITEM_MIGRATION_MAP.md` |
-| Status | **in_progress** — Phase 1 audit done; **Phase 2 sales fields done**; Phases 3–10 open |
-| Next step | Phase 3: nullable `itemId` columns / JSON shapes / indexes; keep `productId` |
+| Status | **done** — Phases 3–10 complete for CRM Lead→SO (+ dispatch) and commercial proforma/tax lines (`itemId` only). Product Master kept for engineering. |
+| Next step | FE cleanup of leftover CRM `productId` dual-read helpers where still present outside commercial |
 
 ### P0-0: Product master API hydration (CRM-P0-1)
 
@@ -387,11 +458,11 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 |-------|-------|
 | Module | Purchase |
 | Description | PR/PO/GRN API |
-| Reason | **Partial** — PO lifecycle + GRN + Approvals + Setup + Invoice/QI/Return APIs. **Multi-unit UOM** (vendor → primary) shipped 2026-07-27 for Item/PO/GRN/inventory posting. Remaining: richer reports FE, fuller invoice/QI/return dual-UOM display, Hostinger migrate deploy of `20260727180000_purchase_multi_unit_uom`. |
+| Reason | **Partial** — PO/GRN/QI/Invoice/Return + Setup + FE parity + **GRNI report** + **per-user approver ₹ limits** + **multi-unit UOM** (vendor → primary for Item/PO/GRN/inventory posting) (2026-07-27). Remaining: ITC/vendor-outstanding placeholders; formal GR/IR clearing GL; fuller invoice/QI/return dual-UOM display; Hostinger migrate deploy of `20260727180000_purchase_multi_unit_uom`. |
 | Dependencies | Items, vendors (done); PR schema Phase 03 (done); PO lifecycle (done); Approvals queue (done); Setup 1A (done) |
-| Next step | Quality inspections / invoice / returns backends when prioritized. **Approvals next iteration:** backend Approval Matrix enforcement (amount bands → role chain, currently demo-only frontend config) + per-user Approval Limits, layered on the existing RBAC + self-approval policy. |
-| Test required | Setup **13/13**; PO lifecycle (warehouse resolution); GRN **15/15** (Setup policies); approvals 11/11 + flow 4/4. Continue quality/invoice suites next. |
-| Status | partial (Setup 1A done; quality/invoice/returns next) |
+| Next step | Optional ITC/AP outstanding report integrations; formal GR/IR clearing account if Finance requires it. |
+| Test required | Setup **13/13**; QI/return lifecycle stock asserts; GRNI report live; matrix + approver-limit unit; invoice lifecycle. |
+| Status | **in_progress** (core purchase loop + GRNI + user limits closed) |
 
 ### P3-3: Inventory / production / quality / finance backends
 
@@ -467,4 +538,4 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ## Recommended next task
 
-See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) open risks. Highest ops: **redeploy production `.htaccess`** so `/api` returns JSON. Product backlog: **verify P1-1/P1-2 admin UIs**; then P2 mobile API E2E. Finance **next:** **Phase 3B6** receipt workspace UI.
+See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) open risks. Highest ops: **redeploy production `.htaccess`** so `/api` returns JSON. Product backlog: **verify P1-1/P1-2 admin UIs**; then P2 mobile API E2E. Finance Money In/Out reverse UIs shipped — next: Dispatch invoice policy UI polish / period close year-end.
