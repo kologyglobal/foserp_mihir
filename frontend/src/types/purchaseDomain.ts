@@ -154,6 +154,7 @@ export interface PurchaseOrderAllowedActions {
   canClose: boolean
   canReopen: boolean
   canReceive: boolean
+  canRevise?: boolean
 }
 
 export type PurchaseOrderOrigin =
