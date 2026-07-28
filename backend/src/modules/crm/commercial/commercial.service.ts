@@ -451,20 +451,32 @@ export async function reverseAllocation(
 }
 
 export async function syncBundle(tenantId: string, companyId?: string) {
-  const [receipts, invoices, allocations] = await Promise.all([
-    repo.findReceipts(tenantId, { page: 1, limit: 500, companyId, sortOrder: 'desc' }),
-    repo.findInvoices(tenantId, { page: 1, limit: 500, companyId, sortOrder: 'desc' }),
-    repo.findAllocations(tenantId, {
-      page: 1,
-      limit: 500,
-      companyId,
-      includeReversed: true,
-      sortOrder: 'desc',
-    }),
-  ])
-  return {
-    receipts: receipts.items.map(mapReceiptDto),
-    invoices: invoices.items.map(mapInvoiceDto),
-    allocations: allocations.items.map(mapAllocationDto),
+  try {
+    const [receipts, invoices, allocations] = await Promise.all([
+      repo.findReceipts(tenantId, { page: 1, limit: 500, companyId, sortOrder: 'desc' }),
+      repo.findInvoices(tenantId, { page: 1, limit: 500, companyId, sortOrder: 'desc' }),
+      repo.findAllocations(tenantId, {
+        page: 1,
+        limit: 500,
+        companyId,
+        includeReversed: true,
+        sortOrder: 'desc',
+      }),
+    ])
+    return {
+      receipts: receipts.items.map(mapReceiptDto),
+      invoices: invoices.items.map(mapInvoiceDto),
+      allocations: allocations.items.map(mapAllocationDto),
+    }
+  } catch (err) {
+    // Stage DBs may lag commercial schema; never block CRM shell hydrate.
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError ||
+      err instanceof Prisma.PrismaClientUnknownRequestError ||
+      err instanceof Prisma.PrismaClientValidationError
+    ) {
+      return { receipts: [], invoices: [], allocations: [] }
+    }
+    throw err
   }
 }

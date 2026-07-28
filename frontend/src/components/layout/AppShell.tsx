@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { Outlet } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Outlet, useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { DynamicsSuiteBar } from './DynamicsSuiteBar'
 import { DynamicsWorkspaceChrome } from './DynamicsWorkspaceChrome'
@@ -19,6 +19,7 @@ import { DensityProvider } from '../../design-system/enterprise/DensityProvider'
 import { useCrmApiSync } from '../../hooks/useCrmApiSync'
 import { useMasterApiSync } from '../../hooks/useMasterApiSync'
 import { useAdminApiSync } from '../../hooks/useAdminApiSync'
+import { useAuth } from '../../context/AuthProvider'
 import { isApiMode } from '@/config/apiConfig'
 import { runDemoCrmBootstrap } from '@/bootstrap/demoBootstrap'
 import { useTenantModulesStore } from '../../store/tenantModulesStore'
@@ -26,6 +27,9 @@ import { Loader } from '../ui/Loader'
 import { cn } from '../../utils/cn'
 
 export function AppShell() {
+  const navigate = useNavigate()
+  const { logout } = useAuth()
+  const [signingOut, setSigningOut] = useState(false)
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const mobileNavOpen = useUIStore((s) => s.mobileNavOpen)
   const closeMobileNav = useUIStore((s) => s.closeMobileNav)
@@ -70,14 +74,38 @@ export function AppShell() {
               <code className="rounded bg-slate-100 px-1">backend/</code> (port 5000). On production, confirm{' '}
               <code className="rounded bg-slate-100 px-1">/api/v1/health</code> returns JSON, not the SPA HTML.
             </p>
-          ) : null}
-          <button
-            type="button"
-            className="erp-btn erp-btn--primary mt-4 text-[13px]"
-            onClick={() => window.location.reload()}
-          >
-            Retry
-          </button>
+          ) : (
+            <p className="mt-3 text-left text-xs text-erp-muted">
+              Usually a stage DB schema gap during CRM hydrate (often{' '}
+              <code className="rounded bg-slate-100 px-1">/crm/commercial/sync</code>). Check DevTools → Network for the
+              failing request.
+            </p>
+          )}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              className="erp-btn erp-btn--primary text-[13px]"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              className="erp-btn text-[13px]"
+              disabled={signingOut}
+              onClick={() => {
+                setSigningOut(true)
+                void logout()
+                  .catch(() => undefined)
+                  .finally(() => {
+                    navigate('/login', { replace: true })
+                    setSigningOut(false)
+                  })
+              }}
+            >
+              {signingOut ? 'Signing out…' : 'Sign out'}
+            </button>
+          </div>
         </div>
       </div>
     )

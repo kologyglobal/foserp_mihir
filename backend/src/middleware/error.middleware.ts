@@ -73,6 +73,18 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
       return
     }
     logger.error('Prisma error', err)
+    // Surface missing-table / missing-column codes so stage/ops can fix schema without server log access.
+    // Never include raw SQL. meta.modelName / column / table are safe Prisma identifiers.
+    if (err.code === 'P2021' || err.code === 'P2022') {
+      const meta = (err.meta ?? {}) as Record<string, unknown>
+      sendError(res, 500, 'Database operation failed', null, err.code, {
+        prismaCode: err.code,
+        modelName: meta.modelName ?? null,
+        table: meta.table ?? null,
+        column: meta.column ?? null,
+      })
+      return
+    }
     sendError(res, 500, 'Database operation failed')
     return
   }

@@ -1,5 +1,5 @@
 import { isApiMode } from '../../config/apiConfig'
-import { ApiError, formatApiError } from '../api/apiErrors'
+import { formatApiError } from '../api/apiErrors'
 import * as api from '../api/crmCommercialApi'
 import { useCrmCommercialStore } from '../../store/crmCommercialStore'
 import type {
@@ -34,6 +34,8 @@ function upsertAllocations(rows: CrmPaymentAllocation[]) {
  * Hydrate commercial receivables. Requires `crm.commercial.view`.
  * Swallow 403 so CRM AppShell hydration still succeeds for sales users
  * without commercial rights (quotation templates, pipeline, etc.).
+ * Also swallow 5xx / DB errors so missing commercial tables on stage
+ * do not block Super Admin login (commercial is optional for shell load).
  */
 export async function syncCommercialFromApi(): Promise<void> {
   if (!isApiMode()) return
@@ -45,17 +47,13 @@ export async function syncCommercialFromApi(): Promise<void> {
       invoices: data.invoices ?? [],
       allocations: data.allocations ?? [],
     })
-  } catch (err) {
-    const status = err instanceof ApiError ? err.statusCode : 0
-    if (status === 403) {
-      useCrmCommercialStore.setState({
-        receipts: [],
-        invoices: [],
-        allocations: [],
-      })
-      return
-    }
-    throw err
+  } catch {
+    // 403 (no commercial rights) or 5xx (missing stage tables) must not block AppShell.
+    useCrmCommercialStore.setState({
+      receipts: [],
+      invoices: [],
+      allocations: [],
+    })
   }
 }
 
