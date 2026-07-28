@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Pencil } from 'lucide-react'
 import { OperationalPageShell } from './OperationalPageShell'
@@ -61,6 +61,29 @@ export function Entity360Shell({
   activity = [],
   quickActions,
 }: Entity360ShellProps) {
+  // Stable node identity — fresh JSX each render retriggers workspace setHeader and can loop.
+  const headerActions = useMemo(
+    () => (
+      <div className="flex flex-wrap gap-2">
+        <Link to={backTo}>
+          <Button variant="secondary" size="sm">
+            <ArrowLeft className="h-4 w-4" />
+            {backLabel}
+          </Button>
+        </Link>
+        {editTo && !lockedReason && (
+          <Link to={editTo}>
+            <Button variant="secondary" size="sm">
+              <Pencil className="h-4 w-4" />
+              {editLabel}
+            </Button>
+          </Link>
+        )}
+      </div>
+    ),
+    [backTo, backLabel, editTo, editLabel, lockedReason],
+  )
+
   return (
     <OperationalPageShell
       title={title}
@@ -70,24 +93,7 @@ export function Entity360Shell({
       liveAlerts={liveAlerts}
       insights={insights}
       commandBar={commandBar}
-      actions={
-        <div className="flex flex-wrap gap-2">
-          <Link to={backTo}>
-            <Button variant="secondary" size="sm">
-              <ArrowLeft className="h-4 w-4" />
-              {backLabel}
-            </Button>
-          </Link>
-          {editTo && !lockedReason && (
-            <Link to={editTo}>
-              <Button variant="secondary" size="sm">
-                <Pencil className="h-4 w-4" />
-                {editLabel}
-              </Button>
-            </Link>
-          )}
-        </div>
-      }
+      actions={headerActions}
     >
       <p className="-mt-2 mb-4 font-mono text-[13px] text-erp-muted">{subtitle}</p>
 

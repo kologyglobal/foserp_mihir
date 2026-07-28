@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowDownToLine, Package, ShoppingCart, TrendingDown } from 'lucide-react'
 import { Entity360Shell, Entity360Panel } from '../../components/design-system/Entity360Shell'
@@ -25,18 +25,74 @@ export function Item360Page() {
   const getVendor = useMasterStore((s) => s.getVendor)
   const [tab, setTab] = useState<Tab>('overview')
 
-  if (!data) return <p className="p-8 text-erp-muted">Item not found.</p>
+  const item = data?.item
 
-  const { item } = data
-  const tabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'inventory', label: 'Inventory', count: data.warehouseBreakdown.length },
-    { id: 'purchase', label: 'Purchase', count: data.openPo.length + data.openPr.length },
-    { id: 'consumption', label: 'Consumption' },
-    { id: 'mrp', label: 'MRP', count: data.mrpLines.length },
-    { id: 'transactions', label: 'Transactions', count: data.movements.length },
-    { id: 'timeline', label: 'Timeline' },
-  ]
+  const tabs = useMemo(() => {
+    if (!data) return []
+    return [
+      { id: 'overview', label: 'Overview' },
+      { id: 'inventory', label: 'Inventory', count: data.warehouseBreakdown.length },
+      { id: 'purchase', label: 'Purchase', count: data.openPo.length + data.openPr.length },
+      { id: 'consumption', label: 'Consumption' },
+      { id: 'mrp', label: 'MRP', count: data.mrpLines.length },
+      { id: 'transactions', label: 'Transactions', count: data.movements.length },
+      { id: 'timeline', label: 'Timeline' },
+    ]
+  }, [data])
+
+  const insights = useMemo(() => {
+    if (!data) return []
+    return [
+      { label: 'On Hand', value: formatNumber(data.onHand), accent: 'blue' as const },
+      { label: 'Available', value: formatNumber(data.available), accent: 'green' as const },
+      { label: 'Stock Value', value: formatCurrency(data.stockValue), accent: 'blue' as const },
+      {
+        label: 'MRP Shortage',
+        value: formatNumber(data.shortage),
+        accent: (data.shortage > 0 ? 'red' : 'green') as 'red' | 'green',
+      },
+      { label: 'Open PO', value: data.openPo.length, accent: 'amber' as const },
+    ]
+  }, [data])
+
+  const commandBar = useMemo(() => {
+    if (!item) return null
+    return (
+      <CommandBar>
+        <CommandBarGroup label="Actions">
+          <CommandBarButton icon={ArrowDownToLine} label="Material Inward" onClick={() => navigate('/inventory/inward')} primary />
+          <CommandBarButton icon={Package} label="Stock Ledger" onClick={() => navigate(`/inventory/stock/${item.id}`)} />
+          <CommandBarButton icon={ShoppingCart} label="Create PR" onClick={() => navigate('/purchase/requisitions/new')} />
+          <CommandBarButton icon={TrendingDown} label="Production Plan" onClick={() => navigate('/manufacturing/production-plan')} />
+        </CommandBarGroup>
+        <CommandBarGroup label="QR">
+          <EntityQrToolbar
+            entityType="ITEM_BATCH"
+            entityId={item.id}
+            displayCode={item.itemCode}
+            metadata={{ itemId: item.id, itemCode: item.itemCode, itemName: item.itemName }}
+            payload={{ item: item.itemCode }}
+          />
+        </CommandBarGroup>
+      </CommandBar>
+    )
+  }, [item, navigate])
+
+  const quickActions = useMemo(
+    () => (
+      <QuickActions
+        actions={[
+          { label: 'Issue to WO', onClick: () => navigate('/inventory/issue') },
+          { label: 'Adjust Stock', onClick: () => navigate('/inventory/adjustment') },
+          { label: 'View Reservations', onClick: () => navigate('/inventory/reservations') },
+          { label: 'Production Plan', onClick: () => navigate('/manufacturing/production-plan') },
+        ]}
+      />
+    ),
+    [navigate],
+  )
+
+  if (!data || !item) return <p className="p-8 text-erp-muted">Item not found.</p>
 
   return (
     <Entity360Shell
@@ -47,44 +103,13 @@ export function Item360Page() {
       editTo={`/masters/items/${item.id}/edit`}
       editLabel="Edit Master"
       favoritePath={`/masters/items/${item.id}`}
-      insights={[
-        { label: 'On Hand', value: formatNumber(data.onHand), accent: 'blue' },
-        { label: 'Available', value: formatNumber(data.available), accent: 'green' },
-        { label: 'Stock Value', value: formatCurrency(data.stockValue), accent: 'blue' },
-        { label: 'MRP Shortage', value: formatNumber(data.shortage), accent: data.shortage > 0 ? 'red' : 'green' },
-        { label: 'Open PO', value: data.openPo.length, accent: 'amber' },
-      ]}
-      commandBar={
-        <CommandBar>
-          <CommandBarGroup label="Actions">
-            <CommandBarButton icon={ArrowDownToLine} label="Material Inward" onClick={() => navigate('/inventory/inward')} primary />
-            <CommandBarButton icon={Package} label="Stock Ledger" onClick={() => navigate(`/inventory/stock/${item.id}`)} />
-            <CommandBarButton icon={ShoppingCart} label="Create PR" onClick={() => navigate('/purchase/requisitions/new')} />
-            <CommandBarButton icon={TrendingDown} label="Production Plan" onClick={() => navigate('/manufacturing/production-plan')} />
-          </CommandBarGroup>
-          <CommandBarGroup label="QR">
-            <EntityQrToolbar
-              entityType="ITEM_BATCH"
-              entityId={item.id}
-              displayCode={item.itemCode}
-              metadata={{ itemId: item.id, itemCode: item.itemCode, itemName: item.itemName }}
-              payload={{ item: item.itemCode }}
-            />
-          </CommandBarGroup>
-        </CommandBar>
-      }
+      insights={insights}
+      commandBar={commandBar}
       tabs={tabs}
       activeTab={tab}
       onTabChange={(t) => setTab(t as Tab)}
       activity={data.activity}
-      quickActions={
-        <QuickActions actions={[
-          { label: 'Issue to WO', onClick: () => navigate('/inventory/issue') },
-          { label: 'Adjust Stock', onClick: () => navigate('/inventory/adjustment') },
-          { label: 'View Reservations', onClick: () => navigate('/inventory/reservations') },
-          { label: 'Production Plan', onClick: () => navigate('/manufacturing/production-plan') },
-        ]} />
-      }
+      quickActions={quickActions}
       factBoxes={
         <>
           <FactBox

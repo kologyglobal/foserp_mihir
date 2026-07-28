@@ -1,6 +1,12 @@
 import type { PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus } from '@prisma/client'
 import { PURCHASE_ERROR_CODE, purchaseMessage } from '../shared/purchase-error-catalog.js'
 import {
+  lineAmountFromVendor,
+  resolveDualQuantities,
+  toPrimaryUnitCost,
+  UomConversionError,
+} from '../shared/uom-conversion.js'
+import {
   PurchaseOrderValidationError,
   PurchaseOrderWorkflowError,
 } from './purchase-order.errors.js'
@@ -10,6 +16,15 @@ export type PoWithLines = PurchaseOrder & { lines: PurchaseOrderLine[] }
 
 /** Statuses where the header/lines may still be edited by the buyer. */
 export const PO_EDITABLE_STATUSES: PurchaseOrderStatus[] = ['DRAFT', 'SENT_BACK']
+
+/** Statuses that may be amended via versioned revise (not draft edit). */
+export const PO_REVISABLE_STATUSES: PurchaseOrderStatus[] = [
+  'SENT_TO_VENDOR',
+  'PARTIALLY_RECEIVED',
+  'FULLY_RECEIVED',
+  'PARTIALLY_INVOICED',
+  'FULLY_INVOICED',
+]
 
 /** Statuses that may receive goods (Phase 3 GRN gate). */
 export const PO_RECEIVABLE_STATUSES: PurchaseOrderStatus[] = [
@@ -36,6 +51,13 @@ export function assertEditable(po: Pick<PurchaseOrder, 'status' | 'deletedAt'>):
   assertNotDeleted(po)
   if (!PO_EDITABLE_STATUSES.includes(po.status)) {
     throw workflowError(PURCHASE_ERROR_CODE.PO_NOT_EDITABLE)
+  }
+}
+
+export function assertRevisable(po: Pick<PurchaseOrder, 'status' | 'deletedAt'>): void {
+  assertNotDeleted(po)
+  if (!PO_REVISABLE_STATUSES.includes(po.status)) {
+    throw workflowError(PURCHASE_ERROR_CODE.PO_NOT_REVISABLE)
   }
 }
 
@@ -197,6 +219,9 @@ export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
   itemNameSnapshot: string
   description: string | null
   quantity: number
+  uomQuantity: number
+  uomConversionFactor: number
+  unitCostPrimary: number
   uomId: string | null
   rate: number
   amount: number
@@ -206,14 +231,6 @@ export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
   purchasePlanningRowId: string | null
 }> {
   return lines.map((line, index) => {
-    const qty = Number(line.quantity)
-    if (!(qty > 0)) {
-      throw new PurchaseOrderValidationError(
-        purchaseMessage(PURCHASE_ERROR_CODE.PO_QTY_INVALID),
-        PURCHASE_ERROR_CODE.PO_QTY_INVALID,
-        [{ field: `lines[${index}].quantity`, message: purchaseMessage(PURCHASE_ERROR_CODE.PO_QTY_INVALID) }],
-      )
-    }
     const rate = Number(line.rate ?? 0)
     if (rate < 0) {
       throw new PurchaseOrderValidationError(
@@ -222,16 +239,49 @@ export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
         [{ field: `lines[${index}].rate`, message: purchaseMessage(PURCHASE_ERROR_CODE.PO_RATE_INVALID) }],
       )
     }
+
+    let dual: ReturnType<typeof resolveDualQuantities>
+    try {
+      dual = resolveDualQuantities({
+        uomQuantity: line.uomQuantity,
+        quantity: line.quantity,
+        uomConversionFactor: line.uomConversionFactor ?? 1,
+      })
+    } catch (err) {
+      if (err instanceof UomConversionError) {
+        throw new PurchaseOrderValidationError(err.message, PURCHASE_ERROR_CODE.PO_QTY_INVALID, [
+          { field: `lines[${index}].uomConversionFactor`, message: err.message },
+        ])
+      }
+      throw err
+    }
+
+    if (!(dual.uomQuantity > 0) || !(dual.quantity > 0)) {
+      throw new PurchaseOrderValidationError(
+        purchaseMessage(PURCHASE_ERROR_CODE.PO_QTY_INVALID),
+        PURCHASE_ERROR_CODE.PO_QTY_INVALID,
+        [{ field: `lines[${index}].uomQuantity`, message: purchaseMessage(PURCHASE_ERROR_CODE.PO_QTY_INVALID) }],
+      )
+    }
+
+    const unitCostPrimary =
+      line.unitCostPrimary != null && Number(line.unitCostPrimary) >= 0
+        ? Number(line.unitCostPrimary)
+        : toPrimaryUnitCost(rate, dual.uomConversionFactor)
+
     return {
       lineNumber: line.lineNumber ?? index + 1,
       itemId: line.itemId ?? null,
       itemCodeSnapshot: (line.itemCode ?? '').trim(),
       itemNameSnapshot: (line.itemName ?? '').trim(),
       description: line.description?.trim() || null,
-      quantity: qty,
+      quantity: dual.quantity,
+      uomQuantity: dual.uomQuantity,
+      uomConversionFactor: dual.uomConversionFactor,
+      unitCostPrimary,
       uomId: line.uomId ?? null,
       rate,
-      amount: money(qty * rate),
+      amount: money(lineAmountFromVendor(rate, dual.uomQuantity)),
       requiredDate: parseDateInput(line.requiredDate ?? undefined) ?? null,
       remarks: line.remarks?.trim() || null,
       purchaseRequisitionLineId: line.purchaseRequisitionLineId ?? null,
@@ -252,6 +302,7 @@ export function allowedActions(po: PoWithLines): {
   canClose: boolean
   canReopen: boolean
   canReceive: boolean
+  canRevise: boolean
 } {
   const received = totalReceived(po.lines)
   const editable = !po.deletedAt && PO_EDITABLE_STATUSES.includes(po.status)
@@ -280,5 +331,6 @@ export function allowedActions(po: PoWithLines): {
         po.status === 'CLOSED' ||
         (po.status === 'CANCELLED' && received === 0)),
     canReceive: !po.deletedAt && PO_RECEIVABLE_STATUSES.includes(po.status),
+    canRevise: !po.deletedAt && PO_REVISABLE_STATUSES.includes(po.status),
   }
 }

@@ -21,7 +21,19 @@ export async function listBalances(tenantId: string, query: ListBalancesQuery) {
       take,
       orderBy: { updatedAt: 'desc' },
       include: {
-        item: { select: { id: true, code: true, name: true } },
+        item: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            baseUomId: true,
+            purchaseUomId: true,
+            uomConversionFactor: true,
+            purchaseQtyPerUom: true,
+            baseUom: { select: { id: true, code: true } },
+            purchaseUom: { select: { id: true, code: true } },
+          },
+        },
         warehouse: { select: { id: true, code: true, name: true } },
       },
     }),

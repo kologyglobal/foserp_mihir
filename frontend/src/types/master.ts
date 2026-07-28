@@ -255,7 +255,12 @@ export interface Item extends MasterRecordAudit {
   isActive: boolean
   quantityPerUom?: number
   purchaseUomId?: string | null
+  /** @deprecated Prefer uomConversionFactor — mirrored from API. */
   purchaseQtyPerUom?: number
+  /** Vendor units per 1 primary/base unit (e.g. 3 m = 1 NOS). */
+  uomConversionFactor?: number
+  /** ±% band for GRN receiving vs open qty. */
+  receivingTolerancePercentage?: number
   /** Read-only inventory snapshot fields */
   inventoryQty?: number
   qtyOnPurchaseOrder?: number

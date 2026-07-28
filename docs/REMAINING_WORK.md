@@ -4,6 +4,14 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Done recently — Purchase multi-unit UOM (2026-07-27)
+
+- Vendor → primary conversion across Item Master / PO / GRN / inventory posting.
+- Fields: `quantity` (primary), `uomQuantity` (vendor), `uomConversionFactor`.
+- Docs: `docs/PURCHASE_MULTI_UNIT_UOM.md`; Hostinger SQL: `backend/scripts/purchase-multi-unit-uom-hostinger.sql`.
+
+---
+
 ## Done recently — Dispatch commercial policy UI + enforcement (2026-07-27)
 
 | Field | Value |
@@ -35,6 +43,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Status | **done** for manual close path + commercial policy — live e-Way deferred until base flow sign-off |
 
 ---
+
 
 ## Done recently — Bank & Cash UAT readiness (2026-07-23)
 
@@ -449,7 +458,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 |-------|-------|
 | Module | Purchase |
 | Description | PR/PO/GRN API |
-| Reason | **Partial** — PO/GRN/QI/Invoice/Return + Setup + FE parity + **GRNI report** + **per-user approver ₹ limits** (2026-07-27). Remaining: ITC/vendor-outstanding placeholders; formal GR/IR clearing GL. |
+| Reason | **Partial** — PO/GRN/QI/Invoice/Return + Setup + FE parity + **GRNI report** + **per-user approver ₹ limits** + **multi-unit UOM** (vendor → primary for Item/PO/GRN/inventory posting) (2026-07-27). Remaining: ITC/vendor-outstanding placeholders; formal GR/IR clearing GL; fuller invoice/QI/return dual-UOM display; Hostinger migrate deploy of `20260727180000_purchase_multi_unit_uom`. |
 | Dependencies | Items, vendors (done); PR schema Phase 03 (done); PO lifecycle (done); Approvals queue (done); Setup 1A (done) |
 | Next step | Optional ITC/AP outstanding report integrations; formal GR/IR clearing account if Finance requires it. |
 | Test required | Setup **13/13**; QI/return lifecycle stock asserts; GRNI report live; matrix + approver-limit unit; invoice lifecycle. |

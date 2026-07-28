@@ -1,12 +1,10 @@
 import type { CrmFilterField, CrmFilterValues } from '../types/crmListFilters'
 import {
-  PURCHASE_ORDER_APPROVAL_STATUS_LABELS,
   PURCHASE_ORDER_DOMAIN_STATUS_LABELS,
   PURCHASE_ORDER_INVOICE_STATUS_LABELS,
   PURCHASE_ORDER_ORIGIN_LABELS,
 } from '../services/purchase'
 import type {
-  PurchaseOrderApprovalStatus,
   PurchaseOrderDomainStatus,
   PurchaseOrderInvoiceStatus,
   PurchaseOrderOrigin,
@@ -18,7 +16,6 @@ export interface PoListFilters {
   vendorName: string
   locationName: string
   buyerName: string
-  approvalStatus: string
   invoiceStatus: string
   origin: string
   documentDateFrom: string
@@ -33,7 +30,6 @@ export const DEFAULT_PO_LIST_FILTERS: PoListFilters = {
   vendorName: '',
   locationName: '',
   buyerName: '',
-  approvalStatus: '',
   invoiceStatus: '',
   origin: '',
   documentDateFrom: '',
@@ -49,7 +45,6 @@ export type PoSortKey =
   | 'totalAmount'
   | 'expectedDeliveryDate'
   | 'status'
-  | 'approvalStatus'
   | 'receivedPercentage'
 
 export const PO_SORT_OPTIONS: { value: PoSortKey; label: string }[] = [
@@ -59,7 +54,6 @@ export const PO_SORT_OPTIONS: { value: PoSortKey; label: string }[] = [
   { value: 'totalAmount', label: 'Sort: Total Amount' },
   { value: 'expectedDeliveryDate', label: 'Sort: Expected Delivery' },
   { value: 'status', label: 'Sort: Status' },
-  { value: 'approvalStatus', label: 'Sort: Approval' },
   { value: 'receivedPercentage', label: 'Sort: Received %' },
 ]
 
@@ -80,7 +74,7 @@ export function buildPoFilterFields(input: {
     {
       type: 'select',
       key: 'status',
-      label: 'PO Status',
+      label: 'Status',
       options: [
         ...Object.entries(PURCHASE_ORDER_DOMAIN_STATUS_LABELS).map(([value, label]) => ({
           value,
@@ -88,15 +82,6 @@ export function buildPoFilterFields(input: {
         })),
         ...PO_COMPOSITE_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
       ],
-    },
-    {
-      type: 'select',
-      key: 'approvalStatus',
-      label: 'Approval Status',
-      options: Object.entries(PURCHASE_ORDER_APPROVAL_STATUS_LABELS).map(([value, label]) => ({
-        value,
-        label,
-      })),
     },
     {
       type: 'select',
@@ -170,7 +155,6 @@ export function crmValuesToPoFilters(values: CrmFilterValues): PoListFilters {
     vendorName: str('vendorName'),
     locationName: str('locationName'),
     buyerName: str('buyerName'),
-    approvalStatus: str('approvalStatus'),
     invoiceStatus: str('invoiceStatus'),
     origin: str('origin'),
     documentDateFrom: str('documentDateFrom'),
@@ -196,9 +180,6 @@ export function poFilterChipLabelResolver(key: string, value: string): string | 
     const composite = PO_COMPOSITE_STATUS_OPTIONS.find((o) => o.value === value)
     if (composite) return composite.label
     return PURCHASE_ORDER_DOMAIN_STATUS_LABELS[value as PurchaseOrderDomainStatus] ?? value
-  }
-  if (key === 'approvalStatus') {
-    return PURCHASE_ORDER_APPROVAL_STATUS_LABELS[value as PurchaseOrderApprovalStatus] ?? value
   }
   if (key === 'invoiceStatus') {
     return PURCHASE_ORDER_INVOICE_STATUS_LABELS[value as PurchaseOrderInvoiceStatus] ?? value

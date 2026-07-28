@@ -1,23 +1,20 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { DocumentPrintShell } from '@/components/print/DocumentPrintShell'
+import { PurchaseDocumentLetterhead } from '@/components/purchase/PurchaseDocumentLetterhead'
 import { getPurchaseInvoiceById } from '@/services/purchase'
 import type { PurchaseInvoice } from '@/types/purchaseDomain'
-import {
-  COMPANY_ADDRESS,
-  COMPANY_GSTIN,
-  COMPANY_NAME,
-  COMPANY_PAN,
-  COMPANY_STATE,
-} from '@/types/invoice'
 import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { formatStatus } from '@/components/ui/Badge'
 import { notify } from '@/store/toastStore'
+import { handlePurchasePdfDownload } from '@/utils/purchaseDocumentPdfExport'
+import { QUOTATION_COMPANY } from '@/utils/quotationEngine/companyProfile'
 
 export function PurchaseInvoicePrintPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [inv, setInv] = useState<PurchaseInvoice | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -41,6 +38,17 @@ export function PurchaseInvoicePrintPage() {
     }
   }, [id, navigate])
 
+  useEffect(() => {
+    if (!inv) return
+    if (searchParams.get('download') !== '1' && searchParams.get('autodownload') !== '1') return
+    const timer = window.setTimeout(() => {
+      void handlePurchasePdfDownload(`${inv.documentNumber}.pdf`, {
+        documentKind: 'purchase_invoice',
+      })
+    }, 450)
+    return () => window.clearTimeout(timer)
+  }, [inv, searchParams])
+
   if (loading || !inv) {
     return <div className="erp-page p-12 text-center text-erp-muted">Loading purchase invoice…</div>
   }
@@ -48,29 +56,22 @@ export function PurchaseInvoicePrintPage() {
   return (
     <DocumentPrintShell
       title={inv.documentNumber}
-      subtitle="Purchase invoice — print-ready / Save as PDF"
+      subtitle="Purchase invoice — Vasant Fabricators letterhead"
       backLabel="Back to invoice"
-      onBack={() => navigate(`/purchase/invoices/${inv.id}`)}
+      backTo={`/purchase/invoices/${inv.id}`}
+      pdfFileName={`${inv.documentNumber}.pdf`}
+      documentKind="purchase_invoice"
     >
       <article className="po-print-doc">
-        <header className="po-print-header">
-          <div>
-            <h1 className="po-print-header__company">{COMPANY_NAME}</h1>
-            <p className="po-print-header__address">{COMPANY_ADDRESS}</p>
-            <p className="po-print-header__gst">
-              GSTIN: {COMPANY_GSTIN} · PAN: {COMPANY_PAN} · {COMPANY_STATE}
-            </p>
-          </div>
-          <div className="po-print-header__meta">
-            <p className="po-print-title">PURCHASE INVOICE</p>
-            <p>
-              <strong>{inv.documentNumber}</strong>
-            </p>
-            <p>Date: {formatDate(inv.documentDate)}</p>
-            <p>Vendor inv: {inv.vendorInvoiceNumber}</p>
-            <p>Status: {formatStatus(inv.status)}</p>
-          </div>
-        </header>
+        <PurchaseDocumentLetterhead
+          docType="Purchase Invoice"
+          docNumber={inv.documentNumber}
+          meta={[
+            { label: 'Date', value: formatDate(inv.documentDate) },
+            { label: 'Vendor inv', value: inv.vendorInvoiceNumber || '—' },
+            { label: 'Status', value: formatStatus(inv.status) },
+          ]}
+        />
 
         <div className="po-print-grid">
           <section className="po-print-box">
@@ -127,16 +128,25 @@ export function PurchaseInvoicePrintPage() {
 
         <div className="po-print-totals">
           <p>Taxable: {formatCurrency(inv.taxableAmount)}</p>
-          <p>CGST: {formatCurrency(inv.cgst)} · SGST: {formatCurrency(inv.sgst)} · IGST: {formatCurrency(inv.igst)}</p>
+          <p>
+            CGST: {formatCurrency(inv.cgst)} · SGST: {formatCurrency(inv.sgst)} · IGST:{' '}
+            {formatCurrency(inv.igst)}
+          </p>
           <p className="po-print-totals__grand">Grand Total: {formatCurrency(inv.totalAmount)}</p>
         </div>
 
-        {inv.remarks && (
+        {inv.remarks ? (
           <section className="po-print-box mt-4">
             <p className="po-print-box__label">Remarks</p>
             <p>{inv.remarks}</p>
           </section>
-        )}
+        ) : null}
+
+        <div className="po-print-signatures">
+          <div className="po-print-signatures__line">Prepared by</div>
+          <div className="po-print-signatures__line">Checked by</div>
+          <div className="po-print-signatures__line">For {QUOTATION_COMPANY.legalName}</div>
+        </div>
       </article>
     </DocumentPrintShell>
   )

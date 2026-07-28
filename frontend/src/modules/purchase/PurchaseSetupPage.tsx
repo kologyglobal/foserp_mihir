@@ -41,8 +41,6 @@ import type {
   PurchaseItemCategory,
   PurchaseNotificationEventKey,
   PurchaseNumberSeriesConfig,
-  PurchasePrintOrientation,
-  PurchasePrintPaperSize,
   PurchaseSetup,
   PurchaseSetupNumberSeries,
   PurchaseSetupTabId,
@@ -702,6 +700,11 @@ export function PurchaseSetupPage() {
                   label="Allow over receipt"
                   checked={setup.general.allowOverReceipt}
                   onChange={(e) => patchGeneral('allowOverReceipt', e.target.checked)}
+                />
+                <Checkbox
+                  label="Require approval on PO revision"
+                  checked={Boolean(setup.general.requireApprovalOnPoRevision)}
+                  onChange={(e) => patchGeneral('requireApprovalOnPoRevision', e.target.checked)}
                 />
                 <Checkbox
                   label="Require warehouse on PO"
@@ -1576,24 +1579,16 @@ export function PurchaseSetupPage() {
                   />
                 </FormField>
                 <FormField label="Paper size">
-                  <Select
-                    value={setup.print.paperSize}
-                    onChange={(e) => patchPrint('paperSize', e.target.value as PurchasePrintPaperSize)}
-                  >
-                    <option value="A4">A4</option>
-                    <option value="Letter">Letter</option>
-                  </Select>
+                  <Input value="A4 (locked)" disabled readOnly />
+                  <p className="mt-1 text-[11px] text-erp-muted">
+                    All purchase PDFs use fixed A4. Letter / custom sizes are not allowed.
+                  </p>
                 </FormField>
                 <FormField label="Orientation">
-                  <Select
-                    value={setup.print.orientation}
-                    onChange={(e) =>
-                      patchPrint('orientation', e.target.value as PurchasePrintOrientation)
-                    }
-                  >
-                    <option value="portrait">Portrait</option>
-                    <option value="landscape">Landscape</option>
-                  </Select>
+                  <Input value="By document type (locked)" disabled readOnly />
+                  <p className="mt-1 text-[11px] text-erp-muted">
+                    PO / PR / RFQ / Invoice / Return = Portrait. GRN = Landscape. Not user-selectable.
+                  </p>
                 </FormField>
               </FieldGrid>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">

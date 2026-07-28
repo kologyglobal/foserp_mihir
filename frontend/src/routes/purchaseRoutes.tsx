@@ -8,6 +8,8 @@ import {
 import { RfqListPage } from '../modules/purchase/RfqListPage'
 import { RfqDetailPage } from '../modules/purchase/RfqDetailPage'
 import { RfqEditorPage } from '../modules/purchase/RfqEditorPage'
+import { RfqPrintPage } from '../modules/purchase/RfqPrintPage'
+import { PurchaseRequisitionPrintPage } from '../modules/purchase/PurchaseRequisitionPrintPage'
 import {
   PurchaseRequisitionFormPage,
   PurchaseRequisitionEditPage,
@@ -24,6 +26,7 @@ import {
   GrnListPage,
   GrnEditorPage,
   GrnDetailPage,
+  GrnPrintPage,
   QualityInspectionListPage,
   QualityInspectionDetailPage,
   QualityInspectionCreatePage,
@@ -70,11 +73,13 @@ export const purchaseRouteChildren = [
   { path: 'requisitions', element: <PurchaseRequisitionListPage /> },
   { path: 'requisitions/new', element: <PurchaseRequisitionFormPage /> },
   { path: 'requisitions/:id/edit', element: <PurchaseRequisitionEditPage /> },
+  { path: 'requisitions/:id/print', element: <PurchaseRequisitionPrintPage /> },
   { path: 'requisitions/:id', element: <PurchaseRequisitionDetailPage /> },
   { path: 'planning-sheet', element: <PurchasePlanningSheetPage /> },
   { path: 'rfqs', element: <RfqListPage /> },
   { path: 'rfqs/new', element: <RfqEditorPage /> },
   { path: 'rfqs/:id/edit', element: <RfqEditorPage /> },
+  { path: 'rfqs/:id/print', element: <RfqPrintPage /> },
   { path: 'rfqs/:id', element: <RfqDetailPage /> },
   { path: 'vendor-quotations', element: <VendorQuotationListPage /> },
   { path: 'vendor-quotations/new', element: <VendorQuotationEditorPage /> },
@@ -97,7 +102,7 @@ export const purchaseRouteChildren = [
   { path: 'grn', element: <GrnListPage /> },
   { path: 'grn/new', element: <GrnEditorPage /> },
   { path: 'grn/:id/edit', element: <GrnEditorPage /> },
-  { path: 'grn/:id/print', element: <GrnDetailPage /> },
+  { path: 'grn/:id/print', element: <GrnPrintPage /> },
   { path: 'grn/:id', element: <GrnDetailPage /> },
   { path: 'grns', element: <Navigate to="/purchase/grn" replace /> },
   { path: 'grns/:id', element: <GrnDetailPage /> },

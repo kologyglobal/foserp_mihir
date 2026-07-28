@@ -9,6 +9,7 @@
 import { isApiMode } from '../../config/apiConfig'
 import { useMasterStore } from '../../store/masterStore'
 import type { Item as MasterItem, Vendor as MasterVendor } from '../../types/master'
+import { normalizeEngineeringProductType } from '../../utils/purchaseProductType'
 import type {
   PurchaseApprovalDocumentType,
   PurchaseApprovalQueueFilters,
@@ -901,16 +902,33 @@ export async function reopenPurchaseOrder(id: string): Promise<PurchaseOrder> {
   }
 }
 
-/** PO revision (versioned amendments) has no backend yet — never simulate it in API mode. */
+/** PO revision (versioned amendments) — API persists Rev N snapshots. */
 export async function revisePurchaseOrder(
   id: string,
   input: Parameters<typeof demo.revisePurchaseOrder>[1],
 ): Promise<PurchaseOrder> {
   if (!isApiMode()) return demo.revisePurchaseOrder(id, input)
-  throw new PurchaseServiceError(
-    'PURCHASE_API_NOT_IMPLEMENTED',
-    'PO revision is not available yet. Reopen or edit the draft/sent-back PO instead.',
-  )
+  try {
+    const payload: Record<string, unknown> = {
+      reason: input.reason,
+    }
+    if (input.expectedDeliveryDate != null) payload.expectedDeliveryDate = input.expectedDeliveryDate
+    if (input.paymentTerms != null) payload.paymentTerms = input.paymentTerms
+    if (input.deliveryTerms != null) payload.deliveryTerms = input.deliveryTerms
+    if (input.freight != null) payload.freightAmount = input.freight
+    if (input.remarks != null) payload.remarks = input.remarks
+    if (input.lines?.length) {
+      payload.lines = input.lines.map((l) => ({
+        id: l.id,
+        quantity: l.quantity,
+        rate: l.rate,
+      }))
+    }
+    const res = await poApi.revisePurchaseOrderApi(id, payload)
+    return mapApiPurchaseOrderToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
 }
 
 export async function getPurchaseOrderLinkedDocuments(
@@ -1068,6 +1086,9 @@ export async function submitGRN(id: string): Promise<GoodsReceiptNote> {
   try {
     const res = await grnApi.submitGoodsReceiptApi(id, {})
     let grn = mapApiGoodsReceiptToDomain(res.data)
+    if (grn.status === 'pending_tolerance_approval') {
+      return grn
+    }
     if (grn.inspectionRequired && !grn.qualityInspectionId) {
       const qcLine =
         grn.lines.find((l) => l.inspectionStatus === 'pending' || l.pendingInspectionQty > 0)
@@ -1090,6 +1111,30 @@ export async function submitGRN(id: string): Promise<GoodsReceiptNote> {
       }
     }
     return grn
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function approveToleranceGRN(id: string, remarks = ''): Promise<GoodsReceiptNote> {
+  if (!isApiMode()) {
+    throw new PurchaseServiceError('NOT_SUPPORTED', 'Tolerance approval is only available in API mode.')
+  }
+  try {
+    const res = await grnApi.approveToleranceGoodsReceiptApi(id, remarks ? { remarks } : {})
+    return mapApiGoodsReceiptToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function rejectToleranceGRN(id: string, remarks = ''): Promise<GoodsReceiptNote> {
+  if (!isApiMode()) {
+    throw new PurchaseServiceError('NOT_SUPPORTED', 'Tolerance rejection is only available in API mode.')
+  }
+  try {
+    const res = await grnApi.rejectToleranceGoodsReceiptApi(id, remarks ? { remarks } : {})
+    return mapApiGoodsReceiptToDomain(res.data)
   } catch (err) {
     throwApi(err)
   }
@@ -1501,7 +1546,7 @@ function applyApprovalQueueFilters(
   })
 }
 
-/** Approvals inbox — API mode uses GET /purchase/approvals (PR + PO). */
+/** Approvals inbox — API mode uses GET /purchase/approvals (PR + PO + GRN tolerance). */
 export async function getPurchaseApprovalQueue(
   tab: PurchaseApprovalQueueTab = 'pending_mine',
   filters: PurchaseApprovalQueueFilters = {},
@@ -1513,7 +1558,9 @@ export async function getPurchaseApprovalQueue(
         ? 'PURCHASE_REQUISITION'
         : filters.documentType === 'purchase_order'
           ? 'PURCHASE_ORDER'
-          : undefined
+          : filters.documentType === 'goods_receipt_note'
+            ? 'GOODS_RECEIPT'
+            : undefined
     const res = await approvalApi.listPurchaseApprovalsApi({
       page: 1,
       limit: 100,
@@ -1555,7 +1602,7 @@ export async function approvePurchaseDocument(
   documentType: PurchaseApprovalDocumentType,
   documentId: string,
   remarks = 'Approved',
-): Promise<PurchaseRequisition | PurchaseOrder> {
+): Promise<PurchaseRequisition | PurchaseOrder | GoodsReceiptNote> {
   if (!isApiMode()) return demo.approvePurchaseDocument(documentType, documentId, remarks)
   if (documentType === 'purchase_requisition') {
     return approvePurchaseRequisition(documentId, remarks)
@@ -1563,9 +1610,12 @@ export async function approvePurchaseDocument(
   if (documentType === 'purchase_order') {
     return approvePurchaseOrder(documentId, remarks)
   }
+  if (documentType === 'goods_receipt_note') {
+    return approveToleranceGRN(documentId, remarks)
+  }
   throw new PurchaseServiceError(
     'NOT_SUPPORTED',
-    'Only PR and PO approvals are available in API mode yet.',
+    'Only PR, PO, and GRN tolerance approvals are available in API mode yet.',
   )
 }
 
@@ -1573,7 +1623,7 @@ export async function rejectPurchaseDocument(
   documentType: PurchaseApprovalDocumentType,
   documentId: string,
   remarks: string,
-): Promise<PurchaseRequisition | PurchaseOrder> {
+): Promise<PurchaseRequisition | PurchaseOrder | GoodsReceiptNote> {
   if (!isApiMode()) return demo.rejectPurchaseDocument(documentType, documentId, remarks)
   if (!remarks.trim()) {
     throw new PurchaseServiceError('REMARKS_REQUIRED', 'Rejection comments are mandatory')
@@ -1584,9 +1634,12 @@ export async function rejectPurchaseDocument(
   if (documentType === 'purchase_order') {
     return rejectPurchaseOrder(documentId, remarks)
   }
+  if (documentType === 'goods_receipt_note') {
+    return rejectToleranceGRN(documentId, remarks)
+  }
   throw new PurchaseServiceError(
     'NOT_SUPPORTED',
-    'Only PR and PO rejection are available in API mode yet.',
+    'Only PR, PO, and GRN tolerance rejection are available in API mode yet.',
   )
 }
 
@@ -1594,10 +1647,13 @@ export async function sendBackPurchaseDocument(
   documentType: PurchaseApprovalDocumentType,
   documentId: string,
   remarks: string,
-): Promise<PurchaseRequisition | PurchaseOrder> {
+): Promise<PurchaseRequisition | PurchaseOrder | GoodsReceiptNote> {
   if (!isApiMode()) return demo.sendBackPurchaseDocument(documentType, documentId, remarks)
   if (!remarks.trim()) {
     throw new PurchaseServiceError('REMARKS_REQUIRED', 'Send-back comments are mandatory')
+  }
+  if (documentType === 'goods_receipt_note') {
+    return rejectToleranceGRN(documentId, remarks)
   }
   if (documentType === 'purchase_order') {
     return sendBackPurchaseOrder(documentId, remarks)
@@ -1605,7 +1661,7 @@ export async function sendBackPurchaseDocument(
   if (documentType !== 'purchase_requisition') {
     throw new PurchaseServiceError(
       'NOT_SUPPORTED',
-      'Only PR and PO send-back are available in API mode yet.',
+      'Only PR, PO, and GRN tolerance send-back are available in API mode yet.',
     )
   }
   try {
@@ -1894,7 +1950,8 @@ function mapItemTypeToCategory(itemType: MasterItem['itemType']): PurchaseItemCa
 
 /** Prefer engineering productType when present — aligns PR Product Type with Item Master. */
 function mapMasterItemToPurchaseCategory(item: MasterItem): PurchaseItemCategory {
-  switch (item.productType) {
+  const productType = normalizeEngineeringProductType(item.productType)
+  switch (productType) {
     case 'raw_material':
     case 'scrap':
       return 'raw_material'
@@ -1917,7 +1974,14 @@ function mapMasterItemToPurchaseItem(item: MasterItem): PurchaseItem {
     useMasterStore.getState().uoms.find((u) => u.id === item.baseUomId)?.uomCode ??
     useMasterStore.getState().uoms.find((u) => u.id === item.baseUomId)?.uomName ??
     'NOS'
-  const productType = item.productType ?? null
+  const productType =
+    normalizeEngineeringProductType(item.productType) ||
+    (item.itemType === 'finished_good' ? 'finish_product' : null) ||
+    (item.itemType === 'bought_out' ? 'boi' : null) ||
+    (item.itemType === 'raw' ? 'raw_material' : null) ||
+    (item.itemType === 'sub_assembly' ? 'sub_assembly' : null) ||
+    (item.itemType === 'service' ? 'service' : null) ||
+    (item.itemType === 'scrap' ? 'scrap' : null)
   return {
     id: item.id,
     itemCode: item.itemCode,
@@ -1938,6 +2002,7 @@ function mapMasterItemToPurchaseItem(item: MasterItem): PurchaseItem {
     batchControlled: false,
     serialControlled: false,
     expiryControlled: false,
+    receivingTolerancePercentage: Number(item.receivingTolerancePercentage ?? 0),
     isActive: item.isActive !== false && item.isBlocked !== true,
     remarks: '',
     createdBy: 'API',
@@ -1959,10 +2024,12 @@ function mapMasterVendorToPurchaseVendor(v: MasterVendor): Vendor {
     contactPhone: v.contactPhone ?? '',
     contactEmail: v.email ?? '',
     address: v.address ?? '',
+    address2: v.address2 ?? '',
     city: v.city ?? '',
     state: v.state ?? '',
     stateCode: '',
     pincode: v.pincode ?? '',
+    country: v.country ?? '',
     gstin: v.gstin ?? '',
     pan: v.pan ?? '',
     isInterstate: false,
@@ -1982,23 +2049,44 @@ function mapMasterVendorToPurchaseVendor(v: MasterVendor): Vendor {
   }
 }
 
-/** Items for PR/PO pickers — master store in API mode, demo seed otherwise. */
-export async function getPurchaseItems(): Promise<PurchaseItem[]> {
+/** Items for PR/PO pickers — Item Master via API in API mode, demo seed otherwise. */
+export async function getPurchaseItems(options?: {
+  forceRefresh?: boolean
+  /**
+   * When true (default), only items with Allow purchase.
+   * PO editors pass false so Product Type filters include Finish Product / Sub Assembly
+   * rows that exist in Item Master but are marked non-purchasable for manufacturing.
+   */
+  purchasableOnly?: boolean
+}): Promise<PurchaseItem[]> {
   if (!isApiMode()) return demo.getPurchaseItems()
   let items = useMasterStore.getState().items
-  // Always refresh when store is empty OR stale after master edits in another tab/session.
-  // Prefer live store (kept current by masterBatchApiBridge upserts after create/update).
-  if (!items.length) {
+  // Refresh from Item Master API when empty or when the caller asks for a live snapshot.
+  if (!items.length || options?.forceRefresh) {
     try {
-      const { syncBatchMastersFromApi } = await import('../bridges/masterBatchApiBridge')
-      await syncBatchMastersFromApi()
+      const api = await import('../api/masterBatchApi')
+      const rows = await api.fetchItems()
+      useMasterStore.setState({ items: rows.map(api.mapItemDto) })
       items = useMasterStore.getState().items
     } catch {
-      /* keep empty — UI shows no matching items */
+      if (!items.length) {
+        try {
+          const { syncBatchMastersFromApi } = await import('../bridges/masterBatchApiBridge')
+          await syncBatchMastersFromApi()
+          items = useMasterStore.getState().items
+        } catch {
+          /* keep empty — UI shows no matching items */
+        }
+      }
     }
   }
+  const purchasableOnly = options?.purchasableOnly !== false
   return items
-    .filter((i) => i.isActive !== false && i.isBlocked !== true && i.isPurchasable !== false)
+    .filter((i) => {
+      if (i.isActive === false || i.isBlocked === true) return false
+      if (purchasableOnly && i.isPurchasable === false) return false
+      return true
+    })
     .map(mapMasterItemToPurchaseItem)
 }
 
@@ -2109,6 +2197,7 @@ function mapApiSetupToDomain(api: setupApi.ApiPurchaseSetup): PurchaseSetup {
       requireQuotationComparison: g.requireQuotationComparison,
       allowOverReceipt: g.allowOverReceipt,
       overReceiptTolerancePct: Number(g.overReceiptTolerancePct ?? 0),
+      requireApprovalOnPoRevision: g.requireApprovalOnPoRevision ?? true,
       allowShortClose: g.allowShortClose,
       requirePoWarehouse: g.requirePoWarehouse,
       requireExpectedDeliveryDate: g.requireExpectedDeliveryDate,
@@ -2228,6 +2317,7 @@ function mapDomainSetupToApiPayload(setup: PurchaseSetup): setupApi.ApiPurchaseS
       requireQuotationComparison: setup.general.requireQuotationComparison,
       allowOverReceipt: setup.general.allowOverReceipt,
       overReceiptTolerancePct: setup.general.overReceiptTolerancePct,
+      requireApprovalOnPoRevision: setup.general.requireApprovalOnPoRevision,
       allowShortClose: setup.general.allowShortClose,
       requirePoWarehouse: setup.general.requirePoWarehouse,
       requireExpectedDeliveryDate: setup.general.requireExpectedDeliveryDate,
@@ -2293,8 +2383,9 @@ function mapDomainSetupToApiPayload(setup: PurchaseSetup): setupApi.ApiPurchaseS
       showTermsOnGrn: setup.print.showTermsOnGrn,
       showTermsOnInvoice: setup.print.showTermsOnInvoice,
       defaultCopies: setup.print.defaultCopies,
-      paperSize: setup.print.paperSize,
-      orientation: setup.print.orientation,
+      // Locked ERP standard — always A4 portrait at tenant default; per-doc orientation is code-driven.
+      paperSize: 'A4',
+      orientation: 'portrait',
     },
   }
 }

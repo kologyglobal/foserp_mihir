@@ -1,10 +1,16 @@
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
-
-const A4_WIDTH_MM = 210
-const A4_HEIGHT_MM = 297
+import {
+  purchasePdfPageSizeMm,
+  type PurchasePrintOrientationLocked,
+} from './purchasePrintFormat'
 
 export type DocumentPdfResult = { ok: true; fileName: string } | { ok: false; error: string }
+
+export type DownloadElementAsPdfOptions = {
+  /** Locked to A4; only orientation may vary by document type. Default portrait. */
+  orientation?: PurchasePrintOrientationLocked
+}
 
 function resolveFileName(fileName: string): string {
   const trimmed = fileName.trim() || 'Document.pdf'
@@ -67,12 +73,16 @@ export function findPrintDocumentElement(
 /**
  * Capture a visible print/preview document and download a multi-page A4 PDF
  * that matches the on-screen professional layout.
+ * Paper size is always A4 — orientation only (portrait | landscape).
  */
 export async function downloadElementAsPdf(
   element: HTMLElement,
   fileName: string,
+  options: DownloadElementAsPdfOptions = {},
 ): Promise<DocumentPdfResult> {
   const safeName = resolveFileName(fileName)
+  const orientation = options.orientation ?? 'portrait'
+  const pageMm = purchasePdfPageSizeMm(orientation)
 
   try {
     await waitForImages(element)
@@ -107,17 +117,16 @@ export async function downloadElementAsPdf(
     }
 
     const pdf = new jsPDF({
-      orientation: 'portrait',
+      orientation,
       unit: 'mm',
       format: 'a4',
       compress: true,
     })
 
-    const pageWidth = pdf.internal.pageSize.getWidth() || A4_WIDTH_MM
-    const pageHeight = pdf.internal.pageSize.getHeight() || A4_HEIGHT_MM
+    const pageWidth = pdf.internal.pageSize.getWidth() || pageMm.width
+    const pageHeight = pdf.internal.pageSize.getHeight() || pageMm.height
     const imgWidth = pageWidth
 
-    // Slice tall canvases into A4 pages.
     const pageCanvas = document.createElement('canvas')
     const pageCtx = pageCanvas.getContext('2d')
     if (!pageCtx) return { ok: false, error: 'PDF canvas unavailable in this browser.' }
@@ -168,6 +177,7 @@ export async function downloadElementAsPdf(
 export async function downloadPrintDocumentPdf(options: {
   fileName: string
   selectors?: string | string[]
+  orientation?: PurchasePrintOrientationLocked
 }): Promise<DocumentPdfResult> {
   const element = findPrintDocumentElement(options.selectors)
   if (!element) {
@@ -176,5 +186,7 @@ export async function downloadPrintDocumentPdf(options: {
       error: 'Document preview is not ready. Open Preview / Print, then download PDF.',
     }
   }
-  return downloadElementAsPdf(element, options.fileName)
+  return downloadElementAsPdf(element, options.fileName, {
+    orientation: options.orientation,
+  })
 }

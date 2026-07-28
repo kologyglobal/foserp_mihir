@@ -190,10 +190,26 @@ export function LoginPage() {
   }
 
   useEffect(() => {
-    document.title = 'Sign in — Vasant Fabricators'
     const notice = consumeAuthNotice()
     if (notice) setInfo(notice)
   }, [])
+
+  useEffect(() => {
+    const brand = directoryTenantName?.trim() || 'FOS ERP'
+    if (view === 'forgot') {
+      document.title = `Reset password — ${brand}`
+      return
+    }
+    if (view === 'reset') {
+      document.title = `Choose new password — ${brand}`
+      return
+    }
+    if (view === 'accept-invite') {
+      document.title = `Accept invitation — ${brand}`
+      return
+    }
+    document.title = `Sign in — ${brand}`
+  }, [view, directoryTenantName])
 
   useEffect(() => {
     if (view !== 'signin') return

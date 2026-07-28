@@ -9,11 +9,13 @@ import {
 import {
   mapApprovalQueueRow,
   mapApprovalReviewDetail,
+  mapGrnLinesForReview,
   mapPoLinesForReview,
   mapPrLinesForReview,
   mapStatusHistoryToPreviousApproval,
 } from './purchase-approval.mapper.js'
 import * as repo from './purchase-approval.repository.js'
+import type { ApprovalDocumentType } from './purchase-approval.repository.js'
 import type { ListPurchaseApprovalsQuery } from './purchase-approval.validation.js'
 
 function tabToStatuses(tab: ListPurchaseApprovalsQuery['tab']): PurchaseApprovalStatus[] | undefined {
@@ -42,8 +44,8 @@ function tabToActorScope(
 function allowedDocumentTypes(
   permissions: string[],
   requireApprovalPermission = false,
-): Array<'PURCHASE_REQUISITION' | 'PURCHASE_ORDER'> {
-  const types: Array<'PURCHASE_REQUISITION' | 'PURCHASE_ORDER'> = []
+): ApprovalDocumentType[] {
+  const types: ApprovalDocumentType[] = []
   if (
     permissionSetIncludes(permissions, 'purchase.pr.approve') ||
     (!requireApprovalPermission && permissionSetIncludes(permissions, 'purchase.pr.view'))
@@ -56,14 +58,31 @@ function allowedDocumentTypes(
   ) {
     types.push('PURCHASE_ORDER')
   }
+  if (
+    permissionSetIncludes(permissions, 'purchase.grn.post') ||
+    (!requireApprovalPermission && permissionSetIncludes(permissions, 'purchase.grn.view'))
+  ) {
+    types.push('GOODS_RECEIPT')
+  }
   return types
 }
 
-function canActOn(documentType: 'PURCHASE_REQUISITION' | 'PURCHASE_ORDER', permissions: string[]) {
+function canActOn(documentType: ApprovalDocumentType, permissions: string[]) {
   if (documentType === 'PURCHASE_REQUISITION') {
     return permissionSetIncludes(permissions, 'purchase.pr.approve')
   }
+  if (documentType === 'GOODS_RECEIPT') {
+    return permissionSetIncludes(permissions, 'purchase.grn.post')
+  }
   return permissionSetIncludes(permissions, 'purchase.po.approve')
+}
+
+function requiredPermissionFor(
+  documentType: ApprovalDocumentType,
+): 'purchase.pr.approve' | 'purchase.po.approve' | 'purchase.grn.post' {
+  if (documentType === 'PURCHASE_REQUISITION') return 'purchase.pr.approve'
+  if (documentType === 'GOODS_RECEIPT') return 'purchase.grn.post'
+  return 'purchase.po.approve'
 }
 
 function toDateOnly(date: Date | null | undefined): string | null {
@@ -117,17 +136,30 @@ export async function listPurchaseApprovals(
     .filter((id): id is string => Boolean(id))
   const nameById = await repo.resolveRequesterNames(tenantId, userIds)
 
+  const grnIds = items
+    .filter((a) => a.documentType === 'GOODS_RECEIPT')
+    .map((a) => a.documentId)
+  const grnById = new Map<
+    string,
+    Awaited<ReturnType<typeof repo.findGoodsReceiptForApproval>>
+  >()
+  await Promise.all(
+    grnIds.map(async (id) => {
+      const grn = await repo.findGoodsReceiptForApproval(tenantId, id)
+      if (grn) grnById.set(id, grn)
+    }),
+  )
+
   let rows = items.map((approval) => {
     const pr = approval.purchaseRequisition
     const po = approval.purchaseOrder
+    const grn = approval.documentType === 'GOODS_RECEIPT' ? grnById.get(approval.documentId) : null
     const requestedByName = approval.requesterId
       ? nameById.get(approval.requesterId) ?? null
       : null
 
-    const hasPermission = canActOn(
-      approval.documentType as 'PURCHASE_REQUISITION' | 'PURCHASE_ORDER',
-      permissions,
-    )
+    const docType = approval.documentType as ApprovalDocumentType
+    const hasPermission = canActOn(docType, permissions)
     return mapApprovalQueueRow(approval, {
       canAct:
         hasPermission &&
@@ -138,12 +170,16 @@ export async function listPurchaseApprovals(
         ? nameById.get(approval.approverId) ?? null
         : null,
       departmentName: pr?.departmentId ?? null,
-      locationId: pr?.warehouseId ?? null,
+      locationId: pr?.warehouseId ?? grn?.warehouseId ?? null,
       locationName:
         pr?.warehouse?.name ||
         pr?.warehouse?.code ||
-        (po?.vendor ? `${po.vendor.code} · ${po.vendor.name}` : null),
-      documentDate: pr?.requisitionDate ?? po?.orderDate ?? null,
+        grn?.warehouse?.name ||
+        grn?.warehouseNameSnapshot ||
+        (po?.vendor ? `${po.vendor.code} · ${po.vendor.name}` : null) ||
+        (grn?.vendor ? `${grn.vendor.code} · ${grn.vendor.name}` : null),
+      documentDate:
+        pr?.requisitionDate ?? po?.orderDate ?? grn?.receiptDate ?? null,
       priority: pr?.priority ?? 'NORMAL',
     })
   })
@@ -174,7 +210,11 @@ export async function getPurchaseApprovalReview(
   }
   if (!approval) {
     // Last resort: orphan pending document id
-    for (const documentType of ['PURCHASE_REQUISITION', 'PURCHASE_ORDER'] as const) {
+    for (const documentType of [
+      'PURCHASE_REQUISITION',
+      'PURCHASE_ORDER',
+      'GOODS_RECEIPT',
+    ] as const) {
       const healed = await repo.ensurePendingApprovalForDocument(tenantId, documentType, approvalId)
       if (healed) {
         approval = healed
@@ -185,12 +225,17 @@ export async function getPurchaseApprovalReview(
   if (!approval) throw new PurchaseApprovalNotFoundError()
 
   const allowed = allowedDocumentTypes(permissions)
-  if (!allowed.includes(approval.documentType as 'PURCHASE_REQUISITION' | 'PURCHASE_ORDER')) {
+  const docType = approval.documentType as ApprovalDocumentType
+  if (!allowed.includes(docType)) {
     throw new PurchaseApprovalNotFoundError()
   }
 
   const pr = approval.purchaseRequisition
   const po = approval.purchaseOrder
+  const grn =
+    docType === 'GOODS_RECEIPT'
+      ? await repo.findGoodsReceiptForApproval(tenantId, approval.documentId)
+      : null
   const nameById = await repo.resolveRequesterNames(
     tenantId,
     [approval.requesterId, approval.approverId].filter((id): id is string => Boolean(id)),
@@ -202,10 +247,7 @@ export async function getPurchaseApprovalReview(
   const selfApprovalAllowed = await isSelfApprovalAllowed(tenantId, permissions)
   const row = mapApprovalQueueRow(approval, {
     canAct:
-      canActOn(
-        approval.documentType as 'PURCHASE_REQUISITION' | 'PURCHASE_ORDER',
-        permissions,
-      ) &&
+      canActOn(docType, permissions) &&
       (selfApprovalAllowed || approval.requesterId !== actorId) &&
       (!approval.approverId || approval.approverId === actorId),
     requestedByName,
@@ -213,49 +255,50 @@ export async function getPurchaseApprovalReview(
       ? nameById.get(approval.approverId) ?? null
       : null,
     departmentName: pr?.departmentId ?? null,
-    locationId: pr?.warehouseId ?? null,
+    locationId: pr?.warehouseId ?? grn?.warehouseId ?? null,
     locationName:
       pr?.warehouse?.name ||
       pr?.warehouse?.code ||
-      (po?.vendor ? `${po.vendor.code} · ${po.vendor.name}` : null),
-    documentDate: pr?.requisitionDate ?? po?.orderDate ?? null,
+      grn?.warehouse?.name ||
+      grn?.warehouseNameSnapshot ||
+      (po?.vendor ? `${po.vendor.code} · ${po.vendor.name}` : null) ||
+      (grn?.vendor ? `${grn.vendor.code} · ${grn.vendor.name}` : null),
+    documentDate: pr?.requisitionDate ?? po?.orderDate ?? grn?.receiptDate ?? null,
     priority: pr?.priority ?? 'NORMAL',
   })
 
-  const historyDocType =
-    approval.documentType === 'PURCHASE_ORDER' ? 'PURCHASE_ORDER' : 'PURCHASE_REQUISITION'
-  const history = await repo.listStatusHistory(tenantId, historyDocType, approval.documentId)
+  const history = await repo.listStatusHistory(tenantId, docType, approval.documentId)
   const historyActorNames = await repo.resolveRequesterNames(
     tenantId,
     history.map((entry) => entry.actorId).filter((id): id is string => Boolean(id)),
   )
-  const requiredPermission =
-    approval.documentType === 'PURCHASE_ORDER'
-      ? 'purchase.po.approve'
-      : 'purchase.pr.approve'
+  const requiredPermission = requiredPermissionFor(docType)
   const eligibleApprovers = (
     await repo.listEligibleApprovers(tenantId, requiredPermission, approval.requesterId)
   ).filter((user) => user.id !== actorId)
 
   const defaults = await resolveEffectivePurchaseDefaults(tenantId)
-  const chainRoles = resolveApprovalRolesFromDefaults(
-    defaults,
-    Number(approval.amount ?? 0),
-    approval.documentType as 'PURCHASE_REQUISITION' | 'PURCHASE_ORDER',
-  ).map((role) => {
-    switch (role) {
-      case 'DEPARTMENT_HEAD':
-        return 'department_head'
-      case 'PURCHASE_HEAD':
-        return 'purchase_head'
-      case 'FINANCE_HEAD':
-        return 'finance_head'
-      case 'MANAGEMENT':
-        return 'management'
-      default:
-        return 'purchase_head'
-    }
-  })
+  const chainRoles =
+    docType === 'GOODS_RECEIPT'
+      ? ['purchase_head']
+      : resolveApprovalRolesFromDefaults(
+          defaults,
+          Number(approval.amount ?? 0),
+          docType as 'PURCHASE_REQUISITION' | 'PURCHASE_ORDER',
+        ).map((role) => {
+          switch (role) {
+            case 'DEPARTMENT_HEAD':
+              return 'department_head'
+            case 'PURCHASE_HEAD':
+              return 'purchase_head'
+            case 'FINANCE_HEAD':
+              return 'finance_head'
+            case 'MANAGEMENT':
+              return 'management'
+            default:
+              return 'purchase_head'
+          }
+        })
 
   return mapApprovalReviewDetail({
     row: {
@@ -264,14 +307,19 @@ export async function getPurchaseApprovalReview(
       chainLength: chainRoles.length || 1,
       approvalLevelLabel: `${approval.level} of ${chainRoles.length || 1} · ${approval.approverRole ?? 'Approver'}`,
     },
-    purpose: pr?.purchasePurpose ?? po?.remarks ?? '',
-    requesterRemarks: pr?.remarks ?? po?.remarks ?? '',
+    purpose:
+      pr?.purchasePurpose ??
+      po?.remarks ??
+      (grn ? `Tolerance exception · ${grn.purchaseOrderNumber}` : ''),
+    requesterRemarks: pr?.remarks ?? po?.remarks ?? grn?.remarks ?? '',
     expectedDeliveryDate: toDateOnly(pr?.requiredDate ?? po?.expectedDeliveryDate ?? null),
     lines: pr
       ? mapPrLinesForReview(pr.lines)
       : po
         ? mapPoLinesForReview(po.lines)
-        : [],
+        : grn
+          ? mapGrnLinesForReview(grn.lines)
+          : [],
     previousApprovals: history.map((entry) =>
       mapStatusHistoryToPreviousApproval(
         entry,
@@ -295,7 +343,7 @@ export async function delegatePurchaseApproval(
     throw new PurchaseApprovalNotFoundError()
   }
 
-  const documentType = approval.documentType as 'PURCHASE_REQUISITION' | 'PURCHASE_ORDER'
+  const documentType = approval.documentType as ApprovalDocumentType
   if (
     !canActOn(documentType, permissions) ||
     (approval.approverId && approval.approverId !== actorId)
@@ -306,8 +354,7 @@ export async function delegatePurchaseApproval(
     throw new PurchaseApprovalActionError(PURCHASE_ERROR_CODE.APPROVAL_DELEGATE_INVALID)
   }
 
-  const requiredPermission =
-    documentType === 'PURCHASE_ORDER' ? 'purchase.po.approve' : 'purchase.pr.approve'
+  const requiredPermission = requiredPermissionFor(documentType)
   const eligible = (
     await repo.listEligibleApprovers(tenantId, requiredPermission, approval.requesterId)
   ).filter((user) => user.id !== actorId)

@@ -44,7 +44,7 @@ import {
 } from '../../../types/taxMaster'
 import type { Item, ItemSalesFulfilmentMethod, ItemType, SubAssemblyRule } from '../../../types/master'
 import { SUB_ASSEMBLY_RULE_LABELS } from '../../../types/bom'
-import { EnterpriseMasterWorkspace, MasterForm, MasterStickyFooter } from '../shared/EnterpriseMasterShell'
+import { EnterpriseMasterWorkspace, MasterStickyFooter } from '../shared/EnterpriseMasterShell'
 import { MasterCodeField } from '../../../components/masters/MasterCodeField'
 import type { MasterCodeSeriesHandle } from '../../../hooks/useMasterCodeSeries'
 
@@ -70,7 +70,9 @@ const schema = z.object({
   baseUomId: z.string().min(1),
   quantityPerUom: z.coerce.number().min(0),
   purchaseUomId: z.string().nullable().optional(),
-  purchaseQtyPerUom: z.coerce.number().min(0),
+  purchaseQtyPerUom: z.coerce.number().positive().default(1),
+  uomConversionFactor: z.coerce.number().positive().optional(),
+  receivingTolerancePercentage: z.coerce.number().min(0).max(100).optional(),
   hsnId: z.string().nullable().optional(),
   hsnCode: z.string(),
   gstGroupId: z.string().nullable().optional(),
@@ -263,7 +265,9 @@ export function ItemFormPage() {
           isBlocked: existing.isBlocked ?? false,
           qcRequired: existing.qcRequired ?? false,
           quantityPerUom: existing.quantityPerUom ?? 1,
-          purchaseQtyPerUom: existing.purchaseQtyPerUom ?? 1,
+          purchaseQtyPerUom: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
+          uomConversionFactor: existing.uomConversionFactor ?? existing.purchaseQtyPerUom ?? 1,
+          receivingTolerancePercentage: existing.receivingTolerancePercentage ?? 0,
           salesDescription: existing.salesDescription ?? '',
           salesUomId: existing.salesUomId ?? existing.baseUomId,
           defaultSalesRate: existing.defaultSalesRate ?? 0,
@@ -289,6 +293,8 @@ export function ItemFormPage() {
           qualityTestGroupCode: '',
           quantityPerUom: 1,
           purchaseQtyPerUom: 1,
+          uomConversionFactor: 1,
+          receivingTolerancePercentage: 0,
           reorderLevel: 0,
           reorderQty: 0,
           standardRate: 0,
@@ -398,7 +404,7 @@ export function ItemFormPage() {
         { label: 'HSN', value: hsnId ? getHsn(hsnId)?.code ?? '—' : watched.hsnCode ?? '—' },
         { label: 'Status', value: watched.isBlocked ? 'Blocked' : watched.isActive ? 'Active' : 'Inactive' },
       ]}
-      commandBar={<MasterForm listPath="/masters/items" isEdit={isEdit} onSave={() => save('default')} onSaveClose={() => save('close')} onSaveNew={() => save('new')} onCancel={cancelForm} />}
+      commandBar={undefined}
       sectionNavItems={[
         { id: 'general', label: 'General', icon: Package, done: Boolean(watched.itemCode?.trim() && watched.itemName?.trim()) },
         { id: 'tax', label: 'Tax', icon: Percent, done: Boolean(hsnId || watched.hsnCode) },
@@ -420,7 +426,13 @@ export function ItemFormPage() {
         { label: 'UOM', value: uoms.find((u) => u.id === baseUomId)?.uomCode ?? '—' },
         { label: 'Modified', value: existing ? formatDate(existing.updatedAt.slice(0, 10)) : 'New' },
       ]}
-      stickyFooter={<MasterStickyFooter isEdit={isEdit} isSubmitting={isSubmitting} onSave={() => save('default')} onSaveClose={() => save('close')} onSaveNew={() => save('new')} onCancel={cancelForm} />}
+      stickyFooter={
+        <MasterStickyFooter
+          isSubmitting={isSubmitting}
+          onSave={() => save('default')}
+          onCancel={cancelForm}
+        />
+      }
     >
       <form onSubmit={(e: FormEvent) => { e.preventDefault(); save('default') }}>
         <ErpCardSection
@@ -487,8 +499,38 @@ export function ItemFormPage() {
           <FormField label="Purchase Unit of Measure">
             <UomMasterSelect value={watch('purchaseUomId') ?? ''} onChange={(v) => setValue('purchaseUomId', v)} />
           </FormField>
-          <FormField label="Purchase Qty per UOM">
-            <Input type="number" step="0.001" {...register('purchaseQtyPerUom')} />
+          <FormField
+            label="UOM Conversion Factor"
+            error={errors.uomConversionFactor?.message ?? errors.purchaseQtyPerUom?.message}
+          >
+            <Input
+              type="number"
+              step="0.001"
+              {...register('uomConversionFactor')}
+              onChange={(e) => {
+                const v = e.target.value
+                setValue('uomConversionFactor', Number(v) as never, { shouldValidate: true })
+                setValue('purchaseQtyPerUom', Number(v) as never, { shouldValidate: true })
+              }}
+            />
+            <p className="mt-1 text-xs text-erp-muted">
+              Vendor units per 1 stock unit (e.g. 3 Meter = 1 NOS). Use 1 when purchase UOM equals base UOM.
+            </p>
+          </FormField>
+          <FormField
+            label="Receiving tolerance (%)"
+            error={errors.receivingTolerancePercentage?.message}
+          >
+            <Input
+              type="number"
+              step="0.01"
+              min={0}
+              max={100}
+              {...register('receivingTolerancePercentage')}
+            />
+            <p className="mt-1 text-xs text-erp-muted">
+              ±% band vs open PO qty on GRN (e.g. 2 = accept 98–102%). 0 = exact / Setup fallback.
+            </p>
           </FormField>
           <FormField label="Material Grade">
             <Input {...register('materialGrade')} />
