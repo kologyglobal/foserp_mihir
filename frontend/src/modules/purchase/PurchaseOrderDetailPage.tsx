@@ -79,7 +79,6 @@ import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { appPromptNote } from '@/store/confirmDialogStore'
 import { ReservationsPanel } from '@/components/inventory/ReservationsPanel'
-import { isApiMode } from '@/config/apiConfig'
 
 const REVISABLE_STATUSES: PurchaseOrder['status'][] = [
   'released',

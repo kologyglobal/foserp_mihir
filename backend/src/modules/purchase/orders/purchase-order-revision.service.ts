@@ -4,8 +4,7 @@
  */
 import type { PurchaseOrderLine, PurchaseOrderStatus } from '@prisma/client'
 import { prisma } from '../../../config/database.js'
-import { PURCHASE_AUDIT_ACTION } from '../shared/purchase-audit.js'
-import { writePurchaseAuditLog } from '../shared/purchase-audit-writer.js'
+import { PURCHASE_AUDIT_ACTION, PURCHASE_AUDIT_ENTITY, writePurchaseAudit } from '../shared/purchase-audit.js'
 import { PURCHASE_ERROR_CODE, purchaseMessage } from '../shared/purchase-error-catalog.js'
 import {
   lineAmountFromVendor,
@@ -381,14 +380,13 @@ export async function revisePurchaseOrder(
     }
   })
 
-  await writePurchaseAuditLog({
+  await writePurchaseAudit({
     tenantId,
     actorId,
-    action: PURCHASE_AUDIT_ACTION.PO_UPDATED,
-    entityType: 'PURCHASE_ORDER',
+    entity: PURCHASE_AUDIT_ENTITY.PO,
     entityId: existing.id,
-    entityNumber: existing.orderNumber,
-    oldValue: { status: statusBefore, revisionNo: existing.revisionNo },
+    action: PURCHASE_AUDIT_ACTION.PO_UPDATED,
+    previousValue: { status: statusBefore, revisionNo: existing.revisionNo },
     newValue: { status: statusAfter, revisionNo: nextRev, reason, changeCount: changes.length },
   })
 

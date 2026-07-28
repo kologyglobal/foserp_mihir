@@ -8,6 +8,7 @@ import type {
   PurchaseRequisition,
   PurchaseRequisitionLine,
   PurchaseStatusHistory,
+  Prisma,
 } from '@prisma/client'
 import { decimalToNumber, toIso } from '../../../shared/index.js'
 
@@ -181,10 +182,10 @@ export function mapGrnLinesForReview(
     lineNumber: number
     itemCodeSnapshot: string
     itemNameSnapshot: string
-    receivedQuantity: unknown
+    receivedQuantity: Prisma.Decimal | number | null | undefined
     uomId: string | null
-    rate: unknown
-    amount: unknown
+    rate: Prisma.Decimal | number | null | undefined
+    amount: Prisma.Decimal | number | null | undefined
     toleranceStatus?: string | null
   }>,
 ) {
