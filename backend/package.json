@@ -19,6 +19,7 @@
     "test:purchase-qi-live": "vitest run tests/purchase-qi-lifecycle.test.ts --hookTimeout=120000",
     "test:purchase-return-live": "vitest run tests/purchase-return-lifecycle.test.ts --hookTimeout=120000",
     "test:purchase-coverage-live": "vitest run tests/purchase-module-coverage.test.ts --hookTimeout=120000",
+    "test:purchase-multi-unit-uom-live": "tsx scripts/test-purchase-multi-unit-uom-flow.ts",
     "test:crm-live": "tsx scripts/run-crm-live-tests.ts",
     "test:backend-structure": "tsx scripts/test-backend-structure.ts",
     "swagger:generate": "tsx scripts/generate-swagger-paths.ts",

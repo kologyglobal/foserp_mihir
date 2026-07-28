@@ -156,9 +156,19 @@ Legend: **Auto** = unit/API test candidate · **Manual** = UI/E2E · **Partial**
 | Layer | Coverage |
 |-------|----------|
 | Unit | `backend/tests/purchase/uom-conversion.test.ts` — formulas, factor 1, reject ≤0, dual resolve | Scenarios **1, 4, 5, 6** math |
-| API (recommended next) | PO create with `uomQuantity`; GRN create + `post-inventory`; assert balance | Scenarios **1, 2, 5, 6, 8** |
-| Live E2E | Stage after Hostinger SQL | Full matrix Manual column |
-| Not automated yet | Over-receipt Setup matrix, multi-WH UI, invoice (#13–14), backdate (#10) | |
+| **Live E2E (API)** | `backend/scripts/test-purchase-multi-unit-uom-flow.ts` — multi-item PO (MTR + KG + NOS) → GRN → inventory; logs expected vs actual | Scenarios **1, 5, 6, 9** |
+| Live E2E (stage UI) | Stage after Hostinger SQL | Full matrix Manual column |
+| Not automated yet | Over-receipt Setup matrix, multi-WH UI, invoice (#13–14), backdate (#10), partial/split (#2/#8) | |
+
+**Run live multi-unit script (local DB must be up):**
+
+```bash
+cd backend
+npm run test:purchase-multi-unit-uom-live
+# or: npx tsx scripts/test-purchase-multi-unit-uom-flow.ts
+```
+
+Script creates `PIPE-MUOM-MTR` (3 m = 1 NOS), `ROD-MUOM-KG` (50 kg = 1 NOS), `BOLT-MUOM-NOS` (1:1), one PO with all three lines, GRN with `receivedUomQuantity`, then asserts stock Δ in **primary** UOM and prints a PASS/FAIL summary.
 
 **Suggested API test seed:** create PIPE-56 in fixture → PO 30 m @ 30 → GRN 30 → post-inventory → `onHandQty === 10`, `avgRate` reflects primary cost path.
 
@@ -214,4 +224,5 @@ Legend: **Auto** = unit/API test candidate · **Manual** = UI/E2E · **Partial**
 - Implementation notes: [`PURCHASE_MULTI_UNIT_UOM.md`](./PURCHASE_MULTI_UNIT_UOM.md)
 - Hostinger SQL: [`backend/scripts/purchase-multi-unit-uom-hostinger.sql`](../backend/scripts/purchase-multi-unit-uom-hostinger.sql)
 - Unit tests: [`backend/tests/purchase/uom-conversion.test.ts`](../backend/tests/purchase/uom-conversion.test.ts)
+- Live E2E script: [`backend/scripts/test-purchase-multi-unit-uom-flow.ts`](../backend/scripts/test-purchase-multi-unit-uom-flow.ts) (`npm run test:purchase-multi-unit-uom-live`)
 - Conversion helper: [`backend/src/modules/purchase/shared/uom-conversion.ts`](../backend/src/modules/purchase/shared/uom-conversion.ts)
