@@ -101,3 +101,24 @@ export const poReasonSchema = z.object({
 })
 
 export type PoReasonInput = z.infer<typeof poReasonSchema>
+
+export const revisePurchaseOrderSchema = z.object({
+  reason: z.string().trim().min(1, 'Revision reason is required').max(2000),
+  expectedDeliveryDate: dateString.nullable().optional(),
+  paymentTerms: z.string().max(200).nullable().optional(),
+  deliveryTerms: z.string().max(200).nullable().optional(),
+  freightAmount: z.coerce.number().min(0).optional(),
+  remarks: z.string().max(4000).nullable().optional(),
+  lines: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        /** Primary qty after revision. */
+        quantity: z.coerce.number().positive().optional(),
+        rate: z.coerce.number().min(0).optional(),
+      }),
+    )
+    .optional(),
+})
+
+export type RevisePurchaseOrderInput = z.infer<typeof revisePurchaseOrderSchema>

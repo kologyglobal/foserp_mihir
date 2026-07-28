@@ -25,9 +25,13 @@ import type { PurchaseApprovalQueueRow } from '../../types/purchaseDomain'
 import { canPurchasePermission } from '../../utils/permissions'
 
 function documentPath(row: PurchaseApprovalQueueRow) {
-  return row.documentType === 'purchase_requisition'
-    ? `/purchase/requisitions/${row.documentId}`
-    : `/purchase/orders/${row.documentId}`
+  if (row.documentType === 'purchase_requisition') {
+    return `/purchase/requisitions/${row.documentId}`
+  }
+  if (row.documentType === 'goods_receipt_note') {
+    return `/purchase/grn/${row.documentId}`
+  }
+  return `/purchase/orders/${row.documentId}`
 }
 
 function priorityColor(
@@ -40,7 +44,9 @@ function priorityColor(
 }
 
 function docTypeShort(type: PurchaseApprovalQueueRow['documentType']) {
-  return type === 'purchase_requisition' ? 'PR' : 'PO'
+  if (type === 'purchase_requisition') return 'PR'
+  if (type === 'goods_receipt_note') return 'GRN'
+  return 'PO'
 }
 
 export interface PurchaseApprovalRowHandlers {
@@ -75,7 +81,9 @@ function buildRowActions(
     const canApprove =
       row.documentType === 'purchase_order'
         ? canPurchasePermission('purchase.po.approve')
-        : canPurchasePermission('purchase.pr.approve')
+        : row.documentType === 'goods_receipt_note'
+          ? canPurchasePermission('purchase.grn.post')
+          : canPurchasePermission('purchase.pr.approve')
     if (canApprove) {
       actions.push(
         {

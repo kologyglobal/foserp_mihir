@@ -90,6 +90,8 @@ const itemBaseSchema = z.object({
   purchaseQtyPerUom: z.coerce.number().positive().default(1),
   /** Vendor units per 1 primary/base unit. */
   uomConversionFactor: z.coerce.number().positive().optional(),
+  /** ±% receiving tolerance vs open PO qty on GRN. */
+  receivingTolerancePercentage: z.coerce.number().min(0).max(100).optional(),
   salesDescription: z.string().trim().max(5000).nullable().optional(),
   salesUomId: z.string().uuid().nullable().optional(),
   defaultSalesRate: z.coerce.number().min(0).optional(),

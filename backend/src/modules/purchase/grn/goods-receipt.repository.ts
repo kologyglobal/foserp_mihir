@@ -63,6 +63,10 @@ export type GrnLineCreateData = {
   manufacturingDate: Date | null
   expiryDate: Date | null
   qcRequired: boolean
+  tolerancePercentage: number
+  variancePercentage: number | null
+  toleranceStatus: 'OK' | 'PARTIAL' | 'NOT_RECEIVED' | 'SHORT_OUTSIDE' | 'EXCESS_WITHIN' | 'EXCESS_OUTSIDE'
+  closeOpenQuantity: boolean
   remarks: string | null
 }
 

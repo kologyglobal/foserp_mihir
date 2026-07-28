@@ -48,8 +48,7 @@ export function assertSubmittable(grn: GrnWithLines): void {
       [{ field: 'warehouseId', message: purchaseMessage(PURCHASE_ERROR_CODE.GRN_WAREHOUSE_REQUIRED) }],
     )
   }
-  const valid = grn.lines.filter((l) => Number(l.receivedQuantity) > 0)
-  if (valid.length === 0) {
+  if (grn.lines.length === 0) {
     throw new GoodsReceiptValidationError(
       purchaseMessage(PURCHASE_ERROR_CODE.GRN_NO_LINES),
       PURCHASE_ERROR_CODE.GRN_NO_LINES,
@@ -58,9 +57,20 @@ export function assertSubmittable(grn: GrnWithLines): void {
   }
 }
 
+export function assertToleranceApprovable(grn: Pick<GoodsReceipt, 'status' | 'deletedAt'>): void {
+  assertNotDeleted(grn)
+  if (grn.status !== 'PENDING_TOLERANCE_APPROVAL') {
+    throw workflowError(PURCHASE_ERROR_CODE.GRN_TOLERANCE_NOT_PENDING)
+  }
+}
+
 export function assertCancellable(grn: Pick<GoodsReceipt, 'status' | 'deletedAt'>): void {
   assertNotDeleted(grn)
-  if (!['DRAFT', 'SUBMITTED', 'RECEIVING_COMPLETED', 'QC_PENDING'].includes(grn.status)) {
+  if (
+    !['DRAFT', 'PENDING_TOLERANCE_APPROVAL', 'SUBMITTED', 'RECEIVING_COMPLETED', 'QC_PENDING'].includes(
+      grn.status,
+    )
+  ) {
     throw workflowError(PURCHASE_ERROR_CODE.GRN_NOT_CANCELLABLE)
   }
 }
@@ -114,6 +124,8 @@ export function allowedActions(grn: Pick<GoodsReceipt, 'status' | 'deletedAt' | 
   canCancel: boolean
   canReverse: boolean
   canPostInventory: boolean
+  canApproveTolerance: boolean
+  canRejectTolerance: boolean
 } {
   const active = !grn.deletedAt
   const canPostInventory =
@@ -122,10 +134,14 @@ export function allowedActions(grn: Pick<GoodsReceipt, 'status' | 'deletedAt' | 
     (grn.inspectionRequired
       ? ['PARTIALLY_ACCEPTED', 'FULLY_ACCEPTED'].includes(grn.status)
       : ['SUBMITTED', 'RECEIVING_COMPLETED', 'PARTIALLY_ACCEPTED', 'FULLY_ACCEPTED'].includes(grn.status))
+  const pendingTol = active && grn.status === 'PENDING_TOLERANCE_APPROVAL'
   return {
     canEdit: active && grn.status === 'DRAFT',
     canSubmit: active && grn.status === 'DRAFT',
-    canCancel: active && ['DRAFT', 'SUBMITTED', 'RECEIVING_COMPLETED', 'QC_PENDING'].includes(grn.status),
+    canCancel: active &&
+      ['DRAFT', 'PENDING_TOLERANCE_APPROVAL', 'SUBMITTED', 'RECEIVING_COMPLETED', 'QC_PENDING'].includes(
+        grn.status,
+      ),
     canReverse:
       active &&
       [
@@ -137,5 +153,7 @@ export function allowedActions(grn: Pick<GoodsReceipt, 'status' | 'deletedAt' | 
         'INVENTORY_POSTED',
       ].includes(grn.status),
     canPostInventory,
+    canApproveTolerance: pendingTol,
+    canRejectTolerance: pendingTol,
   }
 }

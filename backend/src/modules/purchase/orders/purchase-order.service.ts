@@ -232,7 +232,17 @@ async function toPurchaseOrderDto(
   tenantId: string,
   order: Parameters<typeof mapPurchaseOrderToDto>[0],
 ) {
-  const userNames = await repo.resolveUserNames(tenantId, [order.createdById])
+  const revisionIds =
+    (
+      order as {
+        revisions?: Array<{ revisedById?: string | null }>
+      }
+    ).revisions?.map((r) => r.revisedById) ?? []
+  const userNames = await repo.resolveUserNames(tenantId, [
+    order.createdById,
+    order.updatedById,
+    ...revisionIds,
+  ])
   return mapPurchaseOrderToDto(order, userNames)
 }
 

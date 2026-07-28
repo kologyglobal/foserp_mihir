@@ -46,7 +46,9 @@ export function PurchaseReturnPrintPage() {
     if (!doc) return
     if (searchParams.get('download') !== '1' && searchParams.get('autodownload') !== '1') return
     const timer = window.setTimeout(() => {
-      void handlePurchasePdfDownload(`${doc.documentNumber}.pdf`)
+      void handlePurchasePdfDownload(`${doc.documentNumber}.pdf`, {
+        documentKind: 'purchase_return',
+      })
     }, 450)
     return () => window.clearTimeout(timer)
   }, [doc, searchParams])
@@ -62,6 +64,7 @@ export function PurchaseReturnPrintPage() {
       backLabel="Back to Return"
       backTo={`/purchase/returns/${doc.id}`}
       pdfFileName={`${doc.documentNumber}.pdf`}
+      documentKind="purchase_return"
     >
       <article className="po-print-doc">
         <PurchaseDocumentLetterhead

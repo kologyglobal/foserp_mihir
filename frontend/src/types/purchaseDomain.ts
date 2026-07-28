@@ -130,7 +130,7 @@ export const PURCHASE_ORDER_DOMAIN_STATUSES: readonly PurchaseOrderDomainStatus[
 
 export const PURCHASE_ORDER_DOMAIN_STATUS_LABELS: Record<PurchaseOrderDomainStatus, string> = {
   draft: 'Draft',
-  pending_approval: 'Pending Approval',
+  pending_approval: 'Sent for Approval',
   approved: 'Approved',
   rejected: 'Rejected',
   sent_back: 'Sent Back',
@@ -238,6 +238,7 @@ export const PURCHASE_ORDER_LINE_ITEM_TYPE_LABELS: Record<PurchaseOrderLineItemT
 
 export type GrnDomainStatus =
   | 'draft'
+  | 'pending_tolerance_approval'
   | 'pending_inspection'
   | 'accepted'
   | 'partially_accepted'
@@ -247,6 +248,7 @@ export type GrnDomainStatus =
 
 export const GRN_DOMAIN_STATUSES: readonly GrnDomainStatus[] = [
   'draft',
+  'pending_tolerance_approval',
   'pending_inspection',
   'accepted',
   'partially_accepted',
@@ -257,6 +259,7 @@ export const GRN_DOMAIN_STATUSES: readonly GrnDomainStatus[] = [
 
 export const GRN_DOMAIN_STATUS_LABELS: Record<GrnDomainStatus, string> = {
   draft: 'Draft',
+  pending_tolerance_approval: 'Pending Tolerance Approval',
   pending_inspection: 'Pending Inspection',
   accepted: 'Accepted',
   partially_accepted: 'Partially Accepted',
@@ -653,6 +656,8 @@ export interface PurchaseItem {
   serialControlled: boolean
   /** Expiry date required on GRN. */
   expiryControlled: boolean
+  /** Item Master ±% vs open qty for GRN receiving. */
+  receivingTolerancePercentage?: number
   isActive: boolean
   remarks: string
   createdBy: string
@@ -753,6 +758,8 @@ export interface PurchaseSetupGeneral {
   allowOverReceipt: boolean
   /** Percent over ordered qty allowed on GRN when over-receipt is enabled. */
   overReceiptTolerancePct: number
+  /** When true, revising a released PO returns it to Pending Approval. */
+  requireApprovalOnPoRevision: boolean
   allowShortClose: boolean
   requirePoWarehouse: boolean
   requireExpectedDeliveryDate: boolean
@@ -983,7 +990,7 @@ export interface PurchaseApproval {
   id: string
   documentType: Extract<
     PurchaseDocumentKind,
-    'purchase_requisition' | 'purchase_order' | 'purchase_invoice' | 'purchase_return'
+    'purchase_requisition' | 'purchase_order' | 'purchase_invoice' | 'purchase_return' | 'goods_receipt_note'
   >
   documentId: string
   documentNumber: string
@@ -1016,12 +1023,13 @@ export const PURCHASE_APPROVAL_QUEUE_TAB_LABELS: Record<PurchaseApprovalQueueTab
 
 export type PurchaseApprovalDocumentType = Extract<
   PurchaseDocumentKind,
-  'purchase_requisition' | 'purchase_order'
+  'purchase_requisition' | 'purchase_order' | 'goods_receipt_note'
 >
 
 export const PURCHASE_APPROVAL_DOCUMENT_TYPE_LABELS: Record<PurchaseApprovalDocumentType, string> = {
   purchase_requisition: 'Purchase Requisition',
   purchase_order: 'Purchase Order',
+  goods_receipt_note: 'Goods Receipt (tolerance)',
 }
 
 export type PurchaseApprovalAgeingBucket = '' | '0_3' | '4_7' | '8_15' | '16_plus'
@@ -1893,6 +1901,7 @@ export interface PurchaseOrder extends PurchaseMoneyTotals, PurchaseAuditFields 
     state: string
     isInterstate: boolean
     address: string
+    city?: string
   }
   placeOfSupply: string
   currency: IndianCurrencyCode
@@ -2026,6 +2035,20 @@ export interface GoodsReceiptLine {
   serialControlled: boolean
   expiryControlled: boolean
   qcRequired: boolean
+  /** Snapshot ±% tolerance at receive time. */
+  tolerancePercentage?: number
+  variancePercentage?: number | null
+  toleranceStatus?:
+    | 'OK'
+    | 'PARTIAL'
+    | 'NOT_RECEIVED'
+    | 'SHORT_OUTSIDE'
+    | 'EXCESS_WITHIN'
+    | 'EXCESS_OUTSIDE'
+  closeOpenQuantity?: boolean
+  /** Item master tolerance used for client preview before save. */
+  receivingTolerancePercentage?: number
+  orderedUomQty?: number
   remarks: string
 }
 
@@ -2059,6 +2082,7 @@ export interface GoodsReceiptNote extends PurchaseMoneyTotals, PurchaseAuditFiel
   inspectionRequired: boolean
   /** Header-level permission to receive above pending qty. */
   allowExcess: boolean
+  toleranceApprovalRequired?: boolean
   qualityInspectionId: string | null
   lines: GoodsReceiptLine[]
   postedAt: IsoDateTime | null
@@ -2618,6 +2642,8 @@ export type GrnInput = {
   lines: Array<{
     purchaseOrderLineId: string
     receivedQty: number
+    /** Vendor UOM received qty when dual-UOM; falls back to receivedQty. */
+    receivedUomQty?: number
     acceptedQty?: number
     rejectedQty?: number
     shortQty?: number
@@ -2632,6 +2658,8 @@ export type GrnInput = {
     warehouseName?: string
     bin?: string
     allowExcess?: boolean
+    /** Close remaining open qty (short outside band → approval). */
+    closeOpenQuantity?: boolean
     remarks?: string
   }>
 }

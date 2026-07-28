@@ -274,7 +274,9 @@ export function PurchaseOrderDetailPage() {
     ? aa.canSendToVendor
     : (po.status === 'approved' || po.status === 'released') && !po.sentToVendorAt
   const canCreateGrn = aa ? aa.canReceive : RECEIVABLE_STATUSES.includes(po.status)
-  const canRevise = isApiMode() ? false : REVISABLE_STATUSES.includes(po.status)
+  const canRevise = aa
+    ? Boolean(aa.canRevise)
+    : REVISABLE_STATUSES.includes(po.status)
   const canClose = aa ? aa.canClose : !['draft', 'closed', 'cancelled'].includes(po.status)
   const canCancel = aa ? aa.canCancel : !['closed', 'cancelled'].includes(po.status)
 

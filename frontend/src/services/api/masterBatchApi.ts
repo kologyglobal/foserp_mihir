@@ -84,6 +84,7 @@ export interface ItemDto {
   purchaseUomId?: string | null
   purchaseQtyPerUom: number | string
   uomConversionFactor?: number | string
+  receivingTolerancePercentage?: number | string
   qcRequired: boolean
   qualityTestGroupCode?: string | null
   productionBomId?: string | null
@@ -274,6 +275,7 @@ export function mapItemDto(row: ItemDto): Item {
     purchaseUomId: row.purchaseUomId ?? null,
     purchaseQtyPerUom: num(row.uomConversionFactor ?? row.purchaseQtyPerUom),
     uomConversionFactor: num(row.uomConversionFactor ?? row.purchaseQtyPerUom),
+    receivingTolerancePercentage: num(row.receivingTolerancePercentage),
     qcRequired: row.qcRequired,
     qualityTestGroupCode: row.qualityTestGroupCode ?? null,
     productionBomId: row.productionBomId ?? null,
@@ -430,6 +432,7 @@ export function itemToApiPayload(data: Item): Record<string, unknown> {
     purchaseUomId: data.purchaseUomId || null,
     purchaseQtyPerUom: data.uomConversionFactor ?? data.purchaseQtyPerUom ?? 1,
     uomConversionFactor: data.uomConversionFactor ?? data.purchaseQtyPerUom ?? 1,
+    receivingTolerancePercentage: data.receivingTolerancePercentage ?? 0,
     qcRequired: data.qcRequired ?? false,
     qualityTestGroupCode: data.qualityTestGroupCode || null,
     productionBomId: data.productionBomId || null,

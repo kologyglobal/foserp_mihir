@@ -3,7 +3,7 @@ import { prisma } from '../../../config/database.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import type { ListPurchaseOrdersQuery } from './purchase-order.validation.js'
 
-const includeOrder = {
+const includeOrderBase = {
   lines: {
     orderBy: { lineNumber: 'asc' as const },
     include: {
@@ -34,6 +34,17 @@ const includeOrder = {
   },
   deliveryWarehouse: {
     select: { id: true, code: true, name: true, plantId: true },
+  },
+} as const
+
+/** List: skip revision snapshots (lighter). Detail/update: include history. */
+const includeOrderList = includeOrderBase
+
+const includeOrderDetail = {
+  ...includeOrderBase,
+  revisions: {
+    orderBy: { revisionNo: 'desc' as const },
+    take: 50,
   },
 } as const
 
@@ -74,7 +85,7 @@ export async function findPurchaseOrders(tenantId: string, query: ListPurchaseOr
       skip,
       take,
       orderBy: { orderDate: query.sortOrder },
-      include: includeOrder,
+      include: includeOrderList,
     }),
     prisma.purchaseOrder.count({ where }),
   ])
@@ -85,7 +96,7 @@ export async function findPurchaseOrders(tenantId: string, query: ListPurchaseOr
 export async function findPurchaseOrderById(tenantId: string, id: string) {
   return prisma.purchaseOrder.findFirst({
     where: { id, ...tenantActiveFilter(tenantId) },
-    include: includeOrder,
+    include: includeOrderDetail,
   })
 }
 
@@ -102,7 +113,7 @@ export async function updatePurchaseOrder(
   if (result.count !== 1) return null
   return tx.purchaseOrder.findFirst({
     where: { id, tenantId },
-    include: includeOrder,
+    include: includeOrderDetail,
   })
 }
 

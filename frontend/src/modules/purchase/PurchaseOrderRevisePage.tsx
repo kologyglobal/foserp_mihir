@@ -37,10 +37,16 @@ interface RevisableLine {
   itemCode: string
   itemName: string
   uom: string
+  /** Primary / stock qty (API `quantity`). */
   originalQuantity: number
+  /** Vendor / purchase qty (API `uomQuantity`). */
+  originalUomQuantity: number
   originalRate: number
   quantity: number
+  uomQuantity: number
+  uomConversionFactor: number
   rate: number
+  /** Received in primary UOM. */
   receivedQty: number
 }
 
@@ -105,18 +111,27 @@ export function PurchaseOrderRevisePage() {
       }
       setPo(row)
       setLines(
-        row.lines.map((l: PurchaseOrderLine) => ({
-          id: l.id,
-          itemId: l.itemId,
-          itemCode: l.itemCode,
-          itemName: l.itemName,
-          uom: l.uom,
-          originalQuantity: l.quantity,
-          originalRate: l.rate,
-          quantity: l.quantity,
-          rate: l.rate,
-          receivedQty: l.receivedQty,
-        })),
+        row.lines.map((l: PurchaseOrderLine) => {
+          const factor = Number(l.uomConversionFactor) > 0 ? Number(l.uomConversionFactor) : 1
+          const quantity = Number(l.quantity) || 0
+          const uomQuantity =
+            Number(l.uomQuantity) > 0 ? Number(l.uomQuantity) : quantity * factor
+          return {
+            id: l.id,
+            itemId: l.itemId,
+            itemCode: l.itemCode,
+            itemName: l.itemName,
+            uom: l.uom || 'NOS',
+            originalQuantity: quantity,
+            originalUomQuantity: uomQuantity,
+            originalRate: Number(l.rate) || 0,
+            quantity,
+            uomQuantity,
+            uomConversionFactor: factor,
+            rate: Number(l.rate) || 0,
+            receivedQty: Number(l.receivedQty) || 0,
+          }
+        }),
       )
       setPaymentTerms(row.paymentTerms)
       setDeliveryTerms(row.deliveryTerms)
@@ -178,8 +193,10 @@ export function PurchaseOrderRevisePage() {
     tradeDiscount,
   ])
 
-  const lineChangeCount = lines.filter((l) => l.quantity !== l.originalQuantity || l.rate !== l.originalRate).length
-  const newValue = lines.reduce((s, l) => s + l.quantity * l.rate, 0)
+  const lineChangeCount = lines.filter(
+    (l) => l.uomQuantity !== l.originalUomQuantity || l.rate !== l.originalRate,
+  ).length
+  const newValue = lines.reduce((s, l) => s + l.uomQuantity * l.rate, 0)
   const commercialPeek = commercialTermsSummary({
     expectedDelivery: expectedDeliveryDate,
     paymentTerms,
@@ -201,8 +218,25 @@ export function PurchaseOrderRevisePage() {
     else resetDirty()
   }, [dirty, markDirty, resetDirty, saving])
 
-  const patchLine = (lineId: string, patch: Partial<Pick<RevisableLine, 'quantity' | 'rate'>>) => {
-    setLines((prev) => prev.map((l) => (l.id === lineId ? { ...l, ...patch } : l)))
+  const patchLine = (
+    lineId: string,
+    patch: Partial<Pick<RevisableLine, 'uomQuantity' | 'rate'>>,
+  ) => {
+    setLines((prev) =>
+      prev.map((l) => {
+        if (l.id !== lineId) return l
+        const next = { ...l, ...patch }
+        const factor = next.uomConversionFactor > 0 ? next.uomConversionFactor : 1
+        if (patch.uomQuantity != null) {
+          next.uomQuantity = Math.max(0, Number(patch.uomQuantity) || 0)
+          next.quantity = factor > 0 ? next.uomQuantity / factor : next.uomQuantity
+        }
+        if (patch.rate != null) {
+          next.rate = Math.max(0, Number(patch.rate) || 0)
+        }
+        return next
+      }),
+    )
   }
 
   const save = async () => {
@@ -211,13 +245,27 @@ export function PurchaseOrderRevisePage() {
       notify.error('Revision reason is required')
       return
     }
+    const belowReceived = lines.find((l) => l.quantity + 1e-9 < l.receivedQty)
+    if (belowReceived) {
+      notify.error(
+        `${belowReceived.itemCode}: quantity cannot be below already received (${belowReceived.receivedQty})`,
+      )
+      return
+    }
     setSaving(true)
     try {
       const input: PurchaseOrderReviseInput = {
         reason: reason.trim(),
         lines: lines
-          .filter((l) => l.quantity !== l.originalQuantity || l.rate !== l.originalRate)
-          .map((l) => ({ id: l.id, itemId: l.itemId, quantity: l.quantity, rate: l.rate })),
+          .filter(
+            (l) => l.uomQuantity !== l.originalUomQuantity || l.rate !== l.originalRate,
+          )
+          .map((l) => ({
+            id: l.id,
+            itemId: l.itemId,
+            quantity: l.quantity,
+            rate: l.rate,
+          })),
         paymentTerms,
         deliveryTerms,
         freightTerms,
@@ -238,7 +286,7 @@ export function PurchaseOrderRevisePage() {
       const revised = await revisePurchaseOrder(po.id, input)
       notify.success(`${revised.documentNumber} revised · Rev ${revised.revisionNo}`)
       resetDirty()
-      navigate('/purchase/orders', { replace: true })
+      navigate(`/purchase/orders/${revised.id}`, { replace: true })
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Revision failed')
     } finally {
@@ -305,63 +353,198 @@ export function PurchaseOrderRevisePage() {
         </ErpFieldRow>
       </ErpCardSection>
 
-      <ErpCardSection title="Item Lines" collapsible defaultOpen>
-        <p className="mb-2 text-[12px] text-erp-muted">
-          {lineChangeCount} of {lines.length} line(s) changed · New order value {formatCurrency(newValue)}
+      <ErpCardSection title="Item Lines" collapsible defaultOpen columns={1} dense={false}>
+        <div className="w-full min-w-0 space-y-2">
+        <p className="text-[12px] text-erp-muted">
+          {lineChangeCount} of {lines.length} line(s) changed · New order value{' '}
+          {formatCurrency(newValue)}
+          {lines.some((l) => l.uomConversionFactor !== 1)
+            ? ' · Qty is vendor/purchase UOM (same as PO editor)'
+            : null}
         </p>
-        <div className="overflow-x-auto rounded-md border border-erp-border">
-          <table className="erp-table text-[12px]">
-            <thead>
-              <tr>
-                <th>Item Code</th>
-                <th>Item</th>
-                <th>UOM</th>
-                <th className="num">Received</th>
-                <th className="num">Original Qty</th>
-                <th className="num">New Qty</th>
-                <th className="num">Original Rate</th>
-                <th className="num">New Rate</th>
-                <th className="num">New Line Total</th>
-              </tr>
-            </thead>
-            <tbody>
+        {lines.length === 0 ? (
+          <p className="rounded-md border border-erp-border bg-erp-surface-alt px-3 py-4 text-[12px] text-erp-muted">
+            No lines on this purchase order.
+          </p>
+        ) : (
+          <>
+            {/* Mobile cards */}
+            <ul className="flex w-full flex-col gap-2 md:hidden" aria-label="Item lines">
               {lines.map((l) => {
-                const qtyChanged = l.quantity !== l.originalQuantity
+                const qtyChanged = l.uomQuantity !== l.originalUomQuantity
                 const rateChanged = l.rate !== l.originalRate
+                const minVendorQty = l.receivedQty * l.uomConversionFactor
+                const belowRecv = l.quantity + 1e-9 < l.receivedQty
                 return (
-                  <tr key={l.id} className={cn((qtyChanged || rateChanged) && 'bg-amber-50/50')}>
-                    <td className="font-mono">{l.itemCode}</td>
-                    <td>{l.itemName}</td>
-                    <td>{l.uom}</td>
-                    <td className="num">{l.receivedQty}</td>
-                    <td className="num tabular-nums text-erp-muted">{l.originalQuantity}</td>
-                    <td className="num">
-                      <input
-                        type="number"
-                        min={l.receivedQty}
-                        step="any"
-                        className={cn('erp-input h-8 w-24 text-right text-[12px]', qtyChanged && 'border-erp-warning-border')}
-                        value={l.quantity}
-                        onChange={(e) => patchLine(l.id, { quantity: Number(e.target.value) })}
-                      />
-                    </td>
-                    <td className="num tabular-nums text-erp-muted">{formatCurrency(l.originalRate)}</td>
-                    <td className="num">
-                      <input
-                        type="number"
-                        min={0}
-                        step="any"
-                        className={cn('erp-input h-8 w-24 text-right text-[12px]', rateChanged && 'border-erp-warning-border')}
-                        value={l.rate}
-                        onChange={(e) => patchLine(l.id, { rate: Number(e.target.value) })}
-                      />
-                    </td>
-                    <td className="num font-medium">{formatCurrency(l.quantity * l.rate)}</td>
-                  </tr>
+                  <li
+                    key={l.id}
+                    className={cn(
+                      'rounded-md border border-erp-border bg-erp-surface p-3',
+                      (qtyChanged || rateChanged) && 'border-erp-warning-border bg-amber-50/40',
+                      belowRecv && 'border-red-300 bg-red-50/40',
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-mono text-[11px] text-erp-muted">{l.itemCode}</p>
+                        <p className="truncate text-[13px] font-medium text-erp-text">{l.itemName}</p>
+                        <p className="mt-0.5 text-[11px] text-erp-muted">
+                          UOM {l.uom}
+                          {l.uomConversionFactor !== 1
+                            ? ` · factor ${l.uomConversionFactor} · stock ${l.quantity.toFixed(4)}`
+                            : null}
+                          {l.receivedQty > 0 ? ` · received ${l.receivedQty}` : null}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-[13px] font-semibold tabular-nums">
+                        {formatCurrency(l.uomQuantity * l.rate)}
+                      </p>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <label className="text-[11px] text-erp-muted">
+                        Qty ({l.uom})
+                        <Input
+                          type="number"
+                          min={minVendorQty}
+                          step="any"
+                          className={cn(
+                            'mt-1 h-9 text-right',
+                            qtyChanged && 'border-erp-warning-border',
+                            belowRecv && 'border-red-400',
+                          )}
+                          value={l.uomQuantity}
+                          onChange={(e) =>
+                            patchLine(l.id, { uomQuantity: Number(e.target.value) })
+                          }
+                        />
+                        <ChangedHint
+                          changed={qtyChanged}
+                          original={String(l.originalUomQuantity)}
+                        />
+                      </label>
+                      <label className="text-[11px] text-erp-muted">
+                        Rate
+                        <Input
+                          type="number"
+                          min={0}
+                          step="any"
+                          className={cn(
+                            'mt-1 h-9 text-right',
+                            rateChanged && 'border-erp-warning-border',
+                          )}
+                          value={l.rate}
+                          onChange={(e) => patchLine(l.id, { rate: Number(e.target.value) })}
+                        />
+                        <ChangedHint
+                          changed={rateChanged}
+                          original={formatCurrency(l.originalRate)}
+                        />
+                      </label>
+                    </div>
+                    {belowRecv ? (
+                      <p className="mt-2 text-[11px] text-red-600">
+                        Cannot go below received qty ({l.receivedQty} stock).
+                      </p>
+                    ) : null}
+                  </li>
                 )
               })}
-            </tbody>
-          </table>
+            </ul>
+
+            {/* Desktop table — full width of the form card */}
+            <div className="hidden w-full min-w-0 overflow-x-auto rounded-md border border-erp-border md:block">
+              <table className="erp-table w-full min-w-[52rem] text-[12px]">
+                <thead>
+                  <tr>
+                    <th className="text-left">Item</th>
+                    <th>UOM</th>
+                    <th className="num">Received</th>
+                    <th className="num">Original Qty</th>
+                    <th className="num">New Qty</th>
+                    {lines.some((l) => l.uomConversionFactor !== 1) ? (
+                      <th className="num">Stock qty</th>
+                    ) : null}
+                    <th className="num">Original Rate</th>
+                    <th className="num">New Rate</th>
+                    <th className="num">Line Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((l) => {
+                    const qtyChanged = l.uomQuantity !== l.originalUomQuantity
+                    const rateChanged = l.rate !== l.originalRate
+                    const minVendorQty = l.receivedQty * l.uomConversionFactor
+                    const belowRecv = l.quantity + 1e-9 < l.receivedQty
+                    const showStock = lines.some((x) => x.uomConversionFactor !== 1)
+                    return (
+                      <tr
+                        key={l.id}
+                        className={cn(
+                          (qtyChanged || rateChanged) && 'bg-amber-50/50',
+                          belowRecv && 'bg-red-50/50',
+                        )}
+                      >
+                        <td className="text-left">
+                          <div className="min-w-[12rem] max-w-[20rem]">
+                            <div className="font-mono text-[11px] text-erp-muted">{l.itemCode}</div>
+                            <div className="font-medium text-erp-text">{l.itemName}</div>
+                          </div>
+                        </td>
+                        <td>{l.uom}</td>
+                        <td className="num tabular-nums">{l.receivedQty}</td>
+                        <td className="num tabular-nums text-erp-muted">
+                          {l.originalUomQuantity}
+                        </td>
+                        <td className="num">
+                          <Input
+                            type="number"
+                            min={minVendorQty}
+                            step="any"
+                            className={cn(
+                              'h-8 w-full min-w-[5rem] max-w-[7rem] text-right text-[12px]',
+                              qtyChanged && 'border-erp-warning-border',
+                              belowRecv && 'border-red-400',
+                            )}
+                            value={l.uomQuantity}
+                            onChange={(e) =>
+                              patchLine(l.id, { uomQuantity: Number(e.target.value) })
+                            }
+                            aria-label={`New qty for ${l.itemCode}`}
+                          />
+                        </td>
+                        {showStock ? (
+                          <td className="num tabular-nums text-erp-muted">
+                            {Number(l.quantity.toFixed(4))}
+                          </td>
+                        ) : null}
+                        <td className="num tabular-nums text-erp-muted">
+                          {formatCurrency(l.originalRate)}
+                        </td>
+                        <td className="num">
+                          <Input
+                            type="number"
+                            min={0}
+                            step="any"
+                            className={cn(
+                              'h-8 w-full min-w-[5rem] max-w-[7rem] text-right text-[12px]',
+                              rateChanged && 'border-erp-warning-border',
+                            )}
+                            value={l.rate}
+                            onChange={(e) => patchLine(l.id, { rate: Number(e.target.value) })}
+                            aria-label={`New rate for ${l.itemCode}`}
+                          />
+                        </td>
+                        <td className="num font-medium tabular-nums">
+                          {formatCurrency(l.uomQuantity * l.rate)}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
         </div>
       </ErpCardSection>
 

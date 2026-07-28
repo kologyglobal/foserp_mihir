@@ -374,7 +374,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
     expect(row?.warehouseId).toBe(warehouseId)
   })
 
-  it('blocks over-receipt when Setup disallows over-receipt (ignores client allowExcess)', async () => {
+  it('saves over-receipt as draft with EXCESS_OUTSIDE when Setup disallows silent excess', async () => {
     await putSetup({
       allowOverReceipt: false,
       overReceiptTolerancePct: 0,
@@ -393,11 +393,20 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
           lines: [{ purchaseOrderLineId: lineId, receivedQuantity: 150, binId }],
         }),
       )
-    expect(res.status).toBe(400)
-    expect(res.body.error?.code || res.body.code).toMatch(/GRN_QTY_EXCEEDS|VALIDATION/)
+    expect(res.status).toBe(201)
+    expect(res.body.data.status).toBe('DRAFT')
+    expect(res.body.data.toleranceApprovalRequired).toBe(true)
+    expect(res.body.data.lines[0].toleranceStatus).toBe('EXCESS_OUTSIDE')
+
+    const submit = await request(app)
+      .post(`${grnBase()}/${res.body.data.id}/submit`)
+      .set(auth())
+      .send({})
+    expect(submit.status).toBe(200)
+    expect(submit.body.data.status).toBe('PENDING_TOLERANCE_APPROVAL')
   })
 
-  it('allows over-receipt within Setup tolerance even when client allowExcess is false', async () => {
+  it('allows over-receipt within Setup tolerance; outside band requires approval on submit', async () => {
     await putSetup({
       allowOverReceipt: true,
       overReceiptTolerancePct: 10,
@@ -417,6 +426,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
         }),
       )
     expect(res.status).toBe(201)
+    expect(res.body.data.lines[0].toleranceStatus).toBe('EXCESS_WITHIN')
 
     const overTol = await request(app)
       .post(grnBase())
@@ -428,7 +438,14 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
           lines: [{ purchaseOrderLineId: lineId, receivedQuantity: 120, binId }],
         }),
       )
-    expect(overTol.status).toBe(400)
+    expect(overTol.status).toBe(201)
+    expect(overTol.body.data.lines[0].toleranceStatus).toBe('EXCESS_OUTSIDE')
+    const submit = await request(app)
+      .post(`${grnBase()}/${overTol.body.data.id}/submit`)
+      .set(auth())
+      .send({})
+    expect(submit.status).toBe(200)
+    expect(submit.body.data.status).toBe('PENDING_TOLERANCE_APPROVAL')
   })
 
   it('enforces Setup challan / vehicle / gate requirements', async () => {
@@ -477,7 +494,7 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
     })
   })
 
-  it('blocks over-receipt without allowExcess', async () => {
+  it('queues outside-tolerance GRN for approval instead of hard-blocking create', async () => {
     const res = await request(app)
       .post(grnBase())
       .set(auth())
@@ -486,8 +503,69 @@ describe.skipIf(!dbAvailable)('Goods receipt lifecycle (Phase 3)', () => {
           lines: [{ purchaseOrderLineId: poLineId, receivedQuantity: 150 }],
         }),
       )
-    expect(res.status).toBe(400)
-    expect(res.body.error?.code || res.body.code).toMatch(/GRN_QTY_EXCEEDS|VALIDATION/)
+    expect(res.status).toBe(201)
+    expect(res.body.data.lines[0].toleranceStatus).toBe('EXCESS_OUTSIDE')
+  })
+
+  it('zero received is NOT_RECEIVED; approve/reject tolerance paths work', async () => {
+    await putSetup({
+      allowOverReceipt: false,
+      overReceiptTolerancePct: 0,
+      requireVendorChallan: false,
+      requireVehicleNumber: false,
+      requireGateEntry: false,
+      autoCreateQualityInspection: false,
+    })
+    const { poId: zeroPoId, lineId } = await createReceivablePo(50)
+    const zeroDraft = await request(app)
+      .post(grnBase())
+      .set(auth())
+      .send(
+        draftPayload({
+          purchaseOrderId: zeroPoId,
+          lines: [{ purchaseOrderLineId: lineId, receivedQuantity: 0, binId }],
+        }),
+      )
+    expect(zeroDraft.status).toBe(201)
+    expect(zeroDraft.body.data.lines[0].toleranceStatus).toBe('NOT_RECEIVED')
+
+    const { poId: excessPoId, lineId: excessLineId } = await createReceivablePo(100)
+    const excessDraft = await request(app)
+      .post(grnBase())
+      .set(auth())
+      .send(
+        draftPayload({
+          purchaseOrderId: excessPoId,
+          lines: [{ purchaseOrderLineId: excessLineId, receivedQuantity: 130, binId }],
+        }),
+      )
+    expect(excessDraft.status).toBe(201)
+    const submitted = await request(app)
+      .post(`${grnBase()}/${excessDraft.body.data.id}/submit`)
+      .set(auth())
+      .send({})
+    expect(submitted.status).toBe(200)
+    expect(submitted.body.data.status).toBe('PENDING_TOLERANCE_APPROVAL')
+
+    const rejected = await request(app)
+      .post(`${grnBase()}/${excessDraft.body.data.id}/reject-tolerance`)
+      .set(auth())
+      .send({ remarks: 'Correct qty' })
+    expect(rejected.status).toBe(200)
+    expect(rejected.body.data.status).toBe('DRAFT')
+
+    const resubmit = await request(app)
+      .post(`${grnBase()}/${excessDraft.body.data.id}/submit`)
+      .set(auth())
+      .send({})
+    expect(resubmit.body.data.status).toBe('PENDING_TOLERANCE_APPROVAL')
+
+    const approved = await request(app)
+      .post(`${grnBase()}/${excessDraft.body.data.id}/approve-tolerance`)
+      .set(auth())
+      .send({ remarks: 'Accepted excess' })
+    expect(approved.status).toBe(200)
+    expect(['INVENTORY_POSTED', 'SUBMITTED', 'QC_PENDING']).toContain(approved.body.data.status)
   })
 
   it('blocks GRN against a cancelled PO', async () => {

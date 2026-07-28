@@ -49,6 +49,7 @@ import type {
   VendorQuotationLine,
   VendorQuotationListRow,
   GoodsReceiptNote,
+  GoodsReceiptLine,
   GrnDomainStatus,
   GrnInput,
   GrnListRow,
@@ -1241,7 +1242,7 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
     status,
     orderType: 'standard',
     origin: mapApiPoOrigin(String(api.origin), Boolean(api.purchaseRequisitionId)),
-    revisionNo: 0,
+    revisionNo: Number(api.revisionNo ?? 0),
     buyer,
     location: locationFromApi,
     purchaseLocation: locationFromApi,
@@ -1303,8 +1304,24 @@ export function mapApiPurchaseOrderToDomain(api: ApiPurchaseOrder): PurchaseOrde
           ? 'fully_invoiced'
           : 'not_invoiced',
     approvalIds: [],
-    changeHistory: [],
-    revisions: [],
+    changeHistory: (api.changeHistory ?? []).map((c) => ({
+      id: c.id,
+      revisionNo: c.revisionNo,
+      changedAt: c.changedAt ?? '',
+      changedBy: c.changedBy,
+      reason: c.reason,
+      fieldPath: c.fieldPath,
+      fieldLabel: c.fieldLabel,
+      previousValue: c.previousValue,
+      newValue: c.newValue,
+    })),
+    revisions: (api.revisions ?? []).map((r) => ({
+      revisionNo: r.revisionNo,
+      revisedAt: r.revisedAt ?? '',
+      revisedBy: r.revisedByName ?? r.revisedById ?? '',
+      reason: r.reason,
+      snapshot: r.snapshot ?? '',
+    })),
     attachmentIds: [],
     sentToVendorAt: api.sentAt ?? null,
     releasedAt: api.sentAt ?? null,
@@ -1396,6 +1413,8 @@ function mapApiGrnStatus(status: string): GrnDomainStatus {
   switch (key) {
     case 'DRAFT':
       return 'draft'
+    case 'PENDING_TOLERANCE_APPROVAL':
+      return 'pending_tolerance_approval'
     case 'QC_PENDING':
       return 'pending_inspection'
     case 'PARTIALLY_ACCEPTED':
@@ -1456,6 +1475,7 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
     qcRequired: api.inspectionRequired,
     inspectionRequired: api.inspectionRequired,
     allowExcess: api.allowExcess,
+    toleranceApprovalRequired: Boolean(api.toleranceApprovalRequired),
     qualityInspectionId: null,
     lines: (api.lines ?? []).map((l) => ({
       id: l.id,
@@ -1468,9 +1488,12 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
       uom: l.uom,
       hsnCode: '',
       orderedQty: Number(l.orderedQuantity) || 0,
+      orderedUomQty: Number(l.orderedUomQuantity) || 0,
       previouslyReceivedQty: Number(l.previouslyReceivedQuantity) || 0,
       pendingQty: Number(l.openQuantity) || 0,
       receivedQty: Number(l.receivedQuantity) || 0,
+      receivedUomQty: Number(l.receivedUomQuantity) || 0,
+      uomConversionFactor: Number(l.uomConversionFactor) || 1,
       acceptedQty: Number(l.acceptedQuantity) || 0,
       rejectedQty: Number(l.rejectedQuantity) || 0,
       shortQty: Number(l.shortQuantity) || 0,
@@ -1495,6 +1518,11 @@ export function mapApiGoodsReceiptToDomain(api: ApiGoodsReceipt): GoodsReceiptNo
       serialControlled: false,
       expiryControlled: false,
       qcRequired: l.qcRequired,
+      tolerancePercentage: Number(l.tolerancePercentage) || 0,
+      variancePercentage:
+        l.variancePercentage == null ? null : Number(l.variancePercentage),
+      toleranceStatus: (l.toleranceStatus as GoodsReceiptLine['toleranceStatus']) || 'OK',
+      closeOpenQuantity: Boolean(l.closeOpenQuantity),
       remarks: l.remarks || '',
     })),
     postedAt: api.status === 'INVENTORY_POSTED' ? api.updatedAt : null,
@@ -2132,11 +2160,12 @@ export function mapDomainGrnInputToApiPayload(input: GrnInput): Record<string, u
     remarks: input.remarks ?? null,
     lines: input.lines.map((line) => ({
       purchaseOrderLineId: line.purchaseOrderLineId,
-      /** Vendor UOM qty — backend converts to primary receivedQuantity. */
+      /** Vendor UOM qty — backend converts to primary receivedQuantity. Zero = Not Received. */
       receivedUomQuantity: Number(line.receivedUomQty ?? line.receivedQty) || 0,
       damagedQuantity: Number(line.damagedQty) || 0,
       shortQuantity: Number(line.shortQty) || 0,
       excessQuantity: Number(line.excessQty) || 0,
+      closeOpenQuantity: Boolean(line.closeOpenQuantity),
       warehouseId: line.warehouseId || input.warehouseId,
       batchNumber: line.batchNumber || null,
       lotNumber: line.lotNumber || null,

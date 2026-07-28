@@ -119,6 +119,7 @@
     "test:purchase-e2e": "tsx --tsconfig tsconfig.app.json scripts/smoke-purchase-e2e-flow.ts",
     "test:purchase-qi-states": "tsx --tsconfig tsconfig.app.json scripts/smoke-purchase-qi-consignment-states.ts",
     "test:purchase-grn-qi": "tsx --tsconfig tsconfig.app.json scripts/smoke-purchase-grn-qi.ts",
+    "test:grn-tolerance": "tsx --tsconfig tsconfig.app.json scripts/test-grn-tolerance.ts",
     "test:purchase-phase15": "tsx --tsconfig tsconfig.app.json scripts/test-purchase-phase15.ts",
     "test:purchase-phase15-e2e-a": "tsx --tsconfig tsconfig.app.json scripts/smoke-purchase-phase15-e2e-a.ts",
     "test:purchase-phase15-e2e-b": "tsx --tsconfig tsconfig.app.json scripts/smoke-purchase-phase15-e2e-b.ts",

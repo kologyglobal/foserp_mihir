@@ -86,8 +86,8 @@ export function MasterStickyFooter({
   isEdit,
 }: {
   onSave: () => void
-  onSaveClose: () => void
-  onSaveNew: () => void
+  onSaveClose?: () => void
+  onSaveNew?: () => void
   onCancel: () => void
   isSubmitting?: boolean
   hint?: ReactNode
@@ -135,7 +135,8 @@ export interface EnterpriseMasterWorkspaceProps {
   documentStrip: { label: string; value: string; highlight?: boolean }[]
   recordAudit?: RecordAuditView
   pendingAuditUserName?: string
-  commandBar: ReactNode
+  /** Optional — omit header save actions; use sticky footer only. */
+  commandBar?: ReactNode
   sectionNavItems: EnterpriseFormSectionNavItem[]
   activeSection: string
   onSectionSelect: (id: string) => void

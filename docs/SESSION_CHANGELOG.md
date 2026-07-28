@@ -1,3 +1,65 @@
+## 2026-07-28 — Purchase Order versioning (Rev N)
+
+### Shipped
+
+- Plan: `docs/PURCHASE_PO_VERSIONING.md`
+- Schema: `PurchaseOrder.revisionNo`, `purchase_order_revisions`, Setup `requireApprovalOnPoRevision` (default on)
+- API: `POST /orders/:id/revise`, `GET /orders/:id/revisions`
+- UI: Revise enabled in API mode; Setup toggle; history on PO DTO
+
+---
+
+## 2026-07-28 — GRN tolerance evening review pack
+
+### Shipped
+
+- Seed: `npm run seed:grn-tolerance-review` → 6 items (0–15%), open POs, GRNs in draft / pending / posted (incl. 1-of-3).
+- Walkthrough: `docs/PURCHASE_GRN_TOLERANCE_REVIEW_DEMO.md`.
+
+---
+
+## 2026-07-28 — GRN tolerance multi-line plans (1-of-3 receive)
+
+### Shipped
+
+- **Document rollup:** `evaluateGrnDocumentTolerance` (FE + BE) — any outside line → header approval; zeros = `NOT_RECEIVED` independently.
+- **FE Plans A–E + M:** `frontend/scripts/test-grn-tolerance.ts` (edges + 10 multi-line docs).
+- **Live:** 3-line PO receive only middle; 3-line receive one outside → pending.
+- **Test plan:** `docs/PURCHASE_GRN_TOLERANCE_TEST_PLAN.md` Plan M.
+
+---
+
+## 2026-07-28 — GRN tolerance test suite (0% / 2% / 10%)
+
+### Shipped
+
+- **Scenarios:** `docs/PURCHASE_GRN_TOLERANCE_TEST_PLAN.md` (matrix + UI checklist).
+- **Seed + live API:** `backend/scripts/test-grn-tolerance-flow.ts` → items `TOL-ITEM-0PCT` / `2PCT` / `10PCT`; `npm run test:grn-tolerance-live` (`--seed-only` for UI).
+- **Unit:** backend vitest extended; frontend `npm run test:grn-tolerance` mirrors calculator.
+
+---
+
+## 2026-07-28 — Purchase PDF size locked to A4
+
+### Shipped
+
+- **Fixed A4** for all purchase Print / Download PDF (no Letter/custom).
+- **Orientation by document type:** GRN = landscape; PO / PR / RFQ / Invoice / Return = portrait.
+- Shared `purchasePrintFormat.ts` + `DocumentPrintShell` format chip; Setup print size/orientation read-only.
+- Contract: `docs/PURCHASE_PDF_STANDARD.md`.
+
+---
+
+### Shipped
+
+- **Item Master:** `receivingTolerancePercentage` (±% vs open PO qty).
+- **GRN engine:** line statuses OK / Partial / Not Received / Excess within|outside / Short outside; zero qty allowed; variance vs open qty; Setup over-receipt % as fallback.
+- **Approval:** outside-tolerance submit → `PENDING_TOLERANCE_APPROVAL` + `PurchaseApproval` GOODS_RECEIPT; approve/reject endpoints; **Approvals queue** lists GRN exceptions (`purchase.grn.post`).
+- **UI:** GRN editor/detail tolerance columns, pending banner, close-open checkbox; PDF always shows vendor + stock qty.
+- **Tests:** `backend/tests/purchase/grn-tolerance.test.ts`; contract `docs/PURCHASE_GRN_TOLERANCE.md`.
+
+---
+
 ## 2026-07-28 — Purchase print/PDF: Vasant Fabricators letterhead
 
 ### Shipped

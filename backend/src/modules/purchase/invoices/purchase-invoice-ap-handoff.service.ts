@@ -1,5 +1,6 @@
 import type { Request } from 'express'
 import { prisma } from '../../../config/database.js'
+import { ensureDefaultLegalEntity } from '../../accounting/legal-entities/ensure-default-legal-entity.js'
 import { createVendorInvoiceDraft } from '../../accounting/payables/vendor-invoices/vendor-invoice-draft.service.js'
 import type { CreateVendorInvoiceInput } from '../../accounting/payables/vendor-invoices/vendor-invoice.schemas.js'
 import { PurchaseInvoiceValidationError } from './purchase-invoice.errors.js'
@@ -27,13 +28,9 @@ async function resolveLegalEntityId(tenantId: string): Promise<string> {
     select: { id: true },
     orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
   })
-  if (!le) {
-    throw new PurchaseInvoiceValidationError(
-      'No active legal entity configured for AP handoff. Set Finance Settings legal entity first.',
-      [{ field: 'legalEntityId', message: 'Legal entity required for Vendor Invoice draft.' }],
-    )
-  }
-  return le.id
+  if (le) return le.id
+  // Local / incomplete finance setup: create a default LE so PI → Vendor Invoice draft works.
+  return ensureDefaultLegalEntity(tenantId)
 }
 
 export async function buildVendorInvoiceDraftPreview(tenantId: string, purchaseInvoiceId: string) {

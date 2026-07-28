@@ -17,6 +17,15 @@ export type PoWithLines = PurchaseOrder & { lines: PurchaseOrderLine[] }
 /** Statuses where the header/lines may still be edited by the buyer. */
 export const PO_EDITABLE_STATUSES: PurchaseOrderStatus[] = ['DRAFT', 'SENT_BACK']
 
+/** Statuses that may be amended via versioned revise (not draft edit). */
+export const PO_REVISABLE_STATUSES: PurchaseOrderStatus[] = [
+  'SENT_TO_VENDOR',
+  'PARTIALLY_RECEIVED',
+  'FULLY_RECEIVED',
+  'PARTIALLY_INVOICED',
+  'FULLY_INVOICED',
+]
+
 /** Statuses that may receive goods (Phase 3 GRN gate). */
 export const PO_RECEIVABLE_STATUSES: PurchaseOrderStatus[] = [
   'SENT_TO_VENDOR',
@@ -42,6 +51,13 @@ export function assertEditable(po: Pick<PurchaseOrder, 'status' | 'deletedAt'>):
   assertNotDeleted(po)
   if (!PO_EDITABLE_STATUSES.includes(po.status)) {
     throw workflowError(PURCHASE_ERROR_CODE.PO_NOT_EDITABLE)
+  }
+}
+
+export function assertRevisable(po: Pick<PurchaseOrder, 'status' | 'deletedAt'>): void {
+  assertNotDeleted(po)
+  if (!PO_REVISABLE_STATUSES.includes(po.status)) {
+    throw workflowError(PURCHASE_ERROR_CODE.PO_NOT_REVISABLE)
   }
 }
 
@@ -286,6 +302,7 @@ export function allowedActions(po: PoWithLines): {
   canClose: boolean
   canReopen: boolean
   canReceive: boolean
+  canRevise: boolean
 } {
   const received = totalReceived(po.lines)
   const editable = !po.deletedAt && PO_EDITABLE_STATUSES.includes(po.status)
@@ -314,5 +331,6 @@ export function allowedActions(po: PoWithLines): {
         po.status === 'CLOSED' ||
         (po.status === 'CANCELLED' && received === 0)),
     canReceive: !po.deletedAt && PO_RECEIVABLE_STATUSES.includes(po.status),
+    canRevise: !po.deletedAt && PO_REVISABLE_STATUSES.includes(po.status),
   }
 }

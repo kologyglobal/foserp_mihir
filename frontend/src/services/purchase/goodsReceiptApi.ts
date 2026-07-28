@@ -70,6 +70,26 @@ export async function postInventoryGoodsReceiptApi(id: string, payload: Record<s
   })
 }
 
+export async function approveToleranceGoodsReceiptApi(
+  id: string,
+  payload: Record<string, unknown> = {},
+) {
+  return apiRequest<ApiGoodsReceipt>(`${base()}/${id}/approve-tolerance`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function rejectToleranceGoodsReceiptApi(
+  id: string,
+  payload: Record<string, unknown> = {},
+) {
+  return apiRequest<ApiGoodsReceipt>(`${base()}/${id}/reject-tolerance`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
 export async function getReceivableLinesApi(purchaseOrderId: string) {
   return apiRequest<ApiReceivableLinesResponse>(
     `${tenantPath('/purchase/orders')}/${purchaseOrderId}/receivable-lines`,

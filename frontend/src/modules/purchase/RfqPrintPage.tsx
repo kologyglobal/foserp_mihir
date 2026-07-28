@@ -42,7 +42,9 @@ export function RfqPrintPage() {
     if (!rfq) return
     if (searchParams.get('download') !== '1' && searchParams.get('autodownload') !== '1') return
     const timer = window.setTimeout(() => {
-      void handlePurchasePdfDownload(`${rfq.documentNumber}.pdf`)
+      void handlePurchasePdfDownload(`${rfq.documentNumber}.pdf`, {
+        documentKind: 'request_for_quotation',
+      })
     }, 450)
     return () => window.clearTimeout(timer)
   }, [rfq, searchParams])
@@ -63,6 +65,7 @@ export function RfqPrintPage() {
       backLabel="Back to RFQ"
       backTo={`/purchase/rfqs/${rfq.id}`}
       pdfFileName={`${rfq.documentNumber}.pdf`}
+      documentKind="request_for_quotation"
     >
       <article className="po-print-doc">
         <PurchaseDocumentLetterhead

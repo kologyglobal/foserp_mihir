@@ -42,7 +42,9 @@ export function PurchaseOrderPrintPage() {
     if (!po) return
     if (searchParams.get('download') !== '1' && searchParams.get('autodownload') !== '1') return
     const timer = window.setTimeout(() => {
-      void handlePurchasePdfDownload(`${po.documentNumber}.pdf`)
+      void handlePurchasePdfDownload(`${po.documentNumber}.pdf`, {
+        documentKind: 'purchase_order',
+      })
     }, 450)
     return () => window.clearTimeout(timer)
   }, [po, searchParams])
@@ -62,6 +64,7 @@ export function PurchaseOrderPrintPage() {
       backLabel="Back to PO"
       backTo={`/purchase/orders/${po.id}`}
       pdfFileName={`${po.documentNumber}.pdf`}
+      documentKind="purchase_order"
     >
       <article className="po-print-doc">
         <PurchaseDocumentLetterhead

@@ -4,12 +4,74 @@ import { DocumentPrintShell } from '@/components/print/DocumentPrintShell'
 import { PurchaseDocumentLetterhead } from '@/components/purchase/PurchaseDocumentLetterhead'
 import { getGRNById } from '@/services/purchase'
 import type { GoodsReceiptNote } from '@/types/purchaseDomain'
+import { useMasterStore } from '@/store/masterStore'
 import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { formatStatus } from '@/components/ui/Badge'
 import { notify } from '@/store/toastStore'
 import { handlePurchasePdfDownload } from '@/utils/purchaseDocumentPdfExport'
 import { QUOTATION_COMPANY } from '@/utils/quotationEngine/companyProfile'
+
+function factorOf(l: GoodsReceiptNote['lines'][number]) {
+  return Number(l.uomConversionFactor ?? 1) > 0 ? Number(l.uomConversionFactor ?? 1) : 1
+}
+
+/** Purchase (vendor) UOM code on the GRN line. */
+function purchaseUomOf(l: GoodsReceiptNote['lines'][number]) {
+  return (l.uom || 'NOS').trim().toUpperCase()
+}
+
+/** Stock / base UOM used for factory inward counting. */
+function stockUomOf(l: GoodsReceiptNote['lines'][number]) {
+  const { items, uoms } = useMasterStore.getState()
+  const item = l.itemId ? items.find((i) => i.id === l.itemId) : undefined
+  if (item?.baseUomId) {
+    const uom = uoms.find((u) => u.id === item.baseUomId)
+    if (uom?.uomCode) return uom.uomCode.trim().toUpperCase()
+  }
+  // Same UOM when factor is 1 and no base found
+  if (factorOf(l) === 1) return purchaseUomOf(l)
+  return 'NOS'
+}
+
+/** Stacked dual qty for print/PDF — e.g. "8 MTR" over "2.33 NOS". */
+function DualQtyCell({
+  purchaseQty,
+  purchaseUom,
+  stockQty,
+  stockUom,
+}: {
+  purchaseQty: number
+  purchaseUom: string
+  stockQty: number
+  stockUom: string
+}) {
+  const showDual =
+    purchaseUom !== stockUom || Math.abs(purchaseQty - stockQty) > 1e-6
+
+  if (!showDual) {
+    return (
+      <td className="num">
+        <span className="po-print-qty-line">
+          {formatNumber(stockQty)} {stockUom}
+        </span>
+      </td>
+    )
+  }
+
+  return (
+    <td className="num">
+      <div className="po-print-dual-qty">
+        <span className="po-print-qty-line">
+          {formatNumber(purchaseQty)} {purchaseUom}
+        </span>
+        <span className="po-print-qty-line po-print-qty-line--stock">
+          {formatNumber(stockQty)} {stockUom}
+        </span>
+      </div>
+    </td>
+  )
+}
 
 export function GrnPrintPage() {
   const { id } = useParams()
@@ -23,6 +85,16 @@ export function GrnPrintPage() {
     let cancelled = false
     ;(async () => {
       setLoading(true)
+      // Ensure item master is available so stock UOM codes resolve on print.
+      try {
+        const store = useMasterStore.getState()
+        if (!store.items.length || !store.uoms.length) {
+          const { syncBatchMastersFromApi } = await import('@/services/bridges/masterBatchApiBridge')
+          await syncBatchMastersFromApi()
+        }
+      } catch {
+        /* print still works with purchase UOM + NOS fallback */
+      }
       const row = await getGRNById(id)
       if (cancelled) return
       if (!row) {
@@ -42,7 +114,9 @@ export function GrnPrintPage() {
     if (!grn) return
     if (searchParams.get('download') !== '1' && searchParams.get('autodownload') !== '1') return
     const timer = window.setTimeout(() => {
-      void handlePurchasePdfDownload(`${grn.documentNumber}.pdf`)
+      void handlePurchasePdfDownload(`${grn.documentNumber}.pdf`, {
+        documentKind: 'goods_receipt_note',
+      })
     }, 450)
     return () => window.clearTimeout(timer)
   }, [grn, searchParams])
@@ -51,10 +125,6 @@ export function GrnPrintPage() {
     return <div className="erp-page p-12 text-center text-erp-muted">Loading GRN…</div>
   }
 
-  const showVendorUom = grn.lines.some(
-    (l) => Number(l.uomConversionFactor ?? 1) > 1 && Number(l.receivedUomQty ?? 0) > 0,
-  )
-
   return (
     <DocumentPrintShell
       title={grn.documentNumber}
@@ -62,6 +132,7 @@ export function GrnPrintPage() {
       backLabel="Back to GRN"
       backTo={`/purchase/grn/${grn.id}`}
       pdfFileName={`${grn.documentNumber}.pdf`}
+      documentKind="goods_receipt_note"
     >
       <article className="po-print-doc">
         <PurchaseDocumentLetterhead
@@ -94,6 +165,9 @@ export function GrnPrintPage() {
             <p>Transporter: {grn.transporterName || '—'}</p>
             <p>LR / Gate: {grn.lrNumber || grn.gateEntryNo || '—'}</p>
             <p>QC required: {grn.inspectionRequired || grn.qcRequired ? 'Yes' : 'No'}</p>
+            <p className="po-print-hint">
+              Qty: purchase unit on top · stock inward unit below
+            </p>
           </section>
         </div>
 
@@ -102,41 +176,54 @@ export function GrnPrintPage() {
             <tr>
               <th>#</th>
               <th>Item</th>
-              <th>HSN</th>
               <th className="num">Ordered</th>
-              {showVendorUom ? <th className="num">Vendor qty</th> : null}
-              <th className="num">Received</th>
-              <th className="num">Accepted</th>
-              <th className="num">Rejected</th>
-              <th>UOM</th>
+              <th className="num">Received / inward</th>
+              <th className="num">Tol %</th>
+              <th>Status</th>
               <th className="num">Rate</th>
               <th>Batch / Lot</th>
             </tr>
           </thead>
           <tbody>
-            {grn.lines.map((l) => (
-              <tr key={l.id}>
-                <td className="num">{l.lineNo}</td>
-                <td>
-                  <span className="mono">{l.itemCode}</span>
-                  <span className="block">{l.itemName}</span>
-                </td>
-                <td>{l.hsnCode || '—'}</td>
-                <td className="num">{formatNumber(l.orderedQty)}</td>
-                {showVendorUom ? (
-                  <td className="num">{formatNumber(l.receivedUomQty ?? l.receivedQty)}</td>
-                ) : null}
-                <td className="num">{formatNumber(l.receivedQty)}</td>
-                <td className="num">{formatNumber(l.acceptedQty)}</td>
-                <td className="num">{formatNumber(l.rejectedQty)}</td>
-                <td>{l.uom}</td>
-                <td className="num">{formatCurrency(l.rate)}</td>
-                <td>
-                  {l.batchNumber || l.lotNumber || '—'}
-                  {l.serialNumber ? ` / ${l.serialNumber}` : ''}
-                </td>
-              </tr>
-            ))}
+            {grn.lines.map((l) => {
+              const factor = factorOf(l)
+              const purchaseUom = purchaseUomOf(l)
+              const stockUom = stockUomOf(l)
+              const purchaseOrdered =
+                Number(l.orderedUomQty) || Number(l.orderedQty) * factor
+              const purchaseReceived =
+                Number(l.receivedUomQty) || Number(l.receivedQty) * factor
+              const stockOrdered = Number(l.orderedQty) || 0
+              const stockReceived = Number(l.receivedQty) || 0
+              return (
+                <tr key={l.id}>
+                  <td className="num">{l.lineNo}</td>
+                  <td>
+                    <span className="mono">{l.itemCode}</span>
+                    <span className="block">{l.itemName}</span>
+                  </td>
+                  <DualQtyCell
+                    purchaseQty={purchaseOrdered}
+                    purchaseUom={purchaseUom}
+                    stockQty={stockOrdered}
+                    stockUom={stockUom}
+                  />
+                  <DualQtyCell
+                    purchaseQty={purchaseReceived}
+                    purchaseUom={purchaseUom}
+                    stockQty={stockReceived}
+                    stockUom={stockUom}
+                  />
+                  <td className="num">{formatNumber(l.tolerancePercentage ?? 0)}</td>
+                  <td>{formatStatus(l.toleranceStatus ?? 'OK')}</td>
+                  <td className="num">{formatCurrency(l.rate)}</td>
+                  <td>
+                    {l.batchNumber || l.lotNumber || '—'}
+                    {l.serialNumber ? ` / ${l.serialNumber}` : ''}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
 

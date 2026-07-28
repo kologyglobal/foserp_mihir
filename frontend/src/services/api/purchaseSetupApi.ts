@@ -27,6 +27,7 @@ export interface ApiPurchaseSetupGeneral {
   requireQuotationComparison: boolean
   allowOverReceipt: boolean
   overReceiptTolerancePct: number
+  requireApprovalOnPoRevision?: boolean
   allowShortClose: boolean
   requirePoWarehouse: boolean
   requireExpectedDeliveryDate: boolean

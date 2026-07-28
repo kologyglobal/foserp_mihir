@@ -42,7 +42,9 @@ export function PurchaseRequisitionPrintPage() {
     if (!pr) return
     if (searchParams.get('download') !== '1' && searchParams.get('autodownload') !== '1') return
     const timer = window.setTimeout(() => {
-      void handlePurchasePdfDownload(`${pr.documentNumber}.pdf`)
+      void handlePurchasePdfDownload(`${pr.documentNumber}.pdf`, {
+        documentKind: 'purchase_requisition',
+      })
     }, 450)
     return () => window.clearTimeout(timer)
   }, [pr, searchParams])
@@ -58,6 +60,7 @@ export function PurchaseRequisitionPrintPage() {
       backLabel="Back to PR"
       backTo={`/purchase/requisitions/${pr.id}`}
       pdfFileName={`${pr.documentNumber}.pdf`}
+      documentKind="purchase_requisition"
     >
       <article className="po-print-doc">
         <PurchaseDocumentLetterhead

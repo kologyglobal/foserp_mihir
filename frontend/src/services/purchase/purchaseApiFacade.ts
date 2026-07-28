@@ -902,16 +902,33 @@ export async function reopenPurchaseOrder(id: string): Promise<PurchaseOrder> {
   }
 }
 
-/** PO revision (versioned amendments) has no backend yet — never simulate it in API mode. */
+/** PO revision (versioned amendments) — API persists Rev N snapshots. */
 export async function revisePurchaseOrder(
   id: string,
   input: Parameters<typeof demo.revisePurchaseOrder>[1],
 ): Promise<PurchaseOrder> {
   if (!isApiMode()) return demo.revisePurchaseOrder(id, input)
-  throw new PurchaseServiceError(
-    'PURCHASE_API_NOT_IMPLEMENTED',
-    'PO revision is not available yet. Reopen or edit the draft/sent-back PO instead.',
-  )
+  try {
+    const payload: Record<string, unknown> = {
+      reason: input.reason,
+    }
+    if (input.expectedDeliveryDate != null) payload.expectedDeliveryDate = input.expectedDeliveryDate
+    if (input.paymentTerms != null) payload.paymentTerms = input.paymentTerms
+    if (input.deliveryTerms != null) payload.deliveryTerms = input.deliveryTerms
+    if (input.freight != null) payload.freightAmount = input.freight
+    if (input.remarks != null) payload.remarks = input.remarks
+    if (input.lines?.length) {
+      payload.lines = input.lines.map((l) => ({
+        id: l.id,
+        quantity: l.quantity,
+        rate: l.rate,
+      }))
+    }
+    const res = await poApi.revisePurchaseOrderApi(id, payload)
+    return mapApiPurchaseOrderToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
 }
 
 export async function getPurchaseOrderLinkedDocuments(
@@ -1041,6 +1058,9 @@ export async function submitGRN(id: string): Promise<GoodsReceiptNote> {
   try {
     const res = await grnApi.submitGoodsReceiptApi(id, {})
     let grn = mapApiGoodsReceiptToDomain(res.data)
+    if (grn.status === 'pending_tolerance_approval') {
+      return grn
+    }
     if (grn.inspectionRequired && !grn.qualityInspectionId) {
       const qcLine =
         grn.lines.find((l) => l.inspectionStatus === 'pending' || l.pendingInspectionQty > 0)
@@ -1063,6 +1083,30 @@ export async function submitGRN(id: string): Promise<GoodsReceiptNote> {
       }
     }
     return grn
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function approveToleranceGRN(id: string, remarks = ''): Promise<GoodsReceiptNote> {
+  if (!isApiMode()) {
+    throw new PurchaseServiceError('NOT_SUPPORTED', 'Tolerance approval is only available in API mode.')
+  }
+  try {
+    const res = await grnApi.approveToleranceGoodsReceiptApi(id, remarks ? { remarks } : {})
+    return mapApiGoodsReceiptToDomain(res.data)
+  } catch (err) {
+    throwApi(err)
+  }
+}
+
+export async function rejectToleranceGRN(id: string, remarks = ''): Promise<GoodsReceiptNote> {
+  if (!isApiMode()) {
+    throw new PurchaseServiceError('NOT_SUPPORTED', 'Tolerance rejection is only available in API mode.')
+  }
+  try {
+    const res = await grnApi.rejectToleranceGoodsReceiptApi(id, remarks ? { remarks } : {})
+    return mapApiGoodsReceiptToDomain(res.data)
   } catch (err) {
     throwApi(err)
   }
@@ -1474,7 +1518,7 @@ function applyApprovalQueueFilters(
   })
 }
 
-/** Approvals inbox — API mode uses GET /purchase/approvals (PR + PO). */
+/** Approvals inbox — API mode uses GET /purchase/approvals (PR + PO + GRN tolerance). */
 export async function getPurchaseApprovalQueue(
   tab: PurchaseApprovalQueueTab = 'pending_mine',
   filters: PurchaseApprovalQueueFilters = {},
@@ -1486,7 +1530,9 @@ export async function getPurchaseApprovalQueue(
         ? 'PURCHASE_REQUISITION'
         : filters.documentType === 'purchase_order'
           ? 'PURCHASE_ORDER'
-          : undefined
+          : filters.documentType === 'goods_receipt_note'
+            ? 'GOODS_RECEIPT'
+            : undefined
     const res = await approvalApi.listPurchaseApprovalsApi({
       page: 1,
       limit: 100,
@@ -1528,7 +1574,7 @@ export async function approvePurchaseDocument(
   documentType: PurchaseApprovalDocumentType,
   documentId: string,
   remarks = 'Approved',
-): Promise<PurchaseRequisition | PurchaseOrder> {
+): Promise<PurchaseRequisition | PurchaseOrder | GoodsReceiptNote> {
   if (!isApiMode()) return demo.approvePurchaseDocument(documentType, documentId, remarks)
   if (documentType === 'purchase_requisition') {
     return approvePurchaseRequisition(documentId, remarks)
@@ -1536,9 +1582,12 @@ export async function approvePurchaseDocument(
   if (documentType === 'purchase_order') {
     return approvePurchaseOrder(documentId, remarks)
   }
+  if (documentType === 'goods_receipt_note') {
+    return approveToleranceGRN(documentId, remarks)
+  }
   throw new PurchaseServiceError(
     'NOT_SUPPORTED',
-    'Only PR and PO approvals are available in API mode yet.',
+    'Only PR, PO, and GRN tolerance approvals are available in API mode yet.',
   )
 }
 
@@ -1546,7 +1595,7 @@ export async function rejectPurchaseDocument(
   documentType: PurchaseApprovalDocumentType,
   documentId: string,
   remarks: string,
-): Promise<PurchaseRequisition | PurchaseOrder> {
+): Promise<PurchaseRequisition | PurchaseOrder | GoodsReceiptNote> {
   if (!isApiMode()) return demo.rejectPurchaseDocument(documentType, documentId, remarks)
   if (!remarks.trim()) {
     throw new PurchaseServiceError('REMARKS_REQUIRED', 'Rejection comments are mandatory')
@@ -1557,9 +1606,12 @@ export async function rejectPurchaseDocument(
   if (documentType === 'purchase_order') {
     return rejectPurchaseOrder(documentId, remarks)
   }
+  if (documentType === 'goods_receipt_note') {
+    return rejectToleranceGRN(documentId, remarks)
+  }
   throw new PurchaseServiceError(
     'NOT_SUPPORTED',
-    'Only PR and PO rejection are available in API mode yet.',
+    'Only PR, PO, and GRN tolerance rejection are available in API mode yet.',
   )
 }
 
@@ -1567,10 +1619,13 @@ export async function sendBackPurchaseDocument(
   documentType: PurchaseApprovalDocumentType,
   documentId: string,
   remarks: string,
-): Promise<PurchaseRequisition | PurchaseOrder> {
+): Promise<PurchaseRequisition | PurchaseOrder | GoodsReceiptNote> {
   if (!isApiMode()) return demo.sendBackPurchaseDocument(documentType, documentId, remarks)
   if (!remarks.trim()) {
     throw new PurchaseServiceError('REMARKS_REQUIRED', 'Send-back comments are mandatory')
+  }
+  if (documentType === 'goods_receipt_note') {
+    return rejectToleranceGRN(documentId, remarks)
   }
   if (documentType === 'purchase_order') {
     return sendBackPurchaseOrder(documentId, remarks)
@@ -1578,7 +1633,7 @@ export async function sendBackPurchaseDocument(
   if (documentType !== 'purchase_requisition') {
     throw new PurchaseServiceError(
       'NOT_SUPPORTED',
-      'Only PR and PO send-back are available in API mode yet.',
+      'Only PR, PO, and GRN tolerance send-back are available in API mode yet.',
     )
   }
   try {
@@ -1919,6 +1974,7 @@ function mapMasterItemToPurchaseItem(item: MasterItem): PurchaseItem {
     batchControlled: false,
     serialControlled: false,
     expiryControlled: false,
+    receivingTolerancePercentage: Number(item.receivingTolerancePercentage ?? 0),
     isActive: item.isActive !== false && item.isBlocked !== true,
     remarks: '',
     createdBy: 'API',
@@ -2113,6 +2169,7 @@ function mapApiSetupToDomain(api: setupApi.ApiPurchaseSetup): PurchaseSetup {
       requireQuotationComparison: g.requireQuotationComparison,
       allowOverReceipt: g.allowOverReceipt,
       overReceiptTolerancePct: Number(g.overReceiptTolerancePct ?? 0),
+      requireApprovalOnPoRevision: g.requireApprovalOnPoRevision ?? true,
       allowShortClose: g.allowShortClose,
       requirePoWarehouse: g.requirePoWarehouse,
       requireExpectedDeliveryDate: g.requireExpectedDeliveryDate,
@@ -2222,6 +2279,7 @@ function mapDomainSetupToApiPayload(setup: PurchaseSetup): setupApi.ApiPurchaseS
       requireQuotationComparison: setup.general.requireQuotationComparison,
       allowOverReceipt: setup.general.allowOverReceipt,
       overReceiptTolerancePct: setup.general.overReceiptTolerancePct,
+      requireApprovalOnPoRevision: setup.general.requireApprovalOnPoRevision,
       allowShortClose: setup.general.allowShortClose,
       requirePoWarehouse: setup.general.requirePoWarehouse,
       requireExpectedDeliveryDate: setup.general.requireExpectedDeliveryDate,
@@ -2280,8 +2338,9 @@ function mapDomainSetupToApiPayload(setup: PurchaseSetup): setupApi.ApiPurchaseS
       showTermsOnGrn: setup.print.showTermsOnGrn,
       showTermsOnInvoice: setup.print.showTermsOnInvoice,
       defaultCopies: setup.print.defaultCopies,
-      paperSize: setup.print.paperSize,
-      orientation: setup.print.orientation,
+      // Locked ERP standard — always A4 portrait at tenant default; per-doc orientation is code-driven.
+      paperSize: 'A4',
+      orientation: 'portrait',
     },
   }
 }

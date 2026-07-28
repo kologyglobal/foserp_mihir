@@ -42,7 +42,9 @@ export function PurchaseInvoicePrintPage() {
     if (!inv) return
     if (searchParams.get('download') !== '1' && searchParams.get('autodownload') !== '1') return
     const timer = window.setTimeout(() => {
-      void handlePurchasePdfDownload(`${inv.documentNumber}.pdf`)
+      void handlePurchasePdfDownload(`${inv.documentNumber}.pdf`, {
+        documentKind: 'purchase_invoice',
+      })
     }, 450)
     return () => window.clearTimeout(timer)
   }, [inv, searchParams])
@@ -58,6 +60,7 @@ export function PurchaseInvoicePrintPage() {
       backLabel="Back to invoice"
       backTo={`/purchase/invoices/${inv.id}`}
       pdfFileName={`${inv.documentNumber}.pdf`}
+      documentKind="purchase_invoice"
     >
       <article className="po-print-doc">
         <PurchaseDocumentLetterhead

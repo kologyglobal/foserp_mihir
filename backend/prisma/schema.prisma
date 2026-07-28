@@ -410,6 +410,7 @@ model Tenant {
   vendorComparisonLines           VendorComparisonLine[]
   purchaseOrders                  PurchaseOrder[]
   purchaseOrderLines              PurchaseOrderLine[]
+  purchaseOrderRevisions          PurchaseOrderRevision[]
   goodsReceipts                   GoodsReceipt[]
   goodsReceiptLines               GoodsReceiptLine[]
   purchaseApprovals               PurchaseApproval[]
@@ -2609,6 +2610,8 @@ model MasterItem {
   purchaseQtyPerUom    Decimal            @default(1) @db.Decimal(18, 4)
   /// Vendor units per 1 primary/base unit (e.g. 3 meters = 1 NOS).
   uomConversionFactor  Decimal            @default(1) @db.Decimal(18, 4)
+  /// ±% band for GRN receiving vs open qty (Item Master source of truth).
+  receivingTolerancePercentage Decimal @default(0) @db.Decimal(5, 2)
   /// CRM / Sales commercial description (distinct from engineering itemDescription).
   salesDescription           String?                     @db.Text
   /// Optional sales UOM; falls back to baseUom when null.
@@ -5212,6 +5215,7 @@ enum PurchaseApprovalDocumentType {
   PURCHASE_ORDER
   REQUEST_FOR_QUOTATION
   PURCHASE_PLANNING
+  GOODS_RECEIPT
 }
 
 enum PurchaseApprovalStatus {
@@ -5660,6 +5664,8 @@ model PurchaseOrder {
   freightAmount         Decimal             @default(0) @db.Decimal(18, 2)
   totalAmount           Decimal             @default(0) @db.Decimal(18, 2)
   remarks               String?             @db.Text
+  /// Amendment counter — Rev 0 = original; increments on each POST /revise.
+  revisionNo            Int                 @default(0)
   submittedAt           DateTime?
   approvedAt            DateTime?
   rejectedAt            DateTime?
@@ -5687,6 +5693,7 @@ model PurchaseOrder {
   convertedRequisitionLines PurchaseRequisitionLine[]
   goodsReceipts             GoodsReceipt[]
   approvals                 PurchaseApproval[]        @relation("PurchaseApprovalPo")
+  revisions                 PurchaseOrderRevision[]
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId])
@@ -5752,8 +5759,37 @@ model PurchaseOrderLine {
   @@map("purchase_order_lines")
 }
 
+/// Immutable snapshot of a PO amendment (Rev N). Live PO stays the current document.
+model PurchaseOrderRevision {
+  id              String   @id @default(uuid())
+  tenantId        String
+  purchaseOrderId String
+  revisionNo      Int
+  reason          String   @db.Text
+  statusBefore    String   @db.VarChar(40)
+  statusAfter     String   @db.VarChar(40)
+  revisedById     String?  @db.VarChar(36)
+  revisedAt       DateTime @default(now())
+  /// Header fields before this revision applied.
+  headerSnapshot  Json
+  /// Lines before this revision applied.
+  linesSnapshot   Json
+  /// Field-level diffs [{ fieldPath, fieldLabel, previousValue, newValue }].
+  changes         Json     @default("[]")
+  createdAt       DateTime @default(now())
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+
+  @@unique([tenantId, purchaseOrderId, revisionNo])
+  @@index([tenantId])
+  @@index([tenantId, purchaseOrderId])
+  @@map("purchase_order_revisions")
+}
+
 enum GoodsReceiptStatus {
   DRAFT
+  PENDING_TOLERANCE_APPROVAL
   SUBMITTED
   RECEIVING_COMPLETED
   QC_PENDING
@@ -5763,6 +5799,15 @@ enum GoodsReceiptStatus {
   CANCELLED
   REVERSED
   CLOSED
+}
+
+enum GrnLineToleranceStatus {
+  OK
+  PARTIAL
+  NOT_RECEIVED
+  SHORT_OUTSIDE
+  EXCESS_WITHIN
+  EXCESS_OUTSIDE
 }
 
 model GoodsReceipt {
@@ -5794,6 +5839,10 @@ model GoodsReceipt {
   receivedByName              String?            @db.VarChar(200)
   inspectionRequired          Boolean            @default(false)
   allowExcess                 Boolean            @default(false)
+  /// True when any line is SHORT_OUTSIDE / EXCESS_OUTSIDE and needs approval.
+  toleranceApprovalRequired   Boolean            @default(false)
+  toleranceApprovedAt         DateTime?
+  toleranceApprovedById       String?            @db.VarChar(36)
   remarks                     String?            @db.Text
   submittedAt                 DateTime?
   cancelledAt                 DateTime?
@@ -5871,6 +5920,13 @@ model GoodsReceiptLine {
   expiryDate                 DateTime? @db.Date
   inventoryLotId             String?
   qcRequired                 Boolean   @default(false)
+  /// Snapshot of item/Setup receiving tolerance % at receive time.
+  tolerancePercentage        Decimal   @default(0) @db.Decimal(5, 2)
+  /// ((received - open) / open) * 100 when open > 0.
+  variancePercentage         Decimal?  @db.Decimal(9, 4)
+  toleranceStatus            GrnLineToleranceStatus @default(OK)
+  /// When true, under-receipt outside band is SHORT_OUTSIDE (close open) instead of PARTIAL.
+  closeOpenQuantity          Boolean   @default(false)
   remarks                    String?   @db.Text
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
@@ -6063,6 +6119,8 @@ model PurchaseSettings {
   requirePaymentTerms            Boolean                     @default(false)
   allowOverReceipt               Boolean                     @default(false)
   overReceiptTolerancePct        Decimal                     @default(0) @db.Decimal(5, 2)
+  /// When true, revising a released PO returns it to PENDING_APPROVAL.
+  requireApprovalOnPoRevision    Boolean                     @default(true)
   allowShortClose                Boolean                     @default(true)
   requireVendorChallan           Boolean                     @default(false)
   requireVehicleNumber           Boolean                     @default(false)

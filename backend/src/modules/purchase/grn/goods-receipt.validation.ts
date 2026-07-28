@@ -3,6 +3,7 @@ import { paginationSchema } from '../../../utils/pagination.js'
 
 export const GRN_STATUSES = [
   'DRAFT',
+  'PENDING_TOLERANCE_APPROVAL',
   'SUBMITTED',
   'RECEIVING_COMPLETED',
   'QC_PENDING',
@@ -25,10 +26,10 @@ export const listGoodsReceiptsQuerySchema = paginationSchema.extend({
 export const goodsReceiptLineInputSchema = z.object({
   purchaseOrderLineId: z.string().uuid(),
   challanQuantity: z.coerce.number().min(0).optional(),
-  /** Primary qty — computed when receivedUomQuantity provided. */
-  receivedQuantity: z.coerce.number().positive().optional(),
+  /** Primary qty — computed when receivedUomQuantity provided. Zero = Not Received. */
+  receivedQuantity: z.coerce.number().min(0).optional(),
   /** Vendor UOM received qty (preferred input). */
-  receivedUomQuantity: z.coerce.number().positive().optional(),
+  receivedUomQuantity: z.coerce.number().min(0).optional(),
   damagedQuantity: z.coerce.number().min(0).optional(),
   shortQuantity: z.coerce.number().min(0).optional(),
   excessQuantity: z.coerce.number().min(0).optional(),
@@ -43,12 +44,14 @@ export const goodsReceiptLineInputSchema = z.object({
   manufacturingDate: z.string().trim().optional().nullable(),
   expiryDate: z.string().trim().optional().nullable(),
   qcRequired: z.boolean().optional(),
+  /** Close remaining open qty; under-band short becomes SHORT_OUTSIDE (approval). */
+  closeOpenQuantity: z.boolean().optional(),
   remarks: z.string().trim().max(2000).optional().nullable(),
 }).superRefine((line, ctx) => {
   if (line.receivedUomQuantity == null && line.receivedQuantity == null) {
     ctx.addIssue({
       code: 'custom',
-      message: 'Either receivedUomQuantity or receivedQuantity is required',
+      message: 'Either receivedUomQuantity or receivedQuantity is required (use 0 for Not Received)',
       path: ['receivedUomQuantity'],
     })
   }
@@ -70,7 +73,7 @@ export const createGoodsReceiptSchema = z.object({
   receivedById: z.string().trim().max(36).optional().nullable(),
   receivedByName: z.string().trim().max(200).optional().nullable(),
   inspectionRequired: z.boolean().optional(),
-  /** Ignored by server — over-receipt is derived from Purchase Setup. */
+  /** Ignored by server — over-receipt is derived from Purchase Setup / item tolerance. */
   allowExcess: z.boolean().optional(),
   remarks: z.string().trim().max(5000).optional().nullable(),
   lines: z.array(goodsReceiptLineInputSchema).min(1),

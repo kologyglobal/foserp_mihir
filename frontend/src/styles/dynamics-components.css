@@ -9067,6 +9067,8 @@ a.crm-companies-table__name:hover {
     size: A4;
     margin: 10mm 12mm;
   }
+
+  /* Per-document @page is injected at print time (see purchaseDocumentPdfExport). */
 }
 
 /* CRM Quotation Templates */
@@ -16913,6 +16915,14 @@ a.crm-companies-table__name:hover {
   color: var(--po-print-muted);
 }
 
+.po-print-toolbar__format {
+  margin: 4px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--po-print-muted);
+  letter-spacing: 0.02em;
+}
+
 .po-print-stage {
   display: block;
 }
@@ -16929,6 +16939,15 @@ a.crm-companies-table__name:hover {
   font-size: 11px;
   line-height: 1.45;
   box-shadow: none;
+}
+
+/* Fixed A4 landscape preview (GRN and other wide tabular docs) */
+.po-print-page--landscape {
+  max-width: 297mm;
+}
+
+.po-print-page--landscape .po-print-doc {
+  max-width: 297mm;
 }
 
 .po-print-header {
@@ -17127,6 +17146,36 @@ a.crm-companies-table__name:hover {
 .po-print-lines .num {
   text-align: right;
   white-space: nowrap;
+}
+
+.po-print-table td.num:has(.po-print-dual-qty) {
+  white-space: normal;
+}
+
+.po-print-dual-qty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.po-print-qty-line {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--po-print-ink);
+}
+
+.po-print-qty-line--stock {
+  font-weight: 700;
+  color: var(--po-print-ink);
+}
+
+.po-print-hint {
+  margin-top: 6px !important;
+  font-size: 10px;
+  color: #6b7280;
 }
 
 .po-print-table .mono {
