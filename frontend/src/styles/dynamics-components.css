@@ -19642,3 +19642,126 @@ a.crm-companies-table__name:hover {
   border-top: 1px solid var(--vi-zoho-border, #dde3ea);
 }
 
+/* ── Zoho Books–style Sales Invoice (Money In / Receivables, SERVICES) ────
+   New/Edit Invoice — same white-card + soft-blue-accent chrome family as
+   the vendor invoice Zoho form and CRM Lead form: compact document header
+   (Customer + Bill To on the left, dates/GST grid on the right), a clean
+   table-like line-item grid, and Notes-left / Totals-right footer split.
+   Scoped to `.sales-invoice-zoho-form`; other money-in forms are untouched. */
+.sales-invoice-zoho-form {
+  --si-zoho-blue: #3659b6;
+  --si-zoho-blue-soft: #e8eef9;
+  --si-zoho-border: #dde3ea;
+  --si-zoho-text: #1a2332;
+  --si-zoho-muted: #6b7785;
+}
+
+.sales-invoice-zoho-form .sales-invoice-zoho-form__section {
+  border-color: var(--si-zoho-border);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.sales-invoice-zoho-form .sales-invoice-zoho-form__section-header {
+  background: linear-gradient(180deg, #fafbfc 0%, #f5f7fa 100%);
+  border-color: var(--si-zoho-border);
+  border-left: 3px solid var(--si-zoho-blue);
+  border-top-left-radius: 9px;
+  border-top-right-radius: 9px;
+}
+
+.sales-invoice-zoho-form .erp-input,
+.sales-invoice-zoho-form select,
+.sales-invoice-zoho-form [role='combobox'] {
+  border-radius: 4px;
+  border-color: #c9d1dc;
+}
+
+.sales-invoice-zoho-form .erp-input:focus,
+.sales-invoice-zoho-form select:focus,
+.sales-invoice-zoho-form [role='combobox']:focus-within {
+  outline: none;
+  border-color: var(--si-zoho-blue);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--si-zoho-blue) 22%, transparent);
+}
+
+/* Compact document header — customer/Bill To (left) vs. dates + GST grid (right) */
+.sales-invoice-zoho-form__header-grid {
+  display: grid;
+  gap: 10px 24px;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.4fr);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .sales-invoice-zoho-form__header-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sales-invoice-zoho-form__customer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sales-invoice-zoho-form__bill-to {
+  border: 1px dashed var(--si-zoho-border);
+  border-radius: 8px;
+  padding: 8px 10px 10px;
+  background: #fafbfc;
+}
+
+.sales-invoice-zoho-form__bill-to-label {
+  margin: 0 0 2px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--si-zoho-blue);
+}
+
+/* Item lines — clean table feel: header rule + bottom-border rows (no per-row card chrome on md+) */
+.sales-invoice-zoho-form__lines-head {
+  color: var(--si-zoho-muted);
+  border-color: var(--si-zoho-border);
+}
+
+.sales-invoice-zoho-form__line-row {
+  border-color: var(--si-zoho-border);
+  transition: background-color 120ms ease;
+}
+
+@media (min-width: 768px) {
+  .sales-invoice-zoho-form__line-row:hover {
+    background: #fafbfc;
+  }
+  .sales-invoice-zoho-form__line-row:last-child {
+    border-bottom: none;
+  }
+}
+
+.sales-invoice-zoho-form__add-line {
+  border: none;
+  background: none;
+  padding: 4px 2px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--si-zoho-blue);
+  cursor: pointer;
+}
+
+.sales-invoice-zoho-form__add-line:hover {
+  text-decoration: underline;
+}
+
+/* Sticky Save/Cancel bar — relative to normal page scroll (MoneyInWorkspaceShell
+   is not a fixed-height ErpCardFormPage shell). */
+.sales-invoice-zoho-form__sticky-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(4px);
+}
+

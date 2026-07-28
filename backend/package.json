@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "prisma generate && node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc",
+    "build": "node ./scripts/build-production.mjs",
     "start": "node dist/server.js",
     "typecheck": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc --noEmit",
     "test": "vitest run",
