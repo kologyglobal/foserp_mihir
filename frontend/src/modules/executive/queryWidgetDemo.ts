@@ -73,7 +73,10 @@ export function queryWidgetDemo(
     }
     case 'purchase.commitments': {
       const pos = usePurchaseStore.getState().purchaseOrders.filter((p) => !['closed', 'cancelled'].includes(p.status))
-      const value = pos.reduce((s, p) => s + (p.grandTotal ?? 0), 0)
+      const value = pos.reduce(
+        (s, p) => s + p.lines.reduce((lineSum, line) => lineSum + line.qty * line.rate, 0),
+        0,
+      )
       return base({ value, unit: 'INR', label: `${pos.length} open POs` }, '/purchase/orders')
     }
     case 'purchase.pending_pr': {

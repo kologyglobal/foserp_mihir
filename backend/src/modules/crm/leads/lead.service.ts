@@ -118,6 +118,8 @@ export async function createLead(tenantId: string, userId: string, input: Create
 
   const leadCode = input.leadNo ?? (await nextCode(tenantId, 'LEAD'))
   const lead = await repo.createLead(tenantId, userId, { ...input, leadOwnerId, leadCode })
+  const { syncLeadOpportunityStageSafely } = await import('./lead-opportunity-sync.js')
+  await syncLeadOpportunityStageSafely(tenantId, userId, lead)
   // Resolve display names — create response is upserted into the FE list store
   return (await mapLeadWithNames(tenantId, lead))!
 }
@@ -158,6 +160,8 @@ export async function qualifyLead(tenantId: string, id: string, userId: string, 
   // Qualify has no field gates — product / value / company are optional.
   // Convert-to-opportunity still requires a linked company elsewhere.
   const lead = await repo.qualifyLead(tenantId, id, userId, input)
+  const { syncLeadOpportunityStageSafely } = await import('./lead-opportunity-sync.js')
+  await syncLeadOpportunityStageSafely(tenantId, userId, lead)
   return (await mapLeadWithNames(tenantId, lead))!
 }
 
@@ -195,6 +199,8 @@ export async function changeLeadStage(tenantId: string, id: string, userId: stri
         ? (input.closedDate ? new Date(input.closedDate) : new Date())
         : null,
   })
+  const { syncLeadOpportunityStageSafely } = await import('./lead-opportunity-sync.js')
+  await syncLeadOpportunityStageSafely(tenantId, userId, lead)
   return (await mapLeadWithNames(tenantId, lead))!
 }
 
@@ -226,7 +232,13 @@ export async function convertLead(tenantId: string, id: string, userId: string, 
   let stageId = input.stageId
 
   if (!pipelineId || !stageId) {
-    const pipeline = await repo.getDefaultPipeline(tenantId)
+    let pipeline = await repo.getDefaultPipeline(tenantId)
+    if (!pipeline || pipeline.stages.length === 0) {
+      // Self-heal tenants that never had a CRM pipeline provisioned — qualifying
+      // a lead should always be able to produce an opportunity.
+      const { ensureDefaultPipeline } = await import('../pipelines/pipeline.repository.js')
+      pipeline = await ensureDefaultPipeline(tenantId, userId)
+    }
     if (!pipeline || pipeline.stages.length === 0) {
       throw new InvalidStateError('No default pipeline configured')
     }

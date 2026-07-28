@@ -413,12 +413,110 @@ export async function logout(userId: string, tenantId: string, input: LogoutInpu
   })
 }
 
-export async function getMe(userId: string, tenantId: string): Promise<AuthUser & { tenant: { id: string; name: string; slug: string } }> {
+export interface CompanyBankDetails {
+  accountName: string | null
+  bankName: string
+  accountNumber: string | null
+  ifscCode: string | null
+  branch: string | null
+}
+
+export interface CompanyProfile {
+  legalName: string
+  tradeName: string | null
+  gstin: string | null
+  pan: string | null
+  address: string | null
+  email: string | null
+  phone: string | null
+  website: string | null
+  bank: CompanyBankDetails | null
+}
+
+/** Renders a legal entity's registeredAddressJson into print-friendly lines. */
+function formatLegalEntityAddress(json: unknown): string | null {
+  if (!json || typeof json !== 'object' || Array.isArray(json)) return null
+  const a = json as Record<string, unknown>
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '')
+  const cityLine = [str(a.city), str(a.state), str(a.postalCode)].filter(Boolean).join(' ')
+  const lines = [str(a.line1), str(a.line2), cityLine, str(a.country)].filter(Boolean)
+  return lines.length > 0 ? lines.join('\n') : null
+}
+
+/**
+ * Resolves the print/letterhead company profile from the tenant's default legal entity.
+ * Data-driven — never branch on tenant slug; callers should fall back to a static
+ * demo profile (keyed by businessType) when this returns null (e.g. no legal entity set up yet).
+ */
+export async function getCompanyProfile(tenantId: string): Promise<CompanyProfile | null> {
+  const legalEntity = await prisma.legalEntity.findFirst({
+    where: { tenantId, isActive: true },
+    orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+    select: {
+      legalName: true,
+      tradeName: true,
+      displayName: true,
+      gstin: true,
+      pan: true,
+      registeredAddressJson: true,
+      email: true,
+      phone: true,
+      website: true,
+      bankAccountName: true,
+      bankName: true,
+      bankAccountNumber: true,
+      bankIfscCode: true,
+      bankBranch: true,
+    },
+  })
+  if (!legalEntity) return null
+
+  return {
+    legalName: legalEntity.legalName,
+    tradeName: legalEntity.tradeName ?? legalEntity.displayName ?? null,
+    gstin: legalEntity.gstin,
+    pan: legalEntity.pan,
+    address: formatLegalEntityAddress(legalEntity.registeredAddressJson),
+    email: legalEntity.email,
+    phone: legalEntity.phone,
+    website: legalEntity.website,
+    bank: legalEntity.bankName
+      ? {
+          accountName: legalEntity.bankAccountName,
+          bankName: legalEntity.bankName,
+          accountNumber: legalEntity.bankAccountNumber,
+          ifscCode: legalEntity.bankIfscCode,
+          branch: legalEntity.bankBranch,
+        }
+      : null,
+  }
+}
+
+export async function getMe(userId: string, tenantId: string): Promise<
+  AuthUser & {
+    tenant: {
+      id: string
+      name: string
+      slug: string
+      businessType: string
+      displayTerminology: Record<string, string>
+      companyProfile: CompanyProfile | null
+    }
+  }
+> {
   const user = await prisma.user.findFirst({
     where: { id: userId, tenantId, deletedAt: null },
     select: {
       ...userSelect,
-      tenant: { select: { id: true, name: true, slug: true } },
+      tenant: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          businessType: true,
+          displayTerminology: true,
+        },
+      },
     },
   })
 
@@ -428,10 +526,22 @@ export async function getMe(userId: string, tenantId: string): Promise<AuthUser 
 
   const userPermissions = await loadUserPermissions(userId, tenantId)
   const { passwordHash: _, failedLoginAttempts: _a, lockedUntil: _l, tenant, ...safeUser } = user
+  const terminology =
+    tenant.displayTerminology && typeof tenant.displayTerminology === 'object' && !Array.isArray(tenant.displayTerminology)
+      ? (tenant.displayTerminology as Record<string, string>)
+      : {}
+  const companyProfile = await getCompanyProfile(tenantId)
 
   return {
     ...toAuthUser(safeUser, userPermissions),
-    tenant,
+    tenant: {
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      businessType: tenant.businessType,
+      displayTerminology: terminology,
+      companyProfile,
+    },
   }
 }
 

@@ -79,20 +79,19 @@ async function assertApprovalAssignedToActor(
         ),
     )
   }
-  const pr = await prisma.purchaseRequisition.findFirst({
-    where: { id: purchaseRequisitionId, tenantId },
-    select: { estimatedAmount: true },
+  const prAmount = await prisma.purchaseRequisitionLine.aggregate({
+    where: { purchaseRequisitionId, tenantId },
+    _sum: { estimatedAmount: true },
   })
-  if (pr) {
-    const { assertActorWithinApproverLimit } = await import('../shared/purchase-approver-limit.js')
-    await assertActorWithinApproverLimit({
-      tenantId,
-      actorId,
-      documentAmount: Number(pr.estimatedAmount),
-      documentType: 'PURCHASE_REQUISITION',
-      makeError: (message, code) => new PurchaseRequisitionNotApprovableError(message, code),
-    })
-  }
+  const documentAmount = Number(prAmount._sum.estimatedAmount ?? 0)
+  const { assertActorWithinApproverLimit } = await import('../shared/purchase-approver-limit.js')
+  await assertActorWithinApproverLimit({
+    tenantId,
+    actorId,
+    documentAmount,
+    documentType: 'PURCHASE_REQUISITION',
+    makeError: (message, code) => new PurchaseRequisitionNotApprovableError(message, code),
+  })
 }
 
 export async function listPurchaseRequisitions(tenantId: string, query: ListPurchaseRequisitionsQuery) {

@@ -2,7 +2,9 @@ import type { QuotationTemplate } from '../../types/crm'
 import {
   DEFAULT_QUOTATION_TEMPLATES,
   RETIRED_BUILTIN_QUOTATION_TEMPLATE_IDS,
+  SERVICES_DEFAULT_QUOTATION_TEMPLATES,
 } from '../../data/quotations/quotationTemplates'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 
 /** Demo ids for VF Word-source quotation templates. */
 export const ALLOWED_QUOTATION_TEMPLATE_IDS = new Set(
@@ -23,6 +25,15 @@ export const ALLOWED_QUOTATION_TEMPLATE_CODES = new Set([
   'CHEM-TANKER-16KL',
   'TIPPING-TANK-31M3',
   'TIP-TRAILER-34M3',
+])
+
+/** SERVICES (Kology) standard templates — allowed through API sync / picker filters. */
+export const SERVICES_QUOTATION_TEMPLATE_CODES = new Set([
+  'KOLOGY-OUTBOUND-PILOT',
+])
+
+export const SERVICES_QUOTATION_TEMPLATE_IDS = new Set([
+  'qtpl-kology-outbound-pilot',
 ])
 
 const RETIRED_IDS = new Set<string>(RETIRED_BUILTIN_QUOTATION_TEMPLATE_IDS)
@@ -46,16 +57,45 @@ export function isAllowedQuotationTemplate(
   template: Pick<QuotationTemplate, 'id'> & { code?: string | null },
 ): boolean {
   if (ALLOWED_QUOTATION_TEMPLATE_IDS.has(template.id)) return true
+  if (SERVICES_QUOTATION_TEMPLATE_IDS.has(template.id)) return true
+  if (template.code && ALLOWED_QUOTATION_TEMPLATE_CODES.has(template.code)) return true
+  if (template.code && SERVICES_QUOTATION_TEMPLATE_CODES.has(template.code)) return true
+  return false
+}
+
+function isServicesCatalogTemplate(
+  template: Pick<QuotationTemplate, 'id'> & { code?: string | null },
+): boolean {
+  if (SERVICES_QUOTATION_TEMPLATE_IDS.has(template.id)) return true
+  if (template.code && SERVICES_QUOTATION_TEMPLATE_CODES.has(template.code)) return true
+  return false
+}
+
+function isManufacturingCatalogTemplate(
+  template: Pick<QuotationTemplate, 'id'> & { code?: string | null },
+): boolean {
+  if (ALLOWED_QUOTATION_TEMPLATE_IDS.has(template.id)) return true
   if (template.code && ALLOWED_QUOTATION_TEMPLATE_CODES.has(template.code)) return true
   return false
 }
 
-/** Drop copies / retired / blank customs — catalog is only the VF Word templates. */
+/** Drop copies / retired / wrong packaging — SERVICES vs MANUFACTURING catalogs stay separate. */
 export function filterAllowedQuotationTemplates(
   templates: QuotationTemplate[] | null | undefined,
 ): QuotationTemplate[] {
   const list = Array.isArray(templates) ? templates : []
-  return list.filter((t) => isAllowedQuotationTemplate(t) && !RETIRED_IDS.has(t.id))
+  const profile = useTenantProfileStore.getState()
+  const isServices = profile.isServices()
+  // Until /auth/me hydrates packaging, keep either catalog so SERVICES API rows are not dropped
+  // when CRM sync races ahead of tenant profile hydrate.
+  const packagingKnown = profile.hydrated
+  return list.filter((t) => {
+    if (RETIRED_IDS.has(t.id)) return false
+    if (!packagingKnown) {
+      return isServicesCatalogTemplate(t) || isManufacturingCatalogTemplate(t)
+    }
+    return isServices ? isServicesCatalogTemplate(t) : isManufacturingCatalogTemplate(t)
+  })
 }
 
 /** Built-in templates shipped with the app — always refreshed when seed version increases */
@@ -64,7 +104,9 @@ export function mergeBuiltinQuotationTemplates(
 ): QuotationTemplate[] {
   const list = Array.isArray(current) ? current : []
   const currentById = new Map(list.map((t) => [t.id, t]))
-  const merged = DEFAULT_QUOTATION_TEMPLATES.map((builtin) => {
+  const isServices = useTenantProfileStore.getState().isServices()
+  const builtins = isServices ? SERVICES_DEFAULT_QUOTATION_TEMPLATES : DEFAULT_QUOTATION_TEMPLATES
+  const merged = builtins.map((builtin) => {
     const existing = currentById.get(builtin.id)
     const builtinVersion = builtin.version ?? 1
     const existingVersion = existing?.version ?? 0
@@ -72,7 +114,8 @@ export function mergeBuiltinQuotationTemplates(
     const builtinSections = builtin.sections.length
 
     const forceLetterheadRefresh =
-      VF_LETTERHEAD_TEMPLATE_IDS.has(builtin.id)
+      !isServices
+      && VF_LETTERHEAD_TEMPLATE_IDS.has(builtin.id)
       && (
         existingSections < 10
         || existing?.printLayout?.showCompanyHeader !== true
@@ -84,7 +127,8 @@ export function mergeBuiltinQuotationTemplates(
       || forceLetterheadRefresh
       || existingSections < Math.min(3, builtinSections)
       || !existing.printLayout
-      || existing.printLayout.printSkin !== 'vf_word'
+      || (!isServices && existing.printLayout.printSkin !== 'vf_word')
+      || (isServices && existing.printLayout.printSkin !== 'kology_proposal')
       || existing.templateName !== builtin.templateName
 
     return shouldReplace ? builtin : existing
@@ -95,5 +139,8 @@ export function mergeBuiltinQuotationTemplates(
 }
 
 export function isBuiltinQuotationTemplate(templateId: string): boolean {
-  return ALLOWED_QUOTATION_TEMPLATE_IDS.has(templateId)
+  return (
+    ALLOWED_QUOTATION_TEMPLATE_IDS.has(templateId)
+    || SERVICES_QUOTATION_TEMPLATE_IDS.has(templateId)
+  )
 }

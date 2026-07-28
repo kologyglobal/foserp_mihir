@@ -1,7 +1,7 @@
 /** Money In (AR) DTOs — amounts as decimal strings matching backend Phase 3A. */
 
 export type SalesInvoiceStatus = 'DRAFT' | 'READY_TO_POST' | 'POSTED' | 'CANCELLED' | 'REVERSED'
-export type SalesInvoiceSourceType = 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH'
+export type SalesInvoiceSourceType = 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH' | 'PROFORMA_INVOICE'
 export type SalesInvoiceSettlementStatus =
   | 'UNPAID'
   | 'PARTIALLY_PAID'

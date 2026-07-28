@@ -5,10 +5,11 @@ import type { Opportunity } from '../../types/crm'
 import { calcPriceSummary, syncLineTotals } from '../crmQuotationCalc'
 import { formatCurrency } from '../formatters/currency'
 import { amountInWordsINR } from './amountInWords'
-import { QUOTATION_COMPANY } from './companyProfile'
+import { getActiveCompanyProfile } from './companyProfile'
 import { sectionContent } from '../crmIntegration'
 import { formatDate } from '../dates/format'
 import { opportunityRequirementDisplay } from '../leadRequirementLines'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 
 export interface QuotationMergeContext {
   document: QuotationDocument
@@ -58,8 +59,10 @@ function fmtMoney(n: number) {
 
 export function buildQuotationMergeMap(ctx: QuotationMergeContext): Record<QuotationPlaceholderKey, string> {
   const { document, quotation, customer, opportunity, contactName } = ctx
+  const company = getActiveCompanyProfile()
   const lines = syncLineTotals(document.priceLines)
-  const summary = calcPriceSummary(lines, document.freightAmount, document.installationAmount, document.customCharges)
+  const freightAmount = useTenantProfileStore.getState().isServices() ? 0 : document.freightAmount
+  const summary = calcPriceSummary(lines, freightAmount, document.installationAmount, document.customCharges)
   const primary = lines.find((l) => !l.isOptional) ?? lines[0]
   const payment = sectionContent(document, 'payment')
   const delivery = sectionContent(document, 'delivery')
@@ -90,10 +93,10 @@ export function buildQuotationMergeMap(ctx: QuotationMergeContext): Record<Quota
     delivery_time: delivery || quotation?.deliveryTerms || 'As agreed',
     // Prefer explicit "N days" from commercial copy; never dump a raw validity Date into a days slot
     validity_days: validityMatch?.[1] ?? '30',
-    authorized_person: QUOTATION_COMPANY.authorizedPerson,
-    designation: QUOTATION_COMPANY.designation,
-    company_name: QUOTATION_COMPANY.legalName,
-    company_gstin: QUOTATION_COMPANY.gstin,
+    authorized_person: company.authorizedPerson,
+    designation: company.designation,
+    company_name: company.legalName,
+    company_gstin: company.gstin || '—',
   }
 }
 

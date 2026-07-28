@@ -4,7 +4,29 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Done recently — Money In Recurring Invoices + Zoho-style create form (2026-07-28)
+
+| Field | Value |
+|-------|-------|
+| Module | Accounting Money In (AR) |
+| Description | `RecurringSalesInvoiceSchedule`/`Execution` (migration `20260728060000`) — create-form "Recurring invoice" toggle (frequency + next date + optional end date) posts `POST /recurring-schedules`; `/accounting/money-in/recurring-invoices` (schedules + cancel) and `/recurring-invoices/upcoming` (queue + Approve → creates a real Sales Invoice draft via `approveUpcomingInvoice`, advances `nextInvoiceDate`, and self-schedules the next occurrence). Invoice create form also cleaned to a Zoho-style layout: dropped Customer PO / Payment Terms / Posting Date / Project Ref / Project Name / Round Off / Other Charges from the UI (posting date silently trails invoice date; PO/project still flow through on SO/dispatch sourced invoices); added a Currency dropdown and a "+ New" customer quick-create popup (`QuickCompanyCreateModal`). Freight remains hidden for SERVICES tenants via `isServices()` (pre-existing). |
+| Test | Backend `npm run typecheck` clean; frontend `npx tsc --noEmit` clean; `prisma migrate deploy` applied locally |
+| Status | **done** — API mode only (recurring schedules are not modelled in the demo store, matching the AR disputes pattern); live UAT (create → upcoming → approve → post) not yet run against a seeded tenant |
+
+---
+
+## Done recently — Kology SERVICES packaging K1–K5 base (2026-07-27)
+
+| Field | Value |
+|-------|-------|
+| Module | Tenant packaging / CRM+Sales+Accounting reuse |
+| Description | `businessType=SERVICES`, module flags, nav/route gates, service MasterItems, SO→AR over-invoice guard, Expenses hub; docs under `docs/kology/` |
+| Status | **done** for packaging base — **open**: full golden-path live UAT evidence (Lead→SO→SI→Receipt + expense) on `kology`; live P&L/BS polish; billing-type schema beyond `productType` string |
+
+---
+
 ## Done recently — Dispatch commercial policy UI + enforcement (2026-07-27)
+
 
 | Field | Value |
 |-------|-------|

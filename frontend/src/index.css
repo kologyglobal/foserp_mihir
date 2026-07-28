@@ -6,6 +6,7 @@
 @import './styles/dynamics-typography.css';
 @import './styles/dynamics-tokens.css';
 @import './styles/dynamics-components.css';
+@import './styles/kology-proposal-print.css';
 @import './styles/erp-document.css';
 @import './styles/mobile-ops-theme.css';
 @import './styles/enterprise-tokens.css';
@@ -2911,18 +2912,19 @@
   }
 }
 
-/* ── Login brand panel (Vasant) ───────────────────────────────────────── */
+/* ── Login brand panel (Kology) ───────────────────────────────────────── */
 .login-brand-panel {
-  --login-brand-orange: #f58220;
-  --login-brand-orange-soft: rgb(245 130 32 / 0.55);
+  --login-brand-accent: #1e5bb8;
+  --login-brand-accent-soft: rgb(30 91 184 / 0.55);
+  --login-brand-cyan: #3ec6e8;
   --login-brand-text-muted: rgb(255 255 255 / 0.66);
   --login-brand-text-soft: rgb(255 255 255 / 0.48);
   grid-template-rows: auto 1fr auto;
   row-gap: 0;
   background:
-    radial-gradient(ellipse 72% 48% at 8% 12%, rgb(245 130 32 / 0.24), transparent 52%),
-    radial-gradient(ellipse 65% 45% at 92% 92%, rgb(245 130 32 / 0.1), transparent 48%),
-    linear-gradient(165deg, #050505 0%, #111111 48%, #0a0a0a 100%);
+    radial-gradient(ellipse 72% 48% at 8% 12%, rgb(30 91 184 / 0.32), transparent 52%),
+    radial-gradient(ellipse 65% 45% at 92% 92%, rgb(62 198 232 / 0.14), transparent 48%),
+    linear-gradient(165deg, #050505 0%, #0a1220 48%, #05080f 100%);
 }
 
 .login-brand-panel::before {
@@ -2935,9 +2937,10 @@
   background: linear-gradient(
     180deg,
     transparent 8%,
-    rgb(245 130 32 / 0.15) 22%,
-    var(--login-brand-orange-soft) 50%,
-    rgb(245 130 32 / 0.15) 78%,
+    rgb(30 91 184 / 0.2) 22%,
+    var(--login-brand-accent-soft) 42%,
+    var(--login-brand-cyan) 58%,
+    rgb(30 91 184 / 0.2) 78%,
     transparent 92%
   );
 }
@@ -2958,10 +2961,11 @@
 
 .login-brand-panel__logo-mark {
   display: block;
-  height: 4.25rem;
+  height: 4.75rem;
   width: auto;
-  max-width: none;
-  filter: drop-shadow(0 6px 18px rgb(0 0 0 / 0.45));
+  max-width: min(100%, 17rem);
+  border-radius: 0.35rem;
+  filter: drop-shadow(0 8px 22px rgb(0 0 0 / 0.45));
   animation: login-brand-fade-in 700ms ease-out both;
 }
 
@@ -2983,7 +2987,7 @@
   line-height: 1.4;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #f58220;
+  color: var(--login-brand-cyan);
 }
 
 .login-brand-panel__rule {
@@ -2991,7 +2995,7 @@
   height: 2px;
   margin-top: 1.25rem;
   border-radius: 9999px;
-  background: linear-gradient(90deg, var(--login-brand-orange), rgb(245 130 32 / 0.35));
+  background: linear-gradient(90deg, var(--login-brand-accent), var(--login-brand-cyan));
   animation: login-brand-fade-in 700ms ease-out 80ms both;
 }
 
@@ -3044,7 +3048,7 @@
   flex-shrink: 0;
   width: 1.75rem;
   height: 1px;
-  background: linear-gradient(90deg, var(--login-brand-orange), rgb(245 130 32 / 0.25));
+  background: linear-gradient(90deg, var(--login-brand-accent), var(--login-brand-cyan));
 }
 
 .login-brand-panel__powered-by-text {
@@ -3052,9 +3056,9 @@
   font-size: 0.6875rem;
   font-weight: 500;
   line-height: 1.5;
-  letter-spacing: 0.12em;
-  font-variant: all-small-caps;
-  color: var(--login-brand-orange);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--login-brand-cyan);
 }
 
 .login-brand-panel__body {
@@ -3101,9 +3105,9 @@
   border-radius: 1px;
   background: linear-gradient(
     180deg,
-    rgb(245 130 32 / 0.35),
-    var(--login-brand-orange) 45%,
-    rgb(245 130 32 / 0.35)
+    rgb(30 91 184 / 0.35),
+    var(--login-brand-cyan) 45%,
+    rgb(30 91 184 / 0.35)
   );
 }
 
@@ -3131,9 +3135,9 @@
 
 .login-brand-panel__footer-sanskrit {
   font-size: 0.9375rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  color: rgb(255 255 255 / 0.9);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgb(255 255 255 / 0.92);
 }
 
 .login-brand-panel__footer-sep {
@@ -3170,7 +3174,7 @@
   right: -4rem;
   width: 18rem;
   height: 18rem;
-  background: rgb(245 130 32 / 0.18);
+  background: rgb(30 91 184 / 0.28);
 }
 
 .login-brand-panel__glow--bottom {
@@ -3178,7 +3182,7 @@
   left: 18%;
   width: 16rem;
   height: 16rem;
-  background: rgb(245 130 32 / 0.1);
+  background: rgb(62 198 232 / 0.14);
 }
 
 .login-brand-panel__grid {

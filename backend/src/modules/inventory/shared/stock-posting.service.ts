@@ -590,13 +590,16 @@ export async function postStockMovement(
       )
     }
 
-    let standardVarianceDraft: {
-      varianceType: 'STANDARD_RECEIPT' | 'STANDARD_ISSUE'
-      quantity: Prisma.Decimal
-      standardUnitCost: Prisma.Decimal
-      actualUnitCost: Prisma.Decimal
-      varianceAmount: Prisma.Decimal
-    } | null = null
+    // Object holders so assignments inside the valuation IIFE stay visible to TS.
+    const standardVarianceDraft: {
+      current: {
+        varianceType: 'STANDARD_RECEIPT' | 'STANDARD_ISSUE'
+        quantity: Prisma.Decimal
+        standardUnitCost: Prisma.Decimal
+        actualUnitCost: Prisma.Decimal
+        varianceAmount: Prisma.Decimal
+      } | null
+    } = { current: null }
 
     const fifoIssueAllocations: Array<{
       layerId: string
@@ -605,13 +608,15 @@ export async function postStockMovement(
       totalCost: Prisma.Decimal
     }> = []
 
-    let fifoReceiptCostLayerDraft: {
-      quantity: Prisma.Decimal
-      unitCost: Prisma.Decimal
-      totalCost: Prisma.Decimal
-      serialId: string | null
-      lotId: string | null
-    } | null = null
+    const fifoReceiptCostLayerDraft: {
+      current: {
+        quantity: Prisma.Decimal
+        unitCost: Prisma.Decimal
+        totalCost: Prisma.Decimal
+        serialId: string | null
+        lotId: string | null
+      } | null
+    } = { current: null }
 
     let fifoReturnRestores: FifoReturnRestoreAllocation[] = []
 
@@ -646,7 +651,7 @@ export async function postStockMovement(
             .times(qtyAbs)
             .toDecimalPlaces(2)
           if (!varianceAmount.isZero()) {
-            standardVarianceDraft = {
+            standardVarianceDraft.current = {
               varianceType: isReceipt ? 'STANDARD_RECEIPT' : 'STANDARD_ISSUE',
               quantity: qtyAbs,
               standardUnitCost,
@@ -739,7 +744,7 @@ export async function postStockMovement(
           if (planned.remainderQty.greaterThan(0)) {
             const remainderRate = inputRate.greaterThan(0) ? inputRate : previousAvgRate
             remainderValue = planned.remainderQty.times(remainderRate).toDecimalPlaces(2)
-            fifoReceiptCostLayerDraft = {
+            fifoReceiptCostLayerDraft.current = {
               quantity: planned.remainderQty,
               unitCost: remainderRate.toDecimalPlaces(4),
               totalCost: remainderValue,
@@ -794,7 +799,7 @@ export async function postStockMovement(
           data: { avgRate: avgRateAfter, stockValue: stockValueAfter },
         })
 
-        fifoReceiptCostLayerDraft = {
+        fifoReceiptCostLayerDraft.current = {
           quantity: signedQty.abs(),
           unitCost: rate.toDecimalPlaces(4),
           totalCost: value,
@@ -1055,13 +1060,13 @@ export async function postStockMovement(
           data: { lotId: lot.id, updatedBy: input.createdBy ?? null },
         })
       }
-      if (fifoReceiptCostLayerDraft) {
-        fifoReceiptCostLayerDraft.lotId = lot.id
+      if (fifoReceiptCostLayerDraft.current) {
+        fifoReceiptCostLayerDraft.current.lotId = lot.id
       }
     }
 
     const fifoReceiptCostLayerId =
-      usesCostLayers && fifoReceiptCostLayerDraft
+      usesCostLayers && fifoReceiptCostLayerDraft.current
         ? (
             await innerTx.inventoryCostLayer.create({
               data: {
@@ -1069,16 +1074,16 @@ export async function postStockMovement(
                 legalEntityId: null,
                 itemId: input.itemId,
                 warehouseId: input.warehouseId,
-                lotId: fifoReceiptCostLayerDraft.lotId,
-                serialId: fifoReceiptCostLayerDraft.serialId,
+                lotId: fifoReceiptCostLayerDraft.current.lotId,
+                serialId: fifoReceiptCostLayerDraft.current.serialId,
                 sourceMovementId: movement.id,
                 receiptDate: movementDate,
                 postingDate: movementDate,
-                originalQuantity: fifoReceiptCostLayerDraft.quantity,
-                remainingQuantity: fifoReceiptCostLayerDraft.quantity,
-                unitCost: fifoReceiptCostLayerDraft.unitCost,
-                originalValue: fifoReceiptCostLayerDraft.totalCost,
-                remainingValue: fifoReceiptCostLayerDraft.totalCost,
+                originalQuantity: fifoReceiptCostLayerDraft.current.quantity,
+                remainingQuantity: fifoReceiptCostLayerDraft.current.quantity,
+                unitCost: fifoReceiptCostLayerDraft.current.unitCost,
+                originalValue: fifoReceiptCostLayerDraft.current.totalCost,
+                remainingValue: fifoReceiptCostLayerDraft.current.totalCost,
                 currencyCode: 'INR',
                 status: 'OPEN',
               },
@@ -1151,7 +1156,7 @@ export async function postStockMovement(
       }
     }
 
-    if (standardVarianceDraft) {
+    if (standardVarianceDraft.current) {
       await innerTx.inventoryCostVariance.create({
         data: {
           tenantId: input.tenantId,
@@ -1159,11 +1164,11 @@ export async function postStockMovement(
           warehouseId: input.warehouseId,
           inventoryMovementId: movement.id,
           costEntryId: costEntry.id,
-          varianceType: standardVarianceDraft.varianceType,
-          quantity: standardVarianceDraft.quantity,
-          standardUnitCost: standardVarianceDraft.standardUnitCost,
-          actualUnitCost: standardVarianceDraft.actualUnitCost,
-          varianceAmount: standardVarianceDraft.varianceAmount,
+          varianceType: standardVarianceDraft.current.varianceType,
+          quantity: standardVarianceDraft.current.quantity,
+          standardUnitCost: standardVarianceDraft.current.standardUnitCost,
+          actualUnitCost: standardVarianceDraft.current.actualUnitCost,
+          varianceAmount: standardVarianceDraft.current.varianceAmount,
           postingDate: movementDate,
           sourceType: input.referenceType,
           sourceId: input.referenceNo ?? movement.id,

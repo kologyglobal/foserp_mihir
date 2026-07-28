@@ -1,0 +1,958 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Kology SERVICES outbound proposal print skin (printable + html2canvas PDF)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.quo-print-doc--skin-kology-proposal {
+  --kology-navy: #0b1e3f;
+  --kology-navy-mid: #132a52;
+  --kology-cyan: #5fb4c4;
+  --kology-cyan-soft: #e8f4f7;
+  --kology-text: #1e293b;
+  --kology-muted: #64748b;
+  --kology-line: #e2e8f0;
+  --kology-card: #f8fafc;
+  font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--kology-text);
+  background: #fff;
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.quo-print-doc--skin-kology-proposal *,
+.quo-print-doc--skin-kology-proposal *::before,
+.quo-print-doc--skin-kology-proposal *::after {
+  box-sizing: border-box;
+}
+
+.kology-prop__page {
+  padding: 10mm 12mm 12mm;
+}
+
+.kology-prop__page--break {
+  break-before: page;
+  page-break-before: always;
+}
+
+/* Letterhead: actual brand logo + company block (professional left/right alignment) */
+.kology-prop__letterhead {
+  margin: 0 0 16px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.kology-prop__letterhead-bar {
+  height: 7px;
+  background: var(--kology-navy);
+}
+
+.kology-prop__letterhead-row {
+  display: flex;
+  align-items: center; /* logo vertically centered to company info block */
+  gap: 22px;
+  padding: 14px 4px 12px;
+  border-bottom: 1px solid var(--kology-line);
+}
+
+.kology-prop__letterhead-logo-wrap {
+  flex: 0 0 auto;
+  width: 148px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.kology-prop__letterhead-logo {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  object-position: left center;
+  display: block;
+}
+
+.kology-prop__letterhead-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.kology-prop__letterhead-name {
+  margin: 0 0 5px;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--kology-navy);
+  letter-spacing: 0.01em;
+}
+
+.kology-prop__letterhead-line,
+.kology-prop__letterhead-contact,
+.kology-prop__letterhead-gstin {
+  margin: 0;
+  font-size: 10.5px;
+  color: #334155;
+}
+
+.kology-prop__letterhead-contact {
+  margin-top: 5px;
+  color: var(--kology-text);
+  font-weight: 500;
+}
+
+.kology-prop__letterhead-gstin {
+  margin-top: 2px;
+  font-weight: 600;
+  color: var(--kology-navy-mid);
+}
+
+.kology-prop__hero {
+  background: var(--kology-navy);
+  color: #fff;
+  border-radius: 14px;
+  padding: 22px 24px 18px;
+  margin-bottom: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.kology-prop__hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.kology-prop__brand {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.kology-prop__dot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 8px);
+  gap: 4px;
+}
+
+.kology-prop__dot-grid span {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: rgba(95, 180, 196, 0.35);
+}
+
+.kology-prop__dot-grid span:nth-child(3n) { background: rgba(95, 180, 196, 0.7); }
+.kology-prop__dot-grid span:nth-child(5n) { background: rgba(255, 255, 255, 0.25); }
+
+.kology-prop__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--kology-cyan);
+}
+
+.kology-prop__eyebrow--light { color: var(--kology-cyan); }
+
+.kology-prop__eyebrow-rule {
+  display: inline-block;
+  width: 28px;
+  height: 2px;
+  background: var(--kology-cyan);
+  border-radius: 1px;
+}
+
+.kology-prop__hero-title {
+  margin: 0 0 10px;
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.kology-prop__hero-lead {
+  margin: 0 0 18px;
+  max-width: 52em;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.kology-prop__meta-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.kology-prop__meta-bar > div {
+  padding: 10px 12px;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.kology-prop__meta-bar > div:last-child { border-right: 0; }
+
+.kology-prop__meta-bar span {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(95, 180, 196, 0.95);
+  margin-bottom: 4px;
+}
+
+.kology-prop__meta-bar strong {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.35;
+}
+
+.kology-prop__confidential {
+  margin: 10px 0 0;
+  font-size: 9.5px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.kology-prop__block { margin: 0 0 18px; }
+
+.kology-prop__h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--kology-navy);
+}
+
+.kology-prop__h3 {
+  margin: 16px 0 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--kology-navy);
+}
+
+.kology-prop__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--kology-cyan);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.kology-prop__sec-no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--kology-navy);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.kology-prop__body {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--kology-muted);
+}
+
+.kology-prop__body--tight { margin: 0; color: var(--kology-text); }
+
+.kology-prop__metric-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.kology-prop__metric-card {
+  background: var(--kology-card);
+  border: 1px solid var(--kology-line);
+  border-radius: 12px;
+  padding: 14px 12px;
+  text-align: left;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.kology-prop__metric-card strong {
+  display: block;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--kology-navy);
+  margin-bottom: 4px;
+}
+
+.kology-prop__metric-card span {
+  font-size: 11px;
+  color: var(--kology-muted);
+}
+
+.kology-prop__glance {
+  border: 1px solid var(--kology-line);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.kology-prop__glance-head {
+  background: var(--kology-navy);
+  color: #fff;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.kology-prop__glance-table,
+.kology-prop__data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+
+.kology-prop__glance-table th {
+  width: 28%;
+  text-align: left;
+  padding: 9px 12px;
+  background: #f1f5f9;
+  color: var(--kology-navy);
+  font-weight: 700;
+  border-bottom: 1px solid var(--kology-line);
+  vertical-align: top;
+}
+
+.kology-prop__glance-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--kology-line);
+  color: var(--kology-text);
+  vertical-align: top;
+}
+
+.kology-prop__glance-table tr:last-child th,
+.kology-prop__glance-table tr:last-child td { border-bottom: 0; }
+
+.kology-prop__data-table thead th {
+  background: var(--kology-navy);
+  color: #fff;
+  text-align: left;
+  padding: 9px 12px;
+  font-weight: 650;
+  font-size: 11px;
+}
+
+.kology-prop__data-table tbody td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--kology-line);
+  vertical-align: top;
+}
+
+.kology-prop__data-table tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+.kology-prop__data-table--nums td:not(:first-child),
+.kology-prop__data-table--nums th:not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.kology-prop__highlight-row td {
+  background: #1d6fd8 !important;
+  color: #fff !important;
+  font-weight: 700;
+  border-bottom: 0 !important;
+}
+
+.kology-prop__teal-text { color: #0f766e; font-weight: 600; }
+
+.kology-prop__tint-box {
+  background: var(--kology-cyan-soft);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+
+.kology-prop__tint-label {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--kology-cyan);
+}
+
+.kology-prop__sector-grid,
+.kology-prop__exp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.kology-prop__exp-grid { grid-template-columns: repeat(3, 1fr); }
+
+.kology-prop__sector-card,
+.kology-prop__exp-card,
+.kology-prop__report-card {
+  background: #fff;
+  border: 1px solid var(--kology-line);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.kology-prop__sector-card strong,
+.kology-prop__exp-card strong {
+  display: block;
+  font-size: 12.5px;
+  color: var(--kology-navy);
+  margin-bottom: 4px;
+}
+
+.kology-prop__sector-card span,
+.kology-prop__exp-card span {
+  font-size: 11px;
+  color: var(--kology-muted);
+  line-height: 1.4;
+}
+
+.kology-prop__motion-row,
+.kology-prop__own-row,
+.kology-prop__price-row,
+.kology-prop__onboard-row,
+.kology-prop__metric-detail-row,
+.kology-prop__report-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.kology-prop__report-grid { gap: 8px; }
+
+.kology-prop__motion {
+  border-radius: 12px;
+  border: 1px solid var(--kology-line);
+  overflow: hidden;
+  background: #fff;
+}
+
+.kology-prop__motion > span {
+  display: block;
+  padding: 6px 12px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: #f1f5f9;
+  color: var(--kology-cyan);
+}
+
+.kology-prop__motion--a { border-top: 4px solid var(--kology-navy); }
+.kology-prop__motion--b { border-top: 4px solid var(--kology-cyan); }
+.kology-prop__motion--b > span { background: var(--kology-cyan-soft); }
+
+.kology-prop__motion strong {
+  display: block;
+  padding: 10px 12px 4px;
+  font-size: 13px;
+  color: var(--kology-navy);
+}
+
+.kology-prop__motion p {
+  margin: 0;
+  padding: 0 12px 12px;
+  font-size: 11.5px;
+  color: var(--kology-muted);
+  line-height: 1.45;
+}
+
+.kology-prop__own {
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.kology-prop__own h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--kology-navy);
+}
+
+.kology-prop__own--kology {
+  background: #f1f5f9;
+  border: 1px solid var(--kology-line);
+}
+
+.kology-prop__own--client {
+  background: var(--kology-navy);
+  color: #fff;
+}
+
+.kology-prop__own--client h3 { color: #fff; }
+
+.kology-prop__own--client .kology-prop__chevron-list li {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.kology-prop__own--client .kology-prop__chevron-list li::before {
+  color: var(--kology-cyan);
+}
+
+.kology-prop__chevron-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kology-prop__chevron-list li {
+  position: relative;
+  padding: 3px 0 3px 14px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--kology-text);
+}
+
+.kology-prop__chevron-list li::before {
+  content: '›';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  color: var(--kology-cyan);
+  font-weight: 700;
+}
+
+.kology-prop__callout {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--kology-cyan-soft);
+  border-left: 4px solid #3b82f6;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--kology-text);
+}
+
+.kology-prop__flow {
+  background: var(--kology-navy);
+  border-radius: 14px;
+  padding: 16px;
+  color: #fff;
+}
+
+.kology-prop__flow-label {
+  margin: 0 0 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.kology-prop__flow-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.kology-prop__flow-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kology-prop__flow-arrow {
+  color: var(--kology-cyan);
+  font-weight: 700;
+}
+
+.kology-prop__flow-chip {
+  display: inline-block;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(95, 180, 196, 0.45);
+  background: rgba(19, 42, 82, 0.65);
+  font-size: 11px;
+  font-weight: 650;
+  color: #fff;
+}
+
+.kology-prop__flow-chip--end {
+  background: var(--kology-cyan);
+  border-color: var(--kology-cyan);
+  color: var(--kology-navy);
+}
+
+.kology-prop__cadence {
+  border: 1px solid var(--kology-line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.kology-prop__cadence-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--kology-line);
+  font-size: 12px;
+}
+
+.kology-prop__cadence-row:last-child { border-bottom: 0; }
+
+.kology-prop__pill {
+  display: inline-flex;
+  min-width: 64px;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.kology-prop__pill--navy { background: var(--kology-navy); color: #fff; }
+.kology-prop__pill--blue { background: #3b82f6; color: #fff; }
+.kology-prop__pill--teal { background: #cffafe; color: #0e7490; }
+.kology-prop__pill--mint { background: #d1fae5; color: #047857; }
+
+.kology-prop__week-card {
+  border: 1px solid var(--kology-line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.kology-prop__week-card p {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--kology-text);
+}
+
+.kology-prop__week-head,
+.kology-prop__week-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.kology-prop__week-bar {
+  background: var(--kology-navy);
+  color: #fff;
+  margin: -14px -16px 12px;
+  padding: 12px 16px;
+  border-radius: 14px 14px 0 0;
+}
+
+.kology-prop__week-bar strong { color: #fff; font-size: 13px; }
+
+.kology-prop__week-badge {
+  display: inline-flex;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: var(--kology-navy);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.kology-prop__week-bar .kology-prop__week-badge {
+  background: rgba(95, 180, 196, 0.95);
+  color: var(--kology-navy);
+}
+
+.kology-prop__week-head strong {
+  font-size: 13.5px;
+  color: var(--kology-navy);
+}
+
+.kology-prop__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.kology-prop__tags span {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: var(--kology-navy-mid);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.kology-prop__label-blue { color: #2563eb; }
+.kology-prop__label-teal { color: #0f766e; }
+
+.kology-prop__price-card {
+  position: relative;
+  border-radius: 14px;
+  padding: 18px 16px 16px;
+  background: #f1f5f9;
+  border: 1px solid var(--kology-line);
+}
+
+.kology-prop__price-card--rec {
+  background: #fff;
+  border: 1.5px solid #3b82f6;
+}
+
+.kology-prop__rec-badge {
+  position: absolute;
+  top: -10px;
+  left: 14px;
+  background: var(--kology-navy);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.kology-prop__price-card h3 {
+  margin: 4px 0 6px;
+  font-size: 14px;
+  color: var(--kology-navy);
+}
+
+.kology-prop__price-card > p {
+  margin: 0 0 12px;
+  font-size: 11.5px;
+  color: var(--kology-muted);
+  line-height: 1.4;
+}
+
+.kology-prop__price {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--kology-navy);
+  letter-spacing: -0.02em;
+}
+
+.kology-prop__price span {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--kology-muted);
+}
+
+.kology-prop__live-price { margin-top: 14px; }
+
+.kology-prop__metric-detail {
+  border: 1px solid var(--kology-line);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+
+.kology-prop__metric-detail p:last-child {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--kology-text);
+}
+
+.kology-prop__qa > div {
+  border: 1px solid var(--kology-line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+
+.kology-prop__qa-q {
+  display: flex;
+  gap: 10px;
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--kology-navy);
+}
+
+.kology-prop__qa-q span {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--kology-cyan-soft);
+  color: #0e7490;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kology-prop__qa-a {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--kology-muted);
+}
+
+.kology-prop__qa-a strong { color: var(--kology-cyan); }
+
+.kology-prop__onboard-hero {
+  background: var(--kology-navy);
+  color: #fff;
+  border-radius: 14px;
+  padding: 18px 16px;
+}
+
+.kology-prop__onboard-hero strong {
+  display: block;
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--kology-cyan);
+  line-height: 1;
+}
+
+.kology-prop__onboard-hero > span {
+  display: block;
+  margin: 6px 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.kology-prop__onboard-hero p {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.kology-prop__onboard-need {
+  border: 1px solid var(--kology-line);
+  border-radius: 14px;
+  padding: 14px;
+  background: #fff;
+}
+
+.kology-prop__bank { margin-top: 16px; }
+
+.kology-prop__cta {
+  background: var(--kology-navy);
+  color: #fff;
+  border-radius: 14px;
+  padding: 22px 24px;
+}
+
+.kology-prop__cta h2 {
+  margin: 0 0 10px;
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.kology-prop__cta > p {
+  margin: 0 0 18px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.82);
+  max-width: 48em;
+}
+
+.kology-prop__cta-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.kology-prop__cta-foot strong {
+  display: block;
+  font-size: 14px;
+}
+
+.kology-prop__cta-foot span {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.kology-prop__cta-brand {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.kology-prop__cta-logo {
+  width: 120px;
+  height: 36px;
+  object-fit: contain;
+  object-position: right center;
+  background: #fff;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.kology-prop__cta-brand span {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  font-weight: 650;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+@media print {
+  .quo-print-doc--skin-kology-proposal {
+    max-width: none;
+    margin: 0;
+  }
+
+  .kology-prop__page { padding: 8mm 10mm; }
+
+  .kology-prop__page--break {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .kology-prop__metric-card,
+  .kology-prop__week-card,
+  .kology-prop__sector-card,
+  .kology-prop__exp-card,
+  .kology-prop__price-card,
+  .kology-prop__glance,
+  .kology-prop__letterhead {
+    box-shadow: none !important;
+  }
+}

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
   Building2,
+  Check,
   ClipboardList,
   FileText,
   PenLine,
@@ -15,14 +16,15 @@ import { ErpCardSection, ErpFieldRow, ErpStickySaveBar } from '../../components/
 import { ErpSegmentedControl } from '../../components/erp/ErpSegmentedControl'
 import { ErpSmartSelect } from '../../components/erp/ErpSmartSelect'
 import { Input, Textarea } from '../../components/forms/Inputs'
+import { CommercialTermSelect } from '../../components/masters/GeographySelects'
 import { TableLink } from '../../components/ui/AppLink'
 import { Toast } from '../../components/ui/Toast'
 import {
   EnterpriseBusinessFactBox,
   EnterpriseFormContextPanel,
   EnterpriseFormMetrics,
-  EnterpriseFormSectionNav,
 } from '../../design-system/workspace'
+import { cn } from '../../utils/cn'
 import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
 import { useMrpStore } from '../../store/mrpStore'
 import { useMasterStore } from '../../store/masterStore'
@@ -40,6 +42,7 @@ import { SalesCardFormShell } from './SalesCardFormShell'
 import { salesChildBreadcrumbs } from '../../utils/salesNavigation'
 import { isApiMode } from '../../config/apiConfig'
 import { apiCreateProforma } from '../../services/bridges/crmCommercialApiBridge'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 
 type PiCreateMode = 'direct' | 'sales_order'
 
@@ -53,9 +56,16 @@ type PiLineRow = {
 }
 
 const GST_RATE_OPTIONS = [0, 5, 12, 18, 28] as const
+const DEFAULT_VALIDITY_DAYS = 30
 
 function round2(n: number) {
   return Math.round(n * 100) / 100
+}
+
+function addDays(isoDate: string, days: number): string {
+  const d = new Date(isoDate.slice(0, 10))
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
 }
 
 function toLineRows(lines: ProformaInvoiceLine[]): PiLineRow[] {
@@ -110,7 +120,6 @@ export function ProformaInvoiceFormPage() {
   const getItem = useMasterStore((s) => s.getItem)
 
   const today = new Date().toISOString().slice(0, 10)
-  const [activeSection, setActiveSection] = useState('source')
   const [mode, setMode] = useState<PiCreateMode>(initialSoId ? 'sales_order' : 'direct')
   const [salesOrderId, setSalesOrderId] = useState(initialSoId)
   const [customerId, setCustomerId] = useState(() => {
@@ -118,7 +127,7 @@ export function ProformaInvoiceFormPage() {
     return prefill?.customerId ?? ''
   })
   const [proformaDate, setProformaDate] = useState(today)
-  const [validUntil, setValidUntil] = useState('')
+  const [validUntil, setValidUntil] = useState(() => addDays(today, DEFAULT_VALIDITY_DAYS))
   const [paymentTerms, setPaymentTerms] = useState(() => {
     const prefill = initialSoId ? resolveSalesOrderProformaPrefill(initialSoId) : null
     return prefill?.paymentTerms ?? ''
@@ -136,6 +145,7 @@ export function ProformaInvoiceFormPage() {
     'sales',
     initialSoId ? resolveSalesOrderProformaPrefill(initialSoId)?.locationId : null,
   )
+  const showLocationField = !useTenantProfileStore((s) => s.isServices())
   const [lineRows, setLineRows] = useState<PiLineRow[]>(() => {
     const prefill = initialSoId ? resolveSalesOrderProformaPrefill(initialSoId) : null
     if (prefill?.lines.length) return toLineRows(prefill.lines)
@@ -265,8 +275,6 @@ export function ProformaInvoiceFormPage() {
     const errs: string[] = []
     if (mode === 'sales_order' && !salesOrderId) errs.push('Select a sales order.')
     if (!customerId) errs.push('Select a customer.')
-    if (!paymentTerms.trim()) errs.push('Payment terms are required.')
-    if (!deliveryTerms.trim()) errs.push('Delivery terms are required.')
     if (lines.length === 0) errs.push('Add at least one line with product and quantity.')
     return errs
   }
@@ -317,7 +325,6 @@ export function ProformaInvoiceFormPage() {
   }
 
   function scrollToSection(sectionId: string) {
-    setActiveSection(sectionId)
     document.getElementById(`pi-section-${sectionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
@@ -329,13 +336,6 @@ export function ProformaInvoiceFormPage() {
   ], [mode, salesOrderId, customerId, hasValidLines, paymentTerms, deliveryTerms])
 
   const completionPercent = Math.round((completionItems.filter((i) => i.done).length / completionItems.length) * 100)
-
-  const sectionNavItems = useMemo(() => [
-    { id: 'source', label: 'Source', icon: FileText, done: completionItems.find((i) => i.id === 'source')?.done },
-    { id: 'customer', label: 'Customer', icon: Building2, done: completionItems.find((i) => i.id === 'customer')?.done },
-    { id: 'lines', label: 'Products', icon: ClipboardList, done: completionItems.find((i) => i.id === 'lines')?.done },
-    { id: 'commercial', label: 'Commercial', icon: Banknote, done: completionItems.find((i) => i.id === 'commercial')?.done },
-  ], [completionItems])
 
   const formMetrics = useMemo(() => [
     { label: 'Completion', value: `${completionPercent}%`, accent: 'blue' as const, hint: `${completionItems.filter((i) => i.done).length} of ${completionItems.length} sections` },
@@ -430,98 +430,115 @@ export function ProformaInvoiceFormPage() {
   )
 
   const lineGrid = (
-    <div className="col-span-2 overflow-x-auto erp-line-items-grid">
-      <table className="w-full min-w-[960px] text-[12px] erp-line-items-grid__table">
-        <thead>
-          <tr className="border-b border-erp-border bg-erp-surface-alt/60 text-left text-[11px] uppercase tracking-wide text-erp-muted">
-            <th className="px-2 py-2 erp-line-items-grid__sticky-sr">#</th>
-            <th className="px-2 py-2 erp-line-items-grid__sticky-product">Product</th>
-            <th className="px-2 py-2 text-right">Qty</th>
-            <th className="px-2 py-2 text-right">Unit Price</th>
-            <th className="px-2 py-2 text-right">Disc %</th>
-            <th className="px-2 py-2">GST %</th>
-            <th className="px-2 py-2 text-right">Taxable</th>
-            <th className="px-2 py-2 text-right">GST</th>
-            <th className="px-2 py-2 text-right">Line Total</th>
-            <th className="px-2 py-2" />
-          </tr>
-        </thead>
-        <tbody>
-          {lineRows.map((row, idx) => {
-            const built = buildLinesFromRows([row], items)[0]
-            return (
-              <tr key={row.key} className="border-b border-erp-border/60">
-                <td className="px-2 py-2 tabular-nums text-erp-muted erp-line-items-grid__sticky-sr">{idx + 1}</td>
-                <td className="px-2 py-2 min-w-[220px] erp-line-items-grid__sticky-product">
-                  <ErpSmartSelect
-                    options={itemOptions}
-                    value={row.itemId}
-                    onChange={(v) => {
-                      if (!v) return
-                      const item = getItem(v)
-                      const check = canUseItemInSales(v)
-                      if (!check.ok) {
-                        setErrors([check.error ?? 'Item is not allowed for sales'])
-                        return
-                      }
-                      patchLine(row.key, {
-                        itemId: v,
-                        unitPrice: String(item?.defaultSalesRate ?? item?.standardRate ?? row.unitPrice),
-                      })
-                    }}
-                    placeholder="Select sellable item…"
-                    appearance="dropdown"
-                    emptyMessage="Only items allowed for sales can be selected."
-                  />
-                </td>
-                <td className="px-2 py-2">
-                  <Input type="number" min={1} className="text-right w-20" value={row.qty} onChange={(e) => patchLine(row.key, { qty: e.target.value })} />
-                </td>
-                <td className="px-2 py-2">
-                  <Input type="number" min={0} className="text-right w-28" value={row.unitPrice} onChange={(e) => patchLine(row.key, { unitPrice: e.target.value })} />
-                </td>
-                <td className="px-2 py-2">
-                  <Input type="number" min={0} max={100} className="text-right w-16" value={row.discountPct} onChange={(e) => patchLine(row.key, { discountPct: e.target.value })} />
-                </td>
-                <td className="px-2 py-2">
-                  <select
-                    className="erp-input h-9 w-full"
-                    value={row.taxPct}
-                    onChange={(e) => patchLine(row.key, { taxPct: e.target.value })}
-                  >
-                    {GST_RATE_OPTIONS.map((rate) => (
-                      <option key={rate} value={rate}>{rate}%</option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-2 py-2 text-right tabular-nums">{built ? formatCurrency(built.taxableValue) : '—'}</td>
-                <td className="px-2 py-2 text-right tabular-nums">{built ? formatCurrency(built.gstAmount) : '—'}</td>
-                <td className="px-2 py-2 text-right font-semibold tabular-nums text-erp-primary">
-                  {built ? formatCurrency(built.lineTotal) : '—'}
-                </td>
-                <td className="px-2 py-2">
-                  <button
-                    type="button"
-                    className="rounded p-1 text-erp-muted hover:bg-erp-danger/10 hover:text-erp-danger"
-                    onClick={() => removeLine(row.key)}
-                    disabled={lineRows.length <= 1}
-                    aria-label="Remove line"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-      <button
-        type="button"
-        className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-erp-primary hover:underline"
-        onClick={addLine}
-      >
-        <Plus className="h-3.5 w-3.5" /> Add item line
-      </button>
+    <div className="col-span-2 so-pricing-panel so-pricing-panel--pro">
+      <div className="so-pricing-table-wrap">
+        <table className="so-pricing-table">
+          <colgroup>
+            <col className="so-pricing-col-idx" />
+            <col className="so-pricing-col-product" />
+            <col className="so-pricing-col-qty" />
+            <col className="so-pricing-col-price" />
+            <col className="so-pricing-col-disc" />
+            <col className="so-pricing-col-gst" />
+            <col className="so-pricing-col-money" />
+            <col className="so-pricing-col-money" />
+            <col className="so-pricing-col-money" />
+            <col className="so-pricing-col-action" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th className="so-pricing-th so-pricing-th--center">#</th>
+              <th className="so-pricing-th">Product</th>
+              <th className="so-pricing-th so-pricing-th--right">Qty</th>
+              <th className="so-pricing-th so-pricing-th--right">Unit price</th>
+              <th className="so-pricing-th so-pricing-th--right">Disc %</th>
+              <th className="so-pricing-th so-pricing-th--right">GST %</th>
+              <th className="so-pricing-th so-pricing-th--right so-pricing-th--calc">Taxable</th>
+              <th className="so-pricing-th so-pricing-th--right so-pricing-th--calc">GST</th>
+              <th className="so-pricing-th so-pricing-th--right so-pricing-th--calc">Line total</th>
+              <th className="so-pricing-th so-pricing-th--center" aria-label="Actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {lineRows.map((row, idx) => {
+              const built = buildLinesFromRows([row], items)[0]
+              return (
+                <tr key={row.key} className="so-pricing-row">
+                  <td className="so-pricing-td so-pricing-td--center tabular-nums text-erp-muted">{idx + 1}</td>
+                  <td className="so-pricing-td so-pricing-td--product">
+                    <ErpSmartSelect
+                      options={itemOptions}
+                      value={row.itemId}
+                      onChange={(v) => {
+                        if (!v) return
+                        const item = getItem(v)
+                        const check = canUseItemInSales(v)
+                        if (!check.ok) {
+                          setErrors([check.error ?? 'Item is not allowed for sales'])
+                          return
+                        }
+                        patchLine(row.key, {
+                          itemId: v,
+                          unitPrice: String(item?.defaultSalesRate ?? item?.standardRate ?? row.unitPrice),
+                        })
+                      }}
+                      placeholder="Select sellable item…"
+                      appearance="dropdown"
+                      dropdownMinWidth={360}
+                      emptyMessage="Only items allowed for sales can be selected."
+                    />
+                  </td>
+                  <td className="so-pricing-td">
+                    <Input type="number" min={1} className="so-pricing-input so-pricing-input--num" value={row.qty} onChange={(e) => patchLine(row.key, { qty: e.target.value })} />
+                  </td>
+                  <td className="so-pricing-td">
+                    <Input type="number" min={0} className="so-pricing-input so-pricing-input--num" value={row.unitPrice} onChange={(e) => patchLine(row.key, { unitPrice: e.target.value })} />
+                  </td>
+                  <td className="so-pricing-td">
+                    <Input type="number" min={0} max={100} className="so-pricing-input so-pricing-input--num" value={row.discountPct} onChange={(e) => patchLine(row.key, { discountPct: e.target.value })} />
+                  </td>
+                  <td className="so-pricing-td">
+                    <select
+                      className="erp-input so-pricing-input so-pricing-input--select"
+                      value={row.taxPct}
+                      onChange={(e) => patchLine(row.key, { taxPct: e.target.value })}
+                    >
+                      {GST_RATE_OPTIONS.map((rate) => (
+                        <option key={rate} value={rate}>{rate}%</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="so-pricing-td so-pricing-td--right so-pricing-td--calc tabular-nums">{built ? formatCurrency(built.taxableValue) : '—'}</td>
+                  <td className="so-pricing-td so-pricing-td--right so-pricing-td--calc tabular-nums">{built ? formatCurrency(built.gstAmount) : '—'}</td>
+                  <td className="so-pricing-td so-pricing-td--right so-pricing-td--total tabular-nums">
+                    {built ? formatCurrency(built.lineTotal) : '—'}
+                  </td>
+                  <td className="so-pricing-td so-pricing-td--center">
+                    <button
+                      type="button"
+                      className="so-pricing-remove"
+                      onClick={() => removeLine(row.key)}
+                      disabled={lineRows.length <= 1}
+                      aria-label="Remove line"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="so-pricing-toolbar">
+        <button type="button" className="so-pricing-add" onClick={addLine}>
+          <Plus className="h-4 w-4" /> Add item line
+        </button>
+        <p className="so-pricing-toolbar__hint">
+          <span className="so-pricing-toolbar__count">{lineRows.length}</span>
+          {' '}line{lineRows.length === 1 ? '' : 's'}
+        </p>
+      </div>
     </div>
   )
 
@@ -531,7 +548,7 @@ export function ProformaInvoiceFormPage() {
       <SalesCardFormShell
         title="New Proforma Invoice"
         badge="Sales"
-        className="enterprise-workspace--dynamics-form"
+        className="pi-form-page--zoho crm-lead-form-page crm-lead-form-page--zoho enterprise-workspace--dynamics-form enterprise-workspace--crm-smart-overview"
         recordNo="New"
         recordTitle={recordTitle}
         status="Draft"
@@ -564,20 +581,48 @@ export function ProformaInvoiceFormPage() {
           />
         )}
       >
-        <EnterpriseFormSectionNav
-          sections={sectionNavItems}
-          activeId={activeSection}
-          onSelect={scrollToSection}
-        />
+       <div className="erp-form-body crm-lead-form-body">
+        <div className="crm-lead-zoho-layout pi-zoho-layout">
+          <nav className="crm-lead-zoho-rail" aria-label="Proforma form sections">
+            <p className="crm-lead-zoho-rail__eyebrow">New Proforma</p>
+            <p className="crm-lead-zoho-rail__title">Sections</p>
+            <ul className="crm-lead-zoho-rail__list">
+              {completionItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className={cn('crm-lead-zoho-rail__item', item.done && 'is-done')}
+                    onClick={() => scrollToSection(item.id)}
+                  >
+                    <span className="crm-lead-zoho-rail__marker" aria-hidden>
+                      {item.done ? <Check size={12} strokeWidth={2.5} /> : null}
+                    </span>
+                    <span className="crm-lead-zoho-rail__label">{item.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="crm-lead-zoho-rail__progress" aria-label={`${completionPercent}% complete`}>
+              <div className="crm-lead-zoho-rail__progress-meta">
+                <span>Completion</span>
+                <strong>{completionPercent}%</strong>
+              </div>
+              <div className="crm-lead-zoho-rail__bar">
+                <div className="crm-lead-zoho-rail__bar-fill" style={{ width: `${completionPercent}%` }} />
+              </div>
+            </div>
+          </nav>
 
+          <div className="crm-lead-zoho-canvas pi-zoho-canvas">
+        <div id="pi-section-source">
         <ErpCardSection
-          id="pi-section-source"
           title="Source & Dates"
           subtitle="Create directly or pull lines and terms from a sales order."
           icon={FileText}
           accent="blue"
           collapsible
           defaultOpen
+          columns={2}
         >
           <ErpFieldRow label="Create from" colSpan={2}>
             <ErpSegmentedControl<PiCreateMode>
@@ -630,15 +675,17 @@ export function ProformaInvoiceFormPage() {
             </ErpFieldRow>
           ) : null}
         </ErpCardSection>
+        </div>
 
+        <div id="pi-section-customer">
         <ErpCardSection
-          id="pi-section-customer"
           title="Customer"
           subtitle="Bill-to account, GST registration, and customer PO reference."
           icon={Building2}
           accent="teal"
           collapsible
           defaultOpen
+          columns={2}
         >
           <ErpFieldRow label="Customer" required>
             <ErpSmartSelect
@@ -697,9 +744,10 @@ export function ProformaInvoiceFormPage() {
             <Input value={customerPoNumber} onChange={(e) => setCustomerPoNumber(e.target.value)} placeholder="Optional customer PO reference" />
           </ErpFieldRow>
         </ErpCardSection>
+        </div>
 
+        <div id="pi-section-lines">
         <ErpCardSection
-          id="pi-section-lines"
           title="Product & Pricing"
           subtitle="Set quantity, price, discount and GST per product line."
           icon={ClipboardList}
@@ -774,34 +822,52 @@ export function ProformaInvoiceFormPage() {
             </div>
           </div>
         </ErpCardSection>
+        </div>
 
+        <div id="pi-section-commercial">
         <ErpCardSection
-          id="pi-section-commercial"
           title="Commercial Terms"
           subtitle="Payment, delivery, and notes printed on the proforma."
           icon={Banknote}
           accent="green"
           collapsible
           defaultOpen
+          columns={2}
         >
-          <ErpFieldRow label="Payment Terms" required className="col-span-2">
-            <Textarea rows={2} value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} />
+          <ErpFieldRow label="Payment Terms">
+            <CommercialTermSelect
+              termType="payment"
+              value={paymentTerms}
+              onChange={setPaymentTerms}
+              placeholder="Select payment terms"
+            />
           </ErpFieldRow>
-          <ErpFieldRow label="Delivery Terms" required className="col-span-2">
-            <Textarea rows={2} value={deliveryTerms} onChange={(e) => setDeliveryTerms(e.target.value)} />
+          <ErpFieldRow label="Delivery Terms">
+            <CommercialTermSelect
+              termType="delivery"
+              value={deliveryTerms}
+              onChange={setDeliveryTerms}
+              placeholder="Select delivery terms"
+            />
           </ErpFieldRow>
-          <LocationFieldRow
-            value={locationId}
-            onChange={(locId) => setLocationId(locId)}
-            usage="sales"
-            colSpan={2}
-            label="Location Code"
-            hint="Inherited from sales order when linked"
-          />
+          {showLocationField ? (
+            <LocationFieldRow
+              value={locationId}
+              onChange={(locId) => setLocationId(locId)}
+              usage="sales"
+              colSpan={2}
+              label="Location Code"
+              hint="Inherited from sales order when linked"
+            />
+          ) : null}
           <ErpFieldRow label="Remarks" className="col-span-2">
             <Textarea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Special instructions for advance billing…" />
           </ErpFieldRow>
         </ErpCardSection>
+        </div>
+          </div>
+        </div>
+       </div>
       </SalesCardFormShell>
     </>
   )

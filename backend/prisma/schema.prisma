@@ -112,24 +112,33 @@ enum PipelineStatus {
 
 // ─── Tenants ─────────────────────────────────────────────────────────────────
 
+enum TenantBusinessType {
+  MANUFACTURING
+  SERVICES
+}
+
 model Tenant {
-  id                 String       @id @default(uuid())
-  name               String       @db.VarChar(200)
-  slug               String       @unique @db.VarChar(100)
-  legalName          String?      @db.VarChar(300)
-  email              String       @db.VarChar(255)
-  phone              String?      @db.VarChar(30)
-  country            String?      @db.VarChar(100)
-  state              String?      @db.VarChar(100)
-  city               String?      @db.VarChar(100)
-  timezone           String       @default("Asia/Kolkata") @db.VarChar(64)
-  currency           String       @default("INR") @db.VarChar(8)
-  status             TenantStatus @default(TRIAL)
-  subscriptionPlan   String?      @db.VarChar(64)
-  subscriptionStatus String?      @db.VarChar(64)
+  id                 String             @id @default(uuid())
+  name               String             @db.VarChar(200)
+  slug               String             @unique @db.VarChar(100)
+  legalName          String?            @db.VarChar(300)
+  email              String             @db.VarChar(255)
+  phone              String?            @db.VarChar(30)
+  country            String?            @db.VarChar(100)
+  state              String?            @db.VarChar(100)
+  city               String?            @db.VarChar(100)
+  timezone           String             @default("Asia/Kolkata") @db.VarChar(64)
+  currency           String             @default("INR") @db.VarChar(8)
+  status             TenantStatus       @default(TRIAL)
+  /// Product packaging profile — drives default module flags + SERVICES nav/terminology.
+  businessType       TenantBusinessType @default(MANUFACTURING)
+  /// Display-only label overrides (e.g. { "product": "Service" }). Never renames DB models.
+  displayTerminology Json               @default("{}")
+  subscriptionPlan   String?            @db.VarChar(64)
+  subscriptionStatus String?            @db.VarChar(64)
   trialEndsAt        DateTime?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
   deletedAt          DateTime?
 
   users                                  User[]
@@ -265,6 +274,8 @@ model Tenant {
   bankPostingRules                       BankPostingRule[]
   standingInstructions                   StandingInstruction[]
   standingInstructionExecutions          StandingInstructionExecution[]
+  recurringSalesInvoiceSchedules         RecurringSalesInvoiceSchedule[]
+  recurringSalesInvoiceExecutions        RecurringSalesInvoiceExecution[]
   treasuryDayCloses                      TreasuryDayClose[]
   bankConnectors                         BankConnector[]
   bankConnectorConsents                  BankConnectorConsent[]
@@ -322,24 +333,24 @@ model Tenant {
   inventoryStockReservations      InventoryStockReservation[]
   inventorySettings               InventorySettings?
 
-  inventoryTransfers       InventoryTransfer[]
-  inventoryTransferLines   InventoryTransferLine[]
-  inventoryStockCounts     InventoryStockCount[]
-  inventoryStockCountLines InventoryStockCountLine[]
-  inventoryAdjustments     InventoryAdjustment[]
-  inventoryAdjustmentLines InventoryAdjustmentLine[]
-  inventoryBatches         InventoryBatch[]
-  inventoryBatchBalances   InventoryBatchBalance[]
-  inventorySerials         InventorySerial[]
-  inventorySerialMovements InventorySerialMovement[]
-  inventoryLots            InventoryLot[]
-  inventoryLotMovements    InventoryLotMovement[]
-  inventoryCostEntries            InventoryCostEntry[]
-  inventoryCostLayers             InventoryCostLayer[]
-  inventoryCostLayerConsumptions  InventoryCostLayerConsumption[]
+  inventoryTransfers                InventoryTransfer[]
+  inventoryTransferLines            InventoryTransferLine[]
+  inventoryStockCounts              InventoryStockCount[]
+  inventoryStockCountLines          InventoryStockCountLine[]
+  inventoryAdjustments              InventoryAdjustment[]
+  inventoryAdjustmentLines          InventoryAdjustmentLine[]
+  inventoryBatches                  InventoryBatch[]
+  inventoryBatchBalances            InventoryBatchBalance[]
+  inventorySerials                  InventorySerial[]
+  inventorySerialMovements          InventorySerialMovement[]
+  inventoryLots                     InventoryLot[]
+  inventoryLotMovements             InventoryLotMovement[]
+  inventoryCostEntries              InventoryCostEntry[]
+  inventoryCostLayers               InventoryCostLayer[]
+  inventoryCostLayerConsumptions    InventoryCostLayerConsumption[]
   inventoryItemStandardCostVersions InventoryItemStandardCostVersion[]
-  inventoryCostVariances          InventoryCostVariance[]
-  inventoryValuationMethodChanges InventoryValuationMethodChange[]
+  inventoryCostVariances            InventoryCostVariance[]
+  inventoryValuationMethodChanges   InventoryValuationMethodChange[]
 
   productionOrderMaterials          ProductionOrderMaterial[]
   qualityNcrs                       QualityNcr[]
@@ -464,45 +475,45 @@ model Tenant {
 // ─── Auth & Users ────────────────────────────────────────────────────────────
 
 model User {
-  id            String     @id @default(uuid())
-  tenantId      String
-  firstName     String     @db.VarChar(100)
-  lastName      String     @db.VarChar(100)
-  email         String     @db.VarChar(255)
-  mobile        String?    @db.VarChar(20)
-  passwordHash  String     @db.VarChar(255)
-  designation   String?    @db.VarChar(100)
-  department    String?    @db.VarChar(100)
-  departmentId  String?
-  status        UserStatus @default(INVITED)
-  emailVerified Boolean    @default(false)
-  lastLoginAt   DateTime?
+  id                  String     @id @default(uuid())
+  tenantId            String
+  firstName           String     @db.VarChar(100)
+  lastName            String     @db.VarChar(100)
+  email               String     @db.VarChar(255)
+  mobile              String?    @db.VarChar(20)
+  passwordHash        String     @db.VarChar(255)
+  designation         String?    @db.VarChar(100)
+  department          String?    @db.VarChar(100)
+  departmentId        String?
+  status              UserStatus @default(INVITED)
+  emailVerified       Boolean    @default(false)
+  lastLoginAt         DateTime?
   /// Consecutive failed password attempts; reset on successful login / unlock (Phase 8 admin).
-  failedLoginCount Int       @default(0)
+  failedLoginCount    Int        @default(0)
   /// When auto-lockout or admin lock set status to BLOCKED (informational).
-  lockedAt      DateTime?
+  lockedAt            DateTime?
   /// Consecutive failed password attempts (reset on successful login) — A1 temp lockout.
-  failedLoginAttempts Int       @default(0)
+  failedLoginAttempts Int        @default(0)
   /// When set and in the future, login is rejected until this time.
   lockedUntil         DateTime?
-  createdBy     String?
-  updatedBy     String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  deletedAt     DateTime?
+  createdBy           String?
+  updatedBy           String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  deletedAt           DateTime?
 
-  tenant              Tenant               @relation(fields: [tenantId], references: [id])
-  departmentRef       Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  userRoles           UserRole[]
-  refreshTokens       RefreshToken[]
-  passwordResetTokens PasswordResetToken[]
-  invitations         UserInvitation[]
-  loginActivities     LoginActivity[]
-  legalEntityAccess   UserLegalEntityAccess[]
-  branchAccess        UserBranchAccess[]
-  warehouseAccess     UserWarehouseAccess[]
-  responsibilities    UserResponsibility[]
-  moduleAdministrations ModuleAdministrator[]
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id])
+  departmentRef          Department?             @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  userRoles              UserRole[]
+  refreshTokens          RefreshToken[]
+  passwordResetTokens    PasswordResetToken[]
+  invitations            UserInvitation[]
+  loginActivities        LoginActivity[]
+  legalEntityAccess      UserLegalEntityAccess[]
+  branchAccess           UserBranchAccess[]
+  warehouseAccess        UserWarehouseAccess[]
+  responsibilities       UserResponsibility[]
+  moduleAdministrations  ModuleAdministrator[]
   purchaseApproverLimits PurchaseApproverLimit[]
 
   @@unique([tenantId, email])
@@ -792,15 +803,15 @@ model TenantModuleFlag {
 
 /// Designated module owners/contacts (does not grant module.manage by itself).
 model ModuleAdministrator {
-  id         String    @id @default(uuid())
-  tenantId   String
-  userId     String
-  moduleKey  String    @db.VarChar(64)
-  createdBy  String?
-  updatedBy  String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  deletedAt  DateTime?
+  id        String    @id @default(uuid())
+  tenantId  String
+  userId    String
+  moduleKey String    @db.VarChar(64)
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -814,17 +825,17 @@ model ModuleAdministrator {
 
 /// Per-tenant editable auth/security policy (password + lockout + MFA mode).
 model TenantSecuritySettings {
-  id                 String   @id @default(uuid())
-  tenantId           String   @unique
-  passwordMinLength  Int      @default(8)
-  maxFailedLogins    Int      @default(5)
-  requireComplexity  Boolean  @default(false)
+  id                String   @id @default(uuid())
+  tenantId          String   @unique
+  passwordMinLength Int      @default(8)
+  maxFailedLogins   Int      @default(5)
+  requireComplexity Boolean  @default(false)
   /// off | optional | required — enrollment not shipped; required rejected until MFA exists
-  mfaMode            String   @default("off") @db.VarChar(32)
-  createdBy          String?
-  updatedBy          String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  mfaMode           String   @default("off") @db.VarChar(32)
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -933,16 +944,16 @@ model CrmCompany {
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
 
-  tenant        Tenant           @relation(fields: [tenantId], references: [id])
-  contacts      CrmContact[]
-  leads         CrmLead[]
-  activities    CrmActivity[]
-  opportunities CrmOpportunity[]
-  quotations    CrmQuotation[]
-  salesOrders   CrmSalesOrder[]
-  paymentReceipts CrmPaymentReceipt[]
-  proformaInvoices CrmProformaInvoice[]
-  taxInvoices     CrmTaxInvoice[]
+  tenant             Tenant                 @relation(fields: [tenantId], references: [id])
+  contacts           CrmContact[]
+  leads              CrmLead[]
+  activities         CrmActivity[]
+  opportunities      CrmOpportunity[]
+  quotations         CrmQuotation[]
+  salesOrders        CrmSalesOrder[]
+  paymentReceipts    CrmPaymentReceipt[]
+  proformaInvoices   CrmProformaInvoice[]
+  taxInvoices        CrmTaxInvoice[]
   paymentAllocations CrmPaymentAllocation[]
 
   @@unique([tenantId, companyCode])
@@ -993,71 +1004,71 @@ model CrmContact {
 }
 
 model CrmLead {
-  id                  String    @id @default(uuid())
-  tenantId            String
-  leadCode            String    @db.VarChar(32)
-  prospectName        String    @db.VarChar(300)
-  companyName         String?   @db.VarChar(300)
-  companyId           String?
-  contactId           String?
-  designation         String?   @db.VarChar(100)
-  email               String?   @db.VarChar(255)
-  mobile              String?   @db.VarChar(20)
-  contactPerson       String?   @db.VarChar(200)
-  source              String    @default("other") @db.VarChar(64)
-  industry            String?   @db.VarChar(100)
-  turnoverRange       String?   @db.VarChar(64)
-  productRequirement  String?   @db.Text
-  expectedQty         Int?
-  expectedValue       Decimal   @default(0) @db.Decimal(18, 2)
-  probability         Int       @default(0)
-  stage               String    @default("new") @db.VarChar(64)
-  priority            String    @default("medium") @db.VarChar(32)
-  lifecycleStatus     String    @default("open") @db.VarChar(32)
-  activityStatus      String    @default("active") @db.VarChar(32)
-  qualificationStatus String?   @db.VarChar(32)
-  temperature         String?   @db.VarChar(16)
-  assignedTo          String?
-  ownerId             String?
-  lastContactedAt     DateTime?
-  nextFollowUpAt      DateTime?
-  expectedCloseDate   DateTime?
-  inactiveReason      String?   @db.VarChar(64)
-  notQualifiedReason  String?   @db.VarChar(64)
-  closedReason        String?   @db.VarChar(64)
-  closedDate          DateTime?
-  lostReason          String?   @db.Text
-  remarks             String?   @db.Text
-  followUpType        String?   @db.VarChar(64)
-  followUpNotes       String?   @db.Text
-  opportunityId       String?
-  convertedAt         DateTime?
-  isArchived          Boolean   @default(false)
-  locationId          String?
+  id                      String    @id @default(uuid())
+  tenantId                String
+  leadCode                String    @db.VarChar(32)
+  prospectName            String    @db.VarChar(300)
+  companyName             String?   @db.VarChar(300)
+  companyId               String?
+  contactId               String?
+  designation             String?   @db.VarChar(100)
+  email                   String?   @db.VarChar(255)
+  mobile                  String?   @db.VarChar(20)
+  contactPerson           String?   @db.VarChar(200)
+  source                  String    @default("other") @db.VarChar(64)
+  industry                String?   @db.VarChar(100)
+  turnoverRange           String?   @db.VarChar(64)
+  productRequirement      String?   @db.Text
+  expectedQty             Int?
+  expectedValue           Decimal   @default(0) @db.Decimal(18, 2)
+  probability             Int       @default(0)
+  stage                   String    @default("new") @db.VarChar(64)
+  priority                String    @default("medium") @db.VarChar(32)
+  lifecycleStatus         String    @default("open") @db.VarChar(32)
+  activityStatus          String    @default("active") @db.VarChar(32)
+  qualificationStatus     String?   @db.VarChar(32)
+  temperature             String?   @db.VarChar(16)
+  assignedTo              String?
+  ownerId                 String?
+  lastContactedAt         DateTime?
+  nextFollowUpAt          DateTime?
+  expectedCloseDate       DateTime?
+  inactiveReason          String?   @db.VarChar(64)
+  notQualifiedReason      String?   @db.VarChar(64)
+  closedReason            String?   @db.VarChar(64)
+  closedDate              DateTime?
+  lostReason              String?   @db.Text
+  remarks                 String?   @db.Text
+  followUpType            String?   @db.VarChar(64)
+  followUpNotes           String?   @db.Text
+  opportunityId           String?
+  convertedAt             DateTime?
+  isArchived              Boolean   @default(false)
+  locationId              String?
   /// Optional org scope (Admin LE/branch ACL). Null = legacy / unrestricted row.
-  legalEntityId       String?
-  branchId            String?
+  legalEntityId           String?
+  branchId                String?
   /// External connector source code, e.g. INDIAMART
-  externalSource            String?   @db.VarChar(64)
+  externalSource          String?   @db.VarChar(64)
   /// External enquiry/lead id from the source system (UNIQUE_QUERY_ID for IndiaMART)
-  externalSourceId          String?   @db.VarChar(128)
-  externalSourceReference   String?   @db.VarChar(255)
-  sourceEnquiryDate         DateTime?
-  integrationEnquiryId      String?
-  createdBy           String?
-  updatedBy           String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  deletedAt           DateTime?
+  externalSourceId        String?   @db.VarChar(128)
+  externalSourceReference String?   @db.VarChar(255)
+  sourceEnquiryDate       DateTime?
+  integrationEnquiryId    String?
+  createdBy               String?
+  updatedBy               String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  deletedAt               DateTime?
 
-  tenant        Tenant                 @relation(fields: [tenantId], references: [id])
-  company       CrmCompany?            @relation(fields: [companyId], references: [id])
-  contact       CrmContact?            @relation(fields: [contactId], references: [id])
-  activities    CrmActivity[]
-  statusHistory CrmLeadStatusHistory[]
-  assignments   CrmLeadAssignment[]
-  indiaMartEnquiries IndiaMartEnquiry[] @relation("IndiaMartEnquiryCreatedLead")
-  indiaMartMatchedEnquiries IndiaMartEnquiry[] @relation("IndiaMartEnquiryMatchedLead")
+  tenant                    Tenant                 @relation(fields: [tenantId], references: [id])
+  company                   CrmCompany?            @relation(fields: [companyId], references: [id])
+  contact                   CrmContact?            @relation(fields: [contactId], references: [id])
+  activities                CrmActivity[]
+  statusHistory             CrmLeadStatusHistory[]
+  assignments               CrmLeadAssignment[]
+  indiaMartEnquiries        IndiaMartEnquiry[]     @relation("IndiaMartEnquiryCreatedLead")
+  indiaMartMatchedEnquiries IndiaMartEnquiry[]     @relation("IndiaMartEnquiryMatchedLead")
 
   @@unique([tenantId, leadCode])
   @@unique([tenantId, externalSource, externalSourceId])
@@ -1457,49 +1468,49 @@ enum IndiaMartAlertSeverity {
 }
 
 model IndiaMartConnection {
-  id                     String                     @id @default(uuid())
-  tenantId               String                     @unique
+  id                     String                      @id @default(uuid())
+  tenantId               String                      @unique
   companyId              String?
-  accountName            String?                    @db.VarChar(200)
-  registeredMobileMasked String?                    @db.VarChar(32)
-  registeredEmailMasked  String?                    @db.VarChar(255)
-  apiBaseUrl             String                     @default("https://mapi.indiamart.com") @db.VarChar(500)
-  leadFetchEndpoint      String                     @default("/wservce/crm/crmListing/v2/") @db.VarChar(500)
+  accountName            String?                     @db.VarChar(200)
+  registeredMobileMasked String?                     @db.VarChar(32)
+  registeredEmailMasked  String?                     @db.VarChar(255)
+  apiBaseUrl             String                      @default("https://mapi.indiamart.com") @db.VarChar(500)
+  leadFetchEndpoint      String                      @default("/wservce/crm/crmListing/v2/") @db.VarChar(500)
   authenticationType     IndiaMartAuthenticationType @default(QUERY_PARAMETER)
-  encryptedCredentials   String                     @db.Text
+  encryptedCredentials   String                      @db.Text
   configurationJson      Json?
-  status                 IndiaMartConnectionStatus  @default(NOT_CONFIGURED)
-  syncEnabled            Boolean                    @default(false)
-  autoCreateLead         Boolean                    @default(true)
+  status                 IndiaMartConnectionStatus   @default(NOT_CONFIGURED)
+  syncEnabled            Boolean                     @default(false)
+  autoCreateLead         Boolean                     @default(true)
   defaultLeadSourceId    String?
   defaultLeadOwnerId     String?
   defaultTerritoryId     String?
-  defaultPriority        String?                    @db.VarChar(32)
+  defaultPriority        String?                     @db.VarChar(32)
   defaultIndustryId      String?
   duplicateBehaviour     IndiaMartDuplicateBehaviour @default(CREATE_ACTIVITY_ON_EXISTING_LEAD)
-  assignmentMode         IndiaMartAssignmentMode    @default(DEFAULT_OWNER)
-  syncIntervalMinutes    Int                        @default(15)
-  initialLookbackDays    Int                        @default(7)
-  maxRecordsPerRun       Int                        @default(500)
+  assignmentMode         IndiaMartAssignmentMode     @default(DEFAULT_OWNER)
+  syncIntervalMinutes    Int                         @default(15)
+  initialLookbackDays    Int                         @default(7)
+  maxRecordsPerRun       Int                         @default(500)
   lastSuccessfulSyncAt   DateTime?
   lastAttemptedSyncAt    DateTime?
   nextScheduledSyncAt    DateTime?
-  lastCursor             String?                    @db.VarChar(255)
+  lastCursor             String?                     @db.VarChar(255)
   lastExternalTimestamp  DateTime?
   syncLockUntil          DateTime?
-  syncLockToken          String?                    @db.VarChar(64)
-  pushWebhookEnabled     Boolean                    @default(false)
-  pushWebhookTokenHash   String?                    @unique @db.VarChar(128)
-  pushWebhookTokenPrefix String?                    @db.VarChar(12)
+  syncLockToken          String?                     @db.VarChar(64)
+  pushWebhookEnabled     Boolean                     @default(false)
+  pushWebhookTokenHash   String?                     @unique @db.VarChar(128)
+  pushWebhookTokenPrefix String?                     @db.VarChar(12)
   createdById            String?
   updatedById            String?
-  createdAt              DateTime                   @default(now())
-  updatedAt              DateTime                   @updatedAt
+  createdAt              DateTime                    @default(now())
+  updatedAt              DateTime                    @updatedAt
 
-  tenant     Tenant             @relation(fields: [tenantId], references: [id])
-  enquiries  IndiaMartEnquiry[]
-  syncRuns   IndiaMartSyncRun[]
-  alerts     IndiaMartAlert[]
+  tenant    Tenant             @relation(fields: [tenantId], references: [id])
+  enquiries IndiaMartEnquiry[]
+  syncRuns  IndiaMartSyncRun[]
+  alerts    IndiaMartAlert[]
 
   @@index([tenantId, status])
   @@index([syncEnabled, nextScheduledSyncAt])
@@ -1507,73 +1518,73 @@ model IndiaMartConnection {
 }
 
 model IndiaMartEnquiry {
-  id                     String                          @id @default(uuid())
-  tenantId               String
-  connectionId           String
-  externalEnquiryId      String                          @db.VarChar(128)
-  externalUniqueKey      String?                         @db.VarChar(255)
-  enquiryDate            DateTime?
-  receivedAt             DateTime?
-  fetchedAt              DateTime                        @default(now())
-  buyerName              String?                         @db.VarChar(300)
-  buyerCompanyName       String?                         @db.VarChar(300)
-  buyerMobile            String?                         @db.VarChar(40)
-  buyerAlternateMobile   String?                         @db.VarChar(40)
-  buyerEmail             String?                         @db.VarChar(255)
-  buyerAddress           String?                         @db.Text
-  buyerCity              String?                         @db.VarChar(120)
-  buyerState             String?                         @db.VarChar(120)
-  buyerCountry           String?                         @db.VarChar(120)
-  buyerPincode           String?                         @db.VarChar(20)
-  subject                String?                         @db.VarChar(500)
-  requirementText        String?                         @db.Text
-  productName            String?                         @db.VarChar(500)
-  productCategory        String?                         @db.VarChar(255)
-  quantityText           String?                         @db.VarChar(120)
-  quantityValue          Decimal?                        @db.Decimal(18, 6)
-  quantityUom            String?                         @db.VarChar(32)
-  estimatedOrderValue    Decimal?                        @db.Decimal(18, 2)
-  sourceType             String?                         @db.VarChar(64)
-  sourceUrl              String?                         @db.VarChar(500)
-  senderIp               String?                         @db.VarChar(64)
-  normalizedMobile       String?                         @db.VarChar(32)
-  normalizedEmail        String?                         @db.VarChar(255)
-  normalizedCompanyName  String?                         @db.VarChar(300)
-  dedupeFingerprint      String?                         @db.VarChar(255)
-  processingStatus       IndiaMartEnquiryProcessingStatus @default(NEW)
-  matchStatus            IndiaMartMatchStatus            @default(NOT_CHECKED)
-  importStatus           IndiaMartImportStatus           @default(NOT_IMPORTED)
-  matchedLeadId          String?
-  matchedCompanyId       String?
-  matchedContactId       String?
-  createdLeadId          String?
-  assignedUserId         String?
-  assignedAt             DateTime?
-  duplicateOfEnquiryId   String?
-  duplicateReason        String?                         @db.VarChar(255)
-  validationErrors       Json?
-  matchDetails           Json?
-  rawPayload             Json
-  syncRunId              String?
-  firstSeenAt            DateTime                        @default(now())
-  lastSeenAt             DateTime                        @default(now())
-  processedAt            DateTime?
-  importedAt             DateTime?
-  ignoredAt              DateTime?
-  ignoredById            String?
-  ignoreReason           String?                         @db.Text
-  firstContactedAt       DateTime?
-  slaStatus              IndiaMartSlaStatus?
-  failureCode            String?                         @db.VarChar(64)
-  failureMessage         String?                         @db.Text
-  createdAt              DateTime                        @default(now())
-  updatedAt              DateTime                        @updatedAt
+  id                    String                           @id @default(uuid())
+  tenantId              String
+  connectionId          String
+  externalEnquiryId     String                           @db.VarChar(128)
+  externalUniqueKey     String?                          @db.VarChar(255)
+  enquiryDate           DateTime?
+  receivedAt            DateTime?
+  fetchedAt             DateTime                         @default(now())
+  buyerName             String?                          @db.VarChar(300)
+  buyerCompanyName      String?                          @db.VarChar(300)
+  buyerMobile           String?                          @db.VarChar(40)
+  buyerAlternateMobile  String?                          @db.VarChar(40)
+  buyerEmail            String?                          @db.VarChar(255)
+  buyerAddress          String?                          @db.Text
+  buyerCity             String?                          @db.VarChar(120)
+  buyerState            String?                          @db.VarChar(120)
+  buyerCountry          String?                          @db.VarChar(120)
+  buyerPincode          String?                          @db.VarChar(20)
+  subject               String?                          @db.VarChar(500)
+  requirementText       String?                          @db.Text
+  productName           String?                          @db.VarChar(500)
+  productCategory       String?                          @db.VarChar(255)
+  quantityText          String?                          @db.VarChar(120)
+  quantityValue         Decimal?                         @db.Decimal(18, 6)
+  quantityUom           String?                          @db.VarChar(32)
+  estimatedOrderValue   Decimal?                         @db.Decimal(18, 2)
+  sourceType            String?                          @db.VarChar(64)
+  sourceUrl             String?                          @db.VarChar(500)
+  senderIp              String?                          @db.VarChar(64)
+  normalizedMobile      String?                          @db.VarChar(32)
+  normalizedEmail       String?                          @db.VarChar(255)
+  normalizedCompanyName String?                          @db.VarChar(300)
+  dedupeFingerprint     String?                          @db.VarChar(255)
+  processingStatus      IndiaMartEnquiryProcessingStatus @default(NEW)
+  matchStatus           IndiaMartMatchStatus             @default(NOT_CHECKED)
+  importStatus          IndiaMartImportStatus            @default(NOT_IMPORTED)
+  matchedLeadId         String?
+  matchedCompanyId      String?
+  matchedContactId      String?
+  createdLeadId         String?
+  assignedUserId        String?
+  assignedAt            DateTime?
+  duplicateOfEnquiryId  String?
+  duplicateReason       String?                          @db.VarChar(255)
+  validationErrors      Json?
+  matchDetails          Json?
+  rawPayload            Json
+  syncRunId             String?
+  firstSeenAt           DateTime                         @default(now())
+  lastSeenAt            DateTime                         @default(now())
+  processedAt           DateTime?
+  importedAt            DateTime?
+  ignoredAt             DateTime?
+  ignoredById           String?
+  ignoreReason          String?                          @db.Text
+  firstContactedAt      DateTime?
+  slaStatus             IndiaMartSlaStatus?
+  failureCode           String?                          @db.VarChar(64)
+  failureMessage        String?                          @db.Text
+  createdAt             DateTime                         @default(now())
+  updatedAt             DateTime                         @updatedAt
 
-  tenant     Tenant              @relation(fields: [tenantId], references: [id])
-  connection IndiaMartConnection @relation(fields: [connectionId], references: [id])
-  syncRun    IndiaMartSyncRun?   @relation(fields: [syncRunId], references: [id])
-  createdLead CrmLead?           @relation("IndiaMartEnquiryCreatedLead", fields: [createdLeadId], references: [id])
-  matchedLead CrmLead?           @relation("IndiaMartEnquiryMatchedLead", fields: [matchedLeadId], references: [id])
+  tenant      Tenant              @relation(fields: [tenantId], references: [id])
+  connection  IndiaMartConnection @relation(fields: [connectionId], references: [id])
+  syncRun     IndiaMartSyncRun?   @relation(fields: [syncRunId], references: [id])
+  createdLead CrmLead?            @relation("IndiaMartEnquiryCreatedLead", fields: [createdLeadId], references: [id])
+  matchedLead CrmLead?            @relation("IndiaMartEnquiryMatchedLead", fields: [matchedLeadId], references: [id])
 
   @@unique([tenantId, externalEnquiryId])
   @@index([tenantId, processingStatus, enquiryDate])
@@ -2028,30 +2039,30 @@ enum CrmProformaSource {
 }
 
 model CrmPaymentReceipt {
-  id                   String                    @id @default(uuid())
+  id                   String                   @id @default(uuid())
   tenantId             String
-  receiptNo            String                    @db.VarChar(64)
-  receiptDate          DateTime                  @db.Date
+  receiptNo            String                   @db.VarChar(64)
+  receiptDate          DateTime                 @db.Date
   companyId            String
-  customerNameSnapshot String                    @db.VarChar(300)
+  customerNameSnapshot String                   @db.VarChar(300)
   proformaInvoiceId    String?
-  proformaNo           String?                   @db.VarChar(64)
+  proformaNo           String?                  @db.VarChar(64)
   paymentMode          CrmCommercialPaymentMode
-  transactionRef       String?                   @db.VarChar(120)
-  amount               Decimal                   @db.Decimal(18, 2)
-  unallocatedAmount    Decimal                   @db.Decimal(18, 2)
-  remarks              String?                   @db.Text
-  attachmentName       String?                   @db.VarChar(255)
+  transactionRef       String?                  @db.VarChar(120)
+  amount               Decimal                  @db.Decimal(18, 2)
+  unallocatedAmount    Decimal                  @db.Decimal(18, 2)
+  remarks              String?                  @db.Text
+  attachmentName       String?                  @db.VarChar(255)
   createdBy            String?
   updatedBy            String?
-  createdAt            DateTime                  @default(now())
-  updatedAt            DateTime                  @updatedAt
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
   deletedAt            DateTime?
 
-  tenant           Tenant              @relation(fields: [tenantId], references: [id])
-  company          CrmCompany          @relation(fields: [companyId], references: [id])
-  proformaInvoice  CrmProformaInvoice? @relation(fields: [proformaInvoiceId], references: [id])
-  allocations      CrmPaymentAllocation[]
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id])
+  company         CrmCompany             @relation(fields: [companyId], references: [id])
+  proformaInvoice CrmProformaInvoice?    @relation(fields: [proformaInvoiceId], references: [id])
+  allocations     CrmPaymentAllocation[]
 
   @@unique([tenantId, receiptNo])
   @@index([tenantId])
@@ -2101,8 +2112,8 @@ model CrmProformaInvoice {
   updatedAt            DateTime                 @updatedAt
   deletedAt            DateTime?
 
-  tenant          Tenant                 @relation(fields: [tenantId], references: [id])
-  company         CrmCompany             @relation(fields: [companyId], references: [id])
+  tenant          Tenant                   @relation(fields: [tenantId], references: [id])
+  company         CrmCompany               @relation(fields: [companyId], references: [id])
   lines           CrmProformaInvoiceLine[]
   paymentReceipts CrmPaymentReceipt[]
 
@@ -2116,26 +2127,26 @@ model CrmProformaInvoice {
 }
 
 model CrmProformaInvoiceLine {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   tenantId     String
   proformaId   String
   lineNo       Int
   itemId       String
-  itemCode     String   @db.VarChar(64)
-  description  String   @db.VarChar(500)
-  hsnCode      String?  @db.VarChar(16)
-  qty          Decimal  @db.Decimal(18, 4)
-  uom          String   @default("NOS") @db.VarChar(16)
-  unitPrice    Decimal  @db.Decimal(18, 2)
-  discountPct  Decimal  @default(0) @db.Decimal(5, 2)
-  taxPct       Decimal  @default(18) @db.Decimal(5, 2)
-  taxableValue Decimal  @db.Decimal(18, 2)
-  gstAmount    Decimal  @db.Decimal(18, 2)
-  lineTotal    Decimal  @db.Decimal(18, 2)
+  itemCode     String    @db.VarChar(64)
+  description  String    @db.VarChar(500)
+  hsnCode      String?   @db.VarChar(16)
+  qty          Decimal   @db.Decimal(18, 4)
+  uom          String    @default("NOS") @db.VarChar(16)
+  unitPrice    Decimal   @db.Decimal(18, 2)
+  discountPct  Decimal   @default(0) @db.Decimal(5, 2)
+  taxPct       Decimal   @default(18) @db.Decimal(5, 2)
+  taxableValue Decimal   @db.Decimal(18, 2)
+  gstAmount    Decimal   @db.Decimal(18, 2)
+  lineTotal    Decimal   @db.Decimal(18, 2)
   sourceLineId String?
-  maxQty       Decimal? @db.Decimal(18, 4)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  maxQty       Decimal?  @db.Decimal(18, 4)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
   proforma CrmProformaInvoice @relation(fields: [proformaId], references: [id], onDelete: Cascade)
@@ -2205,27 +2216,27 @@ model CrmTaxInvoice {
 }
 
 model CrmTaxInvoiceLine {
-  id            String   @id @default(uuid())
-  tenantId      String
-  invoiceId     String
-  lineNo        Int
-  itemId        String
-  itemCode      String   @db.VarChar(64)
-  description   String   @db.VarChar(500)
-  hsnCode       String?  @db.VarChar(16)
-  qty           Decimal  @db.Decimal(18, 4)
-  uom           String   @default("NOS") @db.VarChar(16)
-  unitPrice     Decimal  @db.Decimal(18, 2)
-  discountPct   Decimal  @default(0) @db.Decimal(5, 2)
-  taxPct        Decimal  @default(18) @db.Decimal(5, 2)
-  taxableValue  Decimal  @db.Decimal(18, 2)
-  gstAmount     Decimal  @db.Decimal(18, 2)
-  lineTotal     Decimal  @db.Decimal(18, 2)
-  sourceLineId  String?
-  maxQty        Decimal? @db.Decimal(18, 4)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  deletedAt     DateTime?
+  id           String    @id @default(uuid())
+  tenantId     String
+  invoiceId    String
+  lineNo       Int
+  itemId       String
+  itemCode     String    @db.VarChar(64)
+  description  String    @db.VarChar(500)
+  hsnCode      String?   @db.VarChar(16)
+  qty          Decimal   @db.Decimal(18, 4)
+  uom          String    @default("NOS") @db.VarChar(16)
+  unitPrice    Decimal   @db.Decimal(18, 2)
+  discountPct  Decimal   @default(0) @db.Decimal(5, 2)
+  taxPct       Decimal   @default(18) @db.Decimal(5, 2)
+  taxableValue Decimal   @db.Decimal(18, 2)
+  gstAmount    Decimal   @db.Decimal(18, 2)
+  lineTotal    Decimal   @db.Decimal(18, 2)
+  sourceLineId String?
+  maxQty       Decimal?  @db.Decimal(18, 4)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   invoice CrmTaxInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
@@ -2243,7 +2254,7 @@ model CrmPaymentAllocation {
   receiptNo      String    @db.VarChar(64)
   invoiceNo      String    @db.VarChar(64)
   companyId      String
-  customerName  String    @db.VarChar(300)
+  customerName   String    @db.VarChar(300)
   amount         Decimal   @db.Decimal(18, 2)
   allocationDate DateTime  @db.Date
   remarks        String?   @db.Text
@@ -2639,23 +2650,23 @@ model MasterBin {
 }
 
 model MasterItemCategory {
-  id                    String             @id @default(uuid())
-  tenantId              String
-  code                  String             @db.VarChar(32)
-  name                  String             @db.VarChar(200)
-  parentId              String?
-  level                 Int                @default(1)
-  defaultWarehouseId    String?
+  id                   String             @id @default(uuid())
+  tenantId             String
+  code                 String             @db.VarChar(32)
+  name                 String             @db.VarChar(200)
+  parentId             String?
+  level                Int                @default(1)
+  defaultWarehouseId   String?
   /// REQUIRED = always stockable; OPTIONAL = SFG logical or stockable; FORBIDDEN = service (no stock).
-  stockPolicy           String             @default("REQUIRED") @db.VarChar(16)
-  defaultIsStockable    Boolean            @default(true)
-  defaultInventoryType  String             @default("inventory") @db.VarChar(32)
-  status                MasterRecordStatus @default(ACTIVE)
-  createdBy             String?
-  updatedBy             String?
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
-  deletedAt             DateTime?
+  stockPolicy          String             @default("REQUIRED") @db.VarChar(16)
+  defaultIsStockable   Boolean            @default(true)
+  defaultInventoryType String             @default("inventory") @db.VarChar(32)
+  status               MasterRecordStatus @default(ACTIVE)
+  createdBy            String?
+  updatedBy            String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  deletedAt            DateTime?
 
   tenant           Tenant               @relation(fields: [tenantId], references: [id])
   parent           MasterItemCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
@@ -2722,24 +2733,24 @@ model MasterHsnCode {
 }
 
 model MasterGstRate {
-  id                String               @id @default(uuid())
+  id                String              @id @default(uuid())
   tenantId          String
-  code              String               @db.VarChar(32)
+  code              String              @db.VarChar(32)
   gstGroupId        String
-  fromState         String               @db.VarChar(100)
-  locationStateCode String               @db.VarChar(100)
-  dateFrom          DateTime             @db.Date
-  dateTo            DateTime?            @db.Date
-  sgst              Decimal              @default(0) @db.Decimal(5, 2)
-  cgst              Decimal              @default(0) @db.Decimal(5, 2)
-  igst              Decimal              @default(0) @db.Decimal(5, 2)
+  fromState         String              @db.VarChar(100)
+  locationStateCode String              @db.VarChar(100)
+  dateFrom          DateTime            @db.Date
+  dateTo            DateTime?           @db.Date
+  sgst              Decimal             @default(0) @db.Decimal(5, 2)
+  cgst              Decimal             @default(0) @db.Decimal(5, 2)
+  igst              Decimal             @default(0) @db.Decimal(5, 2)
   /// Sales / purchase / both — finance engine filters by document context.
-  applicableFor     GstTaxApplicability  @default(BOTH)
-  status            MasterRecordStatus   @default(ACTIVE)
+  applicableFor     GstTaxApplicability @default(BOTH)
+  status            MasterRecordStatus  @default(ACTIVE)
   createdBy         String?
   updatedBy         String?
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
   deletedAt         DateTime?
 
   tenant   Tenant         @relation(fields: [tenantId], references: [id])
@@ -2755,56 +2766,56 @@ model MasterGstRate {
 }
 
 model MasterItem {
-  id                   String             @id @default(uuid())
-  tenantId             String
-  code                 String             @db.VarChar(64)
-  name                 String             @db.VarChar(300)
-  itemName2            String?            @db.VarChar(300)
-  itemDescription      String             @default("") @db.Text
-  categoryId           String
-  baseUomId            String
-  itemType             String             @db.VarChar(32)
-  productType          String?            @db.VarChar(32)
-  inventoryType        String?            @default("inventory") @db.VarChar(32)
-  codeSeriesMode       String?            @default("manual") @db.VarChar(16)
-  materialGrade        String             @default("") @db.VarChar(100)
-  hsnCode              String             @default("") @db.VarChar(16)
-  hsnId                String?
-  gstGroupId           String?
-  reorderLevel         Decimal            @default(0) @db.Decimal(18, 4)
-  reorderQty           Decimal            @default(0) @db.Decimal(18, 4)
-  standardRate         Decimal            @default(0) @db.Decimal(18, 2)
-  isPurchasable        Boolean            @default(true)
-  isStockable          Boolean            @default(true)
-  isBlocked            Boolean            @default(false)
-  batchTracked         Boolean            @default(false)
-  serialTracked        Boolean            @default(false)
-  quantityPerUom       Decimal            @default(1) @db.Decimal(18, 4)
-  purchaseUomId        String?
-  purchaseQtyPerUom    Decimal            @default(1) @db.Decimal(18, 4)
+  id                      String                    @id @default(uuid())
+  tenantId                String
+  code                    String                    @db.VarChar(64)
+  name                    String                    @db.VarChar(300)
+  itemName2               String?                   @db.VarChar(300)
+  itemDescription         String                    @default("") @db.Text
+  categoryId              String
+  baseUomId               String
+  itemType                String                    @db.VarChar(32)
+  productType             String?                   @db.VarChar(32)
+  inventoryType           String?                   @default("inventory") @db.VarChar(32)
+  codeSeriesMode          String?                   @default("manual") @db.VarChar(16)
+  materialGrade           String                    @default("") @db.VarChar(100)
+  hsnCode                 String                    @default("") @db.VarChar(16)
+  hsnId                   String?
+  gstGroupId              String?
+  reorderLevel            Decimal                   @default(0) @db.Decimal(18, 4)
+  reorderQty              Decimal                   @default(0) @db.Decimal(18, 4)
+  standardRate            Decimal                   @default(0) @db.Decimal(18, 2)
+  isPurchasable           Boolean                   @default(true)
+  isStockable             Boolean                   @default(true)
+  isBlocked               Boolean                   @default(false)
+  batchTracked            Boolean                   @default(false)
+  serialTracked           Boolean                   @default(false)
+  quantityPerUom          Decimal                   @default(1) @db.Decimal(18, 4)
+  purchaseUomId           String?
+  purchaseQtyPerUom       Decimal                   @default(1) @db.Decimal(18, 4)
   /// CRM / Sales commercial description (distinct from engineering itemDescription).
-  salesDescription           String?                     @db.Text
+  salesDescription        String?                   @db.Text
   /// Optional sales UOM; falls back to baseUom when null.
-  salesUomId                 String?
+  salesUomId              String?
   /// Interim sales price SoT for CRM (do not use standardRate as sales price).
-  defaultSalesRate           Decimal                     @default(0) @db.Decimal(18, 2)
-  salesLeadDays              Int                         @default(0)
+  defaultSalesRate        Decimal                   @default(0) @db.Decimal(18, 2)
+  salesLeadDays           Int                       @default(0)
   /// When false, item is excluded from CRM/Sales pickers (filter salesAllowed=true).
-  salesAllowed               Boolean                     @default(false)
-  defaultFulfilmentMethod    ItemSalesFulfilmentMethod   @default(MANUAL)
-  productionAllowed          Boolean                     @default(false)
-  qcRequired           Boolean            @default(false)
-  qualityTestGroupCode String?            @db.VarChar(32)
-  productionBomId      String?            @db.VarChar(36)
-  routingNo            String?            @db.VarChar(64)
-  drawingNo            String?            @db.VarChar(64)
-  subAssemblyRule      String?            @db.VarChar(32)
-  status               MasterRecordStatus @default(ACTIVE)
-  createdBy            String?
-  updatedBy            String?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-  deletedAt            DateTime?
+  salesAllowed            Boolean                   @default(false)
+  defaultFulfilmentMethod ItemSalesFulfilmentMethod @default(MANUAL)
+  productionAllowed       Boolean                   @default(false)
+  qcRequired              Boolean                   @default(false)
+  qualityTestGroupCode    String?                   @db.VarChar(32)
+  productionBomId         String?                   @db.VarChar(36)
+  routingNo               String?                   @db.VarChar(64)
+  drawingNo               String?                   @db.VarChar(64)
+  subAssemblyRule         String?                   @db.VarChar(32)
+  status                  MasterRecordStatus        @default(ACTIVE)
+  createdBy               String?
+  updatedBy               String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  deletedAt               DateTime?
 
   tenant                   Tenant                    @relation(fields: [tenantId], references: [id])
   category                 MasterItemCategory        @relation(fields: [categoryId], references: [id])
@@ -2832,20 +2843,20 @@ model MasterItem {
   demandConsolidationDemandLines DemandConsolidationDemandLine[]
   demandConsolidationSuggestions DemandConsolidationSuggestion[]
 
-  inventoryStockBalances     InventoryStockBalance[]
-  inventoryStockMovements    InventoryStockMovement[]
-  inventoryStockReservations InventoryStockReservation[]
-  inventoryCostEntries       InventoryCostEntry[]
-  inventoryCostLayers        InventoryCostLayer[]
+  inventoryStockBalances            InventoryStockBalance[]
+  inventoryStockMovements           InventoryStockMovement[]
+  inventoryStockReservations        InventoryStockReservation[]
+  inventoryCostEntries              InventoryCostEntry[]
+  inventoryCostLayers               InventoryCostLayer[]
   inventoryItemStandardCostVersions InventoryItemStandardCostVersion[]
-  inventoryCostVariances     InventoryCostVariance[]
-  inventoryBatches           InventoryBatch[]
-  inventoryBatchBalances     InventoryBatchBalance[]
-  inventorySerials           InventorySerial[]
-  inventoryLots              InventoryLot[]
-  inventoryTransferLines     InventoryTransferLine[]
-  inventoryStockCountLines   InventoryStockCountLine[]
-  inventoryAdjustmentLines   InventoryAdjustmentLine[]
+  inventoryCostVariances            InventoryCostVariance[]
+  inventoryBatches                  InventoryBatch[]
+  inventoryBatchBalances            InventoryBatchBalance[]
+  inventorySerials                  InventorySerial[]
+  inventoryLots                     InventoryLot[]
+  inventoryTransferLines            InventoryTransferLine[]
+  inventoryStockCountLines          InventoryStockCountLine[]
+  inventoryAdjustmentLines          InventoryAdjustmentLine[]
 
   productionOrderMaterials        ProductionOrderMaterial[]
   productionWipMovements          ProductionWipMovement[]
@@ -3157,6 +3168,18 @@ model LegalEntity {
   updatedAt             DateTime        @updatedAt
   /// Trade / display name for organisation setup (falls back to displayName in APIs).
   tradeName             String?         @db.VarChar(300)
+  /// Letterhead / print contact details — used by Proforma, Sales Order, Tax Invoice prints.
+  email                 String?         @db.VarChar(255)
+  phone                 String?         @db.VarChar(30)
+  website               String?         @db.VarChar(255)
+  /// Letterhead bank details for remittance instructions on print documents.
+  /// Public by design (shared with customers for payment) — distinct from TreasuryBankProfile,
+  /// which intentionally masks account numbers for internal treasury/reconciliation security.
+  bankAccountName       String?         @db.VarChar(200)
+  bankName              String?         @db.VarChar(200)
+  bankAccountNumber     String?         @db.VarChar(40)
+  bankIfscCode          String?         @db.VarChar(20)
+  bankBranch            String?         @db.VarChar(200)
 
   tenant                                 Tenant                                  @relation(fields: [tenantId], references: [id])
   userLegalEntityAccess                  UserLegalEntityAccess[]
@@ -3237,6 +3260,7 @@ model LegalEntity {
   treasuryAdjustments                    TreasuryAdjustment[]
   bankPostingRules                       BankPostingRule[]
   standingInstructions                   StandingInstruction[]
+  recurringSalesInvoiceSchedules         RecurringSalesInvoiceSchedule[]
   treasuryDayCloses                      TreasuryDayClose[]
   bankConnectors                         BankConnector[]
   budgetVersions                         BudgetVersion[]
@@ -3338,6 +3362,7 @@ model Branch {
   payableAllocationReversalBatches PayableAllocationReversalBatch[]
   treasuryAccounts                 TreasuryAccount[]
   paymentAccountMappings           PaymentAccountMapping[]
+  recurringSalesInvoiceSchedules   RecurringSalesInvoiceSchedule[]
 
   @@unique([legalEntityId, code])
   @@index([tenantId])
@@ -4247,6 +4272,7 @@ enum SalesInvoiceSourceType {
   DIRECT
   SALES_ORDER
   OUTBOUND_DISPATCH
+  PROFORMA_INVOICE
 }
 
 enum SalesInvoiceSupplyType {
@@ -4407,6 +4433,7 @@ model SalesInvoice {
   arDisputes            ArDispute[]
   gstEInvoices          GstEInvoice[]
   gstEWayBills          GstEWayBill[]
+  recurringExecution    RecurringSalesInvoiceExecution?
 
   @@unique([legalEntityId, invoiceNumber], map: "sales_inv_le_number_key")
   @@unique([legalEntityId, draftReference], map: "sales_inv_le_draft_ref_key")
@@ -4532,6 +4559,100 @@ enum SalesInvoiceSourceLinkType {
 enum SalesInvoiceSourceLinkStatus {
   ACTIVE
   RELEASED
+}
+
+enum RecurringInvoiceScheduleStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  COMPLETED
+}
+
+enum RecurringInvoiceExecutionStatus {
+  SCHEDULED
+  APPROVED
+  SKIPPED
+  CANCELLED
+}
+
+/// Recurring Sales Invoice template. Never posts/creates a SalesInvoice directly —
+/// each due cycle surfaces as an "upcoming" RecurringSalesInvoiceExecution that a
+/// user must explicitly approve. Mirrors the StandingInstruction (treasury) pattern.
+model RecurringSalesInvoiceSchedule {
+  id            String  @id @default(uuid())
+  tenantId      String
+  legalEntityId String
+  branchId      String?
+
+  /// CrmCompany.id — soft reference, same convention as SalesInvoice.customerId.
+  customerId String
+
+  status    RecurringInvoiceScheduleStatus @default(ACTIVE)
+  frequency Frequency
+
+  startDate       DateTime  @db.Date
+  endDate         DateTime? @db.Date
+  nextInvoiceDate DateTime  @db.Date
+
+  /// Frozen CreateSalesInvoiceInput fields (customer, lines, charges, currency, tax…)
+  /// minus invoiceDate/postingDate/dueDate, which are derived per due execution.
+  invoiceTemplate Json
+
+  lastGeneratedAt      DateTime?
+  lastGeneratedForDate DateTime? @db.Date
+
+  cancelledAt DateTime?
+  cancelledBy String?
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
+  branch      Branch?     @relation(fields: [branchId], references: [id])
+
+  executions        RecurringSalesInvoiceExecution[]
+  treasuryAccount   TreasuryAccount?                 @relation(fields: [treasuryAccountId], references: [id])
+  treasuryAccountId String?
+
+  @@index([tenantId])
+  @@index([tenantId, legalEntityId, status], map: "recur_si_sched_le_status_idx")
+  @@index([nextInvoiceDate])
+  @@map("recurring_sales_invoice_schedules")
+}
+
+/// One row per scheduled occurrence — the "upcoming invoice" queue entry shown to
+/// users before it becomes a real SalesInvoice draft on approval.
+model RecurringSalesInvoiceExecution {
+  id         String @id @default(uuid())
+  tenantId   String
+  scheduleId String
+
+  invoiceDate DateTime                        @db.Date
+  status      RecurringInvoiceExecutionStatus @default(SCHEDULED)
+
+  /// Set once approved and a real SalesInvoice draft is created.
+  salesInvoiceId String? @unique
+
+  failureReason String? @db.VarChar(500)
+
+  approvedAt DateTime?
+  approvedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant                        @relation(fields: [tenantId], references: [id])
+  schedule     RecurringSalesInvoiceSchedule @relation(fields: [scheduleId], references: [id])
+  salesInvoice SalesInvoice?                 @relation(fields: [salesInvoiceId], references: [id])
+
+  @@unique([scheduleId, invoiceDate], map: "recur_si_exec_due_key")
+  @@index([tenantId])
+  @@index([tenantId, status], map: "recur_si_exec_tenant_status_idx")
+  @@map("recurring_sales_invoice_executions")
 }
 
 /// Open receivable balance row — unified debit (invoice) and credit (receipt) subledger.
@@ -8581,6 +8702,7 @@ model TreasuryAccount {
   treasuryAdjustments                 TreasuryAdjustment[]
   bankPostingRules                    BankPostingRule[]
   standingInstructions                StandingInstruction[]
+  recurringSalesInvoiceSchedules      RecurringSalesInvoiceSchedule[]
   bankConnectors                      BankConnector[]
   fixedAssetDisposals                 FixedAssetDisposal[]
 
@@ -11764,14 +11886,14 @@ model InventoryCostEntry {
   createdBy                String?
   createdAt                DateTime                 @default(now())
 
-  tenant            Tenant                 @relation(fields: [tenantId], references: [id])
-  legalEntity       LegalEntity?           @relation(fields: [legalEntityId], references: [id])
-  item              MasterItem             @relation(fields: [itemId], references: [id])
-  warehouse         MasterWarehouse        @relation(fields: [warehouseId], references: [id])
-  inventoryMovement InventoryStockMovement @relation(fields: [inventoryMovementId], references: [id])
-  lot               InventoryLot?          @relation(fields: [lotId], references: [id])
-  serial            InventorySerial?       @relation(fields: [serialId], references: [id])
-  costLayer         InventoryCostLayer?    @relation(fields: [costLayerId], references: [id])
+  tenant            Tenant                          @relation(fields: [tenantId], references: [id])
+  legalEntity       LegalEntity?                    @relation(fields: [legalEntityId], references: [id])
+  item              MasterItem                      @relation(fields: [itemId], references: [id])
+  warehouse         MasterWarehouse                 @relation(fields: [warehouseId], references: [id])
+  inventoryMovement InventoryStockMovement          @relation(fields: [inventoryMovementId], references: [id])
+  lot               InventoryLot?                   @relation(fields: [lotId], references: [id])
+  serial            InventorySerial?                @relation(fields: [serialId], references: [id])
+  costLayer         InventoryCostLayer?             @relation(fields: [costLayerId], references: [id])
   layerConsumptions InventoryCostLayerConsumption[]
 
   @@unique([tenantId, inventoryMovementId], map: "inv_cost_entry_tenant_movement_uidx")
@@ -11783,32 +11905,32 @@ model InventoryCostEntry {
 }
 
 model InventoryCostLayer {
-  id                  String                   @id @default(uuid())
-  tenantId            String
-  legalEntityId       String?
-  itemId              String
-  warehouseId         String
-  lotId               String?
-  serialId            String?
-  sourceMovementId   String
-  receiptDate        DateTime                @db.Date
-  postingDate        DateTime                @db.Date
-  originalQuantity   Decimal                 @db.Decimal(18, 4)
-  remainingQuantity  Decimal                 @db.Decimal(18, 4)
-  unitCost            Decimal                 @db.Decimal(18, 4)
-  originalValue      Decimal                 @db.Decimal(18, 2)
-  remainingValue     Decimal                 @db.Decimal(18, 2)
-  currencyCode        String                  @default("INR") @db.VarChar(8)
-  status              InventoryCostLayerStatus @default(OPEN)
-  createdAt           DateTime                @default(now())
+  id                String                   @id @default(uuid())
+  tenantId          String
+  legalEntityId     String?
+  itemId            String
+  warehouseId       String
+  lotId             String?
+  serialId          String?
+  sourceMovementId  String
+  receiptDate       DateTime                 @db.Date
+  postingDate       DateTime                 @db.Date
+  originalQuantity  Decimal                  @db.Decimal(18, 4)
+  remainingQuantity Decimal                  @db.Decimal(18, 4)
+  unitCost          Decimal                  @db.Decimal(18, 4)
+  originalValue     Decimal                  @db.Decimal(18, 2)
+  remainingValue    Decimal                  @db.Decimal(18, 2)
+  currencyCode      String                   @default("INR") @db.VarChar(8)
+  status            InventoryCostLayerStatus @default(OPEN)
+  createdAt         DateTime                 @default(now())
 
-  tenant        Tenant              @relation(fields: [tenantId], references: [id])
-  legalEntity   LegalEntity?       @relation(fields: [legalEntityId], references: [id])
-  item          MasterItem         @relation(fields: [itemId], references: [id])
-  warehouse     MasterWarehouse    @relation(fields: [warehouseId], references: [id])
-  sourceMovement InventoryStockMovement @relation(fields: [sourceMovementId], references: [id])
-  lot            InventoryLot?     @relation(fields: [lotId], references: [id])
-  serial         InventorySerial?  @relation(fields: [serialId], references: [id])
+  tenant         Tenant                          @relation(fields: [tenantId], references: [id])
+  legalEntity    LegalEntity?                    @relation(fields: [legalEntityId], references: [id])
+  item           MasterItem                      @relation(fields: [itemId], references: [id])
+  warehouse      MasterWarehouse                 @relation(fields: [warehouseId], references: [id])
+  sourceMovement InventoryStockMovement          @relation(fields: [sourceMovementId], references: [id])
+  lot            InventoryLot?                   @relation(fields: [lotId], references: [id])
+  serial         InventorySerial?                @relation(fields: [serialId], references: [id])
   consumptions   InventoryCostLayerConsumption[]
   costEntries    InventoryCostEntry[]
 
@@ -11819,18 +11941,18 @@ model InventoryCostLayer {
 }
 
 model InventoryCostLayerConsumption {
-  id               String                 @id @default(uuid())
+  id               String   @id @default(uuid())
   tenantId         String
   issueCostEntryId String
-  layerId           String
-  quantityConsumed Decimal               @db.Decimal(18, 4)
-  unitCost          Decimal               @db.Decimal(18, 4)
-  totalCost         Decimal               @db.Decimal(18, 2)
-  createdAt         DateTime             @default(now())
+  layerId          String
+  quantityConsumed Decimal  @db.Decimal(18, 4)
+  unitCost         Decimal  @db.Decimal(18, 4)
+  totalCost        Decimal  @db.Decimal(18, 2)
+  createdAt        DateTime @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant         Tenant             @relation(fields: [tenantId], references: [id])
   issueCostEntry InventoryCostEntry @relation(fields: [issueCostEntryId], references: [id])
-  layer InventoryCostLayer @relation(fields: [layerId], references: [id])
+  layer          InventoryCostLayer @relation(fields: [layerId], references: [id])
 
   @@index([tenantId, layerId])
   @@index([tenantId, issueCostEntryId])
@@ -11863,25 +11985,25 @@ model InventoryItemStandardCostVersion {
 
 /// Variance between actual transaction cost and standard (or revaluation).
 model InventoryCostVariance {
-  id                  String                   @id @default(uuid())
+  id                  String                    @id @default(uuid())
   tenantId            String
   itemId              String
   warehouseId         String?
   inventoryMovementId String?
   costEntryId         String?
   varianceType        InventoryCostVarianceType
-  quantity            Decimal                  @db.Decimal(18, 4)
-  standardUnitCost    Decimal                  @db.Decimal(18, 4)
-  actualUnitCost      Decimal                  @db.Decimal(18, 4)
-  varianceAmount      Decimal                  @db.Decimal(18, 2)
-  postingDate         DateTime                 @db.Date
-  sourceType          String                   @db.VarChar(64)
-  sourceId            String?                  @db.VarChar(191)
-  remarks             String?                  @db.Text
+  quantity            Decimal                   @db.Decimal(18, 4)
+  standardUnitCost    Decimal                   @db.Decimal(18, 4)
+  actualUnitCost      Decimal                   @db.Decimal(18, 4)
+  varianceAmount      Decimal                   @db.Decimal(18, 2)
+  postingDate         DateTime                  @db.Date
+  sourceType          String                    @db.VarChar(64)
+  sourceId            String?                   @db.VarChar(191)
+  remarks             String?                   @db.Text
   createdBy           String?
-  createdAt           DateTime                 @default(now())
+  createdAt           DateTime                  @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant Tenant     @relation(fields: [tenantId], references: [id])
   item   MasterItem @relation(fields: [itemId], references: [id])
 
   @@index([tenantId, postingDate])
@@ -11892,16 +12014,16 @@ model InventoryCostVariance {
 
 /// Audit of valuation method changes (policy gate + history).
 model InventoryValuationMethodChange {
-  id              String                    @id @default(uuid())
-  tenantId        String
-  fromMethod      InventoryValuationMethod
-  toMethod        InventoryValuationMethod
-  effectiveDate   DateTime                  @db.Date
-  reason          String                    @db.Text
-  openingMigrationRequired Boolean          @default(false)
-  openingMigrationCompleted Boolean         @default(false)
-  createdBy       String?
-  createdAt       DateTime                  @default(now())
+  id                        String                   @id @default(uuid())
+  tenantId                  String
+  fromMethod                InventoryValuationMethod
+  toMethod                  InventoryValuationMethod
+  effectiveDate             DateTime                 @db.Date
+  reason                    String                   @db.Text
+  openingMigrationRequired  Boolean                  @default(false)
+  openingMigrationCompleted Boolean                  @default(false)
+  createdBy                 String?
+  createdAt                 DateTime                 @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -12160,39 +12282,39 @@ enum DispatchPodAttachmentKind {
 
 /// Confirms customer receipt after posted dispatch. Never posts inventory.
 model DispatchProofOfDelivery {
-  id                   String            @id @default(uuid())
-  tenantId             String
+  id                  String            @id @default(uuid())
+  tenantId            String
   /// One POD register per outbound (1:1). UUID unique is enough; tenant scoped in queries.
-  outboundDispatchId   String            @unique(map: "dsp_pod_ob_uidx")
-  deliveryChallanId    String?
-  salesOrderId         String?
-  customerId           String?
-  status               DispatchPodStatus @default(IN_TRANSIT)
-  deliveryAddress      String?           @db.Text
-  deliveredAt          DateTime?
-  receiverName         String?           @db.VarChar(200)
-  receiverContact      String?           @db.VarChar(64)
-  signatureStorageKey  String?           @db.VarChar(500)
-  quantityDelivered    Decimal           @default(0) @db.Decimal(18, 4)
-  quantityDamaged      Decimal           @default(0) @db.Decimal(18, 4)
-  quantityShort        Decimal           @default(0) @db.Decimal(18, 4)
-  deliveryRemarks      String?           @db.Text
-  transporterRemarks   String?           @db.Text
-  exceptionCode        String?           @db.VarChar(64)
-  exceptionNotes       String?           @db.Text
-  gpsLatitude          Decimal?          @db.Decimal(10, 7)
-  gpsLongitude         Decimal?          @db.Decimal(10, 7)
-  inTransitAt          DateTime?
-  inTransitBy          String?
-  capturedAt           DateTime?
-  capturedBy           String?
-  createdBy            String?
-  updatedBy            String?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  outboundDispatchId  String            @unique(map: "dsp_pod_ob_uidx")
+  deliveryChallanId   String?
+  salesOrderId        String?
+  customerId          String?
+  status              DispatchPodStatus @default(IN_TRANSIT)
+  deliveryAddress     String?           @db.Text
+  deliveredAt         DateTime?
+  receiverName        String?           @db.VarChar(200)
+  receiverContact     String?           @db.VarChar(64)
+  signatureStorageKey String?           @db.VarChar(500)
+  quantityDelivered   Decimal           @default(0) @db.Decimal(18, 4)
+  quantityDamaged     Decimal           @default(0) @db.Decimal(18, 4)
+  quantityShort       Decimal           @default(0) @db.Decimal(18, 4)
+  deliveryRemarks     String?           @db.Text
+  transporterRemarks  String?           @db.Text
+  exceptionCode       String?           @db.VarChar(64)
+  exceptionNotes      String?           @db.Text
+  gpsLatitude         Decimal?          @db.Decimal(10, 7)
+  gpsLongitude        Decimal?          @db.Decimal(10, 7)
+  inTransitAt         DateTime?
+  inTransitBy         String?
+  capturedAt          DateTime?
+  capturedBy          String?
+  createdBy           String?
+  updatedBy           String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
-  tenant           Tenant                 @relation(fields: [tenantId], references: [id])
-  outboundDispatch OutboundDispatch       @relation(fields: [outboundDispatchId], references: [id], onDelete: Cascade)
+  tenant           Tenant                  @relation(fields: [tenantId], references: [id])
+  outboundDispatch OutboundDispatch        @relation(fields: [outboundDispatchId], references: [id], onDelete: Cascade)
   lines            DispatchPodLine[]
   attachments      DispatchPodAttachment[]
 
@@ -12216,7 +12338,7 @@ model DispatchPodLine {
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
-  tenant          Tenant                 @relation(fields: [tenantId], references: [id])
+  tenant          Tenant                  @relation(fields: [tenantId], references: [id])
   proofOfDelivery DispatchProofOfDelivery @relation(fields: [proofOfDeliveryId], references: [id], onDelete: Cascade)
 
   @@unique([proofOfDeliveryId, outboundDispatchLineId], map: "dsp_pod_line_pod_obline_uidx")
@@ -12264,39 +12386,39 @@ enum EmergencyOverrideUrgency {
 
 /// Time-bound, document-scoped override grant. Single-use when consumed by the blocked action.
 model EmergencyOverride {
-  id                      String                    @id @default(uuid())
-  tenantId                String
-  overrideNo              String                    @db.VarChar(64)
-  module                  String                    @db.VarChar(64)
-  documentType            String                    @db.VarChar(64)
-  documentId              String
-  documentNo              String?                   @db.VarChar(64)
-  blockedAction           String                    @db.VarChar(64)
-  primaryBlockerCode      String?                   @db.VarChar(64)
+  id                       String                   @id @default(uuid())
+  tenantId                 String
+  overrideNo               String                   @db.VarChar(64)
+  module                   String                   @db.VarChar(64)
+  documentType             String                   @db.VarChar(64)
+  documentId               String
+  documentNo               String?                  @db.VarChar(64)
+  blockedAction            String                   @db.VarChar(64)
+  primaryBlockerCode       String?                  @db.VarChar(64)
   /// JSON string[] of original blocker codes preserved for audit.
-  blockerCodesJson        Json
+  blockerCodesJson         Json
   originalBlockersSnapshot Json?
-  businessReason          String                    @db.Text
-  urgency                 EmergencyOverrideUrgency  @default(HIGH)
-  riskAcknowledged        Boolean                   @default(false)
-  supportingAttachmentKey String?                   @db.VarChar(500)
-  requestedByUserId       String?
-  requestedByName         String?                   @db.VarChar(200)
-  approvedByUserId        String?
-  approvedByName          String?                   @db.VarChar(200)
-  approvalReference       String?                   @db.VarChar(64)
-  expiresAt               DateTime
-  scope                   String?                   @db.VarChar(500)
-  remarks                 String?                   @db.Text
-  status                  EmergencyOverrideStatus   @default(REQUESTED)
-  grantedAt               DateTime?
-  consumedAt              DateTime?
-  consumedByAction        String?                   @db.VarChar(64)
-  consumedDocumentId      String?
-  createdBy               String?
-  updatedBy               String?
-  createdAt               DateTime                  @default(now())
-  updatedAt               DateTime                  @updatedAt
+  businessReason           String                   @db.Text
+  urgency                  EmergencyOverrideUrgency @default(HIGH)
+  riskAcknowledged         Boolean                  @default(false)
+  supportingAttachmentKey  String?                  @db.VarChar(500)
+  requestedByUserId        String?
+  requestedByName          String?                  @db.VarChar(200)
+  approvedByUserId         String?
+  approvedByName           String?                  @db.VarChar(200)
+  approvalReference        String?                  @db.VarChar(64)
+  expiresAt                DateTime
+  scope                    String?                  @db.VarChar(500)
+  remarks                  String?                  @db.Text
+  status                   EmergencyOverrideStatus  @default(REQUESTED)
+  grantedAt                DateTime?
+  consumedAt               DateTime?
+  consumedByAction         String?                  @db.VarChar(64)
+  consumedDocumentId       String?
+  createdBy                String?
+  updatedBy                String?
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -12390,8 +12512,8 @@ model DispatchPostingLine {
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
-  tenant    Tenant          @relation(fields: [tenantId], references: [id])
-  posting   DispatchPosting @relation(fields: [postingId], references: [id], onDelete: Cascade)
+  tenant    Tenant                 @relation(fields: [tenantId], references: [id])
+  posting   DispatchPosting        @relation(fields: [postingId], references: [id], onDelete: Cascade)
   reversals DispatchReversalLine[]
 
   @@unique([postingId, lineNo], map: "dispatch_posting_line_no_uidx")
@@ -12403,27 +12525,27 @@ model DispatchPostingLine {
 }
 
 model DispatchReversal {
-  id                String                  @id @default(uuid())
-  tenantId          String
-  reversalNumber    String                  @db.VarChar(64)
-  originalPostingId String
+  id                 String                 @id @default(uuid())
+  tenantId           String
+  reversalNumber     String                 @db.VarChar(64)
+  originalPostingId  String
   outboundDispatchId String
-  status            DispatchReversalStatus  @default(DRAFT_REQUEST)
-  reasonCode        String?                 @db.VarChar(64)
-  reason            String?                 @db.Text
-  requestedBy       String?
-  requestedAt       DateTime?
-  approvedBy        String?
-  approvedAt        DateTime?
-  appliedBy         String?
-  appliedAt         DateTime?
-  effectiveDate     DateTime                @db.Date
-  rejectedBy        String?
-  rejectedAt        DateTime?
-  rejectionReason   String?                 @db.Text
-  idempotencyKey    String?                 @db.VarChar(150)
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
+  status             DispatchReversalStatus @default(DRAFT_REQUEST)
+  reasonCode         String?                @db.VarChar(64)
+  reason             String?                @db.Text
+  requestedBy        String?
+  requestedAt        DateTime?
+  approvedBy         String?
+  approvedAt         DateTime?
+  appliedBy          String?
+  appliedAt          DateTime?
+  effectiveDate      DateTime               @db.Date
+  rejectedBy         String?
+  rejectedAt         DateTime?
+  rejectionReason    String?                @db.Text
+  idempotencyKey     String?                @db.VarChar(150)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
 
   tenant          Tenant                 @relation(fields: [tenantId], references: [id])
   originalPosting DispatchPosting        @relation(fields: [originalPostingId], references: [id])
@@ -12438,24 +12560,24 @@ model DispatchReversal {
 }
 
 model DispatchReversalLine {
-  id                      String   @id @default(uuid())
-  tenantId                String
-  reversalId              String
-  originalPostingLineId   String
-  quantity                Decimal  @db.Decimal(18, 4)
-  inventoryMovementId     String?
-  inventoryMovementNo     String?  @db.VarChar(64)
-  serialLotSnapshotJson   Json?
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  id                    String   @id @default(uuid())
+  tenantId              String
+  reversalId            String
+  originalPostingLineId String
+  quantity              Decimal  @db.Decimal(18, 4)
+  inventoryMovementId   String?
+  inventoryMovementNo   String?  @db.VarChar(64)
+  serialLotSnapshotJson Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   tenant              Tenant              @relation(fields: [tenantId], references: [id])
   reversal            DispatchReversal    @relation(fields: [reversalId], references: [id], onDelete: Cascade)
   originalPostingLine DispatchPostingLine @relation(fields: [originalPostingLineId], references: [id])
 
+  @@unique([tenantId, inventoryMovementId], map: "dispatch_reversal_line_mov_uidx")
   @@index([tenantId, reversalId], map: "dispatch_reversal_line_tenant_rev_idx")
   @@index([tenantId, originalPostingLineId], map: "dispatch_reversal_line_post_line_idx")
-  @@unique([tenantId, inventoryMovementId], map: "dispatch_reversal_line_mov_uidx")
   @@map("dispatch_reversal_lines")
 }
 
@@ -14608,48 +14730,48 @@ model GstEInvoice {
 }
 
 model GstEWayBill {
-  id                String                @id @default(uuid())
-  tenantId          String
-  legalEntityId     String
-  sourceType        GstEWayBillSourceType
-  salesInvoiceId    String?
-  deliveryChallanId String?
+  id                 String                @id @default(uuid())
+  tenantId           String
+  legalEntityId      String
+  sourceType         GstEWayBillSourceType
+  salesInvoiceId     String?
+  deliveryChallanId  String?
   /// Soft link for Dispatch workspace panel (DC / SI remain the statutory source docs).
   outboundDispatchId String?
-  documentNumber    String                @db.VarChar(64)
-  documentDate      DateTime              @db.Date
-  partyName         String                @db.VarChar(300)
-  partyGstin        String?               @db.VarChar(20)
-  fromPlace         String                @db.VarChar(200)
-  toPlace           String                @db.VarChar(200)
-  distanceKm        Int                   @default(0)
-  vehicleNumber     String?               @db.VarChar(64)
-  transporterName   String?               @db.VarChar(200)
+  documentNumber     String                @db.VarChar(64)
+  documentDate       DateTime              @db.Date
+  partyName          String                @db.VarChar(300)
+  partyGstin         String?               @db.VarChar(20)
+  fromPlace          String                @db.VarChar(200)
+  toPlace            String                @db.VarChar(200)
+  distanceKm         Int                   @default(0)
+  vehicleNumber      String?               @db.VarChar(64)
+  transporterName    String?               @db.VarChar(200)
   /// Transporter GSTIN / ID when provided to NIC.
-  transporterId     String?               @db.VarChar(20)
-  taxableAmount     Decimal               @default(0) @db.Decimal(18, 4)
-  status            GstEWayBillStatus     @default(REQUIRED)
-  ewbNumber         String?               @db.VarChar(64)
+  transporterId      String?               @db.VarChar(20)
+  taxableAmount      Decimal               @default(0) @db.Decimal(18, 4)
+  status             GstEWayBillStatus     @default(REQUIRED)
+  ewbNumber          String?               @db.VarChar(64)
   /// When NIC (or simulated adapter) returned the EWB.
-  generatedAt       DateTime?
-  validUpto         DateTime?
+  generatedAt        DateTime?
+  validUpto          DateTime?
   /// Human-readable requirement reason (e.g. threshold exceeded).
-  requiredReason    String?               @db.VarChar(500)
-  movementReason    String?               @db.VarChar(200)
-  cancelReason      String?               @db.VarChar(500)
-  cancelledAt       DateTime?
-  cancelledBy       String?
-  exceptionMessage  String?               @db.VarChar(1000)
-  providerMode      String                @default("SIMULATED") @db.VarChar(32)
-  providerRef       String?               @db.VarChar(150)
+  requiredReason     String?               @db.VarChar(500)
+  movementReason     String?               @db.VarChar(200)
+  cancelReason       String?               @db.VarChar(500)
+  cancelledAt        DateTime?
+  cancelledBy        String?
+  exceptionMessage   String?               @db.VarChar(1000)
+  providerMode       String                @default("SIMULATED") @db.VarChar(32)
+  providerRef        String?               @db.VarChar(150)
   /// Last outbound NIC request payload (redact secrets at write time).
-  lastRequestJson   Json?
+  lastRequestJson    Json?
   /// Last NIC / government response payload (exact errors preserved).
-  lastResponseJson  Json?
-  createdBy         String?
-  updatedBy         String?
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
+  lastResponseJson   Json?
+  createdBy          String?
+  updatedBy          String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
   tenant          Tenant           @relation(fields: [tenantId], references: [id])
   legalEntity     LegalEntity      @relation(fields: [legalEntityId], references: [id])
@@ -14809,24 +14931,24 @@ enum ManufacturingAccountingSignOffStatus {
 
 /// Additive audit trail for Manufacturing Accounting enablement sign-offs (ADR — does not replace FinanceFeatureControl.configurationJson snapshot).
 model ManufacturingAccountingSignOff {
-  id                     String                               @id @default(uuid())
-  tenantId               String
-  legalEntityId          String
-  signOffType            ManufacturingAccountingSignOffType
-  status                 ManufacturingAccountingSignOffStatus @default(ACTIVE)
-  confirmedById          String
-  confirmedAt            DateTime
-  remarks                String?                              @db.Text
-  scopeJson              Json?
-  readinessSnapshotJson  Json?
-  idempotencyKey         String?                              @db.VarChar(150)
-  supersedesId           String?
-  createdAt              DateTime                             @default(now())
-  updatedAt              DateTime                             @updatedAt
+  id                    String                               @id @default(uuid())
+  tenantId              String
+  legalEntityId         String
+  signOffType           ManufacturingAccountingSignOffType
+  status                ManufacturingAccountingSignOffStatus @default(ACTIVE)
+  confirmedById         String
+  confirmedAt           DateTime
+  remarks               String?                              @db.Text
+  scopeJson             Json?
+  readinessSnapshotJson Json?
+  idempotencyKey        String?                              @db.VarChar(150)
+  supersedesId          String?
+  createdAt             DateTime                             @default(now())
+  updatedAt             DateTime                             @updatedAt
 
-  tenant      Tenant      @relation(fields: [tenantId], references: [id])
-  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id])
-  supersedes  ManufacturingAccountingSignOff?  @relation("MfgAcctSignOffSupersede", fields: [supersedesId], references: [id], onDelete: SetNull)
+  tenant       Tenant                           @relation(fields: [tenantId], references: [id])
+  legalEntity  LegalEntity                      @relation(fields: [legalEntityId], references: [id])
+  supersedes   ManufacturingAccountingSignOff?  @relation("MfgAcctSignOffSupersede", fields: [supersedesId], references: [id], onDelete: SetNull)
   supersededBy ManufacturingAccountingSignOff[] @relation("MfgAcctSignOffSupersede")
 
   @@unique([tenantId, idempotencyKey], map: "mfg_acct_signoff_tenant_idem_key")
@@ -17063,19 +17185,19 @@ model ExecutiveDashboard {
 }
 
 model ExecutiveDashboardWidget {
-  id                 String   @id @default(uuid())
-  tenantId           String
-  dashboardId        String
-  widgetKey          String   @db.VarChar(100)
-  positionX          Int      @default(0)
-  positionY          Int      @default(0)
-  width              Int      @default(2)
-  height             Int      @default(2)
-  visualization      String?  @db.VarChar(32)
-  configurationJson  Json?
-  filterJson         Json?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                String   @id @default(uuid())
+  tenantId          String
+  dashboardId       String
+  widgetKey         String   @db.VarChar(100)
+  positionX         Int      @default(0)
+  positionY         Int      @default(0)
+  width             Int      @default(2)
+  height            Int      @default(2)
+  visualization     String?  @db.VarChar(32)
+  configurationJson Json?
+  filterJson        Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   dashboard ExecutiveDashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
 

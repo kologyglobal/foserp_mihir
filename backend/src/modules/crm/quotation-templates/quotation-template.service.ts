@@ -1,6 +1,7 @@
 import { prisma } from '../../../config/database.js'
 import { NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { resolveUserNames } from '../../../shared/index.js'
+import { isServicesBusinessType } from '../../modules/tenant-packaging.js'
 import * as repo from './quotation-template.repository.js'
 import { mapQuotationTemplateToDto } from './quotation-template.types.js'
 import {
@@ -11,6 +12,11 @@ import {
   QUOTATION_TEMPLATE_SEED_ROWS,
   VF_WORD_PRINT_LAYOUT_SEED,
 } from './quotation-template.catalog-seed.js'
+import {
+  KOLOGY_OUTBOUND_PILOT_CODE,
+  KOLOGY_OUTBOUND_PILOT_SEED_ROW,
+  KOLOGY_OUTBOUND_PILOT_SECTIONS,
+} from './quotation-template.kology-outbound.js'
 import type {
   CreateQuotationTemplateInput,
   DuplicateQuotationTemplateInput,
@@ -35,15 +41,39 @@ function assertCatalogUnlockedForWrite() {
 }
 
 export async function listQuotationTemplates(tenantId: string, query: ListQuotationTemplatesQuery) {
-  // Always create/restore keep-catalog quotation templates if missing.
-  await repo.ensureKeptQuotationTemplates(
-    tenantId,
-    QUOTATION_TEMPLATE_SEED_ROWS.map((row) => ({
-      ...row,
-      printLayout: VF_WORD_PRINT_LAYOUT_SEED,
-    })),
-  )
-  const catalogCodes = isQuotationTemplateCatalogLocked() ? quotationTemplateKeepCodes() : undefined
+  // The VF Word catalog (ISO tanks, bulkers, tippers, trailers…) is a manufacturing
+  // product line — only ensure/restore it for MANUFACTURING tenants. SERVICES tenants
+  // get the outbound proposal template and must not inherit the VF catalog / keep-list filter.
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { businessType: true } })
+  const isServices = isServicesBusinessType(tenant?.businessType)
+  if (isServices) {
+    await repo.ensureKeptQuotationTemplates(tenantId, [
+      {
+        code: KOLOGY_OUTBOUND_PILOT_SEED_ROW.code,
+        templateName: KOLOGY_OUTBOUND_PILOT_SEED_ROW.templateName,
+        productFamily: KOLOGY_OUTBOUND_PILOT_SEED_ROW.productFamily,
+        version: KOLOGY_OUTBOUND_PILOT_SEED_ROW.version,
+        sections: [...KOLOGY_OUTBOUND_PILOT_SECTIONS],
+        defaultTerms: KOLOGY_OUTBOUND_PILOT_SEED_ROW.defaultTerms,
+        defaultWarranty: KOLOGY_OUTBOUND_PILOT_SEED_ROW.defaultWarranty,
+        defaultExclusions: KOLOGY_OUTBOUND_PILOT_SEED_ROW.defaultExclusions,
+        printLayout: KOLOGY_OUTBOUND_PILOT_SEED_ROW.printLayout,
+      },
+    ])
+  } else {
+    await repo.ensureKeptQuotationTemplates(
+      tenantId,
+      QUOTATION_TEMPLATE_SEED_ROWS.map((row) => ({
+        ...row,
+        printLayout: VF_WORD_PRINT_LAYOUT_SEED,
+      })),
+    )
+  }
+  const catalogCodes = isServices
+    ? [KOLOGY_OUTBOUND_PILOT_CODE]
+    : isQuotationTemplateCatalogLocked()
+      ? quotationTemplateKeepCodes()
+      : undefined
   const result = await repo.findQuotationTemplates(tenantId, query, catalogCodes)
   const nameMap = await resolveUserNames(
     result.items.flatMap((r) => [r.createdBy, r.updatedBy]),

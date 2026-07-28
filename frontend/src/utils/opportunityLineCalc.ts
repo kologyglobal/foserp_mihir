@@ -309,9 +309,6 @@ export function validateOpportunityLines(
   if (!header.customerId) errors.push('Customer is required.')
   if (!header.ownerId) errors.push('Opportunity owner is required.')
   if (!header.stage) errors.push('Stage is required.')
-  if (header.probability === '' || header.probability == null || Number.isNaN(Number(header.probability))) {
-    errors.push('Probability is required.')
-  }
 
   // Minimum-first: early pipeline stages may save without product lines.
   const earlyStages = new Set(['new_lead', 'qualified', 'requirement_discussion'])

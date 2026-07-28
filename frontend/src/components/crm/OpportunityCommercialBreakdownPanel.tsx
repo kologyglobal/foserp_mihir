@@ -3,6 +3,7 @@ import { formatCrmCurrency } from '@/utils/crmMetrics'
 import { formatDate } from '@/utils/dates/format'
 import type { OpportunityCommercialBreakdown } from '@/utils/opportunityLineCalc'
 import { cn } from '@/utils/cn'
+import { useTenantProfileStore } from '@/store/tenantProfileStore'
 
 export interface OpportunityCommercialBreakdownPanelProps {
   breakdown: OpportunityCommercialBreakdown
@@ -16,6 +17,7 @@ export function OpportunityCommercialBreakdownPanel({
   expectedCloseDate,
   className,
 }: OpportunityCommercialBreakdownPanelProps) {
+  const isServices = useTenantProfileStore((s) => s.isServices())
   const {
     hasProductLines,
     dealValueIsManualEstimate,
@@ -79,7 +81,15 @@ export function OpportunityCommercialBreakdownPanel({
               <dd>{formatCrmCurrency(tax)}</dd>
             </div>
             <div className="opp-commercial-breakdown__row">
-              <dt title="Freight, installation, and other commercial charges (when captured)">Other Charges</dt>
+              <dt
+                title={
+                  isServices
+                    ? 'Installation and other commercial charges (when captured)'
+                    : 'Freight, installation, and other commercial charges (when captured)'
+                }
+              >
+                Other Charges
+              </dt>
               <dd>{otherCharges > 0 ? formatCrmCurrency(otherCharges) : '—'}</dd>
             </div>
             <div className="opp-commercial-breakdown__row opp-commercial-breakdown__row--total">

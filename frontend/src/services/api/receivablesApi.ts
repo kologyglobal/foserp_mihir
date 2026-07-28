@@ -34,6 +34,8 @@ import type {
   ListCustomerReceiptsQuery,
   ReceiptAllocationLineInput,
   SalesInvoiceDto,
+  SalesInvoiceLineInput,
+  SalesInvoiceSupplyType,
   SalesInvoiceValidationPreview,
   UpdateCustomerCreditNoteInput,
   UpdateCustomerReceiptInput,
@@ -509,5 +511,114 @@ export async function transitionArDispute(id: string, body: { status: ArDisputeS
 
 export async function deleteArDispute(id: string) {
   return apiRequest<ArDisputeDto>(tenantPath(`${BASE}/disputes/${id}`), { method: 'DELETE' })
+}
+
+// ─── Recurring sales invoice schedules (Money In) ──────────────────────────
+
+export type RecurringInvoiceFrequency = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY'
+export type RecurringInvoiceScheduleStatus = 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'COMPLETED'
+export type RecurringInvoiceExecutionStatus = 'SCHEDULED' | 'APPROVED' | 'SKIPPED' | 'CANCELLED'
+
+export interface RecurringInvoiceTemplate {
+  customerId: string
+  supplyType?: SalesInvoiceSupplyType
+  taxTreatment: string
+  currencyCode: string
+  placeOfSupply?: string | null
+  narration?: string | null
+  freightAmount?: string
+  otherChargesAmount?: string
+  lines: SalesInvoiceLineInput[]
+}
+
+export interface RecurringInvoiceScheduleDto {
+  id: string
+  legalEntityId: string
+  branchId: string | null
+  customerId: string
+  status: RecurringInvoiceScheduleStatus
+  frequency: RecurringInvoiceFrequency
+  startDate: string
+  endDate: string | null
+  nextInvoiceDate: string
+  template: RecurringInvoiceTemplate
+  lastGeneratedAt: string | null
+  lastGeneratedForDate: string | null
+  cancelledAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface UpcomingSalesInvoiceDto {
+  id: string
+  scheduleId: string
+  legalEntityId: string
+  customerId: string
+  frequency: RecurringInvoiceFrequency
+  scheduleStatus: RecurringInvoiceScheduleStatus
+  invoiceDate: string
+  status: RecurringInvoiceExecutionStatus
+  salesInvoiceId: string | null
+  failureReason: string | null
+  approvedAt: string | null
+  createdAt: string
+}
+
+export interface CreateRecurringScheduleInput {
+  legalEntityId: string
+  branchId?: string | null
+  frequency: RecurringInvoiceFrequency
+  startDate: string
+  endDate?: string | null
+  template: RecurringInvoiceTemplate
+}
+
+export interface ListRecurringSchedulesQuery {
+  legalEntityId: string
+  status?: RecurringInvoiceScheduleStatus
+  customerId?: string
+}
+
+export interface ListUpcomingInvoicesQuery {
+  legalEntityId: string
+  status?: RecurringInvoiceExecutionStatus
+}
+
+const RECURRING_BASE = `${BASE}/recurring-schedules`
+
+export async function listRecurringSchedules(params: ListRecurringSchedulesQuery) {
+  return apiRequest<RecurringInvoiceScheduleDto[]>(
+    `${tenantPath(RECURRING_BASE)}${buildQuery(params as unknown as Record<string, string | number | boolean | undefined>)}`,
+  )
+}
+
+export async function getRecurringSchedule(id: string) {
+  return apiRequest<RecurringInvoiceScheduleDto>(tenantPath(`${RECURRING_BASE}/${id}`))
+}
+
+export async function createRecurringSchedule(data: CreateRecurringScheduleInput) {
+  return apiRequest<RecurringInvoiceScheduleDto>(tenantPath(RECURRING_BASE), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function cancelRecurringSchedule(id: string, reason?: string | null) {
+  return apiRequest<RecurringInvoiceScheduleDto>(tenantPath(`${RECURRING_BASE}/${id}/cancel`), {
+    method: 'POST',
+    body: JSON.stringify({ reason: reason ?? null }),
+  })
+}
+
+export async function listUpcomingInvoices(params: ListUpcomingInvoicesQuery) {
+  return apiRequest<UpcomingSalesInvoiceDto[]>(
+    `${tenantPath(`${RECURRING_BASE}/upcoming`)}${buildQuery(params as unknown as Record<string, string | number | boolean | undefined>)}`,
+  )
+}
+
+export async function approveUpcomingInvoice(scheduleId: string, executionId: string) {
+  return apiRequest<SalesInvoiceDto>(tenantPath(`${RECURRING_BASE}/${scheduleId}/executions/${executionId}/approve`), {
+    method: 'POST',
+  })
 }
 

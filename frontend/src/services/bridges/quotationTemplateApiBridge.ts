@@ -2,6 +2,7 @@ import type { QuotationTemplate } from '../../types/crm'
 import { formatApiError } from '../api/apiErrors'
 import * as api from '../api/quotationTemplateApi'
 import { useCrmStore } from '../../store/crmStore'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import type { StoreActionResult } from '../../store/storeAction'
 import { filterAllowedQuotationTemplates } from '../../utils/quotationEngine/builtinTemplateSync'
 
@@ -35,6 +36,10 @@ function upsertTemplate(row: QuotationTemplate): void {
 }
 
 export async function syncQuotationTemplatesFromApi(): Promise<QuotationTemplate[]> {
+  const profile = useTenantProfileStore.getState()
+  if (!profile.hydrated) {
+    await profile.hydrate()
+  }
   const rows = await api.fetchQuotationTemplatesApi()
   const templates = filterAllowedQuotationTemplates(
     (Array.isArray(rows) ? rows : []).map(api.mapQuotationTemplateDto),

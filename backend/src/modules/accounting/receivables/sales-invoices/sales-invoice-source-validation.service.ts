@@ -13,7 +13,7 @@ import { loadSalesOrderSource } from '../source/sales-order-source.service.js'
 import { SalesInvoiceValidationFailedError } from './sales-invoice.errors.js'
 import type { CreateSalesInvoiceSourceLinkInput } from './sales-invoice-source-link.repository.js'
 
-export type SalesInvoiceSourceMode = 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH'
+export type SalesInvoiceSourceMode = 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH' | 'PROFORMA_INVOICE'
 
 export interface SourceLinkRequest {
   sourceType: 'SALES_ORDER' | 'OUTBOUND_DISPATCH' | 'DELIVERY_CHALLAN'
@@ -52,6 +52,18 @@ export async function validateAndEnrichSalesInvoiceSourceLinks(input: {
       throw new SalesInvoiceValidationFailedError(
         'Direct invoices cannot carry source links',
         [{ field: 'sourceLinks', message: 'Remove source links for DIRECT invoices' }],
+      )
+    }
+    return { sourceLinks: [], warnings, primarySalesOrderId: null }
+  }
+
+  // Proforma-sourced invoices carry no dispatch/SO consumption links — the proforma
+  // eligibility + snapshot is resolved separately in the draft service.
+  if (input.sourceType === 'PROFORMA_INVOICE') {
+    if (links.length > 0) {
+      throw new SalesInvoiceValidationFailedError(
+        'Proforma-sourced invoices cannot carry dispatch source links',
+        [{ field: 'sourceLinks', message: 'Remove source links for PROFORMA_INVOICE invoices' }],
       )
     }
     return { sourceLinks: [], warnings, primarySalesOrderId: null }

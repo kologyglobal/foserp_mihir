@@ -27,7 +27,8 @@ import {
 import { applyPrimaryContactFlags, syncCrmContactToMaster, syncPrimaryToCustomer } from '../utils/contactSync'
 import { getStageProbability, opportunityStageLabel } from '../utils/opportunityUtils'
 import { opportunityRequirementDisplay } from '../utils/leadRequirementLines'
-import { resolveLeadConvertToOpportunityGate } from '../utils/leadUtils'
+import { leadStageLabel, resolveLeadConvertToOpportunityGate } from '../utils/leadUtils'
+import { LEAD_STAGE_TO_OPPORTUNITY_STAGE } from '../utils/leadOpportunitySync'
 import { DEFAULT_QUOTATION_TEMPLATES } from '../data/quotations/quotationTemplates'
 import { buildCrmSampleData, emptyCrmState } from '../data/crm/crmSampleSeed'
 import { mergeAudit, stampCreated, stampModified } from '../utils/audit'
@@ -229,6 +230,12 @@ interface CrmState {
   ) => StoreAction<StoreActionResult>
 
   createOpportunity: (input: Omit<Opportunity, keyof import('../types/audit').AuditTrail | 'id' | 'opportunityNo' | 'healthScore' | 'lastActivityAt'>) => StoreAction<StoreActionResult & { opportunityId?: string }>
+  /**
+   * Mirrors a lead's New/Qualified stage into the Opportunity pipeline (demo mode only —
+   * API mode is synced server-side, see lead-opportunity-sync.ts). Does not touch
+   * lead.opportunityId; that remains reserved for the explicit Convert action.
+   */
+  syncOpportunityFromLead: (lead: import('../types/sales').Lead) => void
   createContact: (input: Omit<CrmContact, keyof import('../types/audit').AuditTrail | 'id' | 'masterContactId'>) => StoreAction<StoreActionResult & { contactId?: string }>
   updateContact: (id: string, patch: Partial<Pick<CrmContact, 'contactCode' | 'customerId' | 'name' | 'designation' | 'department' | 'email' | 'phone' | 'isPrimary' | 'isActive'>>) => StoreAction<StoreActionResult & { contactId?: string }>
   deleteContact: (id: string) => StoreAction<StoreActionResult>
@@ -513,20 +520,37 @@ export const useCrmStore = create<CrmState>()(
         ])
         if (!sellable.ok) return sellable
         const computedValue = summary.grandTotal > 0 ? summary.grandTotal : input.value
-        const opp: Opportunity = {
-          id: genId('opp'),
-          opportunityNo: nextDocumentNo('OPP', get().opportunities.map((o) => o.opportunityNo)),
-          ...input,
-          leadId: input.leadId ?? null,
-          inquiryId: null,
-          lines: syncedLines.map((l) => ({ ...l, productId: null })),
-          productId: null,
-          value: computedValue,
-          healthScore: 60,
-          lastActivityAt: audit.createdAt,
-          ...audit,
-        }
-        set((s) => ({ opportunities: [opp, ...s.opportunities] }))
+        // Reuse the opportunity already mirrored from this lead's New/Qualified stage
+        // (see syncOpportunityFromLead) instead of creating a duplicate deal.
+        const existingMirror = input.leadId ? get().opportunities.find((o) => o.leadId === input.leadId) : undefined
+        const opp: Opportunity = existingMirror
+          ? mergeAudit(existingMirror, {
+              ...input,
+              leadId: input.leadId ?? null,
+              inquiryId: null,
+              lines: syncedLines.map((l) => ({ ...l, productId: null })),
+              productId: null,
+              value: computedValue,
+              ...stampModified(existingMirror),
+            })
+          : {
+              id: genId('opp'),
+              opportunityNo: nextDocumentNo('OPP', get().opportunities.map((o) => o.opportunityNo)),
+              ...input,
+              leadId: input.leadId ?? null,
+              inquiryId: null,
+              lines: syncedLines.map((l) => ({ ...l, productId: null })),
+              productId: null,
+              value: computedValue,
+              healthScore: 60,
+              lastActivityAt: audit.createdAt,
+              ...audit,
+            }
+        set((s) => ({
+          opportunities: existingMirror
+            ? s.opportunities.map((o) => (o.id === opp.id ? opp : o))
+            : [opp, ...s.opportunities],
+        }))
         if (input.leadId) {
           const link = useSalesStore.getState().linkLeadToOpportunity(input.leadId, opp.id)
           if (link instanceof Promise) return { ok: false, error: 'Lead link failed' }
@@ -547,6 +571,84 @@ export const useCrmStore = create<CrmState>()(
           ownerName: opp.ownerName,
         })
         return { ok: true, opportunityId: opp.id }
+      },
+
+      syncOpportunityFromLead: (lead) => {
+        if (isApiMode()) return // backend owns this; Opportunities page re-fetches on load
+        if (lead.opportunityId) return // fully converted — owned by the Convert flow from here on
+        const targetStage = LEAD_STAGE_TO_OPPORTUNITY_STAGE[lead.stage]
+        if (!targetStage) return
+
+        const existing = get().opportunities.find((o) => o.leadId === lead.id)
+        if (existing) {
+          if (existing.stage === targetStage) return
+          const prevStage = existing.stage
+          set((s) => ({
+            opportunities: s.opportunities.map((o) =>
+              o.id === existing.id
+                ? mergeAudit(o, {
+                    stage: targetStage,
+                    probability: getStageProbability(targetStage) ?? o.probability,
+                    ...stampModified(o),
+                  })
+                : o,
+            ),
+          }))
+          logActivity(get, set, {
+            type: 'stage_change',
+            subject: `Stage: ${opportunityStageLabel(prevStage)} → ${opportunityStageLabel(targetStage)}`,
+            description: `Synced from lead stage: ${leadStageLabel(lead.stage)}.`,
+            customerId: existing.customerId,
+            contactId: existing.contactId,
+            opportunityId: existing.id,
+            leadId: lead.id,
+            ownerId: existing.ownerId,
+            ownerName: existing.ownerName,
+          })
+          return
+        }
+
+        const audit = stampCreated()
+        const opp: Opportunity = {
+          id: genId('opp'),
+          opportunityNo: nextDocumentNo('OPP', get().opportunities.map((o) => o.opportunityNo)),
+          customerId: lead.customerId ?? '',
+          contactId: lead.contactId ?? null,
+          productId: null,
+          opportunityName: lead.prospectName,
+          productRequirement: lead.productRequirement ?? '',
+          lines: [],
+          stage: targetStage,
+          value: lead.expectedValue ?? 0,
+          probability: getStageProbability(targetStage) ?? lead.probability ?? 0,
+          expectedCloseDate: lead.expectedCloseDate ?? '',
+          ownerId: lead.leadOwnerId,
+          ownerName: lead.leadOwnerName,
+          priority: lead.priority,
+          status: 'open',
+          lostReason: null,
+          healthScore: 60,
+          inquiryId: null,
+          quotationId: null,
+          salesOrderId: null,
+          leadId: lead.id,
+          lastActivityAt: audit.createdAt,
+          nextFollowUpDate: lead.nextFollowUpDate ?? null,
+          locationId: lead.locationId ?? null,
+          ...audit,
+        }
+        set((s) => ({ opportunities: [opp, ...s.opportunities] }))
+        logActivity(get, set, {
+          type: 'note',
+          subject: 'Opportunity synced from lead',
+          description: `${opp.opportunityName} added to the pipeline (${opportunityStageLabel(targetStage)}) from lead ${lead.leadNo}.`,
+          customerId: opp.customerId,
+          contactId: opp.contactId,
+          opportunityId: opp.id,
+          leadId: lead.id,
+          ownerId: opp.ownerId,
+          ownerName: opp.ownerName,
+        })
       },
 
       createContact: (input) => {

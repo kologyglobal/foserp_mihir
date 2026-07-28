@@ -1,4 +1,5 @@
 import type { QuotationTemplate } from '../types/crm'
+import { useTenantProfileStore } from '../store/tenantProfileStore'
 
 type QuotationTemplateIdentity = Pick<QuotationTemplate, 'id' | 'productFamily'> & {
   code?: string | null
@@ -32,10 +33,22 @@ export function isIsoTankQuotationTemplate(template: QuotationTemplateIdentity):
   )
 }
 
+/** Demo id or API seed code for the Kology SERVICES outbound pilot proposal. */
+export function isKologyOutboundPilotTemplate(template: QuotationTemplateIdentity): boolean {
+  return (
+    template.id === 'qtpl-kology-outbound-pilot' ||
+    template.code === 'KOLOGY-OUTBOUND-PILOT' ||
+    template.productFamily === 'Outbound Services'
+  )
+}
+
 export function findFeaturedQuotationTemplate<T extends QuotationTemplateIdentity>(
   templates: T[] | null | undefined,
 ): T | undefined {
   const list = Array.isArray(templates) ? templates : []
+  if (useTenantProfileStore.getState().isServices()) {
+    return list.find(isKologyOutboundPilotTemplate) ?? list[0]
+  }
   return list.find(isFeaturedDryBulkQuotationTemplate) ?? list[0]
 }
 

@@ -127,6 +127,8 @@ import {
   InvoiceListPage as MoneyInInvoiceListPage,
   InvoiceNewPage as MoneyInInvoiceNewPage,
   InvoiceReadyPage as MoneyInInvoiceReadyPage,
+  RecurringInvoiceListPage as MoneyInRecurringInvoiceListPage,
+  UpcomingInvoicesPage as MoneyInUpcomingInvoicesPage,
   ArCorrectionsWorkspacePage as MoneyInCorrectionsWorkspacePage,
   MoneyInOverviewPage,
   OutstandingPage as MoneyInOutstandingPage,
@@ -177,6 +179,7 @@ import {
   PayableCloseGatePage as MoneyOutPayableCloseGatePage,
   PayableCloseGateRunDetailPage as MoneyOutPayableCloseGateRunDetailPage,
 } from '@/modules/accounting/money-out'
+import { AccountingExpenseEntryPage } from '@/modules/accounting/expenses/AccountingExpenseEntryPage'
 
 /** Legacy demo vouchers → live journals (edit keeps id param). */
 function LegacyVoucherEditRedirect() {
@@ -229,6 +232,8 @@ export const accountingRouteChildren: RouteObject[] = [
   { path: 'accounting/money-in/invoices/:id', element: <MoneyInInvoiceDetailPage /> },
   { path: 'accounting/money-in/invoices/:id/edit', element: <MoneyInInvoiceEditPage /> },
   { path: 'accounting/money-in/invoice-ready', element: <MoneyInInvoiceReadyPage /> },
+  { path: 'accounting/money-in/recurring-invoices', element: <MoneyInRecurringInvoiceListPage /> },
+  { path: 'accounting/money-in/recurring-invoices/upcoming', element: <MoneyInUpcomingInvoicesPage /> },
   { path: 'accounting/money-in/receipts', element: <MoneyInReceiptListPage /> },
   { path: 'accounting/money-in/receipts/new', element: <MoneyInReceiptNewPage /> },
   { path: 'accounting/money-in/receipts/:id', element: <MoneyInReceiptDetailPage /> },
@@ -249,6 +254,7 @@ export const accountingRouteChildren: RouteObject[] = [
 
   /** Money Out — Phase 4A5+ AP frontend (API mode) */
   { path: 'accounting/money-out', element: <MoneyOutOverviewPage /> },
+  { path: 'accounting/expenses', element: <AccountingExpenseEntryPage /> },
   { path: 'accounting/money-out/vendor-invoices', element: <MoneyOutVendorInvoiceListPage /> },
   { path: 'accounting/money-out/vendor-invoices/new', element: <MoneyOutVendorInvoiceNewPage /> },
   { path: 'accounting/money-out/vendor-invoices/:id', element: <MoneyOutVendorInvoiceDetailPage /> },

@@ -132,7 +132,7 @@ export interface NormalizedSalesInvoiceBody {
   legalEntityId?: string
   branchId?: string | null
   customerId: string
-  sourceType: 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH'
+  sourceType: 'DIRECT' | 'SALES_ORDER' | 'OUTBOUND_DISPATCH' | 'PROFORMA_INVOICE'
   sourceDocumentId?: string | null
   invoiceDate: string
   postingDate: string
@@ -207,6 +207,13 @@ export const createSalesInvoiceSchema = salesInvoiceDraftFieldsSchema
       ctx.addIssue({
         code: 'custom',
         message: 'sourceDocumentId (outbound dispatch id) is required when sourceType is OUTBOUND_DISPATCH',
+        path: ['sourceDocumentId'],
+      })
+    }
+    if (body.sourceType === 'PROFORMA_INVOICE' && !body.sourceDocumentId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'sourceDocumentId (proforma invoice id) is required when sourceType is PROFORMA_INVOICE',
         path: ['sourceDocumentId'],
       })
     }

@@ -70,6 +70,7 @@ import { buildSalesOrderLinesFromQuotationDocument } from '../../utils/crmQuotat
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { useDocumentLocation } from '../../hooks/useDocumentLocation'
 import { locationDisplayLabel } from '../../utils/locationUtils'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import {
   SalesOrderCreateModeChooser,
   type SalesOrderCreateMode,
@@ -236,6 +237,9 @@ export function SalesOrderNewPage() {
   )
   const [deliveryLocation, setDeliveryLocation] = useState(opportunityPrefill?.deliveryLocation ?? '')
   const { locationId, setLocationId } = useDocumentLocation('sales', opportunityPrefill?.locationId)
+  const isServices = useTenantProfileStore((s) => s.isServices())
+  const showLocationSection = !isServices
+  const showFreight = !isServices
   const [internalRemarks, setInternalRemarks] = useState(opportunityPrefill?.internalRemarks ?? '')
   const [freightAmount, setFreightAmount] = useState(0)
   const [orderDiscountMode, setOrderDiscountMode] = useState<'flat' | 'percent'>('flat')
@@ -320,6 +324,7 @@ export function SalesOrderNewPage() {
   )
 
   const orderSummary = useMemo(() => {
+    const effectiveFreight = showFreight ? freightAmount : 0
     const totalQty = computedLines.reduce((s, l) => s + l.qty, 0)
     const basicAmount = round2(computedLines.reduce((s, l) => s + l.qty * l.unitPrice, 0))
     const subtotal = round2(computedLines.reduce((s, l) => s + l.taxableValue, 0))
@@ -333,8 +338,8 @@ export function SalesOrderNewPage() {
     const orderDiscountAmount =
       orderDiscountMode === 'percent'
         ? round2(discountBase * (Math.min(100, Math.max(0, orderDiscountInput)) / 100))
-        : round2(Math.min(Math.max(0, orderDiscountInput), discountBase + freightAmount))
-    const grandTotal = round2(subtotal + totalGst + freightAmount - orderDiscountAmount)
+        : round2(Math.min(Math.max(0, orderDiscountInput), discountBase + effectiveFreight))
+    const grandTotal = round2(subtotal + totalGst + effectiveFreight - orderDiscountAmount)
     return {
       totalQty,
       basicAmount,
@@ -344,8 +349,9 @@ export function SalesOrderNewPage() {
       totalGst,
       orderDiscountAmount,
       grandTotal,
+      freightAmount: effectiveFreight,
     }
-  }, [computedLines, freightAmount, orderDiscountInput, orderDiscountMode])
+  }, [computedLines, freightAmount, orderDiscountInput, orderDiscountMode, showFreight])
 
   function applyQuotation(docId: string) {
     if (!docId) return
@@ -581,7 +587,7 @@ export function SalesOrderNewPage() {
           quotationRevisionNo: linkedDoc?.revisionNo ?? linkedQuo?.revisionNo ?? null,
           quotationDocumentId: quotationDocumentId || null,
           customerPoDate: customerPoDate || undefined,
-          freightAmount,
+          freightAmount: showFreight ? freightAmount : 0,
           orderDiscountAmount: orderSummary.orderDiscountAmount,
           lines: lines.map((l) => ({
             itemId: l.itemId,
@@ -1014,19 +1020,21 @@ export function SalesOrderNewPage() {
         <div className="so-pricing-adjust">
           <p className="so-pricing-adjust__title">Order adjustments</p>
           <div className="so-pricing-charges">
-            <label className="so-pricing-charge">
-              <span className="so-pricing-charge__label">Freight</span>
-              <div className="so-pricing-charge__control">
-                <span className="so-pricing-charge__prefix" aria-hidden>₹</span>
-                <Input
-                  type="number"
-                  min={0}
-                  className="so-pricing-input so-pricing-input--num"
-                  value={freightAmount}
-                  onChange={(e) => setFreightAmount(Math.max(0, Number(e.target.value) || 0))}
-                />
-              </div>
-            </label>
+            {showFreight ? (
+              <label className="so-pricing-charge">
+                <span className="so-pricing-charge__label">Freight</span>
+                <div className="so-pricing-charge__control">
+                  <span className="so-pricing-charge__prefix" aria-hidden>₹</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    className="so-pricing-input so-pricing-input--num"
+                    value={freightAmount}
+                    onChange={(e) => setFreightAmount(Math.max(0, Number(e.target.value) || 0))}
+                  />
+                </div>
+              </label>
+            ) : null}
             <div className="so-pricing-charge">
               <div className="so-pricing-charge__label-row">
                 <span className="so-pricing-charge__label">Order discount</span>
@@ -1119,10 +1127,12 @@ export function SalesOrderNewPage() {
               <span>Total GST</span>
               <span className="tabular-nums">{formatCurrency(orderSummary.totalGst)}</span>
             </div>
-            <div className="so-pricing-summary__row">
-              <span>Freight</span>
-              <span className="tabular-nums">{formatCurrency(freightAmount)}</span>
-            </div>
+            {showFreight ? (
+              <div className="so-pricing-summary__row">
+                <span>Freight</span>
+                <span className="tabular-nums">{formatCurrency(orderSummary.freightAmount)}</span>
+              </div>
+            ) : null}
             <div className="so-pricing-summary__row">
               <span>
                 Order discount
@@ -1272,7 +1282,7 @@ export function SalesOrderNewPage() {
       </ErpFieldGroup>
 
       <ErpFieldGroup label="Customer purchase order" className="so-qe-po-group" columns={4}>
-        <ErpFieldRow label="Customer PO Number" required dataField="customerPoNumber" fieldError={validationErrors.customerPoNumber}>
+        <ErpFieldRow label="Customer PO Number" dataField="customerPoNumber" fieldError={validationErrors.customerPoNumber}>
           <Input
             value={customerPoNumber}
             onChange={(e) => setCustomerPoNumber(e.target.value)}
@@ -1324,7 +1334,7 @@ export function SalesOrderNewPage() {
     >
       <div className="so-commercial-body">
         <ErpFieldGroup label="Commercial terms" className="so-commercial-group" columns={3}>
-          <ErpFieldRow label="Payment Terms" required dataField="paymentTerms" fieldError={validationErrors.paymentTerms}>
+          <ErpFieldRow label="Payment Terms" dataField="paymentTerms" fieldError={validationErrors.paymentTerms}>
             <CommercialTermSelect
               termType="payment"
               value={paymentTerms}
@@ -1332,7 +1342,7 @@ export function SalesOrderNewPage() {
               placeholder="Select payment terms"
             />
           </ErpFieldRow>
-          <ErpFieldRow label="Delivery Terms" required dataField="deliveryTerms" fieldError={validationErrors.deliveryTerms}>
+          <ErpFieldRow label="Delivery Terms" dataField="deliveryTerms" fieldError={validationErrors.deliveryTerms}>
             <CommercialTermSelect
               termType="delivery"
               value={deliveryTerms}
@@ -1342,7 +1352,6 @@ export function SalesOrderNewPage() {
           </ErpFieldRow>
           <ErpFieldRow
             label="Delivery Time / Lead Time"
-            required
             dataField="deliveryTime"
             fieldError={validationErrors.deliveryTime}
             hint="Commitment shown on print and PDF"
@@ -1360,20 +1369,22 @@ export function SalesOrderNewPage() {
           </ErpFieldRow>
         </ErpFieldGroup>
 
-        <ErpFieldGroup label="Fulfilment" className="so-commercial-group" columns={2}>
-          <LocationFieldRow
-            value={locationId}
-            onChange={(locId) => {
-              setLocationId(locId)
-              const loc = locations.find((l) => l.id === locId)
-              if (loc) setDeliveryLocation(locationDisplayLabel(loc))
-            }}
-            usage="sales"
-            colSpan={2}
-            label="Fulfilment location"
-            hint="Where goods will ship from — inherited from Lead → Opportunity → Quotation when available"
-          />
-        </ErpFieldGroup>
+        {showLocationSection ? (
+          <ErpFieldGroup label="Fulfilment" className="so-commercial-group" columns={2}>
+            <LocationFieldRow
+              value={locationId}
+              onChange={(locId) => {
+                setLocationId(locId)
+                const loc = locations.find((l) => l.id === locId)
+                if (loc) setDeliveryLocation(locationDisplayLabel(loc))
+              }}
+              usage="sales"
+              colSpan={2}
+              label="Fulfilment location"
+              hint="Where goods will ship from — inherited from Lead → Opportunity → Quotation when available"
+            />
+          </ErpFieldGroup>
+        ) : null}
 
         <ErpFieldGroup label="Notes" className="so-commercial-group" columns={1}>
           {needsDirectReasonField ? (

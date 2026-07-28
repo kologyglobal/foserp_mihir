@@ -243,6 +243,7 @@ export const moduleCategories: NavCategory[] = [
       { label: 'Journals', path: '/accounting/entries/journals', icon: FileText },
       { label: 'Money In', path: '/accounting/money-in', icon: ArrowDownToLine },
       { label: 'Money Out', path: '/accounting/money-out', icon: ArrowUpFromLine },
+      { label: 'Expenses', path: '/accounting/expenses', icon: Wallet },
       { label: 'Bank & Cash', path: '/accounting/bank-cash', icon: Landmark },
       { label: 'Fixed Assets', path: '/accounting/fixed-assets', icon: Building2 },
       { label: 'Manufacturing Accounting', path: '/accounting/manufacturing', icon: Factory },
@@ -344,6 +345,7 @@ export function categoryIsActive(category: NavCategory, pathname: string): boole
 
 export function getNavCategoryById(id: string): NavCategory | undefined {
   if (id === platformNavCategory.id) return platformNavCategory
+  // Lazy import avoided — packaging applied at call sites via getPackagedModuleCategories when needed.
   return moduleCategories.find((c) => c.id === id)
 }
 

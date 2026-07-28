@@ -33,6 +33,21 @@ export const VF_WORD_PRINT_LAYOUT: QuotationPrintLayout = {
   printSkin: 'vf_word',
 }
 
+/** Kology SERVICES outbound pilot proposal — matches the standard printable proposal PDF. */
+export const KOLOGY_PROPOSAL_PRINT_LAYOUT: QuotationPrintLayout = {
+  pageSize: 'A4',
+  marginMm: 10,
+  fontScale: 1,
+  headerStyle: 'cover',
+  showLogo: false,
+  showCompanyHeader: false,
+  showCustomerBlock: false,
+  showPageFooter: false,
+  showSignatureBlock: false,
+  pageBreakBefore: [],
+  printSkin: 'kology_proposal',
+}
+
 export const PRINT_LAYOUT_SECTION_OPTIONS: { id: QuotationSectionType; label: string }[] = [
   { id: 'cover', label: 'Cover Page' },
   { id: 'customer_details', label: 'Customer Details' },
@@ -62,14 +77,25 @@ export function resolveQuotationPrintLayout(
     || template?.productFamily === 'ISO Dry Bulk'
     || template?.productFamily === 'Flour Bulker'
     || template?.productFamily === 'Tipper'
-  const fallback = isVfWordProduct ? VF_WORD_PRINT_LAYOUT : DEFAULT_QUOTATION_PRINT_LAYOUT
+  const isKologyProposal =
+    template?.productFamily === 'Outbound Services'
+    || template?.printLayout?.printSkin === 'kology_proposal'
+  const fallback = isVfWordProduct
+    ? VF_WORD_PRINT_LAYOUT
+    : isKologyProposal
+      ? KOLOGY_PROPOSAL_PRINT_LAYOUT
+      : DEFAULT_QUOTATION_PRINT_LAYOUT
   if (!template?.printLayout) return { ...fallback }
   return {
     ...fallback,
     ...template.printLayout,
     pageBreakBefore: template.printLayout.pageBreakBefore ?? fallback.pageBreakBefore,
     // VF Word product templates always render with the professional letter skin.
-    printSkin: isVfWordProduct ? 'vf_word' : (template.printLayout.printSkin ?? fallback.printSkin),
+    printSkin: isVfWordProduct
+      ? 'vf_word'
+      : isKologyProposal
+        ? 'kology_proposal'
+        : (template.printLayout.printSkin ?? fallback.printSkin),
   }
 }
 

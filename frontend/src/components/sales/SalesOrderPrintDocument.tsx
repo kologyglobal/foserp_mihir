@@ -1,4 +1,5 @@
-import { QUOTATION_COMPANY } from '../../utils/quotationEngine/companyProfile'
+import { useCompanyProfile } from '../../utils/quotationEngine/companyProfile'
+import { CompanyBankDetailsBlock } from '../print/CompanyBankDetailsBlock'
 import type { SalesOrder, SalesOrderLine } from '../../types/mrp'
 import type { Customer, Location, Product } from '../../types/master'
 import { formatCurrency, formatNumber } from '../../utils/formatters/currency'
@@ -9,6 +10,7 @@ import { amountInWords } from '../../utils/amountInWords'
 import { resolveSalesOrderDeliveryLocationLabel } from '../../utils/locationUtils'
 import { resolveSalesOrderValue } from './SalesOrder360Sections'
 import { cn } from '../../utils/cn'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 
 export type SalesOrderPrintLine = {
   lineNo: number
@@ -107,8 +109,10 @@ export function SalesOrderPrintDocument({
     order.shippingAddress?.trim() ||
     (customer ? resolveCustomerShippingAddress(customer) : billTo)
 
-  const company = QUOTATION_COMPANY
+  const company = useCompanyProfile()
+  const isServices = useTenantProfileStore((s) => s.isServices())
   const deliveryLocationLabel = resolveSalesOrderDeliveryLocationLabel(order, locations)
+  const bank = company.bankDetails
 
   return (
     <article className={cn('so-print-doc', className)}>
@@ -125,13 +129,12 @@ export function SalesOrderPrintDocument({
           </div>
           <div className="so-print-header__identity">
             <h1 className="so-print-header__company">{company.legalName}</h1>
-            <p className="so-print-header__tagline">{company.tagline}</p>
+            {company.tagline ? <p className="so-print-header__tagline">{company.tagline}</p> : null}
             <p className="so-print-header__address">{company.address}</p>
             <p className="so-print-header__contact">
-              {company.phone} · {company.email}
-              {company.website ? ` · ${company.website}` : ''}
+              {[company.phone, company.email, company.website].filter(Boolean).join(' · ')}
             </p>
-            <p className="so-print-header__gstin">GSTIN: {company.gstin}</p>
+            {company.gstin ? <p className="so-print-header__gstin">GSTIN: {company.gstin}</p> : null}
           </div>
         </div>
         <div className="so-print-header__badge">
@@ -163,31 +166,25 @@ export function SalesOrderPrintDocument({
           <p className="so-print-party__line">{billTo}</p>
           <p className="so-print-party__line">State: {customer?.state ?? '—'}</p>
         </section>
-        <section className="so-print-party">
-          <p className="so-print-party__label">Ship to</p>
-          <p className="so-print-party__name">{customer?.customerName ?? '—'}</p>
-          <p className="so-print-party__line">{shipTo}</p>
-          {deliveryLocationLabel ? (
-            <p className="so-print-party__line">Location: {deliveryLocationLabel}</p>
-          ) : null}
-        </section>
-        <section className="so-print-party so-print-party--meta">
-          <p className="so-print-party__label">Commercial</p>
-          <p className="so-print-party__line"><span>Payment</span> {order.paymentTerms || '—'}</p>
-          <p className="so-print-party__line"><span>Delivery terms</span> {order.deliveryTerms || '—'}</p>
-          <p className="so-print-party__line">
-            <span>Delivery Time / Lead Time</span> {order.deliveryTime || '—'}
-          </p>
-          <p className="so-print-party__line"><span>Customer PO</span> {order.customerPoNumber || '—'}</p>
-          <p className="so-print-party__line">
-            <span>PO date</span> {order.customerPoDate ? formatDate(order.customerPoDate) : '—'}
-          </p>
-          <p className="so-print-party__line">
-            <span>Quotation Number (Reference)</span>{' '}
-            {order.quotationNo ? `${order.quotationNo} Rev ${order.quotationRevisionNo ?? 1}` : '—'}
-          </p>
-          <p className="so-print-party__line"><span>Owner</span> {order.salesOwnerName || '—'}</p>
-        </section>
+        {isServices && bank ? (
+          <section className="so-print-party">
+            <p className="so-print-party__label">Bank details</p>
+            <p className="so-print-party__name">{bank.accountName || '—'}</p>
+            <p className="so-print-party__line"><span>Bank</span> {bank.bankName || '—'}</p>
+            <p className="so-print-party__line"><span>A/C No.</span> {bank.accountNumber || '—'}</p>
+            <p className="so-print-party__line"><span>IFSC</span> {bank.ifscCode || '—'}</p>
+            <p className="so-print-party__line"><span>Branch</span> {bank.branch || '—'}</p>
+          </section>
+        ) : (
+          <section className="so-print-party">
+            <p className="so-print-party__label">Ship to</p>
+            <p className="so-print-party__name">{customer?.customerName ?? '—'}</p>
+            <p className="so-print-party__line">{shipTo}</p>
+            {deliveryLocationLabel ? (
+              <p className="so-print-party__line">Location: {deliveryLocationLabel}</p>
+            ) : null}
+          </section>
+        )}
       </div>
 
       <table className="so-print-table">
@@ -256,6 +253,26 @@ export function SalesOrderPrintDocument({
           </div>
         </div>
       </div>
+
+      <section className="so-print-party so-print-party--meta so-print-commercial">
+        <p className="so-print-party__label">Commercial</p>
+        <p className="so-print-party__line"><span>Payment</span> {order.paymentTerms || '—'}</p>
+        <p className="so-print-party__line"><span>Delivery terms</span> {order.deliveryTerms || '—'}</p>
+        <p className="so-print-party__line">
+          <span>Delivery Time / Lead Time</span> {order.deliveryTime || '—'}
+        </p>
+        <p className="so-print-party__line"><span>Customer PO</span> {order.customerPoNumber || '—'}</p>
+        <p className="so-print-party__line">
+          <span>PO date</span> {order.customerPoDate ? formatDate(order.customerPoDate) : '—'}
+        </p>
+        <p className="so-print-party__line">
+          <span>Quotation Number (Reference)</span>{' '}
+          {order.quotationNo ? `${order.quotationNo} Rev ${order.quotationRevisionNo ?? 1}` : '—'}
+        </p>
+        <p className="so-print-party__line"><span>Owner</span> {order.salesOwnerName || '—'}</p>
+      </section>
+
+      {!isServices && bank ? <CompanyBankDetailsBlock bank={bank} /> : null}
 
       <div className="so-print-signatures">
         <div className="so-print-signatures__block">

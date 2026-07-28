@@ -38,6 +38,7 @@ import { formatDate } from '../../utils/dates/format'
 import { Button } from '../../components/ui/Button'
 import { CustomerTrailerQrPanel } from '../../components/qr/CustomerTrailerQrPanel'
 import { useQuickCreate } from '../../hooks/useQuickCreate'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { useCrmContactsForCustomer, useCustomerContacts } from '../../hooks/useStableStoreData'
 import { useCrmStore } from '../../store/crmStore'
 import { LogActivityDrawer, QuickFollowUpDrawer } from '../../components/crm'
@@ -116,6 +117,7 @@ export function Customer360Page() {
   const navigate = useNavigate()
   const data = useCustomer360(id)
   const companyCommercial = useCompanyCommercialPosition(id)
+  const isServices = useTenantProfileStore((s) => s.isServices())
   const fromSales = pathname.startsWith('/sales/customers')
   const fromCrm = pathname.startsWith('/entity360/customers')
   const hubPath = customer360HubPath(pathname)
@@ -505,7 +507,12 @@ export function Customer360Page() {
               id: 'create-invoice',
               label: 'Create Invoice',
               icon: Banknote,
-              onClick: () => navigate(`/sales/invoices/new?customerId=${customer.id}`),
+              onClick: () =>
+                navigate(
+                  isServices
+                    ? `/accounting/money-in/invoices/new?customerId=${customer.id}`
+                    : `/sales/invoices/new?customerId=${customer.id}`,
+                ),
             }]
           : []),
       ]}
@@ -538,7 +545,12 @@ export function Customer360Page() {
           id: 'alloc',
           label: 'Payment Allocation',
           icon: ArrowLeftRight,
-          onClick: () => navigate(`/sales/payment-allocation?customerId=${customer.id}`),
+          onClick: () =>
+            navigate(
+              isServices
+                ? `/accounting/money-in/customers/${customer.id}`
+                : `/sales/payment-allocation?customerId=${customer.id}`,
+            ),
         },
         {
           id: 'finance',
@@ -1100,7 +1112,13 @@ export function Customer360Page() {
               <ErpButton
                 variant="secondary"
                 icon={Plus}
-                onClick={() => navigate(`/sales/invoices/new?customerId=${customer.id}`)}
+                onClick={() =>
+                  navigate(
+                    isServices
+                      ? `/accounting/money-in/invoices/new?customerId=${customer.id}`
+                      : `/sales/invoices/new?customerId=${customer.id}`,
+                  )
+                }
               >
                 Create Invoice
               </ErpButton>
@@ -1200,7 +1218,13 @@ export function Customer360Page() {
             <ErpButton
               variant="secondary"
               icon={ArrowLeftRight}
-              onClick={() => navigate(`/sales/payment-allocation?customerId=${customer.id}`)}
+              onClick={() =>
+                navigate(
+                  isServices
+                    ? `/accounting/money-in/customers/${customer.id}`
+                    : `/sales/payment-allocation?customerId=${customer.id}`,
+                )
+              }
             >
               Open Allocation Workspace
             </ErpButton>

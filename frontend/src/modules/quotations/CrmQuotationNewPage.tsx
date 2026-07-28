@@ -55,6 +55,7 @@ import {
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { CommercialTermSelect } from '../../components/masters/GeographySelects'
 import { useDocumentLocation } from '../../hooks/useDocumentLocation'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
 import { crmChildBreadcrumbs } from '../../utils/crmNavigation'
 import { CrmTypedDocumentUpload } from '../../components/crm/CrmTypedDocumentUpload'
@@ -257,6 +258,7 @@ export function CrmQuotationNewPage() {
     ? (selectedOpp?.customerId ?? '')
     : customerId
   const { locationId, setLocationId } = useDocumentLocation('sales', selectedOpp?.locationId)
+  const showLocationField = !useTenantProfileStore((s) => s.isServices())
   const selectedCustomer = effectiveCustomerId
     ? customers.find((c) => c.id === effectiveCustomerId)
     : undefined
@@ -798,13 +800,15 @@ export function CrmQuotationNewPage() {
           />
         </ErpFieldRow>
 
-        <LocationFieldRow
-          value={locationId}
-          onChange={(locId) => setLocationId(locId)}
-          usage="sales"
-          colSpan={2}
-          label="Sales location"
-        />
+        {showLocationField ? (
+          <LocationFieldRow
+            value={locationId}
+            onChange={(locId) => setLocationId(locId)}
+            usage="sales"
+            colSpan={2}
+            label="Sales location"
+          />
+        ) : null}
 
         {(selectedOpp || selectedCustomer) ? (
           <div className="quote-create-context" role="status" aria-label="Selected record summary">

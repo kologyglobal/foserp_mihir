@@ -1,6 +1,7 @@
 import type { CrmPaymentAllocation, CrmPaymentReceipt } from '../types/crmCommercial'
 import { CRM_PAYMENT_MODE_LABELS } from '../types/crmCommercial'
-import { QUOTATION_COMPANY } from './quotationEngine/companyProfile'
+import { getActiveCompanyProfile } from './quotationEngine/companyProfile'
+import { useTenantProfileStore } from '../store/tenantProfileStore'
 import { amountInWords } from './amountInWords'
 import { formatCurrency } from './formatters/currency'
 import { formatDate } from './dates/format'
@@ -30,9 +31,9 @@ const RCPT_PRINT_CSS = `
   .pi-print-doc { position: relative; max-width: 210mm; margin: 0 auto; padding: 14mm 12mm; font-size: 11px; line-height: 1.45; overflow: hidden; }
   .pi-print-doc__accent { position: absolute; left: 0; right: 0; top: 0; height: 5px; background: linear-gradient(90deg, #0b3a66 0%, #1d6fb8 55%, #b45309 100%); }
   .pi-print-header { display: flex; justify-content: space-between; gap: 20px; padding-top: 10px; margin-bottom: 14px; border-bottom: 1px solid #dbe3ef; padding-bottom: 14px; }
-  .pi-print-header__brand { display: flex; gap: 12px; min-width: 0; flex: 1; }
-  .pi-print-header__logo-wrap { flex-shrink: 0; width: 56px; height: 56px; border-radius: 12px; border: 1px solid #dbe3ef; background: #fff; display: grid; place-items: center; overflow: hidden; }
-  .pi-print-header__logo { max-width: 46px; max-height: 46px; object-fit: contain; }
+  .pi-print-header__brand { display: flex; align-items: center; gap: 16px; min-width: 0; flex: 1; }
+  .pi-print-header__logo-wrap { flex-shrink: 0; width: 140px; height: 60px; display: flex; align-items: center; justify-content: flex-start; }
+  .pi-print-header__logo { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; object-position: left center; display: block; }
   .pi-print-header__company { margin: 0 0 2px; font-size: 15px; font-weight: 800; color: #0b3a66; }
   .pi-print-header__tagline { margin: 1px 0; font-size: 10px; font-weight: 600; color: #1d6fb8; }
   .pi-print-header__address, .pi-print-header__contact, .pi-print-header__gstin { margin: 1px 0; font-size: 10px; color: #4b5563; }
@@ -85,7 +86,8 @@ function buildReceiptPrintBodyHtml(
   allocations: CrmPaymentAllocation[] = [],
   customer?: PaymentReceiptPartyInfo | null,
 ): string {
-  const company = QUOTATION_COMPANY
+  const company = getActiveCompanyProfile()
+  const isServices = useTenantProfileStore.getState().isServices()
   const allocatedAmount = Math.max(0, receipt.amount - receipt.unallocatedAmount)
   const activeAllocations = allocations.filter((a) => !a.reversedAt)
 
@@ -123,10 +125,10 @@ function buildReceiptPrintBodyHtml(
           </div>
           <div>
             <h1 class="pi-print-header__company">${escapeHtml(company.legalName)}</h1>
-            <p class="pi-print-header__tagline">${escapeHtml(company.tagline)}</p>
-            <p class="pi-print-header__address">${escapeHtml(company.address)}</p>
-            <p class="pi-print-header__contact">${escapeHtml(company.phone)} · ${escapeHtml(company.email)}${company.website ? ` · ${escapeHtml(company.website)}` : ''}</p>
-            <p class="pi-print-header__gstin">GSTIN: ${escapeHtml(company.gstin)}</p>
+            ${company.tagline ? `<p class="pi-print-header__tagline">${escapeHtml(company.tagline)}</p>` : ''}
+            <p class="pi-print-header__address" style="white-space:pre-line">${escapeHtml(company.address)}</p>
+            <p class="pi-print-header__contact">${escapeHtml([company.phone, company.email, company.website].filter(Boolean).join(' · '))}</p>
+            ${company.gstin ? `<p class="pi-print-header__gstin">GSTIN: ${escapeHtml(company.gstin)}</p>` : ''}
           </div>
         </div>
         <div class="pi-print-header__badge">
@@ -195,7 +197,7 @@ function buildReceiptPrintBodyHtml(
 
       <footer class="pi-print-doc__footer">
         <span>${escapeHtml(company.legalName)}</span>
-        <span>Computer-generated payment receipt · Subject to Chhapi jurisdiction</span>
+        <span>Computer-generated payment receipt${!isServices ? ' · Subject to Chhapi jurisdiction' : ''}</span>
       </footer>
     </article>
   `
@@ -230,10 +232,11 @@ export async function downloadPaymentReceiptPdf(options: {
   const style = document.createElement('style')
   style.textContent = RCPT_PRINT_CSS
   host.appendChild(style)
+  const logoUrl = getActiveCompanyProfile().logoUrl
   const wrap = document.createElement('div')
   wrap.innerHTML = buildReceiptPrintBodyHtml(receipt, allocations, customer).replace(
-    `src="${QUOTATION_COMPANY.logoUrl}"`,
-    `src="${absoluteBrandAsset(QUOTATION_COMPANY.logoUrl)}"`,
+    `src="${logoUrl}"`,
+    `src="${absoluteBrandAsset(logoUrl)}"`,
   )
   host.appendChild(wrap)
   document.body.appendChild(host)

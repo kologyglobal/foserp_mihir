@@ -1,7 +1,8 @@
 # Project Status
 
-Last verified against codebase: **2026-07-27** (Money In/Out reverse + AP reversal history + Dispatch→SI POD gate; Fuel Tank / Inventory Costing / prior notes).
+Last verified against codebase: **2026-07-27** (Kology SERVICES packaging + Money In/Out reverse + Inventory Costing; Fuel Tank / prior notes).
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
+**Kology service packaging:** [`docs/kology/KOLOGY_REUSE_AUDIT.md`](kology/KOLOGY_REUSE_AUDIT.md) — reuse CRM/Sales/Accounting; no forks.
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
 Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocked
@@ -401,10 +402,10 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ⚠️ | **2026-07-27:** Money In (invoices, invoice-ready, receipts, credit notes, allocate, corrections/reversals) + Money Out (vendor invoices/payments/adjustments, allocate, corrections, reversal history) live in API mode. Journals + Approvals + Bank & Cash UAT. |
-| Backend | ⚠️ | Phase 1–5D + AR 3A–3C + AP 4A–4D + journal reverse + receipt/CN/allocation reverse + AP reversal history list + Dispatch→SI source links + POD gate on manual SI |
-| DB | ⚠️ | Setup + ledger + approval tables + manual journals on `AccountingVoucher`; GL via existing-voucher post path; `ReceivableOpenItem` DEBIT (invoice) / CREDIT (receipt/credit-note) rows on post; `CustomerCreditNoteAllocationBatch` / `CustomerCreditNoteAllocation` subledger tables (no GL) |
-| API | ⚠️ | Setup + journals (+ reverse) + AR invoice/receipt/credit-note post/allocate/reverse + AP vendor docs/payments/adjustments/allocations/reversals + `GET /accounting/payables/reversals` |
+| Frontend | ⚠️ | **2026-07-28:** Money In invoice create moved to a Zoho-style layout (dropped Customer PO/Payment Terms/Posting Date/Project fields/Round Off/Other Charges from the UI; added Currency dropdown + customer quick-create popup) and gained a **Recurring invoice** toggle → `/accounting/money-in/recurring-invoices` (schedules + cancel) and `/recurring-invoices/upcoming` (queue + Approve → creates a real SI draft). **2026-07-27:** Money In (invoices, invoice-ready, receipts, credit notes, allocate, corrections/reversals) + Money Out (vendor invoices/payments/adjustments, allocate, corrections, reversal history) live in API mode. Journals + Approvals + Bank & Cash UAT. |
+| Backend | ⚠️ | Phase 1–5D + AR 3A–3C + AP 4A–4D + journal reverse + receipt/CN/allocation reverse + AP reversal history list + Dispatch→SI source links + POD gate on manual SI + **recurring sales-invoice schedules** (`recurring-invoices/*`, migration `20260728060000`) |
+| DB | ⚠️ | Setup + ledger + approval tables + manual journals on `AccountingVoucher`; GL via existing-voucher post path; `ReceivableOpenItem` DEBIT (invoice) / CREDIT (receipt/credit-note) rows on post; `CustomerCreditNoteAllocationBatch` / `CustomerCreditNoteAllocation` subledger tables (no GL); `RecurringSalesInvoiceSchedule` / `RecurringSalesInvoiceExecution` (no GL until approved into a real `SalesInvoice`) |
+| API | ⚠️ | Setup + journals (+ reverse) + AR invoice/receipt/credit-note post/allocate/reverse + AP vendor docs/payments/adjustments/allocations/reversals + `GET /accounting/payables/reversals` + recurring schedules CRUD/upcoming/approve |
 | Tests | ⚠️ | finance suites + money-in/money-out FE scripts — see `TESTING_STATUS.md` |
 | Demo mode | ✅ | Settings + journals + approvals + demo journal posting; Money In/Out prefer API mode for full reverse flows |
 | API mode | ⚠️ | Full Money In/Out user flows + journal reverse + Dispatch invoice-ready → SI (POD when policy on) |

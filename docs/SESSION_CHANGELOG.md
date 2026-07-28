@@ -1,4 +1,128 @@
+## 2026-07-28 — Money In: Create Tax Invoice from Proforma (full detail carry-over)
+
+### Root cause
+- Sales → Proforma Invoices → ⋯ → **Create Tax Invoice** (and the detail page's "Create Invoice") already navigated services/Kology tenants to `/accounting/money-in/invoices/new?proformaId=…` (fixed in the 2026-07-27 403 session above), but `InvoiceFormPage` never read the `proformaId` query param — it always opened a blank Direct invoice. Non-services tenants had a working equivalent (`/sales/invoices/new?proformaId=…` → `CrmInvoiceCreatePage` → `resolveTaxInvoiceFromProforma`), but that path targets the CRM commercial `CrmTaxInvoice`, not the canonical AR `SalesInvoice`.
+
+### Shipped
+- **Backend — `PROFORMA_INVOICE` source type (AR):** `SalesInvoiceSourceType` enum gains `PROFORMA_INVOICE` (migration `20260728120000_sales_invoice_proforma_source`), alongside `DIRECT`/`SALES_ORDER`/`OUTBOUND_DISPATCH`. New `receivables/source/proforma-invoice-source.service.ts::loadProformaInvoiceSource` resolves + validates the source `CrmProformaInvoice` (must be `issued`, not `cancelled`/`draft`; customer must match `companyId`; warns if another sales invoice already references the same proforma) and snapshots it onto `SalesInvoice.sourceDocumentSnapshot`. Wired into `sales-invoice-draft.service.ts` (create + edit revalidation) and `sales-invoice-source-validation.service.ts` (treated like `DIRECT` — no dispatch/SO consumption links). New errors: `ProformaInvoiceNotFoundError` / `ProformaInvoiceNotEligibleError` / `ProformaInvoiceCustomerMismatchError`.
+- **Frontend — `InvoiceFormPage` proforma prefill:** on create with `?proformaId=`, reuses the existing `resolveTaxInvoiceFromProforma` (same helper the CRM commercial path already uses, backed by `useProformaInvoiceStore` which is hydrated from the API via `syncCommercialFromApi` in both demo and API mode) to prefill customer, customer PO number, narration (from proforma remarks), and all line items (item/description/qty/rate/HSN/UOM) with full quantities. Adds a `PROFORMA_INVOICE` source mode: hides the Direct/From-Sales-Order toggle, shows a "Sourced from proforma invoice PI-00001…" banner + readonly Proforma/Sales Order/Quotation reference fields, locks the customer picker, and submits `sourceType: 'PROFORMA_INVOICE'`, `sourceDocumentId: <proformaId>`, `referenceNumber: <proformaNo>` (surfaces on the invoice detail page's existing "Reference no." field) plus per-line `sourceLineId` back to the proforma line for traceability.
+- `invoiceVariant.ts` — `sourceTypeLabel`/`sourceDocumentRoute` gain a `PROFORMA_INVOICE` case ("Proforma Invoice" label, drill-down to `/sales/proforma-invoices/:id`).
+- Existing Proforma print/PDF, row actions (View, Receive Payment, Print/PDF), and the non-services `/sales/invoices/new?proformaId=` CRM commercial path are untouched.
+
+### Verify
+- Backend `npm run typecheck` and frontend `npm run typecheck` — clean.
+- `npx prisma migrate deploy` applied `20260728120000_sales_invoice_proforma_source` to local `fos_erp`; confirmed via `loadProformaInvoiceSource` direct call against the real Kology `PI-00001` (status `issued`, 1 line, "45 M3 Bulker Trailer") — resolves the full snapshot with no warnings.
+- Manual (pending live click-through): Kology tenant → Sales → Proforma Invoices → PI-00001 ⋯ → **Create Tax Invoice** → Money In new-invoice form opens pre-filled with Kology Ventures Pvt Ltd, the bulker trailer line, and a "Sourced from proforma invoice PI-00001" banner → Save Draft → Mark Ready → Post, unchanged lifecycle.
+
+---
+
+## 2026-07-28 — Money In: Recurring Invoices + Zoho-style create form
+
+### Shipped
+- **Recurring invoice schedules (AR):** `RecurringSalesInvoiceSchedule` / `RecurringSalesInvoiceExecution` Prisma models (migration `20260728060000_recurring_sales_invoice_schedule`) — a schedule freezes an invoice template (customer, tax treatment, currency, lines, freight/other charges) plus a frequency (`WEEKLY`/`MONTHLY`/`QUARTERLY`/`HALF_YEARLY`/`YEARLY`) and `nextInvoiceDate`; each due cycle is a separate `SCHEDULED` execution row — never posts a `SalesInvoice` automatically.
+- **Backend (pre-existing this session, verified + migrated):** `backend/src/modules/accounting/receivables/recurring-invoices/*` — service/repository/controller/routes under `POST/GET /accounting/t/:slug/receivables/recurring-schedules`, `GET .../upcoming`, `POST .../:id/cancel`, `POST .../:id/executions/:executionId/approve` (creates the real `SalesInvoice` draft via `createSalesInvoiceDraft`, advances the schedule, and self-schedules the next occurrence). Reuses `finance.ar.invoice.{view,create,cancel}` permissions — no new permission keys.
+- **New Money In UI:**
+  - `InvoiceFormPage` (`/accounting/money-in/invoices/new`) gains a **Recurring invoice** checkbox (Direct-invoice only). When on, the "Invoice Details" section becomes "Recurring Schedule" (Next invoice date / Frequency / optional End date) and Save creates a schedule instead of a draft invoice, landing on the new Recurring list.
+  - `/accounting/money-in/recurring-invoices` — schedule register (customer, frequency, next date, amount/cycle, status) with **Cancel** (reason prompt via `appPromptNote`).
+  - `/accounting/money-in/recurring-invoices/upcoming` — due-cycle queue with **Approve & Create Invoice**, which creates the Sales Invoice draft and redirects to it. New "Recurring" tab added to the Money In workspace tabs.
+- **Money In create form — Zoho-style cleanup:** removed Customer PO No., Payment Terms (read-only), Posting Date, Project Ref, Project Name, Round Off, and Other Charges from the visible create/edit form (posting date now silently trails invoice date; PO/project fields still flow through untouched for Sales-Order/Dispatch sourced invoices — they were already non-functional on Direct create since the backend schema never accepted `projectRef`/`projectNameSnapshot`). Added a **Currency** dropdown (INR/USD/EUR/GBP/AED) wired into `currencyCode` on both create and edit payloads, and a **"+ New"** quick-create button next to the Customer picker (reuses the existing `QuickCompanyCreateModal` used elsewhere in CRM). Freight-hidden-for-SERVICES (`isServices()`) was already correct and is unchanged.
+
+### Verify
+- `npx prisma migrate deploy` applied `20260728060000_recurring_sales_invoice_schedule` to local `fos_erp`; `npx prisma generate` regenerated the client.
+- Backend `npm run typecheck` — clean. Frontend `npx tsc --noEmit -p tsconfig.app.json` — clean.
+- Manual (API mode, pending live click-through): Money In → Invoices → New → check **Recurring invoice** → pick Monthly + a next date → Create Recurring Schedule → appears in `/accounting/money-in/recurring-invoices`; on/after the next date it appears in `/recurring-invoices/upcoming` → **Approve** creates a real Draft Sales Invoice and schedules the following month automatically.
+
+---
+
+## 2026-07-27 — Kology letterhead + bank details on Proforma / Sales Order / Tax Invoice prints
+
+### Shipped
+- **Data-driven company profile (never `tenantSlug` checks):** `LegalEntity` gains print/letterhead columns — `email`, `phone`, `website`, `bankAccountName`, `bankName`, `bankAccountNumber`, `bankIfscCode`, `bankBranch` (migration `20260727210000_legal_entity_print_profile`); validated in `legal-entity.validation.ts`.
+- `auth.service.ts::getCompanyProfile` resolves the tenant's default active Legal Entity into a `CompanyProfile` (legalName, formatted address, gstin, contact, bank) and returns it as `tenant.companyProfile` from `GET /auth/me`.
+- `tenantProfileStore.ts` hydrates `companyProfile` alongside `businessType`; `utils/quotationEngine/companyProfile.ts` now exposes `useCompanyProfile()` / `getActiveCompanyProfile()`, which prefer the live API profile and fall back to a businessType-keyed static profile (`VASANT_COMPANY_PROFILE` for MANUFACTURING, `KOLOGY_COMPANY_PROFILE` for SERVICES demo mode) — replaces the old hardcoded `QUOTATION_COMPANY` (kept as a deprecated alias for stragglers).
+- New shared `components/print/CompanyBankDetailsBlock.tsx` (+ `.doc-print-bank` CSS) renders Company Name / Bank Name / Account No / IFSC / Branch; wired into `ProformaInvoiceDocument`, `SalesOrderPrintDocument` (placed after Commercial, above Signatures), `SalesInvoicePrintPage` (Money In tax invoice, after Grand Total), and `QuotationPrintDocument`. Same treatment applied to the non-React PDF/print fallbacks in `proformaInvoiceExport.ts` / `paymentReceiptExport.ts`.
+- Manufacturing tenants (Vasant Fabricators) are unaffected — same letterhead, tagline, "Chhapi jurisdiction" footer copy, no bank block (no real bank on file). SERVICES tenants (Kology) get the new Ahmedabad address + IDFC FIRST Bank details and no manufacturing-specific copy (tagline/jurisdiction lines now render conditionally).
+- `scripts/seed-kology-organisation-setup.ts` updated with the real Kology letterhead address (Sharan Circle Business Hub, Chandkheda) and bank details; re-run against local DB.
+
+### Verify
+- Kology tenant → Proforma / Sales Order / Money In Tax Invoice print preview and PDF download all show **Kology Global Groupe Pvt. Ltd.**, Ahmedabad address, office@kology.co / www.kology.co, and a Bank Details block (IDFC FIRST Bank, A/c 51423051116, IFSC IDFB0040308, CHANDKHEDA).
+- A MANUFACTURING tenant's same three documents are pixel-identical to before (Vasant Fabricators letterhead, no bank block).
+- `npm run typecheck` clean on both `frontend` and `backend`; `npx prisma migrate deploy` applied cleanly to local `fos_erp` DB.
+
+---
+
+## 2026-07-27 — Kology Tenant Admin 403 on Sales (Create Invoice / Payment Allocation)
+
+### Root cause
+- **Not a permission bug.** `admin@kology.co` (role `Tenant Admin`) already had 965/965 non-platform permissions in the live DB, including `sales.view` — confirmed by direct query.
+- Real cause: `tenantProfileStore.ROUTE_MODULE_GATES` hard-blocks `/sales/invoices*` and `/sales/payment-allocation*` for SERVICES tenants (`isRouteAllowedByModules`) with **no admin/permission bypass at all** — it runs before `canRoute`'s `hasWorkspaceAdminRole()` check. This is correct by design (SERVICES tenants use the Accounting **Money In** AR flow, not the manufacturing-style CRM commercial tax invoice), and `SalesOrder360Page.tsx`'s "Create Invoice" already redirected to `/accounting/money-in/invoices/new` for `isServices` tenants — but that fix wasn't applied to the other entry points, so clicking "Create Invoice" / "Payment Allocation" from **Customer 360** or **Proforma Invoice** pages still linked to the blocked `/sales/invoices/new` / `/sales/payment-allocation` routes, producing the generic `PermissionDeniedPage` (whose "Required permission: sales.view" text is just `resolveRoutePermission`'s generic guess for any `/sales/*` path — misleading, unrelated to the actual block).
+
+### Shipped
+- `Customer360Page.tsx` — "Create Invoice" (header + Tax Invoices panel) and "Payment Allocation" / "Open Allocation Workspace" (header + Payment Allocations panel) now branch on `useTenantProfileStore().isServices()`, matching the `SalesOrder360Page.tsx` pattern: SERVICES → `/accounting/money-in/invoices/new` / `/accounting/money-in/customers/:id`; else unchanged `/sales/invoices/new` / `/sales/payment-allocation`.
+- `ProformaInvoicePages.tsx` — "Create Invoice" from the Proforma list and Proforma detail page now uses the same `isServices` branch to `/accounting/money-in/invoices/new?proformaId=…`.
+- Re-ran `prisma/seedKologyOnly.ts` against the local DB (idempotent) to reconfirm `Tenant Admin` / `Admin` roles carry the full `TENANT_ADMIN_PERMISSIONS` catalog — no drift found, no seed changes were needed.
+
+### Verify
+- `admin@kology.co` / `Admin@123` (tenant `kology`) → Sales → Company 360 → **Create Invoice** now opens `/accounting/money-in/invoices/new` (loads, no 403). Same page → **Payment Allocation** opens `/accounting/money-in/customers/:id`.
+- Sales → Proforma Invoices → a proforma's **Create Invoice** action opens `/accounting/money-in/invoices/new?proformaId=…`.
+- Directly visiting `/sales/invoices/new` or `/sales/payment-allocation` on a SERVICES tenant still shows Permission Denied — that block is intentional (routes only apply to MANUFACTURING/full-ERP tenants) and unaffected by role/permissions.
+- No re-login required — this was a routing bug, not a stale JWT/permission cache issue.
+
+---
+
+## 2026-07-27 — CRM: Leads auto-mirror into Opportunities (New/Qualified)
+
+### Root cause
+- `Opportunity` records were only ever created via the explicit "Convert" action. Newly created / qualified leads had no linked opportunity, so they never appeared in the Opportunities list/pipeline even though Leads already showed "New" and "Qualified" sections for them. Separately, tenants (e.g. `kology`) with no `CrmPipeline` row couldn't convert at all (`No default pipeline configured`).
+
+### Shipped
+- **Self-healing pipeline:** `pipeline.repository.ts::ensureDefaultPipeline` provisions the default 10-stage pipeline on the fly when a tenant has none; called from `convertLead` and `listPipelines` (`pipeline.service.ts` / `pipeline.controller.ts` now thread `userId` through).
+- **Lead → Opportunity mirror:** new `backend/src/modules/crm/leads/lead-opportunity-sync.ts`. Maps lead stage → pipeline stage slug (`new`/`contacted`/`requirement_collected` → `new_lead`, `qualified` → `qualified`); creates a mirrored `CrmOpportunity` (auto-creating a placeholder `CrmCompany` via `ensureLeadCompany` when the lead has none) or moves the existing mirror's stage. Wired into `lead.service.ts` (`createLead`, `qualifyLead`, `changeLeadStage`) as a best-effort side effect that never blocks the lead write. Not_qualified/closed/converted leads are left alone — the mirror only covers Leads' open "New"/"Qualified" sections.
+- **No duplicate opportunities:** `lead.repository.ts::convertLead` now reuses the already-mirrored opportunity (update in place) instead of always inserting a new row when the user later hits "Convert".
+- **Demo mode parity:** `crmStore.ts` gets `syncOpportunityFromLead` (mirrors the same New/Qualified mapping via `utils/leadOpportunitySync.ts`, without touching `lead.opportunityId`); called from `salesStore.ts` `createLead` / `advanceLeadStage`. `createOpportunity` (demo) also reuses an existing lead-linked opportunity instead of duplicating it when "Convert" is used from the UI.
+- API mode needs no extra frontend wiring — the Opportunities page already refetches from the server on load, which now includes the backend-mirrored rows.
+
+### Verify
+- Create a lead (API or demo mode) → open `/crm/opportunities` → appears under **New Lead**.
+- Qualify that lead → same opportunity moves to **Qualified** (no duplicate row).
+- Convert the qualified lead → still one opportunity, now fully converted/locked.
+
+---
+
+## 2026-07-27 — Kology legal entity / Money In org setup
+
+### Shipped
+- Script `backend/scripts/seed-kology-organisation-setup.ts` (TENANT_SLUG=kology): Legal Entity **Kology Global Groupe Pvt Ltd.** (`KGG-HO`), HO branch Ahmedabad, GST registration, FY 2026-27 + 12 open periods, SERVICE CoA, mandatory mappings, number series, finance activate.
+- `seedKology.ts` tenant `legalName` aligned to **Kology Global Groupe Pvt Ltd.**
+- Verified: `GET /t/kology/accounting/legal-entities` returns active default LE — Money In `ensureLegalEntity` toast resolved after refresh.
+
+### Note
+- Demo GSTIN `24AAACK1234A1Z5` — replace with real registration when available.
+
+---
+
+## 2026-07-27 — Kology SERVICES packaging (no product fork)
+
+### Shipped
+- **Audit:** `docs/kology/KOLOGY_REUSE_AUDIT.md` + flow/scope/permissions/UAT docs.
+- **Tenant packaging:** `Tenant.businessType` (`MANUFACTURING` \| `SERVICES`) + `displayTerminology`; migration `20260727193000_tenant_business_type_services`.
+- **Seed:** tenant `kology` via `prisma/seedKology.ts` / `seedKologyOnly.ts` — module flags ON crm/accounting/masters/reports; OFF purchase/inventory/manufacturing/quality/dispatch/logistics/gate; 12 service `MasterItem`s; admin/sales/accounts users.
+- **Nav/route gates:** `tenantProfileStore` + `tenantNavPackaging` + `canRoute` module checks; SERVICES hides CRM tax invoices / mfg accounting / IndiaMart; Sales nav points to Money In SI/receipts.
+- **SO 360:** hide production/dispatch panels when manufacturing/dispatch off; Create Invoice → Money In for SERVICES.
+- **AR:** amount-based SO over-invoicing guard (`sales-order-invoice-amount.guard.ts`).
+- **Expenses:** `/accounting/expenses` hub → Money Out EXPENSE vendor bill / payment (no shadow ledger).
+- **Login:** Kology branding; All-users quick-login panel removed.
+
+### Credentials (API mode)
+- `tenantSlug=kology` · `admin@kology.co` / `Admin@123`
+
+### Non-goals (unchanged)
+- No CRM/Sales/Accounting fork; manufacturing code retained for other tenants.
+
+---
+
 ## 2026-07-27 — Inventory valuation methods hardened (all 4)
+
 
 ### Fixes
 - **Moving average:** issues always use current avg rate (ignore caller rate).

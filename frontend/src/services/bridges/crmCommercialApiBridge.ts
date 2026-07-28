@@ -42,8 +42,10 @@ function upsertProforma(proforma: ProformaInvoice) {
 function mapProformaPayload(input: ProformaInvoiceInput & { salesOrderId?: string | null; salesOrderNo?: string | null; source?: string }) {
   return {
     companyId: input.customerId,
-    proformaDate: input.proformaDate,
-    validUntil: input.validUntil,
+    // Backend defaults proformaDate/validUntil server-side when omitted; an empty
+    // string fails the dateOnly regex validator, so normalize blank values away.
+    proformaDate: input.proformaDate || undefined,
+    validUntil: input.validUntil || undefined,
     source: input.source ?? (input.salesOrderId ? 'sales_order' : 'direct'),
     salesOrderId: input.salesOrderId ?? null,
     salesOrderNo: input.salesOrderNo ?? null,

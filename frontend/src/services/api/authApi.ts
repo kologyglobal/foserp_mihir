@@ -71,6 +71,13 @@ export async function fetchMe() {
     mobile?: string | null
     designation?: string | null
     department?: string | null
+    tenant?: {
+      id: string
+      name: string
+      slug: string
+      businessType?: 'MANUFACTURING' | 'SERVICES'
+      displayTerminology?: Record<string, string>
+    }
   }>('/auth/me')
 }
 

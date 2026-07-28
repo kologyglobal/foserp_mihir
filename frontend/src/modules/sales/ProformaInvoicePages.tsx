@@ -19,6 +19,7 @@ import { Toast } from '../../components/ui/Toast'
 import { salesCustomer360Path } from '../../config/entity360Routes'
 import { useProformaInvoiceStore } from '../../store/proformaInvoiceStore'
 import { useCrmCommercialStore } from '../../store/crmCommercialStore'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { useMasterStore } from '../../store/masterStore'
 import { useSavedViews } from '../../hooks/useSavedViews'
 import { useCrmFilterDrawer } from '../../hooks/useCrmFilterDrawer'
@@ -530,6 +531,7 @@ function ProformaInvoiceTable({
 
 export function ProformaInvoiceListPage() {
   const navigate = useNavigate()
+  const isServices = useTenantProfileStore((s) => s.isServices())
   const [searchParams, setSearchParams] = useSearchParams()
   const proformas = useProformaInvoiceStore((s) => s.proformaInvoices)
   const getCustomer = useMasterStore((s) => s.getCustomer)
@@ -861,7 +863,13 @@ export function ProformaInvoiceListPage() {
             }
             onRowView={(row) => navigate(`/sales/proforma-invoices/${row.id}`)}
             onRowPrint={(row) => navigate(`/sales/proforma-invoices/${row.id}/print`)}
-            onCreateInvoice={(row) => navigate(`/sales/invoices/new?proformaId=${row.id}`)}
+            onCreateInvoice={(row) =>
+              navigate(
+                isServices
+                  ? `/accounting/money-in/invoices/new?proformaId=${row.id}`
+                  : `/sales/invoices/new?proformaId=${row.id}`,
+              )
+            }
             onReceivePayment={(row) => navigate(`/sales/proforma-invoices/${row.id}/receive-payment`)}
             canCreateInvoice={canCreateInvoice}
             canReceivePayment={canReceivePayment}
@@ -893,6 +901,7 @@ export function ProformaInvoiceListPage() {
 export function ProformaInvoiceDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const isServices = useTenantProfileStore((s) => s.isServices())
   const proforma = useProformaInvoiceStore((s) => (id ? s.getProforma(id) : undefined))
   const issue = useProformaInvoiceStore((s) => s.issue)
   const cancel = useProformaInvoiceStore((s) => s.cancel)
@@ -969,7 +978,12 @@ export function ProformaInvoiceDetailPage() {
                     id: 'invoice',
                     label: 'Create Invoice',
                     icon: Receipt,
-                    onClick: () => navigate(`/sales/invoices/new?proformaId=${proforma.id}`),
+                    onClick: () =>
+                      navigate(
+                        isServices
+                          ? `/accounting/money-in/invoices/new?proformaId=${proforma.id}`
+                          : `/sales/invoices/new?proformaId=${proforma.id}`,
+                      ),
                   }]
                 : []),
               { id: 'print', label: 'Print', icon: Printer, onClick: () => navigate(`/sales/proforma-invoices/${proforma.id}/print`) },

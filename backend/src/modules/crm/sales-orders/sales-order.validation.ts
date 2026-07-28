@@ -61,11 +61,14 @@ export const createSalesOrderSchema = z
     qty: z.number().positive().optional(),
     unitPrice: z.number().nonnegative().optional(),
     discountPct: z.number().min(0).max(100).optional().nullable(),
-    customerPoNumber: z.string().trim().min(1),
+    // Customer PO number, payment/delivery terms, and delivery time are optional at
+    // create time — enforced later at SO confirmation (see sales-order.workflow.ts
+    // assertConfirmable). Empty strings are normalized to undefined below.
+    customerPoNumber: z.preprocess((v) => (v === '' ? undefined : v), z.string().trim().min(1).optional()),
     customerPoDate: optionalDate,
-    paymentTerms: z.string().trim().min(1),
-    deliveryTerms: z.string().trim().min(1),
-    deliveryTime: z.string().trim().min(1),
+    paymentTerms: z.preprocess((v) => (v === '' ? undefined : v), z.string().trim().min(1).optional()),
+    deliveryTerms: z.preprocess((v) => (v === '' ? undefined : v), z.string().trim().min(1).optional()),
+    deliveryTime: z.preprocess((v) => (v === '' ? undefined : v), z.string().trim().min(1).optional()),
     warrantyTerms: z.string().trim().optional().nullable(),
     commercialNotes: z.string().trim().optional().nullable(),
     technicalNotes: z.string().trim().optional().nullable(),

@@ -57,6 +57,7 @@ import { canCrmPermission } from '../../utils/permissions/crm'
 import { useProductMasterOptionMap } from '../../utils/opportunityProductOptions'
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { useDocumentLocation } from '../../hooks/useDocumentLocation'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
 import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
 import { crmChildBreadcrumbs } from '../../utils/crmNavigation'
@@ -169,6 +170,8 @@ export function OpportunityNewPage() {
   const [ownerId, setOwnerId] = useState(initialOwnerId)
   const [priority, setPriority] = useState<OpportunityPriority>(initialPriority)
   const { locationId, setLocationId } = useDocumentLocation('sales', lead?.locationId)
+  /** Location/branch is manufacturing-oriented; hide for SERVICES packaging (e.g. Kology). */
+  const showLocationSection = !useTenantProfileStore((s) => s.isServices())
 
   const attachmentScopeId = 'draft:new-opp'
   const setOpportunityAttachments = useOpportunityAttachmentStore((s) => s.setForOpportunity)
@@ -187,7 +190,6 @@ export function OpportunityNewPage() {
     {
       customerId: { required: true, message: 'Customer is required' },
       opportunityName: { required: true, message: 'Opportunity Name is required' },
-      expectedCloseDate: { required: true, message: 'Expected Close Date is required' },
       ownerId: { required: true, message: 'Owner is required' },
     },
   )
@@ -701,17 +703,11 @@ export function OpportunityNewPage() {
         </ErpFieldRow>
         <ErpFieldRow
           label="Expected Close Date"
-          required
           dataField="expectedCloseDate"
           fieldState={
-            inline.fieldError('expectedCloseDate') || validationErrors.some((e) => /close date/i.test(e))
-              ? 'error'
-              : inline.fieldState('expectedCloseDate')
+            validationErrors.some((e) => /close date/i.test(e)) ? 'error' : 'idle'
           }
-          fieldError={
-            inline.fieldError('expectedCloseDate')
-            ?? validationErrors.find((e) => /close date/i.test(e))
-          }
+          fieldError={validationErrors.find((e) => /close date/i.test(e))}
         >
           <Input
             type="date"
@@ -723,8 +719,6 @@ export function OpportunityNewPage() {
               inline.touch('expectedCloseDate')
             }}
             onBlur={() => inline.touch('expectedCloseDate')}
-            required
-            error={Boolean(inline.fieldError('expectedCloseDate'))}
             className="erp-input"
           />
         </ErpFieldRow>
@@ -736,18 +730,20 @@ export function OpportunityNewPage() {
       </ErpQuickEntrySection>
 
 
-      <ErpCardSection
-        id="opp-section-location"
-        title="Location"
-        subtitle="Sales branch / location for this opportunity."
-        icon={Building2}
-        accent="teal"
-        columns={3}
-        collapsible
-        defaultOpen
-      >
-        <LocationFieldRow value={locationId} onChange={(locId) => setLocationId(locId)} usage="sales" />
-      </ErpCardSection>
+      {showLocationSection ? (
+        <ErpCardSection
+          id="opp-section-location"
+          title="Location"
+          subtitle="Sales branch / location for this opportunity."
+          icon={Building2}
+          accent="teal"
+          columns={3}
+          collapsible
+          defaultOpen
+        >
+          <LocationFieldRow value={locationId} onChange={(locId) => setLocationId(locId)} usage="sales" />
+        </ErpCardSection>
+      ) : null}
 
       <ErpProductPricingSection
         sectionId="opp-section-products"
@@ -792,7 +788,7 @@ export function OpportunityNewPage() {
           value={formatCrmCurrency(dealValue)}
           hint="Synced from product lines (subtotal − discount + tax)."
         />
-        <ErpFieldRow label="Probability" required>
+        <ErpFieldRow label="Probability">
           <div className="dyn-probability-field">
             <div className="dyn-probability-field__track">
               <input

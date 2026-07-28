@@ -1,15 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { DocumentPrintShell } from '@/components/print/DocumentPrintShell'
+import { CompanyBankDetailsBlock } from '@/components/print/CompanyBankDetailsBlock'
 import { getSalesInvoice } from '@/services/bridges/receivablesApiBridge'
 import type { SalesInvoiceDto } from '@/types/moneyIn'
-import {
-  COMPANY_ADDRESS,
-  COMPANY_GSTIN,
-  COMPANY_NAME,
-  COMPANY_PAN,
-  COMPANY_STATE,
-} from '@/types/invoice'
+import { useCompanyProfile } from '@/utils/quotationEngine/companyProfile'
 import { formatCurrency } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { invoiceDisplayNumber, MONEY_IN_STATUS_LABELS, parseDecimal } from '../moneyInUi'
@@ -22,6 +17,7 @@ function gstRate(line: NonNullable<SalesInvoiceDto['lines']>[number]): number {
 export function SalesInvoicePrintPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const company = useCompanyProfile()
   const [invoice, setInvoice] = useState<SalesInvoiceDto | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -60,12 +56,24 @@ export function SalesInvoicePrintPage() {
     >
       <article className="po-print-doc">
         <header className="po-print-header">
-          <div>
-            <h1 className="po-print-header__company">{COMPANY_NAME}</h1>
-            <p className="po-print-header__address">{COMPANY_ADDRESS}</p>
-            <p className="po-print-header__gst">
-              GSTIN: {COMPANY_GSTIN} · PAN: {COMPANY_PAN} · {COMPANY_STATE}
-            </p>
+          <div className="po-print-header__brand">
+            {company.logoUrl ? (
+              <div className="po-print-header__logo-wrap">
+                <img className="po-print-header__logo" src={company.logoUrl} alt={company.brandName} />
+              </div>
+            ) : null}
+            <div>
+              <h1 className="po-print-header__company">{company.legalName}</h1>
+              <p className="po-print-header__address">{company.address}</p>
+              <p className="po-print-header__gst">
+                {[
+                  company.gstin ? `GSTIN: ${company.gstin}` : null,
+                  [company.phone, company.email, company.website].filter(Boolean).join(' · ') || null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            </div>
           </div>
           <div className="po-print-header__meta">
             <p className="po-print-title">TAX INVOICE</p>
@@ -142,6 +150,8 @@ export function SalesInvoicePrintPage() {
             Grand Total: {formatCurrency(parseDecimal(invoice.totalAmount))}
           </p>
         </div>
+
+        {company.bankDetails ? <CompanyBankDetailsBlock bank={company.bankDetails} /> : null}
 
         {invoice.narration ? (
           <section className="po-print-box mt-4">

@@ -120,66 +120,67 @@ export function VendorInvoiceListPage() {
           </ErpButton>
         ) : null
       }
-      commandBar={
-        <div className="flex flex-wrap items-center gap-2">
-          <Select
-            className="h-9 min-w-[160px] text-[12px]"
-            value={status}
-            onChange={(e) => {
-              const v = e.target.value as '' | VendorInvoiceStatus
-              setStatus(v)
-              setPage(1)
-              syncUrl({ status: v, page: 1 })
-            }}
-            aria-label="Filter by status"
-          >
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o.value || 'all'} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
-          <Input
-            className="h-9 min-w-[200px] text-[12px]"
-            placeholder="Search FOS / supplier / vendor"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                setPage(1)
-                syncUrl({ search, page: 1 })
-                void load()
-              }
-            }}
-            aria-label="Search vendor invoices"
-          />
-          <ErpButton
-            variant="secondary"
-            onClick={() => {
+    >
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-erp-border bg-erp-surface/40 px-3 py-2">
+        <Select
+          className="h-9 min-w-[160px] text-[12px]"
+          value={status}
+          onChange={(e) => {
+            const v = e.target.value as '' | VendorInvoiceStatus
+            setStatus(v)
+            setPage(1)
+            syncUrl({ status: v, page: 1 })
+          }}
+          aria-label="Filter by status"
+        >
+          {STATUS_OPTIONS.map((o) => (
+            <option key={o.value || 'all'} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
+        <Input
+          className="h-9 min-w-[200px] flex-1 max-w-xs text-[12px]"
+          placeholder="Search FOS / supplier / vendor"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
               setPage(1)
               syncUrl({ search, page: 1 })
               void load()
-            }}
-          >
-            Apply
-          </ErpButton>
-          <ErpButton
-            variant="ghost"
-            onClick={() => {
-              setStatus('')
-              setSearch('')
-              setPage(1)
-              setSearchParams({}, { replace: true })
-            }}
-          >
-            Clear
-          </ErpButton>
-          <ErpButton variant="secondary" icon={RefreshCw} onClick={() => void load()}>
-            Refresh
-          </ErpButton>
-        </div>
-      }
-    >
+            }
+          }}
+          aria-label="Search vendor invoices"
+        />
+        <ErpButton
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            setPage(1)
+            syncUrl({ search, page: 1 })
+            void load()
+          }}
+        >
+          Apply
+        </ErpButton>
+        <ErpButton
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setStatus('')
+            setSearch('')
+            setPage(1)
+            setSearchParams({}, { replace: true })
+          }}
+        >
+          Clear
+        </ErpButton>
+        <ErpButton variant="secondary" size="sm" icon={RefreshCw} onClick={() => void load()}>
+          Refresh
+        </ErpButton>
+        <span className="ml-auto whitespace-nowrap text-[11px] text-erp-muted">{total} invoices</span>
+      </div>
       {loading ? (
         <LoadingState variant="table" />
       ) : rows.length === 0 ? (
