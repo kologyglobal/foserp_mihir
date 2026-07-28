@@ -331,8 +331,7 @@ export function PurchaseRequisitionListPage() {
         navigate(`/purchase/planning-sheet?search=${q}`)
       },
       onPrint: (pr: PurchaseRequisitionListRow) => {
-        navigate(`/purchase/requisitions/${pr.id}?print=1`)
-        notify.info('Open print dialog from the requisition detail (Ctrl+P)')
+        navigate(`/purchase/requisitions/${pr.id}/print`)
       },
       onCancel: (pr: PurchaseRequisitionListRow) =>
         void runAction(

@@ -1,28 +1,24 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, Printer } from 'lucide-react'
-import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { DocumentPrintShell } from '@/components/print/DocumentPrintShell'
+import { PurchaseDocumentLetterhead } from '@/components/purchase/PurchaseDocumentLetterhead'
 import {
   getPurchaseReturnById,
   PURCHASE_RETURN_ORIGIN_LABELS,
   PURCHASE_RETURN_REASON_LABELS,
 } from '@/services/purchase'
 import type { PurchaseReturn } from '@/types/purchaseDomain'
-import {
-  COMPANY_ADDRESS,
-  COMPANY_GSTIN,
-  COMPANY_NAME,
-  COMPANY_PAN,
-  COMPANY_STATE,
-} from '@/types/invoice'
 import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { formatStatus } from '@/components/ui/Badge'
 import { notify } from '@/store/toastStore'
+import { handlePurchasePdfDownload } from '@/utils/purchaseDocumentPdfExport'
+import { QUOTATION_COMPANY } from '@/utils/quotationEngine/companyProfile'
 
 export function PurchaseReturnPrintPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [doc, setDoc] = useState<PurchaseReturn | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -46,63 +42,47 @@ export function PurchaseReturnPrintPage() {
     }
   }, [id, navigate])
 
+  useEffect(() => {
+    if (!doc) return
+    if (searchParams.get('download') !== '1' && searchParams.get('autodownload') !== '1') return
+    const timer = window.setTimeout(() => {
+      void handlePurchasePdfDownload(`${doc.documentNumber}.pdf`)
+    }, 450)
+    return () => window.clearTimeout(timer)
+  }, [doc, searchParams])
+
   if (loading || !doc) {
     return <div className="erp-page p-12 text-center text-erp-muted">Loading return challan…</div>
   }
 
   return (
-    <div className="po-print-page erp-page">
-      <div className="po-print-toolbar no-print">
-        <div>
-          <p className="po-print-toolbar__title">{doc.documentNumber}</p>
-          <p className="po-print-toolbar__subtitle">Purchase return challan print preview</p>
-        </div>
-        <ErpButtonGroup>
-          <ErpButton type="button" variant="secondary" icon={Printer} onClick={() => window.print()}>
-            Print
-          </ErpButton>
-          <ErpButton type="button" variant="secondary" icon={Download} onClick={() => window.print()}>
-            Download PDF
-          </ErpButton>
-          <Link to={`/purchase/returns/${doc.id}`}>
-            <ErpButton type="button" variant="ghost" icon={ArrowLeft}>
-              Back to Return
-            </ErpButton>
-          </Link>
-        </ErpButtonGroup>
-      </div>
-
+    <DocumentPrintShell
+      title={doc.documentNumber}
+      subtitle="Purchase return challan — Vasant Fabricators letterhead"
+      backLabel="Back to Return"
+      backTo={`/purchase/returns/${doc.id}`}
+      pdfFileName={`${doc.documentNumber}.pdf`}
+    >
       <article className="po-print-doc">
-        <header className="po-print-header">
-          <div>
-            <h1 className="po-print-header__company">{COMPANY_NAME}</h1>
-            <p className="po-print-header__address">{COMPANY_ADDRESS}</p>
-            <p className="po-print-header__gst">
-              GSTIN: {COMPANY_GSTIN} · PAN: {COMPANY_PAN} · {COMPANY_STATE}
-            </p>
-          </div>
-          <div className="po-print-header__meta">
-            <h2>PURCHASE RETURN CHALLAN</h2>
-            <p>
-              <strong>{doc.documentNumber}</strong>
-            </p>
-            <p>Date: {formatDate(doc.documentDate)}</p>
-            <p>Status: {formatStatus(doc.status)}</p>
-          </div>
-        </header>
+        <PurchaseDocumentLetterhead
+          docType="Purchase Return Challan"
+          docNumber={doc.documentNumber}
+          meta={[
+            { label: 'Date', value: formatDate(doc.documentDate) },
+            { label: 'Status', value: formatStatus(doc.status) },
+            { label: 'Origin', value: PURCHASE_RETURN_ORIGIN_LABELS[doc.origin] },
+          ]}
+        />
 
-        <section className="po-print-parties">
-          <div>
-            <h3>Vendor</h3>
-            <p>
-              <strong>{doc.vendor.name}</strong>
-            </p>
+        <div className="po-print-grid">
+          <section className="po-print-box">
+            <p className="po-print-box__label">Vendor</p>
+            <p className="po-print-box__name">{doc.vendor.name}</p>
             <p>GSTIN: {doc.vendor.gstin}</p>
             <p>Code: {doc.vendor.code}</p>
-          </div>
-          <div>
-            <h3>Return details</h3>
-            <p>Origin: {PURCHASE_RETURN_ORIGIN_LABELS[doc.origin]}</p>
+          </section>
+          <section className="po-print-box">
+            <p className="po-print-box__label">Return details</p>
             <p>Reason: {PURCHASE_RETURN_REASON_LABELS[doc.returnReason]}</p>
             <p>Warehouse: {doc.warehouseName}</p>
             <p>Transport: {doc.transportDetails || '—'}</p>
@@ -113,8 +93,8 @@ export function PurchaseReturnPrintPage() {
             {doc.linkedReplacementPoNumber ? (
               <p>Replacement PO: {doc.linkedReplacementPoNumber}</p>
             ) : null}
-          </div>
-        </section>
+          </section>
+        </div>
 
         <table className="po-print-lines">
           <thead>
@@ -154,7 +134,7 @@ export function PurchaseReturnPrintPage() {
           </tbody>
         </table>
 
-        <footer className="po-print-totals">
+        <div className="po-print-totals">
           <p>
             Taxable: {formatCurrency(doc.taxableAmount)} · CGST: {formatCurrency(doc.cgst)} · SGST:{' '}
             {formatCurrency(doc.sgst)} · IGST: {formatCurrency(doc.igst)}
@@ -163,8 +143,14 @@ export function PurchaseReturnPrintPage() {
             <strong>Grand Total: {formatCurrency(doc.totalAmount)}</strong>
           </p>
           {doc.remarks ? <p>Remarks: {doc.remarks}</p> : null}
-        </footer>
+        </div>
+
+        <div className="po-print-signatures">
+          <div className="po-print-signatures__line">Prepared by</div>
+          <div className="po-print-signatures__line">Stores / Warehouse</div>
+          <div className="po-print-signatures__line">For {QUOTATION_COMPANY.legalName}</div>
+        </div>
       </article>
-    </div>
+    </DocumentPrintShell>
   )
 }

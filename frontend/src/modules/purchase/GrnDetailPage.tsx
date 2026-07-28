@@ -8,6 +8,7 @@ import {
   Printer,
   RotateCcw,
   Send,
+  Download,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
 import {
@@ -42,7 +43,7 @@ export function GrnDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const perms = usePurchasePermissions()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const [grn, setGrn] = useState<GoodsReceiptNote | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -71,12 +72,10 @@ export function GrnDetailPage() {
 
   useEffect(() => {
     if (!grn) return
-    if (searchParams.get('print') === '1' || window.location.pathname.endsWith('/print')) {
-      window.print()
-      searchParams.delete('print')
-      setSearchParams(searchParams, { replace: true })
+    if (searchParams.get('print') === '1') {
+      navigate(`/purchase/grn/${grn.id}/print`, { replace: true })
     }
-  }, [grn, searchParams, setSearchParams])
+  }, [grn, navigate, searchParams])
 
   const run = async (work: () => Promise<GoodsReceiptNote>, success: string) => {
     setBusy(true)
@@ -261,6 +260,12 @@ export function GrnDetailPage() {
               icon: Printer,
               pin: true,
               onClick: () => navigate(`/purchase/grn/${grn.id}/print`),
+            },
+            {
+              id: 'download',
+              label: 'Download PDF',
+              icon: Download,
+              onClick: () => navigate(`/purchase/grn/${grn.id}/print?download=1`),
             },
             {
               id: 'return',

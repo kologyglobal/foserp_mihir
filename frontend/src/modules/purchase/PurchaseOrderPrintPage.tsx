@@ -1,24 +1,20 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, Printer } from 'lucide-react'
-import { ErpButton, ErpButtonGroup } from '@/components/erp/ErpButton'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { DocumentPrintShell } from '@/components/print/DocumentPrintShell'
+import { PurchaseDocumentLetterhead } from '@/components/purchase/PurchaseDocumentLetterhead'
 import { getPurchaseOrderById } from '@/services/purchase'
 import type { PurchaseOrder } from '@/types/purchaseDomain'
-import {
-  COMPANY_ADDRESS,
-  COMPANY_GSTIN,
-  COMPANY_NAME,
-  COMPANY_PAN,
-  COMPANY_STATE,
-} from '@/types/invoice'
 import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
 import { formatStatus } from '@/components/ui/Badge'
 import { notify } from '@/store/toastStore'
+import { handlePurchasePdfDownload } from '@/utils/purchaseDocumentPdfExport'
+import { QUOTATION_COMPANY } from '@/utils/quotationEngine/companyProfile'
 
 export function PurchaseOrderPrintPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [po, setPo] = useState<PurchaseOrder | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -42,51 +38,42 @@ export function PurchaseOrderPrintPage() {
     }
   }, [id, navigate])
 
+  useEffect(() => {
+    if (!po) return
+    if (searchParams.get('download') !== '1' && searchParams.get('autodownload') !== '1') return
+    const timer = window.setTimeout(() => {
+      void handlePurchasePdfDownload(`${po.documentNumber}.pdf`)
+    }, 450)
+    return () => window.clearTimeout(timer)
+  }, [po, searchParams])
+
   if (loading || !po) {
     return <div className="erp-page p-12 text-center text-erp-muted">Loading purchase order…</div>
   }
 
-  return (
-    <div className="po-print-page erp-page">
-      <div className="po-print-toolbar no-print">
-        <div>
-          <p className="po-print-toolbar__title">{po.documentNumber}</p>
-          <p className="po-print-toolbar__subtitle">Purchase order print preview</p>
-        </div>
-        <ErpButtonGroup>
-          <ErpButton type="button" variant="secondary" icon={Printer} onClick={() => window.print()}>
-            Print
-          </ErpButton>
-          <ErpButton type="button" variant="secondary" icon={Download} onClick={() => window.print()}>
-            Download PDF
-          </ErpButton>
-          <Link to={`/purchase/orders/${po.id}`}>
-            <ErpButton type="button" variant="ghost" icon={ArrowLeft}>
-              Back to PO
-            </ErpButton>
-          </Link>
-        </ErpButtonGroup>
-      </div>
+  const showVendorUom = po.lines.some(
+    (l) => Number(l.uomConversionFactor ?? 1) > 1 && Number(l.uomQuantity ?? 0) > 0,
+  )
 
+  return (
+    <DocumentPrintShell
+      title={po.documentNumber}
+      subtitle="Purchase order — Vasant Fabricators letterhead"
+      backLabel="Back to PO"
+      backTo={`/purchase/orders/${po.id}`}
+      pdfFileName={`${po.documentNumber}.pdf`}
+    >
       <article className="po-print-doc">
-        <header className="po-print-header">
-          <div>
-            <h1 className="po-print-header__company">{COMPANY_NAME}</h1>
-            <p className="po-print-header__address">{COMPANY_ADDRESS}</p>
-            <p className="po-print-header__gst">
-              GSTIN: {COMPANY_GSTIN} · PAN: {COMPANY_PAN} · {COMPANY_STATE}
-            </p>
-          </div>
-          <div className="po-print-header__meta">
-            <p className="po-print-title">PURCHASE ORDER</p>
-            <p>
-              <strong>{po.documentNumber}</strong> · Rev {po.revisionNo}
-            </p>
-            <p>Date: {formatDate(po.documentDate)}</p>
-            <p>Expected: {formatDate(po.expectedDeliveryDate)}</p>
-            <p>Status: {formatStatus(po.status)}</p>
-          </div>
-        </header>
+        <PurchaseDocumentLetterhead
+          docType="Purchase Order"
+          docNumber={po.documentNumber}
+          meta={[
+            { label: 'Date', value: formatDate(po.documentDate) },
+            { label: 'Expected', value: formatDate(po.expectedDeliveryDate) },
+            { label: 'Rev', value: String(po.revisionNo) },
+            { label: 'Status', value: formatStatus(po.status) },
+          ]}
+        />
 
         <div className="po-print-grid">
           <section className="po-print-box">
@@ -117,6 +104,7 @@ export function PurchaseOrderPrintPage() {
               <th>Item</th>
               <th>Description</th>
               <th>HSN</th>
+              {showVendorUom ? <th className="num">Vendor qty</th> : null}
               <th className="num">Qty</th>
               <th>UOM</th>
               <th className="num">Rate</th>
@@ -133,6 +121,9 @@ export function PurchaseOrderPrintPage() {
                 <td className="mono">{l.itemCode}</td>
                 <td>{l.itemName}</td>
                 <td>{l.hsnCode || l.sacCode || '—'}</td>
+                {showVendorUom ? (
+                  <td className="num">{formatNumber(l.uomQuantity ?? l.quantity)}</td>
+                ) : null}
                 <td className="num">{formatNumber(l.quantity)}</td>
                 <td>{l.uom}</td>
                 <td className="num">{formatCurrency(l.rate)}</td>
@@ -156,7 +147,9 @@ export function PurchaseOrderPrintPage() {
           </div>
           <div className="po-print-summary__row">
             <span>Freight / Packing / Insurance / Other</span>
-            <span>{formatCurrency(po.freight + po.packingCharges + po.insuranceCharges + po.otherCharges)}</span>
+            <span>
+              {formatCurrency(po.freight + po.packingCharges + po.insuranceCharges + po.otherCharges)}
+            </span>
           </div>
           <div className="po-print-summary__row">
             <span>Taxable Amount</span>
@@ -199,9 +192,11 @@ export function PurchaseOrderPrintPage() {
         <div className="po-print-signatures">
           <div className="po-print-signatures__line">Prepared by ({po.buyer.name})</div>
           <div className="po-print-signatures__line">Approved by ({po.approver?.name ?? '—'})</div>
-          <div className="po-print-signatures__line">Vendor acknowledgement</div>
+          <div className="po-print-signatures__line">
+            For {QUOTATION_COMPANY.legalName} / Vendor acknowledgement
+          </div>
         </div>
       </article>
-    </div>
+    </DocumentPrintShell>
   )
 }

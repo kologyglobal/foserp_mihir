@@ -172,32 +172,6 @@ export function PurchaseOrderDetailPage() {
     }
   }
 
-  const downloadStub = () => {
-    if (!po) return
-    const blob = new Blob(
-      [
-        [
-          `PURCHASE ORDER ${po.documentNumber}`,
-          `Vendor: ${po.vendor.name} (${po.vendor.gstin})`,
-          `Date: ${po.documentDate} · Expected: ${po.expectedDeliveryDate}`,
-          '',
-          ...po.lines.map(
-            (l) => `${l.lineNo}. ${l.itemCode} ${l.itemName} qty ${l.quantity} ${l.uom} @ ${l.rate} = ${l.lineTotal}`,
-          ),
-          '',
-          `Grand Total: ${formatCurrency(po.totalAmount)}`,
-        ].join('\n'),
-      ],
-      { type: 'text/plain' },
-    )
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${po.documentNumber}.txt`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   const changeHistoryPeek = useMemo(() => {
     if (!po) return ''
     return po.changeHistory.length > 0
@@ -502,7 +476,12 @@ export function PurchaseOrderDetailPage() {
                 pin: true,
                 onClick: () => navigate(`/purchase/orders/${po.id}/print`),
               },
-              { id: 'download', label: 'Download PDF', icon: Download, onClick: downloadStub },
+              {
+                id: 'download',
+                label: 'Download PDF',
+                icon: Download,
+                onClick: () => navigate(`/purchase/orders/${po.id}/print?download=1`),
+              },
             ]}
             destructiveActions={[
               {

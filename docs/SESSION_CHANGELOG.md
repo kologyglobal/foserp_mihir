@@ -1,4 +1,14 @@
-## 2026-07-27 — Purchase multi-unit UOM conversion (vendor → primary)
+## 2026-07-28 — Purchase print/PDF: Vasant Fabricators letterhead
+
+### Shipped
+
+- **Shared:** `PurchaseDocumentLetterhead` (`QUOTATION_COMPANY` + `/brand/vasant-fabricators-logo.png`) and `purchaseDocumentPdfExport` (Print + real jsPDF via `.po-print-doc`).
+- **Print routes:** PO (upgraded), RFQ, GRN, PR, Purchase Invoice, Purchase Return — all use Fabricators letterhead; `?download=1` auto-PDF.
+- **Actions:** Detail/list Print + Download PDF navigate to `/print` (or `/print?download=1`); GRN no longer aliases print to the detail page.
+
+---
+
+
 
 ### Shipped
 
