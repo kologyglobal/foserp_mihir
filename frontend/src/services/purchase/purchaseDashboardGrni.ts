@@ -31,7 +31,7 @@ export function buildPurchaseDashboardGrniRows(
 
   const invoicedByGrnLine = new Map<string, number>()
   for (const inv of invoices) {
-    if (inv.status === 'draft' || inv.status === 'cancelled' || inv.status === 'rejected') continue
+    if (inv.status === 'draft' || inv.status === 'cancelled') continue
     for (const line of inv.lines) {
       if (!line.goodsReceiptLineId) continue
       invoicedByGrnLine.set(
