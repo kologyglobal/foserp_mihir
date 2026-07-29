@@ -347,9 +347,9 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex h-dvh min-h-0 bg-white">
       {/* Left — Vasant brand panel */}
-      <aside className="login-brand-panel relative hidden w-[48%] overflow-hidden px-12 py-10 text-white lg:grid xl:px-16">
+      <aside className="login-brand-panel relative hidden h-full w-[48%] shrink-0 overflow-hidden px-12 py-10 text-white lg:grid xl:px-16">
         <div className="login-brand-panel__glow login-brand-panel__glow--top" aria-hidden />
         <div className="login-brand-panel__glow login-brand-panel__glow--bottom" aria-hidden />
         <div className="login-brand-panel__grid" aria-hidden />
@@ -416,10 +416,10 @@ export function LoginPage() {
         </footer>
       </aside>
 
-      {/* Right — sign-in panel */}
-      <main className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-12 lg:px-16 xl:px-20">
-        <div className={`mx-auto w-full ${view === 'signin' ? 'max-w-[920px]' : 'max-w-[420px]'}`}>
-          <div className="mb-8 lg:hidden">
+      {/* Right — sign-in panel (scrollable; my-auto centers when short, top-aligns when tall) */}
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-6 sm:px-12 sm:py-8 lg:px-16 xl:px-20">
+        <div className={`mx-auto my-auto w-full ${view === 'signin' ? 'max-w-[920px]' : 'max-w-[420px]'}`}>
+          <div className="mb-6 lg:hidden">
             <img
               src={VASANT_LOGO}
               alt="Vasant Fabricators Pvt. Ltd."
@@ -427,7 +427,7 @@ export function LoginPage() {
             />
           </div>
 
-          <div className="mb-8">
+          <div className="mb-6">
             <h2 className="text-2xl font-semibold tracking-tight text-erp-text">
               {view === 'signin' && 'Welcome back'}
               {view === 'forgot' && 'Reset your password'}
@@ -526,8 +526,8 @@ export function LoginPage() {
                 </button>
               </form>
 
-              <aside className="rounded-xl border border-erp-border bg-erp-bg-subtle p-4">
-                <div className="mb-3 flex items-start justify-between gap-2">
+              <aside className="flex max-h-[min(70dvh,560px)] flex-col overflow-hidden rounded-xl border border-erp-border bg-erp-bg-subtle p-4">
+                <div className="mb-3 flex shrink-0 items-start justify-between gap-2">
                   <div>
                     <p className="flex items-center gap-1.5 text-sm font-semibold text-erp-text">
                       <Users className="h-4 w-4 text-erp-primary" />
@@ -544,12 +544,12 @@ export function LoginPage() {
                 </div>
 
                 {directoryError && (
-                  <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
+                  <p className="mb-2 shrink-0 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
                     Live directory unavailable — showing seeded users.
                   </p>
                 )}
 
-                <ul className="grid gap-2 sm:grid-cols-1 xl:grid-cols-1">
+                <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5">
                   {directoryUsers.map((user) => {
                     const selected = email.toLowerCase() === user.email.toLowerCase()
                     const seedPassword = SEED_PASSWORDS[user.email.toLowerCase()]

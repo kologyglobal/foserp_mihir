@@ -72,7 +72,8 @@ export function ErpCardFormPage({
   const mergeHeader = isEnterprise && Boolean(workspaceHeaderSetters)
   const factBoxPaneKey = factBoxStorageKey ?? (collapsibleFactBox ? `erp-factbox:${pathname}` : undefined)
   const [internalFactBoxOpen, setInternalFactBoxOpenState] = useState(() => {
-    if (!collapsibleFactBox || !factBoxPaneKey) return true
+    if (!collapsibleFactBox) return true
+    if (!factBoxPaneKey) return false
     return getFactBoxInitialOpen(factBoxPaneKey)
   })
 

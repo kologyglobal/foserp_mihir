@@ -63,7 +63,7 @@ export function AccountLedgerPage() {
   const [audit, setAudit] = useState<LedgerEntryAuditEvent[]>([])
   const [auditOpen, setAuditOpen] = useState(false)
   const [refresh, setRefresh] = useState(0)
-  const [factBoxOpen, setFactBoxOpen] = useState(!isMobile)
+  const [factBoxOpen, setFactBoxOpen] = useState(false)
   const pageSize = 25
 
   useEffect(() => {
