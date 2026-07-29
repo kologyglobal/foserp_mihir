@@ -538,7 +538,7 @@ export function PurchaseOrderDetailPage() {
             label="Status"
             value={<StatusDot label={statusLabel} tone={statusToneFromLabel(po.status)} />}
           />
-          <ErpViewField label="Revision" value={`Rev ${po.revisionNo}`} />
+          <ErpViewField label="Revised version" value={String(po.revisionNo)} />
           <ErpViewField label="Currency" value={po.currency} />
           <ErpViewField label="Vendor" value={`${po.vendor.code} — ${po.vendor.name}`} />
           <ErpViewField label="Vendor GST Number" value={po.vendor.gstin} />

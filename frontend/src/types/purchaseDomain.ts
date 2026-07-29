@@ -129,8 +129,8 @@ export const PURCHASE_ORDER_DOMAIN_STATUSES: readonly PurchaseOrderDomainStatus[
 ] as const
 
 export const PURCHASE_ORDER_DOMAIN_STATUS_LABELS: Record<PurchaseOrderDomainStatus, string> = {
-  draft: 'Draft',
-  pending_approval: 'Sent for Approval',
+  draft: 'Open',
+  pending_approval: 'Pending Approved',
   approved: 'Approved',
   rejected: 'Rejected',
   sent_back: 'Sent Back',

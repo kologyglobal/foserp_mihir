@@ -1156,7 +1156,7 @@ export function PurchaseOrderEditorPage() {
       <PurchaseCardFormShell
         title="Purchase Order"
         description="Loading…"
-        status="Draft"
+        status="Open"
         favoritePath="/purchase/orders/new"
         breadcrumbs={[
           { label: 'Purchase', to: '/purchase' },
@@ -1266,6 +1266,20 @@ export function PurchaseOrderEditorPage() {
                 placeholder="Loading number…"
                 readOnly
                 className="bg-erp-surface-alt"
+              />
+            </ErpFieldRow>
+            <ErpFieldRow label="Status" readOnly hint="Lifecycle status — not editable on the form">
+              <Input
+                value={PURCHASE_ORDER_DOMAIN_STATUS_LABELS[status]}
+                readOnly
+                className="bg-erp-surface-alt"
+              />
+            </ErpFieldRow>
+            <ErpFieldRow label="Revised version" readOnly>
+              <Input
+                value={String(revisionNo)}
+                readOnly
+                className="bg-erp-surface-alt tabular-nums"
               />
             </ErpFieldRow>
             <ErpFieldRow
@@ -1762,9 +1776,6 @@ export function PurchaseOrderEditorPage() {
                 />
               }
             />
-            {revisionNo > 0 ? (
-              <p className="mt-2 text-[12px] text-erp-muted">Revision {revisionNo}</p>
-            ) : null}
           </ErpCardSection>
           </div>
         </>
