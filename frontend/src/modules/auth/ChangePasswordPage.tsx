@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Eye, EyeOff, KeyRound, Lock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
@@ -20,10 +20,6 @@ export function ChangePasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    document.title = 'Change password — FOS ERP'
-  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

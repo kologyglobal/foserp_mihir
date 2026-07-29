@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Eye, Pencil, Plus, Printer, RefreshCw, Save, Send, Trash2 } from 'lucide-react'
+import { Eye, Pencil, Plus, Printer, Download, RefreshCw, Save, Send, Trash2 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { SaveViewDialog } from '@/components/design-system/SaveViewDialog'
 import { CrmFilterDrawer } from '@/components/crm/CrmFilterDrawer'
@@ -268,7 +268,13 @@ export function RfqListPage() {
             id: 'print',
             label: 'Print',
             icon: Printer,
-            onClick: () => navigate(`/purchase/rfqs/${r.id}?print=1`),
+            onClick: () => navigate(`/purchase/rfqs/${r.id}/print`),
+          })
+          actions.push({
+            id: 'download',
+            label: 'Download PDF',
+            icon: Download,
+            onClick: () => navigate(`/purchase/rfqs/${r.id}/print?download=1`),
           })
           return <EnterpriseRowActionsMenu actions={actions} />
         },

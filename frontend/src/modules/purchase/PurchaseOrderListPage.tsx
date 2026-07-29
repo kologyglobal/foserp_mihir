@@ -79,8 +79,6 @@ function sortPoRows(rows: PurchaseOrderListRow[], sortBy: PoSortKey): PurchaseOr
       return list.sort((a, b) => cmp(a.expectedDeliveryDate, b.expectedDeliveryDate))
     case 'status':
       return list.sort((a, b) => cmp(a.statusLabel, b.statusLabel))
-    case 'approvalStatus':
-      return list.sort((a, b) => cmp(a.approvalStatusLabel, b.approvalStatusLabel))
     case 'receivedPercentage':
       return list.sort((a, b) => b.receivedPercentage - a.receivedPercentage)
     case 'documentDate':
@@ -145,7 +143,6 @@ export function PurchaseOrderListPage() {
       vendorName: saved.vendorName ?? '',
       locationName: saved.locationName ?? '',
       buyerName: saved.buyerName ?? '',
-      approvalStatus: saved.approvalStatus ?? '',
       invoiceStatus: saved.invoiceStatus ?? '',
       origin: saved.origin ?? '',
       documentDateFrom: saved.documentDateFrom ?? '',
@@ -208,8 +205,7 @@ export function PurchaseOrderListPage() {
           r.vendorGstin.toLowerCase().includes(q) ||
           r.buyerName.toLowerCase().includes(q) ||
           r.locationName.toLowerCase().includes(q) ||
-          r.statusLabel.toLowerCase().includes(q) ||
-          r.approvalStatusLabel.toLowerCase().includes(q),
+          r.statusLabel.toLowerCase().includes(q),
       )
     }
     if (filters.status === 'released_or_later') {
@@ -227,9 +223,6 @@ export function PurchaseOrderListPage() {
     if (filters.vendorName) list = list.filter((r) => r.vendorName === filters.vendorName)
     if (filters.locationName) list = list.filter((r) => r.locationName === filters.locationName)
     if (filters.buyerName) list = list.filter((r) => r.buyerName === filters.buyerName)
-    if (filters.approvalStatus) {
-      list = list.filter((r) => r.approvalStatus === filters.approvalStatus)
-    }
     if (filters.invoiceStatus) {
       list = list.filter((r) => r.invoiceStatus === filters.invoiceStatus)
     }
@@ -329,8 +322,7 @@ export function PurchaseOrderListPage() {
         'Total Amount',
         'Received %',
         'Invoice Status',
-        'Approval Status',
-        'PO Status',
+        'Status',
       ],
       filtered.map((r) => [
         r.documentNumber,
@@ -346,7 +338,6 @@ export function PurchaseOrderListPage() {
         r.totalAmount,
         r.receivedPercentage,
         r.invoiceStatusLabel,
-        r.approvalStatusLabel,
         r.statusLabel,
       ]),
     )

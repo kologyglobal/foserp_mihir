@@ -410,6 +410,8 @@ function mergeScalarData(
       requirePaymentTerms: g?.requirePaymentTerms ?? defaults.requirePaymentTerms,
       allowOverReceipt: g?.allowOverReceipt ?? defaults.allowOverReceipt,
       overReceiptTolerancePct: g?.overReceiptTolerancePct ?? defaults.overReceiptTolerancePct,
+      requireApprovalOnPoRevision:
+        g?.requireApprovalOnPoRevision ?? defaults.requireApprovalOnPoRevision,
       allowShortClose: g?.allowShortClose ?? defaults.allowShortClose,
       requireVendorChallan: recv?.requireVendorChallan ?? defaults.requireVendorChallan,
       requireVehicleNumber: recv?.requireVehicleNumber ?? defaults.requireVehicleNumber,
@@ -486,6 +488,8 @@ function mergeScalarData(
     if (g.allowOverReceipt !== undefined) set('allowOverReceipt', g.allowOverReceipt)
     if (g.overReceiptTolerancePct !== undefined)
       set('overReceiptTolerancePct', g.overReceiptTolerancePct)
+    if (g.requireApprovalOnPoRevision !== undefined)
+      set('requireApprovalOnPoRevision', g.requireApprovalOnPoRevision)
     if (g.allowShortClose !== undefined) set('allowShortClose', g.allowShortClose)
     if (g.requirePoWarehouse !== undefined) set('requirePoWarehouse', g.requirePoWarehouse)
     if (g.requireExpectedDeliveryDate !== undefined)

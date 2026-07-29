@@ -130,7 +130,7 @@ function buildRowActions(
         ? getPurchasePermissionDenialReason('purchase.po.approve')
         : canApprove
           ? undefined
-          : 'Only Pending Approval orders can be approved',
+          : 'Only Sent for Approval orders can be approved',
     },
     {
       id: 'release',
@@ -301,20 +301,9 @@ export function PurchaseOrdersTable({
         ),
       },
       {
-        accessorKey: 'approvalStatus',
-        header: 'Approval',
-        meta: { columnLabel: 'Approval Status' },
-        cell: ({ row }) => (
-          <StatusBadge
-            label={row.original.approvalStatusLabel}
-            status={row.original.approvalStatus}
-          />
-        ),
-      },
-      {
         accessorKey: 'status',
         header: 'Status',
-        meta: { columnLabel: 'PO Status' },
+        meta: { columnLabel: 'Status' },
         cell: ({ row }) => (
           <StatusBadge label={row.original.statusLabel} status={row.original.status} />
         ),

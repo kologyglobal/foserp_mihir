@@ -152,6 +152,8 @@ export {
   getGRNById,
   updateGRN,
   submitGRN,
+  approveToleranceGRN,
+  rejectToleranceGRN,
   cancelGRN,
   reverseGRN,
   createQualityInspection,

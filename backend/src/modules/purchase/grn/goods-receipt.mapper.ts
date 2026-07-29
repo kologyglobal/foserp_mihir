@@ -52,6 +52,12 @@ export function mapGoodsReceiptToDto(grn: GrnWithRelations) {
     receivedByName: grn.receivedByName,
     inspectionRequired: grn.inspectionRequired,
     allowExcess: grn.allowExcess,
+    toleranceApprovalRequired: Boolean(
+      (grn as { toleranceApprovalRequired?: boolean }).toleranceApprovalRequired,
+    ),
+    toleranceApprovedAt: iso((grn as { toleranceApprovedAt?: Date | null }).toleranceApprovedAt),
+    toleranceApprovedById:
+      (grn as { toleranceApprovedById?: string | null }).toleranceApprovedById ?? null,
     remarks: grn.remarks,
     submittedAt: iso(grn.submittedAt),
     cancelledAt: iso(grn.cancelledAt),
@@ -79,11 +85,17 @@ export function mapGoodsReceiptToDto(grn: GrnWithRelations) {
       description: line.description,
       uomId: line.uomId,
       uom: line.uomCodeSnapshot,
+      uomConversionFactor: qty((line as { uomConversionFactor?: unknown }).uomConversionFactor ?? 1) || 1,
+      unitCostPrimary: qty((line as { unitCostPrimary?: unknown }).unitCostPrimary ?? line.rate),
       orderedQuantity: qty(line.orderedQuantity),
       previouslyReceivedQuantity: qty(line.previouslyReceivedQuantity),
       openQuantity: qty(line.openQuantity),
       challanQuantity: qty(line.challanQuantity),
       receivedQuantity: qty(line.receivedQuantity),
+      receivedUomQuantity: qty((line as { receivedUomQuantity?: unknown }).receivedUomQuantity ?? line.receivedQuantity),
+      orderedUomQuantity: qty((line as { orderedUomQuantity?: unknown }).orderedUomQuantity ?? line.orderedQuantity),
+      acceptedUomQuantity: qty((line as { acceptedUomQuantity?: unknown }).acceptedUomQuantity ?? line.acceptedQuantity),
+      rejectedUomQuantity: qty((line as { rejectedUomQuantity?: unknown }).rejectedUomQuantity ?? line.rejectedQuantity),
       damagedQuantity: qty(line.damagedQuantity),
       shortQuantity: qty(line.shortQuantity),
       excessQuantity: qty(line.excessQuantity),
@@ -103,6 +115,14 @@ export function mapGoodsReceiptToDto(grn: GrnWithRelations) {
       manufacturingDate: date(line.manufacturingDate),
       expiryDate: date(line.expiryDate),
       qcRequired: line.qcRequired,
+      tolerancePercentage: qty((line as { tolerancePercentage?: unknown }).tolerancePercentage),
+      variancePercentage:
+        (line as { variancePercentage?: unknown }).variancePercentage == null
+          ? null
+          : qty((line as { variancePercentage?: unknown }).variancePercentage),
+      toleranceStatus:
+        ((line as { toleranceStatus?: string }).toleranceStatus as string | undefined) ?? 'OK',
+      closeOpenQuantity: Boolean((line as { closeOpenQuantity?: boolean }).closeOpenQuantity),
       remarks: line.remarks,
     })),
   }
@@ -120,9 +140,13 @@ export function mapReceivableLineDto(line: {
   uomId: string | null
   rate: unknown
   uom?: { code: string } | null
+  receivingTolerancePercentage?: number | null
+  uomQuantity?: unknown
+  uomConversionFactor?: unknown
 }) {
   const ordered = qty(line.quantity)
   const received = qty(line.receivedQuantity)
+  const factor = qty(line.uomConversionFactor) || 1
   return {
     purchaseOrderLineId: line.id,
     lineNumber: line.lineNumber,
@@ -133,8 +157,11 @@ export function mapReceivableLineDto(line: {
     uomId: line.uomId,
     uom: line.uom?.code ?? '',
     orderedQuantity: ordered,
+    orderedUomQuantity: qty(line.uomQuantity) || ordered * factor,
     previouslyReceivedQuantity: received,
     openQuantity: Math.max(0, ordered - received),
     rate: qty(line.rate),
+    uomConversionFactor: factor,
+    receivingTolerancePercentage: qty(line.receivingTolerancePercentage),
   }
 }

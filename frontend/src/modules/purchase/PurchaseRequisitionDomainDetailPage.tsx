@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ClipboardList, Pencil, Printer, Send, ShoppingCart } from 'lucide-react'
+import { ClipboardList, Download, Pencil, Printer, Send, ShoppingCart } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
 import {
   PurchaseDocumentFactBox,
@@ -133,7 +133,7 @@ export function PurchaseRequisitionDomainDetailPage({
       }
       setLoading(false)
       if (searchParams.get('print') === '1') {
-        window.setTimeout(() => window.print(), 400)
+        navigate(`/purchase/requisitions/${id}/print`, { replace: true })
       }
     })()
     return () => {
@@ -386,7 +386,13 @@ export function PurchaseRequisitionDomainDetailPage({
               label: 'Print',
               icon: Printer,
               pin: true,
-              onClick: () => window.print(),
+              onClick: () => navigate(`/purchase/requisitions/${pr.id}/print`),
+            },
+            {
+              id: 'download',
+              label: 'Download PDF',
+              icon: Download,
+              onClick: () => navigate(`/purchase/requisitions/${pr.id}/print?download=1`),
             },
           ]}
         />

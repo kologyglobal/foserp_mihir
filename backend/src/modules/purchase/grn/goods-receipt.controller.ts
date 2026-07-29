@@ -84,6 +84,26 @@ export const postInventoryGoodsReceipt = asyncHandler(async (req: Request, res: 
   sendSuccess(res, 'Goods receipt inventory posted', data)
 })
 
+export const approveToleranceGoodsReceipt = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.approveToleranceGoodsReceipt(
+    getTenantId(req),
+    getRouteParam(req, 'id'),
+    getUserId(req),
+    req.body ?? {},
+  )
+  sendSuccess(res, 'Goods receipt tolerance approved and submitted', data)
+})
+
+export const rejectToleranceGoodsReceipt = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.rejectToleranceGoodsReceipt(
+    getTenantId(req),
+    getRouteParam(req, 'id'),
+    getUserId(req),
+    req.body ?? {},
+  )
+  sendSuccess(res, 'Goods receipt tolerance rejected', data)
+})
+
 export const getReceivableLines = asyncHandler(async (req: Request, res: Response) => {
   const data = await service.getReceivableLines(getTenantId(req), getRouteParam(req, 'id'))
   sendSuccess(res, 'Receivable PO lines retrieved', data)

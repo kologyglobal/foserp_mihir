@@ -11,6 +11,7 @@ import {
   listPurchaseOrdersQuerySchema,
   poLifecycleRemarksSchema,
   poReasonSchema,
+  revisePurchaseOrderSchema,
   updatePurchaseOrderSchema,
 } from './purchase-order.validation.js'
 
@@ -41,6 +42,21 @@ router.get(
   requirePermission('purchase.po.view'),
   validateParams(uuidParamSchema),
   controller.getPurchaseOrder,
+)
+
+router.get(
+  '/:id/revisions',
+  requirePermission('purchase.po.view'),
+  validateParams(uuidParamSchema),
+  controller.listPurchaseOrderRevisions,
+)
+
+router.post(
+  '/:id/revise',
+  requirePermission('purchase.po.edit'),
+  validateParams(uuidParamSchema),
+  validateBody(revisePurchaseOrderSchema),
+  controller.revisePurchaseOrder,
 )
 
 router.patch(

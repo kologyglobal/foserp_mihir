@@ -1,5 +1,4 @@
-import type { ReactNode } from 'react'
-import { useMemo } from 'react'
+import { memo, type ReactNode, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { getModuleFromPath, getPageTitle } from '../../utils/moduleContext'
 import { buildRouteBreadcrumbs } from '../../utils/pageNavigation'
@@ -30,6 +29,11 @@ function isUsableWorkspaceTab(label: string, path: string): boolean {
   if (UUID_TAB_RE.test(last) && (trimmed === 'Edit' || trimmed === 'New' || trimmed === 'Record')) return false
   return true
 }
+
+/** Isolate page body from header chrome re-renders (avoids setHeader ↔ page infinite loop). */
+const WorkspacePageBody = memo(function WorkspacePageBody({ children }: { children: ReactNode }) {
+  return <div className="d365-workspace-content">{children}</div>
+})
 
 function DynamicsWorkspaceChromeInner({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
@@ -138,7 +142,7 @@ function DynamicsWorkspaceChromeInner({ children }: { children: ReactNode }) {
         )}
       </div>
 
-      <div className="d365-workspace-content">{children}</div>
+      <WorkspacePageBody>{children}</WorkspacePageBody>
     </div>
   )
 }

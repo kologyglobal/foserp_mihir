@@ -8,12 +8,14 @@ import type {
   PurchaseRequisition,
   PurchaseRequisitionLine,
   PurchaseStatusHistory,
+  Prisma,
 } from '@prisma/client'
 import { decimalToNumber, toIso } from '../../../shared/index.js'
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   PURCHASE_REQUISITION: 'Purchase Requisition',
   PURCHASE_ORDER: 'Purchase Order',
+  GOODS_RECEIPT: 'Goods Receipt (tolerance)',
 }
 
 const APPROVAL_STATUS_LABELS: Record<string, string> = {
@@ -54,8 +56,15 @@ function mapApprovalStatus(status: PurchaseApprovalStatus): string {
   return status.toLowerCase()
 }
 
-function mapDocumentType(type: PurchaseApprovalDocumentType): 'purchase_requisition' | 'purchase_order' {
-  return type === 'PURCHASE_ORDER' ? 'purchase_order' : 'purchase_requisition'
+export type QueueDocumentType =
+  | 'purchase_requisition'
+  | 'purchase_order'
+  | 'goods_receipt_note'
+
+function mapDocumentType(type: PurchaseApprovalDocumentType): QueueDocumentType {
+  if (type === 'PURCHASE_ORDER') return 'purchase_order'
+  if (type === 'GOODS_RECEIPT') return 'goods_receipt_note'
+  return 'purchase_requisition'
 }
 
 function mapPriority(priority: PurchasePriority | string | null | undefined): string {
@@ -124,7 +133,11 @@ export function mapStatusHistoryToPreviousApproval(
   resolvedActorName?: string | null,
 ) {
   const documentType =
-    h.documentType === 'PURCHASE_ORDER' ? 'purchase_order' : 'purchase_requisition'
+    h.documentType === 'PURCHASE_ORDER'
+      ? 'purchase_order'
+      : h.documentType === 'GOODS_RECEIPT'
+        ? 'goods_receipt_note'
+        : 'purchase_requisition'
   return {
     id: h.id,
     documentType,
@@ -158,6 +171,29 @@ export function mapPoLinesForReview(lines: PurchaseOrderLine[]) {
     itemCode: l.itemCodeSnapshot,
     itemName: l.itemNameSnapshot,
     quantity: decimalToNumber(l.quantity),
+    uom: l.uomId ?? '',
+    rate: decimalToNumber(l.rate),
+    amount: decimalToNumber(l.amount),
+  }))
+}
+
+export function mapGrnLinesForReview(
+  lines: Array<{
+    lineNumber: number
+    itemCodeSnapshot: string
+    itemNameSnapshot: string
+    receivedQuantity: Prisma.Decimal | number | null | undefined
+    uomId: string | null
+    rate: Prisma.Decimal | number | null | undefined
+    amount: Prisma.Decimal | number | null | undefined
+    toleranceStatus?: string | null
+  }>,
+) {
+  return lines.map((l) => ({
+    lineNo: l.lineNumber,
+    itemCode: l.itemCodeSnapshot,
+    itemName: `${l.itemNameSnapshot}${l.toleranceStatus ? ` · ${l.toleranceStatus}` : ''}`,
+    quantity: decimalToNumber(l.receivedQuantity),
     uom: l.uomId ?? '',
     rate: decimalToNumber(l.rate),
     amount: decimalToNumber(l.amount),

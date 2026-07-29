@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { isApiMode } from '@/config/apiConfig'
 import { hydrateAdminFromApi } from '@/bootstrap/apiHydration'
-import { formatApiError } from '@/services/api/apiErrors'
+import { formatApiError, isPermissionDeniedError } from '@/services/api/apiErrors'
 
 /**
  * When VITE_USE_API=true, hydrates admin users/roles/tenants from the backend.
@@ -27,6 +27,11 @@ export function useAdminApiSync() {
         if (!cancelled) setStatus('ready')
       } catch (e) {
         if (!cancelled) {
+          if (isPermissionDeniedError(e)) {
+            setError(null)
+            setStatus('ready')
+            return
+          }
           setError(formatApiError(e))
           setStatus('error')
         }

@@ -92,11 +92,9 @@ export function RfqDetailPage() {
       setSendOpen(true)
     }
     if (searchParams.get('print') === '1') {
-      window.print()
-      searchParams.delete('print')
-      setSearchParams(searchParams, { replace: true })
+      navigate(`/purchase/rfqs/${rfq.id}/print`, { replace: true })
     }
-  }, [rfq, searchParams, setSearchParams])
+  }, [rfq, navigate, searchParams, setSearchParams])
 
   const confirmSend = async () => {
     if (!rfq) return
@@ -132,32 +130,6 @@ export function RfqDetailPage() {
     } catch (err) {
       notify.error(err instanceof PurchaseServiceError ? err.message : 'Cancel failed')
     }
-  }
-
-  const downloadStub = () => {
-    if (!rfq) return
-    const blob = new Blob(
-      [
-        [
-          `RFQ ${rfq.documentNumber}`,
-          `Date ${rfq.documentDate}`,
-          `Enquiry due ${rfq.bidDueDate}`,
-          `Vendors: ${rfq.vendors.map((v) => v.vendorName).join(', ')}`,
-          '',
-          ...rfq.lines.map(
-            (l) =>
-              `${l.lineNo}. ${l.itemCode} ${l.itemName} qty ${l.quantity} ${l.uom} target ${l.targetPrice}`,
-          ),
-        ].join('\n'),
-      ],
-      { type: 'text/plain' },
-    )
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${rfq.documentNumber}.txt`
-    a.click()
-    URL.revokeObjectURL(url)
   }
 
   const responseStats = useMemo(() => {
@@ -337,16 +309,16 @@ export function RfqDetailPage() {
               },
               {
                 id: 'download',
-                label: 'Download RFQ',
+                label: 'Download PDF',
                 icon: Download,
-                onClick: downloadStub,
+                onClick: () => navigate(`/purchase/rfqs/${rfq.id}/print?download=1`),
               },
               {
                 id: 'print',
                 label: 'Print',
                 icon: Printer,
                 pin: true,
-                onClick: () => window.print(),
+                onClick: () => navigate(`/purchase/rfqs/${rfq.id}/print`),
               },
             ]}
             destructiveActions={[

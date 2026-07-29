@@ -460,7 +460,7 @@ export function PurchaseInvoiceDetailPage() {
                 id: 'pdf',
                 label: 'Download PDF',
                 icon: Download,
-                onClick: () => navigate(`/purchase/invoices/${inv.id}/print`),
+                onClick: () => navigate(`/purchase/invoices/${inv.id}/print?download=1`),
               },
             ]}
             destructiveActions={[

@@ -82,4 +82,20 @@ router.post(
   controller.postInventoryGoodsReceipt,
 )
 
+router.post(
+  '/:id/approve-tolerance',
+  requireAnyPermission('purchase.grn.post', 'purchase.po.approve'),
+  validateParams(uuidParamSchema),
+  validateBody(grnLifecycleRemarksSchema),
+  controller.approveToleranceGoodsReceipt,
+)
+
+router.post(
+  '/:id/reject-tolerance',
+  requireAnyPermission('purchase.grn.post', 'purchase.po.approve'),
+  validateParams(uuidParamSchema),
+  validateBody(grnLifecycleRemarksSchema),
+  controller.rejectToleranceGoodsReceipt,
+)
+
 export default router

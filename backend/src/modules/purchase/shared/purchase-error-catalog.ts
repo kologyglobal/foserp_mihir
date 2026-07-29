@@ -92,6 +92,8 @@ export const PURCHASE_ERROR_CODE = {
   GRN_NO_LINES: 'GRN_NO_LINES',
   GRN_QTY_INVALID: 'GRN_QTY_INVALID',
   GRN_QTY_EXCEEDS: 'GRN_QTY_EXCEEDS',
+  GRN_TOLERANCE_APPROVAL_REQUIRED: 'GRN_TOLERANCE_APPROVAL_REQUIRED',
+  GRN_TOLERANCE_NOT_PENDING: 'GRN_TOLERANCE_NOT_PENDING',
   GRN_LINE_PO_MISMATCH: 'GRN_LINE_PO_MISMATCH',
   GRN_DUPLICATE_CHALLAN: 'GRN_DUPLICATE_CHALLAN',
   GRN_VALIDATION_FAILED: 'GRN_VALIDATION_FAILED',
@@ -110,6 +112,11 @@ export const PURCHASE_ERROR_CODE = {
   PO_WAREHOUSE_REQUIRED: 'PO_WAREHOUSE_REQUIRED',
   PO_EXPECTED_DELIVERY_REQUIRED: 'PO_EXPECTED_DELIVERY_REQUIRED',
   PO_PAYMENT_TERMS_REQUIRED: 'PO_PAYMENT_TERMS_REQUIRED',
+  PO_NOT_REVISABLE: 'PO_NOT_REVISABLE',
+  PO_REVISION_REASON_REQUIRED: 'PO_REVISION_REASON_REQUIRED',
+  PO_REVISION_NO_CHANGES: 'PO_REVISION_NO_CHANGES',
+  PO_REVISION_QTY_BELOW_RECEIVED: 'PO_REVISION_QTY_BELOW_RECEIVED',
+  PO_REVISION_LINE_NOT_FOUND: 'PO_REVISION_LINE_NOT_FOUND',
 
   // Shared
   TENANT_MISMATCH: 'TENANT_MISMATCH',
@@ -205,9 +212,13 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   [PURCHASE_ERROR_CODE.GRN_NOT_REVERSIBLE]: 'Only submitted goods receipts can be reversed.',
   [PURCHASE_ERROR_CODE.GRN_PO_NOT_RECEIVABLE]: 'Purchase order is not open for receipt.',
   [PURCHASE_ERROR_CODE.GRN_WAREHOUSE_REQUIRED]: 'Warehouse is required.',
-  [PURCHASE_ERROR_CODE.GRN_NO_LINES]: 'Add at least one receipt line with quantity greater than zero.',
-  [PURCHASE_ERROR_CODE.GRN_QTY_INVALID]: 'Received quantity must be greater than zero.',
+  [PURCHASE_ERROR_CODE.GRN_NO_LINES]: 'Add at least one receipt line (zero qty marks Not Received).',
+  [PURCHASE_ERROR_CODE.GRN_QTY_INVALID]: 'Received quantity cannot be negative.',
   [PURCHASE_ERROR_CODE.GRN_QTY_EXCEEDS]: 'Received quantity exceeds open PO quantity. Excess beyond tolerance requires approval.',
+  [PURCHASE_ERROR_CODE.GRN_TOLERANCE_APPROVAL_REQUIRED]:
+    'One or more lines are outside receiving tolerance and require Purchase Manager approval.',
+  [PURCHASE_ERROR_CODE.GRN_TOLERANCE_NOT_PENDING]:
+    'Goods receipt is not awaiting tolerance approval.',
   [PURCHASE_ERROR_CODE.GRN_LINE_PO_MISMATCH]: 'GRN line must belong to the selected purchase order.',
   [PURCHASE_ERROR_CODE.GRN_DUPLICATE_CHALLAN]: 'A goods receipt with this vendor challan already exists.',
   [PURCHASE_ERROR_CODE.GRN_VALIDATION_FAILED]: 'Please correct the highlighted fields and try again.',
@@ -228,6 +239,13 @@ export const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
   [PURCHASE_ERROR_CODE.PO_WAREHOUSE_REQUIRED]: 'Delivery warehouse is required.',
   [PURCHASE_ERROR_CODE.PO_EXPECTED_DELIVERY_REQUIRED]: 'Expected delivery date is required.',
   [PURCHASE_ERROR_CODE.PO_PAYMENT_TERMS_REQUIRED]: 'Payment terms are required.',
+  [PURCHASE_ERROR_CODE.PO_NOT_REVISABLE]:
+    'Only released or received purchase orders can be revised. Edit draft or sent-back orders instead.',
+  [PURCHASE_ERROR_CODE.PO_REVISION_REASON_REQUIRED]: 'Revision reason is required.',
+  [PURCHASE_ERROR_CODE.PO_REVISION_NO_CHANGES]: 'No changes detected for this revision.',
+  [PURCHASE_ERROR_CODE.PO_REVISION_QTY_BELOW_RECEIVED]:
+    'Revised quantity cannot be less than quantity already received.',
+  [PURCHASE_ERROR_CODE.PO_REVISION_LINE_NOT_FOUND]: 'One or more revision lines were not found on this PO.',
 
   [PURCHASE_ERROR_CODE.TENANT_MISMATCH]: 'Tenant access denied.',
   [PURCHASE_ERROR_CODE.FORBIDDEN]: 'You do not have permission for this action.',

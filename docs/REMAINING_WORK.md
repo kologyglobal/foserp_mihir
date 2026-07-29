@@ -4,6 +4,14 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Done recently — Purchase multi-unit UOM (2026-07-27)
+
+- Vendor → primary conversion across Item Master / PO / GRN / inventory posting.
+- Fields: `quantity` (primary), `uomQuantity` (vendor), `uomConversionFactor`.
+- Docs: `docs/PURCHASE_MULTI_UNIT_UOM.md`; Hostinger SQL: `backend/scripts/purchase-multi-unit-uom-hostinger.sql`.
+
+---
+
 ## Done recently — Dispatch commercial policy UI + enforcement (2026-07-27)
 
 | Field | Value |
@@ -35,6 +43,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Status | **done** for manual close path + commercial policy — live e-Way deferred until base flow sign-off |
 
 ---
+
 
 ## Done recently — Bank & Cash UAT readiness (2026-07-23)
 
@@ -503,7 +512,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 |-------|-------|
 | Module | Purchase |
 | Description | PR/PO/GRN API |
-| Reason | **Partial** — PO/GRN/QI/Invoice/Return + Setup + FE parity + GRNI + approver limits + **2026-07-28 completion links** (GRN chain, AP handoff UX, return pending banner, GRN→costing test). Remaining: ITC placeholders; formal GR/IR clearing GL; return→AP debit; invoice retro cost adjust. |
+| Reason | **Partial** — PO/GRN/QI/Invoice/Return + Setup + FE parity + GRNI + approver limits + **multi-unit UOM** + **GRN tolerance** + **PO versioning** + **2026-07-28 completion links** (GRN chain, AP handoff UX, return pending banner, GRN→costing test). Remaining: ITC placeholders; formal GR/IR clearing GL; return→AP debit; invoice retro cost adjust; fuller dual-UOM display; Hostinger migrate deploy of purchase UOM/tolerance/versioning migrations. |
 | Dependencies | Items, vendors (done); PR schema Phase 03 (done); PO lifecycle (done); Approvals queue (done); Setup 1A (done) |
 | Next step | Live SPA UAT checklist; optional ITC/AP outstanding; return→AP debit; formal GR/IR clearing if Finance requires it. |
 | Test required | Setup **13/13**; QI/return lifecycle; GRNI; invoice lifecycle; **purchase-completion-grn-costing** PASS |

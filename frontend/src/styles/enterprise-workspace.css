@@ -38,10 +38,9 @@
 }
 
 @media (min-width: 1280px) {
-  .enterprise-workspace .erp-card-form-page__layout--with-factbox {
-    grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr);
-  }
-
+  /* Fixed Smart Context rail — avoid fractional 3fr/32fr columns that leave
+     empty gutter beside a max-width: 320px pane (masters Item edit, etc.). */
+  .enterprise-workspace .erp-card-form-page__layout--with-factbox,
   .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
     grid-template-columns: minmax(0, 1fr) 320px;
     align-items: start;
@@ -66,10 +65,7 @@
 }
 
 @media (min-width: 1440px) {
-  .enterprise-workspace .erp-card-form-page__layout--with-factbox {
-    grid-template-columns: minmax(0, 68fr) minmax(340px, 32fr);
-  }
-
+  .enterprise-workspace .erp-card-form-page__layout--with-factbox,
   .enterprise-workspace.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
     grid-template-columns: minmax(0, 1fr) 340px;
   }
@@ -2118,10 +2114,7 @@
 }
 
 @media (min-width: 1280px) {
-  .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox .erp-card-form-page__layout--with-factbox {
-    grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr);
-  }
-
+  .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox .erp-card-form-page__layout--with-factbox,
   .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
     grid-template-columns: minmax(0, 1fr) 320px;
     align-items: start;
@@ -2140,10 +2133,7 @@
 }
 
 @media (min-width: 1440px) {
-  .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox .erp-card-form-page__layout--with-factbox {
-    grid-template-columns: minmax(0, 68fr) minmax(340px, 32fr);
-  }
-
+  .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox .erp-card-form-page__layout--with-factbox,
   .enterprise-workspace--dynamics-form.enterprise-workspace--record-in-factbox.enterprise-workspace--crm-smart-overview .erp-card-form-page__layout--with-factbox {
     grid-template-columns: minmax(0, 1fr) 340px;
   }
@@ -2233,7 +2223,9 @@
   flex-direction: column;
   min-width: 0;
   width: 100%;
-  max-width: 320px;
+  /* Fill the fixed Smart Context rail (320/340px). A hard 320px cap left a grey
+     gutter when the grid column was wider (masters / fractional 3fr columns). */
+  max-width: none;
   height: auto;
   max-height: inherit;
   overflow: hidden;

@@ -86,7 +86,9 @@ export function CeoDashboardPage() {
   const onLayoutChange = useCallback(
     (next: Layout) => {
       if (!editing) return
-      updateWidgetLayout(next.map((l) => ({ i: l.i, x: l.x, y: l.y, w: l.w, h: l.h })))
+      updateWidgetLayout(
+        next.map((l: Layout[number]) => ({ i: l.i, x: l.x, y: l.y, w: l.w, h: l.h })),
+      )
     },
     [editing, updateWidgetLayout],
   )

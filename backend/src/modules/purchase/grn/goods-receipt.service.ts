@@ -14,6 +14,17 @@ import {
 } from '../shared/purchase-inventory-posting.js'
 import { tryRecordInventoryAccountingEventsForMovements } from '../../inventory/accounting/inventory-accounting-event.service.js'
 import {
+  evaluateGrnLineTolerance,
+  lineRequiresToleranceApproval,
+} from '../shared/grn-tolerance.js'
+import {
+  lineAmountFromVendor,
+  resolveDualQuantities,
+  toPrimaryUnitCost,
+  toUomQuantity,
+  UomConversionError,
+} from '../shared/uom-conversion.js'
+import {
   nextPurchaseDocumentNumber,
   previewPurchaseDocumentNumber,
 } from '../shared/purchase-document-number.js'
@@ -41,6 +52,7 @@ import {
   assertInventoryPostable,
   assertReversible,
   assertSubmittable,
+  assertToleranceApprovable,
   money,
   parseDateInput,
   qty,
@@ -159,6 +171,19 @@ async function buildLineCreates(
     : []
   const uomCode = new Map(uoms.map((u) => [u.id, u.code]))
 
+  const itemIds = [
+    ...new Set(po.lines.map((l) => l.itemId).filter((id): id is string => Boolean(id))),
+  ]
+  const items = itemIds.length
+    ? await prisma.masterItem.findMany({
+        where: { id: { in: itemIds }, tenantId, deletedAt: null },
+        select: { id: true, receivingTolerancePercentage: true },
+      })
+    : []
+  const itemTolById = new Map(
+    items.map((it) => [it.id, Number(it.receivingTolerancePercentage ?? 0)]),
+  )
+
   const result: repo.GrnLineCreateData[] = []
   for (let i = 0; i < lines.length; i++) {
     const input = lines[i]!
@@ -170,26 +195,54 @@ async function buildLineCreates(
         [{ field: `lines[${i}].purchaseOrderLineId`, message: purchaseMessage(PURCHASE_ERROR_CODE.GRN_LINE_PO_MISMATCH) }],
       )
     }
-    const received = qty(input.receivedQuantity)
-    if (!(received > 0)) {
+    const factor = (() => {
+      const fromPo = Number(
+        (poLine as { uomConversionFactor?: unknown }).uomConversionFactor ?? 1,
+      )
+      return fromPo > 0 ? fromPo : 1
+    })()
+
+    let receivedUom: number
+    let received: number
+    try {
+      const dual = resolveDualQuantities({
+        uomQuantity: input.receivedUomQuantity,
+        quantity: input.receivedQuantity,
+        uomConversionFactor: factor,
+      })
+      receivedUom = dual.uomQuantity
+      received = dual.quantity
+    } catch (err) {
+      if (err instanceof UomConversionError) {
+        throw new GoodsReceiptValidationError(err.message, PURCHASE_ERROR_CODE.GRN_QTY_INVALID, [
+          { field: `lines[${i}].receivedUomQuantity`, message: err.message },
+        ])
+      }
+      throw err
+    }
+
+    if (received < 0 || receivedUom < 0) {
       throw new GoodsReceiptValidationError(
         purchaseMessage(PURCHASE_ERROR_CODE.GRN_QTY_INVALID),
         PURCHASE_ERROR_CODE.GRN_QTY_INVALID,
-        [{ field: `lines[${i}].receivedQuantity`, message: purchaseMessage(PURCHASE_ERROR_CODE.GRN_QTY_INVALID) }],
+        [{ field: `lines[${i}].receivedUomQuantity`, message: purchaseMessage(PURCHASE_ERROR_CODE.GRN_QTY_INVALID) }],
       )
     }
+
     const ordered = qty(poLine.quantity)
+    const orderedUom = qty((poLine as { uomQuantity?: unknown }).uomQuantity) || toUomQuantity(ordered, factor)
     const previously = qty(poLine.receivedQuantity)
     const open = Math.max(0, ordered - previously)
-    const excess = Math.max(0, received - open)
-    const maxAllowed = open + (allowExcess ? (open * overReceiptTolerancePct) / 100 : 0)
-    if (received > maxAllowed + 1e-9) {
-      throw new GoodsReceiptValidationError(
-        purchaseMessage(PURCHASE_ERROR_CODE.GRN_QTY_EXCEEDS),
-        PURCHASE_ERROR_CODE.GRN_QTY_EXCEEDS,
-        [{ field: `lines[${i}].receivedQuantity`, message: purchaseMessage(PURCHASE_ERROR_CODE.GRN_QTY_EXCEEDS) }],
-      )
-    }
+    const closeOpenQuantity = Boolean(input.closeOpenQuantity)
+    const itemTol = poLine.itemId ? itemTolById.get(poLine.itemId) ?? 0 : 0
+    const tol = evaluateGrnLineTolerance({
+      openQuantity: open,
+      receivedQuantity: received,
+      itemTolerancePct: itemTol,
+      setupTolerancePct: overReceiptTolerancePct,
+      allowOverReceipt: allowExcess,
+      closeOpenQuantity,
+    })
 
     const lineWarehouseId = input.warehouseId ?? headerWarehouseId
     const lineStorageId = input.storageLocationId ?? headerStorageLocationId ?? null
@@ -197,13 +250,18 @@ async function buildLineCreates(
     const bin = await resolveBin(tenantId, lineWarehouseId, lineStorageId, input.binId)
 
     const rate = qty(poLine.rate)
+    const unitCostPrimary =
+      qty((poLine as { unitCostPrimary?: unknown }).unitCostPrimary) || toPrimaryUnitCost(rate, factor)
     const damaged = qty(input.damagedQuantity)
-    const short = qty(input.shortQuantity) || Math.max(0, open - received)
-    const excessQty = qty(input.excessQuantity) || excess
+    const short = qty(input.shortQuantity) || tol.shortQuantity
+    const excessQty = qty(input.excessQuantity) || tol.excessQuantity
     const qcRequired = input.qcRequired ?? inspectionRequired
-    const acceptedForQc = qty(input.acceptedForQcQuantity) || (qcRequired ? Math.max(0, received - damaged) : 0)
-    const accepted = qcRequired ? 0 : Math.max(0, received - damaged)
-    const rejected = damaged
+    const acceptedForQc =
+      received <= 0 ? 0 : qty(input.acceptedForQcQuantity) || (qcRequired ? Math.max(0, received - damaged) : 0)
+    const accepted = received <= 0 ? 0 : qcRequired ? 0 : Math.max(0, received - damaged)
+    const rejected = received <= 0 ? 0 : damaged
+    const acceptedUom = toUomQuantity(accepted || acceptedForQc, factor)
+    const rejectedUom = toUomQuantity(rejected, factor)
 
     result.push({
       lineNumber: i + 1,
@@ -214,6 +272,8 @@ async function buildLineCreates(
       description: poLine.description,
       uomId: poLine.uomId,
       uomCodeSnapshot: poLine.uomId ? (uomCode.get(poLine.uomId) ?? '') : '',
+      uomConversionFactor: factor,
+      unitCostPrimary,
       orderedQuantity: ordered,
       previouslyReceivedQuantity: previously,
       openQuantity: open,
@@ -225,8 +285,12 @@ async function buildLineCreates(
       acceptedForQcQuantity: acceptedForQc,
       acceptedQuantity: accepted,
       rejectedQuantity: rejected,
+      orderedUomQuantity: orderedUom,
+      receivedUomQuantity: receivedUom,
+      acceptedUomQuantity: acceptedUom,
+      rejectedUomQuantity: rejectedUom,
       rate,
-      amount: money(received * rate),
+      amount: money(lineAmountFromVendor(rate, receivedUom)),
       warehouseId: lineWarehouseId,
       storageLocationId: lineStorageId,
       binId: bin?.id ?? null,
@@ -238,6 +302,10 @@ async function buildLineCreates(
       manufacturingDate: parseDateInput(input.manufacturingDate ?? undefined) ?? null,
       expiryDate: parseDateInput(input.expiryDate ?? undefined) ?? null,
       qcRequired,
+      tolerancePercentage: tol.tolerancePercentage,
+      variancePercentage: tol.variancePercentage,
+      toleranceStatus: tol.toleranceStatus,
+      closeOpenQuantity,
       remarks: input.remarks?.trim() || null,
     })
   }
@@ -362,6 +430,14 @@ export async function getReceivableLines(tenantId: string, purchaseOrderId: stri
       })
     : []
   const uomById = new Map(uoms.map((u) => [u.id, u]))
+  const itemIds = [...new Set(po.lines.map((l) => l.itemId).filter((id): id is string => Boolean(id)))]
+  const items = itemIds.length
+    ? await prisma.masterItem.findMany({
+        where: { id: { in: itemIds }, tenantId, deletedAt: null },
+        select: { id: true, receivingTolerancePercentage: true },
+      })
+    : []
+  const itemTolById = new Map(items.map((it) => [it.id, Number(it.receivingTolerancePercentage ?? 0)]))
   return {
     purchaseOrderId: po.id,
     orderNumber: po.orderNumber,
@@ -374,6 +450,7 @@ export async function getReceivableLines(tenantId: string, purchaseOrderId: stri
         mapReceivableLineDto({
           ...line,
           uom: line.uomId ? uomById.get(line.uomId) ?? null : null,
+          receivingTolerancePercentage: line.itemId ? itemTolById.get(line.itemId) ?? 0 : 0,
         }),
       )
       .filter((l) => l.openQuantity > 0),
@@ -425,6 +502,7 @@ export async function createGoodsReceipt(
     inspectionRequired,
     input.lines,
   )
+  const toleranceApprovalRequired = lines.some((l) => lineRequiresToleranceApproval(l.toleranceStatus))
 
   await assertDuplicateChallanPolicy(
     tenantId,
@@ -466,6 +544,7 @@ export async function createGoodsReceipt(
         receivedByName: input.receivedByName?.trim() || null,
         inspectionRequired,
         allowExcess,
+        toleranceApprovalRequired,
         remarks: input.remarks?.trim() || null,
         createdById: actorId,
         updatedById: actorId,
@@ -578,6 +657,11 @@ export async function updateGoodsReceipt(
     storageLocationNameSnapshot: storage?.name ?? '',
     allowExcess,
     inspectionRequired,
+  }
+  if (lines) {
+    data.toleranceApprovalRequired = lines.some((l) =>
+      lineRequiresToleranceApproval(l.toleranceStatus),
+    )
   }
   if (input.receiptDate !== undefined) data.receiptDate = parseDateInput(input.receiptDate) ?? existing.receiptDate
   if (input.vendorChallanNumber !== undefined) data.vendorChallanNumber = challan
@@ -693,11 +777,21 @@ export async function submitGoodsReceipt(
     existing.lines,
   )
 
-  // Re-validate against current PO open qty + Setup tolerance
+  // Re-evaluate tolerance against current PO open qty
   const po = await loadReceivablePo(tenantId, existing.purchaseOrderId)
   const poLineById = new Map(po.lines.map((l) => [l.id, l]))
-  const allowExcess = settings.allowOverReceipt
-  const tolerancePct = settings.overReceiptTolerancePct
+  const itemIds = [
+    ...new Set(existing.lines.map((l) => l.itemId).filter((x): x is string => Boolean(x))),
+  ]
+  const items = itemIds.length
+    ? await prisma.masterItem.findMany({
+        where: { id: { in: itemIds }, tenantId, deletedAt: null },
+        select: { id: true, receivingTolerancePercentage: true },
+      })
+    : []
+  const itemTolById = new Map(items.map((it) => [it.id, Number(it.receivingTolerancePercentage ?? 0)]))
+
+  let needsApproval = false
   for (const line of existing.lines) {
     const poLine = poLineById.get(line.purchaseOrderLineId)
     if (!poLine) {
@@ -708,36 +802,117 @@ export async function submitGoodsReceipt(
     }
     const open = Math.max(0, qty(poLine.quantity) - qty(poLine.receivedQuantity))
     const received = qty(line.receivedQuantity)
-    const maxAllowed = open + (allowExcess ? (open * tolerancePct) / 100 : 0)
-    if (received > maxAllowed + 1e-9) {
-      throw new GoodsReceiptValidationError(
-        purchaseMessage(PURCHASE_ERROR_CODE.GRN_QTY_EXCEEDS),
-        PURCHASE_ERROR_CODE.GRN_QTY_EXCEEDS,
-      )
-    }
+    const tol = evaluateGrnLineTolerance({
+      openQuantity: open,
+      receivedQuantity: received,
+      itemTolerancePct: line.itemId ? itemTolById.get(line.itemId) ?? 0 : 0,
+      setupTolerancePct: settings.overReceiptTolerancePct,
+      allowOverReceipt: settings.allowOverReceipt,
+      closeOpenQuantity: Boolean((line as { closeOpenQuantity?: boolean }).closeOpenQuantity),
+    })
+    if (tol.requiresApproval) needsApproval = true
   }
 
+  if (needsApproval) {
+    await prisma.$transaction(async (tx) => {
+      await repo.updateGoodsReceipt(
+        tenantId,
+        id,
+        {
+          status: 'PENDING_TOLERANCE_APPROVAL',
+          toleranceApprovalRequired: true,
+          updatedById: actorId,
+          remarks: body.remarks?.trim() || existing.remarks,
+        },
+        tx,
+      )
+      await tx.purchaseApproval.create({
+        data: {
+          tenantId,
+          documentType: 'GOODS_RECEIPT',
+          documentId: id,
+          documentNumber: existing.grnNumber,
+          level: 1,
+          status: 'PENDING',
+          requesterId: actorId,
+          amount: existing.lines.reduce((s, l) => s + qty(l.amount), 0),
+          remarks: body.remarks?.trim() || null,
+        },
+      })
+      await repo.createStatusHistory(
+        {
+          tenantId,
+          documentId: id,
+          documentNumber: existing.grnNumber,
+          action: 'GRN_TOLERANCE_APPROVAL_REQUESTED',
+          fromStatus: existing.status,
+          toStatus: 'PENDING_TOLERANCE_APPROVAL',
+          actorId,
+          remarks: body.remarks,
+        },
+        tx,
+      )
+    })
+
+    await writePurchaseAudit({
+      tenantId,
+      actorId,
+      entity: PURCHASE_AUDIT_ENTITY.GRN,
+      entityId: id,
+      action: 'GRN_TOLERANCE_APPROVAL_REQUESTED',
+      previousValue: { status: existing.status },
+      newValue: { status: 'PENDING_TOLERANCE_APPROVAL' },
+    })
+
+    return mapGoodsReceiptToDto(await loadOrThrow(tenantId, id))
+  }
+
+  return finalizeGoodsReceiptSubmit(tenantId, id, actorId, body)
+}
+
+/** Continue GRN submit after tolerance is within band or approved. */
+async function finalizeGoodsReceiptSubmit(
+  tenantId: string,
+  id: string,
+  actorId: string,
+  body: { remarks?: string } = {},
+) {
+  const existing = await loadOrThrow(tenantId, id)
+  if (existing.status !== 'DRAFT' && existing.status !== 'PENDING_TOLERANCE_APPROVAL') {
+    throw new GoodsReceiptWorkflowError(
+      purchaseMessage(PURCHASE_ERROR_CODE.GRN_NOT_SUBMITTABLE),
+      PURCHASE_ERROR_CODE.GRN_NOT_SUBMITTABLE,
+    )
+  }
+
+  const settings = await resolveEffectivePurchaseDefaults(tenantId, existing.plantId)
+  const allowExcess = settings.allowOverReceipt
   const nextStatus: GoodsReceiptStatus = existing.inspectionRequired ? 'QC_PENDING' : 'SUBMITTED'
-  const deltas = existing.lines.map((l) => ({
-    purchaseOrderLineId: l.purchaseOrderLineId,
-    receivedDelta: qty(l.receivedQuantity),
-    acceptedDelta: qty(l.acceptedQuantity),
-    rejectedDelta: qty(l.rejectedQuantity),
-  }))
+  const deltas = existing.lines
+    .filter((l) => qty(l.receivedQuantity) > 0)
+    .map((l) => ({
+      purchaseOrderLineId: l.purchaseOrderLineId,
+      receivedDelta: qty(l.receivedQuantity),
+      acceptedDelta: qty(l.acceptedQuantity),
+      rejectedDelta: qty(l.rejectedQuantity),
+    }))
+
+  const stockLines = existing.lines.filter((l) => qty(l.receivedQuantity) > 0)
 
   const qcHoldMovements = await prisma.$transaction(async (tx) => {
-    const movements = existing.inspectionRequired
-      ? await postGrnStockInward({
-          tenantId,
-          grnId: existing.id,
-          grnNumber: existing.grnNumber,
-          warehouseId: existing.warehouseId,
-          lines: existing.lines,
-          useAcceptedQuantity: true,
-          actorId,
-          tx,
-        })
-      : []
+    const movements =
+      existing.inspectionRequired && stockLines.length
+        ? await postGrnStockInward({
+            tenantId,
+            grnId: existing.id,
+            grnNumber: existing.grnNumber,
+            warehouseId: existing.warehouseId,
+            lines: stockLines,
+            useAcceptedQuantity: true,
+            actorId,
+            tx,
+          })
+        : []
     const updated = await repo.updateGoodsReceipt(
       tenantId,
       id,
@@ -745,6 +920,7 @@ export async function submitGoodsReceipt(
         status: nextStatus,
         submittedAt: new Date(),
         allowExcess,
+        toleranceApprovalRequired: false,
         updatedById: actorId,
         remarks: body.remarks?.trim() || existing.remarks,
       },
@@ -785,10 +961,124 @@ export async function submitGoodsReceipt(
     newValue: { status: nextStatus },
   })
 
-  // No QC required → post inventory immediately (idempotent).
   if (!existing.inspectionRequired && nextStatus === 'SUBMITTED') {
     return postInventoryGoodsReceipt(tenantId, id, actorId, body)
   }
+
+  return mapGoodsReceiptToDto(await loadOrThrow(tenantId, id))
+}
+
+export async function approveToleranceGoodsReceipt(
+  tenantId: string,
+  id: string,
+  actorId: string,
+  body: { remarks?: string } = {},
+) {
+  const existing = await loadOrThrow(tenantId, id)
+  assertToleranceApprovable(existing)
+
+  await prisma.$transaction(async (tx) => {
+    await tx.purchaseApproval.updateMany({
+      where: {
+        tenantId,
+        documentType: 'GOODS_RECEIPT',
+        documentId: id,
+        status: 'PENDING',
+      },
+      data: {
+        status: 'APPROVED',
+        approverId: actorId,
+        respondedAt: new Date(),
+        remarks: body.remarks?.trim() || null,
+      },
+    })
+    await repo.updateGoodsReceipt(
+      tenantId,
+      id,
+      {
+        toleranceApprovedAt: new Date(),
+        toleranceApprovedById: actorId,
+        updatedById: actorId,
+      },
+      tx,
+    )
+    await repo.createStatusHistory(
+      {
+        tenantId,
+        documentId: id,
+        documentNumber: existing.grnNumber,
+        action: 'GRN_TOLERANCE_APPROVED',
+        fromStatus: existing.status,
+        toStatus: existing.status,
+        actorId,
+        remarks: body.remarks,
+      },
+      tx,
+    )
+  })
+
+  return finalizeGoodsReceiptSubmit(tenantId, id, actorId, body)
+}
+
+export async function rejectToleranceGoodsReceipt(
+  tenantId: string,
+  id: string,
+  actorId: string,
+  body: { remarks?: string } = {},
+) {
+  const existing = await loadOrThrow(tenantId, id)
+  assertToleranceApprovable(existing)
+
+  await prisma.$transaction(async (tx) => {
+    await tx.purchaseApproval.updateMany({
+      where: {
+        tenantId,
+        documentType: 'GOODS_RECEIPT',
+        documentId: id,
+        status: 'PENDING',
+      },
+      data: {
+        status: 'REJECTED',
+        approverId: actorId,
+        respondedAt: new Date(),
+        remarks: body.remarks?.trim() || null,
+      },
+    })
+    await repo.updateGoodsReceipt(
+      tenantId,
+      id,
+      {
+        status: 'DRAFT',
+        toleranceApprovalRequired: true,
+        updatedById: actorId,
+        remarks: body.remarks?.trim() || existing.remarks,
+      },
+      tx,
+    )
+    await repo.createStatusHistory(
+      {
+        tenantId,
+        documentId: id,
+        documentNumber: existing.grnNumber,
+        action: 'GRN_TOLERANCE_REJECTED',
+        fromStatus: existing.status,
+        toStatus: 'DRAFT',
+        actorId,
+        remarks: body.remarks,
+      },
+      tx,
+    )
+  })
+
+  await writePurchaseAudit({
+    tenantId,
+    actorId,
+    entity: PURCHASE_AUDIT_ENTITY.GRN,
+    entityId: id,
+    action: 'GRN_TOLERANCE_REJECTED',
+    previousValue: { status: existing.status },
+    newValue: { status: 'DRAFT' },
+  })
 
   return mapGoodsReceiptToDto(await loadOrThrow(tenantId, id))
 }

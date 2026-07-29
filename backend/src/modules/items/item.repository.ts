@@ -22,6 +22,23 @@ function normalizeNullableIds(input: Record<string, unknown>): Record<string, un
   ] as const) {
     if (data[key] === '') data[key] = null
   }
+
+  // Keep uomConversionFactor ↔ purchaseQtyPerUom in sync; force 1 when UOMs match.
+  const baseUomId = data.baseUomId != null ? String(data.baseUomId) : null
+  const purchaseUomId = data.purchaseUomId != null ? String(data.purchaseUomId) : null
+  const rawFactor =
+    data.uomConversionFactor !== undefined
+      ? Number(data.uomConversionFactor)
+      : data.purchaseQtyPerUom !== undefined
+        ? Number(data.purchaseQtyPerUom)
+        : undefined
+  if (rawFactor !== undefined || baseUomId || purchaseUomId !== undefined) {
+    const sameUom = !purchaseUomId || !baseUomId || purchaseUomId === baseUomId
+    const factor = sameUom ? 1 : rawFactor !== undefined && rawFactor > 0 ? rawFactor : 1
+    data.uomConversionFactor = factor
+    data.purchaseQtyPerUom = factor
+  }
+
   return data
 }
 
@@ -252,7 +269,10 @@ export async function updateItem(
   try {
     return await prisma.masterItem.update({
       where: { id, tenantId },
-      data: { ...data, updatedBy: userId },
+      data: {
+        ...(data as Prisma.MasterItemUncheckedUpdateInput),
+        updatedBy: userId,
+      },
     })
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {

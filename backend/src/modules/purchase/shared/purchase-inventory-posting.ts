@@ -10,6 +10,11 @@ type QtyLine = {
   acceptedForQcQuantity?: unknown
   returnQuantity?: unknown
   rate?: unknown
+  unitCostPrimary?: unknown
+  receivedUomQuantity?: unknown
+  acceptedUomQuantity?: unknown
+  uomId?: string | null
+  uomConversionFactor?: unknown
   batchNumber?: string | null
   lotNumber?: string | null
   heatNumber?: string | null
@@ -41,6 +46,11 @@ export async function postGrnStockInward(input: {
       ? qty(line.acceptedForQcQuantity ?? line.acceptedQuantity)
       : qty(line.receivedQuantity)
     if (quantity <= 0) continue
+    const unitCostPrimary = qty(line.unitCostPrimary) || qty(line.rate)
+    const uomQty = input.useAcceptedQuantity
+      ? qty(line.acceptedUomQuantity)
+      : qty(line.receivedUomQuantity)
+    const factor = qty(line.uomConversionFactor) || 1
     const movement = await postStockMovement(
       {
         tenantId: input.tenantId,
@@ -56,7 +66,10 @@ export async function postGrnStockInward(input: {
         serialNumber: line.serialNumber ?? undefined,
         manufacturingDate: line.manufacturingDate ?? undefined,
         expiryDate: line.expiryDate ?? undefined,
-        rate: qty(line.rate),
+        rate: unitCostPrimary,
+        uomQuantity: uomQty > 0 ? uomQty : undefined,
+        uomId: line.uomId ?? undefined,
+        uomConversionFactor: factor > 0 ? factor : undefined,
         referenceNo: input.grnNumber,
         remarks: `GRN inward ${input.grnNumber}`,
         idempotencyKey: `grn-in:${input.grnId}:${line.id}`,

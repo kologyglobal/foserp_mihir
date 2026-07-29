@@ -9058,6 +9058,7 @@ a.crm-companies-table__name:hover {
   .so-print-toolbar,
   .wo-print-toolbar,
   .po-print-toolbar,
+  .po-print-back,
   .pi-print-toolbar {
     display: none !important;
   }
@@ -9066,6 +9067,8 @@ a.crm-companies-table__name:hover {
     size: A4;
     margin: 10mm 12mm;
   }
+
+  /* Per-document @page is injected at print time (see purchaseDocumentPdfExport). */
 }
 
 /* CRM Quotation Templates */
@@ -14555,14 +14558,14 @@ a.crm-companies-table__name:hover {
 
 @media (min-width: 1280px) {
   .erp-card-form-page__layout--with-factbox {
-    grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr);
-    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
   }
 }
 
 @media (min-width: 1440px) {
   .erp-card-form-page__layout--with-factbox {
-    grid-template-columns: minmax(0, 68fr) minmax(340px, 32fr);
+    grid-template-columns: minmax(0, 1fr) 340px;
   }
 }
 
@@ -16859,10 +16862,21 @@ a.crm-companies-table__name:hover {
   }
 }
 
-/* ── Purchase Order print document ── */
+/* ── Purchase print / PDF document (clean B/W/gray + theme accents) ── */
 .po-print-page {
-  max-width: 980px;
+  --po-print-ink: #111827;
+  --po-print-muted: #6b7280;
+  --po-print-line: #d1d5db;
+  --po-print-soft: #f3f4f6;
+  --po-print-paper: #ffffff;
+  --po-print-accent: var(--erp-primary, #0078d4);
+  max-width: 210mm;
   margin: 0 auto;
+  padding: 16px 12px 40px;
+}
+
+.po-print-back {
+  margin: 0 0 10px;
 }
 
 .po-print-toolbar {
@@ -16873,61 +16887,189 @@ a.crm-companies-table__name:hover {
   gap: 12px;
   margin-bottom: 16px;
   padding: 12px 14px;
-  border: 1px solid var(--erp-border);
-  border-radius: 10px;
-  background: var(--erp-surface);
+  border: 1px solid var(--po-print-line);
+  border-radius: 8px;
+  background: var(--po-print-paper);
+}
+
+.po-print-toolbar__copy {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.po-print-toolbar__actions {
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .po-print-toolbar__title {
   margin: 0;
   font-size: 15px;
   font-weight: 700;
-  color: var(--erp-text);
+  color: var(--po-print-ink);
 }
 
 .po-print-toolbar__subtitle {
   margin: 2px 0 0;
   font-size: 12px;
-  color: var(--erp-muted);
+  color: var(--po-print-muted);
+}
+
+.po-print-toolbar__format {
+  margin: 4px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--po-print-muted);
+  letter-spacing: 0.02em;
+}
+
+.po-print-stage {
+  display: block;
 }
 
 .po-print-doc {
+  width: 100%;
   max-width: 210mm;
   margin: 0 auto;
   padding: 18px 20px 24px;
-  border: 1px solid var(--erp-border);
-  border-radius: 10px;
-  background: #fff;
-  color: #1f2937;
+  border: 1px solid var(--po-print-line);
+  border-radius: 8px;
+  background: var(--po-print-paper);
+  color: var(--po-print-ink);
   font-size: 11px;
   line-height: 1.45;
-  box-shadow: 0 1px 3px rgb(15 23 42 / 0.06);
+  box-shadow: none;
+}
+
+/* Fixed A4 landscape preview (GRN and other wide tabular docs) */
+.po-print-page--landscape {
+  max-width: 297mm;
+}
+
+.po-print-page--landscape .po-print-doc {
+  max-width: 297mm;
 }
 
 .po-print-header {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 2px solid #004e8c;
+  border-bottom: 2px solid var(--po-print-accent);
   padding-bottom: 12px;
   margin-bottom: 16px;
 }
 
+.po-print-header--branded {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(168px, 0.8fr);
+  align-items: start;
+  gap: 14px;
+}
+
+.po-print-header__brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.po-print-header__logo-wrap {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  border: 1px solid var(--po-print-line);
+  background: var(--po-print-paper);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.po-print-header__logo {
+  max-width: 46px;
+  max-height: 46px;
+  object-fit: contain;
+}
+
+.po-print-header__identity {
+  min-width: 0;
+}
+
 .po-print-header__company {
   margin: 0 0 4px;
-  font-size: 16px;
-  font-weight: 700;
-  color: #004e8c;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--po-print-ink);
+}
+
+.po-print-header__tagline {
+  margin: 1px 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--po-print-accent);
 }
 
 .po-print-header__address,
 .po-print-header__gst {
   margin: 2px 0;
-  color: #4b5563;
+  color: var(--po-print-muted);
+  font-size: 10px;
 }
 
 .po-print-header__meta {
   text-align: right;
+}
+
+.po-print-header__badge {
+  flex-shrink: 0;
+  min-width: 190px;
+  text-align: right;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--po-print-line);
+  border-left: 3px solid var(--po-print-accent);
+  background: var(--po-print-soft);
+  color: var(--po-print-ink);
+}
+
+.po-print-header__doc-type {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--po-print-accent);
+}
+
+.po-print-header__doc-no {
+  margin: 4px 0 8px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--po-print-ink);
+}
+
+.po-print-header__meta-list {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.po-print-header__meta-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 10px;
+}
+
+.po-print-header__meta-list dt {
+  color: var(--po-print-muted);
+}
+
+.po-print-header__meta-list dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--po-print-ink);
 }
 
 .po-print-title {
@@ -16935,7 +17077,7 @@ a.crm-companies-table__name:hover {
   font-size: 18px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: #111827;
+  color: var(--po-print-ink);
 }
 
 .po-print-grid {
@@ -16946,10 +17088,10 @@ a.crm-companies-table__name:hover {
 }
 
 .po-print-box {
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--po-print-line);
   border-radius: 6px;
   padding: 10px 12px;
-  background: #f9fafb;
+  background: var(--po-print-paper);
 }
 
 .po-print-box__label {
@@ -16958,18 +17100,21 @@ a.crm-companies-table__name:hover {
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #6b7280;
+  color: var(--po-print-accent);
 }
 
 .po-print-box__name {
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--po-print-ink);
 }
 
 .po-print-box p {
   margin: 2px 0;
+  color: #374151;
 }
 
-.po-print-table {
+.po-print-table,
+.po-print-lines {
   width: 100%;
   border-collapse: collapse;
   margin: 12px 0;
@@ -16977,24 +17122,60 @@ a.crm-companies-table__name:hover {
 }
 
 .po-print-table th,
-.po-print-table td {
-  border: 1px solid #d1d5db;
+.po-print-table td,
+.po-print-lines th,
+.po-print-lines td {
+  border: 1px solid var(--po-print-line);
   padding: 6px 8px;
   vertical-align: top;
+  color: var(--po-print-ink);
 }
 
-.po-print-table th {
-  background: #f3f4f6;
+.po-print-table th,
+.po-print-lines th {
+  background: var(--po-print-soft);
+  border-top: 2px solid var(--po-print-accent);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #4b5563;
+  color: #374151;
 }
 
-.po-print-table .num {
+.po-print-table .num,
+.po-print-lines .num {
   text-align: right;
   white-space: nowrap;
+}
+
+.po-print-table td.num:has(.po-print-dual-qty) {
+  white-space: normal;
+}
+
+.po-print-dual-qty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.po-print-qty-line {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--po-print-ink);
+}
+
+.po-print-qty-line--stock {
+  font-weight: 700;
+  color: var(--po-print-ink);
+}
+
+.po-print-hint {
+  margin-top: 6px !important;
+  font-size: 10px;
+  color: #6b7280;
 }
 
 .po-print-table .mono {
@@ -17004,9 +17185,10 @@ a.crm-companies-table__name:hover {
 .po-print-summary {
   margin-left: auto;
   width: min(100%, 280px);
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--po-print-line);
   border-radius: 6px;
   overflow: hidden;
+  background: var(--po-print-paper);
 }
 
 .po-print-summary__row {
@@ -17015,32 +17197,67 @@ a.crm-companies-table__name:hover {
   gap: 12px;
   padding: 7px 10px;
   border-bottom: 1px solid #e5e7eb;
+  color: #374151;
 }
 
 .po-print-summary__row--total {
   border-bottom: 0;
-  background: #eff6ff;
+  background: var(--po-print-soft);
   font-weight: 700;
+  color: var(--po-print-ink);
+  border-left: 3px solid var(--po-print-accent);
+}
+
+.po-print-totals {
+  margin-left: auto;
+  width: min(100%, 320px);
+  border: 1px solid var(--po-print-line);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--po-print-paper);
+  padding: 8px 10px;
+}
+
+.po-print-totals p {
+  margin: 4px 0;
+  color: #374151;
+}
+
+.po-print-totals__grand {
+  margin-top: 8px !important;
+  padding: 8px 10px;
+  background: var(--po-print-soft);
+  font-weight: 700;
+  color: var(--po-print-ink);
+  border-left: 3px solid var(--po-print-accent);
 }
 
 .po-print-words {
   margin: 10px 0 16px;
   padding: 8px 10px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--po-print-soft);
+  border: 1px solid var(--po-print-line);
   border-radius: 6px;
   font-size: 10.5px;
+  color: #374151;
+}
+
+.po-print-terms {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--po-print-line);
 }
 
 .po-print-terms__title {
   margin: 0 0 6px;
   font-weight: 700;
+  color: var(--po-print-ink);
 }
 
 .po-print-terms__list {
   margin: 0;
   padding-left: 18px;
-  color: #4b5563;
+  color: var(--po-print-muted);
 }
 
 .po-print-signatures {
@@ -17054,7 +17271,7 @@ a.crm-companies-table__name:hover {
   border-top: 1px solid #9ca3af;
   padding-top: 6px;
   font-size: 10px;
-  color: #6b7280;
+  color: var(--po-print-muted);
 }
 
 @media print {
@@ -17064,12 +17281,25 @@ a.crm-companies-table__name:hover {
     padding: 0;
   }
 
+  .po-print-stage {
+    display: block;
+  }
+
   .po-print-doc {
     border: 0;
     border-radius: 0;
     box-shadow: none;
     padding: 0;
     max-width: none;
+  }
+
+  .po-print-header__badge,
+  .po-print-table th,
+  .po-print-lines th,
+  .po-print-summary__row--total,
+  .po-print-totals__grand {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }
 
@@ -17078,12 +17308,17 @@ a.crm-companies-table__name:hover {
     grid-template-columns: 1fr;
   }
 
-  .po-print-header {
+  .po-print-header,
+  .po-print-header--branded {
+    display: flex;
     flex-direction: column;
   }
 
-  .po-print-header__meta {
+  .po-print-header__meta,
+  .po-print-header__badge {
     text-align: left;
+    min-width: 0;
+    width: 100%;
   }
 
   .po-print-signatures {
