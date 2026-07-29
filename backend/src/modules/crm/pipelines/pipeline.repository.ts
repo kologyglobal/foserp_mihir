@@ -2,6 +2,7 @@ import type { PipelineStatus, Prisma } from '@prisma/client'
 import { DEFAULT_PIPELINE_STAGES } from '../../../constants/permissions.js'
 import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
+import { DEFAULT_PIPELINE_NAME } from './pipeline.constants.js'
 import type { CreatePipelineInput, ListPipelinesQuery, StageInput, UpdatePipelineInput } from './pipeline.validation.js'
 
 const stageInclude = {
@@ -61,6 +62,26 @@ export async function createPipeline(tenantId: string, userId: string, data: Cre
     await createStages(tx, tenantId, pipeline.id, userId, stages)
     return tx.crmPipeline.findUniqueOrThrow({ where: { id: pipeline.id }, include: stageInclude })
   })
+}
+
+/**
+ * Fetch the tenant's default (or first) pipeline, provisioning one on the fly
+ * when the tenant has none — every tenant is expected to reach lead conversion /
+ * opportunity creation without a manual pipeline setup step.
+ */
+export async function ensureDefaultPipeline(tenantId: string, userId: string) {
+  const existing = await prisma.crmPipeline.findFirst({
+    where: tenantActiveFilter(tenantId),
+    include: stageInclude,
+    orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+  })
+  if (existing && existing.stages.length > 0) return existing
+  if (existing) {
+    // Pipeline exists but has no stages — backfill the default stage set.
+    await createStages(prisma, tenantId, existing.id, userId, DEFAULT_PIPELINE_STAGES.map((s) => ({ ...s })))
+    return prisma.crmPipeline.findUniqueOrThrow({ where: { id: existing.id }, include: stageInclude })
+  }
+  return createPipeline(tenantId, userId, { name: DEFAULT_PIPELINE_NAME, isDefault: true, status: 'ACTIVE' })
 }
 
 export async function updatePipeline(tenantId: string, id: string, userId: string, data: UpdatePipelineInput) {

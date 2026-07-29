@@ -4,6 +4,7 @@ import { prisma } from '../../../config/prisma.js'
 import { ConflictError, InvalidStateError, ValidationError } from '../../../utils/errors.js'
 import { findWonStage } from '../opportunities/opportunity.repository.js'
 import { normalizeSalesLineForWrite } from '../shared/crm-item-resolver.js'
+import { DEFAULT_VALIDITY_DAYS } from './quotation.constants.js'
 import { includeRelations } from './quotation.repository.js'
 import { calcDocumentTotal, syncLineTotals } from './quotation.workflow.js'
 import type { ConvertQuotationToSalesOrderInput } from '../sales-orders/sales-order.validation.js'
@@ -27,6 +28,12 @@ function formatAddress(parts: Array<string | null | undefined>): string {
 
 function todayDateOnly(): Date {
   return new Date(new Date().toISOString().slice(0, 10))
+}
+
+function addDaysDateOnly(from: Date, days: number): Date {
+  const next = new Date(from)
+  next.setDate(next.getDate() + days)
+  return new Date(next.toISOString().slice(0, 10))
 }
 
 async function buildSoLines(
@@ -196,7 +203,9 @@ export async function convertQuotationToSalesOrder(
   const deliveryTime = quotation.deliveryTime?.trim() || null
   if (!paymentTerms) throw new ValidationError('Payment terms are required')
   if (!deliveryTerms) throw new ValidationError('Delivery terms are required')
-  if (!quotation.validityDate) throw new ValidationError('Quotation validity date is required')
+  // The header is locked from approval onwards, so a missing validity date can no longer be
+  // patched by the user — derive it from the quotation date and backfill it on conversion.
+  const validityDate = quotation.validityDate ?? addDaysDateOnly(quotation.createdAt, DEFAULT_VALIDITY_DAYS)
 
   const company = await prisma.crmCompany.findFirst({
     where: { id: quotation.companyId, tenantId, deletedAt: null },
@@ -221,7 +230,7 @@ export async function convertQuotationToSalesOrder(
 
   const primaryLine = lines[0]
   const totalQty = lines.reduce((s, l) => s + l.qty, 0)
-  const expectedDeliveryDate = parseDate(input.expectedDeliveryDate) ?? quotation.validityDate
+  const expectedDeliveryDate = parseDate(input.expectedDeliveryDate) ?? validityDate
   const warrantyTerms = sectionContent(doc.sections, 'warranty') || null
   const opportunityId = opportunity.id
 
@@ -359,6 +368,7 @@ export async function convertQuotationToSalesOrder(
           locked: true,
           salesOrderId: salesOrder.id,
           salesOrderNo: salesOrder.salesOrderNo,
+          ...(quotation.validityDate ? {} : { validityDate }),
           changeHistory: changeHistory as unknown as Prisma.InputJsonValue,
           updatedBy: userId,
         },

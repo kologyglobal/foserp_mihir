@@ -175,11 +175,15 @@ export function resolveLeadNextBestAction(input: LeadSmartOverviewInput): LeadNe
       sectionId: null,
     }
   }
-  if (input.leadStage === 'qualified' && input.customerId) {
+  const openCommercialStages = new Set(['new', 'contacted', 'requirement_collected', 'qualified'])
+  if (openCommercialStages.has(input.leadStage) && input.customerId) {
     return {
       id: 'create_opportunity',
       title: 'Create Opportunity',
-      description: 'This lead is qualified and linked — continue in the opportunity pipeline.',
+      description:
+        input.leadStage === 'qualified'
+          ? 'This lead is qualified and linked — continue in the opportunity pipeline.'
+          : 'Creates the opportunity and qualifies this lead automatically if needed.',
       ctaLabel: 'Create Opportunity',
       sectionId: null,
     }

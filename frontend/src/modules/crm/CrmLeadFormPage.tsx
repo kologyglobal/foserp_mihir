@@ -2,14 +2,21 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Calendar,
+  Check,
+  Clock,
   Copy,
   ExternalLink,
   FileText,
   Handshake,
   Mail,
+  MapPin,
   MessageCircle,
+  Paperclip,
   Phone,
+  StickyNote,
 } from 'lucide-react'
+import { cn } from '../../utils/cn'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { Input, MobileInput, Select, Textarea } from '../../components/forms/Inputs'
 import { ErpSmartSelect } from '../../components/erp/ErpSmartSelect'
 import { ErpProductPricingSection } from '../../components/erp/ErpProductPricingSection'
@@ -56,6 +63,7 @@ import {
   applyLeadStageDefaults,
   buildLeadStageSmartSelectOptions,
   resolveLeadConvertToOpportunityGate,
+  toLeadDateOnly,
 } from '../../utils/leadUtils'
 import {
   isLeadFieldLocked,
@@ -76,7 +84,7 @@ import type {
 import type { OpportunityLine } from '../../types/crm'
 import { formatStatus } from '../../components/ui/Badge'
 import { formatDate } from '../../utils/dates/format'
-import { ErpFieldRow, ErpFieldGroup, ErpCardCommandBar } from '../../components/erp/card-form'
+import { ErpFieldRow, ErpFieldGroup, ErpCardSection, ErpCardCommandBar } from '../../components/erp/card-form'
 import { FormActionBar } from '../../components/erp/FormActionBar'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
 import { useFormDraftAutosave } from '../../hooks/useFormDraftAutosave'
@@ -137,8 +145,8 @@ const LEAD_SECTION_BY_FIELD: Record<string, string> = {
   email: 'lead-section-quick',
   remarks: 'lead-section-enquiry-notes',
   productRequirement: 'lead-section-requirement',
-  expectedCloseDate: 'lead-section-commercial',
-  nextFollowUpDate: 'lead-section-followup',
+  expectedCloseDate: 'lead-section-quick',
+  nextFollowUpDate: 'lead-section-quick',
   inactiveReason: 'lead-section-status',
   notQualifiedReason: 'lead-section-status',
   closedDate: 'lead-section-status',
@@ -198,7 +206,7 @@ export function CrmLeadFormPage() {
   const [email, setEmail] = useState(existing?.email ?? '')
   const [leadOwnerId, setLeadOwnerId] = useState(existing?.leadOwnerId ?? session.id)
   const [priority, setPriority] = useState<LeadPriority>(existing?.priority ?? 'medium')
-  const [createdDate, setCreatedDate] = useState(existing?.createdDate ?? todayIso())
+  const [createdDate, setCreatedDate] = useState(toLeadDateOnly(existing?.createdDate) ?? todayIso())
   const [source, setSource] = useState<LeadSource>(existing?.source ?? 'other')
   const [industry, setIndustry] = useState(existing?.industry ?? '')
   const [requirementLines, setRequirementLines] = useState<OpportunityLine[]>(() =>
@@ -267,7 +275,7 @@ export function CrmLeadFormPage() {
     )
     setExpectedValue(duplicateSource.expectedValue ?? 0)
     setProbability(duplicateSource.probability ?? 30)
-    setExpectedCloseDate(duplicateSource.expectedCloseDate ?? '')
+    setExpectedCloseDate(toLeadDateOnly(duplicateSource.expectedCloseDate) ?? '')
     setRemarks(duplicateSource.remarks ?? '')
     setLeadStage('new')
     setNotQualifiedReason('')
@@ -291,7 +299,7 @@ export function CrmLeadFormPage() {
     setEmail(existing.email ?? '')
     setLeadOwnerId(existing.leadOwnerId)
     setPriority(existing.priority)
-    setCreatedDate(existing.createdDate)
+    setCreatedDate(toLeadDateOnly(existing.createdDate) ?? todayIso())
     setSource(existing.source)
     setIndustry(existing.industry ?? '')
     setRequirementLines(
@@ -303,16 +311,16 @@ export function CrmLeadFormPage() {
     )
     setExpectedValue(existing.expectedValue ?? 0)
     setProbability(existing.probability ?? 30)
-    setExpectedCloseDate(existing.expectedCloseDate ?? '')
+    setExpectedCloseDate(toLeadDateOnly(existing.expectedCloseDate) ?? '')
     setRemarks(existing.remarks ?? '')
     setLeadStage(existing.stage)
     setNotQualifiedReason(existing.notQualifiedReason ?? '')
     setActivityStatus(existing.activityStatus)
     setInactiveReason(existing.inactiveReason ?? '')
     setLifecycleStatus(existing.lifecycleStatus)
-    setClosedDate(existing.closedDate ?? '')
+    setClosedDate(toLeadDateOnly(existing.closedDate) ?? '')
     setClosedReason(existing.closedReason ?? '')
-    setNextFollowUpDate(existing.nextFollowUpDate ?? '')
+    setNextFollowUpDate(toLeadDateOnly(existing.nextFollowUpDate) ?? '')
     setFollowUpType(existing.followUpType ?? 'call')
     setFollowUpNotes(existing.followUpNotes ?? '')
     if (existing.locationId) setLocationId(existing.locationId)
@@ -477,7 +485,6 @@ export function CrmLeadFormPage() {
       createdDate,
       mobile,
       email,
-      remarks,
       expectedValue,
     },
     {
@@ -500,10 +507,6 @@ export function CrmLeadFormPage() {
       },
       email: {
         validate: (v) => validateEmail(String(v ?? '')),
-      },
-      remarks: {
-        required: true,
-        message: 'Notes are required',
       },
     },
   )
@@ -602,30 +605,54 @@ export function CrmLeadFormPage() {
     else resetDirty()
   }, [dirtySnapshot, markDirty, resetDirty])
 
+  const productLabel = useTenantProfileStore((s) => s.term('product', 'Product'))
+  const showLocationField = !useTenantProfileStore((s) => s.isServices())
+
   const completionItems = useMemo(() => [
-    { id: 'quick', label: 'Quick entry', done: Boolean((company.prospectName.trim() || company.customerId) && leadOwnerId && (requirementText || remarks.trim())) },
-    { id: 'communication', label: 'Communication', done: Boolean(email.trim() || mobile.trim()) },
-    { id: 'requirement', label: 'Requirement', done: hasLeadRequirementLines(requirementLines) || Boolean(remarks.trim()) },
+    { id: 'quick', label: 'Lead Information', done: Boolean((company.prospectName.trim() || company.customerId) && leadOwnerId) },
+    { id: 'communication', label: 'Contact', done: Boolean(email.trim() || mobile.trim()) },
+    { id: 'enquiry-notes', label: 'Enquiry Notes', done: Boolean(remarks.trim()) },
+    { id: 'requirement', label: `${productLabel} & Pricing`, done: hasLeadRequirementLines(requirementLines) },
     { id: 'commercial', label: 'Commercial', done: expectedValue > 0 && Boolean(expectedCloseDate) },
     { id: 'followup', label: 'Follow-up', done: Boolean(nextFollowUpDate) },
-    { id: 'documents', label: 'Documents', done: attachments.length > 0 },
+    { id: 'notes', label: 'Internal Notes', done: Boolean(internalNotes.trim()) },
+    { id: 'documents', label: 'Attachments', done: attachments.length > 0 },
     { id: 'status', label: 'Status', done: activityStatus === 'active' || Boolean(inactiveReason) },
-  ], [company.prospectName, company.customerId, leadOwnerId, requirementText, requirementLines, remarks, email, mobile, expectedValue, expectedCloseDate, nextFollowUpDate, attachments.length, activityStatus, inactiveReason])
+  ], [company.prospectName, company.customerId, leadOwnerId, requirementLines, remarks, email, mobile, expectedValue, expectedCloseDate, nextFollowUpDate, attachments.length, activityStatus, inactiveReason, productLabel, internalNotes])
 
   const completionPercent = useMemo(() => {
     if (completionItems.length === 0) return 0
     return Math.round((completionItems.filter((i) => i.done).length / completionItems.length) * 100)
   }, [completionItems])
 
+  /**
+   * Compact one-viewport layout: secondary sections (Requirement, Commercial,
+   * Follow-up, Internal Notes, Attachments, Status) are collapsible FastTabs
+   * that default closed. Bumping a section's counter force-opens it — driven
+   * by the section rail, invalid-submit focus, and Smart Context shortcuts.
+   */
+  const [sectionForceOpen, setSectionForceOpen] = useState<Record<string, number>>({})
+  function bumpSectionOpen(sectionId: string) {
+    setSectionForceOpen((prev) => ({ ...prev, [sectionId]: (prev[sectionId] ?? 0) + 1 }))
+  }
+
   function scrollToSection(sectionId: string) {
-    const mapped = sectionId === 'communication' ? 'status' : sectionId
+    // Expected Revenue / Probability / Expected Closing Date / Currency and
+    // Lead Status now live inside Lead Information (see fields-in-quick-entry
+    // note below) — route legacy 'commercial' jumps there too.
+    const mapped = sectionId === 'communication' || sectionId === 'commercial' ? 'quick' : sectionId
     const targetId =
       mapped === 'quick'
         ? 'lead-section-quick'
-        : mapped === 'notes' || mapped === 'enquiry-notes'
+        : mapped === 'enquiry-notes'
           ? 'lead-section-enquiry-notes'
-          : `lead-section-${mapped}`
-    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          : mapped === 'notes'
+            ? 'lead-section-notes'
+            : `lead-section-${mapped}`
+    bumpSectionOpen(targetId)
+    window.setTimeout(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
   }
 
   const quoteOpportunityId = useMemo(
@@ -840,8 +867,10 @@ export function CrmLeadFormPage() {
     })
   }
 
-  function expandLeadSectionForField(_sectionId: string) {
-    // Continuous plain form — all blocks are visible; focus/scroll is handled by handleInvalidSubmit.
+  function expandLeadSectionForField(sectionId: string) {
+    // Secondary sections are collapsible FastTabs — force the one with the first
+    // invalid field open before handleInvalidSubmit scrolls/focuses it.
+    bumpSectionOpen(sectionId)
   }
 
   function buildPayload() {
@@ -1205,11 +1234,11 @@ export function CrmLeadFormPage() {
   return (
     <>
       <CrmCardFormShell
-        title={isEdit ? 'Edit Lead' : 'New Lead'}
+        title={isEdit ? 'Edit Lead' : 'Create Lead'}
         badge="CRM"
-        className="crm-lead-form-page crm-lead-form-page--plain enterprise-workspace--dynamics-form enterprise-workspace--crm-smart-overview"
+        className="crm-lead-form-page crm-lead-form-page--zoho enterprise-workspace--dynamics-form enterprise-workspace--crm-smart-overview"
         recordNo={existing?.leadNo ?? 'New'}
-        recordTitle={company.prospectName.trim() || (isEdit ? existing?.prospectName : 'New Lead') || 'New Lead'}
+        recordTitle={company.prospectName.trim() || (isEdit ? existing?.prospectName : 'Create Lead') || 'Create Lead'}
         status={formatStatus(lifecycleStatus)}
         statusTone={leadStage === 'closed' ? 'critical' : leadStage === 'qualified' ? 'success' : 'info'}
         stage={leadStageLabel(leadStage)}
@@ -1273,9 +1302,43 @@ export function CrmLeadFormPage() {
           />
         ) : null}
 
-        <div className="crm-lead-form-flow">
-        <div id="lead-section-quick" className="crm-lead-quick-entry">
-          <ErpFieldGroup label="Prospect" columns={3}>
+        <div className="crm-lead-zoho-layout">
+          <nav className="crm-lead-zoho-rail" aria-label="Lead form sections">
+            <p className="crm-lead-zoho-rail__eyebrow">{isEdit ? 'Edit Lead' : 'Create Lead'}</p>
+            <p className="crm-lead-zoho-rail__title">Sections</p>
+            <ul className="crm-lead-zoho-rail__list">
+              {completionItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className={cn('crm-lead-zoho-rail__item', item.done && 'is-done')}
+                    onClick={() => scrollToSection(item.id)}
+                  >
+                    <span className="crm-lead-zoho-rail__marker" aria-hidden>
+                      {item.done ? <Check size={12} strokeWidth={2.5} /> : null}
+                    </span>
+                    <span className="crm-lead-zoho-rail__label">{item.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="crm-lead-zoho-rail__progress" aria-label={`${completionPercent}% complete`}>
+              <div className="crm-lead-zoho-rail__progress-meta">
+                <span>Completion</span>
+                <strong>{completionPercent}%</strong>
+              </div>
+              <div className="crm-lead-zoho-rail__bar">
+                <div className="crm-lead-zoho-rail__bar-fill" style={{ width: `${completionPercent}%` }} />
+              </div>
+            </div>
+          </nav>
+
+          <div className="crm-lead-form-flow crm-lead-zoho-canvas">
+        <div id="lead-section-quick" className="crm-lead-quick-entry crm-lead-zoho-block">
+          {/* Merged Lead Information / Contact / Ownership / Stage into one dense
+              FastTab so the primary create path fits one viewport without headers
+              eating vertical space for every sub-group. */}
+          <ErpFieldGroup label="Lead Information" columns={3} className="crm-lead-zoho-section">
             <ErpFieldRow
               label="Company / Prospect"
               required
@@ -1311,9 +1374,14 @@ export function CrmLeadFormPage() {
                 disabled={fieldLocked('customerId') || fieldLocked('prospectName')}
               />
             </ErpFieldRow>
-          </ErpFieldGroup>
-
-          <ErpFieldGroup label="Contact" columns={3}>
+            <ErpFieldRow label="Industry" horizontal={false}>
+              <Input
+                value={industry}
+                onChange={(e) => setIndustry(e.target.value)}
+                placeholder="Industry segment"
+                className="erp-input"
+              />
+            </ErpFieldRow>
             {company.customerId ? (
               <ErpFieldRow
                 label="Contact Person"
@@ -1418,9 +1486,6 @@ export function CrmLeadFormPage() {
                 disabled={fieldLocked('email')}
               />
             </ErpFieldRow>
-          </ErpFieldGroup>
-
-          <ErpFieldGroup label="Ownership" columns={3}>
             <ErpFieldRow
               label="Lead Owner"
               required
@@ -1477,9 +1542,6 @@ export function CrmLeadFormPage() {
                 disabled={fieldLocked('priority')}
               />
             </ErpFieldRow>
-          </ErpFieldGroup>
-
-          <ErpFieldGroup label="Stage & timing" columns={3}>
             <ErpFieldRow label="Lead Stage" required horizontal={false}>
               <ErpSmartSelect
                 options={leadStageSelectOptions}
@@ -1527,70 +1589,10 @@ export function CrmLeadFormPage() {
                 className="erp-input"
               />
             </ErpFieldRow>
-          </ErpFieldGroup>
-        </div>
-
-        <div id="lead-section-enquiry-notes">
-          <ErpFieldGroup label="Enquiry notes" columns={1}>
-            <ErpFieldRow
-              label="Notes"
-              required
-              colSpan={3}
-              horizontal={false}
-              dataField="remarks"
-              fieldState={
-                (inlineValidation.fieldError('remarks') ?? validationErrors.remarks)
-                  ? 'error'
-                  : inlineValidation.fieldState('remarks')
-              }
-              fieldError={inlineValidation.fieldError('remarks') ?? validationErrors.remarks}
-              hint="Capture call summaries, requirements, and next steps."
-            >
-              <Textarea
-                rows={5}
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                onBlur={() => inlineValidation.touch('remarks')}
-                placeholder="Context from first call or enquiry…"
-                className="erp-input"
-                error={Boolean(inlineValidation.fieldError('remarks') ?? validationErrors.remarks)}
-                disabled={fieldLocked('remarks')}
-              />
-            </ErpFieldRow>
-          </ErpFieldGroup>
-        </div>
-
-        <div id="lead-section-requirement">
-          <ErpProductPricingSection
-            sectionId="lead-section-requirement-pricing"
-            nbaTarget="requirement"
-            title="Product & Pricing"
-            subtitle="Build line items, then review adjustments and the live order total."
-            accent="blue"
-            lines={requirementLines}
-            onChange={(next) => {
-              handleRequirementLinesChange(next)
-            }}
-            productOptions={productOptions}
-            productPickMap={pickMap}
-          >
-            {validationErrors.productRequirement ? (
-              <p className="erp-field-row__error mt-2" data-field="productRequirement">
-                {validationErrors.productRequirement}
-              </p>
-            ) : null}
-            <div className="mt-4">
-              <ErpFieldGroup label="Industry" columns={3}>
-                <ErpFieldRow label="Industry" colSpan={3} horizontal={false}>
-                  <Input value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="Industry segment" className="erp-input" />
-                </ErpFieldRow>
-              </ErpFieldGroup>
-            </div>
-          </ErpProductPricingSection>
-        </div>
-
-        <div id="lead-section-commercial">
-          <ErpFieldGroup label="Commercial" columns={3}>
+            {/* Expected Revenue / Probability / Expected Closing Date / Currency and
+                Lead Status live here (moved from the former Commercial and
+                Status & Location FastTabs) so Lead Information is the single
+                place to see deal value and lead status at a glance. */}
             <ErpFieldRow label="Expected Revenue (₹)" horizontal={false} dataField="expectedValue" fieldState={inlineValidation.fieldState('expectedValue')}>
               <Input
                 type="number"
@@ -1638,11 +1640,78 @@ export function CrmLeadFormPage() {
             <ErpFieldRow label="Currency" readOnly horizontal={false}>
               <Input value="INR (₹)" readOnly className="erp-input" />
             </ErpFieldRow>
+            <ErpFieldRow label="Lead Status" horizontal={false}>
+              <Select native value={activityStatus} onChange={(e) => setActivityStatus(e.target.value as LeadActivityStatus)} className="erp-input">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </Select>
+            </ErpFieldRow>
           </ErpFieldGroup>
         </div>
 
+        <div id="lead-section-enquiry-notes">
+          <ErpFieldGroup label="Enquiry Notes" columns={1} className="crm-lead-zoho-section">
+            <ErpFieldRow
+              label="Notes"
+              colSpan={3}
+              horizontal={false}
+              dataField="remarks"
+              fieldState={validationErrors.remarks ? 'error' : 'idle'}
+              fieldError={validationErrors.remarks}
+              hint="Capture call summaries, requirements, and next steps."
+            >
+              <Textarea
+                rows={3}
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="Context from first call or enquiry…"
+                className="erp-input"
+                error={Boolean(validationErrors.remarks)}
+                disabled={fieldLocked('remarks')}
+              />
+            </ErpFieldRow>
+          </ErpFieldGroup>
+        </div>
+
+        {/* Secondary sections default collapsed — compact FastTabs so the primary
+            create path (above) fits one viewport. Expand on click, rail chip, or
+            when a validation error lands inside them. */}
+        <div id="lead-section-requirement">
+          <ErpProductPricingSection
+            sectionId="lead-section-requirement-pricing"
+            nbaTarget="requirement"
+            title={`${productLabel} & Pricing`}
+            subtitle={`Build ${productLabel.toLowerCase()} lines, then review adjustments and the live total.`}
+            accent="blue"
+            lines={requirementLines}
+            onChange={(next) => {
+              handleRequirementLinesChange(next)
+            }}
+            productOptions={productOptions}
+            productPickMap={pickMap}
+            defaultOpen={hasLeadRequirementLines(requirementLines)}
+            forceOpenKey={sectionForceOpen['lead-section-requirement']}
+          >
+            {validationErrors.productRequirement ? (
+              <p className="erp-field-row__error mt-2" data-field="productRequirement">
+                {validationErrors.productRequirement}
+              </p>
+            ) : null}
+          </ErpProductPricingSection>
+        </div>
+
         <div id="lead-section-followup">
-          <ErpFieldGroup label="Follow-up" columns={3}>
+          <ErpCardSection
+            title="Follow-up"
+            subtitle="Schedule the next call, meeting, or email."
+            icon={Clock}
+            accent="amber"
+            collapsible
+            defaultOpen={Boolean(nextFollowUpDate) || Boolean(followUpNotes)}
+            forceOpenKey={sectionForceOpen['lead-section-followup']}
+            columns={3}
+            className="crm-lead-zoho-section"
+          >
             <ErpFieldRow label="Follow-up Type" horizontal={false}>
               <ErpSmartSelect
                 options={followUpSelectOptions}
@@ -1658,46 +1727,82 @@ export function CrmLeadFormPage() {
             <ErpFieldRow label="Remarks" colSpan={3} horizontal={false}>
               <Textarea rows={2} value={followUpNotes} onChange={(e) => setFollowUpNotes(e.target.value)} placeholder="Follow-up notes" className="erp-input" />
             </ErpFieldRow>
-          </ErpFieldGroup>
+          </ErpCardSection>
         </div>
 
         <div id="lead-section-notes">
-          <ErpFieldGroup label="Internal notes" columns={3}>
+          <ErpCardSection
+            title="Internal Notes"
+            subtitle="Team-only notes and campaign reference — not shown to the customer."
+            icon={StickyNote}
+            accent="slate"
+            optional
+            collapsible
+            defaultOpen={Boolean(internalNotes) || Boolean(reference)}
+            forceOpenKey={sectionForceOpen['lead-section-notes']}
+            columns={1}
+            className="crm-lead-zoho-section"
+          >
             <ErpFieldRow label="Internal Notes" colSpan={3} horizontal={false}>
-              <Textarea rows={5} value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} placeholder="Internal team notes" className="erp-input" />
+              <Textarea rows={3} value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} placeholder="Internal team notes" className="erp-input" />
             </ErpFieldRow>
             <ErpFieldRow label="Reference" colSpan={3} horizontal={false}>
               <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Campaign / RFQ ref" className="erp-input" />
             </ErpFieldRow>
-          </ErpFieldGroup>
+          </ErpCardSection>
         </div>
 
         <div id="lead-section-documents">
-          <ErpFieldGroup label="Attachments" columns={1}>
+          <ErpCardSection
+            title="Attachments"
+            subtitle="Choose document type, then upload supporting files."
+            icon={Paperclip}
+            accent="slate"
+            optional
+            collapsible
+            defaultOpen={attachments.length > 0}
+            forceOpenKey={sectionForceOpen['lead-section-documents']}
+            columns={1}
+            className="crm-lead-zoho-section"
+          >
             <CrmTypedDocumentUpload
               attachments={attachments}
               onChange={setAttachments}
             />
-          </ErpFieldGroup>
+          </ErpCardSection>
         </div>
 
         <div id="lead-section-status">
-          <ErpFieldGroup label="Status & location" columns={3}>
+          <ErpCardSection
+            title={showLocationField ? 'Status & Location' : 'Status'}
+            subtitle={
+              showLocationField
+                ? 'Territory, fulfillment location, and lifecycle reasons.'
+                : 'Territory and lifecycle reasons.'
+            }
+            icon={MapPin}
+            accent="slate"
+            collapsible
+            defaultOpen={
+              activityStatus === 'inactive' || leadStage === 'not_qualified' || leadStage === 'closed'
+            }
+            forceOpenKey={sectionForceOpen['lead-section-status']}
+            columns={3}
+            className="crm-lead-zoho-section"
+          >
             <ErpFieldRow label="Territory" readOnly horizontal={false}>
               <Input value={territory} readOnly className="erp-input" />
             </ErpFieldRow>
-            <LocationFieldRow
-              value={locationId}
-              onChange={(locId) => setLocationId(locId)}
-              usage="sales"
-              horizontal={false}
-            />
-            <ErpFieldRow label="Lead Status" horizontal={false}>
-              <Select native value={activityStatus} onChange={(e) => setActivityStatus(e.target.value as LeadActivityStatus)} className="erp-input">
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </Select>
-            </ErpFieldRow>
+            {showLocationField ? (
+              <LocationFieldRow
+                value={locationId}
+                onChange={(locId) => setLocationId(locId)}
+                usage="sales"
+                horizontal={false}
+              />
+            ) : null}
+            {/* Lead Status select moved to Lead Information — kept here only as
+                the condition driving Inactive Reason below. */}
             <ErpFieldRow label="Lifecycle" readOnly horizontal={false}>
               <Input value={formatStatus(lifecycleStatus)} readOnly className="erp-input" />
             </ErpFieldRow>
@@ -1770,8 +1875,9 @@ export function CrmLeadFormPage() {
                 </ErpFieldRow>
               </>
             ) : null}
-          </ErpFieldGroup>
+          </ErpCardSection>
         </div>
+          </div>
         </div>
 
         </div>

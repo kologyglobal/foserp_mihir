@@ -110,9 +110,6 @@ export function assertConfirmable(order: CrmSalesOrder): void {
   if (!quotationBacked && !directOrder) {
     throw new InvalidStateError('Sales order must be linked to a quotation or created as a direct SO')
   }
-  if (directOrder && !quotationBacked && !order.directSoReason?.trim()) {
-    throw new ValidationError('Direct sales orders require a justification before confirmation')
-  }
   if (!order.customerPoNumber?.trim()) {
     throw new ValidationError('Customer PO number is required before confirmation')
   }

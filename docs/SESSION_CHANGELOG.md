@@ -1,3 +1,28 @@
+## 2026-07-29 — Port Kology CRM/Sales day-pack into foserp_mihir
+
+### Shipped
+Ported today's Kology-ERP CRM / Sales UX + bugfixes into this repo (manufacturing-safe defaults via `tenantProfileStore` → `MANUFACTURING`):
+
+- **Lead → Opportunity mirror** — create/qualify/stage sync + Opportunities list backfill; convert reuses mirror; delete opp reopens converted lead as Qualified
+- **Self-healing default pipeline** (`ensureDefaultPipeline`)
+- **Lead form** design + date-only `createdDate` hydrate; Notes not falsely required
+- **Auto-qualify** when Create Opportunity / Quotation from a lead
+- **Opp / Quotation / SO create** form layout alignment; SO 360 Smart Context polish
+- **More Actions / CommandBar** overflow fix; Quotation editor duplicate actions cleanup
+- **Quotation → SO** validity date default when field missing; **direct SO reason** optional
+- **PDF export** aligned with preview (`documentPdfDownload` + print docs)
+- **Direct tax invoice** (no SO/proforma) + demo commercial permission seed keys
+- Prisma import path fixed for this repo (`config/prisma.js`)
+
+### Verify
+- Backend `tsc --noEmit` — clean
+- Frontend `tsc -b --noEmit` — clean
+
+### Not ported (Kology-only packaging)
+- Full SERVICES tenant seed / IndiaMART hide / recurring invoices / Kology proposal Word templates (already scoped to Kology packaging commits)
+
+---
+
 ## 2026-07-29 — PO editor / lifecycle (`purchase_16`)
 
 ### Shipped

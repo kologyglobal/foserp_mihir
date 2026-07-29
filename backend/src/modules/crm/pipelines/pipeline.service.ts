@@ -5,7 +5,12 @@ import * as repo from './pipeline.repository.js'
 import { mapPipelineToDto } from './pipeline.types.js'
 import type { CreatePipelineInput, ListPipelinesQuery, UpdatePipelineInput } from './pipeline.validation.js'
 
-export async function listPipelines(tenantId: string, query: ListPipelinesQuery) {
+export async function listPipelines(tenantId: string, query: ListPipelinesQuery, userId?: string) {
+  if (userId) {
+    // Self-heal tenants that never had a pipeline provisioned — CRM conversion
+    // (lead → opportunity) and manual opportunity creation both depend on one existing.
+    await repo.ensureDefaultPipeline(tenantId, userId)
+  }
   const result = await repo.findPipelines(tenantId, query)
   const nameMap = await resolveUserNames(
     result.items.flatMap((p) => [p.createdBy, p.updatedBy]),

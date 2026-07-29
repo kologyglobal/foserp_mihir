@@ -7,7 +7,8 @@ import * as service from './pipeline.service.js'
 
 export const listPipelines = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = getTenantId(req)
-  const result = await service.listPipelines(tenantId, req.query as never)
+  const { userId } = getContext(req)
+  const result = await service.listPipelines(tenantId, req.query as never, userId)
   sendPaginated(res, 'Pipelines retrieved', result.items, buildPaginationMeta(result.total, result.page, result.limit))
 })
 

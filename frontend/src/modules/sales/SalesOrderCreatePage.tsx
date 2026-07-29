@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
   Building2,
+  Check,
   ClipboardList,
   ExternalLink,
   FileImage,
@@ -21,9 +22,8 @@ import {
   ErpCardSection,
   ErpFieldGroup,
   ErpFieldRow,
-  ErpQuickEntrySection,
-  ErpStickySaveBar,
 } from '../../components/erp/card-form'
+import { FormActionBar } from '../../components/erp/FormActionBar'
 import { CrmCardFormShell } from '@/components/crm/CrmCardFormShell'
 import { CrmSmartOverviewPanel } from '@/components/crm/CrmSmartOverviewPanel'
 import { DynamicsStatusChip } from '../../components/dynamics/DynamicsStatusChip'
@@ -70,11 +70,13 @@ import { buildSalesOrderLinesFromQuotationDocument } from '../../utils/crmQuotat
 import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { useDocumentLocation } from '../../hooks/useDocumentLocation'
 import { locationDisplayLabel } from '../../utils/locationUtils'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import {
   SalesOrderCreateModeChooser,
   type SalesOrderCreateMode,
 } from '../../components/sales/SalesOrderCreateModeChooser'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
+import { cn } from '../../utils/cn'
 
 const GST_RATE_OPTIONS = [0, 5, 12, 18, 28] as const
 
@@ -236,6 +238,9 @@ export function SalesOrderNewPage() {
   )
   const [deliveryLocation, setDeliveryLocation] = useState(opportunityPrefill?.deliveryLocation ?? '')
   const { locationId, setLocationId } = useDocumentLocation('sales', opportunityPrefill?.locationId)
+  const isServices = useTenantProfileStore((s) => s.isServices())
+  const showLocationSection = !isServices
+  const showFreight = !isServices
   const [internalRemarks, setInternalRemarks] = useState(opportunityPrefill?.internalRemarks ?? '')
   const [freightAmount, setFreightAmount] = useState(0)
   const [orderDiscountMode, setOrderDiscountMode] = useState<'flat' | 'percent'>('flat')
@@ -320,6 +325,7 @@ export function SalesOrderNewPage() {
   )
 
   const orderSummary = useMemo(() => {
+    const effectiveFreight = showFreight ? freightAmount : 0
     const totalQty = computedLines.reduce((s, l) => s + l.qty, 0)
     const basicAmount = round2(computedLines.reduce((s, l) => s + l.qty * l.unitPrice, 0))
     const subtotal = round2(computedLines.reduce((s, l) => s + l.taxableValue, 0))
@@ -333,8 +339,8 @@ export function SalesOrderNewPage() {
     const orderDiscountAmount =
       orderDiscountMode === 'percent'
         ? round2(discountBase * (Math.min(100, Math.max(0, orderDiscountInput)) / 100))
-        : round2(Math.min(Math.max(0, orderDiscountInput), discountBase + freightAmount))
-    const grandTotal = round2(subtotal + totalGst + freightAmount - orderDiscountAmount)
+        : round2(Math.min(Math.max(0, orderDiscountInput), discountBase + effectiveFreight))
+    const grandTotal = round2(subtotal + totalGst + effectiveFreight - orderDiscountAmount)
     return {
       totalQty,
       basicAmount,
@@ -344,8 +350,9 @@ export function SalesOrderNewPage() {
       totalGst,
       orderDiscountAmount,
       grandTotal,
+      freightAmount: effectiveFreight,
     }
-  }, [computedLines, freightAmount, orderDiscountInput, orderDiscountMode])
+  }, [computedLines, freightAmount, orderDiscountInput, orderDiscountMode, showFreight])
 
   function applyQuotation(docId: string) {
     if (!docId) return
@@ -581,7 +588,7 @@ export function SalesOrderNewPage() {
           quotationRevisionNo: linkedDoc?.revisionNo ?? linkedQuo?.revisionNo ?? null,
           quotationDocumentId: quotationDocumentId || null,
           customerPoDate: customerPoDate || undefined,
-          freightAmount,
+          freightAmount: showFreight ? freightAmount : 0,
           orderDiscountAmount: orderSummary.orderDiscountAmount,
           lines: lines.map((l) => ({
             itemId: l.itemId,
@@ -681,18 +688,6 @@ export function SalesOrderNewPage() {
     ? getQuotation(opportunityPrefill.quotationId)?.quotationNo
     : undefined
   const quotationDisplayNo = linkedQuotationNo ?? opportunityQuotationNo ?? '—'
-
-  const documentStrip = [
-    { label: 'SO No.', value: 'Auto on save' },
-    { label: 'Status', value: 'Draft SO' },
-    { label: 'Mode', value: modeBadgeLabel, highlight: true },
-    { label: 'Customer', value: customer?.customerName ?? '—', highlight: Boolean(customerId) },
-    { label: 'Customer PO', value: customerPoNumber.trim() || '—', highlight: Boolean(customerPoNumber.trim()) },
-    { label: 'Quotation', value: createMode === 'quotation' ? quotationDisplayNo : '—', highlight: createMode === 'quotation' && quotationDisplayNo !== '—' },
-    { label: 'Opportunity', value: opportunityPrefill?.opportunityNo ?? '—', highlight: Boolean(opportunityPrefill) },
-    { label: 'Lines', value: String(lines.length), highlight: lines.length > 0 },
-    { label: 'Grand Total', value: orderSummary.grandTotal > 0 ? formatCurrency(orderSummary.grandTotal) : '—', highlight: orderSummary.grandTotal > 0 },
-  ]
 
   const recordTitle = fromOpportunity && opportunityPrefill
     ? opportunityPrefill.opportunityName
@@ -1014,19 +1009,21 @@ export function SalesOrderNewPage() {
         <div className="so-pricing-adjust">
           <p className="so-pricing-adjust__title">Order adjustments</p>
           <div className="so-pricing-charges">
-            <label className="so-pricing-charge">
-              <span className="so-pricing-charge__label">Freight</span>
-              <div className="so-pricing-charge__control">
-                <span className="so-pricing-charge__prefix" aria-hidden>₹</span>
-                <Input
-                  type="number"
-                  min={0}
-                  className="so-pricing-input so-pricing-input--num"
-                  value={freightAmount}
-                  onChange={(e) => setFreightAmount(Math.max(0, Number(e.target.value) || 0))}
-                />
-              </div>
-            </label>
+            {showFreight ? (
+              <label className="so-pricing-charge">
+                <span className="so-pricing-charge__label">Freight</span>
+                <div className="so-pricing-charge__control">
+                  <span className="so-pricing-charge__prefix" aria-hidden>₹</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    className="so-pricing-input so-pricing-input--num"
+                    value={freightAmount}
+                    onChange={(e) => setFreightAmount(Math.max(0, Number(e.target.value) || 0))}
+                  />
+                </div>
+              </label>
+            ) : null}
             <div className="so-pricing-charge">
               <div className="so-pricing-charge__label-row">
                 <span className="so-pricing-charge__label">Order discount</span>
@@ -1119,10 +1116,12 @@ export function SalesOrderNewPage() {
               <span>Total GST</span>
               <span className="tabular-nums">{formatCurrency(orderSummary.totalGst)}</span>
             </div>
-            <div className="so-pricing-summary__row">
-              <span>Freight</span>
-              <span className="tabular-nums">{formatCurrency(freightAmount)}</span>
-            </div>
+            {showFreight ? (
+              <div className="so-pricing-summary__row">
+                <span>Freight</span>
+                <span className="tabular-nums">{formatCurrency(orderSummary.freightAmount)}</span>
+              </div>
+            ) : null}
             <div className="so-pricing-summary__row">
               <span>
                 Order discount
@@ -1272,7 +1271,7 @@ export function SalesOrderNewPage() {
       </ErpFieldGroup>
 
       <ErpFieldGroup label="Customer purchase order" className="so-qe-po-group" columns={4}>
-        <ErpFieldRow label="Customer PO Number" required dataField="customerPoNumber" fieldError={validationErrors.customerPoNumber}>
+        <ErpFieldRow label="Customer PO Number" dataField="customerPoNumber" fieldError={validationErrors.customerPoNumber}>
           <Input
             value={customerPoNumber}
             onChange={(e) => setCustomerPoNumber(e.target.value)}
@@ -1289,13 +1288,15 @@ export function SalesOrderNewPage() {
             onChange={(e) => setExpectedDeliveryDate(e.target.value)}
           />
         </ErpFieldRow>
+        <ErpFieldRow label="Create Mode" readOnly>
+          <Input value={modeBadgeLabel} readOnly />
+        </ErpFieldRow>
       </ErpFieldGroup>
     </>
   )
 
   const linesSection = (
     <ErpCardSection
-      id="so-section-lines"
       nbaTarget="lines"
       title="Product & Pricing"
       subtitle="Build line items, then review adjustments and the live order total."
@@ -1312,7 +1313,6 @@ export function SalesOrderNewPage() {
 
   const commercialSection = (
     <ErpCardSection
-      id="so-section-commercial"
       title="Commercial & Delivery"
       subtitle="Payment, fulfilment location, and optional notes."
       icon={Banknote}
@@ -1323,8 +1323,8 @@ export function SalesOrderNewPage() {
       columns={1}
     >
       <div className="so-commercial-body">
-        <ErpFieldGroup label="Commercial terms" className="so-commercial-group" columns={3}>
-          <ErpFieldRow label="Payment Terms" required dataField="paymentTerms" fieldError={validationErrors.paymentTerms}>
+        <ErpFieldGroup label="Commercial terms" className="so-commercial-group" columns={4}>
+          <ErpFieldRow label="Payment Terms" dataField="paymentTerms" fieldError={validationErrors.paymentTerms}>
             <CommercialTermSelect
               termType="payment"
               value={paymentTerms}
@@ -1332,7 +1332,7 @@ export function SalesOrderNewPage() {
               placeholder="Select payment terms"
             />
           </ErpFieldRow>
-          <ErpFieldRow label="Delivery Terms" required dataField="deliveryTerms" fieldError={validationErrors.deliveryTerms}>
+          <ErpFieldRow label="Delivery Terms" dataField="deliveryTerms" fieldError={validationErrors.deliveryTerms}>
             <CommercialTermSelect
               termType="delivery"
               value={deliveryTerms}
@@ -1342,7 +1342,6 @@ export function SalesOrderNewPage() {
           </ErpFieldRow>
           <ErpFieldRow
             label="Delivery Time / Lead Time"
-            required
             dataField="deliveryTime"
             fieldError={validationErrors.deliveryTime}
             hint="Commitment shown on print and PDF"
@@ -1358,22 +1357,27 @@ export function SalesOrderNewPage() {
               ))}
             </Select>
           </ErpFieldRow>
+          <ErpFieldRow label="Order Total" readOnly>
+            <Input value={formatCurrency(orderSummary.grandTotal)} readOnly />
+          </ErpFieldRow>
         </ErpFieldGroup>
 
-        <ErpFieldGroup label="Fulfilment" className="so-commercial-group" columns={2}>
-          <LocationFieldRow
-            value={locationId}
-            onChange={(locId) => {
-              setLocationId(locId)
-              const loc = locations.find((l) => l.id === locId)
-              if (loc) setDeliveryLocation(locationDisplayLabel(loc))
-            }}
-            usage="sales"
-            colSpan={2}
-            label="Fulfilment location"
-            hint="Where goods will ship from — inherited from Lead → Opportunity → Quotation when available"
-          />
-        </ErpFieldGroup>
+        {showLocationSection ? (
+          <ErpFieldGroup label="Fulfilment" className="so-commercial-group" columns={2}>
+            <LocationFieldRow
+              value={locationId}
+              onChange={(locId) => {
+                setLocationId(locId)
+                const loc = locations.find((l) => l.id === locId)
+                if (loc) setDeliveryLocation(locationDisplayLabel(loc))
+              }}
+              usage="sales"
+              colSpan={2}
+              label="Fulfilment location"
+              hint="Where goods will ship from — inherited from Lead → Opportunity → Quotation when available"
+            />
+          </ErpFieldGroup>
+        ) : null}
 
         <ErpFieldGroup label="Notes" className="so-commercial-group" columns={1}>
           {needsDirectReasonField ? (
@@ -1405,7 +1409,6 @@ export function SalesOrderNewPage() {
 
   const documentsSection = (
     <ErpCardSection
-      id="so-section-documents"
       title="Document Attachments"
       subtitle="PDF, images, Excel, drawings, and customer PO."
       icon={Paperclip}
@@ -1513,30 +1516,50 @@ export function SalesOrderNewPage() {
   ) : null
 
   const formBody = (
-    <div className="erp-form-body crm-so-create-body">
+    <div className="erp-form-body crm-lead-form-body crm-so-create-body">
       {contextBanner}
-      <ErpQuickEntrySection
-        id="so-section-quick"
-        title="Quick Entry"
-        subtitle={
-          createMode === 'quotation'
-            ? 'From quotation — pick an approved quote, then confirm PO details.'
-            : 'Direct sales order — choose customer and PO; quotation not required.'
-        }
-        collapsedSummary={
-          customer
-            ? `${customer.customerName}${customerPoNumber ? ` · PO ${customerPoNumber}` : ''}`
-            : createMode === 'quotation'
-              ? 'Select quotation and customer'
-              : 'Select customer and PO'
-        }
-      >
-        {customerFields}
-      </ErpQuickEntrySection>
+      <div className="crm-lead-zoho-layout">
+        <nav className="crm-lead-zoho-rail" aria-label="Sales order form sections">
+          <p className="crm-lead-zoho-rail__eyebrow">Create Sales Order</p>
+          <p className="crm-lead-zoho-rail__title">Sections</p>
+          <ul className="crm-lead-zoho-rail__list">
+            {completionItems.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  className={cn('crm-lead-zoho-rail__item', item.done && 'is-done')}
+                  onClick={() => scrollToSection(item.id)}
+                >
+                  <span className="crm-lead-zoho-rail__marker" aria-hidden>
+                    {item.done ? <Check size={12} strokeWidth={2.5} /> : null}
+                  </span>
+                  <span className="crm-lead-zoho-rail__label">{item.label}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="crm-lead-zoho-rail__progress" aria-label={`${completionPercent}% complete`}>
+            <div className="crm-lead-zoho-rail__progress-meta">
+              <span>Completion</span>
+              <strong>{completionPercent}%</strong>
+            </div>
+            <div className="crm-lead-zoho-rail__bar">
+              <div className="crm-lead-zoho-rail__bar-fill" style={{ width: `${completionPercent}%` }} />
+            </div>
+          </div>
+        </nav>
 
-      {linesSection}
-      {commercialSection}
-      {documentsSection}
+        <div className="crm-lead-form-flow crm-lead-zoho-canvas">
+          <div id="so-section-quick" className="crm-lead-quick-entry crm-lead-zoho-block">
+            <ErpFieldGroup label="Sales Order Information" columns={4} className="crm-lead-zoho-section">
+              {customerFields}
+            </ErpFieldGroup>
+          </div>
+          <div id="so-section-lines">{linesSection}</div>
+          <div id="so-section-commercial">{commercialSection}</div>
+          <div id="so-section-documents">{documentsSection}</div>
+        </div>
+      </div>
     </div>
   )
 
@@ -1567,10 +1590,11 @@ export function SalesOrderNewPage() {
       <CrmCardFormShell
         title={createTitle}
         badge={fromCrm ? 'CRM' : 'Sales'}
-        className={`${ENTERPRISE_FORM_CLASS} enterprise-workspace--crm-smart-overview crm-so-create-page`}
+        className={`${ENTERPRISE_FORM_CLASS} crm-lead-form-page crm-lead-form-page--zoho crm-sales-order-form-page--zoho enterprise-workspace--crm-smart-overview crm-so-create-page`}
         collapsibleFactBox
         factBoxLabel="Smart Context"
         suppressFactBoxRecord
+        hideRecordBar
         stickyFooter
         recordNo="New"
         recordTitle={recordTitle}
@@ -1591,18 +1615,17 @@ export function SalesOrderNewPage() {
             ? crmChildBreadcrumbs('Sales Orders', CRM_SALES_ORDERS_PATH, 'New')
             : salesChildBreadcrumbs('Sales Orders', '/sales/orders', createTitle)
         }
-        documentStrip={documentStrip}
         factBox={factBox}
         onSubmit={handleSubmit}
         onSaveShortcut={() => persist('save')}
         onSaveCloseShortcut={() => persist('save_close')}
         onSaveAndNewShortcut={() => persist('save_new')}
         footer={(
-          <ErpStickySaveBar
+          <FormActionBar
             sticky
-            cancelTo={listPath}
-            submitLabel="Save"
-            isSubmitting={isSubmitting}
+            busy={isSubmitting}
+            dirty={Boolean(customerId || quotationDocumentId || customerPoNumber.trim() || hasValidLines)}
+            onCancel={() => navigate(listPath)}
             onSave={() => void persist('save')}
             onSaveAndNew={() => void persist('save_new')}
             onSaveAndClose={() => void persist('save_close')}

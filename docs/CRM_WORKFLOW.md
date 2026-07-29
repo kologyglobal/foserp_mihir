@@ -229,7 +229,7 @@ flowchart TD
 | `closed` | Closed after confirm |
 | `in_production` … `invoiced` | **Present in enum / demo UI chrome; backend fulfilment not implemented** |
 
-Direct SO: `POST /crm/sales-orders` with `source: direct` and required `directSoReason`.
+Direct SO: `POST /crm/sales-orders` with `source: direct`; `directSoReason` is optional (audit note only).
 
 ---
 

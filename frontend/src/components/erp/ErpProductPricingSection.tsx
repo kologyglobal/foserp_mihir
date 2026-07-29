@@ -58,6 +58,8 @@ export interface ErpProductPricingSectionProps extends ErpProductPricingPanelPro
   /** When false, render panel only (caller supplies the card). Default true. */
   wrapInSection?: boolean
   sectionClassName?: string
+  /** Uncontrolled initial open state for the collapsible FastTab. Default true. */
+  defaultOpen?: boolean
 }
 
 export function ErpProductPricingPanel({
@@ -546,6 +548,7 @@ export function ErpProductPricingSection({
   children,
   wrapInSection = true,
   sectionClassName,
+  defaultOpen = true,
   ...panelProps
 }: ErpProductPricingSectionProps) {
   const panel = <ErpProductPricingPanel {...panelProps} />
@@ -566,7 +569,7 @@ export function ErpProductPricingSection({
       icon={ClipboardList}
       accent={accent}
       collapsible
-      defaultOpen
+      defaultOpen={defaultOpen}
       forceOpenKey={forceOpenKey}
       className={cn('!max-w-none so-pricing-section', sectionClassName)}
       columns={1}
