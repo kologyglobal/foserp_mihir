@@ -629,6 +629,13 @@ export async function returnMaterial(req: Request, tenantId: string, orderId: st
     throw new ValidationError(`Cannot return more than net issued quantity (${dec(net)})`)
   }
 
+  const batchTracked = Boolean(material.item.batchTracked)
+  if (batchTracked && !input.batchId && !input.batchNumber?.trim()) {
+    throw new ValidationError(
+      `Item ${material.item.code} is batch-tracked — provide batchId or batchNumber when returning`,
+    )
+  }
+
   const movement = await postReturnFromWorkOrder(req, tenantId, {
     itemId: material.itemId,
     warehouseId,
@@ -637,6 +644,8 @@ export async function returnMaterial(req: Request, tenantId: string, orderId: st
     idempotencyKey: input.idempotencyKey ?? `wo-mat-ret:${material.id}:${dec(returnQty)}`,
     remarks: input.remarks,
     rate: input.rate,
+    batchId: input.batchId,
+    batchNumber: input.batchNumber,
   })
 
   const movementAmount = Math.abs(Number(movement.value ?? 0))

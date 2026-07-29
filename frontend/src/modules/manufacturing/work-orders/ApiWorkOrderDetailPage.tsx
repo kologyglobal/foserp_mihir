@@ -1513,6 +1513,23 @@ export function ApiWorkOrderDetailPage() {
       ? [{ id: 'correct', label: 'Correct / Reverse', icon: RotateCcw, onClick: () => setCorrectionOpen(true) }]
       : []),
     ...(canCancel ? [{ id: 'cancel', label: 'Cancel', icon: Ban, onClick: () => setDialog('cancel') }] : []),
+    {
+      id: 'report-breakdown',
+      label: 'Report Breakdown',
+      icon: AlertTriangle,
+      onClick: () => {
+        const opWithMachine = (wo.operations ?? []).find((o) => o.machineId)
+        const qs = new URLSearchParams({
+          workOrderId: wo.id,
+          sourceType: 'WORK_ORDER',
+        })
+        if (opWithMachine?.machineId) qs.set('machineId', opWithMachine.machineId)
+        if (opWithMachine?.id) qs.set('operationId', opWithMachine.id)
+        if (opWithMachine?.name) qs.set('operationName', opWithMachine.name)
+        if (opWithMachine?.code) qs.set('operationCode', opWithMachine.code)
+        navigate(`/maintenance/tickets/new?${qs.toString()}`)
+      },
+    },
   ]
 
   return (

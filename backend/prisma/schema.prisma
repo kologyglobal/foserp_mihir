@@ -73,6 +73,7 @@ enum CodeSeriesEntity {
   MANUFACTURING_ROUTING
   DISPATCH_POSTING
   DISPATCH_REVERSAL
+  MAINTENANCE_TICKET
 }
 
 enum ActivityType {
@@ -287,6 +288,9 @@ model Tenant {
 
   manufacturingWorkCentres           ManufacturingWorkCentre[]
   manufacturingMachines              ManufacturingMachine[]
+  maintenanceTickets                 MaintenanceTicket[]
+  maintenanceParts                   MaintenancePart[]
+  maintenanceAttachments             MaintenanceAttachment[]
   manufacturingCostingPolicies       ManufacturingCostingPolicy[]
   manufacturingBoms                  ManufacturingBom[]
   manufacturingBomVersions           ManufacturingBomVersion[]
@@ -2867,6 +2871,7 @@ model MasterItem {
   dispatchPickLines               DispatchPickLine[]
   dispatchTrackingAllocations     DispatchTrackingAllocation[]
   dispatchPackageLines            DispatchPackageLine[]
+  maintenanceParts                MaintenancePart[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2931,6 +2936,7 @@ model MasterVendor {
 
   manufacturingRoutingOperationsVendor ManufacturingRoutingOperation[]
   jobWorkOrders                        JobWorkOrder[]
+  maintenanceTickets                   MaintenanceTicket[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -3026,6 +3032,11 @@ enum DefaultAccountMappingKey {
   FINISHED_GOODS_INVENTORY
   STOCK_ADJUSTMENT
   MATERIAL_CONSUMPTION
+  /// FIN-CLOSE-1 — goods received not invoiced clearing. Credited on GRN inward,
+  /// debited when the Vendor Invoice posts. Replaces PURCHASE as the GRN counterpart.
+  GRIR_CLEARING
+  /// FIN-CLOSE-1 — purchase price variance (vendor invoice vs receipt / standard cost).
+  PURCHASE_PRICE_VARIANCE
   /// Manufacturing costing uses the finance default-account mapping source (ADR-039);
   /// do not introduce a separate manufacturing account-mapping table.
   LABOUR_ABSORPTION
@@ -6712,6 +6723,10 @@ model PurchaseReturn {
   warehouseId         String?
   reason              String?              @db.Text
   remarks             String?              @db.Text
+  /// FIN-CLOSE-1 — soft link to the Accounting VendorAdjustment (debit note) raised for
+  /// the invoiced portion of this return. Null when no posted invoice exists (no AP effect).
+  vendorAdjustmentId       String?         @db.VarChar(36)
+  vendorAdjustmentDraftRef String?         @db.VarChar(64)
   submittedAt         DateTime?
   completedAt         DateTime?
   cancelledAt         DateTime?
@@ -7965,6 +7980,8 @@ enum VendorAdjustmentSourceLinkType {
   PURCHASE_ORDER
   GOODS_RECEIPT
   PURCHASE_RECEIPT
+  /// FIN-CLOSE-1 — Purchase Return that triggered this AP adjustment.
+  PURCHASE_RETURN
   CONTRACT
   PROJECT
   OTHER
@@ -9821,6 +9838,7 @@ model ManufacturingMachine {
   dailyProductionLines      DailyProductionLine[]
   productionIssues          ProductionIssue[]
   productionDowntimes       ProductionDowntime[]
+  maintenanceTickets        MaintenanceTicket[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -17255,4 +17273,210 @@ model ExecutiveDashboardWidget {
   @@index([tenantId, dashboardId])
   @@index([dashboardId])
   @@map("executive_dashboard_widgets")
+}
+
+// ─── Maintenance V1 ──────────────────────────────────────────────────────────
+
+enum MaintenanceTicketStatus {
+  REPORTED
+  IN_REPAIR
+  WAITING_FOR_PART
+  ON_HOLD
+  TESTING
+  CLOSED
+  CANCELLED
+}
+
+enum MaintenancePriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum MaintenanceTechnicianType {
+  INTERNAL
+  EXTERNAL
+}
+
+enum MaintenanceTestResult {
+  PASS
+  FAIL
+}
+
+enum MaintenanceFailureCategory {
+  MECHANICAL
+  ELECTRICAL
+  HYDRAULIC
+  PNEUMATIC
+  CONTROL
+  OTHER
+}
+
+enum MaintenancePhotoCategory {
+  BEFORE
+  DURING
+  AFTER
+  OTHER
+}
+
+enum MaintenanceSourceType {
+  MANUAL
+  MY_WORK
+  WORK_ORDER
+  JOB_CARD
+  OPERATION
+}
+
+model MaintenanceTicket {
+  id     String @id @default(uuid())
+  tenantId String
+
+  ticketNumber String @db.VarChar(32)
+
+  machineId    String
+  workCentreId String?
+
+  sourceType       MaintenanceSourceType @default(MANUAL)
+  sourceDocumentId String?               @db.VarChar(64)
+
+  workOrderId String?
+  jobCardId   String? @db.VarChar(64)
+  /// ProductionOrderStage / Job Card code for display
+  jobCardCode String? @db.VarChar(64)
+  operationId String?
+  operationCode String? @db.VarChar(64)
+  operationName String? @db.VarChar(200)
+
+  problem  String              @db.Text
+  priority MaintenancePriority @default(NORMAL)
+  status   MaintenanceTicketStatus @default(REPORTED)
+
+  failureCategory MaintenanceFailureCategory?
+
+  reportedByUserId String?
+  reportedAt       DateTime @default(now())
+
+  /// Operator / reporter display name (may differ from logged-in user)
+  operatorName String? @db.VarChar(200)
+
+  /// Auto-captured at report time when browser GPS is available
+  reportedLatitude     Decimal? @db.Decimal(10, 7)
+  reportedLongitude    Decimal? @db.Decimal(10, 7)
+  reportedAccuracyM    Decimal? @db.Decimal(10, 2)
+  /// Plant / work centre / workstation label captured at report
+  reportedLocationLabel String? @db.VarChar(300)
+
+  repairStartedAt DateTime?
+
+  technicianType    MaintenanceTechnicianType?
+  technicianUserId  String?
+  contractorId      String?
+  technicianName    String? @db.VarChar(200)
+
+  repairDetails String? @db.Text
+
+  testResult      MaintenanceTestResult?
+  testedByUserId  String?
+  testedAt        DateTime?
+  testRemarks     String? @db.Text
+
+  closingRemarks String? @db.Text
+  closedByUserId String?
+  closedAt       DateTime?
+
+  /// Derived on close / when machine returns AVAILABLE
+  downtimeEndedAt DateTime?
+  downtimeMinutes Int?
+
+  partsCost   Decimal @default(0) @db.Decimal(18, 2)
+  serviceCost Decimal @default(0) @db.Decimal(18, 2)
+  otherCost   Decimal @default(0) @db.Decimal(18, 2)
+  totalCost   Decimal @default(0) @db.Decimal(18, 2)
+
+  serviceDescription String?   @db.Text
+  invoiceNumber      String?   @db.VarChar(64)
+  invoiceDate        DateTime?
+
+  holdReason String? @db.Text
+
+  /// V1: parts recorded without Inventory ISSUE movement until integration is enabled
+  inventoryPostingPending Boolean @default(true)
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant     Tenant                   @relation(fields: [tenantId], references: [id])
+  machine    ManufacturingMachine     @relation(fields: [machineId], references: [id])
+  contractor MasterVendor?            @relation(fields: [contractorId], references: [id])
+  parts      MaintenancePart[]
+  photos     MaintenanceAttachment[]
+
+  @@unique([tenantId, ticketNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, machineId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, reportedAt])
+  @@map("maintenance_tickets")
+}
+
+model MaintenancePart {
+  id       String @id @default(uuid())
+  tenantId String
+  ticketId String
+
+  itemId      String?
+  description String  @db.VarChar(300)
+  qty         Decimal @db.Decimal(18, 4)
+  unitCost    Decimal @default(0) @db.Decimal(18, 4)
+  totalCost   Decimal @default(0) @db.Decimal(18, 2)
+  remarks     String? @db.VarChar(500)
+
+  /// When Inventory ISSUE was posted (null = pending / not posted)
+  inventoryMovementId String?
+  shortageQty         Decimal? @db.Decimal(18, 4)
+  purchaseRequisitionId String?
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id])
+  ticket MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  item   MasterItem?       @relation(fields: [itemId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, ticketId])
+  @@index([tenantId, deletedAt])
+  @@map("maintenance_parts")
+}
+
+model MaintenanceAttachment {
+  id       String @id @default(uuid())
+  tenantId String
+  ticketId String
+
+  category         MaintenancePhotoCategory @default(OTHER)
+  originalFilename String                   @db.VarChar(255)
+  storedFilename   String                   @db.VarChar(255)
+  mimeType         String                   @db.VarChar(120)
+  fileSize         Int
+  storagePath      String                   @db.VarChar(500)
+
+  uploadedBy String?
+  uploadedAt DateTime @default(now())
+  deletedAt  DateTime?
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id])
+  ticket MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, ticketId])
+  @@map("maintenance_attachments")
 }

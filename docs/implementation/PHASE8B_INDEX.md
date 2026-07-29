@@ -20,7 +20,8 @@ Phase 8B prepares a **controlled pilot / internal UAT** tenant. It does **not** 
 | [`PHASE8B_UAT_PACK.md`](PHASE8B_UAT_PACK.md) | UAT cases (N/A for excluded flows) |
 | [`PHASE8B_CUTOVER_DRAFT.md`](PHASE8B_CUTOVER_DRAFT.md) | Prepare-only cutover (no go-live date) |
 | [`PHASE8B_TECHNICAL_READINESS.md`](PHASE8B_TECHNICAL_READINESS.md) | Host/ops checklist |
-| [`PHASE8B_DATA_TEMPLATES_README.md`](PHASE8B_DATA_TEMPLATES_README.md) + [`templates/`](templates/) | CSV stubs |
+| [`PHASE8B_DATA_TEMPLATES_README.md`](PHASE8B_DATA_TEMPLATES_README.md) + [`templates/`](templates/) | CSV stubs (pilot) |
+| [`client-csv-import/`](client-csv-import/) | **Client pack:** `FOS_ERP_Client_Data_Collection.xlsx` + CSVs |
 | [`PHASE8B_READINESS_CHECKLIST.md`](PHASE8B_READINESS_CHECKLIST.md) | Implementation checklist |
 | [`PHASE8B_PHASE8C_READINESS.md`](PHASE8B_PHASE8C_READINESS.md) | Gate into formal UAT |
 

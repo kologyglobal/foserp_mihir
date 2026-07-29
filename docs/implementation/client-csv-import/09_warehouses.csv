@@ -1,0 +1,4 @@
+code,name,warehouseType,plantCode,address,status
+WH-RM,Raw Material,stores,PLANT-01,,ACTIVE
+WH-WIP,WIP,wip,PLANT-01,,ACTIVE
+WH-FG,Finished Goods,fg,PLANT-01,,ACTIVE

@@ -10,6 +10,7 @@ import { canAccessPurchaseShell } from './purchase'
 import { canAccessInventoryShell } from './inventory'
 import { canAccessManufacturingShell } from './manufacturing'
 import { hasFinancePermission } from './finance'
+import { hasMaintenancePermission } from './maintenance'
 
 /** Whether a sidebar module category should appear for the current session. */
 export function canAccessModuleCategory(categoryId: string): boolean {
@@ -28,6 +29,9 @@ export function canAccessModuleCategory(categoryId: string): boolean {
       return canAccessManufacturingShell()
     case 'quality':
       return canPermission('quality', 'view')
+    case 'maintenance':
+      // Prefer maintenance.view; fall back to manufacturing shell so operators can reach Report Breakdown
+      return hasMaintenancePermission('maintenance.view') || canAccessManufacturingShell()
     case 'inventory':
       return canAccessInventoryShell()
     case 'dispatch':

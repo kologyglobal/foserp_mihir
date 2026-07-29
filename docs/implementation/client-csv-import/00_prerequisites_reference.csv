@@ -1,0 +1,10 @@
+master_type,code,name,notes
+uom,NOS,Numbers,Base UOM for count items
+uom,KG,Kilogram,Base UOM for weight items
+item_category,CAT-RAW,Raw Material,Category Code on Items sheet
+item_category,CAT-FG,Finished Goods,Category Code on Items sheet
+gst_group,GG18,GST 18%,GST Group Code on HSN + Items
+warehouse,RM-WH,Raw Material Warehouse,Optional; BOM source_warehouse_code
+warehouse,WH-RM,Pilot Raw Material,Alternate warehouse code example
+country,IN,India,Geography — vendor Country Code
+state,MH,Maharashtra,Geography — vendor State Code

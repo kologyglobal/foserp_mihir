@@ -46,6 +46,7 @@ const DEFAULT_PREFIX: Record<CodeSeriesEntity, string> = {
   INVENTORY_STOCK_COUNT: 'STC',
   INVENTORY_ADJUSTMENT: 'IADJ',
   MANUFACTURING_ROUTING: 'RT',
+  MAINTENANCE_TICKET: 'MT',
 }
 
 export async function ensureCodeSeries(

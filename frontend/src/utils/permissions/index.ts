@@ -248,6 +248,15 @@ export function canRoute(pathname: string): boolean {
   if (isManufacturingPath(pathname)) {
     return canManufacturingRoute(pathname)
   }
+  if (pathname === '/maintenance' || pathname.startsWith('/maintenance/')) {
+    if (isApiMode() && hasWorkspaceAdminRole()) return true
+    if (isApiMode()) {
+      const perms = getStoredSession()?.user.permissions ?? []
+      if (perms.includes('maintenance.view') || perms.includes('maintenance.create')) return true
+      return canAccessManufacturingShell()
+    }
+    return false
+  }
   if (pathname === '/operations/exceptions' || pathname.startsWith('/operations/exceptions/')) {
     return canViewExceptions()
   }
@@ -382,6 +391,13 @@ export {
   type ManufacturingPermission,
 } from './manufacturing'
 
+export {
+  hasMaintenancePermission,
+  useMaintenancePermissions,
+  MAINTENANCE_PERMISSIONS,
+  type MaintenancePermission,
+} from './maintenance'
+
 import {
   canPurchaseRoute,
   isPurchasePath,
@@ -390,6 +406,7 @@ import {
   canManufacturingRoute,
   canViewExceptions,
   isManufacturingPath,
+  canAccessManufacturingShell,
 } from './manufacturing'
 import {
   canAccessAdminShell,

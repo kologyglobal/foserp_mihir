@@ -1,0 +1,3 @@
+Item Code,Item Name,Category Code,Base UOM Code,Item Type,Product Type,HSN Code,GST Group Code,Standard Rate,Status
+RM-001,Steel Plate 6mm,CAT-RAW,KG,raw,raw_material,72085100,GG18,1250.00,ACTIVE
+FG-001,40ft Trailer,CAT-FG,NOS,finished,finished_good,87163900,GG18,0,ACTIVE

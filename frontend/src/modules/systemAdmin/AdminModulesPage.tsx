@@ -64,7 +64,10 @@ export function AdminModulesPage() {
       }
       const res = await fetchAdminModulesApi()
       setRows(res.data.modules)
-      setEnabledKeys(res.data.enabledKeys)
+      setEnabledKeys(
+        res.data.enabledKeys,
+        res.data.modules.map((m) => m.key),
+      )
     } catch (err) {
       setError(formatApiError(err))
     } finally {

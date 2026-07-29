@@ -1,0 +1,2 @@
+itemCode,warehouseCode,onHandQty,reservedQty,movementDate,referenceNo,notes
+RM-001,WH-RM,1000,0,2026-08-01,OPEN-001,Go-live opening stock

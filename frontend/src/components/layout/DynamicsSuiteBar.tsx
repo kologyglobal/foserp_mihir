@@ -7,6 +7,7 @@ import { cn } from '../../utils/cn'
 import { GlobalSearchTrigger } from '../design-system/GlobalSearch'
 import { NotificationBell } from '../design-system/NotificationPanel'
 import { UserMenuDropdown } from './UserMenuDropdown'
+import { AppLauncher } from './AppLauncher'
 
 /** Full-width Dynamics 365 suite bar */
 export function DynamicsSuiteBar() {
@@ -14,6 +15,7 @@ export function DynamicsSuiteBar() {
   const toggleMobileNav = useUIStore((s) => s.toggleMobileNav)
   const landingPath = getUserLandingPath()
   const [refreshing, setRefreshing] = useState(false)
+  const [launcherOpen, setLauncherOpen] = useState(false)
   const today = new Date().toLocaleDateString('en-IN', {
     weekday: 'short',
     day: 'numeric',
@@ -37,9 +39,16 @@ export function DynamicsSuiteBar() {
         >
           <Menu className="h-4 w-4" strokeWidth={1.75} />
         </button>
-        <Link to={landingPath} className="d365-suite-waffle hidden md:flex" title="App launcher" aria-label="App launcher">
+        <button
+          type="button"
+          className="d365-suite-waffle hidden md:flex"
+          title="App launcher — modules"
+          aria-label="Open modules menu"
+          aria-expanded={launcherOpen}
+          onClick={() => setLauncherOpen(true)}
+        >
           <LayoutGrid className="h-4 w-4" strokeWidth={1.75} />
-        </Link>
+        </button>
 
         <Link to={landingPath} className="d365-suite-brand" title="Go to home">
           <span className="d365-suite-title hidden sm:inline">FOS ERP</span>
@@ -79,6 +88,8 @@ export function DynamicsSuiteBar() {
         <NotificationBell className="d365-suite-icon-btn d365-suite-notify border-0 bg-transparent shadow-none hover:bg-white/10 hover:text-white" />
         <UserMenuDropdown variant="suite" />
       </div>
+
+      <AppLauncher open={launcherOpen} onClose={() => setLauncherOpen(false)} />
     </header>
   )
 }

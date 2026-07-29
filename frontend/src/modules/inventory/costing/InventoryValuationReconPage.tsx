@@ -102,6 +102,13 @@ export function InventoryValuationReconPage() {
                 window.location.assign('/inventory/accounting')
               },
             },
+            {
+              id: 'inv-gl',
+              label: 'Inventory ↔ GL',
+              onClick: () => {
+                window.location.assign('/accounting/inventory-gl-reconciliation')
+              },
+            },
           ]}
         />
       }

@@ -1,0 +1,3 @@
+code,name,description,plantCode,departmentRef,capacityPerShift,capacityUomCode,defaultShiftRef,isActive
+WC-FAB,Fabrication,Fabrication centre,PLANT-01,Production,,,SHIFT-A,true
+WC-ASSY,Assembly,Assembly centre,PLANT-01,Production,,,SHIFT-A,true

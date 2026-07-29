@@ -1,7 +1,7 @@
 # Project Status
 
-Last verified against codebase: **2026-07-28** (MFG-GOLDEN-1 Fuel Tank factory golden path re-verified PASS — READY FOR CONTROLLED PILOT; prior: Purchase completion FE links; Inventory Costing UAT-1; IV-MFG-1).
-**Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
+Last verified against codebase: **2026-07-29** (FIN-CLOSE-1 **stop** — GR/IR + Return→AP + Inventory↔GL recon + Dispatch→AR polish; retro-cost + Hostinger migrate still open; Maintenance V1 READY WITH CONDITIONS; MFG Fuel Tank golden path READY).
+**Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** see [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
 Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocked
@@ -28,7 +28,7 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | **Partially completed** | Auth UI; mobile CRM (API hydrate, no offline); sales-order fulfilment beyond confirm/close; **user/role/tenant admin UI** (API wired; product UAT open); **Admin A8** broader demo-mix pack beyond security regression |
 | **Scaffolding (not shipped)** | — (Accounting: some CoA/voucher demo surfaces; Period Close **P1 + hardening** live for lock/readiness — year-end/accruals still demo; **Finance Settings** at `/accounting/settings` is Phase 1 dual-mode) |
 | **Blocked** | — (none currently) |
-| **Deferred by design** | Purchase backends beyond RFQ award→draft PO (full PO lifecycle, GRN); inventory / production / quality / maintenance beyond shipped slices; finance **Dispatch partial/multi/consolidated invoice policy UI polish**; SO MRP / dispatch client production hardening |
+| **Deferred by design** | Purchase backends beyond RFQ award→draft PO (full PO lifecycle, GRN); inventory / production / quality / maintenance beyond shipped slices; SO MRP / dispatch client production hardening |
 
 ---
 
@@ -41,7 +41,9 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | DB cleanup scripts | `cleanup-leads.ts`, `cleanup-opp-quotations.ts`, `cleanup-sales-orders.ts` — local one-offs; do not run on prod without intent |
 | Accounting orphan UI | **Resolved 2026-07-15** — all `/accounting/*` deep links from the dashboard now resolve (dashboard live; other screens are placeholders, not 404s) |
 | Inventory costing rollout | **UAT-1 hardening 2026-07-28** — automated 4-method golden paths PASS; method-change preview; transfer cost preserve; cost-entry value parity. Verdict still **READY WITH CONDITIONS** (live SPA UAT + Inventory↔GL TB deferred). |
-| Manufacturing Fuel Tank golden path | **MFG-GOLDEN-1 2026-07-28** — harness PASS (`WO-000010`, ₹111,020 Inventory=WO=FG). Verdict **READY FOR CONTROLLED PILOT**. Live SPA sign-off / SO→WO UI / shortage-return-partial SPA still open. |
+| Manufacturing Fuel Tank golden path | **MFG-GOLDEN-1** + **pilot A1–A9 + partial FG signed 2026-07-29** (`WO-000039` happy / `WO-000040` partial). Verdict **READY**. Optional live SPA UX walk only. |
+| Maintenance V1 | Ticket-centric REPORT→REPAIR→TEST→CLOSE. Harness **PASS** (`MT-000001`). **READY WITH CONDITIONS** — inventory ISSUE pending; see `docs/maintenance/`. |
+| FIN-CLOSE-1 accounting integration | **Stop met 2026-07-29** — decisions 1–4 + GR/IR live + Inventory↔GL/WIP↔GL recon (no Force Balance) + Dispatch Invoice Ready polish. Outside stop: purchase invoice retro cost adjust; Hostinger migrate deploy. See `docs/accounting/ACCOUNTING_INTEGRATION_CLOSURE_AUDIT.md`. |
 
 ---
 

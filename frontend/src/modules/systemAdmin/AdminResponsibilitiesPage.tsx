@@ -247,7 +247,7 @@ export function AdminResponsibilitiesPage() {
                 <FormField label="Module" required>
                   <Select value={module} onChange={(e) => setModule(e.target.value)}>
                     <option value="">{SELECT_PLACEHOLDER}</option>
-                    {['purchase', 'finance', 'crm', 'inventory', 'manufacturing', 'quality', 'dispatch', 'admin'].map((m) => (
+                    {['purchase', 'finance', 'crm', 'inventory', 'manufacturing', 'quality', 'maintenance', 'dispatch', 'admin'].map((m) => (
                       <option key={m} value={m}>{m}</option>
                     ))}
                   </Select>

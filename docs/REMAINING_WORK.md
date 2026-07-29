@@ -4,6 +4,29 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Open — FIN-CLOSE-1 deferred leftovers (2026-07-29)
+
+| Field | Value |
+|-------|-------|
+| Module | Accounting / Purchase / Inventory |
+| Description | **FIN-CLOSE-1 stop met.** Scoped chains closed: GR/IR + Return→AP (live), Inventory↔GL / WIP↔GL recon + failed-events hub, Dispatch→AR Invoice Ready polish. Still open **outside stop**: purchase invoice retro cost adjustment; Hostinger migrate deploy of `20260729160000_fin_close_1_grir_ppv_return_ap`; optional GR/IR ageing |
+| Blocker | Hostinger migrate deploy still pending. Local `fos_erp` migration applied; mappings via `scripts/map-fin-close-1-grir-ppv.ts` |
+| Test evidence | **PASS** — `npm run test:fin-close-1-live`; inventory-gl recon 4/4; BE/FE `tsc` clean after G11 polish |
+| Status | **stop** (do not expand into Money In/Out redesign / statutory / advanced Finance unless newly asked) |
+
+---
+
+## Open — Maintenance V1 follow-ups (2026-07-29)
+
+| Field | Value |
+|-------|-------|
+| Module | Maintenance |
+| Description | Inventory ISSUE posting for spare parts; deep PR sourceType=MAINTENANCE; contractor UAT with vendors; live SPA walk; role permission refresh for existing tenants |
+| Status | **open** (core V1 shipped — READY WITH CONDITIONS) |
+| Docs | `docs/maintenance/` |
+
+---
+
 ## Done recently — Purchase multi-unit UOM (2026-07-27)
 
 - Vendor → primary conversion across Item Master / PO / GRN / inventory posting.
@@ -121,6 +144,16 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Status | **done** |
 
 ---
+
+## Done recently — MFG pilot scenarios API pack (2026-07-29)
+
+| Field | Value |
+|-------|-------|
+| Module | Manufacturing |
+| Description | Open pilot scenarios automated: shortage→PR, material return (+ batch return fix), hold/resume, SO→Demand→WO, Dispatch serial AVAILABLE; SPA checklist for UI walk |
+| Evidence | `test-fuel-tank-pilot-scenarios.ts` **PASS**; `PR-000010`; `WO-000038` from SO; serials @ FG-MAIN |
+| Doc | `docs/manufacturing/MFG_PILOT_SPA_UAT_CHECKLIST.md`, `MFG_PILOT_SCENARIO_RESULTS.md` |
+| Status | **done** for API scenario pack + **A1–A9 + partial FG signed** (2026-07-29) — optional live SPA UX walk remains |
 
 ## Done recently — MFG-GOLDEN-1 Fuel Tank re-verification (2026-07-28)
 
@@ -512,9 +545,9 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 |-------|-------|
 | Module | Purchase |
 | Description | PR/PO/GRN API |
-| Reason | **Partial** — PO/GRN/QI/Invoice/Return + Setup + FE parity + GRNI + approver limits + **multi-unit UOM** + **GRN tolerance** + **PO versioning** + **2026-07-28 completion links** (GRN chain, AP handoff UX, return pending banner, GRN→costing test). Remaining: ITC placeholders; formal GR/IR clearing GL; return→AP debit; invoice retro cost adjust; fuller dual-UOM display; Hostinger migrate deploy of purchase UOM/tolerance/versioning migrations. |
+| Reason | **Partial** — PO/GRN/QI/Invoice/Return + Setup + FE parity + GRNI + approver limits + **multi-unit UOM** + **GRN tolerance** + **PO versioning** + **2026-07-28 completion links** (GRN chain, AP handoff UX, return pending banner, GRN→costing test) + **2026-07-29 FIN-CLOSE-1 decisions 1–4** (`GRIR_CLEARING` on GRN inward, `PURCHASE_PRICE_VARIANCE` key, return→AP debit note draft, GR/IR under the `INVENTORY_ACCOUNTING` gate). Vendor Invoice GR/IR release + PPV and return→AP draft are live-verified. Remaining: ITC placeholders; invoice retro cost adjust; fuller dual-UOM display; Hostinger migrate deploy of purchase UOM/tolerance/versioning + `20260729160000_fin_close_1_grir_ppv_return_ap`. |
 | Dependencies | Items, vendors (done); PR schema Phase 03 (done); PO lifecycle (done); Approvals queue (done); Setup 1A (done) |
-| Next step | Live SPA UAT checklist; optional ITC/AP outstanding; return→AP debit; formal GR/IR clearing if Finance requires it. |
+| Next step | Purchase invoice retro cost adjustment (additive cost entry; never mutate original receipt). |
 | Test required | Setup **13/13**; QI/return lifecycle; GRNI; invoice lifecycle; **purchase-completion-grn-costing** PASS |
 | Status | **in_progress** (core loop ready for internal UAT) |
 

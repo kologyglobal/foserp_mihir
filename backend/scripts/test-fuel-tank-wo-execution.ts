@@ -24,6 +24,13 @@ const ISSUE_WH = 'WIP'
 const FG_WH = 'FG-MAIN'
 const PROFILE_CODE = 'MP-FUEL-TANK-5000L'
 
+/** Happy path: defaults. Partial FG: FT_PARTIAL=1 (planned 3, good/fg 1, skip complete). */
+const PARTIAL_MODE = process.env.FT_PARTIAL === '1' || process.env.FT_SKIP_COMPLETE === '1'
+const PLANNED_QTY = Math.max(1, Number(process.env.FT_PLANNED_QTY ?? (PARTIAL_MODE ? 3 : 1)))
+const GOOD_QTY = Math.max(1, Number(process.env.FT_GOOD_QTY ?? 1))
+const FG_RECEIPT_QTY = Math.max(1, Number(process.env.FT_FG_QTY ?? GOOD_QTY))
+const SKIP_COMPLETE = PARTIAL_MODE || process.env.FT_SKIP_COMPLETE === '1'
+
 const EXPECTED_JC = [
   'JC-SHELL',
   'JC-DISHED-END',
@@ -130,9 +137,9 @@ async function ensureOpeningStock(tenantId: string, userId: string | undefined, 
     const onHand = Number(balance?.onHandQty ?? 0)
     const reserved = Number(balance?.reservedQty ?? 0)
     const free = onHand - reserved
-    const need = line.qty - free
+    const need = line.qty * PLANNED_QTY - free
     if (need <= 0) {
-      console.log(`  · stock ok ${line.itemCode.padEnd(26)} free=${free}`)
+      console.log(`  · stock ok ${line.itemCode.padEnd(26)} free=${free} (need ${line.qty * PLANNED_QTY})`)
       continue
     }
 
@@ -167,7 +174,10 @@ async function main() {
   }
 
   console.log(`\n=== Fuel Tank factory golden path (${TENANT_SLUG}) ===`)
-  console.log(`Model: LOGICAL SFG Job Cards under ONE FG WO (no child WOs)\n`)
+  console.log(`Model: LOGICAL SFG Job Cards under ONE FG WO (no child WOs)`)
+  console.log(
+    `Mode: ${PARTIAL_MODE ? 'PARTIAL FG' : 'HAPPY'} planned=${PLANNED_QTY} good=${GOOD_QTY} fgReceipt=${FG_RECEIPT_QTY} skipComplete=${SKIP_COMPLETE}\n`,
+  )
 
   const tenant = await prisma.tenant.findFirst({ where: { slug: TENANT_SLUG, deletedAt: null } })
   if (!tenant) fail(`Tenant not found: ${TENANT_SLUG}`)
@@ -333,17 +343,24 @@ async function main() {
     .set(auth(maker.token))
     .send({
       productItemId: fg.id,
-      plannedQuantity: 1,
+      plannedQuantity: PLANNED_QTY,
       requiredCompletionDate: due.toISOString(),
       plannedStartDate: new Date().toISOString(),
       priority: 'HIGH',
-      notes: 'Fuel tank 5000L factory golden path UAT',
-      idempotencyKey: `ft-golden-${runStamp}`,
+      notes: PARTIAL_MODE
+        ? `Fuel tank partial FG UAT qty ${PLANNED_QTY} → receive ${FG_RECEIPT_QTY}`
+        : 'Fuel tank 5000L factory golden path UAT',
+      idempotencyKey: `ft-${PARTIAL_MODE ? 'partial' : 'golden'}-${runStamp}`,
     })
   if (create.status !== 201) fail(`Create WO failed: ${create.status} ${JSON.stringify(create.body)}`)
   const woId = create.body.data.id as string
   const woNo = (create.body.data.orderNumber ?? create.body.data.workOrderNo) as string
-  push('Create FG WO', true, `${woNo} status=${create.body.data.status}`, '1. one FG WO only')
+  push(
+    'Create FG WO',
+    Number(create.body.data.plannedQuantity ?? PLANNED_QTY) === PLANNED_QTY,
+    `${woNo} status=${create.body.data.status} planned=${create.body.data.plannedQuantity}`,
+    '1. one FG WO only',
+  )
 
   const childrenRes = await request(app)
     .post(`${mfg}/work-orders/${woId}/generate-child-orders`)
@@ -441,7 +458,7 @@ async function main() {
       workCentreId: assignOp.workCentreId,
       machineId: assignOp.machineId ?? undefined,
       assignmentDate: new Date().toISOString().slice(0, 10),
-      assignedQuantity: 1,
+      assignedQuantity: GOOD_QTY,
       notes: 'Fuel tank golden path WC/machine assignment',
     })
   push(
@@ -493,7 +510,10 @@ async function main() {
     const already = Number(m.issuedQty ?? 0)
     const resQty = Number(m.reservedQty ?? 0)
     const remaining = required - already
-    const qty = Math.min(remaining, resQty > 0 ? resQty : remaining)
+    // Partial mode: issue only one-unit share so FG capitalisation is not dumped with 3× BOM cost.
+    const unitShare =
+      PLANNED_QTY > 1 ? (required * GOOD_QTY) / PLANNED_QTY : remaining
+    const qty = Math.min(remaining, resQty > 0 ? resQty : remaining, unitShare)
     if (qty <= 0) continue
 
     let batchNumber: string | undefined
@@ -598,7 +618,7 @@ async function main() {
     await request(app)
       .post(`${mfg}/work-orders/${woId}/progress`)
       .set(auth(maker.token))
-      .send({ stageId: stage.id, goodQuantity: 1 })
+      .send({ stageId: stage.id, goodQuantity: GOOD_QTY })
 
     const isQc = Boolean(live.qualityRequired)
     let complete = await request(app)
@@ -666,7 +686,7 @@ async function main() {
               decision: 'REWORK',
               acceptedQty: 0,
               rejectedQty: 0,
-              reworkQty: 1,
+              reworkQty: GOOD_QTY,
               remarks: 'Fuel tank golden path rework exercise',
               parameterResults,
             })
@@ -683,7 +703,7 @@ async function main() {
               .set(auth(maker.token))
               .send({
                 decision: 'PASS',
-                acceptedQty: 1,
+                acceptedQty: GOOD_QTY,
                 rejectedQty: 0,
                 reworkQty: 0,
                 remarks: 'Fuel tank golden path pass after rework',
@@ -704,7 +724,7 @@ async function main() {
               .set(auth(maker.token))
               .send({
                 decision: 'PASS',
-                acceptedQty: 1,
+                acceptedQty: GOOD_QTY,
                 rejectedQty: 0,
                 reworkQty: 0,
                 remarks: 'Fuel tank golden path QC pass',
@@ -725,7 +745,7 @@ async function main() {
             .set(auth(maker.token))
             .send({
               decision: 'PASS',
-              acceptedQty: 1,
+              acceptedQty: GOOD_QTY,
               rejectedQty: 0,
               reworkQty: 0,
               remarks: 'Fuel tank golden path QC pass',
@@ -806,7 +826,7 @@ async function main() {
       .set(auth(maker.token))
       .send({
         decision: 'PASS',
-        acceptedQty: 1,
+        acceptedQty: GOOD_QTY,
         rejectedQty: 0,
         reworkQty: 0,
         remarks: 'Fuel tank FINAL QC pass',
@@ -868,16 +888,21 @@ async function main() {
     `eligible=${elig.eligibleQuantity} raw=${elig.rawEligibleQuantity} serialRequired=${elig.serialTrackingRequired}`,
   )
 
-  const fgQty = 1
+  const fgQty = FG_RECEIPT_QTY
+  const fgSerials = Array.from({ length: fgQty }, (_, i) =>
+    i === 0 ? FG_SERIAL : `${FG_SERIAL}-${i + 1}`,
+  )
   const fgPost = await request(app)
     .post(`${mfg}/work-orders/${woId}/fg-receipts`)
     .set(auth(maker.token))
     .send({
       quantity: fgQty,
       warehouseId: fgWh.id,
-      serialNumbers: [FG_SERIAL],
-      idempotencyKey: `fg-ft-${woId}-1`,
-      remarks: 'Fuel tank golden path FG serial receipt',
+      serialNumbers: fgSerials,
+      idempotencyKey: `fg-ft-${woId}-${fgQty}`,
+      remarks: PARTIAL_MODE
+        ? `Fuel tank partial FG receipt ${fgQty} of planned ${PLANNED_QTY}`
+        : 'Fuel tank golden path FG serial receipt',
     })
   if (fgPost.status !== 201 && fgPost.status !== 200) {
     fail(
@@ -887,7 +912,7 @@ async function main() {
   push(
     'FG Serial Receipt',
     true,
-    `serial=${FG_SERIAL} receipt=${fgPost.body.data?.receiptNumber ?? '?'} qty=${fgQty} → ${FG_WH}`,
+    `serial=${fgSerials.join(',')} receipt=${fgPost.body.data?.receiptNumber ?? '?'} qty=${fgQty} → ${FG_WH}`,
     '7. serial-numbered FG receipt',
   )
 
@@ -931,11 +956,11 @@ async function main() {
   const fgOnHandAfter = Number(fgAfter?.onHandQty ?? 0)
   push(
     'FG stock increased',
-    fgOnHandAfter >= fgOnHandBefore + 1,
+    fgOnHandAfter >= fgOnHandBefore + fgQty,
     `onHand ${fgOnHandBefore} → ${fgOnHandAfter}`,
   )
 
-  // Close readiness + Complete (operational close)
+  // Close readiness + Complete (operational close) — skipped in partial mode
   const readinessClose = await request(app)
     .get(`${mfg}/work-orders/${woId}/close-readiness`)
     .set(auth(maker.token))
@@ -946,44 +971,84 @@ async function main() {
     '10. closure / Close Readiness',
   )
 
-  // Release any leftover reservations that soft/hard-block complete
   await request(app)
     .post(`${mfg}/work-orders/${woId}/materials/release-reservation`)
     .set(auth(maker.token))
     .send({})
 
-  const readinessComplete = await request(app)
-    .get(`${mfg}/work-orders/${woId}/close-readiness?allowInProgress=true`)
-    .set(auth(maker.token))
-  const hard = (readinessComplete.body.data?.blockers ?? []) as Array<{ code?: string }>
-  push(
-    'Close readiness (COMPLETE)',
-    readinessComplete.status === 200 && (hard.length === 0 || readinessComplete.body.data?.readyToClose === true),
-    `blockers=${hard.map((b) => b.code).join(',') || 'none'} ready=${readinessComplete.body.data?.readyToClose}`,
-    '10. closure / Close Readiness',
-  )
+  if (SKIP_COMPLETE) {
+    const afterFg = await prisma.productionOrder.findUnique({
+      where: { id: woId },
+      select: {
+        status: true,
+        plannedQuantity: true,
+        completedGoodQuantity: true,
+      },
+    })
+    const eligAfter = await request(app)
+      .get(`${mfg}/work-orders/${woId}/fg-eligibility`)
+      .set(auth(maker.token))
+    const remainingElig = Number(eligAfter.body.data?.eligibleQuantity ?? 0)
+    const planned = Number(afterFg?.plannedQuantity ?? 0)
+    const completedGood = Number(afterFg?.completedGoodQuantity ?? 0)
+    const openOk =
+      afterFg?.status !== 'COMPLETED' &&
+      afterFg?.status !== 'CLOSED' &&
+      planned === PLANNED_QTY &&
+      completedGood >= GOOD_QTY
+    push(
+      'Partial FG — WO remains open',
+      openOk && remainingElig === 0,
+      `status=${afterFg?.status} planned=${planned} completedGood=${completedGood} remainingEligible=${remainingElig} unitCost=${unitActualCost}`,
+      'partial FG',
+    )
+    // Capitalisation: FG rate should track unit actual (1 unit), not dump full planned BOM ×3 as if one unit.
+    const materialIssued = materialCostFromInventory
+    const expectedUnitBand = materialIssued / Math.max(completedGood, 1)
+    const capitalOk =
+      fgRate > 0 &&
+      Math.abs(fgRate - unitActualCost) < 1 &&
+      fgRate <= expectedUnitBand * 1.15 + 1
+    push(
+      'Partial FG — capitalisation not dumped on first unit incorrectly',
+      capitalOk,
+      `fgRate=${fgRate} unitActual=${unitActualCost} materialIssued=${materialIssued.toFixed(2)} expectedUnit≈${expectedUnitBand.toFixed(2)}`,
+      'partial FG',
+    )
+  } else {
+    const readinessComplete = await request(app)
+      .get(`${mfg}/work-orders/${woId}/close-readiness?allowInProgress=true`)
+      .set(auth(maker.token))
+    const hard = (readinessComplete.body.data?.blockers ?? []) as Array<{ code?: string }>
+    push(
+      'Close readiness (COMPLETE)',
+      readinessComplete.status === 200 && (hard.length === 0 || readinessComplete.body.data?.readyToClose === true),
+      `blockers=${hard.map((b) => b.code).join(',') || 'none'} ready=${readinessComplete.body.data?.readyToClose}`,
+      '10. closure / Close Readiness',
+    )
 
-  const completed = await request(app)
-    .post(`${mfg}/work-orders/${woId}/complete`)
-    .set(auth(maker.token))
-    .send({ remarks: 'Fuel tank golden path complete' })
-  if (completed.status !== 200) {
-    fail(`Complete WO failed: ${completed.status} ${JSON.stringify(completed.body)}`)
+    const completed = await request(app)
+      .post(`${mfg}/work-orders/${woId}/complete`)
+      .set(auth(maker.token))
+      .send({ remarks: 'Fuel tank golden path complete' })
+    if (completed.status !== 200) {
+      fail(`Complete WO failed: ${completed.status} ${JSON.stringify(completed.body)}`)
+    }
+    const finalWo = await prisma.productionOrder.findUnique({
+      where: { id: woId },
+      select: { status: true, completedGoodQuantity: true, qualityStatus: true },
+    })
+    const closedOk =
+      finalWo?.status === 'COMPLETED' ||
+      finalWo?.status === 'CLOSED' ||
+      completed.body.data?.order?.status === 'COMPLETED'
+    push(
+      'Work Order Closed (COMPLETED)',
+      Boolean(closedOk),
+      `api=${completed.body.data?.status ?? completed.body.data?.order?.status} db=${finalWo?.status} good=${finalWo?.completedGoodQuantity}`,
+      '10. closure',
+    )
   }
-  const finalWo = await prisma.productionOrder.findUnique({
-    where: { id: woId },
-    select: { status: true, completedGoodQuantity: true, qualityStatus: true },
-  })
-  const closedOk =
-    finalWo?.status === 'COMPLETED' ||
-    finalWo?.status === 'CLOSED' ||
-    completed.body.data?.order?.status === 'COMPLETED'
-  push(
-    'Work Order Closed (COMPLETED)',
-    Boolean(closedOk),
-    `api=${completed.body.data?.status ?? completed.body.data?.order?.status} db=${finalWo?.status} good=${finalWo?.completedGoodQuantity}`,
-    '10. closure',
-  )
 
   // ── Checklist summary ──
   const criteria: Array<{ id: string; label: string }> = [
@@ -996,7 +1061,12 @@ async function main() {
     { id: '7', label: 'serial-numbered FG receipt' },
     { id: '8', label: 'WO actual cost' },
     { id: '9', label: 'FG valuation' },
-    { id: '10', label: 'closure (close readiness + WO COMPLETED)' },
+    {
+      id: '10',
+      label: SKIP_COMPLETE
+        ? 'partial FG (WO open after receive 1 of planned)'
+        : 'closure (close readiness + WO COMPLETED)',
+    },
   ]
 
   console.log('\n══ Golden path checklist ══')
@@ -1007,12 +1077,6 @@ async function main() {
   console.log(`Model: LOGICAL SFG Job Cards under ONE FG WO (no child WOs)\n`)
 
   for (const c of criteria) {
-    const related = results.filter((r) => r.criterion?.includes(c.id) || r.criterion?.toLowerCase().includes(c.label.split(' ')[0].toLowerCase()))
-    const ok =
-      related.length === 0
-        ? results.some((r) => r.ok && (r.step.toLowerCase().includes(c.label.split(' ')[0].toLowerCase()) || r.criterion?.includes(c.id)))
-        : related.every((r) => r.ok)
-    // Explicit mapping for reliability
     const mapped: Record<string, boolean> = {
       '1': results.some((r) => r.step === 'Create FG WO' && r.ok) && results.some((r) => r.step === 'No SFG child WOs' && r.ok),
       '2': results.some((r) => r.step === 'Job Cards on WO (route snapshot)' && r.ok),
@@ -1023,11 +1087,12 @@ async function main() {
       '7': results.some((r) => r.step === 'FG Serial Receipt' && r.ok),
       '8': results.some((r) => r.step === 'Actual WO Cost' && r.ok),
       '9': results.some((r) => r.step === 'FG valuation' && r.ok),
-      '10':
-        results.some((r) => r.step.startsWith('Close readiness') && r.ok) &&
-        results.some((r) => r.step.startsWith('Work Order Closed') && r.ok),
+      '10': SKIP_COMPLETE
+        ? results.some((r) => r.step.startsWith('Partial FG') && r.ok)
+        : results.some((r) => r.step.startsWith('Close readiness') && r.ok) &&
+          results.some((r) => r.step.startsWith('Work Order Closed') && r.ok),
     }
-    const pass = mapped[c.id] ?? ok
+    const pass = mapped[c.id] ?? false
     console.log(`  ${pass ? 'PASS' : 'FAIL'}  ${c.id}. ${c.label}`)
   }
 
@@ -1035,9 +1100,12 @@ async function main() {
   for (const r of results) {
     console.log(`  ${r.ok ? 'PASS' : 'FAIL'}  ${r.step}`)
   }
-  console.log(`\nFUEL TANK FACTORY GOLDEN PATH — PASS`)
-  console.log(`Command: npx tsx scripts/test-fuel-tank-wo-execution.ts\n`)
-}
+  console.log(
+    `\nFUEL TANK FACTORY GOLDEN PATH — PASS (${PARTIAL_MODE ? 'PARTIAL FG' : 'HAPPY'})`,
+  )
+  console.log(
+    `Command: ${PARTIAL_MODE ? 'FT_PARTIAL=1 npx tsx scripts/test-fuel-tank-wo-execution.ts' : 'npx tsx scripts/test-fuel-tank-wo-execution.ts'}\n`,
+  )}
 
 main()
   .catch((e) => {

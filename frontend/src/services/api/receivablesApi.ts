@@ -65,6 +65,14 @@ export async function listInvoiceReadyDispatchLines(params?: ListInvoiceReadyQue
   )
 }
 
+export type InvoiceReadyListApiMeta = {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+  policy?: import('@/types/moneyIn').InvoiceReadyPolicyDto
+}
+
 export async function prefillInvoiceFromDispatch(outboundDispatchLineIds: string[]) {
   return apiRequest<InvoicePrefillFromDispatchDto>(tenantPath(`${BASE}/invoices/prefill-from-dispatch`), {
     method: 'POST',

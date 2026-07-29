@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02">
+  <BkToCstmrStmt>
+    <GrpHdr>
+      <MsgId>CAMT-MSG-001</MsgId>
+      <CreDtTm>2026-07-02T18:00:00</CreDtTm>
+    </GrpHdr>
+    <Stmt>
+      <Id>STMT-CAMT-001</Id>
+      <CreDtTm>2026-07-02T18:00:00</CreDtTm>
+      <FrToDt>
+        <FrDtTm>2026-07-01T00:00:00</FrDtTm>
+        <ToDtTm>2026-07-02T23:59:59</ToDtTm>
+      </FrToDt>
+      <Acct>
+        <Id>
+          <Othr>
+            <Id>998877665544</Id>
+          </Othr>
+        </Id>
+        <Ccy>INR</Ccy>
+      </Acct>
+      <Bal>
+        <Tp>
+          <CdOrPrtry>
+            <Cd>OPBD</Cd>
+          </CdOrPrtry>
+        </Tp>
+        <Amt Ccy="INR">100000.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Dt>
+          <Dt>2026-07-01</Dt>
+        </Dt>
+      </Bal>
+      <Bal>
+        <Tp>
+          <CdOrPrtry>
+            <Cd>CLBD</Cd>
+          </CdOrPrtry>
+        </Tp>
+        <Amt Ccy="INR">115000.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Dt>
+          <Dt>2026-07-02</Dt>
+        </Dt>
+      </Bal>
+      <Ntry>
+        <Amt Ccy="INR">40000.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <BookgDt>
+          <Dt>2026-07-01</Dt>
+        </BookgDt>
+        <ValDt>
+          <Dt>2026-07-01</Dt>
+        </ValDt>
+        <AcctSvcrRef>REF-C1</AcctSvcrRef>
+        <NtryDtls>
+          <TxDtls>
+            <Refs>
+              <EndToEndId>E2E-C1</EndToEndId>
+            </Refs>
+            <RmtInf>
+              <Ustrd>NEFT credit customer ABC</Ustrd>
+            </RmtInf>
+          </TxDtls>
+        </NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="INR">25000.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <BookgDt>
+          <Dt>2026-07-02</Dt>
+        </BookgDt>
+        <ValDt>
+          <Dt>2026-07-02</Dt>
+        </ValDt>
+        <AcctSvcrRef>REF-D1</AcctSvcrRef>
+        <NtryDtls>
+          <TxDtls>
+            <Refs>
+              <EndToEndId>E2E-D1</EndToEndId>
+            </Refs>
+            <RmtInf>
+              <Ustrd>Vendor payment NEFT</Ustrd>
+            </RmtInf>
+          </TxDtls>
+        </NtryDtls>
+      </Ntry>
+    </Stmt>
+  </BkToCstmrStmt>
+</Document>

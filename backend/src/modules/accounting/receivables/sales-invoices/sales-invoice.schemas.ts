@@ -283,6 +283,13 @@ export const listInvoiceReadyQuerySchema = z.object({
       if (v === undefined) return undefined
       return v === true || v === 'true'
     }),
+  excludePodBlocked: z
+    .union([z.literal('true'), z.literal('false'), z.boolean()])
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined
+      return v === true || v === 'true'
+    }),
 })
 
 export type ListInvoiceReadyQueryInput = z.infer<typeof listInvoiceReadyQuerySchema>

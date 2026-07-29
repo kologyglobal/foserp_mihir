@@ -19,6 +19,167 @@
 
 ---
 
+## 2026-07-29 — FIN-CLOSE-1 stop: Dispatch → AR Invoice Ready polish (G11)
+
+### Shipped
+- Invoice Ready list returns tenant **policy** in response meta (`invoiceMode`, POD, multi-dispatch allowance)
+- Line DTO: `blockers[]`, `canCreateInvoice`, POD fields; query `excludePodBlocked`
+- FE `/accounting/money-in/invoice-ready`: policy banner, POD + blockers columns, Create blocked for multi-customer / POD / ONE_PER_DISPATCH multi-dispatch, Show POD-waiting, partial-qty guidance (draft SI edit capped)
+- Bridge returns `{ items, policy }`; outbound dispatch Create Invoice updated
+
+### FIN-CLOSE-1 stop verdict
+Scoped chains closed. **Do not continue** into deferred statutory / advanced Finance or Money In/Out redesign from this phase. Still open outside stop: retro cost adjustment; Hostinger migrate deploy.
+
+### Evidence
+- Backend + frontend `tsc --noEmit` — clean
+
+---
+
+## 2026-07-29 — Maintenance client feedback (Start Maintenance flow)
+
+### Shipped
+- Dashboard primary **Start Maintenance**; revised close flow per client checklist
+- Operator name + GPS / plant-workstation location on report
+- Max **4** photos; required before close
+- Resource assignment: Internal User/Technician, External Contractor/Vendor, Operator Name
+- Parts Changed (item, qty, remarks) + Service Performed + invoice/amount always on update
+- Close readiness: photos, technician, operator, parts/service, invoice, amount
+- Migration `20260729180000_maintenance_client_feedback`
+- Docs: `MAINTENANCE_WORKFLOW.md`, `MAINTENANCE_UAT.md`
+
+### Evidence
+- `npx tsx scripts/test-maintenance-v1.ts` — PASS (`MT-000002`)
+- Frontend `tsc --noEmit` — clean
+
+---
+
+## 2026-07-29 — FIN-CLOSE-1 Inventory ↔ GL / WIP ↔ GL trial balance + failed events
+
+### Shipped
+- Accounting read model under `/accounting/inventory-gl-reconciliation`:
+  - `GET …/trial-balance` — RM / FG / WIP / GR-IR operational vs mapped GL (as-of date)
+  - `GET …/failed-events` — unified Inventory + Manufacturing FAILED/RECORDED queue
+  - `POST …/failed-events/:id/retry` — idempotent retry (no Force Balance)
+- Reason codes: `ACCOUNTING_EVENT_FAILED`, `GRIR_NOT_CLEARED`, `MANUAL_GL_ENTRY_DIFFERENCE`, …
+- FE hub: `/accounting/inventory-gl-reconciliation` (nav: Accounting → Inventory ↔ GL)
+- Permissions reuse `finance.gl.view` / `manufacturing.accounting.*` / `inventory.view_cost`
+
+### Evidence
+- `npx tsc --noEmit` (backend) — clean
+- `tests/finance/finance-inventory-gl-reconciliation.test.ts` — 4 tests passed
+
+### Conditions
+- Operational RM/FG use stock-balance buckets by item type; WIP uses WO snapshot − FG capitalisation
+- Open GR/IR operational = posted GRN inward still uninvoiced (aligned with VI GR/IR release)
+- Hostinger migrate deploy of earlier FIN-CLOSE-1 migration still pending
+
+### Verdict
+**FIN-CLOSE-1 — INVENTORY↔GL / WIP↔GL RECON HUB LANDED (NO FORCE BALANCE)**
+
+---
+
+## 2026-07-29 — FIN-CLOSE-1 foundation: GR/IR, PPV, Purchase Return → AP debit note
+
+Closes the four product decisions from `docs/accounting/ACCOUNTING_INTEGRATION_CLOSURE_AUDIT.md`.
+No redesign of Money In / Money Out / Journals / Bank & Cash / Fixed Assets / Budgeting;
+no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap` is forward-only.
+
+### Shipped
+- **`GRIR_CLEARING`** mapping key — `GRN_INWARD` now posts `Dr RAW_MATERIAL_INVENTORY / Cr GRIR_CLEARING`
+  (reversal flips). `PURCHASE` is no longer the GRN proxy; historical events are untouched.
+- **`PURCHASE_PRICE_VARIANCE`** mapping key + category metadata (EXPENSE/INCOME), available for mapping.
+- **Purchase Return → Vendor Debit Note** — `purchase-return-ap-handoff.service.ts` creates an
+  Accounting `VendorAdjustment` **draft** (`VENDOR_DEBIT_NOTE`, reason `PURCHASE_RETURN`) for the
+  invoiced portion of a completed return. Backend-owned eligibility; invoiced rate, not return rate;
+  idempotent on `PurchaseReturn.vendorAdjustmentId`; never posts GL.
+  Routes: `GET /purchase/returns/:id/ap-adjustment-preview`, `POST /purchase/returns/:id/ap-adjustment`.
+- **GR/IR gating** — unchanged `INVENTORY_ACCOUNTING` feature gate. Enabling it now also requires
+  `RAW_MATERIAL_INVENTORY` + `GRIR_CLEARING` mappings alongside COGS/FG.
+- `VendorAdjustmentSourceLinkType.PURCHASE_RETURN` for traceability back to the return.
+- **GR/IR closes on Vendor Invoice post** — a GRN-linked invoice line posts
+  `Dr GRIR_CLEARING (receipt cost) / Dr-Cr PURCHASE_PRICE_VARIANCE (invoice − receipt) /
+  Dr PURCHASE (non-recoverable tax only)`. Total debit unchanged, so the voucher still balances.
+  Receipt cost comes from the POSTED `InventoryAccountingEvent`, joined via the deterministic
+  movement key `grn-in:<grnId>:<grnLineId>`. Lines whose GRN never posted GL keep the old
+  `PURCHASE` debit. Partial invoicing releases proportionally, quantity already billed by a POSTED
+  invoice is excluded, and the final release snaps to the exact remaining balance.
+  Reversal is automatic (the reversal voucher mirrors the original lines).
+
+### Evidence
+- `npx tsc --noEmit` (backend) — clean
+- `npm run test:purchase-phase15` — 7 files / 29 tests passed
+- `tests/finance/finance-ap-vendor-invoice-grir-release.test.ts` — 7 tests passed (new)
+- `finance-ap-vendor-invoice-calculation` + vendor-payment calculation/preview — 43 tests passed (no regression)
+- `npm run test:fin-close-1-live` — **PASS** against local MySQL:
+  - tenant `fin-close-1-1785321404895-4433`
+  - GRN `d0cb5d65-3172-48a7-ad1e-5b75367627f9`: Cr GR/IR ₹1,000
+  - Vendor Invoice `b33c94a3-0307-4cd2-b6cd-3871768fc562`: Dr GR/IR ₹1,000 + Dr PPV ₹100
+  - GR/IR closing balance: ₹0
+  - Purchase Return `090bcca6-1ec9-4912-9dc3-dea8ebec4975` → Vendor Debit Note
+    `VADJ-DRAFT-20260729-Z767PH` for ₹220 at invoiced rate
+
+### Conditions
+- Migration **applied** locally (`20260729160000_fin_close_1_grir_ppv_return_ap` on `fos_erp`).
+- `GRIR_CLEARING` → `2110 GR/IR Clearing` and `PURCHASE_PRICE_VARIANCE` → `5510 Purchase Price Variance`
+  mapped on every active LE that already had a CoA (script: `npx tsx scripts/map-fin-close-1-grir-ppv.ts`).
+  Does **not** enable `INVENTORY_ACCOUNTING` — that remains a deliberate finance settings action.
+- Retro cost adjustment on purchase invoice and the Inventory ↔ GL / WIP ↔ GL trial balances
+  are still open.
+- Hostinger migrate deploy of this migration is still pending.
+
+### Verdict
+**FIN-CLOSE-1 — GR/IR + RETURN→AP CHAINS VERIFIED LIVE**
+
+---
+
+## 2026-07-29 — Maintenance Module V1
+
+### Shipped
+- Module flag `maintenance`; APIs under `/api/v1/t/:tenantSlug/maintenance`
+- Prisma: `MaintenanceTicket` / `MaintenancePart` / `MaintenanceAttachment` + migration
+- Lifecycle: Report → Start Repair → Update/Parts/Photos → Test → Close
+- Machine status: report→`OUT_OF_SERVICE`, repair→`UNDER_MAINTENANCE`, close→`AVAILABLE`
+- FE: `/maintenance` dashboard, tickets, report, detail, machine history, reports (API mode only)
+- MFG: Report Breakdown from My Work + Work Order detail
+- Docs: `docs/maintenance/*`
+- Harness: `npx tsx scripts/test-maintenance-v1.ts` → **PASS** (`MT-000001`)
+
+### Conditions
+- Inventory ISSUE posting deferred (`inventoryPostingPending`)
+- External contractor UAT skipped (no vendor in run tenant)
+- Live SPA UAT optional
+
+### Verdict
+**MAINTENANCE V1 — READY WITH CONDITIONS**
+
+---
+
+## 2026-07-29 — Fuel Tank SPA checklist A1–A9 + partial FG signed
+
+### Evidence
+- Happy A1–A9: `WO-000039` / `FT-5000L-08208574` / COMPLETED / ₹111,020 — `npx tsx scripts/test-fuel-tank-wo-execution.ts`
+- Partial FG: `WO-000040` planned=3 completedGood=1 FG `FT-5000L-08267674` WO remains IN_PROGRESS — `FT_PARTIAL=1 npx tsx scripts/test-fuel-tank-wo-execution.ts`
+- Checklist signed: `docs/manufacturing/MFG_PILOT_SPA_UAT_CHECKLIST.md`
+
+### Verdict
+**READY** for controlled pilot (API evidence). Optional live SPA click-through for UX only.
+
+---
+
+## 2026-07-29 — Manufacturing pilot scenarios (Fuel Tank)
+
+### Shipped
+- SPA checklist: `docs/manufacturing/MFG_PILOT_SPA_UAT_CHECKLIST.md`
+- API harness: `backend/scripts/test-fuel-tank-pilot-scenarios.ts` — shortage→PR, issue/return, hold/resume, SO→Demand→WO, Dispatch serial readiness — **PASS**
+- Fix: WO material return accepts `batchId`/`batchNumber` for batch-tracked items
+- Applied pending local migrations (UOM / GRN tolerance / PO versioning)
+- Results: `docs/manufacturing/MFG_PILOT_SCENARIO_RESULTS.md`
+
+### Still open
+- Human SPA walk A1–A9 + partial FG qty-3 UI
+
+---
+
 ## 2026-07-28 ΓÇö MFG-GOLDEN-1 Fuel Tank golden path closure
 
 ### Shipped

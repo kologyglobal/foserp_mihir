@@ -41,10 +41,11 @@ Sales Order / Manual Demand
 cd backend
 npx tsx scripts/seed-fuel-tank-pilot-items.ts
 npx tsx scripts/seed-fuel-tank-mfg-setup.ts
-npx tsx scripts/test-fuel-tank-wo-execution.ts
+npx tsx scripts/test-fuel-tank-wo-execution.ts          # Scenario A happy path
+npx tsx scripts/test-fuel-tank-pilot-scenarios.ts       # B/E/F/H/I/D open scenarios
 ```
 
-Requires MySQL + `vasant-trailers` tenant + `admin@vasant-trailers.com`. API mode only — no Zustand demo.
+SPA checklist: [`MFG_PILOT_SPA_UAT_CHECKLIST.md`](MFG_PILOT_SPA_UAT_CHECKLIST.md) · Results: [`MFG_PILOT_SCENARIO_RESULTS.md`](MFG_PILOT_SCENARIO_RESULTS.md)
 
 ---
 
