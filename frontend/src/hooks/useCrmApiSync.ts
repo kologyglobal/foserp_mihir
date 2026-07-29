@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { isApiMode } from '@/config/apiConfig'
 import { hydrateCrmFromApi } from '@/bootstrap/apiHydration'
-import { formatApiError } from '@/services/api/apiErrors'
+import { formatApiError, isPermissionDeniedError } from '@/services/api/apiErrors'
 
 /**
  * When VITE_USE_API=true, hydrates CRM stores from backend on mount.
@@ -26,6 +26,12 @@ export function useCrmApiSync() {
         if (!cancelled) setStatus('ready')
       } catch (e) {
         if (!cancelled) {
+          // Missing module permission must not trap the whole shell — route guards handle UX.
+          if (isPermissionDeniedError(e)) {
+            setError(null)
+            setStatus('ready')
+            return
+          }
           setError(formatApiError(e))
           setStatus('error')
         }

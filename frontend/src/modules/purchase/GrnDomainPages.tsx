@@ -5,6 +5,7 @@
 export { GrnListPage } from './GrnListPage'
 export { GrnEditorPage } from './GrnEditorPage'
 export { GrnDetailPage } from './GrnDetailPage'
+export { GrnPrintPage } from './GrnPrintPage'
 export { QualityInspectionListPage } from './QualityInspectionListPage'
 export { QualityInspectionDetailPage } from './QualityInspectionDetailPage'
 export { QualityInspectionCreatePage } from './QualityInspectionCreatePage'

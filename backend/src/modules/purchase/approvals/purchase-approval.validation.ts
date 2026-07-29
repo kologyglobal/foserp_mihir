@@ -8,7 +8,11 @@ export const APPROVAL_QUEUE_TABS = [
   'all_history',
 ] as const
 
-export const APPROVAL_DOCUMENT_TYPES = ['PURCHASE_REQUISITION', 'PURCHASE_ORDER'] as const
+export const APPROVAL_DOCUMENT_TYPES = [
+  'PURCHASE_REQUISITION',
+  'PURCHASE_ORDER',
+  'GOODS_RECEIPT',
+] as const
 
 export const listPurchaseApprovalsQuerySchema = paginationSchema.extend({
   tab: z.enum(APPROVAL_QUEUE_TABS).optional().default('pending_mine'),

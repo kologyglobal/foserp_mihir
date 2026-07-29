@@ -38,6 +38,12 @@ import {
   updateGRN,
   GRN_DOMAIN_STATUS_LABELS,
 } from '@/services/purchase'
+import {
+  evaluateGrnDocumentTolerance,
+  evaluateGrnLineTolerance,
+  GRN_TOLERANCE_STATUS_LABELS,
+  resolveReceivingTolerancePct,
+} from '@/services/purchase/grnTolerance'
 import type { GoodsReceiptNote, GrnInput, PurchaseOrder } from '@/types/purchaseDomain'
 import { formatNumber } from '@/utils/formatters/currency'
 import { formatDate } from '@/utils/dates/format'
@@ -88,6 +94,7 @@ type LineDraft = {
   previouslyReceivedQty: number
   pendingQty: number
   receivedQty: number
+  receivedUomQty?: number
   acceptedQty: number
   rejectedQty: number
   shortQty: number
@@ -105,6 +112,11 @@ type LineDraft = {
   batchControlled: boolean
   serialControlled: boolean
   expiryControlled: boolean
+  tolerancePercentage: number
+  variancePercentage: number | null
+  toleranceStatus: string
+  closeOpenQuantity: boolean
+  receivingTolerancePercentage: number
   remarks: string
 }
 
@@ -114,12 +126,35 @@ function today() {
 
 function linesFromPo(
   po: PurchaseOrder,
-  itemControls: Record<string, { batch: boolean; serial: boolean; expiry: boolean }>,
+  itemControls: Record<
+    string,
+    { batch: boolean; serial: boolean; expiry: boolean; receivingTolerancePercentage: number }
+  >,
+  setup: { allowOverReceipt: boolean; overReceiptTolerancePct: number },
 ): LineDraft[] {
   return po.lines
     .filter((l) => l.pendingQty > 0)
     .map((l) => {
-      const ctrl = itemControls[l.itemId] ?? { batch: false, serial: false, expiry: false }
+      const ctrl = itemControls[l.itemId] ?? {
+        batch: false,
+        serial: false,
+        expiry: false,
+        receivingTolerancePercentage: 0,
+      }
+      const itemTol = ctrl.receivingTolerancePercentage
+      const resolvedTol = resolveReceivingTolerancePct({
+        itemTolerancePct: itemTol,
+        setupTolerancePct: setup.overReceiptTolerancePct,
+        allowOverReceipt: setup.allowOverReceipt,
+      })
+      const preview = evaluateGrnLineTolerance({
+        openQuantity: l.pendingQty,
+        receivedQuantity: l.pendingQty,
+        itemTolerancePct: itemTol,
+        setupTolerancePct: setup.overReceiptTolerancePct,
+        allowOverReceipt: setup.allowOverReceipt,
+        closeOpenQuantity: false,
+      })
       return {
         purchaseOrderLineId: l.id,
         itemCode: l.itemCode,
@@ -132,8 +167,8 @@ function linesFromPo(
         receivedQty: l.pendingQty,
         acceptedQty: 0,
         rejectedQty: 0,
-        shortQty: 0,
-        excessQty: 0,
+        shortQty: preview.shortQuantity,
+        excessQty: preview.excessQuantity,
         damagedQty: 0,
         batchNumber: '',
         lotNumber: '',
@@ -143,10 +178,15 @@ function linesFromPo(
         warehouseId: l.locationId || po.deliveryLocation.id,
         warehouseName: l.locationName || po.deliveryLocation.name,
         bin: '',
-        allowExcess: false,
+        allowExcess: setup.allowOverReceipt,
         batchControlled: ctrl.batch,
         serialControlled: ctrl.serial,
         expiryControlled: ctrl.expiry,
+        tolerancePercentage: resolvedTol,
+        variancePercentage: preview.variancePercentage,
+        toleranceStatus: preview.toleranceStatus,
+        closeOpenQuantity: false,
+        receivingTolerancePercentage: itemTol,
         remarks: '',
       }
     })
@@ -180,6 +220,11 @@ function linesFromGrn(grn: GoodsReceiptNote): LineDraft[] {
     batchControlled: l.batchControlled,
     serialControlled: l.serialControlled,
     expiryControlled: l.expiryControlled,
+    tolerancePercentage: l.tolerancePercentage ?? 0,
+    variancePercentage: l.variancePercentage ?? null,
+    toleranceStatus: l.toleranceStatus ?? 'OK',
+    closeOpenQuantity: Boolean(l.closeOpenQuantity),
+    receivingTolerancePercentage: l.receivingTolerancePercentage ?? l.tolerancePercentage ?? 0,
     remarks: l.remarks,
   }))
 }
@@ -197,8 +242,12 @@ export function GrnEditorPage() {
   const [status, setStatus] = useState('draft')
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [itemControls, setItemControls] = useState<
-    Record<string, { batch: boolean; serial: boolean; expiry: boolean }>
+    Record<
+      string,
+      { batch: boolean; serial: boolean; expiry: boolean; receivingTolerancePercentage: number }
+    >
   >({})
+  const [setupTolerancePct, setSetupTolerancePct] = useState(0)
   const [poId, setPoId] = useState(searchParams.get('poId') ?? '')
   const [documentDate, setDocumentDate] = useState(today())
   const [vendorChallanNumber, setVendorChallanNumber] = useState('')
@@ -273,14 +322,36 @@ export function GrnEditorPage() {
     const pendingQty = lines.reduce((s, l) => s + (Number(l.pendingQty) || 0), 0)
     const shortQty = lines.reduce((s, l) => s + (Number(l.shortQty) || 0), 0)
     const excessQty = lines.reduce((s, l) => s + (Number(l.excessQty) || 0), 0)
+    const doc = evaluateGrnDocumentTolerance(
+      lines.map((l) => ({
+        itemCode: l.itemCode,
+        openQuantity: Number(l.pendingQty) || 0,
+        receivedQuantity: Number(l.receivedQty) || 0,
+        itemTolerancePct: l.receivingTolerancePercentage,
+        setupTolerancePct: setupTolerancePct,
+        allowOverReceipt: allowExcess,
+        closeOpenQuantity: l.closeOpenQuantity,
+      })),
+    )
+    const remainingOpenQty = lines.reduce((s, l) => {
+      const pending = Number(l.pendingQty) || 0
+      const received = Number(l.receivedQty) || 0
+      return s + Math.max(0, pending - received)
+    }, 0)
     return {
       lineCount: lines.length,
       receivedQty,
       pendingQty,
       shortQty,
       excessQty,
+      notReceivedCount: doc.notReceivedCount,
+      partialCount: doc.partialCount,
+      outsideCount: doc.outsideCount,
+      requiresToleranceApproval: doc.requiresApproval,
+      receivableLineCount: doc.receivableLineCount,
+      remainingOpenQty,
     }
-  }, [lines])
+  }, [lines, allowExcess, setupTolerancePct])
 
   const receivingPeek = useMemo(
     () =>
@@ -366,14 +437,26 @@ export function GrnEditorPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [pos, items] = await Promise.all([getPurchaseOrders(), getPurchaseItems()])
+      const [pos, items, setup] = await Promise.all([
+        getPurchaseOrders(),
+        getPurchaseItems(),
+        getPurchaseSetup().catch(() => null),
+      ])
       setOrders(pos)
-      const controls: Record<string, { batch: boolean; serial: boolean; expiry: boolean }> = {}
+      if (setup) {
+        setAllowExcess(Boolean(setup.general.allowOverReceipt))
+        setSetupTolerancePct(Number(setup.general.overReceiptTolerancePct ?? 0))
+      }
+      const controls: Record<
+        string,
+        { batch: boolean; serial: boolean; expiry: boolean; receivingTolerancePercentage: number }
+      > = {}
       for (const item of items) {
         controls[item.id] = {
           batch: item.batchControlled,
           serial: item.serialControlled,
           expiry: item.expiryControlled,
+          receivingTolerancePercentage: Number(item.receivingTolerancePercentage ?? 0),
         }
       }
       setItemControls(controls)
@@ -407,20 +490,32 @@ export function GrnEditorPage() {
       } else {
         const initialPoId = searchParams.get('poId') ?? ''
         if (initialPoId) {
-          const [po, setup] = await Promise.all([
+          const [po, poSetup] = await Promise.all([
             getPurchaseOrderById(initialPoId),
             getPurchaseSetup().catch(() => null),
           ])
+          const effectiveSetup = poSetup ?? setup
+          if (effectiveSetup) {
+            setAllowExcess(Boolean(effectiveSetup.general.allowOverReceipt))
+            setSetupTolerancePct(Number(effectiveSetup.general.overReceiptTolerancePct ?? 0))
+          }
           if (po) {
             setPoId(po.id)
-            const wh = warehouseFromPoDelivery(po, setup?.general.defaultWarehouseId)
+            const wh = warehouseFromPoDelivery(po, effectiveSetup?.general.defaultWarehouseId)
             setWarehouseId(wh.id)
             setWarehouseName(wh.name)
-            if (setup?.receiving.defaultReceivingLocationId) {
-              setReceivingLocation(setup.receiving.defaultReceivingLocationId)
+            if (effectiveSetup?.receiving.defaultReceivingLocationId) {
+              setReceivingLocation(effectiveSetup.receiving.defaultReceivingLocationId)
             }
-            setLines(linesFromPo(po, controls))
-            setInspectionRequired(setup?.receiving.autoCreateInspection ?? true)
+            setLines(
+              linesFromPo(po, controls, {
+                allowOverReceipt: Boolean(effectiveSetup?.general.allowOverReceipt),
+                overReceiptTolerancePct: Number(
+                  effectiveSetup?.general.overReceiptTolerancePct ?? 0,
+                ),
+              }),
+            )
+            setInspectionRequired(effectiveSetup?.receiving.autoCreateInspection ?? true)
           }
         }
         const nextNumber = await previewNextGoodsReceiptNumber().catch(() => null)
@@ -448,25 +543,46 @@ export function GrnEditorPage() {
       getPurchaseSetup().catch(() => null),
     ])
     if (!po) return
+    if (setup) {
+      setAllowExcess(Boolean(setup.general.allowOverReceipt))
+      setSetupTolerancePct(Number(setup.general.overReceiptTolerancePct ?? 0))
+    }
     const wh = warehouseFromPoDelivery(po, setup?.general.defaultWarehouseId)
     setWarehouseId(wh.id)
     setWarehouseName(wh.name)
     if (!receivingLocation && setup?.receiving.defaultReceivingLocationId) {
       setReceivingLocation(setup.receiving.defaultReceivingLocationId)
     }
-    setLines(linesFromPo(po, itemControls))
+    setLines(
+      linesFromPo(po, itemControls, {
+        allowOverReceipt: Boolean(setup?.general.allowOverReceipt ?? allowExcess),
+        overReceiptTolerancePct: Number(
+          setup?.general.overReceiptTolerancePct ?? setupTolerancePct,
+        ),
+      }),
+    )
   }
 
   const updateLine = (index: number, patch: Partial<LineDraft>) => {
     setLines((prev) => {
       const next = [...prev]
       const row = { ...next[index], ...patch }
-      // Auto-derive short/excess only when received qty changes; manual edits stay put.
-      if ('receivedQty' in patch) {
+      if ('receivedQty' in patch || 'receivedUomQty' in patch || 'closeOpenQuantity' in patch) {
         const pending = row.pendingQty
         const received = Number(row.receivedQty) || 0
-        row.excessQty = Math.max(0, received - pending)
-        row.shortQty = Math.max(0, pending - received)
+        const tol = evaluateGrnLineTolerance({
+          openQuantity: pending,
+          receivedQuantity: received,
+          itemTolerancePct: row.receivingTolerancePercentage,
+          setupTolerancePct: setupTolerancePct,
+          allowOverReceipt: allowExcess || row.allowExcess,
+          closeOpenQuantity: row.closeOpenQuantity,
+        })
+        row.excessQty = tol.excessQuantity
+        row.shortQty = tol.shortQuantity
+        row.tolerancePercentage = tol.tolerancePercentage
+        row.variancePercentage = tol.variancePercentage
+        row.toleranceStatus = tol.toleranceStatus
       }
       next[index] = row
       return next
@@ -507,6 +623,7 @@ export function GrnEditorPage() {
       warehouseName: l.warehouseName || warehouseName,
       bin: l.bin,
       allowExcess: l.allowExcess || allowExcess,
+      closeOpenQuantity: Boolean(l.closeOpenQuantity),
       remarks: l.remarks,
     })),
   })
@@ -523,27 +640,21 @@ export function GrnEditorPage() {
 
     if (!poId) push('poId', 'Please select a purchase order.')
     if (!warehouseId.trim()) push('warehouseId', 'Please select a warehouse.')
-    if (!lines.length) push('lines', 'Add at least one line with open quantity to receive.')
+    if (!lines.length) push('lines', 'Add at least one open PO line to receive.')
 
     lines.forEach((l, i) => {
       const itemLabel = (l.itemCode || l.itemName || `Line ${i + 1}`).trim()
-      if ((Number(l.receivedQty) || 0) <= 0) {
-        push(`line-${i}-qty`, `Enter received quantity for ${itemLabel}.`)
+      if ((Number(l.receivedQty) || 0) < 0) {
+        push(`line-${i}-qty`, `Received quantity cannot be negative for ${itemLabel}.`)
       }
-      if (l.batchControlled && !l.batchNumber.trim()) {
+      if (l.batchControlled && (Number(l.receivedQty) || 0) > 0 && !l.batchNumber.trim()) {
         push(`line-${i}-batch`, `Batch number is required for ${itemLabel}.`)
       }
-      if (l.serialControlled && !l.serialNumber.trim()) {
+      if (l.serialControlled && (Number(l.receivedQty) || 0) > 0 && !l.serialNumber.trim()) {
         push(`line-${i}-serial`, `Serial number is required for ${itemLabel}.`)
       }
-      if (l.expiryControlled && !l.expiryDate) {
+      if (l.expiryControlled && (Number(l.receivedQty) || 0) > 0 && !l.expiryDate) {
         push(`line-${i}-expiry`, `Expiry date is required for ${itemLabel}.`)
-      }
-      if ((Number(l.receivedQty) || 0) > l.pendingQty && !l.allowExcess && !allowExcess) {
-        push(
-          `line-${i}-excess`,
-          `Received quantity for ${itemLabel} exceeds pending quantity. Turn on Allow Excess to continue.`,
-        )
       }
     })
 
@@ -1011,9 +1122,27 @@ export function GrnEditorPage() {
         {fieldErrors.lines ? (
           <p className="mb-2 text-sm text-red-600">{fieldErrors.lines}</p>
         ) : (
-          <p className="mb-2 text-[12px] text-erp-muted">
-            Adjust received quantities; short / excess recalculate from pending open qty.
-          </p>
+          <div className="mb-2 space-y-1.5 text-[12px] text-erp-muted">
+            <p>
+              All open PO lines are listed. Enter 0 for Not Received (stays open). Outside tolerance
+              submits for Purchase Manager approval.
+            </p>
+            {lineTotals.remainingOpenQty > 0 ||
+            lineTotals.notReceivedCount > 0 ||
+            lineTotals.partialCount > 0 ||
+            lineTotals.outsideCount > 0 ? (
+              <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
+                Pending after this receipt: {formatNumber(lineTotals.remainingOpenQty)} open qty
+                {lineTotals.notReceivedCount
+                  ? ` · ${lineTotals.notReceivedCount} not received`
+                  : ''}
+                {lineTotals.partialCount ? ` · ${lineTotals.partialCount} partial` : ''}
+                {lineTotals.outsideCount
+                  ? ` · ${lineTotals.outsideCount} outside tolerance (approval)`
+                  : ''}
+              </p>
+            ) : null}
+          </div>
         )}
         <div className="min-w-0 overflow-x-auto rounded-md border border-erp-border">
           <table className="erp-table min-w-full text-left text-[12px]">
@@ -1024,6 +1153,10 @@ export function GrnEditorPage() {
                 <th className="num">Prev. Recd</th>
                 <th className="num">Pending</th>
                 <th className="num">Received</th>
+                <th className="num">Tol %</th>
+                <th className="num">Var %</th>
+                <th>Status</th>
+                <th title="Close remaining open qty (short outside → approval)">Close open</th>
                 <th>Short / Excess / Dmg</th>
                 <th>Batch / Lot / Serial</th>
                 <th>Mfg / Expiry</th>
@@ -1046,14 +1179,42 @@ export function GrnEditorPage() {
                     <Input
                       type="number"
                       className="w-24"
-                      value={l.receivedQty}
-                      onChange={(e) => updateLine(i, { receivedQty: Number(e.target.value) })}
+                      min={0}
+                      value={l.receivedUomQty ?? l.receivedQty}
+                      onChange={(e) =>
+                        updateLine(i, {
+                          receivedUomQty: Number(e.target.value),
+                          receivedQty: Number(e.target.value),
+                        })
+                      }
                     />
                     {fieldErrors[`line-${i}-qty`] || fieldErrors[`line-${i}-excess`] ? (
                       <p className="mt-1 text-xs text-red-600">
                         {fieldErrors[`line-${i}-qty`] || fieldErrors[`line-${i}-excess`]}
                       </p>
                     ) : null}
+                  </td>
+                  <td className="num">{formatNumber(l.tolerancePercentage)}</td>
+                  <td className="num">
+                    {l.variancePercentage == null ? '—' : `${formatNumber(l.variancePercentage)}%`}
+                  </td>
+                  <td>
+                    {GRN_TOLERANCE_STATUS_LABELS[
+                      l.toleranceStatus as keyof typeof GRN_TOLERANCE_STATUS_LABELS
+                    ] ?? l.toleranceStatus}
+                  </td>
+                  <td>
+                    <label className="inline-flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={l.closeOpenQuantity}
+                        disabled={(Number(l.receivedQty) || 0) <= 0}
+                        onChange={(e) =>
+                          updateLine(i, { closeOpenQuantity: e.target.checked })
+                        }
+                      />
+                      <span className="text-[11px] text-erp-muted">Close</span>
+                    </label>
                   </td>
                   <td>
                     <div className="flex gap-1">

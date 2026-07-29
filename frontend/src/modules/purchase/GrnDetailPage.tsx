@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
+  CheckCircle2,
   ClipboardCheck,
   Package,
   PackageCheck,
@@ -8,6 +9,8 @@ import {
   Printer,
   RotateCcw,
   Send,
+  Download,
+  XCircle,
 } from 'lucide-react'
 import { PurchaseCardFormShell } from '@/components/purchase/PurchaseCardFormShell'
 import {
@@ -23,14 +26,17 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Modal } from '@/design-system/components/Modal'
 import { ErpButton } from '@/components/erp/ErpButton'
 import {
+  approveToleranceGRN,
   createPurchaseReturnFromGrn,
   getGRNById,
   GRN_DOMAIN_STATUS_LABELS,
   GRN_LINE_INSPECTION_STATUS_LABELS,
   postGRN,
   PurchaseServiceError,
+  rejectToleranceGRN,
   submitGRN,
 } from '@/services/purchase'
+import { GRN_TOLERANCE_STATUS_LABELS } from '@/services/purchase/grnTolerance'
 import type { GoodsReceiptNote } from '@/types/purchaseDomain'
 import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
 import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
@@ -42,7 +48,7 @@ export function GrnDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const perms = usePurchasePermissions()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const [grn, setGrn] = useState<GoodsReceiptNote | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -71,12 +77,10 @@ export function GrnDetailPage() {
 
   useEffect(() => {
     if (!grn) return
-    if (searchParams.get('print') === '1' || window.location.pathname.endsWith('/print')) {
-      window.print()
-      searchParams.delete('print')
-      setSearchParams(searchParams, { replace: true })
+    if (searchParams.get('print') === '1') {
+      navigate(`/purchase/grn/${grn.id}/print`, { replace: true })
     }
-  }, [grn, searchParams, setSearchParams])
+  }, [grn, navigate, searchParams])
 
   const run = async (work: () => Promise<GoodsReceiptNote>, success: string) => {
     setBusy(true)
@@ -209,6 +213,18 @@ export function GrnDetailPage() {
                   disabled: busy || postGate.disabled,
                   disabledReason: postGate.disabledReason,
                 }
+              : grn.status === 'pending_tolerance_approval' && perms.canPostGrn
+                ? {
+                    id: 'approve-tol',
+                    label: 'Approve Tolerance',
+                    icon: CheckCircle2,
+                    onClick: () =>
+                      void run(
+                        () => approveToleranceGRN(grn.id),
+                        'Tolerance approved — GRN submitted',
+                      ),
+                    disabled: busy,
+                  }
               : canSubmit && !createGate.hidden
                 ? {
                     id: 'submit',
@@ -216,7 +232,11 @@ export function GrnDetailPage() {
                     icon: Send,
                     onClick: async () => {
                       const updated = await run(() => submitGRN(grn.id), 'GRN submitted')
-                      if (
+                      if (updated?.status === 'pending_tolerance_approval') {
+                        notify.info(
+                          'Outside tolerance — awaiting Purchase Manager approval.',
+                        )
+                      } else if (
                         updated &&
                         updated.inspectionRequired &&
                         !updated.qualityInspectionId
@@ -232,6 +252,15 @@ export function GrnDetailPage() {
                 : undefined
           }
           secondaryActions={[
+            {
+              id: 'reject-tol',
+              label: 'Reject Tolerance',
+              icon: XCircle,
+              onClick: () =>
+                void run(() => rejectToleranceGRN(grn.id, 'Rejected'), 'Returned to draft'),
+              hidden: grn.status !== 'pending_tolerance_approval',
+              disabled: busy || !perms.canPostGrn,
+            },
             {
               id: 'edit',
               label: 'Edit',
@@ -261,6 +290,12 @@ export function GrnDetailPage() {
               icon: Printer,
               pin: true,
               onClick: () => navigate(`/purchase/grn/${grn.id}/print`),
+            },
+            {
+              id: 'download',
+              label: 'Download PDF',
+              icon: Download,
+              onClick: () => navigate(`/purchase/grn/${grn.id}/print?download=1`),
             },
             {
               id: 'valuation',
@@ -296,6 +331,12 @@ export function GrnDetailPage() {
       stickyFooter={false}
     >
       <div className="space-y-3">
+        {grn.status === 'pending_tolerance_approval' ? (
+          <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-950">
+            Outside receiving tolerance — awaiting Purchase Manager approval. Use Approve / Reject
+            Tolerance above, or resolve from the Purchase Approvals queue.
+          </div>
+        ) : null}
         <ErpCardSection
           title="General"
           subtitle="Identity, vendor, and receipt details"
@@ -352,6 +393,9 @@ export function GrnDetailPage() {
                   <th className="num">Prev</th>
                   <th className="num">Pending</th>
                   <th className="num">Received</th>
+                  <th className="num">Tol %</th>
+                  <th className="num">Var %</th>
+                  <th>Tol status</th>
                   <th className="num">Accepted</th>
                   <th className="num">Rejected</th>
                   <th>Batch</th>
@@ -373,6 +417,15 @@ export function GrnDetailPage() {
                     <td className="num tabular-nums">{formatNumber(l.previouslyReceivedQty)}</td>
                     <td className="num tabular-nums">{formatNumber(l.pendingQty)}</td>
                     <td className="num tabular-nums">{formatNumber(l.receivedQty)}</td>
+                    <td className="num tabular-nums">{formatNumber(l.tolerancePercentage ?? 0)}</td>
+                    <td className="num tabular-nums">
+                      {l.variancePercentage == null ? '—' : `${formatNumber(l.variancePercentage)}%`}
+                    </td>
+                    <td className="whitespace-nowrap">
+                      {GRN_TOLERANCE_STATUS_LABELS[
+                        (l.toleranceStatus ?? 'OK') as keyof typeof GRN_TOLERANCE_STATUS_LABELS
+                      ] ?? l.toleranceStatus}
+                    </td>
                     <td className="num tabular-nums">{formatNumber(l.acceptedQty)}</td>
                     <td className="num tabular-nums">{formatNumber(l.rejectedQty)}</td>
                     <td className="font-mono text-[11px] whitespace-nowrap">{l.batchNumber || '—'}</td>

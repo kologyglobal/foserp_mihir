@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { DynamicsSuiteBar } from './DynamicsSuiteBar'
@@ -11,6 +11,8 @@ import { RecordDetailPanel } from '../design-system/RecordDetailPanel'
 import { RightDrawer } from '../design-system/RightDrawer'
 import { CrmQuickCreateHost } from '../crm/quick-create/CrmQuickCreateHost'
 import { AppErrorBoundary } from '../system/AppErrorBoundary'
+import { ApiHydrationErrorScreen } from '../system/ApiHydrationErrorScreen'
+import { PermissionDeniedPage } from '../system/PermissionDeniedPage'
 import { ScrollToTop } from '../routing/ScrollToTop'
 import { BackToTopButton } from './BackToTopButton'
 import { ProtectedOutlet } from '../auth/ProtectedRoute'
@@ -25,6 +27,10 @@ import { useTenantModulesStore } from '../../store/tenantModulesStore'
 import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { Loader } from '../ui/Loader'
 import { cn } from '../../utils/cn'
+import {
+  isPermissionDeniedError,
+  parseMissingPermissionKey,
+} from '@/services/api/apiErrors'
 
 export function AppShell() {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
@@ -33,6 +39,7 @@ export function AppShell() {
   const { status: apiSyncStatus, error: apiSyncError } = useCrmApiSync()
   const { status: masterSyncStatus, error: masterSyncError } = useMasterApiSync()
   const { status: adminSyncStatus, error: adminSyncError } = useAdminApiSync()
+  const [continueDespiteSyncError, setContinueDespiteSyncError] = useState(false)
 
   useEffect(() => {
     if (!mobileNavOpen) return
@@ -56,32 +63,32 @@ export function AppShell() {
     return <Loader fullScreen size="lg" label="Loading data from server" />
   }
 
-  if (isApiMode() && (apiSyncStatus === 'error' || masterSyncStatus === 'error' || adminSyncStatus === 'error')) {
-    const detail = apiSyncError ?? masterSyncError ?? adminSyncError ?? 'Unknown error'
-    const looksLikeOffline =
-      /failed to fetch|networkerror|load failed/i.test(detail) ||
-      /not routing \/api|backend running|expected json/i.test(detail)
-    return (
-      <div className="flex min-h-screen items-center justify-center p-6">
-        <div className="max-w-lg rounded-xl border border-red-200 bg-white p-6 text-center">
-          <p className="font-medium text-erp-text">Could not load application data</p>
-          <p className="mt-2 text-sm text-erp-muted">{detail}</p>
-          {looksLikeOffline ? (
-            <p className="mt-3 text-left text-xs text-erp-muted">
-              API mode needs the backend. Locally run <code className="rounded bg-slate-100 px-1">npm run dev</code> in{' '}
-              <code className="rounded bg-slate-100 px-1">backend/</code> (port 5000). On production, confirm{' '}
-              <code className="rounded bg-slate-100 px-1">/api/v1/health</code> returns JSON, not the SPA HTML.
-            </p>
-          ) : null}
-          <button
-            type="button"
-            className="erp-btn erp-btn--primary mt-4 text-[13px]"
-            onClick={() => window.location.reload()}
-          >
-            Retry
-          </button>
+  const syncFailed =
+    isApiMode() &&
+    (apiSyncStatus === 'error' || masterSyncStatus === 'error' || adminSyncStatus === 'error')
+  const syncErrorDetail = apiSyncError ?? masterSyncError ?? adminSyncError ?? 'Unknown error'
+  const looksLikeOffline =
+    /failed to fetch|networkerror|load failed/i.test(syncErrorDetail) ||
+    /not routing \/api|backend running|expected json/i.test(syncErrorDetail)
+
+  if (syncFailed && !continueDespiteSyncError) {
+    if (isPermissionDeniedError(syncErrorDetail)) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-slate-50">
+          <PermissionDeniedPage
+            requiredPermission={parseMissingPermissionKey(syncErrorDetail)}
+            pageName="this workspace area"
+            onGoHome={() => setContinueDespiteSyncError(true)}
+          />
         </div>
-      </div>
+      )
+    }
+    return (
+      <ApiHydrationErrorScreen
+        detail={syncErrorDetail}
+        looksLikeOffline={looksLikeOffline}
+        onContinueHome={() => setContinueDespiteSyncError(true)}
+      />
     )
   }
 

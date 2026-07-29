@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { isApiMode } from '@/config/apiConfig'
 import { hydrateCoreMastersFromApi } from '@/bootstrap/apiHydration'
 import { hydrateBatchMastersFromApi } from '@/bootstrap/apiHydration'
-import { formatApiError } from '@/services/api/apiErrors'
+import { formatApiError, isPermissionDeniedError } from '@/services/api/apiErrors'
 
 /** Hydrates core master slices from backend when VITE_USE_API=true. */
 export function useMasterApiSync() {
@@ -25,6 +25,11 @@ export function useMasterApiSync() {
         if (!cancelled) setStatus('ready')
       } catch (e) {
         if (!cancelled) {
+          if (isPermissionDeniedError(e)) {
+            setError(null)
+            setStatus('ready')
+            return
+          }
           setError(formatApiError(e))
           setStatus('error')
         }

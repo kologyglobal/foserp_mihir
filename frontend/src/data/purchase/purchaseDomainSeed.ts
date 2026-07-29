@@ -1545,6 +1545,8 @@ function poLine(partial: {
     hsnCode: partial.hsnCode,
     sacCode: partial.sacCode ?? null,
     quantity,
+    uomQuantity: quantity,
+    uomConversionFactor: 1,
     rate: partial.rate,
     discountPct: partial.discountPct ?? 0,
     discountAmount: partial.discountAmount ?? 0,

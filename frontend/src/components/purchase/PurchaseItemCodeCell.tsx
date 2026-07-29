@@ -37,6 +37,8 @@ export type PurchaseItemCodeCellProps = {
   labelMode?: 'code' | 'name'
   /** When false, hide manual code entry (catalog pick only). Default true. */
   allowManual?: boolean
+  /** Shown when the filtered catalog has no rows (e.g. product type with no Item Master matches). */
+  emptyCatalogHint?: string
   onSelectItem: (itemId: string) => void
   onClearCatalog: () => void
   onManualCodeChange: (code: string) => void
@@ -59,6 +61,7 @@ export function PurchaseItemCodeCell({
   textClassName = 'text-[12px]',
   labelMode = 'code',
   allowManual = true,
+  emptyCatalogHint = 'No matching items',
   onSelectItem,
   onClearCatalog,
   onManualCodeChange,
@@ -227,7 +230,7 @@ export function PurchaseItemCodeCell({
                   className={cn('h-7 min-w-0 flex-1 border-0 bg-transparent outline-none', textClassName)}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search name, code, product type…"
+                  placeholder="Search Item Master by name or code…"
                   aria-label="Filter catalog items"
                 />
               </div>
@@ -236,16 +239,18 @@ export function PurchaseItemCodeCell({
                   <colgroup>
                     {labelMode === 'name' ? (
                       <>
-                        <col style={{ width: '55%' }} />
-                        <col style={{ width: '15%' }} />
-                        <col style={{ width: '30%' }} />
+                        <col style={{ width: '42%' }} />
+                        <col style={{ width: '22%' }} />
+                        <col style={{ width: '12%' }} />
+                        <col style={{ width: '24%' }} />
                       </>
                     ) : (
                       <>
-                        <col style={{ width: '28%' }} />
-                        <col style={{ width: '40%' }} />
+                        <col style={{ width: '22%' }} />
+                        <col style={{ width: '30%' }} />
+                        <col style={{ width: '18%' }} />
                         <col style={{ width: '12%' }} />
-                        <col style={{ width: '20%' }} />
+                        <col style={{ width: '18%' }} />
                       </>
                     )}
                   </colgroup>
@@ -259,8 +264,9 @@ export function PurchaseItemCodeCell({
                           <th className="px-2.5 py-1.5 font-semibold">Item Name</th>
                         </>
                       )}
+                      <th className="px-2.5 py-1.5 font-semibold">Product Type</th>
                       <th className="px-2.5 py-1.5 font-semibold">UOM</th>
-                      <th className="px-2.5 py-1.5 text-right font-semibold">Last Rate</th>
+                      <th className="px-2.5 py-1.5 text-right font-semibold">Rate</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -275,7 +281,7 @@ export function PurchaseItemCodeCell({
                           setQuery('')
                         }}
                       >
-                        <td colSpan={labelMode === 'name' ? 3 : 4} className="px-2.5 py-2 italic text-erp-muted">
+                        <td colSpan={labelMode === 'name' ? 4 : 5} className="px-2.5 py-2 italic text-erp-muted">
                           Manual entry (clear catalog)
                         </td>
                       </tr>
@@ -283,15 +289,18 @@ export function PurchaseItemCodeCell({
                     {filtered.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={labelMode === 'name' ? 3 : 4}
+                          colSpan={labelMode === 'name' ? 4 : 5}
                           className="px-2.5 py-3 text-center text-erp-muted"
                         >
-                          No matching items
+                          {catalogItems.length === 0 ? emptyCatalogHint : 'No matching items'}
                         </td>
                       </tr>
                     ) : (
                       filtered.map((item) => {
                         const lastRate = lastRateFor(item)
+                        const productTypeLabel = item.productType
+                          ? ENGINEERING_PRODUCT_TYPE_LABELS[item.productType]
+                          : '—'
                         return (
                           <tr
                             key={item.id}
@@ -323,6 +332,9 @@ export function PurchaseItemCodeCell({
                                 </td>
                               </>
                             )}
+                            <td className="truncate px-2.5 py-1.5" title={productTypeLabel}>
+                              {productTypeLabel}
+                            </td>
                             <td className="truncate px-2.5 py-1.5">{item.uom}</td>
                             <td className="px-2.5 py-1.5 text-right tabular-nums whitespace-nowrap">
                               {formatCurrency(lastRate)}

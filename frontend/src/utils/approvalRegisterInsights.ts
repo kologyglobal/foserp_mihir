@@ -30,6 +30,7 @@ export function buildApprovalRegisterOverview(
   const overdue = pending.filter(isApprovalOverdue).length
   const prCount = rows.filter((r) => r.documentType === 'purchase_requisition').length
   const poCount = rows.filter((r) => r.documentType === 'purchase_order').length
+  const grnCount = rows.filter((r) => r.documentType === 'goods_receipt_note').length
   const pendingValue = pending.reduce((s, r) => s + r.amount, 0)
   const urgent = pending.filter((r) => r.priority === 'urgent' || r.priority === 'high').length
 
@@ -47,7 +48,7 @@ export function buildApprovalRegisterOverview(
     },
     { label: 'Approved', value: approved },
     { label: 'Rejected', value: rejected },
-    { label: 'PR / PO', value: `${prCount} / ${poCount}` },
+    { label: 'PR / PO / GRN', value: `${prCount} / ${poCount} / ${grnCount}` },
     {
       label: 'High / urgent',
       value: urgent,

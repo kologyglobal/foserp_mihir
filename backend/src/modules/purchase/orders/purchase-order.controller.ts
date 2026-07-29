@@ -125,3 +125,15 @@ export const reopenPurchaseOrder = asyncHandler(async (req: Request, res: Respon
   )
   sendSuccess(res, 'Purchase order reopened', data)
 })
+
+export const revisePurchaseOrder = asyncHandler(async (req: Request, res: Response) => {
+  const { revisePurchaseOrder: revise } = await import('./purchase-order-revision.service.js')
+  const data = await revise(getTenantId(req), getRouteParam(req, 'id'), getUserId(req), req.body)
+  sendSuccess(res, 'Purchase order revised', data)
+})
+
+export const listPurchaseOrderRevisions = asyncHandler(async (req: Request, res: Response) => {
+  const { listPurchaseOrderRevisions: list } = await import('./purchase-order-revision.service.js')
+  const data = await list(getTenantId(req), getRouteParam(req, 'id'))
+  sendSuccess(res, 'Purchase order revisions retrieved', data)
+})

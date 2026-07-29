@@ -93,7 +93,7 @@ export function buildPoRegisterKpiItems(
     },
     {
       id: 'pending',
-      label: 'Pending Approval',
+      label: 'Sent for Approval',
       value: summary.pendingApproval,
       icon: Clock,
       accent: 'amber',

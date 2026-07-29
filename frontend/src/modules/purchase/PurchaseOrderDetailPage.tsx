@@ -79,7 +79,6 @@ import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { appPromptNote } from '@/store/confirmDialogStore'
 import { ReservationsPanel } from '@/components/inventory/ReservationsPanel'
-import { isApiMode } from '@/config/apiConfig'
 
 const REVISABLE_STATUSES: PurchaseOrder['status'][] = [
   'released',
@@ -170,32 +169,6 @@ export function PurchaseOrderDetailPage() {
     } finally {
       setBusy(false)
     }
-  }
-
-  const downloadStub = () => {
-    if (!po) return
-    const blob = new Blob(
-      [
-        [
-          `PURCHASE ORDER ${po.documentNumber}`,
-          `Vendor: ${po.vendor.name} (${po.vendor.gstin})`,
-          `Date: ${po.documentDate} · Expected: ${po.expectedDeliveryDate}`,
-          '',
-          ...po.lines.map(
-            (l) => `${l.lineNo}. ${l.itemCode} ${l.itemName} qty ${l.quantity} ${l.uom} @ ${l.rate} = ${l.lineTotal}`,
-          ),
-          '',
-          `Grand Total: ${formatCurrency(po.totalAmount)}`,
-        ].join('\n'),
-      ],
-      { type: 'text/plain' },
-    )
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${po.documentNumber}.txt`
-    a.click()
-    URL.revokeObjectURL(url)
   }
 
   const changeHistoryPeek = useMemo(() => {
@@ -300,7 +273,9 @@ export function PurchaseOrderDetailPage() {
     ? aa.canSendToVendor
     : (po.status === 'approved' || po.status === 'released') && !po.sentToVendorAt
   const canCreateGrn = aa ? aa.canReceive : RECEIVABLE_STATUSES.includes(po.status)
-  const canRevise = isApiMode() ? false : REVISABLE_STATUSES.includes(po.status)
+  const canRevise = aa
+    ? Boolean(aa.canRevise)
+    : REVISABLE_STATUSES.includes(po.status)
   const canClose = aa ? aa.canClose : !['draft', 'closed', 'cancelled'].includes(po.status)
   const canCancel = aa ? aa.canCancel : !['closed', 'cancelled'].includes(po.status)
 
@@ -502,7 +477,12 @@ export function PurchaseOrderDetailPage() {
                 pin: true,
                 onClick: () => navigate(`/purchase/orders/${po.id}/print`),
               },
-              { id: 'download', label: 'Download PDF', icon: Download, onClick: downloadStub },
+              {
+                id: 'download',
+                label: 'Download PDF',
+                icon: Download,
+                onClick: () => navigate(`/purchase/orders/${po.id}/print?download=1`),
+              },
             ]}
             destructiveActions={[
               {
@@ -665,7 +645,14 @@ export function PurchaseOrderDetailPage() {
                         <div className="text-[12px] text-erp-muted">{l.itemName}</div>
                       </td>
                       <td>{l.uom}</td>
-                      <td className="num tabular-nums">{l.quantity}</td>
+                      <td className="num tabular-nums">
+                        <div>{Number(l.uomQuantity ?? l.quantity)}</div>
+                        {Number(l.uomConversionFactor ?? 1) !== 1 ? (
+                          <div className="text-[10px] text-erp-muted">
+                            → {Number(l.quantity).toLocaleString()} stock
+                          </div>
+                        ) : null}
+                      </td>
                       <td className="num tabular-nums">{formatCurrency(l.rate)}</td>
                       <td className="num tabular-nums">{formatCurrency(l.taxableAmount)}</td>
                       <td className="num tabular-nums">{formatCurrency(l.cgst)}</td>

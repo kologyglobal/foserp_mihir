@@ -1,6 +1,11 @@
 import type { PurchaseApprovalStatus, Prisma } from '@prisma/client'
 import { prisma } from '../../../config/database.js'
 
+export type ApprovalDocumentType =
+  | 'PURCHASE_REQUISITION'
+  | 'PURCHASE_ORDER'
+  | 'GOODS_RECEIPT'
+
 const approvalInclude = {
   purchaseRequisition: {
     include: {
@@ -22,7 +27,7 @@ export async function listApprovals(
   tenantId: string,
   opts: {
     statuses?: PurchaseApprovalStatus[]
-    documentTypes?: Array<'PURCHASE_REQUISITION' | 'PURCHASE_ORDER'>
+    documentTypes?: ApprovalDocumentType[]
     documentNumber?: string
     actorId?: string
     actorScope?: 'pending' | 'responded' | 'all'
@@ -34,7 +39,9 @@ export async function listApprovals(
 ) {
   const where: Prisma.PurchaseApprovalWhereInput = {
     tenantId,
-    documentType: { in: opts.documentTypes ?? ['PURCHASE_REQUISITION', 'PURCHASE_ORDER'] },
+    documentType: {
+      in: opts.documentTypes ?? ['PURCHASE_REQUISITION', 'PURCHASE_ORDER', 'GOODS_RECEIPT'],
+    },
     ...(opts.statuses?.length ? { status: { in: opts.statuses } } : {}),
     ...(opts.documentNumber
       ? { documentNumber: { contains: opts.documentNumber } }
@@ -68,13 +75,13 @@ export async function listApprovals(
   return { total, items }
 }
 
-/** PRs / POs in PENDING_APPROVAL with no PENDING approval row (legacy / orphan). */
+/** PRs / POs / GRNs pending approval with no PENDING approval row (legacy / orphan). */
 export async function findOrphanPendingDocuments(
   tenantId: string,
-  documentTypes: Array<'PURCHASE_REQUISITION' | 'PURCHASE_ORDER'>,
+  documentTypes: ApprovalDocumentType[],
 ) {
   const orphans: Array<{
-    documentType: 'PURCHASE_REQUISITION' | 'PURCHASE_ORDER'
+    documentType: ApprovalDocumentType
     documentId: string
   }> = []
 
@@ -114,12 +121,31 @@ export async function findOrphanPendingDocuments(
     }
   }
 
+  if (documentTypes.includes('GOODS_RECEIPT')) {
+    const grns = await prisma.goodsReceipt.findMany({
+      where: { tenantId, deletedAt: null, status: 'PENDING_TOLERANCE_APPROVAL' },
+      select: { id: true },
+    })
+    for (const grn of grns) {
+      const pending = await prisma.purchaseApproval.findFirst({
+        where: {
+          tenantId,
+          documentType: 'GOODS_RECEIPT',
+          documentId: grn.id,
+          status: 'PENDING',
+        },
+        select: { id: true },
+      })
+      if (!pending) orphans.push({ documentType: 'GOODS_RECEIPT', documentId: grn.id })
+    }
+  }
+
   return orphans
 }
 
 export async function ensurePendingApprovalForDocument(
   tenantId: string,
-  documentType: 'PURCHASE_REQUISITION' | 'PURCHASE_ORDER',
+  documentType: ApprovalDocumentType,
   documentId: string,
 ): Promise<ApprovalWithDocs | null> {
   if (documentType === 'PURCHASE_REQUISITION') {
@@ -145,6 +171,34 @@ export async function ensurePendingApprovalForDocument(
         requesterId: pr.requestedById ?? pr.createdById,
         amount,
         requestedAt: pr.submittedAt ?? pr.updatedAt,
+      },
+      include: approvalInclude,
+    })
+    return created
+  }
+
+  if (documentType === 'GOODS_RECEIPT') {
+    const grn = await prisma.goodsReceipt.findFirst({
+      where: { id: documentId, tenantId, deletedAt: null },
+      include: {
+        lines: true,
+        vendor: { select: { id: true, name: true, code: true } },
+      },
+    })
+    if (!grn || grn.status !== 'PENDING_TOLERANCE_APPROVAL') return null
+
+    const amount = grn.lines.reduce((s, l) => s + Number(l.amount), 0)
+    const created = await prisma.purchaseApproval.create({
+      data: {
+        tenantId,
+        documentType: 'GOODS_RECEIPT',
+        documentId: grn.id,
+        documentNumber: grn.grnNumber,
+        level: 1,
+        status: 'PENDING',
+        requesterId: grn.createdById,
+        amount,
+        requestedAt: grn.updatedAt,
       },
       include: approvalInclude,
     })
@@ -191,16 +245,27 @@ export async function findPendingApprovalByDocumentId(tenantId: string, document
       tenantId,
       documentId,
       status: 'PENDING',
-      documentType: { in: ['PURCHASE_REQUISITION', 'PURCHASE_ORDER'] },
+      documentType: { in: ['PURCHASE_REQUISITION', 'PURCHASE_ORDER', 'GOODS_RECEIPT'] },
     },
     include: approvalInclude,
     orderBy: { requestedAt: 'desc' },
   })
 }
 
+export async function findGoodsReceiptForApproval(tenantId: string, documentId: string) {
+  return prisma.goodsReceipt.findFirst({
+    where: { id: documentId, tenantId, deletedAt: null },
+    include: {
+      lines: { orderBy: { lineNumber: 'asc' } },
+      vendor: { select: { id: true, name: true, code: true } },
+      warehouse: { select: { id: true, name: true, code: true } },
+    },
+  })
+}
+
 export async function listStatusHistory(
   tenantId: string,
-  documentType: 'PURCHASE_REQUISITION' | 'PURCHASE_ORDER',
+  documentType: ApprovalDocumentType,
   documentId: string,
 ) {
   return prisma.purchaseStatusHistory.findMany({
@@ -224,7 +289,7 @@ export async function resolveRequesterNames(tenantId: string, userIds: string[])
 
 export async function listEligibleApprovers(
   tenantId: string,
-  permission: 'purchase.pr.approve' | 'purchase.po.approve',
+  permission: 'purchase.pr.approve' | 'purchase.po.approve' | 'purchase.grn.post',
   excludeUserId?: string | null,
 ) {
   const users = await prisma.user.findMany({
@@ -298,14 +363,18 @@ export async function delegatePendingApproval(input: {
         documentType:
           current.documentType === 'PURCHASE_ORDER'
             ? 'PURCHASE_ORDER'
-            : 'PURCHASE_REQUISITION',
+            : current.documentType === 'GOODS_RECEIPT'
+              ? 'GOODS_RECEIPT'
+              : 'PURCHASE_REQUISITION',
         documentId: current.documentId,
         documentNumber: current.documentNumber,
-        action: 'DELEGATED',
+        action: 'APPROVAL_DELEGATED',
         fromStatus: 'PENDING',
         toStatus: 'PENDING',
         actorId: input.actorId,
-        actorName: actor ? `${actor.firstName} ${actor.lastName}`.trim() : null,
+        actorName: actor
+          ? `${actor.firstName} ${actor.lastName}`.trim()
+          : null,
         remarks: input.remarks?.trim() || `Delegated to ${input.toRole}`,
       },
     })

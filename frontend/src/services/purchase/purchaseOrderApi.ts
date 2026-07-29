@@ -101,6 +101,17 @@ export async function reopenPurchaseOrderApi(id: string, payload: Record<string,
   })
 }
 
+export async function revisePurchaseOrderApi(id: string, payload: Record<string, unknown>) {
+  return apiRequest<ApiPurchaseOrder>(`${base()}/${id}/revise`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function listPurchaseOrderRevisionsApi(id: string) {
+  return apiRequest<unknown[]>(`${base()}/${id}/revisions`)
+}
+
 /** Create PO(s) from Planning Sheet selection — server-side grouping. */
 export async function createPurchaseOrdersFromPlanningApi(payload: {
   rowIds: string[]

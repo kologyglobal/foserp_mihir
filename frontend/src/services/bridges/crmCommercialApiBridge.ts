@@ -76,6 +76,8 @@ function mapProformaPayload(input: ProformaInvoiceInput & { salesOrderId?: strin
  * Hydrate commercial receivables. Requires `crm.commercial.view`.
  * Swallow 403 so CRM AppShell hydration still succeeds for sales users
  * without commercial rights (quotation templates, pipeline, etc.).
+ * Also swallow 5xx / DB errors so missing commercial tables on stage
+ * do not block Super Admin login (commercial is optional for shell load).
  */
 export async function syncCommercialFromApi(): Promise<void> {
   if (!isApiMode()) return
@@ -91,8 +93,9 @@ export async function syncCommercialFromApi(): Promise<void> {
       proformaInvoices: data.proformas ?? [],
     })
   } catch (err) {
+    // 403 (no commercial rights) or 5xx (missing stage tables) must not block AppShell.
     const status = err instanceof ApiError ? err.statusCode : 0
-    if (status === 403) {
+    if (status === 403 || status >= 500 || status === 0) {
       useCrmCommercialStore.setState({
         receipts: [],
         invoices: [],

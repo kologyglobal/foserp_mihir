@@ -92,6 +92,7 @@ export interface ApiPurchaseOrderAllowedActions {
   canClose: boolean
   canReopen: boolean
   canReceive: boolean
+  canRevise?: boolean
 }
 
 /* ─── Requisition ─── */
@@ -424,7 +425,12 @@ export interface ApiPurchaseOrderLine {
   itemName: string
   description: string | null
   quantity: number
+  uomQuantity?: number
+  uomConversionFactor?: number
+  unitCostPrimary?: number
   uomId: string | null
+  /** Vendor/purchase UOM code from MasterUom when relation is loaded. */
+  uomCode?: string | null
   rate: number
   amount: number
   receivedQuantity?: number
@@ -452,6 +458,7 @@ export interface ApiPurchaseOrder {
   vendorCity?: string
   status: ApiPurchaseOrderStatus | string
   origin: string
+  revisionNo?: number
   purchaseRequisitionId: string | null
   purchaseRequisitionNumber?: string | null
   requestForQuotationId?: string | null
@@ -484,6 +491,34 @@ export interface ApiPurchaseOrder {
   cancelledAt?: string | null
   allowedActions?: ApiPurchaseOrderAllowedActions
   lines?: ApiPurchaseOrderLine[]
+  revisions?: Array<{
+    id: string
+    revisionNo: number
+    reason: string
+    statusBefore?: string
+    statusAfter?: string
+    revisedAt: string | null
+    revisedById?: string | null
+    revisedByName?: string | null
+    snapshot?: string
+    changes?: Array<{
+      fieldPath?: string
+      fieldLabel?: string
+      previousValue?: string
+      newValue?: string
+    }>
+  }>
+  changeHistory?: Array<{
+    id: string
+    revisionNo: number
+    changedAt: string | null
+    changedBy: string
+    reason: string
+    fieldPath: string
+    fieldLabel: string
+    previousValue: string
+    newValue: string
+  }>
   createdAt?: string | null
   updatedAt?: string | null
 }
@@ -495,7 +530,12 @@ export interface ApiPurchaseOrderLineInput {
   itemCode?: string | null
   itemName?: string | null
   description?: string | null
-  quantity: number
+  /** Primary qty — optional when uomQuantity is sent. */
+  quantity?: number
+  /** Vendor / purchase UOM quantity. */
+  uomQuantity?: number
+  /** Vendor units per 1 primary unit. */
+  uomConversionFactor?: number
   uomId?: string | null
   rate?: number
   requiredDate?: string | null
@@ -526,6 +566,7 @@ export interface ApiCreatePoFromPlanningPayload {
 
 export type ApiGoodsReceiptStatus =
   | 'DRAFT'
+  | 'PENDING_TOLERANCE_APPROVAL'
   | 'SUBMITTED'
   | 'RECEIVING_COMPLETED'
   | 'QC_PENDING'
@@ -542,6 +583,9 @@ export interface ApiGoodsReceiptAllowedActions {
   canSubmit: boolean
   canCancel: boolean
   canReverse: boolean
+  canPostInventory?: boolean
+  canApproveTolerance?: boolean
+  canRejectTolerance?: boolean
 }
 
 export interface ApiGoodsReceiptLine {
@@ -554,11 +598,14 @@ export interface ApiGoodsReceiptLine {
   description: string | null
   uomId: string | null
   uom: string
+  uomConversionFactor?: number
   orderedQuantity: number
   previouslyReceivedQuantity: number
   openQuantity: number
   challanQuantity: number
   receivedQuantity: number
+  receivedUomQuantity?: number
+  orderedUomQuantity?: number
   damagedQuantity: number
   shortQuantity: number
   excessQuantity: number
@@ -578,6 +625,10 @@ export interface ApiGoodsReceiptLine {
   manufacturingDate: string | null
   expiryDate: string | null
   qcRequired: boolean
+  tolerancePercentage?: number
+  variancePercentage?: number | null
+  toleranceStatus?: string
+  closeOpenQuantity?: boolean
   remarks: string | null
 }
 
@@ -612,6 +663,9 @@ export interface ApiGoodsReceipt {
   receivedByName: string | null
   inspectionRequired: boolean
   allowExcess: boolean
+  toleranceApprovalRequired?: boolean
+  toleranceApprovedAt?: string | null
+  toleranceApprovedById?: string | null
   remarks: string | null
   submittedAt: string | null
   cancelledAt: string | null

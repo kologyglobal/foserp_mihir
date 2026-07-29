@@ -812,6 +812,8 @@ function buildOrderLines(
       hsnCode: row.hsnCode ?? item.hsnCode,
       sacCode: row.sacCode !== undefined ? row.sacCode : item.sacCode,
       quantity,
+      uomQuantity: Number(row.uomQuantity ?? quantity) || quantity,
+      uomConversionFactor: Number(row.uomConversionFactor ?? 1) || 1,
       rate,
       discountPct,
       discountAmount,
@@ -6627,6 +6629,12 @@ export async function approvePurchaseDocument(
   remarks = 'Approved',
 ): Promise<PurchaseRequisition | PurchaseOrder> {
   await delay()
+  if (documentType === 'goods_receipt_note') {
+    throw new PurchaseServiceError(
+      'NOT_SUPPORTED',
+      'GRN tolerance approval requires API mode',
+    )
+  }
   return advanceDocumentApproval(documentType, documentId, 'approve', remarks)
 }
 
@@ -6639,6 +6647,12 @@ export async function rejectPurchaseDocument(
   if (!remarks.trim()) {
     throw new PurchaseServiceError('REMARKS_REQUIRED', 'Rejection comments are mandatory')
   }
+  if (documentType === 'goods_receipt_note') {
+    throw new PurchaseServiceError(
+      'NOT_SUPPORTED',
+      'GRN tolerance rejection requires API mode',
+    )
+  }
   return advanceDocumentApproval(documentType, documentId, 'reject', remarks)
 }
 
@@ -6650,6 +6664,12 @@ export async function sendBackPurchaseDocument(
   await delay()
   if (!remarks.trim()) {
     throw new PurchaseServiceError('REMARKS_REQUIRED', 'Send-back comments are mandatory')
+  }
+  if (documentType === 'goods_receipt_note') {
+    throw new PurchaseServiceError(
+      'NOT_SUPPORTED',
+      'GRN tolerance send-back requires API mode',
+    )
   }
   return advanceDocumentApproval(documentType, documentId, 'send_back', remarks)
 }

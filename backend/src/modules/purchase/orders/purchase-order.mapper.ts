@@ -21,6 +21,18 @@ type OrderWithRelations = PurchaseOrder & {
   } | null
   requestForQuotation?: { id: string; rfqNumber: string } | null
   deliveryWarehouse?: WarehousePick | null
+  revisions?: Array<{
+    id: string
+    revisionNo: number
+    reason: string
+    statusBefore: string
+    statusAfter: string
+    revisedById: string | null
+    revisedAt: Date
+    headerSnapshot: unknown
+    linesSnapshot: unknown
+    changes: unknown
+  }>
 }
 
 export function mapPurchaseOrderToDto(
@@ -44,6 +56,7 @@ export function mapPurchaseOrderToDto(
     vendorCity: order.vendor?.city ?? '',
     status: order.status,
     origin: order.origin,
+    revisionNo: order.revisionNo ?? 0,
     purchaseRequisitionId: order.purchaseRequisitionId,
     purchaseRequisitionNumber: order.purchaseRequisition?.requisitionNumber ?? null,
     requestForQuotationId: order.requestForQuotationId,
@@ -77,6 +90,35 @@ export function mapPurchaseOrderToDto(
     createdAt: iso(order.createdAt),
     updatedAt: iso(order.updatedAt),
     allowedActions: allowedActions(order),
+    revisions: (order.revisions ?? []).map((r) => ({
+      id: r.id,
+      revisionNo: r.revisionNo,
+      reason: r.reason,
+      statusBefore: r.statusBefore,
+      statusAfter: r.statusAfter,
+      revisedAt: iso(r.revisedAt),
+      revisedById: r.revisedById,
+      revisedByName: (r.revisedById && userNames?.get(r.revisedById)) || null,
+      snapshot: JSON.stringify({
+        header: r.headerSnapshot,
+        lines: r.linesSnapshot,
+      }),
+      changes: Array.isArray(r.changes) ? r.changes : [],
+    })),
+    changeHistory: (order.revisions ?? []).flatMap((r) => {
+      const rows = Array.isArray(r.changes) ? (r.changes as Array<Record<string, string>>) : []
+      return rows.map((c, i) => ({
+        id: `${r.id}-${i}`,
+        revisionNo: r.revisionNo,
+        changedAt: iso(r.revisedAt),
+        changedBy: (r.revisedById && userNames?.get(r.revisedById)) || r.revisedById || '',
+        reason: r.reason,
+        fieldPath: c.fieldPath ?? '',
+        fieldLabel: c.fieldLabel ?? '',
+        previousValue: c.previousValue ?? '',
+        newValue: c.newValue ?? '',
+      }))
+    }),
     lines: order.lines.map((line) => {
       const quantity = num(line.quantity)
       const received = num(line.receivedQuantity)
@@ -88,7 +130,13 @@ export function mapPurchaseOrderToDto(
         itemName: line.itemNameSnapshot,
         description: line.description,
         quantity,
+        uomQuantity: num((line as { uomQuantity?: unknown }).uomQuantity ?? quantity),
+        uomConversionFactor: num((line as { uomConversionFactor?: unknown }).uomConversionFactor ?? 1) || 1,
+        unitCostPrimary: num((line as { unitCostPrimary?: unknown }).unitCostPrimary ?? line.rate),
         uomId: line.uomId,
+        uomCode:
+          (line as { uom?: { code?: string | null } | null }).uom?.code ??
+          null,
         rate: num(line.rate),
         amount: num(line.amount),
         receivedQuantity: received,

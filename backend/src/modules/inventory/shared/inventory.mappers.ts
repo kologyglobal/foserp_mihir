@@ -13,19 +13,44 @@ export function dateOnly(value: Date | null | undefined): string | null {
 
 export function mapStockBalance(
   row: InventoryStockBalance & {
-    item?: { id: string; code: string; name: string } | null
+    item?: {
+      id: string
+      code: string
+      name: string
+      baseUomId?: string | null
+      purchaseUomId?: string | null
+      uomConversionFactor?: unknown
+      purchaseQtyPerUom?: unknown
+      baseUom?: { id: string; code: string } | null
+      purchaseUom?: { id: string; code: string } | null
+    } | null
     warehouse?: { id: string; code: string; name: string } | null
   },
   inTransitQty = 0,
 ) {
   const onHandQty = toDecimal(row.onHandQty)
   const reservedQty = toDecimal(row.reservedQty)
+  const item = row.item
+  const sameUom =
+    !item?.purchaseUomId || !item?.baseUomId || item.purchaseUomId === item.baseUomId
+  const factorRaw = Number(item?.uomConversionFactor ?? item?.purchaseQtyPerUom ?? 1)
+  const factor = sameUom ? 1 : factorRaw > 0 ? factorRaw : 1
+  const primaryOnHand = onHandQty.toNumber()
+  const uomOnHand = primaryOnHand * factor
+
   return {
     id: row.id,
     tenantId: row.tenantId,
     itemId: row.itemId,
     warehouseId: row.warehouseId,
+    /** Primary / stock UOM quantity. */
+    quantity: dec(onHandQty),
     onHandQty: dec(onHandQty),
+    /** Vendor UOM quantity (computed for display). */
+    uomQuantity: dec(uomOnHand),
+    uomConversionFactor: dec(factor),
+    primaryUomCode: item?.baseUom?.code ?? null,
+    purchaseUomCode: item?.purchaseUom?.code ?? item?.baseUom?.code ?? null,
     reservedQty: dec(reservedQty),
     unrestrictedQty: dec(
       onHandQty.minus(row.qcHoldQty).minus(row.blockedQty).minus(row.rejectedQty),
@@ -58,6 +83,8 @@ export function mapStockMovement(row: InventoryStockMovement) {
     rate: dec(row.rate),
     value: dec(row.value),
     balanceAfter: dec(row.balanceAfter),
+    uomQuantity: row.uomQuantity != null ? dec(row.uomQuantity) : null,
+    uomConversionFactor: row.uomConversionFactor != null ? dec(row.uomConversionFactor) : null,
     createdAt: isoDateTime(row.createdAt),
   }
 }

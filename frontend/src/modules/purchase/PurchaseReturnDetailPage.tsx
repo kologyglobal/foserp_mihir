@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Ban,
   CheckCircle2,
+  Download,
   FileText,
   PackagePlus,
   Pencil,
@@ -246,6 +247,12 @@ export function PurchaseReturnDetailPage() {
                 label: 'Print Return Challan',
                 icon: Printer,
                 onClick: () => navigate(`/purchase/returns/${doc.id}/print`),
+              },
+              {
+                id: 'download',
+                label: 'Download PDF',
+                icon: Download,
+                onClick: () => navigate(`/purchase/returns/${doc.id}/print?download=1`),
               },
               {
                 id: 'cancel',

@@ -7807,58 +7807,6 @@ a.crm-companies-table__name:hover {
   background: #fff;
 }
 
-/* Inline WYSIWYG editing — quotation template preview editor */
-.quo-preview-edit-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-bottom: 16px;
-  padding: 10px 16px;
-  border-radius: 10px;
-  border: 1px solid #93c5fd;
-  background: #eff6ff;
-  color: #1d4ed8;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.quo-preview-edit-banner__hint {
-  font-weight: 500;
-  color: #3b5a8a;
-}
-
-.quo-preview-shell--editing .quo-preview-canvas {
-  background: #dbe6f5;
-  box-shadow: inset 0 0 0 2px #93c5fd;
-}
-
-.quo-print-doc--editing [contenteditable] {
-  cursor: text;
-  border-radius: 3px;
-  outline: 1px dashed transparent;
-  outline-offset: 2px;
-  transition: outline-color 0.12s ease, background-color 0.12s ease;
-}
-
-.quo-print-doc--editing [contenteditable]:hover {
-  outline-color: #93c5fd;
-  background-color: rgba(59, 130, 246, 0.07);
-}
-
-.quo-print-doc--editing [contenteditable]:focus {
-  outline: 1.5px solid #2563eb;
-  outline-offset: 2px;
-  background-color: rgba(37, 99, 235, 0.09);
-}
-
-.quo-print-doc--editing [contenteditable]:empty::before {
-  content: attr(data-placeholder);
-  color: #94a3b8;
-  font-style: italic;
-}
-
 .quo-print-page {
   min-height: 100vh;
   background: #d8e0ea;
@@ -8283,22 +8231,14 @@ a.crm-companies-table__name:hover {
 }
 
 .quo-print-header__logo-wrap {
-  flex-shrink: 0;
-  width: 132px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  width: 48px;
+  height: 48px;
 }
 
 .quo-print-header__logo-img {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-  object-position: left center;
-  display: block;
 }
 
 .quo-print-header__tagline {
@@ -8840,8 +8780,7 @@ a.crm-companies-table__name:hover {
 
 .quo-print-header__brand {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .quo-print-header__logo {
@@ -8869,10 +8808,6 @@ a.crm-companies-table__name:hover {
   font-size: 9pt;
   color: #555;
   margin: 2px 0 0;
-}
-
-.quo-print-header__address {
-  white-space: pre-line;
 }
 
 .quo-print-header__meta {
@@ -9028,16 +8963,6 @@ a.crm-companies-table__name:hover {
     visibility: hidden;
   }
 
-  [contenteditable] {
-    outline: none !important;
-    background: none !important;
-    cursor: default !important;
-  }
-
-  .quo-preview-edit-banner {
-    display: none !important;
-  }
-
   .quo-print-doc,
   .quo-print-doc *,
   .quo-print-page,
@@ -9133,6 +9058,7 @@ a.crm-companies-table__name:hover {
   .so-print-toolbar,
   .wo-print-toolbar,
   .po-print-toolbar,
+  .po-print-back,
   .pi-print-toolbar {
     display: none !important;
   }
@@ -9141,6 +9067,8 @@ a.crm-companies-table__name:hover {
     size: A4;
     margin: 10mm 12mm;
   }
+
+  /* Per-document @page is injected at print time (see purchaseDocumentPdfExport). */
 }
 
 /* CRM Quotation Templates */
@@ -12157,355 +12085,6 @@ a.crm-companies-table__name:hover {
   min-width: 0;
 }
 
-/* ── Zoho CRM–style Create Lead ───────────────────────────────────────────── */
-.crm-lead-form-page--zoho {
-  --zoho-blue: #3659b6;
-  --zoho-blue-soft: #e8eef9;
-  --zoho-canvas: #f4f6f9;
-  --zoho-card: #ffffff;
-  --zoho-border: #dde3ea;
-  --zoho-text: #1a2332;
-  --zoho-muted: #6b7785;
-}
-
-.crm-lead-form-page--zoho .erp-form-body.crm-lead-form-body,
-.crm-lead-form-page--zoho .crm-lead-form-body {
-  gap: 8px;
-  background: transparent;
-}
-
-.crm-lead-zoho-layout {
-  display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-  min-width: 0;
-}
-
-.crm-lead-zoho-rail {
-  position: sticky;
-  top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 12px 16px;
-  border: 1px solid var(--zoho-border, #dde3ea);
-  border-radius: 10px;
-  background: var(--zoho-card, #fff);
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-}
-
-.crm-lead-zoho-rail__eyebrow {
-  margin: 0;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--zoho-blue, #3659b6);
-}
-
-.crm-lead-zoho-rail__title {
-  margin: 0 0 4px;
-  font-size: 14px;
-  font-weight: 650;
-  color: var(--zoho-text, #1a2332);
-}
-
-.crm-lead-zoho-rail__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.crm-lead-zoho-rail__item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 8px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--zoho-muted, #6b7785);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
-}
-
-.crm-lead-zoho-rail__item:hover {
-  background: var(--zoho-blue-soft, #e8eef9);
-  color: var(--zoho-blue, #3659b6);
-}
-
-.crm-lead-zoho-rail__item.is-done {
-  color: var(--zoho-text, #1a2332);
-}
-
-.crm-lead-zoho-rail__marker {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 1.5px solid var(--zoho-border, #dde3ea);
-  background: #fff;
-  color: transparent;
-}
-
-.crm-lead-zoho-rail__item.is-done .crm-lead-zoho-rail__marker {
-  border-color: var(--zoho-blue, #3659b6);
-  background: var(--zoho-blue, #3659b6);
-  color: #fff;
-}
-
-.crm-lead-zoho-rail__label {
-  min-width: 0;
-  line-height: 1.3;
-}
-
-.crm-lead-zoho-rail__progress {
-  margin-top: 10px;
-  padding-top: 12px;
-  border-top: 1px solid var(--zoho-border, #dde3ea);
-}
-
-.crm-lead-zoho-rail__progress-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-  font-size: 11px;
-  color: var(--zoho-muted, #6b7785);
-}
-
-.crm-lead-zoho-rail__progress-meta strong {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--zoho-blue, #3659b6);
-}
-
-.crm-lead-zoho-rail__bar {
-  height: 4px;
-  border-radius: 999px;
-  background: #e8edf3;
-  overflow: hidden;
-}
-
-.crm-lead-zoho-rail__bar-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #3659b6, #4f7ad8);
-  transition: width 200ms ease;
-}
-
-.crm-lead-zoho-canvas {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-  padding: 2px 2px 4px;
-}
-
-.crm-lead-form-page--zoho .crm-lead-quick-entry,
-.crm-lead-form-page--zoho .crm-lead-zoho-block {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  transform: none !important;
-}
-
-.crm-lead-form-page--zoho .crm-lead-zoho-section.erp-field-group,
-.crm-lead-form-page--zoho .erp-field-group.crm-lead-zoho-section {
-  gap: 0;
-  padding: 0 0 16px;
-  margin: 0;
-  border: 1px solid var(--zoho-border, #dde3ea);
-  border-radius: 10px;
-  background: var(--zoho-card, #fff);
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-  overflow: hidden;
-}
-
-.crm-lead-form-page--zoho .crm-lead-zoho-section.erp-field-group + .crm-lead-zoho-section.erp-field-group,
-.crm-lead-form-page--zoho .erp-field-group.crm-lead-zoho-section + .erp-field-group.crm-lead-zoho-section {
-  padding-top: 0;
-  border-top: 1px solid var(--zoho-border, #dde3ea);
-}
-
-.crm-lead-form-page--zoho .crm-lead-zoho-section > .erp-field-group__label {
-  margin: 0;
-  padding: 9px 14px;
-  font-size: 13px;
-  font-weight: 650;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--zoho-text, #1a2332);
-  background: linear-gradient(180deg, #fafbfc 0%, #f5f7fa 100%);
-  border-bottom: 1px solid var(--zoho-border, #dde3ea);
-  border-left: 3px solid var(--zoho-blue, #3659b6);
-}
-
-.crm-lead-form-page--zoho .crm-lead-zoho-section > .erp-field-group__grid {
-  padding: 11px 14px 3px;
-  gap: 9px 14px;
-}
-
-.crm-lead-form-page--zoho .erp-form-label,
-.crm-lead-form-page--zoho .crm-lead-field__label,
-.crm-lead-form-page--zoho .erp-field-label {
-  font-size: 12px !important;
-  font-weight: 550 !important;
-  letter-spacing: 0 !important;
-  text-transform: none !important;
-  color: var(--zoho-muted, #6b7785) !important;
-}
-
-.crm-lead-form-page--zoho .erp-input,
-.crm-lead-form-page--zoho .erp-select,
-.crm-lead-form-page--zoho [role='combobox'] {
-  border-radius: 4px !important;
-  border-color: #c9d1dc !important;
-  background: #fff !important;
-}
-
-.crm-lead-form-page--zoho .erp-input:focus,
-.crm-lead-form-page--zoho .erp-input-prefix:focus-within,
-.crm-lead-form-page--zoho [role='combobox']:focus-within {
-  border-color: var(--zoho-blue, #3659b6) !important;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--zoho-blue, #3659b6) 22%, transparent) !important;
-}
-
-.crm-lead-form-page--zoho .crm-lead-zoho-section {
-  border-radius: 10px;
-}
-
-/* Secondary FastTabs (Requirement, Commercial, Follow-up, Notes, Attachments,
-   Status) — same collapsible ErpCardSection used app-wide; re-skin to match
-   the Zoho card chrome and keep the closed-by-default headers dense. */
-.crm-lead-form-page--zoho .crm-lead-zoho-canvas [id^="lead-section-"] .erp-card-section,
-.crm-lead-form-page--zoho .crm-lead-zoho-canvas [id^="pi-section-"] .erp-card-section {
-  border: 1px solid var(--zoho-border, #dde3ea) !important;
-  border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04) !important;
-  overflow: hidden;
-}
-
-.crm-lead-form-page--zoho .crm-lead-zoho-canvas [id^="lead-section-"] .erp-card-section__header,
-.crm-lead-form-page--zoho .crm-lead-zoho-canvas [id^="pi-section-"] .erp-card-section__header {
-  padding: 9px 14px;
-  background: linear-gradient(180deg, #fafbfc 0%, #f5f7fa 100%) !important;
-  border-bottom: 1px solid var(--zoho-border, #dde3ea) !important;
-  border-left: 3px solid var(--zoho-blue, #3659b6);
-}
-
-.crm-lead-form-page--zoho .crm-lead-zoho-canvas [id^="lead-section-"] .erp-card-section--collapsed .erp-card-section__header,
-.crm-lead-form-page--zoho .crm-lead-zoho-canvas [id^="pi-section-"] .erp-card-section--collapsed .erp-card-section__header {
-  border-bottom: none;
-}
-
-.crm-lead-form-page--zoho .crm-lead-zoho-canvas [id^="lead-section-"] .erp-card-section__title,
-.crm-lead-form-page--zoho .crm-lead-zoho-canvas [id^="pi-section-"] .erp-card-section__title {
-  font-size: 13px;
-}
-
-.crm-lead-form-page--zoho .crm-lead-zoho-canvas [id^="lead-section-"] .erp-card-section__body,
-.crm-lead-form-page--zoho .crm-lead-zoho-canvas [id^="pi-section-"] .erp-card-section__body {
-  padding: 11px 14px 12px;
-}
-
-.crm-lead-form-page--zoho .crm-lead-zoho-canvas [id^="lead-section-"] .erp-card-section__grid,
-.crm-lead-form-page--zoho .crm-lead-zoho-canvas [id^="pi-section-"] .erp-card-section__grid {
-  gap: 9px 14px;
-}
-
-@media (max-width: 960px) {
-  .crm-lead-zoho-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .crm-lead-zoho-rail {
-    position: static;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 10px;
-    padding: 12px;
-  }
-
-  .crm-lead-zoho-rail__eyebrow,
-  .crm-lead-zoho-rail__title {
-    width: 100%;
-  }
-
-  .crm-lead-zoho-rail__list {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 4px;
-    width: 100%;
-  }
-
-  .crm-lead-zoho-rail__item {
-    width: auto;
-    padding: 5px 10px;
-    border: 1px solid var(--zoho-border, #dde3ea);
-    background: #fff;
-  }
-
-  .crm-lead-zoho-rail__marker {
-    display: none;
-  }
-
-  .crm-lead-zoho-rail__progress {
-    width: 100%;
-    margin-top: 4px;
-    padding-top: 8px;
-  }
-}
-
-/* When Smart Context is open, collapse the left rail into a compact chip strip */
-.crm-lead-form-page--zoho .erp-card-form-page__layout-wrap[data-factbox-open="true"] .crm-lead-zoho-layout {
-  grid-template-columns: 1fr;
-}
-
-.crm-lead-form-page--zoho .erp-card-form-page__layout-wrap[data-factbox-open="true"] .crm-lead-zoho-rail {
-  position: static;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-  padding: 10px 12px;
-}
-
-.crm-lead-form-page--zoho .erp-card-form-page__layout-wrap[data-factbox-open="true"] .crm-lead-zoho-rail__list {
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 4px;
-  width: 100%;
-}
-
-.crm-lead-form-page--zoho .erp-card-form-page__layout-wrap[data-factbox-open="true"] .crm-lead-zoho-rail__item {
-  width: auto;
-  padding: 5px 10px;
-  border: 1px solid var(--zoho-border, #dde3ea);
-}
-
-.crm-lead-form-page--zoho .erp-card-form-page__layout-wrap[data-factbox-open="true"] .crm-lead-zoho-rail__marker,
-.crm-lead-form-page--zoho .erp-card-form-page__layout-wrap[data-factbox-open="true"] .crm-lead-zoho-rail__progress {
-  display: none;
-}
-
 /* Lead Quick Entry — Company full-width; Contact / Ownership / Stage rows in equal 3-col grid.
    Global factbox / tablet rules collapse cols-3 → 2; override so lead Quick Entry stays
    3 columns on desktop even when Smart Context is open. */
@@ -12536,79 +12115,6 @@ a.crm-companies-table__name:hover {
   .crm-lead-form-page .crm-lead-quick-entry .erp-form-grid--cols-3,
   .crm-lead-form-page .erp-card-form-page__layout-wrap[data-factbox-open="true"] .crm-lead-quick-entry .erp-form-grid--cols-3 {
     grid-template-columns: 1fr !important;
-  }
-}
-
-/* ── Zoho CRM–style Opportunity 360 (view/detail) ─────────────────────────
-   Reuses the Create Lead Zoho rail/canvas tokens (crm-lead-form-page--zoho)
-   and re-skins the existing 360 cards (pipeline, summary, notes, additional
-   section tabs) with the same white-card + blue-left-accent chrome. */
-.crm-opp-360-zoho .crm-opp-zoho-layout {
-  margin-top: 2px;
-}
-
-.crm-opp-360-zoho .crm-opp-zoho-canvas {
-  gap: 10px;
-}
-
-.crm-opp-360-zoho .dyn-detail-pipeline {
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.crm-opp-360-zoho .dyn-detail-pipeline .ent-360-pipeline {
-  border: 1px solid var(--zoho-border, #dde3ea);
-  border-left: 3px solid var(--zoho-blue, #3659b6);
-  border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-}
-
-.crm-opp-360-zoho .dyn-detail-pipeline .ent-360-pipeline__title {
-  color: var(--zoho-blue, #3659b6);
-  font-weight: 700;
-}
-
-.crm-opp-360-zoho .lead-summary-card,
-.crm-opp-360-zoho .lead-notes-card {
-  border: 1px solid var(--zoho-border, #dde3ea);
-  border-left: 3px solid var(--zoho-blue, #3659b6);
-  border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-  margin-bottom: 0;
-}
-
-.crm-opp-360-zoho .lead-summary-card__title,
-.crm-opp-360-zoho .lead-notes-card__title {
-  color: var(--zoho-text, #1a2332);
-}
-
-.crm-opp-360-zoho .erp-additional-section-nav {
-  border: 1px solid var(--zoho-border, #dde3ea);
-  border-left: 3px solid var(--zoho-blue, #3659b6);
-  border-radius: 10px;
-  background: var(--zoho-card, #fff);
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-}
-
-.crm-opp-360-zoho .erp-additional-section-nav__tab.is-active {
-  border-color: color-mix(in srgb, var(--zoho-blue, #3659b6) 55%, #e1dfdd);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--zoho-blue, #3659b6) 16%, transparent);
-  color: var(--zoho-blue, #3659b6);
-}
-
-.crm-opp-360-zoho .erp-additional-panel {
-  box-shadow: inset 3px 0 0 var(--zoho-blue, #3659b6);
-  border-color: color-mix(in srgb, var(--zoho-blue, #3659b6) 28%, #e1dfdd);
-}
-
-.crm-opp-360-zoho .crm-opp-move-modal__btn--primary,
-.crm-opp-360-zoho .opp-360-quote-card:hover {
-  border-color: color-mix(in srgb, var(--zoho-blue, #3659b6) 45%, transparent);
-}
-
-@media (max-width: 960px) {
-  .crm-opp-360-zoho .crm-opp-zoho-canvas {
-    gap: 8px;
   }
 }
 
@@ -15052,14 +14558,14 @@ a.crm-companies-table__name:hover {
 
 @media (min-width: 1280px) {
   .erp-card-form-page__layout--with-factbox {
-    grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr);
-    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
   }
 }
 
 @media (min-width: 1440px) {
   .erp-card-form-page__layout--with-factbox {
-    grid-template-columns: minmax(0, 68fr) minmax(340px, 32fr);
+    grid-template-columns: minmax(0, 1fr) 340px;
   }
 }
 
@@ -17356,10 +16862,21 @@ a.crm-companies-table__name:hover {
   }
 }
 
-/* ── Purchase Order print document ── */
+/* ── Purchase print / PDF document (clean B/W/gray + theme accents) ── */
 .po-print-page {
-  max-width: 980px;
+  --po-print-ink: #111827;
+  --po-print-muted: #6b7280;
+  --po-print-line: #d1d5db;
+  --po-print-soft: #f3f4f6;
+  --po-print-paper: #ffffff;
+  --po-print-accent: var(--erp-primary, #0078d4);
+  max-width: 210mm;
   margin: 0 auto;
+  padding: 16px 12px 40px;
+}
+
+.po-print-back {
+  margin: 0 0 10px;
 }
 
 .po-print-toolbar {
@@ -17370,91 +16887,189 @@ a.crm-companies-table__name:hover {
   gap: 12px;
   margin-bottom: 16px;
   padding: 12px 14px;
-  border: 1px solid var(--erp-border);
-  border-radius: 10px;
-  background: var(--erp-surface);
+  border: 1px solid var(--po-print-line);
+  border-radius: 8px;
+  background: var(--po-print-paper);
+}
+
+.po-print-toolbar__copy {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.po-print-toolbar__actions {
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .po-print-toolbar__title {
   margin: 0;
   font-size: 15px;
   font-weight: 700;
-  color: var(--erp-text);
+  color: var(--po-print-ink);
 }
 
 .po-print-toolbar__subtitle {
   margin: 2px 0 0;
   font-size: 12px;
-  color: var(--erp-muted);
+  color: var(--po-print-muted);
+}
+
+.po-print-toolbar__format {
+  margin: 4px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--po-print-muted);
+  letter-spacing: 0.02em;
+}
+
+.po-print-stage {
+  display: block;
 }
 
 .po-print-doc {
+  width: 100%;
   max-width: 210mm;
   margin: 0 auto;
   padding: 18px 20px 24px;
-  border: 1px solid var(--erp-border);
-  border-radius: 10px;
-  background: #fff;
-  color: #1f2937;
+  border: 1px solid var(--po-print-line);
+  border-radius: 8px;
+  background: var(--po-print-paper);
+  color: var(--po-print-ink);
   font-size: 11px;
   line-height: 1.45;
-  box-shadow: 0 1px 3px rgb(15 23 42 / 0.06);
+  box-shadow: none;
+}
+
+/* Fixed A4 landscape preview (GRN and other wide tabular docs) */
+.po-print-page--landscape {
+  max-width: 297mm;
+}
+
+.po-print-page--landscape .po-print-doc {
+  max-width: 297mm;
 }
 
 .po-print-header {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 2px solid #004e8c;
+  border-bottom: 2px solid var(--po-print-accent);
   padding-bottom: 12px;
   margin-bottom: 16px;
 }
 
+.po-print-header--branded {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(168px, 0.8fr);
+  align-items: start;
+  gap: 14px;
+}
+
 .po-print-header__brand {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  align-items: flex-start;
+  gap: 12px;
   min-width: 0;
 }
 
 .po-print-header__logo-wrap {
   flex-shrink: 0;
-  width: 132px;
+  width: 56px;
   height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  border-radius: 6px;
+  border: 1px solid var(--po-print-line);
+  background: var(--po-print-paper);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
 }
 
 .po-print-header__logo {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
+  max-width: 46px;
+  max-height: 46px;
   object-fit: contain;
-  object-position: left center;
-  display: block;
+}
+
+.po-print-header__identity {
+  min-width: 0;
 }
 
 .po-print-header__company {
   margin: 0 0 4px;
-  font-size: 16px;
-  font-weight: 700;
-  color: #004e8c;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--po-print-ink);
+}
+
+.po-print-header__tagline {
+  margin: 1px 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--po-print-accent);
 }
 
 .po-print-header__address,
 .po-print-header__gst {
   margin: 2px 0;
-  color: #4b5563;
-}
-
-.po-print-header__address {
-  white-space: pre-line;
+  color: var(--po-print-muted);
+  font-size: 10px;
 }
 
 .po-print-header__meta {
   text-align: right;
+}
+
+.po-print-header__badge {
+  flex-shrink: 0;
+  min-width: 190px;
+  text-align: right;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--po-print-line);
+  border-left: 3px solid var(--po-print-accent);
+  background: var(--po-print-soft);
+  color: var(--po-print-ink);
+}
+
+.po-print-header__doc-type {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--po-print-accent);
+}
+
+.po-print-header__doc-no {
+  margin: 4px 0 8px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--po-print-ink);
+}
+
+.po-print-header__meta-list {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.po-print-header__meta-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 10px;
+}
+
+.po-print-header__meta-list dt {
+  color: var(--po-print-muted);
+}
+
+.po-print-header__meta-list dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--po-print-ink);
 }
 
 .po-print-title {
@@ -17462,7 +17077,7 @@ a.crm-companies-table__name:hover {
   font-size: 18px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: #111827;
+  color: var(--po-print-ink);
 }
 
 .po-print-grid {
@@ -17473,10 +17088,10 @@ a.crm-companies-table__name:hover {
 }
 
 .po-print-box {
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--po-print-line);
   border-radius: 6px;
   padding: 10px 12px;
-  background: #f9fafb;
+  background: var(--po-print-paper);
 }
 
 .po-print-box__label {
@@ -17485,18 +17100,21 @@ a.crm-companies-table__name:hover {
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #6b7280;
+  color: var(--po-print-accent);
 }
 
 .po-print-box__name {
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--po-print-ink);
 }
 
 .po-print-box p {
   margin: 2px 0;
+  color: #374151;
 }
 
-.po-print-table {
+.po-print-table,
+.po-print-lines {
   width: 100%;
   border-collapse: collapse;
   margin: 12px 0;
@@ -17504,24 +17122,60 @@ a.crm-companies-table__name:hover {
 }
 
 .po-print-table th,
-.po-print-table td {
-  border: 1px solid #d1d5db;
+.po-print-table td,
+.po-print-lines th,
+.po-print-lines td {
+  border: 1px solid var(--po-print-line);
   padding: 6px 8px;
   vertical-align: top;
+  color: var(--po-print-ink);
 }
 
-.po-print-table th {
-  background: #f3f4f6;
+.po-print-table th,
+.po-print-lines th {
+  background: var(--po-print-soft);
+  border-top: 2px solid var(--po-print-accent);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #4b5563;
+  color: #374151;
 }
 
-.po-print-table .num {
+.po-print-table .num,
+.po-print-lines .num {
   text-align: right;
   white-space: nowrap;
+}
+
+.po-print-table td.num:has(.po-print-dual-qty) {
+  white-space: normal;
+}
+
+.po-print-dual-qty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.po-print-qty-line {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--po-print-ink);
+}
+
+.po-print-qty-line--stock {
+  font-weight: 700;
+  color: var(--po-print-ink);
+}
+
+.po-print-hint {
+  margin-top: 6px !important;
+  font-size: 10px;
+  color: #6b7280;
 }
 
 .po-print-table .mono {
@@ -17531,9 +17185,10 @@ a.crm-companies-table__name:hover {
 .po-print-summary {
   margin-left: auto;
   width: min(100%, 280px);
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--po-print-line);
   border-radius: 6px;
   overflow: hidden;
+  background: var(--po-print-paper);
 }
 
 .po-print-summary__row {
@@ -17542,32 +17197,67 @@ a.crm-companies-table__name:hover {
   gap: 12px;
   padding: 7px 10px;
   border-bottom: 1px solid #e5e7eb;
+  color: #374151;
 }
 
 .po-print-summary__row--total {
   border-bottom: 0;
-  background: #eff6ff;
+  background: var(--po-print-soft);
   font-weight: 700;
+  color: var(--po-print-ink);
+  border-left: 3px solid var(--po-print-accent);
+}
+
+.po-print-totals {
+  margin-left: auto;
+  width: min(100%, 320px);
+  border: 1px solid var(--po-print-line);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--po-print-paper);
+  padding: 8px 10px;
+}
+
+.po-print-totals p {
+  margin: 4px 0;
+  color: #374151;
+}
+
+.po-print-totals__grand {
+  margin-top: 8px !important;
+  padding: 8px 10px;
+  background: var(--po-print-soft);
+  font-weight: 700;
+  color: var(--po-print-ink);
+  border-left: 3px solid var(--po-print-accent);
 }
 
 .po-print-words {
   margin: 10px 0 16px;
   padding: 8px 10px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--po-print-soft);
+  border: 1px solid var(--po-print-line);
   border-radius: 6px;
   font-size: 10.5px;
+  color: #374151;
+}
+
+.po-print-terms {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--po-print-line);
 }
 
 .po-print-terms__title {
   margin: 0 0 6px;
   font-weight: 700;
+  color: var(--po-print-ink);
 }
 
 .po-print-terms__list {
   margin: 0;
   padding-left: 18px;
-  color: #4b5563;
+  color: var(--po-print-muted);
 }
 
 .po-print-signatures {
@@ -17581,7 +17271,7 @@ a.crm-companies-table__name:hover {
   border-top: 1px solid #9ca3af;
   padding-top: 6px;
   font-size: 10px;
-  color: #6b7280;
+  color: var(--po-print-muted);
 }
 
 @media print {
@@ -17591,12 +17281,25 @@ a.crm-companies-table__name:hover {
     padding: 0;
   }
 
+  .po-print-stage {
+    display: block;
+  }
+
   .po-print-doc {
     border: 0;
     border-radius: 0;
     box-shadow: none;
     padding: 0;
     max-width: none;
+  }
+
+  .po-print-header__badge,
+  .po-print-table th,
+  .po-print-lines th,
+  .po-print-summary__row--total,
+  .po-print-totals__grand {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }
 
@@ -17605,12 +17308,17 @@ a.crm-companies-table__name:hover {
     grid-template-columns: 1fr;
   }
 
-  .po-print-header {
+  .po-print-header,
+  .po-print-header--branded {
+    display: flex;
     flex-direction: column;
   }
 
-  .po-print-header__meta {
+  .po-print-header__meta,
+  .po-print-header__badge {
     text-align: left;
+    min-width: 0;
+    width: 100%;
   }
 
   .po-print-signatures {
@@ -17695,29 +17403,27 @@ a.crm-companies-table__name:hover {
 
 .so-print-header__brand {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
   flex: 1;
 }
 
 .so-print-header__logo-wrap {
   flex-shrink: 0;
-  width: 140px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  border: 1px solid #0b3a66;
+  background: #0b3a66;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
 }
 
 .so-print-header__logo {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  object-position: left center;
-  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .so-print-header__company {
@@ -17735,10 +17441,6 @@ a.crm-companies-table__name:hover {
   margin: 1px 0;
   color: #4b5563;
   font-size: 10px;
-}
-
-.so-print-header__address {
-  white-space: pre-line;
 }
 
 .so-print-header__tagline {
@@ -17812,10 +17514,6 @@ a.crm-companies-table__name:hover {
 .so-print-party--meta {
   grid-column: 1 / -1;
   background: #f3f7fb;
-}
-
-.so-print-commercial {
-  margin: 0 0 18px;
 }
 
 .so-print-party__label {
@@ -18122,29 +17820,27 @@ a.crm-companies-table__name:hover {
 
 .pi-print-header__brand {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
   flex: 1;
 }
 
 .pi-print-header__logo-wrap {
   flex-shrink: 0;
-  width: 140px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  border: 1px solid #dbe3ef;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
 }
 
 .pi-print-header__logo {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
+  max-width: 46px;
+  max-height: 46px;
   object-fit: contain;
-  object-position: left center;
-  display: block;
 }
 
 .pi-print-header__company {
@@ -18162,10 +17858,6 @@ a.crm-companies-table__name:hover {
   margin: 1px 0;
   color: #4b5563;
   font-size: 10px;
-}
-
-.pi-print-header__address {
-  white-space: pre-line;
 }
 
 .pi-print-header__tagline {
@@ -18495,67 +18187,6 @@ a.crm-companies-table__name:hover {
 
   .pi-print-header__badge {
     text-align: left;
-  }
-}
-
-/* ── Shared letterhead bank / remittance details block ─────────────────
-   Reused across pi-print (Proforma / Payment Receipt), so-print (Sales
-   Order), po-print (Purchase Order / Money In Tax Invoice) and quo-print
-   (Quotation) document layouts — keep class names doc-agnostic. */
-.doc-print-bank {
-  margin: 10px 0 14px;
-  padding: 8px 12px;
-  border: 1px dashed #cbd5e1;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.doc-print-bank__title {
-  margin: 0 0 6px;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #64748b;
-}
-
-.doc-print-bank__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px 18px;
-}
-
-.doc-print-bank__row {
-  display: flex;
-  gap: 6px;
-  margin: 0;
-  font-size: 10px;
-}
-
-.doc-print-bank__row dt {
-  min-width: 92px;
-  flex-shrink: 0;
-  color: #64748b;
-  font-weight: 600;
-}
-
-.doc-print-bank__row dd {
-  margin: 0;
-  font-weight: 600;
-  color: #0f172a;
-  word-break: break-word;
-}
-
-@media print {
-  .doc-print-bank {
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
-  }
-}
-
-@media (max-width: 900px) {
-  .doc-print-bank__grid {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -19449,319 +19080,3 @@ a.crm-companies-table__name:hover {
   height: 14px;
   flex-shrink: 0;
 }
-
-/* ── Zoho-style New/Edit Vendor Invoice (Money Out → Expense entry) ───────
-   Same white-card + blue-left-accent chrome as the Zoho CRM Lead form and
-   recent Money In invoice work — denser 2-col grids, polished line rows,
-   sticky save. Scoped to this page only; other money-out / D365 card
-   forms keep their existing per-section accent-color chrome untouched. */
-.vendor-invoice-zoho-form {
-  --vi-zoho-blue: #3659b6;
-  --vi-zoho-blue-soft: #e8eef9;
-  --vi-zoho-border: #dde3ea;
-  --vi-zoho-text: #1a2332;
-  --vi-zoho-muted: #6b7785;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.vendor-invoice-zoho-form__header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 6px 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--vi-zoho-border);
-}
-
-.vendor-invoice-zoho-form__header-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.vendor-invoice-zoho-form__header-title h2 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  color: var(--vi-zoho-text);
-}
-
-.vendor-invoice-zoho-form__header-meta {
-  margin: 0;
-  font-size: 12px;
-  color: var(--vi-zoho-muted);
-}
-
-.vendor-invoice-zoho-form__header-meta span {
-  font-weight: 650;
-  color: var(--vi-zoho-text);
-}
-
-.vendor-invoice-zoho-form__toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 20px;
-  padding: 10px 14px;
-  border: 1px solid var(--vi-zoho-border);
-  border-radius: 10px;
-  background: linear-gradient(180deg, #fafbfc 0%, #f5f7fa 100%);
-}
-
-.vendor-invoice-zoho-form__toolbar-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.vendor-invoice-zoho-form__toolbar-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--vi-zoho-muted);
-}
-
-.vendor-invoice-zoho-form__source-picker {
-  padding: 12px 14px;
-  border: 1px solid var(--vi-zoho-border);
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-}
-
-.vendor-invoice-zoho-form__body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* White cards, uniform blue left accent — overrides the per-section D365
-   accent colors so every FastTab on this form reads as one Zoho document. */
-.enterprise-workspace--dynamics-form.vendor-invoice-zoho-form .erp-card-section {
-  border: 1px solid var(--vi-zoho-border, #dde3ea);
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-}
-
-.enterprise-workspace--dynamics-form.vendor-invoice-zoho-form .erp-card-section[class*='erp-card-section--accent'] {
-  border-left: 3px solid var(--vi-zoho-blue, #3659b6);
-}
-
-.enterprise-workspace--dynamics-form.vendor-invoice-zoho-form .erp-card-section__header {
-  padding: 10px 14px;
-  background: linear-gradient(180deg, #fafbfc 0%, #f5f7fa 100%);
-  border-bottom: 1px solid var(--vi-zoho-border, #dde3ea);
-}
-
-.enterprise-workspace--dynamics-form.vendor-invoice-zoho-form .erp-card-section--collapsed .erp-card-section__header {
-  border-bottom: none;
-}
-
-.enterprise-workspace--dynamics-form.vendor-invoice-zoho-form .erp-card-section__icon {
-  background: var(--vi-zoho-blue-soft, #e8eef9);
-  color: var(--vi-zoho-blue, #3659b6);
-}
-
-.enterprise-workspace--dynamics-form.vendor-invoice-zoho-form .erp-card-section__title {
-  font-size: 13.5px;
-  font-weight: 650;
-  color: var(--vi-zoho-text, #1a2332);
-}
-
-.enterprise-workspace--dynamics-form.vendor-invoice-zoho-form .erp-card-section__subtitle {
-  font-size: 11.5px;
-  color: var(--vi-zoho-muted, #6b7785);
-}
-
-.enterprise-workspace--dynamics-form.vendor-invoice-zoho-form .erp-card-section__body {
-  padding: 12px 14px 14px;
-}
-
-.enterprise-workspace--dynamics-form.vendor-invoice-zoho-form .erp-card-section__grid {
-  gap: 10px 16px;
-}
-
-.enterprise-workspace--dynamics-form.vendor-invoice-zoho-form .erp-input,
-.enterprise-workspace--dynamics-form.vendor-invoice-zoho-form select,
-.enterprise-workspace--dynamics-form.vendor-invoice-zoho-form [role='combobox'] {
-  border-radius: 4px;
-  border-color: #c9d1dc;
-}
-
-.enterprise-workspace--dynamics-form.vendor-invoice-zoho-form .erp-input:focus,
-.enterprise-workspace--dynamics-form.vendor-invoice-zoho-form select:focus,
-.enterprise-workspace--dynamics-form.vendor-invoice-zoho-form [role='combobox']:focus-within {
-  outline: none;
-  border-color: var(--vi-zoho-blue, #3659b6);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--vi-zoho-blue, #3659b6) 22%, transparent);
-}
-
-/* Invoice line rows — polished lines: subtle border + hover affordance */
-.vendor-invoice-zoho-form .vendor-invoice-line-row {
-  border-color: var(--vi-zoho-border, #dde3ea);
-  border-radius: 6px;
-  background: #fff;
-  transition: background-color 120ms ease;
-}
-
-.vendor-invoice-zoho-form .vendor-invoice-line-row:hover {
-  background: #fafbfc;
-}
-
-.vendor-invoice-zoho-form .vendor-invoice-lines__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.vendor-invoice-zoho-form .vendor-invoice-lines__count {
-  margin: 0;
-  font-size: 11.5px;
-  font-weight: 650;
-  color: var(--vi-zoho-muted, #6b7785);
-}
-
-/* Sticky save bar — keeps Save Draft reachable while scrolling a long
-   expense form. Position is relative to the normal page scroll (this
-   route does not use the fixed-height ErpCardFormPage shell). */
-.vendor-invoice-zoho-form__sticky-footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 20;
-  margin-top: 4px;
-  padding-top: 10px;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(4px);
-  border-top: 1px solid var(--vi-zoho-border, #dde3ea);
-}
-
-/* ── Zoho Books–style Sales Invoice (Money In / Receivables, SERVICES) ────
-   New/Edit Invoice — same white-card + soft-blue-accent chrome family as
-   the vendor invoice Zoho form and CRM Lead form: compact document header
-   (Customer + Bill To on the left, dates/GST grid on the right), a clean
-   table-like line-item grid, and Notes-left / Totals-right footer split.
-   Scoped to `.sales-invoice-zoho-form`; other money-in forms are untouched. */
-.sales-invoice-zoho-form {
-  --si-zoho-blue: #3659b6;
-  --si-zoho-blue-soft: #e8eef9;
-  --si-zoho-border: #dde3ea;
-  --si-zoho-text: #1a2332;
-  --si-zoho-muted: #6b7785;
-}
-
-.sales-invoice-zoho-form .sales-invoice-zoho-form__section {
-  border-color: var(--si-zoho-border);
-  border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-}
-
-.sales-invoice-zoho-form .sales-invoice-zoho-form__section-header {
-  background: linear-gradient(180deg, #fafbfc 0%, #f5f7fa 100%);
-  border-color: var(--si-zoho-border);
-  border-left: 3px solid var(--si-zoho-blue);
-  border-top-left-radius: 9px;
-  border-top-right-radius: 9px;
-}
-
-.sales-invoice-zoho-form .erp-input,
-.sales-invoice-zoho-form select,
-.sales-invoice-zoho-form [role='combobox'] {
-  border-radius: 4px;
-  border-color: #c9d1dc;
-}
-
-.sales-invoice-zoho-form .erp-input:focus,
-.sales-invoice-zoho-form select:focus,
-.sales-invoice-zoho-form [role='combobox']:focus-within {
-  outline: none;
-  border-color: var(--si-zoho-blue);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--si-zoho-blue) 22%, transparent);
-}
-
-/* Compact document header — customer/Bill To (left) vs. dates + GST grid (right) */
-.sales-invoice-zoho-form__header-grid {
-  display: grid;
-  gap: 10px 24px;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.4fr);
-  align-items: start;
-}
-
-@media (max-width: 900px) {
-  .sales-invoice-zoho-form__header-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.sales-invoice-zoho-form__customer-col {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.sales-invoice-zoho-form__bill-to {
-  border: 1px dashed var(--si-zoho-border);
-  border-radius: 8px;
-  padding: 8px 10px 10px;
-  background: #fafbfc;
-}
-
-.sales-invoice-zoho-form__bill-to-label {
-  margin: 0 0 2px;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--si-zoho-blue);
-}
-
-/* Item lines — clean table feel: header rule + bottom-border rows (no per-row card chrome on md+) */
-.sales-invoice-zoho-form__lines-head {
-  color: var(--si-zoho-muted);
-  border-color: var(--si-zoho-border);
-}
-
-.sales-invoice-zoho-form__line-row {
-  border-color: var(--si-zoho-border);
-  transition: background-color 120ms ease;
-}
-
-@media (min-width: 768px) {
-  .sales-invoice-zoho-form__line-row:hover {
-    background: #fafbfc;
-  }
-  .sales-invoice-zoho-form__line-row:last-child {
-    border-bottom: none;
-  }
-}
-
-.sales-invoice-zoho-form__add-line {
-  border: none;
-  background: none;
-  padding: 4px 2px;
-  font-size: 12px;
-  font-weight: 650;
-  color: var(--si-zoho-blue);
-  cursor: pointer;
-}
-
-.sales-invoice-zoho-form__add-line:hover {
-  text-decoration: underline;
-}
-
-/* Sticky Save/Cancel bar — relative to normal page scroll (MoneyInWorkspaceShell
-   is not a fixed-height ErpCardFormPage shell). */
-.sales-invoice-zoho-form__sticky-footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 20;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(4px);
-}
-

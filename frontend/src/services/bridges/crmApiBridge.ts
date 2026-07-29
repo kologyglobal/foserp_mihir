@@ -12,6 +12,7 @@ import type { PipelineDto } from '../api/crmApi'
 import { useCrmStore } from '../../store/crmStore'
 import { useMasterStore } from '../../store/masterStore'
 import { useSalesStore } from '../../store/salesStore'
+import { useMrpStore } from '../../store/mrpStore'
 import type { StoreActionResult } from '../../store/storeAction'
 import { sanitizePhoneDigits } from '../../utils/phoneValidation'
 import { getLeadUser } from '../../data/crm/leadUsers'
@@ -200,7 +201,9 @@ export async function syncAllCrmFromApi(): Promise<void> {
       api.fetchCrmMastersSync(),
       syncQuotationTemplatesFromApi(),
     ])
-  await syncSalesOrdersFromApi()
+  await syncSalesOrdersFromApi().catch(() => {
+    useMrpStore.setState({ salesOrders: [] })
+  })
   await syncCommercialFromApi()
   useSalesStore.setState({
     leads: leads.map((l) => normalizeLead(l)),

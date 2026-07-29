@@ -63,6 +63,7 @@ export const SERVER_DEFAULT_SETUP = {
   requirePaymentTerms: false,
   allowOverReceipt: false,
   overReceiptTolerancePct: 0,
+  requireApprovalOnPoRevision: true,
   allowShortClose: true,
   requireVendorChallan: false,
   requireVehicleNumber: false,
