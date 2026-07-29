@@ -522,7 +522,8 @@ export function PurchaseRequisitionDomainDetailPage({
           <PurchaseAuditTimeline
             entityType="purchase-requisition"
             entityId={pr.id}
-            title="Audit Timeline"
+            showTitle={false}
+            className="border-0 p-0 shadow-none"
             demoEvents={buildDemoPurchaseTimeline({
               entityId: pr.id,
               entityType: 'PurchaseRequisition',

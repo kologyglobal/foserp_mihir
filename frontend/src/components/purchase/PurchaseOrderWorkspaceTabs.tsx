@@ -13,7 +13,7 @@ export type PoWorkspaceTabModel = DocumentWorkspaceTabModel<PoEditorWorkspace>
 
 /** Map FastTab sections from purchaseOrderValidation → workspace. */
 export function poSectionToWorkspace(
-  section: 'general' | 'commercial' | 'lines' | null | undefined,
+  section: 'general' | 'lines' | 'notes' | null | undefined,
 ): PoEditorWorkspace {
   if (section === 'lines') return 'items_financials'
   return 'vendor_order'
@@ -24,7 +24,7 @@ export function poWorkspaceHasValidationErrors(
   result: PoValidationResult,
 ): boolean {
   if (workspace === 'vendor_order') {
-    return result.sectionsToOpen.some((s) => s === 'general' || s === 'commercial')
+    return result.sectionsToOpen.some((s) => s === 'general' || s === 'notes')
   }
   return result.sectionsToOpen.includes('lines')
 }

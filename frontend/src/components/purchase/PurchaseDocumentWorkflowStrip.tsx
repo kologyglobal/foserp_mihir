@@ -51,7 +51,10 @@ export function purchaseOrderWorkflowNextAction(
 ): string {
   switch (status) {
     case 'draft':
-      return ctx.canSubmit === false ? 'Save draft (submit permission required)' : 'Submit for Approval'
+      if (ctx.canSubmit) return 'Send for Approval'
+      // Approval can be switched off in Purchase Setup — then Open releases directly.
+      if (ctx.canRelease) return 'Release Purchase Order'
+      return ctx.canSubmit === false ? 'Save draft (submit permission required)' : 'Send for Approval'
     case 'pending_approval':
       return ctx.canApprove === false ? 'Awaiting Approval' : 'Approve Purchase Order'
     case 'approved':

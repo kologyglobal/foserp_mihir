@@ -61,11 +61,7 @@ import {
   getBlanketOrders,
   getPurchaseItems,
   getPurchaseOrderById,
-  getPurchaseRequisitions,
   getPurchaseSetup,
-  getQuotationComparison,
-  getRFQs,
-  getVendorQuotations,
   getVendors,
   getPurchaseWarehouses,
   previewNextPurchaseOrderNumber,
@@ -83,12 +79,8 @@ import type {
   PurchaseOrderLineItemType,
   PurchaseOrderOrigin,
   PurchaseOrderType,
-  PurchaseRequisition,
   PurchaseSetup,
-  QuotationComparison,
-  RequestForQuotation,
   Vendor,
-  VendorQuotation,
 } from '@/types/purchaseDomain'
 import {
   isPurchaseInsuranceTermsApplicable,
@@ -461,7 +453,7 @@ export function PurchaseOrderEditorPage() {
 
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
-  const [creating, setCreating] = useState(false)
+  const [, setCreating] = useState(false)
   const [recordId, setRecordId] = useState<string | null>(id ?? null)
   const [documentNumber, setDocumentNumber] = useState<string | null>(null)
   const [status, setStatus] = useState<PurchaseOrder['status']>('draft')
@@ -503,21 +495,14 @@ export function PurchaseOrderEditorPage() {
    * Blank `/purchase/orders/new` opens the manual PO form immediately (no origin chooser).
    * Deep links (`?origin=…`, `?prId=…`, etc.) auto-create then navigate to edit.
    */
-  const [approvedPrs, setApprovedPrs] = useState<PurchaseRequisition[]>([])
-  const [selectedPrId, setSelectedPrId] = useState(searchParams.get('prId') ?? '')
-  const [selectedPrVendorId, setSelectedPrVendorId] = useState('')
-
-  const [eligibleComparisons, setEligibleComparisons] = useState<
-    { comparison: QuotationComparison; rfq: RequestForQuotation }[]
-  >([])
-  const [selectedComparisonId, setSelectedComparisonId] = useState(searchParams.get('comparisonId') ?? '')
-
-  const [approvedVqs, setApprovedVqs] = useState<VendorQuotation[]>([])
-  const [selectedVqId, setSelectedVqId] = useState(searchParams.get('vqId') ?? '')
+  const [selectedPrId] = useState(searchParams.get('prId') ?? '')
+  const [selectedPrVendorId] = useState('')
+  const [selectedComparisonId] = useState(searchParams.get('comparisonId') ?? '')
+  const [selectedVqId] = useState(searchParams.get('vqId') ?? '')
 
   const [activeBlankets, setActiveBlankets] = useState<BlanketPurchaseOrder[]>([])
-  const [selectedBlanketId, setSelectedBlanketId] = useState(searchParams.get('blanketId') ?? '')
-  const [blanketQuantities, setBlanketQuantities] = useState<Record<string, number>>({})
+  const [selectedBlanketId] = useState(searchParams.get('blanketId') ?? '')
+  const [blanketQuantities] = useState<Record<string, number>>({})
 
   const editable = EDITABLE_STATUSES.includes(status)
   const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(editable)
@@ -861,14 +846,11 @@ export function PurchaseOrderEditorPage() {
     void Promise.all([
       getVendors(),
       getPurchaseItems({ forceRefresh: true, purchasableOnly: false }),
-      getPurchaseRequisitions(),
-      getVendorQuotations(),
-      getRFQs(),
       getBlanketOrders(),
       getPurchaseSetup(),
       getPurchaseWarehouses(),
       import('@/services/bridges/masterApiBridge').then((m) => m.syncCoreMastersFromApi()).catch(() => undefined),
-    ]).then(async ([vendorRows, items, prs, vqs, rfqs, blankets, setup, warehouses]) => {
+    ]).then(([vendorRows, items, blankets, setup, warehouses]) => {
       setVendors(vendorRows.filter((v) => v.isActive))
       setCatalogItems(items)
       setPurchaseSetup(setup)
@@ -901,27 +883,7 @@ export function PurchaseOrderEditorPage() {
             /* preview is optional — save still allocates server-side */
           })
       }
-      setApprovedPrs(
-        prs
-          .filter((p) => p.status === 'approved' || p.status === 'converted_to_rfq')
-          .sort((a, b) => Number(!a.rfqRequired) - Number(!b.rfqRequired)),
-      )
-      setApprovedVqs(vqs.filter((q) => q.status === 'selected'))
       setActiveBlankets(blankets.filter((b) => b.status === 'active'))
-
-      const rfqsWithComparison = rfqs.filter((r) => r.comparisonId)
-      const comparisons = await Promise.all(
-        rfqsWithComparison.map(async (rfq) => {
-          const cmp = await getQuotationComparison(rfq.id)
-          return cmp ? { comparison: cmp, rfq } : null
-        }),
-      )
-      setEligibleComparisons(
-        comparisons.filter(
-          (c): c is { comparison: QuotationComparison; rfq: RequestForQuotation } =>
-            c !== null && c.comparison.status === 'completed' && c.comparison.recommendationStatus === 'approved',
-        ),
-      )
     })
   }, [isNew])
 
@@ -1298,6 +1260,7 @@ export function PurchaseOrderEditorPage() {
             </ErpFieldRow>
             <ErpFieldRow label="Order Type">
               <Select
+                native={false}
                 value={header.orderType}
                 disabled={!editable}
                 onChange={(e) => patchHeader({ orderType: e.target.value as PurchaseOrderType })}
@@ -1476,14 +1439,14 @@ export function PurchaseOrderEditorPage() {
             forceOpenKey={forceOpenSections.lines}
             dense
             columns={1}
-            className="ring-1 ring-teal-200/70 shadow-sm"
+            className="purchase-doc-lines-section ring-1 ring-teal-200/70 shadow-sm"
             badge={
               <span className="text-[11px] tabular-nums text-erp-muted">
                 {computedLines.length} line{computedLines.length === 1 ? '' : 's'}
               </span>
             }
           >
-            <div id={purchaseFieldId('lines')}>
+            <div id={purchaseFieldId('lines')} className="min-w-0 max-w-full">
               <PurchaseOrderLinesTable
                 lines={computedLines}
                 catalogItems={catalogItemsForPicker}

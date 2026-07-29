@@ -2266,7 +2266,6 @@ function mapApiSetupToDomain(api: setupApi.ApiPurchaseSetup): PurchaseSetup {
       overReceiptTolerancePct: Number(g.overReceiptTolerancePct ?? 0),
       requireApprovalOnPoRevision: g.requireApprovalOnPoRevision ?? true,
       requireApprovalOnPo: g.requireApprovalOnPo ?? true,
-      allowShortClose: g.allowShortClose ?? true,
       allowShortClose: g.allowShortClose,
       requirePoWarehouse: g.requirePoWarehouse,
       requireExpectedDeliveryDate: g.requireExpectedDeliveryDate,

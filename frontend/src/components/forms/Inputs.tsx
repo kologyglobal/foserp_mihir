@@ -114,7 +114,7 @@ interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>
   error?: boolean
   /** Width/layout on the outer wrapper (e.g. w-40, shrink-0) */
   wrapClassName?: string
-  /** Force native `<select>` (e.g. multi-select) */
+  /** Force native (`true`) or smart (`false`) rendering. Omit for automatic selection. */
   native?: boolean
   onChange?: React.ChangeEventHandler<HTMLSelectElement>
 }
@@ -178,7 +178,7 @@ export function Select({
   )
   /** Short lists (Yes/No, priority, type) use native — no search chrome or portal flicker. */
   const preferNative =
-    Boolean(native) || multiple || parsedRaw.length === 0 || realOptionCount <= 8
+    multiple || parsedRaw.length === 0 || (native ?? realOptionCount <= 8)
 
   const hasWrapWidth = Boolean(wrapClassName ?? partitioned.wrap)
   const resolvedWrap = cn(

@@ -593,6 +593,43 @@ a.purchase-process-map__step:hover {
   align-items: stretch;
 }
 
+/*
+ * Item lines section — the wide lines grid must scroll inside its own wrapper.
+ * A `1fr` track resolves its minimum from content, so the section (and the page)
+ * blow out to table width and the workspace clips the overflow instead of
+ * letting the grid scroll. Pin the track and its items to a zero minimum.
+ */
+.purchase-doc-lines-section .erp-card-section__body {
+  min-width: 0;
+}
+
+.purchase-doc-lines-section .erp-card-section__grid,
+.purchase-doc-lines-section .erp-card-section__grid--cols-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.purchase-doc-lines-section .erp-card-section__grid > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Purchase Setup uses one consistent 32px dropdown across every tab. */
+.purchase-setup-page .erp-select-wrap,
+.purchase-setup-page .erp-smart-select,
+.purchase-setup-page .erp-smart-select__anchor {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.purchase-setup-page .erp-smart-select__anchor {
+  height: 2rem;
+  min-height: 2rem;
+  max-height: 2rem;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
 /* PR Quick Entry — stacked labels, 4 compact fields per row */
 .pr-quick-entry .erp-card-section__grid--cols-4 {
   gap: 10px 12px;

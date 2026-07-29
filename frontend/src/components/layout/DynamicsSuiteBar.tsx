@@ -1,7 +1,9 @@
-import { LayoutGrid, Menu, Search } from 'lucide-react'
+import { useState } from 'react'
+import { LayoutGrid, Menu, RefreshCw, Search } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useUIStore } from '../../store/uiStore'
 import { getUserLandingPath } from '../../utils/permissions/moduleCategoryAccess'
+import { cn } from '../../utils/cn'
 import { GlobalSearchTrigger } from '../design-system/GlobalSearch'
 import { NotificationBell } from '../design-system/NotificationPanel'
 import { UserMenuDropdown } from './UserMenuDropdown'
@@ -11,11 +13,18 @@ export function DynamicsSuiteBar() {
   const setSearchOpen = useUIStore((s) => s.setSearchOpen)
   const toggleMobileNav = useUIStore((s) => s.toggleMobileNav)
   const landingPath = getUserLandingPath()
+  const [refreshing, setRefreshing] = useState(false)
   const today = new Date().toLocaleDateString('en-IN', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
   })
+
+  function handleRefresh() {
+    if (refreshing) return
+    setRefreshing(true)
+    window.location.reload()
+  }
 
   return (
     <header className="d365-suite-bar" role="banner">
@@ -51,6 +60,20 @@ export function DynamicsSuiteBar() {
           aria-label="Search"
         >
           <Search className="h-4 w-4" strokeWidth={1.75} />
+        </button>
+
+        <button
+          type="button"
+          className="d365-suite-icon-btn"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          aria-label="Refresh"
+          title="Refresh"
+        >
+          <RefreshCw
+            className={cn('h-4 w-4', refreshing && 'animate-spin')}
+            strokeWidth={1.75}
+          />
         </button>
 
         <NotificationBell className="d365-suite-icon-btn d365-suite-notify border-0 bg-transparent shadow-none hover:bg-white/10 hover:text-white" />

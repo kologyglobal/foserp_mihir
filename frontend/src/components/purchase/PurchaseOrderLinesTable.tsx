@@ -306,11 +306,8 @@ export function PurchaseOrderLinesTable({
           </div>
 
           {/* Tablet / desktop: grid table — scroll lives on this wrapper only */}
-          <div
-            className="purchase-doc-lines-grid-scroll relative hidden rounded-md border border-erp-border md:block"
-            onWheel={(e) => e.stopPropagation()}
-          >
-          <table className="erp-table purchase-doc-lines-grid min-w-[108rem] text-[11px]">
+          <div className="purchase-doc-lines-grid-scroll relative hidden rounded-md border border-erp-border md:block">
+          <table className="erp-table purchase-doc-lines-grid w-max min-w-full text-[11px]">
             <thead>
               <tr>
                 <th className="purchase-doc-lines-grid__sticky-line">#</th>
@@ -616,11 +613,26 @@ export function PurchaseOrderLinesTable({
 
       <style>{`
         .purchase-doc-lines-grid-scroll {
+          width: 100%;
+          min-width: 0;
+          max-width: 100%;
           max-height: min(32rem, 60vh);
           overflow-x: auto;
           overflow-y: auto;
-          overscroll-behavior: contain;
+          overscroll-behavior-x: contain;
           -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin;
+        }
+        .purchase-doc-lines-grid-scroll::-webkit-scrollbar {
+          width: 10px;
+          height: 10px;
+        }
+        .purchase-doc-lines-grid-scroll::-webkit-scrollbar-thumb {
+          border-radius: 999px;
+          background: var(--erp-border-strong, #cbd5e1);
+        }
+        .purchase-doc-lines-grid-scroll::-webkit-scrollbar-track {
+          background: var(--erp-surface-alt, #f8fafc);
         }
         .purchase-doc-lines-grid thead th {
           position: sticky;

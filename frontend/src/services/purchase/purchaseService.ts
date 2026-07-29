@@ -3599,12 +3599,17 @@ export async function submitPurchaseOrder(id: string): Promise<PurchaseOrder> {
   await delay()
   const po = state.orders.find((o) => o.id === id)
   if (!po) throw new PurchaseServiceError('PO_NOT_FOUND', `Purchase order not found: ${id}`)
-  if (po.status !== 'draft') {
-    throw new PurchaseServiceError('PO_NOT_DRAFT', 'Only draft POs can be submitted')
+  // Matches backend PO_EDITABLE_STATUSES — a sent-back PO can be resubmitted.
+  if (po.status !== 'draft' && po.status !== 'sent_back') {
+    throw new PurchaseServiceError(
+      'PO_NOT_DRAFT',
+      'Only Open or Sent Back POs can be sent for approval',
+    )
   }
   if (!po.lines.length) {
     throw new PurchaseServiceError('PO_NO_LINES', 'Cannot submit without lines')
   }
+  const previousStatus = po.status
   po.status = 'pending_approval'
   po.approvalStatus = 'pending'
   po.updatedAt = nowIso()
@@ -3625,7 +3630,7 @@ export async function submitPurchaseOrder(id: string): Promise<PurchaseOrder> {
     po.id,
     po.documentNumber,
     'submitted',
-    'draft',
+    previousStatus,
     'pending_approval',
     'Submitted for approval',
   )
@@ -3712,7 +3717,7 @@ export async function reopenPurchaseOrder(id: string): Promise<PurchaseOrder> {
     po.closedAt = null
   } else {
     po.status = 'draft'
-    po.cancelledAt = undefined
+    po.cancelledAt = null
     po.approvalStatus = 'not_required'
   }
   po.updatedAt = nowIso()
@@ -3801,7 +3806,7 @@ export async function cancelPurchaseOrder(id: string, reason = ''): Promise<Purc
   const from = po.status
   po.status = 'draft'
   po.approvalStatus = 'not_required'
-  po.cancelledAt = undefined
+  po.cancelledAt = null
   po.updatedAt = nowIso()
   po.updatedBy = PURCHASE_DOMAIN_ACTORS.buyer.name
   po.remarks = reason ? `${po.remarks}\nWithdraw: ${reason}`.trim() : po.remarks

@@ -1522,6 +1522,7 @@ function poLine(partial: {
   invoicedQty?: number
   expectedDeliveryDate: string
   prLineId?: string | null
+  requisitionNo?: string | null
   remarks?: string
   description?: string
   specification?: string
