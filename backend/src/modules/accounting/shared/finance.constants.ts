@@ -65,6 +65,9 @@ export const MAPPING_KEY_CATEGORIES: Partial<Record<DefaultAccountMappingKey, Ac
   SALES_RETURN: ['INCOME', 'EXPENSE'],
   PURCHASE: ['EXPENSE'],
   PURCHASE_RETURN: ['EXPENSE', 'INCOME'],
+  // Clearing account — liability while goods are received but not invoiced.
+  GRIR_CLEARING: ['LIABILITY', 'ASSET'],
+  PURCHASE_PRICE_VARIANCE: ['EXPENSE', 'INCOME'],
   STOCK_ADJUSTMENT: ['EXPENSE', 'ASSET'],
   MATERIAL_CONSUMPTION: ['EXPENSE'],
   COST_OF_GOODS_SOLD: ['EXPENSE'],

@@ -11,6 +11,7 @@ interface OperatorTaskActionsProps {
   onResume: () => void
   onComplete: () => void
   onReportProblem: () => void
+  onReportBreakdown?: () => void
 }
 
 /** Large touch-target operator lifecycle actions driven by backend allowedActions. */
@@ -23,6 +24,7 @@ export function OperatorTaskActions({
   onResume,
   onComplete,
   onReportProblem,
+  onReportBreakdown,
 }: OperatorTaskActionsProps) {
   const actions = assignment.allowedActions
   if (!actions) return null
@@ -52,6 +54,11 @@ export function OperatorTaskActions({
       {actions.complete ? (
         <button type="button" className={operatorBtnPrimary} disabled={busy} onClick={onComplete}>
           {t('action.complete')}
+        </button>
+      ) : null}
+      {onReportBreakdown ? (
+        <button type="button" className={operatorBtnDanger} disabled={busy} onClick={onReportBreakdown}>
+          Report Breakdown
         </button>
       ) : null}
       <button type="button" className={operatorBtnDanger} disabled={busy} onClick={onReportProblem}>

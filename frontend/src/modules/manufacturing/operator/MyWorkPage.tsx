@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { RefreshCw, Smartphone } from 'lucide-react'
 import { isApiMode } from '@/config/apiConfig'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -25,6 +26,7 @@ import { QuickIssueSheet } from './QuickIssueSheet'
 
 /** Operator My Work — mobile-first assignment queue (API mode only). */
 export function MyWorkPage() {
+  const navigate = useNavigate()
   const perms = useManufacturingPhase2bPermissions()
   const { options: items } = useSetupLookup('items')
   const [assignments, setAssignments] = useState<ProductionAssignment[]>([])
@@ -135,6 +137,24 @@ export function MyWorkPage() {
               onResume={() => void runAction(() => resumeAssignment(assignment.id), 'Work resumed')}
               onComplete={() => setCompleteTarget(assignment)}
               onReportProblem={() => setIssueTarget(assignment)}
+              onReportBreakdown={() => {
+                if (!assignment.machineId) {
+                  notify.error('No machine on this assignment — pick a machine first')
+                  return
+                }
+                const qs = new URLSearchParams({
+                  machineId: assignment.machineId,
+                  workOrderId: assignment.productionOrderId,
+                  sourceType: 'MY_WORK',
+                })
+                if (assignment.stageId) qs.set('jobCardId', assignment.stageId)
+                if (assignment.stage?.code) qs.set('jobCardCode', assignment.stage.code)
+                else if (assignment.stage?.name) qs.set('jobCardCode', assignment.stage.name)
+                if (assignment.operationId) qs.set('operationId', assignment.operationId)
+                if (assignment.operation?.code) qs.set('operationCode', assignment.operation.code)
+                if (assignment.operation?.name) qs.set('operationName', assignment.operation.name)
+                navigate(`/maintenance/tickets/new?${qs.toString()}`)
+              }}
             />
           ))}
         </div>

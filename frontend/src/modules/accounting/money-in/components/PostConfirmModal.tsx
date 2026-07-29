@@ -24,7 +24,9 @@ export function PostConfirmModal({
           Posting <strong>{invoiceLabel}</strong> for <strong>₹{Number(totalAmount).toLocaleString('en-IN')}</strong> will create a
           system voucher, GL entries, and a receivable open item. This action cannot be undone from Money In.
         </p>
-        <p className="mt-2 text-[12px] text-erp-muted">Receipt allocation and credit notes are Phase 3B — not available here.</p>
+        <p className="mt-2 text-[12px] text-erp-muted">
+          After posting, allocate customer receipts or credit notes from their respective Money In workspaces.
+        </p>
         <div className="mt-4 flex justify-end gap-2">
           <ErpButton variant="secondary" onClick={onCancel} disabled={posting}>
             Cancel

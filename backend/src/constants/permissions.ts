@@ -690,6 +690,17 @@ export const PERMISSIONS = [
   'manufacturing.work_centre.view', 'manufacturing.work_centre.manage',
   'manufacturing.machine.view', 'manufacturing.machine.manage',
 
+  // Maintenance V1
+  'maintenance.view',
+  'maintenance.create',
+  'maintenance.start',
+  'maintenance.update',
+  'maintenance.test',
+  'maintenance.close',
+  'maintenance.cost.view',
+  'maintenance.cost.manage',
+  'maintenance.report.view',
+
   // Phase 7D — reporting foundation (saved views, exception centre, traceability)
   'manufacturing.reports.saved_views',
   'manufacturing.reports.shared_views',
@@ -1444,6 +1455,16 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'dispatch.reports.invoice_readiness',
     'operations.exceptions.view',
     'operations.exceptions.manage',
+    // Maintenance V1 — full operational access
+    'maintenance.view',
+    'maintenance.create',
+    'maintenance.start',
+    'maintenance.update',
+    'maintenance.test',
+    'maintenance.close',
+    'maintenance.cost.view',
+    'maintenance.cost.manage',
+    'maintenance.report.view',
   ],
   'Production Supervisor': [
     'master.lookup.view',
@@ -1505,6 +1526,13 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     'manufacturing.material.release_reservation',
     'manufacturing.material.reallocate',
     'manufacturing.material.additional_issue',
+    // Maintenance V1 — coordinate repair / test (no cost manage / close)
+    'maintenance.view',
+    'maintenance.create',
+    'maintenance.start',
+    'maintenance.update',
+    'maintenance.test',
+    'maintenance.cost.view',
   ],
   'Production Operator': [
     'manufacturing.view',
@@ -1518,6 +1546,9 @@ export const ROLE_PERMISSIONS: Record<string, PermissionName[]> = {
     // Product label on kiosk cards (read-only WO header fields)
     'manufacturing.work_orders.view',
     'master.item.view',
+    // Maintenance V1 — report breakdown only
+    'maintenance.view',
+    'maintenance.create',
   ],
   'Production Engineer': [
     'master.lookup.view',

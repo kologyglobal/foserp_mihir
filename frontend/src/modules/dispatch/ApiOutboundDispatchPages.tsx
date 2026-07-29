@@ -428,7 +428,7 @@ export function ApiOutboundDispatchDetailPage() {
         readyOnly: false,
         limit: 100,
       })
-      const readySum = ready.reduce((sum, row) => sum + parseDecimal(row.invoiceReadyQty), 0)
+      const readySum = ready.items.reduce((sum, row) => sum + parseDecimal(row.invoiceReadyQty), 0)
       setInvoiceReadyQty(readySum)
       const invoices = await listSalesInvoices({
         sourceType: 'OUTBOUND_DISPATCH',
@@ -814,7 +814,7 @@ export function ApiOutboundDispatchDetailPage() {
         readyOnly: true,
         limit: 100,
       })
-      if (!ready.length) {
+      if (!ready.items.length) {
         notify.info('No invoice-ready quantity — open Invoice Ready or view the linked invoice')
         if (linkedInvoice) {
           navigate(moneyInPath(`invoices/${linkedInvoice.id}`))
@@ -823,7 +823,7 @@ export function ApiOutboundDispatchDetailPage() {
         }
         return
       }
-      const prefill = await prefillInvoiceFromDispatch(ready.map((r) => r.outboundDispatchLineId))
+      const prefill = await prefillInvoiceFromDispatch(ready.items.map((r) => r.outboundDispatchLineId))
       const state: DispatchInvoicePrefillState = { dispatchPrefill: prefill }
       navigate(moneyInPath('invoices/new'), { state })
     } catch (e) {

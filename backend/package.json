@@ -22,6 +22,7 @@
     "test:purchase-multi-unit-uom-live": "tsx scripts/test-purchase-multi-unit-uom-flow.ts",
     "test:grn-tolerance": "vitest run tests/purchase/grn-tolerance.test.ts",
     "test:grn-tolerance-live": "tsx scripts/test-grn-tolerance-flow.ts",
+    "test:fin-close-1-live": "tsx scripts/test-fin-close-1-grir-ppv-return-ap.ts",
     "seed:grn-tolerance-review": "tsx scripts/seed-grn-tolerance-review-pack.ts",
     "test:crm-live": "tsx scripts/run-crm-live-tests.ts",
     "test:backend-structure": "tsx scripts/test-backend-structure.ts",

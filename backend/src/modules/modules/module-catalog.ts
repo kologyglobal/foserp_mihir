@@ -50,6 +50,12 @@ export const TENANT_MODULE_CATALOG: TenantModuleDef[] = [
     dependsOn: ['manufacturing'],
   },
   {
+    key: 'maintenance',
+    name: 'Maintenance',
+    description: 'Machine breakdown tickets — report, repair, test, close',
+    dependsOn: ['manufacturing'],
+  },
+  {
     key: 'dispatch',
     name: 'Dispatch',
     description: 'Delivery challans and dispatch',

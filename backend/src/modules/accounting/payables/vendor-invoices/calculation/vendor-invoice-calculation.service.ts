@@ -17,6 +17,7 @@ import type { VendorInvoiceAmountsCalculationResult } from './vendor-invoice-amo
 import { assessVendorInvoiceDuplicates, emptyVendorInvoiceDuplicateAssessment } from './vendor-invoice-duplicate-detector.service.js'
 import { buildRequiredAccountComponents, finalizeAccountReadiness, resolveVendorInvoiceAccounts } from './vendor-invoice-account-resolver.service.js'
 import { buildVendorInvoiceAccountingPreview } from './vendor-invoice-accounting-preview.service.js'
+import { emptyGrirReleasePlan, resolveVendorInvoiceGrirReleasePlan } from './vendor-invoice-grir-release.service.js'
 import { mergeVendorInvoiceValidation } from './vendor-invoice-validation.service.js'
 import { VENDOR_INVOICE_CALCULATION_VERSION } from './vendor-invoice-calculation.types.js'
 import type {
@@ -150,6 +151,18 @@ export async function calculateVendorInvoice(
         })
       : emptyVendorInvoiceDuplicateAssessment(normalizedSupplierInvoiceNumber)
 
+  // FIN-CLOSE-1 — receipt lines whose GRN already posted GL clear GR/IR instead of debiting
+  // PURCHASE. Empty when no line is GRN-sourced or inventory accounting never posted.
+  const grirReleasePlan =
+    includeAccountReadiness && context.tenantId
+      ? await resolveVendorInvoiceGrirReleasePlan({
+          tenantId: context.tenantId,
+          legalEntityId: context.legalEntityId,
+          amountsResult: amounts,
+          vendorInvoiceId: context.vendorInvoiceId ?? null,
+        })
+      : emptyGrirReleasePlan()
+
   // resolveVendorInvoiceAccounts internally skips all DB access when includeDbLookups is false,
   // resolving purely from configuration/line overrides — this covers the "readiness from
   // overrides only" fallback without a separate code path.
@@ -159,6 +172,7 @@ export async function calculateVendorInvoice(
     amountsResult: amounts,
     input: { configuration: input.configuration, tdsRecognitionMode: input.tdsRecognitionMode },
     includeDbLookups: includeAccountReadiness,
+    grirReleasePlan,
   })
 
   const accountingPreview = includeAccountingPreview
@@ -171,6 +185,7 @@ export async function calculateVendorInvoice(
           exchangeRate: input.exchangeRate,
           tdsRecognitionMode: input.tdsRecognitionMode,
         },
+        grirReleasePlan,
       })
     : emptyAccountingPreview(amounts.totals.vendorPayableAmount)
 

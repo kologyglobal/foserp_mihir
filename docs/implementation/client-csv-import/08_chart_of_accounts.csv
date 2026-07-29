@@ -1,0 +1,4 @@
+Account Code,Account Name,Account Type,Category,Parent Account Code,Normal Balance,Direct Posting,Control Account,Active
+1000,Assets,Group,Asset,,Debit,N,N,Y
+1100,Current Assets,Group,Asset,1000,Debit,N,N,Y
+1110,Cash and Bank,Posting,Asset,1100,Debit,Y,N,Y

@@ -33,6 +33,8 @@ export const returnMaterialSchema = z.object({
   rate: z.coerce.number().min(0).optional(),
   idempotencyKey: z.string().trim().min(1).max(150).optional(),
   remarks: z.string().trim().max(2000).optional(),
+  batchId: z.string().uuid().optional(),
+  batchNumber: z.string().trim().max(64).optional(),
 })
 
 export const shortageRequisitionSchema = z.object({

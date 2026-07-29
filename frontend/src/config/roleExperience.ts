@@ -142,6 +142,7 @@ const PRODUCTION: RoleExperienceDefinition = {
     { label: 'Work Orders', path: '/manufacturing/work-orders', icon: FileText },
     { label: 'Production Plan', path: '/manufacturing/production-plan', icon: ClipboardList },
     { label: 'Shopfloor', path: '/manufacturing/shopfloor', icon: Wrench },
+    { label: 'Maintenance', path: '/maintenance', icon: Wrench },
     { label: 'BOMs', path: '/manufacturing/setup/boms', icon: Layers },
   ],
 }

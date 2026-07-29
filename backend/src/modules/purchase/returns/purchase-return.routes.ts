@@ -13,4 +13,7 @@ router.post('/:id/submit', requirePermission('purchase.return.submit'), validate
 router.post('/:id/approve', requirePermission('purchase.return.complete'), validateParams(uuidParamSchema), validateBody(purchaseReturnRemarksSchema), controller.approvePurchaseReturn)
 router.post('/:id/complete', requirePermission('purchase.return.complete'), validateParams(uuidParamSchema), validateBody(purchaseReturnRemarksSchema), controller.completePurchaseReturn)
 router.post('/:id/cancel', requirePermission('purchase.return.cancel'), validateParams(uuidParamSchema), validateBody(purchaseReturnRemarksSchema), controller.cancelPurchaseReturn)
+// FIN-CLOSE-1 — AP debit note handoff. Eligibility is backend-owned; the preview is read-only.
+router.get('/:id/ap-adjustment-preview', requirePermission('purchase.return.view'), validateParams(uuidParamSchema), controller.getPurchaseReturnApAdjustmentPreview)
+router.post('/:id/ap-adjustment', requirePermission('purchase.return.complete'), validateParams(uuidParamSchema), controller.createPurchaseReturnApAdjustment)
 export default router

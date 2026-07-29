@@ -23,3 +23,7 @@ export const completePurchaseReturn = asyncHandler(async (req: Request, res: Res
   sendSuccess(res, 'Purchase return completed', await service.completePurchaseReturn(getTenantId(req), getRouteParam(req, 'id'), actor(req), req.body ?? {})))
 export const cancelPurchaseReturn = asyncHandler(async (req: Request, res: Response) =>
   sendSuccess(res, 'Purchase return cancelled', await service.cancelPurchaseReturn(getTenantId(req), getRouteParam(req, 'id'), actor(req), req.body ?? {})))
+export const getPurchaseReturnApAdjustmentPreview = asyncHandler(async (req: Request, res: Response) =>
+  sendSuccess(res, 'AP adjustment preview retrieved', await service.getPurchaseReturnApAdjustmentPreview(getTenantId(req), getRouteParam(req, 'id'))))
+export const createPurchaseReturnApAdjustment = asyncHandler(async (req: Request, res: Response) =>
+  sendSuccess(res, 'AP adjustment draft created', await service.createPurchaseReturnApAdjustment(getTenantId(req), getRouteParam(req, 'id'), actor(req))))
