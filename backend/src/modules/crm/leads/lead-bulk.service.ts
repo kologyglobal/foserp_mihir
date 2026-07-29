@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { assertUserInTenant } from '../crm.tenant-refs.js'
 import * as repo from './lead.repository.js'
 import {

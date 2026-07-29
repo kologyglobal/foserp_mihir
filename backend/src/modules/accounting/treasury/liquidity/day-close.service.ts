@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence } from '../../shared/finance-decimal.js'
 import { getLegalEntityOrThrow } from '../../shared/finance.helpers.js'
 import { getClosingControls } from './closing-controls.service.js'

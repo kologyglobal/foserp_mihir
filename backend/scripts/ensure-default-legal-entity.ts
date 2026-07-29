@@ -5,7 +5,7 @@
  *
  * Usage: npx tsx scripts/ensure-default-legal-entity.ts
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 const TENANT_SLUG = process.env.TENANT_SLUG ?? 'vasant-trailers'
 

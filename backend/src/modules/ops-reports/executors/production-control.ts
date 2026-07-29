@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import type { ExecutorContext, ExecutorOutput, ReportChartData, ReportRow } from '../types.js'
 import { applyDateRangeFilter, chartFromCounts, countBy, toNum } from './helpers.js'
 

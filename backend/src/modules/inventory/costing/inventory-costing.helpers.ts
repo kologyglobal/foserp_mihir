@@ -1,5 +1,5 @@
 import type { InventoryValuationMethod, Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { toDecimal } from '../shared/quantity.helpers.js'
 
 export function mapDefaultCostingMethodToValuationMethod(value: unknown): InventoryValuationMethod {

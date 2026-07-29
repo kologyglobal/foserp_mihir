@@ -1,5 +1,5 @@
 import { Prisma, type PayableAllocationBatch, type PayableAllocationLine } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getPagination } from '../../../../utils/pagination.js'
 import { getLegalEntityOrThrow } from '../../shared/finance.helpers.js'
 import { formatForPersistence, roundExchangeRate, toDecimal } from '../../shared/finance-decimal.js'

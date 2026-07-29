@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import type { ProductionAccountingEventType } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { post } from '../../accounting/posting/posting.service.js'
 import type { PostingContext } from '../../accounting/posting/posting.types.js'

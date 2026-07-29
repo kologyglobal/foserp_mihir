@@ -1,5 +1,5 @@
 import type { AccountingPeriod, FinancialYear, FinanceSettings } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { parseDateOnly } from '../shared/finance.helpers.js'
 import { PostingError } from './posting.errors.js'
 

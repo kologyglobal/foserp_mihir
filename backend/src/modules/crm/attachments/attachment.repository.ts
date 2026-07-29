@@ -1,6 +1,6 @@
 import type { CrmEntityType } from '@prisma/client'
 import { randomUUID } from 'node:crypto'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { env } from '../../../config/env.js'
 import {
   getAttachmentExtension,

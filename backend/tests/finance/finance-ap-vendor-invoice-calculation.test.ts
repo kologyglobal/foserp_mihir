@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { prisma } from '../../src/config/database.js'
+import { prisma } from '../../src/config/prisma.js'
 import { calculateVendorInvoice, calculateVendorInvoiceSync } from '../../src/modules/accounting/payables/vendor-invoices/calculation/vendor-invoice-calculation.service.js'
 import { calculateVendorInvoiceAmounts } from '../../src/modules/accounting/payables/vendor-invoices/calculation/vendor-invoice-amounts.service.js'
 import { assertBaseCurrencyRate } from '../../src/modules/accounting/payables/vendor-invoices/calculation/vendor-invoice-currency-calculator.service.js'

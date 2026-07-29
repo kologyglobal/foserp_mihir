@@ -1,4 +1,4 @@
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 /** Complete the failed purchase_setup_full_persistence migration after identifier-length fix. */
 async function main() {

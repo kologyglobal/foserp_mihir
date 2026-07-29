@@ -2,7 +2,7 @@
  * Global null itemId audit across all tenants (Phase 9 gate).
  * Usage: npx tsx scripts/crm-item-null-itemid-audit-all.ts
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 function parseJsonArray(raw: unknown): unknown[] {
   if (Array.isArray(raw)) return raw

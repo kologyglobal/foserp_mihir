@@ -2,7 +2,7 @@
  * Admin Panel Phase 9 — tenant module enablement flags + dependency rules.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import * as moduleService from '../src/modules/modules/module.service.js'
 import { ValidationError } from '../src/utils/errors.js'
 

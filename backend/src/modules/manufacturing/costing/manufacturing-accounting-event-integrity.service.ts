@@ -3,7 +3,7 @@
  * Derives exception kinds from existing event + inventory + posting fields (no new tables).
  */
 import type { ProductionAccountingEvent } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 
 const DETAIL_LIMIT = 50
 const MAX_RETRY_ATTEMPTS = 5

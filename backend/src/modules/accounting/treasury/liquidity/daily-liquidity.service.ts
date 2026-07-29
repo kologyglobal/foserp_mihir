@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { add, formatForPersistence, toDecimal } from '../../shared/finance-decimal.js'
 import { getCashPosition } from './cash-position.service.js'
 import type { LiquidityQuery } from './treasury-liquidity.schemas.js'

@@ -12,7 +12,7 @@
  *
  * Users must log out and back in afterwards ? session permissions are issued at login.
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { PERMISSIONS, ROLE_PERMISSIONS } from '../src/constants/permissions.js'
 
 const dryRun = process.argv.includes('--dry-run')

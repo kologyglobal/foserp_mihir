@@ -1,6 +1,6 @@
 import type { ArDisputeStatus, Prisma } from '@prisma/client'
 import type { Request } from 'express'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { isPositive, toDecimal } from '../../shared/finance-decimal.js'
 import {
   ArDisputeAmountInvalidError,

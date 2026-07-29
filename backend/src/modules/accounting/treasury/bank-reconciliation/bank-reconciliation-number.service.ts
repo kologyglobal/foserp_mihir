@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 
 const DOCUMENT_TYPE = 'BANK_RECONCILIATION_MATCH' as const
 const DEFAULT_PREFIX = 'BREC/'

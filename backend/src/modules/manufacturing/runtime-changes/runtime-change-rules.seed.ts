@@ -1,5 +1,5 @@
 import type { ManufacturingRuntimeChangeRule, ProductionRuntimeChangeType, Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 
 /** One active default rule per changeType (risk service uses first active match). */
 const DEFAULT_RULES: Array<{

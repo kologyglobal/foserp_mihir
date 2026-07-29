@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { PayableCloseGateRunNotFoundError } from './payable-reconciliation.errors.js'
 
 function csvEscape(value: unknown): string {

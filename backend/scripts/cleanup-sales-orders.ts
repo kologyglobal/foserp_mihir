@@ -22,7 +22,7 @@
  *   DRY_RUN=1                     (counts only, no writes)
  */
 import { Prisma } from '@prisma/client'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 const slugArg = process.env.TENANT_SLUG ?? 'vasant-trailers'
 const allTenants = slugArg.toUpperCase() === 'ALL'
 const dryRun = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true'

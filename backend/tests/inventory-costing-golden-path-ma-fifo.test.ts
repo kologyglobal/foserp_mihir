@@ -7,7 +7,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '../src/app.js'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { postStockMovement } from '../src/modules/inventory/shared/stock-posting.service.js'
 import { reconcileValuation } from '../src/modules/inventory/costing/costing.service.js'
 import { DEFAULT_INVENTORY_SETTINGS } from '../src/modules/inventory/setup/setup.service.js'

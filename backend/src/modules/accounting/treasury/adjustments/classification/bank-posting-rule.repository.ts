@@ -1,5 +1,5 @@
 import { Prisma, type BankPostingRule } from '@prisma/client'
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 import { getPagination } from '../../../../../utils/pagination.js'
 import { BankPostingRuleNotFoundError } from './bank-posting-rule.errors.js'
 import type { CreateBankPostingRuleInput, ListBankPostingRulesQuery, UpdateBankPostingRuleInput } from './bank-posting-rule.schemas.js'

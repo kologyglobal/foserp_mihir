@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/prisma/helpers.js'
 import type { ListAllocationsQuery, ListInvoicesQuery, ListProformasQuery, ListReceiptsQuery } from './commercial.validation.js'
 

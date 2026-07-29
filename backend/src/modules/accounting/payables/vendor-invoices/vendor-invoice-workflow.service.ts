@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { auditFromRequest, createAuditLog } from '../../../../services/audit.service.js'
 import type { VendorInvoiceSourceMode } from '../../shared/master-resolvers/accounting-source-document-resolver.js'
 import { buildSupplierInvoiceUniquenessKey } from './vendor-invoice-number-normalization.js'

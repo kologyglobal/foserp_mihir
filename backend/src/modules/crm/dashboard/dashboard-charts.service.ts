@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { decimalToNumber, resolveUserNames, tenantActiveFilter } from '../../../shared/index.js'
 
 const CLOSED_STAGE_SLUGS = new Set(['won', 'lost', 'on_hold'])

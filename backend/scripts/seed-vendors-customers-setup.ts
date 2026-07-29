@@ -10,7 +10,7 @@
  * - Customer billing → addressLine*; shipping → notes + addressLine2; credit terms → creditDays/creditLimit
  * - Customer tax/payment labels → notes (no dedicated taxRule/currency columns on CrmCompany)
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { nextCode } from '../src/services/codeSeries.service.js'
 
 const TENANT_SLUG = process.env.TENANT_SLUG ?? 'vasant-trailers'

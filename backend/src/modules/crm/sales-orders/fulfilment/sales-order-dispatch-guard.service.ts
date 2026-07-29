@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { InvalidStateError, NotFoundError } from '../../../../utils/errors.js'
 
 const BLOCKED_DISPATCH_STATUSES = new Set(['closed', 'cancelled'])

@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import type { CalculationIssue } from '../calculation/sales-invoice-calculation.types.js'
 import { calcError, calcWarning } from '../calculation/sales-invoice-calculation.errors.js'
 

@@ -1,5 +1,5 @@
 import type { Prisma, Tenant, TenantStatus } from '@prisma/client'
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 import type { PaginationInput } from '../../utils/pagination.js'
 import { getPagination } from '../../utils/pagination.js'
 import type { CreateTenantInput, UpdateTenantInput } from './tenant.validation.js'

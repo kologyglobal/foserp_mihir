@@ -1,5 +1,5 @@
 import { createAuditLog } from '../../services/audit.service.js'
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 import { ConflictError, NotFoundError } from '../../utils/errors.js'
 import { buildPaginationMeta } from '../../utils/pagination.js'
 import { hashPassword } from '../../utils/password.js'

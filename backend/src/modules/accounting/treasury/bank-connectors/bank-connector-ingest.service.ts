@@ -5,7 +5,7 @@
 import type { Request } from 'express'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { saveTreasuryStatementFile } from '../../../../services/fileStorage.service.js'
 import {
   assertNoDuplicateFile,

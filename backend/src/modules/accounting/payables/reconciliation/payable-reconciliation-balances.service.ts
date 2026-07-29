@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence, subtract, sumDecimals, toDecimal } from '../../shared/finance-decimal.js'
 import type { ReconciledOpenItemAsOf } from './payable-reconciliation.types.js'
 

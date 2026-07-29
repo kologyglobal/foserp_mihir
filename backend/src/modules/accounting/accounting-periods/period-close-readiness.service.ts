@@ -1,5 +1,5 @@
 import type { AccountingPeriod, AccountingVoucherStatus } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { AppError } from '../../../utils/errors.js'
 import {
   JOURNAL_SOURCE_DOCUMENT_TYPE,

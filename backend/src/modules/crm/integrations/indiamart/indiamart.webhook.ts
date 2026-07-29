@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { createAuditLog } from '../../../../services/audit.service.js'
 import { IndiaMartError } from './indiamart.errors.js'
 import { extractPushLeadPayload, ingestIndiaMartEnquiry } from './indiamart.ingest.js'

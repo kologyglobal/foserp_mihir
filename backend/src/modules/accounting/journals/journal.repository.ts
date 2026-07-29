@@ -1,5 +1,5 @@
 import type { AccountingVoucher, Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { getPagination } from '../../../utils/pagination.js'
 import { ConflictError, InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { getLegalEntityOrThrow, parseDateOnly } from '../shared/finance.helpers.js'

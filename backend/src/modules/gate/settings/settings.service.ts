@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import {
   DEFAULT_GATE_LOCATIONS,
   DEFAULT_GATE_SETTINGS,

@@ -1,4 +1,4 @@
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 import { isSensitivePermission } from './sensitive-permissions.js'
 
 export type AccessReviewSeverity = 'high' | 'medium' | 'low'

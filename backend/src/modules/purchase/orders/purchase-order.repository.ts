@@ -1,5 +1,5 @@
 import type { Prisma, PurchaseOrderStatus } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import type { ListPurchaseOrdersQuery } from './purchase-order.validation.js'
 

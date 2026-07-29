@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import type { PurchaseApprovalTierDocumentType } from '@prisma/client'
 import { PURCHASE_ERROR_CODE, purchaseMessage } from './purchase-error-catalog.js'
 

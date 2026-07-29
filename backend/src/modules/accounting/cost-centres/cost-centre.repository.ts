@@ -1,6 +1,6 @@
 import type { CostCentre } from '@prisma/client'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { getPagination } from '../../../utils/pagination.js'
 import { ConflictError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { MAX_COST_CENTRE_DEPTH } from '../shared/finance.constants.js'

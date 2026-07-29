@@ -1,4 +1,4 @@
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 /**
  * Completes partial Phase 4C1 migration after index-name failure,

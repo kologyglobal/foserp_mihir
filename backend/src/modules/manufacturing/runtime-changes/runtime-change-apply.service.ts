@@ -1,7 +1,7 @@
 import type { Request } from 'express'
 import type { Prisma, ProductionStageStatus } from '@prisma/client'
 import { Prisma as PrismaRuntime } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { InvalidStateError, ValidationError } from '../../../utils/errors.js'
 import { logProductionActivity } from '../shared/activity.service.js'
 import { recomputeOrderHealth } from '../work-orders/work-order-health.service.js'

@@ -1,5 +1,5 @@
 import type { Account, DefaultAccountMappingKey } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import type { PostingPurpose, PostingRequestLine, ResolvedPostingLine } from './posting.types.js'
 import { PostingError } from './posting.errors.js'
 

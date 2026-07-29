@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
-import { prisma } from '../config/database.js'
+import { prisma } from '../config/prisma.js'
 import { AuthenticationError, AuthorizationError, TenantMismatchError } from '../utils/errors.js'
 
 export const TENANT_HEADER = 'x-tenant-id'

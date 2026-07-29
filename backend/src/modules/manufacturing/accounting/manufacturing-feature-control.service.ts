@@ -1,6 +1,6 @@
 import type { FinanceFeatureKey, Prisma } from '@prisma/client'
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { assertFinanceActivated } from '../../accounting/posting/posting-currency.service.js'
 import {
   AuthenticationError,

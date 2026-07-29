@@ -1,5 +1,5 @@
 import type { DefaultAccountMappingKey } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { NotFoundError, ValidationError } from '../../../utils/errors.js'
 import {
   MANDATORY_MAPPING_KEYS,

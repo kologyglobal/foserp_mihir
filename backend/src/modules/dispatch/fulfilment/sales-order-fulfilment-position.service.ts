@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { DispatchReadinessStatus } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import type { SalesOrderLineDto } from '../../crm/sales-orders/sales-order.types.js'
 import { collectQualityBlockers } from '../../quality/shared/blockers.service.js'

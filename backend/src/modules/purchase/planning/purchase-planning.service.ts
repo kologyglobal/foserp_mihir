@@ -1,5 +1,5 @@
 import type { Prisma, PurchasePlanningRow, PurchasePlanningStatus } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import {
   PURCHASE_AUDIT_ACTION,
   PURCHASE_AUDIT_ENTITY,

@@ -13,7 +13,7 @@ import {
 import { serializeTreasuryTransfer } from '../treasury-transfer-read.service.js'
 import { validateTreasuryTransferForReceiveAction } from './treasury-transfer-posting-validation.service.js'
 import { buildTreasuryTransferPostingRequest, buildTreasuryTransferReceiveEventKey } from './treasury-transfer-posting-builder.service.js'
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 
 function hasPerm(req: Request, permission: string): boolean {
   const perms = req.context?.permissions ?? []

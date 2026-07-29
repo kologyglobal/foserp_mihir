@@ -1,6 +1,6 @@
 import type { PayableOpenItem } from '@prisma/client'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getLegalEntityOrThrow } from '../../shared/finance.helpers.js'
 import { toDecimal } from '../../shared/finance-decimal.js'
 import { PayableOpenItemDuplicateSourceError } from './payable-open-item.errors.js'

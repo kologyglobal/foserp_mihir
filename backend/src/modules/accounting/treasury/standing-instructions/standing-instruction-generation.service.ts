@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import type { StandingInstruction } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { parseDateOnly } from '../../shared/finance.helpers.js'
 import { loadTreasuryAccountSnapshot } from '../adjustments/treasury-adjustment-account-resolver.service.js'
 import { createTreasuryAdjustmentDraft } from '../adjustments/treasury-adjustment-draft.service.js'

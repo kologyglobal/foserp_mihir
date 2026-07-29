@@ -6,7 +6,7 @@
  * Run: npx tsx scripts/purge-business-data.ts
  * Optional: TENANT_SLUG=vasant-trailers
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 const slug = process.env.TENANT_SLUG ?? 'vasant-trailers'
 
 async function main() {

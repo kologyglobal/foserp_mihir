@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import type { ManufacturingBomLine, ManufacturingBomVersion } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import { auditFromRequest, createAuditLog } from '../../../services/audit.service.js'
 import { InvalidStateError, ValidationError } from '../../../utils/errors.js'

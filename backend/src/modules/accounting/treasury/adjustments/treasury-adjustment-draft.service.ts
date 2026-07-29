@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getLegalEntityOrThrow, parseDateOnly } from '../../shared/finance.helpers.js'
 import { validateBranchOwnership } from '../../ledger/ledger.validators.js'
 import { compare, formatForPersistence, toDecimal } from '../../shared/finance-decimal.js'

@@ -2,7 +2,7 @@
  * Auto-create DRAFT Sales Invoice from a successful Dispatch posting.
  * Idempotent per DispatchPosting id. Does not post the invoice.
  */
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { env } from '../../../config/env.js'
 import { createAuditLog } from '../../../services/audit.service.js'
 import { logger } from '../../../config/logger.js'

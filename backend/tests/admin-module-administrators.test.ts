@@ -2,7 +2,7 @@
  * Admin A3–A9 — Module Administrators designation register.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import * as moduleService from '../src/modules/modules/module.service.js'
 import * as userService from '../src/modules/users/user.service.js'
 import { NotFoundError, ValidationError } from '../src/utils/errors.js'

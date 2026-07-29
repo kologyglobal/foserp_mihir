@@ -1,7 +1,7 @@
 import request from 'supertest'
 import { expect } from 'vitest'
 import type { Express } from 'express'
-import { prisma } from '../../../src/config/database.js'
+import { prisma } from '../../../src/config/prisma.js'
 import { PERMISSIONS, type PermissionName } from '../../../src/constants/permissions.js'
 
 export const FINANCE_PERMS = PERMISSIONS.filter((p) => p.startsWith('finance.')) as PermissionName[]

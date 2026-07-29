@@ -1,4 +1,4 @@
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 import { TENANT_ADMIN_PERMISSIONS } from '../../constants/permissions.js'
 import { createAuditLog } from '../../services/audit.service.js'
 import { initTenantCodeSeries } from '../../services/codeSeries.service.js'

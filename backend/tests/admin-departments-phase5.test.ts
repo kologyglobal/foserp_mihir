@@ -2,7 +2,7 @@
  * Admin Panel Phase 5 — Department master CRUD + User.departmentId sync.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import * as departmentService from '../src/modules/departments/department.service.js'
 import * as userService from '../src/modules/users/user.service.js'
 

@@ -1,5 +1,5 @@
 import type { BankReconciliationProfile } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence } from '../../shared/finance-decimal.js'
 import { BankReconciliationProfileNotFoundError, TreasuryStaleVersionError } from '../treasury.errors.js'
 

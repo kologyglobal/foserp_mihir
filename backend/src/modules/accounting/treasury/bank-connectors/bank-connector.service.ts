@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { auditFromRequest, createAuditLog } from '../../../../services/audit.service.js'
 import { getLegalEntityOrThrow } from '../../shared/finance.helpers.js'
 import { TreasuryAccountNotFoundError } from '../treasury.errors.js'

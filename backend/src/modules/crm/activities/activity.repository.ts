@@ -1,5 +1,5 @@
 import type { ActivityStatus, ActivityType, Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import { FRONTEND_TYPE_TO_ACTIVITY } from './activity.constants.js'
 import type {

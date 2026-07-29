@@ -1,5 +1,5 @@
 import { Prisma, type VendorInvoice } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getLegalEntityOrThrow } from '../../shared/finance.helpers.js'
 import { convertToBase, toDecimal } from '../../shared/finance-decimal.js'
 import type { VendorInvoiceCalculationResult } from './calculation/vendor-invoice-calculation.types.js'

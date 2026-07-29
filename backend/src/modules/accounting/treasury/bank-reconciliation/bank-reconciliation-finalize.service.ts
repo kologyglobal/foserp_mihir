@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence, toDecimal } from '../../shared/finance-decimal.js'
 import { auditBankReconciliation } from './bank-reconciliation-audit.service.js'
 import * as readRepo from './bank-reconciliation-read.repository.js'

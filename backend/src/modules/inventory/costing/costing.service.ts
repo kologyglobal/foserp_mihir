@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { getPagination } from '../../../utils/pagination.js'
 import { ValidationError } from '../../../utils/errors.js'
 import { dec, toDecimal } from '../shared/quantity.helpers.js'

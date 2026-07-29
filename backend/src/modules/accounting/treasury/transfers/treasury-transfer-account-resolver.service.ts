@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import type { TreasuryTransferAccountResolution, TreasuryAccountSnapshot } from './treasury-transfer.types.js'
 import { TreasuryTransferAccountNotFoundError, TreasuryTransferClearingAccountMissingError } from './treasury-transfer.errors.js'
 

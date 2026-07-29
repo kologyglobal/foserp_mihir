@@ -2,7 +2,7 @@
  * Thin location resolver — finance Branch (invoice branchId).
  * Warehouse/plant lookups stay on master lookup routers; this is the accounting boundary.
  */
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { NotFoundError } from '../../../../utils/errors.js'
 
 export class AccountingBranchNotFoundError extends NotFoundError {

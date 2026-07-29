@@ -1,5 +1,5 @@
 import type { Prisma, User, UserStatus } from '@prisma/client'
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 import { NotFoundError } from '../../utils/errors.js'
 import type { PaginationInput } from '../../utils/pagination.js'
 import { getPagination } from '../../utils/pagination.js'

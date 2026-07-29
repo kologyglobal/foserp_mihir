@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import type { ControlAccountInfo, ReconciliationExceptionDraft } from './payable-reconciliation.types.js'
 
 /**

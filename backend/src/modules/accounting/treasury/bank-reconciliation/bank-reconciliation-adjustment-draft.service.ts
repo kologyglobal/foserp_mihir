@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { createJournal } from '../../journals/journal.service.js'
 import type { CreateJournalInput } from '../../journals/journal.schemas.js'
 import type { JournalDetailDto } from '../../journals/journal.types.js'

@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import { randomUUID } from 'node:crypto'
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 import {
   getAttachmentExtension,
   readTreasuryStatementFile,

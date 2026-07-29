@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { toDecimal } from '../shared/finance-decimal.js'
 import { ApprovalError } from './approval.errors.js'
 import * as repo from './approval.repository.js'

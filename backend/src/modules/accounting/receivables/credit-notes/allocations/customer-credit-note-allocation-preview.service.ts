@@ -1,4 +1,4 @@
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 import { formatForPersistence } from '../../../shared/finance-decimal.js'
 import {
   CREDIT_NOTE_ALLOCATION_ERROR_CODES,

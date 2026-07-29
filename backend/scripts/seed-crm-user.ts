@@ -6,7 +6,7 @@
  */
 
 import { ROLE_PERMISSIONS } from '../src/constants/permissions.js'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { hashPassword } from '../src/utils/password.js'
 
 const TENANT_SLUG = process.env.SEED_TENANT_SLUG ?? 'vasant-trailers'

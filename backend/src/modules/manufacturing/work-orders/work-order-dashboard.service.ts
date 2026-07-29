@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import { mapProductionOrder } from '../shared/manufacturing.mappers.js'
 import { ACTIVE_ASSIGNMENT_STATUSES } from '../assignments/assignment.helpers.js'

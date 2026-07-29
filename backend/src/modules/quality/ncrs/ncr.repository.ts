@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import type { ListNcrsQuery } from './ncr.schemas.js'
 
 export async function listNcrs(tenantId: string, query: ListNcrsQuery) {

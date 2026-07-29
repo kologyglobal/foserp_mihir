@@ -2,7 +2,7 @@
  * Admin Panel Phase 4 — invitations + deactivate/session revoke (service-level).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import * as invitationService from '../src/modules/users/user-invitation.service.js'
 import { hashPassword } from '../src/utils/password.js'
 

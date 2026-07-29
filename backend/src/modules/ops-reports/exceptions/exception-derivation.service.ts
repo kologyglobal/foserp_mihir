@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { ageInDays } from '../executors/helpers.js'
 import type { DerivedException } from './exception.types.js'
 

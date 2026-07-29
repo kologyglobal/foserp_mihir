@@ -1,5 +1,5 @@
 import type { ManufacturingQualityInspectionStatus } from '@prisma/client'
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 
 const PENDING_STATUSES: ManufacturingQualityInspectionStatus[] = ['PENDING', 'REWORK', 'READY', 'IN_PROGRESS']
 const OPEN_QI_STATUSES = ['DRAFT', 'PENDING', 'IN_PROGRESS', 'DEVIATION_PENDING'] as const

@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 import { executeMatch } from '../../bank-reconciliation/bank-reconciliation-match.service.js'
 import type { ReconciliationContext } from '../../bank-reconciliation/bank-reconciliation.types.js'
 import { auditFromRequest } from '../../../../../services/audit.service.js'

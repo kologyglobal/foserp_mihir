@@ -1,5 +1,5 @@
 import type { Prisma, PurchasePlanningStatus, PurchasePriority, PurchasePlanningPurchaseType } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import type { ListPlanningSheetQuery } from './purchase-planning.validation.js'
 import { OPEN_PO_STATUSES, startOfTodayUtc } from './purchase-planning.workflow.js'

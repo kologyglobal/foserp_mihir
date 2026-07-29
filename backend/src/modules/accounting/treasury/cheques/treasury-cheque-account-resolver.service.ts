@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import type { TreasuryChequeCounterpartResolution, TreasuryAccountSnapshot } from './treasury-cheque.types.js'
 import {
   TreasuryChequeAccountNotFoundError,

@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { freeQty } from '../shared/balance.service.js'
 import { dec } from '../shared/quantity.helpers.js'
 

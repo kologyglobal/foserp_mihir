@@ -1,6 +1,6 @@
 import type { QualityInspectionCategory, QualityInspectionPlanStatus } from '@prisma/client'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import type { ListPlansQuery, PlanLineInput } from './inspection-plan.schemas.js'
 
 const planInclude = {

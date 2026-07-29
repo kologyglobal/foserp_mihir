@@ -14,7 +14,7 @@
  */
 import request from 'supertest'
 import { createApp } from '../src/app.js'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { getManufacturingAccountingReadiness } from '../src/modules/manufacturing/costing/accounting-readiness.service.js'
 
 const TENANT_SLUG = process.env.TENANT_SLUG ?? 'vasant-trailers'

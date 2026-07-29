@@ -1,5 +1,5 @@
 import type { ApDisputeStatus, Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import type { ApDisputeWithContext } from './ap-dispute.types.js'
 
 const contextInclude = {

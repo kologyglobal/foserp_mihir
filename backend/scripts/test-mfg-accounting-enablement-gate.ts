@@ -2,7 +2,7 @@
  * Focused readiness/enablement gate checks (no full WO fixture).
  * Usage: npx tsx scripts/test-mfg-accounting-enablement-gate.ts
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { getManufacturingAccountingReadiness } from '../src/modules/manufacturing/costing/accounting-readiness.service.js'
 import { setManufacturingAccountingFeature } from '../src/modules/manufacturing/accounting/manufacturing-feature-control.service.js'
 import type { Request } from 'express'

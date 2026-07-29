@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { postSaReceipt as postInventorySaReceipt } from '../../inventory/movements/movement.service.js'
 import { tryRecordManufacturingAccountingEvent } from '../accounting/manufacturing-accounting-event.service.js'

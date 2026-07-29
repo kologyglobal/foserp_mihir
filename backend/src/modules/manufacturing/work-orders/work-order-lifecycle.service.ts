@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { auditFromRequest, createAuditLog } from '../../../services/audit.service.js'
 import { ConflictError, InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { logProductionActivity } from '../shared/activity.service.js'

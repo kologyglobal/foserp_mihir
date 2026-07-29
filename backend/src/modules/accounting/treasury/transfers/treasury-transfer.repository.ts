@@ -1,5 +1,5 @@
 import { Prisma, type TreasuryTransfer } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getPagination } from '../../../../utils/pagination.js'
 import { toDecimal } from '../../shared/finance-decimal.js'
 import { parseDateOnly } from '../../shared/finance.helpers.js'

@@ -1,5 +1,5 @@
 import type { PurchaseApprovalStatus, Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 
 export type ApprovalDocumentType =
   | 'PURCHASE_REQUISITION'

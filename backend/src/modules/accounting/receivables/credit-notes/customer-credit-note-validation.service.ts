@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import type { SalesInvoice, SalesInvoiceLine } from '@prisma/client'
 import { formatForPersistence, toDecimal } from '../../shared/finance-decimal.js'
 import type { CreateCustomerCreditNoteInput, UpdateCustomerCreditNoteInput } from './customer-credit-note.schemas.js'

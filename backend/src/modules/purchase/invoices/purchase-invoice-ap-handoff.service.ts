@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { ensureDefaultLegalEntity } from '../../accounting/legal-entities/ensure-default-legal-entity.js'
 import { createVendorInvoiceDraft } from '../../accounting/payables/vendor-invoices/vendor-invoice-draft.service.js'
 import type { CreateVendorInvoiceInput } from '../../accounting/payables/vendor-invoices/vendor-invoice.schemas.js'

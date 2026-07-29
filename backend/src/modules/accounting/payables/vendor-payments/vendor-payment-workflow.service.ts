@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { auditFromRequest, createAuditLog } from '../../../../services/audit.service.js'
 import { resolvePaymentUniquenessKey } from './vendor-payment-reference-normalization.js'
 import { recalculateVendorPayment } from './vendor-payment-draft.service.js'

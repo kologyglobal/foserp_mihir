@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { previewNextNumber } from '../../finance-number-series/finance-number-series.repository.js'
 import { CustomerCreditNoteApprovalRequiredError, CustomerCreditNoteInvalidStatusError } from './customer-credit-note.errors.js'
 import * as repo from './customer-credit-note.repository.js'

@@ -9,7 +9,7 @@
  * Optional: TENANT_SLUG=vasant-trailers
  */
 import type { DefaultAccountMappingKey, FinanceDocumentType } from '@prisma/client'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { applyCoaTemplate } from '../src/modules/accounting/accounts/account.repository.js'
 import { computeSetupStatus, activateFinance } from '../src/modules/accounting/finance-settings/finance-settings.repository.js'
 import { MANDATORY_MAPPING_KEYS, REQUIRED_NUMBER_SERIES_TYPES } from '../src/modules/accounting/shared/finance.constants.js'

@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { ConflictError, NotFoundError } from '../../../utils/errors.js'
 import { n, roundQty } from '../shared/dispatch-qty.js'
 import { netPickedForLine } from '../picking/dispatch-pick-list.service.js'

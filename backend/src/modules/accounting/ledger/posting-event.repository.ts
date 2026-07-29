@@ -1,5 +1,5 @@
 import type { PostingEvent, PostingEventStatus, Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { ConflictError, InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { getLegalEntityOrThrow } from '../shared/finance.helpers.js'
 import { hashPayload } from '../shared/payload-hash.js'

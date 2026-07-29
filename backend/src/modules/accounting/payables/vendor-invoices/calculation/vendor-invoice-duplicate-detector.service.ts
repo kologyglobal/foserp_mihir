@@ -9,7 +9,7 @@
  *     vendor shares the same supplier invoice date and grand total (within paise
  *     rounding tolerance) under a different invoice number — flagged, not blocking.
  */
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 import { add, isZero, subtract, toDecimal } from '../../../shared/finance-decimal.js'
 import { parseDateOnly } from '../../../shared/finance.helpers.js'
 import { normalizeSupplierInvoiceNumber } from '../vendor-invoice-number-normalization.js'

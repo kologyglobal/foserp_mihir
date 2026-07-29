@@ -4,7 +4,7 @@
  */
 import type { Request } from 'express'
 import type { InventoryStockMovement, OutboundDispatch } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { ConflictError, InvalidStateError, NotFoundError, ValidationError, AuthorizationError } from '../../../utils/errors.js'
 import {
   assertDispatchQtyAllowed,

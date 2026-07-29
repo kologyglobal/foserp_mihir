@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
 import { mapPurchaseRequisitionToDto } from './purchase-requisition.mapper.js'
 import { findPurchaseRequisitionById } from './purchase-requisition.repository.js'

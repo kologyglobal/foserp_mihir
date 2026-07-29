@@ -47,7 +47,7 @@ async function tick(): Promise<void> {
 
     // SLA refresh for all connected tenants (even if sync not due)
     const connected = await repo.listDueConnections() // reuse limited set
-    const allConnected = await (await import('../../../../config/database.js')).prisma.indiaMartConnection.findMany({
+    const allConnected = await (await import('../../../../config/prisma.js')).prisma.indiaMartConnection.findMany({
       where: { status: { in: ['CONNECTED', 'CONNECTION_FAILED'] } },
       take: 100,
     })

@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import type { DefaultAccountMappingKey } from '@prisma/client'
 import type { TreasuryAccountSnapshot } from './treasury-adjustment.types.js'
 import { TreasuryAdjustmentAccountNotFoundError, TreasuryAdjustmentLineAccountInvalidError, TreasuryAdjustmentMappingKeyUnresolvedError } from './treasury-adjustment.errors.js'

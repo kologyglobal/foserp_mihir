@@ -10,7 +10,7 @@ import type {
   IndiaMartSyncTriggerType,
   Prisma,
 } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 
 export async function findConnectionByTenant(tenantId: string) {
   return prisma.indiaMartConnection.findUnique({ where: { tenantId } })

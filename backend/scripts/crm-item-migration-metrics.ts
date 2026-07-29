@@ -6,7 +6,7 @@
  *   npx tsx scripts/crm-item-migration-metrics.ts --tenant=vasant-trailers
  */
 import { Prisma } from '@prisma/client'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 type Counts = Record<string, number>
 

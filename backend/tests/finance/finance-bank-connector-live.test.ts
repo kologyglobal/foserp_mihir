@@ -8,7 +8,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import request from 'supertest'
 import { createApp } from '../../src/app.js'
-import { prisma } from '../../src/config/database.js'
+import { prisma } from '../../src/config/prisma.js'
 import { setSftpClientFactoryForTests } from '../../src/modules/accounting/treasury/bank-connectors/adapters/sftp-client.js'
 import {
   bootstrapApAllocFixture,
