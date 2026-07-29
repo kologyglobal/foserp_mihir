@@ -161,6 +161,8 @@ export function DataGrid<T>({
   const [currentPageSize, setCurrentPageSize] = useState(pageSize)
   const columnMenuRef = useRef<HTMLDivElement>(null)
   const viewMenuRef = useRef<HTMLDivElement>(null)
+  const tableScrollRef = useRef<HTMLDivElement>(null)
+  const [scrolledX, setScrolledX] = useState(false)
 
   const resolvedViewOptions = viewOptions ?? (viewName ? [viewName] : ['Default view'])
   const resolvedActiveView = activeView ?? viewName ?? resolvedViewOptions[0] ?? 'Default view'
@@ -247,6 +249,21 @@ export function DataGrid<T>({
   useEffect(() => {
     table.setPageSize(currentPageSize)
   }, [currentPageSize, table])
+
+  /** Sticky-column shadow is only meaningful once content is actually scrolled under it. */
+  useEffect(() => {
+    const el = tableScrollRef.current
+    if (!el) return
+    const sync = () => setScrolledX(el.scrollLeft > 0)
+    sync()
+    el.addEventListener('scroll', sync, { passive: true })
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(sync)
+    observer?.observe(el)
+    return () => {
+      el.removeEventListener('scroll', sync)
+      observer?.disconnect()
+    }
+  }, [])
 
   const pageCount = table.getPageCount()
   const pageIndex = table.getState().pagination.pageIndex
@@ -561,12 +578,13 @@ export function DataGrid<T>({
 
       {selectedCount > 0 && bulkActions ? bulkActions : null}
 
-      <div className={cn(stickyHeader && 'erp-table-wrap')}>
+      <div ref={tableScrollRef} className={cn(stickyHeader && 'erp-table-wrap')}>
         <table className={cn(
           'erp-table',
           compact && 'erp-table-compact',
           zebra && 'erp-table-zebra',
           stickyFirstColumn && 'erp-table-sticky-first',
+          stickyFirstColumn && scrolledX && 'erp-table-sticky-first--scrolled',
           stickyFirstColumn && selectable && 'erp-table-sticky-first--with-select',
           hasCustomActionsColumn && 'erp-table-has-actions-col',
         )}>

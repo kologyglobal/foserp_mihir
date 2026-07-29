@@ -2167,6 +2167,7 @@ export type PurchaseWarehouseOption = {
   id: string
   code: string
   name: string
+  address: string
   state: string
   city: string
 }
@@ -2182,6 +2183,9 @@ export async function getPurchaseWarehouses(): Promise<PurchaseWarehouseOption[]
         id: PURCHASE_DEMO_LOCATION.id,
         code: PURCHASE_DEMO_LOCATION.code,
         name: PURCHASE_DEMO_LOCATION.name,
+        address: [PURCHASE_DEMO_LOCATION.name, PURCHASE_DEMO_LOCATION.city, PURCHASE_DEMO_LOCATION.state]
+          .filter(Boolean)
+          .join(', '),
         state: PURCHASE_DEMO_LOCATION.state,
         city: PURCHASE_DEMO_LOCATION.city,
       },
@@ -2189,6 +2193,13 @@ export async function getPurchaseWarehouses(): Promise<PurchaseWarehouseOption[]
         id: PURCHASE_DEMO_LOCATION_FG.id,
         code: PURCHASE_DEMO_LOCATION_FG.code,
         name: PURCHASE_DEMO_LOCATION_FG.name,
+        address: [
+          PURCHASE_DEMO_LOCATION_FG.name,
+          PURCHASE_DEMO_LOCATION_FG.city,
+          PURCHASE_DEMO_LOCATION_FG.state,
+        ]
+          .filter(Boolean)
+          .join(', '),
         state: PURCHASE_DEMO_LOCATION_FG.state,
         city: PURCHASE_DEMO_LOCATION_FG.city,
       },
@@ -2210,6 +2221,7 @@ export async function getPurchaseWarehouses(): Promise<PurchaseWarehouseOption[]
       id: w.id,
       code: w.warehouseCode,
       name: w.warehouseName,
+      address: w.address || '',
       state: '',
       city: '',
     }))

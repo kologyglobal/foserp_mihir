@@ -204,7 +204,6 @@ export function ItemListPage() {
       statusFilter={status}
       onStatusFilterChange={setStatus}
       statusOptions={STATUS_FILTER_OPTIONS}
-      resultCount={filtered.length}
       onImport={() => setImportOpen(true)}
       onExport={() => void handleExport()}
       extraFilters={(

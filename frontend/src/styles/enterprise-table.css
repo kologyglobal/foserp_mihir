@@ -192,6 +192,11 @@
   left: 0;
   z-index: 2;
   background-color: #fff;
+  box-shadow: none;
+}
+
+.ent-data-grid .erp-table-sticky-first--scrolled th:first-child,
+.ent-data-grid .erp-table-sticky-first--scrolled td:first-child {
   box-shadow: 2px 0 4px rgb(15 23 42 / 0.04);
 }
 
@@ -211,6 +216,10 @@
   padding-left: 12px;
   padding-right: 4px;
   background-color: #fff;
+  box-shadow: none;
+}
+
+.ent-data-grid .erp-table-sticky-first--with-select.erp-table-sticky-first--scrolled .erp-table-select-cell {
   box-shadow: 2px 0 6px rgb(15 23 42 / 0.08);
 }
 
@@ -227,6 +236,10 @@
   left: 0;
   z-index: 7;
   background-color: #fff;
+  box-shadow: none;
+}
+
+.ent-data-grid .erp-table-sticky-first--scrolled .erp-table-sticky-data-cell {
   box-shadow: 4px 0 10px -4px rgb(15 23 42 / 0.14);
 }
 

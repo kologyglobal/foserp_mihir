@@ -2,8 +2,8 @@
 
 ### Shipped
 
-- `/purchase` dashboard shows **GRNs awaiting invoice (GRNI)**: KPI, pending action, and table with Create invoice.
-- Demo + API: client GRNI aggregation; API prefers `GET /purchase/reports/grni`.
+- /purchase dashboard shows **GRNs awaiting invoice (GRNI)**: KPI, pending action, and table with Create invoice.
+- Demo + API: client GRNI aggregation; API prefers GET /purchase/reports/grni.
 
 ---
 

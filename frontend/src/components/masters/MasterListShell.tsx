@@ -2,7 +2,6 @@ import {
   cloneElement,
   isValidElement,
   useMemo,
-  useState,
   type ReactElement,
   type ReactNode,
 } from 'react'
@@ -61,6 +60,7 @@ interface MasterListShellProps {
   onExport?: () => void
   extraCommandSecondary?: ErpCommandAction[]
   extraCommandMore?: ErpCommandAction[]
+  /** @deprecated No longer shown in the register filter bar */
   resultCount?: number
   children: ReactNode
   /** Optional sidebar (usage tips, relationships) */
@@ -114,11 +114,9 @@ export function MasterListShell({
   onExport,
   extraCommandSecondary,
   extraCommandMore,
-  resultCount,
   children,
   sidebar,
 }: MasterListShellProps) {
-  const [savedView, setSavedView] = useState('All Records')
   const group = masterGroupId ? getMasterGroupById(masterGroupId) : undefined
   const resolvedBreadcrumbs =
     breadcrumbs ?? (masterGroupId ? buildMasterBreadcrumbs(masterGroupId, title) : undefined)
@@ -177,9 +175,6 @@ export function MasterListShell({
       chips={filterChips}
       onRemoveChip={removeChip}
       onClearAll={filterChips.length > 0 ? clearFilters : undefined}
-      resultCount={resultCount}
-      savedView={savedView}
-      onSavedViewChange={setSavedView}
       trailing={extraFilters}
     />
   )
