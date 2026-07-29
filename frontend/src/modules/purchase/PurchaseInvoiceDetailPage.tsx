@@ -781,7 +781,12 @@ export function PurchaseInvoiceDetailPage() {
                 </div>
                 {Boolean(inv.accountingVendorInvoiceId || apPreview?.existingVendorInvoiceId) && (
                   <Link
-                    to={`/accounting/money-out/vendor-invoices/${String(inv.accountingVendorInvoiceId ?? apPreview?.existingVendorInvoiceId)}`}
+                    to={`/accounting/money-out/vendor-invoices/${String(
+                      inv.accountingVendorInvoiceId ??
+                        (typeof apPreview?.existingVendorInvoiceId === 'string'
+                          ? apPreview.existingVendorInvoiceId
+                          : ''),
+                    )}`}
                     className="text-[13px] font-semibold text-erp-primary hover:underline"
                   >
                     Open in Money Out →
