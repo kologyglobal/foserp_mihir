@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -173,33 +174,35 @@ export function CommandBarOverflowMenu({
 }) {
   const visible = actions.filter((a) => a.label)
   const [open, setOpen] = useState(false)
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({})
   const ref = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  const [menuStyle, setMenuStyle] = useState<CSSProperties>({
-    position: 'fixed',
-    opacity: 0,
-    pointerEvents: 'none',
-  })
 
-  useLayoutEffect(() => {
-    if (!open || !ref.current || !menuRef.current) return
-    const trigger = ref.current.getBoundingClientRect()
-    const menu = menuRef.current.getBoundingClientRect()
-    const width = Math.max(menu.width, 200)
-    const left = Math.max(8, Math.min(trigger.right - width, window.innerWidth - width - 8))
-    const below = trigger.bottom + 4
-    const top =
-      below + menu.height > window.innerHeight - 8
-        ? Math.max(8, trigger.top - menu.height - 4)
-        : below
+  const positionMenu = useCallback(() => {
+    const trigger = ref.current
+    if (!trigger) return
+    const rect = trigger.getBoundingClientRect()
+    const menu = menuRef.current
+    const width = Math.max(menu?.offsetWidth ?? 0, 200)
+    const height = menu?.scrollHeight ?? visible.length * 34 + 8
+    const spaceBelow = window.innerHeight - rect.bottom - 8
+    const spaceAbove = rect.top - 8
+    const openUp = height > spaceBelow && spaceAbove > spaceBelow
     setMenuStyle({
       position: 'fixed',
-      left,
-      top,
+      left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
+      top: openUp ? undefined : rect.bottom + 4,
+      bottom: openUp ? window.innerHeight - rect.top + 4 : undefined,
+      maxHeight: Math.max(120, (openUp ? spaceAbove : spaceBelow) - 4),
       zIndex: 10070,
-      minWidth: Math.max(width, trigger.width),
+      minWidth: Math.max(width, rect.width),
     })
-  }, [open, visible.length])
+  }, [visible.length])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    positionMenu()
+  }, [open, positionMenu])
 
   useEffect(() => {
     if (!open) return
@@ -211,18 +214,17 @@ export function CommandBarOverflowMenu({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
-    const onScroll = () => setOpen(false)
     document.addEventListener('mousedown', close)
     window.addEventListener('keydown', onKey)
-    window.addEventListener('scroll', onScroll, true)
-    window.addEventListener('resize', onScroll)
+    window.addEventListener('scroll', positionMenu, true)
+    window.addEventListener('resize', positionMenu)
     return () => {
       document.removeEventListener('mousedown', close)
       window.removeEventListener('keydown', onKey)
-      window.removeEventListener('scroll', onScroll, true)
-      window.removeEventListener('resize', onScroll)
+      window.removeEventListener('scroll', positionMenu, true)
+      window.removeEventListener('resize', positionMenu)
     }
-  }, [open])
+  }, [open, positionMenu])
 
   if (visible.length === 0) return null
 
@@ -235,7 +237,10 @@ export function CommandBarOverflowMenu({
             'erp-command-more__icon-btn',
             open && 'erp-command-more__icon-btn--open',
           )}
-          onClick={() => setOpen((v) => !v)}
+          onClick={(e) => {
+            e.stopPropagation()
+            setOpen((v) => !v)
+          }}
           aria-expanded={open}
           aria-haspopup="menu"
           aria-label={label}
@@ -248,19 +253,24 @@ export function CommandBarOverflowMenu({
           icon={TriggerIcon}
           label={label}
           accent
-          onClick={() => setOpen((v) => !v)}
+          onClick={(e) => {
+            e.stopPropagation()
+            setOpen((v) => !v)
+          }}
           aria-expanded={open}
           aria-haspopup="menu"
           className={open ? 'border-erp-primary/35 bg-erp-primary-soft' : undefined}
         />
       )}
-      {open
+      {open && typeof document !== 'undefined'
         ? createPortal(
             <div
               ref={menuRef}
               className="erp-command-more__menu erp-command-more__menu--portal"
-              role="menu"
               style={menuStyle}
+              role="menu"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
               {visible.map((action) => {
                 const Icon = action.icon ?? Circle

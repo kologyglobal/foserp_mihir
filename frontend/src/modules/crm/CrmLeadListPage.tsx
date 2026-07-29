@@ -37,10 +37,8 @@ import {
   linkedOpportunityIdsForLead,
   primaryLinkedOpportunityIdForLead,
 } from '../../utils/leadEngagement'
-import {
-  leadStageLabel,
-  resolveLeadConvertActionGate,
-} from '../../utils/leadUtils'
+import { leadStageLabel } from '../../utils/leadUtils'
+import { ensureLeadReadyForCommercialAction } from '../../utils/leadConvertPrepare'
 import { canOpenLeadEditor, resolveLeadEditPolicy } from '../../utils/leadEditPolicy'
 import {
   DEFAULT_LEAD_LIST_FILTERS,
@@ -72,6 +70,8 @@ export function CrmLeadListPage() {
   const archiveLead = useSalesStore((s) => s.archiveLead)
   const updateLead = useSalesStore((s) => s.updateLead)
   const assignLead = useSalesStore((s) => s.assignLead)
+  const advanceLeadStage = useSalesStore((s) => s.advanceLeadStage)
+  const getLead = useSalesStore((s) => s.getLead)
   const customers = useMasterStore((s) => s.customers)
   const opportunities = useCrmStore((s) => s.opportunities)
   const activities = useCrmStore((s) => s.activities)
@@ -94,6 +94,7 @@ export function CrmLeadListPage() {
   const canDelete = canCrmPermission('crm.lead.delete')
   const canAssign = canCrmPermission('crm.lead.assign')
   const canConvert = canCrmPermission('crm.lead.convert')
+  const canQualify = canCrmPermission('crm.lead.qualify')
   const canCreateLead = canCrmPermission('crm.lead.create')
   const canScheduleActivity = canCrmPermission('crm.activity.create')
 
@@ -519,27 +520,60 @@ export function CrmLeadListPage() {
               navigate(routes.edit(row.lead.id))
             }}
             onDelete={openDeleteModal}
-            onCreateOpportunity={(row) => {
-              const gate = resolveLeadConvertActionGate(row.lead, canConvert)
-              if (!gate.ok) {
-                showToast(gate.reason, 'warning')
+            onCreateOpportunity={async (row) => {
+              const ready = await ensureLeadReadyForCommercialAction(row.lead, {
+                customers,
+                updateLead,
+                advanceLeadStage,
+                getLead,
+                opportunities: () => useCrmStore.getState().opportunities,
+                canConvertPermission: canConvert,
+                canQualifyPermission: canQualify,
+              })
+              if (!ready.ok) {
+                showToast(ready.reason, 'warning')
                 return
               }
-              const { customerId, id: leadId } = row.lead
-              navigate(`/crm/opportunities/new?customerId=${encodeURIComponent(customerId!)}&leadId=${encodeURIComponent(leadId)}`)
+              if (ready.qualifiedNow) {
+                showToast('Lead qualified', 'success')
+              }
+              navigate(
+                `/crm/opportunities/new?customerId=${encodeURIComponent(ready.customerId)}&leadId=${encodeURIComponent(ready.lead.id)}`,
+              )
             }}
             onScheduleActivity={(row) => {
               setActivityLeadId(row.lead.id)
               setLogActivityOpen(true)
             }}
             linkedOpportunityId={(row) => primaryLinkedOpportunityIdForLead(row.lead, opportunities)}
-            onCreateQuotation={(row) => {
-              const oppId = primaryLinkedOpportunityIdForLead(row.lead, opportunities)
-              if (!oppId) {
-                showToast('Convert to opportunity before creating a quotation', 'warning')
+            onCreateQuotation={async (row) => {
+              const ready = await ensureLeadReadyForCommercialAction(row.lead, {
+                customers,
+                updateLead,
+                advanceLeadStage,
+                getLead,
+                opportunities: () => useCrmStore.getState().opportunities,
+                canConvertPermission: canConvert,
+                canQualifyPermission: canQualify,
+              })
+              if (!ready.ok) {
+                showToast(ready.reason, 'warning')
                 return
               }
-              navigate(`/crm/quotations/new?opportunityId=${encodeURIComponent(oppId)}`)
+              if (ready.qualifiedNow) {
+                showToast('Lead qualified', 'success')
+              }
+              const oppId =
+                ready.opportunityId
+                ?? primaryLinkedOpportunityIdForLead(ready.lead, useCrmStore.getState().opportunities)
+              if (oppId) {
+                navigate(`/crm/quotations/new?opportunityId=${encodeURIComponent(oppId)}`)
+                return
+              }
+              showToast('Lead is ready — create the opportunity, then quotation', 'warning')
+              navigate(
+                `/crm/opportunities/new?customerId=${encodeURIComponent(ready.customerId)}&leadId=${encodeURIComponent(ready.lead.id)}`,
+              )
             }}
             onBulkExport={exportSelectedLeads}
             onBulkDelete={(selected) => selected.forEach((r) => openDeleteModal(r))}

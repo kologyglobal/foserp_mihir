@@ -24,6 +24,7 @@ import { useAdminApiSync } from '../../hooks/useAdminApiSync'
 import { isApiMode } from '@/config/apiConfig'
 import { runDemoCrmBootstrap } from '@/bootstrap/demoBootstrap'
 import { useTenantModulesStore } from '../../store/tenantModulesStore'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 import { Loader } from '../ui/Loader'
 import { cn } from '../../utils/cn'
 import {
@@ -55,6 +56,7 @@ export function AppShell() {
 
   useEffect(() => {
     void useTenantModulesStore.getState().hydrate()
+    void useTenantProfileStore.getState().hydrate()
   }, [])
 
   if (isApiMode() && (apiSyncStatus === 'loading' || masterSyncStatus === 'loading' || adminSyncStatus === 'loading')) {

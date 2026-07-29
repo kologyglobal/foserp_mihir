@@ -1,3 +1,290 @@
+/* CRM Lead create/edit — structured capture workspace.
+   The corresponding crm-lead-zoho-* markup intentionally stays page-scoped so
+   other CRM card forms keep their existing density. */
+.crm-lead-form-page--zoho .crm-lead-form-body {
+  gap: 14px;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-layout {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+  min-width: 0;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail {
+  position: sticky;
+  top: 12px;
+  z-index: 3;
+  min-width: 0;
+  padding: 14px 12px 12px;
+  border: 1px solid var(--dyn-border, #e1e5ea);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__eyebrow {
+  margin: 0 0 3px;
+  color: var(--dyn-primary, #0078d4);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__title {
+  margin: 0 0 12px;
+  color: var(--dyn-text, #1f2933);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__item {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--dyn-text-secondary, #5f6b7a);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__item:hover {
+  color: var(--dyn-primary, #0078d4);
+  background: color-mix(in srgb, var(--dyn-primary, #0078d4) 7%, #fff);
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__item:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--dyn-primary, #0078d4) 45%, transparent);
+  outline-offset: 1px;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid #c8cdd3;
+  border-radius: 50%;
+  color: #fff;
+  background: #fff;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__item.is-done {
+  color: var(--dyn-text, #1f2933);
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__item.is-done .crm-lead-zoho-rail__marker {
+  border-color: #107c10;
+  background: #107c10;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__label {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__progress {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--dyn-border, #e1e5ea);
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  color: var(--dyn-text-secondary, #5f6b7a);
+  font-size: 10.5px;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__progress-meta strong {
+  color: var(--dyn-primary, #0078d4);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__bar {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf0f3;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-rail__bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--dyn-primary, #0078d4);
+  transition: width 220ms ease;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-canvas > [id] {
+  min-width: 0;
+  scroll-margin-top: 16px;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-block > .erp-field-group,
+.crm-lead-form-page--zoho #lead-section-enquiry-notes > .erp-field-group {
+  overflow: visible;
+  padding: 0 16px 16px;
+  border: 1px solid var(--dyn-border, #e1e5ea);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-block > .erp-field-group > .erp-field-group__label,
+.crm-lead-form-page--zoho #lead-section-enquiry-notes > .erp-field-group > .erp-field-group__label {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0 -16px 14px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--dyn-border, #e1e5ea);
+  color: var(--dyn-text, #1f2933);
+  background: #f8fafc;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.crm-lead-form-page--zoho .crm-lead-quick-entry .erp-form-grid--cols-3,
+.crm-lead-form-page--zoho .crm-lead-quick-entry .erp-form-grid--cols-4 {
+  gap: 14px 16px;
+}
+
+.crm-opportunity-form-page--zoho .crm-opportunity-info__name {
+  grid-column: span 3;
+}
+
+.crm-quotation-form-page--zoho .crm-quotation-info__source,
+.crm-quotation-form-page--zoho .crm-quotation-info__template {
+  grid-column: span 2;
+}
+
+.crm-lead-form-page--zoho .crm-lead-quick-entry .erp-field-label,
+.crm-lead-form-page--zoho #lead-section-enquiry-notes .erp-field-label {
+  margin-bottom: 5px;
+  color: #4b5563;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.crm-lead-form-page--zoho .crm-lead-quick-entry .erp-input,
+.crm-lead-form-page--zoho .crm-lead-quick-entry .erp-select,
+.crm-lead-form-page--zoho .crm-lead-quick-entry .erp-smart-select__control {
+  min-height: 36px;
+}
+
+.crm-lead-form-page--zoho #lead-section-enquiry-notes textarea.erp-input {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.crm-lead-form-page--zoho .crm-lead-zoho-canvas > div > .erp-card-section,
+.crm-lead-form-page--zoho .crm-lead-zoho-canvas > div > .erp-product-pricing-section {
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.035);
+}
+
+@media (max-width: 1279px) {
+  .crm-lead-form-page--zoho .crm-lead-zoho-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail {
+    position: static;
+    padding: 10px 12px;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail__eyebrow,
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail__title {
+    display: none;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail__list {
+    flex-direction: row;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail__item {
+    display: inline-flex;
+    width: auto;
+    min-width: max-content;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail__progress {
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail__progress-meta {
+    margin-bottom: 4px;
+  }
+}
+
+@media (max-width: 899px) {
+  .crm-opportunity-form-page--zoho .crm-opportunity-info__name,
+  .crm-quotation-form-page--zoho .crm-quotation-info__source,
+  .crm-quotation-form-page--zoho .crm-quotation-info__template {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 767px) {
+  .crm-lead-form-page--zoho .crm-lead-zoho-rail {
+    margin-inline: -4px;
+    border-radius: 8px;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-block > .erp-field-group,
+  .crm-lead-form-page--zoho #lead-section-enquiry-notes > .erp-field-group {
+    padding: 0 12px 12px;
+    border-radius: 8px;
+  }
+
+  .crm-lead-form-page--zoho .crm-lead-zoho-block > .erp-field-group > .erp-field-group__label,
+  .crm-lead-form-page--zoho #lead-section-enquiry-notes > .erp-field-group > .erp-field-group__label {
+    margin-inline: -12px;
+    padding-inline: 12px;
+  }
+}
 /* vite-tailwind-layer-shim: keep @layer valid when Vite HMR processes this file alone */
 @tailwind components;
 
@@ -18171,6 +18458,41 @@ a.crm-companies-table__name:hover {
   .pi-print-totals__row--grand {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+  }
+}
+
+/* ── Sales order / proforma / quotation print pagination ──────────────── */
+@media print {
+  /* Chrome treats a non-visible overflow box as monolithic, so a letterhead
+     taller than one sheet loses everything after page 1. */
+  .so-print-doc,
+  .pi-print-doc {
+    overflow: visible;
+  }
+
+  .so-print-table thead,
+  .pi-print-table thead,
+  .quo-print-price thead,
+  .quo-print-spec thead {
+    display: table-header-group;
+  }
+
+  .so-print-table tr,
+  .pi-print-table tr,
+  .quo-print-price tr,
+  .quo-print-spec tr {
+    break-inside: avoid;
+  }
+
+  .so-print-parties,
+  .so-print-party,
+  .so-print-totals,
+  .so-print-signatures,
+  .pi-print-parties,
+  .pi-print-party,
+  .pi-print-totals,
+  .pi-print-signatures {
+    break-inside: avoid;
   }
 }
 

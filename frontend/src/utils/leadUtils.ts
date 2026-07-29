@@ -10,6 +10,7 @@ import type { ErpSmartSelectOption } from '../components/erp/ErpSmartSelect'
 import { getCrmMasterEntries, getCrmMasterLabel } from '../store/crmMasterStore'
 import { getLeadUser } from '../data/crm/leadUsers'
 import { getSessionUser } from './permissions'
+import { getDateInputMin } from './validation/crmDatePolicy'
 
 const LEGACY_STAGE_MAP: Record<string, LeadStage> = {
   disqualified: 'not_qualified',
@@ -197,8 +198,23 @@ export const LEAD_STAGE_FUNNEL: LeadStage[] = [
   'converted_to_opportunity',
 ]
 
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * Lead dates are date-only (`YYYY-MM-DD`) everywhere in the UI — `type="date"` inputs,
+ * register range filters, KPI day matches — but the API serializes them as ISO instants.
+ * Collapse to the local calendar day so comparisons against `getDateInputMin()` agree.
+ */
+export function toLeadDateOnly(value: string | null | undefined): string | null {
+  const raw = value?.trim()
+  if (!raw) return null
+  if (DATE_ONLY_RE.test(raw)) return raw
+  const parsed = new Date(raw)
+  return Number.isNaN(parsed.getTime()) ? null : getDateInputMin(parsed)
+}
+
 export function normalizeLead(lead: Lead): Lead {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = getDateInputMin()
   const resolvedOwnerName =
     lead.leadOwnerName?.trim()
     || lead.salesOwner?.trim()
@@ -214,22 +230,22 @@ export function normalizeLead(lead: Lead): Lead {
     leadOwnerId: lead.leadOwnerId?.trim() || getSessionUser().id || 'user-demo',
     leadOwnerName: resolvedOwnerName,
     priority: lead.priority ?? 'medium',
-    createdDate: lead.createdDate ?? lead.createdAt?.slice(0, 10) ?? today,
+    createdDate: toLeadDateOnly(lead.createdDate) ?? toLeadDateOnly(lead.createdAt) ?? today,
     activityStatus: lead.activityStatus ?? 'active',
     inactiveReason: lead.inactiveReason ?? null,
     lifecycleStatus,
-    closedDate: lead.closedDate ?? null,
+    closedDate: toLeadDateOnly(lead.closedDate),
     closedReason: lead.closedReason ?? null,
     notQualifiedReason: lead.notQualifiedReason ?? null,
     opportunityId: lead.opportunityId ?? null,
     productRequirement: lead.productRequirement ?? '',
     expectedQty: lead.expectedQty ?? null,
-    expectedCloseDate: lead.expectedCloseDate ?? null,
+    expectedCloseDate: toLeadDateOnly(lead.expectedCloseDate),
     contactPerson: lead.contactPerson ?? null,
     contactId: lead.contactId ?? null,
     mobile: lead.mobile ?? null,
     email: lead.email ?? null,
-    nextFollowUpDate: lead.nextFollowUpDate ?? null,
+    nextFollowUpDate: toLeadDateOnly(lead.nextFollowUpDate),
     followUpType: lead.followUpType ?? null,
     followUpNotes: lead.followUpNotes ?? null,
     isArchived: lead.isArchived ?? false,

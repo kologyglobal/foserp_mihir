@@ -51,6 +51,95 @@ function applyExactColorAdjust(root: ParentNode): void {
   })
 }
 
+/** Blocks that start their own page in the on-screen document design. */
+const PDF_PAGE_BREAK_SELECTOR = [
+  '[data-pdf-page-break]',
+  '.kology-prop__page--break',
+  '.quo-print-section--break',
+].join(', ')
+
+/** Blocks that must not be split between two PDF pages. */
+const PDF_KEEP_TOGETHER_SELECTOR = [
+  'thead',
+  'tr',
+  '.quo-print-section',
+  '.kology-prop__page',
+  '.so-print-party',
+  '.pi-print-party',
+  '.po-print-party',
+  '.so-print-totals',
+  '.pi-print-totals',
+  '.so-print-signatures',
+  '.pi-print-signatures',
+  '.so-print-doc__footer',
+  '.pi-print-doc__footer',
+].join(', ')
+
+type PdfBreakPlan = {
+  pageBreaks: number[]
+  keepTogether: { top: number; bottom: number }[]
+}
+
+/**
+ * Translate the on-screen page-break intent (`break-before: page`,
+ * `break-inside: avoid`) into canvas-pixel offsets, since html2canvas
+ * flattens the document into one image and drops CSS fragmentation.
+ */
+function measureBreakPlan(element: HTMLElement, canvasWidth: number): PdfBreakPlan {
+  const bounds = element.getBoundingClientRect()
+  const pxScale = bounds.width > 0 ? canvasWidth / bounds.width : 1
+  const toLocal = (clientY: number) => Math.round((clientY - bounds.top) * pxScale)
+
+  const pageBreaks = new Set<number>()
+  element.querySelectorAll<HTMLElement>(PDF_PAGE_BREAK_SELECTOR).forEach((node) => {
+    const top = toLocal(node.getBoundingClientRect().top)
+    if (top > 0) pageBreaks.add(top)
+  })
+
+  const keepTogether: { top: number; bottom: number }[] = []
+  element.querySelectorAll<HTMLElement>(PDF_KEEP_TOGETHER_SELECTOR).forEach((node) => {
+    const rect = node.getBoundingClientRect()
+    if (rect.height <= 0) return
+    keepTogether.push({ top: toLocal(rect.top), bottom: toLocal(rect.bottom) })
+  })
+
+  return {
+    pageBreaks: [...pageBreaks].sort((a, b) => a - b),
+    keepTogether,
+  }
+}
+
+function resolveSliceEnd(
+  plan: PdfBreakPlan,
+  start: number,
+  pageHeightPx: number,
+  totalHeightPx: number,
+): number {
+  const maxEnd = start + pageHeightPx
+  if (maxEnd >= totalHeightPx) return totalHeightPx
+
+  // Breaks that sit almost exactly on the current page top would emit a blank
+  // page, so they are skipped and their content packs onto this page instead.
+  const earliestBreak = start + Math.max(4, pageHeightPx * 0.05)
+  const nextPageBreak = plan.pageBreaks.find((y) => y > earliestBreak)
+  if (nextPageBreak != null && nextPageBreak <= maxEnd) return nextPageBreak
+
+  let end = maxEnd
+  for (let pass = 0; pass < 4; pass += 1) {
+    let moved = false
+    for (const block of plan.keepTogether) {
+      if (block.bottom - block.top >= pageHeightPx) continue
+      if (block.top > start && block.top < end && block.bottom > end) {
+        end = block.top
+        moved = true
+      }
+    }
+    if (!moved) break
+  }
+
+  return end > start + pageHeightPx * 0.2 ? end : maxEnd
+}
+
 /** Find the professional print document currently on screen. */
 export function findPrintDocumentElement(
   selectors: string | string[] = [
@@ -94,10 +183,10 @@ export async function downloadElementAsPdf(
       allowTaint: false,
       backgroundColor: '#ffffff',
       logging: false,
-      scrollX: 0,
-      scrollY: -window.scrollY,
-      windowWidth: element.scrollWidth,
-      windowHeight: element.scrollHeight,
+      // html2canvas re-evaluates media queries inside a clone iframe sized to
+      // windowWidth/windowHeight. Overriding them with the element's own box
+      // makes responsive rules fire that never fire on screen, so the defaults
+      // (live viewport) are what keeps the export identical to the preview.
       onclone: (clonedDoc: Document) => {
         const cloned =
           clonedDoc.querySelector('.so-print-doc') ??
@@ -133,11 +222,13 @@ export async function downloadElementAsPdf(
 
     const pxPerMm = canvas.width / imgWidth
     const pageHeightPx = Math.floor(pageHeight * pxPerMm)
+    const breakPlan = measureBreakPlan(element, canvas.width)
     let renderedHeightPx = 0
     let pageIndex = 0
 
     while (renderedHeightPx < canvas.height) {
-      const sliceHeight = Math.min(pageHeightPx, canvas.height - renderedHeightPx)
+      const sliceEnd = resolveSliceEnd(breakPlan, renderedHeightPx, pageHeightPx, canvas.height)
+      const sliceHeight = Math.max(1, sliceEnd - renderedHeightPx)
       pageCanvas.width = canvas.width
       pageCanvas.height = sliceHeight
       pageCtx.fillStyle = '#ffffff'

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { notify } from '../../store/toastStore'
+import { parseMissingPermissionKey } from '../../services/api/apiErrors'
 import {
   formatRequiredFieldsNotifyMessage,
   toRequiredFieldLabel,
@@ -9,6 +10,17 @@ interface ErpValidationSummaryProps {
   errors?: string[]
   lockedReason?: string
   className?: string
+}
+
+/** RBAC denials reach this shell as plain save errors — they are not field labels. */
+const PERMISSION_DENIAL =
+  /(missing permission|permission_denied|permission denied|(?:do|does) not have permission|no permission to|not permitted)/i
+
+function permissionDenialMessage(message: string): string {
+  const key = parseMissingPermissionKey(message)
+  return key
+    ? `You do not have permission for this action (${key}). Ask an administrator to grant it.`
+    : message
 }
 
 /**
@@ -29,6 +41,11 @@ export function ErpValidationSummary({ errors = [], lockedReason }: ErpValidatio
 
     if (lockedReason) {
       notify.warning(lockedReason)
+      return
+    }
+    const denial = errors.find((e) => PERMISSION_DENIAL.test(e))
+    if (denial) {
+      notify.error(permissionDenialMessage(denial))
       return
     }
     if (errors.length > 0) {

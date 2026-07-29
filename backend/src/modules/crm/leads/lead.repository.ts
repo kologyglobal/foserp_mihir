@@ -283,25 +283,33 @@ export async function convertLead(
       contactId = await ensureLeadContact(tx, tenantId, userId, companyId, lead)
     }
 
-    const opportunity = await tx.crmOpportunity.create({
-      data: {
-        tenantId,
-        opportunityCode: input.opportunityCode,
-        name: input.opportunityName ?? lead.prospectName,
-        companyId,
-        contactId,
-        leadId: lead.id,
-        pipelineId: input.pipelineId,
-        stageId: input.stageId,
-        ownerId: lead.assignedTo ?? lead.ownerId,
-        amount: input.value ?? lead.expectedValue,
-        expectedCloseDate: input.expectedCloseDate ? new Date(input.expectedCloseDate) : lead.expectedCloseDate,
-        probability: lead.probability,
-        requirement: lead.productRequirement,
-        createdBy: userId,
-        updatedBy: userId,
-      },
+    // Reuse the opportunity already mirrored from this lead's New/Qualified stage
+    // (see lead-opportunity-sync.ts) instead of creating a duplicate deal.
+    const existingOpportunity = await tx.crmOpportunity.findFirst({
+      where: { tenantId, leadId: lead.id, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
     })
+
+    const opportunityFields = {
+      name: input.opportunityName ?? lead.prospectName,
+      companyId,
+      contactId,
+      leadId: lead.id,
+      pipelineId: input.pipelineId,
+      stageId: input.stageId,
+      ownerId: lead.assignedTo ?? lead.ownerId,
+      amount: input.value ?? lead.expectedValue,
+      expectedCloseDate: input.expectedCloseDate ? new Date(input.expectedCloseDate) : lead.expectedCloseDate,
+      probability: lead.probability,
+      requirement: lead.productRequirement,
+      updatedBy: userId,
+    }
+
+    const opportunity = existingOpportunity
+      ? await tx.crmOpportunity.update({ where: { id: existingOpportunity.id }, data: opportunityFields })
+      : await tx.crmOpportunity.create({
+          data: { tenantId, opportunityCode: input.opportunityCode, createdBy: userId, ...opportunityFields },
+        })
 
     if (input.lines?.length) {
       await createOpportunityLines(tx, tenantId, opportunity.id, input.lines)
@@ -381,7 +389,7 @@ async function ensureLeadContact(
   return created.id
 }
 
-async function ensureLeadCompany(
+export async function ensureLeadCompany(
   tx: Prisma.TransactionClient,
   tenantId: string,
   lead: { companyName: string | null; prospectName: string },
@@ -426,4 +434,63 @@ export async function findLeadAssignmentHistory(tenantId: string, leadId: string
     where: { tenantId, leadId },
     orderBy: { createdAt: 'desc' },
   })
+}
+
+/**
+ * After an opportunity is deleted: clear convert lock and reopen Converted leads as Qualified.
+ * Mirror-only leads (open New/Qualified with opportunity.leadId but no convert) are left unchanged.
+ */
+export async function releaseLeadsLinkedToOpportunity(
+  tenantId: string,
+  opportunityId: string,
+  userId: string,
+  opportunityLeadId?: string | null,
+): Promise<number> {
+  const candidates = await prisma.crmLead.findMany({
+    where: {
+      tenantId,
+      deletedAt: null,
+      OR: [
+        { opportunityId },
+        ...(opportunityLeadId ? [{ id: opportunityLeadId }] : []),
+      ],
+    },
+  })
+
+  let released = 0
+  for (const lead of candidates) {
+    const linkedByConvertFk = lead.opportunityId === opportunityId
+    const converted =
+      lead.stage === 'converted_to_opportunity' || lead.lifecycleStatus === 'converted'
+    const shouldRelease =
+      linkedByConvertFk
+      || (converted && opportunityLeadId === lead.id && (!lead.opportunityId || lead.opportunityId === opportunityId))
+
+    if (!shouldRelease) continue
+
+    const fromStage = lead.stage
+    const toStage = 'qualified'
+    await prisma.crmLead.update({
+      where: { id: lead.id, tenantId },
+      data: {
+        stage: toStage,
+        lifecycleStatus: 'qualified',
+        opportunityId: null,
+        convertedAt: null,
+        updatedBy: userId,
+      },
+    })
+    await prisma.crmLeadStatusHistory.create({
+      data: {
+        tenantId,
+        leadId: lead.id,
+        fromStage,
+        toStage,
+        changedBy: userId,
+        reason: 'Opportunity deleted — lead reopened as Qualified',
+      },
+    })
+    released += 1
+  }
+  return released
 }

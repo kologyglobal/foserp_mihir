@@ -43,6 +43,7 @@ import { LocationFieldRow } from '../../components/masters/LocationFieldRow'
 import { useDocumentLocation } from '../../hooks/useDocumentLocation'
 import { locationDisplayLabel } from '../../utils/locationUtils'
 import { resolveSalesOrderValue } from '../../components/sales/SalesOrder360Sections'
+import { useTenantProfileStore } from '../../store/tenantProfileStore'
 
 export { SalesOrderNewPage } from './SalesOrderCreatePage'
 
@@ -72,6 +73,7 @@ export function SalesOrderEditPage() {
   const [internalRemarks, setInternalRemarks] = useState('')
   const deliveryTimeOptions = useDeliveryTimeOptions()
   const { locationId, setLocationId } = useDocumentLocation('sales', so?.locationId)
+  const showLocationField = !useTenantProfileStore((s) => s.isServices())
 
   useEffect(() => {
     if (!so) return
@@ -168,7 +170,7 @@ export function SalesOrderEditPage() {
       locationId: locationId || null,
       paymentTerms: paymentTerms.trim() || undefined,
       deliveryTerms: deliveryTerms.trim() || undefined,
-      deliveryTime: deliveryTime.trim(),
+      deliveryTime: deliveryTime.trim() || undefined,
       internalRemarks: internalRemarks.trim() || null,
       requiredDate: expectedDeliveryDate || draftSo.requiredDate,
     }
@@ -280,7 +282,7 @@ export function SalesOrderEditPage() {
       <SalesCardFormShell
         title="Edit Sales Order"
         badge={fromCrm ? 'CRM' : 'Sales'}
-        className={ENTERPRISE_FORM_CLASS}
+        className={`${ENTERPRISE_FORM_CLASS} enterprise-workspace--crm-smart-overview`}
         recordNo={so.salesOrderNo}
         recordTitle={customer?.customerName ?? so.salesOrderNo}
         status="Draft"
@@ -293,6 +295,7 @@ export function SalesOrderEditPage() {
         commandBar={commandBar}
         documentStrip={documentStrip}
         factBox={factBox}
+        suppressFactBoxRecord
         collapsibleFactBox
         factBoxLabel="Smart Context"
         stickyFooter
@@ -364,18 +367,20 @@ export function SalesOrderEditPage() {
           <ErpFieldRow label="Expected Delivery Date">
             <Input type="date" value={expectedDeliveryDate} onChange={(e) => setExpectedDeliveryDate(e.target.value)} className="erp-input" />
           </ErpFieldRow>
-          <LocationFieldRow
-            value={locationId}
-            onChange={(locId) => {
-              setLocationId(locId)
-              const loc = locations.find((l) => l.id === locId)
-              if (loc) setDeliveryLocation(locationDisplayLabel(loc))
-            }}
-            usage="sales"
-            colSpan={2}
-            label="Location Code"
-            hint="Fulfilment location from Lead → Opportunity → Quotation chain"
-          />
+          {showLocationField ? (
+            <LocationFieldRow
+              value={locationId}
+              onChange={(locId) => {
+                setLocationId(locId)
+                const loc = locations.find((l) => l.id === locId)
+                if (loc) setDeliveryLocation(locationDisplayLabel(loc))
+              }}
+              usage="sales"
+              colSpan={2}
+              label="Location Code"
+              hint="Fulfilment location from Lead → Opportunity → Quotation chain"
+            />
+          ) : null}
         </ErpCardSection>
 
         <ErpCardSection
@@ -387,15 +392,14 @@ export function SalesOrderEditPage() {
           collapsible
           defaultOpen
         >
-          <ErpFieldRow label="Payment Terms" required dataField="paymentTerms" fieldError={validationErrors.paymentTerms}>
+          <ErpFieldRow label="Payment Terms" dataField="paymentTerms" fieldError={validationErrors.paymentTerms}>
             <CommercialTermSelect termType="payment" value={paymentTerms} onChange={setPaymentTerms} />
           </ErpFieldRow>
-          <ErpFieldRow label="Delivery Terms" required dataField="deliveryTerms" fieldError={validationErrors.deliveryTerms}>
+          <ErpFieldRow label="Delivery Terms" dataField="deliveryTerms" fieldError={validationErrors.deliveryTerms}>
             <CommercialTermSelect termType="delivery" value={deliveryTerms} onChange={setDeliveryTerms} />
           </ErpFieldRow>
           <ErpFieldRow
             label="Delivery Time / Lead Time"
-            required
             dataField="deliveryTime"
             fieldError={validationErrors.deliveryTime}
           >

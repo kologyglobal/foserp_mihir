@@ -19,6 +19,10 @@ import { getLeadUser } from '../../data/crm/leadUsers'
 import { opportunityStageLabel } from '../../utils/opportunityUtils'
 import { normalizeLead, resolveLeadConvertToOpportunityGate, leadStageLabel } from '../../utils/leadUtils'
 import {
+  reopenLeadAfterOpportunityDelete,
+  shouldReopenLeadAfterOpportunityDelete,
+} from '../../utils/leadOpportunitySync'
+import {
   formatMissingStageFieldsMessage,
   getMissingLeadStageFields,
   getMissingOpportunityStageFields,
@@ -434,6 +438,8 @@ export async function apiCreateLead(input: Record<string, unknown>): Promise<Sto
     try {
       const res = await api.createLeadApi(mapLeadCreatePayload(input))
       upsertLead(res.data)
+      // Backend mirrors the lead into Opportunities (New); refresh store so pipeline updates immediately.
+      await syncOpportunitiesFromApi().catch(() => undefined)
       return { ok: true, leadId: res.data.id }
     } catch (err) {
       return fail(err)
@@ -472,6 +478,7 @@ export async function apiQualifyLead(id: string, stage?: LeadStage, remarks?: st
     try {
       const res = await api.qualifyLeadApi(id, { stage, remarks })
       upsertLead(res.data)
+      await syncOpportunitiesFromApi().catch(() => undefined)
       return { ok: true }
     } catch (err) {
       return fail(err)
@@ -563,6 +570,7 @@ export async function apiAdvanceLeadStage(
         closedDate: extras?.closedDate ? toApiDateTime(extras.closedDate) : extras?.closedDate,
       })
       upsertLead(res.data)
+      await syncOpportunitiesFromApi().catch(() => undefined)
       return { ok: true }
     } catch (err) {
       return fail(err)
@@ -854,8 +862,20 @@ export async function apiMoveOpportunityStage(opportunityId: string, stage: Oppo
 export async function apiDeleteOpportunity(id: string): Promise<StoreActionResult> {
   return withSubmitLock(lockKey('opportunity:delete', id), async () => {
     try {
+      const opp = useCrmStore.getState().getOpportunity(id)
       await api.deleteOpportunityApi(id)
       removeOpportunity(id)
+      // Backend reopens Converted leads as Qualified — keep the local lead store in sync.
+      if (opp) {
+        useSalesStore.setState((s) => ({
+          leads: s.leads.map((lead) =>
+            shouldReopenLeadAfterOpportunityDelete(lead, id, opp.leadId)
+              ? reopenLeadAfterOpportunityDelete(lead)
+              : lead,
+          ),
+        }))
+      }
+      await syncLeadsFromApi().catch(() => undefined)
       return { ok: true }
     } catch (err) {
       return fail(err)

@@ -1064,11 +1064,20 @@
   box-shadow: var(--ent-shadow-sm);
 }
 
+/*
+ * Rendered into <body>, so the command bar's own `overflow-x: auto` strip and the
+ * `overflow: hidden` app shell (.d365-app / .d365-body / .d365-main) cannot clip it.
+ * Offsets come from inline styles; these resets stop the absolute rules above from
+ * stretching the box between top/bottom or left/right.
+ */
 .erp-command-more__menu--portal {
   position: fixed;
   right: auto;
   top: auto;
+  bottom: auto;
   z-index: 10070;
+  overflow-y: auto;
+  box-shadow: var(--ent-shadow-md, 0 8px 24px rgb(0 0 0 / 0.16));
 }
 
 .erp-command-more__item {
