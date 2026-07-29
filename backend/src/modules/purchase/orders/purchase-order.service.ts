@@ -830,7 +830,19 @@ export async function cancelPurchaseOrder(
 ) {
   const existing = await loadOrThrow(tenantId, id)
   assertCancellable(existing)
-  // Withdraw from Pending Approved → Open (Draft), not permanent CANCELLED.
+
+  // Open (Draft): soft-delete the document.
+  if (existing.status === 'DRAFT') {
+    return applyLifecycleTransition(tenantId, actorId, existing, {
+      action: 'CANCELLED',
+      auditAction: PURCHASE_AUDIT_ACTION.PO_CANCELLED,
+      data: { status: 'CANCELLED', cancelledAt: new Date(), deletedAt: new Date() },
+      approvalResolution: 'CANCELLED',
+      remarks: input.remarks ?? null,
+    })
+  }
+
+  // Pending Approved: withdraw back to Open (Draft).
   return applyLifecycleTransition(tenantId, actorId, existing, {
     action: 'CANCELLED',
     auditAction: PURCHASE_AUDIT_ACTION.PO_CANCELLED,

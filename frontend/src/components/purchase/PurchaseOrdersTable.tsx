@@ -1,14 +1,10 @@
 import { useMemo } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import {
-  Ban,
-  CheckCircle2,
   Eye,
-  PackageCheck,
   Pencil,
   Printer,
-  RotateCw,
-  Send,
+  RotateCcw,
   Trash2,
 } from 'lucide-react'
 import { ErpDataGrid } from '../erp/ErpDataGrid'
@@ -23,30 +19,17 @@ import { CrmListFilterBar, type CrmListFilterBarProps } from '../crm/CrmListFilt
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { cn } from '../../utils/cn'
-import type {
-  PurchaseOrderDomainStatus,
-  PurchaseOrderListRow,
-} from '../../types/purchaseDomain'
+import type { PurchaseOrderListRow } from '../../types/purchaseDomain'
 import {
   canPurchasePermission,
   getPurchasePermissionDenialReason,
 } from '../../utils/permissions'
 
-const REVISABLE_STATUSES: PurchaseOrderDomainStatus[] = [
-  'released',
-  'partially_received',
-  'fully_received',
-  'invoiced',
-]
-
 export interface PurchaseOrderRowHandlers {
   onView: (row: PurchaseOrderListRow) => void
   onEdit: (row: PurchaseOrderListRow) => void
-  onRevise: (row: PurchaseOrderListRow) => void
   onPrint: (row: PurchaseOrderListRow) => void
-  onSubmit: (row: PurchaseOrderListRow) => void
-  onApprove: (row: PurchaseOrderListRow) => void
-  onRelease: (row: PurchaseOrderListRow) => void
+  onReopen: (row: PurchaseOrderListRow) => void
   onCancel: (row: PurchaseOrderListRow) => void
 }
 
@@ -55,21 +38,14 @@ function buildRowActions(
   handlers: PurchaseOrderRowHandlers,
 ): RowActionItem[] {
   const status = row.status
-  const isCancelled = status === 'cancelled'
-  const isClosed = status === 'closed'
-  const canEdit = status === 'draft'
-  const canRevise = REVISABLE_STATUSES.includes(status)
-  const canSubmit = status === 'draft'
-  const canApprove = status === 'pending_approval'
-  const canRelease = status === 'approved'
-  const canCancel = !isCancelled && !isClosed
-  /** Hard delete only for draft; otherwise cancel is the destructive path. */
+  const canEdit = status === 'draft' || status === 'sent_back'
+  const canReopen =
+    status === 'closed' || status === 'rejected' || status === 'cancelled'
+  /** Hard delete only for Open (draft); destructive path stays on detail for other statuses. */
   const canDelete = status === 'draft'
   const statusLabel = row.statusLabel || status
 
   const canEditPerm = canPurchasePermission('purchase.po.edit')
-  const canApprovePerm = canPurchasePermission('purchase.po.approve')
-  const canReleasePerm = canPurchasePermission('purchase.po.send')
   const canCancelPerm = canPurchasePermission('purchase.po.cancel')
 
   return [
@@ -95,71 +71,18 @@ function buildRowActions(
         ? getPurchasePermissionDenialReason('purchase.po.cancel')
         : `${statusLabel} purchase orders cannot be deleted`,
     },
-    {
-      id: 'revise',
-      label: 'Revise Order',
-      icon: RotateCw,
-      onClick: () => handlers.onRevise(row),
-      disabled: !canEditPerm || !canRevise,
-      disabledReason: !canEditPerm
-        ? getPurchasePermissionDenialReason('purchase.po.edit')
-        : canRevise
-          ? undefined
-          : 'Revise is only available once released',
-    },
     { id: 'print', label: 'Print', icon: Printer, onClick: () => handlers.onPrint(row) },
     {
-      id: 'submit',
-      label: 'Submit for Approval',
-      icon: Send,
-      onClick: () => handlers.onSubmit(row),
-      disabled: !canEditPerm || !canSubmit,
+      id: 'reopen',
+      label: 'Reopen',
+      icon: RotateCcw,
+      onClick: () => handlers.onReopen(row),
+      disabled: !canEditPerm || !canReopen,
       disabledReason: !canEditPerm
         ? getPurchasePermissionDenialReason('purchase.po.edit')
-        : canSubmit
+        : canReopen
           ? undefined
-          : 'Only Draft orders can be submitted',
-    },
-    {
-      id: 'approve',
-      label: 'Approve',
-      icon: CheckCircle2,
-      onClick: () => handlers.onApprove(row),
-      disabled: !canApprovePerm || !canApprove,
-      disabledReason: !canApprovePerm
-        ? getPurchasePermissionDenialReason('purchase.po.approve')
-        : canApprove
-          ? undefined
-          : 'Only Sent for Approval orders can be approved',
-    },
-    {
-      id: 'release',
-      label: 'Release',
-      icon: PackageCheck,
-      onClick: () => handlers.onRelease(row),
-      disabled: !canReleasePerm || !canRelease,
-      disabledReason: !canReleasePerm
-        ? getPurchasePermissionDenialReason('purchase.po.send')
-        : canRelease
-          ? undefined
-          : 'Only Approved orders can be released',
-    },
-    {
-      id: 'cancel',
-      label: 'Cancel',
-      icon: Ban,
-      onClick: () => handlers.onCancel(row),
-      danger: true,
-      disabled: !canCancelPerm || !canCancel || canDelete,
-      disabledReason: !canCancelPerm
-        ? getPurchasePermissionDenialReason('purchase.po.cancel')
-        : canDelete
-          ? 'Use Delete for draft orders'
-          : isCancelled
-            ? 'Already cancelled'
-            : isClosed
-              ? 'Closed orders cannot be cancelled'
-              : `${statusLabel} purchase orders cannot be cancelled`,
+          : 'Reopen is available for Rejected, Cancelled, or Closed orders',
     },
   ]
 }

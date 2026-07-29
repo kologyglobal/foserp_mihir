@@ -3695,13 +3695,20 @@ export async function reopenPurchaseOrder(id: string): Promise<PurchaseOrder> {
   await delay()
   const po = state.orders.find((o) => o.id === id)
   if (!po) throw new PurchaseServiceError('PO_NOT_FOUND', `Purchase order not found: ${id}`)
-  if (po.status !== 'closed') {
-    throw new PurchaseServiceError('PO_NOT_CLOSED', 'Only closed POs can be reopened')
+  if (!['closed', 'rejected', 'cancelled'].includes(po.status)) {
+    throw new PurchaseServiceError('PO_NOT_REOPENABLE', 'Only closed, rejected, or cancelled POs can be reopened')
   }
-  const hasReceipt = po.lines.some((l) => l.receivedQty > 0)
-  const fully = po.lines.every((l) => l.receivedQty >= l.quantity)
-  po.status = fully ? 'fully_received' : hasReceipt ? 'partially_received' : 'released'
-  po.closedAt = null
+  const from = po.status
+  if (po.status === 'closed') {
+    const hasReceipt = po.lines.some((l) => l.receivedQty > 0)
+    const fully = po.lines.every((l) => l.receivedQty >= l.quantity)
+    po.status = fully ? 'fully_received' : hasReceipt ? 'partially_received' : 'released'
+    po.closedAt = null
+  } else {
+    po.status = 'draft'
+    po.cancelledAt = undefined
+    po.approvalStatus = 'not_required'
+  }
   po.updatedAt = nowIso()
   po.updatedBy = PURCHASE_DOMAIN_ACTORS.buyer.name
   pushHistory(
@@ -3709,7 +3716,7 @@ export async function reopenPurchaseOrder(id: string): Promise<PurchaseOrder> {
     po.id,
     po.documentNumber,
     'reopened',
-    'closed',
+    from,
     po.status,
     'Reopened',
   )
@@ -3762,6 +3769,23 @@ export async function cancelPurchaseOrder(id: string, reason = ''): Promise<Purc
   await delay()
   const po = state.orders.find((o) => o.id === id)
   if (!po) throw new PurchaseServiceError('PO_NOT_FOUND', `Purchase order not found: ${id}`)
+  if (po.status === 'draft') {
+    const from = po.status
+    po.status = 'cancelled'
+    po.cancelledAt = nowIso()
+    po.updatedAt = nowIso()
+    po.updatedBy = PURCHASE_DOMAIN_ACTORS.buyer.name
+    pushHistory(
+      'purchase_order',
+      po.id,
+      po.documentNumber,
+      'cancelled',
+      from,
+      'cancelled',
+      reason || 'Deleted draft',
+    )
+    return structuredClone(po)
+  }
   if (po.status !== 'pending_approval') {
     throw new PurchaseServiceError(
       'PO_NOT_CANCELLABLE',

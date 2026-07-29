@@ -156,8 +156,11 @@ export function assertWithdrawFromApproval(po: Pick<PurchaseOrder, 'status' | 'd
 }
 
 export function assertCancellable(po: PoWithLines): void {
-  // Product rule: Cancel only withdraws Pending Approved → Open. Released cannot cancel.
-  assertWithdrawFromApproval(po)
+  assertNotDeleted(po)
+  // Cancel = withdraw Pending Approved → Open, or soft-delete an Open (Draft) PO.
+  if (po.status !== 'PENDING_APPROVAL' && po.status !== 'DRAFT') {
+    throw workflowError(PURCHASE_ERROR_CODE.PO_INVALID_STATUS)
+  }
 }
 
 export function assertCloseable(po: Pick<PurchaseOrder, 'status' | 'deletedAt'>): void {
@@ -330,7 +333,7 @@ export function allowedActions(
       (requireApproval
         ? po.status === 'APPROVED'
         : PO_EDITABLE_STATUSES.includes(po.status)),
-    canCancel: pending,
+    canCancel: pending || (!po.deletedAt && po.status === 'DRAFT'),
     canClose:
       !po.deletedAt &&
       ['SENT_TO_VENDOR', 'PARTIALLY_RECEIVED', 'FULLY_RECEIVED', 'PARTIALLY_INVOICED', 'FULLY_INVOICED'].includes(

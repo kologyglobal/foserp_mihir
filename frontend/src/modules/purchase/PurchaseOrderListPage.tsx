@@ -32,12 +32,10 @@ import {
   buildPoRegisterSuggestions,
 } from '../../utils/poRegisterInsights'
 import {
-  approvePurchaseOrder,
   cancelPurchaseOrder,
   getPurchaseOrderList,
   PurchaseServiceError,
-  releasePurchaseOrder,
-  submitPurchaseOrder,
+  reopenPurchaseOrder,
 } from '../../services/purchase'
 import type { PurchaseOrderListRow } from '../../types/purchaseDomain'
 import { exportRowsToCsv } from '../../utils/exportCsv'
@@ -283,23 +281,14 @@ export function PurchaseOrderListPage() {
     () => ({
       onView: (po: PurchaseOrderListRow) => navigate(`/purchase/orders/${po.id}`),
       onEdit: (po: PurchaseOrderListRow) => navigate(`/purchase/orders/${po.id}/edit`),
-      onRevise: (po: PurchaseOrderListRow) => navigate(`/purchase/orders/${po.id}/revise`),
       onPrint: (po: PurchaseOrderListRow) => navigate(`/purchase/orders/${po.id}/print`),
-      onSubmit: (po: PurchaseOrderListRow) =>
-        void runAction(
-          po.id,
-          () => submitPurchaseOrder(po.id),
-          `${po.documentNumber} submitted for approval`,
-        ),
-      onApprove: (po: PurchaseOrderListRow) =>
-        void runAction(po.id, () => approvePurchaseOrder(po.id), `${po.documentNumber} approved`),
-      onRelease: (po: PurchaseOrderListRow) =>
-        void runAction(po.id, () => releasePurchaseOrder(po.id), `${po.documentNumber} released`),
+      onReopen: (po: PurchaseOrderListRow) =>
+        void runAction(po.id, () => reopenPurchaseOrder(po.id), `${po.documentNumber} reopened`),
       onCancel: (po: PurchaseOrderListRow) =>
         void runAction(
           po.id,
-          () => cancelPurchaseOrder(po.id, 'Cancelled from list'),
-          `${po.documentNumber} cancelled`,
+          () => cancelPurchaseOrder(po.id, 'Deleted from list'),
+          `${po.documentNumber} deleted`,
         ),
     }),
     [navigate],
