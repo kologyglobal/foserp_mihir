@@ -779,7 +779,7 @@ export function PurchaseInvoiceDetailPage() {
                     )}
                   />
                 </div>
-                {(inv.accountingVendorInvoiceId || apPreview?.existingVendorInvoiceId) && (
+                {Boolean(inv.accountingVendorInvoiceId || apPreview?.existingVendorInvoiceId) && (
                   <Link
                     to={`/accounting/money-out/vendor-invoices/${String(inv.accountingVendorInvoiceId ?? apPreview?.existingVendorInvoiceId)}`}
                     className="text-[13px] font-semibold text-erp-primary hover:underline"

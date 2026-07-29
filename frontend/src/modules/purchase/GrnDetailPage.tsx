@@ -44,7 +44,6 @@ import { formatCurrency, formatNumber } from '@/utils/formatters/currency'
 import { purchaseActionGate, usePurchasePermissions } from '@/utils/permissions'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
-import { isApiMode } from '@/config/apiConfig'
 
 export function GrnDetailPage() {
   const { id } = useParams()

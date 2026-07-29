@@ -151,7 +151,7 @@ export function InventoryStandardCostPage() {
             <div className="mt-1">
               <ItemLookupSelect
                 value={form.itemId}
-                onChange={(sel) => setForm((f) => ({ ...f, itemId: sel?.id ?? '' }))}
+                onChange={(sel) => setForm((f) => ({ ...f, itemId: sel?.itemId ?? '' }))}
                 placeholder="Search by item code or name…"
                 allowEmpty
                 disabled={!perms.canManageSetup}

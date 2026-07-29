@@ -316,7 +316,7 @@ export function InventoryMethodChangePage() {
               </p>
             ) : null}
             <div className="flex flex-wrap gap-3">
-              <Link to={inventoryCostingPaths.root} className="font-semibold text-erp-primary hover:underline">
+              <Link to={inventoryCostingPaths.summary} className="font-semibold text-erp-primary hover:underline">
                 Overview
               </Link>
               <Link
