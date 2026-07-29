@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Download, FileText, Plus, RefreshCw, Save } from 'lucide-react'
+import { Download, FileText, Plus, RefreshCw } from 'lucide-react'
 import { OperationalPageShell } from '../../components/design-system/OperationalPageShell'
 import { SaveViewDialog } from '../../components/design-system/SaveViewDialog'
 import { EnterpriseRegisterTableShell } from '../../design-system/list-page/EnterpriseRegisterTableShell'
@@ -467,18 +467,6 @@ export function PurchaseOrderListPage() {
                 icon: Download,
                 onClick: exportList,
               },
-              {
-                id: 'refresh',
-                label: 'Refresh',
-                icon: RefreshCw,
-                onClick: () => {
-                  setRefreshToken((n) => n + 1)
-                  notify.info('Purchase orders refreshed')
-                },
-              },
-            ]}
-            moreActions={[
-              { id: 'save-view', label: 'Save View', icon: Save, onClick: savedViews.openSaveDialog },
             ]}
           />
         }
