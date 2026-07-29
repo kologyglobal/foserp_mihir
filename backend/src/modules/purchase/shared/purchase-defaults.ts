@@ -36,6 +36,7 @@ export type EffectivePurchaseDefaults = {
   allowOverReceipt: boolean
   overReceiptTolerancePct: number
   requireApprovalOnPoRevision: boolean
+  requireApprovalOnPo: boolean
   allowShortClose: boolean
   requireVendorChallan: boolean
   requireVehicleNumber: boolean
@@ -134,6 +135,9 @@ function mapTenantSetup(tenantSetup: NonNullable<
     overReceiptTolerancePct: Number(tenantSetup.overReceiptTolerancePct ?? 0),
     requireApprovalOnPoRevision: Boolean(
       (tenantSetup as { requireApprovalOnPoRevision?: boolean }).requireApprovalOnPoRevision ?? true,
+    ),
+    requireApprovalOnPo: Boolean(
+      (tenantSetup as { requireApprovalOnPo?: boolean }).requireApprovalOnPo ?? true,
     ),
     allowShortClose: tenantSetup.allowShortClose,
     requireVendorChallan: tenantSetup.requireVendorChallan,

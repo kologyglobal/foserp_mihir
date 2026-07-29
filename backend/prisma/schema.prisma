@@ -6305,6 +6305,8 @@ model PurchaseSettings {
   overReceiptTolerancePct        Decimal                     @default(0) @db.Decimal(5, 2)
   /// When true, revising a released PO returns it to PENDING_APPROVAL.
   requireApprovalOnPoRevision    Boolean                     @default(true)
+  /// When true, new POs must be submitted for approval before release.
+  requireApprovalOnPo            Boolean                     @default(true)
   allowShortClose                Boolean                     @default(true)
   requireVendorChallan           Boolean                     @default(false)
   requireVehicleNumber           Boolean                     @default(false)

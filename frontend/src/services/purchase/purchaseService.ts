@@ -3633,7 +3633,7 @@ export async function approvePurchaseOrder(id: string, remarks = ''): Promise<Pu
   if (po.status !== 'pending_approval') {
     throw new PurchaseServiceError('PO_NOT_PENDING', 'PO is not pending approval')
   }
-  po.status = 'approved'
+  po.status = 'released'
   po.approvalStatus = 'approved'
   po.approver = partyFromActor(PURCHASE_DOMAIN_ACTORS.purchaseHead)
   po.updatedAt = nowIso()
@@ -3649,8 +3649,8 @@ export async function approvePurchaseOrder(id: string, remarks = ''): Promise<Pu
     po.documentNumber,
     'approved',
     'pending_approval',
-    'approved',
-    remarks || 'Approved',
+    'released',
+    remarks || 'Approved and released',
     PURCHASE_DOMAIN_ACTORS.purchaseHead,
   )
   return structuredClone(po)
@@ -3660,21 +3660,21 @@ export async function releasePurchaseOrder(id: string): Promise<PurchaseOrder> {
   await delay()
   const po = state.orders.find((o) => o.id === id)
   if (!po) throw new PurchaseServiceError('PO_NOT_FOUND', `Purchase order not found: ${id}`)
-  if (!['approved', 'pending_approval'].includes(po.status) && po.status !== 'draft') {
-    // allow approved primarily; also approve-on-release from pending if already approved status path
+  const requireApproval = Boolean(state.setup?.general.requireApprovalOnPo ?? true)
+  if (requireApproval) {
+    if (po.status === 'draft') {
+      throw new PurchaseServiceError('PO_NOT_APPROVED', 'Submit and approve before release')
+    }
+    if (po.status === 'pending_approval') {
+      throw new PurchaseServiceError('PO_NOT_APPROVED', 'Approve before release')
+    }
+    if (po.status !== 'approved') {
+      throw new PurchaseServiceError('PO_NOT_APPROVED', 'Only approved POs can be released')
+    }
+  } else if (po.status !== 'draft' && po.status !== 'sent_back' && po.status !== 'approved') {
+    throw new PurchaseServiceError('PO_NOT_APPROVED', 'Only open POs can be released when approval is off')
   }
-  if (po.status === 'draft') {
-    throw new PurchaseServiceError('PO_NOT_APPROVED', 'Submit and approve before release')
-  }
-  if (po.status === 'pending_approval') {
-    throw new PurchaseServiceError('PO_NOT_APPROVED', 'Approve before release')
-  }
-  if (po.status !== 'approved' && po.releasedAt) {
-    throw new PurchaseServiceError('PO_ALREADY_RELEASED', 'PO already released')
-  }
-  if (po.status !== 'approved') {
-    throw new PurchaseServiceError('PO_NOT_APPROVED', 'Only approved POs can be released')
-  }
+  const from = po.status
   po.status = 'released'
   po.releasedAt = nowIso()
   po.updatedAt = nowIso()
@@ -3684,7 +3684,7 @@ export async function releasePurchaseOrder(id: string): Promise<PurchaseOrder> {
     po.id,
     po.documentNumber,
     'released',
-    'approved',
+    from,
     'released',
     'Released to vendor',
   )
@@ -3762,26 +3762,32 @@ export async function cancelPurchaseOrder(id: string, reason = ''): Promise<Purc
   await delay()
   const po = state.orders.find((o) => o.id === id)
   if (!po) throw new PurchaseServiceError('PO_NOT_FOUND', `Purchase order not found: ${id}`)
-  if (['fully_received', 'invoiced', 'closed', 'cancelled'].includes(po.status)) {
-    throw new PurchaseServiceError('PO_NOT_CANCELLABLE', 'PO cannot be cancelled in current status')
-  }
-  if (po.lines.some((l) => l.receivedQty > 0)) {
-    throw new PurchaseServiceError('PO_HAS_RECEIPTS', 'Cancel blocked — receipts exist; close instead')
+  if (po.status !== 'pending_approval') {
+    throw new PurchaseServiceError(
+      'PO_NOT_CANCELLABLE',
+      'Cancel only withdraws a Pending Approved PO back to Open',
+    )
   }
   const from = po.status
-  po.status = 'cancelled'
-  po.cancelledAt = nowIso()
+  po.status = 'draft'
+  po.approvalStatus = 'not_required'
+  po.cancelledAt = undefined
   po.updatedAt = nowIso()
   po.updatedBy = PURCHASE_DOMAIN_ACTORS.buyer.name
-  po.remarks = reason ? `${po.remarks}\nCancel: ${reason}`.trim() : po.remarks
+  po.remarks = reason ? `${po.remarks}\nWithdraw: ${reason}`.trim() : po.remarks
+  for (const appr of state.approvals.filter((a) => a.documentId === id && a.status === 'pending')) {
+    appr.status = 'cancelled'
+    appr.respondedAt = nowIso()
+    appr.remarks = reason || 'Withdrawn to Open'
+  }
   pushHistory(
     'purchase_order',
     po.id,
     po.documentNumber,
     'cancelled',
     from,
-    'cancelled',
-    reason || 'Cancelled',
+    'draft',
+    reason || 'Withdrawn to Open',
   )
   return structuredClone(po)
 }

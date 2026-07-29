@@ -772,6 +772,8 @@ export interface PurchaseSetupGeneral {
   overReceiptTolerancePct: number
   /** When true, revising a released PO returns it to Pending Approval. */
   requireApprovalOnPoRevision: boolean
+  /** When true, new POs must be submitted for approval before release. */
+  requireApprovalOnPo: boolean
   allowShortClose: boolean
   requirePoWarehouse: boolean
   requireExpectedDeliveryDate: boolean

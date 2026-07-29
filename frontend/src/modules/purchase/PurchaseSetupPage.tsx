@@ -702,6 +702,11 @@ export function PurchaseSetupPage() {
                   onChange={(e) => patchGeneral('allowOverReceipt', e.target.checked)}
                 />
                 <Checkbox
+                  label="Require approval on new PO"
+                  checked={Boolean(setup.general.requireApprovalOnPo)}
+                  onChange={(e) => patchGeneral('requireApprovalOnPo', e.target.checked)}
+                />
+                <Checkbox
                   label="Require approval on PO revision"
                   checked={Boolean(setup.general.requireApprovalOnPoRevision)}
                   onChange={(e) => patchGeneral('requireApprovalOnPoRevision', e.target.checked)}

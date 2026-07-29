@@ -269,7 +269,14 @@ async function toPurchaseOrderDto(
     order.updatedById,
     ...revisionIds,
   ])
-  return mapPurchaseOrderToDto(order, userNames)
+  const settings = await resolveEffectivePurchaseDefaults(
+    tenantId,
+    order.deliveryWarehouse?.plantId,
+  )
+  const requireApprovalOnPo = Boolean(
+    (settings as { requireApprovalOnPo?: boolean }).requireApprovalOnPo ?? true,
+  )
+  return mapPurchaseOrderToDto(order, userNames, { requireApprovalOnPo })
 }
 
 export async function listPurchaseOrders(tenantId: string, query: ListPurchaseOrdersQuery) {
@@ -735,10 +742,12 @@ export async function approvePurchaseOrder(
     : false
   assertApprovable(existing, actorId, { allowSelfApproval })
   await assertApprovalAssignedToActor(tenantId, id, actorId, actorPermissions)
+  const now = new Date()
   return applyLifecycleTransition(tenantId, actorId, existing, {
     action: 'APPROVED',
     auditAction: PURCHASE_AUDIT_ACTION.PO_APPROVED,
-    data: { status: 'APPROVED', approvedAt: new Date() },
+    // Approve releases the PO (UI status: Released / SENT_TO_VENDOR).
+    data: { status: 'SENT_TO_VENDOR', approvedAt: now, sentAt: now },
     approvalResolution: 'APPROVED',
     remarks: input.remarks ?? null,
     // Traceability: maker-checker was bypassed via self-approval policy/permission.
@@ -797,7 +806,14 @@ export async function sendPurchaseOrderToVendor(
   input: PoLifecycleRemarksInput = {},
 ) {
   const existing = await loadOrThrow(tenantId, id)
-  assertSendableToVendor(existing)
+  const settings = await resolveEffectivePurchaseDefaults(
+    tenantId,
+    existing.deliveryWarehouse?.plantId,
+  )
+  const requireApprovalOnPo = Boolean(
+    (settings as { requireApprovalOnPo?: boolean }).requireApprovalOnPo ?? true,
+  )
+  assertSendableToVendor(existing, { requireApprovalOnPo })
   return applyLifecycleTransition(tenantId, actorId, existing, {
     action: 'SENT_TO_VENDOR',
     auditAction: PURCHASE_AUDIT_ACTION.PO_SENT_TO_VENDOR,
@@ -814,10 +830,20 @@ export async function cancelPurchaseOrder(
 ) {
   const existing = await loadOrThrow(tenantId, id)
   assertCancellable(existing)
+  // Withdraw from Pending Approved → Open (Draft), not permanent CANCELLED.
   return applyLifecycleTransition(tenantId, actorId, existing, {
     action: 'CANCELLED',
     auditAction: PURCHASE_AUDIT_ACTION.PO_CANCELLED,
-    data: { status: 'CANCELLED', cancelledAt: new Date() },
+    data: {
+      status: 'DRAFT',
+      submittedAt: null,
+      approvedAt: null,
+      rejectedAt: null,
+      rejectionReason: null,
+      sentBackAt: null,
+      sendBackReason: null,
+      cancelledAt: null,
+    },
     approvalResolution: 'CANCELLED',
     remarks: input.remarks ?? null,
   })

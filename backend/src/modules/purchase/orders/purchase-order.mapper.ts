@@ -38,6 +38,7 @@ type OrderWithRelations = PurchaseOrder & {
 export function mapPurchaseOrderToDto(
   order: OrderWithRelations,
   userNames?: Map<string, string>,
+  opts: { requireApprovalOnPo?: boolean } = {},
 ) {
   const warehouse = order.deliveryWarehouse ?? order.purchaseRequisition?.warehouse ?? null
   const warehouseId =
@@ -89,7 +90,9 @@ export function mapPurchaseOrderToDto(
     createdByName: (order.createdById && userNames?.get(order.createdById)) || null,
     createdAt: iso(order.createdAt),
     updatedAt: iso(order.updatedAt),
-    allowedActions: allowedActions(order),
+    allowedActions: allowedActions(order, {
+      requireApprovalOnPo: opts.requireApprovalOnPo,
+    }),
     revisions: (order.revisions ?? []).map((r) => ({
       id: r.id,
       revisionNo: r.revisionNo,

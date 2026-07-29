@@ -264,20 +264,22 @@ export function PurchaseOrderDetailPage() {
 
   // Prefer backend-provided eligibility (API mode); fall back to local status rules (demo).
   const aa = po.allowedActions
-  const isEditable = aa ? aa.canEdit : po.status === 'draft' || po.status === 'pending_approval'
+  const isEditable = aa ? aa.canEdit : po.status === 'draft' || po.status === 'sent_back'
   const canSubmit = aa ? aa.canSubmit : po.status === 'draft'
   const canApprove = aa ? aa.canApprove : po.status === 'pending_approval'
-  const canRelease = aa ? aa.canSendToVendor : po.status === 'approved'
-  const canReopen = aa ? aa.canReopen : po.status === 'closed'
+  const canRelease = aa
+    ? aa.canSendToVendor
+    : po.status === 'approved' || po.status === 'draft' || po.status === 'sent_back'
+  const canReopen = aa ? aa.canReopen : po.status === 'closed' || po.status === 'rejected' || po.status === 'cancelled'
   const canSendToVendor = aa
     ? aa.canSendToVendor
     : (po.status === 'approved' || po.status === 'released') && !po.sentToVendorAt
   const canCreateGrn = aa ? aa.canReceive : RECEIVABLE_STATUSES.includes(po.status)
   const canRevise = aa
     ? Boolean(aa.canRevise)
-    : REVISABLE_STATUSES.includes(po.status)
-  const canClose = aa ? aa.canClose : !['draft', 'closed', 'cancelled'].includes(po.status)
-  const canCancel = aa ? aa.canCancel : !['closed', 'cancelled'].includes(po.status)
+    : REVISABLE_STATUSES.includes(po.status) && !po.lines.some((l) => l.receivedQty > 0)
+  const canClose = aa ? aa.canClose : !['draft', 'closed', 'cancelled', 'pending_approval'].includes(po.status)
+  const canCancel = aa ? aa.canCancel : po.status === 'pending_approval'
 
   const approveGate = purchaseActionGate({
     permission: 'purchase.po.approve',
