@@ -1841,6 +1841,8 @@ export interface PurchaseOrderLine {
   locationName: string
   expectedDeliveryDate: IsoDate
   prLineId: string | null
+  /** Display / editable PR document number on the line (manual or from source). */
+  requisitionNo?: string | null
   rfqLineId: string | null
   vendorQuotationLineId: string | null
   remarks: string

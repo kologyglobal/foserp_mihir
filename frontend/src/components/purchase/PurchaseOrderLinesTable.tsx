@@ -305,9 +305,12 @@ export function PurchaseOrderLinesTable({
             />
           </div>
 
-          {/* Tablet / desktop: grid table */}
-          <div className="erp-table-wrap relative isolate hidden max-h-[min(28rem,55vh)] overflow-auto rounded-md border border-erp-border md:block">
-          <table className="erp-table purchase-doc-lines-grid min-w-[92rem] text-[11px]">
+          {/* Tablet / desktop: grid table — scroll lives on this wrapper only */}
+          <div
+            className="purchase-doc-lines-grid-scroll relative hidden rounded-md border border-erp-border md:block"
+            onWheel={(e) => e.stopPropagation()}
+          >
+          <table className="erp-table purchase-doc-lines-grid min-w-[108rem] text-[11px]">
             <thead>
               <tr>
                 <th className="purchase-doc-lines-grid__sticky-line">#</th>
@@ -322,6 +325,8 @@ export function PurchaseOrderLinesTable({
                 <th className="num">Tax %</th>
                 <th className="num">Taxable Amount</th>
                 <th className="num">Line Total</th>
+                <th className="min-w-[9rem]">Expected Delivery Date</th>
+                <th className="min-w-[8rem]">Requisition no.</th>
                 <th className="purchase-doc-lines-grid__sticky-actions">Actions</th>
               </tr>
             </thead>
@@ -542,6 +547,33 @@ export function PurchaseOrderLinesTable({
                     </td>
                     <td className="num tabular-nums">{formatCurrency(line.taxableAmount)}</td>
                     <td className="num tabular-nums font-medium">{formatCurrency(line.lineTotal)}</td>
+                    <td onKeyDown={onCellKeyDown}>
+                      <input
+                        type="date"
+                        className="erp-input h-8 min-w-[9rem] text-[11px]"
+                        disabled={!editable}
+                        value={line.expectedDeliveryDate || line.requiredDate || ''}
+                        onChange={(e) =>
+                          onPatchLine(line.key, {
+                            expectedDeliveryDate: e.target.value,
+                            requiredDate: e.target.value,
+                          })
+                        }
+                      />
+                    </td>
+                    <td onKeyDown={onCellKeyDown}>
+                      <input
+                        className="erp-input h-8 min-w-[8rem] text-[11px] font-mono"
+                        disabled={!editable}
+                        value={line.requisitionNo ?? ''}
+                        placeholder="PR no."
+                        onChange={(e) =>
+                          onPatchLine(line.key, {
+                            requisitionNo: e.target.value.trim() ? e.target.value : null,
+                          })
+                        }
+                      />
+                    </td>
                     <td className="purchase-doc-lines-grid__sticky-actions">
                       <div className="flex items-center justify-center gap-0.5">
                         <button
@@ -573,6 +605,7 @@ export function PurchaseOrderLinesTable({
                 </td>
                 <td className="num tabular-nums">{formatCurrency(totals.taxable)}</td>
                 <td className="num tabular-nums">{formatCurrency(totals.lineTotal)}</td>
+                <td colSpan={2} />
                 <td className="purchase-doc-lines-grid__sticky-actions" />
               </tr>
             </tfoot>
@@ -582,6 +615,13 @@ export function PurchaseOrderLinesTable({
       )}
 
       <style>{`
+        .purchase-doc-lines-grid-scroll {
+          max-height: min(32rem, 60vh);
+          overflow-x: auto;
+          overflow-y: auto;
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
+        }
         .purchase-doc-lines-grid thead th {
           position: sticky;
           top: 0;

@@ -229,6 +229,7 @@ export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
   remarks: string | null
   purchaseRequisitionLineId: string | null
   purchasePlanningRowId: string | null
+  requisitionNumber: string | null
 }> {
   return lines.map((line, index) => {
     const rate = Number(line.rate ?? 0)
@@ -286,6 +287,7 @@ export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
       remarks: line.remarks?.trim() || null,
       purchaseRequisitionLineId: line.purchaseRequisitionLineId ?? null,
       purchasePlanningRowId: line.purchasePlanningRowId ?? null,
+      requisitionNumber: line.requisitionNumber?.trim() || null,
     }
   })
 }

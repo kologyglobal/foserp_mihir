@@ -205,6 +205,7 @@ function emptyLine(partial?: Partial<PurchaseOrderLine>): PoEditorLine {
     locationName: '',
     expectedDeliveryDate: today(),
     prLineId: null,
+    requisitionNo: null,
     rfqLineId: null,
     vendorQuotationLineId: null,
     remarks: '',

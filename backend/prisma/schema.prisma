@@ -5920,6 +5920,8 @@ model PurchaseOrderLine {
   returnedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
   invoicedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
   requiredDate              DateTime? @db.Date
+  /// Optional PR document number displayed on the PO line.
+  requisitionNumber         String?   @db.VarChar(64)
   remarks                   String?   @db.Text
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime  @updatedAt

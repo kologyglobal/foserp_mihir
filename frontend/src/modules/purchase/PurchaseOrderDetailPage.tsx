@@ -633,7 +633,8 @@ export function PurchaseOrderDetailPage() {
                     <th className="num">Received</th>
                     <th className="num">Pending</th>
                     <th>Status</th>
-                    <th>Required Date</th>
+                    <th>Expected Delivery</th>
+                    <th>Requisition no.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -666,7 +667,10 @@ export function PurchaseOrderDetailPage() {
                           {PURCHASE_ORDER_LINE_STATUS_LABELS[l.lineStatus]}
                         </Badge>
                       </td>
-                      <td className="whitespace-nowrap">{formatDate(l.requiredDate)}</td>
+                      <td className="whitespace-nowrap">
+                        {formatDate(l.expectedDeliveryDate || l.requiredDate)}
+                      </td>
+                      <td className="font-mono text-[12px]">{l.requisitionNo || '—'}</td>
                     </tr>
                   ))}
                 </tbody>

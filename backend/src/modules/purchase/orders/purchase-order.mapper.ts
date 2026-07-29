@@ -148,6 +148,7 @@ export function mapPurchaseOrderToDto(
         requiredDate: date(line.requiredDate),
         purchaseRequisitionLineId: line.purchaseRequisitionLineId,
         purchasePlanningRowId: line.purchasePlanningRowId,
+        requisitionNumber: (line as { requisitionNumber?: string | null }).requisitionNumber ?? null,
         remarks: line.remarks,
       }
     }),

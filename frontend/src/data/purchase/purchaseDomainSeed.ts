@@ -1572,6 +1572,7 @@ function poLine(partial: {
     locationName: PURCHASE_DEMO_LOCATION.name,
     expectedDeliveryDate: partial.expectedDeliveryDate,
     prLineId: partial.prLineId ?? null,
+    requisitionNo: partial.requisitionNo ?? null,
     rfqLineId: null,
     vendorQuotationLineId: null,
     remarks: partial.remarks ?? '',

@@ -442,6 +442,8 @@ export interface ApiPurchaseOrderLine {
   requiredDate: string | null
   purchaseRequisitionLineId: string | null
   purchasePlanningRowId: string | null
+  /** Optional PR document number shown on the PO line. */
+  requisitionNumber: string | null
   remarks: string | null
 }
 
@@ -542,6 +544,7 @@ export interface ApiPurchaseOrderLineInput {
   remarks?: string | null
   purchaseRequisitionLineId?: string | null
   purchasePlanningRowId?: string | null
+  requisitionNumber?: string | null
 }
 
 export interface ApiPurchaseOrderInput {
