@@ -2,12 +2,10 @@ import { useMemo } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import {
   Ban,
-  CheckCircle2,
   Eye,
-  PackageCheck,
   Pencil,
   Printer,
-  RotateCw,
+  RotateCcw,
   Send,
   Trash2,
 } from 'lucide-react'
@@ -23,53 +21,40 @@ import { CrmListFilterBar, type CrmListFilterBarProps } from '../crm/CrmListFilt
 import { formatCurrency } from '../../utils/formatters/currency'
 import { formatDate } from '../../utils/dates/format'
 import { cn } from '../../utils/cn'
-import type {
-  PurchaseOrderDomainStatus,
-  PurchaseOrderListRow,
-} from '../../types/purchaseDomain'
+import type { PurchaseOrderListRow } from '../../types/purchaseDomain'
 import {
   canPurchasePermission,
   getPurchasePermissionDenialReason,
 } from '../../utils/permissions'
 
-const REVISABLE_STATUSES: PurchaseOrderDomainStatus[] = [
-  'released',
-  'partially_received',
-  'fully_received',
-  'invoiced',
-]
-
 export interface PurchaseOrderRowHandlers {
   onView: (row: PurchaseOrderListRow) => void
   onEdit: (row: PurchaseOrderListRow) => void
-  onRevise: (row: PurchaseOrderListRow) => void
-  onPrint: (row: PurchaseOrderListRow) => void
   onSubmit: (row: PurchaseOrderListRow) => void
-  onApprove: (row: PurchaseOrderListRow) => void
-  onRelease: (row: PurchaseOrderListRow) => void
+  onPrint: (row: PurchaseOrderListRow) => void
+  onReopen: (row: PurchaseOrderListRow) => void
+  /** Withdraws a Pending Approved order back to Open. */
   onCancel: (row: PurchaseOrderListRow) => void
+  onDelete: (row: PurchaseOrderListRow) => void
 }
 
 function buildRowActions(
   row: PurchaseOrderListRow,
   handlers: PurchaseOrderRowHandlers,
+  requireApprovalOnPo: boolean,
 ): RowActionItem[] {
   const status = row.status
-  const isCancelled = status === 'cancelled'
-  const isClosed = status === 'closed'
-  const canEdit = status === 'draft'
-  const canRevise = REVISABLE_STATUSES.includes(status)
-  const canSubmit = status === 'draft'
-  const canApprove = status === 'pending_approval'
-  const canRelease = status === 'approved'
-  const canCancel = !isCancelled && !isClosed
-  /** Hard delete only for draft; otherwise cancel is the destructive path. */
+  const canEdit = status === 'draft' || status === 'sent_back'
+  const canSubmit = canEdit
+  /** Cancel withdraws approval — Pending Approved returns to Open. Released cannot cancel. */
+  const canCancel = status === 'pending_approval'
+  const canReopen =
+    status === 'closed' || status === 'rejected' || status === 'cancelled'
+  /** Hard delete only for Open (draft); destructive path stays on detail for other statuses. */
   const canDelete = status === 'draft'
   const statusLabel = row.statusLabel || status
 
   const canEditPerm = canPurchasePermission('purchase.po.edit')
-  const canApprovePerm = canPurchasePermission('purchase.po.approve')
-  const canReleasePerm = canPurchasePermission('purchase.po.send')
   const canCancelPerm = canPurchasePermission('purchase.po.cancel')
 
   return [
@@ -84,82 +69,54 @@ function buildRowActions(
         ? getPurchasePermissionDenialReason('purchase.po.edit')
         : `${statusLabel} purchase orders cannot be edited`,
     },
-    {
-      id: 'delete',
-      label: 'Delete',
-      icon: Trash2,
-      danger: true,
-      onClick: () => handlers.onCancel(row),
-      disabled: !canCancelPerm || !canDelete,
-      disabledReason: !canCancelPerm
-        ? getPurchasePermissionDenialReason('purchase.po.cancel')
-        : `${statusLabel} purchase orders cannot be deleted`,
-    },
-    {
-      id: 'revise',
-      label: 'Revise Order',
-      icon: RotateCw,
-      onClick: () => handlers.onRevise(row),
-      disabled: !canEditPerm || !canRevise,
-      disabledReason: !canEditPerm
-        ? getPurchasePermissionDenialReason('purchase.po.edit')
-        : canRevise
-          ? undefined
-          : 'Revise is only available once released',
-    },
-    { id: 'print', label: 'Print', icon: Printer, onClick: () => handlers.onPrint(row) },
-    {
-      id: 'submit',
-      label: 'Submit for Approval',
-      icon: Send,
-      onClick: () => handlers.onSubmit(row),
-      disabled: !canEditPerm || !canSubmit,
-      disabledReason: !canEditPerm
-        ? getPurchasePermissionDenialReason('purchase.po.edit')
-        : canSubmit
-          ? undefined
-          : 'Only Draft orders can be submitted',
-    },
-    {
-      id: 'approve',
-      label: 'Approve',
-      icon: CheckCircle2,
-      onClick: () => handlers.onApprove(row),
-      disabled: !canApprovePerm || !canApprove,
-      disabledReason: !canApprovePerm
-        ? getPurchasePermissionDenialReason('purchase.po.approve')
-        : canApprove
-          ? undefined
-          : 'Only Sent for Approval orders can be approved',
-    },
-    {
-      id: 'release',
-      label: 'Release',
-      icon: PackageCheck,
-      onClick: () => handlers.onRelease(row),
-      disabled: !canReleasePerm || !canRelease,
-      disabledReason: !canReleasePerm
-        ? getPurchasePermissionDenialReason('purchase.po.send')
-        : canRelease
-          ? undefined
-          : 'Only Approved orders can be released',
-    },
+    // Approval can be switched off in Purchase Setup — then Open goes straight to Release.
+    ...(requireApprovalOnPo
+      ? [
+          {
+            id: 'submit',
+            label: 'Send for Approval',
+            icon: Send,
+            onClick: () => handlers.onSubmit(row),
+            disabled: !canEditPerm || !canSubmit,
+            disabledReason: !canEditPerm
+              ? getPurchasePermissionDenialReason('purchase.po.edit')
+              : `${statusLabel} purchase orders cannot be sent for approval`,
+          } satisfies RowActionItem,
+        ]
+      : []),
     {
       id: 'cancel',
       label: 'Cancel',
       icon: Ban,
       onClick: () => handlers.onCancel(row),
-      danger: true,
-      disabled: !canCancelPerm || !canCancel || canDelete,
+      disabled: !canCancelPerm || !canCancel,
       disabledReason: !canCancelPerm
         ? getPurchasePermissionDenialReason('purchase.po.cancel')
-        : canDelete
-          ? 'Use Delete for draft orders'
-          : isCancelled
-            ? 'Already cancelled'
-            : isClosed
-              ? 'Closed orders cannot be cancelled'
-              : `${statusLabel} purchase orders cannot be cancelled`,
+        : 'Cancel returns a Pending Approved order to Open',
+    },
+    {
+      id: 'delete',
+      label: 'Delete',
+      icon: Trash2,
+      danger: true,
+      onClick: () => handlers.onDelete(row),
+      disabled: !canCancelPerm || !canDelete,
+      disabledReason: !canCancelPerm
+        ? getPurchasePermissionDenialReason('purchase.po.cancel')
+        : `${statusLabel} purchase orders cannot be deleted`,
+    },
+    { id: 'print', label: 'Print', icon: Printer, onClick: () => handlers.onPrint(row) },
+    {
+      id: 'reopen',
+      label: 'Reopen',
+      icon: RotateCcw,
+      onClick: () => handlers.onReopen(row),
+      disabled: !canEditPerm || !canReopen,
+      disabledReason: !canEditPerm
+        ? getPurchasePermissionDenialReason('purchase.po.edit')
+        : canReopen
+          ? undefined
+          : 'Reopen is available for Rejected, Cancelled, or Closed orders',
     },
   ]
 }
@@ -168,6 +125,8 @@ export interface PurchaseOrdersTableProps {
   rows: PurchaseOrderListRow[]
   registerFilter?: CrmListFilterBarProps
   handlers: PurchaseOrderRowHandlers
+  /** Purchase Setup → “Require approval on new PO”; hides the submit action when off. */
+  requireApprovalOnPo?: boolean
   busyId?: string | null
   emptyAction?: React.ReactNode
   hasActiveFilters?: boolean
@@ -179,6 +138,7 @@ export function PurchaseOrdersTable({
   rows,
   registerFilter,
   handlers,
+  requireApprovalOnPo = true,
   busyId,
   emptyAction,
   hasActiveFilters,
@@ -320,13 +280,15 @@ export function PurchaseOrdersTable({
               className={busyId === po.id ? 'pointer-events-none opacity-50' : undefined}
               onClick={(e) => e.stopPropagation()}
             >
-              <EnterpriseRowActionsMenu actions={buildRowActions(po, handlers)} />
+              <EnterpriseRowActionsMenu
+                actions={buildRowActions(po, handlers, requireApprovalOnPo)}
+              />
             </div>
           )
         },
       },
     ],
-    [busyId, handlers],
+    [busyId, handlers, requireApprovalOnPo],
   )
 
   const emptyMessage = hasActiveFilters

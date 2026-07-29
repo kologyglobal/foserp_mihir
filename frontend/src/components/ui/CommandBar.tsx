@@ -174,20 +174,53 @@ export function CommandBarOverflowMenu({
   const visible = actions.filter((a) => a.label)
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({
+    position: 'fixed',
+    opacity: 0,
+    pointerEvents: 'none',
+  })
+
+  useLayoutEffect(() => {
+    if (!open || !ref.current || !menuRef.current) return
+    const trigger = ref.current.getBoundingClientRect()
+    const menu = menuRef.current.getBoundingClientRect()
+    const width = Math.max(menu.width, 200)
+    const left = Math.max(8, Math.min(trigger.right - width, window.innerWidth - width - 8))
+    const below = trigger.bottom + 4
+    const top =
+      below + menu.height > window.innerHeight - 8
+        ? Math.max(8, trigger.top - menu.height - 4)
+        : below
+    setMenuStyle({
+      position: 'fixed',
+      left,
+      top,
+      zIndex: 10070,
+      minWidth: Math.max(width, trigger.width),
+    })
+  }, [open, visible.length])
 
   useEffect(() => {
     if (!open) return
     const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) return
+      setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
+    const onScroll = () => setOpen(false)
     document.addEventListener('mousedown', close)
     window.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onScroll)
     return () => {
       document.removeEventListener('mousedown', close)
       window.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onScroll)
     }
   }, [open])
 
@@ -221,33 +254,41 @@ export function CommandBarOverflowMenu({
           className={open ? 'border-erp-primary/35 bg-erp-primary-soft' : undefined}
         />
       )}
-      {open ? (
-        <div className="erp-command-more__menu" role="menu">
-          {visible.map((action) => {
-            const Icon = action.icon ?? Circle
-            return (
-              <button
-                key={action.id}
-                type="button"
-                role="menuitem"
-                className={cn(
-                  'erp-command-more__item',
-                  action.danger && 'erp-command-more__item--danger',
-                )}
-                disabled={action.disabled}
-                title={action.disabled ? action.disabledReason : undefined}
-                onClick={() => {
-                  setOpen(false)
-                  action.onClick?.()
-                }}
-              >
-                <Icon className="h-4 w-4 shrink-0 opacity-70" />
-                {action.label}
-              </button>
-            )
-          })}
-        </div>
-      ) : null}
+      {open
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className="erp-command-more__menu erp-command-more__menu--portal"
+              role="menu"
+              style={menuStyle}
+            >
+              {visible.map((action) => {
+                const Icon = action.icon ?? Circle
+                return (
+                  <button
+                    key={action.id}
+                    type="button"
+                    role="menuitem"
+                    className={cn(
+                      'erp-command-more__item',
+                      action.danger && 'erp-command-more__item--danger',
+                    )}
+                    disabled={action.disabled}
+                    title={action.disabled ? action.disabledReason : undefined}
+                    onClick={() => {
+                      setOpen(false)
+                      action.onClick?.()
+                    }}
+                  >
+                    <Icon className="h-4 w-4 shrink-0 opacity-70" />
+                    {action.label}
+                  </button>
+                )
+              })}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   )
 }

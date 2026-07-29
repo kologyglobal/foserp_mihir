@@ -54,9 +54,17 @@ export function assertEditable(po: Pick<PurchaseOrder, 'status' | 'deletedAt'>):
   }
 }
 
-export function assertRevisable(po: Pick<PurchaseOrder, 'status' | 'deletedAt'>): void {
+export function assertRevisable(
+  po: Pick<PurchaseOrder, 'status' | 'deletedAt'> & {
+    lines?: Array<Pick<PurchaseOrderLine, 'receivedQuantity'>>
+  },
+): void {
   assertNotDeleted(po)
   if (!PO_REVISABLE_STATUSES.includes(po.status)) {
+    throw workflowError(PURCHASE_ERROR_CODE.PO_NOT_REVISABLE)
+  }
+  const received = (po.lines ?? []).reduce((sum, l) => sum + Number(l.receivedQuantity), 0)
+  if (received > 0) {
     throw workflowError(PURCHASE_ERROR_CODE.PO_NOT_REVISABLE)
   }
 }
@@ -128,29 +136,38 @@ export function assertSendBackable(po: Pick<PurchaseOrder, 'status' | 'deletedAt
   }
 }
 
-export function assertSendableToVendor(po: Pick<PurchaseOrder, 'status' | 'deletedAt'>): void {
+export function assertSendableToVendor(
+  po: Pick<PurchaseOrder, 'status' | 'deletedAt'>,
+  opts: { requireApprovalOnPo?: boolean } = {},
+): void {
   assertNotDeleted(po)
-  if (po.status !== 'APPROVED') {
+  const requireApproval = opts.requireApprovalOnPo !== false
+  if (requireApproval) {
+    // Legacy rows may still sit in APPROVED before release.
+    if (po.status !== 'APPROVED') {
+      throw workflowError(PURCHASE_ERROR_CODE.PO_NOT_SENDABLE)
+    }
+    return
+  }
+  // Approval-off: release directly from Open / Sent Back.
+  if (!PO_EDITABLE_STATUSES.includes(po.status)) {
     throw workflowError(PURCHASE_ERROR_CODE.PO_NOT_SENDABLE)
+  }
+}
+
+/** Withdraw from Pending Approved back to Open (Draft). */
+export function assertWithdrawFromApproval(po: Pick<PurchaseOrder, 'status' | 'deletedAt'>): void {
+  assertNotDeleted(po)
+  if (po.status !== 'PENDING_APPROVAL') {
+    throw workflowError(PURCHASE_ERROR_CODE.PO_INVALID_STATUS)
   }
 }
 
 export function assertCancellable(po: PoWithLines): void {
   assertNotDeleted(po)
-  const allowed: PurchaseOrderStatus[] = [
-    'DRAFT',
-    'PENDING_APPROVAL',
-    'APPROVED',
-    'REJECTED',
-    'SENT_BACK',
-    'SENT_TO_VENDOR',
-  ]
-  if (!allowed.includes(po.status)) {
+  // Cancel = withdraw Pending Approved → Open, or soft-delete an Open (Draft) PO.
+  if (po.status !== 'PENDING_APPROVAL' && po.status !== 'DRAFT') {
     throw workflowError(PURCHASE_ERROR_CODE.PO_INVALID_STATUS)
-  }
-  // A PO with any receipt against it can no longer be cancelled — it must be closed.
-  if (totalReceived(po.lines) > 0) {
-    throw workflowError(PURCHASE_ERROR_CODE.PO_CANNOT_CANCEL_RECEIVED)
   }
 }
 
@@ -229,6 +246,7 @@ export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
   remarks: string | null
   purchaseRequisitionLineId: string | null
   purchasePlanningRowId: string | null
+  requisitionNumber: string | null
 }> {
   return lines.map((line, index) => {
     const rate = Number(line.rate ?? 0)
@@ -286,12 +304,16 @@ export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
       remarks: line.remarks?.trim() || null,
       purchaseRequisitionLineId: line.purchaseRequisitionLineId ?? null,
       purchasePlanningRowId: line.purchasePlanningRowId ?? null,
+      requisitionNumber: line.requisitionNumber?.trim() || null,
     }
   })
 }
 
 /** Backend-provided action eligibility so the frontend never guesses. */
-export function allowedActions(po: PoWithLines): {
+export function allowedActions(
+  po: PoWithLines,
+  opts: { requireApprovalOnPo?: boolean } = {},
+): {
   canEdit: boolean
   canSubmit: boolean
   canApprove: boolean
@@ -307,19 +329,19 @@ export function allowedActions(po: PoWithLines): {
   const received = totalReceived(po.lines)
   const editable = !po.deletedAt && PO_EDITABLE_STATUSES.includes(po.status)
   const pending = !po.deletedAt && po.status === 'PENDING_APPROVAL'
+  const requireApproval = opts.requireApprovalOnPo !== false
   return {
     canEdit: editable,
-    canSubmit: editable,
+    canSubmit: editable && requireApproval,
     canApprove: pending,
     canReject: pending,
     canSendBack: pending,
-    canSendToVendor: !po.deletedAt && po.status === 'APPROVED',
-    canCancel:
+    canSendToVendor:
       !po.deletedAt &&
-      received === 0 &&
-      ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'SENT_BACK', 'SENT_TO_VENDOR'].includes(
-        po.status,
-      ),
+      (requireApproval
+        ? po.status === 'APPROVED'
+        : PO_EDITABLE_STATUSES.includes(po.status)),
+    canCancel: pending || (!po.deletedAt && po.status === 'DRAFT'),
     canClose:
       !po.deletedAt &&
       ['SENT_TO_VENDOR', 'PARTIALLY_RECEIVED', 'FULLY_RECEIVED', 'PARTIALLY_INVOICED', 'FULLY_INVOICED'].includes(
@@ -331,6 +353,6 @@ export function allowedActions(po: PoWithLines): {
         po.status === 'CLOSED' ||
         (po.status === 'CANCELLED' && received === 0)),
     canReceive: !po.deletedAt && PO_RECEIVABLE_STATUSES.includes(po.status),
-    canRevise: !po.deletedAt && PO_REVISABLE_STATUSES.includes(po.status),
+    canRevise: !po.deletedAt && PO_REVISABLE_STATUSES.includes(po.status) && received === 0,
   }
 }

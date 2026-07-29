@@ -565,6 +565,7 @@ export function RfqDetailPage() {
             <PurchaseAuditTimeline
               entityType="rfq"
               entityId={rfq.id}
+              showTitle={false}
               className="border-0 p-0 shadow-none"
               demoEvents={buildDemoPurchaseTimeline({
                 entityId: rfq.id,

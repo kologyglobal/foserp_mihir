@@ -4,7 +4,7 @@ import { Plus, Save, Trash2 } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
 import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { ErpButton } from '@/components/erp/ErpButton'
-import { Checkbox, Input, Select } from '@/components/forms/Inputs'
+import { Checkbox, Input, Select as FormSelect } from '@/components/forms/Inputs'
 import { FormField } from '@/components/forms/FormField'
 import { SELECT_PLACEHOLDER } from '@/components/forms/selectStandards'
 import { TabStrip } from '@/components/ui/TabStrip'
@@ -161,6 +161,11 @@ function SectionCard({
 
 function FieldGrid({ children }: { children: React.ReactNode }) {
   return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{children}</div>
+}
+
+/** Keep every setup dropdown on the same shared smart-select control. */
+function Select(props: React.ComponentProps<typeof FormSelect>) {
+  return <FormSelect {...props} native={false} />
 }
 
 export function PurchaseSetupPage() {
@@ -495,6 +500,7 @@ export function PurchaseSetupPage() {
 
   return (
     <OperationalPageShell
+      className="purchase-setup-page"
       title="Purchase Setup"
       description="Company-wide purchase configuration — general defaults, numbering, approvals, tax, matching, receiving, quality, print, and notifications"
       badge="Purchase"
@@ -700,6 +706,11 @@ export function PurchaseSetupPage() {
                   label="Allow over receipt"
                   checked={setup.general.allowOverReceipt}
                   onChange={(e) => patchGeneral('allowOverReceipt', e.target.checked)}
+                />
+                <Checkbox
+                  label="Require approval on new PO"
+                  checked={Boolean(setup.general.requireApprovalOnPo)}
+                  onChange={(e) => patchGeneral('requireApprovalOnPo', e.target.checked)}
                 />
                 <Checkbox
                   label="Require approval on PO revision"

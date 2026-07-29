@@ -426,6 +426,8 @@ model Tenant {
   purchaseOrders                  PurchaseOrder[]
   purchaseOrderLines              PurchaseOrderLine[]
   purchaseOrderRevisions          PurchaseOrderRevision[]
+  purchaseOrdersArchived          PurchaseOrderArchived[]
+  purchaseOrderLinesArchived      PurchaseOrderLineArchived[]
   goodsReceipts                   GoodsReceipt[]
   goodsReceiptLines               GoodsReceiptLine[]
   purchaseApprovals               PurchaseApproval[]
@@ -5887,6 +5889,7 @@ model PurchaseOrder {
   goodsReceipts             GoodsReceipt[]
   approvals                 PurchaseApproval[]        @relation("PurchaseApprovalPo")
   revisions                 PurchaseOrderRevision[]
+  archives                  PurchaseOrderArchived[]
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId])
@@ -5931,6 +5934,8 @@ model PurchaseOrderLine {
   returnedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
   invoicedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
   requiredDate              DateTime? @db.Date
+  /// Optional PR document number displayed on the PO line.
+  requisitionNumber         String?   @db.VarChar(64)
   remarks                   String?   @db.Text
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime  @updatedAt
@@ -5978,6 +5983,82 @@ model PurchaseOrderRevision {
   @@index([tenantId])
   @@index([tenantId, purchaseOrderId])
   @@map("purchase_order_revisions")
+}
+
+/// Relational archive of a PO header as it existed before a revise (Rev N snapshot).
+model PurchaseOrderArchived {
+  id                    String              @id @default(uuid())
+  tenantId              String
+  purchaseOrderId       String
+  revisionNo            Int
+  orderNumber           String              @db.VarChar(64)
+  orderDate             DateTime            @db.Date
+  vendorId              String
+  origin                PurchaseOrderOrigin @default(MANUAL)
+  status                PurchaseOrderStatus
+  purchaseRequisitionId String?
+  requestForQuotationId String?
+  vendorQuotationId     String?
+  vendorComparisonId    String?
+  currencyCode          String              @default("INR") @db.VarChar(8)
+  expectedDeliveryDate  DateTime?           @db.Date
+  paymentTerms          String?             @db.VarChar(200)
+  deliveryTerms         String?             @db.VarChar(200)
+  deliveryWarehouseId   String?
+  subtotalAmount        Decimal             @default(0) @db.Decimal(18, 2)
+  taxAmount             Decimal             @default(0) @db.Decimal(18, 2)
+  freightAmount         Decimal             @default(0) @db.Decimal(18, 2)
+  totalAmount           Decimal             @default(0) @db.Decimal(18, 2)
+  remarks               String?             @db.Text
+  archivedById          String?             @db.VarChar(36)
+  archivedAt            DateTime            @default(now())
+  reason                String              @db.Text
+
+  tenant        Tenant                     @relation(fields: [tenantId], references: [id])
+  purchaseOrder PurchaseOrder              @relation(fields: [purchaseOrderId], references: [id])
+  lines         PurchaseOrderLineArchived[]
+
+  @@unique([tenantId, purchaseOrderId, revisionNo])
+  @@index([tenantId])
+  @@index([tenantId, purchaseOrderId])
+  @@map("purchase_order_archived")
+}
+
+/// Relational archive of PO lines as they existed before a revise.
+model PurchaseOrderLineArchived {
+  id                        String    @id @default(uuid())
+  tenantId                  String
+  archivedHeaderId          String
+  purchaseOrderId           String
+  sourceLineId              String?
+  revisionNo                Int
+  lineNumber                Int
+  purchaseRequisitionLineId String?
+  purchasePlanningRowId     String?
+  itemId                    String?
+  itemCodeSnapshot          String    @default("") @db.VarChar(64)
+  itemNameSnapshot          String    @default("") @db.VarChar(300)
+  description               String?   @db.Text
+  quantity                  Decimal   @default(0) @db.Decimal(18, 4)
+  uomQuantity               Decimal   @default(0) @db.Decimal(18, 4)
+  uomConversionFactor       Decimal   @default(1) @db.Decimal(18, 4)
+  unitCostPrimary           Decimal   @default(0) @db.Decimal(18, 4)
+  uomId                     String?
+  rate                      Decimal   @default(0) @db.Decimal(18, 2)
+  amount                    Decimal   @default(0) @db.Decimal(18, 2)
+  receivedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
+  requiredDate              DateTime? @db.Date
+  requisitionNumber         String?   @db.VarChar(64)
+  remarks                   String?   @db.Text
+  archivedAt                DateTime  @default(now())
+
+  tenant         Tenant                @relation(fields: [tenantId], references: [id])
+  archivedHeader PurchaseOrderArchived @relation(fields: [archivedHeaderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, archivedHeaderId])
+  @@map("purchase_line_archived")
 }
 
 enum GoodsReceiptStatus {
@@ -6314,6 +6395,8 @@ model PurchaseSettings {
   overReceiptTolerancePct        Decimal                     @default(0) @db.Decimal(5, 2)
   /// When true, revising a released PO returns it to PENDING_APPROVAL.
   requireApprovalOnPoRevision    Boolean                     @default(true)
+  /// When true, new POs must be submitted for approval before release.
+  requireApprovalOnPo            Boolean                     @default(true)
   allowShortClose                Boolean                     @default(true)
   requireVendorChallan           Boolean                     @default(false)
   requireVehicleNumber           Boolean                     @default(false)

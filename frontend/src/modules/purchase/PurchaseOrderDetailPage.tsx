@@ -33,14 +33,12 @@ import { purchaseActionGate, usePurchasePermissions } from '@/utils/permissions'
 import { ErpButton } from '@/components/erp/ErpButton'
 import { Badge } from '@/components/ui/Badge'
 import { StatusDot, statusToneFromLabel } from '@/components/design-system/StatusDot'
-import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Modal } from '@/design-system/components/Modal'
 import { Textarea } from '@/components/forms/Inputs'
 import {
   approvalActivitySummary,
   attachmentsSummary,
-  commercialTermsSummary,
   hasMeaningfulTaxTotals,
   notesSummary,
   taxTotalsSummary,
@@ -52,6 +50,7 @@ import {
   getApprovalHistory,
   getPurchaseOrderById,
   getPurchaseOrderLinkedDocuments,
+  getPurchaseSetup,
   getVendors,
   rejectPurchaseOrder,
   releasePurchaseOrder,
@@ -104,6 +103,126 @@ function lineStatusBadgeColor(
   return 'gray'
 }
 
+function PurchaseOrderDetailSkeleton() {
+  const fieldWidths = ['w-24', 'w-20', 'w-28', 'w-16', 'w-20', 'w-24', 'w-36', 'w-28']
+
+  const skeletonFields = (count: number) =>
+    Array.from({ length: count }).map((_, index) => (
+      <div key={index} className="min-w-0 space-y-2">
+        <div className={`erp-skeleton h-3 rounded ${fieldWidths[index % fieldWidths.length]}`} />
+        <div className="erp-skeleton h-4 w-3/4 max-w-full rounded" />
+      </div>
+    ))
+
+  const collapsedSection = (title: string, subtitle?: string) => (
+    <ErpCardSection
+      key={title}
+      title={title}
+      subtitle={subtitle}
+      columns={1}
+      collapsible
+      defaultOpen={false}
+    >
+      <span />
+    </ErpCardSection>
+  )
+
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Loading purchase order" role="status">
+      <div className="po-workflow-strip po-workflow-strip--dense">
+        <div className="flex min-w-0 items-center gap-3 px-2 py-1">
+          {Array.from({ length: 7 }).map((_, index) => (
+            <div key={index} className="flex min-w-0 flex-1 items-center gap-2">
+              <div className="erp-skeleton h-6 w-6 shrink-0 rounded-full" />
+              <div className="erp-skeleton h-3 min-w-0 flex-1 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <ErpCardSection
+        title="General"
+        subtitle="Identity, vendor, locations, and commercial terms"
+        collapsible
+        defaultOpen
+        columns={4}
+      >
+        {skeletonFields(24)}
+      </ErpCardSection>
+
+      <ErpCardSection
+        title="Item Lines"
+        subtitle="Loading order lines"
+        columns={1}
+        collapsible
+        defaultOpen
+      >
+        <div className="overflow-x-auto rounded-md border border-erp-border">
+          <div className="grid min-w-[1100px] grid-cols-[3rem_2fr_repeat(13,minmax(5rem,1fr))] gap-3 border-b border-erp-border bg-erp-surface-alt px-3 py-2">
+            {Array.from({ length: 15 }).map((_, index) => (
+              <div key={index} className="erp-skeleton h-3 rounded" />
+            ))}
+          </div>
+          {Array.from({ length: 3 }).map((_, row) => (
+            <div
+              key={row}
+              className="grid min-w-[1100px] grid-cols-[3rem_2fr_repeat(13,minmax(5rem,1fr))] gap-3 border-b border-erp-border px-3 py-3 last:border-b-0"
+            >
+              {Array.from({ length: 15 }).map((_, cell) => (
+                <div
+                  key={cell}
+                  className={`erp-skeleton rounded ${cell === 1 ? 'h-8' : 'h-4'}`}
+                  style={{ animationDelay: `${row * 45 + cell * 10}ms` }}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </ErpCardSection>
+
+      <ErpCardSection
+        title="Tax & Totals"
+        subtitle="Charges, tax, and document total"
+        columns={1}
+        collapsible
+        defaultOpen
+      >
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {skeletonFields(14)}
+        </div>
+      </ErpCardSection>
+
+      {collapsedSection('Inventory Reservations', 'Stock reserved for this purchase order')}
+      {collapsedSection('Terms & Notes')}
+      {collapsedSection('Attachments')}
+
+      <ErpCardSection
+        title="Audit Timeline"
+        subtitle="Purchase order lifecycle events"
+        columns={1}
+        collapsible
+        defaultOpen
+      >
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="flex items-start gap-3">
+              <div className="erp-skeleton h-8 w-8 shrink-0 rounded-full" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="erp-skeleton h-3 w-40 max-w-full rounded" />
+                <div className="erp-skeleton h-3 w-64 max-w-full rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </ErpCardSection>
+
+      {collapsedSection('Approval History')}
+      {collapsedSection('Change History')}
+      {collapsedSection('Linked Documents', 'Upstream and downstream references')}
+    </div>
+  )
+}
+
 export function PurchaseOrderDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -113,6 +232,7 @@ export function PurchaseOrderDetailPage() {
   const [history, setHistory] = useState<ApprovalHistory[]>([])
   const [linked, setLinked] = useState<PurchaseOrderLinkedDocuments | null>(null)
   const [vendorMaster, setVendorMaster] = useState<Vendor | null>(null)
+  const [requireApprovalOnPo, setRequireApprovalOnPo] = useState(true)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [approveOpen, setApproveOpen] = useState(false)
@@ -131,14 +251,17 @@ export function PurchaseOrderDetailPage() {
         return
       }
       setPo(row)
-      const [hist, linkedDocs, vendors] = await Promise.all([
+      const [hist, linkedDocs, vendors, setup] = await Promise.all([
         getApprovalHistory(row.id),
         getPurchaseOrderLinkedDocuments(row.id),
         getVendors(),
+        // Setup only drives action visibility — never fail the document on it.
+        getPurchaseSetup().catch(() => null),
       ])
       setHistory(hist)
       setLinked(linkedDocs)
       setVendorMaster(vendors.find((v) => v.id === row.vendor.id) ?? null)
+      setRequireApprovalOnPo(setup?.general.requireApprovalOnPo ?? true)
     } finally {
       setLoading(false)
     }
@@ -249,11 +372,28 @@ export function PurchaseOrderDetailPage() {
           { label: 'Purchase Orders', to: '/purchase/orders' },
           { label: 'Loading' },
         ]}
+        factBox={
+          <div
+            className="space-y-4 rounded-md border border-erp-border bg-erp-surface p-4"
+            aria-hidden="true"
+          >
+            <div className="erp-skeleton h-5 w-36 rounded" />
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="erp-skeleton h-3 w-20 rounded" />
+                  <div className="erp-skeleton h-4 w-full rounded" />
+                </div>
+              ))}
+            </div>
+          </div>
+        }
+        collapsibleFactBox
         footer={null}
         stickyFooter={false}
         detailMode
       >
-        <LoadingState variant="form" rows={8} />
+        <PurchaseOrderDetailSkeleton />
       </PurchaseCardFormShell>
     )
   }
@@ -264,20 +404,25 @@ export function PurchaseOrderDetailPage() {
 
   // Prefer backend-provided eligibility (API mode); fall back to local status rules (demo).
   const aa = po.allowedActions
-  const isEditable = aa ? aa.canEdit : po.status === 'draft' || po.status === 'pending_approval'
-  const canSubmit = aa ? aa.canSubmit : po.status === 'draft'
+  const isEditable = aa ? aa.canEdit : po.status === 'draft' || po.status === 'sent_back'
+  const canSubmit = aa ? aa.canSubmit : isEditable && requireApprovalOnPo
   const canApprove = aa ? aa.canApprove : po.status === 'pending_approval'
-  const canRelease = aa ? aa.canSendToVendor : po.status === 'approved'
-  const canReopen = aa ? aa.canReopen : po.status === 'closed'
+  // With approval required, Open/Sent Back must be submitted first — only Approved can release.
+  const canRelease = aa
+    ? aa.canSendToVendor
+    : requireApprovalOnPo
+      ? po.status === 'approved'
+      : po.status === 'approved' || po.status === 'draft' || po.status === 'sent_back'
+  const canReopen = aa ? aa.canReopen : po.status === 'closed' || po.status === 'rejected' || po.status === 'cancelled'
   const canSendToVendor = aa
     ? aa.canSendToVendor
     : (po.status === 'approved' || po.status === 'released') && !po.sentToVendorAt
   const canCreateGrn = aa ? aa.canReceive : RECEIVABLE_STATUSES.includes(po.status)
   const canRevise = aa
     ? Boolean(aa.canRevise)
-    : REVISABLE_STATUSES.includes(po.status)
-  const canClose = aa ? aa.canClose : !['draft', 'closed', 'cancelled'].includes(po.status)
-  const canCancel = aa ? aa.canCancel : !['closed', 'cancelled'].includes(po.status)
+    : REVISABLE_STATUSES.includes(po.status) && !po.lines.some((l) => l.receivedQty > 0)
+  const canClose = aa ? aa.canClose : !['draft', 'closed', 'cancelled', 'pending_approval'].includes(po.status)
+  const canCancel = aa ? aa.canCancel : po.status === 'pending_approval'
 
   const approveGate = purchaseActionGate({
     permission: 'purchase.po.approve',
@@ -290,7 +435,7 @@ export function PurchaseOrderDetailPage() {
   const submitGate = purchaseActionGate({
     permission: 'purchase.po.edit',
     statusAllowed: canSubmit,
-    statusBlockedReason: 'Only Draft orders can be submitted',
+    statusBlockedReason: 'Only Open or Sent Back orders can be sent for approval',
   })
   const editGate = purchaseActionGate({
     permission: 'purchase.po.edit',
@@ -307,14 +452,6 @@ export function PurchaseOrderDetailPage() {
 
   const gstTotal = po.cgst + po.sgst + po.igst
   const taxTotalsDefaultOpen = hasMeaningfulTaxTotals(po.subtotal, gstTotal, po.totalAmount)
-  const commercialPeek = commercialTermsSummary({
-    expectedDelivery: po.expectedDeliveryDate,
-    paymentTerms: po.paymentTerms,
-    freightTerms: po.freightTerms,
-    deliveryTerms: po.deliveryTerms,
-    priceBasis: po.priceBasis,
-    validityDate: po.validityDate,
-  })
   const taxPeek = taxTotalsSummary({
     subtotal: po.subtotal,
     tax: gstTotal,
@@ -342,7 +479,6 @@ export function PurchaseOrderDetailPage() {
           { label: 'Purchase Orders', to: '/purchase/orders' },
           { label: po.documentNumber },
         ]}
-        backLink={{ to: '/purchase/orders', label: 'Back to Purchase Orders' }}
         createdBy={po.createdBy}
         createdDate={formatDate(po.createdAt.slice(0, 10))}
         modifiedBy={po.updatedBy ?? undefined}
@@ -353,7 +489,8 @@ export function PurchaseOrderDetailPage() {
           <ErpCommandBar
             inline
             sticky={false}
-            collapseSecondaryOnNarrow={false}
+            moreActionsLabel="More"
+            maxHeaderActions={3}
             primaryAction={
               canApprove && !approveGate.hidden
                 ? {
@@ -377,10 +514,13 @@ export function PurchaseOrderDetailPage() {
                   : canSubmit && !submitGate.hidden
                     ? {
                         id: 'submit',
-                        label: 'Submit',
+                        label: 'Send for Approval',
                         icon: Send,
                         onClick: () =>
-                          void runAction(() => submitPurchaseOrder(po.id), `${po.documentNumber} submitted`),
+                          void runAction(
+                            () => submitPurchaseOrder(po.id),
+                            `${po.documentNumber} sent for approval`,
+                          ),
                         disabled: busy || submitGate.disabled,
                         disabledReason: submitGate.disabledReason,
                       }
@@ -474,7 +614,6 @@ export function PurchaseOrderDetailPage() {
                 id: 'print',
                 label: 'Print',
                 icon: Printer,
-                pin: true,
                 onClick: () => navigate(`/purchase/orders/${po.id}/print`),
               },
               {
@@ -526,7 +665,7 @@ export function PurchaseOrderDetailPage() {
 
         <ErpCardSection
           title="General"
-          subtitle="Identity, vendor, and locations"
+          subtitle="Identity, vendor, locations, and commercial terms"
           collapsible
           defaultOpen
           columns={4}
@@ -538,7 +677,7 @@ export function PurchaseOrderDetailPage() {
             label="Status"
             value={<StatusDot label={statusLabel} tone={statusToneFromLabel(po.status)} />}
           />
-          <ErpViewField label="Revision" value={`Rev ${po.revisionNo}`} />
+          <ErpViewField label="Revised version" value={String(po.revisionNo)} />
           <ErpViewField label="Currency" value={po.currency} />
           <ErpViewField label="Vendor" value={`${po.vendor.code} — ${po.vendor.name}`} />
           <ErpViewField label="Vendor GST Number" value={po.vendor.gstin} />
@@ -546,6 +685,21 @@ export function PurchaseOrderDetailPage() {
           <ErpViewField label="Buyer" value={po.buyer.name} />
           <ErpViewField label="Purchase Location" value={po.purchaseLocation.name} />
           <ErpViewField label="Delivery Location" value={po.deliveryLocation.name} />
+          <ErpViewField label="Expected Delivery Date" value={formatDate(po.expectedDeliveryDate)} />
+          <ErpViewField label="Validity Date" value={po.validityDate ? formatDate(po.validityDate) : '—'} />
+          <ErpViewField label="Price Basis" value={po.priceBasis || '—'} />
+          <ErpViewField label="Payment Terms" value={po.paymentTerms} />
+          <ErpViewField label="Delivery Terms" value={po.deliveryTerms} />
+          <ErpViewField label="Freight Terms" value={po.freightTerms || '—'} />
+          <ErpViewField label="Packing Terms" value={po.packingTerms || '—'} />
+          <ErpViewField label="Insurance Terms" value={po.insuranceTerms || '—'} />
+          <ErpViewField label="Warranty" value={po.warranty || '—'} />
+          <ErpViewField label="Inspection Requirement" value={po.inspectionRequirement || '—'} />
+          <ErpViewField
+            label="Sent to Vendor"
+            value={po.sentToVendorAt ? formatDate(po.sentToVendorAt.slice(0, 10)) : '—'}
+          />
+          <ErpViewField label="Released At" value={po.releasedAt ? formatDate(po.releasedAt.slice(0, 10)) : '—'} />
           <ErpViewField label="Vendor Address" value={po.vendor.address || '—'} colSpan={3} />
           <ErpViewField label="Source PR" hideIfEmpty>
             {po.purchaseRequisitionId ? (
@@ -582,31 +736,6 @@ export function PurchaseOrderDetailPage() {
         </ErpCardSection>
 
         <ErpCardSection
-          title="Commercial Terms"
-          subtitle="Delivery, payment, and logistics"
-          collapsedSummary={commercialPeek || undefined}
-          collapsible
-          defaultOpen={false}
-          columns={4}
-        >
-          <ErpViewField label="Expected Delivery Date" value={formatDate(po.expectedDeliveryDate)} />
-          <ErpViewField label="Validity Date" value={po.validityDate ? formatDate(po.validityDate) : '—'} />
-          <ErpViewField label="Price Basis" value={po.priceBasis || '—'} />
-          <ErpViewField label="Payment Terms" value={po.paymentTerms} />
-          <ErpViewField label="Delivery Terms" value={po.deliveryTerms} />
-          <ErpViewField label="Freight Terms" value={po.freightTerms || '—'} />
-          <ErpViewField label="Packing Terms" value={po.packingTerms || '—'} />
-          <ErpViewField label="Insurance Terms" value={po.insuranceTerms || '—'} />
-          <ErpViewField label="Warranty" value={po.warranty || '—'} />
-          <ErpViewField label="Inspection Requirement" value={po.inspectionRequirement || '—'} />
-          <ErpViewField
-            label="Sent to Vendor"
-            value={po.sentToVendorAt ? formatDate(po.sentToVendorAt.slice(0, 10)) : '—'}
-          />
-          <ErpViewField label="Released At" value={po.releasedAt ? formatDate(po.releasedAt.slice(0, 10)) : '—'} />
-        </ErpCardSection>
-
-        <ErpCardSection
           title="Item Lines"
           subtitle={`${po.lines.length} line${po.lines.length === 1 ? '' : 's'}`}
           columns={1}
@@ -633,7 +762,8 @@ export function PurchaseOrderDetailPage() {
                     <th className="num">Received</th>
                     <th className="num">Pending</th>
                     <th>Status</th>
-                    <th>Required Date</th>
+                    <th>Expected Delivery</th>
+                    <th>Requisition no.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -666,7 +796,10 @@ export function PurchaseOrderDetailPage() {
                           {PURCHASE_ORDER_LINE_STATUS_LABELS[l.lineStatus]}
                         </Badge>
                       </td>
-                      <td className="whitespace-nowrap">{formatDate(l.requiredDate)}</td>
+                      <td className="whitespace-nowrap">
+                        {formatDate(l.expectedDeliveryDate || l.requiredDate)}
+                      </td>
+                      <td className="font-mono text-[12px]">{l.requisitionNo || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -758,6 +891,7 @@ export function PurchaseOrderDetailPage() {
           <PurchaseAuditTimeline
             entityType="purchase-order"
             entityId={po.id}
+            showTitle={false}
             className="border-0 p-0 shadow-none"
             demoEvents={buildDemoPurchaseTimeline({
               entityId: po.id,

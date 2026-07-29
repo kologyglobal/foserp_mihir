@@ -129,8 +129,8 @@ export const PURCHASE_ORDER_DOMAIN_STATUSES: readonly PurchaseOrderDomainStatus[
 ] as const
 
 export const PURCHASE_ORDER_DOMAIN_STATUS_LABELS: Record<PurchaseOrderDomainStatus, string> = {
-  draft: 'Draft',
-  pending_approval: 'Sent for Approval',
+  draft: 'Open',
+  pending_approval: 'Pending Approved',
   approved: 'Approved',
   rejected: 'Rejected',
   sent_back: 'Sent Back',
@@ -772,6 +772,8 @@ export interface PurchaseSetupGeneral {
   overReceiptTolerancePct: number
   /** When true, revising a released PO returns it to Pending Approval. */
   requireApprovalOnPoRevision: boolean
+  /** When true, new POs must be submitted for approval before release. */
+  requireApprovalOnPo: boolean
   allowShortClose: boolean
   requirePoWarehouse: boolean
   requireExpectedDeliveryDate: boolean
@@ -1841,6 +1843,8 @@ export interface PurchaseOrderLine {
   locationName: string
   expectedDeliveryDate: IsoDate
   prLineId: string | null
+  /** Display / editable PR document number on the line (manual or from source). */
+  requisitionNo?: string | null
   rfqLineId: string | null
   vendorQuotationLineId: string | null
   remarks: string

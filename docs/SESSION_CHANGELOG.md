@@ -1,3 +1,15 @@
+## 2026-07-29 — PO editor / lifecycle (`purchase_16`)
+
+### Shipped
+- Editor collapsed to 4 sections (General, Item Lines, Tax & Totals, Terms/Notes/Attachments); Source Reference panel removed
+- Line grid scroll fix; Expected Delivery Date + Requisition no. on lines (`requisitionNumber` column)
+- Status labels Open / Pending Approved / Released; readonly Status + Revised version on General
+- `requireApprovalOnPo`: approve → Released; Cancel Pending → Open; approval-off Release from Open
+- List actions slimmed + Reopen; revise archives to `purchase_order_archived` / `purchase_line_archived`; revise blocked after any receipt
+- Docs: `docs/PURCHASE_PO_VERSIONING.md`
+
+---
+
 ## 2026-07-29 — Purchase dashboard GRNI (received, not invoiced)
 
 ### Shipped

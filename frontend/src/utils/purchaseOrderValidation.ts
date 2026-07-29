@@ -22,11 +22,11 @@ export type PoValidationResult = {
   errors: string[]
   fieldErrors: Record<string, string>
   lineErrors: Record<string, string>
-  /** FastTab section ids to expand (`general` | `commercial` | `lines`) */
-  sectionsToOpen: Array<'general' | 'commercial' | 'lines'>
+  /** FastTab section ids to expand (`general` | `lines` | `notes`) */
+  sectionsToOpen: Array<'general' | 'lines' | 'notes'>
   /** Prefer scrolling to this field DOM id when present */
   firstFieldId: string | null
-  firstSection: 'general' | 'commercial' | 'lines' | null
+  firstSection: 'general' | 'lines' | 'notes' | null
 }
 
 export function purchaseFieldId(field: string) {
@@ -64,9 +64,9 @@ export function validatePurchaseOrderForm(
   const errors: string[] = []
   const fieldErrors: Record<string, string> = {}
   const lineErrors: Record<string, string> = {}
-  const sectionsToOpen: Array<'general' | 'commercial' | 'lines'> = []
+  const sectionsToOpen: Array<'general' | 'lines' | 'notes'> = []
 
-  const pushSection = (section: 'general' | 'commercial' | 'lines') => {
+  const pushSection = (section: 'general' | 'lines' | 'notes') => {
     if (!sectionsToOpen.includes(section)) sectionsToOpen.push(section)
   }
 
@@ -96,14 +96,14 @@ export function validatePurchaseOrderForm(
   if (!header.expectedDeliveryDate.trim()) {
     errors.push('Expected Delivery Date is required.')
     fieldErrors.expectedDeliveryDate = 'Required'
-    pushSection('commercial')
+    pushSection('general')
   } else if (
     header.documentDate &&
     header.expectedDeliveryDate < header.documentDate
   ) {
     errors.push('Expected Delivery Date cannot be before PO Date.')
     fieldErrors.expectedDeliveryDate = 'Cannot be before PO Date'
-    pushSection('commercial')
+    pushSection('general')
   }
 
   const usableLines = lines.filter(lineHasAnyContent)

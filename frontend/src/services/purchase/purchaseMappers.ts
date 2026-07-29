@@ -1180,6 +1180,7 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
     locationName: '',
     expectedDeliveryDate: requiredDate,
     prLineId: line.purchaseRequisitionLineId,
+    requisitionNo: line.requisitionNumber ?? null,
     rfqLineId: null,
     vendorQuotationLineId: null,
     remarks: line.remarks ?? '',
@@ -1398,9 +1399,10 @@ export function mapDomainPoInputToApiPayload(
         uomConversionFactor: factor,
         uomId: uuidOrNull(line.uomId ?? null),
         rate: Number(line.rate) || 0,
-        requiredDate: line.requiredDate ?? null,
+        requiredDate: line.requiredDate ?? line.expectedDeliveryDate ?? null,
         remarks: line.remarks ?? null,
         purchaseRequisitionLineId: uuidOrNull(line.prLineId ?? null),
+        requisitionNumber: line.requisitionNo?.trim() || null,
       }
     }),
   }

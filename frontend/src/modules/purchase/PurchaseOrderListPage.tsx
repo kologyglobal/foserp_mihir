@@ -32,17 +32,18 @@ import {
   buildPoRegisterSuggestions,
 } from '../../utils/poRegisterInsights'
 import {
-  approvePurchaseOrder,
   cancelPurchaseOrder,
   getPurchaseOrderList,
+  getPurchaseSetup,
   PurchaseServiceError,
-  releasePurchaseOrder,
+  reopenPurchaseOrder,
   submitPurchaseOrder,
 } from '../../services/purchase'
 import type { PurchaseOrderListRow } from '../../types/purchaseDomain'
 import { exportRowsToCsv } from '../../utils/exportCsv'
 import { poListBreadcrumbs } from '../../utils/purchaseNavigation'
 import { notify } from '../../store/toastStore'
+import { appPromptNote } from '../../store/confirmDialogStore'
 import { usePurchasePermissions } from '../../utils/permissions'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'empty'
@@ -104,13 +105,19 @@ export function PurchaseOrderListPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [requireApprovalOnPo, setRequireApprovalOnPo] = useState(true)
 
   const load = useCallback(async (signal?: { cancelled: boolean }) => {
     setLoadState('loading')
     setErrorMessage(null)
     try {
-      const list = await getPurchaseOrderList()
+      const [list, setup] = await Promise.all([
+        getPurchaseOrderList(),
+        // Setup only drives action visibility — never fail the register on it.
+        getPurchaseSetup().catch(() => null),
+      ])
       if (signal?.cancelled) return
+      setRequireApprovalOnPo(setup?.general.requireApprovalOnPo ?? true)
       setRows(list)
       setLoadState(list.length === 0 ? 'empty' : 'ready')
     } catch (err) {
@@ -283,23 +290,42 @@ export function PurchaseOrderListPage() {
     () => ({
       onView: (po: PurchaseOrderListRow) => navigate(`/purchase/orders/${po.id}`),
       onEdit: (po: PurchaseOrderListRow) => navigate(`/purchase/orders/${po.id}/edit`),
-      onRevise: (po: PurchaseOrderListRow) => navigate(`/purchase/orders/${po.id}/revise`),
-      onPrint: (po: PurchaseOrderListRow) => navigate(`/purchase/orders/${po.id}/print`),
       onSubmit: (po: PurchaseOrderListRow) =>
         void runAction(
           po.id,
           () => submitPurchaseOrder(po.id),
-          `${po.documentNumber} submitted for approval`,
+          `${po.documentNumber} sent for approval`,
         ),
-      onApprove: (po: PurchaseOrderListRow) =>
-        void runAction(po.id, () => approvePurchaseOrder(po.id), `${po.documentNumber} approved`),
-      onRelease: (po: PurchaseOrderListRow) =>
-        void runAction(po.id, () => releasePurchaseOrder(po.id), `${po.documentNumber} released`),
-      onCancel: (po: PurchaseOrderListRow) =>
+      onPrint: (po: PurchaseOrderListRow) => navigate(`/purchase/orders/${po.id}/print`),
+      onReopen: (po: PurchaseOrderListRow) =>
+        void runAction(po.id, () => reopenPurchaseOrder(po.id), `${po.documentNumber} reopened`),
+      onCancel: (po: PurchaseOrderListRow) => {
+        void (async () => {
+          const reason = await appPromptNote({
+            title: `Cancel ${po.documentNumber}`,
+            description:
+              'Cancelling withdraws the approval request and returns the order to Open.',
+            confirmLabel: 'Confirm Cancel',
+            tone: 'danger',
+            note: {
+              label: 'Cancellation reason',
+              placeholder: 'Why is this being cancelled?',
+              required: false,
+            },
+          })
+          if (reason === null) return
+          await runAction(
+            po.id,
+            () => cancelPurchaseOrder(po.id, reason || undefined),
+            `${po.documentNumber} cancelled — back to Open`,
+          )
+        })()
+      },
+      onDelete: (po: PurchaseOrderListRow) =>
         void runAction(
           po.id,
-          () => cancelPurchaseOrder(po.id, 'Cancelled from list'),
-          `${po.documentNumber} cancelled`,
+          () => cancelPurchaseOrder(po.id, 'Deleted from list'),
+          `${po.documentNumber} deleted`,
         ),
     }),
     [navigate],
@@ -472,6 +498,7 @@ export function PurchaseOrderListPage() {
                 rows={filtered}
                 busyId={busyId}
                 handlers={rowHandlers}
+                requireApprovalOnPo={requireApprovalOnPo}
                 hasActiveFilters={activeFilters}
                 onClearFilters={clearFilters}
                 onExport={exportList}

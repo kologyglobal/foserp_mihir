@@ -72,6 +72,7 @@ export const rejectPurchaseOrder = asyncHandler(async (req: Request, res: Respon
     getRouteParam(req, 'id'),
     getUserId(req),
     req.body ?? {},
+    getContext(req).permissions,
   )
   sendSuccess(res, 'Purchase order rejected', data)
 })
@@ -82,6 +83,7 @@ export const sendBackPurchaseOrder = asyncHandler(async (req: Request, res: Resp
     getRouteParam(req, 'id'),
     getUserId(req),
     req.body ?? {},
+    getContext(req).permissions,
   )
   sendSuccess(res, 'Purchase order sent back for rework', data)
 })

@@ -202,6 +202,9 @@ export async function replacePurchaseOrderLines(
     itemNameSnapshot: string
     description: string | null
     quantity: number
+    uomQuantity?: number
+    uomConversionFactor?: number
+    unitCostPrimary?: number
     uomId: string | null
     rate: number
     amount: number
@@ -209,6 +212,7 @@ export async function replacePurchaseOrderLines(
     remarks: string | null
     purchaseRequisitionLineId: string | null
     purchasePlanningRowId: string | null
+    requisitionNumber?: string | null
   }>,
   tx: Prisma.TransactionClient,
 ) {

@@ -269,7 +269,14 @@ async function toPurchaseOrderDto(
     order.updatedById,
     ...revisionIds,
   ])
-  return mapPurchaseOrderToDto(order, userNames)
+  const settings = await resolveEffectivePurchaseDefaults(
+    tenantId,
+    order.deliveryWarehouse?.plantId,
+  )
+  const requireApprovalOnPo = Boolean(
+    (settings as { requireApprovalOnPo?: boolean }).requireApprovalOnPo ?? true,
+  )
+  return mapPurchaseOrderToDto(order, userNames, { requireApprovalOnPo })
 }
 
 export async function listPurchaseOrders(tenantId: string, query: ListPurchaseOrdersQuery) {
@@ -735,10 +742,12 @@ export async function approvePurchaseOrder(
     : false
   assertApprovable(existing, actorId, { allowSelfApproval })
   await assertApprovalAssignedToActor(tenantId, id, actorId, actorPermissions)
+  const now = new Date()
   return applyLifecycleTransition(tenantId, actorId, existing, {
     action: 'APPROVED',
     auditAction: PURCHASE_AUDIT_ACTION.PO_APPROVED,
-    data: { status: 'APPROVED', approvedAt: new Date() },
+    // Approve releases the PO (UI status: Released / SENT_TO_VENDOR).
+    data: { status: 'SENT_TO_VENDOR', approvedAt: now, sentAt: now },
     approvalResolution: 'APPROVED',
     remarks: input.remarks ?? null,
     // Traceability: maker-checker was bypassed via self-approval policy/permission.
@@ -751,10 +760,11 @@ export async function rejectPurchaseOrder(
   id: string,
   actorId: string,
   input: PoReasonInput = {},
+  actorPermissions: readonly string[] = [],
 ) {
   const existing = await loadOrThrow(tenantId, id)
   assertRejectable(existing)
-  await assertApprovalAssignedToActor(tenantId, id, actorId, [])
+  await assertApprovalAssignedToActor(tenantId, id, actorId, actorPermissions)
   const reason = assertReasonPresent(
     input.reason ?? input.remarks,
     PURCHASE_ERROR_CODE.PO_REJECTION_REASON_REQUIRED,
@@ -773,10 +783,11 @@ export async function sendBackPurchaseOrder(
   id: string,
   actorId: string,
   input: PoReasonInput = {},
+  actorPermissions: readonly string[] = [],
 ) {
   const existing = await loadOrThrow(tenantId, id)
   assertSendBackable(existing)
-  await assertApprovalAssignedToActor(tenantId, id, actorId, [])
+  await assertApprovalAssignedToActor(tenantId, id, actorId, actorPermissions)
   const reason = assertReasonPresent(
     input.reason ?? input.remarks,
     PURCHASE_ERROR_CODE.PO_SEND_BACK_REASON_REQUIRED,
@@ -797,7 +808,14 @@ export async function sendPurchaseOrderToVendor(
   input: PoLifecycleRemarksInput = {},
 ) {
   const existing = await loadOrThrow(tenantId, id)
-  assertSendableToVendor(existing)
+  const settings = await resolveEffectivePurchaseDefaults(
+    tenantId,
+    existing.deliveryWarehouse?.plantId,
+  )
+  const requireApprovalOnPo = Boolean(
+    (settings as { requireApprovalOnPo?: boolean }).requireApprovalOnPo ?? true,
+  )
+  assertSendableToVendor(existing, { requireApprovalOnPo })
   return applyLifecycleTransition(tenantId, actorId, existing, {
     action: 'SENT_TO_VENDOR',
     auditAction: PURCHASE_AUDIT_ACTION.PO_SENT_TO_VENDOR,
@@ -814,10 +832,32 @@ export async function cancelPurchaseOrder(
 ) {
   const existing = await loadOrThrow(tenantId, id)
   assertCancellable(existing)
+
+  // Open (Draft): mark Cancelled (list Delete). Released cannot cancel.
+  if (existing.status === 'DRAFT') {
+    return applyLifecycleTransition(tenantId, actorId, existing, {
+      action: 'CANCELLED',
+      auditAction: PURCHASE_AUDIT_ACTION.PO_CANCELLED,
+      data: { status: 'CANCELLED', cancelledAt: new Date() },
+      approvalResolution: 'CANCELLED',
+      remarks: input.remarks ?? null,
+    })
+  }
+
+  // Pending Approved: withdraw back to Open (Draft).
   return applyLifecycleTransition(tenantId, actorId, existing, {
     action: 'CANCELLED',
     auditAction: PURCHASE_AUDIT_ACTION.PO_CANCELLED,
-    data: { status: 'CANCELLED', cancelledAt: new Date() },
+    data: {
+      status: 'DRAFT',
+      submittedAt: null,
+      approvedAt: null,
+      rejectedAt: null,
+      rejectionReason: null,
+      sentBackAt: null,
+      sendBackReason: null,
+      cancelledAt: null,
+    },
     approvalResolution: 'CANCELLED',
     remarks: input.remarks ?? null,
   })

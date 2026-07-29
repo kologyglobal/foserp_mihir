@@ -26,6 +26,7 @@ export const DEFAULT_PURCHASE_SETUP: PurchaseSetup = {
     allowOverReceipt: true,
     overReceiptTolerancePct: 5,
     requireApprovalOnPoRevision: true,
+    requireApprovalOnPo: true,
     allowShortClose: true,
     requirePoWarehouse: false,
     requireExpectedDeliveryDate: false,

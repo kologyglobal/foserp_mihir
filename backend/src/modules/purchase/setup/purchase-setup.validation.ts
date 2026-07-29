@@ -81,6 +81,7 @@ const generalSchema = z.object({
   allowOverReceipt: z.boolean().optional(),
   overReceiptTolerancePct: pct.optional(),
   requireApprovalOnPoRevision: z.boolean().optional(),
+  requireApprovalOnPo: z.boolean().optional(),
   allowShortClose: z.boolean().optional(),
   requirePoWarehouse: z.boolean().optional(),
   requireExpectedDeliveryDate: z.boolean().optional(),
