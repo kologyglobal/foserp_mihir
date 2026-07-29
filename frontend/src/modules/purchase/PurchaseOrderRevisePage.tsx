@@ -109,6 +109,11 @@ export function PurchaseOrderRevisePage() {
         }
         return
       }
+      if (row.lines.some((l) => Number(l.receivedQty) > 0)) {
+        notify.info('Revise is disabled after goods have been received against this order')
+        navigate(`/purchase/orders/${row.id}`, { replace: true })
+        return
+      }
       setPo(row)
       setLines(
         row.lines.map((l: PurchaseOrderLine) => {

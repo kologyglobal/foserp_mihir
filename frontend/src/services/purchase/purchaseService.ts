@@ -946,6 +946,12 @@ function assertPoRevisable(po: PurchaseOrder) {
       'Only released (or later open) purchase orders can be revised',
     )
   }
+  if (po.lines.some((l) => Number(l.receivedQty) > 0)) {
+    throw new PurchaseServiceError(
+      'PO_NOT_REVISABLE',
+      'Revise is disabled after goods have been received against this order',
+    )
+  }
 }
 
 /* -------------------------------------------------------------------------- */

@@ -54,9 +54,17 @@ export function assertEditable(po: Pick<PurchaseOrder, 'status' | 'deletedAt'>):
   }
 }
 
-export function assertRevisable(po: Pick<PurchaseOrder, 'status' | 'deletedAt'>): void {
+export function assertRevisable(
+  po: Pick<PurchaseOrder, 'status' | 'deletedAt'> & {
+    lines?: Array<Pick<PurchaseOrderLine, 'receivedQuantity'>>
+  },
+): void {
   assertNotDeleted(po)
   if (!PO_REVISABLE_STATUSES.includes(po.status)) {
+    throw workflowError(PURCHASE_ERROR_CODE.PO_NOT_REVISABLE)
+  }
+  const received = (po.lines ?? []).reduce((sum, l) => sum + Number(l.receivedQuantity), 0)
+  if (received > 0) {
     throw workflowError(PURCHASE_ERROR_CODE.PO_NOT_REVISABLE)
   }
 }
