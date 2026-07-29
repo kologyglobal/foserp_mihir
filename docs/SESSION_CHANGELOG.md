@@ -1,3 +1,87 @@
+## 2026-07-28 — MFG-GOLDEN-1 Fuel Tank golden path closure
+
+### Shipped
+- Audit: `docs/manufacturing/MFG_GOLDEN_PATH_AUDIT.md` (LOGICAL SFG Job Cards = stages; no JobCard table)
+- Docs: `FUEL_TANK_GOLDEN_PATH.md`, `MFG_JOB_CARD_EXECUTION.md`, `MFG_ROUTE_EXECUTION_UAT.md`, `MFG_MATERIAL_COST_UAT.md`, `MFG_QC_GOLDEN_PATH.md`, `MFG_FG_SERIAL_UAT.md`, `MFG_CLOSE_READINESS_UAT.md`, `MFG_GOLDEN_PATH_TEST_RESULTS.md`
+- Re-ran seeds + `test-fuel-tank-wo-execution.ts` → **PASS** (`WO-000010`, serial `FT-5000L-52948875`, ₹111,020 material=WO=FG)
+- No Manufacturing feature rebuild; no hard blockers
+
+### Verdict
+**MANUFACTURING GOLDEN PATH — READY FOR CONTROLLED PILOT**
+
+---
+
+## 2026-07-28 — Purchase completion (QI / Invoice / Return / Costing / AP links)
+
+### Shipped
+- Audit: `docs/purchase/PURCHASE_COMPLETION_AUDIT.md` + QI/Invoice/Return/Costing/AP/UAT docs
+- GRN detail: Receiving chain (QI · Costing · Invoice · Return); Create Invoice; cost entries deep-link with `?search=`
+- Purchase Invoice: honest AP handoff messaging; Money Out deep link; `accountingVendorInvoiceId` mapped
+- Purchase Return: ACCOUNTING_ADJUSTMENT_PENDING banner (no fake AP credit)
+- Integration test: `purchase-completion-grn-costing.test.ts` (GRN → InventoryCostEntry) **PASS**
+
+### Verdict
+**READY FOR INTERNAL UAT** (Purchase to stock value + VI draft). Deferred: return→AP debit, invoice retro cost adjust, QI parameter persistence, supplier performance dashboard.
+
+---
+
+## 2026-07-28 — Inventory Costing UAT-1 production hardening
+
+### Shipped
+- Audit: `docs/inventory/INVENTORY_COSTING_UAT_AUDIT.md`
+- Controlled UAT suite: `backend/tests/inventory-costing-uat1-controlled.test.ts` (MA / FIFO+transfer / Standard / Specific / method preview + tenant isolation) — **PASS**
+- Cost entry stamps in-memory rate/value (parity with movement value; no DB rate 2dp re-round)
+- Transfer receive preserves dispatch cost entry unit cost
+- Method change: `GET …/method-change/preview` readiness + wizard Readiness→Preview→Execute
+- MA history: `GET …/moving-average/history` derived before/after; FE History grid
+- Recon reason codes expanded; GL **Not Available** (not ₹0)
+- Standard Cost create: `ItemLookupSelect` (no UUID typing)
+- Docs: CONTROLLED_UAT, INVARIANTS, METHOD_CHANGE_UAT, PRODUCTION_READINESS, TEST_RESULTS
+
+### Verdict
+**READY WITH CONDITIONS** — automated method golden paths pass; live SPA sign-off, purchase-return/dispatch 4-method matrices, 10k performance, fine-grained approve, Inventory↔GL TB still open.
+
+---
+
+## 2026-07-28 — Inventory Costing FE + Valuation Reconciliation
+
+### Shipped
+- FE audit: `docs/inventory/INVENTORY_COSTING_FE_AUDIT.md` + UI docs for entries/FIFO/MA/standard/specific/recon/method-change
+- Read APIs: `overview`, `items`, `moving-average`, `standard-costs` (list), `specific`, `POST reconciliation/run`; enriched cost entries/layers with item/warehouse
+- Overview hub: summary strip, policy panel, health, valuation-by-item table
+- Registers: named entries, MA state, standard versions, specific ID with unidentified highlight, recon Run + reason codes
+- Method change shows current method; route aliases (`fifo-layers`, `moving-average`, …)
+- No force-balance; no frontend cost recalculation
+
+### Decision
+**READY WITH CONDITIONS** for internal UAT (live method golden paths + recon still need controlled API-mode sign-off).
+
+---
+
+## 2026-07-28 — IV-MFG-1 Inventory valuation consolidation
+
+### Architecture
+- **Canonical:** `InventoryValuationMethod` (FIFO / MOVING_WEIGHTED_AVERAGE / STANDARD_COST / SPECIFIC_IDENTIFICATION).
+- **Legacy:** `ManufacturingInventoryValuationMethod` marked deprecated (column retained; unused at runtime).
+- WO material cost prefers **`InventoryCostEntry`** (`sourceEntityType = INVENTORY_COST_ENTRY`); fallback movement value / provisional standard.
+- `getEffectiveValuationMethod` + APIs: `GET …/inventory/costing/effective-method`, `GET …/inventory/costing/items/:itemId/summary`, `GET …/manufacturing/work-orders/:id/cost-trace/:entryId`.
+- WO Costing tab: material table + cost-trace drawer (Inventory-owned valuation display).
+
+### Docs
+- `docs/inventory/INVENTORY_MANUFACTURING_COSTING_AUDIT.md`
+- `docs/inventory/INVENTORY_VALUATION_ARCHITECTURE.md`
+- `docs/inventory/INVENTORY_COSTING_UI.md`
+- `docs/manufacturing/MANUFACTURING_COST_INTEGRATION.md`
+- `docs/manufacturing/LEGACY_MANUFACTURING_VALUATION_MIGRATION.md`
+- `docs/manufacturing/WO_COST_TRACEABILITY.md`
+- `docs/accounting/INVENTORY_MANUFACTURING_POSTING_FLOW.md`
+- Updated `MATERIAL_COSTING_RULES.md`
+
+### Verified
+- Adapter unit test `inventory-mfg-valuation-adapter.test.ts` (run with suite).
+
+---
+
 ## 2026-07-27 — Inventory valuation methods hardened (all 4)
 
 ### Fixes

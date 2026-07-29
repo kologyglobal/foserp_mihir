@@ -208,7 +208,9 @@ export function PurchaseInvoiceDetailPage() {
             onClick: () =>
               void run(
                 () => postPurchaseInvoice(inv.id),
-                'Invoice posted (AP/GL deferred — demo confirmation only)',
+                apiMode
+                  ? 'Invoice posted — Vendor Invoice draft created in Money Out (AP SoT). Post GL from Accounting.'
+                  : 'Invoice posted (demo)',
               ),
             disabled: busy || postBlocked,
             disabledReason: postBlocked
@@ -341,6 +343,24 @@ export function PurchaseInvoiceDetailPage() {
                 hidden: !perms.canCreateInvoice || !editable,
                 disabled: busy,
               },
+              {
+                id: 'money-out',
+                label: 'Open in Money Out',
+                icon: Building2,
+                onClick: () => {
+                  const viId =
+                    inv.accountingVendorInvoiceId ||
+                    (typeof apPreview?.existingVendorInvoiceId === 'string'
+                      ? apPreview.existingVendorInvoiceId
+                      : null)
+                  navigate(
+                    viId
+                      ? `/accounting/money-out/vendor-invoices/${viId}`
+                      : '/accounting/money-out/vendor-invoices',
+                  )
+                },
+                hidden: !apiMode || inv.status !== 'posted',
+              },
             ]}
             moreActions={[
               {
@@ -396,8 +416,8 @@ export function PurchaseInvoiceDetailPage() {
                   void run(
                     () => postPurchaseInvoice(inv.id),
                     apiMode
-                      ? 'Invoice posted'
-                      : 'Invoice posted (AP/GL deferred — demo confirmation only)',
+                      ? 'Invoice posted — Vendor Invoice draft created in Money Out (AP SoT). Post GL from Accounting.'
+                      : 'Invoice posted (demo)',
                   ),
                 hidden: !showPost || primaryAction?.id === 'post',
                 disabled: busy || postBlocked,
@@ -723,41 +743,50 @@ export function PurchaseInvoiceDetailPage() {
 
         {apiMode && (apPreview || apPreviewError) ? (
           <ErpCardSection
-            title="AP handoff preview"
-            subtitle="Vendor invoice draft mapping"
+            title="AP handoff"
+            subtitle="Accounting Vendor Invoice is the liability SoT — Purchase does not post GL"
             icon={Building2}
             columns={1}
             collapsible
-            defaultOpen={Boolean(apPreviewError)}
+            defaultOpen={Boolean(apPreviewError) || inv.status === 'posted'}
           >
             {apPreviewError ? (
               <p className="text-sm text-erp-muted">{apPreviewError}</p>
             ) : (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 text-sm">
-                <ErpViewField
-                  label="Vendor invoice no."
-                  value={String(apPreview?.vendorInvoiceNumber ?? apPreview?.invoiceNumber ?? '—')}
-                />
-                <ErpViewField
-                  label="Grand total"
-                  value={
-                    apPreview?.grandTotal != null
-                      ? formatCurrency(Number(apPreview.grandTotal))
-                      : apPreview?.totalAmount != null
-                        ? formatCurrency(Number(apPreview.totalAmount))
-                        : '—'
-                  }
-                />
-                <ErpViewField
-                  label="Legal entity"
-                  value={String(apPreview?.legalEntityId ?? apPreview?.legalEntityName ?? '—')}
-                />
-                <ErpViewField
-                  label="Lines"
-                  value={String(
-                    Array.isArray(apPreview?.lines) ? apPreview.lines.length : '—',
-                  )}
-                />
+              <div className="space-y-3">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+                  <ErpViewField
+                    label="Accounting status"
+                    value={
+                      inv.accountingVendorInvoiceId || apPreview?.existingVendorInvoiceId
+                        ? 'Vendor Invoice draft linked'
+                        : inv.status === 'posted'
+                          ? 'Handoff pending / check Finance Settings'
+                          : 'Not posted yet'
+                    }
+                  />
+                  <ErpViewField
+                    label="Vendor invoice no."
+                    value={String(apPreview?.supplierInvoiceNumber ?? apPreview?.vendorInvoiceNumber ?? inv.vendorInvoiceNumber ?? '—')}
+                  />
+                  <ErpViewField
+                    label="Draft ref / ID"
+                    value={String(
+                      inv.accountingVendorInvoiceId ??
+                        apPreview?.existingVendorInvoiceId ??
+                        apPreview?.existingVendorInvoiceDraftRef ??
+                        '—',
+                    )}
+                  />
+                </div>
+                {(inv.accountingVendorInvoiceId || apPreview?.existingVendorInvoiceId) && (
+                  <Link
+                    to={`/accounting/money-out/vendor-invoices/${String(inv.accountingVendorInvoiceId ?? apPreview?.existingVendorInvoiceId)}`}
+                    className="text-[13px] font-semibold text-erp-primary hover:underline"
+                  >
+                    Open in Money Out →
+                  </Link>
+                )}
               </div>
             )}
           </ErpCardSection>

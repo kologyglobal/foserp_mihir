@@ -221,36 +221,76 @@ export async function calculateWorkOrderCost(
     warnings.push('INCOMPLETE_MACHINE_TIME')
   }
 
+  // Material: Inventory Cost Entry is authoritative (IV-MFG-1). Never re-run FIFO/MA here.
   const movements = await prisma.inventoryStockMovement.findMany({
     where: { tenantId, workOrderId, referenceType: { in: ['ISSUE_TO_WO', 'RETURN_FROM_WO'] } },
-    include: { item: { select: { standardRate: true } } },
+    include: {
+      item: { select: { standardRate: true } },
+      costEntries: {
+        orderBy: { createdAt: 'asc' },
+        take: 1,
+        select: {
+          id: true,
+          unitCost: true,
+          totalCost: true,
+          quantity: true,
+          valuationMethod: true,
+          postingDate: true,
+        },
+      },
+    },
     orderBy: { createdAt: 'asc' },
   })
   let actualMaterial = D(0)
   let provisionalCost = D(0)
   for (const movement of movements) {
     const direction = movement.referenceType === 'RETURN_FROM_WO' ? D(-1) : D(1)
-    const movementValue = D(movement.value).abs()
-    const fallback = D(movement.quantity).abs().mul(D(movement.item.standardRate))
-    const provisional = movementValue.lessThanOrEqualTo(0)
-    const amount = movementValue.greaterThan(0) ? movementValue : fallback
-    actualMaterial = actualMaterial.plus(direction.mul(amount))
-    if (provisional) {
-      provisionalCost = provisionalCost.plus(direction.mul(amount))
-      warnings.push(
-        D(movement.item.standardRate).greaterThan(0)
-          ? `PROVISIONAL_MATERIAL_RATE:${movement.id}`
-          : `INCOMPLETE_MATERIAL_RATE:${movement.itemId}`,
-      )
+    const qtyAbs = D(movement.quantity).abs()
+    const costEntry = movement.costEntries[0]
+    let amount: Prisma.Decimal
+    let rate: Prisma.Decimal
+    let provisional: boolean
+    let sourceEntityType: string
+    let sourceEntityId: string
+    let sourceTransactionDate: Date
+
+    if (costEntry) {
+      amount = D(costEntry.totalCost).abs()
+      rate = D(costEntry.unitCost)
+      provisional = false
+      sourceEntityType = 'INVENTORY_COST_ENTRY'
+      sourceEntityId = costEntry.id
+      sourceTransactionDate = costEntry.postingDate ?? movement.movementDate
+    } else {
+      const movementValue = D(movement.value).abs()
+      const fallback = qtyAbs.mul(D(movement.item.standardRate))
+      provisional = movementValue.lessThanOrEqualTo(0)
+      amount = movementValue.greaterThan(0) ? movementValue : fallback
+      rate = amount.div(qtyAbs.greaterThan(0) ? qtyAbs : D(1))
+      sourceEntityType = 'INVENTORY_STOCK_MOVEMENT'
+      sourceEntityId = movement.id
+      sourceTransactionDate = movement.movementDate
+      if (provisional) {
+        provisionalCost = provisionalCost.plus(direction.mul(amount))
+        warnings.push(
+          D(movement.item.standardRate).greaterThan(0)
+            ? `PROVISIONAL_MATERIAL_RATE:${movement.id}`
+            : `INCOMPLETE_MATERIAL_RATE:${movement.itemId}`,
+        )
+      } else {
+        warnings.push(`MISSING_INVENTORY_COST_ENTRY:${movement.id}`)
+      }
     }
+
+    actualMaterial = actualMaterial.plus(direction.mul(amount))
     entries.push({
       costCategory: 'MATERIAL',
-      sourceEntityType: 'INVENTORY_STOCK_MOVEMENT',
-      sourceEntityId: movement.id,
-      sourceTransactionDate: movement.movementDate,
+      sourceEntityType,
+      sourceEntityId,
+      sourceTransactionDate,
       itemId: movement.itemId,
-      quantity: direction.mul(D(movement.quantity).abs()),
-      rate: amount.div(D(movement.quantity).abs().greaterThan(0) ? D(movement.quantity).abs() : D(1)),
+      quantity: direction.mul(qtyAbs),
+      rate,
       amount: direction.mul(amount),
       provisional,
     })
@@ -420,7 +460,11 @@ export async function calculateWorkOrderCost(
     ? movements.reduce((sum, movement) => {
       const direction = movement.referenceType === 'RETURN_FROM_WO' ? D(-1) : D(1)
       const standard = D(movement.quantity).abs().mul(D(movement.item.standardRate))
-      const actual = D(movement.value).abs().greaterThan(0) ? D(movement.value).abs() : standard
+      const costEntry = movement.costEntries[0]
+      const posted = costEntry
+        ? D(costEntry.totalCost).abs()
+        : D(movement.value).abs()
+      const actual = posted.greaterThan(0) ? posted : standard
       return sum.plus(direction.mul(actual.minus(standard)))
     }, D(0))
     : D(0)
@@ -520,6 +564,29 @@ export async function calculateWorkOrderCost(
     const snapshot = await tx.workOrderCostSnapshot.create({
       data: { ...snapshotData, warningSummaryJson: uniqueWarnings, snapshotVersion: (latest?.snapshotVersion ?? 0) + 1 },
     })
+
+    // Drop legacy MATERIAL rows keyed only by stock movement when we now key by cost entry.
+    const materialKeys = entries
+      .filter((e) => e.costCategory === 'MATERIAL')
+      .map((e) => ({ sourceEntityType: e.sourceEntityType, sourceEntityId: e.sourceEntityId }))
+    await tx.workOrderCostEntry.deleteMany({
+      where: {
+        tenantId,
+        productionOrderId: workOrderId,
+        costCategory: 'MATERIAL',
+        ...(materialKeys.length > 0
+          ? {
+              NOT: {
+                OR: materialKeys.map((k) => ({
+                  sourceEntityType: k.sourceEntityType,
+                  sourceEntityId: k.sourceEntityId,
+                })),
+              },
+            }
+          : {}),
+      },
+    })
+
     for (const entry of entries) {
       await tx.workOrderCostEntry.upsert({
         where: {
@@ -551,10 +618,242 @@ export async function calculateWorkOrderCost(
 }
 
 export async function listCostDetails(tenantId: string, workOrderId: string) {
-  return prisma.workOrderCostEntry.findMany({
+  const rows = await prisma.workOrderCostEntry.findMany({
     where: { tenantId, productionOrderId: workOrderId },
     orderBy: [{ sourceTransactionDate: 'asc' }, { createdAt: 'asc' }],
   })
+
+  const costEntryIds = rows
+    .filter((r) => r.costCategory === 'MATERIAL' && r.sourceEntityType === 'INVENTORY_COST_ENTRY')
+    .map((r) => r.sourceEntityId)
+  const movementIds = rows
+    .filter((r) => r.costCategory === 'MATERIAL' && r.sourceEntityType === 'INVENTORY_STOCK_MOVEMENT')
+    .map((r) => r.sourceEntityId)
+
+  const [invEntries, movementCostEntries, items] = await Promise.all([
+    costEntryIds.length
+      ? prisma.inventoryCostEntry.findMany({
+          where: { tenantId, id: { in: costEntryIds } },
+          select: {
+            id: true,
+            valuationMethod: true,
+            inventoryMovementId: true,
+            lotId: true,
+            serialId: true,
+            unitCost: true,
+            totalCost: true,
+            quantity: true,
+            postingDate: true,
+            itemId: true,
+          },
+        })
+      : Promise.resolve([]),
+    movementIds.length
+      ? prisma.inventoryCostEntry.findMany({
+          where: { tenantId, inventoryMovementId: { in: movementIds } },
+          select: {
+            id: true,
+            valuationMethod: true,
+            inventoryMovementId: true,
+            lotId: true,
+            serialId: true,
+            unitCost: true,
+            totalCost: true,
+            quantity: true,
+            postingDate: true,
+            itemId: true,
+          },
+        })
+      : Promise.resolve([]),
+    prisma.masterItem.findMany({
+      where: {
+        tenantId,
+        id: { in: [...new Set(rows.map((r) => r.itemId).filter(Boolean) as string[])] },
+        deletedAt: null,
+      },
+      select: { id: true, code: true, name: true, baseUom: { select: { code: true } } },
+    }),
+  ])
+
+  const invById = new Map(invEntries.map((e) => [e.id, e]))
+  const invByMovement = new Map(movementCostEntries.map((e) => [e.inventoryMovementId, e]))
+  const itemById = new Map(items.map((i) => [i.id, i]))
+
+  return rows.map((row) => {
+    const inv =
+      row.sourceEntityType === 'INVENTORY_COST_ENTRY'
+        ? invById.get(row.sourceEntityId)
+        : row.sourceEntityType === 'INVENTORY_STOCK_MOVEMENT'
+          ? invByMovement.get(row.sourceEntityId)
+          : undefined
+    const item = row.itemId ? itemById.get(row.itemId) : undefined
+    return {
+      ...row,
+      itemCode: item?.code ?? null,
+      itemName: item?.name ?? null,
+      uom: item?.baseUom?.code ?? null,
+      valuationMethod: inv?.valuationMethod ?? null,
+      inventoryCostEntryId: inv?.id ?? (row.sourceEntityType === 'INVENTORY_COST_ENTRY' ? row.sourceEntityId : null),
+      inventoryMovementId: inv?.inventoryMovementId ?? (row.sourceEntityType === 'INVENTORY_STOCK_MOVEMENT' ? row.sourceEntityId : null),
+      costSource:
+        row.sourceEntityType === 'INVENTORY_COST_ENTRY'
+          ? 'INVENTORY_COST_ENTRY'
+          : row.sourceEntityType === 'INVENTORY_STOCK_MOVEMENT'
+            ? 'INVENTORY_STOCK_MOVEMENT'
+            : row.sourceEntityType,
+    }
+  })
+}
+
+export async function getCostTrace(tenantId: string, workOrderId: string, entryId: string) {
+  const entry = await prisma.workOrderCostEntry.findFirst({
+    where: { id: entryId, tenantId, productionOrderId: workOrderId },
+  })
+  if (!entry) throw new NotFoundError('Work-order cost entry not found')
+
+  const order = await prisma.productionOrder.findFirst({
+    where: { id: workOrderId, tenantId, deletedAt: null },
+    select: { id: true, orderNumber: true },
+  })
+
+  let inventoryCostEntry: Awaited<ReturnType<typeof prisma.inventoryCostEntry.findFirst>> = null
+  let movement: Awaited<ReturnType<typeof prisma.inventoryStockMovement.findFirst>> = null
+  let layerConsumptions: Array<{
+    id: string
+    quantityConsumed: Prisma.Decimal
+    unitCost: Prisma.Decimal
+    totalCost: Prisma.Decimal
+    layer: {
+      id: string
+      unitCost: Prisma.Decimal
+      receiptDate: Date
+      remainingQuantity: Prisma.Decimal
+      originalQuantity: Prisma.Decimal
+      status: string
+      lotId: string | null
+      serialId: string | null
+    }
+  }> = []
+  let standardVersion: { id: string; version: number; unitCost: Prisma.Decimal; effectiveFrom: Date; status: string } | null = null
+  let variances: Array<{
+    id: string
+    varianceType: string
+    standardUnitCost: Prisma.Decimal
+    actualUnitCost: Prisma.Decimal
+    varianceAmount: Prisma.Decimal
+  }> = []
+
+  if (entry.costCategory === 'MATERIAL') {
+    if (entry.sourceEntityType === 'INVENTORY_COST_ENTRY') {
+      inventoryCostEntry = await prisma.inventoryCostEntry.findFirst({
+        where: { id: entry.sourceEntityId, tenantId },
+      })
+    } else if (entry.sourceEntityType === 'INVENTORY_STOCK_MOVEMENT') {
+      inventoryCostEntry = await prisma.inventoryCostEntry.findFirst({
+        where: { tenantId, inventoryMovementId: entry.sourceEntityId },
+      })
+      movement = await prisma.inventoryStockMovement.findFirst({
+        where: { id: entry.sourceEntityId, tenantId },
+      })
+    }
+
+    if (inventoryCostEntry) {
+      if (!movement) {
+        movement = await prisma.inventoryStockMovement.findFirst({
+          where: { id: inventoryCostEntry.inventoryMovementId, tenantId },
+        })
+      }
+      layerConsumptions = await prisma.inventoryCostLayerConsumption.findMany({
+        where: { tenantId, issueCostEntryId: inventoryCostEntry.id },
+        include: {
+          layer: {
+            select: {
+              id: true,
+              unitCost: true,
+              receiptDate: true,
+              remainingQuantity: true,
+              originalQuantity: true,
+              status: true,
+              lotId: true,
+              serialId: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      })
+      if (inventoryCostEntry.valuationMethod === 'STANDARD_COST' && inventoryCostEntry.itemId) {
+        standardVersion = await prisma.inventoryItemStandardCostVersion.findFirst({
+          where: {
+            tenantId,
+            itemId: inventoryCostEntry.itemId,
+            status: 'ACTIVE',
+            effectiveFrom: { lte: inventoryCostEntry.postingDate },
+            OR: [{ effectiveTo: null }, { effectiveTo: { gte: inventoryCostEntry.postingDate } }],
+          },
+          orderBy: [{ effectiveFrom: 'desc' }, { version: 'desc' }],
+          select: { id: true, version: true, unitCost: true, effectiveFrom: true, status: true },
+        })
+        variances = await prisma.inventoryCostVariance.findMany({
+          where: { tenantId, costEntryId: inventoryCostEntry.id },
+          select: {
+            id: true,
+            varianceType: true,
+            standardUnitCost: true,
+            actualUnitCost: true,
+            varianceAmount: true,
+          },
+          take: 20,
+        })
+      }
+    }
+  }
+
+  const item = entry.itemId
+    ? await prisma.masterItem.findFirst({
+        where: { id: entry.itemId, tenantId, deletedAt: null },
+        select: { id: true, code: true, name: true, baseUom: { select: { code: true } } },
+      })
+    : null
+
+  return {
+    workOrder: order,
+    costEntry: entry,
+    item: item
+      ? { id: item.id, itemCode: item.code, itemName: item.name, uom: item.baseUom?.code ?? null }
+      : null,
+    inventoryCostEntry,
+    inventoryMovement: movement
+      ? {
+          id: movement.id,
+          movementNumber: movement.movementNumber,
+          movementType: movement.movementType,
+          referenceType: movement.referenceType,
+          quantity: movement.quantity,
+          rate: movement.rate,
+          value: movement.value,
+          movementDate: movement.movementDate,
+          warehouseId: movement.warehouseId,
+        }
+      : null,
+    valuationMethod: inventoryCostEntry?.valuationMethod ?? null,
+    fifoLayers: layerConsumptions.map((c) => ({
+      consumptionId: c.id,
+      quantityConsumed: c.quantityConsumed,
+      unitCost: c.unitCost,
+      totalCost: c.totalCost,
+      layerId: c.layer.id,
+      receiptDate: c.layer.receiptDate,
+      layerUnitCost: c.layer.unitCost,
+      layerStatus: c.layer.status,
+      lotId: c.layer.lotId,
+      serialId: c.layer.serialId,
+    })),
+    specificIdentity: inventoryCostEntry
+      ? { lotId: inventoryCostEntry.lotId, serialId: inventoryCostEntry.serialId }
+      : null,
+    standardCost: standardVersion,
+    variances,
+  }
 }
 
 export async function listCostSnapshots(tenantId: string, workOrderId: string) {

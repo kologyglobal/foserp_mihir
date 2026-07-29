@@ -1094,12 +1094,14 @@ export async function postStockMovement(
     const costEntry = await recordInventoryCostEntryInTx(innerTx, {
       tenantId: input.tenantId,
       costLayerId: fifoReceiptCostLayerId,
+      unitCost: rate,
+      totalCost: value,
       movement: {
         id: movement.id,
         movementType: movement.movementType,
         referenceType: movement.referenceType,
         quantity: movement.quantity,
-        rate: movement.rate,
+        rate,
         itemId: movement.itemId,
         warehouseId: movement.warehouseId,
         movementDate: movement.movementDate,

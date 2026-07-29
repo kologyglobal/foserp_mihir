@@ -732,6 +732,9 @@ export interface ApiPurchaseInvoice {
   matchingRemarks: string | null
   overrideAuthorized: boolean
   overrideRemarks: string | null
+  /** Soft link to Accounting Vendor Invoice (AP SoT) after post handoff. */
+  vendorInvoiceId?: string | null
+  vendorInvoiceDraftRef?: string | null
   remarks: string | null
   submittedAt: string | null
   approvedAt: string | null

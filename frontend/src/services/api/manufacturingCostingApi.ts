@@ -255,7 +255,7 @@ export type CostCategory = 'MATERIAL' | 'LABOUR' | 'MACHINE' | 'JOB_WORK' | 'OVE
 
 export interface WorkOrderCostEntry {
   id: string
-  costCategory: CostCategory
+  costCategory: CostCategory | string
   sourceEntityType: string
   sourceEntityId: string
   sourceTransactionDate: string
@@ -270,6 +270,13 @@ export interface WorkOrderCostEntry {
   currencyCode: string
   provisional: boolean
   createdAt: string
+  itemCode?: string | null
+  itemName?: string | null
+  uom?: string | null
+  valuationMethod?: string | null
+  inventoryCostEntryId?: string | null
+  inventoryMovementId?: string | null
+  costSource?: string | null
 }
 
 export interface AccountingStatusCount {
@@ -291,6 +298,68 @@ export async function getWorkOrderCostSummary(workOrderId: string) {
 
 export async function getWorkOrderCostDetails(workOrderId: string) {
   return apiRequest<WorkOrderCostEntry[]>(tenantPath(`/manufacturing/work-orders/${workOrderId}/cost-details`))
+}
+
+export interface WorkOrderCostTrace {
+  workOrder: { id: string; orderNumber: string } | null
+  costEntry: WorkOrderCostEntry
+  item: { id: string; itemCode: string; itemName: string; uom: string | null } | null
+  inventoryCostEntry: {
+    id: string
+    valuationMethod: string
+    unitCost: string
+    totalCost: string
+    quantity: string
+    postingDate: string
+    inventoryMovementId: string
+    lotId: string | null
+    serialId: string | null
+  } | null
+  inventoryMovement: {
+    id: string
+    movementNumber: string
+    movementType: string
+    referenceType: string
+    quantity: string
+    rate: string
+    value: string
+    movementDate: string
+    warehouseId: string
+  } | null
+  valuationMethod: string | null
+  fifoLayers: Array<{
+    consumptionId: string
+    quantityConsumed: string
+    unitCost: string
+    totalCost: string
+    layerId: string
+    receiptDate: string
+    layerUnitCost: string
+    layerStatus: string
+    lotId: string | null
+    serialId: string | null
+  }>
+  specificIdentity: { lotId: string | null; serialId: string | null } | null
+  standardCost: {
+    id: string
+    version: number
+    unitCost: string
+    effectiveFrom: string
+    status: string
+  } | null
+  variances: Array<{
+    id: string
+    varianceType: string
+    standardUnitCost: string
+    actualUnitCost: string
+    varianceAmount: string
+  }>
+}
+
+export async function getWorkOrderCostTrace(workOrderId: string, entryId: string) {
+  return apiRequest<WorkOrderCostTrace>(
+    tenantPath(`/manufacturing/work-orders/${workOrderId}/cost-trace/${entryId}`),
+  )
 }
 
 export async function getWorkOrderCostSnapshots(workOrderId: string) {

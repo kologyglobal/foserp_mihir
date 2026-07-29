@@ -38,6 +38,9 @@ export interface RecordInventoryCostEntryInput {
   tenantId: string
   legalEntityId?: string | null
   costLayerId?: string | null
+  /** Prefer posted valuation so entry matches InventoryStockMovement.value (avoids DB rate 2dp re-round). */
+  unitCost?: Prisma.Decimal | number | string
+  totalCost?: Prisma.Decimal | number | string
   movement: {
     id: string
     movementType: InventoryMovementType
@@ -67,6 +70,9 @@ export async function recordInventoryCostEntryInTx(
     quantity: toDecimal(input.movement.quantity),
     rate: toDecimal(input.movement.rate),
   })
+  const unitCost = input.unitCost != null ? toDecimal(input.unitCost) : valuation.unitCost
+  const totalCost =
+    input.totalCost != null ? toDecimal(input.totalCost).toDecimalPlaces(2) : valuation.totalCost
 
   return tx.inventoryCostEntry.upsert({
     where: {
@@ -84,8 +90,8 @@ export async function recordInventoryCostEntryInTx(
       entryType: mapMovementTypeToEntryType(input.movement.movementType),
       valuationMethod,
       quantity: input.movement.quantity,
-      unitCost: valuation.unitCost,
-      totalCost: valuation.totalCost,
+      unitCost,
+      totalCost,
       currencyCode: 'INR',
       postingDate: input.movement.movementDate,
       sourceType: input.movement.referenceType,
@@ -105,8 +111,8 @@ export async function recordInventoryCostEntryInTx(
     update: {
       costLayerId: input.costLayerId ?? null,
       valuationMethod,
-      unitCost: valuation.unitCost,
-      totalCost: valuation.totalCost,
+      unitCost,
+      totalCost,
       quantity: input.movement.quantity,
       lotId: input.movement.lotId ?? null,
       serialId: input.movement.serialId ?? null,
