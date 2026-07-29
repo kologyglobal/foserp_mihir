@@ -1,5 +1,5 @@
 import type { AccountingVoucherLine, Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { InvalidStateError, ValidationError } from '../../../utils/errors.js'
 import { toDecimal } from '../shared/finance-decimal.js'
 import { parseDateOnly } from '../shared/finance.helpers.js'

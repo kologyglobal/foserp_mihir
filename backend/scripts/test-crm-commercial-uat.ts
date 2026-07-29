@@ -5,7 +5,7 @@
  */
 import request from 'supertest'
 import { createApp } from '../src/app.js'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 const TENANT_SLUG = process.argv[2] ?? process.env.TENANT_SLUG ?? 'vasant-trailers'
 const app = createApp()

@@ -1,7 +1,7 @@
 import { nextCode } from '../../../services/codeSeries.service.js'
 import { NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { resolveUserNames } from '../../../shared/index.js'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import * as repo from './contact.repository.js'
 import { mapContactToDto } from './contact.types.js'
 import type { CreateContactInput, ListContactsQuery, UpdateContactInput } from './contact.validation.js'

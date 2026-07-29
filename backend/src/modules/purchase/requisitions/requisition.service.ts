@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import type { Prisma, PurchaseRequisitionSource } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
 import { isPositive, toDecimal } from '../../inventory/shared/quantity.helpers.js'

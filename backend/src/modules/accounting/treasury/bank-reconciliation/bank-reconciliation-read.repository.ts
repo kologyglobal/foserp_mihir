@@ -1,5 +1,5 @@
 import type { BankStatement, BankStatementLine, GeneralLedgerEntry, Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getPagination } from '../../../../utils/pagination.js'
 import { BankStatementLineNotFoundError, BankStatementNotFoundError } from '../treasury.errors.js'
 import type { ListExceptionsQueryInput, ListHistoryQueryInput, ListSessionsQueryInput } from './bank-reconciliation.schemas.js'

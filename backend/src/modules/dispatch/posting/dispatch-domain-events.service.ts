@@ -9,7 +9,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import type { DispatchDomainEvent, Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import { logger } from '../../../config/logger.js'
 

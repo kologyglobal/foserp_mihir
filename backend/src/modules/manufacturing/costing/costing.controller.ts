@@ -41,6 +41,12 @@ export const getCostSummary = asyncHandler(async (req: Request, res: Response) =
   sendSuccess(res, 'Work-order cost summary fetched', await costing.getCostSummary(getTenantId(req), getRouteParam(req, 'id'))))
 export const getCostDetails = asyncHandler(async (req: Request, res: Response) =>
   sendSuccess(res, 'Work-order cost details fetched', await costing.listCostDetails(getTenantId(req), getRouteParam(req, 'id'))))
+export const getCostTrace = asyncHandler(async (req: Request, res: Response) =>
+  sendSuccess(
+    res,
+    'Work-order cost trace fetched',
+    await costing.getCostTrace(getTenantId(req), getRouteParam(req, 'id'), getRouteParam(req, 'entryId')),
+  ))
 export const getCostSnapshots = asyncHandler(async (req: Request, res: Response) =>
   sendSuccess(res, 'Work-order cost snapshots fetched', await costing.listCostSnapshots(getTenantId(req), getRouteParam(req, 'id'))))
 

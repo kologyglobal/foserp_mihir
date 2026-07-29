@@ -8,7 +8,7 @@
  *   npx tsx scripts/seed-manufacturing-fixtures.ts <tenantSlug>
  *   TENANT_SLUG=vasant-trailers npx tsx scripts/seed-manufacturing-fixtures.ts
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 const tenantSlug = process.argv[2] ?? process.env.TENANT_SLUG
 if (!tenantSlug) {

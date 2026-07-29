@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { NotFoundError } from '../../../../utils/errors.js'
 import type { SalesOrderLineDto } from '../sales-order.types.js'
 import {

@@ -1,7 +1,7 @@
 /**
  * Patch the last null-itemId sales order and apply NOT NULL alters.
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 async function main() {
   const sos = await prisma.$queryRaw<Array<{ id: string; tenantId: string; productId: string | null }>>`

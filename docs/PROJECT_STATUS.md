@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified against codebase: **2026-07-27** (Money In/Out reverse + AP reversal history + Dispatch→SI POD gate; Fuel Tank / Inventory Costing / prior notes).
+Last verified against codebase: **2026-07-28** (MFG-GOLDEN-1 Fuel Tank factory golden path re-verified PASS — READY FOR CONTROLLED PILOT; prior: Purchase completion FE links; Inventory Costing UAT-1; IV-MFG-1).
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
@@ -40,7 +40,8 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | Local API-mode empty data | Backend must listen on `:5000`; not a demo/API mix bug |
 | DB cleanup scripts | `cleanup-leads.ts`, `cleanup-opp-quotations.ts`, `cleanup-sales-orders.ts` — local one-offs; do not run on prod without intent |
 | Accounting orphan UI | **Resolved 2026-07-15** — all `/accounting/*` deep links from the dashboard now resolve (dashboard live; other screens are placeholders, not 404s) |
-| Inventory costing rollout | **Phase C BE + Phase 1 FE UI shipped (2026-07-27)** — costing workspace under Inventory → Costing; variance GL / full inventory↔GL trial balance still deferred. |
+| Inventory costing rollout | **UAT-1 hardening 2026-07-28** — automated 4-method golden paths PASS; method-change preview; transfer cost preserve; cost-entry value parity. Verdict still **READY WITH CONDITIONS** (live SPA UAT + Inventory↔GL TB deferred). |
+| Manufacturing Fuel Tank golden path | **MFG-GOLDEN-1 2026-07-28** — harness PASS (`WO-000010`, ₹111,020 Inventory=WO=FG). Verdict **READY FOR CONTROLLED PILOT**. Live SPA sign-off / SO→WO UI / shortage-return-partial SPA still open. |
 
 ---
 

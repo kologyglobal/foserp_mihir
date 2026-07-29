@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { ageDaysToBucket, ageInDays, buildAgeBucketChart, toNum } from './helpers.js'
 import type { ExecutorContext, ExecutorOutput, ReportRow } from '../types.js'
 

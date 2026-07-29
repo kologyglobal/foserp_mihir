@@ -1,5 +1,5 @@
 import { Prisma, type VendorPayment } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getLegalEntityOrThrow, parseDateOnly } from '../../shared/finance.helpers.js'
 import { convertToBase, isPositive, sumDecimals, toDecimal } from '../../shared/finance-decimal.js'
 import { getPagination } from '../../../../utils/pagination.js'

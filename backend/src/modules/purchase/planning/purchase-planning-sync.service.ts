@@ -1,5 +1,5 @@
 import type { Prisma, PurchasePlanningStatus, PurchaseRequisition, PurchaseRequisitionLine } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { nextCode } from '../../../services/codeSeries.service.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import { isValidSubmittableLine } from '../requisitions/purchase-requisition.workflow.js'

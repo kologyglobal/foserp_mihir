@@ -2,7 +2,7 @@
  * Upsert Quality Phase 4B sample masters for vasant-trailers only.
  * Usage: npx tsx scripts/seed-quality-4b-masters.ts
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 async function main() {
   const tenant = await prisma.tenant.findFirst({ where: { slug: 'vasant-trailers' } })

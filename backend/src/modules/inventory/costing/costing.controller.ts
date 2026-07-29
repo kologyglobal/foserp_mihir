@@ -81,3 +81,112 @@ export const postMethodChange = asyncHandler(async (req: Request, res: Response)
   )
   return sendSuccess(res, 'Valuation method change applied', data)
 })
+
+export const getItemCostingSummary = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.getItemCostingSummary(getTenantId(req), String(req.params.itemId))
+  if (!data) throw new NotFoundError('Item not found')
+  return sendSuccess(res, 'Item costing summary', data)
+})
+
+export const getEffectiveMethod = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.getEffectiveMethod(getTenantId(req), req.query as {
+    itemId?: string
+    legalEntityId?: string
+    warehouseId?: string
+    postingDate?: Date
+  })
+  return sendSuccess(res, 'Effective inventory valuation method', data)
+})
+
+export const getCostingOverview = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.getCostingOverview(getTenantId(req))
+  return sendSuccess(res, 'Inventory costing overview', data)
+})
+
+export const listValuationItems = asyncHandler(async (req: Request, res: Response) => {
+  const result = await service.listValuationItems(getTenantId(req), req.query as {
+    page?: number
+    limit?: number
+    warehouseId?: string
+    itemId?: string
+    search?: string
+  })
+  return sendPaginated(
+    res,
+    'Valuation items listed',
+    result.items,
+    buildPaginationMeta(result.total, result.page, result.limit),
+  )
+})
+
+export const listMovingAverage = asyncHandler(async (req: Request, res: Response) => {
+  const result = await service.listMovingAverageState(getTenantId(req), req.query as {
+    page?: number
+    limit?: number
+    warehouseId?: string
+    itemId?: string
+  })
+  return sendPaginated(
+    res,
+    'Moving average state listed',
+    result.items,
+    buildPaginationMeta(result.total, result.page, result.limit),
+  )
+})
+
+export const listMovingAverageHistory = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.listMovingAverageHistory(
+    getTenantId(req),
+    req.query as unknown as { itemId: string; warehouseId?: string; limit?: number },
+  )
+  return sendSuccess(res, 'Moving average history (derived)', data)
+})
+
+export const previewMethodChange = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.previewValuationMethodChange(
+    getTenantId(req),
+    req.query as unknown as {
+      toMethod: 'standard' | 'average' | 'fifo' | 'specific'
+      effectiveDate?: Date
+    },
+  )
+  return sendSuccess(res, 'Valuation method change preview', data)
+})
+
+export const listStandardCosts = asyncHandler(async (req: Request, res: Response) => {
+  const result = await service.listStandardCostVersions(getTenantId(req), req.query as {
+    page?: number
+    limit?: number
+    itemId?: string
+    status?: string
+  })
+  return sendPaginated(
+    res,
+    'Standard cost versions listed',
+    result.items,
+    buildPaginationMeta(result.total, result.page, result.limit),
+  )
+})
+
+export const listSpecificIdentification = asyncHandler(async (req: Request, res: Response) => {
+  const result = await service.listSpecificIdentification(getTenantId(req), req.query as {
+    page?: number
+    limit?: number
+    itemId?: string
+    unidentifiedOnly?: boolean
+  })
+  return sendPaginated(
+    res,
+    'Specific identification layers listed',
+    result.items,
+    buildPaginationMeta(result.total, result.page, result.limit),
+  )
+})
+
+export const runValuationReconciliation = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.runValuationReconciliation(
+    getTenantId(req),
+    (req.body ?? {}) as ValuationReconciliationQuery,
+  )
+  return sendSuccess(res, 'Valuation reconciliation refreshed', data)
+})

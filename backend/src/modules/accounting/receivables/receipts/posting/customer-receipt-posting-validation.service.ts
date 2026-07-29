@@ -1,4 +1,4 @@
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 import { getLegalEntityOrThrow } from '../../../shared/finance.helpers.js'
 import { compare, isPositive, isZero, sumDecimals } from '../../../shared/finance-decimal.js'
 import { validateReceiptInput } from '../calculation/customer-receipt-validation-preview.service.js'

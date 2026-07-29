@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import type { Prisma, ProductionStageStatus } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { auditFromRequest, createAuditLog } from '../../../services/audit.service.js'
 import { InvalidStateError, ValidationError } from '../../../utils/errors.js'
 import { computeBomLineRequiredQuantity } from '../shared/quantity.service.js'

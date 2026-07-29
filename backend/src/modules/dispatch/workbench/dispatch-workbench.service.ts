@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import * as reqRepo from '../requirements/dispatch-requirement.repository.js'
 import { synchroniseDispatchRequirements } from '../requirements/dispatch-requirement-sync.service.js'
 import type { DispatchWorkbenchSummary } from '../shared/dispatch.types.js'

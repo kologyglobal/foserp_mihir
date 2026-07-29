@@ -4,7 +4,7 @@ import { auditFromRequest, createAuditLog } from '../../../services/audit.servic
 import { NotFoundError } from '../../../utils/errors.js'
 import { resolveUserNames } from '../../../shared/index.js'
 import { assertCrmEntityInTenant } from '../crm.entity-refs.js'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import * as repo from './note.repository.js'
 import type { CreateNoteInput, ListNotesQuery, UpdateNoteInput } from './note.validation.js'
 

@@ -8,7 +8,7 @@
  *   npx tsx scripts/seed-iso-tank-26kl-from-csv.ts
  *   npx tsx scripts/seed-iso-tank-26kl-from-csv.ts vasant-trailers
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 const tenantSlug = process.argv[2] ?? process.env.TENANT_SLUG ?? 'vasant-trailers'
 

@@ -1701,6 +1701,7 @@ export function mapApiPurchaseInvoiceToDomain(api: ApiPurchaseInvoice): Purchase
     holdAt: null,
     debitNoteId: null,
     debitNoteNumber: null,
+    accountingVendorInvoiceId: api.vendorInvoiceId ?? null,
     lines: (api.lines ?? []).map((l) => {
       const lineTax = Number(l.taxAmount) || 0
       return {

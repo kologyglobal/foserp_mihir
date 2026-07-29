@@ -427,7 +427,7 @@ export async function updateProductMapping(
 }
 
 export async function suggestProductMappingsFromEnquiries(tenantId: string, userId: string) {
-  const { prisma } = await import('../../../../config/database.js')
+  const { prisma } = await import('../../../../config/prisma.js')
   const products = await prisma.indiaMartEnquiry.groupBy({
     by: ['productName'],
     where: { tenantId, productName: { not: null } },

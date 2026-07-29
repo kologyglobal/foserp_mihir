@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../src/app.js'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import {
   bootstrapManufacturingFixture,
   cleanupTenant,
@@ -460,7 +460,7 @@ describe.skipIf(!dbAvailable)('Manufacturing Phase 2A — production demands + w
         (s) => s.displayOrder === 1,
       )!
 
-      const { prisma } = await import('../src/config/database.js')
+      const { prisma } = await import('../src/config/prisma.js')
       await prisma.productionOrderStage.update({
         where: { id: stage1.id },
         data: { qualityRequired: true },

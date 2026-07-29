@@ -1,6 +1,6 @@
 import type { BankConnector, BankConnectorProvider, BankConnectorStatus } from '@prisma/client'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getPagination } from '../../../../utils/pagination.js'
 import { BankConnectorNotFoundError, BankConnectorStaleVersionError } from './bank-connector.errors.js'
 import type { ListBankConnectorsQuery } from './bank-connector.schemas.js'

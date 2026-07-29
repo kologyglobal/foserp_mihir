@@ -1,5 +1,5 @@
 import type { BankStatement, BankStatementLine, GeneralLedgerEntry } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence, toDecimal } from '../../shared/finance-decimal.js'
 import { getTreasuryAccount } from '../accounts/treasury-account.repository.js'
 import * as readRepo from './bank-reconciliation-read.repository.js'

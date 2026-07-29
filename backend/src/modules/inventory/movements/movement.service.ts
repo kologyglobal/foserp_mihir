@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { postStockMovement } from '../shared/stock-posting.service.js'
 import { mapStockMovement } from '../shared/inventory.mappers.js'
 import type {

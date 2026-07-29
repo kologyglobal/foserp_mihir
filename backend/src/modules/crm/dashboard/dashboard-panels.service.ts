@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { decimalToNumber, tenantActiveFilter } from '../../../shared/index.js'
 
 /** High-value deal threshold (INR) — matches frontend HOT_MIN_VALUE. */

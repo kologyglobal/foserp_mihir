@@ -5308,6 +5308,7 @@ export async function createPurchaseInvoice(
     holdAt: null,
     debitNoteId: null,
     debitNoteNumber: null,
+    accountingVendorInvoiceId: null,
     ...totals,
     lines,
     approvalIds: [],

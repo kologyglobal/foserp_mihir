@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../../src/app.js'
-import { prisma } from '../../src/config/database.js'
+import { prisma } from '../../src/config/prisma.js'
 import { buildVendorAdjustmentPostEventKey } from '../../src/modules/accounting/payables/vendor-adjustments/posting/vendor-adjustment-posting.types.js'
 import {
   bootstrapApAllocFixture,

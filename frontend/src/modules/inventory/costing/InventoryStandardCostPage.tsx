@@ -7,10 +7,12 @@ import { ErpCommandBar } from '@/components/erp/ErpCommandBar'
 import { LoadingState } from '@/design-system/components/LoadingState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Input, Select } from '@/components/forms/Inputs'
+import { ItemLookupSelect } from '@/components/lookups/ItemLookupSelect'
 import { Button } from '@/design-system/components/Button'
 import { isApiMode } from '@/config/apiConfig'
 import {
   fetchInventoryCostVariances,
+  fetchStandardCostVersions,
   postStandardCostVersion,
   type InventoryCostVarianceDto,
 } from '@/services/api/inventoryCostingApi'
@@ -44,6 +46,18 @@ export function InventoryStandardCostPage() {
   const api = isApiMode()
   const perms = useInventoryPermissions()
   const [rows, setRows] = useState<InventoryCostVarianceDto[]>([])
+  const [versions, setVersions] = useState<
+    Array<{
+      id: string
+      itemCode: string
+      itemName: string
+      unitCost: string
+      effectiveFrom: string
+      version: number
+      status: string
+      difference: string
+    }>
+  >([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -61,12 +75,17 @@ export function InventoryStandardCostPage() {
     try {
       if (!api) {
         setRows(DEMO_VARIANCES)
+        setVersions([])
         return
       }
-      const res = await fetchInventoryCostVariances({ limit: 100 })
-      setRows(res.data ?? [])
+      const [varRes, verRes] = await Promise.all([
+        fetchInventoryCostVariances({ limit: 100 }),
+        fetchStandardCostVersions({ limit: 100 }),
+      ])
+      setRows(varRes.data ?? [])
+      setVersions(verRes.data ?? [])
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load variances')
+      setError(e instanceof Error ? e.message : 'Failed to load standard costs')
     } finally {
       setLoading(false)
     }
@@ -88,7 +107,7 @@ export function InventoryStandardCostPage() {
     }
     const unitCost = Number(form.unitCost)
     if (!form.itemId.trim() || !Number.isFinite(unitCost) || unitCost < 0) {
-      notify.error('Item id and non-negative unit cost are required')
+      notify.error('Select an item and enter a non-negative unit cost')
       return
     }
     setBusy(true)
@@ -127,14 +146,17 @@ export function InventoryStandardCostPage() {
           New standard cost version
         </h3>
         <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" onSubmit={onSubmit}>
-          <label className="block text-[12px]">
-            <span className="text-erp-muted">Item id (UUID)</span>
-            <Input
-              value={form.itemId}
-              onChange={(e) => setForm((f) => ({ ...f, itemId: e.target.value }))}
-              placeholder="Master item UUID"
-              className="mt-1"
-            />
+          <label className="block text-[12px] sm:col-span-2 lg:col-span-1">
+            <span className="text-erp-muted">Item</span>
+            <div className="mt-1">
+              <ItemLookupSelect
+                value={form.itemId}
+                onChange={(sel) => setForm((f) => ({ ...f, itemId: sel?.itemId ?? '' }))}
+                placeholder="Search by item code or name…"
+                allowEmpty
+                disabled={!perms.canManageSetup}
+              />
+            </div>
           </label>
           <label className="block text-[12px]">
             <span className="text-erp-muted">Unit cost</span>
@@ -184,6 +206,39 @@ export function InventoryStandardCostPage() {
         ) : null}
       </div>
 
+      <div className="border-b border-erp-border px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
+        Standard cost versions
+      </div>
+      {!loading && versions.length > 0 ? (
+        <div className="erp-table-wrap overflow-x-auto border-b border-erp-border">
+          <table className="erp-table w-full min-w-[800px] text-left text-[12px]">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th className="text-right">Standard</th>
+                <th>Effective</th>
+                <th>Version</th>
+                <th>Status</th>
+                <th className="text-right">vs master rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {versions.map((v) => (
+                <tr key={v.id}>
+                  <td className="font-medium">
+                    {v.itemCode} — {v.itemName}
+                  </td>
+                  <td className="text-right tabular-nums">{formatCurrency(Number(v.unitCost))}</td>
+                  <td>{formatDate(v.effectiveFrom.slice(0, 10))}</td>
+                  <td>v{v.version}</td>
+                  <td>{v.status}</td>
+                  <td className="text-right tabular-nums">{formatCurrency(Number(v.difference))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
       <div className="border-b border-erp-border px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
         Cost variances
       </div>

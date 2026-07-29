@@ -33,13 +33,18 @@ export function InventoryCostEntriesPage() {
   const [rows, setRows] = useState<InventoryCostEntryDto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => params.get('search') ?? '')
   const [entryType, setEntryType] = useState('')
   const [method, setMethod] = useState('')
 
   const movementId = params.get('movementId') ?? undefined
   const workOrderId = params.get('workOrderId') ?? undefined
   const itemId = params.get('itemId') ?? undefined
+
+  useEffect(() => {
+    const q = params.get('search')
+    if (q) setSearch(q)
+  }, [params])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -151,7 +156,10 @@ export function InventoryCostEntriesPage() {
           <table className="erp-table w-full min-w-[880px] text-left text-[12px]">
             <thead>
               <tr>
+                <th>Entry</th>
                 <th>Date</th>
+                <th>Item</th>
+                <th>Warehouse</th>
                 <th>Type</th>
                 <th>Method</th>
                 <th className="text-right">Qty</th>
@@ -164,7 +172,14 @@ export function InventoryCostEntriesPage() {
             <tbody>
               {visible.map((r) => (
                 <tr key={r.id}>
+                  <td className="font-mono text-[11px]">{r.entryNo ?? `CE-${r.id.slice(0, 8).toUpperCase()}`}</td>
                   <td className="whitespace-nowrap">{formatDate(r.postingDate.slice(0, 10))}</td>
+                  <td className="font-medium">
+                    {r.itemCode || r.item?.code
+                      ? `${r.itemCode ?? r.item?.code} — ${r.itemName ?? r.item?.name ?? ''}`
+                      : shortId(r.itemId)}
+                  </td>
+                  <td>{r.warehouseCode ?? r.warehouse?.code ?? shortId(r.warehouseId)}</td>
                   <td>
                     <DynamicsStatusChip label={r.entryType} tone={r.entryType === 'ISSUE' ? 'warning' : 'info'} />
                   </td>
@@ -257,12 +272,34 @@ export function InventoryCostEntryDetailPage() {
             <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-erp-muted">Entry</h3>
             <dl className="grid gap-2 text-[13px] sm:grid-cols-2">
               <div>
+                <dt className="text-erp-muted">Entry No.</dt>
+                <dd className="font-mono">{row.entryNo ?? `CE-${row.id.slice(0, 8).toUpperCase()}`}</dd>
+              </div>
+              <div>
+                <dt className="text-erp-muted">Status</dt>
+                <dd>
+                  <DynamicsStatusChip label={row.status} tone={row.isReversal ? 'warning' : 'success'} />
+                </dd>
+              </div>
+              <div>
                 <dt className="text-erp-muted">Type</dt>
                 <dd>{row.entryType}</dd>
               </div>
               <div>
                 <dt className="text-erp-muted">Method</dt>
                 <dd>{methodLabel(String(row.valuationMethod))}</dd>
+              </div>
+              <div>
+                <dt className="text-erp-muted">Item</dt>
+                <dd className="font-medium">
+                  {row.itemCode || row.item?.code
+                    ? `${row.itemCode ?? row.item?.code} — ${row.itemName ?? row.item?.name ?? ''}`
+                    : shortId(row.itemId)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-erp-muted">Warehouse</dt>
+                <dd>{row.warehouseCode ?? row.warehouse?.code ?? shortId(row.warehouseId)}</dd>
               </div>
               <div>
                 <dt className="text-erp-muted">Qty</dt>
@@ -280,10 +317,31 @@ export function InventoryCostEntryDetailPage() {
                 <dt className="text-erp-muted">Posted</dt>
                 <dd>{formatDate(row.postingDate.slice(0, 10))}</dd>
               </div>
+              {(row.lotId || row.serialId) && (
+                <div className="sm:col-span-2">
+                  <dt className="text-erp-muted">Lot / Serial</dt>
+                  <dd className="font-mono text-[12px]">
+                    {row.lotId ? `Lot ${shortId(row.lotId)}` : ''}
+                    {row.lotId && row.serialId ? ' · ' : ''}
+                    {row.serialId ? `Serial ${shortId(row.serialId)}` : ''}
+                  </dd>
+                </div>
+              )}
             </dl>
           </div>
           <div className="rounded-md border border-erp-border p-3">
-            <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-erp-muted">Links</h3>
+            <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-erp-muted">Source & links</h3>
+            {row.movement ? (
+              <p className="mb-2 text-[13px]">
+                Movement <strong>{row.movement.movementNumber}</strong> · {row.movement.referenceType.replace(/_/g, ' ')}
+                {row.movement.referenceNo ? ` · ${row.movement.referenceNo}` : ''}
+              </p>
+            ) : (
+              <p className="mb-2 text-[13px] text-erp-muted">
+                {row.sourceType}
+                {row.sourceId ? ` · ${shortId(row.sourceId)}` : ''}
+              </p>
+            )}
             <ul className="space-y-2 text-[13px]">
               <li>
                 <Link
@@ -319,19 +377,76 @@ export function InventoryCostEntryDetailPage() {
                 </Link>
               </li>
             </ul>
-            {row.consumptions && row.consumptions.length > 0 ? (
-              <div className="mt-4">
-                <h4 className="mb-1 text-[11px] font-semibold uppercase text-erp-muted">Layer consumptions</h4>
-                <ul className="space-y-1 text-[12px] font-mono">
+            {row.accounting ? (
+              <p className="mt-3 text-[11px] text-erp-muted">{row.accounting.note}</p>
+            ) : null}
+          </div>
+
+          {row.consumptions && row.consumptions.length > 0 ? (
+            <div className="rounded-md border border-erp-border p-3 lg:col-span-2">
+              <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-erp-muted">
+                FIFO / Specific layer consumption
+              </h3>
+              <table className="erp-table w-full text-left text-[12px]">
+                <thead>
+                  <tr>
+                    <th>Layer</th>
+                    <th>Receipt</th>
+                    <th className="text-right">Qty consumed</th>
+                    <th className="text-right">Unit cost</th>
+                    <th className="text-right">Value</th>
+                    <th>Identity</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {row.consumptions.map((c) => (
-                    <li key={c.id}>
-                      layer {shortId(c.layerId)} · qty {c.quantityConsumed} @ {formatCurrency(Number(c.unitCost))}
+                    <tr key={c.id}>
+                      <td>
+                        <Link
+                          to={inventoryCostingPaths.layer(c.layerId)}
+                          className="font-semibold text-erp-primary hover:underline"
+                        >
+                          {c.layer?.layerNo ?? shortId(c.layerId)}
+                        </Link>
+                      </td>
+                      <td>{c.layer?.receiptDate ? formatDate(c.layer.receiptDate) : '—'}</td>
+                      <td className="text-right tabular-nums">{c.quantityConsumed}</td>
+                      <td className="text-right tabular-nums">{formatCurrency(Number(c.unitCost))}</td>
+                      <td className="text-right tabular-nums">{formatCurrency(Number(c.totalCost))}</td>
+                      <td className="font-mono text-[11px]">
+                        {c.layer?.serialId ? `S ${shortId(c.layer.serialId)}` : ''}
+                        {c.layer?.lotId ? `L ${shortId(c.layer.lotId)}` : ''}
+                        {!c.layer?.serialId && !c.layer?.lotId ? '—' : ''}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+
+          {row.standardCost || (row.variances && row.variances.length > 0) ? (
+            <div className="rounded-md border border-erp-border p-3 lg:col-span-2">
+              <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-erp-muted">
+                Standard cost evidence
+              </h3>
+              {row.standardCost ? (
+                <p className="text-[13px]">
+                  Active standard v{row.standardCost.version}: {formatCurrency(Number(row.standardCost.unitCost))}{' '}
+                  (from {formatDate(row.standardCost.effectiveFrom)})
+                </p>
+              ) : null}
+              {row.variances && row.variances.length > 0 ? (
+                <ul className="mt-2 space-y-1 text-[12px]">
+                  {row.variances.map((v) => (
+                    <li key={v.id}>
+                      {v.varianceType.replace(/_/g, ' ')}: {formatCurrency(Number(v.varianceAmount))}
                     </li>
                   ))}
                 </ul>
-              </div>
-            ) : null}
-          </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
       </div>

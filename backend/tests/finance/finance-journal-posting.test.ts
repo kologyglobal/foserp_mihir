@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../../src/app.js'
-import { prisma } from '../../src/config/database.js'
+import { prisma } from '../../src/config/prisma.js'
 import { PERMISSIONS, type PermissionName } from '../../src/constants/permissions.js'
 import { buildManualJournalPostEventKey } from '../../src/modules/accounting/posting/posting-existing-voucher.service.js'
 import { setTestOnlyFailBeforeGl } from '../../src/modules/accounting/posting/posting.service.js'

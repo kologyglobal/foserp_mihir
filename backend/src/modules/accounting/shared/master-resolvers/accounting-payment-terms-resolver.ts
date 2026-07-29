@@ -2,7 +2,7 @@
  * Payment terms — CRM masters kind `payment-terms` + day overrides.
  * No MasterPaymentTerm Prisma model.
  */
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 
 export interface AccountingPaymentTermsLookup {
   id: string

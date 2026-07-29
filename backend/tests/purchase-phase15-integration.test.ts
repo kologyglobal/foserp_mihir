@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../src/app.js'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { PERMISSIONS, type PermissionName } from '../src/constants/permissions.js'
 import { syncPurchasePlanningRowsFromApprovedPr } from '../src/modules/purchase/planning/purchase-planning-sync.service.js'
 

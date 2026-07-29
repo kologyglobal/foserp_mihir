@@ -1,5 +1,5 @@
 import type { CustomerReceiptAllocationBatch, Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence, roundExchangeRate } from '../../shared/finance-decimal.js'
 import type { CustomerReceiptAllocationBatchDto } from './customer-receipt-allocation.types.js'
 

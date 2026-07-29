@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence, toDecimal } from '../../shared/finance-decimal.js'
 import { post } from '../../posting/posting.service.js'
 import type { PostingContext, PostingRequest, PostingRequestLine, PostingResult } from '../../posting/posting.types.js'

@@ -2320,6 +2320,8 @@ export interface PurchaseInvoice extends PurchaseMoneyTotals, PurchaseAuditField
   holdAt: IsoDateTime | null
   debitNoteId: string | null
   debitNoteNumber: string | null
+  /** Soft FK to Accounting Vendor Invoice after post handoff (API mode). */
+  accountingVendorInvoiceId: string | null
   lines: PurchaseInvoiceLine[]
   approvalIds: string[]
   postedAt: IsoDateTime | null

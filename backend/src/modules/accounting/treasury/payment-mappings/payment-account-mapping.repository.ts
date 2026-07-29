@@ -1,5 +1,5 @@
 import type { Prisma, PaymentAccountMapping } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getPagination } from '../../../../utils/pagination.js'
 import { PaymentAccountMappingNotFoundError, TreasuryStaleVersionError } from '../treasury.errors.js'
 import type { ListPaymentAccountMappingsQuery } from './payment-account-mapping.schemas.js'

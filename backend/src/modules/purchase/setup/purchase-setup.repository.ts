@@ -11,7 +11,7 @@ import type {
   PurchaseSettings,
   SelfApprovalPolicy,
 } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 
 export type PurchaseSettingsRow = PurchaseSettings
 export type PurchasePlantSettingsRow = PurchasePlantSettings

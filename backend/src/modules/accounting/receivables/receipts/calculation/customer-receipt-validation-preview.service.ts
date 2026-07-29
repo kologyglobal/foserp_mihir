@@ -1,4 +1,4 @@
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 import { isMultiCurrencyEnabled } from '../../../posting/posting-currency.service.js'
 import { toDecimal } from '../../../shared/finance-decimal.js'
 import {

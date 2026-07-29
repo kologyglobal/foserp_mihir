@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import type { DispatchInvoiceMode, Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { AuthorizationError, ConflictError, ValidationError } from '../../../utils/errors.js'
 import {
   DISPATCH_POSTING_POLICY_DEFAULTS,

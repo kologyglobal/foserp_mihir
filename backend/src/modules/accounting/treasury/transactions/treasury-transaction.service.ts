@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence } from '../../shared/finance-decimal.js'
 import { getLegalEntityOrThrow } from '../../shared/finance.helpers.js'
 import type { ListTreasuryTransactionsQuery } from './treasury-transaction.schemas.js'

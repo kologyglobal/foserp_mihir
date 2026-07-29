@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { add, formatForPersistence, subtract } from '../../shared/finance-decimal.js'
 import { getDailyLiquidity } from './daily-liquidity.service.js'
 import type { ForecastQuery } from './treasury-liquidity.schemas.js'

@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { compare } from '../../shared/finance-decimal.js'
 import type { ReconciliationExceptionDraft } from './payable-reconciliation.types.js'
 

@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import { Prisma, type ProductionOrderStage } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { auditFromRequest, createAuditLog } from '../../../services/audit.service.js'
 import { InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { addDec, computeCompletionPercent, subDec, toDecimal } from '../shared/quantity.service.js'

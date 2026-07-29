@@ -1,6 +1,6 @@
 import type { InventoryStockBalance, InventoryStockStatus, Prisma } from '@prisma/client'
 import { Prisma as PrismaRuntime } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import { addDec, subDec } from './quantity.helpers.js'
 

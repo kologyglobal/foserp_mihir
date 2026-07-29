@@ -1,5 +1,5 @@
 import type { PayableOpenItem, Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence, min, roundExchangeRate, subtract, toDecimal } from '../../shared/finance-decimal.js'
 import {
   PayableAllocationBatchNotFoundError,

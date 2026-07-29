@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { checkOpenAccountingPeriod } from '../../accounting/accounting-periods/accounting-period.service.js'
 import { getManufacturingAccountingGateStatus } from '../accounting/manufacturing-accounting-gate.service.js'
 import {

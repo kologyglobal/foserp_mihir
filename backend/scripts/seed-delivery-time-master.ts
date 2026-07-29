@@ -2,7 +2,7 @@
  * One-off: ensure Delivery Time master rows exist for every active tenant.
  * Usage: npx tsx scripts/seed-delivery-time-master.ts
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { CRM_MASTER_SEED_ROWS } from '../src/modules/crm/masters/crm-master.seed-data.js'
 import { ensureSeedRows } from '../src/modules/crm/masters/crm-master.repository.js'
 

@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { getMaterialReconciliation } from '../../manufacturing/materials/material-reconciliation.service.js'
 import type { ExecutorContext, ExecutorOutput, ReportRow } from '../types.js'
 

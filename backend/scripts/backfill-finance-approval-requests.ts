@@ -4,7 +4,7 @@
  *
  * Usage: npx tsx backend/scripts/backfill-finance-approval-requests.ts [--tenant-id=<uuid>] [--dry-run]
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { resolveJournalApproval } from '../src/modules/accounting/journals/journal-approval.service.js'
 import { backfillApprovalRequestForJournal } from '../src/modules/accounting/approvals/approval-request.service.js'
 import { JOURNAL_SOURCE_DOCUMENT_TYPE, JOURNAL_SOURCE_MODULE } from '../src/modules/accounting/journals/journal.types.js'

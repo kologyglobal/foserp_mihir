@@ -74,6 +74,10 @@ run(['run', 'build'], backend)
 
 assertFile(join(frontendDist, 'index.html'), 'Vite did not produce index.html')
 assertFile(join(backend, 'dist', 'server.js'), 'Backend did not produce dist/server.js')
+assertFile(
+  join(backend, 'dist', 'config', 'prisma.js'),
+  'Backend did not produce dist/config/prisma.js (incomplete tsc emit — delete dist + tsconfig.tsbuildinfo and rebuild)',
+)
 
 // Publish only after both builds pass. The running app continues using the old
 // directory until the deployment platform restarts it.

@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import type { VendorAdjustment, VendorAdjustmentLine } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence } from '../../shared/finance-decimal.js'
 import type { ListVendorAdjustmentsQuery } from './vendor-adjustment.schemas.js'
 import type { VendorAdjustmentWithLines } from './vendor-adjustment.types.js'

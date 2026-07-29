@@ -9,7 +9,7 @@
  *   npx tsx scripts/migrate-fifo-opening-stock.ts --tenant=vasant-trailers
  *   npx tsx scripts/migrate-fifo-opening-stock.ts --tenant=vasant-trailers --force
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { migrateFifoOpeningStock } from '../src/modules/inventory/costing/fifo-opening-stock-migration.service.js'
 
 function arg(name: string): string | undefined {

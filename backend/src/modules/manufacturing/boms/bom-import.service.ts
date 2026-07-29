@@ -7,7 +7,7 @@ import {
   ManufacturingQuantityBasis,
   Prisma,
 } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { auditFromRequest } from '../../../services/audit.service.js'
 import { ConflictError, ValidationError } from '../../../utils/errors.js'
 import type { ConfirmBomImportInput, PreviewBomImportInput } from './bom.schemas.js'

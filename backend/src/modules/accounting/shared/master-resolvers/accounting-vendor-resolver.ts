@@ -4,7 +4,7 @@
  * No FinanceVendor table.
  */
 import type { MasterVendor } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getPagination } from '../../../../utils/pagination.js'
 import { AppError, NotFoundError } from '../../../../utils/errors.js'
 import { normalizeStateCode, validateStateCode } from '../../receivables/validation/state-code.validator.js'

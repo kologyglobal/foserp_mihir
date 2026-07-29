@@ -1,7 +1,7 @@
 /**
  * Tenant commercial O2C rules from DispatchSettings (partial / multi / invoice / POD).
  */
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { UnprocessableEntityError, ValidationError } from '../../../utils/errors.js'
 import {
   allowsConsolidatedInvoice,

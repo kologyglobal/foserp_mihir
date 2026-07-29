@@ -1,4 +1,4 @@
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 
 export async function nextBatchReference(tenantId: string, legalEntityId: string): Promise<string> {
   const count = await prisma.bankStatementImportBatch.count({ where: { tenantId, legalEntityId } })

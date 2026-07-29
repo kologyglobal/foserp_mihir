@@ -7,7 +7,7 @@
  * otherwise skips silently (revenue posting is unchanged).
  */
 import type { DefaultAccountMappingKey } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import {
   add,
   formatForPersistence,

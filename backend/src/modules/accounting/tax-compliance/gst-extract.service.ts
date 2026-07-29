@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { formatForPersistence, sumDecimals } from '../shared/finance-decimal.js'
 import type { GstExtractSummary, GstSupplyExtractRow } from './tax-compliance.types.js'
 

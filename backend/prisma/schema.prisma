@@ -14997,6 +14997,9 @@ enum WorkOrderCostCategory {
   REVERSAL
 }
 
+/// @deprecated LEGACY — InventoryValuationMethod on Inventory Costing is canonical.
+/// ManufacturingCostingPolicy.inventoryValuationMethod is retained for historical readability only.
+/// Do not use for new material valuation decisions (IV-MFG-1).
 model ManufacturingCostingPolicy {
   id                       String                                @id @default(uuid())
   tenantId                 String
@@ -15014,6 +15017,7 @@ model ManufacturingCostingPolicy {
   defaultMachineRate       Decimal                               @default(0) @db.Decimal(18, 2)
   fgPostingMode            ManufacturingPostingMode              @default(MANUAL)
   variancePostingMode      ManufacturingPostingMode              @default(MANUAL)
+  /// @deprecated Unused at runtime. Canonical method: InventorySettings → InventoryValuationMethod.
   inventoryValuationMethod ManufacturingInventoryValuationMethod @default(MOVING_AVERAGE)
   status                   ManufacturingCostingPolicyStatus      @default(DRAFT)
   effectiveFrom            DateTime?                             @db.Date

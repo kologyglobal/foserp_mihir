@@ -9,6 +9,12 @@ const frontend = join(backend, 'public')
 if (!existsSync(server)) {
   throw new Error(`Backend build is missing: ${server}. Hostinger must run npm run build before start.`)
 }
+const prismaModule = join(backend, 'dist', 'config', 'prisma.js')
+if (!existsSync(prismaModule)) {
+  throw new Error(
+    `Backend build is incomplete: ${prismaModule} is missing. Delete dist/ and tsconfig.tsbuildinfo, then run npm run build and confirm dist/config/prisma.js exists before restart.`,
+  )
+}
 if (!existsSync(join(frontend, 'index.html'))) {
   throw new Error(`Frontend build is missing: ${frontend}. Hostinger must run npm run build before start.`)
 }

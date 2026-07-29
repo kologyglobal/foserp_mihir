@@ -1,6 +1,6 @@
 import type { QualityInspectionCategory, ManufacturingQualityInspectionStatus } from '@prisma/client'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import type { ListInspectionsQuery } from './inspection.schemas.js'
 
 export async function listInspections(tenantId: string, query: ListInspectionsQuery) {

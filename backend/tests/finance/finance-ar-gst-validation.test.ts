@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../src/config/database.js'
+import { prisma } from '../../src/config/prisma.js'
 import { validateGstin } from '../../src/modules/accounting/receivables/validation/gstin.validator.js'
 import { validatePan } from '../../src/modules/accounting/receivables/validation/pan.validator.js'
 import { validateStateCode } from '../../src/modules/accounting/receivables/validation/state-code.validator.js'

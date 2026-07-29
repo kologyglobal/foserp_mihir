@@ -5,7 +5,7 @@ import type {
   IndiaMartEnquiry,
   Prisma,
 } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import type { IndiaMartConfigurationJson } from './indiamart.types.js'
 import { computeSlaStatus } from './indiamart.ingest.js'
 

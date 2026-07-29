@@ -1,6 +1,6 @@
 import type { FixedAssetStatus } from '@prisma/client'
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { auditFromRequest, createAuditLog } from '../../../services/audit.service.js'
 import { AuthorizationError } from '../../../utils/errors.js'
 import {

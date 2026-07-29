@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { add, subtract, formatForPersistence } from '../../shared/finance-decimal.js'
 import type { BookQuery } from './treasury-books.schemas.js'
 import { TreasuryBookAccountNotFoundError, TreasuryBookAccountTypeMismatchError } from './treasury-books.errors.js'

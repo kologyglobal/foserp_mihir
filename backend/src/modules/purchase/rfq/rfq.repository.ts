@@ -1,5 +1,5 @@
 import type { Prisma, RequestForQuotationStatus } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import type { ListRfqsQuery } from './rfq.validation.js'
 

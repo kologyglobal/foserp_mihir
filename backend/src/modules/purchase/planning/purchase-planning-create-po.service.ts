@@ -1,5 +1,5 @@
 import type { PurchaseOrder, PurchaseOrderLine, PurchasePlanningRow } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { mapPurchaseOrderToDto } from '../comparisons/comparison.mapper.js'
 import {
   PURCHASE_AUDIT_ACTION,

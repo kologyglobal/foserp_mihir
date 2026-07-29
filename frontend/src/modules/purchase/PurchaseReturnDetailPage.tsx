@@ -267,6 +267,13 @@ export function PurchaseReturnDetailPage() {
         }
         footer={null}
       >
+        {isApiMode() && doc.status === 'posted' ? (
+          <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-950">
+            <strong>ACCOUNTING_ADJUSTMENT_PENDING.</strong> Stock issue is posted via Inventory Costing.
+            Vendor debit note / AP reduction is not auto-created from Purchase Return in API mode — open Money
+            Out vendor adjustments when a posted Vendor Invoice exists.
+          </div>
+        ) : null}
         <ErpCardSection title="Header" collapsible defaultOpen>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <ErpViewField label="Return Date" value={formatDate(doc.documentDate)} />

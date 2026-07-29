@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../src/config/database.js'
+import { prisma } from '../../src/config/prisma.js'
 import { validateReceiptInput } from '../../src/modules/accounting/receivables/receipts/calculation/customer-receipt-validation-preview.service.js'
 import { validateReceiptPaymentMethod } from '../../src/modules/accounting/receivables/receipts/validation/receipt-payment-method.validator.js'
 import type { CustomerReceiptCalculationInput } from '../../src/modules/accounting/receivables/receipts/calculation/customer-receipt-calculation.types.js'

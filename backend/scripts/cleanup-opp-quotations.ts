@@ -15,7 +15,7 @@
  *   KEEP_TEMPLATE_CODE=ISO-TANK-26KL  (preferred keep code)
  */
 import { CrmEntityType } from '@prisma/client'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 const slug = process.env.TENANT_SLUG ?? 'vasant-trailers'
 const dryRun = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true'
 const preferredTemplateCode = process.env.KEEP_TEMPLATE_CODE ?? 'ISO-TANK-26KL'

@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import type { TreasuryCheque } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { formatForPersistence } from '../../shared/finance-decimal.js'
 import { resolveTreasuryChequeAllowedActions } from './treasury-cheque-allowed-actions.js'
 import * as repo from './treasury-cheque.repository.js'

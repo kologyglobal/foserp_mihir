@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { getStockPosition } from '../../inventory/balances/balance.service.js'
 import { addDec, dec as decQty, isPositive, isZero, subDec, toDecimal } from '../../inventory/shared/quantity.helpers.js'
 import { dec } from '../shared/manufacturing.mappers.js'

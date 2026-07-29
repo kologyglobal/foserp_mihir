@@ -1,6 +1,6 @@
 # FOS ERP — Project Memory
 
-> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-27** (Inventory Costing Phase A–C backend + **Phase 1 Costing UI** under Inventory → Costing). Prior: CRM Item Phase 2/3; Dispatch 7C0–7C5; Bank & Cash live API for internal UAT.
+> Source of truth for AI agents and developers. When docs and code disagree, **code wins**. Last verified: **2026-07-28** (Purchase completion links for QI/Invoice/Return/Costing/AP; Inventory Costing UAT-1). Prior: Costing FE; IV-MFG-1; Phase A–C.
 
 ---
 
@@ -208,6 +208,9 @@ AR/AP invoices reuse the **real** masters — never parallel finance copies:
 | `docs/MASTER_REGISTRY.md` | Canonical master routes, aliases, dual-source warnings |
 | `docs/ui/production/MANUFACTURING_FORM_DESIGN_STANDARD.md` | Manufacturing form UX standard (CRM-aligned shell, readiness, posting drawers) |
 | `docs/manufacturing/examples/FUEL_TANK_MASTER_SETUP.md` | 5000 L Fuel Tank live BOM/Route/Profile/WO UAT example |
+| `docs/manufacturing/MFG_GOLDEN_PATH_AUDIT.md` | MFG-GOLDEN-1 architecture audit (LOGICAL SFG Job Cards) |
+| `docs/manufacturing/FUEL_TANK_GOLDEN_PATH.md` | Fuel Tank controlled UAT chain + scripts |
+| `docs/manufacturing/MFG_GOLDEN_PATH_TEST_RESULTS.md` | Latest harness PASS evidence |
 | `docs/ui/production/MANUFACTURING_FORM_INFORMATION_MATRIX.md` | Per-form 10-point information scores (before/after) |
 | `docs/accounting/AP_ARCHITECTURE.md` | AP vendor invoice / payable open-item design |
 | `docs/accounting/AP_STATUS.md` | AP phase checklist and status |

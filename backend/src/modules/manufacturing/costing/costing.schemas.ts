@@ -6,7 +6,12 @@ const policyFields = z.object({
   plantCode: z.string().trim().max(32).nullable().optional(),
   name: z.string().trim().min(1).max(191),
   costingMethod: z.enum(['ACTUAL', 'PLANNED_AS_PROVISIONAL', 'STANDARD_WITH_VARIANCE']).default('PLANNED_AS_PROVISIONAL'),
+  /**
+   * @deprecated Legacy ManufacturingInventoryValuationMethod.
+   * Inventory Costing owns valuation (InventoryValuationMethod). Accepted for backward compatibility only — ignored for cost math.
+   */
   inventoryValuationMethod: z.enum(['MOVING_AVERAGE', 'FIFO']).default('MOVING_AVERAGE'),
+  /** Preferred material source is Inventory Cost Entry; MOVEMENT_UNIT_COST is legacy alias. */
   materialValuationSource: z.enum(['MOVEMENT_UNIT_COST', 'PROVISIONAL_RATE']).default('MOVEMENT_UNIT_COST'),
   labourRateSource: z.enum(['WORK_CENTRE_RATE', 'TENANT_DEFAULT', 'LABOUR_RATE_CARD']).default('WORK_CENTRE_RATE'),
   machineRateSource: z.enum(['MACHINE_RATE', 'WORK_CENTRE_RATE']).default('MACHINE_RATE'),
@@ -34,6 +39,11 @@ export const listCostingPoliciesQuerySchema = paginationSchema.extend({
   plantCode: z.string().trim().max(32).optional(),
 })
 export const calculateWorkOrderCostSchema = z.object({ persist: z.boolean().default(true) })
+
+export const workOrderCostTraceParamSchema = z.object({
+  id: z.string().uuid(),
+  entryId: z.string().uuid(),
+})
 
 export type CreateCostingPolicyInput = z.infer<typeof createCostingPolicySchema>
 export type UpdateCostingPolicyInput = z.infer<typeof updateCostingPolicySchema>

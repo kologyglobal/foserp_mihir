@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { prisma } from '../../src/config/database.js'
+import { prisma } from '../../src/config/prisma.js'
 import { normalizeSupplierInvoiceNumber } from '../../src/modules/accounting/payables/vendor-invoices/vendor-invoice-number-normalization.js'
 import {
   createVendorInvoiceRecord,

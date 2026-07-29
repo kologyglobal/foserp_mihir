@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import type {
   CreateCostingPolicyInput,
@@ -13,6 +13,7 @@ export const BUILT_IN_COSTING_POLICY = {
   plantCode: null,
   name: 'Built-in provisional costing',
   costingMethod: 'PLANNED_AS_PROVISIONAL',
+  /** @deprecated Ignored — Inventory Costing owns valuation method. */
   inventoryValuationMethod: 'MOVING_AVERAGE',
   materialValuationSource: 'MOVEMENT_UNIT_COST',
   labourRateSource: 'WORK_CENTRE_RATE',

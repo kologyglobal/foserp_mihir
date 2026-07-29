@@ -1,6 +1,6 @@
 import type { AccountingPeriodStatus } from '@prisma/client'
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { auditFromRequest, createAuditLog } from '../../../services/audit.service.js'
 import { getTodayInTimezone, toDateOnlyString } from '../shared/finance.helpers.js'
 import { resolvePeriodByDate } from '../posting/posting-period.service.js'

@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 import { tenantActiveFilter } from '../../shared/index.js'
 import { getPagination } from '../../utils/pagination.js'
 import { ConflictError, NotFoundError, ValidationError } from '../../utils/errors.js'

@@ -1,7 +1,7 @@
 /**
  * Repair Phase 9 migration: soft-delete remaining null-itemId commercial rows, then finish ALTER.
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 async function main() {
   const soNull = await prisma.$executeRaw`

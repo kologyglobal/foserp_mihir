@@ -1,7 +1,7 @@
 /**
  * Phase 7C5 — Dispatch reconciliation (report-only; no auto-fix).
  */
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { n, roundQty } from '../shared/dispatch-qty.js'
 
 export type ReconciliationExceptionCode =

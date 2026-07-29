@@ -3,7 +3,7 @@
  * Finance engines resolve CGST/SGST/IGST from these — do not hardcode rates in forms.
  */
 import type { GstTaxApplicability, Prisma } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { NotFoundError } from '../../../../utils/errors.js'
 
 export class AccountingTaxMasterNotFoundError extends NotFoundError {

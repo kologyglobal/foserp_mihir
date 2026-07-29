@@ -10,7 +10,7 @@
  * and layers on DB-backed default-mapping lookups + account validation.
  */
 import type { Account, DefaultAccountMappingKey, TdsRecognitionMode } from '@prisma/client'
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 import { add, divide, isPositive, isZero, multiply, subtract, toDecimal } from '../../../shared/finance-decimal.js'
 import { formatDecimal4 } from './vendor-adjustment-decimal.js'
 import { calcError, VENDOR_ADJUSTMENT_CALC_CODES } from './vendor-adjustment-calculation.errors.js'

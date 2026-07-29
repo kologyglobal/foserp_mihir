@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { NotFoundError } from '../../../utils/errors.js'
 import { assertFollowUpInFuture } from '../../../utils/crmDatePolicy.js'
 import { resolveUserNames } from '../../../shared/index.js'

@@ -3,7 +3,7 @@
  * Usage: npx tsx scripts/crm-item-null-itemid-audit.ts --tenant=vasant-trailers
  */
 import { Prisma } from '@prisma/client'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 async function resolveTenantId(slugOrId?: string): Promise<{ id: string; slug: string }> {
   if (!slugOrId) throw new Error('Pass --tenant=slug')

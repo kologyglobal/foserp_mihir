@@ -1,7 +1,7 @@
 import { getLegalEntityOrThrow } from '../../shared/finance.helpers.js'
 import { resolvePeriodByDate } from '../../posting/posting-period.service.js'
 import { isMultiCurrencyEnabled } from '../../posting/posting-currency.service.js'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { toDecimal } from '../../shared/finance-decimal.js'
 import {
   findCustomerParty,

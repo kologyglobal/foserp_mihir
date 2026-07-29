@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 
 /** True when MANUFACTURING_ACCOUNTING is enabled for the legal entity (default off). */
 export async function isManufacturingAccountingEnabled(

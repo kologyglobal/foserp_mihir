@@ -9,7 +9,7 @@
  *
  * Run: npx tsx scripts/seed-inventory-setup.ts [tenantSlug]
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 const TENANT_SLUG = process.argv[2] ?? 'vasant-trailers'
 

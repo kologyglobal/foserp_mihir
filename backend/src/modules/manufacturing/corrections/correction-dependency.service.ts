@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { toDecimal } from '../shared/quantity.service.js'
 import type { CorrectionDependency, CorrectionHandlerContext } from './correction.types.js'
 

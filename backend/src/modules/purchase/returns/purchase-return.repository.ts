@@ -1,5 +1,5 @@
 import type { Prisma, PurchaseReturnStatus } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import type { ListPurchaseReturnsQuery } from './purchase-return.validation.js'
 export const includePurchaseReturn = { lines: { orderBy: { lineNumber: 'asc' as const } } } as const

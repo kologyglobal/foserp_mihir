@@ -1,5 +1,5 @@
 import { Prisma, type VendorInvoiceSourceLink } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { VendorInvoiceNotFoundError, VendorInvoiceSourceLinkConflictError } from './vendor-invoice.errors.js'
 import type { CreateVendorInvoiceSourceLinkInput } from './vendor-invoice.types.js'
 

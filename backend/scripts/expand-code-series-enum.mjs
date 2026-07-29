@@ -1,4 +1,4 @@
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 /** Expand code_series.entityType to match Prisma CodeSeriesEntity (local catch-up). */
 const ENUM_VALUES = [

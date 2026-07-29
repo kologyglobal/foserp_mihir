@@ -1,5 +1,5 @@
 import type { PostingEvent } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { reserveSourceDocumentNumber, type ReservedSourceDocumentNumber } from '../../posting/posting-number.service.js'
 
 const DOCUMENT_TYPE = 'TREASURY_ADJUSTMENT' as const

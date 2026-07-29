@@ -122,6 +122,16 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Done recently — MFG-GOLDEN-1 Fuel Tank re-verification (2026-07-28)
+
+| Field | Value |
+|-------|-------|
+| Module | Manufacturing |
+| Description | Audit + re-run factory golden path; docs pack under `docs/manufacturing/MFG_*`; no new mfg features |
+| Evidence | `WO-000010`, serial `FT-5000L-52948875`, material=WO=FG ₹111,020; CLOSE purpose blocked / COMPLETE ready |
+| Doc | `docs/manufacturing/MFG_GOLDEN_PATH_AUDIT.md`, `MFG_GOLDEN_PATH_TEST_RESULTS.md`, `FUEL_TANK_GOLDEN_PATH.md` |
+| Status | **READY FOR CONTROLLED PILOT** — live SPA sign-off / shortage-return-partial SPA / SO→WO UI run / perf soak remain open |
+
 ## Done recently — Fuel Tank factory golden path (2026-07-27)
 
 | Field | Value |
@@ -130,7 +140,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Description | Controlled UAT: ONE FG WO + LOGICAL SFG Job Cards → reserve/issue → route/QC/rework → WC/machine assignment → FG serial receipt → WO actual cost (inventory costing) → FG valuation → close readiness → COMPLETED |
 | Evidence | `WO-000009`, serial `FT-5000L-43550266`, material/WO/FG cost ₹111,020; script `npx tsx scripts/test-fuel-tank-wo-execution.ts` |
 | Doc | `docs/manufacturing/examples/FUEL_TANK_UAT.md` |
-| Status | **PASS** — factory golden path closed (no new mfg features) |
+| Status | **PASS** — superseded evidence by 2026-07-28 re-run (`WO-000010`) |
 
 ## Done recently — Fuel Tank mfg master (2026-07-23)
 
@@ -143,14 +153,58 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
+## Done recently — Purchase completion FE/integration (2026-07-28)
+
+| Field | Value |
+|-------|-------|
+| Module | Purchase |
+| Description | GRN receiving-chain UX; Invoice AP handoff honesty + Money Out link; Return accounting-pending banner; GRN→cost entry automated proof |
+| Doc | `docs/purchase/PURCHASE_COMPLETION_AUDIT.md`, `PURCHASE_COMPLETION_TEST_RESULTS.md` |
+| Status | **done** for internal UAT closure of FE/integration links — **open**: return→AP debit, invoice cost adjust, QI parameters API, spend/supplier dashboards |
+
+---
+
+## Done recently — Inventory Costing UAT-1 hardening (2026-07-28)
+
+| Field | Value |
+|-------|-------|
+| Module | Inventory Costing |
+| Description | Controlled UAT suite (4 methods + transfer + tenant isolation); cost-entry/movement value parity; transfer cost preservation; method-change readiness preview; MA before/after history; Standard ItemLookupSelect; recon GL Not Available |
+| Doc | `docs/inventory/INVENTORY_COSTING_UAT_AUDIT.md`, `INVENTORY_COSTING_TEST_RESULTS.md`, `INVENTORY_COSTING_PRODUCTION_READINESS.md` |
+| Status | **done** for UAT-1 automated hardening — **open**: live SPA sign-off, purchase-return/dispatch matrices, performance soak, Inventory↔GL TB |
+
+---
+
+## Done recently — Inventory Costing FE + Reconciliation UI (2026-07-28)
+
+| Field | Value |
+|-------|-------|
+| Module | Inventory Costing UI |
+| Description | Overview, enriched registers, MA/standard/specific screens, Run Reconciliation, method-change current method, read APIs |
+| Doc | `docs/inventory/INVENTORY_COSTING_FE_AUDIT.md`, `INVENTORY_COSTING_UI.md` |
+| Status | **done** for FE usability — **open**: controlled UAT + inventory↔GL TB |
+
+---
+
+## Done recently — IV-MFG-1 Inventory ↔ Manufacturing cost consolidation (2026-07-28)
+
+| Field | Value |
+|-------|-------|
+| Module | Inventory Costing / Manufacturing Costing |
+| Description | Inventory Costing is sole inventory valuation authority; WO material consumes InventoryCostEntry; legacy mfg valuation enum deprecated (not dropped); cost-trace + item summary + effective-method APIs; WO Costing material UI |
+| Doc | `docs/inventory/INVENTORY_MANUFACTURING_COSTING_AUDIT.md`, `docs/inventory/INVENTORY_VALUATION_ARCHITECTURE.md` |
+| Status | **done** for architecture consolidation — **open**: controlled golden-path UAT (MA/FIFO/Standard/Specific) + live mfg GL still blocked |
+
+---
+
 ## In progress — Inventory costing engine (2026-07-27)
 
 | Field | Value |
 |-------|-------|
 | Module | Inventory / Manufacturing / Finance integration |
-| Description | Costing engine Phase A–C BE + **Phase 1 FE Costing UI** + **all 4 valuation methods hardened** (MA issue rate, standard fail-closed, FIFO/Specific return restore, Specific lot/pool + method-change migration). |
-| Status | **in_progress** (engines + UI + method fixes shipped; live UAT + variance GL / inventory↔GL TB still open) |
-| Next step | Controlled UAT with `VITE_USE_API=true` (FIFO + standard/specific + WO actual FG + recon + method change). **Do not** expand live Manufacturing Accounting GL until the gate below clears. |
+| Description | Costing engine Phase A–C BE + **Phase 1 FE Costing UI** + **all 4 valuation methods hardened** + **IV-MFG-1** (WO material from InventoryCostEntry; legacy mfg enum deprecated). |
+| Status | **in_progress** (engines + UI + IV-MFG-1 + **UAT-1 automated hardening** shipped; live SPA UAT + variance GL / inventory↔GL TB still open) |
+| Next step | Live SPA controlled UAT checklist (`INVENTORY_COSTING_CONTROLLED_UAT.md`); purchase-return + dispatch 4-method matrices; performance soak. **Do not** expand live Manufacturing Accounting GL until the gate below clears. |
 
 ---
 
@@ -458,11 +512,11 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 |-------|-------|
 | Module | Purchase |
 | Description | PR/PO/GRN API |
-| Reason | **Partial** — PO/GRN/QI/Invoice/Return + Setup + FE parity + **GRNI report** + **per-user approver ₹ limits** + **multi-unit UOM** (vendor → primary for Item/PO/GRN/inventory posting) (2026-07-27). Remaining: ITC/vendor-outstanding placeholders; formal GR/IR clearing GL; fuller invoice/QI/return dual-UOM display; Hostinger migrate deploy of `20260727180000_purchase_multi_unit_uom`. |
+| Reason | **Partial** — PO/GRN/QI/Invoice/Return + Setup + FE parity + GRNI + approver limits + **multi-unit UOM** + **GRN tolerance** + **PO versioning** + **2026-07-28 completion links** (GRN chain, AP handoff UX, return pending banner, GRN→costing test). Remaining: ITC placeholders; formal GR/IR clearing GL; return→AP debit; invoice retro cost adjust; fuller dual-UOM display; Hostinger migrate deploy of purchase UOM/tolerance/versioning migrations. |
 | Dependencies | Items, vendors (done); PR schema Phase 03 (done); PO lifecycle (done); Approvals queue (done); Setup 1A (done) |
-| Next step | Optional ITC/AP outstanding report integrations; formal GR/IR clearing account if Finance requires it. |
-| Test required | Setup **13/13**; QI/return lifecycle stock asserts; GRNI report live; matrix + approver-limit unit; invoice lifecycle. |
-| Status | **in_progress** (core purchase loop + GRNI + user limits closed) |
+| Next step | Live SPA UAT checklist; optional ITC/AP outstanding; return→AP debit; formal GR/IR clearing if Finance requires it. |
+| Test required | Setup **13/13**; QI/return lifecycle; GRNI; invoice lifecycle; **purchase-completion-grn-costing** PASS |
+| Status | **in_progress** (core loop ready for internal UAT) |
 
 ### P3-3: Inventory / production / quality / finance backends
 

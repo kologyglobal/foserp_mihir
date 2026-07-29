@@ -7,7 +7,7 @@
  *   npx tsx scripts/crm-product-to-item-backfill.ts
  */
 import { Prisma } from '@prisma/client'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 type ExceptionRow = {
   module: string

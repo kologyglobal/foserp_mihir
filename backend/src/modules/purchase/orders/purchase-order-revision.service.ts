@@ -3,7 +3,7 @@
  * See docs/PURCHASE_PO_VERSIONING.md
  */
 import type { PurchaseOrderLine, PurchaseOrderStatus } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { PURCHASE_AUDIT_ACTION, PURCHASE_AUDIT_ENTITY, writePurchaseAudit } from '../shared/purchase-audit.js'
 import { PURCHASE_ERROR_CODE, purchaseMessage } from '../shared/purchase-error-catalog.js'
 import {

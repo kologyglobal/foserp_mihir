@@ -3,7 +3,7 @@
  * Soft links only — no Prisma FKs from accounting invoices.
  */
 import type { CrmSalesOrder, GoodsReceipt, PurchaseOrder } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getPagination } from '../../../../utils/pagination.js'
 import { AppError, NotFoundError } from '../../../../utils/errors.js'
 import type { SalesOrderLineDto } from '../../../crm/sales-orders/sales-order.types.js'

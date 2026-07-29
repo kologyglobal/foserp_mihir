@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 
 const D = (value: Prisma.Decimal.Value = 0) => new Prisma.Decimal(value)
 

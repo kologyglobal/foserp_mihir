@@ -2,7 +2,7 @@
  * Admin Panel Phase 10 — polish: audit list, security policy, requireModule proof.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { createAuditLog, listAuditLogs } from '../src/services/audit.service.js'
 import { requireModule } from '../src/middleware/require-module.middleware.js'
 import * as moduleService from '../src/modules/modules/module.service.js'

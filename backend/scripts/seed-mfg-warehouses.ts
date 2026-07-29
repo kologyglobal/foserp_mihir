@@ -2,7 +2,7 @@
  * Upsert canonical manufacturing warehouses + locations/bins + default warehouse mapping.
  * Usage: npx tsx scripts/seed-mfg-warehouses.ts [tenantSlug]
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import {
   LOCATION_SEED_ROWS,
   MFG_WAREHOUSE_CODES,

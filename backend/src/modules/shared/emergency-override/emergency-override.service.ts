@@ -4,7 +4,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import type { EmergencyOverrideUrgency, Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { ConflictError, UnprocessableEntityError } from '../../../utils/errors.js'
 import {
   classifyBlockersForEmergencyOverride,

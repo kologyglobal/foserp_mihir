@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { ConflictError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { getPagination } from '../../../utils/pagination.js'
 import type {

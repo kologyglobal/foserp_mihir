@@ -1,5 +1,5 @@
 import { Prisma, type StandingInstruction } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getPagination } from '../../../../utils/pagination.js'
 import { parseDateOnly } from '../../shared/finance.helpers.js'
 import { StandingInstructionNotFoundError, StandingInstructionStaleVersionError } from './standing-instruction.errors.js'

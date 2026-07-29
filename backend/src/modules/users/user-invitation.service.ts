@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { v4 as uuidv4 } from 'uuid'
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 import { env } from '../../config/env.js'
 import { createAuditLog } from '../../services/audit.service.js'
 import { isMailConfigured, sendInvitationEmail } from '../../services/mail.service.js'

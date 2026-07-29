@@ -1,5 +1,5 @@
 import type { AccountingVoucherType, FinanceDocumentType, PostingEvent } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import type { VoucherType } from '../ledger/ledger.types.js'
 import { PostingError } from './posting.errors.js'
 import * as postingEventRepo from '../ledger/posting-event.repository.js'

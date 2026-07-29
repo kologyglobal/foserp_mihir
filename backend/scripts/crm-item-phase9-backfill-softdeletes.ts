@@ -1,7 +1,7 @@
 /**
  * Backfill itemId on soft-deleted CRM headers from productId→fgItemId (Phase 9 NOT NULL prep).
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 async function main() {
   const sos = await prisma.crmSalesOrder.findMany({

@@ -6,7 +6,7 @@
  *   npx tsx scripts/seed-default-legal-entity.ts
  *   TENANT_SLUG=vasant-trailers npx tsx scripts/seed-default-legal-entity.ts
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import { ensureDefaultLegalEntity } from '../src/modules/accounting/legal-entities/ensure-default-legal-entity.js'
 
 const TENANT_SLUG = process.env.TENANT_SLUG?.trim()

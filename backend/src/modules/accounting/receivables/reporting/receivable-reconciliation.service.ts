@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { compare, formatForPersistence, subtract, sumDecimals, toDecimal } from '../../shared/finance-decimal.js'
 import { compareDateOnly } from './receivable-ageing.service.js'
 import {

@@ -1,7 +1,7 @@
 /**
  * Aggregated AP reversal history — vendor invoices/payments/adjustments + allocation reversals.
  */
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getPagination } from '../../../../utils/pagination.js'
 
 export type ApReversalDocumentType = 'payment' | 'invoice' | 'adjustment' | 'allocation'

@@ -1,4 +1,4 @@
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 
 /**
  * `luxon`/`dayjs`/`date-fns-tz` are not in backend/package.json (checked before writing this

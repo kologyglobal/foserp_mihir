@@ -2,7 +2,7 @@
  * Admin Panel Phase 6 — data scopes + responsibilities.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import * as scopeService from '../src/modules/access-scopes/scope.service.js'
 import * as responsibilityService from '../src/modules/responsibilities/responsibility.service.js'
 import * as userService from '../src/modules/users/user.service.js'

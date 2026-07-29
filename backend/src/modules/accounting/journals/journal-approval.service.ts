@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { compare, toDecimal } from '../shared/finance-decimal.js'
 import type { JournalApprovalInfo, JournalApprovalLevel } from './journal.types.js'
 

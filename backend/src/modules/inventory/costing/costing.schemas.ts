@@ -35,6 +35,14 @@ export const valuationReconciliationQuerySchema = z.object({
 
 export type ValuationReconciliationQuery = z.infer<typeof valuationReconciliationQuerySchema>
 
+export const runReconciliationBodySchema = z
+  .object({
+    itemId: z.string().uuid().optional(),
+    warehouseId: z.string().uuid().optional(),
+    mismatchesOnly: z.boolean().optional(),
+  })
+  .default({})
+
 export const methodChangeBodySchema = z.object({
   toMethod: z.enum(['standard', 'average', 'fifo', 'specific']),
   effectiveDate: z.coerce.date().optional(),
@@ -65,3 +73,57 @@ export const listVariancesQuerySchema = paginationSchema.extend({
 })
 
 export type ListVariancesQuery = z.infer<typeof listVariancesQuerySchema>
+
+export const effectiveMethodQuerySchema = z.object({
+  itemId: z.string().uuid().optional(),
+  legalEntityId: z.string().uuid().optional(),
+  warehouseId: z.string().uuid().optional(),
+  postingDate: z.coerce.date().optional(),
+})
+
+export type EffectiveMethodQuery = z.infer<typeof effectiveMethodQuerySchema>
+
+export const itemCostingSummaryParamSchema = z.object({
+  itemId: z.string().uuid(),
+})
+
+export const listValuationItemsQuerySchema = paginationSchema.extend({
+  warehouseId: z.string().uuid().optional(),
+  itemId: z.string().uuid().optional(),
+  search: z.string().trim().optional(),
+})
+
+export const listMovingAverageQuerySchema = paginationSchema.extend({
+  warehouseId: z.string().uuid().optional(),
+  itemId: z.string().uuid().optional(),
+})
+
+export const listStandardCostsQuerySchema = paginationSchema.extend({
+  itemId: z.string().uuid().optional(),
+  status: z.enum(['DRAFT', 'ACTIVE', 'SUPERSEDED']).optional(),
+})
+
+export const listSpecificQuerySchema = paginationSchema.extend({
+  itemId: z.string().uuid().optional(),
+  unidentifiedOnly: z.coerce.boolean().optional(),
+})
+
+export const methodChangePreviewQuerySchema = z.object({
+  toMethod: z.enum(['standard', 'average', 'fifo', 'specific']),
+  effectiveDate: z.coerce.date().optional(),
+})
+
+export type MethodChangePreviewQuery = z.infer<typeof methodChangePreviewQuerySchema>
+
+export const listMovingAverageHistoryQuerySchema = z.object({
+  itemId: z.string().uuid(),
+  warehouseId: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+})
+
+export type ListMovingAverageHistoryQuery = z.infer<typeof listMovingAverageHistoryQuerySchema>
+
+export type ListValuationItemsQuery = z.infer<typeof listValuationItemsQuerySchema>
+export type ListMovingAverageQuery = z.infer<typeof listMovingAverageQuerySchema>
+export type ListStandardCostsQuery = z.infer<typeof listStandardCostsQuerySchema>
+export type ListSpecificQuery = z.infer<typeof listSpecificQuerySchema>

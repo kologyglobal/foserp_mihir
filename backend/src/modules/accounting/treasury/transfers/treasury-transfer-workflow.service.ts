@@ -1,5 +1,5 @@
 import type { Request } from 'express'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { auditTreasuryTransfer } from './treasury-transfer-audit.js'
 import { recalculateTreasuryTransfer } from './treasury-transfer-draft.service.js'
 import * as repo from './treasury-transfer.repository.js'

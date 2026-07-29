@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { tenantActiveFilter } from '../../../shared/index.js'
 import type { DashboardQuery } from './dashboard.validation.js'
 import { getDashboardCharts } from './dashboard-charts.service.js'

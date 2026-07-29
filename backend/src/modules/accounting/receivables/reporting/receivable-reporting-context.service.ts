@@ -1,4 +1,4 @@
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import { getLegalEntityOrThrow } from '../../shared/finance.helpers.js'
 import { compareDateOnly, getTodayInTimezone } from './receivable-ageing.service.js'
 import {

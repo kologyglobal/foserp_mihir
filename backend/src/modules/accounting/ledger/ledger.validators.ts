@@ -1,5 +1,5 @@
 import type { Account, AccountingPeriod, AccountingVoucher, FinancialYear } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { getLegalEntityOrThrow } from '../shared/finance.helpers.js'
 import { add, compare, convertToBase, isNegative, isPositive, isZero, sumDecimals, toDecimal } from '../shared/finance-decimal.js'
 import type {

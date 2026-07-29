@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../config/database.js'
+import { prisma } from '../config/prisma.js'
 import { buildPaginationMeta, getPagination, type PaginationInput } from '../utils/pagination.js'
 
 export interface AuditInput {

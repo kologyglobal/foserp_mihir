@@ -7,7 +7,7 @@ import type {
   PurchasePrintPaperSize,
   SelfApprovalPolicy,
 } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { permissionSetIncludes } from '../../../constants/permissions.js'
 import { SERVER_DEFAULT_SETUP } from '../setup/purchase-setup.repository.js'
 

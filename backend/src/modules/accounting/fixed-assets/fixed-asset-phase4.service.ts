@@ -12,7 +12,7 @@ import type {
   FixedAssetMaintenanceType,
   FixedAssetRevaluation,
 } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { auditFromRequest, createAuditLog } from '../../../services/audit.service.js'
 import { AuthorizationError } from '../../../utils/errors.js'
 import { add, compare, formatForPersistence, min, subtract } from '../shared/finance-decimal.js'

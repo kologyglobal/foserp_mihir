@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { AuthorizationError, ConflictError, NotFoundError } from '../../../utils/errors.js'
 import type { CreateSavedViewInput, UpdateSavedViewInput } from './saved-view.schemas.js'
 

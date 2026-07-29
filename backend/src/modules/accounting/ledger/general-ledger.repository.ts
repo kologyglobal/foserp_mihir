@@ -8,7 +8,7 @@
  */
 
 import type { GeneralLedgerEntry, Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { getLegalEntityOrThrow, parseDateOnly } from '../shared/finance.helpers.js'
 
 /** Type-level proof that this repository has no mutating methods beyond insertMany. */

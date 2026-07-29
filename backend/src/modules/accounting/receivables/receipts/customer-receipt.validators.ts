@@ -1,5 +1,5 @@
 import type { Account, ReceivableOpenItem } from '@prisma/client'
-import { prisma } from '../../../../config/database.js'
+import { prisma } from '../../../../config/prisma.js'
 import {
   CustomerReceiptAccountOwnershipError,
   CustomerReceiptAllocationCustomerMismatchError,

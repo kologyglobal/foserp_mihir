@@ -2,7 +2,7 @@
  * Inspect / soft-delete leftover CRM rows blocking Phase 9 NOT NULL.
  * Usage: npx tsx scripts/crm-item-phase9-cleanup-blockers.ts [--apply]
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 const APPLY = process.argv.includes('--apply')
 
