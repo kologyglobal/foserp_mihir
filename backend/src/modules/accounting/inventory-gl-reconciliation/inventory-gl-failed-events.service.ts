@@ -3,7 +3,7 @@
  * Retry is idempotent via existing posting event keys. No silent success / Force Balance.
  */
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { InvalidStateError, NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { formatForPersistence, toDecimal } from '../shared/finance-decimal.js'
 import { post } from '../posting/posting.service.js'

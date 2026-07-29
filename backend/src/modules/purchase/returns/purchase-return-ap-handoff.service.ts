@@ -9,7 +9,7 @@
  * adjustable value.
  */
 import type { Request } from 'express'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { ensureDefaultLegalEntity } from '../../accounting/legal-entities/ensure-default-legal-entity.js'
 import { createVendorAdjustmentDraft } from '../../accounting/payables/vendor-adjustments/vendor-adjustment-draft.service.js'
 import type { CreateVendorAdjustmentInput } from '../../accounting/payables/vendor-adjustments/vendor-adjustment.schemas.js'

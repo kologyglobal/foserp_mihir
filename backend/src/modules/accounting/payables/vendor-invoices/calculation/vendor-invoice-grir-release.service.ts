@@ -10,7 +10,7 @@
  * `INVENTORY_ACCOUNTING` was off at receipt time there is no GR/IR balance to clear, and the
  * line keeps the ordinary `LINE_DEBIT` (PURCHASE) treatment.
  */
-import { prisma } from '../../../../../config/database.js'
+import { prisma } from '../../../../../config/prisma.js'
 import { add, divide, isZero, multiply, subtract, toDecimal } from '../../../shared/finance-decimal.js'
 import { formatDecimal4 } from './vendor-invoice-decimal.js'
 import type { VendorInvoiceAmountsCalculationResult } from './vendor-invoice-amounts.service.js'

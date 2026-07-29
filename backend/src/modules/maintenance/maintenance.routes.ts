@@ -15,7 +15,7 @@ import { getRouteParam, getTenantId } from '../../types/request-context.js'
 import { asyncHandler } from '../../utils/asyncHandler.js'
 import { sendSuccess } from '../../utils/response.js'
 import { NotFoundError, ValidationError } from '../../utils/errors.js'
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 import { auditFromRequest, createAuditLog } from '../../services/audit.service.js'
 import * as controller from './ticket.controller.js'
 import {

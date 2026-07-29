@@ -5,7 +5,7 @@
  * Safe / idempotent. Does not enable INVENTORY_ACCOUNTING.
  */
 import type { AccountCategory, AccountType, DefaultAccountMappingKey, NormalBalance } from '@prisma/client'
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 
 const TARGETS: Array<{
   mappingKey: DefaultAccountMappingKey

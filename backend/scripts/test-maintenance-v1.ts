@@ -4,7 +4,7 @@
  * Usage (from backend/):
  *   npx tsx scripts/test-maintenance-v1.ts
  */
-import { prisma } from '../src/config/database.js'
+import { prisma } from '../src/config/prisma.js'
 import {
   addPart,
   closeReadiness,

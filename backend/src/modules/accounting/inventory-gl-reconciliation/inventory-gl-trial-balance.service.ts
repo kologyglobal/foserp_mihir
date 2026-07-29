@@ -5,7 +5,7 @@
  * balances. Never mutates balances and never exposes a Force Balance action.
  */
 import type { DefaultAccountMappingKey, Prisma } from '@prisma/client'
-import { prisma } from '../../../config/database.js'
+import { prisma } from '../../../config/prisma.js'
 import { NotFoundError, ValidationError } from '../../../utils/errors.js'
 import { formatForPersistence, isZero, subtract, toDecimal } from '../shared/finance-decimal.js'
 import { isInventoryAccountingEnabled } from '../../inventory/accounting/inventory-accounting-gate.service.js'

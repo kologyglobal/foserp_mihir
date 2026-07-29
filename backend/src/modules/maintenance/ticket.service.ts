@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../../config/database.js'
+import { prisma } from '../../config/prisma.js'
 import { nextCode } from '../../services/codeSeries.service.js'
 import { auditFromRequest, createAuditLog } from '../../services/audit.service.js'
 import { ConflictError, InvalidStateError, ValidationError } from '../../utils/errors.js'
