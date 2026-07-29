@@ -760,10 +760,11 @@ export async function rejectPurchaseOrder(
   id: string,
   actorId: string,
   input: PoReasonInput = {},
+  actorPermissions: readonly string[] = [],
 ) {
   const existing = await loadOrThrow(tenantId, id)
   assertRejectable(existing)
-  await assertApprovalAssignedToActor(tenantId, id, actorId, [])
+  await assertApprovalAssignedToActor(tenantId, id, actorId, actorPermissions)
   const reason = assertReasonPresent(
     input.reason ?? input.remarks,
     PURCHASE_ERROR_CODE.PO_REJECTION_REASON_REQUIRED,
@@ -782,10 +783,11 @@ export async function sendBackPurchaseOrder(
   id: string,
   actorId: string,
   input: PoReasonInput = {},
+  actorPermissions: readonly string[] = [],
 ) {
   const existing = await loadOrThrow(tenantId, id)
   assertSendBackable(existing)
-  await assertApprovalAssignedToActor(tenantId, id, actorId, [])
+  await assertApprovalAssignedToActor(tenantId, id, actorId, actorPermissions)
   const reason = assertReasonPresent(
     input.reason ?? input.remarks,
     PURCHASE_ERROR_CODE.PO_SEND_BACK_REASON_REQUIRED,
@@ -831,12 +833,12 @@ export async function cancelPurchaseOrder(
   const existing = await loadOrThrow(tenantId, id)
   assertCancellable(existing)
 
-  // Open (Draft): soft-delete the document.
+  // Open (Draft): mark Cancelled (list Delete). Released cannot cancel.
   if (existing.status === 'DRAFT') {
     return applyLifecycleTransition(tenantId, actorId, existing, {
       action: 'CANCELLED',
       auditAction: PURCHASE_AUDIT_ACTION.PO_CANCELLED,
-      data: { status: 'CANCELLED', cancelledAt: new Date(), deletedAt: new Date() },
+      data: { status: 'CANCELLED', cancelledAt: new Date() },
       approvalResolution: 'CANCELLED',
       remarks: input.remarks ?? null,
     })

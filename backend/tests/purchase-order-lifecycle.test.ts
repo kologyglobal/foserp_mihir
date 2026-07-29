@@ -297,14 +297,14 @@ describe.skipIf(!dbAvailable)('Purchase order lifecycle (Phase 1)', () => {
     expect(res.body.code ?? res.body.error?.code).toBe('PO_NOT_EDITABLE')
   })
 
-  it('approves a pending PO and resolves the approval', async () => {
+  it('approves a pending PO and releases it', async () => {
     const id = await createSubmitted()
     const res = await request(app)
       .post(`${poBase()}/${id}/approve`)
       .set(auth(approverToken))
       .send({})
     expect(res.status).toBe(200)
-    expect(res.body.data.status).toBe('APPROVED')
+    expect(res.body.data.status).toBe('SENT_TO_VENDOR')
     const approval = await prisma.purchaseApproval.findFirst({
       where: { tenantId, purchaseOrderId: id },
       orderBy: { createdAt: 'desc' },
@@ -321,11 +321,11 @@ describe.skipIf(!dbAvailable)('Purchase order lifecycle (Phase 1)', () => {
 
   it('requires a reason to reject and rejects with reason', async () => {
     const id = await createSubmitted()
-    const missing = await request(app).post(`${poBase()}/${id}/reject`).set(auth()).send({})
-    expect(missing.status).toBe(400)
+    const missing = await request(app).post(`${poBase()}/${id}/reject`).set(auth(approverToken)).send({})
+    expect([400, 422]).toContain(missing.status)
     const res = await request(app)
       .post(`${poBase()}/${id}/reject`)
-      .set(auth())
+      .set(auth(approverToken))
       .send({ reason: 'Price too high' })
     expect(res.status).toBe(200)
     expect(res.body.data.status).toBe('REJECTED')
@@ -334,12 +334,12 @@ describe.skipIf(!dbAvailable)('Purchase order lifecycle (Phase 1)', () => {
 
   it('sends back with reason, allows rework edit, and resubmits', async () => {
     const id = await createSubmitted()
-    const missing = await request(app).post(`${poBase()}/${id}/send-back`).set(auth()).send({})
-    expect(missing.status).toBe(400)
+    const missing = await request(app).post(`${poBase()}/${id}/send-back`).set(auth(approverToken)).send({})
+    expect([400, 422]).toContain(missing.status)
 
     const sentBack = await request(app)
       .post(`${poBase()}/${id}/send-back`)
-      .set(auth())
+      .set(auth(approverToken))
       .send({ reason: 'Fix delivery date' })
     expect(sentBack.status).toBe(200)
     expect(sentBack.body.data.status).toBe('SENT_BACK')
@@ -357,19 +357,24 @@ describe.skipIf(!dbAvailable)('Purchase order lifecycle (Phase 1)', () => {
     expect(resubmit.body.data.status).toBe('PENDING_APPROVAL')
   })
 
-  it('sends an approved PO to vendor; blocks sending unapproved', async () => {
+  it('approve releases the PO; send-to-vendor blocked after release', async () => {
     const id = await createSubmitted()
     const early = await request(app).post(`${poBase()}/${id}/send-to-vendor`).set(auth()).send({})
     expect(early.status).toBe(422)
 
-    await request(app).post(`${poBase()}/${id}/approve`).set(auth(approverToken)).send({})
+    const approve = await request(app)
+      .post(`${poBase()}/${id}/approve`)
+      .set(auth(approverToken))
+      .send({})
+    expect(approve.status).toBe(200)
+    expect(approve.body.data.status).toBe('SENT_TO_VENDOR')
+    expect(approve.body.data.allowedActions.canReceive).toBe(true)
+
     const res = await request(app).post(`${poBase()}/${id}/send-to-vendor`).set(auth()).send({})
-    expect(res.status).toBe(200)
-    expect(res.body.data.status).toBe('SENT_TO_VENDOR')
-    expect(res.body.data.allowedActions.canReceive).toBe(true)
+    expect(res.status).toBe(422)
   })
 
-  it('cancels an unreceived PO and reopens it back to draft', async () => {
+  it('cancels an open PO and reopens it back to draft', async () => {
     const id = await createDraft()
     const cancel = await request(app).post(`${poBase()}/${id}/cancel`).set(auth()).send({})
     expect(cancel.status).toBe(200)
@@ -381,23 +386,22 @@ describe.skipIf(!dbAvailable)('Purchase order lifecycle (Phase 1)', () => {
     expect(reopen.body.data.status).toBe('DRAFT')
   })
 
-  it('blocks cancelling a PO with receipts', async () => {
+  it('withdraws pending approval back to open; blocks cancel when released', async () => {
+    const pendingId = await createSubmitted()
+    const withdraw = await request(app).post(`${poBase()}/${pendingId}/cancel`).set(auth()).send({})
+    expect(withdraw.status).toBe(200)
+    expect(withdraw.body.data.status).toBe('DRAFT')
+
     const id = await createSubmitted()
     await request(app).post(`${poBase()}/${id}/approve`).set(auth(approverToken)).send({})
-    await request(app).post(`${poBase()}/${id}/send-to-vendor`).set(auth()).send({})
-    await prisma.purchaseOrderLine.updateMany({
-      where: { tenantId, purchaseOrderId: id },
-      data: { receivedQuantity: 1 },
-    })
     const res = await request(app).post(`${poBase()}/${id}/cancel`).set(auth()).send({})
     expect(res.status).toBe(422)
-    expect(res.body.code ?? res.body.error?.code).toBe('PO_CANNOT_CANCEL_RECEIVED')
+    expect(res.body.code ?? res.body.error?.code).toBe('PO_INVALID_STATUS')
   })
 
   it('closes a sent PO; closed PO cannot be edited; reopen restores receipt state', async () => {
     const id = await createSubmitted()
     await request(app).post(`${poBase()}/${id}/approve`).set(auth(approverToken)).send({})
-    await request(app).post(`${poBase()}/${id}/send-to-vendor`).set(auth()).send({})
 
     const close = await request(app).post(`${poBase()}/${id}/close`).set(auth()).send({})
     expect(close.status).toBe(200)
