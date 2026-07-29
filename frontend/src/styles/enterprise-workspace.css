@@ -2442,6 +2442,18 @@
   min-height: 2.25rem;
 }
 
+/* PO editor: preserve wheel/touch scrolling without reserving scrollbar width. */
+.purchase-order-editor--scrollbar-hidden .erp-card-form-page__body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.purchase-order-editor--scrollbar-hidden .erp-card-form-page__body::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 /* Legacy class kept as alias for any remaining call sites */
 .erp-card-form-page__factbox-restore {
   display: flex;

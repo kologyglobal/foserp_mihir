@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
-  Building2,
   CheckCircle,
   ClipboardList,
   Copy,
@@ -123,8 +122,22 @@ import { useOptionalAuth } from '@/context/AuthProvider'
 import { isApiMode } from '@/config/apiConfig'
 import { useMasterStore } from '@/store/masterStore'
 
-type LocationOption = { id: string; code: string; name: string; state: string; city: string }
-const EMPTY_LOCATION: LocationOption = { id: '', code: '', name: '', state: '', city: '' }
+type LocationOption = {
+  id: string
+  code: string
+  name: string
+  address: string
+  state: string
+  city: string
+}
+const EMPTY_LOCATION: LocationOption = {
+  id: '',
+  code: '',
+  name: '',
+  address: '',
+  state: '',
+  city: '',
+}
 
 // Backend rule: only draft and sent-back POs are editable (submitted POs are locked).
 const EDITABLE_STATUSES: PurchaseOrder['status'][] = ['draft', 'sent_back']
@@ -496,17 +509,11 @@ export function PurchaseOrderEditorPage() {
             : 'manual'
 
   const [originMode, setOriginMode] = useState<PurchaseOrderOrigin>(originModeFromParam)
-  /** Deep-link / query param: origin already chosen; otherwise start with compact source chips. */
-  const [originChosen, setOriginChosen] = useState(
-    () =>
-      Boolean(originParam) ||
-      Boolean(
-        searchParams.get('prId') ||
-          searchParams.get('comparisonId') ||
-          searchParams.get('vqId') ||
-          searchParams.get('blanketId'),
-      ),
-  )
+  /**
+   * Blank `/purchase/orders/new` opens the manual PO form immediately (no origin chooser).
+   * Deep links (`?origin=…`, `?prId=…`, etc.) still skip the chooser and land on the source panel.
+   */
+  const [originChosen, setOriginChosen] = useState(true)
   const [approvedPrs, setApprovedPrs] = useState<PurchaseRequisition[]>([])
   const [selectedPrId, setSelectedPrId] = useState(searchParams.get('prId') ?? '')
   const [selectedPrVendorId, setSelectedPrVendorId] = useState('')
@@ -527,6 +534,14 @@ export function PurchaseOrderEditorPage() {
   const { dirty, markDirty, resetDirty } = useUnsavedChangesGuard(editable)
 
   const selectedVendor = useMemo(() => vendors.find((v) => v.id === header.vendorId), [vendors, header.vendorId])
+  const selectedPurchaseLocation = useMemo(
+    () => locationOptions.find((location) => location.id === header.purchaseLocationId),
+    [header.purchaseLocationId, locationOptions],
+  )
+  const selectedDeliveryLocation = useMemo(
+    () => locationOptions.find((location) => location.id === header.deliveryLocationId),
+    [header.deliveryLocationId, locationOptions],
+  )
   const catalogItemsForPicker = useMemo(
     () =>
       catalogItems.map((item) => ({
@@ -872,6 +887,7 @@ export function PurchaseOrderEditorPage() {
         id: w.id,
         code: w.code,
         name: w.name,
+        address: w.address,
         state: w.state,
         city: w.city,
       }))
@@ -1210,34 +1226,12 @@ export function PurchaseOrderEditorPage() {
     )
   }
 
-  /** Origin-gated source refs: only relevant labels; hide empty values (no wall of "—"). */
-  const allSourceRefs: { label: string; value: string | null }[] = [
-    { label: 'Source PR', value: header.purchaseRequisitionNumber },
-    { label: 'Source RFQ', value: header.rfqNumber },
-    { label: 'Source Vendor Quotation', value: header.vendorQuotationNumber },
-    { label: 'Source Comparison', value: header.comparisonNumber },
-    { label: 'Source Blanket Order', value: header.blanketOrderNumber },
-  ]
-  const sourceLabelsByOrigin: Record<Exclude<PurchaseOrderOrigin, 'manual'>, string[]> = {
-    purchase_requisition: ['Source PR'],
-    quotation_comparison: ['Source RFQ', 'Source Comparison'],
-    vendor_quotation: ['Source Vendor Quotation', 'Source RFQ'],
-    blanket_order: ['Source Blanket Order'],
-  }
-  const sourceCandidates =
-    originMode === 'manual'
-      ? []
-      : allSourceRefs.filter((r) => sourceLabelsByOrigin[originMode].includes(r.label))
-  const populatedSourceRefs = sourceCandidates.filter(
-    (r): r is { label: string; value: string } => Boolean(r.value),
-  )
-  const showManualSourceFact = originMode === 'manual'
-
   return (
     <>
     <PurchaseCardFormShell
       title={isNew ? 'New Purchase Order' : `Edit ${documentNumber ?? 'Purchase Order'}`}
       description="Vendor purchase commitment — draft and pending-approval documents only"
+      className="purchase-order-editor--scrollbar-hidden"
       recordNo={documentNumber ?? (isNew ? 'New' : undefined)}
       recordTitle={documentTitle}
       status={PURCHASE_ORDER_DOMAIN_STATUS_LABELS[status]}
@@ -1561,18 +1555,6 @@ export function PurchaseOrderEditorPage() {
                 onChange={(e) => patchHeader({ department: e.target.value })}
               />
             </ErpFieldRow>
-          </ErpCardSection>
-
-          <ErpCardSection
-            title="Vendor Information"
-            subtitle="Supplier identity and place of supply"
-            icon={Building2}
-            accent="teal"
-            collapsible
-            defaultOpen
-            forceOpenKey={forceOpenSections.general}
-            dense
-          >
             <ErpFieldRow
               id={purchaseFieldId('vendorId')}
               label="Vendor"
@@ -1624,41 +1606,6 @@ export function PurchaseOrderEditorPage() {
                 />
               </ErpFieldRow>
             </ErpFormSpan>
-            <ErpFormSpan span={3}>
-              <div className="mt-1 min-h-[4.75rem] rounded-md border border-erp-border bg-erp-surface-alt/60 px-3 py-2.5 text-[12px]">
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-erp-muted">
-                  Vendor summary
-                </p>
-                <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-4">
-                  <div>
-                    <span className="text-erp-muted">Code</span>
-                    <p className="font-mono font-medium text-erp-text">
-                      {selectedVendor?.vendorCode || '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-erp-muted">GSTIN</span>
-                    <p className="font-mono font-medium text-erp-text">
-                      {selectedVendor?.gstin || '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-erp-muted">Payment terms</span>
-                    <p className="font-medium text-erp-text">
-                      {header.paymentTerms || selectedVendor?.paymentTerms || '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-erp-muted">Lead time</span>
-                    <p className="font-medium text-erp-text">
-                      {selectedVendor?.leadTimeDays != null
-                        ? `${selectedVendor.leadTimeDays} days`
-                        : '—'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </ErpFormSpan>
           </ErpCardSection>
 
           <ErpCardSection
@@ -1696,39 +1643,46 @@ export function PurchaseOrderEditorPage() {
                 ))}
               </Select>
             </ErpFieldRow>
-          </ErpCardSection>
-
-          <ErpCardSection
-            title="Source Reference"
-            subtitle="Origin document linkage for this purchase order"
-            icon={ClipboardList}
-            accent="blue"
-            collapsible
-            defaultOpen
-            dense
-          >
-            {showManualSourceFact ? (
-              <ErpFormSpan span={3}>
-                <p className="text-[13px] text-erp-muted">
-                  Source: <span className="text-erp-text">{PURCHASE_ORDER_ORIGIN_LABELS.manual}</span>
-                </p>
-              </ErpFormSpan>
-            ) : populatedSourceRefs.length > 0 ? (
-              populatedSourceRefs.map((ref) => (
-                <ErpFieldRow key={ref.label} label={ref.label} readOnly>
-                  <Input value={ref.value} readOnly className="bg-erp-surface-alt font-mono" />
+            <ErpFormSpan span={3}>
+              <div className="grid gap-3 md:grid-cols-2">
+                <ErpFieldRow label="Purchase Location Address" readOnly>
+                  <Textarea
+                    value={
+                      selectedPurchaseLocation?.address ||
+                      [
+                        selectedPurchaseLocation?.name,
+                        selectedPurchaseLocation?.city,
+                        selectedPurchaseLocation?.state,
+                      ]
+                        .filter(Boolean)
+                        .join(', ')
+                    }
+                    readOnly
+                    rows={3}
+                    className="resize-none whitespace-pre-wrap bg-erp-surface-alt"
+                    placeholder="Select a purchase location to show its full address"
+                  />
                 </ErpFieldRow>
-              ))
-            ) : (
-              <ErpFormSpan span={3}>
-                <p className="text-[13px] text-erp-muted">
-                  Source: <span className="text-erp-text">{PURCHASE_ORDER_ORIGIN_LABELS[originMode]}</span>
-                  {!originChosen ? null : (
-                    <span className="ml-1">(select a source document to populate references)</span>
-                  )}
-                </p>
-              </ErpFormSpan>
-            )}
+                <ErpFieldRow label="Delivery Location Address" readOnly>
+                  <Textarea
+                    value={
+                      selectedDeliveryLocation?.address ||
+                      [
+                        selectedDeliveryLocation?.name,
+                        selectedDeliveryLocation?.city,
+                        selectedDeliveryLocation?.state,
+                      ]
+                        .filter(Boolean)
+                        .join(', ')
+                    }
+                    readOnly
+                    rows={3}
+                    className="resize-none whitespace-pre-wrap bg-erp-surface-alt"
+                    placeholder="Select a delivery location to show its full address"
+                  />
+                </ErpFieldRow>
+              </div>
+            </ErpFormSpan>
           </ErpCardSection>
 
           <ErpCardSection

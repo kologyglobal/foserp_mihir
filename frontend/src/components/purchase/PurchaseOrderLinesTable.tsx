@@ -306,8 +306,8 @@ export function PurchaseOrderLinesTable({
           </div>
 
           {/* Tablet / desktop: grid table */}
-          <div className="erp-table-wrap hidden max-h-[min(28rem,55vh)] overflow-auto rounded-md border border-erp-border md:block">
-          <table className="erp-table purchase-doc-lines-grid text-[11px]">
+          <div className="erp-table-wrap relative isolate hidden max-h-[min(28rem,55vh)] overflow-auto rounded-md border border-erp-border md:block">
+          <table className="erp-table purchase-doc-lines-grid min-w-[92rem] text-[11px]">
             <thead>
               <tr>
                 <th className="purchase-doc-lines-grid__sticky-line">#</th>
@@ -611,7 +611,7 @@ export function PurchaseOrderLinesTable({
           max-width: 9.5rem;
           box-sizing: border-box;
           background: #fff;
-          box-shadow: 2px 0 4px rgb(15 23 42 / 0.04);
+          border-right: 1px solid var(--erp-border, #e2e8f0);
         }
         .purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-type,
         .purchase-doc-lines-grid tfoot .purchase-doc-lines-grid__sticky-type {
@@ -625,6 +625,7 @@ export function PurchaseOrderLinesTable({
           min-width: 10.5rem;
           max-width: 14rem;
           background: #fff;
+          border-right: 1px solid var(--erp-border, #e2e8f0);
           box-shadow: 4px 0 8px -4px rgb(15 23 42 / 0.12);
           overflow: visible;
         }
@@ -641,6 +642,7 @@ export function PurchaseOrderLinesTable({
           width: 2.75rem;
           text-align: center;
           background: #fff;
+          border-left: 1px solid var(--erp-border, #e2e8f0);
           box-shadow: -4px 0 8px rgb(15 23 42 / 0.06);
         }
         .purchase-doc-lines-grid thead .purchase-doc-lines-grid__sticky-actions,

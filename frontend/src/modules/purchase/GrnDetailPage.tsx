@@ -120,7 +120,6 @@ export function GrnDetailPage() {
           { label: 'GRN / Receipts', to: '/purchase/grn' },
           { label: 'Loading' },
         ]}
-        backLink={{ to: '/purchase/grn', label: 'Back to GRN / Receipts' }}
         footer={null}
         stickyFooter={false}
         detailMode
@@ -190,7 +189,6 @@ export function GrnDetailPage() {
         { label: 'GRN / Receipts', to: '/purchase/grn' },
         { label: grn.documentNumber },
       ]}
-      backLink={{ to: '/purchase/grn', label: 'Back to GRN / Receipts' }}
       createdBy={grn.createdBy}
       createdDate={formatDate(grn.createdAt.slice(0, 10))}
       modifiedBy={grn.updatedBy ?? undefined}
