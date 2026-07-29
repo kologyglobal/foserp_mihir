@@ -1,20 +1,18 @@
-import { MQ_XL_UP } from '../../../hooks/useMediaQuery'
-
 /** Purchase documents — localStorage key; value `'1'` means collapsed/hidden. */
 export const PURCHASE_FACTBOX_COLLAPSED_KEY = 'purchase.factbox.collapsed'
 
 /**
  * Resolve initial FactBox open state.
  * - Explicit storage preference wins.
- * - When unset, default open at 1280px+ (side-by-side form + Smart Context).
+ * - When unset, default **closed** (restore via ✦). User can open and preference persists.
  *
  * Supports:
  * - sessionStorage `erp-factbox:*` → `'1'` open / `'0'` closed
  * - localStorage `purchase.factbox.collapsed` → `'1'` collapsed / `'0'` open
  */
 export function getFactBoxInitialOpen(storageKey: string | undefined): boolean {
-  if (!storageKey) return true
-  if (typeof window === 'undefined') return true
+  if (!storageKey) return false
+  if (typeof window === 'undefined') return false
 
   const isPurchaseCollapsedKey = storageKey === PURCHASE_FACTBOX_COLLAPSED_KEY
 
@@ -32,5 +30,6 @@ export function getFactBoxInitialOpen(storageKey: string | undefined): boolean {
     /* ignore */
   }
 
-  return window.matchMedia(MQ_XL_UP).matches
+  // Unset preference: keep insights / Smart Context closed by default on all viewports.
+  return false
 }

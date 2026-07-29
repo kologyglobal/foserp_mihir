@@ -5,7 +5,7 @@
    Expect: all schema rows OK + LE/finance ready for tenant.
    ========================================================= */
 
-USE `u233611619_fos_erp`;
+USE `u233611619_foserp`;
 
 SELECT DATABASE() AS current_db, NOW() AS ran_at, 'verify' AS script;
 

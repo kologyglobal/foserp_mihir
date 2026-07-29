@@ -167,7 +167,7 @@ export function ChartOfAccountsPage() {
   const [draftFilter, setDraftFilter] = useState<AccountFilter>({ ...DEFAULT_COA_FILTER })
   const [filterOpen, setFilterOpen] = useState(false)
   const [treeOpen, setTreeOpen] = useState(false)
-  const [factBoxOpen, setFactBoxOpen] = useState(true)
+  const [factBoxOpen, setFactBoxOpen] = useState(false)
   const [expandedIds, setExpandedIds] = useState<string[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
 

@@ -1,11 +1,11 @@
 /* =========================================================
    LIVE DEPLOY — Part A (READ-ONLY diagnostic)
-   DB:   u233611619_fos_erp
+   DB:   u233611619_foserp
    Pack: purchase multi-unit + GRN tolerance + PO versioning + LE
    Run:  1st (before any ALTER). Safe — SELECT only.
    ========================================================= */
 
-USE `u233611619_fos_erp`;
+USE `u233611619_foserp`;
 
 SELECT DATABASE() AS current_db, NOW() AS ran_at;
 

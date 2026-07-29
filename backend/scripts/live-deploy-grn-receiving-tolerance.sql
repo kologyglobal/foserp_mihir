@@ -7,7 +7,7 @@
    Run check script first if unsure about existing GRN statuses.
    ========================================================= */
 
-USE `u233611619_fos_erp`;
+USE `u233611619_foserp`;
 
 SELECT DATABASE() AS current_db, NOW() AS ran_at, 'grn_receiving_tolerance' AS script;
 SET @db := DATABASE();

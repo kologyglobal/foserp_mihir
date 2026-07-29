@@ -7,7 +7,7 @@
    Then run: live-deploy-mark-prisma-migrations.sql
    ========================================================= */
 
-USE `u233611619_fos_erp`;
+USE `u233611619_foserp`;
 
 SELECT DATABASE() AS current_db, NOW() AS ran_at, 'multi_unit_uom' AS script;
 SET @db := DATABASE();
