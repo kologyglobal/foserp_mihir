@@ -1,3 +1,12 @@
+## 2026-07-29 — Purchase dashboard GRNI (received, not invoiced)
+
+### Shipped
+
+- `/purchase` dashboard shows **GRNs awaiting invoice (GRNI)**: KPI, pending action, and table with Create invoice.
+- Demo + API: client GRNI aggregation; API prefers `GET /purchase/reports/grni`.
+
+---
+
 ## 2026-07-28 ΓÇö MFG-GOLDEN-1 Fuel Tank golden path closure
 
 ### Shipped

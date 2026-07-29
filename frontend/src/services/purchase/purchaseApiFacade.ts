@@ -7,6 +7,7 @@
  */
 
 import { isApiMode } from '../../config/apiConfig'
+import { apiRequest, tenantPath } from '../api/client'
 import { useMasterStore } from '../../store/masterStore'
 import type { Item as MasterItem, Vendor as MasterVendor } from '../../types/master'
 import { normalizeEngineeringProductType } from '../../utils/purchaseProductType'
@@ -74,6 +75,11 @@ import * as invoiceApi from './purchaseInvoiceApi'
 import * as qiApi from './qualityInspectionApi'
 import * as returnApi from './purchaseReturnApi'
 import * as setupApi from '../api/purchaseSetupApi'
+import {
+  aggregateGrniReportToDashboardRows,
+  buildPurchaseDashboardGrniRows,
+  type GrniReportApiRow,
+} from './purchaseDashboardGrni'
 import {
   formatPurchaseApiError,
   isBackendMissingError,
@@ -1764,6 +1770,9 @@ export async function getPurchaseDashboard(
   const filteredRfqs = rfqs.filter(
     (r) => inDateRange(r.documentDate) && matchLocation(r.location.id),
   )
+  const filteredGrns = grns.filter(
+    (g) => inDateRange(g.documentDate) && matchLocation(g.location.id),
+  )
 
   const openRequisitions = prs.filter((r) =>
     ['draft', 'pending_approval', 'approved'].includes(r.status),
@@ -1778,15 +1787,38 @@ export async function getPurchaseDashboard(
   const pendingDeliveries = ordersInRange.filter((o) =>
     ['released', 'partially_received', 'confirmed', 'sent'].includes(o.status),
   ).length
-  const pendingGrns = grns.filter((g) =>
-    ['draft', 'submitted', 'qc_pending', 'receiving_completed'].includes(g.status),
+  const pendingGrns = filteredGrns.filter((g) =>
+    ['draft', 'submitted', 'qc_pending', 'receiving_completed', 'pending_inspection', 'pending_tolerance_approval'].includes(
+      g.status,
+    ),
   ).length
   const pendingPurchaseInvoices = invoices.filter((inv) =>
-    ['draft', 'pending_approval', 'approved', 'matched', 'partially_matched'].includes(inv.status),
+    ['draft', 'pending_approval', 'approved', 'matched', 'partially_matched', 'pending_verification'].includes(
+      inv.status,
+    ),
   ).length
   const monthlyPurchaseValue = ordersInRange
     .filter((o) => o.documentDate.startsWith(monthPrefix))
     .reduce((sum, o) => sum + (Number(o.totalAmount ?? 0) || 0), 0)
+
+  let grniPending = buildPurchaseDashboardGrniRows(filteredGrns, invoices, { today })
+  try {
+    const qs = new URLSearchParams()
+    if (dateFrom) qs.set('dateFrom', dateFrom)
+    if (dateTo) qs.set('dateTo', dateTo)
+    const q = qs.toString()
+    const res = await apiRequest<{ rows: GrniReportApiRow[]; openValueTotal: number }>(
+      `${tenantPath('/purchase/reports/grni')}${q ? `?${q}` : ''}`,
+    )
+    const reportRows = (res.data?.rows ?? []).filter((row) => {
+      if (!locationId) return true
+      const grn = grns.find((g) => g.id === row.goodsReceiptId)
+      return grn ? matchLocation(grn.location.id) : true
+    })
+    grniPending = aggregateGrniReportToDashboardRows(reportRows, { limit: 15 })
+  } catch {
+    // Fall back to client-side GRNI from listed GRNs + invoices.
+  }
 
   const emptyPoStatus = [
     {
@@ -1834,6 +1866,10 @@ export async function getPurchaseDashboard(
     })
   }
 
+  const grnInspections = filteredGrns.filter((g) =>
+    ['pending_inspection', 'qc_pending'].includes(g.status),
+  ).length
+
   return {
     kpis: {
       openRequisitions,
@@ -1842,6 +1878,7 @@ export async function getPurchaseDashboard(
       purchaseOrdersThisMonth,
       pendingDeliveries,
       pendingGrns,
+      grniPending: grniPending.length,
       pendingPurchaseInvoices,
       monthlyPurchaseValue,
     },
@@ -1852,6 +1889,7 @@ export async function getPurchaseDashboard(
       purchaseOrdersThisMonth: '/purchase/orders',
       pendingDeliveries: '/purchase/orders?status=overdue',
       pendingGrns: '/purchase/grn',
+      grniPending: '/purchase/reports?focus=grn-grni',
       pendingPurchaseInvoices: '/purchase/invoices',
       monthlyPurchaseValue: '/purchase/orders',
     },
@@ -1894,7 +1932,24 @@ export async function getPurchaseDashboard(
         href: '/purchase/requisitions?status=pending_approval',
         severity: 'primary' as const,
       },
+      {
+        id: 'grn-inspection',
+        type: 'grn_inspection' as const,
+        label: 'GRN inspections',
+        count: grnInspections,
+        href: '/purchase/grn?status=pending_inspection',
+        severity: 'warning' as const,
+      },
+      {
+        id: 'grn-not-invoiced',
+        type: 'grn_not_invoiced' as const,
+        label: 'GRNs awaiting invoice',
+        count: grniPending.length,
+        href: '/purchase/reports?focus=grn-grni',
+        severity: 'warning' as const,
+      },
     ].filter((a) => a.count > 0),
+    grniPending,
     monthlyTrend,
     byCategory: [],
     topVendors: [],

@@ -2454,6 +2454,7 @@ export type PurchasePendingActionType =
   | 'pr_approval'
   | 'po_approval'
   | 'grn_inspection'
+  | 'grn_not_invoiced'
   | 'invoice_mismatch'
   | 'overdue_delivery'
 
@@ -2464,6 +2465,26 @@ export interface PurchaseDashboardPendingAction {
   count: number
   href: string
   severity: 'primary' | 'warning' | 'critical'
+}
+
+/** GRNs with accepted/received qty that still have open (uninvoiced) quantity. */
+export interface PurchaseDashboardGrniRow {
+  id: string
+  grnNumber: string
+  receiptDate: IsoDate
+  ageDays: number
+  vendorName: string
+  purchaseOrderId: string
+  purchaseOrderNumber: string
+  openLineCount: number
+  acceptedQty: number
+  invoicedQty: number
+  openQty: number
+  openValue: number
+  status: GrnDomainStatus | string
+  statusLabel: string
+  href: string
+  createInvoiceHref: string
 }
 
 export interface PurchaseDashboardTrendPoint {
@@ -2510,6 +2531,7 @@ export interface PurchaseDashboardData {
     purchaseOrdersThisMonth: number
     pendingDeliveries: number
     pendingGrns: number
+    grniPending: number
     pendingPurchaseInvoices: number
     monthlyPurchaseValue: number
   }
@@ -2520,6 +2542,7 @@ export interface PurchaseDashboardData {
     purchaseOrdersThisMonth: string
     pendingDeliveries: string
     pendingGrns: string
+    grniPending: string
     pendingPurchaseInvoices: string
     monthlyPurchaseValue: string
   }
@@ -2527,6 +2550,7 @@ export interface PurchaseDashboardData {
   poStatus: PurchaseDashboardStatusBucket[]
   upcomingDeliveries: PurchaseDashboardDeliveryRow[]
   pendingActions: PurchaseDashboardPendingAction[]
+  grniPending: PurchaseDashboardGrniRow[]
   monthlyTrend: PurchaseDashboardTrendPoint[]
   byCategory: PurchaseDashboardCategorySlice[]
   topVendors: PurchaseDashboardVendorRow[]

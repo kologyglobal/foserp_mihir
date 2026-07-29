@@ -143,6 +143,7 @@ import {
 } from '../../utils/purchaseApprovalMatrix'
 import { getSessionUser } from '../../utils/permissions'
 import { mapPurchaseErrorMessage } from '../../utils/purchase/purchaseErrorMessages'
+import { buildPurchaseDashboardGrniRows } from './purchaseDashboardGrni'
 
 const LATENCY_MS = 35
 
@@ -1553,6 +1554,9 @@ export async function getPurchaseDashboard(
   const invoiceMismatches = invoices.filter((i) => i.status === 'mismatch' || i.matchStatus === 'mismatch')
     .length
 
+  // GRNI uses full invoice set (not date-filtered) so older receipts still surface when open.
+  const grniPending = buildPurchaseDashboardGrniRows(grns, state.invoices, { today })
+
   const pendingActions: PurchaseDashboardPendingAction[] = [
     {
       id: 'pr-approval',
@@ -1576,6 +1580,14 @@ export async function getPurchaseDashboard(
       label: 'GRN inspections',
       count: grnInspections,
       href: '/purchase/grn?status=pending_inspection',
+      severity: 'warning' as const,
+    },
+    {
+      id: 'grn-not-invoiced',
+      type: 'grn_not_invoiced' as const,
+      label: 'GRNs awaiting invoice',
+      count: grniPending.length,
+      href: '/purchase/reports?focus=grn-grni',
       severity: 'warning' as const,
     },
     {
@@ -1714,6 +1726,7 @@ export async function getPurchaseDashboard(
       purchaseOrdersThisMonth,
       pendingDeliveries,
       pendingGrns,
+      grniPending: grniPending.length,
       pendingPurchaseInvoices,
       monthlyPurchaseValue,
     },
@@ -1724,6 +1737,7 @@ export async function getPurchaseDashboard(
       purchaseOrdersThisMonth: '/purchase/orders?period=this_month',
       pendingDeliveries: '/purchase/orders?status=pending_delivery',
       pendingGrns: '/purchase/grn?status=pending',
+      grniPending: '/purchase/reports?focus=grn-grni',
       pendingPurchaseInvoices: '/purchase/invoices',
       monthlyPurchaseValue: '/purchase/orders?period=this_month',
     },
@@ -1731,6 +1745,7 @@ export async function getPurchaseDashboard(
     poStatus,
     upcomingDeliveries,
     pendingActions,
+    grniPending,
     monthlyTrend,
     byCategory,
     topVendors,
