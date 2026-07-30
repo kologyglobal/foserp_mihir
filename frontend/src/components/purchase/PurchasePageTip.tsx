@@ -8,6 +8,7 @@ import {
 import { isPurchasePath } from '../../utils/purchasePageTip'
 import { getPageLabel } from '../../utils/pageNavigation'
 import { cn } from '../../utils/cn'
+import { PageTipPortal } from '../ui/PageTipPortal'
 
 interface PurchasePageTipProps {
   className?: string
@@ -20,6 +21,7 @@ export function PurchasePageTip({ className }: PurchasePageTipProps) {
   const { pathname } = useLocation()
   const panelId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [open, setOpen] = useState(false)
 
@@ -54,11 +56,12 @@ export function PurchasePageTip({ className }: PurchasePageTipProps) {
   return (
     <div
       ref={rootRef}
-      className={cn('purchase-page-tip relative inline-flex', open && 'z-[100]', className)}
+      className={cn('purchase-page-tip relative inline-flex', className)}
       onMouseEnter={openTip}
       onMouseLeave={scheduleClose}
     >
       <button
+        ref={triggerRef}
         type="button"
         className={cn(
           'purchase-page-tip__trigger inline-flex h-7 w-7 items-center justify-center rounded-md border',
@@ -75,15 +78,8 @@ export function PurchasePageTip({ className }: PurchasePageTipProps) {
         <Info className="h-3.5 w-3.5" aria-hidden />
       </button>
 
-      {open ? (
+      <PageTipPortal open={open} anchorRef={triggerRef} panelId={panelId}>
         <div
-          id={panelId}
-          role="tooltip"
-          className={cn(
-            'purchase-page-tip__panel absolute left-0 top-[calc(100%+6px)] z-[100] w-[min(22rem,calc(100vw-2rem))]',
-            'rounded border border-[var(--d365-border-strong,#c8c6c4)] bg-[var(--d365-surface,#fff)]',
-            'shadow-[0_4px_16px_rgb(0_0_0_/_0.12)]',
-          )}
           onMouseEnter={openTip}
           onMouseLeave={scheduleClose}
         >
@@ -104,7 +100,7 @@ export function PurchasePageTip({ className }: PurchasePageTipProps) {
             ) : null}
           </div>
         </div>
-      ) : null}
+      </PageTipPortal>
     </div>
   )
 }

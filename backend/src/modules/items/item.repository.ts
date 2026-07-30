@@ -67,17 +67,22 @@ async function assertTenantFk(tenantId: string, input: Record<string, unknown>):
     })
     if (!uom) throw new ValidationError('Sales UOM not found in tenant')
   }
+  let resolvedHsn: { gstGroupId: string } | null = null
   if (input.hsnId) {
     const hsn = await prisma.masterHsnCode.findFirst({
       where: { id: String(input.hsnId), ...tenantActiveFilter(tenantId) },
     })
     if (!hsn) throw new ValidationError('HSN code not found in tenant')
+    resolvedHsn = hsn
   }
   if (input.gstGroupId) {
     const group = await prisma.masterGstGroup.findFirst({
       where: { id: String(input.gstGroupId), ...tenantActiveFilter(tenantId) },
     })
     if (!group) throw new ValidationError('GST group not found in tenant')
+    if (resolvedHsn && resolvedHsn.gstGroupId !== String(input.gstGroupId)) {
+      throw new ValidationError('HSN code does not belong to the selected GST group')
+    }
   }
 }
 
@@ -300,5 +305,18 @@ export async function setItemStatus(
   return prisma.masterItem.update({
     where: { id, tenantId },
     data: { status, updatedBy: userId },
+  })
+}
+
+export async function setItemImageUrl(
+  tenantId: string,
+  id: string,
+  userId: string,
+  imageUrl: string | null,
+) {
+  await getItem(tenantId, id)
+  return prisma.masterItem.update({
+    where: { id, tenantId },
+    data: { imageUrl, updatedBy: userId },
   })
 }

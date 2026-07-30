@@ -50,3 +50,28 @@ export function resolveUomCode(uomId: string | null | undefined, fallback = ''):
   const u = useMasterStore.getState().uoms.find((row) => row.id === uomId)
   return (u?.uomCode || u?.uomName || fallback).trim()
 }
+
+/** Base / stock UOM code from Item Master (NOS, etc.). */
+export function getPurchaseLineBaseUomCode(itemId: string | null | undefined): string {
+  if (!itemId) return ''
+  const master = useMasterStore.getState().items.find((i) => i.id === itemId)
+  if (!master?.baseUomId) return ''
+  return resolveUomCode(master.baseUomId, '')
+}
+
+/** True when purchase unit differs from base (e.g. MTR vs NOS). */
+export function purchaseLineHasDualUom(line: {
+  itemId?: string | null
+  uomConversionFactor?: number | null
+}): boolean {
+  const factor = Number(line.uomConversionFactor ?? 1)
+  if (factor !== 1) return true
+  if (!line.itemId) return false
+  const master = useMasterStore.getState().items.find((i) => i.id === line.itemId)
+  if (!master) return false
+  return Boolean(master.purchaseUomId && master.purchaseUomId !== master.baseUomId)
+}
+
+export function formatPurchaseQty(n: number): string {
+  return n.toLocaleString(undefined, { maximumFractionDigits: 4 })
+}

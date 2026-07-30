@@ -67,3 +67,30 @@ export const deactivateItem = asyncHandler(async (req: Request, res: Response) =
   const item = await service.deactivateRecord(req, tenantId, id)
   return sendSuccess(res, 'item deactivated', item)
 })
+
+export const uploadItemImage = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const file = req.file
+  if (!file) {
+    return res.status(400).json({ success: false, message: 'Image file is required' })
+  }
+  const item = await service.uploadItemImage(req, tenantId, id, file)
+  return sendSuccess(res, 'item image uploaded', item)
+})
+
+export const getItemImage = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const { buffer, contentType } = await service.getItemImage(tenantId, id)
+  res.setHeader('Content-Type', contentType)
+  res.setHeader('Cache-Control', 'private, max-age=300')
+  return res.send(buffer)
+})
+
+export const deleteItemImage = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const item = await service.removeItemImage(req, tenantId, id)
+  return sendSuccess(res, 'item image removed', item)
+})

@@ -445,6 +445,19 @@ export interface ApiPurchaseOrderLine {
   /** Optional PR document number shown on the PO line. */
   requisitionNumber: string | null
   remarks: string | null
+  gstGroupId?: string | null
+  hsnId?: string | null
+  hsnCode?: string
+  gstGroupCode?: string
+  binId?: string | null
+  binCode?: string | null
+  qcRequired?: boolean
+  qualityTestGroupCode?: string | null
+  outstandingQty?: number
+  outstandingQtyBase?: number
+  receivedQtyBase?: number
+  receivedUomQty?: number
+  invoicedUomQty?: number
 }
 
 export interface ApiPurchaseOrder {
@@ -545,6 +558,9 @@ export interface ApiPurchaseOrderLineInput {
   purchaseRequisitionLineId?: string | null
   purchasePlanningRowId?: string | null
   requisitionNumber?: string | null
+  gstGroupId?: string | null
+  hsnId?: string | null
+  binId?: string | null
 }
 
 export interface ApiPurchaseOrderInput {

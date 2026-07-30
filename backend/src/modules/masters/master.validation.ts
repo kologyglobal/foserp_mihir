@@ -142,7 +142,7 @@ export const createItemCategorySchema = z.object({
 export const updateItemCategorySchema = createItemCategorySchema.partial()
 
 export const createHsnSacSchema = z.object({
-  code: z.string().trim().min(4).max(10),
+  code: z.string().trim().regex(/^\d{4,10}$/, 'HSN code must be 4–10 digits'),
   gstGroupId: z.string().uuid(),
   description: z.string().trim().min(1).max(500),
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),

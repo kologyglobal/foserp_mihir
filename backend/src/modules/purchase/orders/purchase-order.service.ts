@@ -27,6 +27,7 @@ import {
   PurchaseOrderValidationError,
   PurchaseOrderWorkflowError,
 } from './purchase-order.errors.js'
+import { ValidationError } from '../../../utils/errors.js'
 import { mapPurchaseOrderToDto } from './purchase-order.mapper.js'
 import * as repo from './purchase-order.repository.js'
 import type {
@@ -181,26 +182,112 @@ async function resolveSourceWarehouseId(
   return pr.lines.find((l) => l.warehouseId)?.warehouseId ?? null
 }
 
-/** Fill item code/name snapshots from the item master when only itemId was sent. */
+/** Fill item code/name and tax/QC/bin snapshots from masters when omitted on input. */
+async function fillLineMasterSnapshots(
+  tenantId: string,
+  lines: ReturnType<typeof normalizeLineInputs>,
+) {
+  const itemIds = [...new Set(lines.map((l) => l.itemId).filter((v): v is string => Boolean(v)))]
+  const items = itemIds.length
+    ? await prisma.masterItem.findMany({
+        where: { tenantId, id: { in: itemIds }, deletedAt: null },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          hsnId: true,
+          hsnCode: true,
+          gstGroupId: true,
+          qcRequired: true,
+          qualityTestGroupCode: true,
+        },
+      })
+    : []
+  const itemsById = new Map(items.map((i) => [i.id, i]))
+
+  const gstGroupIds = [
+    ...new Set(
+      lines
+        .map((l) => l.gstGroupId ?? (l.itemId ? itemsById.get(l.itemId)?.gstGroupId : null))
+        .filter((v): v is string => Boolean(v)),
+    ),
+  ]
+  const hsnIds = [
+    ...new Set(
+      lines
+        .map((l) => l.hsnId ?? (l.itemId ? itemsById.get(l.itemId)?.hsnId : null))
+        .filter((v): v is string => Boolean(v)),
+    ),
+  ]
+  const binIds = [...new Set(lines.map((l) => l.binId).filter((v): v is string => Boolean(v)))]
+
+  const [gstGroups, hsns, bins] = await Promise.all([
+    gstGroupIds.length
+      ? prisma.masterGstGroup.findMany({
+          where: { tenantId, id: { in: gstGroupIds }, deletedAt: null },
+          select: { id: true, code: true },
+        })
+      : [],
+    hsnIds.length
+      ? prisma.masterHsnCode.findMany({
+          where: { tenantId, id: { in: hsnIds }, deletedAt: null },
+          select: { id: true, code: true, gstGroupId: true },
+        })
+      : [],
+    binIds.length
+      ? prisma.masterBin.findMany({
+          where: { tenantId, id: { in: binIds }, deletedAt: null },
+          select: { id: true, code: true },
+        })
+      : [],
+  ])
+
+  const gstById = new Map(gstGroups.map((g) => [g.id, g]))
+  const hsnById = new Map(hsns.map((h) => [h.id, h]))
+  const binById = new Map(bins.map((b) => [b.id, b]))
+
+  for (const line of lines) {
+    const item = line.itemId ? itemsById.get(line.itemId) : undefined
+    if (item) {
+      if (!line.itemCodeSnapshot) line.itemCodeSnapshot = item.code
+      if (!line.itemNameSnapshot) line.itemNameSnapshot = item.name
+      if (line.gstGroupId == null && item.gstGroupId) line.gstGroupId = item.gstGroupId
+      if (line.hsnId == null && item.hsnId) line.hsnId = item.hsnId
+      if (!line.hsnCodeSnapshot && item.hsnCode) line.hsnCodeSnapshot = item.hsnCode
+      line.qcRequiredSnapshot = item.qcRequired
+      line.qualityTestGroupCodeSnapshot = item.qualityTestGroupCode ?? null
+    }
+
+    if (line.hsnId) {
+      const hsn = hsnById.get(line.hsnId)
+      if (!hsn) throw new ValidationError('HSN code not found in tenant')
+      line.hsnCodeSnapshot = hsn.code
+      if (line.gstGroupId && line.gstGroupId !== hsn.gstGroupId) {
+        throw new ValidationError('HSN code does not belong to the selected GST group')
+      }
+      if (!line.gstGroupId) line.gstGroupId = hsn.gstGroupId
+    }
+
+    if (line.gstGroupId) {
+      const group = gstById.get(line.gstGroupId)
+      if (!group) throw new ValidationError('GST group not found in tenant')
+      line.gstGroupCodeSnapshot = group.code
+    }
+
+    if (line.binId && !binById.has(line.binId)) {
+      throw new ValidationError('Bin code not found in tenant')
+    }
+  }
+
+  return lines
+}
+
+/** @deprecated use fillLineMasterSnapshots */
 async function fillItemSnapshots(
   tenantId: string,
   lines: ReturnType<typeof normalizeLineInputs>,
 ) {
-  const missing = lines.filter((l) => l.itemId && (!l.itemCodeSnapshot || !l.itemNameSnapshot))
-  if (!missing.length) return lines
-  const items = await prisma.masterItem.findMany({
-    where: { tenantId, id: { in: missing.map((l) => l.itemId!) }, deletedAt: null },
-    select: { id: true, code: true, name: true },
-  })
-  const byId = new Map(items.map((i) => [i.id, i]))
-  for (const line of missing) {
-    const item = byId.get(line.itemId!)
-    if (item) {
-      if (!line.itemCodeSnapshot) line.itemCodeSnapshot = item.code
-      if (!line.itemNameSnapshot) line.itemNameSnapshot = item.name
-    }
-  }
-  return lines
+  return fillLineMasterSnapshots(tenantId, lines)
 }
 
 /**
