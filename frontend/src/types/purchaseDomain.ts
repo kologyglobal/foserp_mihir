@@ -645,6 +645,9 @@ export interface PurchaseItem {
   hsnCode: string
   /** Service Accounting Code — used for job work / services. */
   sacCode: string | null
+  gstGroupId?: string | null
+  hsnId?: string | null
+  qualityTestGroupCode?: string | null
   gstRatePct: number
   standardRate: number
   reorderLevel: number
@@ -1808,6 +1811,16 @@ export interface PurchaseOrderLine {
   uom: string
   hsnCode: string
   sacCode: string | null
+  gstGroupId?: string | null
+  hsnId?: string | null
+  gstGroupCode?: string
+  outstandingQty?: number
+  outstandingQtyBase?: number
+  receivedQtyBase?: number
+  qcRequired?: boolean
+  qualityTestGroupCode?: string | null
+  binId?: string | null
+  binCode?: string
   /** Primary / stock UOM quantity. */
   quantity: number
   /** Vendor / purchase UOM quantity (what user typically enters). */
@@ -1837,6 +1850,8 @@ export interface PurchaseOrderLine {
   receivedQty: number
   pendingQty: number
   invoicedQty: number
+  /** Invoiced qty in base / stock UOM (when MUOM). */
+  invoicedQtyBase?: number
   lineStatus: PurchaseOrderLineStatus
   /** @deprecated use warehouseId — kept for older callers */
   locationId: string

@@ -39,6 +39,8 @@ export type PurchaseItemCodeCellProps = {
   allowManual?: boolean
   /** Shown when the filtered catalog has no rows (e.g. product type with no Item Master matches). */
   emptyCatalogHint?: string
+  /** Override root width constraints (e.g. PO line grid — fill sticky Item column). */
+  className?: string
   onSelectItem: (itemId: string) => void
   onClearCatalog: () => void
   onManualCodeChange: (code: string) => void
@@ -62,6 +64,7 @@ export function PurchaseItemCodeCell({
   labelMode = 'code',
   allowManual = true,
   emptyCatalogHint = 'No matching items',
+  className,
   onSelectItem,
   onClearCatalog,
   onManualCodeChange,
@@ -179,7 +182,9 @@ export function PurchaseItemCodeCell({
       ref={rootRef}
       className={cn(
         'relative flex flex-col gap-1',
-        labelMode === 'name' ? 'min-w-[14rem] max-w-[22rem]' : 'min-w-[9.5rem] max-w-[14rem]',
+        !className &&
+          (labelMode === 'name' ? 'min-w-[14rem] max-w-[22rem]' : 'min-w-[9.5rem] max-w-[14rem]'),
+        className,
       )}
     >
       <div className="erp-select-wrap w-full">

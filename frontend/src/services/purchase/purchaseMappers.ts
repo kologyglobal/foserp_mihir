@@ -1136,6 +1136,19 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
   const unitCostPrimary = Number((line as { unitCostPrimary?: number }).unitCostPrimary ?? rate * factor) || 0
   const amount = Number(line.amount) || uomQuantity * rate
   const received = Number(line.receivedQuantity) || 0
+  const invoiced = Number(line.invoicedQuantity) || 0
+  const outstandingQtyBase =
+    Number((line as { outstandingQtyBase?: number }).outstandingQtyBase) ||
+    Math.max(0, qty - received)
+  const receivedUomQty =
+    Number((line as { receivedUomQty?: number }).receivedUomQty) ||
+    (factor > 0 ? received * factor : received)
+  const invoicedUomQty =
+    Number((line as { invoicedUomQty?: number }).invoicedUomQty) ||
+    (factor > 0 ? invoiced * factor : invoiced)
+  const outstandingQty =
+    Number((line as { outstandingQty?: number }).outstandingQty) ||
+    Math.max(0, uomQuantity - receivedUomQty)
   const requiredDate = line.requiredDate ?? new Date().toISOString().slice(0, 10)
   return {
     id: line.id,
@@ -1148,8 +1161,18 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
     specification: '',
     category: 'raw_material',
     uom: resolveApiUomCode(line),
-    hsnCode: '',
+    hsnCode: line.hsnCode ?? '',
     sacCode: null,
+    gstGroupId: line.gstGroupId ?? null,
+    hsnId: line.hsnId ?? null,
+    gstGroupCode: line.gstGroupCode ?? '',
+    outstandingQty,
+    outstandingQtyBase,
+    receivedQtyBase: Number((line as { receivedQtyBase?: number }).receivedQtyBase) || received,
+    qcRequired: Boolean(line.qcRequired),
+    qualityTestGroupCode: line.qualityTestGroupCode ?? null,
+    binId: line.binId ?? null,
+    binCode: line.binCode ?? '',
     quantity: qty,
     uomQuantity,
     uomConversionFactor: factor,
@@ -1172,9 +1195,10 @@ function mapApiPoLine(line: NonNullable<ApiPurchaseOrder['lines']>[number]): Pur
     costCentre: '',
     project: '',
     productionOrder: '',
-    receivedQty: received,
-    pendingQty: line.openQuantity ?? Math.max(0, qty - received),
-    invoicedQty: Number(line.invoicedQuantity) || 0,
+    receivedQty: receivedUomQty,
+    pendingQty: outstandingQtyBase,
+    invoicedQty: invoicedUomQty,
+    invoicedQtyBase: invoiced,
     lineStatus: received >= qty && qty > 0 ? 'received' : received > 0 ? 'partial' : 'open',
     locationId: '',
     locationName: '',
@@ -1403,6 +1427,9 @@ export function mapDomainPoInputToApiPayload(
         remarks: line.remarks ?? null,
         purchaseRequisitionLineId: uuidOrNull(line.prLineId ?? null),
         requisitionNumber: line.requisitionNo?.trim() || null,
+        gstGroupId: uuidOrNull(line.gstGroupId ?? null),
+        hsnId: uuidOrNull(line.hsnId ?? null),
+        binId: uuidOrNull(line.binId ?? null),
       }
     }),
   }

@@ -247,6 +247,13 @@ export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
   purchaseRequisitionLineId: string | null
   purchasePlanningRowId: string | null
   requisitionNumber: string | null
+  gstGroupId: string | null
+  hsnId: string | null
+  hsnCodeSnapshot: string
+  gstGroupCodeSnapshot: string
+  binId: string | null
+  qcRequiredSnapshot: boolean
+  qualityTestGroupCodeSnapshot: string | null
 }> {
   return lines.map((line, index) => {
     const rate = Number(line.rate ?? 0)
@@ -305,6 +312,13 @@ export function normalizeLineInputs(lines: PurchaseOrderLineInput[]): Array<{
       purchaseRequisitionLineId: line.purchaseRequisitionLineId ?? null,
       purchasePlanningRowId: line.purchasePlanningRowId ?? null,
       requisitionNumber: line.requisitionNumber?.trim() || null,
+      gstGroupId: line.gstGroupId ?? null,
+      hsnId: line.hsnId ?? null,
+      hsnCodeSnapshot: '',
+      gstGroupCodeSnapshot: '',
+      binId: line.binId ?? null,
+      qcRequiredSnapshot: false,
+      qualityTestGroupCodeSnapshot: null,
     }
   })
 }

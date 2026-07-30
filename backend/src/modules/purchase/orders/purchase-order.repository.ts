@@ -8,6 +8,7 @@ const includeOrderBase = {
     orderBy: { lineNumber: 'asc' as const },
     include: {
       uom: { select: { id: true, code: true, name: true } },
+      bin: { select: { id: true, code: true, name: true } },
     },
   },
   vendor: {
@@ -213,6 +214,13 @@ export async function replacePurchaseOrderLines(
     purchaseRequisitionLineId: string | null
     purchasePlanningRowId: string | null
     requisitionNumber?: string | null
+    gstGroupId?: string | null
+    hsnId?: string | null
+    hsnCodeSnapshot?: string
+    gstGroupCodeSnapshot?: string
+    binId?: string | null
+    qcRequiredSnapshot?: boolean
+    qualityTestGroupCodeSnapshot?: string | null
   }>,
   tx: Prisma.TransactionClient,
 ) {

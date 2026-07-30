@@ -74,6 +74,8 @@ import type {
 import { purchaseStatusTone } from '@/components/purchase/purchaseCardFormShared'
 import { PurchaseDocumentWorkflowStrip } from '@/components/purchase/PurchaseDocumentWorkflowStrip'
 import { formatCurrency } from '@/utils/formatters/currency'
+import { PurchaseLineQtyCell } from '@/components/purchase/PurchaseLineQtyCell'
+import { PurchaseLineTrackingQtyCell } from '@/components/purchase/PurchaseLineTrackingQtyCell'
 import { formatDate } from '@/utils/dates/format'
 import { notify } from '@/store/toastStore'
 import { appPromptNote } from '@/store/confirmDialogStore'
@@ -746,64 +748,227 @@ export function PurchaseOrderDetailPage() {
             <EmptyState icon={FileText} title="No lines" description="This order has no item lines." />
           ) : (
             <div className="overflow-x-auto rounded-md border border-erp-border">
-              <table className="erp-table min-w-[1100px] text-[12px]">
+              <table className="erp-table purchase-order-detail-lines w-max min-w-full text-[12px]">
+                <colgroup>
+                  <col className="purchase-order-detail-lines__col-line" />
+                  <col className="purchase-order-detail-lines__col-item" />
+                  <col className="purchase-order-detail-lines__col-uom" />
+                  <col className="purchase-order-detail-lines__col-qty" />
+                  <col className="purchase-order-detail-lines__col-money" />
+                  <col className="purchase-order-detail-lines__col-money" />
+                  <col className="purchase-order-detail-lines__col-money" />
+                  <col className="purchase-order-detail-lines__col-money" />
+                  <col className="purchase-order-detail-lines__col-money" />
+                  <col className="purchase-order-detail-lines__col-money-wide" />
+                  <col className="purchase-order-detail-lines__col-tracking" />
+                  <col className="purchase-order-detail-lines__col-tracking" />
+                  <col className="purchase-order-detail-lines__col-tracking" />
+                  <col className="purchase-order-detail-lines__col-flag" />
+                  <col className="purchase-order-detail-lines__col-code-wide" />
+                  <col className="purchase-order-detail-lines__col-code" />
+                  <col className="purchase-order-detail-lines__col-status" />
+                  <col className="purchase-order-detail-lines__col-date" />
+                  <col className="purchase-order-detail-lines__col-requisition" />
+                </colgroup>
                 <thead>
                   <tr>
-                    <th className="w-10">#</th>
-                    <th>Item</th>
-                    <th>UOM</th>
-                    <th className="num">Qty</th>
-                    <th className="num">Rate</th>
-                    <th className="num">Taxable</th>
-                    <th className="num">CGST</th>
-                    <th className="num">SGST</th>
-                    <th className="num">IGST</th>
-                    <th className="num">Line Total</th>
-                    <th className="num">Received</th>
-                    <th className="num">Pending</th>
-                    <th>Status</th>
-                    <th>Expected Delivery</th>
-                    <th>Requisition no.</th>
+                    <th className="purchase-order-detail-lines__col-line">#</th>
+                    <th className="purchase-order-detail-lines__col-item">Item</th>
+                    <th className="purchase-order-detail-lines__col-uom">UOM</th>
+                    <th className="num purchase-order-detail-lines__col-qty">Qty</th>
+                    <th className="num purchase-order-detail-lines__col-money">Rate</th>
+                    <th className="num purchase-order-detail-lines__col-money">Taxable</th>
+                    <th className="num purchase-order-detail-lines__col-money">CGST</th>
+                    <th className="num purchase-order-detail-lines__col-money">SGST</th>
+                    <th className="num purchase-order-detail-lines__col-money">IGST</th>
+                    <th className="num purchase-order-detail-lines__col-money-wide">Line Total</th>
+                    <th className="num purchase-order-detail-lines__col-tracking">Outstanding</th>
+                    <th className="num purchase-order-detail-lines__col-tracking">Received</th>
+                    <th className="num purchase-order-detail-lines__col-tracking">Invoiced</th>
+                    <th className="purchase-order-detail-lines__col-flag">QC Required</th>
+                    <th className="purchase-order-detail-lines__col-code-wide">Quality Test Group</th>
+                    <th className="purchase-order-detail-lines__col-code">Bin Code</th>
+                    <th className="purchase-order-detail-lines__col-status">Status</th>
+                    <th className="purchase-order-detail-lines__col-date">Expected Delivery</th>
+                    <th className="purchase-order-detail-lines__col-requisition">Requisition no.</th>
                   </tr>
                 </thead>
                 <tbody>
                   {po.lines.map((l) => (
                     <tr key={l.id}>
-                      <td className="tabular-nums text-erp-muted">{l.lineNo}</td>
-                      <td>
+                      <td className="purchase-order-detail-lines__col-line tabular-nums text-erp-muted">
+                        {l.lineNo}
+                      </td>
+                      <td className="purchase-order-detail-lines__col-item">
                         <div className="font-mono text-[12px] text-erp-text">{l.itemCode}</div>
-                        <div className="text-[12px] text-erp-muted">{l.itemName}</div>
+                        <div className="truncate text-[12px] text-erp-muted" title={l.itemName}>
+                          {l.itemName}
+                        </div>
                       </td>
-                      <td>{l.uom}</td>
-                      <td className="num tabular-nums">
-                        <div>{Number(l.uomQuantity ?? l.quantity)}</div>
-                        {Number(l.uomConversionFactor ?? 1) !== 1 ? (
-                          <div className="text-[10px] text-erp-muted">
-                            → {Number(l.quantity).toLocaleString()} stock
-                          </div>
-                        ) : null}
+                      <td className="purchase-order-detail-lines__col-uom">{l.uom}</td>
+                      <td className="num purchase-order-detail-lines__col-qty">
+                        <PurchaseLineQtyCell line={l} />
                       </td>
-                      <td className="num tabular-nums">{formatCurrency(l.rate)}</td>
-                      <td className="num tabular-nums">{formatCurrency(l.taxableAmount)}</td>
-                      <td className="num tabular-nums">{formatCurrency(l.cgst)}</td>
-                      <td className="num tabular-nums">{formatCurrency(l.sgst)}</td>
-                      <td className="num tabular-nums">{formatCurrency(l.igst)}</td>
-                      <td className="num tabular-nums font-medium">{formatCurrency(l.lineTotal)}</td>
-                      <td className="num tabular-nums">{l.receivedQty}</td>
-                      <td className="num tabular-nums">{l.pendingQty}</td>
-                      <td>
+                      <td className="num tabular-nums purchase-order-detail-lines__col-money">
+                        {formatCurrency(l.rate)}
+                      </td>
+                      <td className="num tabular-nums purchase-order-detail-lines__col-money">
+                        {formatCurrency(l.taxableAmount)}
+                      </td>
+                      <td className="num tabular-nums purchase-order-detail-lines__col-money">
+                        {formatCurrency(l.cgst)}
+                      </td>
+                      <td className="num tabular-nums purchase-order-detail-lines__col-money">
+                        {formatCurrency(l.sgst)}
+                      </td>
+                      <td className="num tabular-nums purchase-order-detail-lines__col-money">
+                        {formatCurrency(l.igst)}
+                      </td>
+                      <td className="num tabular-nums font-medium purchase-order-detail-lines__col-money-wide">
+                        {formatCurrency(l.lineTotal)}
+                      </td>
+                      <td className="num purchase-order-detail-lines__col-tracking">
+                        <PurchaseLineTrackingQtyCell
+                          line={l}
+                          purchaseQty={Number(l.outstandingQty ?? l.pendingQty ?? 0)}
+                          baseQty={Number(l.outstandingQtyBase ?? l.pendingQty ?? 0)}
+                        />
+                      </td>
+                      <td className="num purchase-order-detail-lines__col-tracking">
+                        <PurchaseLineTrackingQtyCell
+                          line={l}
+                          purchaseQty={Number(l.receivedQty ?? 0)}
+                          baseQty={Number(l.receivedQtyBase ?? 0)}
+                        />
+                      </td>
+                      <td className="num purchase-order-detail-lines__col-tracking">
+                        <PurchaseLineTrackingQtyCell
+                          line={l}
+                          purchaseQty={Number(l.invoicedQty ?? 0)}
+                          baseQty={Number(l.invoicedQtyBase ?? 0)}
+                        />
+                      </td>
+                      <td className="purchase-order-detail-lines__col-flag">{l.qcRequired ? 'Yes' : 'No'}</td>
+                      <td className="font-mono text-[12px] purchase-order-detail-lines__col-code-wide">
+                        {l.qualityTestGroupCode || '—'}
+                      </td>
+                      <td className="font-mono text-[12px] purchase-order-detail-lines__col-code">
+                        {l.binCode || '—'}
+                      </td>
+                      <td className="purchase-order-detail-lines__col-status">
                         <Badge color={lineStatusBadgeColor(l.lineStatus)}>
                           {PURCHASE_ORDER_LINE_STATUS_LABELS[l.lineStatus]}
                         </Badge>
                       </td>
-                      <td className="whitespace-nowrap">
+                      <td className="whitespace-nowrap purchase-order-detail-lines__col-date">
                         {formatDate(l.expectedDeliveryDate || l.requiredDate)}
                       </td>
-                      <td className="font-mono text-[12px]">{l.requisitionNo || '—'}</td>
+                      <td className="font-mono text-[12px] purchase-order-detail-lines__col-code">
+                        {l.requisitionNo || '—'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              <style>{`
+                .purchase-order-detail-lines {
+                  border-collapse: separate;
+                  border-spacing: 0;
+                }
+                .purchase-order-detail-lines thead th {
+                  vertical-align: bottom;
+                  line-height: 1.25;
+                  white-space: normal;
+                  word-break: break-word;
+                  hyphens: auto;
+                }
+                .purchase-order-detail-lines tbody td {
+                  vertical-align: middle;
+                }
+                .purchase-order-detail-lines__col-line {
+                  width: 2.5rem;
+                  min-width: 2.5rem;
+                  max-width: 2.5rem;
+                  padding-left: 8px !important;
+                  padding-right: 8px !important;
+                }
+                .purchase-order-detail-lines__col-item {
+                  width: 18rem;
+                  min-width: 18rem;
+                  max-width: 22rem;
+                  padding-left: 8px !important;
+                  padding-right: 8px !important;
+                  white-space: normal;
+                }
+                .purchase-order-detail-lines__col-uom {
+                  width: 3rem;
+                  min-width: 3rem;
+                  max-width: 3rem;
+                  padding: 6px 4px !important;
+                  text-align: center;
+                  white-space: nowrap;
+                }
+                .purchase-order-detail-lines thead .purchase-order-detail-lines__col-uom {
+                  padding: 8px 4px !important;
+                }
+                .purchase-order-detail-lines__col-qty {
+                  min-width: 7rem;
+                  width: 7rem;
+                  white-space: nowrap;
+                }
+                .purchase-order-detail-lines__col-money {
+                  min-width: 6.25rem;
+                  width: 6.25rem;
+                  white-space: nowrap;
+                  padding-left: 8px !important;
+                  padding-right: 10px !important;
+                }
+                .purchase-order-detail-lines__col-money-wide {
+                  min-width: 6.75rem;
+                  width: 6.75rem;
+                  white-space: nowrap;
+                  padding-left: 8px !important;
+                  padding-right: 10px !important;
+                }
+                .purchase-order-detail-lines__col-tracking {
+                  min-width: 7.5rem;
+                  width: 7.5rem;
+                  padding-left: 8px !important;
+                  padding-right: 10px !important;
+                  vertical-align: middle;
+                }
+                .purchase-order-detail-lines__col-requisition {
+                  min-width: 7rem;
+                  width: 7rem;
+                  white-space: nowrap;
+                }
+                .purchase-order-detail-lines__col-flag {
+                  min-width: 4.5rem;
+                  width: 4.5rem;
+                  white-space: nowrap;
+                  text-align: center;
+                }
+                .purchase-order-detail-lines__col-code {
+                  min-width: 6rem;
+                  width: 6rem;
+                  white-space: nowrap;
+                }
+                .purchase-order-detail-lines__col-code-wide {
+                  min-width: 7rem;
+                  width: 7rem;
+                  white-space: nowrap;
+                }
+                .purchase-order-detail-lines__col-status {
+                  min-width: 7.25rem;
+                  width: 7.25rem;
+                  white-space: nowrap;
+                }
+                .purchase-order-detail-lines__col-date {
+                  min-width: 7.25rem;
+                  width: 7.25rem;
+                  white-space: nowrap;
+                }
+              `}</style>
             </div>
           )}
         </ErpCardSection>

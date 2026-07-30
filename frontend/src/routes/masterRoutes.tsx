@@ -70,6 +70,11 @@ import {
   WarehouseDetailPage,
 } from '@/modules/masters/warehouse/WarehousePages'
 import {
+  BinListPage,
+  BinFormPage,
+  BinDetailPage,
+} from '@/modules/masters/bin/BinPages'
+import {
   LocationListPage,
   LocationFormPage,
   LocationDetailPage,
@@ -248,6 +253,11 @@ export const masterRouteChildren: RouteObject[] = [
   { path: 'masters/warehouses/new', element: <WarehouseFormPage /> },
   { path: 'masters/warehouses/:id', element: <WarehouseDetailPage /> },
   { path: 'masters/warehouses/:id/edit', element: <WarehouseFormPage /> },
+
+  { path: 'masters/bins', element: <BinListPage /> },
+  { path: 'masters/bins/new', element: <BinFormPage /> },
+  { path: 'masters/bins/:id', element: <BinDetailPage /> },
+  { path: 'masters/bins/:id/edit', element: <BinFormPage /> },
 
   { path: 'masters/products', element: <ProductListPage /> },
   { path: 'masters/products/new', element: <ProductFormPage /> },

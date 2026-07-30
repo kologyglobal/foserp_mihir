@@ -10,6 +10,7 @@ import {
 } from '../../utils/crmPageTipStorage'
 import { getPageLabel } from '../../utils/pageNavigation'
 import { cn } from '../../utils/cn'
+import { PageTipPortal } from '../ui/PageTipPortal'
 
 interface CrmPageTipProps {
   className?: string
@@ -23,6 +24,7 @@ export function CrmPageTip({ className }: CrmPageTipProps) {
   const { pathname } = useLocation()
   const panelId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const pageId = getCrmPageTipId(pathname)
   const [dismissed, setDismissed] = useState(() => isCrmPageTipDismissed(pageId))
   const [open, setOpen] = useState(false)
@@ -35,7 +37,11 @@ export function CrmPageTip({ className }: CrmPageTipProps) {
   useEffect(() => {
     if (!open) return
     function onPointerDown(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+      const target = event.target as Node
+      if (rootRef.current?.contains(target)) return
+      const panel = document.getElementById(panelId)
+      if (panel?.contains(target)) return
+      setOpen(false)
     }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') setOpen(false)
@@ -46,7 +52,7 @@ export function CrmPageTip({ className }: CrmPageTipProps) {
       document.removeEventListener('mousedown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [open])
+  }, [open, panelId])
 
   if (!shouldShowPageTip(pathname) || dismissed) return null
 
@@ -60,8 +66,9 @@ export function CrmPageTip({ className }: CrmPageTipProps) {
   }
 
   return (
-    <div ref={rootRef} className={cn('crm-page-tip relative inline-flex', open && 'z-[100]', className)}>
+    <div ref={rootRef} className={cn('crm-page-tip relative inline-flex', className)}>
       <button
+        ref={triggerRef}
         type="button"
         className={cn(
           'crm-page-tip__trigger inline-flex h-7 w-7 items-center justify-center rounded-md border',
@@ -77,16 +84,10 @@ export function CrmPageTip({ className }: CrmPageTipProps) {
         <CircleHelp className="h-3.5 w-3.5" aria-hidden />
       </button>
 
-      {open ? (
+      <PageTipPortal open={open} anchorRef={triggerRef} panelId={panelId}>
         <div
-          id={panelId}
           role="dialog"
           aria-label={`Tip: ${title}`}
-          className={cn(
-            'crm-page-tip__panel absolute left-0 top-[calc(100%+6px)] z-[100] w-[min(22rem,calc(100vw-2rem))]',
-            'rounded border border-[var(--d365-border-strong,#c8c6c4)] bg-[var(--d365-surface,#fff)]',
-            'shadow-[0_4px_16px_rgb(0_0_0_/_0.12)]',
-          )}
         >
           <div className="border-b border-[var(--d365-border,#edebe9)] bg-[var(--d365-nav-bg,#faf9f8)] px-3 py-2">
             <p className="text-[13px] font-semibold leading-tight text-[var(--d365-text,#323130)]">{title}</p>
@@ -121,7 +122,7 @@ export function CrmPageTip({ className }: CrmPageTipProps) {
             </button>
           </div>
         </div>
-      ) : null}
+      </PageTipPortal>
     </div>
   )
 }

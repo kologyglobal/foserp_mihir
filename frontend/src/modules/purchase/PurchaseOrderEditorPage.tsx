@@ -97,11 +97,15 @@ import {
   purchaseFieldId,
   validatePurchaseOrderForm,
 } from '@/utils/purchaseOrderValidation'
+import { nextPurchaseLineNo } from '@/utils/purchaseLineNumbers'
 import { notify } from '@/store/toastStore'
 import { purchaseUserMessage } from '@/utils/purchase/purchaseErrorMessages'
 import { PURCHASE_FORM_ROUTES } from './purchaseFormRoutes'
 import { useOptionalAuth } from '@/context/AuthProvider'
 import { useMasterStore } from '@/store/masterStore'
+import { isApiMode } from '@/config/apiConfig'
+import { fetchLookup } from '@/services/api/masterApi'
+import { usePurchaseMasterStore } from '@/store/purchaseMasterStore'
 
 type LocationOption = {
   id: string
@@ -167,6 +171,16 @@ function emptyLine(partial?: Partial<PurchaseOrderLine>): PoEditorLine {
     uom: 'NOS',
     hsnCode: '',
     sacCode: null,
+    gstGroupId: null,
+    hsnId: null,
+    gstGroupCode: '',
+    outstandingQty: 0,
+    outstandingQtyBase: 0,
+    receivedQtyBase: 0,
+    qcRequired: false,
+    qualityTestGroupCode: null,
+    binId: null,
+    binCode: '',
     quantity: 0,
     uomQuantity: 0,
     uomConversionFactor: 1,
@@ -192,6 +206,7 @@ function emptyLine(partial?: Partial<PurchaseOrderLine>): PoEditorLine {
     receivedQty: 0,
     pendingQty: 0,
     invoicedQty: 0,
+    invoicedQtyBase: 0,
     lineStatus: 'open',
     locationId: '',
     locationName: '',
@@ -228,14 +243,18 @@ function computeLine(line: PoEditorLine, isInterstate: boolean): PoEditorLine {
   const taxAmount = Number(((taxableAmount * gstRatePct) / 100).toFixed(2))
   const half = Number((taxAmount / 2).toFixed(2))
   const lineTotal = Number((taxableAmount + taxAmount).toFixed(2))
-  const receivedQty = Number(line.receivedQty) || 0
-  const pendingQty = Math.max(0, Number((primaryQty - receivedQty).toFixed(4)))
+  const receivedQtyBase = Number(line.receivedQtyBase ?? line.receivedQty) || 0
+  const receivedUomQty = factor > 0 ? receivedQtyBase * factor : receivedQtyBase
+  const invoicedQtyBase = Number(line.invoicedQtyBase ?? 0) || 0
+  const invoicedUomQty = factor > 0 ? invoicedQtyBase * factor : invoicedQtyBase
+  const outstandingQtyBase = Math.max(0, Number((primaryQty - receivedQtyBase).toFixed(4)))
+  const outstandingQty = Math.max(0, Number((uomQuantity - receivedUomQty).toFixed(4)))
   const lineStatus: PurchaseOrderLine['lineStatus'] =
     line.lineStatus === 'cancelled'
       ? 'cancelled'
-      : receivedQty <= 0
+      : receivedQtyBase <= 0
         ? 'open'
-        : receivedQty >= primaryQty
+        : receivedQtyBase >= primaryQty
           ? 'received'
           : 'partial'
   return {
@@ -251,13 +270,19 @@ function computeLine(line: PoEditorLine, isInterstate: boolean): PoEditorLine {
     sgst: isInterstate ? 0 : half,
     igst: isInterstate ? taxAmount : 0,
     lineTotal,
-    pendingQty,
+    receivedQty: receivedUomQty,
+    receivedQtyBase,
+    pendingQty: outstandingQtyBase,
+    outstandingQty,
+    outstandingQtyBase,
+    invoicedQty: invoicedUomQty,
+    invoicedQtyBase,
     lineStatus,
   }
 }
 
-function renumberLines(lines: PoEditorLine[], isInterstate: boolean) {
-  return lines.map((l, i) => computeLine({ ...l, lineNo: i + 1 }, isInterstate))
+function computeLines(lines: PoEditorLine[], isInterstate: boolean) {
+  return lines.map((l) => computeLine(l, isInterstate))
 }
 
 function aggregateTotals(
@@ -477,6 +502,7 @@ export function PurchaseOrderEditorPage() {
   const [catalogItems, setCatalogItems] = useState<PurchaseItem[]>([])
   const [purchaseSetup, setPurchaseSetup] = useState<PurchaseSetup | null>(null)
   const [locationOptions, setLocationOptions] = useState<LocationOption[]>([])
+  const [binOptions, setBinOptions] = useState<Array<{ id: string; code: string; name: string; warehouseId?: string }>>([])
 
   const originParam = (searchParams.get('origin') ?? '') as string
   const originModeFromParam: PurchaseOrderOrigin =
@@ -515,6 +541,13 @@ export function PurchaseOrderEditorPage() {
   const selectedDeliveryLocation = useMemo(
     () => locationOptions.find((location) => location.id === header.deliveryLocationId),
     [header.deliveryLocationId, locationOptions],
+  )
+  const warehouseBinOptions = useMemo(
+    () =>
+      binOptions.filter(
+        (b) => !header.deliveryLocationId || !b.warehouseId || b.warehouseId === header.deliveryLocationId,
+      ),
+    [binOptions, header.deliveryLocationId],
   )
   const catalogItemsForPicker = useMemo(
     () =>
@@ -575,7 +608,7 @@ export function PurchaseOrderEditorPage() {
     Number(header.insuranceCharges) > 0 ||
     mentionsInsurance(header.freightTerms, header.deliveryTerms, header.packingTerms)
 
-  const computedLines = useMemo(() => renumberLines(lines, isInterstate), [lines, isInterstate])
+  const computedLines = useMemo(() => computeLines(lines, isInterstate), [lines, isInterstate])
   const validation = useMemo(
     () =>
       validatePurchaseOrderForm(
@@ -824,6 +857,10 @@ export function PurchaseOrderEditorPage() {
       mapEngineeringProductTypeToPurchaseCategory(productType) ||
       line?.category ||
       'raw_material'
+    const gstGroupId = item.gstGroupId ?? master?.gstGroupId ?? null
+    const hsnId = item.hsnId ?? master?.hsnId ?? null
+    const hsnMaster = hsnId ? useMasterStore.getState().getHsn(hsnId) : null
+    const gstGroupMaster = gstGroupId ? useMasterStore.getState().getGstGroup(gstGroupId) : null
     patchLine(key, {
       itemId: item.id,
       itemCode: item.itemCode,
@@ -835,21 +872,31 @@ export function PurchaseOrderEditorPage() {
       uom: purchaseUomCode,
       uomId: purchaseUomId,
       uomConversionFactor: factor,
-      hsnCode: item.hsnCode,
+      hsnCode: hsnMaster?.code ?? item.hsnCode,
+      hsnId,
+      gstGroupId,
+      gstGroupCode: gstGroupMaster?.code ?? '',
       sacCode: item.sacCode,
+      qcRequired: Boolean(item.qcRequired ?? master?.qcRequired),
+      qualityTestGroupCode: item.qualityTestGroupCode ?? master?.qualityTestGroupCode ?? null,
       rate: item.standardRate,
       gstRatePct: item.gstRatePct,
     })
   }
 
   useEffect(() => {
+    void import('@/services/bridges/masterApiBridge')
+      .then((m) => m.syncCoreMastersFromApi())
+      .catch(() => undefined)
+    void import('@/services/bridges/masterBatchApiBridge')
+      .then((m) => m.syncBatchMastersFromApi())
+      .catch(() => undefined)
     void Promise.all([
       getVendors(),
       getPurchaseItems({ forceRefresh: true, purchasableOnly: false }),
       getBlanketOrders(),
       getPurchaseSetup(),
       getPurchaseWarehouses(),
-      import('@/services/bridges/masterApiBridge').then((m) => m.syncCoreMastersFromApi()).catch(() => undefined),
     ]).then(([vendorRows, items, blankets, setup, warehouses]) => {
       setVendors(vendorRows.filter((v) => v.isActive))
       setCatalogItems(items)
@@ -886,6 +933,36 @@ export function PurchaseOrderEditorPage() {
       setActiveBlankets(blankets.filter((b) => b.status === 'active'))
     })
   }, [isNew])
+
+  useEffect(() => {
+    if (isApiMode()) {
+      let cancelled = false
+      fetchLookup('bins')
+        .then((res) => {
+          if (cancelled) return
+          setBinOptions(
+            res.data.map((b) => ({
+              id: b.id,
+              code: b.code ?? b.name,
+              name: b.name,
+              warehouseId: b.warehouseId,
+            })),
+          )
+        })
+        .catch(() => undefined)
+      return () => {
+        cancelled = true
+      }
+    }
+    const demoBins = usePurchaseMasterStore.getState().getByKind('bin-codes', true)
+    setBinOptions(
+      demoBins.map((e) => ({
+        id: e.code,
+        code: e.code,
+        name: e.name,
+      })),
+    )
+  }, [])
 
   useEffect(() => {
     if (isNew || !id) return
@@ -1451,13 +1528,16 @@ export function PurchaseOrderEditorPage() {
                 lines={computedLines}
                 catalogItems={catalogItemsForPicker}
                 warehouseOptions={locationOptions}
+                binOptions={warehouseBinOptions}
                 editable={editable}
                 isInterstate={isInterstate}
                 dirty={dirty}
                 formatCurrency={formatCurrency}
                 showErrors={showErrors}
                 lineErrors={activeValidation.lineErrors}
-                onAddLine={() => setLinesDirty([...lines, emptyLine()])}
+                onAddLine={() =>
+                  setLinesDirty([...lines, emptyLine({ lineNo: nextPurchaseLineNo(lines) })])
+                }
                 onPatchLine={patchLine}
                 onRemoveLine={(key) => setLinesDirty(lines.filter((l) => l.key !== key))}
                 onSelectCatalogItem={applyItemCatalog}
@@ -1476,7 +1556,7 @@ export function PurchaseOrderEditorPage() {
                           ...last,
                           key: crypto.randomUUID(),
                           id: '',
-                          lineNo: lines.length + 1,
+                          lineNo: nextPurchaseLineNo(lines),
                         },
                       ])
                     },

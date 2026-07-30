@@ -273,6 +273,8 @@ export interface Item extends MasterRecordAudit {
   drawingNo?: string | null
   /** Sub-assembly MRP/BOM behaviour — required when itemType = sub_assembly */
   subAssemblyRule: SubAssemblyRule | null
+  /** Product image — API storage key or demo data URL */
+  imageUrl?: string | null
   createdAt: string
   updatedAt: string
 }

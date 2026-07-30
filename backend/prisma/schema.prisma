@@ -2635,6 +2635,7 @@ model MasterBin {
   warehouse         MasterWarehouse    @relation(fields: [warehouseId], references: [id])
   storageLocation   MasterLocation     @relation(fields: [storageLocationId], references: [id])
   goodsReceiptLines GoodsReceiptLine[]
+  purchaseOrderLines PurchaseOrderLine[]
 
   @@unique([tenantId, warehouseId, code])
   @@index([tenantId])
@@ -2695,6 +2696,7 @@ model MasterGstGroup {
   hsnCodes MasterHsnCode[]
   gstRates MasterGstRate[]
   items    MasterItem[]
+  purchaseOrderLines PurchaseOrderLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2719,6 +2721,7 @@ model MasterHsnCode {
   tenant   Tenant         @relation(fields: [tenantId], references: [id])
   gstGroup MasterGstGroup @relation(fields: [gstGroupId], references: [id])
   items    MasterItem[]
+  purchaseOrderLines PurchaseOrderLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2811,6 +2814,8 @@ model MasterItem {
   routingNo            String?            @db.VarChar(64)
   drawingNo            String?            @db.VarChar(64)
   subAssemblyRule      String?            @db.VarChar(32)
+  /// Relative storage key under uploads/items (tenantId/itemId.ext)
+  imageUrl             String?            @db.VarChar(500)
   status               MasterRecordStatus @default(ACTIVE)
   createdBy            String?
   updatedBy            String?
@@ -5933,6 +5938,13 @@ model PurchaseOrderLine {
   rejectedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
   returnedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
   invoicedQuantity          Decimal   @default(0) @db.Decimal(18, 4)
+  gstGroupId                String?
+  hsnId                     String?
+  hsnCodeSnapshot           String    @default("") @db.VarChar(16)
+  gstGroupCodeSnapshot      String    @default("") @db.VarChar(32)
+  binId                     String?
+  qcRequiredSnapshot        Boolean   @default(false)
+  qualityTestGroupCodeSnapshot String? @db.VarChar(32)
   requiredDate              DateTime? @db.Date
   /// Optional PR document number displayed on the PO line.
   requisitionNumber         String?   @db.VarChar(64)
@@ -5946,6 +5958,9 @@ model PurchaseOrderLine {
   purchasePlanningRow     PurchasePlanningRow?     @relation(fields: [purchasePlanningRowId], references: [id])
   item                    MasterItem?              @relation(fields: [itemId], references: [id])
   uom                     MasterUom?               @relation(fields: [uomId], references: [id])
+  gstGroup                MasterGstGroup?          @relation(fields: [gstGroupId], references: [id])
+  hsn                     MasterHsnCode?           @relation(fields: [hsnId], references: [id])
+  bin                     MasterBin?               @relation(fields: [binId], references: [id])
   goodsReceiptLines       GoodsReceiptLine[]
 
   @@unique([tenantId, purchaseOrderId, lineNumber])
@@ -5954,6 +5969,9 @@ model PurchaseOrderLine {
   @@index([tenantId, purchaseRequisitionLineId])
   @@index([tenantId, purchasePlanningRowId])
   @@index([tenantId, itemId])
+  @@index([tenantId, gstGroupId])
+  @@index([tenantId, hsnId])
+  @@index([tenantId, binId])
   @@map("purchase_order_lines")
 }
 

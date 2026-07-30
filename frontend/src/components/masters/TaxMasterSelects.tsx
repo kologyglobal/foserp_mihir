@@ -9,11 +9,14 @@ export function HsnMasterSelect({
   onChange,
   disabled,
   allowEmpty,
+  gstGroupId,
 }: {
   value: string
   onChange: (id: string) => void
   disabled?: boolean
   allowEmpty?: boolean
+  /** When set, only HSN codes linked to this GST group are shown. */
+  gstGroupId?: string | null
 }) {
   const hsnMasters = useMasterStore((s) => s.hsnMasters)
   const getGstGroup = useMasterStore((s) => s.getGstGroup)
@@ -21,14 +24,14 @@ export function HsnMasterSelect({
   const options: ErpSmartSelectOption<string>[] = useMemo(
     () =>
       hsnMasters
-        .filter((h) => h.isActive)
+        .filter((h) => h.isActive && (!gstGroupId || h.gstGroupId === gstGroupId))
         .map((h) => ({
           value: h.id,
           label: `${h.code} — ${h.description.slice(0, 40)}`,
           searchText: `${h.code} ${h.description}`.toLowerCase(),
           meta: getGstGroup(h.gstGroupId)?.code,
         })),
-    [hsnMasters, getGstGroup],
+    [hsnMasters, getGstGroup, gstGroupId],
   )
 
   return (

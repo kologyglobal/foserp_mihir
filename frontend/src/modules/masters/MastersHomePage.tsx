@@ -7,7 +7,9 @@ import {
   Database,
   Download,
   Hash,
+  MapPin,
   Package,
+  Percent,
   Pin,
   Plus,
   Settings2,
@@ -62,6 +64,8 @@ import {
 } from '../../components/masters/MastersIndexHub'
 import { resolveMasterLinkIcon } from '../../utils/masterLinkIcons'
 import { cn } from '../../utils/cn'
+import { isApiMode } from '../../config/apiConfig'
+import { fetchMasterBins } from '../../services/api/masterApi'
 
 const ACCENT_CSS_VAR: Record<MasterGroupAccent, string> = {
   blue: 'masters-index-dot-blue',
@@ -212,9 +216,11 @@ const QUICK_CARDS = [
   { href: '/masters/items', label: 'Items', key: 'items' as const, icon: Package, accent: 'masters-index-quick-card--slate' },
   { href: '/masters/vendors', label: 'Vendors', key: 'vendors' as const, icon: Truck, accent: 'masters-index-quick-card--amber' },
   { label: 'Purchase', categoryId: 'purchase' as const, icon: ShoppingCart, accent: 'masters-index-quick-card--amber' },
+  { href: '/masters/gst-groups', label: 'GST Groups', key: 'gstGroups' as const, icon: Percent, accent: 'masters-index-quick-card--cyan' },
+  { href: '/masters/hsn', label: 'HSN Master', key: 'hsn' as const, icon: Hash, accent: 'masters-index-quick-card--cyan' },
+  { href: '/masters/bins', label: 'BIN Codes', countKey: 'bins' as const, icon: MapPin, accent: 'masters-index-quick-card--cyan' },
   { href: '/masters/users', label: 'User Management', key: 'users' as const, icon: Users, accent: 'masters-index-quick-card--indigo' },
   { href: '/masters/code-series', label: 'Code series', countKey: 'codeSeries', icon: Hash, accent: '' },
-  { href: '/masters/hsn', label: 'Tax masters', key: 'taxMasters' as const, icon: Hash, accent: 'masters-index-quick-card--cyan' },
 ] as const
 
 export function MastersHomePage() {
@@ -223,6 +229,7 @@ export function MastersHomePage() {
   const [category, setCategory] = useState<MasterIndexCategoryFilter>(MASTER_INDEX_CATEGORY_ALL)
   const [viewMode, setViewMode] = useState<MastersIndexViewMode>('index')
   const [pinnedPaths, setPinnedPaths] = useState<string[]>(() => readPinnedMasters())
+  const [binCount, setBinCount] = useState(0)
   const recentPages = useUIStore((s) => s.recentPages)
 
   const uoms = useMasterStore((s) => s.uoms)
@@ -296,6 +303,7 @@ export function MastersHomePage() {
       hsn: hsnMasters.length,
       gstGroups: gstGroups.length,
       gstRates: gstRates.length,
+      bins: binCount,
       geoCountries: geoCountries.length,
       geoStates: geoStates.length,
       geoCities: geoCities.length,
@@ -315,7 +323,7 @@ export function MastersHomePage() {
     uoms, categories, items, customers, vendors, crmContacts, quotationTemplates, warehouses, locations, products,
     bomHeaders, workCenters, routingHeaders, serialCount, hsnMasters, gstGroups, gstRates,
     paymentMethods, orderAddresses, bankAccounts, banks, codeSeries, geoCountries, geoStates, geoCities,
-    crmEntries, purchaseMasterEntries, userCount,
+    crmEntries, purchaseMasterEntries, userCount, binCount,
   ])
 
   const summary = useMemo(
@@ -400,6 +408,21 @@ export function MastersHomePage() {
   }
 
   useEffect(() => {
+    if (!isApiMode()) return
+    let cancelled = false
+    fetchMasterBins()
+      .then((rows) => {
+        if (!cancelled) setBinCount(rows.length)
+      })
+      .catch(() => {
+        if (!cancelled) setBinCount(0)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === '/' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
         e.preventDefault()
@@ -421,7 +444,7 @@ export function MastersHomePage() {
 
   function quickCardValue(card: (typeof QUICK_CARDS)[number]) {
     if ('countKey' in card && card.countKey) return counts[card.countKey] ?? 0
-    if ('key' in card && card.key) return summary[card.key] ?? 0
+    if ('key' in card && card.key) return summary[card.key as keyof typeof summary] ?? counts[card.key] ?? 0
     if ('categoryId' in card && card.categoryId === 'purchase') {
       return MASTERS_SETUP_GROUPS.find((g) => g.id === 'purchase')?.links.length ?? 0
     }
