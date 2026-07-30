@@ -44,3 +44,17 @@ export const closeFinancialYear = asyncHandler(async (req: Request, res: Respons
   const item = await service.closeRecord(req, tenantId, id)
   return sendSuccess(res, 'financial year closed', item)
 })
+
+export const previewYearEndClose = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const item = await service.previewYearEnd(tenantId, id)
+  return sendSuccess(res, 'year-end close preview', item)
+})
+
+export const executeYearEndClose = asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = getTenantId(req)
+  const id = getRouteParam(req, 'id')
+  const item = await service.executeYearEnd(req, tenantId, id)
+  return sendSuccess(res, 'year-end closing entries posted', item)
+})

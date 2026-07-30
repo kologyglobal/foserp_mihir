@@ -6,6 +6,7 @@ import { TreasuryAccountNotFoundError } from '../treasury.errors.js'
 import { disabledAdapter } from './adapters/disabled.adapter.js'
 import { genericRestLiveAdapter } from './adapters/generic-rest.adapter.js'
 import { stubAdaptersByProvider } from './adapters/not-implemented.adapter.js'
+import { resolveOpenBankingAisAdapter } from './adapters/open-banking-ais.adapter.js'
 import { createSandboxFsAdapter } from './adapters/sandbox-fs.adapter.js'
 import { createSftpLiveAdapter } from './adapters/sftp-live.adapter.js'
 import { ingestConnectorFetchedFile } from './bank-connector-ingest.service.js'
@@ -22,6 +23,7 @@ import {
 import type { BankConnectorAdapter, BankConnectorAdapterContext } from './bank-connector.interface.js'
 import * as repo from './bank-connector.repository.js'
 import { assertSafeCredentialEnvKey, isSandboxConnectorsEnabled } from './bank-connector.secrets.js'
+import { isValidScheduleCron } from './bank-connector-cron.js'
 import type {
   BankConnectorLifecycleInput,
   CreateBankConnectorInput,
@@ -54,7 +56,7 @@ function readConfig(row: { configJson: unknown }): BankConnectorConfigJson | nul
 
 function wantsSandbox(config: BankConnectorConfigJson | null): boolean {
   if (!config) return false
-  if (config.mode === 'SANDBOX') return true
+  if (config.mode === 'SANDBOX' || config.mode === 'SIMULATED') return true
   if (config.mode === 'LIVE') return false
   return Boolean(config.sandboxRoot?.trim())
 }
@@ -62,8 +64,12 @@ function wantsSandbox(config: BankConnectorConfigJson | null): boolean {
 function resolveAdapter(status: string, provider: string, config: BankConnectorConfigJson | null): BankConnectorAdapter {
   if (status === 'DISABLED') return disabledAdapter
 
-  if (provider === 'OPEN_BANKING' || provider === 'MANUAL_FILE') {
-    return stubAdaptersByProvider[provider as keyof typeof stubAdaptersByProvider] ?? disabledAdapter
+  if (provider === 'MANUAL_FILE') {
+    return stubAdaptersByProvider.MANUAL_FILE
+  }
+
+  if (provider === 'OPEN_BANKING') {
+    return resolveOpenBankingAisAdapter(config)
   }
 
   if (wantsSandbox(config)) {
@@ -85,6 +91,25 @@ function resolveAdapter(status: string, provider: string, config: BankConnectorC
   }
 
   return stubAdaptersByProvider[provider as keyof typeof stubAdaptersByProvider] ?? disabledAdapter
+}
+
+async function assertOpenBankingConsentAuthorized(tenantId: string, connectorId: string): Promise<void> {
+  const consent = await consentRepo.findLatestConsent(tenantId, connectorId)
+  if (!consent || consent.status !== 'AUTHORIZED') {
+    throw new BankConnectorValidationError(
+      'OPEN_BANKING sync requires an AUTHORIZED consent (complete consent start → callback first)',
+      [{ field: 'consent', message: `Current status is ${consent?.status ?? 'none'}` }],
+    )
+  }
+}
+
+function assertScheduleCron(value: string | null | undefined): void {
+  if (value == null || value.trim() === '') return
+  if (!isValidScheduleCron(value)) {
+    throw new BankConnectorValidationError('scheduleCron must be a 5-field cron expression', [
+      { field: 'scheduleCron', message: 'Example: every 15 minutes (5-field cron)' },
+    ])
+  }
 }
 
 function toAdapterContext(row: {
@@ -151,6 +176,7 @@ export async function createBankConnector(req: Request, tenantId: string, input:
   const userId = req.context?.userId ?? null
   await getLegalEntityOrThrow(tenantId, input.legalEntityId)
   await assertTreasuryAccountBank(tenantId, input.legalEntityId, input.treasuryAccountId)
+  assertScheduleCron(input.scheduleCron)
 
   const code = input.code.toUpperCase()
   const existing = await repo.findByCode(tenantId, code)
@@ -195,6 +221,7 @@ export async function updateBankConnector(req: Request, tenantId: string, id: st
   if (input.treasuryAccountId) {
     await assertTreasuryAccountBank(tenantId, before.legalEntityId, input.treasuryAccountId)
   }
+  if (input.scheduleCron !== undefined) assertScheduleCron(input.scheduleCron)
 
   const record = await repo.updateConnector(tenantId, id, {
     name: input.name,
@@ -282,7 +309,13 @@ export async function testBankConnectorConnection(
   const userId = req.context?.userId ?? null
   const row = await repo.getConnector(tenantId, id)
   const config = readConfig(row)
+
   const adapter = resolveAdapter(row.status, row.provider, config)
+  // Consent only when we would actually probe AIS (not when DISABLED stub wins first).
+  if (row.provider === 'OPEN_BANKING' && row.status !== 'DISABLED') {
+    await assertOpenBankingConsentAuthorized(tenantId, id)
+  }
+
   const result = await adapter.testConnection(toAdapterContext(row))
   const probeStatus = mapProbeStatus(result.code)
 
@@ -317,13 +350,26 @@ export async function testBankConnectorConnection(
   throw new BankConnectorProbeFailedError(result.message)
 }
 
-export async function syncBankConnector(
-  req: Request,
-  tenantId: string,
-  id: string,
-): Promise<BankConnectorProbeResult> {
-  const audit = auditMeta(req)
-  const userId = req.context?.userId ?? null
+export type SyncBankConnectorAudit = {
+  userId: string | null
+  ipAddress?: string | null | undefined
+  userAgent?: string | null | undefined
+}
+
+/**
+ * Core sync used by HTTP and the scheduled cron worker.
+ * OPEN_BANKING requires AUTHORIZED consent; SIMULATED AIS pulls from sandbox drop folder.
+ */
+export async function syncBankConnectorCore(params: {
+  tenantId: string
+  connectorId: string
+  userId: string | null
+  audit?: SyncBankConnectorAudit
+  trigger?: 'MANUAL' | 'SCHEDULED'
+}): Promise<BankConnectorProbeResult> {
+  const { tenantId, connectorId: id, userId } = params
+  const audit = params.audit ?? { userId }
+  const trigger = params.trigger ?? 'MANUAL'
   const row = await repo.getConnector(tenantId, id)
   const config = readConfig(row)
 
@@ -336,6 +382,10 @@ export async function syncBankConnector(
       expectedUpdatedAt: row.updatedAt,
     })
     throw new BankConnectorProviderDisabledError('Bank connector is disabled — sync is not available')
+  }
+
+  if (row.provider === 'OPEN_BANKING') {
+    await assertOpenBankingConsentAuthorized(tenantId, id)
   }
 
   const adapter = resolveAdapter(row.status, row.provider, config)
@@ -392,11 +442,11 @@ export async function syncBankConnector(
   for (const remote of files) {
     const fetched = await adapter.fetchStatementFile(ctx, remote.path)
     const ingested = await ingestConnectorFetchedFile({
-      req,
       tenantId,
       legalEntityId: row.legalEntityId,
       treasuryAccountId: row.treasuryAccountId,
       connectorId: id,
+      uploadedBy: userId,
       file: fetched,
     })
     if (ingested.skippedDuplicate) {
@@ -436,10 +486,10 @@ export async function syncBankConnector(
     module: 'finance',
     entity: 'bank_connector',
     entityId: id,
-    action: 'SYNC',
-    newValues: { statementsCreated, statementsSkipped, filesProcessed },
-    ipAddress: audit.ipAddress,
-    userAgent: audit.userAgent,
+    action: trigger === 'SCHEDULED' ? 'SYNC_SCHEDULED' : 'SYNC',
+    newValues: { statementsCreated, statementsSkipped, filesProcessed, trigger },
+    ipAddress: audit.ipAddress ?? null,
+    userAgent: audit.userAgent ?? null,
   })
 
   return {
@@ -451,6 +501,25 @@ export async function syncBankConnector(
     statementsSkipped,
     filesProcessed,
   }
+}
+
+export async function syncBankConnector(
+  req: Request,
+  tenantId: string,
+  id: string,
+): Promise<BankConnectorProbeResult> {
+  const audit = auditMeta(req)
+  return syncBankConnectorCore({
+    tenantId,
+    connectorId: id,
+    userId: req.context?.userId ?? null,
+    audit: {
+      userId: audit.userId ?? null,
+      ipAddress: audit.ipAddress ?? null,
+      userAgent: audit.userAgent ?? null,
+    },
+    trigger: 'MANUAL',
+  })
 }
 
 export function buildProbeFailure(

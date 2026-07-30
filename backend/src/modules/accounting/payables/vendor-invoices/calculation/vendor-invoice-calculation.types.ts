@@ -263,6 +263,8 @@ export type VendorInvoiceAccountComponent =
   | 'GRIR_CLEARING'
   /** FIN-CLOSE-1 — invoice price minus receipt cost on a GR/IR-cleared line. */
   | 'PURCHASE_PRICE_VARIANCE'
+  /** Purchase invoice variance capitalised into remaining raw-material stock. */
+  | 'RAW_MATERIAL_INVENTORY'
   | 'INPUT_CGST'
   | 'INPUT_SGST'
   | 'INPUT_IGST'
@@ -369,4 +371,6 @@ export interface VendorInvoiceCalculationResult {
   accountingPreview: VendorInvoiceAccountingPreview
   validation: VendorInvoiceCalculationValidation
   snapshot: VendorInvoiceCalculationSnapshot
+  /** Internal posting plan; not persisted as the deterministic calculation snapshot. */
+  grirReleasePlan: import('./vendor-invoice-grir-release.service.js').VendorInvoiceGrirReleasePlan
 }

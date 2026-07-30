@@ -8,6 +8,7 @@ import {
   wouldRemoveLastTenantAdmin,
   type EffectiveAccess,
 } from '../roles/effective-access.service.js'
+import { assertPasswordMeetsPolicy } from '../security/security-policy.service.js'
 import * as invitationService from './user-invitation.service.js'
 import * as userRepository from './user.repository.js'
 import type { UserWithRoles } from './user.repository.js'
@@ -127,6 +128,8 @@ export async function createUser(
       }
     }
   }
+
+  await assertPasswordMeetsPolicy(tenantId, input.password)
 
   const passwordHash = await hashPassword(input.password)
   const user = await userRepository.createUser(tenantId, input, passwordHash, audit?.userId)

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { RefreshCw } from 'lucide-react'
 import { OperationalPageShell } from '@/components/design-system/OperationalPageShell'
@@ -31,6 +31,7 @@ import {
   type MaintenanceTestResult,
 } from '@/services/api/maintenanceApi'
 import { notify } from '@/store/toastStore'
+import { useMasterStore } from '@/store/masterStore'
 import { useMaintenancePermissions } from '@/utils/permissions/maintenance'
 import {
   MAINTENANCE_BREADCRUMB,
@@ -69,12 +70,21 @@ export function MaintenanceTicketDetailPage() {
   const [holdStatus, setHoldStatus] = useState<'ON_HOLD' | 'WAITING_FOR_PART'>('WAITING_FOR_PART')
   const [holdReason, setHoldReason] = useState('')
   const [partDesc, setPartDesc] = useState('')
+  const [partItemId, setPartItemId] = useState('')
+  const [partWarehouseId, setPartWarehouseId] = useState('')
   const [partQty, setPartQty] = useState('1')
   const [partUnitCost, setPartUnitCost] = useState('0')
   const [partShortage, setPartShortage] = useState('')
   const [partRemarks, setPartRemarks] = useState('')
   const [photoCategory, setPhotoCategory] = useState<MaintenancePhotoCategory>('BEFORE')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
+
+  const stockableItems = useMasterStore((s) => s.items.filter((i) => i.isStockable && i.isActive))
+  const warehouses = useMasterStore((s) => s.warehouses.filter((w) => w.isActive))
+  const selectedPartItem = useMemo(
+    () => stockableItems.find((i) => i.id === partItemId) ?? null,
+    [stockableItems, partItemId],
+  )
 
   const load = useCallback(async () => {
     if (!id) return
@@ -299,7 +309,15 @@ export function MaintenanceTicketDetailPage() {
         <Section title="Parts Changed">
           {ticket.inventoryPostingPending ? (
             <p className="mb-2 text-xs text-amber-800">
-              Inventory posting pending — parts are recorded on the ticket only (V1 limitation).
+              Inventory posting incomplete — one or more stockable spare lines still lack an ISSUE movement.
+            </p>
+          ) : ticket.parts.some((p) => p.inventoryMovementId) ? (
+            <p className="mb-2 text-xs text-emerald-800">
+              Stockable spares are issued from inventory (`ISSUE_TO_MAINTENANCE`). Free-text lines are ticket-only.
+            </p>
+          ) : ticket.parts.length > 0 ? (
+            <p className="mb-2 text-xs text-erp-muted">
+              Parts are recorded on the ticket only (no stockable item selected — no inventory ISSUE).
             </p>
           ) : null}
           <div className="overflow-hidden rounded-lg border border-erp-border">
@@ -310,6 +328,7 @@ export function MaintenanceTicketDetailPage() {
                   <th className="px-3 py-2">Qty</th>
                   {perms.canViewCost ? <th className="px-3 py-2 text-right">Unit</th> : null}
                   {perms.canViewCost ? <th className="px-3 py-2 text-right">Total</th> : null}
+                  <th className="px-3 py-2">Inventory</th>
                   <th className="px-3 py-2">Shortage</th>
                 </tr>
               </thead>
@@ -320,10 +339,17 @@ export function MaintenanceTicketDetailPage() {
                     <td className="px-3 py-2">{p.qty}</td>
                     {perms.canViewCost ? <td className="px-3 py-2 text-right">{formatInr(p.unitCost)}</td> : null}
                     {perms.canViewCost ? <td className="px-3 py-2 text-right">{formatInr(p.totalCost)}</td> : null}
+                    <td className="px-3 py-2 text-xs">
+                      {p.inventoryMovementId
+                        ? 'Issued'
+                        : p.itemId && p.warehouseId
+                          ? 'Pending ISSUE'
+                          : 'Ticket only'}
+                    </td>
                     <td className="px-3 py-2">
                       {p.shortageQty && p.shortageQty > 0 ? (
                         <Link
-                          to={`/purchase/requisitions/new?notes=${encodeURIComponent(`Source: MAINTENANCE · ${ticket.ticketNumber} · ${p.description}`)}`}
+                          to={`/purchase/requisitions/new?source=MAINTENANCE&sourceDocumentId=${encodeURIComponent(ticket.id)}&purchasePurpose=${encodeURIComponent(`MAINTENANCE · ${ticket.ticketNumber}`)}&remarks=${encodeURIComponent(`sourceType:MAINTENANCE | maintenanceTicketId:${ticket.id} | ${ticket.ticketNumber} · ${p.description}`)}`}
                           className="text-erp-primary hover:underline"
                         >
                           Part Shortage — Create PR
@@ -336,7 +362,7 @@ export function MaintenanceTicketDetailPage() {
                 ))}
                 {!ticket.parts.length ? (
                   <tr>
-                    <td className="px-3 py-3 text-erp-muted" colSpan={5}>
+                    <td className="px-3 py-3 text-erp-muted" colSpan={6}>
                       No parts recorded
                     </td>
                   </tr>
@@ -687,18 +713,22 @@ export function MaintenanceTicketDetailPage() {
             <button
               type="button"
               className="rounded-md bg-erp-primary px-3 py-2 text-sm text-white"
-              disabled={busy}
+              disabled={busy || !partDesc.trim() || (Boolean(partItemId) && !partWarehouseId)}
               onClick={() =>
                 void run(async () => {
                   await addMaintenancePart(id, {
+                    itemId: partItemId || undefined,
+                    warehouseId: partItemId ? partWarehouseId || undefined : undefined,
                     description: partDesc,
                     qty: Number(partQty || 0),
                     unitCost: Number(partUnitCost || 0),
                     remarks: partRemarks.trim() || undefined,
                     shortageQty: partShortage ? Number(partShortage) : undefined,
                   })
-                  notify.success('Part added')
+                  notify.success(partItemId ? 'Part issued from inventory' : 'Part recorded on ticket')
                   setPartDesc('')
+                  setPartItemId('')
+                  setPartWarehouseId('')
                   setPartQty('1')
                   setPartUnitCost('0')
                   setPartShortage('')
@@ -706,27 +736,68 @@ export function MaintenanceTicketDetailPage() {
                 })
               }
             >
-              Add Part
+              {partItemId ? 'Issue Part' : 'Add Part'}
             </button>
           </div>
         }
       >
         <div className="grid gap-3">
+          <FormField
+            label="Stock Item (optional)"
+            hint="Select a stockable item to post an inventory ISSUE. Leave empty for free-text ticket-only recording."
+          >
+            <Select
+              value={partItemId}
+              onChange={(e) => {
+                const nextId = e.target.value
+                setPartItemId(nextId)
+                const item = stockableItems.find((i) => i.id === nextId)
+                if (item) {
+                  setPartDesc(`${item.itemCode} — ${item.itemName}`)
+                  if (perms.canManageCost) setPartUnitCost(String(item.standardRate ?? 0))
+                }
+              }}
+            >
+              <option value="">{SELECT_PLACEHOLDER}</option>
+              {stockableItems.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.itemCode} — {item.itemName}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          {partItemId ? (
+            <FormField label="Issue Warehouse" required hint="Stock is decremented from this warehouse (fail-closed if insufficient).">
+              <Select value={partWarehouseId} onChange={(e) => setPartWarehouseId(e.target.value)}>
+                <option value="">{SELECT_PLACEHOLDER}</option>
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.warehouseCode} — {w.warehouseName}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          ) : null}
           <FormField label="Item Name" required>
-            <Input value={partDesc} onChange={(e) => setPartDesc(e.target.value)} placeholder="Part / item name" />
+            <Input
+              value={partDesc}
+              onChange={(e) => setPartDesc(e.target.value)}
+              placeholder="Part / item name"
+              disabled={Boolean(selectedPartItem)}
+            />
           </FormField>
           <FormField label="Qty" required>
             <Input type="number" min={0} value={partQty} onChange={(e) => setPartQty(e.target.value)} />
           </FormField>
           {perms.canManageCost ? (
-            <FormField label="Unit Cost">
+            <FormField label="Unit Cost" hint={partItemId ? 'Used as issue rate hint; costing may override from layers' : undefined}>
               <Input type="number" min={0} value={partUnitCost} onChange={(e) => setPartUnitCost(e.target.value)} />
             </FormField>
           ) : null}
           <FormField label="Remarks">
             <Input value={partRemarks} onChange={(e) => setPartRemarks(e.target.value)} />
           </FormField>
-          <FormField label="Shortage Qty">
+          <FormField label="Shortage Qty" hint="If stock is short, hold WAITING_FOR_PART and create a PR from the shortage link.">
             <Input type="number" min={0} value={partShortage} onChange={(e) => setPartShortage(e.target.value)} />
           </FormField>
         </div>

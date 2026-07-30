@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified against codebase: **2026-07-29** (FIN-CLOSE-1 **stop** — GR/IR + Return→AP + Inventory↔GL recon + Dispatch→AR polish; retro-cost + Hostinger migrate still open; Maintenance V1 READY WITH CONDITIONS; MFG Fuel Tank golden path READY).
+Last verified against codebase: **2026-07-30** (Accounting year-end P&L close; Maintenance V1 READY; Quality QI checklist; Auth IAM; Inventory Costing READY). Prior **2026-07-29**: FIN-CLOSE-1 stop; MFG Fuel Tank READY.
 **Canonical master routes:** see [`docs/MASTER_REGISTRY.md`](MASTER_REGISTRY.md). **CRM workflow diagrams:** see [`docs/CRM_WORKFLOW.md`](CRM_WORKFLOW.md).
 **Completion rule:** A module is **Completed** only with UI + API + DB + permissions + tenant isolation + tests. Demo FE alone ≠ complete. Otherwise: Partially completed / Not started / Blocked / Deferred by design.
 
@@ -23,12 +23,12 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Category | Modules |
 |----------|---------|
-| **Completed (API mode)** | … **AR 3A–3C** (invoice/receipt/CN + allocation) + **3B6/3C6 Money In UI** + receipt/CN/allocation/journal reverse + corrections hub; **AP Money Out UI** + corrections + AP reversal history; Dispatch→SI invoice-ready + POD gate on manual create |
+| **Completed (API mode)** | **Auth** (login/JWT/self-service) + **Admin tenants/users/roles**; … **AR 3A–3C** (invoice/receipt/CN + allocation) + **3B6/3C6 Money In UI** + receipt/CN/allocation/journal reverse + corrections hub; **AP Money Out UI** + corrections + AP reversal history; Dispatch→SI invoice-ready + POD gate on manual create |
 | **Not started** | — |
-| **Partially completed** | Auth UI; mobile CRM (API hydrate, no offline); sales-order fulfilment beyond confirm/close; **user/role/tenant admin UI** (API wired; product UAT open); **Admin A8** broader demo-mix pack beyond security regression |
-| **Scaffolding (not shipped)** | — (Accounting: some CoA/voucher demo surfaces; Period Close **P1 + hardening** live for lock/readiness — year-end/accruals still demo; **Finance Settings** at `/accounting/settings` is Phase 1 dual-mode) |
+| **Partially completed** | mobile CRM (API hydrate, no offline); sales-order fulfilment beyond confirm/close; **Admin A8** broader demo-mix pack beyond security regression |
+| **Scaffolding (not shipped)** | — (Accounting: some CoA/voucher demo surfaces; Period Close **P1 + hardening + year-end P&L→RE** live — accruals/prepaid/FX/calendar still demo; **Finance Settings** at `/accounting/settings` is Phase 1 dual-mode) |
 | **Blocked** | — (none currently) |
-| **Deferred by design** | Purchase backends beyond RFQ award→draft PO (full PO lifecycle, GRN); inventory / production / quality / maintenance beyond shipped slices; SO MRP / dispatch client production hardening |
+| **Deferred by design** | Broad QMS beyond shipped Quality scope (CAPA/calibration/SPC — see `docs/quality/QUALITY_SCOPE_AND_DEFERRALS.md`); SO MRP / dispatch client production hardening leftovers |
 
 ---
 
@@ -40,10 +40,11 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | Local API-mode empty data | Backend must listen on `:5000`; not a demo/API mix bug |
 | DB cleanup scripts | `cleanup-leads.ts`, `cleanup-opp-quotations.ts`, `cleanup-sales-orders.ts` — local one-offs; do not run on prod without intent |
 | Accounting orphan UI | **Resolved 2026-07-15** — all `/accounting/*` deep links from the dashboard now resolve (dashboard live; other screens are placeholders, not 404s) |
-| Inventory costing rollout | **UAT-1 hardening 2026-07-28** — automated 4-method golden paths PASS; method-change preview; transfer cost preserve; cost-entry value parity. Verdict still **READY WITH CONDITIONS** (live SPA UAT + Inventory↔GL TB deferred). |
+| Inventory costing rollout | **READY 2026-07-30 — live verified after migrate deploy.** Inventory pack: **9 files / 21 tests PASS, 0 skipped**; SPA UAT API harness **9/9 PASS**; Inventory↔GL parity **3/3 PASS** (operational RM = mapped GL, no Force Balance). Purchase invoice retro-cost integration is now closed under FIN-CLOSE-1; residual optional human SPA walk only. |
 | Manufacturing Fuel Tank golden path | **MFG-GOLDEN-1** + **pilot A1–A9 + partial FG signed 2026-07-29** (`WO-000039` happy / `WO-000040` partial). Verdict **READY**. Optional live SPA UX walk only. |
-| Maintenance V1 | Ticket-centric REPORT→REPAIR→TEST→CLOSE. Harness **PASS** (`MT-000001`). **READY WITH CONDITIONS** — inventory ISSUE pending; see `docs/maintenance/`. |
-| FIN-CLOSE-1 accounting integration | **Stop met 2026-07-29** — decisions 1–4 + GR/IR live + Inventory↔GL/WIP↔GL recon (no Force Balance) + Dispatch Invoice Ready polish. Outside stop: purchase invoice retro cost adjust; Hostinger migrate deploy. See `docs/accounting/ACCOUNTING_INTEGRATION_CLOSURE_AUDIT.md`. |
+| Maintenance V1 | Ticket-centric REPORT→REPAIR→TEST→CLOSE + spare ISSUE (`ISSUE_TO_MAINTENANCE`). Harness **PASS** (`MT-000003`/`MT-000004`, `STM-000187`). **READY** — human SPA/contractor sign-off optional; see `docs/maintenance/`. |
+| Quality (scoped QMS) | Manufacturing 4A/4B/7B + Purchase incoming QI (incl. parameter checklist). **READY 2026-07-30 — live verified after migrate deploy: 23/23 PASS, 0 skipped** (4A 5/5, 4B 5/5, 7B 7/7, Purchase QI 6/6). The `awaitingQuality` failures were fixture drift — 4A/4B now seed strict `flexibleExecution: false`. Broad QMS deferred — `docs/quality/QUALITY_SCOPE_AND_DEFERRALS.md`. |
+| FIN-CLOSE-1 accounting integration | **Code closure met 2026-07-30** — prior stop scope plus purchase invoice retro cost + **year-end P&L→RE**. **Human action remains:** Hostinger migrate deploy (incl. `20260730121000_finance_year_end_close`) + mapping runbook. Accruals/FX/AIS still deferred. |
 
 ---
 
@@ -53,14 +54,14 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ⚠️ | Login page + `AuthProvider` + `ApiAuthGate` (API mode only) |
-| Backend | ✅ | login, refresh, logout, forgot/reset/change password, me |
+| Frontend | ✅ | Login + forgot/reset; `ChangePasswordPage` (`/account/change-password`); `ProfileSettingsPage` (`/settings/profile`); user-menu links; `AuthProvider` + `ApiAuthGate` |
+| Backend | ✅ | login, refresh, logout, forgot/reset/change password, `GET/PATCH /me`; tenant password policy on change/reset **and** user create |
 | DB | ✅ | users, refresh_tokens, password_reset_tokens |
 | API | ✅ | `/api/v1/auth/*` |
-| Tests | ⚠️ | Invalid login test (skip without DB); no dedicated auth suite |
+| Tests | ✅ | FE `test:uat-01-auth` **24/24**; BE `auth-hardening` + `auth-self-service` — **live 2026-07-30: 9/9 PASS, 0 skipped** (profile, policy, forgot/reset, refresh/logout) |
 | Demo mode | 🔒 | No login required |
-| API mode | ✅ | JWT session + auto refresh |
-| Remaining gap | Admin self-service UI; password policy tests |
+| API mode | ✅ | JWT session + auto refresh + self-service |
+| Remaining gap | — |
 
 ### Login activity
 
@@ -79,40 +80,40 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ⚠️ | **2026-07-15:** `modules/systemAdmin/TenantAdminPages.tsx` — list/create (incl. first admin user)/edit/detail + suspend/activate/archive at `/admin/tenants`, gated by `isSuperAdminUser()`; not yet manually tested (shell unavailable) |
-| Backend | ✅ | CRUD for Super Admin |
+| Frontend | ✅ | `TenantAdminPages` at `/platform/tenants` (Super Admin); `/admin/tenants` redirects; create first admin + suspend/activate/archive |
+| Backend | ✅ | CRUD for Super Admin; admin password floor vs `PASSWORD_MIN_LENGTH` |
 | DB | ✅ | tenants |
 | API | ✅ | `/api/v1/tenants` |
-| Tests | ⚠️ | Isolation tests create temp tenants; no FE test for new admin pages |
+| Tests | ✅ | FE `test:admin-iam` structure PASS; BE `admin-tenants-users-roles-smoke` — **live 2026-07-30: 5/5 PASS, 0 skipped** (list/create/patch + non–super denied); `admin-security-regression` **6/6** |
 | Demo mode | ✅ | `data/admin/seed.ts` seed tenants |
-| API mode | ⚠️ | Hydrates via `syncAdminTenantsFromApi()`; needs live smoke test |
-| Remaining gap | Manual/live test pass; typecheck not run this session |
+| API mode | ✅ | Hydrates via `syncAdminTenantsFromApi()` |
+| Remaining gap | — |
 
 ### Users (system)
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ⚠️ | **2026-07-15:** `modules/systemAdmin/UserAdminPages.tsx` — list/invite/edit/detail + role assign/remove at `/admin/users` (pre-existing from an earlier interrupted session; wired into routes/nav this session); not yet manually tested |
-| Backend | ✅ | CRUD + role assign under `/t/:slug/users` |
+| Frontend | ✅ | `UserAdminPages` list/invite/edit/detail + role assign at `/admin/users` |
+| Backend | ✅ | CRUD + role assign under `/t/:slug/users`; `assertPasswordMeetsPolicy` on create |
 | DB | ✅ | users, user_roles |
 | API | ✅ | Permission-gated |
-| Tests | ⚠️ | Used in E2E login; no FE test for admin pages |
+| Tests | ✅ | FE `test:admin-iam`; BE smoke + `admin-security-regression` / invitations suites |
 | Demo mode | ✅ | `data/admin/seed.ts` seed users |
-| API mode | ⚠️ | Hydrates via `syncAdminUsersFromApi()`; needs live smoke test |
-| Remaining gap | Manual/live test pass; typecheck not run this session |
+| API mode | ✅ | Hydrates via `syncAdminUsersFromApi()` |
+| Remaining gap | — |
 
 ### Roles
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ⚠️ | **2026-07-15:** `modules/systemAdmin/RoleAdminPages.tsx` — list/create/edit/detail at `/admin/roles` with grouped permission-matrix editor; system roles read-only; not yet manually tested |
+| Frontend | ✅ | `RoleAdminPages` list/create/edit/detail + permission matrix at `/admin/roles` |
 | Backend | ✅ | `/t/:slug/roles` |
 | DB | ✅ | roles, role_permissions |
 | API | ✅ | |
-| Tests | ⚠️ | Seed roles in E2E; no FE test for admin pages |
+| Tests | ✅ | FE `test:admin-iam`; BE smoke create/patch role + catalog |
 | Demo mode | ✅ | `data/admin/seed.ts` seed roles + permission catalog |
-| API mode | ⚠️ | Hydrates via `syncAdminRolesFromApi()`; needs live smoke test |
-| Remaining gap | Manual/live test pass; typecheck not run this session |
+| API mode | ✅ | Hydrates via `syncAdminRolesFromApi()` |
+| Remaining gap | — |
 
 ### Permissions
 
@@ -385,9 +386,22 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | Tests | ✅ | Lifecycle suites + matrix role unit; QI/return stock movement asserts with seeded `itemId` |
 | Demo mode | ✅ | Full RFQ→VQ→comparison→award→PO + Planning→PO paths; Setup via `purchaseService` |
 | API mode | ✅ | Facade wired for QI/Invoice/Return; stub actions hidden |
-| Remaining gap | ITC / vendor-outstanding placeholders; formal GR/IR clearing GL (qty GRNI report shipped); QI parameter checklist persistence |
+| Remaining gap | ITC / vendor-outstanding placeholders; formal GR/IR clearing GL (qty GRNI report shipped) |
 
-### Inventory / Production / Quality / Maintenance / Finance (invoices)
+### Quality (manufacturing QC + Purchase incoming QI)
+
+| Aspect | Status | Notes |
+|--------|--------|-------|
+| Frontend | ✅ | Dual-mode: Api* QC queue/detail/NCR/plans/parameters/reports; Incoming queue live from Purchase; Purchase QI detail checklist |
+| Backend | ✅ | Phases 4A/4B/7B quality engine + Purchase QI lifecycle + parameter checklist API |
+| DB | ✅ | `quality_*` / `mfg_quality_inspections` + `purchase_quality_inspections` (+ parameters migration `20260730110000`) |
+| API | ✅ | `/quality/*` + `/purchase/quality-inspections` (Zod, permissions, tenantId) |
+| Tests | ✅ | **Live 2026-07-30: 4 files / 23 tests PASS, 0 failed, 0 skipped** — `quality-phase4a` 5/5, `quality-phase4b` 5/5, `quality-phase7b` 7/7, `purchase-qi-lifecycle` 6/6 (after QI params migration deploy) |
+| Demo mode | ✅ | qualityStore + Purchase demo QI parameters |
+| API mode | ✅ | qualityRoutes + purchaseApiFacade |
+| Remaining gap | **READY** — QI params migration deployed and live suites green (live-DB evidence condition closed). Broad QMS (CAPA/calibration/SPC/supplier scorecards) **deferred by design** — see `docs/quality/QUALITY_SCOPE_AND_DEFERRALS.md` |
+
+### Inventory / Production / Maintenance / Finance (invoices)
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
@@ -400,18 +414,20 @@ Legend: ✅ done · ⚠️ partial · ❌ missing · 🔒 deferred · ⏸ blocke
 | API mode | ❌ | |
 | Remaining gap | Manufacturing backend when prioritized |
 
-### Accounting (Money In / Money Out API-mode flows live; some period-close / AIS still open)
+### Accounting (Money In / Money Out + period lock / year-end P&L close live; accruals/AIS open)
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| Frontend | ⚠️ | **2026-07-27:** Money In (invoices, invoice-ready, receipts, credit notes, allocate, corrections/reversals) + Money Out (vendor invoices/payments/adjustments, allocate, corrections, reversal history) live in API mode. Journals + Approvals + Bank & Cash UAT. |
-| Backend | ⚠️ | Phase 1–5D + AR 3A–3C + AP 4A–4D + journal reverse + receipt/CN/allocation reverse + AP reversal history list + Dispatch→SI source links + POD gate on manual SI |
-| DB | ⚠️ | Setup + ledger + approval tables + manual journals on `AccountingVoucher`; GL via existing-voucher post path; `ReceivableOpenItem` DEBIT (invoice) / CREDIT (receipt/credit-note) rows on post; `CustomerCreditNoteAllocationBatch` / `CustomerCreditNoteAllocation` subledger tables (no GL) |
-| API | ⚠️ | Setup + journals (+ reverse) + AR invoice/receipt/credit-note post/allocate/reverse + AP vendor docs/payments/adjustments/allocations/reversals + `GET /accounting/payables/reversals` |
-| Tests | ⚠️ | finance suites + money-in/money-out FE scripts — see `TESTING_STATUS.md` |
-| Demo mode | ✅ | Settings + journals + approvals + demo journal posting; Money In/Out prefer API mode for full reverse flows |
-| API mode | ⚠️ | Full Money In/Out user flows + journal reverse + Dispatch invoice-ready → SI (POD when policy on) |
-| Remaining gap | Dispatch partial/multi/consolidated invoice **policy UI** polish; period close year-end; AIS/FX/intercompany |
+| Frontend | ⚠️ | Money In/Out live in API mode. Period Close lock/readiness + **year-end wizard posts P&L→RE**. Accruals/prepaid/FX/calendar still demo. Journals + Approvals + Bank & Cash UAT. |
+| Backend | ⚠️ | Phase 1–5D + AR/AP reverse + journal reverse + **year-end close** + FY lock hardened |
+| DB | ⚠️ | + `YearEndCloseRun` (`year_end_close_runs`); AR/AP open items + allocation tables as before |
+| API | ⚠️ | + `GET/POST …/financial-years/:id/year-end-preview\|year-end-close`; FY close requires year-end run + all periods CLOSED |
+| Tests | ⚠️ | `finance-year-end-close` + period-close hardening + AR/AP finance suites — see `TESTING_STATUS.md` |
+| Demo mode | ✅ | Settings/journals/approvals; year-end preview seed-only in demo |
+| API mode | ⚠️ | Full Money In/Out + year-end P&L close; Dispatch invoice-ready → SI |
+| Remaining gap | Accruals/prepaid/FX reval wizards; Dispatch invoice policy UI polish; live TPP AIS/FX/intercompany (SIMULATED AIS separate) |
+
+**Module verdict:** **READY WITH CONDITIONS** — AR/AP Money In/Out + period lock + year-end P&L→RE live with test evidence. Conditions: human SPA year-end walk; Hostinger migrate deploy; do not treat accruals/FX/AIS screens as live.
 
 ### Mobile CRM
 

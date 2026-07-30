@@ -57,6 +57,20 @@ describe.skipIf(!dbAvailable)('Quality Phase 4B — parameters + inspection plan
       data: { qualityRequired: true },
     })
 
+    // Strict execution — `flexibleExecution` (server default true) softens the QC gate.
+    await prisma.manufacturingSettings.upsert({
+      where: { tenantId: fx.tenantId },
+      create: {
+        tenantId: fx.tenantId,
+        allowCloseWithoutQc: false,
+        payloadJson: { general: { flexibleExecution: false, allowCloseWithoutQc: false } },
+      },
+      update: {
+        allowCloseWithoutQc: false,
+        payloadJson: { general: { flexibleExecution: false, allowCloseWithoutQc: false } },
+      },
+    })
+
     const fullUser = await createUserWithPerms(app, fx.tenantId, fx.slug, TEST_PERMS, 'qc4b-full')
     token = fullUser.token
   }, 180_000)
@@ -66,7 +80,7 @@ describe.skipIf(!dbAvailable)('Quality Phase 4B — parameters + inspection plan
       await cleanupProductionData(fx.tenantId)
       await prisma.qualityInspectionParameterResult.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
       await prisma.qualityNcr.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
-      await prisma.qualityInspection.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
+      await prisma.manufacturingQualityInspection.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
       await prisma.qualityInspectionPlanLine.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
       await prisma.qualityInspectionPlan.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
       await prisma.qualityParameter.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})

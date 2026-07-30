@@ -2,6 +2,11 @@ import type { Request } from 'express'
 import { auditFromRequest, createAuditLog } from '../../../services/audit.service.js'
 import type { CreateFinancialYearInput, ListFinancialYearsQuery, UpdateFinancialYearInput } from './financial-year.validation.js'
 import * as repo from './financial-year.repository.js'
+import {
+  assertFinancialYearReadyToClose,
+  executeYearEndClose,
+  previewYearEndClose,
+} from './year-end-close.service.js'
 
 function auditMeta(req: Request) {
   return auditFromRequest(req)
@@ -74,6 +79,7 @@ export async function activateRecord(req: Request, tenantId: string, id: string)
 export async function closeRecord(req: Request, tenantId: string, id: string) {
   const audit = auditMeta(req)
   const userId = req.context?.userId ?? ''
+  await assertFinancialYearReadyToClose(tenantId, id)
   const record = await repo.closeFinancialYear(tenantId, id, userId)
   await createAuditLog({
     tenantId,
@@ -87,4 +93,33 @@ export async function closeRecord(req: Request, tenantId: string, id: string) {
     userAgent: audit.userAgent,
   })
   return record
+}
+
+export async function previewYearEnd(tenantId: string, id: string) {
+  return previewYearEndClose(tenantId, id)
+}
+
+export async function executeYearEnd(req: Request, tenantId: string, id: string) {
+  const audit = auditMeta(req)
+  const userId = req.context?.userId ?? ''
+  const result = await executeYearEndClose(tenantId, id, userId)
+  await createAuditLog({
+    tenantId,
+    userId: audit.userId,
+    module: 'finance',
+    entity: 'financial_year',
+    entityId: id,
+    action: 'YEAR_END_CLOSE',
+    newValues: {
+      runId: result.run.id,
+      status: result.run.status,
+      voucherId: result.run.voucherId,
+      voucherNumber: result.run.voucherNumber,
+      profitOrLoss: result.run.profitOrLoss,
+      idempotentReplay: result.idempotentReplay,
+    },
+    ipAddress: audit.ipAddress,
+    userAgent: audit.userAgent,
+  })
+  return result
 }

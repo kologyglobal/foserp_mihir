@@ -4,25 +4,63 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ---
 
-## Open — FIN-CLOSE-1 deferred leftovers (2026-07-29)
+## Done recently — Accounting year-end P&L close (2026-07-30)
+
+| Field | Value |
+|-------|-------|
+| Module | Accounting / Period Close |
+| Description | Year-end closing entries (INCOME/EXPENSE → `RETAINED_EARNINGS`), FY lock hardened, FE year-end wizard API mode, AP cascade idempotencyKey hash fix, money-out npm scripts wired |
+| Doc | `docs/accounting/PERIOD_CLOSE_STATUS.md` |
+| Test evidence | `finance-year-end-close` **8/8**; core finance pack **50/50**; BE/FE typecheck PASS; `test:period-close` PASS; `test:money-out` **68/68** |
+| Status | **done** for year-end P&L slice — **conditions**: Hostinger migrate deploy of `20260730121000_finance_year_end_close`; human SPA year-end walk |
+| Next step | Accruals/prepaid/FX reval (deferred); live TPP AIS/FX/intercompany (Bank & Cash phases) |
+
+---
+
+## Done recently — Purchase QI parameter checklist (2026-07-30)
+
+| Field | Value |
+|-------|-------|
+| Module | Quality / Purchase QI |
+| Description | Persist incoming QI `inspectionPlan` + parameter checklist (DB → API → facade → FE); hold/DEVIATION_PENDING editable; docs scope + deferrals |
+| Doc | `docs/quality/QUALITY_SCOPE_AND_DEFERRALS.md` |
+| Status | **done** in code — **condition**: migrate deploy + live `purchase-qi-lifecycle` re-run when MySQL up |
+| Next step | `npx tsx scripts/prisma-cli.ts migrate deploy` then vitest QI + quality-phase suites |
+
+---
+
+## Done recently — Inventory Costing READY gate closure (2026-07-30)
+
+| Field | Value |
+|-------|-------|
+| Module | Inventory Costing |
+| Description | Closed READY WITH CONDITIONS: wired costing recon/overview to FIN-CLOSE-1 Inventory↔GL TB (Not Available when flag off; never ₹0; no Force Balance); SPA UAT API harness; live GL parity suite + npm scripts |
+| Doc | `docs/inventory/INVENTORY_COSTING_TEST_RESULTS.md`, `INVENTORY_COSTING_CONTROLLED_UAT.md` |
+| Status | **done** for Inventory Costing READY — residual optional human browser walk; purchase-return/dispatch matrices + 10k soak accepted deferrals; **purchase invoice retro cost** remains Purchase/FIN open (not an Inventory Costing condition) |
+| Next step | Optional SPA browser sign-off; Purchase retro cost adjust separately |
+
+---
+
+## FIN-CLOSE-1 deferred leftovers (updated 2026-07-30)
 
 | Field | Value |
 |-------|-------|
 | Module | Accounting / Purchase / Inventory |
-| Description | **FIN-CLOSE-1 stop met.** Scoped chains closed: GR/IR + Return→AP (live), Inventory↔GL / WIP↔GL recon + failed-events hub, Dispatch→AR Invoice Ready polish. Still open **outside stop**: purchase invoice retro cost adjustment; Hostinger migrate deploy of `20260729160000_fin_close_1_grir_ppv_return_ap`; optional GR/IR ageing |
-| Blocker | Hostinger migrate deploy still pending. Local `fos_erp` migration applied; mappings via `scripts/map-fin-close-1-grir-ppv.ts` |
-| Test evidence | **PASS** — `npm run test:fin-close-1-live`; inventory-gl recon 4/4; BE/FE `tsc` clean after G11 polish |
-| Status | **stop** (do not expand into Money In/Out redesign / statutory / advanced Finance unless newly asked) |
+| Description | **FIN-CLOSE-1 code closure met.** Purchase invoice retro cost now uses Inventory Costing: remaining stock is capitalised, consumed delta remains PPV, original receipt is immutable, retries are idempotent, and reversal reallocates consumed delta to PPV. Optional GR/IR ageing remains nice-to-have. |
+| Blocker | **Human production action only:** Hostinger `migrate deploy`, FIN mapping script, build/redeploy and post-checks per `docs/accounting/FIN_CLOSE_1_HOSTINGER_MIGRATION_RUNBOOK.md`. Nothing was deployed remotely. |
+| Test evidence | **PASS** — `npm run test:fin-close-1-live`; retro-cost live 4/4; purchase/inventory regression pack 15/15; backend typecheck; Inventory↔GL matched without Force Balance. |
+| Status | **done in code / production deploy pending human action** |
 
 ---
 
-## Open — Maintenance V1 follow-ups (2026-07-29)
+## Done recently — Maintenance V1 inventory ISSUE (2026-07-30)
 
 | Field | Value |
 |-------|-------|
 | Module | Maintenance |
-| Description | Inventory ISSUE posting for spare parts; deep PR sourceType=MAINTENANCE; contractor UAT with vendors; live SPA walk; role permission refresh for existing tenants |
-| Status | **open** (core V1 shipped — READY WITH CONDITIONS) |
+| Description | Spare parts post `ISSUE_TO_MAINTENANCE` via inventory `postStockMovement` (on-hand + cost entry); FE honest stockable vs free-text; PR shortage deep-link (`source=MAINTENANCE`); `sync-permissions` verified |
+| Test | `npx tsx scripts/test-maintenance-v1.ts` — **PASS** (ISSUE `STM-000187`; insufficient stock fail-closed). External contractor **SKIP** (no vendor). |
+| Status | **done** for V1 product gate (**READY**). Human: optional SPA walk; contractor UAT when vendor exists. Deferred: PM scheduler; persisted PR `sourceType` column. |
 | Docs | `docs/maintenance/` |
 
 ---
@@ -68,14 +106,14 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 ---
 
 
-## Done recently — Bank & Cash UAT readiness (2026-07-23)
+## Done recently — Bank & Cash UAT readiness (2026-07-23; 5D4 closed 2026-07-30)
 
 | Field | Value |
 |-------|-------|
 | Module | Accounting / Treasury |
-| Description | Live API for **internal UAT / controlled pilot**; workspace tabs + seed redirects cleaned |
+| Description | Live API for **internal UAT / controlled pilot**; workspace tabs + seed redirects cleaned; **5D4 SIMULATED AIS + scheduleCron** shipped |
 | Doc | `docs/accounting/BANK_CASH_STATUS.md` |
-| Status | **done** for core UAT surface — **open** / deferred: **AIS (5D4)**, **FX**, **intercompany** |
+| Status | **done** for core UAT + SIMULATED AIS/cron — **open** / deferred: **live TPP AIS**, **FX**, **intercompany**, cheque print |
 
 ---
 
@@ -193,7 +231,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Module | Purchase |
 | Description | GRN receiving-chain UX; Invoice AP handoff honesty + Money Out link; Return accounting-pending banner; GRN→cost entry automated proof |
 | Doc | `docs/purchase/PURCHASE_COMPLETION_AUDIT.md`, `PURCHASE_COMPLETION_TEST_RESULTS.md` |
-| Status | **done** for internal UAT closure of FE/integration links — **open**: return→AP debit, invoice cost adjust, QI parameters API, spend/supplier dashboards |
+| Status | **done** for internal UAT closure of FE/integration links — return→AP and invoice retro cost are now closed; spend/supplier dashboards remain optional (QI parameters API **done** 2026-07-30) |
 
 ---
 
@@ -204,7 +242,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Module | Inventory Costing |
 | Description | Controlled UAT suite (4 methods + transfer + tenant isolation); cost-entry/movement value parity; transfer cost preservation; method-change readiness preview; MA before/after history; Standard ItemLookupSelect; recon GL Not Available |
 | Doc | `docs/inventory/INVENTORY_COSTING_UAT_AUDIT.md`, `INVENTORY_COSTING_TEST_RESULTS.md`, `INVENTORY_COSTING_PRODUCTION_READINESS.md` |
-| Status | **done** for UAT-1 automated hardening — **open**: live SPA sign-off, purchase-return/dispatch matrices, performance soak, Inventory↔GL TB |
+| Status | **done** for UAT-1 automated hardening + **2026-07-30 READY gate** (SPA API harness + Inventory↔GL wiring) — **accepted deferrals**: purchase-return/dispatch 4-method matrices, 10k soak, dedicated approve permission; residual human SPA walk optional |
 
 ---
 
@@ -215,7 +253,7 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Module | Inventory Costing UI |
 | Description | Overview, enriched registers, MA/standard/specific screens, Run Reconciliation, method-change current method, read APIs |
 | Doc | `docs/inventory/INVENTORY_COSTING_FE_AUDIT.md`, `INVENTORY_COSTING_UI.md` |
-| Status | **done** for FE usability — **open**: controlled UAT + inventory↔GL TB |
+| Status | **done** for FE usability + Inventory↔GL summary surface — residual human SPA walk optional |
 
 ---
 
@@ -236,8 +274,8 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 |-------|-------|
 | Module | Inventory / Manufacturing / Finance integration |
 | Description | Costing engine Phase A–C BE + **Phase 1 FE Costing UI** + **all 4 valuation methods hardened** + **IV-MFG-1** (WO material from InventoryCostEntry; legacy mfg enum deprecated). |
-| Status | **in_progress** (engines + UI + IV-MFG-1 + **UAT-1 automated hardening** shipped; live SPA UAT + variance GL / inventory↔GL TB still open) |
-| Next step | Live SPA controlled UAT checklist (`INVENTORY_COSTING_CONTROLLED_UAT.md`); purchase-return + dispatch 4-method matrices; performance soak. **Do not** expand live Manufacturing Accounting GL until the gate below clears. |
+| Status | **done** (engines + UI + IV-MFG-1 + UAT-1 + **2026-07-30 READY**: SPA API harness + Inventory↔GL TB wiring) |
+| Next step | Optional live SPA browser checklist. Purchase-return + dispatch 4-method matrices and 10k soak remain accepted deferrals. **Do not** expand live Manufacturing Accounting GL until the gate below clears. |
 
 ---
 
@@ -545,9 +583,9 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 |-------|-------|
 | Module | Purchase |
 | Description | PR/PO/GRN API |
-| Reason | **Partial** — PO/GRN/QI/Invoice/Return + Setup + FE parity + GRNI + approver limits + **multi-unit UOM** + **GRN tolerance** + **PO versioning** + **2026-07-28 completion links** (GRN chain, AP handoff UX, return pending banner, GRN→costing test) + **2026-07-29 FIN-CLOSE-1 decisions 1–4** (`GRIR_CLEARING` on GRN inward, `PURCHASE_PRICE_VARIANCE` key, return→AP debit note draft, GR/IR under the `INVENTORY_ACCOUNTING` gate). Vendor Invoice GR/IR release + PPV and return→AP draft are live-verified. Remaining: ITC placeholders; invoice retro cost adjust; fuller dual-UOM display; Hostinger migrate deploy of purchase UOM/tolerance/versioning + `20260729160000_fin_close_1_grir_ppv_return_ap`. |
+| Reason | **Partial** — PO/GRN/QI/Invoice/Return + Setup + FE parity + GRNI + approver limits + **multi-unit UOM** + **GRN tolerance** + **PO versioning** + FIN-CLOSE-1 GR/IR, PPV, return→AP and **purchase invoice retro cost** are live-verified. Remaining product gaps: ITC placeholders and fuller dual-UOM display. Hostinger migration/redeploy remains a human operation. |
 | Dependencies | Items, vendors (done); PR schema Phase 03 (done); PO lifecycle (done); Approvals queue (done); Setup 1A (done) |
-| Next step | Purchase invoice retro cost adjustment (additive cost entry; never mutate original receipt). |
+| Next step | Human Hostinger migration/mapping/redeploy runbook; optional ITC and reporting enhancements. |
 | Test required | Setup **13/13**; QI/return lifecycle; GRNI; invoice lifecycle; **purchase-completion-grn-costing** PASS |
 | Status | **in_progress** (core loop ready for internal UAT) |
 
@@ -604,10 +642,10 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 | Field | Value |
 |-------|-------|
 | Module | Accounting |
-| Description | **Finance Settings Phase 1** + journals/AR/AP/treasury + **Period Close P1 + Close Control Hardening** (close-readiness, optional hard-block, checklist acks). |
-| Next step | Period close year-end / accruals; Budgeting Phase 2+ / GST filing as prioritized. |
-| Test required | Finance tests (`tests/finance/`) + `npm run test:money-in` + `npm run test:period-close` |
-| Status | partial (Period Close lock/readiness hardening shipped 2026-07-23; year-end/accruals/calendar still demo) |
+| Description | **Finance Settings Phase 1** + journals/AR/AP/treasury + **Period Close P1 + Close Control Hardening + year-end P&L→RE** (2026-07-30). |
+| Next step | Accruals / prepaid / FX reval posting wizards; close calendar; reopen-request workflow; Budgeting Phase 2+ / GST filing as prioritized. |
+| Test required | `tests/finance/finance-year-end-close.test.ts` + `period-close-hardening` + `npm run test:period-close` |
+| Status | partial (year-end shipped; accruals/calendar still demo) |
 
 ### P3-6: Commercial terms single source
 
@@ -625,4 +663,4 @@ Prioritized backlog. Status values: `open`, `in_progress`, `blocked`, `done`.
 
 ## Recommended next task
 
-See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) open risks. Highest ops: **redeploy production `.htaccess`** so `/api` returns JSON. Product backlog: **verify P1-1/P1-2 admin UIs**; then P2 mobile API E2E. Finance Money In/Out reverse UIs shipped — next: Dispatch invoice policy UI polish / period close year-end.
+See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) open risks. Highest ops: **redeploy production `.htaccess`** so `/api` returns JSON. Product backlog: **verify P1-1/P1-2 admin UIs**; then P2 mobile API E2E. Finance Money In/Out + year-end P&L close shipped — next: accruals/FX wizards or Dispatch invoice policy UI polish as prioritized.

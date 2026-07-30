@@ -13,13 +13,13 @@
 | MA / FIFO / Standard / Specific engines | ✅ | Inside `stock-posting.service.ts` |
 | WO material = Inventory cost entry | ✅ | IV-MFG-1 — `work-order-cost.service.ts` prefers `INVENTORY_COST_ENTRY` |
 | Costing FE workspace | ✅ | Overview → Method Change under `/inventory/costing/*` |
-| Inventory ↔ GL TB | 🔒 Deferred | Recon correctly returns `glInventoryValue: null` |
-| Method change preview / readiness | ⚠️ Thin | Immediate apply; soft mid-period gate only |
-| Transfer layer preservation | ⚠️ Gap | Dispatch consumes layers; receipt recreates at `line.rate` (P/L risk) |
-| Standard Cost create UX | ⚠️ | Raw UUID item field |
-| MA before/after history | ⚠️ | Cost-entry list only (reconstructible derived read model) |
-| Fine-grained costing permissions | 🔒 Deferred | `inventory.view_cost` / `inventory.setup.manage` |
-| Live UI golden-path UAT | ❌ Open | Automated DB tests exist; controlled UI checklist pending |
+| Inventory ↔ GL TB | ✅ Wired | Costing recon/overview call FIN-CLOSE-1 `buildInventoryGlTrialBalance` when `INVENTORY_ACCOUNTING` on; off → Not Available (not ₹0) |
+| Method change preview / readiness | ✅ | Readiness PASS/WARNING/BLOCKED; soft mid-period gate |
+| Transfer layer preservation | ✅ | Receive uses dispatch cost entry unit cost |
+| Standard Cost create UX | ✅ | `ItemLookupSelect` |
+| MA before/after history | ✅ | Derived from cost entries |
+| Fine-grained costing permissions | 🔒 Deferred | `inventory.view_cost` / `inventory.setup.manage` (dedicated approve deferred) |
+| Live UI golden-path UAT | ✅ API harness | `npm run test:inventory-costing-spa-uat`; residual human browser walk optional |
 
 ---
 
@@ -95,7 +95,7 @@
 - MA/Standard: layer check skipped → typically `MATCHED`.
 - Reason codes present: `COSTED_QTY_MISMATCH`, `FIFO_LAYER_MISMATCH`, `NEGATIVE_STOCK_COST_PENDING`.
 - Overview attention also: `UNCOSTED_MOVEMENT`, `SPECIFIC_COST_NOT_IDENTIFIED`, `MISSING_STANDARD_COST`.
-- GL: explicitly deferred — **must not** display GL = ₹0.
+- GL: when Inventory Accounting is enabled, summary pulls RM+FG from FIN-CLOSE-1 Inventory↔GL trial balance; when off, **Not Available** (never ₹0). Force Balance never allowed.
 
 ---
 

@@ -33,6 +33,7 @@ const DEFAULT_MAPPING_BY_COMPONENT: Partial<Record<VendorInvoiceAccountComponent
   LINE_DEBIT: 'PURCHASE',
   GRIR_CLEARING: 'GRIR_CLEARING',
   PURCHASE_PRICE_VARIANCE: 'PURCHASE_PRICE_VARIANCE',
+  RAW_MATERIAL_INVENTORY: 'RAW_MATERIAL_INVENTORY',
   INPUT_CGST: 'GST_INPUT_CGST',
   INPUT_SGST: 'GST_INPUT_SGST',
   INPUT_IGST: 'GST_INPUT_IGST',
@@ -150,7 +151,10 @@ export function buildRequiredAccountComponents(params: BuildRequiredAccountCompo
       if (!isZero(grir.grirAmount)) {
         results.push(componentRef('GRIR_CLEARING', line.lineNumber, true, 'UNRESOLVED', null, null, null))
       }
-      if (!isZero(grir.varianceAmount)) {
+      if (!isZero(grir.inventoryAdjustmentAmount)) {
+        results.push(componentRef('RAW_MATERIAL_INVENTORY', line.lineNumber, true, 'UNRESOLVED', null, null, null))
+      }
+      if (!isZero(grir.ppvAmount)) {
         results.push(componentRef('PURCHASE_PRICE_VARIANCE', line.lineNumber, true, 'UNRESOLVED', null, null, null))
       }
     }

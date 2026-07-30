@@ -87,6 +87,7 @@ export async function cleanupPurchaseTenant(tenantId: string) {
   await prisma.vendorInvoice.deleteMany({ where: { tenantId } })
   await prisma.purchaseInvoiceLine.deleteMany({ where: { tenantId } })
   await prisma.purchaseInvoice.deleteMany({ where: { tenantId } })
+  await prisma.purchaseQualityInspectionParameter.deleteMany({ where: { tenantId } }).catch(() => {})
   await prisma.purchaseQualityInspectionLine.deleteMany({ where: { tenantId } })
   await prisma.purchaseQualityInspection.deleteMany({ where: { tenantId } })
   await prisma.purchaseReturnLine.deleteMany({ where: { tenantId } })

@@ -1,10 +1,11 @@
 /**
- * Maintenance V1 UAT harness — happy path + external + failed test + concurrency.
+ * Maintenance V1 UAT harness — happy path + inventory ISSUE + external + failed test + concurrency.
  *
  * Usage (from backend/):
  *   npx tsx scripts/test-maintenance-v1.ts
  */
 import { prisma } from '../src/config/prisma.js'
+import { postStockMovement } from '../src/modules/inventory/shared/stock-posting.service.js'
 import {
   addPart,
   closeReadiness,
@@ -73,6 +74,7 @@ async function main() {
   })
   console.log('Created', created.ticketNumber, created.status)
   assert(created.status === 'REPORTED', 'status REPORTED')
+  assert(created.inventoryPostingPending === false, 'no inventory pending on create')
   assert(Boolean(created.operatorName), 'operator name captured')
   assert(Boolean(created.reportedLocationLabel), 'location label captured')
   const m1 = await prisma.manufacturingMachine.findUnique({ where: { id: machine.id } })
@@ -114,6 +116,9 @@ async function main() {
     qty: 2,
     unitCost: 4250,
   })
+  const afterFreeTextPart = await getTicket(tenantId, created.id)
+  assert(afterFreeTextPart.inventoryPostingPending === false, 'free-text part does not leave inventory pending')
+  assert(afterFreeTextPart.parts[0]?.inventoryMovementId == null, 'free-text part has no movement')
 
   await prisma.maintenanceAttachment.create({
     data: {
@@ -160,6 +165,137 @@ async function main() {
 
   const history = await getMachineHistory(tenantId, machine.id)
   assert(history.ticketCount >= 1, 'history has tickets')
+
+  // ── Inventory ISSUE for spare parts ───────────────────────────────────
+  const warehouse = await prisma.masterWarehouse.findFirst({
+    where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+    orderBy: { code: 'asc' },
+  })
+  assert(warehouse, 'No active warehouse for spare ISSUE test')
+
+  const spareItem = await prisma.masterItem.findFirst({
+    where: {
+      tenantId,
+      deletedAt: null,
+      isStockable: true,
+      isBlocked: false,
+      status: 'ACTIVE',
+      batchTracked: false,
+      serialTracked: false,
+    },
+    orderBy: { code: 'asc' },
+  })
+  assert(spareItem, 'No stockable non-batch/serial item for spare ISSUE test')
+
+  const openingKey = `MT_UAT_OPN:${spareItem.id}:${warehouse.id}:${Date.now()}`
+  await postStockMovement({
+    tenantId,
+    itemId: spareItem.id,
+    warehouseId: warehouse.id,
+    movementType: 'OPENING',
+    referenceType: 'OPN',
+    quantity: 10,
+    rate: 100,
+    referenceNo: 'MT-UAT-OPENING',
+    remarks: 'Maintenance UAT opening stock for spare ISSUE',
+    idempotencyKey: openingKey,
+    createdBy: user.id,
+  })
+
+  await prisma.manufacturingMachine.update({
+    where: { id: machine.id },
+    data: { status: 'AVAILABLE' },
+  })
+
+  const issueTicket = await createTicket(fakeReq, tenantId, {
+    machineId: machine.id,
+    problem: 'UAT: inventory ISSUE spare path',
+    priority: 'NORMAL',
+    operatorName: 'UAT Operator',
+  })
+  await startRepair(fakeReq, tenantId, issueTicket.id, {
+    technicianType: 'INTERNAL',
+    technicianUserId: user.id,
+    technicianName: 'UAT Tech',
+    operatorName: 'UAT Operator',
+  })
+
+  const balanceBefore = await prisma.inventoryStockBalance.findFirst({
+    where: { tenantId, itemId: spareItem.id, warehouseId: warehouse.id },
+  })
+  const onHandBefore = Number(balanceBefore?.onHandQty ?? 0)
+
+  const withIssue = await addPart(fakeReq, tenantId, issueTicket.id, {
+    itemId: spareItem.id,
+    warehouseId: warehouse.id,
+    description: `${spareItem.code} — ${spareItem.name}`,
+    qty: 2,
+    unitCost: 100,
+  })
+  const issuedPart = withIssue.parts.find((p) => p.itemId === spareItem.id)
+  assert(issuedPart?.inventoryMovementId, 'stockable part posts inventory movement')
+  assert(withIssue.inventoryPostingPending === false, 'inventory posting not pending after ISSUE')
+
+  const movement = await prisma.inventoryStockMovement.findUnique({
+    where: { id: issuedPart!.inventoryMovementId! },
+  })
+  assert(movement?.referenceType === 'ISSUE_TO_MAINTENANCE', 'referenceType ISSUE_TO_MAINTENANCE')
+  assert(movement?.referenceNo === issueTicket.ticketNumber, 'referenceNo = ticket number')
+  assert(Number(movement?.quantity) === -2, `issue qty -2 got ${movement?.quantity}`)
+
+  const costEntry = await prisma.inventoryCostEntry.findFirst({
+    where: { tenantId, inventoryMovementId: movement!.id },
+  })
+  assert(costEntry, 'cost entry created for maintenance ISSUE')
+  assert(costEntry?.sourceType === 'ISSUE_TO_MAINTENANCE', 'cost entry sourceType')
+
+  const balanceAfter = await prisma.inventoryStockBalance.findFirst({
+    where: { tenantId, itemId: spareItem.id, warehouseId: warehouse.id },
+  })
+  assert(Number(balanceAfter?.onHandQty ?? 0) === onHandBefore - 2, 'on-hand decremented by ISSUE qty')
+  console.log('Inventory ISSUE path PASS', {
+    ticket: issueTicket.ticketNumber,
+    movement: movement?.movementNumber,
+    onHandBefore,
+    onHandAfter: Number(balanceAfter?.onHandQty ?? 0),
+  })
+
+  let insufficientBlocked = false
+  try {
+    await addPart(fakeReq, tenantId, issueTicket.id, {
+      itemId: spareItem.id,
+      warehouseId: warehouse.id,
+      description: `${spareItem.code} — over-issue`,
+      qty: 999_999,
+      unitCost: 100,
+    })
+  } catch {
+    insufficientBlocked = true
+  }
+  assert(insufficientBlocked, 'insufficient stock fail-closed')
+
+  // Close inventory ticket so machine is free for external path
+  await updateRepair(fakeReq, tenantId, issueTicket.id, {
+    repairDetails: 'Issued spare from stock',
+    serviceDescription: 'Spare issue UAT',
+    invoiceNumber: 'INT-ISSUE-001',
+    invoiceDate: new Date().toISOString().slice(0, 10),
+  })
+  await prisma.maintenanceAttachment.create({
+    data: {
+      tenantId,
+      ticketId: issueTicket.id,
+      category: 'AFTER',
+      originalFilename: 'uat-issue.jpg',
+      storedFilename: 'uat-issue.jpg',
+      mimeType: 'image/jpeg',
+      fileSize: 1024,
+      storagePath: '/tmp/uat-issue.jpg',
+      uploadedBy: user.id,
+    },
+  })
+  await testMachine(fakeReq, tenantId, issueTicket.id, { result: 'PASS' })
+  await closeTicket(fakeReq, tenantId, issueTicket.id, {})
 
   await prisma.manufacturingMachine.update({
     where: { id: machine.id },
@@ -216,10 +352,12 @@ async function main() {
     JSON.stringify(
       {
         ticket: closed.ticketNumber,
+        issueTicket: issueTicket.ticketNumber,
         downtimeMinutes: closed.downtimeMinutes,
         totalCost: closed.totalCost,
         machineStatus: m3?.status,
         historyTickets: history.ticketCount,
+        inventoryIssue: movement?.movementNumber,
       },
       null,
       2,

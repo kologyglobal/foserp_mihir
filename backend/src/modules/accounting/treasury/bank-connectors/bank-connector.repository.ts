@@ -150,3 +150,17 @@ export async function softDeleteConnector(tenantId: string, id: string, updatedB
     },
   })
 }
+
+/** ENABLED connectors with a non-empty scheduleCron (for the 5D4 cron worker). */
+export async function listScheduledEnabledConnectors(take = 200): Promise<BankConnector[]> {
+  return prisma.bankConnector.findMany({
+    where: {
+      ...notDeleted(),
+      status: 'ENABLED',
+      scheduleCron: { not: null },
+      NOT: { scheduleCron: '' },
+    },
+    take,
+    orderBy: [{ lastSyncAt: 'asc' }, { code: 'asc' }],
+  })
+}

@@ -123,6 +123,7 @@ export const closeTicketSchema = z.object({
 
 export const addPartSchema = z.object({
   itemId: z.string().uuid().optional(),
+  warehouseId: z.string().uuid().optional(),
   description: z.string().trim().min(1).max(300),
   qty: z.coerce.number().positive(),
   unitCost: z.coerce.number().min(0).default(0),

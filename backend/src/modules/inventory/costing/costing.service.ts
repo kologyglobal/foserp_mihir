@@ -24,6 +24,108 @@ function asObject(value: unknown): Record<string, unknown> {
     : {}
 }
 
+/**
+ * Surfaces FIN-CLOSE-1 Inventory↔GL trial-balance totals on costing recon/overview.
+ * Never invents ₹0 GL when accounting is off; never exposes Force Balance.
+ */
+async function resolveInventoryGlSummary(tenantId: string): Promise<{
+  accountingEnabled: boolean
+  legalEntityId: string | null
+  glInventoryValue: number | null
+  difference: number | null
+  glReconciliation: string
+  glReconciliationReason: string
+  note: string
+  forceBalanceAllowed: false
+  inventoryGlPath: string
+  trialBalance: {
+    asOfDate: string
+    rmStatus: string | null
+    fgStatus: string | null
+    differences: number
+    absoluteDifference: string
+  } | null
+}> {
+  const {
+    resolveInventoryLegalEntityId,
+    isInventoryAccountingEnabled,
+  } = await import('../accounting/inventory-accounting-gate.service.js')
+  const legalEntityId = await resolveInventoryLegalEntityId(tenantId)
+  if (!legalEntityId) {
+    return {
+      accountingEnabled: false,
+      legalEntityId: null,
+      glInventoryValue: null,
+      difference: null,
+      glReconciliation: 'Not Available',
+      glReconciliationReason: 'No active legal entity for Inventory↔GL trial balance.',
+      note: 'Physical stock ↔ OPEN cost layers (FIFO/Specific). Inventory↔GL requires a legal entity + INVENTORY_ACCOUNTING.',
+      forceBalanceAllowed: false,
+      inventoryGlPath: '/accounting/inventory-gl-reconciliation',
+      trialBalance: null,
+    }
+  }
+
+  const enabled = await isInventoryAccountingEnabled(tenantId, legalEntityId)
+  if (!enabled) {
+    return {
+      accountingEnabled: false,
+      legalEntityId,
+      glInventoryValue: null,
+      difference: null,
+      glReconciliation: 'Not Available',
+      glReconciliationReason:
+        'Inventory Accounting is not enabled. Enable INVENTORY_ACCOUNTING and open Inventory↔GL for trial balance.',
+      note: 'Physical stock ↔ OPEN cost layers (FIFO/Specific). GL is not shown as ₹0 while accounting is off.',
+      forceBalanceAllowed: false,
+      inventoryGlPath: '/accounting/inventory-gl-reconciliation',
+      trialBalance: null,
+    }
+  }
+
+  const { buildInventoryGlTrialBalance } = await import(
+    '../../accounting/inventory-gl-reconciliation/inventory-gl-trial-balance.service.js'
+  )
+  const tb = await buildInventoryGlTrialBalance(tenantId, { legalEntityId })
+  const invRows = tb.rows.filter(
+    (r) => r.mappingKey === 'RAW_MATERIAL_INVENTORY' || r.mappingKey === 'FINISHED_GOODS_INVENTORY',
+  )
+  const glInventoryValue = invRows.reduce((s, r) => s + Number(r.glBalance), 0)
+  const operationalInventory = invRows.reduce((s, r) => s + Number(r.operationalBalance), 0)
+  const difference = operationalInventory - glInventoryValue
+  const invDifferences = invRows.filter((r) => r.status === 'DIFFERENCE' || r.status === 'UNMAPPED').length
+  const glReconciliation =
+    invDifferences > 0
+      ? 'Difference'
+      : invRows.every((r) => r.status === 'MATCHED')
+        ? 'Matched'
+        : invRows.some((r) => r.status === 'WARNING')
+          ? 'Warning'
+          : 'Available'
+
+  return {
+    accountingEnabled: true,
+    legalEntityId,
+    glInventoryValue,
+    difference,
+    glReconciliation,
+    glReconciliationReason:
+      invDifferences > 0
+        ? 'Operational inventory stock value differs from mapped RM/FG GL control accounts (see Inventory↔GL).'
+        : 'Operational RM+FG stock value ties to mapped GL control accounts within tolerance. Force Balance is not allowed.',
+    note: 'Physical stock ↔ OPEN cost layers (FIFO/Specific). Inventory↔GL trial balance is live via /accounting/inventory-gl-reconciliation (no Force Balance).',
+    forceBalanceAllowed: false,
+    inventoryGlPath: '/accounting/inventory-gl-reconciliation',
+    trialBalance: {
+      asOfDate: tb.asOfDate,
+      rmStatus: tb.rows.find((r) => r.mappingKey === 'RAW_MATERIAL_INVENTORY')?.status ?? null,
+      fgStatus: tb.rows.find((r) => r.mappingKey === 'FINISHED_GOODS_INVENTORY')?.status ?? null,
+      differences: tb.totals.differences,
+      absoluteDifference: tb.totals.absoluteDifference,
+    },
+  }
+}
+
 function mapCostEntry(
   row: {
     id: string
@@ -514,6 +616,7 @@ export async function reconcileValuation(tenantId: string, query: ValuationRecon
   const filtered = query.mismatchesOnly ? rows.filter((r) => r.status === 'MISMATCHED') : rows
   const inventoryValue = balances.reduce((s, b) => s + Number(b.stockValue), 0)
   const stockQty = balances.reduce((s, b) => s + Number(b.onHandQty), 0)
+  const glSummary = await resolveInventoryGlSummary(tenantId)
   return {
     valuationMethod: method,
     total: filtered.length,
@@ -521,18 +624,20 @@ export async function reconcileValuation(tenantId: string, query: ValuationRecon
     summary: {
       stockQuantity: stockQty,
       inventoryCostValue: inventoryValue,
-      glInventoryValue: null,
-      difference: null,
+      glInventoryValue: glSummary.glInventoryValue,
+      difference: glSummary.difference,
       uncostedMovements,
       unidentifiedOpenLayers,
       missingStandardItems: missingStandardItemIds.length,
-      unpostedAccountingEvents: null,
+      unpostedAccountingEvents: glSummary.trialBalance?.differences ?? null,
       failedCostingEvents: 0,
-      accountingEnabled: false,
-      glReconciliation: 'Not Available',
-      glReconciliationReason:
-        'Inventory Accounting is not enabled / GL integration is not yet available.',
-      note: 'Physical stock ↔ OPEN cost layers (FIFO/Specific). Inventory↔GL trial balance is deferred — GL is not shown as ₹0.',
+      accountingEnabled: glSummary.accountingEnabled,
+      glReconciliation: glSummary.glReconciliation,
+      glReconciliationReason: glSummary.glReconciliationReason,
+      note: glSummary.note,
+      forceBalanceAllowed: glSummary.forceBalanceAllowed,
+      inventoryGlPath: glSummary.inventoryGlPath,
+      inventoryGlTrialBalance: glSummary.trialBalance,
     },
     items: filtered,
     ranAt: new Date().toISOString(),
@@ -977,7 +1082,7 @@ export async function getCostingOverview(tenantId: string) {
       unreconciledValue: recon.items
         .filter((i) => i.status === 'MISMATCHED')
         .reduce((s, i) => s + Math.abs(Number(i.valueDifference)), 0),
-      glDifference: null as number | null,
+      glDifference: recon.summary.difference,
       openLayers,
       openLayerValue: Number(openLayerAgg._sum.remainingValue ?? 0),
       costEntryCount: entryCount,
@@ -993,8 +1098,12 @@ export async function getCostingOverview(tenantId: string) {
     },
     attention,
     accounting: {
-      enabled: false,
-      note: 'Inventory↔GL reconciliation deferred until inventory accounting trial balance is live.',
+      enabled: recon.summary.accountingEnabled,
+      glReconciliation: recon.summary.glReconciliation,
+      glInventoryValue: recon.summary.glInventoryValue,
+      note: recon.summary.note,
+      inventoryGlPath: recon.summary.inventoryGlPath,
+      forceBalanceAllowed: false as const,
     },
     manufacturing: {
       note: 'WO material costs consume Inventory Cost Entries — open Manufacturing Costing for WO detail.',
@@ -1538,8 +1647,11 @@ export async function previewValuationMethodChange(
   checks.push({
     code: 'GL_INTEGRATION',
     severity: 'WARNING',
-    message: 'Inventory↔GL trial balance is deferred; method change does not post GL revaluation',
+    message:
+      'Method change does not post GL revaluation. Review Inventory↔GL trial balance after the change if Inventory Accounting is enabled.',
   })
+
+  const glSummary = await resolveInventoryGlSummary(tenantId)
 
   const severityRank = { PASS: 0, WARNING: 1, BLOCKED: 2 }
   let overall: ReadinessSeverity = 'PASS'
@@ -1573,8 +1685,11 @@ export async function previewValuationMethodChange(
     },
     financialDifference: {
       inventoryValueDelta: 0,
-      glImpact: 'Not Available',
-      glImpactReason: 'Inventory Accounting is not enabled / GL integration is not yet available.',
+      glImpact: glSummary.accountingEnabled ? glSummary.glReconciliation : 'Not Available',
+      glImpactReason: glSummary.glReconciliationReason,
+      glInventoryValue: glSummary.glInventoryValue,
+      forceBalanceAllowed: false as const,
+      inventoryGlPath: glSummary.inventoryGlPath,
     },
     permissions: {
       preview: 'inventory.view_cost (or inventory.view / stock.view)',

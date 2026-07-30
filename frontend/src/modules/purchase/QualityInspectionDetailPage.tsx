@@ -401,10 +401,10 @@ export function QualityInspectionDetailPage() {
         </div>
       </ErpCardSection>
 
-      <ErpCardSection title="Parameters" defaultOpen={!isApiMode()}>
-        {isApiMode() && parameters.length === 0 ? (
+      <ErpCardSection title="Parameters" defaultOpen>
+        {parameters.length === 0 ? (
           <p className="text-sm text-erp-muted">
-            Parameter checklists are not persisted on the API yet. Record observations in Remarks.
+            No parameter checklist on this inspection yet. Save after create seeds Visual / Documentation defaults.
           </p>
         ) : (
         <div className="overflow-x-auto">
@@ -427,7 +427,7 @@ export function QualityInspectionDetailPage() {
                   <td className="px-2 py-2">{p.parameter}</td>
                   <td className="px-2 py-2">{p.specification}</td>
                   <td className="px-2 py-2">
-                    {canEdit && !isApiMode() ? (
+                    {canEdit ? (
                       <Input
                         type="number"
                         className="w-20"
@@ -446,7 +446,7 @@ export function QualityInspectionDetailPage() {
                     )}
                   </td>
                   <td className="px-2 py-2">
-                    {canEdit && !isApiMode() ? (
+                    {canEdit ? (
                       <Input
                         type="number"
                         className="w-20"

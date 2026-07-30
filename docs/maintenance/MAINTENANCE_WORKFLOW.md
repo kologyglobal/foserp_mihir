@@ -7,7 +7,7 @@
 2. **Upload Photos** — up to four photographs (also allowed during repair)
 3. **Start Maintenance / Assign** — Internal User/Technician **or** External Contractor/Vendor + Operator Name  
    → `IN_REPAIR`, Machine `UNDER_MAINTENANCE`
-4. **Parts Changed** — Item Name, Qty, Remarks (+ optional cost)
+4. **Parts Changed** — Stockable item + warehouse posts inventory ISSUE; or free-text ticket-only line (+ optional cost / shortage)
 5. **Service Performed** — service description + invoice number/date + service amount
 6. **Close Ticket** — blocked until photos, technician/contractor, parts/service details, invoice number, and amount are present  
    → `CLOSED`, Machine `AVAILABLE` (if no other open ticket)

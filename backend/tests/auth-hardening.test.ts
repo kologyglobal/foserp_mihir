@@ -9,7 +9,11 @@ import { prisma } from '../src/config/prisma.js'
 import { AUTH_MSG, LOGIN_LOCKOUT_THRESHOLD } from '../src/modules/auth/auth.messages.js'
 
 const app = createApp()
-let dbAvailable = false
+
+const dbAvailable = await prisma
+  .$queryRaw`SELECT 1`
+  .then(() => true)
+  .catch(() => false)
 
 const slug = `auth-a1-${Date.now()}`
 let tenantId = ''
@@ -18,13 +22,7 @@ let suspendedSlug = ''
 let suspendedTenantId = ''
 
 beforeAll(async () => {
-  try {
-    await prisma.$queryRaw`SELECT 1`
-    dbAvailable = true
-  } catch {
-    dbAvailable = false
-    return
-  }
+  if (!dbAvailable) return
 
   const tenant = await prisma.tenant.create({
     data: {
@@ -129,9 +127,16 @@ describe('A1 auth hardening', () => {
   })
 
   it.skipIf(!dbAvailable)('successful login resets lockout counters', async () => {
+    // Lockout may also set status=BLOCKED via failedLoginCount — clear the full lock surface.
     await prisma.user.updateMany({
       where: { tenantId, email: userEmail },
-      data: { failedLoginAttempts: 0, lockedUntil: null },
+      data: {
+        status: 'ACTIVE',
+        failedLoginAttempts: 0,
+        failedLoginCount: 0,
+        lockedUntil: null,
+        lockedAt: null,
+      },
     })
 
     const res = await request(app).post('/api/v1/auth/login').send({

@@ -110,14 +110,26 @@ export function buildVendorInvoiceAccountingPreview(params: BuildVendorInvoiceAc
         sourceLineNumber: line.lineNumber,
         costCentreId: line.costCentreId,
       })
-      const variance = toDecimal(grir.varianceAmount)
-      if (isPositive(variance)) {
-        pushLine('PURCHASE_PRICE_VARIANCE', 'DEBIT', formatForPersistence(variance), `Price variance — ${line.description}`, {
+      const inventoryAdjustment = toDecimal(grir.inventoryAdjustmentAmount)
+      if (isPositive(inventoryAdjustment)) {
+        pushLine('RAW_MATERIAL_INVENTORY', 'DEBIT', formatForPersistence(inventoryAdjustment), `Retro cost adjustment — ${line.description}`, {
           sourceLineNumber: line.lineNumber,
           costCentreId: line.costCentreId,
         })
-      } else if (isNegative(variance)) {
-        pushLine('PURCHASE_PRICE_VARIANCE', 'CREDIT', formatForPersistence(variance.abs()), `Price variance — ${line.description}`, {
+      } else if (isNegative(inventoryAdjustment)) {
+        pushLine('RAW_MATERIAL_INVENTORY', 'CREDIT', formatForPersistence(inventoryAdjustment.abs()), `Retro cost adjustment — ${line.description}`, {
+          sourceLineNumber: line.lineNumber,
+          costCentreId: line.costCentreId,
+        })
+      }
+      const ppv = toDecimal(grir.ppvAmount)
+      if (isPositive(ppv)) {
+        pushLine('PURCHASE_PRICE_VARIANCE', 'DEBIT', formatForPersistence(ppv), `Price variance — ${line.description}`, {
+          sourceLineNumber: line.lineNumber,
+          costCentreId: line.costCentreId,
+        })
+      } else if (isNegative(ppv)) {
+        pushLine('PURCHASE_PRICE_VARIANCE', 'CREDIT', formatForPersistence(ppv.abs()), `Price variance — ${line.description}`, {
           sourceLineNumber: line.lineNumber,
           costCentreId: line.costCentreId,
         })

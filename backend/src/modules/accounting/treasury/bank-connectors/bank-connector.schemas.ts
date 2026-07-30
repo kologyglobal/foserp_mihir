@@ -9,7 +9,7 @@ import {
 
 const configJsonSchema = z
   .object({
-    mode: z.enum(['SANDBOX', 'LIVE']).optional(),
+    mode: z.enum(['SANDBOX', 'SIMULATED', 'LIVE']).optional(),
     expectedFormat: z.enum(BANK_CONNECTOR_EXPECTED_FORMATS).optional(),
     remotePath: z.string().trim().max(500).optional(),
     fileNamePattern: z.string().trim().max(200).optional(),

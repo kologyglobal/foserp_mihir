@@ -44,5 +44,17 @@ router.post(
   requirePermission('finance.financial_year.manage'),
   controller.closeFinancialYear,
 )
+router.get(
+  '/:id/year-end-preview',
+  validateParams(uuidParamSchema),
+  requirePermission('finance.financial_year.view'),
+  controller.previewYearEndClose,
+)
+router.post(
+  '/:id/year-end-close',
+  validateParams(uuidParamSchema),
+  requirePermission('finance.financial_year.manage'),
+  controller.executeYearEndClose,
+)
 
 export default router

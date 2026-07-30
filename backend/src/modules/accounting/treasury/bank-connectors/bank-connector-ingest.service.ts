@@ -2,7 +2,6 @@
  * Phase 5D2 — ingest a fetched statement file into BankStatement via existing parsers.
  * sourceType = BANK_API. Reuses MT940 / CAMT.053 structured parse + duplicate guards.
  */
-import type { Request } from 'express'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { prisma } from '../../../../config/prisma.js'
@@ -36,11 +35,11 @@ function extensionFor(format: 'MT940' | 'CAMT_053', fileName: string): string {
 }
 
 export async function ingestConnectorFetchedFile(args: {
-  req: Request
   tenantId: string
   legalEntityId: string
   treasuryAccountId: string
   connectorId: string
+  uploadedBy: string | null
   file: BankConnectorFetchedFile
 }): Promise<{
   statementId: string
@@ -48,7 +47,7 @@ export async function ingestConnectorFetchedFile(args: {
   lineCount: number
   skippedDuplicate: boolean
 }> {
-  const { req, tenantId, legalEntityId, treasuryAccountId, file } = args
+  const { tenantId, legalEntityId, treasuryAccountId, uploadedBy, file } = args
   const importFormat = toImportFormat(file.formatHint)
   const fileChecksum = computeFileChecksum(file.buffer)
 
@@ -122,7 +121,7 @@ export async function ingestConnectorFetchedFile(args: {
     batchReference,
     sourceType: 'BANK_API',
     importFormat,
-    uploadedBy: req.context?.userId ?? null,
+    uploadedBy,
     originalFileName: file.fileName,
     sanitisedFileName: sanitiseFileName(file.fileName),
     fileSizeBytes: file.buffer.length,
@@ -149,7 +148,7 @@ export async function ingestConnectorFetchedFile(args: {
     statementUniquenessKey: uniquenessKey,
     importFormat,
     sourceType: 'BANK_API',
-    createdBy: req.context?.userId ?? null,
+    createdBy: uploadedBy,
   })
 
   let lineNumber = 0

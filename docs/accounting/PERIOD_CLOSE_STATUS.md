@@ -1,6 +1,6 @@
 # Period Close — Status
 
-Last verified: **2026-07-23** (Close Control Hardening).
+Last verified: **2026-07-30** (Year-end P&L → retained earnings slice).
 
 ## Phase 1 — shipped
 
@@ -14,7 +14,8 @@ Dual-mode workspace at `/accounting/period-close` that **actually** closes/reope
 | **Inventory Close** | Seed KPIs | Live inventory accounting event counts + gate status |
 | **Manufacturing Close** | Seed KPIs | Live mfg workspace summary (unposted/failed/WIP/close-ready) |
 | **Bank Reconciliation Status** | Seed KPIs | Live open recon session count from close-readiness |
-| Other screens (calendar, accruals, year-end, FA/GST close, …) | Demo scaffolding | Still demo / empty — later phases |
+| **Year-End Closing** | Seed preview only | **Live** P&L → `RETAINED_EARNINGS` via `POST …/financial-years/:id/year-end-close`; FY lock hardened |
+| Other screens (calendar, accruals, prepaid, FX reval, reopen-request workflow) | Demo scaffolding | Still demo / empty — later phases |
 
 ### Permissions
 
@@ -24,6 +25,7 @@ Reuse existing backend keys — **no** parallel `accounting.period_close.*` API 
 - `finance.period.manage` (under review, checklist acks)
 - `finance.period.close`
 - `finance.period.reopen`
+- Year-end preview/execute: `finance.financial_year.view` / `finance.financial_year.manage`
 
 FE demo role packs still use `accounting.period_close.*` for mock gating only.
 
@@ -38,6 +40,9 @@ FE demo role packs still use `accounting.period_close.*` for mock gating only.
 | Mark under review | `POST` | `/api/v1/t/:slug/accounting/periods/:id/mark-under-review` |
 | Close | `POST` | `/api/v1/t/:slug/accounting/periods/:id/close` |
 | Reopen | `POST` | `/api/v1/t/:slug/accounting/periods/:id/reopen` `{ reason }` |
+| **Year-end preview** | `GET` | `/api/v1/t/:slug/accounting/financial-years/:id/year-end-preview` |
+| **Year-end close** | `POST` | `/api/v1/t/:slug/accounting/financial-years/:id/year-end-close` |
+| **Lock FY** | `POST` | `/api/v1/t/:slug/accounting/financial-years/:id/close` (requires all periods CLOSED + year-end run) |
 
 Readiness is **backend-authoritative** (`period-close-readiness.service.ts`). FE maps `PASS | WARN | BLOCK` into the Period Close UI.
 
@@ -52,18 +57,27 @@ Readiness is **backend-authoritative** (`period-close-readiness.service.ts`). FE
 
 Closing a period sets `AccountingPeriod.status = CLOSED`. The posting engine rejects journals into closed periods (`ACCOUNTING_PERIOD_CLOSED`) — covered by `finance-posting-engine.test.ts` and period close/reopen lifecycle in `finance-setup.test.ts` / `period-close-hardening.test.ts`.
 
+### Year-end slice (2026-07-30)
+
+1. Close all periods **except** the last (`OPEN`/`REOPENED` required for posting).
+2. `POST …/year-end-close` posts a SYSTEM `JOURNAL` that zeros INCOME/EXPENSE into mapped `RETAINED_EARNINGS` (idempotent `YearEndCloseRun`).
+3. Close the last period.
+4. `POST …/financial-years/:id/close` locks the FY (blocked until year-end run exists + all periods CLOSED).
+
+Continuous GL carries balance-sheet balances forward — **no** opening-balance voucher in this slice.
+
 ### FE verification
 
 ```bash
 cd frontend && npx tsx scripts/verify-period-close.ts
-# or, if wired:
+# or:
 npm run test:period-close
 ```
 
 ### BE verification
 
 ```bash
-cd backend && npx vitest run tests/finance/period-close-hardening.test.ts
+cd backend && npx vitest run tests/finance/period-close-hardening.test.ts tests/finance/finance-year-end-close.test.ts --no-file-parallelism
 ```
 
 ---
@@ -78,10 +92,10 @@ cd backend && npx vitest run tests/finance/period-close-hardening.test.ts
 ## Still deferred
 
 - Accruals / prepaid / FX revaluation posting wizards
-- Year-end close wizard (P&L transfer, opening balances)
 - Configurable close checklist templates + calendar (persisted)
 - Module soft/hard locks beyond whole-period GL lock
 - Reopen **request** approval workflow (today: direct reopen with reason)
+- Opening-balance voucher for greenfield ledgers (not required for continuous GL)
 
 ---
 

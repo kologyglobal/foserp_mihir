@@ -323,6 +323,7 @@ export async function validateVendorInvoiceForPosting(
       vendorPayableAccountId: vendorPayable.accountId,
       financialYearId: resolvedPeriod.financialYear.id,
       expectedUpdatedAt,
+      retroCostPlan: calc.grirReleasePlan,
     },
   }
 }

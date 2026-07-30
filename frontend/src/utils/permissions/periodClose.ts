@@ -120,8 +120,12 @@ export function usePeriodClosePermissions() {
         canMarkUnderReview: canManage,
         canReopenRequest: canReopen,
         canApproveReopen: canReopen,
-        canYearEndPreview: canView,
-        canApproveYearEnd: false,
+        canYearEndPreview:
+          canView ||
+          hasFinancePermission('finance.financial_year.view') ||
+          hasWorkspaceAdminRole(),
+        canApproveYearEnd:
+          hasFinancePermission('finance.financial_year.manage') || hasWorkspaceAdminRole(),
         canExport: canView,
         canManageSetup: canManage,
         canViewAudit: canView,

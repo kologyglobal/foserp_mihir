@@ -79,6 +79,32 @@ check(
 check('UAT-01.7', 'Login/logout', 'Login page supports sign-in + forgot + reset views', loginPage.includes("'signin'") && loginPage.includes("'forgot'") && loginPage.includes("'reset'"))
 check('UAT-01.8', 'Login/logout', 'Logout API wired in AuthProvider', read('src/context/AuthProvider.tsx').includes('authApi.logout'))
 
+const changePasswordPage = read('src/modules/auth/ChangePasswordPage.tsx')
+const profileSettings = read('src/modules/settings/ProfileSettingsPage.tsx')
+const userMenu = read('src/components/layout/UserMenuDropdown.tsx')
+const platformRoutes = read('src/routes/platformRoutes.tsx')
+
+check(
+  'UAT-01.8a',
+  'Self-service',
+  'Change password route + page wired',
+  authRoutes.includes('account/change-password') && changePasswordPage.includes('changePassword'),
+)
+check(
+  'UAT-01.8b',
+  'Self-service',
+  'Profile settings route + updateProfile + changePassword',
+  platformRoutes.includes('settings/profile') &&
+    profileSettings.includes('updateProfile') &&
+    profileSettings.includes('changePassword'),
+)
+check(
+  'UAT-01.8c',
+  'Self-service',
+  'User menu exposes Edit profile and Change password',
+  userMenu.includes('/settings/profile') && userMenu.includes('/account/change-password'),
+)
+
 // ─── Session persistence ─────────────────────────────────────────────────────
 
 const { getStoredSession, setStoredSession } = await import('../src/services/api/client')

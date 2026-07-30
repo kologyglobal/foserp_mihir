@@ -5,15 +5,17 @@
 
 ## Incoming GRN Quality readiness
 
-**Verdict: BLOCKED BY MISSING GRN FOUNDATION**
+**Verdict: READY** — Purchase GRN + Purchase QI are the SoT for incoming material QC.
 
 | Check | Result |
 |-------|--------|
-| Prisma Goods Receipt / Purchase Receipt | Not present (Purchase backend = requisitions only) |
-| Inventory adapter with reliable PO/supplier/receipt-line FKs | Not reliable enough (`InventoryStockMovement` has `GRN` reference enum only) |
-| Fake GRN inside Quality | **Not created** (explicitly forbidden) |
+| Prisma Goods Receipt | Present (`goods_receipts`) |
+| Purchase QI | `purchase_quality_inspections` + lines + parameter checklist |
+| Fake GRN inside Quality | **Not created** (correct) |
 
-Incoming Quality API returns `{ ready: false, code: 'PURCHASE_RECEIPT_FOUNDATION_REQUIRED' }`.
+Incoming Quality API returns `{ ready: true, code: 'PURCHASE_INCOMING_QC_AVAILABLE', items, counts }`.
+
+See [INCOMING_QUALITY_WORKFLOW.md](./INCOMING_QUALITY_WORKFLOW.md) and [QUALITY_SCOPE_AND_DEFERRALS.md](./QUALITY_SCOPE_AND_DEFERRALS.md).
 
 Continue with: Production in-process/final, Job Work return QC, plans/revisions, NCR disposition, certificates, workspace KPIs.
 
@@ -61,20 +63,17 @@ Continue with: Production in-process/final, Job Work return QC, plans/revisions,
 
 ## Deferred
 
-- Purchase GRN / incoming release against real receipts
-- Supplier debit note / AP claim / Purchase return workflow
+- CAPA / audits / calibration / SPC / supplier scorecards (see QUALITY_SCOPE_AND_DEFERRALS)
+- Supplier debit note / AP claim polish (Purchase/Accounting)
 - Customer RMA / complaints
-- Advanced AQL / SPC / LIMS / calibration scheduling
 - Quality cost accounting / automatic GL
 - Automatic vendor rating deductions
 - Policy B Quality-Hold FG release end-to-end UI polish
-
-## Next phase
-
-**PHASE 7C — Dispatch and Sales Order fulfilment** (do not start in 7B).
+- Merging Purchase QI free-form checklist into manufacturing `QualityParameter` masters
 
 ## Related docs
 
+- [QUALITY_SCOPE_AND_DEFERRALS.md](./QUALITY_SCOPE_AND_DEFERRALS.md)
 - [QUALITY_INSPECTION_PLAN_RULES.md](./QUALITY_INSPECTION_PLAN_RULES.md)
 - [INCOMING_QUALITY_WORKFLOW.md](./INCOMING_QUALITY_WORKFLOW.md)
 - [PRODUCTION_QUALITY_GATES.md](./PRODUCTION_QUALITY_GATES.md)

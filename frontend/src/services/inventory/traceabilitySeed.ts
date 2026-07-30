@@ -38,7 +38,7 @@ function genId(prefix: string) {
 function mapRefTypeToLedgerType(refType: string, qty: number): ItemLedgerTransactionType {
   if (refType === 'OPN') return 'opening_balance'
   if (refType === 'GRN' || refType === 'INW' || refType === 'FG_RECEIPT' || refType === 'SUBCON_IN') return 'receipt'
-  if (refType === 'ISS' || refType === 'ISSUE_TO_WO' || refType === 'FG_DISPATCH' || refType === 'SUBCON_OUT') return 'issue'
+  if (refType === 'ISS' || refType === 'ISSUE_TO_WO' || refType === 'FG_DISPATCH' || refType === 'SUBCON_OUT' || refType === 'ISSUE_TO_MAINTENANCE') return 'issue'
   if (refType === 'ADJ' && qty > 0) return 'adjustment_in'
   if (refType === 'ADJ' && qty < 0) return 'adjustment_out'
   if (refType === 'WIP_TRANSFER' && qty > 0) return 'transfer_in'
@@ -51,6 +51,7 @@ function documentHref(refType: string, refNo: string): string | null {
   if (refNo.startsWith('IS-')) return `/inventory/movements/issues/${refNo}`
   if (refType === 'GRN') return `/purchase/grn`
   if (refType === 'ISSUE_TO_WO' || refType === 'FG_RECEIPT') return `/work-orders`
+  if (refType === 'ISSUE_TO_MAINTENANCE') return `/maintenance/tickets`
   return null
 }
 

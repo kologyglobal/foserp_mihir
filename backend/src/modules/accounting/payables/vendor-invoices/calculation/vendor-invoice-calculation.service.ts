@@ -82,6 +82,7 @@ function assembleResult(
   accountingPreview: VendorInvoiceAccountingPreview,
   validation: VendorInvoiceCalculationValidation,
   input: VendorInvoiceCalculationInput,
+  grirReleasePlan: ReturnType<typeof emptyGrirReleasePlan>,
 ): VendorInvoiceCalculationResult {
   return {
     calculationVersion: VENDOR_INVOICE_CALCULATION_VERSION,
@@ -96,6 +97,7 @@ function assembleResult(
     accountingPreview,
     validation,
     snapshot: buildSnapshot(amounts, input, duplicateAssessment, accountReadiness, accountingPreview, validation),
+    grirReleasePlan,
   }
 }
 
@@ -197,7 +199,15 @@ export async function calculateVendorInvoice(
     accountingPreview,
   })
 
-  return assembleResult(amounts, duplicateAssessment, accountReadiness, accountingPreview, validation, input)
+  return assembleResult(
+    amounts,
+    duplicateAssessment,
+    accountReadiness,
+    accountingPreview,
+    validation,
+    input,
+    grirReleasePlan,
+  )
 }
 
 /**
@@ -236,5 +246,13 @@ export function calculateVendorInvoiceSync(input: VendorInvoiceCalculationInput)
     accountingPreview,
   })
 
-  return assembleResult(amounts, duplicateAssessment, accountReadiness, accountingPreview, validation, input)
+  return assembleResult(
+    amounts,
+    duplicateAssessment,
+    accountReadiness,
+    accountingPreview,
+    validation,
+    input,
+    emptyGrirReleasePlan(),
+  )
 }

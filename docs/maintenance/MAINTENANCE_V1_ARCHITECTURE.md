@@ -1,6 +1,6 @@
 # Maintenance V1 — Architecture
 
-**Status:** Controlled pilot candidate  
+**Status:** READY (ticket lifecycle + spare ISSUE)  
 **Module flag:** `maintenance` (depends on `manufacturing`)  
 **Central document:** Maintenance Ticket (`MT-######`)
 
@@ -87,6 +87,7 @@ API mode only (`VITE_USE_API=true`). Demo mode shows API-required page (no demo 
 
 ## Inventory / Purchase
 
-- V1 records parts with `inventoryPostingPending=true` — **no stock ISSUE ledger posting yet**
-- Part shortage → link to Purchase Requisition create (`Source: MAINTENANCE` in notes)
-- No Maintenance PO
+- Stockable spare lines (`itemId` + `warehouseId`) post Inventory ISSUE via `postStockMovement` with `referenceType=ISSUE_TO_MAINTENANCE`, `referenceNo=ticketNumber`; fail-closed on insufficient stock
+- Free-text / non-stockable lines remain ticket-only (no silent “posted” claim)
+- Part shortage → Create PR deep-link (`source=MAINTENANCE` + purpose/remarks); no Maintenance PO
+- PM scheduler deferred

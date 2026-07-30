@@ -37,6 +37,7 @@ export type InventoryReferenceType =
   | 'QUALITY_RELEASE'
   | 'QUALITY_HOLD'
   | 'QUALITY_REJECT'
+  | 'ISSUE_TO_MAINTENANCE'
 
 export type InventoryReservationDemandType = 'SO' | 'WO' | 'DISPATCH'
 export type InventoryReservationStatus = 'ACTIVE' | 'FULFILLED' | 'CANCELLED'

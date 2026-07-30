@@ -324,12 +324,18 @@ export interface CloseDashboardData {
 
 export interface YearEndPreview {
   fiscalYear: string
+  financialYearId?: string
   revenueToClose: number
   expenseToClose: number
   profitOrLoss: number
   retainedEarningsAccount: string
   exceptions: string[]
   unresolvedDifferences: number
+  readyToPost?: boolean
+  alreadyClosed?: boolean
+  blockers?: Array<{ code: string; message: string }>
+  voucherNumber?: string | null
+  postingDate?: string
 }
 
 export interface CloseReportDef {

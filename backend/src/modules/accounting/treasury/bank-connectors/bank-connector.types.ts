@@ -8,8 +8,8 @@ import type { BankConnectorExpectedFormat, BankConnectorProbeStatusCode } from '
 
 /** Non-secret connector config. Credentials are env refs only (credentialEnvKey = env var name). */
 export interface BankConnectorConfigJson {
-  /** SANDBOX = local filesystem; LIVE = REST/SFTP. */
-  mode?: 'SANDBOX' | 'LIVE'
+  /** SANDBOX/SIMULATED = local filesystem drop folder; LIVE = REST/SFTP/real AIS. */
+  mode?: 'SANDBOX' | 'SIMULATED' | 'LIVE'
   expectedFormat?: BankConnectorExpectedFormat
   remotePath?: string
   fileNamePattern?: string
@@ -134,7 +134,7 @@ export function toBankConnectorDto(
   if (row.status === 'DISABLED') connectionLabel = 'Disabled'
   else if (row.status === 'ERROR' || row.lastTestStatus === 'ERROR') connectionLabel = 'Error'
   else if (isLiveConnected) connectionLabel = 'Connected'
-  else if (row.provider === 'OPEN_BANKING' || row.provider === 'MANUAL_FILE') connectionLabel = 'Coming soon'
+  else if (row.provider === 'MANUAL_FILE') connectionLabel = 'Coming soon'
   else connectionLabel = 'Not connected'
 
   return {

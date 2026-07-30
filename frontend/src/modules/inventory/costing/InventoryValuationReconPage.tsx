@@ -140,8 +140,19 @@ export function InventoryValuationReconPage() {
                   GL reconciliation:{' '}
                   <strong>
                     {(data.summary as { glReconciliation?: string }).glReconciliation ??
-                      (data.summary.glInventoryValue == null ? 'Not Available' : formatCurrency(data.summary.glInventoryValue))}
+                      (data.summary.glInventoryValue == null
+                        ? 'Not Available'
+                        : formatCurrency(data.summary.glInventoryValue))}
                   </strong>
+                  {data.summary.glInventoryValue != null ? (
+                    <span className="ml-1 tabular-nums text-erp-muted">
+                      ({formatCurrency(data.summary.glInventoryValue)}
+                      {data.summary.difference != null
+                        ? ` · Δ ${formatCurrency(data.summary.difference)}`
+                        : ''}
+                      )
+                    </span>
+                  ) : null}
                 </span>
               </>
             ) : null}
@@ -160,7 +171,8 @@ export function InventoryValuationReconPage() {
 
       <div className="border-b border-erp-border px-3 py-2 text-[12px] text-erp-muted">
         Compares physical stock balances to OPEN cost layers. Run Reconciliation refreshes the read model — it does not
-        force-balance or rewrite posted costs. Inventory↔GL trial balance remains deferred.
+        force-balance or rewrite posted costs. When Inventory Accounting is enabled, summary GL totals come from the
+        Inventory↔GL trial balance (RM+FG control accounts); open that hub for WIP/GR-IR detail.
         {data?.summary?.note ? ` ${data.summary.note}` : ''}
       </div>
 

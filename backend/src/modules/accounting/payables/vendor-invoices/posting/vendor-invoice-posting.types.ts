@@ -56,6 +56,7 @@ export interface VendorInvoicePostingValidationContext {
   vendorPayableAccountId: string
   financialYearId: string
   expectedUpdatedAt: string
+  retroCostPlan: import('../calculation/vendor-invoice-grir-release.service.js').VendorInvoiceGrirReleasePlan
 }
 
 export function buildVendorInvoicePostEventKey(vendorInvoiceId: string): string {

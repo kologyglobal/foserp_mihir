@@ -36,13 +36,14 @@ Also covered previously: FIFO layers, FIFO return restore, specific ID, Phase C 
 
 | Item | Status |
 |------|--------|
-| Live SPA controlled UAT checklist | Open |
-| Performance 10k movements | Not run |
-| Purchase return × 4 methods matrix | Deferred |
-| Dispatch relief × 4 methods matrix | Deferred |
-| Dedicated method-change approve permission | Deferred |
-| Inventory ↔ GL trial balance | Deferred by design |
+| Live SPA controlled UAT checklist | **API harness substitute shipped 2026-07-30** (`npm run test:inventory-costing-spa-uat`); residual human browser walk optional |
+| Performance 10k movements | Accepted deferral (not a READY blocker) |
+| Purchase return × 4 methods matrix | Accepted deferral — engine path exists; full matrix follow-on |
+| Dispatch relief × 4 methods matrix | Accepted deferral — engine path exists; COGS GL separate |
+| Dedicated method-change approve permission | Accepted deferral — reuses `inventory.setup.manage` |
+| Inventory ↔ GL trial balance | **CLOSED 2026-07-30** — FIN-CLOSE-1 hub + costing recon wiring + `npm run test:inventory-gl-recon-live` |
+| Purchase invoice retro cost adjustment | **Out of scope for Inventory Costing** — tracked under Purchase / FIN-CLOSE-1 outside stop |
 
 ## Final verdict
 
-**READY WITH CONDITIONS**
+**READY** (2026-07-30) — automated 4-method golden paths + SPA UAT API harness + Inventory↔GL TB wiring/parity proof. Residual human browser walk optional. Purchase-return/dispatch matrices, 10k soak, and invoice retro cost remain separate accepted deferrals / purchase items.

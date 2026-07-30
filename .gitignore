@@ -49,6 +49,7 @@ dist/
 dist-ssr/
 build/
 coverage/
+*.tsbuildinfo
 # Hostinger deployment output (generated from frontend/dist)
 backend/public/
 backend/.public-next/

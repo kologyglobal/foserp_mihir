@@ -7,6 +7,10 @@
 ```bash
 cd backend
 npx vitest run tests/inventory-costing-uat1-controlled.test.ts --pool=forks --maxWorkers=1
+# SPA UAT API harness (same checklist flows):
+npm run test:inventory-costing-spa-uat
+# Inventory↔GL parity (requires INVENTORY_ACCOUNTING + MySQL):
+npm run test:inventory-gl-recon-live
 ```
 
 Requires MySQL. Fixtures create isolated tenants and clean up after (best-effort).
@@ -74,10 +78,14 @@ Requires MySQL. Fixtures create isolated tenants and clean up after (best-effort
 
 User: Inventory Manager (`inventory.view_cost` + `inventory.setup.manage` for writes)
 
+**Automated API substitute (2026-07-30):** `npm run test:inventory-costing-spa-uat` walks overview, cost entries, layers, recon, method-change preview, and transfer cost preserve via HTTP/API. That is the accepted READY-gate substitute for live SPA UAT.
+
+**Residual human step (optional product sign-off — not a READY blocker):**
+
 1. Open `/inventory/costing` — overview totals load.
 2. MA History — before/after columns populated after MA posts.
 3. Standard Costs — search item by code/name (no UUID box).
-4. Reconciliation — Inventory value shown; **GL reconciliation: Not Available** (not ₹0).
+4. Reconciliation — Inventory value shown; when Inventory Accounting is **off**, GL = **Not Available** (not ₹0); when **on**, GL totals from Inventory↔GL TB (link to `/accounting/inventory-gl-reconciliation`).
 5. Method Change — cannot apply without readiness step; blockers listed from API.
 
 ---

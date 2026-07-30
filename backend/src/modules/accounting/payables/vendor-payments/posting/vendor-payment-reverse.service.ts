@@ -172,7 +172,11 @@ async function cascadeReverseActiveAllocations(args: {
     const batch = await args.tx.payableAllocationBatch.findFirstOrThrow({
       where: { id: batchId, tenantId: args.tenantId },
     })
-    const idempotencyKey = `CASCADE:${args.paymentId}:${batchId}:${args.eventKey}`
+    const idempotencyKey = `CASCADE:${hashPayload({
+      paymentId: args.paymentId,
+      batchId,
+      eventKey: args.eventKey,
+    })}`
     const payloadHash = hashPayload({
       tenantId: args.tenantId,
       legalEntityId: args.legalEntityId,

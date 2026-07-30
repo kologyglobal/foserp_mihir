@@ -55,10 +55,20 @@ async function main() {
   check('API checklist-acks path', apiSrc.includes('/checklist-acks'))
   check('API close path', apiSrc.includes('/close'))
   check('API reopen path', apiSrc.includes('/reopen'))
+  check('API year-end preview path', apiSrc.includes('/year-end-preview'))
+  check('API year-end close path', apiSrc.includes('/year-end-close'))
 
   const beRoutes = read('../backend/src/modules/accounting/accounting-periods/accounting-period.routes.ts')
   check('BE close-readiness route', beRoutes.includes('close-readiness'))
   check('BE checklist-acks route', beRoutes.includes('checklist-acks'))
+
+  const beFyRoutes = read('../backend/src/modules/accounting/financial-years/financial-year.routes.ts')
+  check('BE year-end-preview route', beFyRoutes.includes('year-end-preview'))
+  check('BE year-end-close route', beFyRoutes.includes('year-end-close'))
+
+  const beYearEnd = read('../backend/src/modules/accounting/financial-years/year-end-close.service.ts')
+  check('BE year-end P&L close service', beYearEnd.includes('executeYearEndClose'))
+  check('BE year-end RETAINED_EARNINGS mapping', beYearEnd.includes('RETAINED_EARNINGS'))
 
   const beReadiness = read('../backend/src/modules/accounting/accounting-periods/period-close-readiness.service.ts')
   check('BE assertCloseAllowed', beReadiness.includes('assertCloseAllowed'))
@@ -68,11 +78,14 @@ async function main() {
   check('Permissions map finance.period.view', permsSrc.includes('finance.period.view'))
   check('Permissions map finance.period.close', permsSrc.includes('finance.period.close'))
   check('Permissions map finance.period.reopen', permsSrc.includes('finance.period.reopen'))
+  check('Permissions map year-end to financial_year.manage', permsSrc.includes('finance.financial_year.manage'))
 
   const lockingSrc = read('src/modules/accounting/period-close/ControlPages.tsx')
   check('Locking page closeAccountingPeriod', lockingSrc.includes('closeAccountingPeriod'))
   check('Locking page readiness blockers', lockingSrc.includes('hardBlockEnabled'))
   check('Locking page getPeriodCloseReadiness', lockingSrc.includes('getPeriodCloseReadiness'))
+  check('Year-end page executeYearEndClosing', lockingSrc.includes('executeYearEndClosing'))
+  check('Year-end page Post Year-End Closing Entries', lockingSrc.includes('Post Year-End Closing Entries'))
 
   const checklistSrc = read('src/modules/accounting/period-close/ChecklistAndReconPages.tsx')
   check('Checklist uses isApiMode', checklistSrc.includes('isApiMode'))
@@ -85,6 +98,7 @@ async function main() {
   const statusDoc = read('../docs/accounting/PERIOD_CLOSE_STATUS.md')
   check('Status doc Phase 1 shipped', statusDoc.includes('Phase 1'))
   check('Status doc hardening / Phase 2', statusDoc.includes('close-readiness') || statusDoc.includes('Hardening'))
+  check('Status doc year-end slice', statusDoc.includes('Year-end') || statusDoc.includes('year-end'))
 
   console.log(`\n${passed} passed, ${failed} failed`)
   if (failed > 0) process.exit(1)

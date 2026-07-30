@@ -62,6 +62,19 @@ const envSchema = z.object({
   /** Comma-separated hostnames allowed for live SFTP (default localhost in non-prod). */
   BANK_CONNECTOR_SFTP_ALLOWED_HOSTS: z.string().optional(),
   /**
+   * Phase 5D4 — Open Banking AIS provider mode.
+   * SIMULATED (default) = sandbox drop-folder pull after consent (GST NIC precedent).
+   * LIVE = real TPP AIS (not implemented yet → NOT_IMPLEMENTED).
+   */
+  BANK_CONNECTOR_AIS_PROVIDER: z.enum(['SIMULATED', 'LIVE']).optional().default('SIMULATED'),
+  /**
+   * Phase 5D4 — enable in-process bank connector cron (scheduleCron). Default ON outside production.
+   */
+  BANK_CONNECTOR_CRON_ENABLED: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true')),
+  /**
    * After Dispatch post, automatically create a DRAFT Sales Invoice (not posted).
    * Default ON outside production; set true/false to override.
    */

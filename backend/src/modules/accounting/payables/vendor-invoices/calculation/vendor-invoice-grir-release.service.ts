@@ -26,6 +26,18 @@ export interface VendorInvoiceGrirReleaseLine {
   grirAmount: string
   /** invoice taxable − grirAmount. Positive = paid more than received cost. */
   varianceAmount: string
+  /** Portion of variance capitalised into stock still on hand. */
+  inventoryAdjustmentAmount: string
+  /** Portion left in purchase price variance (already consumed or standard-cost stock). */
+  ppvAmount: string
+  inventoryMovementId: string
+  receiptCostEntryId: string | null
+  receiptCostLayerId: string | null
+  itemId: string
+  warehouseId: string
+  valuationMethod: string
+  receiptQuantity: string
+  releaseQuantity: string
 }
 
 export interface VendorInvoiceGrirReleasePlan {
@@ -115,9 +127,21 @@ async function loadPostedReceiptValues(
   const keys = candidates.map((c) => `grn-in:${c.goodsReceiptId}:${c.goodsReceiptLineId}`)
   const movements = await prisma.inventoryStockMovement.findMany({
     where: { tenantId, idempotencyKey: { in: keys } },
-    select: { id: true, idempotencyKey: true, quantity: true },
+    select: {
+      id: true,
+      idempotencyKey: true,
+      quantity: true,
+      itemId: true,
+      warehouseId: true,
+    },
   })
-  if (movements.length === 0) return new Map<string, { quantity: ReturnType<typeof toDecimal>; amount: ReturnType<typeof toDecimal> }>()
+  if (movements.length === 0) return new Map<string, {
+    movementId: string
+    quantity: ReturnType<typeof toDecimal>
+    amount: ReturnType<typeof toDecimal>
+    itemId: string
+    warehouseId: string
+  }>()
 
   const events = await prisma.inventoryAccountingEvent.findMany({
     where: {
@@ -131,15 +155,24 @@ async function loadPostedReceiptValues(
   })
   const amountByMovement = new Map(events.map((e) => [e.movementId as string, toDecimal(e.amount)]))
 
-  const byKey = new Map<string, { quantity: ReturnType<typeof toDecimal>; amount: ReturnType<typeof toDecimal> }>()
+  const byKey = new Map<string, {
+    movementId: string
+    quantity: ReturnType<typeof toDecimal>
+    amount: ReturnType<typeof toDecimal>
+    itemId: string
+    warehouseId: string
+  }>()
   for (const movement of movements) {
     if (!movement.idempotencyKey) continue
     const amount = amountByMovement.get(movement.id)
     // No POSTED GRN_INWARD event ⇒ no GR/IR balance exists for this receipt line.
     if (!amount) continue
     byKey.set(movement.idempotencyKey, {
+      movementId: movement.id,
       quantity: toDecimal(movement.quantity).abs(),
       amount,
+      itemId: movement.itemId,
+      warehouseId: movement.warehouseId,
     })
   }
   return byKey
@@ -191,6 +224,47 @@ export async function resolveVendorInvoiceGrirReleasePlan(
       ? remainingValue
       : toDecimal(formatDecimal4(multiply(unitCost, releaseQty)))
     const varianceAmount = subtract(toDecimal(candidate.taxableAmount), grirAmount)
+    const [costEntry, balance] = await Promise.all([
+      prisma.inventoryCostEntry.findFirst({
+        where: { tenantId: params.tenantId, inventoryMovementId: receipt.movementId },
+        select: {
+          id: true,
+          valuationMethod: true,
+          costLayerId: true,
+          costLayer: {
+            select: { originalQuantity: true, remainingQuantity: true },
+          },
+        },
+      }),
+      prisma.inventoryStockBalance.findFirst({
+        where: {
+          tenantId: params.tenantId,
+          itemId: receipt.itemId,
+          warehouseId: receipt.warehouseId,
+        },
+        select: { onHandQty: true },
+      }),
+    ])
+    const method = costEntry?.valuationMethod ?? 'MOVING_WEIGHTED_AVERAGE'
+    let onHandRatio = toDecimal(0)
+    if (method === 'FIFO' || method === 'SPECIFIC_IDENTIFICATION') {
+      const original = toDecimal(costEntry?.costLayer?.originalQuantity ?? 0).abs()
+      const remaining = toDecimal(costEntry?.costLayer?.remainingQuantity ?? 0).abs()
+      onHandRatio = original.greaterThan(0)
+        ? divide(remaining.greaterThan(original) ? original : remaining, original)
+        : toDecimal(0)
+    } else if (method === 'MOVING_WEIGHTED_AVERAGE') {
+      // Moving average is fungible and has no receipt layers. Capitalise no more than
+      // the invoiced receipt quantity that can still be represented by current on-hand.
+      const available = toDecimal(balance?.onHandQty ?? 0).abs()
+      const attributable = available.greaterThan(releaseQty) ? releaseQty : available
+      onHandRatio = releaseQty.greaterThan(0) ? divide(attributable, releaseQty) : toDecimal(0)
+    }
+    const inventoryAdjustmentAmount =
+      method === 'STANDARD_COST'
+        ? toDecimal(0)
+        : toDecimal(formatDecimal4(multiply(varianceAmount, onHandRatio)))
+    const ppvAmount = subtract(varianceAmount, inventoryAdjustmentAmount)
 
     lines.push({
       lineNumber: candidate.lineNumber,
@@ -198,6 +272,16 @@ export async function resolveVendorInvoiceGrirReleasePlan(
       goodsReceiptLineId: candidate.goodsReceiptLineId,
       grirAmount: formatDecimal4(grirAmount),
       varianceAmount: formatDecimal4(varianceAmount),
+      inventoryAdjustmentAmount: formatDecimal4(inventoryAdjustmentAmount),
+      ppvAmount: formatDecimal4(ppvAmount),
+      inventoryMovementId: receipt.movementId,
+      receiptCostEntryId: costEntry?.id ?? null,
+      receiptCostLayerId: costEntry?.costLayerId ?? null,
+      itemId: receipt.itemId,
+      warehouseId: receipt.warehouseId,
+      valuationMethod: method,
+      receiptQuantity: formatDecimal4(receipt.quantity),
+      releaseQuantity: formatDecimal4(releaseQty),
     })
   }
 

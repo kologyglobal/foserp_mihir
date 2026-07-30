@@ -19,6 +19,7 @@ export type StockReferenceType =
   | 'FG_DISPATCH'
   | 'SUBCON_OUT'
   | 'SUBCON_IN'
+  | 'ISSUE_TO_MAINTENANCE'
 
 export interface StockMovement {
   id: string

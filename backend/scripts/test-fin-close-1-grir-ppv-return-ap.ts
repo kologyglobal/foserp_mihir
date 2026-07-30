@@ -10,6 +10,7 @@ import request from 'supertest'
 import { createApp } from '../src/app.js'
 import { prisma } from '../src/config/prisma.js'
 import { PERMISSIONS } from '../src/constants/permissions.js'
+import { buildInventoryGlTrialBalance } from '../src/modules/accounting/inventory-gl-reconciliation/inventory-gl-trial-balance.service.js'
 import {
   createSentPo,
   createSubmittedGrn,
@@ -245,6 +246,23 @@ async function bootstrapFinance(tenantId: string, legalEntityId: string) {
     },
     update: { isActive: true },
   })
+  await prisma.financeNumberSeries.upsert({
+    where: {
+      legalEntityId_documentType: {
+        legalEntityId,
+        documentType: 'REVERSAL',
+      },
+    },
+    create: {
+      tenantId,
+      legalEntityId,
+      documentType: 'REVERSAL',
+      prefix: 'RV-',
+      padLength: 6,
+      isActive: true,
+    },
+    update: { isActive: true },
+  })
 
   await prisma.financeFeatureControl.upsert({
     where: {
@@ -414,6 +432,12 @@ async function main() {
     .set(auth)
     .send({ expectedUpdatedAt: ready.body.data.updatedAt })
   assert(viPost.status === 200, 'Vendor Invoice GL post failed', viPost.body)
+  const viReplay = await request(app)
+    .post(`${viBase}/${vendorInvoiceId}/post`)
+    .set(auth)
+    .send({ expectedUpdatedAt: ready.body.data.updatedAt })
+  assert(viReplay.status === 200, 'Vendor Invoice idempotent replay failed', viReplay.body)
+  assert(viReplay.body.data.idempotentReplay === true, 'Vendor Invoice replay was not idempotent', viReplay.body)
 
   const viLedger = await prisma.generalLedgerEntry.findMany({
     where: {
@@ -429,7 +453,30 @@ async function main() {
     .filter((line) => line.accountId === accounts.ppv.id)
     .reduce((sum, line) => sum + Number(line.debitAmount) - Number(line.creditAmount), 0)
   assert(invoiceGrirDebit === 1000, 'Vendor Invoice did not release GR/IR at receipt cost', viLedger)
-  assert(ppvDebit === 100, 'Vendor Invoice did not debit PPV by invoice-receipt difference', viLedger)
+  const inventoryDebit = viLedger
+    .filter((line) => line.accountId === accounts.rawMaterial.id)
+    .reduce((sum, line) => sum + Number(line.debitAmount) - Number(line.creditAmount), 0)
+  assert(inventoryDebit === 100, 'Vendor Invoice did not capitalise full on-hand price delta', viLedger)
+  assert(ppvDebit === 0, 'Full on-hand price delta must not remain in PPV', viLedger)
+  const retroEntry = await prisma.inventoryCostEntry.findFirst({
+    where: {
+      tenantId: maker.tenantId,
+      sourceType: 'PURCHASE_INVOICE_COST_ADJUSTMENT',
+      sourceId: vendorInvoiceId,
+    },
+  })
+  assert(retroEntry && Number(retroEntry.totalCost) === 100, 'Retro cost entry missing or wrong', retroEntry)
+  const stockAfterRetro = await prisma.inventoryStockBalance.findFirst({
+    where: {
+      tenantId: maker.tenantId,
+      itemId: masters.itemId,
+      warehouseId: masters.warehouseId,
+    },
+  })
+  assert(Number(stockAfterRetro?.stockValue) === 1100, 'Inventory value was not revalued to invoice cost', stockAfterRetro)
+  const inventoryGl = await buildInventoryGlTrialBalance(maker.tenantId, { legalEntityId })
+  const rmRow = inventoryGl.rows.find((row) => row.mappingKey === 'RAW_MATERIAL_INVENTORY')
+  assert(rmRow?.status === 'MATCHED', 'Inventory did not tie to GL after retro cost adjustment', rmRow)
 
   const grirBalance = await prisma.generalLedgerEntry.aggregate({
     where: {
@@ -510,6 +557,62 @@ async function main() {
     },
   )
 
+  const viBeforeReverse = await request(app).get(`${viBase}/${vendorInvoiceId}`).set(auth)
+  assert(viBeforeReverse.status === 200, 'Vendor Invoice detail before reversal failed', viBeforeReverse.body)
+  const reversed = await request(app)
+    .post(`${viBase}/${vendorInvoiceId}/reverse`)
+    .set(auth)
+    .send({
+      reversalDate: new Date().toISOString().slice(0, 10),
+      reason: 'FIN-CLOSE-1 retro cost reversal after partial consumption',
+      idempotencyKey: `fin-close-retro-reverse-${vendorInvoiceId}`,
+      expectedUpdatedAt: viBeforeReverse.body.data.updatedAt,
+    })
+  assert(reversed.status === 200, 'Vendor Invoice reversal failed', reversed.body)
+  const retroReversal = await prisma.inventoryCostEntry.findFirst({
+    where: {
+      tenantId: maker.tenantId,
+      sourceType: 'PURCHASE_INVOICE_COST_ADJUSTMENT_REVERSAL',
+      sourceId: vendorInvoiceId,
+    },
+  })
+  assert(
+    retroReversal && Number(retroReversal.totalCost) === -80,
+    'Retro reversal must remove only the delta still represented by eight on-hand units',
+    retroReversal,
+  )
+  const stockAfterReverse = await prisma.inventoryStockBalance.findFirstOrThrow({
+    where: {
+      tenantId: maker.tenantId,
+      itemId: masters.itemId,
+      warehouseId: masters.warehouseId,
+    },
+  })
+  assert(
+    Number(stockAfterReverse.stockValue) === 800,
+    'Vendor Invoice reversal did not restore remaining stock to GRN cost',
+    stockAfterReverse,
+  )
+  const reversalLedger = await prisma.generalLedgerEntry.findMany({
+    where: {
+      tenantId: maker.tenantId,
+      voucherId: reversed.body.data.reversalVoucherId as string,
+    },
+  })
+  const reversalPpvCredit = reversalLedger
+    .filter((line) => line.accountId === accounts.ppv.id)
+    .reduce((sum, line) => sum + Number(line.creditAmount) - Number(line.debitAmount), 0)
+  assert(
+    reversalPpvCredit === 20,
+    'Consumed retro delta was not reclassified to PPV on reversal',
+    reversalLedger,
+  )
+  const reverseInventoryGl = await buildInventoryGlTrialBalance(maker.tenantId, { legalEntityId })
+  const reverseRmRow = reverseInventoryGl.rows.find(
+    (row) => row.mappingKey === 'RAW_MATERIAL_INVENTORY',
+  )
+  assert(reverseRmRow?.status === 'MATCHED', 'Inventory did not tie to GL after reversal', reverseRmRow)
+
   console.log('\nFIN-CLOSE-1 LIVE MYSQL ROUND TRIP — PASS')
   console.log(`Tenant: ${maker.slug} (${maker.tenantId})`)
   console.log(`Legal entity: ${legalEntityId}`)
@@ -517,12 +620,13 @@ async function main() {
   console.log(`GRN: ${grn.grnId} — GR/IR credit ₹${grnGrirCredit.toFixed(2)}`)
   console.log(`Purchase Invoice: ${purchaseInvoiceId}`)
   console.log(
-    `Vendor Invoice: ${vendorInvoiceId} — GR/IR debit ₹${invoiceGrirDebit.toFixed(2)}, PPV debit ₹${ppvDebit.toFixed(2)}`,
+    `Vendor Invoice: ${vendorInvoiceId} — GR/IR debit ₹${invoiceGrirDebit.toFixed(2)}, inventory retro ₹${inventoryDebit.toFixed(2)}, PPV debit ₹${ppvDebit.toFixed(2)}`,
   )
   console.log(`GR/IR net: ₹${grirNet.toFixed(2)}`)
   console.log(
     `Purchase Return: ${returnId} → Vendor Debit Note ${adjustment.draftReference} (${adjustment.id}) ₹${Number(adjustment.adjustmentGrandTotal).toFixed(2)}`,
   )
+  console.log('Vendor Invoice reversal: inventory retro ₹80.00 reversed; consumed ₹20.00 reclassified to PPV')
 }
 
 main()

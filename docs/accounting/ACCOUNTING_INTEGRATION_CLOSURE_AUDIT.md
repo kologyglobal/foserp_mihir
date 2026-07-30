@@ -3,7 +3,7 @@
 > **Phase:** FIN-CLOSE-1  
 > **Audit date:** 2026-07-29  
 > **Rule:** Code is source of truth. Status-matrix docs that lag AP/Bank & Cash are noted; this audit follows live Prisma + services + routes.  
-> **Status:** AUDIT COMPLETE — FIN-CLOSE-1 **stop condition met** for scoped chains (GR/IR + Return→AP live; Inventory↔GL / WIP↔GL recon; Dispatch→AR Invoice Ready polish). Explicitly deferred outside stop: purchase invoice **retro cost adjustment**; Hostinger migrate deploy.
+> **Status:** CODE CLOSURE MET — scoped chains plus purchase invoice **retro cost adjustment** are live-verified. Hostinger migrate deploy remains a human production action.
 
 ---
 
@@ -25,7 +25,7 @@ Core accounting ownership is already in place:
 
 1. ~~**Purchase Return → AP**~~ — **done** (VENDOR_DEBIT_NOTE draft handoff; live PASS)
 2. ~~**Formal GR/IR clearing**~~ — **done** (`GRIR_CLEARING` + VI release + PPV; live PASS)
-3. **Purchase invoice retro cost adjustment** — **deferred past stop** (additive cost entry only; never mutate original)
+3. ~~**Purchase invoice retro cost adjustment**~~ — **done 2026-07-30** (additive immutable cost entry; remaining stock vs PPV split; reversal)
 4. ~~**Inventory ↔ GL trial balance**~~ — **done** (`/accounting/inventory-gl-reconciliation`; no Force Balance)
 5. ~~**WIP ↔ GL TB**~~ — **done** (same recon hub)
 6. ~~**Unified failed-events / Finance recon hub**~~ — **done** (Inv + Mfg FAILED/RECORDED + retry)
@@ -107,9 +107,9 @@ For each gap: existing surface → missing → duplication risk → migration �
 | Field | Finding |
 |-------|---------|
 | **Existing** | Receipt cost ≈ PO `unitCostPrimary` → `InventoryCostEntry` via `postStockMovement`. `correctionOfId` on cost entry exists but unused for PI path. Doc code: `PURCHASE_INVOICE_COST_ADJUSTMENT_DEFERRED`. |
-| **Missing** | Controlled call into Inventory Costing adjustment by valuation method (FIFO remaining / MA / Standard→PPV / Specific); immutable original receipt; link PI→GRN→cost entry→adjustment→accounting event. |
+| **Implemented** | Vendor Invoice calculation resolves the GRN receipt cost entry/layer. FIFO/Specific use exact remaining layer ratio; Moving Average capitalises attributable current on-hand; Standard remains PPV. Posting creates an additive `InventoryCostEntry` correction and updates the existing costing authority; original receipt is immutable. |
 | **Duplication risk** | Editing original cost entry; inventing purchase-side valuation. |
-| **Reuse approach** | Inventory Costing service owns method rules; Accounting posts variance/clearing via events. Mapping candidate: reuse `PRODUCTION_VARIANCE` only if inappropriate — prefer **new or existing purchase variance** (today **no `PURCHASE_PRICE_VARIANCE` key** — must add or map to approved key after product choice). |
+| **Reuse approach** | Inventory Costing owns valuation changes; the Vendor Invoice voucher splits the receipt delta between `RAW_MATERIAL_INVENTORY` and `PURCHASE_PRICE_VARIANCE`. Idempotent movement/cost-entry keys prevent duplicate adjustments. Reversal removes the delta still on hand and reclassifies already-consumed delta to PPV. |
 
 ---
 
@@ -326,10 +326,9 @@ Do **not** mark FIN-CLOSE-1 complete if:
 **Audit status: COMPLETE.**  
 **Implementation status: FIN-CLOSE-1 STOP** — scoped chains closed (GR/IR + Return→AP live; Inventory↔GL / WIP↔GL + failed events; Dispatch→AR Invoice Ready polish). Do **not** continue into deferred statutory / advanced Finance or Money In/Out redesign from this phase.
 
-**Explicitly still open (outside stop — do not start unless asked):**
+**Explicitly still open as human/optional work:**
 
-- Purchase invoice **retro cost adjustment** (additive `InventoryCostEntry` / layer value; never mutate original receipt entry)
-- Hostinger migrate deploy of `20260729160000_fin_close_1_grir_ppv_return_ap`
+- Hostinger migrate deploy of `20260729160000_fin_close_1_grir_ppv_return_ap` and newer migrations, then run `scripts/map-fin-close-1-grir-ppv.ts`
 - GR/IR ageing report (nice-to-have; not a stop blocker)
 
 ---

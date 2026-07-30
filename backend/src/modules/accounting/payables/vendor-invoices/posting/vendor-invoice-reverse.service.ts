@@ -6,7 +6,7 @@ import { AuthorizationError } from '../../../../../utils/errors.js'
 import { validateReversalEligibility } from '../../../ledger/ledger.validators.js'
 import { post, buildPostedResult } from '../../../posting/posting.service.js'
 import type { PostingContext, PostingRequest, PostingRequestLine, PostingResult } from '../../../posting/posting.types.js'
-import { formatForPersistence, isZero, toDecimal } from '../../../shared/finance-decimal.js'
+import { convertToBase, formatForPersistence, isZero, toDecimal } from '../../../shared/finance-decimal.js'
 import { parseDateOnly } from '../../../shared/finance.helpers.js'
 import { hashPayload } from '../../../shared/payload-hash.js'
 import {
@@ -27,6 +27,80 @@ import {
   mapPostingErrorToVendorInvoiceReversalError,
 } from './vendor-invoice-posting.errors.js'
 import { buildVendorInvoiceReverseEventKey } from './vendor-invoice-posting.types.js'
+import {
+  planPurchaseInvoiceRetroCostReversal,
+  reversePurchaseInvoiceRetroCostInTx,
+  type PurchaseInvoiceRetroReversalPlan,
+} from '../../../../inventory/costing/purchase-invoice-retro-cost.service.js'
+
+async function applyRetroCostReversalSplit(
+  tenantId: string,
+  legalEntityId: string,
+  vendorInvoiceId: string,
+  request: PostingRequest,
+  plan: PurchaseInvoiceRetroReversalPlan,
+): Promise<void> {
+  const reallocations = plan.lines.filter((line) => !isZero(line.ppvReclassificationAmount))
+  if (!reallocations.length) return
+  const [mappings, sourceLines] = await Promise.all([
+    prisma.defaultAccountMapping.findMany({
+      where: {
+        tenantId,
+        legalEntityId,
+        mappingKey: { in: ['RAW_MATERIAL_INVENTORY', 'PURCHASE_PRICE_VARIANCE'] },
+      },
+    }),
+    prisma.vendorInvoiceLine.findMany({
+      where: { tenantId, legalEntityId, vendorInvoiceId },
+      select: { id: true, lineNumber: true },
+    }),
+  ])
+  const inventoryAccountId = mappings.find((row) => row.mappingKey === 'RAW_MATERIAL_INVENTORY')?.accountId
+  const ppvAccountId = mappings.find((row) => row.mappingKey === 'PURCHASE_PRICE_VARIANCE')?.accountId
+  if (!inventoryAccountId || !ppvAccountId) {
+    throw new VendorInvoiceReversalEligibilityError(
+      'Retro cost reversal requires RAW_MATERIAL_INVENTORY and PURCHASE_PRICE_VARIANCE mappings',
+    )
+  }
+  const sourceLineByNumber = new Map(sourceLines.map((row) => [row.lineNumber, row.id]))
+  let nextLineNumber = request.lines.reduce((max, line) => Math.max(max, line.lineNumber), 0)
+  for (const allocation of reallocations) {
+    const sourceLineId = sourceLineByNumber.get(allocation.sourceLineNumber)
+    const line = request.lines.find(
+      (row) =>
+        row.accountId === inventoryAccountId &&
+        row.referenceDocumentLineId === sourceLineId,
+    )
+    if (!line) throw new VendorInvoiceReversalEligibilityError('Retro cost inventory reversal line missing')
+    const amount = toDecimal(allocation.ppvReclassificationAmount).abs()
+    const debitSide = toDecimal(line.debitAmount).greaterThan(0)
+    if (debitSide) {
+      line.debitAmount = formatForPersistence(toDecimal(line.debitAmount).minus(amount))
+      line.baseDebitAmount = formatForPersistence(convertToBase(line.debitAmount, request.exchangeRate ?? '1'))
+    } else {
+      line.creditAmount = formatForPersistence(toDecimal(line.creditAmount).minus(amount))
+      line.baseCreditAmount = formatForPersistence(convertToBase(line.creditAmount, request.exchangeRate ?? '1'))
+    }
+    nextLineNumber += 1
+    request.lines.push({
+      ...line,
+      lineNumber: nextLineNumber,
+      accountId: ppvAccountId,
+      debitAmount: debitSide ? formatForPersistence(amount) : '0.0000',
+      creditAmount: debitSide ? '0.0000' : formatForPersistence(amount),
+      baseDebitAmount: debitSide
+        ? formatForPersistence(convertToBase(amount, request.exchangeRate ?? '1'))
+        : '0.0000',
+      baseCreditAmount: debitSide
+        ? '0.0000'
+        : formatForPersistence(convertToBase(amount, request.exchangeRate ?? '1')),
+      lineNarration: 'Reversal: consumed retro cost reclassified to purchase price variance',
+    })
+  }
+  request.lines = request.lines.filter(
+    (line) => !isZero(line.debitAmount) || !isZero(line.creditAmount),
+  )
+}
 
 function hasPerm(req: Request, permission: string): boolean {
   const perms = req.context?.permissions ?? []
@@ -172,7 +246,11 @@ async function cascadeReverseActiveAllocations(args: {
     const batch = await args.tx.payableAllocationBatch.findFirstOrThrow({
       where: { id: batchId, tenantId: args.tenantId },
     })
-    const idempotencyKey = `CASCADE:${args.invoiceId}:${batchId}:${args.eventKey}`
+    const idempotencyKey = `CASCADE:${hashPayload({
+      invoiceId: args.invoiceId,
+      batchId,
+      eventKey: args.eventKey,
+    })}`
     const payloadHash = hashPayload({
       tenantId: args.tenantId,
       legalEntityId: args.legalEntityId,
@@ -406,12 +484,24 @@ export async function reverseVendorInvoice(
   const voucherLines = await prisma.accountingVoucherLine.findMany({
     where: { voucherId: originalVoucher.id, tenantId: context.tenantId },
   })
+  const retroReversalPlan = await planPurchaseInvoiceRetroCostReversal(prisma, {
+    tenantId: context.tenantId,
+    legalEntityId: invoice.legalEntityId,
+    vendorInvoiceId: invoice.id,
+  })
   const postingRequest = buildReversalPostingRequest(
     originalVoucher,
     voucherLines,
     invoice,
     input.reason,
     input.reversalDate,
+  )
+  await applyRetroCostReversalSplit(
+    context.tenantId,
+    invoice.legalEntityId,
+    invoice.id,
+    postingRequest,
+    retroReversalPlan,
   )
 
   const postingContext: PostingContext = {
@@ -510,6 +600,15 @@ export async function reverseVendorInvoice(
         await tx.accountingVoucher.update({
           where: { id: voucherId, tenantId: postCtx.tenantId },
           data: { reversalOfVoucherId: originalVoucher.id, reversalReason: input.reason },
+        })
+
+        await reversePurchaseInvoiceRetroCostInTx(tx, {
+          tenantId: postCtx.tenantId,
+          legalEntityId: invoice.legalEntityId,
+          vendorInvoiceId: invoice.id,
+          postingDate: reversalDateValue,
+          actorId: postCtx.userId ?? null,
+          plan: retroReversalPlan,
         })
 
         const updated = await tx.vendorInvoice.updateMany({

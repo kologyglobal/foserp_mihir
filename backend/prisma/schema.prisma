@@ -192,6 +192,7 @@ model Tenant {
   financialYears                         FinancialYear[]
   accountingPeriods                      AccountingPeriod[]
   periodCloseChecklistAcks               PeriodCloseChecklistAck[]
+  yearEndCloseRuns                       YearEndCloseRun[]
   accounts                               Account[]
   defaultAccountMappings                 DefaultAccountMapping[]
   financeSettings                        FinanceSettings[]
@@ -437,9 +438,10 @@ model Tenant {
   purchaseApprovalTiers           PurchaseApprovalTier[]
   purchaseInspectionCategories    PurchaseInspectionCategory[]
   purchaseApproverLimits          PurchaseApproverLimit[]
-  purchaseQualityInspections      PurchaseQualityInspection[]
-  purchaseQualityInspectionLines  PurchaseQualityInspectionLine[]
-  manufacturingQualityInspections ManufacturingQualityInspection[]
+  purchaseQualityInspections           PurchaseQualityInspection[]
+  purchaseQualityInspectionLines       PurchaseQualityInspectionLine[]
+  purchaseQualityInspectionParameters  PurchaseQualityInspectionParameter[]
+  manufacturingQualityInspections      ManufacturingQualityInspection[]
   purchaseInvoices                PurchaseInvoice[]
   purchaseInvoiceLines            PurchaseInvoiceLine[]
   purchaseReturns                 PurchaseReturn[]
@@ -2512,6 +2514,7 @@ model MasterWarehouse {
   purchaseSettingsDefault            PurchaseSettings[]        @relation("PurchaseSettingsDefaultWarehouse")
   purchaseSettingsRequisitionDefault PurchaseSettings[]        @relation("PurchaseSettingsRequisitionWarehouse")
   plantSettingsDefault               PurchasePlantSettings[]   @relation("PurchasePlantSettingsDefaultWarehouse")
+  maintenanceParts                   MaintenancePart[]
 
   manufacturingProfilesProduction    ManufacturingProfile[]           @relation("ProfileProductionWarehouse")
   manufacturingProfilesWip           ManufacturingProfile[]           @relation("ProfileWipWarehouse")
@@ -3193,6 +3196,7 @@ model LegalEntity {
   branches                               Branch[]
   financialYears                         FinancialYear[]
   accountingPeriods                      AccountingPeriod[]
+  yearEndCloseRuns                       YearEndCloseRun[]
   accounts                               Account[]
   defaultAccountMappings                 DefaultAccountMapping[]
   financeSettings                        FinanceSettings?
@@ -3388,6 +3392,7 @@ model FinancialYear {
   tenant               Tenant                @relation(fields: [tenantId], references: [id])
   legalEntity          LegalEntity           @relation(fields: [legalEntityId], references: [id])
   periods              AccountingPeriod[]
+  yearEndCloseRun      YearEndCloseRun?
   financeNumberSeries  FinanceNumberSeries[]
   accountingVouchers   AccountingVoucher[]
   generalLedgerEntries GeneralLedgerEntry[]
@@ -3403,6 +3408,42 @@ model FinancialYear {
   @@index([legalEntityId, startDate, endDate])
   @@index([legalEntityId, isCurrent])
   @@map("financial_years")
+}
+
+enum YearEndCloseRunStatus {
+  POSTED
+  NO_ACTIVITY
+}
+
+/// Year-end P&L close into retained earnings (one successful run per financial year).
+model YearEndCloseRun {
+  id                        String                @id @default(uuid())
+  tenantId                  String
+  legalEntityId             String
+  financialYearId           String                @unique
+  status                    YearEndCloseRunStatus
+  postingDate               DateTime              @db.Date
+  revenueTotal              Decimal               @db.Decimal(18, 4)
+  expenseTotal              Decimal               @db.Decimal(18, 4)
+  profitOrLoss              Decimal               @db.Decimal(18, 4)
+  retainedEarningsAccountId String
+  retainedEarningsCode      String                @db.VarChar(32)
+  retainedEarningsName      String                @db.VarChar(200)
+  voucherId                 String?
+  postingEventId            String?
+  voucherNumber             String?               @db.VarChar(64)
+  closedBy                  String?
+  closedAt                  DateTime              @default(now())
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  legalEntity   LegalEntity   @relation(fields: [legalEntityId], references: [id])
+  financialYear FinancialYear @relation(fields: [financialYearId], references: [id])
+
+  @@index([tenantId])
+  @@index([legalEntityId])
+  @@map("year_end_close_runs")
 }
 
 model AccountingPeriod {
@@ -6593,6 +6634,7 @@ model PurchaseQualityInspection {
   vendorId         String?
   status           QualityInspectionStatus @default(DRAFT)
   warehouseId      String?
+  inspectionPlan   String?                 @db.VarChar(300)
   remarks          String?                 @db.Text
   deviationRemarks String?                 @db.Text
   inspectedById    String?                 @db.VarChar(36)
@@ -6604,8 +6646,9 @@ model PurchaseQualityInspection {
   updatedAt        DateTime                @updatedAt
   deletedAt        DateTime?
 
-  tenant Tenant                          @relation(fields: [tenantId], references: [id])
-  lines  PurchaseQualityInspectionLine[]
+  tenant     Tenant                               @relation(fields: [tenantId], references: [id])
+  lines      PurchaseQualityInspectionLine[]
+  parameters PurchaseQualityInspectionParameter[]
 
   @@unique([tenantId, inspectionNumber])
   @@index([tenantId])
@@ -6641,6 +6684,32 @@ model PurchaseQualityInspectionLine {
   @@index([tenantId])
   @@index([tenantId, qualityInspectionId])
   @@map("purchase_quality_inspection_lines")
+}
+
+/// Free-form incoming QI parameter checklist (not linked to manufacturing QualityParameter masters).
+model PurchaseQualityInspectionParameter {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  qualityInspectionId String
+  lineNumber          Int
+  parameterName       String   @db.VarChar(200)
+  specification       String   @default("") @db.VarChar(500)
+  minValue            Decimal? @db.Decimal(18, 4)
+  maxValue            Decimal? @db.Decimal(18, 4)
+  observedValue       Decimal? @db.Decimal(18, 4)
+  unit                String   @default("") @db.VarChar(32)
+  result              String   @default("na") @db.VarChar(16)
+  remarks             String?  @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenant            Tenant                    @relation(fields: [tenantId], references: [id])
+  qualityInspection PurchaseQualityInspection @relation(fields: [qualityInspectionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, qualityInspectionId, lineNumber], map: "qi_params_tenant_qi_lineno_key")
+  @@index([tenantId])
+  @@index([tenantId, qualityInspectionId], map: "qi_params_tenant_qi_idx")
+  @@map("purchase_quality_inspection_parameters")
 }
 
 model PurchaseInvoice {
@@ -11402,6 +11471,7 @@ enum InventoryReferenceType {
   STOCK_COUNT_REVERSAL
   CONTROLLED_ADJUSTMENT
   ADJUSTMENT_REVERSAL
+  ISSUE_TO_MAINTENANCE
 }
 
 enum InventoryReservationDemandType {
@@ -17418,8 +17488,8 @@ model MaintenanceTicket {
 
   holdReason String? @db.Text
 
-  /// V1: parts recorded without Inventory ISSUE movement until integration is enabled
-  inventoryPostingPending Boolean @default(true)
+  /// True when any stockable part line still lacks an Inventory ISSUE movement
+  inventoryPostingPending Boolean @default(false)
 
   createdBy String?
   updatedBy String?
@@ -17448,13 +17518,14 @@ model MaintenancePart {
   ticketId String
 
   itemId      String?
+  warehouseId String?
   description String  @db.VarChar(300)
   qty         Decimal @db.Decimal(18, 4)
   unitCost    Decimal @default(0) @db.Decimal(18, 4)
   totalCost   Decimal @default(0) @db.Decimal(18, 2)
   remarks     String? @db.VarChar(500)
 
-  /// When Inventory ISSUE was posted (null = pending / not posted)
+  /// When Inventory ISSUE was posted (null = free-text / non-stockable / not posted)
   inventoryMovementId String?
   shortageQty         Decimal? @db.Decimal(18, 4)
   purchaseRequisitionId String?
@@ -17465,13 +17536,15 @@ model MaintenancePart {
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
 
-  tenant Tenant            @relation(fields: [tenantId], references: [id])
-  ticket MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  item   MasterItem?       @relation(fields: [itemId], references: [id])
+  tenant    Tenant            @relation(fields: [tenantId], references: [id])
+  ticket    MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  item      MasterItem?       @relation(fields: [itemId], references: [id])
+  warehouse MasterWarehouse?  @relation(fields: [warehouseId], references: [id])
 
   @@index([tenantId])
   @@index([tenantId, ticketId])
   @@index([tenantId, deletedAt])
+  @@index([tenantId, warehouseId])
   @@map("maintenance_parts")
 }
 

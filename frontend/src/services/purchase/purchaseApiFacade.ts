@@ -3042,6 +3042,20 @@ async function patchQualityInspectionApi(
     payload.inspectedById = patch.inspectorId ?? null
   }
   if (patch.remarks !== undefined) payload.remarks = patch.remarks || null
+  if (patch.inspectionPlan !== undefined) payload.inspectionPlan = patch.inspectionPlan || null
+  if (patch.parameters !== undefined) {
+    payload.parameters = patch.parameters.map((p) => ({
+      id: p.id,
+      parameter: p.parameter,
+      specification: p.specification,
+      minValue: p.minValue,
+      maxValue: p.maxValue,
+      observedValue: p.observedValue,
+      unit: p.unit,
+      result: p.result,
+      remarks: p.remarks,
+    }))
+  }
   const hasQtyPatch =
     patch.sampleQty !== undefined
     || patch.acceptedQty !== undefined

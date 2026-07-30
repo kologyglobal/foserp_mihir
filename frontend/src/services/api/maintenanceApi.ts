@@ -38,6 +38,7 @@ export type MaintenancePhotoCategory = 'BEFORE' | 'DURING' | 'AFTER' | 'OTHER'
 export interface MaintenancePart {
   id: string
   itemId: string | null
+  warehouseId: string | null
   description: string
   qty: number
   unitCost: number
@@ -242,6 +243,7 @@ export async function addMaintenancePart(
   id: string,
   body: {
     itemId?: string
+    warehouseId?: string
     description: string
     qty: number
     unitCost?: number

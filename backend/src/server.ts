@@ -6,6 +6,10 @@ import {
   startIndiaMartSyncScheduler,
   stopIndiaMartSyncScheduler,
 } from './modules/crm/integrations/indiamart/indiamart.scheduler.js'
+import {
+  startBankConnectorCronScheduler,
+  stopBankConnectorCronScheduler,
+} from './modules/accounting/treasury/bank-connectors/bank-connector.scheduler.js'
 
 async function main(): Promise<void> {
   await connectDatabase()
@@ -17,11 +21,13 @@ async function main(): Promise<void> {
       logger.info(`Swagger docs: http://localhost:${env.PORT}/api/docs`)
     }
     startIndiaMartSyncScheduler()
+    startBankConnectorCronScheduler()
   })
 
   const shutdown = async (signal: string) => {
     logger.info(`${signal} received — shutting down`)
     stopIndiaMartSyncScheduler()
+    stopBankConnectorCronScheduler()
     server.close(async () => {
       await disconnectDatabase()
       process.exit(0)

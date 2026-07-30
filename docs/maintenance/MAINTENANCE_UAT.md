@@ -12,6 +12,8 @@ npx tsx scripts/sync-permissions.ts --dry-run   # review
 npx tsx scripts/sync-permissions.ts             # apply
 ```
 
+Verified **2026-07-30** on local MySQL: catalog complete for `maintenance.*`; seeded roles already linked (0 to add).
+
 `attachRequestContext` reloads permissions per request, so a browser refresh is
 enough — no re-login required.
 

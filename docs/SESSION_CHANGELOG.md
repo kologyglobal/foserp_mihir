@@ -1,41 +1,219 @@
-## 2026-07-29 — Port Kology CRM/Sales day-pack into foserp_mihir
+﻿## 2026-07-30 — FIN-CLOSE-1 retro cost + deploy preparation
 
 ### Shipped
-Ported today's Kology-ERP CRM / Sales UX + bugfixes into this repo (manufacturing-safe defaults via `tenantProfileStore` → `MANUFACTURING`):
+- GRN-linked Vendor Invoice price delta now splits between remaining inventory value and PPV through the existing Inventory Costing engine.
+- Immutable additive cost entries/layer or moving-average updates with deterministic idempotency.
+- Full on-hand, partial/fully consumed, lower-price credit delta, retry, and reversal coverage.
+- Reversal removes the delta still represented by stock and reclassifies consumed delta to PPV; Inventory↔GL remains matched without Force Balance.
+- Prepared `docs/accounting/FIN_CLOSE_1_HOSTINGER_MIGRATION_RUNBOOK.md`; no remote migration, deployment, or push.
 
-- **Lead → Opportunity mirror** — create/qualify/stage sync + Opportunities list backfill; convert reuses mirror; delete opp reopens converted lead as Qualified
+### Evidence
+- Backend `npm run typecheck` — **PASS**
+- `npm run test:fin-close-1-live` — **PASS** (GR/IR ₹1,000; inventory retro ₹100; post-return reversal ₹80 inventory + ₹20 PPV)
+- Retro-cost live suite — **4/4 PASS**
+- Purchase invoice + Inventory↔GL regression pack — **15/15 PASS, 0 skipped**
+- Local `migrate deploy` — 171 migrations found, no pending. The locally applied QI migration record had a missing checklist table; restored that table locally from its committed migration DDL.
+
+### Human action
+- Hostinger migration/mapping/build/redeploy remains pending per the prepared runbook.
+
+---
+
+## 2026-07-30 — Accounting year-end close + AR/AP honest verdict
+
+### Shipped
+- **Year-end P&L → retained earnings**: `GET/POST …/financial-years/:id/year-end-preview|year-end-close`; `YearEndCloseRun` + migration `20260730121000_finance_year_end_close`; SYSTEM journal zeros INCOME/EXPENSE into mapped `RETAINED_EARNINGS`.
+- **FY lock hardened**: `POST …/financial-years/:id/close` requires all periods CLOSED + year-end run present.
+- **FE**: Period Close year-end wizard posts in API mode; `canApproveYearEnd` → `finance.financial_year.manage`.
+- **Defect fix**: AP cascade allocation-reversal `idempotencyKey` hashed (was exceeding VarChar(128)).
+- **Tooling**: wired missing `test:money-out*` npm scripts; period-close verifier covers year-end paths.
+
+### Explicit deferrals (honest)
+- Accruals / prepaid / FX revaluation wizards; close calendar; reopen-request workflow; opening-balance voucher (continuous GL carries BS).
+- Live TPP AIS / FX revaluation / intercompany — Bank & Cash product phases (SIMULATED AIS already separate).
+- Purchase invoice retro cost — **Purchase + Inventory Costing** ownership (FIN-CLOSE leftover; not Accounting AR/AP year-end).
+
+### Evidence
+- Backend/FE `typecheck` PASS; `finance-year-end-close` 8/8; core finance pack 50/50; `test:period-close` + `test:money-out` PASS. See TESTING_STATUS.
+
+### Verdict
+**Accounting Money In/Out + period lock/year-end P&L close — READY WITH CONDITIONS** for controlled UAT. Human: SPA year-end walk on a throwaway FY; Hostinger migrate deploy of year-end migration if not yet applied.
+
+---
+
+
+### Shipped
+- Stockable spare parts on maintenance tickets post Inventory ISSUE via existing `postStockMovement` (`referenceType=ISSUE_TO_MAINTENANCE`, `referenceNo=ticketNumber`); cost entry + on-hand decrement; fail-closed on insufficient stock.
+- Schema: `InventoryReferenceType.ISSUE_TO_MAINTENANCE`, `MaintenancePart.warehouseId`, `inventoryPostingPending` default false.
+- FE Parts Changed: optional stockable item + warehouse; honest Issued / Ticket only labels; shortage PR deep-link (`source=MAINTENANCE` + purpose/remarks) prefills PR editor.
+- `sync-permissions.ts` verified — no missing `maintenance.*` grants on seeded roles.
+
+### Evidence
+- Backend `npm run typecheck` — **PASS**
+- `npx tsx scripts/test-maintenance-v1.ts` — **PASS** (`MT-000003`/`MT-000004`, ISSUE `STM-000187`, on-hand 10→8, insufficient stock fail-closed)
+- External contractor — **SKIP** (no vendor master)
+- Docs: `docs/maintenance/*`, PROJECT_STATUS / REMAINING_WORK / TESTING_STATUS
+
+### Verdict
+**Maintenance V1 — READY** (was READY WITH CONDITIONS). Human: optional SPA walk; contractor UAT when vendor exists.
+
+---
+## 2026-07-30 — Bank & Cash 5D4 SIMULATED AIS + cron
+
+### Shipped
+- **OPEN_BANKING SIMULATED AIS**: consent-gated pull from sandbox drop folder to BankStatement sourceType=BANK_API (GST NIC SIMULATED precedent). mode=LIVE / BANK_CONNECTOR_AIS_PROVIDER=LIVE still NOT_IMPLEMENTED.
+- **scheduleCron worker**: in-process tick from server.ts (IndiaMART pattern); 5-field cron matcher; BANK_CONNECTOR_CRON_ENABLED.
+- Docs: BANK_CASH_STATUS.md, BANK_CONNECTOR_ARCHITECTURE.md; deferred live TPP AIS, FX, intercompany, cheque print.
+
+### Explicit deferrals (honest)
+- **FX**: currencyCode / exchangeRate fields exist; no FX rate table or revaluation journals; transfers same-currency only.
+- **Intercompany**: transfers require same legal entity by design.
+
+### Evidence
+- See TESTING_STATUS.md Bank & Cash 5D4 entry (typecheck + treasury/connector vitest).
+
+### Verdict
+**Bank & Cash — UAT-ready (core + SIMULATED AIS/cron)**; live bank AIS / FX / intercompany still open for product phase.
+
+---
+## 2026-07-30 â€” Inventory Costing READY gate (SPA harness + Inventoryâ†”GL wiring)
+
+### Shipped
+- Costing valuation recon + overview call FIN-CLOSE-1 `buildInventoryGlTrialBalance` when `INVENTORY_ACCOUNTING` is enabled; when off, GL remains **Not Available** (never â‚¹0); `forceBalanceAllowed: false` always.
+- Method-change preview surfaces live GL impact status when accounting is on.
+- Live parity suite: `tests/inventory-costing-gl-recon-parity.test.ts` + `npm run test:inventory-gl-recon-live`.
+- SPA UAT API harness: `scripts/test-inventory-costing-spa-uat-harness.ts` + `npm run test:inventory-costing-spa-uat` (overview, entries, layers, recon, method preview, transfer cost preserve).
+- Named pack script: `npm run test:inventory-costing`.
+- Docs: controlled UAT, test results, production readiness, recon UI, UAT audit; PROJECT_STATUS / REMAINING_WORK / TESTING_STATUS updated.
+
+### Out of scope (explicit)
+- Purchase invoice **retro cost adjustment** â€” Purchase/FIN open item, not an Inventory Costing READY condition.
+- Purchase-return Ã— 4 / Dispatch relief Ã— 4 matrices, 10k soak â€” accepted deferrals.
+- Residual human browser walk of `/inventory/costing/*` â€” optional product sign-off.
+
+### Evidence
+- Backend `npm run typecheck` â€” **PASS**
+- Frontend `npm run typecheck` (`tsc -b --noEmit`) â€” **PASS**
+- Core inventory suites â€” **11 passed** (FIFO layers, opening migration, return restore, Phase C, moving average, finance-inventory-gl contracts 4/4); first GL-parity attempt skipped on pool timeout then re-run **3/3 PASS**
+- UAT-1 controlled + golden path â€” **7/7 PASS**
+- `npm run test:inventory-gl-recon-live` â€” **3/3 PASS**
+- `npm run test:inventory-costing-spa-uat` â€” **PASS** (9 steps)
+
+### Verdict
+**Inventory Costing â€” READY** (was READY WITH CONDITIONS)
+
+### Follow-up live batch (same day, MySQL up)
+- Auth hardening + self-service **9/9 PASS**; admin IAM smoke **5/5 PASS** earlier.
+- Purchase QI lifecycle **6/6 PASS**; Quality Phase 7B **7/7 PASS**.
+- Manufacturing Quality 4A/4B still fail `awaitingQuality` â€” open product/gate issue, separate from Inventory Costing.
+
+---
+
+## 2026-07-30 â€” Quality QI parameter checklist + honest QMS scope
+
+### Shipped
+- **Purchase QI parameter checklist persistence** end-to-end: `inspectionPlan` + `purchase_quality_inspection_parameters`; create seeds Visual/Documentation defaults; PATCH replaces checklist; FE facade/mapper/UI (removed â€œnot persisted on APIâ€ banner).
+- Hold/DEVIATION_PENDING remains editable for checklist (aligns FE hold + API).
+- Migration `20260730110000_purchase_qi_parameter_checklist` (deploy pending â€” local MySQL unreachable this session).
+- Docs: `docs/quality/QUALITY_SCOPE_AND_DEFERRALS.md`; refreshed incoming workflow + Phase 7B readiness (Purchase GRN/QI live).
+
+### Explicit deferrals
+- Full enterprise QMS (CAPA, calibration, audits, SPC, supplier scorecards, quality GL) â€” no scaffolding; not treated as completion blockers for scoped Quality.
+
+### Evidence
+- Backend `npm run typecheck` â€” **PASS**
+- Frontend `tsc -b --noEmit` â€” **PASS**
+- `npx vitest run tests/quality-phase4a.test.ts tests/quality-phase4b.test.ts tests/quality-phase7b.test.ts tests/purchase-qi-lifecycle.test.ts` â€” **3 passed / 20 skipped** (MySQL `localhost:3306` unreachable â€” pool timeout; skips â‰  passes). Re-run after migrate deploy.
+
+### Verdict
+**Quality â€” READY WITH CONDITIONS** (scoped manufacturing QC + Purchase incoming QI). Conditions: deploy migration + live suite re-run.
+
+---
+
+## 2026-07-30 â€” Auth + Admin IAM close-out
+
+### Shipped
+- **Password policy** enforced on `user.create` (`assertPasswordMeetsPolicy`) and tenant admin password floor (`PASSWORD_MIN_LENGTH`) on tenant create
+- **Auth self-service** confirmed wired: `/account/change-password`, `/settings/profile`, user-menu links; FE UAT-01 extended (8aâ€“8c)
+- **Admin routes:** removed duplicate `/admin/tenants` CRUD (canonical `/platform/tenants` + redirects)
+- **Tests:** `backend/tests/auth-self-service.test.ts`, `admin-tenants-users-roles-smoke.test.ts`; FE `scripts/test-admin-iam.ts`; npm scripts `test:auth-self-service`, `test:admin-iam-smoke`, `test:admin-iam`
+
+### Evidence
+- FE `npm run test:admin-iam` â€” **PASS**
+- FE `npm run test:uat-01-auth` â€” **24/24 PASS**
+- BE vitest suites present; local MySQL was down (port 3306) so live cases skipped â€” re-run with DB: `npm run test:auth-self-service` / `npm run test:admin-iam-smoke`
+
+### Docs
+- `PROJECT_STATUS.md` â€” Auth + Tenants/Users/Roles marked completed (API mode)
+
+---
+
+## 2026-07-30 â€” Inventory Costing READY gate (SPA harness + Inventoryâ†”GL wiring)
+
+### Shipped
+- Costing valuation recon + overview call FIN-CLOSE-1 `buildInventoryGlTrialBalance` when `INVENTORY_ACCOUNTING` is enabled; when off, GL remains **Not Available** (never â‚¹0); `forceBalanceAllowed: false` always.
+- Method-change preview surfaces live GL impact status when accounting is on.
+- Live parity suite: `tests/inventory-costing-gl-recon-parity.test.ts` + `npm run test:inventory-gl-recon-live`.
+- SPA UAT API harness: `scripts/test-inventory-costing-spa-uat-harness.ts` + `npm run test:inventory-costing-spa-uat` (overview, entries, layers, recon, method preview, transfer cost preserve).
+- Named pack script: `npm run test:inventory-costing`.
+- Docs: controlled UAT, test results, production readiness, recon UI, UAT audit; PROJECT_STATUS / REMAINING_WORK / TESTING_STATUS updated.
+
+### Out of scope (explicit)
+- Purchase invoice **retro cost adjustment** â€” Purchase/FIN open item, not an Inventory Costing READY condition.
+- Purchase-return Ã— 4 / Dispatch relief Ã— 4 matrices, 10k soak â€” accepted deferrals.
+- Residual human browser walk of `/inventory/costing/*` â€” optional product sign-off.
+
+### Evidence
+- Backend `npm run typecheck` â€” **PASS**
+- Frontend `npm run typecheck` (`tsc -b --noEmit`) â€” **PASS**
+- Core inventory suites â€” **11 passed** (FIFO layers, opening migration, return restore, Phase C, moving average, finance-inventory-gl contracts 4/4)
+- UAT-1 controlled + golden path â€” **7/7 PASS**
+- `npm run test:inventory-gl-recon-live` â€” **3/3 PASS**
+- `npm run test:inventory-costing-spa-uat` â€” **PASS** (9 steps)
+
+### Verdict
+**Inventory Costing â€” READY** (was READY WITH CONDITIONS)
+
+---
+
+## 2026-07-29 â€” Port Kology CRM/Sales day-pack into foserp_mihir
+
+### Shipped
+Ported today's Kology-ERP CRM / Sales UX + bugfixes into this repo (manufacturing-safe defaults via `tenantProfileStore` â†’ `MANUFACTURING`):
+
+- **Lead â†’ Opportunity mirror** â€” create/qualify/stage sync + Opportunities list backfill; convert reuses mirror; delete opp reopens converted lead as Qualified
 - **Self-healing default pipeline** (`ensureDefaultPipeline`)
 - **Lead form** design + date-only `createdDate` hydrate; Notes not falsely required
 - **Auto-qualify** when Create Opportunity / Quotation from a lead
 - **Opp / Quotation / SO create** form layout alignment; SO 360 Smart Context polish
 - **More Actions / CommandBar** overflow fix; Quotation editor duplicate actions cleanup
-- **Quotation → SO** validity date default when field missing; **direct SO reason** optional
+- **Quotation â†’ SO** validity date default when field missing; **direct SO reason** optional
 - **PDF export** aligned with preview (`documentPdfDownload` + print docs)
 - **Direct tax invoice** (no SO/proforma) + demo commercial permission seed keys
 - Prisma import path fixed for this repo (`config/prisma.js`)
 
 ### Verify
-- Backend `tsc --noEmit` — clean
-- Frontend `tsc -b --noEmit` — clean
+- Backend `tsc --noEmit` â€” clean
+- Frontend `tsc -b --noEmit` â€” clean
 
 ### Not ported (Kology-only packaging)
 - Full SERVICES tenant seed / IndiaMART hide / recurring invoices / Kology proposal Word templates (already scoped to Kology packaging commits)
 
 ---
 
-## 2026-07-29 — PO editor / lifecycle (`purchase_16`)
+## 2026-07-29 â€” PO editor / lifecycle (`purchase_16`)
 
 ### Shipped
 - Editor collapsed to 4 sections (General, Item Lines, Tax & Totals, Terms/Notes/Attachments); Source Reference panel removed
 - Line grid scroll fix; Expected Delivery Date + Requisition no. on lines (`requisitionNumber` column)
 - Status labels Open / Pending Approved / Released; readonly Status + Revised version on General
-- `requireApprovalOnPo`: approve → Released; Cancel Pending → Open; approval-off Release from Open
+- `requireApprovalOnPo`: approve â†’ Released; Cancel Pending â†’ Open; approval-off Release from Open
 - List actions slimmed + Reopen; revise archives to `purchase_order_archived` / `purchase_line_archived`; revise blocked after any receipt
 - Docs: `docs/PURCHASE_PO_VERSIONING.md`
 
 ---
 
-## 2026-07-29 — Purchase dashboard GRNI (received, not invoiced)
+## 2026-07-29 â€” Purchase dashboard GRNI (received, not invoiced)
 
 ### Shipped
 
@@ -44,7 +222,7 @@ Ported today's Kology-ERP CRM / Sales UX + bugfixes into this repo (manufacturin
 
 ---
 
-## 2026-07-29 — FIN-CLOSE-1 stop: Dispatch → AR Invoice Ready polish (G11)
+## 2026-07-29 â€” FIN-CLOSE-1 stop: Dispatch â†’ AR Invoice Ready polish (G11)
 
 ### Shipped
 - Invoice Ready list returns tenant **policy** in response meta (`invoiceMode`, POD, multi-dispatch allowance)
@@ -56,11 +234,11 @@ Ported today's Kology-ERP CRM / Sales UX + bugfixes into this repo (manufacturin
 Scoped chains closed. **Do not continue** into deferred statutory / advanced Finance or Money In/Out redesign from this phase. Still open outside stop: retro cost adjustment; Hostinger migrate deploy.
 
 ### Evidence
-- Backend + frontend `tsc --noEmit` — clean
+- Backend + frontend `tsc --noEmit` â€” clean
 
 ---
 
-## 2026-07-29 — Maintenance client feedback (Start Maintenance flow)
+## 2026-07-29 â€” Maintenance client feedback (Start Maintenance flow)
 
 ### Shipped
 - Dashboard primary **Start Maintenance**; revised close flow per client checklist
@@ -73,56 +251,56 @@ Scoped chains closed. **Do not continue** into deferred statutory / advanced Fin
 - Docs: `MAINTENANCE_WORKFLOW.md`, `MAINTENANCE_UAT.md`
 
 ### Evidence
-- `npx tsx scripts/test-maintenance-v1.ts` — PASS (`MT-000002`)
-- Frontend `tsc --noEmit` — clean
+- `npx tsx scripts/test-maintenance-v1.ts` â€” PASS (`MT-000002`)
+- Frontend `tsc --noEmit` â€” clean
 
 ---
 
-## 2026-07-29 — FIN-CLOSE-1 Inventory ↔ GL / WIP ↔ GL trial balance + failed events
+## 2026-07-29 â€” FIN-CLOSE-1 Inventory â†” GL / WIP â†” GL trial balance + failed events
 
 ### Shipped
 - Accounting read model under `/accounting/inventory-gl-reconciliation`:
-  - `GET …/trial-balance` — RM / FG / WIP / GR-IR operational vs mapped GL (as-of date)
-  - `GET …/failed-events` — unified Inventory + Manufacturing FAILED/RECORDED queue
-  - `POST …/failed-events/:id/retry` — idempotent retry (no Force Balance)
-- Reason codes: `ACCOUNTING_EVENT_FAILED`, `GRIR_NOT_CLEARED`, `MANUAL_GL_ENTRY_DIFFERENCE`, …
-- FE hub: `/accounting/inventory-gl-reconciliation` (nav: Accounting → Inventory ↔ GL)
+  - `GET â€¦/trial-balance` â€” RM / FG / WIP / GR-IR operational vs mapped GL (as-of date)
+  - `GET â€¦/failed-events` â€” unified Inventory + Manufacturing FAILED/RECORDED queue
+  - `POST â€¦/failed-events/:id/retry` â€” idempotent retry (no Force Balance)
+- Reason codes: `ACCOUNTING_EVENT_FAILED`, `GRIR_NOT_CLEARED`, `MANUAL_GL_ENTRY_DIFFERENCE`, â€¦
+- FE hub: `/accounting/inventory-gl-reconciliation` (nav: Accounting â†’ Inventory â†” GL)
 - Permissions reuse `finance.gl.view` / `manufacturing.accounting.*` / `inventory.view_cost`
 
 ### Evidence
-- `npx tsc --noEmit` (backend) — clean
-- `tests/finance/finance-inventory-gl-reconciliation.test.ts` — 4 tests passed
+- `npx tsc --noEmit` (backend) â€” clean
+- `tests/finance/finance-inventory-gl-reconciliation.test.ts` â€” 4 tests passed
 
 ### Conditions
-- Operational RM/FG use stock-balance buckets by item type; WIP uses WO snapshot − FG capitalisation
+- Operational RM/FG use stock-balance buckets by item type; WIP uses WO snapshot âˆ’ FG capitalisation
 - Open GR/IR operational = posted GRN inward still uninvoiced (aligned with VI GR/IR release)
 - Hostinger migrate deploy of earlier FIN-CLOSE-1 migration still pending
 
 ### Verdict
-**FIN-CLOSE-1 — INVENTORY↔GL / WIP↔GL RECON HUB LANDED (NO FORCE BALANCE)**
+**FIN-CLOSE-1 â€” INVENTORYâ†”GL / WIPâ†”GL RECON HUB LANDED (NO FORCE BALANCE)**
 
 ---
 
-## 2026-07-29 — FIN-CLOSE-1 foundation: GR/IR, PPV, Purchase Return → AP debit note
+## 2026-07-29 â€” FIN-CLOSE-1 foundation: GR/IR, PPV, Purchase Return â†’ AP debit note
 
 Closes the four product decisions from `docs/accounting/ACCOUNTING_INTEGRATION_CLOSURE_AUDIT.md`.
 No redesign of Money In / Money Out / Journals / Bank & Cash / Fixed Assets / Budgeting;
 no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap` is forward-only.
 
 ### Shipped
-- **`GRIR_CLEARING`** mapping key — `GRN_INWARD` now posts `Dr RAW_MATERIAL_INVENTORY / Cr GRIR_CLEARING`
+- **`GRIR_CLEARING`** mapping key â€” `GRN_INWARD` now posts `Dr RAW_MATERIAL_INVENTORY / Cr GRIR_CLEARING`
   (reversal flips). `PURCHASE` is no longer the GRN proxy; historical events are untouched.
 - **`PURCHASE_PRICE_VARIANCE`** mapping key + category metadata (EXPENSE/INCOME), available for mapping.
-- **Purchase Return → Vendor Debit Note** — `purchase-return-ap-handoff.service.ts` creates an
+- **Purchase Return â†’ Vendor Debit Note** â€” `purchase-return-ap-handoff.service.ts` creates an
   Accounting `VendorAdjustment` **draft** (`VENDOR_DEBIT_NOTE`, reason `PURCHASE_RETURN`) for the
   invoiced portion of a completed return. Backend-owned eligibility; invoiced rate, not return rate;
   idempotent on `PurchaseReturn.vendorAdjustmentId`; never posts GL.
   Routes: `GET /purchase/returns/:id/ap-adjustment-preview`, `POST /purchase/returns/:id/ap-adjustment`.
-- **GR/IR gating** — unchanged `INVENTORY_ACCOUNTING` feature gate. Enabling it now also requires
+- **GR/IR gating** â€” unchanged `INVENTORY_ACCOUNTING` feature gate. Enabling it now also requires
   `RAW_MATERIAL_INVENTORY` + `GRIR_CLEARING` mappings alongside COGS/FG.
 - `VendorAdjustmentSourceLinkType.PURCHASE_RETURN` for traceability back to the return.
-- **GR/IR closes on Vendor Invoice post** — a GRN-linked invoice line posts
-  `Dr GRIR_CLEARING (receipt cost) / Dr-Cr PURCHASE_PRICE_VARIANCE (invoice − receipt) /
+- **GR/IR closes on Vendor Invoice post** â€” a GRN-linked invoice line posts
+  `Dr GRIR_CLEARING (receipt cost) / Dr-Cr PURCHASE_PRICE_VARIANCE (invoice âˆ’ receipt) /
   Dr PURCHASE (non-recoverable tax only)`. Total debit unchanged, so the voucher still balances.
   Receipt cost comes from the POSTED `InventoryAccountingEvent`, joined via the deterministic
   movement key `grn-in:<grnId>:<grnLineId>`. Lines whose GRN never posted GL keep the old
@@ -131,43 +309,43 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
   Reversal is automatic (the reversal voucher mirrors the original lines).
 
 ### Evidence
-- `npx tsc --noEmit` (backend) — clean
-- `npm run test:purchase-phase15` — 7 files / 29 tests passed
-- `tests/finance/finance-ap-vendor-invoice-grir-release.test.ts` — 7 tests passed (new)
-- `finance-ap-vendor-invoice-calculation` + vendor-payment calculation/preview — 43 tests passed (no regression)
-- `npm run test:fin-close-1-live` — **PASS** against local MySQL:
+- `npx tsc --noEmit` (backend) â€” clean
+- `npm run test:purchase-phase15` â€” 7 files / 29 tests passed
+- `tests/finance/finance-ap-vendor-invoice-grir-release.test.ts` â€” 7 tests passed (new)
+- `finance-ap-vendor-invoice-calculation` + vendor-payment calculation/preview â€” 43 tests passed (no regression)
+- `npm run test:fin-close-1-live` â€” **PASS** against local MySQL:
   - tenant `fin-close-1-1785321404895-4433`
-  - GRN `d0cb5d65-3172-48a7-ad1e-5b75367627f9`: Cr GR/IR ₹1,000
-  - Vendor Invoice `b33c94a3-0307-4cd2-b6cd-3871768fc562`: Dr GR/IR ₹1,000 + Dr PPV ₹100
-  - GR/IR closing balance: ₹0
-  - Purchase Return `090bcca6-1ec9-4912-9dc3-dea8ebec4975` → Vendor Debit Note
-    `VADJ-DRAFT-20260729-Z767PH` for ₹220 at invoiced rate
+  - GRN `d0cb5d65-3172-48a7-ad1e-5b75367627f9`: Cr GR/IR â‚¹1,000
+  - Vendor Invoice `b33c94a3-0307-4cd2-b6cd-3871768fc562`: Dr GR/IR â‚¹1,000 + Dr PPV â‚¹100
+  - GR/IR closing balance: â‚¹0
+  - Purchase Return `090bcca6-1ec9-4912-9dc3-dea8ebec4975` â†’ Vendor Debit Note
+    `VADJ-DRAFT-20260729-Z767PH` for â‚¹220 at invoiced rate
 
 ### Conditions
 - Migration **applied** locally (`20260729160000_fin_close_1_grir_ppv_return_ap` on `fos_erp`).
-- `GRIR_CLEARING` → `2110 GR/IR Clearing` and `PURCHASE_PRICE_VARIANCE` → `5510 Purchase Price Variance`
+- `GRIR_CLEARING` â†’ `2110 GR/IR Clearing` and `PURCHASE_PRICE_VARIANCE` â†’ `5510 Purchase Price Variance`
   mapped on every active LE that already had a CoA (script: `npx tsx scripts/map-fin-close-1-grir-ppv.ts`).
-  Does **not** enable `INVENTORY_ACCOUNTING` — that remains a deliberate finance settings action.
-- Retro cost adjustment on purchase invoice and the Inventory ↔ GL / WIP ↔ GL trial balances
+  Does **not** enable `INVENTORY_ACCOUNTING` â€” that remains a deliberate finance settings action.
+- Retro cost adjustment on purchase invoice and the Inventory â†” GL / WIP â†” GL trial balances
   are still open.
 - Hostinger migrate deploy of this migration is still pending.
 
 ### Verdict
-**FIN-CLOSE-1 — GR/IR + RETURN→AP CHAINS VERIFIED LIVE**
+**FIN-CLOSE-1 â€” GR/IR + RETURNâ†’AP CHAINS VERIFIED LIVE**
 
 ---
 
-## 2026-07-29 — Maintenance Module V1
+## 2026-07-29 â€” Maintenance Module V1
 
 ### Shipped
 - Module flag `maintenance`; APIs under `/api/v1/t/:tenantSlug/maintenance`
 - Prisma: `MaintenanceTicket` / `MaintenancePart` / `MaintenanceAttachment` + migration
-- Lifecycle: Report → Start Repair → Update/Parts/Photos → Test → Close
-- Machine status: report→`OUT_OF_SERVICE`, repair→`UNDER_MAINTENANCE`, close→`AVAILABLE`
+- Lifecycle: Report â†’ Start Repair â†’ Update/Parts/Photos â†’ Test â†’ Close
+- Machine status: reportâ†’`OUT_OF_SERVICE`, repairâ†’`UNDER_MAINTENANCE`, closeâ†’`AVAILABLE`
 - FE: `/maintenance` dashboard, tickets, report, detail, machine history, reports (API mode only)
 - MFG: Report Breakdown from My Work + Work Order detail
 - Docs: `docs/maintenance/*`
-- Harness: `npx tsx scripts/test-maintenance-v1.ts` → **PASS** (`MT-000001`)
+- Harness: `npx tsx scripts/test-maintenance-v1.ts` â†’ **PASS** (`MT-000001`)
 
 ### Conditions
 - Inventory ISSUE posting deferred (`inventoryPostingPending`)
@@ -175,15 +353,15 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 - Live SPA UAT optional
 
 ### Verdict
-**MAINTENANCE V1 — READY WITH CONDITIONS**
+**MAINTENANCE V1 â€” READY WITH CONDITIONS**
 
 ---
 
-## 2026-07-29 — Fuel Tank SPA checklist A1–A9 + partial FG signed
+## 2026-07-29 â€” Fuel Tank SPA checklist A1â€“A9 + partial FG signed
 
 ### Evidence
-- Happy A1–A9: `WO-000039` / `FT-5000L-08208574` / COMPLETED / ₹111,020 — `npx tsx scripts/test-fuel-tank-wo-execution.ts`
-- Partial FG: `WO-000040` planned=3 completedGood=1 FG `FT-5000L-08267674` WO remains IN_PROGRESS — `FT_PARTIAL=1 npx tsx scripts/test-fuel-tank-wo-execution.ts`
+- Happy A1â€“A9: `WO-000039` / `FT-5000L-08208574` / COMPLETED / â‚¹111,020 â€” `npx tsx scripts/test-fuel-tank-wo-execution.ts`
+- Partial FG: `WO-000040` planned=3 completedGood=1 FG `FT-5000L-08267674` WO remains IN_PROGRESS â€” `FT_PARTIAL=1 npx tsx scripts/test-fuel-tank-wo-execution.ts`
 - Checklist signed: `docs/manufacturing/MFG_PILOT_SPA_UAT_CHECKLIST.md`
 
 ### Verdict
@@ -191,73 +369,73 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-29 — Manufacturing pilot scenarios (Fuel Tank)
+## 2026-07-29 â€” Manufacturing pilot scenarios (Fuel Tank)
 
 ### Shipped
 - SPA checklist: `docs/manufacturing/MFG_PILOT_SPA_UAT_CHECKLIST.md`
-- API harness: `backend/scripts/test-fuel-tank-pilot-scenarios.ts` — shortage→PR, issue/return, hold/resume, SO→Demand→WO, Dispatch serial readiness — **PASS**
+- API harness: `backend/scripts/test-fuel-tank-pilot-scenarios.ts` â€” shortageâ†’PR, issue/return, hold/resume, SOâ†’Demandâ†’WO, Dispatch serial readiness â€” **PASS**
 - Fix: WO material return accepts `batchId`/`batchNumber` for batch-tracked items
 - Applied pending local migrations (UOM / GRN tolerance / PO versioning)
 - Results: `docs/manufacturing/MFG_PILOT_SCENARIO_RESULTS.md`
 
 ### Still open
-- Human SPA walk A1–A9 + partial FG qty-3 UI
+- Human SPA walk A1â€“A9 + partial FG qty-3 UI
 
 ---
 
-## 2026-07-28 ΓÇö MFG-GOLDEN-1 Fuel Tank golden path closure
+## 2026-07-28 Î“Ã‡Ã¶ MFG-GOLDEN-1 Fuel Tank golden path closure
 
 ### Shipped
 - Audit: `docs/manufacturing/MFG_GOLDEN_PATH_AUDIT.md` (LOGICAL SFG Job Cards = stages; no JobCard table)
 - Docs: `FUEL_TANK_GOLDEN_PATH.md`, `MFG_JOB_CARD_EXECUTION.md`, `MFG_ROUTE_EXECUTION_UAT.md`, `MFG_MATERIAL_COST_UAT.md`, `MFG_QC_GOLDEN_PATH.md`, `MFG_FG_SERIAL_UAT.md`, `MFG_CLOSE_READINESS_UAT.md`, `MFG_GOLDEN_PATH_TEST_RESULTS.md`
-- Re-ran seeds + `test-fuel-tank-wo-execution.ts` ΓåÆ **PASS** (`WO-000010`, serial `FT-5000L-52948875`, Γé╣111,020 material=WO=FG)
+- Re-ran seeds + `test-fuel-tank-wo-execution.ts` Î“Ã¥Ã† **PASS** (`WO-000010`, serial `FT-5000L-52948875`, Î“Ã©â•£111,020 material=WO=FG)
 - No Manufacturing feature rebuild; no hard blockers
 
 ### Verdict
-**MANUFACTURING GOLDEN PATH ΓÇö READY FOR CONTROLLED PILOT**
+**MANUFACTURING GOLDEN PATH Î“Ã‡Ã¶ READY FOR CONTROLLED PILOT**
 
 ---
 
-## 2026-07-28 ΓÇö Purchase completion (QI / Invoice / Return / Costing / AP links)
+## 2026-07-28 Î“Ã‡Ã¶ Purchase completion (QI / Invoice / Return / Costing / AP links)
 
 ### Shipped
 - Audit: `docs/purchase/PURCHASE_COMPLETION_AUDIT.md` + QI/Invoice/Return/Costing/AP/UAT docs
-- GRN detail: Receiving chain (QI ┬╖ Costing ┬╖ Invoice ┬╖ Return); Create Invoice; cost entries deep-link with `?search=`
+- GRN detail: Receiving chain (QI â”¬â•– Costing â”¬â•– Invoice â”¬â•– Return); Create Invoice; cost entries deep-link with `?search=`
 - Purchase Invoice: honest AP handoff messaging; Money Out deep link; `accountingVendorInvoiceId` mapped
 - Purchase Return: ACCOUNTING_ADJUSTMENT_PENDING banner (no fake AP credit)
-- Integration test: `purchase-completion-grn-costing.test.ts` (GRN ΓåÆ InventoryCostEntry) **PASS**
+- Integration test: `purchase-completion-grn-costing.test.ts` (GRN Î“Ã¥Ã† InventoryCostEntry) **PASS**
 
 ### Verdict
-**READY FOR INTERNAL UAT** (Purchase to stock value + VI draft). Deferred: returnΓåÆAP debit, invoice retro cost adjust, QI parameter persistence, supplier performance dashboard.
+**READY FOR INTERNAL UAT** (Purchase to stock value + VI draft). Deferred: returnÎ“Ã¥Ã†AP debit, invoice retro cost adjust, QI parameter persistence, supplier performance dashboard.
 
 ---
 
-## 2026-07-28 ΓÇö Inventory Costing UAT-1 production hardening
+## 2026-07-28 Î“Ã‡Ã¶ Inventory Costing UAT-1 production hardening
 
 ### Shipped
 - Audit: `docs/inventory/INVENTORY_COSTING_UAT_AUDIT.md`
-- Controlled UAT suite: `backend/tests/inventory-costing-uat1-controlled.test.ts` (MA / FIFO+transfer / Standard / Specific / method preview + tenant isolation) ΓÇö **PASS**
+- Controlled UAT suite: `backend/tests/inventory-costing-uat1-controlled.test.ts` (MA / FIFO+transfer / Standard / Specific / method preview + tenant isolation) Î“Ã‡Ã¶ **PASS**
 - Cost entry stamps in-memory rate/value (parity with movement value; no DB rate 2dp re-round)
 - Transfer receive preserves dispatch cost entry unit cost
-- Method change: `GET ΓÇª/method-change/preview` readiness + wizard ReadinessΓåÆPreviewΓåÆExecute
-- MA history: `GET ΓÇª/moving-average/history` derived before/after; FE History grid
-- Recon reason codes expanded; GL **Not Available** (not Γé╣0)
+- Method change: `GET Î“Ã‡Âª/method-change/preview` readiness + wizard ReadinessÎ“Ã¥Ã†PreviewÎ“Ã¥Ã†Execute
+- MA history: `GET Î“Ã‡Âª/moving-average/history` derived before/after; FE History grid
+- Recon reason codes expanded; GL **Not Available** (not Î“Ã©â•£0)
 - Standard Cost create: `ItemLookupSelect` (no UUID typing)
 - Docs: CONTROLLED_UAT, INVARIANTS, METHOD_CHANGE_UAT, PRODUCTION_READINESS, TEST_RESULTS
 
 ### Verdict
-**READY WITH CONDITIONS** ΓÇö automated method golden paths pass; live SPA sign-off, purchase-return/dispatch 4-method matrices, 10k performance, fine-grained approve, InventoryΓåöGL TB still open.
+**READY WITH CONDITIONS** Î“Ã‡Ã¶ automated method golden paths pass; live SPA sign-off, purchase-return/dispatch 4-method matrices, 10k performance, fine-grained approve, InventoryÎ“Ã¥Ã¶GL TB still open.
 
 ---
 
-## 2026-07-28 ΓÇö Inventory Costing FE + Valuation Reconciliation
+## 2026-07-28 Î“Ã‡Ã¶ Inventory Costing FE + Valuation Reconciliation
 
 ### Shipped
 - FE audit: `docs/inventory/INVENTORY_COSTING_FE_AUDIT.md` + UI docs for entries/FIFO/MA/standard/specific/recon/method-change
 - Read APIs: `overview`, `items`, `moving-average`, `standard-costs` (list), `specific`, `POST reconciliation/run`; enriched cost entries/layers with item/warehouse
 - Overview hub: summary strip, policy panel, health, valuation-by-item table
 - Registers: named entries, MA state, standard versions, specific ID with unidentified highlight, recon Run + reason codes
-- Method change shows current method; route aliases (`fifo-layers`, `moving-average`, ΓÇª)
+- Method change shows current method; route aliases (`fifo-layers`, `moving-average`, Î“Ã‡Âª)
 - No force-balance; no frontend cost recalculation
 
 ### Decision
@@ -265,13 +443,13 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-28 ΓÇö IV-MFG-1 Inventory valuation consolidation
+## 2026-07-28 Î“Ã‡Ã¶ IV-MFG-1 Inventory valuation consolidation
 
 ### Architecture
 - **Canonical:** `InventoryValuationMethod` (FIFO / MOVING_WEIGHTED_AVERAGE / STANDARD_COST / SPECIFIC_IDENTIFICATION).
 - **Legacy:** `ManufacturingInventoryValuationMethod` marked deprecated (column retained; unused at runtime).
 - WO material cost prefers **`InventoryCostEntry`** (`sourceEntityType = INVENTORY_COST_ENTRY`); fallback movement value / provisional standard.
-- `getEffectiveValuationMethod` + APIs: `GET ΓÇª/inventory/costing/effective-method`, `GET ΓÇª/inventory/costing/items/:itemId/summary`, `GET ΓÇª/manufacturing/work-orders/:id/cost-trace/:entryId`.
+- `getEffectiveValuationMethod` + APIs: `GET Î“Ã‡Âª/inventory/costing/effective-method`, `GET Î“Ã‡Âª/inventory/costing/items/:itemId/summary`, `GET Î“Ã‡Âª/manufacturing/work-orders/:id/cost-trace/:entryId`.
 - WO Costing tab: material table + cost-trace drawer (Inventory-owned valuation display).
 
 ### Docs
@@ -290,7 +468,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-28 ΓÇö Purchase Order versioning (Rev N)
+## 2026-07-28 Î“Ã‡Ã¶ Purchase Order versioning (Rev N)
 
 ### Shipped
 
@@ -301,37 +479,37 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-28 ΓÇö GRN tolerance evening review pack
+## 2026-07-28 Î“Ã‡Ã¶ GRN tolerance evening review pack
 
 ### Shipped
 
-- Seed: `npm run seed:grn-tolerance-review` ΓåÆ 6 items (0ΓÇô15%), open POs, GRNs in draft / pending / posted (incl. 1-of-3).
+- Seed: `npm run seed:grn-tolerance-review` Î“Ã¥Ã† 6 items (0Î“Ã‡Ã´15%), open POs, GRNs in draft / pending / posted (incl. 1-of-3).
 - Walkthrough: `docs/PURCHASE_GRN_TOLERANCE_REVIEW_DEMO.md`.
 
 ---
 
-## 2026-07-28 ΓÇö GRN tolerance multi-line plans (1-of-3 receive)
+## 2026-07-28 Î“Ã‡Ã¶ GRN tolerance multi-line plans (1-of-3 receive)
 
 ### Shipped
 
-- **Document rollup:** `evaluateGrnDocumentTolerance` (FE + BE) ΓÇö any outside line ΓåÆ header approval; zeros = `NOT_RECEIVED` independently.
-- **FE Plans AΓÇôE + M:** `frontend/scripts/test-grn-tolerance.ts` (edges + 10 multi-line docs).
-- **Live:** 3-line PO receive only middle; 3-line receive one outside ΓåÆ pending.
+- **Document rollup:** `evaluateGrnDocumentTolerance` (FE + BE) Î“Ã‡Ã¶ any outside line Î“Ã¥Ã† header approval; zeros = `NOT_RECEIVED` independently.
+- **FE Plans AÎ“Ã‡Ã´E + M:** `frontend/scripts/test-grn-tolerance.ts` (edges + 10 multi-line docs).
+- **Live:** 3-line PO receive only middle; 3-line receive one outside Î“Ã¥Ã† pending.
 - **Test plan:** `docs/PURCHASE_GRN_TOLERANCE_TEST_PLAN.md` Plan M.
 
 ---
 
-## 2026-07-28 ΓÇö GRN tolerance test suite (0% / 2% / 10%)
+## 2026-07-28 Î“Ã‡Ã¶ GRN tolerance test suite (0% / 2% / 10%)
 
 ### Shipped
 
 - **Scenarios:** `docs/PURCHASE_GRN_TOLERANCE_TEST_PLAN.md` (matrix + UI checklist).
-- **Seed + live API:** `backend/scripts/test-grn-tolerance-flow.ts` ΓåÆ items `TOL-ITEM-0PCT` / `2PCT` / `10PCT`; `npm run test:grn-tolerance-live` (`--seed-only` for UI).
+- **Seed + live API:** `backend/scripts/test-grn-tolerance-flow.ts` Î“Ã¥Ã† items `TOL-ITEM-0PCT` / `2PCT` / `10PCT`; `npm run test:grn-tolerance-live` (`--seed-only` for UI).
 - **Unit:** backend vitest extended; frontend `npm run test:grn-tolerance` mirrors calculator.
 
 ---
 
-## 2026-07-28 ΓÇö Purchase PDF size locked to A4
+## 2026-07-28 Î“Ã‡Ã¶ Purchase PDF size locked to A4
 
 ### Shipped
 
@@ -342,35 +520,35 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-28 ΓÇö GRN receiving tolerance
+## 2026-07-28 Î“Ã‡Ã¶ GRN receiving tolerance
 
 ### Shipped
 
-- **Item Master:** `receivingTolerancePercentage` (┬▒% vs open PO qty).
+- **Item Master:** `receivingTolerancePercentage` (â”¬â–’% vs open PO qty).
 - **GRN engine:** line statuses OK / Partial / Not Received / Excess within|outside / Short outside; zero qty allowed; variance vs open qty; Setup over-receipt % as fallback.
-- **Approval:** outside-tolerance submit ΓåÆ `PENDING_TOLERANCE_APPROVAL` + `PurchaseApproval` GOODS_RECEIPT; approve/reject endpoints; **Approvals queue** lists GRN exceptions (`purchase.grn.post`).
+- **Approval:** outside-tolerance submit Î“Ã¥Ã† `PENDING_TOLERANCE_APPROVAL` + `PurchaseApproval` GOODS_RECEIPT; approve/reject endpoints; **Approvals queue** lists GRN exceptions (`purchase.grn.post`).
 - **UI:** GRN editor/detail tolerance columns, pending banner, close-open checkbox; PDF always shows vendor + stock qty.
 - **Tests:** `backend/tests/purchase/grn-tolerance.test.ts`; contract `docs/PURCHASE_GRN_TOLERANCE.md`.
 
 ---
 
-## 2026-07-28 ΓÇö Purchase print/PDF: Vasant Fabricators letterhead
+## 2026-07-28 Î“Ã‡Ã¶ Purchase print/PDF: Vasant Fabricators letterhead
 
 ### Shipped
 
 - **Shared:** `PurchaseDocumentLetterhead` (`QUOTATION_COMPANY` + `/brand/vasant-fabricators-logo.png`) and `purchaseDocumentPdfExport` (Print + real jsPDF via `.po-print-doc`).
-- **Print routes:** PO (upgraded), RFQ, GRN, PR, Purchase Invoice, Purchase Return ΓÇö all use Fabricators letterhead; `?download=1` auto-PDF.
+- **Print routes:** PO (upgraded), RFQ, GRN, PR, Purchase Invoice, Purchase Return Î“Ã‡Ã¶ all use Fabricators letterhead; `?download=1` auto-PDF.
 - **Actions:** Detail/list Print + Download PDF navigate to `/print` (or `/print?download=1`); GRN no longer aliases print to the detail page.
 
 ---
 
-## 2026-07-27 ΓÇö Purchase multi-unit UOM
+## 2026-07-27 Î“Ã‡Ã¶ Purchase multi-unit UOM
 
 ### Shipped
 
 - **Contract:** `quantity` = primary/stock UOM; `uomQuantity` = vendor/purchase UOM; `uomConversionFactor` = vendor units per 1 primary (e.g. 3 m = 1 NOS). Helper: `backend/src/modules/purchase/shared/uom-conversion.ts`.
 - **Item Master:** `MasterItem.uomConversionFactor` (mirrored with deprecated `purchaseQtyPerUom`); UI label **UOM Conversion Factor**.
-- **PO lines:** `uomQuantity`, `uomConversionFactor`, `unitCostPrimary`; amount = vendor rate ├ù `uomQuantity`; stock/open qty uses primary `quantity`.
+- **PO lines:** `uomQuantity`, `uomConversionFactor`, `unitCostPrimary`; amount = vendor rate â”œÃ¹ `uomQuantity`; stock/open qty uses primary `quantity`.
 - **GRN:** `receivedUomQuantity` (+ ordered/accepted/rejected UOM qty); inventory posting uses primary qty + `unitCostPrimary`.
 - **Inventory:** balances stay primary-only; list API adds computed `uomQuantity` / factor for display; movements optionally snapshot vendor UOM.
 - **Hostinger:** `backend/scripts/purchase-multi-unit-uom-hostinger.sql` + migration `20260727180000_purchase_multi_unit_uom`.
@@ -383,52 +561,52 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-27 ΓÇö Inventory valuation methods hardened (all 4)
+## 2026-07-27 Î“Ã‡Ã¶ Inventory valuation methods hardened (all 4)
 
 ### Fixes
 - **Moving average:** issues always use current avg rate (ignore caller rate).
-- **Standard cost:** fail-closed when active standard / item standardRate Γëñ 0.
+- **Standard cost:** fail-closed when active standard / item standardRate Î“Ã«Ã± 0.
 - **FIFO / Specific:** WO return layer restore + audit trail for both layer methods.
 - **Specific ID:** prefer serial/lot layers; allow unassigned opening-pool layers after migration; persist `lotId` on cost entries; new lot on issue is identity-only (no negative on-hand).
 - **Method change:** opening-stock layer migration runs for FIFO **and** Specific; FE copy updated.
 
 ### Verified
-- `npx vitest run` MA + FIFO + opening + return + Phase C + **new** `inventory-specific-identification.test.ts` ΓÇö **10/10 PASS**
+- `npx vitest run` MA + FIFO + opening + return + Phase C + **new** `inventory-specific-identification.test.ts` Î“Ã‡Ã¶ **10/10 PASS**
 
 ---
 
-## 2026-07-27 ΓÇö Close Money In / Money Out user-flow gaps
+## 2026-07-27 Î“Ã‡Ã¶ Close Money In / Money Out user-flow gaps
 
 ### Shipped
 - **AP reversal history:** `GET /accounting/payables/reversals` (invoices/payments/adjustments + allocation reversal batches); FE `ReversalHistoryPage` + Corrections history tab wired.
 - **Payable allocation history:** reverse action + corrected copy (subledger reverse is live).
 - **Money In Corrections hub:** `/accounting/money-in/corrections` (receipt / CN / allocation / journal reverse entry points).
-- **Dispatch ΓåÆ SI POD gate:** `assertPodAllowsInvoice` uses tenant `DispatchSettings`; enforced on SI source-link validate + invoice prefill; invoice-ready list hides POD-blocked lines when policy on.
+- **Dispatch Î“Ã¥Ã† SI POD gate:** `assertPodAllowsInvoice` uses tenant `DispatchSettings`; enforced on SI source-link validate + invoice prefill; invoice-ready list hides POD-blocked lines when policy on.
 
-### Already live (confirmed ΓÇö not rebuilt)
+### Already live (confirmed Î“Ã‡Ã¶ not rebuilt)
 - Money In: Sales Invoice, Receipt, Allocation, Credit Note, document/allocation reverse on detail pages; Journal reverse on journal detail.
-- Money Out: Vendor Invoice ΓåÆ Payment ΓåÆ Allocation ΓåÆ Adjustment ΓåÆ Reversal preview/history workspace.
+- Money Out: Vendor Invoice Î“Ã¥Ã† Payment Î“Ã¥Ã† Allocation Î“Ã¥Ã† Adjustment Î“Ã¥Ã† Reversal preview/history workspace.
 
 ### Open
 - Dispatch partial / multi / consolidated invoice **policy UI** polish.
 
 ---
 
-## 2026-07-27 ΓÇö Fuel Tank factory golden path UAT (Phase 3 close)
+## 2026-07-27 Î“Ã‡Ã¶ Fuel Tank factory golden path UAT (Phase 3 close)
 
 ### Shipped
 - Extended `backend/scripts/test-fuel-tank-wo-execution.ts` to assert full checklist: one FG WO, LOGICAL SFG Job Cards, route snapshot, WC/machine assignment, valued material issue (Inventory Costing), QC + rework, Final QC, WO actual cost, FG serial receipt, FG valuation, close readiness, WO COMPLETED.
 - Minimal fix: FG receipt passes `serialNumber` into inventory for qty=1 serial-tracked FG (`fg-receipt.service.ts`).
-- Docs: `FUEL_TANK_UAT.md` evidence table; `REMAINING_WORK.md` Fuel Tank entry ΓåÆ PASS.
+- Docs: `FUEL_TANK_UAT.md` evidence table; `REMAINING_WORK.md` Fuel Tank entry Î“Ã¥Ã† PASS.
 
 ### Verified (live, tenant `vasant-trailers`)
 - `npx tsx scripts/seed-fuel-tank-pilot-items.ts` + `seed-fuel-tank-mfg-setup.ts`
-- `npx tsx scripts/test-fuel-tank-wo-execution.ts` ΓÇö **PASS**
-- Evidence: `WO-000009`, serial `FT-5000L-43550266`, material/WO/FG cost Γé╣111,020.00
+- `npx tsx scripts/test-fuel-tank-wo-execution.ts` Î“Ã‡Ã¶ **PASS**
+- Evidence: `WO-000009`, serial `FT-5000L-43550266`, material/WO/FG cost Î“Ã©â•£111,020.00
 
 ---
 
-## 2026-07-27 ΓÇö Dispatch commercial O2C policy (UI + enforcement)
+## 2026-07-27 Î“Ã‡Ã¶ Dispatch commercial O2C policy (UI + enforcement)
 
 ### Shipped
 - Prisma `DispatchSettings` + `DispatchInvoiceMode`; migration `20260727143000_dispatch_commercial_policy`.
@@ -437,7 +615,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 - FE `/dispatch/settings` (partial, multi, one-per / consolidated / manual, POD). **No live e-Way.**
 
 ### Proof
-- Existing: Confirmed SO ΓåÆ FG ΓåÆ requirement ΓåÆ reserve ΓåÆ pick ΓåÆ pack ΓåÆ challan ΓåÆ post ΓåÆ stock ΓåÆ fulfilment ΓåÆ invoice ready (`dispatch-phase7c5`, `dispatch-o2c-invoice-allocate`).
+- Existing: Confirmed SO Î“Ã¥Ã† FG Î“Ã¥Ã† requirement Î“Ã¥Ã† reserve Î“Ã¥Ã† pick Î“Ã¥Ã† pack Î“Ã¥Ã† challan Î“Ã¥Ã† post Î“Ã¥Ã† stock Î“Ã¥Ã† fulfilment Î“Ã¥Ã† invoice ready (`dispatch-phase7c5`, `dispatch-o2c-invoice-allocate`).
 - New: `tests/dispatch-commercial-policy.test.ts`.
 
 ### Docs
@@ -445,92 +623,92 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-27 ΓÇö Manufacturing Accounting sequencing lock
+## 2026-07-27 Î“Ã‡Ã¶ Manufacturing Accounting sequencing lock
 
 ### Decision
 - Live Manufacturing Accounting GL (Issue / FG Receipt / Variance) **only after**: Inventory Costing + WO actual cost + FG valuation + Dispatch cost relief + Finance mappings are stable.
-- Journal model unchanged: Dr WIP / Cr RM ┬╖ Dr FG / Cr WIP ┬╖ Dr/Cr Production Variance.
+- Journal model unchanged: Dr WIP / Cr RM â”¬â•– Dr FG / Cr WIP â”¬â•– Dr/Cr Production Variance.
 - Existing readiness / enablement gate remains the protection model (`MANUFACTURING_ACCOUNTING` stays OFF until prerequisites + gate pass).
 - Captured in `docs/REMAINING_WORK.md` as blocked item.
 
 ---
 
-## 2026-07-27 ΓÇö API docs OpenAPI 1.5.0 (full route refresh)
+## 2026-07-27 Î“Ã‡Ã¶ API docs OpenAPI 1.5.0 (full route refresh)
 
 ### Shipped
-- Regenerated `swagger.generated-paths.ts` (`npm run swagger:generate`) ΓÇö 1411 ops scanned; expanded mounts (gate, executive, security, modules, organisation, departments, IndiaMART webhook).
+- Regenerated `swagger.generated-paths.ts` (`npm run swagger:generate`) Î“Ã‡Ã¶ 1411 ops scanned; expanded mounts (gate, executive, security, modules, organisation, departments, IndiaMART webhook).
 - Generator: match `*Router` / `*Routes` registrations (not only `router.`).
 - Hand-documented **Inventory Costing** + setup FIFO migration + effective-access / access-review in `swagger.ts`.
 - `docs/API_CONVENTIONS.md` bumped to 1.5.0 + inventory costing table.
 
 ### Verified
-- `npm run swagger:generate` ΓÇö Added stubs: 265; skipped already documented: 1146
+- `npm run swagger:generate` Î“Ã‡Ã¶ Added stubs: 265; skipped already documented: 1146
 
 ---
 
-## 2026-07-27 ΓÇö Inventory Costing UI (Phase 1 ΓÇö close stock value)
+## 2026-07-27 Î“Ã‡Ã¶ Inventory Costing UI (Phase 1 Î“Ã‡Ã¶ close stock value)
 
 ### Shipped
-- FE dual-mode **Inventory ΓåÆ Costing** workspace (`/inventory/costing/*`):
+- FE dual-mode **Inventory Î“Ã¥Ã† Costing** workspace (`/inventory/costing/*`):
   - Valuation Summary, Cost Entries (+ detail), FIFO Layers (+ detail), Average Cost History, Standard Cost (+ variances), Specific Identification, Valuation Reconciliation, Method Change wizard
-- API client `inventoryCostingApi.ts` ΓåÆ `/inventory/costing/*`
+- API client `inventoryCostingApi.ts` Î“Ã¥Ã† `/inventory/costing/*`
 - Nav + `inventory.view_cost` route gate; setup-manage for standard/method writes
-- Context links: GRN (Receipt Cost / Valuation), inward receipt detail, WO Costing tab ΓåÆ cost entries, Dispatch confirmed ΓåÆ cost relief
+- Context links: GRN (Receipt Cost / Valuation), inward receipt detail, WO Costing tab Î“Ã¥Ã† cost entries, Dispatch confirmed Î“Ã¥Ã† cost relief
 
 ### Verified
-- Frontend `tsc --noEmit` ΓÇö clean (costing paths)
+- Frontend `tsc --noEmit` Î“Ã‡Ã¶ clean (costing paths)
 
 ---
 
-## 2026-07-27 ΓÇö Purchase reports / GRNI / per-user approval limits
+## 2026-07-27 Î“Ã‡Ã¶ Purchase reports / GRNI / per-user approval limits
 
 ### Shipped
 - **Reports polish:** GRN/invoice reports read via `purchaseApiFacade` (no demo-store dead-end in API mode).
-- **GRNI:** Catalog report `grn-grni` + BE `GET /purchase/reports/grni` (accepted/received ΓêÆ invoiced open qty/value by GRN line).
-- **Per-user Γé╣ limits:** `PurchaseApproverLimit` table + Setup Approval tab grid; enforced on PR/PO approve after matrix role check.
+- **GRNI:** Catalog report `grn-grni` + BE `GET /purchase/reports/grni` (accepted/received Î“ÃªÃ† invoiced open qty/value by GRN line).
+- **Per-user Î“Ã©â•£ limits:** `PurchaseApproverLimit` table + Setup Approval tab grid; enforced on PR/PO approve after matrix role check.
 
 ### Verified
 - Migration `20260727180000_purchase_approver_limits` applied
-- `purchase-approver-limit.test.ts` ΓÇö **PASS**
-- `purchase-grni-report.test.ts` ΓÇö **PASS**
-- `purchase-matrix-role.test.ts` ΓÇö **PASS**
+- `purchase-approver-limit.test.ts` Î“Ã‡Ã¶ **PASS**
+- `purchase-grni-report.test.ts` Î“Ã‡Ã¶ **PASS**
+- `purchase-matrix-role.test.ts` Î“Ã‡Ã¶ **PASS**
 
 ---
 
-## 2026-07-27 ΓÇö Close Purchase paths (QI ΓåÆ Invoice ΓåÆ Return parity)
+## 2026-07-27 Î“Ã‡Ã¶ Close Purchase paths (QI Î“Ã¥Ã† Invoice Î“Ã¥Ã† Return parity)
 
 ### Shipped
-- **QI parity:** BE `POST ΓÇª/hold` ΓåÆ `DEVIATION_PENDING`; cancel wired; reject qty patched before complete; FE cancel action; `purchase.qi.*` permission aliases.
+- **QI parity:** BE `POST Î“Ã‡Âª/hold` Î“Ã¥Ã† `DEVIATION_PENDING`; cancel wired; reject qty patched before complete; FE cancel action; `purchase.qi.*` permission aliases.
 - **Invoice parity:** hide Hold/debit/exception stubs in API mode; matching enriched from PO/GRN; AP handoff preview; PO linked GRN/invoice/return lists.
-- **Return parity:** Submit ΓåÆ Approve ΓåÆ Complete; debit/replacement hidden in API mode; lifecycle asserts stock ISSUE (`prt-out:`).
-- **Valuation:** QI complete fail-closed ΓÇö QI + stock release + GRN `INVENTORY_POSTED` in one transaction (no silent defer).
+- **Return parity:** Submit Î“Ã¥Ã† Approve Î“Ã¥Ã† Complete; debit/replacement hidden in API mode; lifecycle asserts stock ISSUE (`prt-out:`).
+- **Valuation:** QI complete fail-closed Î“Ã‡Ã¶ QI + stock release + GRN `INVENTORY_POSTED` in one transaction (no silent defer).
 - **Approvals:** matrix role binding on PR/PO pending approvals; invoice approve checks amount-band highest role; return approve gate before stock complete.
 
 ### Verified
-- `purchase-matrix-role.test.ts` ΓÇö **PASS**
-- `purchase-qi-lifecycle.test.ts` ΓÇö **PASS** (QC hold ΓåÆ accept ΓåÆ `INVENTORY_POSTED` + `qi-release:` movements)
-- `purchase-return-lifecycle.test.ts` ΓÇö **PASS** (submit ΓåÆ approve ΓåÆ complete + `prt-out:` stock ISSUE)
-- `purchase-invoice-lifecycle-live.test.ts` ΓÇö **PASS**
+- `purchase-matrix-role.test.ts` Î“Ã‡Ã¶ **PASS**
+- `purchase-qi-lifecycle.test.ts` Î“Ã‡Ã¶ **PASS** (QC hold Î“Ã¥Ã† accept Î“Ã¥Ã† `INVENTORY_POSTED` + `qi-release:` movements)
+- `purchase-return-lifecycle.test.ts` Î“Ã‡Ã¶ **PASS** (submit Î“Ã¥Ã† approve Î“Ã¥Ã† complete + `prt-out:` stock ISSUE)
+- `purchase-invoice-lifecycle-live.test.ts` Î“Ã‡Ã¶ **PASS**
 - Fixture `seedPurchaseMasters` seeds `MasterItem`; `createSentPo` passes `itemId` so inventory posts run
 
 ---
 
-## 2026-07-27 ΓÇö Commercial proforma/tax lines: itemId (drop productId)
+## 2026-07-27 Î“Ã‡Ã¶ Commercial proforma/tax lines: itemId (drop productId)
 
 ### Shipped
-- Migration `20260727210000_crm_commercial_item_id`: add `itemId`, backfill from `productIdΓåÆfgItemId` / `itemCode` / tenant fallback, NOT NULL, DROP `productId` on `crm_proforma_invoice_lines` + `crm_tax_invoice_lines`.
+- Migration `20260727210000_crm_commercial_item_id`: add `itemId`, backfill from `productIdÎ“Ã¥Ã†fgItemId` / `itemCode` / tenant fallback, NOT NULL, DROP `productId` on `crm_proforma_invoice_lines` + `crm_tax_invoice_lines`.
 - BE: Zod requires `itemId`; `computeLine` + DTO mappers persist/return `itemId`.
-- FE: commercial/proforma types, bridges, SOΓåÆPI line builder use `MasterItem` / `itemId` only.
+- FE: commercial/proforma types, bridges, SOÎ“Ã¥Ã†PI line builder use `MasterItem` / `itemId` only.
 - UAT script `test-crm-commercial-uat.ts` creates lines from sellable `masterItem`.
 
 ### Verified
-- `npx tsx scripts/prisma-cli.ts migrate deploy` ΓÇö applied
-- `npx tsx scripts/test-crm-commercial-uat.ts vasant-trailers` ΓÇö **PASS**
-- Frontend `tsc` (commercial/proforma paths) ΓÇö clean
+- `npx tsx scripts/prisma-cli.ts migrate deploy` Î“Ã‡Ã¶ applied
+- `npx tsx scripts/test-crm-commercial-uat.ts vasant-trailers` Î“Ã‡Ã¶ **PASS**
+- Frontend `tsc` (commercial/proforma paths) Î“Ã‡Ã¶ clean
 
 ---
 
-## 2026-07-27 ΓÇö Inventory Costing Phase C (read APIs + standard/specific/WO/recon)
+## 2026-07-27 Î“Ã‡Ã¶ Inventory Costing Phase C (read APIs + standard/specific/WO/recon)
 
 ### Shipped
 - **Read APIs** under `/inventory/costing`:
@@ -546,21 +724,21 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 - **Method-change audit:** `InventoryValuationMethodChange` + settings stamp.
 
 ### Verified
-- `npx vitest run tests/inventory-costing-phasec.test.ts` ΓÇö **PASS** (2/2)
-- FIFO layers + return restore regression ΓÇö **PASS**
+- `npx vitest run tests/inventory-costing-phasec.test.ts` Î“Ã‡Ã¶ **PASS** (2/2)
+- FIFO layers + return restore regression Î“Ã‡Ã¶ **PASS**
 
 ---
 
-## 2026-07-27 ΓÇö FIFO RETURN_FROM_WO layer restore
+## 2026-07-27 Î“Ã‡Ã¶ FIFO RETURN_FROM_WO layer restore
 
 ### Shipped
 - **`fifo-return-restore.service.ts`:** plans LIFO restore against original `ISSUE_TO_WO` layer consumptions (WO-scoped or pinned via `reversalOfMovementId`).
 - **`postStockMovement`:** for FIFO + `RETURN_FROM_WO`, restores original layer remaining qty/value (re-OPEN if needed), sets movement `rate/value` from restored costs (ignores wrong caller rate), writes negative `InventoryCostLayerConsumption` audit rows; remainder without issue history falls back to a new OPEN layer.
-- **Material issue correction:** passes `reversalOfMovementId` so compensating returns restore that issueΓÇÖs layers.
+- **Material issue correction:** passes `reversalOfMovementId` so compensating returns restore that issueÎ“Ã‡Ã–s layers.
 
 ### Verified
-- `npx vitest run tests/inventory-fifo-return-restore.test.ts` ΓÇö **PASS** (caller rate 99 ignored; restore @10; layer 2ΓåÆ7 remaining)
-- `tests/inventory-fifo-layers.test.ts` ΓÇö **PASS**
+- `npx vitest run tests/inventory-fifo-return-restore.test.ts` Î“Ã‡Ã¶ **PASS** (caller rate 99 ignored; restore @10; layer 2Î“Ã¥Ã†7 remaining)
+- `tests/inventory-fifo-layers.test.ts` Î“Ã‡Ã¶ **PASS**
 
 ### Pass With Conditions
 - WO-level returns without `reversalOfMovementId` use LIFO across all WO issues for the item/warehouse.
@@ -568,11 +746,11 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-27 ΓÇö Dispatch 7C5 infrastructure fix (no rebuild)
+## 2026-07-27 Î“Ã‡Ã¶ Dispatch 7C5 infrastructure fix (no rebuild)
 
 ### Fixed (posting/reversal already existed)
-- Compat `POST ΓÇª/outbound/:id/reverse` accepts `dispatch.reverse.request|apply|post|override` (was `dispatch.post` only).
-- Readiness `reversibleQty` nets posting line `quantity ΓêÆ reversedQuantity`.
+- Compat `POST Î“Ã‡Âª/outbound/:id/reverse` accepts `dispatch.reverse.request|apply|post|override` (was `dispatch.post` only).
+- Readiness `reversibleQty` nets posting line `quantity Î“ÃªÃ† reversedQuantity`.
 - API outbound detail: reverse force path for `dispatch.override`; open-reversal Submit/Approve/Reject/Cancel/Apply panel; Post/Reverse/Emergency gated by session perms; Emergency command-bar only when override is actually allowed.
 - `dispatchApi`: reject/cancel helpers; typed reversal rows.
 - `.env.example`: `DISPATCH_HARDENED_POSTING_ENABLED` note.
@@ -582,7 +760,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-27 ΓÇö IndiaMART go-live prep (not a rebuild)
+## 2026-07-27 Î“Ã‡Ã¶ IndiaMART go-live prep (not a rebuild)
 
 ### Shipped / local prep
 - `FIELD_ENCRYPTION_KEY` added to local `backend/.env` (AES-256-GCM for Pull credentials).
@@ -593,52 +771,52 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ### Still needs operator
 - Restart API to load encryption key.
-- Paste live IndiaMART `glusr_crm_key` ΓåÆ Save ΓåÆ **Test connection**.
-- Initial import / Sync ΓåÆ UAT checklist in go-live doc.
+- Paste live IndiaMART `glusr_crm_key` Î“Ã¥Ã† Save Î“Ã¥Ã† **Test connection**.
+- Initial import / Sync Î“Ã¥Ã† UAT checklist in go-live doc.
 
 ---
 
 ### Shipped
-- **HTTP:** `GET ΓÇª/receivables/invoices/invoice-ready`, `POST ΓÇª/prefill-from-dispatch` (before `/:id`).
+- **HTTP:** `GET Î“Ã‡Âª/receivables/invoices/invoice-ready`, `POST Î“Ã‡Âª/prefill-from-dispatch` (before `/:id`).
 - **Create SI:** Zod accepts `sourceLinks`; draft service validates/enriches and persists ACTIVE consumption links.
 - **List SI:** optional `sourceDocumentId` filter (View Invoice from outbound).
 - **FE:** Money In `/accounting/money-in/invoice-ready` routed + tab; `moneyInPath` always `/accounting/money-in`.
-- **FE:** API outbound detail (`CONFIRMED`) ΓÇö Create Invoice / Open Invoice Draft / Invoice Ready.
-- **Live test:** `backend/tests/dispatch-o2c-invoice-allocate.test.ts` ΓÇö post ΓåÆ ready ΓåÆ prefill ΓåÆ create ΓåÆ post SI ΓåÆ allocate (**PASS**).
+- **FE:** API outbound detail (`CONFIRMED`) Î“Ã‡Ã¶ Create Invoice / Open Invoice Draft / Invoice Ready.
+- **Live test:** `backend/tests/dispatch-o2c-invoice-allocate.test.ts` Î“Ã‡Ã¶ post Î“Ã¥Ã† ready Î“Ã¥Ã† prefill Î“Ã¥Ã† create Î“Ã¥Ã† post SI Î“Ã¥Ã† allocate (**PASS**).
 
 ### Not in this slice
 - Partial / multi-dispatch / consolidated policy UI; POD gate on manual create; rebuild of 7C5 posting.
 
 ---
 
-## 2026-07-27 ΓÇö CEO Dashboard Builder (plug-and-play)
+## 2026-07-27 Î“Ã‡Ã¶ CEO Dashboard Builder (plug-and-play)
 
 ### Shipped
-- **Frontend:** `/executive` is now a configurable CEO Dashboard ΓÇö Customize mode, widget library (CRM/Sales/Purchase/Inventory/Manufacturing/Quality/Dispatch/Finance), drag/resize via `react-grid-layout`, templates (CEO/Sales/Factory/Finance), multi-dashboard create/rename/duplicate/set-default/delete, global date preset, per-widget visualization config, drill-down links.
+- **Frontend:** `/executive` is now a configurable CEO Dashboard Î“Ã‡Ã¶ Customize mode, widget library (CRM/Sales/Purchase/Inventory/Manufacturing/Quality/Dispatch/Finance), drag/resize via `react-grid-layout`, templates (CEO/Sales/Factory/Finance), multi-dashboard create/rename/duplicate/set-default/delete, global date preset, per-widget visualization config, drill-down links.
 - **Demo mode:** local persist + `queryWidgetDemo` over existing analytics/stores (no invented API-mode finance figures).
 - **API mode:** client + store hydrate against `/executive/*`; falls back to local builder if API not ready.
 - **Backend foundation:** Prisma `ExecutiveDashboard` / `ExecutiveDashboardWidget`, migration `20260727150000_executive_dashboards`, widget registry + permissions `executive.dashboard.*` (service/routes completing).
 
 ### How to try
-1. Open **Executive ΓåÆ CEO Dashboard** (`/executive`)
-2. **Customize Dashboard** ΓåÆ **Add Widget** ΓåÆ pick module widgets ΓåÆ drag/resize ΓåÆ **Save**
+1. Open **Executive Î“Ã¥Ã† CEO Dashboard** (`/executive`)
+2. **Customize Dashboard** Î“Ã¥Ã† **Add Widget** Î“Ã¥Ã† pick module widgets Î“Ã¥Ã† drag/resize Î“Ã¥Ã† **Save**
 3. **New Dashboard** from a template if desired
 
 ---
 
 
 ### Shipped
-- **Service:** `fifo-opening-stock-migration.service.ts` seeds OPEN `InventoryCostLayer` rows for on-hand gaps (`onHand ΓêÆ ╬ú OPEN remaining`) without changing physical `InventoryStockBalance` qty.
+- **Service:** `fifo-opening-stock-migration.service.ts` seeds OPEN `InventoryCostLayer` rows for on-hand gaps (`onHand Î“ÃªÃ† â•¬Ãº OPEN remaining`) without changing physical `InventoryStockBalance` qty.
 - Creates synthetic `OPENING`/`OPN` movement (valuation seed only; `balanceAfter` = current on-hand) + cost entry (`sourceType=FIFO_OPENING_MIGRATION`).
-- Values full covering gap from `stockValue` / `avgRate` (collapsed opening layer ΓÇö does not reconstruct historical receipt layers).
+- Values full covering gap from `stockValue` / `avgRate` (collapsed opening layer Î“Ã‡Ã¶ does not reconstruct historical receipt layers).
 - **CLI:** `npx tsx scripts/migrate-fifo-opening-stock.ts --tenant=<slug> [--dry-run] [--force]`
 - **API:** `POST /inventory/setup/fifo-opening-migration` (`inventory.setup.manage`) with `{ dryRun?, force?, itemIds?, warehouseIds? }`
 - Stamps `InventorySettings.settings.costing.fifoOpeningStockMigration` on apply.
 
 ### Verified
-- `npx vitest run tests/inventory-fifo-opening-migration.test.ts` ΓÇö **PASS**
-  - Average receipts create on-hand with no layers ΓåÆ switch to FIFO ΓåÆ issue fails ΓåÆ migrate seeds 20@15 ΓåÆ issue succeeds @15; qty unchanged
-- `tests/inventory-fifo-layers.test.ts` ΓÇö **PASS**
+- `npx vitest run tests/inventory-fifo-opening-migration.test.ts` Î“Ã‡Ã¶ **PASS**
+  - Average receipts create on-hand with no layers Î“Ã¥Ã† switch to FIFO Î“Ã¥Ã† issue fails Î“Ã¥Ã† migrate seeds 20@15 Î“Ã¥Ã† issue succeeds @15; qty unchanged
+- `tests/inventory-fifo-layers.test.ts` Î“Ã‡Ã¶ **PASS**
 
 ### Pass With Conditions
 - Over-allocated OPEN layers (layers > on-hand) are reported as exceptions; no auto-fix.
@@ -646,7 +824,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-27 ΓÇö CRM ProductΓåÆItem Phase 10 (drop CRM productId)
+## 2026-07-27 Î“Ã‡Ã¶ CRM ProductÎ“Ã¥Ã†Item Phase 10 (drop CRM productId)
 
 ### Shipped
 
@@ -659,20 +837,20 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-27 ΓÇö CRM ProductΓåÆItem Phase 9 + funnel UAT
+## 2026-07-27 Î“Ã‡Ã¶ CRM ProductÎ“Ã¥Ã†Item Phase 9 + funnel UAT
 
 ### Evidence
 
 - **Exceptions:** backfill dry-run `0`; global null-`itemId` audit `0` line blockers (after soft-deleting one leftover dispatch test SO).
-- **API smoke UAT:** `npx tsx scripts/test-crm-item-funnel-uat.ts vasant-trailers` ΓÇö **26/26 PASS** (LeadΓåÆOppΓåÆQuoteΓåÆSOΓåÆconfirmΓåÆMFG demand; asserts `itemId` / `productId: null`).
+- **API smoke UAT:** `npx tsx scripts/test-crm-item-funnel-uat.ts vasant-trailers` Î“Ã‡Ã¶ **26/26 PASS** (LeadÎ“Ã¥Ã†OppÎ“Ã¥Ã†QuoteÎ“Ã¥Ã†SOÎ“Ã¥Ã†confirmÎ“Ã¥Ã†MFG demand; asserts `itemId` / `productId: null`).
 - **Bugfix:** `crm-org-scope.ts` import path corrected (`../../access-scopes`).
 
 ### Phase 9 shipped
 
-- Write resolver no longer accepts `productId` ΓåÆ `fgItemId` fallback.
+- Write resolver no longer accepts `productId` Î“Ã¥Ã† `fgItemId` fallback.
 - Zod: opp lines / quote price lines / SO lines require `itemId`.
-- MFG SOΓåÆdemand convert requires line `itemId`.
-- Migration `20260727180000_crm_product_to_item_phase9_not_null` ΓÇö `itemId` NOT NULL on opp lines, quotations, sales orders.
+- MFG SOÎ“Ã¥Ã†demand convert requires line `itemId`.
+- Migration `20260727180000_crm_product_to_item_phase9_not_null` Î“Ã‡Ã¶ `itemId` NOT NULL on opp lines, quotations, sales orders.
 - Scripts: funnel UAT, null audits, Phase 9 cleanup helpers.
 
 ### Next
@@ -681,23 +859,23 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-27 ΓÇö CRM ProductΓåÆItem Phases 6ΓÇô8 frontend close-out
+## 2026-07-27 Î“Ã‡Ã¶ CRM ProductÎ“Ã¥Ã†Item Phases 6Î“Ã‡Ã´8 frontend close-out
 
 ### Shipped
 
 - **Sales Order create** switched to sellable Item pickers (`SoLineDraft.itemId`, `useSellableItems` / `canUseItemInSales`); create payloads send `itemId` and `productId: null`.
-- **QuotationΓåÆSO line builder** resolves `itemId` first (price line / opp line / product `fgItemId` / label); writes `productId: null` on SO lines.
-- **Opportunity SO prefill** includes `itemId`; duplicate deep-link accepts `itemId` or maps legacy `productId` ΓåÆ `fgItemId`.
-- **API types** ΓÇö `CreateSalesOrderBody` accepts header/line `itemId`.
+- **QuotationÎ“Ã¥Ã†SO line builder** resolves `itemId` first (price line / opp line / product `fgItemId` / label); writes `productId: null` on SO lines.
+- **Opportunity SO prefill** includes `itemId`; duplicate deep-link accepts `itemId` or maps legacy `productId` Î“Ã¥Ã† `fgItemId`.
+- **API types** Î“Ã‡Ã¶ `CreateSalesOrderBody` accepts header/line `itemId`.
 
 ### Next
 
-- API-mode smoke UAT: Lead ΓåÆ Opp ΓåÆ Quote ΓåÆ SO ΓåÆ confirm ΓåÆ MFG demand.
+- API-mode smoke UAT: Lead Î“Ã¥Ã† Opp Î“Ã¥Ã† Quote Î“Ã¥Ã† SO Î“Ã¥Ã† confirm Î“Ã¥Ã† MFG demand.
 - Phase 9: enforce non-null `itemId` when exceptions = 0.
 
 ---
 
-## 2026-07-27 ΓÇö Inventory Costing Phase A foundation (Option A)
+## 2026-07-27 Î“Ã‡Ã¶ Inventory Costing Phase A foundation (Option A)
 
 ### Shipped
 
@@ -728,7 +906,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 - Implement valuation orchestrator service and begin FIFO cost-layer phase without changing physical stock ledger ownership.
 
 ---
-## 2026-07-27 ΓÇö Inventory Costing Phase B FIFO layers
+## 2026-07-27 Î“Ã‡Ã¶ Inventory Costing Phase B FIFO layers
 
 ### Shipped
 - **FIFO layer tables:** added Prisma models + migration for `InventoryCostLayer` and `InventoryCostLayerConsumption` (additive; physical ledger unchanged).
@@ -740,53 +918,53 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ### Verified (2026-07-27)
 - Migrations deployed + Prisma client regenerated on local MySQL.
-- `npx vitest run tests/inventory-fifo-layers.test.ts` ΓÇö **PASS** (oldest-layer consume + cross-layer issue math).
-- `npx vitest run tests/inventory-moving-average.test.ts` ΓÇö **PASS** (non-FIFO path unchanged; cleanup FK order fixed).
+- `npx vitest run tests/inventory-fifo-layers.test.ts` Î“Ã‡Ã¶ **PASS** (oldest-layer consume + cross-layer issue math).
+- `npx vitest run tests/inventory-moving-average.test.ts` Î“Ã‡Ã¶ **PASS** (non-FIFO path unchanged; cleanup FK order fixed).
 ---
 
-## 2026-07-27 ΓÇö Admin A3ΓÇôA9 completion
+## 2026-07-27 Î“Ã‡Ã¶ Admin A3Î“Ã‡Ã´A9 completion
 
 ### Shipped
 
-- **Effective Access route ownership:** Removed compact A4 `GET ΓÇª/users/:id/effective-access` from `user.routes`; Phase 7 detailed report owns the path (`access.view` OR `user.view` OR self). FE bridge maps detailed ΓåÆ compact for store consumers. HTTP proof in `admin-effective-access-phase7.test.ts`.
-- **Module Administrators:** `ModuleAdministrator` model + migration `20260727160000_admin_module_administrators`; `GET/PUT ΓÇª/modules/:key/administrators`; designation register on `/admin/modules` (does **not** grant `module.manage` or hard-gate domain APIs). Surfaced on Effective Access as `moduleAdministrations`.
+- **Effective Access route ownership:** Removed compact A4 `GET Î“Ã‡Âª/users/:id/effective-access` from `user.routes`; Phase 7 detailed report owns the path (`access.view` OR `user.view` OR self). FE bridge maps detailed Î“Ã¥Ã† compact for store consumers. HTTP proof in `admin-effective-access-phase7.test.ts`.
+- **Module Administrators:** `ModuleAdministrator` model + migration `20260727160000_admin_module_administrators`; `GET/PUT Î“Ã‡Âª/modules/:key/administrators`; designation register on `/admin/modules` (does **not** grant `module.manage` or hard-gate domain APIs). Surfaced on Effective Access as `moduleAdministrations`.
 - **Unlock fix:** Admin unlock clears A1 `lockedUntil` / `failedLoginAttempts` as well as Phase 8 `lockedAt` / `failedLoginCount`.
 - **Surfaces verified wired:** Invitations, User LE/Branch scopes panel, Sessions, Login Activity, Responsibilities, Access Review (routes + nav + API clients).
-- **Regression:** `backend/tests/admin-security-regression.test.ts` ΓÇö **6/6 pass** (invite/accept/deactivate, scopes, effective access + review, lock/unlock/sessions, module admins, 403/404). `admin-module-administrators` **2/2**; phase7 effective-access **2/2**.
+- **Regression:** `backend/tests/admin-security-regression.test.ts` Î“Ã‡Ã¶ **6/6 pass** (invite/accept/deactivate, scopes, effective access + review, lock/unlock/sessions, module admins, 403/404). `admin-module-administrators` **2/2**; phase7 effective-access **2/2**.
 
 ### PASS WITH CONDITION
 
 - Invite SMTP still stub (dev/test returns token).
 - LE/branch/warehouse **assignment** shipped; **query enforcement** across CRM/SO still deferred (fail-open when empty).
-- Module admins are ownership contacts only ΓÇö not blanket API module gating.
+- Module admins are ownership contacts only Î“Ã‡Ã¶ not blanket API module gating.
 
 ### Next
 
-- Phase A A6 MasterItem sales / A7 CRM ProductΓåÆItem / A9 deployment readiness gate (separate tracks).
+- Phase A A6 MasterItem sales / A7 CRM ProductÎ“Ã¥Ã†Item / A9 deployment readiness gate (separate tracks).
 - Optional: editable password/MFA Admin settings; profile session list.
 
 ---
 
-## 2026-07-27 ΓÇö CRM Commercial Proforma API
+## 2026-07-27 Î“Ã‡Ã¶ CRM Commercial Proforma API
 
 ### Shipped
 
 - **Backend:** `CrmProformaInvoice` + `CrmProformaInvoiceLine` models; migration `20260727120000_crm_proforma_invoices`; FK from `CrmPaymentReceipt.proformaInvoiceId`; routes under `/crm/commercial/proformas` (CRUD + issue/cancel); proformas included in commercial sync bundle; receipt validation against persisted proforma grand total.
 - **Frontend:** `crmCommercialApi` + bridge proforma functions; `proformaInvoiceStore` delegates to API in `VITE_USE_API=true` (no localStorage persist); form/detail pages async-aware.
-- **UAT:** `backend/scripts/test-crm-commercial-uat.ts` ΓÇö Proforma ΓåÆ issue ΓåÆ receipts ΓåÆ invoice ΓåÆ post ΓåÆ allocate.
+- **UAT:** `backend/scripts/test-crm-commercial-uat.ts` Î“Ã‡Ã¶ Proforma Î“Ã¥Ã† issue Î“Ã¥Ã† receipts Î“Ã¥Ã† invoice Î“Ã¥Ã† post Î“Ã¥Ã† allocate.
 
 ---
 
-## 2026-07-27 ΓÇö Phase A2: Admin / Organization foundation
+## 2026-07-27 Î“Ã‡Ã¶ Phase A2: Admin / Organization foundation
 
 ### Shipped
 
 - **Admin shell IA:** Overview landing at `/admin` (no longer redirects to Users). Nav groups: Organization (Tenant Profile, Legal Entities & Branches), People & Access (Users, Roles), Platform Tenants (Super Admin / `tenant.manage` only).
 - **Overview:** KPI cards for users, roles, tenant status; quick links into Users / Roles / Tenant Profile / Organization.
-- **Tenant Profile:** Current-tenant page at `/admin/organization/tenant` ΓÇö name, slug, status, locale; edits safe fields via existing `PATCH /tenants/:id` when actor has `tenant.update` (Tenant Admin). Status / subscription remain read-only.
-- **Organization hub:** `/admin/organization` links to Accounting Legal Entities & Branches; documents Company = Legal Entity; UserΓåöbranch deferred to A3.
-- **Gates:** `canRoute('/adminΓÇª')` uses `canAccessAdminShell()`; `/admin/tenants*` requires `isSuperAdminUser()`; nav filtered via `canViewAdminNavItem`.
-- **Bridge:** `syncCurrentTenantProfile()` so nonΓÇôSuper Admins still hydrate current tenant without list access.
+- **Tenant Profile:** Current-tenant page at `/admin/organization/tenant` Î“Ã‡Ã¶ name, slug, status, locale; edits safe fields via existing `PATCH /tenants/:id` when actor has `tenant.update` (Tenant Admin). Status / subscription remain read-only.
+- **Organization hub:** `/admin/organization` links to Accounting Legal Entities & Branches; documents Company = Legal Entity; UserÎ“Ã¥Ã¶branch deferred to A3.
+- **Gates:** `canRoute('/adminÎ“Ã‡Âª')` uses `canAccessAdminShell()`; `/admin/tenants*` requires `isSuperAdminUser()`; nav filtered via `canViewAdminNavItem`.
+- **Bridge:** `syncCurrentTenantProfile()` so nonÎ“Ã‡Ã´Super Admins still hydrate current tenant without list access.
 
 ### PASS WITH CONDITION
 
@@ -795,34 +973,34 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ### Follow-on (completed 2026-07-27)
 
-- A3 invitations + UserΓåöLE/Branch assignment; A5 sessions / login activity ΓÇö see Admin A3ΓÇôA9 completion entry.
+- A3 invitations + UserÎ“Ã¥Ã¶LE/Branch assignment; A5 sessions / login activity Î“Ã‡Ã¶ see Admin A3Î“Ã‡Ã´A9 completion entry.
 ---
 
-## 2026-07-27 ΓÇö Phase A1 Authentication hardening
+## 2026-07-27 Î“Ã‡Ã¶ Phase A1 Authentication hardening
 
 ### Shipped
 
 - **Login messages:** BE rejects `SUSPENDED`/`INACTIVE` tenants with org-suspended copy; inactive accounts and lockouts get distinct messages; bad email/password stay generic (`AUTH_MSG` + codes). FE `mapLoginErrorMessage` + rate-limit copy.
-- **Change password:** `authApi.changePassword` ΓåÆ `POST /auth/change-password`; `/account/change-password` page; user-menu entry (API mode); success signs out and returns to login.
+- **Change password:** `authApi.changePassword` Î“Ã¥Ã† `POST /auth/change-password`; `/account/change-password` page; user-menu entry (API mode); success signs out and returns to login.
 - **Token refresh:** Single-flight refresh hardened (no stale-token fallback); failed refresh clears session + `setAuthNotice` for login banner. FE proof: `scripts/test-auth-refresh-singleflight.ts`.
-- **Guards:** Unauthenticated ΓåÆ `/login` (`ApiAuthGate`); no permission ΓåÆ `PermissionDeniedPage` (403), distinct from `PageNotFoundPage` (404); `RequirePermission` alias.
-- **Lockout foundation:** Prisma `failedLoginAttempts` / `lockedUntil` on `users` (migration `20260727120000_auth_login_lockout`); 5 failures ΓåÆ 15 min lock; success/reset/change-password clear counters. IP rate limiter retained (friendlier message).
+- **Guards:** Unauthenticated Î“Ã¥Ã† `/login` (`ApiAuthGate`); no permission Î“Ã¥Ã† `PermissionDeniedPage` (403), distinct from `PageNotFoundPage` (404); `RequirePermission` alias.
+- **Lockout foundation:** Prisma `failedLoginAttempts` / `lockedUntil` on `users` (migration `20260727120000_auth_login_lockout`); 5 failures Î“Ã¥Ã† 15 min lock; success/reset/change-password clear counters. IP rate limiter retained (friendlier message).
 - **Tests:** `backend/tests/auth-hardening.test.ts`.
 
 ### PASS WITH CONDITION
 
-- **Forgot/reset email delivery:** Still stub ΓÇö generic ΓÇ£if account existsΓÇªΓÇ¥ response; **dev** returns `resetToken` in payload (no SMTP). Prod needs mailer or out-of-band token delivery (A5 / ops).
+- **Forgot/reset email delivery:** Still stub Î“Ã‡Ã¶ generic Î“Ã‡Â£if account existsÎ“Ã‡ÂªÎ“Ã‡Â¥ response; **dev** returns `resetToken` in payload (no SMTP). Prod needs mailer or out-of-band token delivery (A5 / ops).
 
 ---
 
-## 2026-07-27 ΓÇö Phase B0: Purchase ΓåÆ GRN ΓåÆ Incoming QC ΓåÆ Inventory audit (read-only)
+## 2026-07-27 Î“Ã‡Ã¶ Phase B0: Purchase Î“Ã¥Ã† GRN Î“Ã¥Ã† Incoming QC Î“Ã¥Ã† Inventory audit (read-only)
 
 ### Shipped
 
-- **Audit doc:** `docs/PHASE_B_PURCHASE_GRN_QC_INVENTORY_AUDIT.md` ΓÇö code-first audit of Purchase/GRN/Incoming QC/Inventory/AP-handoff. No source code changed.
-- **Headline finding:** `PROJECT_STATUS.md`/`REMAINING_WORK.md`/`fos-erp-project.mdc` ┬º16 call this area "deferred by design, demo-only" ΓÇö **code says otherwise**. GRN lifecycle, incoming QC (`PurchaseQualityInspection`), GRNΓåÆInventory posting (single-writer `InventoryPostingService`), Purchase Return (GRN/QC-sourced), and Purchase InvoiceΓåÆVendor Invoice AP handoff are all real, tenant-scoped, permissioned, and covered by lifecycle tests. Frontend is dual-mode (`VITE_USE_API=true`) for GRN/QI/Return/Inventory, not demo-only.
-- **Top gaps identified:** (1) no incoming-QC Γåö NCR linkage (`QualityNcr` only FKs manufacturing inspections); (2) no end-to-end test asserting `InventoryStockMovement`/`InventoryStockBalance` after a GRN/QI flow; (3) `completeQualityInspection` swallows inventory-posting failures (log-and-continue, no compensating state); (4) no GRNI/GR-IR reconciliation report; (5) permission naming (`purchase.grn.*`, `purchase.quality.*`) differs from master-instruction vocabulary (`quality.incoming.*`, `inventory.purchase_receipt.*`) ΓÇö naming only, not a functional gap; dormant `inventory.quality.*` permissions found unused.
-- **Recommendation:** Treat B1ΓÇôB10 as hardening/closing gaps in a real system, not building from zero. Do not duplicate `InventoryPostingService` (`stock-posting.service.ts`), `purchase-inventory-posting.ts`, or the GRN/QI/Return/Invoice models ΓÇö see the doc's "Do not duplicate" section.
+- **Audit doc:** `docs/PHASE_B_PURCHASE_GRN_QC_INVENTORY_AUDIT.md` Î“Ã‡Ã¶ code-first audit of Purchase/GRN/Incoming QC/Inventory/AP-handoff. No source code changed.
+- **Headline finding:** `PROJECT_STATUS.md`/`REMAINING_WORK.md`/`fos-erp-project.mdc` â”¬Âº16 call this area "deferred by design, demo-only" Î“Ã‡Ã¶ **code says otherwise**. GRN lifecycle, incoming QC (`PurchaseQualityInspection`), GRNÎ“Ã¥Ã†Inventory posting (single-writer `InventoryPostingService`), Purchase Return (GRN/QC-sourced), and Purchase InvoiceÎ“Ã¥Ã†Vendor Invoice AP handoff are all real, tenant-scoped, permissioned, and covered by lifecycle tests. Frontend is dual-mode (`VITE_USE_API=true`) for GRN/QI/Return/Inventory, not demo-only.
+- **Top gaps identified:** (1) no incoming-QC Î“Ã¥Ã¶ NCR linkage (`QualityNcr` only FKs manufacturing inspections); (2) no end-to-end test asserting `InventoryStockMovement`/`InventoryStockBalance` after a GRN/QI flow; (3) `completeQualityInspection` swallows inventory-posting failures (log-and-continue, no compensating state); (4) no GRNI/GR-IR reconciliation report; (5) permission naming (`purchase.grn.*`, `purchase.quality.*`) differs from master-instruction vocabulary (`quality.incoming.*`, `inventory.purchase_receipt.*`) Î“Ã‡Ã¶ naming only, not a functional gap; dormant `inventory.quality.*` permissions found unused.
+- **Recommendation:** Treat B1Î“Ã‡Ã´B10 as hardening/closing gaps in a real system, not building from zero. Do not duplicate `InventoryPostingService` (`stock-posting.service.ts`), `purchase-inventory-posting.ts`, or the GRN/QI/Return/Invoice models Î“Ã‡Ã¶ see the doc's "Do not duplicate" section.
 
 ### Not started / unchanged
 
@@ -830,28 +1008,28 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-27 ΓÇö Phase A4: Roles / Permissions / Effective Access
+## 2026-07-27 Î“Ã‡Ã¶ Phase A4: Roles / Permissions / Effective Access
 
 ### Shipped
 
-- **Role builder UX:** full catalog module labels; presets (CRM User, Sales Viewer, Admin); mutate ΓåÆ auto-include `.view`.
+- **Role builder UX:** full catalog module labels; presets (CRM User, Sales Viewer, Admin); mutate Î“Ã¥Ã† auto-include `.view`.
 - **Effective Access:** `EffectiveAccessService` + `GET /api/v1/t/:tenantSlug/users/:userId/effective-access` (`user.view` or self); User detail section (API + demo).
 - **Safeguards (A4.6):** system roles immutable (403); last Tenant Admin protection (deactivate/delete/remove-role/strip role grants); non-admin actors can only assign permissions they hold.
 - **Tests:** `backend/tests/a4-roles-effective-access.test.ts`.
 
 ### PASS WITH CONDITION (A4.4 data scope)
 
-- OWN / BRANCH / COMPANY scope enums **deferred** ΓÇö no UserBranch model and no CRM/SO list filters this session.
+- OWN / BRANCH / COMPANY scope enums **deferred** Î“Ã‡Ã¶ no UserBranch model and no CRM/SO list filters this session.
 - Phase A ships **permission-only RBAC + EffectiveAccess**; branch ACL after A3 Users / post-A4.
 - **No fake scope picker** in UI.
 
 ### Not started / unchanged
 
-- Phase A overall DoD; A3; A5ΓÇôA9; A6/A7. (A1 auth + A2 Admin shell + A4 RBAC shipped.)
+- Phase A overall DoD; A3; A5Î“Ã‡Ã´A9; A6/A7. (A1 auth + A2 Admin shell + A4 RBAC shipped.)
 
 ---
 
-## 2026-07-27 ΓÇö Sales tax invoice create prefill
+## 2026-07-27 Î“Ã‡Ã¶ Sales tax invoice create prefill
 
 ### Shipped
 
@@ -861,7 +1039,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-25 ΓÇö Sales Payment Allocation UX redesign
+## 2026-07-25 Î“Ã‡Ã¶ Sales Payment Allocation UX redesign
 
 ### Shipped
 
@@ -872,7 +1050,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-25 ΓÇö 184 34 m┬│ Tip Trailer quotation template
+## 2026-07-25 Î“Ã‡Ã¶ 184 34 mâ”¬â”‚ Tip Trailer quotation template
 
 ### Shipped
 
@@ -882,7 +1060,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-25 ΓÇö 183 31 m┬│ Tipping Tank quotation template
+## 2026-07-25 Î“Ã‡Ã¶ 183 31 mâ”¬â”‚ Tipping Tank quotation template
 
 ### Shipped
 
@@ -892,7 +1070,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-25 ΓÇö 178 16 KL Chemical Tanker quotation template
+## 2026-07-25 Î“Ã‡Ã¶ 178 16 KL Chemical Tanker quotation template
 
 ### Shipped
 
@@ -902,7 +1080,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-25 ΓÇö 165 40 ft Walking Floor quotation template
+## 2026-07-25 Î“Ã‡Ã¶ 165 40 ft Walking Floor quotation template
 
 ### Shipped
 
@@ -912,7 +1090,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-25 ΓÇö 175 23 m┬│ Bulker quotation template
+## 2026-07-25 Î“Ã‡Ã¶ 175 23 mâ”¬â”‚ Bulker quotation template
 
 ### Shipped
 
@@ -922,17 +1100,17 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-25 ΓÇö 164 30.5 KL Chemical Tanker Trailer quotation template
+## 2026-07-25 Î“Ã‡Ã¶ 164 30.5 KL Chemical Tanker Trailer quotation template
 
 ### Shipped
 
 - New VF Word catalog template **`CHEM-TANKER-30-5KL`** / `qtpl-chem-tanker-30-5kl` from `164.30.5 KL Chemical Tanker Trailer.docx` (archived `docs/quotation-template-sources/164-30.5KL-Chemical-Tanker-Trailer.docx`).
-- Sections: SS 304L elliptical tanker specs, connections/discharge, electrical/paint, York running gear + EBS, terms (30% advance / balance against delivery; 40ΓÇô80 day batch note).
+- Sections: SS 304L elliptical tanker specs, connections/discharge, electrical/paint, York running gear + EBS, terms (30% advance / balance against delivery; 40Î“Ã‡Ã´80 day batch note).
 - Keep codes + seed + demo builtins updated; local seeded; live SQL `backend/scripts/seed-chem-tanker-30-5kl.sql`.
 
 ---
 
-## 2026-07-25 ΓÇö 156 34ΓÇ▓ ├ù 5ΓÇ▓ Side Wall Trailer quotation template
+## 2026-07-25 Î“Ã‡Ã¶ 156 34Î“Ã‡â–“ â”œÃ¹ 5Î“Ã‡â–“ Side Wall Trailer quotation template
 
 ### Shipped
 
@@ -942,7 +1120,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-25 ΓÇö 154 45 m┬│ Bulker Trailer quotation template
+## 2026-07-25 Î“Ã‡Ã¶ 154 45 mâ”¬â”‚ Bulker Trailer quotation template
 
 ### Shipped
 
@@ -958,12 +1136,12 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-27 ΓÇö Phase A A0: Deployment Hardening Audit
+## 2026-07-27 Î“Ã‡Ã¶ Phase A A0: Deployment Hardening Audit
 
 ### Shipped
 
-- Code-verified audit document [`docs/PHASE_A_DEPLOYMENT_HARDENING_AUDIT.md`](PHASE_A_DEPLOYMENT_HARDENING_AUDIT.md) covering Platform, Auth, Admin, MasterItem sales gaps, and CRM ProductΓåÆItem `productId` inventory.
-- Locked delivery sequence A1ΓåÆA9; A7 blocked until A6; no Phase B / MRP / FIFO / Purchase rewrite started.
+- Code-verified audit document [`docs/PHASE_A_DEPLOYMENT_HARDENING_AUDIT.md`](PHASE_A_DEPLOYMENT_HARDENING_AUDIT.md) covering Platform, Auth, Admin, MasterItem sales gaps, and CRM ProductÎ“Ã¥Ã†Item `productId` inventory.
+- Locked delivery sequence A1Î“Ã¥Ã†A9; A7 blocked until A6; no Phase B / MRP / FIFO / Purchase rewrite started.
 
 ### Next
 
@@ -971,50 +1149,50 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-24 ΓÇö CRM-only user (API mode RBAC)
+## 2026-07-24 Î“Ã‡Ã¶ CRM-only user (API mode RBAC)
 
 ### Shipped
 
-- Backend role **`CRM User`** ΓÇö CRM + commercial + IndiaMART enquiry view + master lookup/product/item read; no purchase, manufacturing, inventory, finance, or admin permissions.
+- Backend role **`CRM User`** Î“Ã‡Ã¶ CRM + commercial + IndiaMART enquiry view + master lookup/product/item read; no purchase, manufacturing, inventory, finance, or admin permissions.
 - Seed user **`crm.user@vasant-trailers.com`** / **`CrmUser@123`** on tenant `vasant-trailers` (also `backend/scripts/seed-crm-user.ts` for idempotent upsert).
 - Frontend sidebar filters all module categories via `canAccessModuleCategory()`; route guard unchanged (`canRoute` + backend JWT permissions). Settings chrome hidden when `settings.view` missing; brand link lands on `/crm` for CRM-only users.
 
 ### Verification
 
 - `cd backend && npm run db:seed` (or `npx tsx scripts/seed-crm-user.ts`)
-- Login API mode; sidebar shows CRM only; deep-link `/purchase` ΓåÆ access denied.
+- Login API mode; sidebar shows CRM only; deep-link `/purchase` Î“Ã¥Ã† access denied.
 
 ---
 
-## 2026-07-24 ΓÇö CRM Commercial API + Payment Allocation fix
+## 2026-07-24 Î“Ã‡Ã¶ CRM Commercial API + Payment Allocation fix
 
 ### Shipped
 
-- **Bugfix:** `/crm/commercial/payment-allocation` infinite re-render ΓÇö Zustand selectors returned new arrays every render; switched to stable store slices + `useMemo`.
-- **DB:** migration `20260724160000_crm_commercial_receivables` ΓÇö `crm_payment_receipts`, `crm_tax_invoices`, `crm_tax_invoice_lines`, `crm_payment_allocations`.
+- **Bugfix:** `/crm/commercial/payment-allocation` infinite re-render Î“Ã‡Ã¶ Zustand selectors returned new arrays every render; switched to stable store slices + `useMemo`.
+- **DB:** migration `20260724160000_crm_commercial_receivables` Î“Ã‡Ã¶ `crm_payment_receipts`, `crm_tax_invoices`, `crm_tax_invoice_lines`, `crm_payment_allocations`.
 - **API:** `/api/v1/t/:slug/crm/commercial/*` (receipts, invoices post/cancel, allocations + reverse, sync bundle) gated by `crm.commercial.*`.
 - **FE bridge:** `crmCommercialApiBridge` hydrates via CRM sync; pages call API in `VITE_USE_API=true`.
 
 ### Verification
 
-- `npx tsx scripts/prisma-cli.ts migrate deploy` ΓÇö applied
-- `npm run test:crm-commercial` ΓÇö 20/20 PASS
+- `npx tsx scripts/prisma-cli.ts migrate deploy` Î“Ã‡Ã¶ applied
+- `npm run test:crm-commercial` Î“Ã‡Ã¶ 20/20 PASS
 
 ---
 
-## 2026-07-24 ΓÇö CRM Commercial & Receivables Workflow (demo)
+## 2026-07-24 Î“Ã‡Ã¶ CRM Commercial & Receivables Workflow (demo)
 
 ### Shipped
 
 - Lightweight CRM commercial layer (no Accounting module navigation required):
-  - **Proforma Receive Payment** ΓÇö receipt number auto, mode/UTR/amount/remarks/attachment; Unpaid / Partially Paid / Fully Paid; multi-receipt history on PI detail.
-  - **Create Invoice** from Sales Order, Proforma, and Customer 360; draft ΓåÆ post / cancel draft; partial + multiple invoices per SO.
-  - **Payment Allocation Workspace** at `/crm/commercial/payment-allocation` (oneΓåömany, partial, reverse + audit).
+  - **Proforma Receive Payment** Î“Ã‡Ã¶ receipt number auto, mode/UTR/amount/remarks/attachment; Unpaid / Partially Paid / Fully Paid; multi-receipt history on PI detail.
+  - **Create Invoice** from Sales Order, Proforma, and Customer 360; draft Î“Ã¥Ã† post / cancel draft; partial + multiple invoices per SO.
+  - **Payment Allocation Workspace** at `/crm/commercial/payment-allocation` (oneÎ“Ã¥Ã¶many, partial, reverse + audit).
   - Customer 360 tabs: Quotations, Sales Orders, Proforma Invoices, Invoices, Payment Receipts, Payment Allocations, Outstanding Summary, Customer Ledger (+ commercial timeline).
 - Store: `crmCommercialStore` (receipts, tax invoices, allocations, audit log, timeline).
 - Permissions: `crm.commercial.*` on backend role packs (CRM Admin / Sales Manager / Sales Executive).
-- Nav: CRM ΓåÆ Tax Invoices, Payment Allocation.
-- Tests: `npm run test:crm-commercial` ΓÇö 20/20 PASS.
+- Nav: CRM Î“Ã¥Ã† Tax Invoices, Payment Allocation.
+- Tests: `npm run test:crm-commercial` Î“Ã‡Ã¶ 20/20 PASS.
 
 ### Scope note
 
@@ -1027,7 +1205,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-24 ΓÇö Restore 76 ΓÇö 26 KL ISO Tank quotation template
+## 2026-07-24 Î“Ã‡Ã¶ Restore 76 Î“Ã‡Ã¶ 26 KL ISO Tank quotation template
 
 ### Shipped
 
@@ -1042,7 +1220,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-24 ΓÇö IndiaMART Phase 5 (Push webhook, charts, SLA alerts, product mapping UI)
+## 2026-07-24 Î“Ã‡Ã¶ IndiaMART Phase 5 (Push webhook, charts, SLA alerts, product mapping UI)
 
 ### Shipped
 
@@ -1064,7 +1242,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-24 ΓÇö IndiaMART CRM Lead Integration (Phases 1ΓÇô4 foundation)
+## 2026-07-24 Î“Ã‡Ã¶ IndiaMART CRM Lead Integration (Phases 1Î“Ã‡Ã´4 foundation)
 
 ### Shipped
 
@@ -1079,7 +1257,7 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 ### Verification
 
 - `npx prisma validate` (with DATABASE_URL)
-- `npx vitest run tests/indiamart-normalizer.test.ts` ΓÇö 10/10 PASS
+- `npx vitest run tests/indiamart-normalizer.test.ts` Î“Ã‡Ã¶ 10/10 PASS
 - Backend/frontend typecheck: no new IndiaMART errors
 
 ### Known limitations
@@ -1088,11 +1266,11 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-23 ΓÇö Manufacturing Accounting permission sync + UAT checklist
+## 2026-07-23 Î“Ã‡Ã¶ Manufacturing Accounting permission sync + UAT checklist
 
 ### Shipped
 
-- Ran `sync-permissions.ts` on live DB ΓÇö **84** role-permission links (enablement keys for Tenant Admin / Finance Manager / Inventory Manager / etc.).
+- Ran `sync-permissions.ts` on live DB Î“Ã‡Ã¶ **84** role-permission links (enablement keys for Tenant Admin / Finance Manager / Inventory Manager / etc.).
 - Production Manager limited to `manufacturing.accounting.view` + `.readiness` (Finance owns enable/sign-off); over-grants revoked.
 - UAT checklist: `docs/manufacturing/accounting/MANUFACTURING_ACCOUNTING_UAT_CHECKLIST.md`
 - Smoke: `backend/scripts/uat-mfg-accounting-enablement.ts` (does not enable flag)
@@ -1105,28 +1283,28 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-23 ΓÇö Emergency Override drawers (Dispatch)
+## 2026-07-23 Î“Ã‡Ã¶ Emergency Override drawers (Dispatch)
 
 ### Shipped
 
 - Shared never-overridable vs operational blocker catalog; fail-closed on unknown codes.
-- `emergency_overrides` audit register (GRANTED ΓåÆ CONSUMED, time-bound, document-scoped).
-- Dispatch post accepts `emergencyOverride{ΓÇª}`; readiness exposes `emergencyOverride.canRequest`.
+- `emergency_overrides` audit register (GRANTED Î“Ã¥Ã† CONSUMED, time-bound, document-scoped).
+- Dispatch post accepts `emergencyOverride{Î“Ã‡Âª}`; readiness exposes `emergencyOverride.canRequest`.
 - FE `EmergencyOverrideDrawer` on workbench outbound when Post is blocked.
 - Docs: `docs/EMERGENCY_OVERRIDE.md`, updated `DISPATCH_EMERGENCY_OVERRIDE.md`.
 
 ### Evidence
 
 - Migrate `20260723120000_emergency_overrides` applied
-- `npx vitest run tests/emergency-override-catalog.test.ts` ΓåÆ **4/4 PASS**
-- `dispatch-phase7c5` emergency case ΓåÆ **PASS** (GRANTEDΓåÆCONSUMED path)
+- `npx vitest run tests/emergency-override-catalog.test.ts` Î“Ã¥Ã† **4/4 PASS**
+- `dispatch-phase7c5` emergency case Î“Ã¥Ã† **PASS** (GRANTEDÎ“Ã¥Ã†CONSUMED path)
 
 ---
 
 ### Shipped
 
-- POD register after posted Dispatch: `IN_TRANSIT` ΓåÆ capture DELIVERED / partial / exception / rejected / return.
-- **No stock movements** on POD ΓÇö FG already issued at Dispatch post.
+- POD register after posted Dispatch: `IN_TRANSIT` Î“Ã¥Ã† capture DELIVERED / partial / exception / rejected / return.
+- **No stock movements** on POD Î“Ã‡Ã¶ FG already issued at Dispatch post.
 - Auto-create IN_TRANSIT shell on post; APIs under `/dispatch/outbound/:id/pod/*`.
 - Policy `REQUIRE_POD_BEFORE_INVOICE` (default OFF) gates auto draft SI.
 - FE `DispatchPodPanel` on outbound detail; docs `docs/dispatch/DISPATCH_POD.md`.
@@ -1134,91 +1312,91 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 ### Evidence
 
 - Migrate `20260723110000_dispatch_proof_of_delivery` + `20260723111000_dispatch_pod_ob_unique`
-- `npx vitest run tests/dispatch-pod.test.ts` ΓåÆ **2/2 PASS** (IN_TRANSIT + capture DELIVERED; stock-neutral)
+- `npx vitest run tests/dispatch-pod.test.ts` Î“Ã¥Ã† **2/2 PASS** (IN_TRANSIT + capture DELIVERED; stock-neutral)
 
 ---
 
-## 2026-07-23 ΓÇö Dispatch e-Way Bill (statutory NIC panel)
+## 2026-07-23 Î“Ã‡Ã¶ Dispatch e-Way Bill (statutory NIC panel)
 
 ### Shipped
 
 - e-Way is **not** a manual number field: removed editable DC transport input; system snapshot only on generate.
 - `GstEWayBill` enriched: generatedAt, transporterId, requiredReason, request/response JSON, outboundDispatchId.
 - NIC adapter: generate / cancel / **update vehicle** + request/response snapshots (SIMULATED; LIVE blocked until certified).
-- Dispatch panel API `GET ΓÇª/e-way-bills/panel` + actions; FE `DispatchEWayBillPanel` on Delivery Challan detail.
+- Dispatch panel API `GET Î“Ã‡Âª/e-way-bills/panel` + actions; FE `DispatchEWayBillPanel` on Delivery Challan detail.
 - Docs: `docs/dispatch/DISPATCH_EWAY_BILL.md`.
 
 ### Evidence
 
 - Prisma migrate `20260723103000_eway_bill_statutory_fields` applied
-- `cd backend && npx vitest run tests/finance/finance-gst-einvoice-eway.test.ts` ΓåÆ **4/4 PASS**
+- `cd backend && npx vitest run tests/finance/finance-gst-einvoice-eway.test.ts` Î“Ã¥Ã† **4/4 PASS**
 
 ---
 
 ### Shipped
 
-- Policy locked: Post Dispatch ΓåÆ reduce FG ΓåÆ `InventoryAccountingEvent` ΓåÆ central `post()` **only** when `INVENTORY_ACCOUNTING` is enabled for the Legal Entity.
+- Policy locked: Post Dispatch Î“Ã¥Ã† reduce FG Î“Ã¥Ã† `InventoryAccountingEvent` Î“Ã¥Ã† central `post()` **only** when `INVENTORY_ACCOUNTING` is enabled for the Legal Entity.
 - Dispatch/frontend do **not** create COGS vouchers; Dispatch only calls `tryRecordInventoryAccountingEventsForMovements` with resolved `legalEntityId`.
 - Docs ownership table in `docs/dispatch/DISPATCH_COGS.md`; live test covers POSTED + `SKIPPED_FLAG_OFF`.
 
 ### Evidence
 
-- `cd backend && npx vitest run tests/dispatch-cogs-gl.test.ts` ΓåÆ PASS
+- `cd backend && npx vitest run tests/dispatch-cogs-gl.test.ts` Î“Ã¥Ã† PASS
 
 ---
 
 ### Shipped
 
-- **FOS rule:** Posted Dispatch ΓåÆ `FG_DISPATCH` inventory accounting ΓåÆ Dr `COST_OF_GOODS_SOLD` / Cr `FINISHED_GOODS_INVENTORY` (not on Sales Invoice; `ENABLE_SI_COGS_POSTING` stays OFF).
+- **FOS rule:** Posted Dispatch Î“Ã¥Ã† `FG_DISPATCH` inventory accounting Î“Ã¥Ã† Dr `COST_OF_GOODS_SOLD` / Cr `FINISHED_GOODS_INVENTORY` (not on Sales Invoice; `ENABLE_SI_COGS_POSTING` stays OFF).
 - CoA template leaf **5600 Cost of Goods Sold**; Veer seed maps `COST_OF_GOODS_SOLD` (+ additive create if CoA pre-existed).
 - Enable API: `GET/PUT /inventory/accounting/feature-controls/:legalEntityId` (requires COGS + FG mappings).
 - Docs: `docs/dispatch/DISPATCH_COGS.md`.
 
 ### Evidence
 
-- `cd backend && npx vitest run tests/dispatch-cogs-gl.test.ts` ΓåÆ **2/2 PASS** (Γé╣4,00,000 Dr COGS / Cr FG + idempotent)
-- `tests/inventory-accounting-events.test.ts` ΓåÆ builder COGS pair still green
+- `cd backend && npx vitest run tests/dispatch-cogs-gl.test.ts` Î“Ã¥Ã† **2/2 PASS** (Î“Ã©â•£4,00,000 Dr COGS / Cr FG + idempotent)
+- `tests/inventory-accounting-events.test.ts` Î“Ã¥Ã† builder COGS pair still green
 
 ---
 
 ### Shipped
 
-- Posted dispatch ΓåÆ **DRAFT** Sales Invoice only (never auto-post). Idempotent per `DispatchPosting` via `sourceDocumentSnapshot.autoFromDispatchPostingId`.
-- Outbox: `DISPATCH_POSTED` / `SALES_ORDER_INVOICE_READY` ΓåÆ `createDraftSalesInvoiceFromDispatchPosting`.
-- Qty = invoice-ready (net posted ΓêÆ ACTIVE links ΓêÆ reversed). Partial dispatch invoices dispatched qty only.
+- Posted dispatch Î“Ã¥Ã† **DRAFT** Sales Invoice only (never auto-post). Idempotent per `DispatchPosting` via `sourceDocumentSnapshot.autoFromDispatchPostingId`.
+- Outbox: `DISPATCH_POSTED` / `SALES_ORDER_INVOICE_READY` Î“Ã¥Ã† `createDraftSalesInvoiceFromDispatchPosting`.
+- Qty = invoice-ready (net posted Î“ÃªÃ† ACTIVE links Î“ÃªÃ† reversed). Partial dispatch invoices dispatched qty only.
 - Reverse: only **POSTED** SI hard-blocks; DRAFT/READY linked SIs cancelled on reverse apply.
 - Flag `ENABLE_AUTO_SALES_INVOICE_FROM_DISPATCH`: ON outside production by default; OFF in production until set.
 - Docs: `docs/dispatch/DISPATCH_AUTO_SALES_INVOICE.md`.
 
 ### Evidence
 
-- `cd backend && npx vitest run tests/dispatch-phase7c5.test.ts` ΓåÆ **17/17 PASS**
+- `cd backend && npx vitest run tests/dispatch-phase7c5.test.ts` Î“Ã¥Ã† **17/17 PASS**
 
 ---
 
-## 2026-07-23 ΓÇö Admin UI Dynamics chrome (CRM/Accounting parity)
+## 2026-07-23 Î“Ã‡Ã¶ Admin UI Dynamics chrome (CRM/Accounting parity)
 
 ### Shipped
 
-- `AdminWorkspaceShell` ΓÇö `variant="dynamics"` + `layout="enterprise"` + badge **Admin** + `DynamicsTabs` + `ErpCommandBar`
+- `AdminWorkspaceShell` Î“Ã‡Ã¶ `variant="dynamics"` + `layout="enterprise"` + badge **Admin** + `DynamicsTabs` + `ErpCommandBar`
 - Overview + People / Organisation / Security hubs restyled; Users/Roles/Tenants lists use `badge="Admin"`
 
 ---
 
-## 2026-07-23 ΓÇö Dispatch 7C5 emergency / serial-lot / concurrency tests
+## 2026-07-23 Î“Ã‡Ã¶ Dispatch 7C5 emergency / serial-lot / concurrency tests
 
 ### Shipped
 
-- Live suite covers emergency override post (`dispatch.override`), serial/lot incompleteΓåÆ409 / seeded serialΓåÆ200 / duplicate active serial unique reject, and N-way post + concurrent reverse apply-once stress.
+- Live suite covers emergency override post (`dispatch.override`), serial/lot incompleteÎ“Ã¥Ã†409 / seeded serialÎ“Ã¥Ã†200 / duplicate active serial unique reject, and N-way post + concurrent reverse apply-once stress.
 - Happy-path asserts auto DRAFT SI (created or already existing from outbox) + idempotent re-call.
 
 ### Evidence
 
-- `cd backend && npx vitest run tests/dispatch-phase7c5.test.ts` ΓåÆ **17/17 PASS**
+- `cd backend && npx vitest run tests/dispatch-phase7c5.test.ts` Î“Ã¥Ã† **17/17 PASS**
 
 ---
 
-## 2026-07-23 ΓÇö Admin users blank in API mode
+## 2026-07-23 Î“Ã‡Ã¶ Admin users blank in API mode
 
 ### Shipped
 
@@ -1227,21 +1405,21 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ### Evidence
 
-- Live `GET /api/v1/t/vasant-trailers/users` as `admin@vasant-trailers.com` ΓåÆ **8** ACTIVE users.
+- Live `GET /api/v1/t/vasant-trailers/users` as `admin@vasant-trailers.com` Î“Ã¥Ã† **8** ACTIVE users.
 
 ---
 
-## 2026-07-23 ΓÇö Bank & Cash UAT readiness fix
+## 2026-07-23 Î“Ã‡Ã¶ Bank & Cash UAT readiness fix
 
 ### Shipped
 
 - Status locked: **live API for internal UAT / controlled pilot**; **AIS / FX / intercompany** still deferred (`BANK_CASH_STATUS.md`, PROJECT_MEMORY)
 - Workspace tabs trimmed to live routes only (no seed bank-accounts / deposits / cash-counts / setup links)
-- Seed deep links redirect to `/accounting/bank-cash` (cash-book ΓåÆ cashbook)
+- Seed deep links redirect to `/accounting/bank-cash` (cash-book Î“Ã¥Ã† cashbook)
 
 ---
 
-## 2026-07-23 ΓÇö Inventory + Pilot Finance sign-off (server-stored)
+## 2026-07-23 Î“Ã‡Ã¶ Inventory + Pilot Finance sign-off (server-stored)
 
 ### Shipped
 
@@ -1252,18 +1430,18 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ### Evidence
 
-- `npx tsx scripts/test-mfg-accounting-enablement-gate.ts` ΓåÆ PASS
+- `npx tsx scripts/test-mfg-accounting-enablement-gate.ts` Î“Ã¥Ã† PASS
 
 ---
 
-## 2026-07-23 ΓÇö Manufacturing Accounting readiness / enablement APIs (┬º9ΓÇô30 core)
+## 2026-07-23 Î“Ã‡Ã¶ Manufacturing Accounting readiness / enablement APIs (â”¬Âº9Î“Ã‡Ã´30 core)
 
 ### Shipped
 
 - Consolidated `getReadiness()` (`checks`, `blockingCodes`, `nextAction`, `allowedActions`, feature-flag metadata, sign-off history).
 - `GET /manufacturing/accounting/readiness`
-- `POST ΓÇª/sign-offs/inventory-reconciliation` + `ΓÇª/finance-pilot` (additive `ManufacturingAccountingSignOff` + config snapshot).
-- `POST ΓÇª/enable` (re-validates readiness; stores enabledBy/At/note) + `POST ΓÇª/disable` (reason; preserves events/GL).
+- `POST Î“Ã‡Âª/sign-offs/inventory-reconciliation` + `Î“Ã‡Âª/finance-pilot` (additive `ManufacturingAccountingSignOff` + config snapshot).
+- `POST Î“Ã‡Âª/enable` (re-validates readiness; stores enabledBy/At/note) + `POST Î“Ã‡Âª/disable` (reason; preserves events/GL).
 - Permissions: readiness, reconcile_signoff, finance_signoff, enable, disable, failed_events.view/retry.
 - FE: next-action strip; enable via new APIs; route alias `/manufacturing/costing/accounting-readiness`.
 - Docs under `docs/manufacturing/accounting/`.
@@ -1274,34 +1452,34 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-23 ΓÇö Bank & Cash UAT readiness fix
+## 2026-07-23 Î“Ã‡Ã¶ Bank & Cash UAT readiness fix
 
 ### Shipped
 
 - Status locked: **live API for internal UAT / controlled pilot**; **AIS / FX / intercompany** still deferred (`BANK_CASH_STATUS.md`, PROJECT_MEMORY)
 - Workspace tabs trimmed to live routes only (no seed bank-accounts / deposits / cash-counts / setup links)
-- Seed deep links redirect to `/accounting/bank-cash` (cash-book ΓåÆ cashbook)
+- Seed deep links redirect to `/accounting/bank-cash` (cash-book Î“Ã¥Ã† cashbook)
 
 ---
 
-## 2026-07-23 ΓÇö Guided Fulfilment URL + Control Room shortcut
+## 2026-07-23 Î“Ã‡Ã¶ Guided Fulfilment URL + Control Room shortcut
 
 ### Shipped
 
-- `?step=` persistence on WO detail, SO fulfilment panel, and hub (`/manufacturing/guided-fulfilment`) ΓÇö same pattern as Guided Deal
-- **Fulfilment** shortcut on Control Room + Store workbench ΓåÆ shared journey strip
+- `?step=` persistence on WO detail, SO fulfilment panel, and hub (`/manufacturing/guided-fulfilment`) Î“Ã‡Ã¶ same pattern as Guided Deal
+- **Fulfilment** shortcut on Control Room + Store workbench Î“Ã¥Ã† shared journey strip
 - Smoke checklist: `docs/dispatch/GUIDED_FULFILMENT_SMOKE.md`
 
 ---
 
-## 2026-07-23 ΓÇö Inventory + Pilot Finance sign-off (server-stored)
+## 2026-07-23 Î“Ã‡Ã¶ Inventory + Pilot Finance sign-off (server-stored)
 
 ### Shipped
 
 - Enable PUT requires explicit `inventoryReconcileConfirmed: true` and `pilotSignOff: true` every time (422 product codes).
 - Captures by/at/remarks/scope/reportRef into `FinanceFeatureControl.configurationJson` + additive `signOffHistory[]`.
 - Inventory sign-off needs reconcile (or settings) permission + reconciliation workspace available; pilot needs Finance permission, finance activated, mappings/period/failed pre-checks.
-- FE checkboxes never preselected; remarks fields sent to API ΓÇö no frontend-only storage.
+- FE checkboxes never preselected; remarks fields sent to API Î“Ã‡Ã¶ no frontend-only storage.
 
 ### Evidence
 
@@ -1309,14 +1487,14 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-23 ΓÇö Inventory + Pilot Finance sign-off (server-stored)
+## 2026-07-23 Î“Ã‡Ã¶ Inventory + Pilot Finance sign-off (server-stored)
 
 ### Shipped
 
 - Enable PUT requires explicit `inventoryReconcileConfirmed: true` and `pilotSignOff: true` every time (422 product codes).
 - Captures by/at/remarks/scope/reportRef into `FinanceFeatureControl.configurationJson` + additive `signOffHistory[]`.
 - Inventory sign-off needs reconcile (or settings) permission + reconciliation workspace available; pilot needs Finance permission, finance activated, mappings/period/failed pre-checks.
-- FE checkboxes never preselected; remarks fields sent to API ΓÇö no frontend-only storage.
+- FE checkboxes never preselected; remarks fields sent to API Î“Ã‡Ã¶ no frontend-only storage.
 
 ### Evidence
 
@@ -1324,11 +1502,11 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-23 ΓÇö Failed / unreconciled ProductionAccountingEvent integrity gate
+## 2026-07-23 Î“Ã‡Ã¶ Failed / unreconciled ProductionAccountingEvent integrity gate
 
 ### Shipped
 
-- `manufacturing-accounting-event-integrity.service.ts` classifies FAILED, RECORDED, retry exhausted, inventoryΓåöaccounting gaps, reversal chain issues, duplicate pending.
+- `manufacturing-accounting-event-integrity.service.ts` classifies FAILED, RECORDED, retry exhausted, inventoryÎ“Ã¥Ã¶accounting gaps, reversal chain issues, duplicate pending.
 - Enablement blockers: `FAILED_ACCOUNTING_EVENTS`, `INVENTORY_POSTINGS_UNRECONCILED` (replaces `UNRECONCILED_ACCOUNTING_EVENTS` for the product code).
 - Readiness returns counts + UI-safe exception rows; `technicalDetails` only for settings/post roles (no stack traces).
 - Enable 409 includes exception summary in `details`.
@@ -1339,14 +1517,14 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-23 ΓÇö Manufacturing OPEN accounting period readiness check
+## 2026-07-23 Î“Ã‡Ã¶ Manufacturing OPEN accounting period readiness check
 
 ### Shipped
 
-- `checkOpenAccountingPeriod` on Accounting Period service (uses `resolvePeriodByDate`): `start Γëñ postingDate Γëñ end` and status `OPEN`/`REOPENED`.
+- `checkOpenAccountingPeriod` on Accounting Period service (uses `resolvePeriodByDate`): `start Î“Ã«Ã± postingDate Î“Ã«Ã± end` and status `OPEN`/`REOPENED`.
 - Default posting date = tenant timezone calendar day; optional `?postingDate=YYYY-MM-DD` on readiness APIs.
 - Readiness returns `openPeriod` (id, code, start, end, status) + `postingDateChecked`; blocker `NO_OPEN_ACCOUNTING_PERIOD`.
-- Enablement does **not** bypass posting ΓÇö `post()` still calls `resolvePostingPeriod`.
+- Enablement does **not** bypass posting Î“Ã‡Ã¶ `post()` still calls `resolvePostingPeriod`.
 
 ### Evidence
 
@@ -1354,38 +1532,38 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ---
 
-## 2026-07-23 ΓÇö Dispatch domain outbox (DISPATCH_POSTED / INVOICE_READY)
+## 2026-07-23 Î“Ã‡Ã¶ Dispatch domain outbox (DISPATCH_POSTED / INVOICE_READY)
 
 ### Shipped
 
 - Enqueue in post TX: `DISPATCH_POSTED`, `SALES_ORDER_DISPATCH_FULFILMENT_CHANGED`, `SALES_ORDER_INVOICE_READY`
 - Enqueue on reverse apply: `DISPATCH_REVERSED` + fulfilment changed
-- Post-commit drain ΓåÆ in-process handlers ΓåÆ `PUBLISHED` (retry / FAILED support)
+- Post-commit drain Î“Ã¥Ã† in-process handlers Î“Ã¥Ã† `PUBLISHED` (retry / FAILED support)
 - HTTP: `GET/POST /dispatch/domain-events` (+ process, retry)
 - Doc: `docs/dispatch/DISPATCH_DOMAIN_EVENTS.md`
 
 ### Evidence
 
-- `npx vitest run tests/dispatch-phase7c5.test.ts` ΓåÆ **14/14 passed**
+- `npx vitest run tests/dispatch-phase7c5.test.ts` Î“Ã¥Ã† **14/14 passed**
 
 ---
 
-## 2026-07-23 ΓÇö Dispatch Invoice/COGS reverse blockers
+## 2026-07-23 Î“Ã‡Ã¶ Dispatch Invoice/COGS reverse blockers
 
 ### Shipped
 
 - Hard deps: `SALES_INVOICE_POSTED` / `SALES_INVOICE_OPEN` (source links + header) + `COGS_OR_INV_ACCT_POSTED` (POSTED inv-acct only)
 - `force` requires `dispatch.override`; re-check at apply
 - FE reverse preflight via `getOutboundReversalDependencies`
-- Docs: `DISPATCH_REVERSAL_DEPENDENCIES.md` ΓÇö auto DispatchΓåÆInvoice creation still deferred
+- Docs: `DISPATCH_REVERSAL_DEPENDENCIES.md` Î“Ã‡Ã¶ auto DispatchÎ“Ã¥Ã†Invoice creation still deferred
 
 ### Evidence
 
-- `npx vitest run tests/dispatch-phase7c5.test.ts` ΓåÆ **14/14 passed**
+- `npx vitest run tests/dispatch-phase7c5.test.ts` Î“Ã¥Ã† **14/14 passed**
 
 ---
 
-## 2026-07-23 ΓÇö Dispatch partial reverse + approval workflow
+## 2026-07-23 Î“Ã‡Ã¶ Dispatch partial reverse + approval workflow
 
 ### Shipped
 
@@ -1398,23 +1576,23 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 
 ### Evidence
 
-- `npx vitest run tests/dispatch-phase7c5.test.ts` ΓåÆ **13/13 passed**
+- `npx vitest run tests/dispatch-phase7c5.test.ts` Î“Ã¥Ã† **13/13 passed**
 
 ---
 
-## 2026-07-23 ΓÇö Manufacturing required account mappings readiness
+## 2026-07-23 Î“Ã‡Ã¶ Manufacturing required account mappings readiness
 
 ### Shipped
 
 - `manufacturing-account-mapping-readiness.service.ts`: validates **core** (`WIP_INVENTORY`, `FINISHED_GOODS_INVENTORY`, `PRODUCTION_VARIANCE`) + **conditional** MappingReady keys via existing `DefaultAccountMapping` (ADR-039; no mfg mapping table).
-- Product aliases (`DIRECT_LABOUR_ABSORPTION` ΓåÆ `LABOUR_ABSORPTION`, `SCRAP_EXPENSE` ΓåÆ `SCRAP_LOSS`, etc.) resolve to enum keys; `REWORK_COST` / `PRODUCTION_CLEARING` have no enum key and are not validated separately.
+- Product aliases (`DIRECT_LABOUR_ABSORPTION` Î“Ã¥Ã† `LABOUR_ABSORPTION`, `SCRAP_EXPENSE` Î“Ã¥Ã† `SCRAP_LOSS`, etc.) resolve to enum keys; `REWORK_COST` / `PRODUCTION_CLEARING` have no enum key and are not validated separately.
 - Account checks: exists, active, tenant/LE scope, postable (`!isGroup`), duplicate key conflict.
-- Readiness returns `mappingKeys.missing` (+ `invalid`, `conditionalEnabled`) and specific blockers (`WIP_ACCOUNT_NOT_CONFIGURED`, `FINISHED_GOODS_ACCOUNT_NOT_CONFIGURED`, ΓÇª, `MISSING_ACCOUNT_MAPPINGS`).
+- Readiness returns `mappingKeys.missing` (+ `invalid`, `conditionalEnabled`) and specific blockers (`WIP_ACCOUNT_NOT_CONFIGURED`, `FINISHED_GOODS_ACCOUNT_NOT_CONFIGURED`, Î“Ã‡Âª, `MISSING_ACCOUNT_MAPPINGS`).
 - Docs: `MANUFACTURING_ACCOUNT_MAPPING.md`, feature-flag rollout; FE enable panel shows missing keys.
 
 ### Evidence
 
-- `npx tsx scripts/test-mfg-accounting-enablement-gate.ts` ΓåÆ PASS (flag stays OFF; missing keys + blockers returned).
+- `npx tsx scripts/test-mfg-accounting-enablement-gate.ts` Î“Ã¥Ã† PASS (flag stays OFF; missing keys + blockers returned).
 
 ---
 
@@ -1423,23 +1601,23 @@ no new finance ledger. Migration `20260729160000_fin_close_1_grir_ppv_return_ap`
 ### Shipped
 
 - Shared `fulfilmentAutoAdvance.ts` (same `getFulfilmentAutoMode` preference as WO)
-- After **Reserve** ΓåÆ open/create pick; **Pick complete** ΓåÆ packing; **Pack complete/verify** ΓåÆ challan; **Issue challan** ΓåÆ outbound `?focus=post`
+- After **Reserve** Î“Ã¥Ã† open/create pick; **Pick complete** Î“Ã¥Ã† packing; **Pack complete/verify** Î“Ã¥Ã† challan; **Issue challan** Î“Ã¥Ã† outbound `?focus=post`
 - Tablet pick/pack: auto-complete session when lines are fully done (Auto Mode on)
 - 7C5 coach strip: Auto Mode toggle + tip
 
 ---
 
-## 2026-07-23 ΓÇö start7C5 operator coach (outbound detail)
+## 2026-07-23 Î“Ã‡Ã¶ start7C5 operator coach (outbound detail)
 
 ### Context
 
-Phase 7C5 backend (canonical `postFgDispatch`, readiness gates, reverse) was already shipped. `start7C5` closed the operator gap: guided Reserve ΓåÆ Pick ΓåÆ Pack ΓåÆ Issue Challan ΓåÆ Post on outbound detail.
+Phase 7C5 backend (canonical `postFgDispatch`, readiness gates, reverse) was already shipped. `start7C5` closed the operator gap: guided Reserve Î“Ã¥Ã† Pick Î“Ã¥Ã† Pack Î“Ã¥Ã† Issue Challan Î“Ã¥Ã† Post on outbound detail.
 
 ### Shipped
 
 - `HardenedPostingCoach` on workbench drafts in `ApiOutboundDispatchPages.tsx`
 - Command-bar **Create pick list** / **Create challan** (open existing when present)
-- Tests: `npx vitest run tests/dispatch-phase7c5.test.ts` ΓåÆ **8/8 passed**
+- Tests: `npx vitest run tests/dispatch-phase7c5.test.ts` Î“Ã¥Ã† **8/8 passed**
 
 ### Still pending (manual)
 
@@ -1447,31 +1625,31 @@ Phase 7C5 backend (canonical `postFgDispatch`, readiness gates, reverse) was alr
 
 ---
 
-## 2026-07-23 ΓÇö DispatchPosting / Reversal ledger tables
+## 2026-07-23 Î“Ã‡Ã¶ DispatchPosting / Reversal ledger tables
 
 ### Shipped
 
 - Prisma models + migration `20260723220000_dispatch_posting_reversal_ledger` (legacy backfill).
 - `postFgDispatch` creates immutable `DispatchPosting` + lines with Inventory ISSUE.
-- Reverse creates `DispatchReversal` (`APPLIED`) + lines; posting ΓåÆ `REVERSED`.
+- Reverse creates `DispatchReversal` (`APPLIED`) + lines; posting Î“Ã¥Ã† `REVERSED`.
 - Doc: `docs/dispatch/DISPATCH_POSTING_LEDGER.md`.
 
 ---
 
-## 2026-07-23 ΓÇö ISO tank child MAKE SA WO depth (live)
+## 2026-07-23 Î“Ã‡Ã¶ ISO tank child MAKE SA WO depth (live)
 
 ### Shipped
 
-- Harness `backend/scripts/test-iso-tank-child-sa-wo.ts` ΓÇö parent FG create ΓåÆ generate-child-orders ΓåÆ full child `SA-LADDER` WO (release/issue/stages/SA receipt/complete) ΓåÆ parent reserve+issue of that SA.
+- Harness `backend/scripts/test-iso-tank-child-sa-wo.ts` Î“Ã‡Ã¶ parent FG create Î“Ã¥Ã† generate-child-orders Î“Ã¥Ã† full child `SA-LADDER` WO (release/issue/stages/SA receipt/complete) Î“Ã¥Ã† parent reserve+issue of that SA.
 - Pointer from `test-iso-tank-wo-execution.ts` header to the child depth script.
 
 ### Evidence (`vasant-trailers`)
 
-- `npx tsx scripts/test-iso-tank-child-sa-wo.ts` ΓåÆ **exit 0**
-- Parent **WO-000037**; child **WO-000042**; SA movement `0cc64e0c-ΓÇª` @ `WIP_FABRICATION`; parent consumed SA (onHand 1ΓåÆ0).
+- `npx tsx scripts/test-iso-tank-child-sa-wo.ts` Î“Ã¥Ã† **exit 0**
+- Parent **WO-000037**; child **WO-000042**; SA movement `0cc64e0c-Î“Ã‡Âª` @ `WIP_FABRICATION`; parent consumed SA (onHand 1Î“Ã¥Ã†0).
 
 ---
-## 2026-07-23 ΓÇö Dispatch 7C5 deferred gaps closed
+## 2026-07-23 Î“Ã‡Ã¶ Dispatch 7C5 deferred gaps closed
 
 ### Shipped
 
@@ -1485,11 +1663,11 @@ Phase 7C5 backend (canonical `postFgDispatch`, readiness gates, reverse) was alr
 
 ### Status
 
-**READY FOR INTERNAL UAT** ΓÇö not client production without UAT/reconciliation sign-off.
+**READY FOR INTERNAL UAT** Î“Ã‡Ã¶ not client production without UAT/reconciliation sign-off.
 
 ---
 
-## 2026-07-23 ΓÇö Dispatch 7C5 gap-close (audit refresh + reverse/post UX)
+## 2026-07-23 Î“Ã‡Ã¶ Dispatch 7C5 gap-close (audit refresh + reverse/post UX)
 
 ### Context
 
@@ -1498,32 +1676,32 @@ Phase 7C5 canonical posting already existed; audit doc was stale and reverse HTT
 ### Shipped
 
 - Refreshed `docs/dispatch/PHASE7C5_REPOSITORY_AUDIT.md` to match code (canonical service, gates, conditions).
-- `POST ΓÇª/outbound/:id/reverse` ΓåÆ `DispatchReversalService.reverseOutboundDispatchCanonical`.
+- `POST Î“Ã‡Âª/outbound/:id/reverse` Î“Ã¥Ã† `DispatchReversalService.reverseOutboundDispatchCanonical`.
 - Confirm/post controllers pass body `idempotencyKey`.
 - Direct `POST /inventory/movements/fg-dispatch` blocked when `DISPATCH_HARDENED_POSTING_ENABLED`.
 - Outbound detail: Post only when readiness loads and `allowedActions` includes `POST`; richer post confirm copy; reverse immutable warning.
 
 ### Evidence
 
-`npx vitest run tests/dispatch-phase7c5.test.ts` ΓåÆ **8/8 PASS**.
+`npx vitest run tests/dispatch-phase7c5.test.ts` Î“Ã¥Ã† **8/8 PASS**.
 
 ### Status
 
-**READY FOR INTERNAL UAT ΓÇö WITH CONDITIONS** (partial reverse, invoice/COGS blockers, outbox events deferred).
+**READY FOR INTERNAL UAT Î“Ã‡Ã¶ WITH CONDITIONS** (partial reverse, invoice/COGS blockers, outbox events deferred).
 
 ---
 
-## 2026-07-23 ΓÇö Shortage ΓåÆ RFQ ΓåÆ award ΓåÆ PO live loop
+## 2026-07-23 Î“Ã‡Ã¶ Shortage Î“Ã¥Ã† RFQ Î“Ã¥Ã† award Î“Ã¥Ã† PO live loop
 
 ### Context
 
-Production-shortage PRs default `rfqRequired: false` (planning-sheet ΓåÆ PO). The alternate RFQ path was not covered by `test-shortage-to-purchase-loop.ts`.
+Production-shortage PRs default `rfqRequired: false` (planning-sheet Î“Ã¥Ã† PO). The alternate RFQ path was not covered by `test-shortage-to-purchase-loop.ts`.
 
 ### Shipped
 
 - Manufacturing shortage / bulk shortage schemas + services accept optional `rfqRequired: true` and pass through to `createFromProductionShortage` (default remains planning/PO).
-- Live harness `backend/scripts/test-shortage-rfq-to-po-loop.ts`: WO shortage ΓåÆ PR (`rfqRequired: true`) ΓåÆ submit/approve ΓåÆ convert-to-rfq ΓåÆ send ΓåÆ 2 VQs ΓåÆ comparison ΓåÆ award ΓåÆ PO ΓåÆ GRN + re-reserve.
-- Live result (vasant-trailers): **PASS** ΓÇö WO-000030, PR-000011, RFQ-000001, CMP-000001, PO-000007, GRN-000006.
+- Live harness `backend/scripts/test-shortage-rfq-to-po-loop.ts`: WO shortage Î“Ã¥Ã† PR (`rfqRequired: true`) Î“Ã¥Ã† submit/approve Î“Ã¥Ã† convert-to-rfq Î“Ã¥Ã† send Î“Ã¥Ã† 2 VQs Î“Ã¥Ã† comparison Î“Ã¥Ã† award Î“Ã¥Ã† PO Î“Ã¥Ã† GRN + re-reserve.
+- Live result (vasant-trailers): **PASS** Î“Ã‡Ã¶ WO-000030, PR-000011, RFQ-000001, CMP-000001, PO-000007, GRN-000006.
 
 ### Gaps
 
@@ -1532,16 +1710,16 @@ Production-shortage PRs default `rfqRequired: false` (planning-sheet ΓåÆ PO).
 
 ---
 
-## 2026-07-23 ΓÇö WO complete honours hard close-readiness blockers
+## 2026-07-23 Î“Ã‡Ã¶ WO complete honours hard close-readiness blockers
 
 ### Root cause
 
-`GET ΓÇª/close-readiness` was advisory only; `POST ΓÇª/complete` never called it. Harness called readiness without `allowInProgress=true`, so `OPERATIONAL_STATUS` counted as a blocker while complete still succeeded. Also `allowInProgress` incorrectly soft-gated all inventory/QC checks.
+`GET Î“Ã‡Âª/close-readiness` was advisory only; `POST Î“Ã‡Âª/complete` never called it. Harness called readiness without `allowInProgress=true`, so `OPERATIONAL_STATUS` counted as a blocker while complete still succeeded. Also `allowInProgress` incorrectly soft-gated all inventory/QC checks.
 
 ### Shipped
 
 - Severity split: `allowInProgress` only relaxes status (purpose `COMPLETE`); quality softens via `allowCloseWithoutQc`/`flexibleExecution`; material/reservations soft only under flexible; FG never hard-blocks Complete.
-- `assertCompleteAllowed` ΓåÆ complete returns **409 `WO_COMPLETE_BLOCKED`** with `blockers`/`warnings`.
+- `assertCompleteAllowed` Î“Ã¥Ã† complete returns **409 `WO_COMPLETE_BLOCKED`** with `blockers`/`warnings`.
 - Response adds `purpose`, `blockers`, `warnings`.
 - Focused live test `manufacturing-wo-complete-readiness.test.ts`; ISO harness asserts forced hard blocker then success.
 
@@ -1551,13 +1729,13 @@ Production-shortage PRs default `rfqRequired: false` (planning-sheet ΓåÆ PO).
 
 ### Root cause
 
-`POST ΓÇª/work-orders/:id/materials/issue` never accepted `batchId`/`batchNumber`/`serialId`/`serialNumber`, while `postIssueToWorkOrder` ΓåÆ `postStockMovement` already required them for tracked items. FE `MaterialIssueDrawer` had no batch/serial pickers. Live E2Es cleared tracking flags as a workaround.
+`POST Î“Ã‡Âª/work-orders/:id/materials/issue` never accepted `batchId`/`batchNumber`/`serialId`/`serialNumber`, while `postIssueToWorkOrder` Î“Ã¥Ã† `postStockMovement` already required them for tracked items. FE `MaterialIssueDrawer` had no batch/serial pickers. Live E2Es cleared tracking flags as a workaround.
 
 ### Shipped
 
 - Backend: issue schema + service validate and pass tracking into inventory ISSUE_TO_WO; material item payload includes `batchTracked`/`serialTracked`.
 - Frontend: issue drawer BatchSelector + SerialSelector (qty=1 for serial); BatchSelector API mode falls back to InventoryBatch balances via item lineage.
-- Live: `scripts/test-wo-batch-material-issue.ts` (pass ΓÇö reject without batch, issue with batch, balance ΓêÆ1). ISO/Fuel tank E2Es keep batch tracking and pass `batchNumber` on issue; serial still cleared for multi-qty full-flow.
+- Live: `scripts/test-wo-batch-material-issue.ts` (pass Î“Ã‡Ã¶ reject without batch, issue with batch, balance Î“ÃªÃ†1). ISO/Fuel tank E2Es keep batch tracking and pass `batchNumber` on issue; serial still cleared for multi-qty full-flow.
 
 ### Remaining
 
@@ -1578,15 +1756,15 @@ Production-shortage PRs default `rfqRequired: false` (planning-sheet ΓåÆ PO).
 
 ### Next
 
-Phase 3 ΓÇö nullable `itemId` / JSON shapes (no CRM picker switch yet).
+Phase 3 Î“Ã‡Ã¶ nullable `itemId` / JSON shapes (no CRM picker switch yet).
 
 ---
 
-## 2026-07-23 ΓÇö Admin Panel Phase 10 (polish close-out)
+## 2026-07-23 Î“Ã‡Ã¶ Admin Panel Phase 10 (polish close-out)
 
 ### Shipped
 
-- `/admin/org-structure` ΓÇö read-only LE ΓåÆ Branch; department/warehouse sibling links.
+- `/admin/org-structure` Î“Ã‡Ã¶ read-only LE Î“Ã¥Ã† Branch; department/warehouse sibling links.
 - Admin Audit: `GET /security/audit-logs` + `/admin/security/audit`.
 - Read-only security policy (`GET /security/policy`) on Locked Accounts; Overview quick cards.
 - Module Access on organization workspace + Roles deep-link; `requireModule` on purchase/manufacturing.
@@ -1598,7 +1776,7 @@ Editable password/MFA settings; ModuleAdmin tables; blanket domain API module ga
 
 ---
 
-## 2026-07-23 ΓÇö Admin Panel Phase 9 (module enablement + platform tree)
+## 2026-07-23 Î“Ã‡Ã¶ Admin Panel Phase 9 (module enablement + platform tree)
 
 ### Shipped
 
@@ -1609,11 +1787,11 @@ Editable password/MFA settings; ModuleAdmin tables; blanket domain API module ga
 
 ### Holds
 
-Hard API module middleware / Module Admins ΓåÆ Phase 10; password-policy/MFA settings ΓåÆ later.
+Hard API module middleware / Module Admins Î“Ã¥Ã† Phase 10; password-policy/MFA settings Î“Ã¥Ã† later.
 
 ---
 
-## 2026-07-23 ΓÇö Admin Panel Phase 8 (security)
+## 2026-07-23 Î“Ã‡Ã¶ Admin Panel Phase 8 (security)
 
 ### Shipped
 
@@ -1624,15 +1802,15 @@ Hard API module middleware / Module Admins ΓåÆ Phase 10; password-policy/MFA 
 
 ### Holds
 
-Password-policy Admin settings / MFA ΓåÆ later; module enablement ΓåÆ Phase 9.
+Password-policy Admin settings / MFA Î“Ã¥Ã† later; module enablement Î“Ã¥Ã† Phase 9.
 
 ---
 
-## 2026-07-23 ΓÇö Admin Panel Phase 7 (Effective Access + Access Review)
+## 2026-07-23 Î“Ã‡Ã¶ Admin Panel Phase 7 (Effective Access + Access Review)
 
 ### Shipped
 
-- `EffectiveAccessService` ΓÇö roles ΓåÆ permissions (with sources) + scopes + responsibilities + explain notes.
+- `EffectiveAccessService` Î“Ã‡Ã¶ roles Î“Ã¥Ã† permissions (with sources) + scopes + responsibilities + explain notes.
 - APIs: `GET /users/:id/effective-access`, `GET /access-review`.
 - Admin UI: user detail Effective Access panel; `/admin/access-review` attention register.
 - Perms `access.view` / `access.review` + Tenant Admin grants.
@@ -1640,11 +1818,11 @@ Password-policy Admin settings / MFA ΓåÆ later; module enablement ΓåÆ Phas
 
 ### Holds
 
-Access overrides / review campaigns ΓåÆ later; login activity & security pages ΓåÆ Phase 8.
+Access overrides / review campaigns Î“Ã¥Ã† later; login activity & security pages Î“Ã¥Ã† Phase 8.
 
 ---
 
-## 2026-07-23 ΓÇö Admin Panel Phase 6 (scopes + responsibilities)
+## 2026-07-23 Î“Ã‡Ã¶ Admin Panel Phase 6 (scopes + responsibilities)
 
 ### Shipped
 
@@ -1655,11 +1833,11 @@ Access overrides / review campaigns ΓåÆ later; login activity & security page
 
 ### Holds
 
-Effective Access / Access Review ΓåÆ Phase 7; login activity / security pages ΓåÆ Phase 8.
+Effective Access / Access Review Î“Ã¥Ã† Phase 7; login activity / security pages Î“Ã¥Ã† Phase 8.
 
 ---
 
-## 2026-07-23 ΓÇö Admin Panel Phase 5 (Role Builder + Departments)
+## 2026-07-23 Î“Ã‡Ã¶ Admin Panel Phase 5 (Role Builder + Departments)
 
 ### Shipped
 
@@ -1671,15 +1849,15 @@ Effective Access / Access Review ΓåÆ Phase 7; login activity / security pages
 
 ### Holds
 
-Scopes / responsibilities / Effective Access / login activity ΓåÆ Phase 6+.
+Scopes / responsibilities / Effective Access / login activity Î“Ã¥Ã† Phase 6+.
 
 ---
 
-## 2026-07-23 ΓÇö Dispatch Phase 7C5 hardened posting
+## 2026-07-23 Î“Ã‡Ã¶ Dispatch Phase 7C5 hardened posting
 
 ### Shipped
 
-- Canonical `DispatchPostingService` ΓÇö `/confirm` and `/post` route through it.
+- Canonical `DispatchPostingService` Î“Ã‡Ã¶ `/confirm` and `/post` route through it.
 - Policy + flag `DISPATCH_HARDENED_POSTING_ENABLED` (ON non-prod by default).
 - Posting readiness API, reconciliation report/CSV, reversal dependency inspect.
 - Fulfilment `reversedDispatchQty` from REVERSED headers.
@@ -1692,19 +1870,19 @@ Scopes / responsibilities / Effective Access / login activity ΓåÆ Phase 6+.
 
 ---
 
-## 2026-07-23 ΓÇö Finance foundation after ops (Manufacturing Accounting gated)
+## 2026-07-23 Î“Ã‡Ã¶ Finance foundation after ops (Manufacturing Accounting gated)
 
 ### Shipped
 
 - Extended `seed-veer-organisation-setup.ts`: Cost Centres, AP/AR number series, WIP/FG/variance mappings, **Manufacturing Accounting forced OFF**.
 - Enable gate requires inventory reconcile + pilot Finance sign-off (`pilotSignOff` / `inventoryReconcileConfirmed`) plus mappings/open period.
 - UI gate no longer opens on view-permission alone; checklist copy updated.
-- Live smoke: `scripts/test-finance-core-e2e.ts` ΓÇö Journal/GL, Purchase Invoice, Vendor Payment, Sales Invoice, Customer Receipt.
+- Live smoke: `scripts/test-finance-core-e2e.ts` Î“Ã‡Ã¶ Journal/GL, Purchase Invoice, Vendor Payment, Sales Invoice, Customer Receipt.
 
 ### Evidence (`vasant-trailers`)
 
-- Seed exit 0 ΓÇö Finance activated; mfg accounting disabled.
-- `npx tsx scripts/test-finance-core-e2e.ts` ΓåÆ exit 0 (GL entries populated; PI/VP/SI/CR posted).
+- Seed exit 0 Î“Ã‡Ã¶ Finance activated; mfg accounting disabled.
+- `npx tsx scripts/test-finance-core-e2e.ts` Î“Ã¥Ã† exit 0 (GL entries populated; PI/VP/SI/CR posted).
 
 ### Re-run
 
@@ -1715,7 +1893,7 @@ npx tsx scripts/test-finance-core-e2e.ts
 
 ---
 
-## 2026-07-23 ΓÇö Manufacturing Accounting enablement readiness gate
+## 2026-07-23 Î“Ã‡Ã¶ Manufacturing Accounting enablement readiness gate
 
 ### Shipped
 
@@ -1731,7 +1909,7 @@ Flag stays OFF until mappings + open period + zero failed + zero RECORDED + both
 
 ---
 
-## 2026-07-23 ΓÇö Fuel Tank manufacturing master setup (UAT example)
+## 2026-07-23 Î“Ã‡Ã¶ Fuel Tank manufacturing master setup (UAT example)
 
 ### Shipped
 
@@ -1742,26 +1920,26 @@ Flag stays OFF until mappings + open period + zero failed + zero RECORDED + both
 
 ### Evidence (`vasant-trailers`)
 
-- Seeds exit 0; E2E exit 0 ΓÇö WO **WO-000027** release ΓåÆ 6 JC stages / 15 ops; SFG WO blocked; childCount=0; materials issued; parallel JCs ΓåÆ QC_PENDING.
+- Seeds exit 0; E2E exit 0 Î“Ã‡Ã¶ WO **WO-000027** release Î“Ã¥Ã† 6 JC stages / 15 ops; SFG WO blocked; childCount=0; materials issued; parallel JCs Î“Ã¥Ã† QC_PENDING.
 
 ---
 
-## 2026-07-23 ΓÇö Production-shortage PR submit fields
+## 2026-07-23 Î“Ã‡Ã¶ Production-shortage PR submit fields
 
 ### Shipped
 
-- `production-shortage-pr.service.ts` now sets `departmentId`, `requestedById`, `requiredDate`, and defaults `rfqRequired=false` (opt-in RFQ) so shortage PRs submit ΓåÆ planning ΓåÆ PO without a DRAFT patch.
+- `production-shortage-pr.service.ts` now sets `departmentId`, `requestedById`, `requiredDate`, and defaults `rfqRequired=false` (opt-in RFQ) so shortage PRs submit Î“Ã¥Ã† planning Î“Ã¥Ã† PO without a DRAFT patch.
 - Schema accepts optional `departmentId` / `requestedById` / `rfqRequired`.
 - `test-shortage-to-purchase-loop.ts` removes PATCH workaround; asserts submit-ready fields on create.
 
 ### Evidence (`vasant-trailers`)
 
-- `npx tsx scripts/test-shortage-to-purchase-loop.ts` ΓåÆ **exit 0**
-- WO **WO-000026** ΓåÆ PR **PR-000009** (`rfqRequired=false`) ΓåÆ PO **PO-000005** ΓåÆ GRN **GRN-000004**
+- `npx tsx scripts/test-shortage-to-purchase-loop.ts` Î“Ã¥Ã† **exit 0**
+- WO **WO-000026** Î“Ã¥Ã† PR **PR-000009** (`rfqRequired=false`) Î“Ã¥Ã† PO **PO-000005** Î“Ã¥Ã† GRN **GRN-000004**
 
 ---
 
-## 2026-07-23 ΓÇö Admin Panel Phase 4 (invitations + session revoke)
+## 2026-07-23 Î“Ã‡Ã¶ Admin Panel Phase 4 (invitations + session revoke)
 
 ### Shipped
 
@@ -1775,13 +1953,13 @@ Flag stays OFF until mappings + open period + zero failed + zero RECORDED + both
 
 ---
 
-## 2026-07-23 ΓÇö Admin Panel Phase 3 (Tenant Profile + Companies/Branches)
+## 2026-07-23 Î“Ã‡Ã¶ Admin Panel Phase 3 (Tenant Profile + Companies/Branches)
 
 ### Shipped
 
-- `/admin/tenant-profile` ΓÇö workspace Tenant identity/locale via existing Tenant GET/PATCH (demo store + API).
-- `/admin/companies` ΓÇö Legal Entity hub over organisation/finance APIs; readiness + deep-links to Organisation Setup.
-- `/admin/branches` ΓÇö Branch hub over finance Branch API; deep-links to Accounting ΓåÆ Branches.
+- `/admin/tenant-profile` Î“Ã‡Ã¶ workspace Tenant identity/locale via existing Tenant GET/PATCH (demo store + API).
+- `/admin/companies` Î“Ã‡Ã¶ Legal Entity hub over organisation/finance APIs; readiness + deep-links to Organisation Setup.
+- `/admin/branches` Î“Ã‡Ã¶ Branch hub over finance Branch API; deep-links to Accounting Î“Ã¥Ã† Branches.
 - Nav/routes/page guides updated; Admin Overview CTA to Companies.
 - Product rule: Admin = entry; Organisation/Accounting = full editors; no second company SoT; Department deferred.
 
@@ -1791,30 +1969,30 @@ Flag stays OFF until mappings + open period + zero failed + zero RECORDED + both
 
 ---
 
-## 2026-07-23 ΓÇö ISO tank SA child WO readiness
+## 2026-07-23 Î“Ã‡Ã¶ ISO tank SA child WO readiness
 
 ### Shipped
 
 - Extended `seed-iso-tank-mfg-setup.ts`: each MAKE SA (`SA-TANK-SHELL`, `SA-FRAME`, `SA-VALVE-PIPING`, `SA-WALKWAY`, `SA-LADDER`) gets minimal ACTIVE BOM + DETAILED route + profile (WIP warehouses).
 - FG BOM L1 SA lines kept `childProductionOrderRequired=true` + `stockedSemiFinished=true` (stocked SFG does **not** skip children in this engine).
-- `test-iso-tank-wo-execution.ts` asserts child count ΓëÑ 5 and route snapshot on each released child (stages/ops = job-card execution units).
+- `test-iso-tank-wo-execution.ts` asserts child count Î“Ã«Ã‘ 5 and route snapshot on each released child (stages/ops = job-card execution units).
 
 ### Evidence (`vasant-trailers`)
 
-- Parent **WO-000010** ΓåÆ children **WO-000011ΓÇªWO-000015** (`created=5 skipped=0`)
+- Parent **WO-000010** Î“Ã¥Ã† children **WO-000011Î“Ã‡ÂªWO-000015** (`created=5 skipped=0`)
 - Each child: route snapshot `ST-FAB` + 1 op; parent FG flow completed
 
 ---
 
-## 2026-07-23 ΓÇö Admin Panel Phase 2 (shared DS + Overview)
+## 2026-07-23 Î“Ã‡Ã¶ Admin Panel Phase 2 (shared DS + Overview)
 
 ### Shipped
 
 - Shared Admin kit under `frontend/src/components/admin/` (nav IA, badges, summary cards, needs-attention, states, permission matrix, Role Builder shell, Effective Access placeholder).
-- `/admin` Overview page (`AdminOverviewPage`) ΓÇö summary strip, attention list, planned Admin areas (Soon).
+- `/admin` Overview page (`AdminOverviewPage`) Î“Ã‡Ã¶ summary strip, attention list, planned Admin areas (Soon).
 - Routes/nav: Overview is workspace landing (no redirect to Users); Users/Roles/Tenants remain.
 - Roles form/detail use `AdminRoleBuilder` / `AdminPermissionMatrix` with View Only / No Access presets; Users/Tenants use shared status badges; User detail shows Effective Access placeholder.
-- Docs: `ADMIN_PANEL_PHASE1_AUDIT.md` ┬º14; `REMAINING_WORK` P0-ADMIN next = Phase 3.
+- Docs: `ADMIN_PANEL_PHASE1_AUDIT.md` â”¬Âº14; `REMAINING_WORK` P0-ADMIN next = Phase 3.
 
 ### Hold
 
@@ -1822,48 +2000,48 @@ Flag stays OFF until mappings + open period + zero failed + zero RECORDED + both
 
 ---
 
-## 2026-07-23 ΓÇö Organisation & Finance Foundation Setup
+## 2026-07-23 Î“Ã‡Ã¶ Organisation & Finance Foundation Setup
 
 ### Shipped
 
 - Extended existing accounting SoT (no parallel CoA/LE tables): `LegalEntity.tradeName` + new `OrganisationRegistration`.
 - Tenant APIs: `/api/v1/t/:tenantSlug/organisation/*` (LE, registrations, CoA, mappings, FY, periods).
 - Permissions: `organisation.*` + finance aliases (`finance.chart_accounts.*`, `finance.account_mapping.manage`, `finance.fiscal_year.manage`, `finance.posting_period.manage`); Finance Manager pack includes org perms.
-- FE: Settings ΓåÆ Organisation Setup (`/settings/organisation/...`) shell + 6 pages.
+- FE: Settings Î“Ã¥Ã† Organisation Setup (`/settings/organisation/...`) shell + 6 pages.
 - Veer seed: full Chhapi address + GST registration row; FY/periods/CoA/mappings unchanged.
 - Migration `20260723170000_organisation_foundation` (short unique index `org_reg_tenant_type_number_key`).
 - Tests: `tests/organisation-foundation.test.ts` (6).
 
 ### Verification
 
-- `npx vitest run tests/organisation-foundation.test.ts` ΓÇö 6/6 PASS
-- `npx tsx scripts/seed-veer-organisation-setup.ts` ΓÇö ready
-- Backend + frontend `tsc --noEmit` ΓÇö pass
+- `npx vitest run tests/organisation-foundation.test.ts` Î“Ã‡Ã¶ 6/6 PASS
+- `npx tsx scripts/seed-veer-organisation-setup.ts` Î“Ã‡Ã¶ ready
+- Backend + frontend `tsc --noEmit` Î“Ã‡Ã¶ pass
 
 ---
 
-## 2026-07-23 ΓÇö Admin Panel Phase 1 audit
+## 2026-07-23 Î“Ã‡Ã¶ Admin Panel Phase 1 audit
 
 - Added `docs/admin/ADMIN_PANEL_PHASE1_AUDIT.md`.
 - Confirmed reuse of Tenant/User/Role/Permission/RefreshToken/LegalEntity/Branch/Organisation APIs; no duplicate company model.
 - Gaps: Admin Overview, invitations, departments, data scope, responsibilities, effective access, login activity, module enablement.
-- Hold: no new Admin IAM models until Phase 2ΓÇô3 sign-off.
+- Hold: no new Admin IAM models until Phase 2Î“Ã‡Ã´3 sign-off.
 
 ---
 
-## 2026-07-23 ΓÇö CRM ProductΓåÆItem migration Phase 1 audit
+## 2026-07-23 Î“Ã‡Ã¶ CRM ProductÎ“Ã¥Ã†Item migration Phase 1 audit
 
 - Added `docs/crm/CRM_PRODUCT_TO_ITEM_MIGRATION_MAP.md` (dependency map, DB/API/FE impact, backfill rules, phased plan).
-- Key findings: Opp lines already have nullable `itemId`; Quotation/SO lines still Product-centric JSON; Leads encode product lines in `productRequirement` TEXT; MFG resolver already accepts Item id with ProductΓåÆ`fgItemId` fallback; AR invoices already Item-native.
-- Hold: no frontend Product-picker replacement until Phases 2ΓÇô5.
+- Key findings: Opp lines already have nullable `itemId`; Quotation/SO lines still Product-centric JSON; Leads encode product lines in `productRequirement` TEXT; MFG resolver already accepts Item id with ProductÎ“Ã¥Ã†`fgItemId` fallback; AR invoices already Item-native.
+- Hold: no frontend Product-picker replacement until Phases 2Î“Ã‡Ã´5.
 
 ---
 
-## 2026-07-23 ΓÇö Period Close Control Hardening
+## 2026-07-23 Î“Ã‡Ã¶ Period Close Control Hardening
 
 ### Shipped
 
-- Backend `GET ΓÇª/periods/:id/close-readiness` aggregator (AP gate, unposted journals, bank recon, inv/mfg GL when flags on).
+- Backend `GET Î“Ã‡Âª/periods/:id/close-readiness` aggregator (AP gate, unposted journals, bank recon, inv/mfg GL when flags on).
 - Optional hard-block: `FinanceSettings.periodCloseHardBlock` (default off); close returns `PERIOD_CLOSE_BLOCKED` when on + blockers.
 - `PeriodCloseChecklistAck` + GET/PUT checklist-acks (ACK / NA + note).
 - FE: Period Locking blocker panel; checklist Ack/N/A; Bank scorecard live; Features page toggle.
@@ -1878,39 +2056,39 @@ Flag stays OFF until mappings + open period + zero failed + zero RECORDED + both
 
 ---
 
-## 2026-07-22 ΓÇö Routing Γåö BOM alignment (panel + generate)
+## 2026-07-22 Î“Ã‡Ã¶ Routing Î“Ã¥Ã¶ BOM alignment (panel + generate)
 
 
 ### Shipped
 
-- Migration `20260722190000_routing_stage_source_bom_line` ΓÇö optional `ManufacturingStageGroup.sourceBomLineId`.
-- Backend: `GET ΓÇª/routing-versions/:id/bom-context` and `POST ΓÇª/generate-stages-from-bom` (DRAFT only; MAKE sub-assemblies + FINAL).
-- FE routing version editor: BOM reference panel, Generate stages from BOM, ΓÇ£From BOMΓÇ¥ stage badges.
+- Migration `20260722190000_routing_stage_source_bom_line` Î“Ã‡Ã¶ optional `ManufacturingStageGroup.sourceBomLineId`.
+- Backend: `GET Î“Ã‡Âª/routing-versions/:id/bom-context` and `POST Î“Ã‡Âª/generate-stages-from-bom` (DRAFT only; MAKE sub-assemblies + FINAL).
+- FE routing version editor: BOM reference panel, Generate stages from BOM, Î“Ã‡Â£From BOMÎ“Ã‡Â¥ stage badges.
 - Live test: `tests/routing-bom-alignment.test.ts` (4).
 
 ### Verification
 
-- `npx vitest run tests/routing-bom-alignment.test.ts` ΓÇö 4/4 PASS
+- `npx vitest run tests/routing-bom-alignment.test.ts` Î“Ã‡Ã¶ 4/4 PASS
 
 ---
 
-## 2026-07-22 ΓÇö Flexible Work Order Execution
+## 2026-07-22 Î“Ã‡Ã¶ Flexible Work Order Execution
 
 ### Shipped
 
 - Settings: `flexibleExecution` (default on), `allowCloseWithoutQc` default on with flexible; denormalized on settings DTO.
-- Lifecycle softens: overproduction ΓåÆ warnings; start reservation ΓåÆ warn when flexible; complete WO QC blockers ΓåÆ warnings; complete stage skips QC gate by default when flexible (`skipQcGate` / `qcOverrideReason`).
+- Lifecycle softens: overproduction Î“Ã¥Ã† warnings; start reservation Î“Ã¥Ã† warn when flexible; complete WO QC blockers Î“Ã¥Ã† warnings; complete stage skips QC gate by default when flexible (`skipQcGate` / `qcOverrideReason`).
 - FE: WO detail flexible banner + tracking strip; Stage QC panel (decide / override); Record Progress remaining qty; Assignments Start/Pause/Resume.
 - Docs: `docs/manufacturing/FLEXIBLE_WO_EXECUTION.md`; Phase 2A README rules updated.
 - Tests: `manufacturing-phase2a.test.ts` flexible execution (2).
 
 ### Verification
 
-- `npx vitest run tests/manufacturing-phase2a.test.ts -t "flexible execution"` ΓÇö PASS
+- `npx vitest run tests/manufacturing-phase2a.test.ts -t "flexible execution"` Î“Ã‡Ã¶ PASS
 
 ---
 
-## 2026-07-22 ΓÇö Live Inventory Issues register (API mode)
+## 2026-07-22 Î“Ã‡Ã¶ Live Inventory Issues register (API mode)
 
 ### Shipped
 
@@ -1921,16 +2099,16 @@ Flag stays OFF until mappings + open period + zero failed + zero RECORDED + both
 
 ### Note
 
-- No draft multi-line issue documents ΓÇö same model as live Receipts/Returns.
+- No draft multi-line issue documents Î“Ã‡Ã¶ same model as live Receipts/Returns.
 - Demo mode Issues register unchanged.
 
 ---
 
-## 2026-07-22 ΓÇö GST e-invoice / e-way (simulated NIC)
+## 2026-07-22 Î“Ã‡Ã¶ GST e-invoice / e-way (simulated NIC)
 
 ### Shipped
 
-- Migration `20260722153000_tax_einvoice_eway_registers` ΓÇö `gst_e_invoices` / `gst_e_way_bills`.
+- Migration `20260722153000_tax_einvoice_eway_registers` Î“Ã‡Ã¶ `gst_e_invoices` / `gst_e_way_bills`.
 - Backend: generate/list/cancel IRN + EWB via `SimulatedNicAdapter` (`GST_NIC_PROVIDER`, default SIMULATED).
 - Permissions: `finance.tax.einvoice.manage`, `finance.tax.eway.manage`.
 - FE dual-mode registers + Generate/Cancel on e-invoice / e-way pages (API mode).
@@ -1945,25 +2123,25 @@ Flag stays OFF until mappings + open period + zero failed + zero RECORDED + both
 ### Ops
 
 - `npm run db:sync-permissions` then re-login.
-- Not live GST portal ΓÇö simulated IRN/EWB only.
+- Not live GST portal Î“Ã‡Ã¶ simulated IRN/EWB only.
 
 ---
 
-## 2026-07-22 ΓÇö Manufacturing / Inventory Accounting API-complete pilot
+## 2026-07-22 Î“Ã‡Ã¶ Manufacturing / Inventory Accounting API-complete pilot
 
 ### Shipped
 
 - Prisma: `InventoryAccountingEvent` model + enums aligned to migration `20260722041000_inventory_accounting_events`.
-- FE: `/accounting/manufacturing/**` wrapped in `ManufacturingAccountingApiGate` (API mode ΓåÆ live Phase 7E workspace + costing policies tab; demo seed unchanged).
+- FE: `/accounting/manufacturing/**` wrapped in `ManufacturingAccountingApiGate` (API mode Î“Ã¥Ã† live Phase 7E workspace + costing policies tab; demo seed unchanged).
 - FE: `/inventory/accounting` dual-mode event register (gate + list + detail; voucher deep-link).
 - Period Close Inventory / Manufacturing module pages compose live event/workspace counts in API mode.
 - Docs: `PERIOD_CLOSE_STATUS.md`, accounting matrix, project memory.
 
 ### Verification
 
-- `npx prisma generate` ΓÇö PASS
-- `tests/inventory-accounting-events.test.ts` ΓÇö **11/11 PASS**
-- `npx tsx scripts/verify-mfg-inventory-accounting.ts` ΓÇö PASS (FE seed-leak guards)
+- `npx prisma generate` Î“Ã‡Ã¶ PASS
+- `tests/inventory-accounting-events.test.ts` Î“Ã‡Ã¶ **11/11 PASS**
+- `npx tsx scripts/verify-mfg-inventory-accounting.ts` Î“Ã‡Ã¶ PASS (FE seed-leak guards)
 
 ### Ops
 
@@ -1973,11 +2151,11 @@ Flag stays OFF until mappings + open period + zero failed + zero RECORDED + both
 
 ---
 
-## 2026-07-22 ΓÇö Fixed Assets Phase 4 (revaluation, impairment, maintenance, reports)
+## 2026-07-22 Î“Ã‡Ã¶ Fixed Assets Phase 4 (revaluation, impairment, maintenance, reports)
 
 ### Shipped
 
-- Migration `20260722120000_finance_fixed_assets_phase4_reval_impair_maint` ΓÇö reval/impair/maint tables; asset surplus/impairment fields; mappings `ASSET_REVALUATION_SURPLUS` / `ASSET_IMPAIRMENT_LOSS`.
+- Migration `20260722120000_finance_fixed_assets_phase4_reval_impair_maint` Î“Ã‡Ã¶ reval/impair/maint tables; asset surplus/impairment fields; mappings `ASSET_REVALUATION_SURPLUS` / `ASSET_IMPAIRMENT_LOSS`.
 - API: revaluations (create/post/cancel), impairments (create/recognize/cancel), maintenance CRUD/complete/cancel, reports summary/register/NBV-by-category/disposals.
 - Permissions: `finance.fa.revalue` / `finance.fa.impair` / `finance.fa.maintain`.
 - FE dual-mode lists + live report print preview; banners use live when API mode is on.
@@ -1985,8 +2163,8 @@ Flag stays OFF until mappings + open period + zero failed + zero RECORDED + both
 
 ### Verification
 
-- `migrate deploy` + `prisma generate` ΓÇö PASS
-- `tests/finance/finance-fixed-assets-phase4.test.ts` ΓÇö **4/4 PASS**
+- `migrate deploy` + `prisma generate` Î“Ã‡Ã¶ PASS
+- `tests/finance/finance-fixed-assets-phase4.test.ts` Î“Ã‡Ã¶ **4/4 PASS**
 
 ### Ops
 
@@ -1995,28 +2173,28 @@ Flag stays OFF until mappings + open period + zero failed + zero RECORDED + both
 
 ---
 
-## 2026-07-21 ΓÇö Purchase Setup full persistence
+## 2026-07-21 Î“Ã‡Ã¶ Purchase Setup full persistence
 
 ### Shipped
 
 - Nested Purchase Setup API contract for General, Requisition, Number Series, Approval matrix, Tax, Invoice Matching, Receiving, Quality, and Print.
-- Prisma migration `20260721120000_purchase_setup_full_persistence` (+ status-history docs enum) ΓÇö extended `purchase_settings`, approval tiers/roles, inspection categories, QI/Invoice/Return tables, CodeSeries entities `QUALITY_INSPECTION` / `PURCHASE_INVOICE` / `PURCHASE_RETURN`.
+- Prisma migration `20260721120000_purchase_setup_full_persistence` (+ status-history docs enum) Î“Ã‡Ã¶ extended `purchase_settings`, approval tiers/roles, inspection categories, QI/Invoice/Return tables, CodeSeries entities `QUALITY_INSPECTION` / `PURCHASE_INVOICE` / `PURCHASE_RETURN`.
 - Atomic save with optimistic `version`, FK validation, non-overlapping approval bands, editable series prefix/pad (next number read-only).
-- Notifications tab remains visible, read-only, `ON_HOLD` ΓÇö excluded from save payloads.
-- Frontend `/purchase/setup` is API-only in API mode (no Phase 1 ΓÇ£not persistedΓÇ¥ notices; no silent demo merge).
+- Notifications tab remains visible, read-only, `ON_HOLD` Î“Ã‡Ã¶ excluded from save payloads.
+- Frontend `/purchase/setup` is API-only in API mode (no Phase 1 Î“Ã‡Â£not persistedÎ“Ã‡Â¥ notices; no silent demo merge).
 - Workflow enforcement: direct-PO / PR-before-PO, RFQ vendor count, GRN batch/serial/expiry + receiving flags, short-close, multi-level approval chain from persisted matrix, invoice matching/tax defaults via invoice module.
 
 ### Verification
 
-- `npx tsc --noEmit` (backend) ΓÇö **PASS**
-- `tests/purchase-setup.test.ts` ΓÇö **15/15 PASS**
-- `tests/purchase-invoice-lifecycle.test.ts` ΓÇö **4/4 PASS**
-- Frontend `tsc -p tsconfig.app.json` ΓÇö **PASS**
+- `npx tsc --noEmit` (backend) Î“Ã‡Ã¶ **PASS**
+- `tests/purchase-setup.test.ts` Î“Ã‡Ã¶ **15/15 PASS**
+- `tests/purchase-invoice-lifecycle.test.ts` Î“Ã‡Ã¶ **4/4 PASS**
+- Frontend `tsc -p tsconfig.app.json` Î“Ã‡Ã¶ **PASS**
 - Migrations applied to local `fos_erp` (including recovery after MySQL identifier-length fix)
 
 ---
 
-## 2026-07-21 ΓÇö Purchase Invoice, QI, and Return backend
+## 2026-07-21 Î“Ã‡Ã¶ Purchase Invoice, QI, and Return backend
 
 ### Shipped
 
@@ -2028,12 +2206,12 @@ Flag stays OFF until mappings + open period + zero failed + zero RECORDED + both
 
 ### Verification
 
-- Backend typecheck ΓÇö PASS.
-- `purchase-invoice-lifecycle.test.ts` ΓÇö 4/4 PASS.
-- Purchase RBAC test ΓÇö 4/4 PASS.
-- Combined purchase regression ΓÇö 11/12; pre-existing planning create-PO concurrency case failed with both requests returning 400.
+- Backend typecheck Î“Ã‡Ã¶ PASS.
+- `purchase-invoice-lifecycle.test.ts` Î“Ã‡Ã¶ 4/4 PASS.
+- Purchase RBAC test Î“Ã‡Ã¶ 4/4 PASS.
+- Combined purchase regression Î“Ã‡Ã¶ 11/12; pre-existing planning create-PO concurrency case failed with both requests returning 400.
 
-## 2026-07-21 ΓÇö Purchase create/edit footer standard
+## 2026-07-21 Î“Ã‡Ã¶ Purchase create/edit footer standard
 
 ### Shipped
 
@@ -2046,23 +2224,23 @@ Flag stays OFF until mappings + open period + zero failed + zero RECORDED + both
 
 ### Verification
 
-- `npm run test:purchase-form-footers` ΓÇö **80/80 PASS**
-- `npm run typecheck` ΓÇö **PASS**
-- `npm run test:purchase:production` ΓÇö **39/39 PASS** (runner uses `tsconfig.app.json` for path aliases)
-- `npm run build` ΓÇö **PASS**
-- Targeted `oxlint` ΓÇö **PASS** (4 pre-existing hook warnings in PO/VQ editors)
+- `npm run test:purchase-form-footers` Î“Ã‡Ã¶ **80/80 PASS**
+- `npm run typecheck` Î“Ã‡Ã¶ **PASS**
+- `npm run test:purchase:production` Î“Ã‡Ã¶ **39/39 PASS** (runner uses `tsconfig.app.json` for path aliases)
+- `npm run build` Î“Ã‡Ã¶ **PASS**
+- Targeted `oxlint` Î“Ã‡Ã¶ **PASS** (4 pre-existing hook warnings in PO/VQ editors)
 - Full `npm run lint` remains non-zero because of the existing syntax error in `scripts/generate-uat-deliverables.ts` and the repository-wide warning baseline.
 - Full route/action audit: [`PURCHASE_FORM_FOOTER_AUDIT.md`](PURCHASE_FORM_FOOTER_AUDIT.md).
 
 ---
 
-## 2026-07-21 ΓÇö Purchase form number previews
+## 2026-07-21 Î“Ã‡Ã¶ Purchase form number previews
 
 ### Shipped
 
-- **Backend** ΓÇö Non-consuming `GET ΓÇª/next-number` for RFQ, Vendor Quotation, PO, and GRN (PR already had it)
-- **Frontend** ΓÇö Create forms show the actual next sequence instead of ΓÇ£Auto-generatedΓÇ¥; demo peeks for invoice/return
-- **Tests** ΓÇö `purchase-number-previews.test.ts` **4/4**
+- **Backend** Î“Ã‡Ã¶ Non-consuming `GET Î“Ã‡Âª/next-number` for RFQ, Vendor Quotation, PO, and GRN (PR already had it)
+- **Frontend** Î“Ã‡Ã¶ Create forms show the actual next sequence instead of Î“Ã‡Â£Auto-generatedÎ“Ã‡Â¥; demo peeks for invoice/return
+- **Tests** Î“Ã‡Ã¶ `purchase-number-previews.test.ts` **4/4**
 
 ### Run
 
@@ -2073,20 +2251,20 @@ cd frontend && npm run typecheck
 
 ---
 
-## 2026-07-21 ΓÇö Self-approval policy (maker-checker override)
+## 2026-07-21 Î“Ã‡Ã¶ Self-approval policy (maker-checker override)
 
 ### Shipped
 
-- **Schema** ΓÇö `SelfApprovalPolicy` enum (`NEVER` / `PERMISSION_ONLY` / `EVERYONE`) + `PurchaseSettings.selfApprovalPolicy` (default `PERMISSION_ONLY`) ΓÇö `20260721110000_self_approval_policy`, additive, applied
-- **Permission** ΓÇö `purchase.approvals.self_approve` (238 perms synced); excluded from `PURCHASE_OPS` (Purchase Manager does NOT get it); Tenant Admin / Admin / Administrator / CEO get it via full grant sets
-- **Backend enforcement** ΓÇö PR + PO `assertApprovable` accept `allowSelfApproval`; approve services resolve `isSelfApprovalAllowed(tenantId, actorPermissions)` (policy `EVERYONE` ΓåÆ yes; `PERMISSION_ONLY` ΓåÆ requires the permission; `NEVER` ΓåÆ maker-checker for all); controllers pass `req.context.permissions`; self-approvals audit `selfApproved: true` in `PR_APPROVED` / `PO_APPROVED` newValue
-- **Approvals queue** ΓÇö `pending_mine` keeps the actor's own requests (and `canAct: true`) when self-approval is allowed; assigned-to-another-user check still applies
-- **Setup API + UI** ΓÇö `selfApprovalPolicy` in setup GET/PUT/PATCH + defaults; Purchase Setup ΓåÆ Approval tab "Self-approval policy" select (Never / Permission-only (default) / Everyone)
-- **Tests** ΓÇö `purchase-approval-flow.test.ts` 7/7 (new: permission-based self-approve + audit flag, NEVER blocks, EVERYONE allows); `purchase-approvals.test.ts` 11/11 (requester now provisioned without the bypass permission); backend + frontend typecheck PASS
+- **Schema** Î“Ã‡Ã¶ `SelfApprovalPolicy` enum (`NEVER` / `PERMISSION_ONLY` / `EVERYONE`) + `PurchaseSettings.selfApprovalPolicy` (default `PERMISSION_ONLY`) Î“Ã‡Ã¶ `20260721110000_self_approval_policy`, additive, applied
+- **Permission** Î“Ã‡Ã¶ `purchase.approvals.self_approve` (238 perms synced); excluded from `PURCHASE_OPS` (Purchase Manager does NOT get it); Tenant Admin / Admin / Administrator / CEO get it via full grant sets
+- **Backend enforcement** Î“Ã‡Ã¶ PR + PO `assertApprovable` accept `allowSelfApproval`; approve services resolve `isSelfApprovalAllowed(tenantId, actorPermissions)` (policy `EVERYONE` Î“Ã¥Ã† yes; `PERMISSION_ONLY` Î“Ã¥Ã† requires the permission; `NEVER` Î“Ã¥Ã† maker-checker for all); controllers pass `req.context.permissions`; self-approvals audit `selfApproved: true` in `PR_APPROVED` / `PO_APPROVED` newValue
+- **Approvals queue** Î“Ã‡Ã¶ `pending_mine` keeps the actor's own requests (and `canAct: true`) when self-approval is allowed; assigned-to-another-user check still applies
+- **Setup API + UI** Î“Ã‡Ã¶ `selfApprovalPolicy` in setup GET/PUT/PATCH + defaults; Purchase Setup Î“Ã¥Ã† Approval tab "Self-approval policy" select (Never / Permission-only (default) / Everyone)
+- **Tests** Î“Ã‡Ã¶ `purchase-approval-flow.test.ts` 7/7 (new: permission-based self-approve + audit flag, NEVER blocks, EVERYONE allows); `purchase-approvals.test.ts` 11/11 (requester now provisioned without the bypass permission); backend + frontend typecheck PASS
 
 ### Deferred (next iteration per product direction)
 
-Approval Matrix enforcement (amount bands ΓåÆ role chain) and per-user Approval Limits ΓÇö currently demo-only frontend config; backend approvals remain single-level.
+Approval Matrix enforcement (amount bands Î“Ã¥Ã† role chain) and per-user Approval Limits Î“Ã‡Ã¶ currently demo-only frontend config; backend approvals remain single-level.
 
 ### Run
 
@@ -2098,13 +2276,13 @@ cd backend && npx vitest run tests/purchase-approval-flow.test.ts tests/purchase
 
 ---
 
-## 2026-07-21 ΓÇö Purchase form number previews
+## 2026-07-21 Î“Ã‡Ã¶ Purchase form number previews
 
 ### Shipped
 
-- **Backend** ΓÇö Non-consuming `GET ΓÇª/next-number` for RFQ, Vendor Quotation, PO, and GRN (PR already had it); uses `previewNextCode` / `previewPurchaseDocumentNumber`
-- **Frontend** ΓÇö New create forms show the actual next sequence (e.g. `GRN-000001`) instead of ΓÇ£Auto-generatedΓÇ¥; demo peeks for invoice/return (no API series yet)
-- **Tests** ΓÇö `backend/tests/purchase-number-previews.test.ts` **4/4** (non-consume, RBAC, tenant isolation)
+- **Backend** Î“Ã‡Ã¶ Non-consuming `GET Î“Ã‡Âª/next-number` for RFQ, Vendor Quotation, PO, and GRN (PR already had it); uses `previewNextCode` / `previewPurchaseDocumentNumber`
+- **Frontend** Î“Ã‡Ã¶ New create forms show the actual next sequence (e.g. `GRN-000001`) instead of Î“Ã‡Â£Auto-generatedÎ“Ã‡Â¥; demo peeks for invoice/return (no API series yet)
+- **Tests** Î“Ã‡Ã¶ `backend/tests/purchase-number-previews.test.ts` **4/4** (non-consume, RBAC, tenant isolation)
 
 ### Run
 
@@ -2115,16 +2293,16 @@ cd frontend && npm run typecheck
 
 ---
 
-## 2026-07-21 ΓÇö Purchase Setup Phase 1A (semantics 2A)
+## 2026-07-21 Î“Ã‡Ã¶ Purchase Setup Phase 1A (semantics 2A)
 
 ### Shipped
 
-- **Schema** ΓÇö `PurchaseSettings` + `PurchasePlantSettings`; `DuplicateChallanPolicy` enum; `PurchaseOrder.deliveryWarehouseId` FK (`20260721090000_purchase_setup_phase1`, additive, applied)
-- **Backend** ΓÇö `GET/PUT/PATCH /purchase/setup` + plant overrides; defaults-on-empty GET (no persist-on-read); optimistic `version` concurrency; FK validation (plant/warehouse/location + CRM payment terms); audit `SETUP_*`; shared `purchase-defaults` resolution
-- **PO/GRN enforcement** ΓÇö PO resolves/stores `deliveryWarehouseId` (explicit ΓåÆ PR ΓåÆ setup); `requirePoWarehouse` / expected delivery / payment terms on submit; GRN ignores client `allowExcess` and uses Setup over-receipt + tolerance; challan/vehicle/gate + duplicate challan policy; inspection default from Setup
-- **Permissions** ΓÇö `purchase.setup.view` (+ existing manage); `sync-permissions.ts` (237 perms)
-- **Frontend** ΓÇö `purchaseSetupApi` + facade (no API-mode memory fallback); Setup page 2A warehouse ΓåÆ dependent locations, CRM payment terms, unsaved guard, Phase-1 non-persisted tab notices; PR/PO/GRN drop first-warehouse fallback and prefill from Setup; `getPurchaseWarehouses` lazy-hydrates masters
-- **Tests** ΓÇö `purchase-setup.test.ts` **13/13**; PO lifecycle warehouse/setup cases **3** added (suite pass); GRN setup policy cases **3** added (suite **15/15**); backend `tsc` + frontend `typecheck` **PASS**
+- **Schema** Î“Ã‡Ã¶ `PurchaseSettings` + `PurchasePlantSettings`; `DuplicateChallanPolicy` enum; `PurchaseOrder.deliveryWarehouseId` FK (`20260721090000_purchase_setup_phase1`, additive, applied)
+- **Backend** Î“Ã‡Ã¶ `GET/PUT/PATCH /purchase/setup` + plant overrides; defaults-on-empty GET (no persist-on-read); optimistic `version` concurrency; FK validation (plant/warehouse/location + CRM payment terms); audit `SETUP_*`; shared `purchase-defaults` resolution
+- **PO/GRN enforcement** Î“Ã‡Ã¶ PO resolves/stores `deliveryWarehouseId` (explicit Î“Ã¥Ã† PR Î“Ã¥Ã† setup); `requirePoWarehouse` / expected delivery / payment terms on submit; GRN ignores client `allowExcess` and uses Setup over-receipt + tolerance; challan/vehicle/gate + duplicate challan policy; inspection default from Setup
+- **Permissions** Î“Ã‡Ã¶ `purchase.setup.view` (+ existing manage); `sync-permissions.ts` (237 perms)
+- **Frontend** Î“Ã‡Ã¶ `purchaseSetupApi` + facade (no API-mode memory fallback); Setup page 2A warehouse Î“Ã¥Ã† dependent locations, CRM payment terms, unsaved guard, Phase-1 non-persisted tab notices; PR/PO/GRN drop first-warehouse fallback and prefill from Setup; `getPurchaseWarehouses` lazy-hydrates masters
+- **Tests** Î“Ã‡Ã¶ `purchase-setup.test.ts` **13/13**; PO lifecycle warehouse/setup cases **3** added (suite pass); GRN setup policy cases **3** added (suite **15/15**); backend `tsc` + frontend `typecheck` **PASS**
 
 ### Explicitly deferred (not Phase 1)
 
@@ -2141,16 +2319,16 @@ cd frontend && npm run typecheck
 
 ---
 
-## 2026-07-21 ΓÇö Purchase Approvals queue (PR + PO, production API)
+## 2026-07-21 Î“Ã‡Ã¶ Purchase Approvals queue (PR + PO, production API)
 
 ### Shipped
 
-- **Backend** ΓÇö `GET /purchase/approvals` (+ `GET /:id` review) from `PurchaseApproval` rows for PR + PO; orphan `PENDING_APPROVAL` docs healed into queue; RBAC via `purchase.pr/po.approve|view`
-- **PR send-back** ΓÇö `POST /requisitions/:id/send-back` (pending ΓåÆ draft + reason); approval resolved as `RETURNED`; no longer uses reopen from Approvals
-- **Maker-checker + assignment** ΓÇö PR/PO creators cannot approve their own documents; delegated approvals are actionable only by the assigned user; `pending_mine`, `approved_by_me`, and `rejected_by_me` are actor-scoped
-- **Delegation** ΓÇö `POST /purchase/approvals/:id/delegate` validates a real active user with the required PR/PO approval permission and records delegation in status history
-- **Frontend** ΓÇö Approvals page uses the live queue API (PR + PO); send-back uses the real PR endpoint; review shows named status-history actors and eligible live approvers; no hardcoded Finance Head or fake budget/matrix chrome
-- **Tests** ΓÇö approval queue **11/11**, maker-checker/delegation flow **4/4**, full PR+PO+approval regression **26/26**, frontend API contract **9 assertions**, backend/app typechecks pass
+- **Backend** Î“Ã‡Ã¶ `GET /purchase/approvals` (+ `GET /:id` review) from `PurchaseApproval` rows for PR + PO; orphan `PENDING_APPROVAL` docs healed into queue; RBAC via `purchase.pr/po.approve|view`
+- **PR send-back** Î“Ã‡Ã¶ `POST /requisitions/:id/send-back` (pending Î“Ã¥Ã† draft + reason); approval resolved as `RETURNED`; no longer uses reopen from Approvals
+- **Maker-checker + assignment** Î“Ã‡Ã¶ PR/PO creators cannot approve their own documents; delegated approvals are actionable only by the assigned user; `pending_mine`, `approved_by_me`, and `rejected_by_me` are actor-scoped
+- **Delegation** Î“Ã‡Ã¶ `POST /purchase/approvals/:id/delegate` validates a real active user with the required PR/PO approval permission and records delegation in status history
+- **Frontend** Î“Ã‡Ã¶ Approvals page uses the live queue API (PR + PO); send-back uses the real PR endpoint; review shows named status-history actors and eligible live approvers; no hardcoded Finance Head or fake budget/matrix chrome
+- **Tests** Î“Ã‡Ã¶ approval queue **11/11**, maker-checker/delegation flow **4/4**, full PR+PO+approval regression **26/26**, frontend API contract **9 assertions**, backend/app typechecks pass
 
 ### Run
 
@@ -2161,14 +2339,14 @@ cd frontend && npm run test:purchase-approvals-api
 
 ---
 
-## 2026-07-21 ΓÇö GRN Phase 3 (production backend + FE wiring)
+## 2026-07-21 Î“Ã‡Ã¶ GRN Phase 3 (production backend + FE wiring)
 
 ### Shipped
 
-- **Schema** ΓÇö `GoodsReceipt` + `GoodsReceiptLine`; `GoodsReceiptStatus` enum; `CodeSeriesEntity.GOODS_RECEIPT`; status-history doc type (`20260721080000_grn_phase3`, additive, applied)
-- **Backend** ΓÇö GRN CRUD + `POST /:id/{submit,cancel,reverse}` + `GET /orders/:id/receivable-lines`; submit updates PO `receivedQuantity` + header `PARTIALLY_RECEIVED`/`FULLY_RECEIVED` in one transaction; reverse restores qty; warehouse master required; over-receipt blocked without `allowExcess`; duplicate challan blocked; RBAC (`purchase.grn.*`); audit + status history
-- **Frontend** ΓÇö GRN list/editor/detail use real APIs in API mode; API-mode ΓÇ£not availableΓÇ¥ save/submit blocks removed; warehouse/location/bin dropdowns from Phase 2 masters
-- **Tests** ΓÇö `backend/tests/goods-receipt-lifecycle.test.ts` (12 live) ΓÇö all pass
+- **Schema** Î“Ã‡Ã¶ `GoodsReceipt` + `GoodsReceiptLine`; `GoodsReceiptStatus` enum; `CodeSeriesEntity.GOODS_RECEIPT`; status-history doc type (`20260721080000_grn_phase3`, additive, applied)
+- **Backend** Î“Ã‡Ã¶ GRN CRUD + `POST /:id/{submit,cancel,reverse}` + `GET /orders/:id/receivable-lines`; submit updates PO `receivedQuantity` + header `PARTIALLY_RECEIVED`/`FULLY_RECEIVED` in one transaction; reverse restores qty; warehouse master required; over-receipt blocked without `allowExcess`; duplicate challan blocked; RBAC (`purchase.grn.*`); audit + status history
+- **Frontend** Î“Ã‡Ã¶ GRN list/editor/detail use real APIs in API mode; API-mode Î“Ã‡Â£not availableÎ“Ã‡Â¥ save/submit blocks removed; warehouse/location/bin dropdowns from Phase 2 masters
+- **Tests** Î“Ã‡Ã¶ `backend/tests/goods-receipt-lifecycle.test.ts` (12 live) Î“Ã‡Ã¶ all pass
 
 ### Run
 
@@ -2179,17 +2357,17 @@ cd frontend && npm run typecheck
 
 ---
 
-## 2026-07-21 ΓÇö Inventory masters Phase 2 (Plant/Warehouse/Location/Bin)
+## 2026-07-21 Î“Ã‡Ã¶ Inventory masters Phase 2 (Plant/Warehouse/Location/Bin)
 
 ### Shipped
 
-- **Schema** ΓÇö `MasterPlant` + `MasterBin` models; `MasterWarehouse.plantId` FK (`20260721070000_inventory_masters_phase2`, additive, applied)
-- **Backend** ΓÇö registry-driven CRUD for `plants` / `bins` / `storage-locations` (alias of locations) via existing masters engine; hierarchy FK guards (warehouseΓåÆplant, binΓåÆwarehouse+location, location-must-match-warehouse, inactive parents blocked); reference guards block hard delete (plantΓåÉwarehouses, warehouseΓåÉbins, locationΓåÉbins); dependent list/lookup filters `plantId` / `warehouseId` / `storageLocationId`
-- **Routes** ΓÇö `/api/v1/t/:slug/inventory/{plants|warehouses|storage-locations|bins}` alias (restricted) + existing `/masters/:resource`
-- **RBAC** ΓÇö new `master.plant.*` + `master.bin.*` permissions; `scripts/sync-permissions.ts` (idempotent DB sync ΓÇö 236 perms, roles re-granted)
-- **Seed** ΓÇö `scripts/seed-inventory-setup.ts` (controlled): plants from warehouse plantCodes, links warehouses, default bin per location (vasant-trailers: 2 plants, 8 WH, 8 loc, 8 bins)
-- **Frontend** ΓÇö GRN editor: warehouse free-text ΓåÆ API-backed `Select`; receiving location ΓåÆ dependent Select; line BIN ΓåÆ Select from bins lookup (API mode); warehouse master form supports production warehouse types (receiving/quality_hold/rejected/vendor_return/ΓÇª)
-- **Tests** ΓÇö `backend/tests/inventory-masters.test.ts` (17 live tests: hierarchy, unique codes, inactive blocks, delete guards, dependent filters, tenant isolation, RBAC, audit, persistence) ΓÇö all pass
+- **Schema** Î“Ã‡Ã¶ `MasterPlant` + `MasterBin` models; `MasterWarehouse.plantId` FK (`20260721070000_inventory_masters_phase2`, additive, applied)
+- **Backend** Î“Ã‡Ã¶ registry-driven CRUD for `plants` / `bins` / `storage-locations` (alias of locations) via existing masters engine; hierarchy FK guards (warehouseÎ“Ã¥Ã†plant, binÎ“Ã¥Ã†warehouse+location, location-must-match-warehouse, inactive parents blocked); reference guards block hard delete (plantÎ“Ã¥Ã‰warehouses, warehouseÎ“Ã¥Ã‰bins, locationÎ“Ã¥Ã‰bins); dependent list/lookup filters `plantId` / `warehouseId` / `storageLocationId`
+- **Routes** Î“Ã‡Ã¶ `/api/v1/t/:slug/inventory/{plants|warehouses|storage-locations|bins}` alias (restricted) + existing `/masters/:resource`
+- **RBAC** Î“Ã‡Ã¶ new `master.plant.*` + `master.bin.*` permissions; `scripts/sync-permissions.ts` (idempotent DB sync Î“Ã‡Ã¶ 236 perms, roles re-granted)
+- **Seed** Î“Ã‡Ã¶ `scripts/seed-inventory-setup.ts` (controlled): plants from warehouse plantCodes, links warehouses, default bin per location (vasant-trailers: 2 plants, 8 WH, 8 loc, 8 bins)
+- **Frontend** Î“Ã‡Ã¶ GRN editor: warehouse free-text Î“Ã¥Ã† API-backed `Select`; receiving location Î“Ã¥Ã† dependent Select; line BIN Î“Ã¥Ã† Select from bins lookup (API mode); warehouse master form supports production warehouse types (receiving/quality_hold/rejected/vendor_return/Î“Ã‡Âª)
+- **Tests** Î“Ã‡Ã¶ `backend/tests/inventory-masters.test.ts` (17 live tests: hierarchy, unique codes, inactive blocks, delete guards, dependent filters, tenant isolation, RBAC, audit, persistence) Î“Ã‡Ã¶ all pass
 
 ### Run
 
@@ -2201,16 +2379,16 @@ cd backend && npx tsx scripts/seed-inventory-setup.ts [tenantSlug]
 
 ---
 
-## 2026-07-21 ΓÇö PO lifecycle Phase 1 (production backend + FE wiring)
+## 2026-07-21 Î“Ã‡Ã¶ PO lifecycle Phase 1 (production backend + FE wiring)
 
 ### Shipped
 
-- **Schema** ΓÇö `PurchaseOrderStatus` += `REJECTED`, `SENT_BACK`, `PARTIALLY_INVOICED`, `FULLY_INVOICED`; PO header `rejectedAt/rejectionReason/sentBackAt/sendBackReason`; PO line `acceptedQuantity/rejectedQuantity/returnedQuantity/invoicedQuantity` (`20260721060000_po_lifecycle_phase1`, additive, applied)
-- **Backend** ΓÇö full PO CRUD + lifecycle: `POST /purchase/orders`, `PATCH /:id`, `POST /:id/{submit,approve,reject,send-back,send-to-vendor,cancel,close,reopen}` ΓÇö RBAC per action, tenant-scoped, Zod-validated, transactional, status history + `PurchaseApproval` rows + audit logs; DTO includes `allowedActions` + line `openQuantity`
-- **Rules** ΓÇö draft/sent-back editable only; reject/send-back require reason; only approved ΓåÆ send-to-vendor; receipts block cancel (close instead); reopen: rejected/cancelledΓåÆdraft, closedΓåÆreceipt-derived status; numbering via code-series only
-- **Frontend** ΓÇö PO editor save/submit, detail lifecycle buttons (incl. new Reject / Send Back with `appPromptNote`), list row actions and approvals queue all hit real APIs in API mode; refetch after mutation; eligibility from backend `allowedActions`; manual PO create unblocked in API mode; API-mode block notice removed; `revisePurchaseOrder` explicitly NOT_SUPPORTED in API mode (no silent demo fallback)
-- **Domain** ΓÇö FE `PurchaseOrderDomainStatus` += `rejected`, `sent_back`
-- **Tests** ΓÇö `backend/tests/purchase-order-lifecycle.test.ts` (17 live tests: CRUD, all transitions, invalid transitions, tenant isolation, RBAC denial, audit logs, persistence) ΓÇö all pass
+- **Schema** Î“Ã‡Ã¶ `PurchaseOrderStatus` += `REJECTED`, `SENT_BACK`, `PARTIALLY_INVOICED`, `FULLY_INVOICED`; PO header `rejectedAt/rejectionReason/sentBackAt/sendBackReason`; PO line `acceptedQuantity/rejectedQuantity/returnedQuantity/invoicedQuantity` (`20260721060000_po_lifecycle_phase1`, additive, applied)
+- **Backend** Î“Ã‡Ã¶ full PO CRUD + lifecycle: `POST /purchase/orders`, `PATCH /:id`, `POST /:id/{submit,approve,reject,send-back,send-to-vendor,cancel,close,reopen}` Î“Ã‡Ã¶ RBAC per action, tenant-scoped, Zod-validated, transactional, status history + `PurchaseApproval` rows + audit logs; DTO includes `allowedActions` + line `openQuantity`
+- **Rules** Î“Ã‡Ã¶ draft/sent-back editable only; reject/send-back require reason; only approved Î“Ã¥Ã† send-to-vendor; receipts block cancel (close instead); reopen: rejected/cancelledÎ“Ã¥Ã†draft, closedÎ“Ã¥Ã†receipt-derived status; numbering via code-series only
+- **Frontend** Î“Ã‡Ã¶ PO editor save/submit, detail lifecycle buttons (incl. new Reject / Send Back with `appPromptNote`), list row actions and approvals queue all hit real APIs in API mode; refetch after mutation; eligibility from backend `allowedActions`; manual PO create unblocked in API mode; API-mode block notice removed; `revisePurchaseOrder` explicitly NOT_SUPPORTED in API mode (no silent demo fallback)
+- **Domain** Î“Ã‡Ã¶ FE `PurchaseOrderDomainStatus` += `rejected`, `sent_back`
+- **Tests** Î“Ã‡Ã¶ `backend/tests/purchase-order-lifecycle.test.ts` (17 live tests: CRUD, all transitions, invalid transitions, tenant isolation, RBAC denial, audit logs, persistence) Î“Ã‡Ã¶ all pass
 
 ### Run
 
@@ -2222,15 +2400,15 @@ cd frontend && npm run typecheck
 
 ---
 
-## 2026-07-20 ΓÇö PR line PO track (read-only)
+## 2026-07-20 Î“Ã‡Ã¶ PR line PO track (read-only)
 
 ### Shipped
 
-- **Schema** ΓÇö `purchase_requisition_lines.purchaseOrderId` + `purchaseOrderNumberSnapshot` (`20260720170000_pr_line_purchase_order_track`)
-- **Write-back** ΓÇö PlanningΓåÆPO and RFQ awardΓåÆPO stamp lines via `linkPurchaseRequisitionLinesToOrder` (status `CONVERTED`, id + number snapshot)
-- **API** ΓÇö PR line DTO exposes `purchaseOrderId` / `purchaseOrderNumber` (not accepted on create/update input)
-- **UI** ΓÇö PR lines grid **PO No.** column (link); converted lines locked (`rowEditable` when no PO)
-- **Tests** ΓÇö live coverage asserts stamp after RFQΓåÆPO / Planning create-PO
+- **Schema** Î“Ã‡Ã¶ `purchase_requisition_lines.purchaseOrderId` + `purchaseOrderNumberSnapshot` (`20260720170000_pr_line_purchase_order_track`)
+- **Write-back** Î“Ã‡Ã¶ PlanningÎ“Ã¥Ã†PO and RFQ awardÎ“Ã¥Ã†PO stamp lines via `linkPurchaseRequisitionLinesToOrder` (status `CONVERTED`, id + number snapshot)
+- **API** Î“Ã‡Ã¶ PR line DTO exposes `purchaseOrderId` / `purchaseOrderNumber` (not accepted on create/update input)
+- **UI** Î“Ã‡Ã¶ PR lines grid **PO No.** column (link); converted lines locked (`rowEditable` when no PO)
+- **Tests** Î“Ã‡Ã¶ live coverage asserts stamp after RFQÎ“Ã¥Ã†PO / Planning create-PO
 
 ### Run
 
@@ -2241,13 +2419,13 @@ cd backend && npm run test:purchase-phase15
 
 ---
 
-## 2026-07-20 ΓÇö Purchase UAT flow seed (interconnected docs)
+## 2026-07-20 Î“Ã‡Ã¶ Purchase UAT flow seed (interconnected docs)
 
 ### Shipped
 
-- **Script** ΓÇö `backend/scripts/seed-purchase-flow-uat.ts` (idempotent `UAT-*` docs)
-- **Data** ΓÇö 13 PR + 8 planning + 5 RFQ + 6 VQ + 2 comparisons + 6 PO; warehouses/items/vendors reused; mixed statuses for UI testing
-- **GRN** ΓÇö still no DB table (demo FE only)
+- **Script** Î“Ã‡Ã¶ `backend/scripts/seed-purchase-flow-uat.ts` (idempotent `UAT-*` docs)
+- **Data** Î“Ã‡Ã¶ 13 PR + 8 planning + 5 RFQ + 6 VQ + 2 comparisons + 6 PO; warehouses/items/vendors reused; mixed statuses for UI testing
+- **GRN** Î“Ã‡Ã¶ still no DB table (demo FE only)
 
 ### Run
 
@@ -2259,14 +2437,14 @@ npx tsx scripts/seed-purchase-flow-uat.ts
 
 ---
 
-## 2026-07-20 ΓÇö PR line ΓåÆ PO track record
+## 2026-07-20 Î“Ã‡Ã¶ PR line Î“Ã¥Ã† PO track record
 
 ### Shipped
 
-- **Schema** ΓÇö `purchase_requisition_lines.purchaseOrderId` + `purchaseOrderNumberSnapshot` (migration `20260720170000_pr_line_purchase_order_track`); line status set to `CONVERTED` on PO create
-- **Backend** ΓÇö PlanningΓåÆPO and RFQ awardΓåÆPO stamp PR lines automatically; RFQΓåÆPO also sets `purchaseRequisitionLineId` on PO lines; API PR line DTO exposes `purchaseOrderId` / `purchaseOrderNumber`
-- **Frontend** ΓÇö PR line grid shows read-only **PO No.** (link when id present); demo create-PO paths stamp the same fields; mapper hydrates from API
-- **Tests** ΓÇö Phase 15 integration + coverage assert PR lines carry PO id/number after create-PO
+- **Schema** Î“Ã‡Ã¶ `purchase_requisition_lines.purchaseOrderId` + `purchaseOrderNumberSnapshot` (migration `20260720170000_pr_line_purchase_order_track`); line status set to `CONVERTED` on PO create
+- **Backend** Î“Ã‡Ã¶ PlanningÎ“Ã¥Ã†PO and RFQ awardÎ“Ã¥Ã†PO stamp PR lines automatically; RFQÎ“Ã¥Ã†PO also sets `purchaseRequisitionLineId` on PO lines; API PR line DTO exposes `purchaseOrderId` / `purchaseOrderNumber`
+- **Frontend** Î“Ã‡Ã¶ PR line grid shows read-only **PO No.** (link when id present); demo create-PO paths stamp the same fields; mapper hydrates from API
+- **Tests** Î“Ã‡Ã¶ Phase 15 integration + coverage assert PR lines carry PO id/number after create-PO
 
 ### Run
 
@@ -2278,16 +2456,16 @@ cd frontend && npm run typecheck
 
 ---
 
-## 2026-07-20 ΓÇö Purchase typecheck fix + coverage gap tests
+## 2026-07-20 Î“Ã‡Ã¶ Purchase typecheck fix + coverage gap tests
 
 ### Shipped
 
-- **FE typecheck** ΓÇö Planning Sheet `chipLabelResolver` + `defaults`; `LoadingState` props; unused imports; removed orphan Vitest file; `binCode` master usage guard
-- **Create-PO conflicts** ΓÇö map Prisma `P2034`/`P2028` to purchase `PO_ALREADY_CONVERTED` / global 409; concurrent loser no longer raw 500
-- **Document numbers** ΓÇö `nextPurchaseDocumentNumber` fallback for RFQ/VQ/comparison/PO when code-series enum not yet migrated
-- **Comparison duplicate PO** ΓÇö check existing PO before award-status gate (stable **409**)
-- **Live coverage** ΓÇö `tests/purchase-module-coverage.test.ts` (cross-tenant GET, double-approve idempotency, RFQΓåÆawardΓåÆPO, concurrent create-PO)
-- **DB** ΓÇö deployed `20260720160000_rfq_flow_award_fields` on local MySQL (additive)
+- **FE typecheck** Î“Ã‡Ã¶ Planning Sheet `chipLabelResolver` + `defaults`; `LoadingState` props; unused imports; removed orphan Vitest file; `binCode` master usage guard
+- **Create-PO conflicts** Î“Ã‡Ã¶ map Prisma `P2034`/`P2028` to purchase `PO_ALREADY_CONVERTED` / global 409; concurrent loser no longer raw 500
+- **Document numbers** Î“Ã‡Ã¶ `nextPurchaseDocumentNumber` fallback for RFQ/VQ/comparison/PO when code-series enum not yet migrated
+- **Comparison duplicate PO** Î“Ã‡Ã¶ check existing PO before award-status gate (stable **409**)
+- **Live coverage** Î“Ã‡Ã¶ `tests/purchase-module-coverage.test.ts` (cross-tenant GET, double-approve idempotency, RFQÎ“Ã¥Ã†awardÎ“Ã¥Ã†PO, concurrent create-PO)
+- **DB** Î“Ã‡Ã¶ deployed `20260720160000_rfq_flow_award_fields` on local MySQL (additive)
 
 ### Run
 
@@ -2298,14 +2476,14 @@ cd backend && npm run test:purchase-phase15 && npm run test:purchase-phase15-liv
 
 ---
 
-## 2026-07-20 ΓÇö Purchase Phase 16 final QA
+## 2026-07-20 Î“Ã‡Ã¶ Purchase Phase 16 final QA
 
 ### Shipped
 
-- **QA report only** ΓÇö [`docs/purchase/PHASE_16_FINAL_QA_REPORT.md`](purchase/PHASE_16_FINAL_QA_REPORT.md) (no product features)
-- **Verified** ΓÇö RFQ vs Planning split, idempotent sync, vendor-grouped create-PO, tenant/RBAC, additive migrations, Phase 15 suites
-- **Failed** ΓÇö frontend `npm run typecheck`; claim that all Purchase pages are API-backed / free of FE memory
-- **Go-live** ΓÇö not full-module go-live; blockers listed in Phase 16 report
+- **QA report only** Î“Ã‡Ã¶ [`docs/purchase/PHASE_16_FINAL_QA_REPORT.md`](purchase/PHASE_16_FINAL_QA_REPORT.md) (no product features)
+- **Verified** Î“Ã‡Ã¶ RFQ vs Planning split, idempotent sync, vendor-grouped create-PO, tenant/RBAC, additive migrations, Phase 15 suites
+- **Failed** Î“Ã‡Ã¶ frontend `npm run typecheck`; claim that all Purchase pages are API-backed / free of FE memory
+- **Go-live** Î“Ã‡Ã¶ not full-module go-live; blockers listed in Phase 16 report
 
 ### Run
 
@@ -2317,15 +2495,15 @@ cd frontend && npm run test:purchase-phase15-all && npm run typecheck
 
 ---
 
-## 2026-07-20 ΓÇö Purchase Phase 15 automated tests
+## 2026-07-20 Î“Ã‡Ã¶ Purchase Phase 15 automated tests
 
 ### Shipped
 
-- **Create PO from Planning API** ΓÇö `POST /purchase/planning-sheet/create-po` (vendor grouping, PR conversion status, concurrent guard, RFQ-required blocked)
-- **Backend unit** ΓÇö `purchase-phase15-unit.test.ts` + existing workflow/catalog/RBAC/RFQ/audit suites (`npm run test:purchase-phase15` ΓåÆ **29** tests)
-- **Backend integration** ΓÇö `purchase-phase15-integration.test.ts` covers Phase 15 items 1ΓÇô17 (skip without MySQL)
-- **Frontend** ΓÇö `scripts/test-purchase-phase15.ts` (PR validation, helpers, Planning UI gates, error map)
-- **E2E A/B (demo)** ΓÇö `smoke-purchase-phase15-e2e-a.ts` (direct ΓåÆ Planning ΓåÆ POs), `smoke-purchase-phase15-e2e-b.ts` (RFQ ΓåÆ award ΓåÆ PO)
+- **Create PO from Planning API** Î“Ã‡Ã¶ `POST /purchase/planning-sheet/create-po` (vendor grouping, PR conversion status, concurrent guard, RFQ-required blocked)
+- **Backend unit** Î“Ã‡Ã¶ `purchase-phase15-unit.test.ts` + existing workflow/catalog/RBAC/RFQ/audit suites (`npm run test:purchase-phase15` Î“Ã¥Ã† **29** tests)
+- **Backend integration** Î“Ã‡Ã¶ `purchase-phase15-integration.test.ts` covers Phase 15 items 1Î“Ã‡Ã´17 (skip without MySQL)
+- **Frontend** Î“Ã‡Ã¶ `scripts/test-purchase-phase15.ts` (PR validation, helpers, Planning UI gates, error map)
+- **E2E A/B (demo)** Î“Ã‡Ã¶ `smoke-purchase-phase15-e2e-a.ts` (direct Î“Ã¥Ã† Planning Î“Ã¥Ã† POs), `smoke-purchase-phase15-e2e-b.ts` (RFQ Î“Ã¥Ã† award Î“Ã¥Ã† PO)
 
 ### Run
 
@@ -2336,17 +2514,17 @@ cd frontend && npm run test:purchase-phase15-all
 
 ---
 
-## 2026-07-20 ΓÇö Purchase Phase 14 validation and error messages
+## 2026-07-20 Î“Ã‡Ã¶ Purchase Phase 14 validation and error messages
 
 
 ### Shipped
 
-- **Stable codes + catalog** ΓÇö `purchase/shared/purchase-error-catalog.ts` (`PR_*` / `PPS_*` / `PO_*`) with business copy; Phase 02 ┬º12 expanded
-- **PR workflow** ΓÇö submit enforces department, requested by, dates, RFQ selection, ΓëÑ1 item, item/qty/UOM, date order; submitted ΓåÆ `PR_NOT_EDITABLE`; approved ΓåÆ `PR_MUST_REOPEN` (reopen allowed from approved)
-- **Planning PO guards** ΓÇö `assertPlanningRowReadyForPo` (vendor, net qty, rate, required date, eligible status, cancelled/converted/RFQ/tenant/active masters)
-- **Error middleware** ΓÇö Prisma/FK/SQL/stack never returned to clients; technical detail logged server-side
-- **Frontend** ΓÇö `utils/purchase/purchaseErrorMessages.ts` + `formatPurchaseApiError` / `PurchaseServiceError` map codes to friendly toasts; PR form validation copy aligned
-- **Tests** ΓÇö workflow + catalog unit tests updated; lifecycle expectations use new codes
+- **Stable codes + catalog** Î“Ã‡Ã¶ `purchase/shared/purchase-error-catalog.ts` (`PR_*` / `PPS_*` / `PO_*`) with business copy; Phase 02 â”¬Âº12 expanded
+- **PR workflow** Î“Ã‡Ã¶ submit enforces department, requested by, dates, RFQ selection, Î“Ã«Ã‘1 item, item/qty/UOM, date order; submitted Î“Ã¥Ã† `PR_NOT_EDITABLE`; approved Î“Ã¥Ã† `PR_MUST_REOPEN` (reopen allowed from approved)
+- **Planning PO guards** Î“Ã‡Ã¶ `assertPlanningRowReadyForPo` (vendor, net qty, rate, required date, eligible status, cancelled/converted/RFQ/tenant/active masters)
+- **Error middleware** Î“Ã‡Ã¶ Prisma/FK/SQL/stack never returned to clients; technical detail logged server-side
+- **Frontend** Î“Ã‡Ã¶ `utils/purchase/purchaseErrorMessages.ts` + `formatPurchaseApiError` / `PurchaseServiceError` map codes to friendly toasts; PR form validation copy aligned
+- **Tests** Î“Ã‡Ã¶ workflow + catalog unit tests updated; lifecycle expectations use new codes
 
 ### Remaining
 
@@ -2355,16 +2533,16 @@ cd frontend && npm run test:purchase-phase15-all
 
 ---
 
-## 2026-07-20 ΓÇö Purchase Phase 13 audit logs and timeline
+## 2026-07-20 Î“Ã‡Ã¶ Purchase Phase 13 audit logs and timeline
 
 
 ### Shipped
 
-- **Canonical audit helper** ΓÇö `purchase/shared/purchase-audit.ts` with `PR_*` / `PPS_*` / `RFQ_*` / `PO_*` actions, `writePurchaseAudit`, timeline entity map
-- **Write-side** ΓÇö PR (incl. line add/update/remove + RFQ decision), Planning (generate/buyer/vendor/rate/qty/status/hold/cancel), RFQ/VQ/comparison dual-write, PO create from award
-- **Read API** ΓÇö `GET /purchase/timeline/:entityType/:entityId` merges `AuditLog` + `PurchaseStatusHistory` (RFQ also includes linked VQ/comparison audits)
-- **UI** ΓÇö `PurchaseAuditTimeline` (CRM-style vertical feed) on PR View, Planning Row View, RFQ View, PO View
-- **Tests** ΓÇö `purchase-audit-timeline.test.ts` (labels + entity map)
+- **Canonical audit helper** Î“Ã‡Ã¶ `purchase/shared/purchase-audit.ts` with `PR_*` / `PPS_*` / `RFQ_*` / `PO_*` actions, `writePurchaseAudit`, timeline entity map
+- **Write-side** Î“Ã‡Ã¶ PR (incl. line add/update/remove + RFQ decision), Planning (generate/buyer/vendor/rate/qty/status/hold/cancel), RFQ/VQ/comparison dual-write, PO create from award
+- **Read API** Î“Ã‡Ã¶ `GET /purchase/timeline/:entityType/:entityId` merges `AuditLog` + `PurchaseStatusHistory` (RFQ also includes linked VQ/comparison audits)
+- **UI** Î“Ã‡Ã¶ `PurchaseAuditTimeline` (CRM-style vertical feed) on PR View, Planning Row View, RFQ View, PO View
+- **Tests** Î“Ã‡Ã¶ `purchase-audit-timeline.test.ts` (labels + entity map)
 
 ### Remaining
 
@@ -2375,15 +2553,15 @@ cd frontend && npm run test:purchase-phase15-all
 
 ### Shipped
 
-- **Catalog** ΓÇö renamed to `purchase.pr.*`, expanded `purchase.planning.*` (`assign_buyer`, `select_vendor`, `cancel`), RFQ (`enter_quote`, `compare`, `award`, `convert_to_po`), PO (`purchase.po.*` with `send` / `close`)
-- **Role packs** ΓÇö Requester, Department Manager (+ Department Head alias), Purchase Executive, Purchase Manager, Administrator; seed creates these roles
-- **Backend routes** ΓÇö all purchase routes use canonical keys; legacy JWT/DB names still authorize via `permissionSetIncludes` aliases
-- **Audit** ΓÇö `requirePermission` / `requireAnyPermission` / `requireSuperAdmin` write `PERMISSION_DENIED` audit logs (module `rbac`)
-- **Frontend** ΓÇö `utils/permissions/purchase.ts` + demo admin seed + UI call sites aligned; button hide remains supplementary
+- **Catalog** Î“Ã‡Ã¶ renamed to `purchase.pr.*`, expanded `purchase.planning.*` (`assign_buyer`, `select_vendor`, `cancel`), RFQ (`enter_quote`, `compare`, `award`, `convert_to_po`), PO (`purchase.po.*` with `send` / `close`)
+- **Role packs** Î“Ã‡Ã¶ Requester, Department Manager (+ Department Head alias), Purchase Executive, Purchase Manager, Administrator; seed creates these roles
+- **Backend routes** Î“Ã‡Ã¶ all purchase routes use canonical keys; legacy JWT/DB names still authorize via `permissionSetIncludes` aliases
+- **Audit** Î“Ã‡Ã¶ `requirePermission` / `requireAnyPermission` / `requireSuperAdmin` write `PERMISSION_DENIED` audit logs (module `rbac`)
+- **Frontend** Î“Ã‡Ã¶ `utils/permissions/purchase.ts` + demo admin seed + UI call sites aligned; button hide remains supplementary
 
 ### Verify
 
-- `npx vitest run tests/purchase-rbac-permissions.test.ts` ΓÇö alias checks
+- `npx vitest run tests/purchase-rbac-permissions.test.ts` Î“Ã‡Ã¶ alias checks
 - Re-seed or upsert permissions so new catalog rows exist in MySQL
 
 ### Remaining
@@ -2395,28 +2573,28 @@ cd frontend && npm run test:purchase-phase15-all
 
 ### Shipped
 
-- **Frontend bridge** ΓÇö `purchaseApiFacade` dual-mode for RFQ list/create/update/send/cancel, PRΓåÆRFQ convert, vendor quotations CRUD/submit, comparison build/selection/award, and awardΓåÆdraft PO
-- **Mappers** ΓÇö `mapApiRfqToDomain`, VQ + comparison matrix mappers in `purchaseMappers.ts`; `comparisonApi.ts` client
-- **UI** ΓÇö Quotation Comparison award passes vendor + selection reason into API award endpoint
-- **Tests** ΓÇö `purchase-rfq-workflow.test.ts` (2/2) for PR eligibility + draft send guards
-- **Rule preserved** ΓÇö `rfqRequired=true` never syncs to Planning Sheet (backend + demo)
+- **Frontend bridge** Î“Ã‡Ã¶ `purchaseApiFacade` dual-mode for RFQ list/create/update/send/cancel, PRÎ“Ã¥Ã†RFQ convert, vendor quotations CRUD/submit, comparison build/selection/award, and awardÎ“Ã¥Ã†draft PO
+- **Mappers** Î“Ã‡Ã¶ `mapApiRfqToDomain`, VQ + comparison matrix mappers in `purchaseMappers.ts`; `comparisonApi.ts` client
+- **UI** Î“Ã‡Ã¶ Quotation Comparison award passes vendor + selection reason into API award endpoint
+- **Tests** Î“Ã‡Ã¶ `purchase-rfq-workflow.test.ts` (2/2) for PR eligibility + draft send guards
+- **Rule preserved** Î“Ã‡Ã¶ `rfqRequired=true` never syncs to Planning Sheet (backend + demo)
 
 ### Remaining
 
-- Live MySQL integration tests for RFQΓåÆVQΓåÆawardΓåÆPO
+- Live MySQL integration tests for RFQÎ“Ã¥Ã†VQÎ“Ã¥Ã†awardÎ“Ã¥Ã†PO
 - Enrich vendor/item display names from masters in API mode
 - Create PO from planning selection; full PO lifecycle / GRN
 
 ---
 
-## 2026-07-20 ΓÇö Purchase RFQ vendor quotation and comparison/award APIs
+## 2026-07-20 Î“Ã‡Ã¶ Purchase RFQ vendor quotation and comparison/award APIs
 
 ### Shipped
 
-- **Vendor quotations** ΓÇö list/create/get/draft update/submit under `/purchase/vendor-quotations`; validates RFQ vendor membership and active RFQ state, calculates landed cost on submit, advances a SENT RFQ to `QUOTATION_RECEIVED`, and writes status history/audit records.
-- **Comparisons** ΓÇö list/get/build from submitted quotations, vendor-wise comparison matrix, award workflow, and comparison-to-draft-PO conversion under `/purchase/comparisons`.
-- **PR handoff** ΓÇö `POST /purchase/requisitions/:id/convert-to-rfq` now invokes the RFQ service with the RFQ create permission.
-- **Verification** ΓÇö regenerated Prisma client and `npx tsc --noEmit -p tsconfig.json` passes.
+- **Vendor quotations** Î“Ã‡Ã¶ list/create/get/draft update/submit under `/purchase/vendor-quotations`; validates RFQ vendor membership and active RFQ state, calculates landed cost on submit, advances a SENT RFQ to `QUOTATION_RECEIVED`, and writes status history/audit records.
+- **Comparisons** Î“Ã‡Ã¶ list/get/build from submitted quotations, vendor-wise comparison matrix, award workflow, and comparison-to-draft-PO conversion under `/purchase/comparisons`.
+- **PR handoff** Î“Ã‡Ã¶ `POST /purchase/requisitions/:id/convert-to-rfq` now invokes the RFQ service with the RFQ create permission.
+- **Verification** Î“Ã‡Ã¶ regenerated Prisma client and `npx tsc --noEmit -p tsconfig.json` passes.
 
 ### Remaining
 
@@ -2424,16 +2602,16 @@ cd frontend && npm run test:purchase-phase15-all
 
 ---
 
-## 2026-07-20 ΓÇö Purchase FE dual-mode API integration (PR + Planning)
+## 2026-07-20 Î“Ã‡Ã¶ Purchase FE dual-mode API integration (PR + Planning)
 
 ### Shipped
 
-- **API clients** ΓÇö `purchaseRequisitionApi.ts`, `purchasePlanningApi.ts`, `rfqApi.ts`, `vendorQuotationApi.ts`, `purchaseOrderApi.ts` + `purchaseApiTypes.ts`
-- **Mappers / facade** ΓÇö `purchaseMappers.ts`, `purchaseApiFacade.ts`; barrel `services/purchase/index.ts` routes PR + Planning through dual-mode when `VITE_USE_API=true`
-- **Backend source of truth (API mode)** ΓÇö PR CRUD/submit/approve/reject/cancel; planning list/edit/buyer/vendor/status/recalculate; approval waits for server (planning sync); no optimistic PO/approval
-- **Permissions** ΓÇö FE catalog + route/nav gates for `purchase.planning.view|edit|approve|create_po`
-- **Planning UI** ΓÇö recalculate action, Create PO permission gate, refetch after mutations
-- **RFQ / VQ / PO clients** ΓÇö ready against expected paths; API mode surfaces `PURCHASE_API_NOT_IMPLEMENTED` until backends ship (demo mode unchanged)
+- **API clients** Î“Ã‡Ã¶ `purchaseRequisitionApi.ts`, `purchasePlanningApi.ts`, `rfqApi.ts`, `vendorQuotationApi.ts`, `purchaseOrderApi.ts` + `purchaseApiTypes.ts`
+- **Mappers / facade** Î“Ã‡Ã¶ `purchaseMappers.ts`, `purchaseApiFacade.ts`; barrel `services/purchase/index.ts` routes PR + Planning through dual-mode when `VITE_USE_API=true`
+- **Backend source of truth (API mode)** Î“Ã‡Ã¶ PR CRUD/submit/approve/reject/cancel; planning list/edit/buyer/vendor/status/recalculate; approval waits for server (planning sync); no optimistic PO/approval
+- **Permissions** Î“Ã‡Ã¶ FE catalog + route/nav gates for `purchase.planning.view|edit|approve|create_po`
+- **Planning UI** Î“Ã‡Ã¶ recalculate action, Create PO permission gate, refetch after mutations
+- **RFQ / VQ / PO clients** Î“Ã‡Ã¶ ready against expected paths; API mode surfaces `PURCHASE_API_NOT_IMPLEMENTED` until backends ship (demo mode unchanged)
 
 ### Verify
 
@@ -2447,18 +2625,18 @@ cd frontend && npm run test:purchase-phase15-all
 
 ---
 
-## 2026-07-20 ΓÇö Purchase Planning Sheet backend APIs
+## 2026-07-20 Î“Ã‡Ã¶ Purchase Planning Sheet backend APIs
 
 ### Shipped
 
-- **Permissions** ΓÇö `purchase.planning.view|edit|approve|create_po`
+- **Permissions** Î“Ã‡Ã¶ `purchase.planning.view|edit|approve|create_po`
 - **APIs** under `/api/v1/t/:tenantSlug/purchase/planning-sheet` (+ tenantId alias):
   - `GET /` (filters: search, planningNumber, PR number, status, dept, item, vendor, buyer, priority, purchaseType, date ranges, overdue, poPending, page/pageSize, sort)
   - `GET /summary` (pending, critical, overdue, vendor pending, po pending/created, estimated value)
   - `GET|PATCH /:id` (editable vendor/rates/dates/type/buyer/priority/actionMessage/remarks/status; PR/item/qty/stock/PO refs read-only)
   - `POST /bulk-assign-buyer`, `/bulk-select-vendor`, `/bulk-status`, `/recalculate`
-- **Rules** ΓÇö tenant filter, RBAC, status transition matrix, audit + status history; recalculate batches open-PO qty (stock stub = 0 until inventory)
-- **Tests** ΓÇö workflow 5/5; API integration 4/4
+- **Rules** Î“Ã‡Ã¶ tenant filter, RBAC, status transition matrix, audit + status history; recalculate batches open-PO qty (stock stub = 0 until inventory)
+- **Tests** Î“Ã‡Ã¶ workflow 5/5; API integration 4/4
 
 ### Next
 
@@ -2467,17 +2645,17 @@ cd frontend && npm run test:purchase-phase15-all
 
 ---
 
-## 2026-07-20 ΓÇö Purchase Requisition backend (PR lifecycle + planning sync)
+## 2026-07-20 Î“Ã‡Ã¶ Purchase Requisition backend (PR lifecycle + planning sync)
 
 ### Shipped
 
-- **Code series** ΓÇö `CodeSeriesEntity` + `PURCHASE_REQUISITION` / `PURCHASE_PLANNING` (migration `20260720130000_add_purchase_code_series_entities`); prefixes `PR` / `PPS`
-- **Module** `backend/src/modules/purchase/` ΓÇö routes under `/api/v1/t/:tenantSlug/purchase` and `/api/v1/tenants/:tenantId/purchase`
-- **PR APIs** ΓÇö list/create/get/patch + submit / approve / reject / cancel / reopen
-- **Rules** ΓÇö draft-only edit; ΓëÑ1 valid line + qty>0 to submit; requiredDate ΓëÑ requisitionDate; reject requires reason; approve permission-gated; tenantId on every query; audit + status history on lifecycle
-- **Approve path** ΓÇö `rfqRequired=true` ΓåÆ no PPS rows (RFQ-ready); `rfqRequired=false` ΓåÆ `syncPurchasePlanningRowsFromApprovedPr` in same TX
-- **Error codes** ΓÇö `PURCHASE_REQUISITION_NOT_FOUND|NOT_EDITABLE|NOT_SUBMITTABLE|NOT_APPROVABLE`, `REJECTION_REASON_REQUIRED`, `INVALID_PURCHASE_QUANTITY`; global `PERMISSION_DENIED` / `TENANT_ACCESS_DENIED`
-- **Tests** ΓÇö workflow unit 8/8; lifecycle integration 5/5
+- **Code series** Î“Ã‡Ã¶ `CodeSeriesEntity` + `PURCHASE_REQUISITION` / `PURCHASE_PLANNING` (migration `20260720130000_add_purchase_code_series_entities`); prefixes `PR` / `PPS`
+- **Module** `backend/src/modules/purchase/` Î“Ã‡Ã¶ routes under `/api/v1/t/:tenantSlug/purchase` and `/api/v1/tenants/:tenantId/purchase`
+- **PR APIs** Î“Ã‡Ã¶ list/create/get/patch + submit / approve / reject / cancel / reopen
+- **Rules** Î“Ã‡Ã¶ draft-only edit; Î“Ã«Ã‘1 valid line + qty>0 to submit; requiredDate Î“Ã«Ã‘ requisitionDate; reject requires reason; approve permission-gated; tenantId on every query; audit + status history on lifecycle
+- **Approve path** Î“Ã‡Ã¶ `rfqRequired=true` Î“Ã¥Ã† no PPS rows (RFQ-ready); `rfqRequired=false` Î“Ã¥Ã† `syncPurchasePlanningRowsFromApprovedPr` in same TX
+- **Error codes** Î“Ã‡Ã¶ `PURCHASE_REQUISITION_NOT_FOUND|NOT_EDITABLE|NOT_SUBMITTABLE|NOT_APPROVABLE`, `REJECTION_REASON_REQUIRED`, `INVALID_PURCHASE_QUANTITY`; global `PERMISSION_DENIED` / `TENANT_ACCESS_DENIED`
+- **Tests** Î“Ã‡Ã¶ workflow unit 8/8; lifecycle integration 5/5
 
 ### Not in scope
 
@@ -2485,8 +2663,8 @@ cd frontend && npm run test:purchase-phase15-all
 
 ### Verify
 
-- `migrate deploy` + `prisma generate` + `tsc --noEmit` ΓÇö pass
-- `vitest run tests/purchase-requisition-*.test.ts` ΓÇö **13/13**
+- `migrate deploy` + `prisma generate` + `tsc --noEmit` Î“Ã‡Ã¶ pass
+- `vitest run tests/purchase-requisition-*.test.ts` Î“Ã‡Ã¶ **13/13**
 
 ### Next
 
@@ -2500,18 +2678,18 @@ cd frontend && npm run test:purchase-phase15-all
 ### Verdict
 
 Production `/crm/leads` already rendered the **canonical** CRM stack. Visible
-strings map to current enterprise components ΓÇö not a stale duplicate page:
+strings map to current enterprise components Î“Ã‡Ã¶ not a stale duplicate page:
 
 | String | Source file | Component | On `/crm/leads`? |
 |--------|-------------|-----------|------------------|
 | Quick Entry | `ErpQuickEntrySection.tsx` / `CrmLeadFormPage.tsx` | form FastTab | No (form/360 only) |
 | Smart Context | `ErpCardFormPage` / 360 pages | fact box | No (form/360 only) |
-| Create Lead | **not in source** | ΓÇö | ΓÇö |
-| Lead Information | **not in source** | ΓÇö | ΓÇö |
+| Create Lead | **not in source** | Î“Ã‡Ã¶ | Î“Ã‡Ã¶ |
+| Lead Information | **not in source** | Î“Ã‡Ã¶ | Î“Ã‡Ã¶ |
 | Change Stage | `LeadChangeStageControl.tsx` | Lead 360 | No (detail only) |
 | Notes | `CrmStageNotes` / form sections | 360 + form | No (detail/form) |
 
-List route chain: `crmRoutes` ΓåÆ `LeadListPage` ΓåÆ `CrmLeadListPage` ΓåÆ
+List route chain: `crmRoutes` Î“Ã¥Ã† `LeadListPage` Î“Ã¥Ã† `CrmLeadListPage` Î“Ã¥Ã†
 `CrmLeadsTable`. Detail: `Lead360Workspace`. Form: `CrmLeadFormPage`.
 
 ### Fixes (indirection / alias only)
@@ -2533,15 +2711,15 @@ No business-rule, permission, or API contract changes.
   labelled dialog; `CrmDrawerShell` `closeDisabled` + unique title id.
 - Contact Save chrome: footer-only (`ErpStickySaveBar`); removed duplicate
   header `formSaveActions`.
-- Lifecycle RBAC ANDΓÇÖd with status: quotation update/approve perms; Opp Won/Lost
-  + move-to-won/lost ΓåÆ `crm.opportunity.close`; SO Confirm ΓåÆ
+- Lifecycle RBAC ANDÎ“Ã‡Ã–d with status: quotation update/approve perms; Opp Won/Lost
+  + move-to-won/lost Î“Ã¥Ã† `crm.opportunity.close`; SO Confirm Î“Ã¥Ã†
   `crm.sales_order.confirm`; Complete Activity on Lead360 + Quotation360 feeds.
 - QA: wired orphan scripts + `test:crm-a11y` / `test:crm-form-alignment` into
   package.json and CRM freeze ([Audit CRM QA coverage](aa63249d-73d7-4b2e-a7cf-e2913677596c)).
 
 ### Still deferred
 
-- Full Opp Edit ΓåÆ Quick Entry mirror; native Select ΓåÆ ErpSmartSelect sweep;
+- Full Opp Edit Î“Ã¥Ã† Quick Entry mirror; native Select Î“Ã¥Ã† ErpSmartSelect sweep;
   DocumentTypeSelect extract; full focus-trap / arrow-key menus.
 
 ---
@@ -2551,7 +2729,7 @@ No business-rule, permission, or API contract changes.
 ### Audit (keep working)
 
 - Shared form stack already correct for responsive grids: `ErpFormGrid`
-  desktop 3 ΓåÆ tablet 2 ΓåÆ mobile 1; CRM page forms use `CrmCardFormShell` +
+  desktop 3 Î“Ã¥Ã† tablet 2 Î“Ã¥Ã† mobile 1; CRM page forms use `CrmCardFormShell` +
   `erp-input` heights. No redesign of working Lead/Opp/Quote/SO shells.
 - Masters catalog is centralized via `useCrmMasters` / `CrmMasterPages`
   ([Audit CRM masters reuse](4a1d7172-0830-49e6-b54f-ff95cf696a0e)).
@@ -2562,7 +2740,7 @@ No business-rule, permission, or API contract changes.
   `crm.lead.convert` (`resolveLeadConvertActionGate`, Lead360, list row
   actions, OpportunityNew lead-path, `LeadChangeStageControl`).
 - **Companies / Contacts registers:** pass `canEdit` permissions; contacts
-  New/Duplicate ΓåÆ `/crm/contacts/new`; company Edit ΓåÆ masters edit; remove
+  New/Duplicate Î“Ã¥Ã† `/crm/contacts/new`; company Edit Î“Ã¥Ã† masters edit; remove
   miswired Assign/Duplicate row actions.
 - **CRM masters:** New / Import / Edit / Duplicate / Delete / bulk gated on
   `crm.master.*`.
@@ -2575,11 +2753,11 @@ No business-rule, permission, or API contract changes.
 
 ### Verification
 
-- Frontend `npm run typecheck` ΓÇö pass after alignment edits.
+- Frontend `npm run typecheck` Î“Ã‡Ã¶ pass after alignment edits.
 
 ---
 
-## 2026-07-21 - CRM LeadΓåÆSO funnel hardening
+## 2026-07-21 - CRM LeadÎ“Ã¥Ã†SO funnel hardening
 
 ### Shipped
 
@@ -2588,25 +2766,25 @@ No business-rule, permission, or API contract changes.
   `quotation.workflow.ts` throw `ValidationError` (400); wired from
   `updateQuotation` / `updateQuotationDocument`.
 - Live E2E: PATCH lifecycle rejection; confirm after convert-created SO;
-  continuous LeadΓåÆOppΓåÆQuoteΓåÆmark-sentΓåÆcustomer-approveΓåÆconvertΓåÆconfirm +
+  continuous LeadÎ“Ã¥Ã†OppÎ“Ã¥Ã†QuoteÎ“Ã¥Ã†mark-sentÎ“Ã¥Ã†customer-approveÎ“Ã¥Ã†convertÎ“Ã¥Ã†confirm +
   duplicate convert **409**. Draft-delete case no longer reuses an opportunity
   that already has a quotation.
 - UAT-06 live path: mark-sent + customer-approve before convert; duplicate
-  convert expectation **422 ΓåÆ 409**.
+  convert expectation **422 Î“Ã¥Ã† 409**.
 - Funnel toasts: Lead 360 convert gates use `notify.warning`; SO 360 confirm
   success/errors use `notify.success` / `notify.error`.
 
 ### Verification
 
-- Backend `npm run typecheck` ΓÇö pass.
-- Frontend `npm run typecheck` ΓÇö pass.
-- `npm run test:crm-live` ΓÇö **55 passed / 3 failed**. New funnel cases all
+- Backend `npm run typecheck` Î“Ã‡Ã¶ pass.
+- Frontend `npm run typecheck` Î“Ã‡Ã¶ pass.
+- `npm run test:crm-live` Î“Ã‡Ã¶ **55 passed / 3 failed**. New funnel cases all
   passed (`rejects lifecycle fields on quotation PATCH`,
-  `confirms convert-created sales orderΓÇª`, continuous LeadΓåÆΓÇªΓåÆconfirm funnel,
+  `confirms convert-created sales orderÎ“Ã‡Âª`, continuous LeadÎ“Ã¥Ã†Î“Ã‡ÂªÎ“Ã¥Ã†confirm funnel,
   duplicate 409, draft delete). Remaining failures are **local DB env**, not
   this change: missing `crm_notes.stageCode` column (migration not applied),
   empty locations seed.
-- `npm run test:uat-06-sales-order` ΓÇö demo path hits pre-existing `@/utils`
+- `npm run test:uat-06-sales-order` Î“Ã‡Ã¶ demo path hits pre-existing `@/utils`
   resolution under `tsx`; live 409/sent/customer-approve code path updated in
   script. Static UAT-06.3 string check also pre-existing vs current convert
   action copy.
@@ -2657,12 +2835,12 @@ No business-rule, permission, or API contract changes.
 
 ### Context
 
-- User supplied the two real VF quotation docs (VF/QUO/26-27/76 ΓåÆ 26 KL ISO Tank Container; VF/QUO/26-27/109 ΓåÆ 20' ISO Dry Bulk Tanker 25 CBM). Frontend `DEFAULT_QUOTATION_TEMPLATES` and `prisma/quotationTemplateSeedData.ts` already contain exactly these two ΓÇö but the DB still carried 9 legacy trailer templates (Standard/45M3 Bulker/Sidewall/Flatbed/Lowbed/Tipper/Job Work/Spare Parts/Custom) from the old seed.
+- User supplied the two real VF quotation docs (VF/QUO/26-27/76 Î“Ã¥Ã† 26 KL ISO Tank Container; VF/QUO/26-27/109 Î“Ã¥Ã† 20' ISO Dry Bulk Tanker 25 CBM). Frontend `DEFAULT_QUOTATION_TEMPLATES` and `prisma/quotationTemplateSeedData.ts` already contain exactly these two Î“Ã‡Ã¶ but the DB still carried 9 legacy trailer templates (Standard/45M3 Bulker/Sidewall/Flatbed/Lowbed/Tipper/Job Work/Spare Parts/Custom) from the old seed.
 
 ### Shipped
 
-- **New** `backend/scripts/cleanup-quotation-templates.ts` ΓÇö per-tenant, idempotent: soft-deletes (deletedAt + isActive=0) every template whose code is not `ISO-TANK-26KL` / `ISO-DRY-BULK-25CBM`, then upserts/restores the two keep rows from `quotationTemplateSeedData`. `--dry-run` reports only; `--emit-sql` writes `scripts/quotation-template-cleanup.sql` (phpMyAdmin-ready, backslash + quote escaped JSON) for the live DB without SSH.
-- **Applied on local DB:** 9 legacy templates soft-deleted; ISO-DRY-BULK-25CBM created (was missing). Verified list repo filters `tenantActiveFilter` ΓåÆ only the two ISO templates are served. Quotations referencing old templates are untouched (soft delete, catalog-only).
+- **New** `backend/scripts/cleanup-quotation-templates.ts` Î“Ã‡Ã¶ per-tenant, idempotent: soft-deletes (deletedAt + isActive=0) every template whose code is not `ISO-TANK-26KL` / `ISO-DRY-BULK-25CBM`, then upserts/restores the two keep rows from `quotationTemplateSeedData`. `--dry-run` reports only; `--emit-sql` writes `scripts/quotation-template-cleanup.sql` (phpMyAdmin-ready, backslash + quote escaped JSON) for the live DB without SSH.
+- **Applied on local DB:** 9 legacy templates soft-deleted; ISO-DRY-BULK-25CBM created (was missing). Verified list repo filters `tenantActiveFilter` Î“Ã¥Ã† only the two ISO templates are served. Quotations referencing old templates are untouched (soft delete, catalog-only).
 - Frontend demo mode already correct: `RETIRED_BUILTIN_QUOTATION_TEMPLATE_IDS` drops the same 9 on merge.
 
 ### Live fix (no terminal): run `backend/scripts/quotation-template-cleanup.sql` in phpMyAdmin, then hard-refresh the templates page.
@@ -2673,16 +2851,16 @@ No business-rule, permission, or API contract changes.
 
 ### Shipped
 
-- **New** `frontend/src/components/crm/shared/CrmStageNotes.tsx` ΓÇö single canonical stage-stamped Notes card for CRM 360 pages. Props: `entityType`/`entityId` (useEntityNotes), `sectionId` (preserves `lead-section-notes` / `opp-section-notes` / `quo-section-notes` jump anchors), `stageOptions`, `currentStage`, `historyLabel`, plus the shared demo/composer/onNotesChange contract. Reuses existing `lead-notes-card` CSS ΓÇö zero visual change vs the correct local design.
-- **New** `frontend/src/utils/crmNoteStageOptions.ts` ΓÇö `LEAD_NOTE_STAGE_OPTIONS`, `OPPORTUNITY_NOTE_STAGE_OPTIONS`, `QUOTATION_NOTE_STAGE_OPTIONS`, `quotationNoteStageLabel` (moved out of the deleted QuotationNotesCard; Quotation360Page unified-feed import updated).
+- **New** `frontend/src/components/crm/shared/CrmStageNotes.tsx` Î“Ã‡Ã¶ single canonical stage-stamped Notes card for CRM 360 pages. Props: `entityType`/`entityId` (useEntityNotes), `sectionId` (preserves `lead-section-notes` / `opp-section-notes` / `quo-section-notes` jump anchors), `stageOptions`, `currentStage`, `historyLabel`, plus the shared demo/composer/onNotesChange contract. Reuses existing `lead-notes-card` CSS Î“Ã‡Ã¶ zero visual change vs the correct local design.
+- **New** `frontend/src/utils/crmNoteStageOptions.ts` Î“Ã‡Ã¶ `LEAD_NOTE_STAGE_OPTIONS`, `OPPORTUNITY_NOTE_STAGE_OPTIONS`, `QUOTATION_NOTE_STAGE_OPTIONS`, `quotationNoteStageLabel` (moved out of the deleted QuotationNotesCard; Quotation360Page unified-feed import updated).
 - **Deleted** `LeadNotesCard.tsx`, `OpportunityNotesCard.tsx`, `QuotationNotesCard.tsx`; removed the `QuotationNotesCard` barrel export. Rewired `Lead360Workspace`, `Opportunity360Page`, `Quotation360Page` to render `CrmStageNotes`. No other consumers existed (verified by search). Contact/Customer 360 keep `EntityNotesPanel` (no stage workflow).
 - Demo mode preserved: demoNotes list + editPath fallback behave exactly as before.
 
 ### Verification
 
 - `typecheck` clean; `npm run build` clean; oxlint clean on changed files.
-- Bundle proof of consolidation: `dist/assets/index-j7v20-mn.js` contains exactly **one** copy of the Notes-card strings ("No notes yet. Add the first noteΓÇª", `lead-notes-card__composer`) ΓÇö previously three duplicated components.
-- `npm run test:crm` fails at startup with a **pre-existing** tsx alias error (`Cannot find package '@/utils'` from `permissions/manufacturing.ts`) ΓÇö verified identical failure with all changes stashed; unrelated to this refactor.
+- Bundle proof of consolidation: `dist/assets/index-j7v20-mn.js` contains exactly **one** copy of the Notes-card strings ("No notes yet. Add the first noteÎ“Ã‡Âª", `lead-notes-card__composer`) Î“Ã‡Ã¶ previously three duplicated components.
+- `npm run test:crm` fails at startup with a **pre-existing** tsx alias error (`Cannot find package '@/utils'` from `permissions/manufacturing.ts`) Î“Ã‡Ã¶ verified identical failure with all changes stashed; unrelated to this refactor.
 
 ### Live deploy
 
@@ -2690,23 +2868,23 @@ No business-rule, permission, or API contract changes.
 
 ---
 
-## 2026-07-21 - Live Convert Quotation ΓåÆ SO blocked: stale permission catalog on live DB
+## 2026-07-21 - Live Convert Quotation Î“Ã¥Ã† SO blocked: stale permission catalog on live DB
 
 ### Diagnosis
 
 - `POST /:id/convert-to-sales-order` (backend `quotation.routes.ts`) requires **both** `crm.quotation.convert` and `crm.sales_order.create` (`requirePermission` is all-of). Frontend gate `canConvertQuotationToSalesOrderPermission()` requires the same pair, so the Convert button/action reports "You do not have permission".
-- Live DB catalog only has the pre-convert-era CRM keys (`crm.quotation.view/create/update/delete/approve`, `crm.sales_order.view`, `crm.lead.convert`) ΓÇö neither `crm.quotation.convert` nor `crm.sales_order.create/update/delete/confirm` exists there. Same RBAC seed-drift class as the Notes issue below: the live DB was seeded from the old catalog (old deploy bundle gated convert on `crm.quotation.update` only), then the new backend shipped with the expanded catalog but no permission sync was run.
+- Live DB catalog only has the pre-convert-era CRM keys (`crm.quotation.view/create/update/delete/approve`, `crm.sales_order.view`, `crm.lead.convert`) Î“Ã‡Ã¶ neither `crm.quotation.convert` nor `crm.sales_order.create/update/delete/confirm` exists there. Same RBAC seed-drift class as the Notes issue below: the live DB was seeded from the old catalog (old deploy bundle gated convert on `crm.quotation.update` only), then the new backend shipped with the expanded catalog but no permission sync was run.
 - Code side is already complete: both keys are in `backend/src/constants/permissions.ts` PERMISSIONS and mapped in ROLE_PERMISSIONS (Tenant Admin/Admin/Administrator, Sales Manager, Sales Executive, CRM Admin). No code changes needed; no RBAC bypass.
 
 ### Live fix (idempotent, no code deploy needed if backend is current)
 
-**Option A ΓÇö server terminal available:** from `backend/`: `npx tsx scripts/sync-permissions.ts --dry-run`, review, then re-run without `--dry-run` (upsert-only; never removes grants or touches users/tenants).
+**Option A Î“Ã‡Ã¶ server terminal available:** from `backend/`: `npx tsx scripts/sync-permissions.ts --dry-run`, review, then re-run without `--dry-run` (upsert-only; never removes grants or touches users/tenants).
 
-**Option B ΓÇö no SSH/terminal (phpMyAdmin only):** new generator `backend/scripts/generate-permission-sync-sql.ts` emits `backend/scripts/permission-sync.sql` ΓÇö a self-contained idempotent script (INSERT IGNORE against `permissions.name` and `role_permissions.roleId+permissionId` unique keys) mirroring the same PERMISSIONS/ROLE_PERMISSIONS source of truth. Import/paste it into phpMyAdmin on the live DB. Validated locally: all 244 statements execute cleanly and re-running is a 0-row no-op. Regenerate after any catalog/role-map change.
+**Option B Î“Ã‡Ã¶ no SSH/terminal (phpMyAdmin only):** new generator `backend/scripts/generate-permission-sync-sql.ts` emits `backend/scripts/permission-sync.sql` Î“Ã‡Ã¶ a self-contained idempotent script (INSERT IGNORE against `permissions.name` and `role_permissions.roleId+permissionId` unique keys) mirroring the same PERMISSIONS/ROLE_PERMISSIONS source of truth. Import/paste it into phpMyAdmin on the live DB. Validated locally: all 244 statements execute cleanly and re-running is a 0-row no-op. Regenerate after any catalog/role-map change.
 
 Then in both cases:
 1. Users log out / log in (frontend session permissions are issued at login; backend checks read the DB per request and take effect immediately).
-2. Verify: `fos-erp-auth` ΓåÆ `user.permissions` includes both keys; Convert to Sales Order on a Sent + Customer Approved quotation creates an Open SO and marks the opportunity Won.
+2. Verify: `fos-erp-auth` Î“Ã¥Ã† `user.permissions` includes both keys; Convert to Sales Order on a Sent + Customer Approved quotation creates an Open SO and marks the opportunity Won.
 3. SQL spot-check: `SELECT name FROM permissions WHERE name IN ('crm.quotation.convert','crm.sales_order.create');` and per-role link counts via `role_permissions` join.
 
 Local DB verified in sync (224/224 catalog; applied 3 pending `crm.note.*` links for Sales Executive from the entry below).
@@ -2717,9 +2895,9 @@ Local DB verified in sync (224/224 catalog; applied 3 pending `crm.note.*` links
 
 ### Diagnosis
 
-- Live already serves a SPA that includes the new Notes card (`lead-notes-card` + `crm.note.create` present in `https://erp.dhurandharcrm.com/assets/index-DeT-0V6R.js`). Rebuild succeeded ΓÇö this is not a ΓÇ£missing frontend uploadΓÇ¥ problem anymore.
-- In API mode, Add Note only opens the new inline composer when the session has `crm.note.create`. Without it, the UI used to navigate to the record **edit** page (legacy remarks) ΓÇö which looks like the previous Notes design.
-- `Sales Executive` had no `crm.note.*` grants in `ROLE_PERMISSIONS` (same RBAC seed-drift class as Convert ΓåÆ SO).
+- Live already serves a SPA that includes the new Notes card (`lead-notes-card` + `crm.note.create` present in `https://erp.dhurandharcrm.com/assets/index-DeT-0V6R.js`). Rebuild succeeded Î“Ã‡Ã¶ this is not a Î“Ã‡Â£missing frontend uploadÎ“Ã‡Â¥ problem anymore.
+- In API mode, Add Note only opens the new inline composer when the session has `crm.note.create`. Without it, the UI used to navigate to the record **edit** page (legacy remarks) Î“Ã‡Ã¶ which looks like the previous Notes design.
+- `Sales Executive` had no `crm.note.*` grants in `ROLE_PERMISSIONS` (same RBAC seed-drift class as Convert Î“Ã¥Ã† SO).
 
 ### Shipped
 
@@ -2731,30 +2909,30 @@ Local DB verified in sync (224/224 catalog; applied 3 pending `crm.note.*` links
 1. Deploy these code changes (or at least run permissions sync with updated role map).
 2. On Hostinger app: `npm run db:sync-permissions`
 3. Log out / log in; hard refresh.
-4. Confirm `fos-erp-auth` ΓåÆ `user.permissions` includes `crm.note.create`.
+4. Confirm `fos-erp-auth` Î“Ã¥Ã† `user.permissions` includes `crm.note.create`.
 5. Add Note should open Note type + Stage composer on the 360 page.
 
 ---
 
 ## 2026-07-18 - Finance Phase 3C5: Atomic Credit Note Allocation
 
-### Shipped (subledger allocation only ΓÇö no GL / voucher / PostingEvent / number series)
+### Shipped (subledger allocation only Î“Ã‡Ã¶ no GL / voucher / PostingEvent / number series)
 
-- **Migration** `20260718130000_finance_phase3c5_credit_note_allocations` ΓÇö 6 allocation totals columns on `customer_credit_notes` (`allocatableAmount`/`allocatedAmount`/`unallocatedAmount` + base) + new `CustomerCreditNoteAllocationBatch` / `CustomerCreditNoteAllocation` tables (own enums `CustomerCreditNoteAllocationStatus` / `CustomerCreditNoteAllocationBatchStatus`; new relation names `CreditNoteCreditOpenItem` / `CreditNoteInvoiceDebitOpenItem` / `CreditNoteCreditAllocationBatch` on `ReceivableOpenItem` ΓÇö distinct from the 3B5 receipt relations)
-- **Module** `receivables/credit-notes/allocations/` ΓÇö preview, atomic allocate (idempotent batch), credit-note/invoice history ΓÇö mirrors `receivables/allocations/` (3B5) exactly, reusing `applyDebitAllocation` / `applyCreditAllocation` from `receivable-open-item.repository.ts`
+- **Migration** `20260718130000_finance_phase3c5_credit_note_allocations` Î“Ã‡Ã¶ 6 allocation totals columns on `customer_credit_notes` (`allocatableAmount`/`allocatedAmount`/`unallocatedAmount` + base) + new `CustomerCreditNoteAllocationBatch` / `CustomerCreditNoteAllocation` tables (own enums `CustomerCreditNoteAllocationStatus` / `CustomerCreditNoteAllocationBatchStatus`; new relation names `CreditNoteCreditOpenItem` / `CreditNoteInvoiceDebitOpenItem` / `CreditNoteCreditAllocationBatch` on `ReceivableOpenItem` Î“Ã‡Ã¶ distinct from the 3B5 receipt relations)
+- **Module** `receivables/credit-notes/allocations/` Î“Ã‡Ã¶ preview, atomic allocate (idempotent batch), credit-note/invoice history Î“Ã‡Ã¶ mirrors `receivables/allocations/` (3B5) exactly, reusing `applyDebitAllocation` / `applyCreditAllocation` from `receivable-open-item.repository.ts`
 - **APIs:**
-  - `POST ΓÇª/credit-notes/:creditNoteId/allocations/preview` (`finance.ar.allocation.view`)
-  - `POST ΓÇª/credit-notes/:creditNoteId/allocations` (`finance.ar.allocation.create` + `Idempotency-Key`)
-  - `GET ΓÇª/credit-notes/:creditNoteId/allocations` / reuses `GET ΓÇª/invoices/:invoiceId/allocations`
-  - Reused permissions only ΓÇö no new `credit_note.allocate` permission
+  - `POST Î“Ã‡Âª/credit-notes/:creditNoteId/allocations/preview` (`finance.ar.allocation.view`)
+  - `POST Î“Ã‡Âª/credit-notes/:creditNoteId/allocations` (`finance.ar.allocation.create` + `Idempotency-Key`)
+  - `GET Î“Ã‡Âª/credit-notes/:creditNoteId/allocations` / reuses `GET Î“Ã‡Âª/invoices/:invoiceId/allocations`
+  - Reused permissions only Î“Ã‡Ã¶ no new `credit_note.allocate` permission
 - **Posting hook:** `customer-credit-note-posting.service.ts` now seeds `allocatableAmount = allocatedAmount = 0` / `unallocatedAmount = grandTotal` (+ base) when a CN posts
-- **Repository helper:** `customer-credit-note.repository.ts` ΓÇö `updateCreditNoteAfterAllocation` (conditional/optimistic, mirrors `updateReceiptAfterAllocation`)
-- **Allowed actions:** `customer-credit-note-allowed-actions.ts` ΓÇö `allocate` when `POSTED` + `unallocatedAmount > 0` + `finance.ar.allocation.create`; `viewAllocations` when `POSTED` + `finance.ar.allocation.view`; `reverse: false`
+- **Repository helper:** `customer-credit-note.repository.ts` Î“Ã‡Ã¶ `updateCreditNoteAfterAllocation` (conditional/optimistic, mirrors `updateReceiptAfterAllocation`)
+- **Allowed actions:** `customer-credit-note-allowed-actions.ts` Î“Ã‡Ã¶ `allocate` when `POSTED` + `unallocatedAmount > 0` + `finance.ar.allocation.create`; `viewAllocations` when `POSTED` + `finance.ar.allocation.view`; `reverse: false`
 - **Unified read APIs (shared with receipts):**
-  - `listCustomerCredits` ΓÇö now also returns `CUSTOMER_CREDIT_NOTE` CREDIT open items alongside `CUSTOMER_RECEIPT`; each row carries `sourceType` + (`receiptId`/`receiptNumber`) or (`creditNoteId`/`creditNoteNumber`)
-  - `listAllocationsForInvoice` ΓÇö merges receipt-sourced and credit-note-sourced allocation rows (sorted by date), each tagged with `sourceType`
-- **Bug fix (uncovered by new reconciliation test):** `receivable-reconciliation.service.ts` `CONTROL_ACCOUNT_MANUAL_POSTING` check was missing `CUSTOMER_CREDIT_NOTE` from the allowed `sourceDocumentType` list, so any tenant with a posted credit note falsely failed reconciliation ΓÇö fixed by adding it alongside `SALES_INVOICE` / `CUSTOMER_RECEIPT`
-- **Tests:** `finance-ar-credit-note-allocation.test.ts` (new, 11 cases) ΓÇö full/partial settlement, multi-invoice from one CN, multiple CNs against one invoice, multiple batches on one CN, unallocated CN stays a customer advance, over-allocation/empty/zero rejection, cross-customer rejection, idempotent replay, permission boundary (`credit_note.post` alone insufficient), invoice outstanding unchanged until allocation + reconciliation MATCHED
+  - `listCustomerCredits` Î“Ã‡Ã¶ now also returns `CUSTOMER_CREDIT_NOTE` CREDIT open items alongside `CUSTOMER_RECEIPT`; each row carries `sourceType` + (`receiptId`/`receiptNumber`) or (`creditNoteId`/`creditNoteNumber`)
+  - `listAllocationsForInvoice` Î“Ã‡Ã¶ merges receipt-sourced and credit-note-sourced allocation rows (sorted by date), each tagged with `sourceType`
+- **Bug fix (uncovered by new reconciliation test):** `receivable-reconciliation.service.ts` `CONTROL_ACCOUNT_MANUAL_POSTING` check was missing `CUSTOMER_CREDIT_NOTE` from the allowed `sourceDocumentType` list, so any tenant with a posted credit note falsely failed reconciliation Î“Ã‡Ã¶ fixed by adding it alongside `SALES_INVOICE` / `CUSTOMER_RECEIPT`
+- **Tests:** `finance-ar-credit-note-allocation.test.ts` (new, 11 cases) Î“Ã‡Ã¶ full/partial settlement, multi-invoice from one CN, multiple CNs against one invoice, multiple batches on one CN, unallocated CN stays a customer advance, over-allocation/empty/zero rejection, cross-customer rejection, idempotent replay, permission boundary (`credit_note.post` alone insufficient), invoice outstanding unchanged until allocation + reconciliation MATCHED
 
 ### Not in scope
 
@@ -2762,14 +2940,14 @@ Local DB verified in sync (224/224 catalog; applied 3 pending `crm.note.*` links
 
 ### Verify
 
-- `npx prisma generate` + `npx tsx scripts/prisma-cli.ts migrate deploy` ΓÇö pass
-- `npx tsc --noEmit -p tsconfig.json` ΓÇö pass
-- `npx vitest run tests/finance/finance-ar-credit-note-allocation.test.ts` ΓÇö **11/11**
-- Regression: `finance-ar-credit-note-posting`, `finance-ar-credit-note-foundation`, `finance-ar-receipt-allocation`, `finance-ar-reporting`, `finance-ar-receipt-drafts` ΓÇö all pass; `finance-ar-receipt-posting` ΓÇö 11/12 (one pre-existing Phase 3B4 expectation, documented in the 3C1-3C4 entry below, still asserts posted receipts cannot allocate ΓÇö unrelated to this phase)
+- `npx prisma generate` + `npx tsx scripts/prisma-cli.ts migrate deploy` Î“Ã‡Ã¶ pass
+- `npx tsc --noEmit -p tsconfig.json` Î“Ã‡Ã¶ pass
+- `npx vitest run tests/finance/finance-ar-credit-note-allocation.test.ts` Î“Ã‡Ã¶ **11/11**
+- Regression: `finance-ar-credit-note-posting`, `finance-ar-credit-note-foundation`, `finance-ar-receipt-allocation`, `finance-ar-reporting`, `finance-ar-receipt-drafts` Î“Ã‡Ã¶ all pass; `finance-ar-receipt-posting` Î“Ã‡Ã¶ 11/12 (one pre-existing Phase 3B4 expectation, documented in the 3C1-3C4 entry below, still asserts posted receipts cannot allocate Î“Ã‡Ã¶ unrelated to this phase)
 
 ### Next
 
-- **Phase 3C6** ΓÇö Credit note workspace UI (create/edit/validate/post/allocate/history)
+- **Phase 3C6** Î“Ã‡Ã¶ Credit note workspace UI (create/edit/validate/post/allocate/history)
 
 ---
 
@@ -2785,11 +2963,11 @@ Local DB verified in sync (224/224 catalog; applied 3 pending `crm.note.*` links
 
 ### Verification
 
-- `npx prisma format` + `npx prisma generate` ΓÇö pass.
-- `npx tsx scripts/prisma-cli.ts migrate deploy` ΓÇö migration applied to local MySQL.
-- `npx tsc --noEmit` ΓÇö pass.
-- Focused credit-note tests ΓÇö **8/8 pass** (calculation, atomic post, idempotency, unchanged invoice outstanding, over-credit, status, concurrency, permission boundary).
-- Full finance suite ΓÇö **232/233 pass**; one pre-existing Phase 3B4 expectation still asserts posted receipts cannot allocate, while Phase 3B5 now correctly enables allocation.
+- `npx prisma format` + `npx prisma generate` Î“Ã‡Ã¶ pass.
+- `npx tsx scripts/prisma-cli.ts migrate deploy` Î“Ã‡Ã¶ migration applied to local MySQL.
+- `npx tsc --noEmit` Î“Ã‡Ã¶ pass.
+- Focused credit-note tests Î“Ã‡Ã¶ **8/8 pass** (calculation, atomic post, idempotency, unchanged invoice outstanding, over-credit, status, concurrency, permission boundary).
+- Full finance suite Î“Ã‡Ã¶ **232/233 pass**; one pre-existing Phase 3B4 expectation still asserts posted receipts cannot allocate, while Phase 3B5 now correctly enables allocation.
 
 ---
 
@@ -6946,4 +7124,5 @@ FE show requires `crm.quotation.convert` **and** `crm.sales_order.create`. Never
 | `npm run test:route-integrity` | 438 paths |
 | `npm run test:masters` | 21/26 (5 nav/catalog failures ? pre-existing) |
 | `npm run test:code-series` | 20/20 |
+
 

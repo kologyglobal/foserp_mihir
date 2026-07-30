@@ -165,6 +165,16 @@ export async function closeFinancialYear(id: string): Promise<FinancialYear> {
   return getFinanceSetupStoreState().closeFinancialYear(id)
 }
 
+export async function previewYearEndClose(financialYearId: string) {
+  if (!isApiMode()) throw new Error('Year-end preview requires API mode')
+  return unwrap(await api.previewYearEndClose(financialYearId))
+}
+
+export async function executeYearEndClose(financialYearId: string) {
+  if (!isApiMode()) throw new Error('Year-end close requires API mode')
+  return unwrap(await api.executeYearEndClose(financialYearId))
+}
+
 export async function listPeriods(legalEntityId?: string, financialYearId?: string): Promise<AccountingPeriod[]> {
   const leId = await ensureLegalEntityId(legalEntityId)
   if (isApiMode()) {

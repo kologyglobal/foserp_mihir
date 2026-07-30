@@ -1,9 +1,12 @@
 import type { Request } from 'express'
 import { Prisma } from '@prisma/client'
+import { randomUUID } from 'node:crypto'
 import { prisma } from '../../config/prisma.js'
 import { nextCode } from '../../services/codeSeries.service.js'
 import { auditFromRequest, createAuditLog } from '../../services/audit.service.js'
 import { ConflictError, InvalidStateError, ValidationError } from '../../utils/errors.js'
+import { postStockMovement } from '../inventory/shared/stock-posting.service.js'
+import { InventoryInsufficientStockError } from '../inventory/shared/inventory.errors.js'
 import * as repo from './ticket.repository.js'
 import type {
   AddPartInput,
@@ -201,7 +204,7 @@ export async function createTicket(req: Request, tenantId: string, input: Create
         reportedByUserId: userId || null,
         reportedAt: new Date(),
         status: 'REPORTED',
-        inventoryPostingPending: true,
+        inventoryPostingPending: false,
         createdBy: userId || null,
         updatedBy: userId || null,
         // Optional create remarks append to problem context — never seed repairDetails
@@ -325,47 +328,131 @@ export async function addPart(req: Request, tenantId: string, id: string, input:
 
   let description = input.description
   let unitCost = input.unitCost
+  let warehouseId: string | null = input.warehouseId ?? null
+  let shouldPostIssue = false
+
   if (input.itemId) {
     const item = await prisma.masterItem.findFirst({
       where: { id: input.itemId, tenantId, deletedAt: null },
-      select: { name: true, code: true, standardRate: true },
+      select: {
+        name: true,
+        code: true,
+        standardRate: true,
+        isStockable: true,
+        isBlocked: true,
+        status: true,
+      },
     })
     if (!item) throw new ValidationError('Item not found')
     if (!description) description = `${item.code} — ${item.name}`
     if (!unitCost) unitCost = Number(item.standardRate ?? 0)
+
+    if (item.isStockable) {
+      if (item.isBlocked || item.status !== 'ACTIVE') {
+        throw new ValidationError('Item is blocked or inactive and cannot be issued from inventory')
+      }
+      if (!warehouseId) {
+        throw new ValidationError('Warehouse is required to issue stockable spare parts from inventory')
+      }
+      const warehouse = await prisma.masterWarehouse.findFirst({
+        where: { id: warehouseId, tenantId, deletedAt: null },
+        select: { id: true, status: true },
+      })
+      if (!warehouse) throw new ValidationError('Warehouse not found')
+      if (warehouse.status !== 'ACTIVE') throw new ValidationError('Warehouse is not active')
+      shouldPostIssue = true
+    } else {
+      // Non-stockable master item: record on ticket only (no stock movement).
+      warehouseId = null
+    }
   }
 
+  const partId = randomUUID()
   const lineTotal = Math.round(input.qty * unitCost * 100) / 100
-  await prisma.$transaction(async (tx) => {
-    await tx.maintenancePart.create({
-      data: {
-        tenantId,
-        ticketId: id,
-        itemId: input.itemId,
-        description,
-        qty: input.qty,
-        unitCost,
-        totalCost: lineTotal,
-        remarks: input.remarks,
-        shortageQty: input.shortageQty,
-        // V1: no Inventory ISSUE — document INVENTORY_POSTING_PENDING
-        inventoryMovementId: null,
-        createdBy: userId || null,
-        updatedBy: userId || null,
-      },
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      let inventoryMovementId: string | null = null
+      let postedUnitCost = unitCost
+      let postedTotalCost = lineTotal
+
+      if (shouldPostIssue && input.itemId && warehouseId) {
+        const movement = await postStockMovement(
+          {
+            tenantId,
+            itemId: input.itemId,
+            warehouseId,
+            movementType: 'ISSUE',
+            referenceType: 'ISSUE_TO_MAINTENANCE',
+            quantity: input.qty,
+            referenceNo: before.ticketNumber,
+            remarks: `Maintenance spare issue · ${before.ticketNumber} · ${description}`,
+            idempotencyKey: `MT_PART:${partId}`,
+            rate: unitCost > 0 ? unitCost : undefined,
+            createdBy: userId || undefined,
+            allowNegativeStock: false,
+          },
+          tx,
+        )
+        inventoryMovementId = movement.id
+        const absQty = Math.abs(Number(movement.quantity))
+        const movementValue = Math.abs(Number(movement.value))
+        if (absQty > 0 && movementValue > 0) {
+          postedUnitCost = Math.round((movementValue / absQty) * 10000) / 10000
+          postedTotalCost = Math.round(movementValue * 100) / 100
+        }
+      }
+
+      await tx.maintenancePart.create({
+        data: {
+          id: partId,
+          tenantId,
+          ticketId: id,
+          itemId: input.itemId ?? null,
+          warehouseId,
+          description,
+          qty: input.qty,
+          unitCost: postedUnitCost,
+          totalCost: postedTotalCost,
+          remarks: input.remarks,
+          shortageQty: input.shortageQty,
+          inventoryMovementId,
+          createdBy: userId || null,
+          updatedBy: userId || null,
+        },
+      })
+
+      const parts = await tx.maintenancePart.findMany({
+        where: { ticketId: id, deletedAt: null },
+        select: { totalCost: true, itemId: true, warehouseId: true, inventoryMovementId: true },
+      })
+      const partsCost = parts.reduce((s, p) => s + Number(p.totalCost), 0)
+      const totals = recomputeTotals(partsCost, dec(before.serviceCost), dec(before.otherCost))
+      // Stockable issues always set warehouseId; pending only if movement missing.
+      const inventoryPostingPending = parts.some(
+        (p) => Boolean(p.itemId) && Boolean(p.warehouseId) && !p.inventoryMovementId,
+      )
+      await tx.maintenanceTicket.update({
+        where: { id },
+        data: { ...totals, inventoryPostingPending, updatedBy: userId || null },
+      })
     })
-    const parts = await tx.maintenancePart.findMany({
-      where: { ticketId: id, deletedAt: null },
-      select: { totalCost: true },
-    })
-    const partsCost = parts.reduce((s, p) => s + Number(p.totalCost), 0)
-    const totals = recomputeTotals(partsCost, dec(before.serviceCost), dec(before.otherCost))
-    await tx.maintenanceTicket.update({
-      where: { id },
-      data: { ...totals, inventoryPostingPending: true, updatedBy: userId || null },
-    })
+  } catch (err) {
+    if (err instanceof InventoryInsufficientStockError) {
+      throw new ValidationError(
+        `Insufficient stock to issue spare part "${description}". Record shortage and create a Purchase Requisition, or reduce qty.`,
+      )
+    }
+    throw err
+  }
+
+  await audit(req, tenantId, id, 'ADD_PART', before, {
+    description,
+    qty: input.qty,
+    itemId: input.itemId ?? null,
+    warehouseId,
+    inventoryPosted: shouldPostIssue,
   })
-  await audit(req, tenantId, id, 'ADD_PART', before, { description, qty: input.qty, lineTotal })
   return getTicket(tenantId, id)
 }
 

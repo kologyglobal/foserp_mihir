@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Banknote,
   ClipboardList,
@@ -291,6 +291,7 @@ export function PurchaseRequisitionEditorPage() {
   const { id } = useParams()
   const isNew = !id
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [recordId, setRecordId] = useState<string | null>(id ?? null)
@@ -324,6 +325,25 @@ export function PurchaseRequisitionEditorPage() {
     }))
     setCreatedMeta((prev) => ({ ...prev, by: name || session.user.email || prev.by }))
   }, [isNew, session])
+
+  /** Deep-link from Maintenance shortage: source=MAINTENANCE + purpose/remarks. */
+  useEffect(() => {
+    if (!isNew) return
+    const source = searchParams.get('source')
+    if (source !== 'MAINTENANCE' && source !== 'maintenance') return
+    const purpose =
+      searchParams.get('purchasePurpose') ?? searchParams.get('purpose') ?? 'MAINTENANCE spare shortage'
+    const remarks = searchParams.get('remarks') ?? searchParams.get('notes') ?? ''
+    const ticketRef = searchParams.get('sourceDocumentId') ?? ''
+    setHeader((prev) => ({
+      ...prev,
+      source: 'maintenance',
+      purpose: purpose || prev.purpose,
+      remarks: remarks || prev.remarks,
+      maintenanceOrderNo: ticketRef || prev.maintenanceOrderNo,
+      referenceNumber: ticketRef || prev.referenceNumber,
+    }))
+  }, [isNew, searchParams])
 
   const validation = useMemo(
     () => validatePurchaseRequisitionForm(header, lines),

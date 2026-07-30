@@ -56,6 +56,20 @@ describe.skipIf(!dbAvailable)('Quality Phase 4A — inspections + NCR + WO block
       data: { qualityRequired: true },
     })
 
+    // Strict execution — `flexibleExecution` (server default true) softens the QC gate.
+    await prisma.manufacturingSettings.upsert({
+      where: { tenantId: fx.tenantId },
+      create: {
+        tenantId: fx.tenantId,
+        allowCloseWithoutQc: false,
+        payloadJson: { general: { flexibleExecution: false, allowCloseWithoutQc: false } },
+      },
+      update: {
+        allowCloseWithoutQc: false,
+        payloadJson: { general: { flexibleExecution: false, allowCloseWithoutQc: false } },
+      },
+    })
+
     const fullUser = await createUserWithPerms(app, fx.tenantId, fx.slug, TEST_PERMS, 'qc-full')
     token = fullUser.token
 
@@ -67,7 +81,7 @@ describe.skipIf(!dbAvailable)('Quality Phase 4A — inspections + NCR + WO block
     if (fx?.tenantId) {
       await cleanupProductionData(fx.tenantId)
       await prisma.qualityNcr.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
-      await prisma.qualityInspection.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
+      await prisma.manufacturingQualityInspection.deleteMany({ where: { tenantId: fx.tenantId } }).catch(() => {})
       await cleanupTenant(fx.tenantId)
     }
   })
@@ -115,11 +129,18 @@ describe.skipIf(!dbAvailable)('Quality Phase 4A — inspections + NCR + WO block
     expect(complete.body.data.inspection.status).toBe('PENDING')
     expect(complete.body.data.promotedStages ?? []).toHaveLength(0)
 
+    // Re-completing a stage that already awaits QC is idempotent (`stage-qc:<stageId>` key) —
+    // same inspection returned, no second inspection row.
     const dup = await auth(
       request(app).post(`${mfg(fx.slug)}/work-orders/${orderId}/stages/complete`).send({ stageId: stage1.id }),
     )
-    expect(dup.status).toBeGreaterThanOrEqual(400)
-    expect(dup.status).toBeLessThan(500)
+    expect(dup.status).toBe(200)
+    expect(dup.body.data.stage.status).toBe('QC_PENDING')
+    expect(dup.body.data.inspection.id).toBe(complete.body.data.inspection.id)
+    const stageInspections = await prisma.manufacturingQualityInspection.count({
+      where: { tenantId: fx.tenantId, productionOrderId: orderId, stageId: stage1.id },
+    })
+    expect(stageInspections).toBe(1)
   }, 45_000)
 
   it('PASS on IN_PROCESS inspection completes stage and promotes successor', async () => {
@@ -212,9 +233,12 @@ describe.skipIf(!dbAvailable)('Quality Phase 4A — inspections + NCR + WO block
       request(app).post(`${mfg(fx.slug)}/work-orders/${orderId}/stages/complete`).send({ stageId: stage3.id }),
     )
 
+    // Strict close-readiness rejects with 409 WO_COMPLETE_BLOCKED; the FINAL_QC_REQUIRED
+    // blocker detail carries the reason.
     const blocked = await auth(request(app).post(`${mfg(fx.slug)}/work-orders/${orderId}/complete`).send({}))
-    expect(blocked.status).toBe(400)
-    expect(blocked.body.message).toMatch(/FINAL quality inspection/i)
+    expect(blocked.status).toBe(409)
+    expect(blocked.body.code).toBe('WO_COMPLETE_BLOCKED')
+    expect(JSON.stringify(blocked.body.blockers ?? [])).toMatch(/FINAL quality inspection/i)
 
     const finalInsp = await auth(
       request(app)

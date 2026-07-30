@@ -119,27 +119,110 @@ describe.skipIf(!dbAvailable)('Finance Phase 5D2 — Bank connector sandbox sync
     expect(afterReplay).toBe(afterCount)
   })
 
-  it('OPEN_BANKING remains not implemented for test/sync', async () => {
+  it('OPEN_BANKING LIVE mode remains not implemented for AIS pull', async () => {
+    process.env.BANK_CONNECTOR_AIS_PROVIDER = 'SIMULATED'
+    process.env.FIELD_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString('base64')
     const create = await request(app)
       .post(base())
       .set(auth())
       .send({
         legalEntityId: fx.legalEntityId,
         treasuryAccountId: bank.id,
-        code: 'PSD2-STILL-STUB',
-        name: 'PSD2 deferred',
+        code: 'PSD2-LIVE-STUB',
+        name: 'PSD2 live deferred',
         provider: 'OPEN_BANKING',
+        configJson: { mode: 'LIVE', authorizeUrl: 'https://openbanking.example/authorize' },
       })
+    expect(create.status, JSON.stringify(create.body)).toBe(201)
     const id = create.body.data.id as string
+
+    const start = await request(app)
+      .post(`${base()}/${id}/consents/start`)
+      .set(auth())
+      .send({ redirectUri: 'https://app.example/oauth/callback' })
+    expect(start.status, JSON.stringify(start.body)).toBe(201)
+    const state = new URL(start.body.data.authorizationUrl).searchParams.get('state')
+    await request(app)
+      .post(`${base()}/${id}/consents/callback`)
+      .set(auth())
+      .send({ state, accessToken: 'live-stub-token' })
+
     const enabled = await request(app)
       .post(`${base()}/${id}/enable`)
       .set(auth())
-      .send({ expectedUpdatedAt: create.body.data.updatedAt })
+      .send({ expectedUpdatedAt: (await request(app).get(`${base()}/${id}`).set(auth())).body.data.updatedAt })
     expect(enabled.status).toBe(200)
 
     const test = await request(app).post(`${base()}/${id}/test-connection`).set(auth())
     expect(test.status).toBe(422)
     expect(test.body.code).toBe('BANK_CONNECTOR_NOT_IMPLEMENTED')
+  })
+
+  it('OPEN_BANKING SIMULATED AIS: consent + sandbox sync creates BANK_API statement', async () => {
+    process.env.BANK_CONNECTOR_SANDBOX_ENABLED = 'true'
+    process.env.BANK_CONNECTOR_SANDBOX_ROOTS = FIXTURES
+    process.env.BANK_CONNECTOR_AIS_PROVIDER = 'SIMULATED'
+    process.env.FIELD_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString('base64')
+
+    // Dedicated treasury account so checksum dedupe from prior MT940 sync does not mask create.
+    const aisBank = await createAdjustmentBankAccount(app, fx, { namePrefix: 'BCONNAIS' })
+
+    const create = await request(app)
+      .post(base())
+      .set(auth())
+      .send({
+        legalEntityId: fx.legalEntityId,
+        treasuryAccountId: aisBank.id,
+        code: 'PSD2-AIS-SIM',
+        name: 'Simulated AIS',
+        provider: 'OPEN_BANKING',
+        scheduleCron: '*/15 * * * *',
+        configJson: {
+          mode: 'SIMULATED',
+          sandboxRoot: FIXTURES,
+          expectedFormat: 'MT940',
+          fileNamePattern: '*.mt940',
+          authorizeUrl: 'https://openbanking.example/authorize',
+        },
+      })
+    expect(create.status, JSON.stringify(create.body)).toBe(201)
+    const id = create.body.data.id as string
+    expect(create.body.data.scheduleCron).toBe('*/15 * * * *')
+
+    const start = await request(app)
+      .post(`${base()}/${id}/consents/start`)
+      .set(auth())
+      .send({ redirectUri: 'https://app.example/oauth/callback' })
+    expect(start.status, JSON.stringify(start.body)).toBe(201)
+    const state = new URL(start.body.data.authorizationUrl).searchParams.get('state')
+    const cb = await request(app)
+      .post(`${base()}/${id}/consents/callback`)
+      .set(auth())
+      .send({ state, accessToken: 'ais-sim-token' })
+    expect(cb.status).toBe(200)
+    expect(cb.body.data.consent.status).toBe('AUTHORIZED')
+
+    const enabled = await request(app)
+      .post(`${base()}/${id}/enable`)
+      .set(auth())
+      .send({ expectedUpdatedAt: (await request(app).get(`${base()}/${id}`).set(auth())).body.data.updatedAt })
+    expect(enabled.status).toBe(200)
+
+    const test = await request(app).post(`${base()}/${id}/test-connection`).set(auth())
+    expect(test.status, JSON.stringify(test.body)).toBe(200)
+    expect(test.body.data.ok).toBe(true)
+
+    const sync = await request(app).post(`${base()}/${id}/sync`).set(auth())
+    expect(sync.status, JSON.stringify(sync.body)).toBe(200)
+    expect(sync.body.data.ok).toBe(true)
+    expect(sync.body.data.statementsCreated).toBeGreaterThanOrEqual(1)
+
+    const stmt = await prisma.bankStatement.findFirst({
+      where: { tenantId: fx.tenantId, treasuryAccountId: aisBank.id, sourceType: 'BANK_API' },
+      orderBy: { createdAt: 'desc' },
+    })
+    expect(stmt).toBeTruthy()
+    expect(stmt!.importFormat).toBe('MT940')
   })
 })
 
@@ -325,7 +408,134 @@ describe.skipIf(!dbAvailable)('Finance Phase 5D3 — live SFTP (mocked client) +
     expect(enabled.status).toBe(200)
 
     const sync = await request(app).post(`${base()}/${id}/sync`).set(auth())
-    expect(sync.status).toBe(422)
-    expect(sync.body.code).toBe('BANK_CONNECTOR_NOT_IMPLEMENTED')
+    expect(sync.status).toBe(400)
+    expect(sync.body.code).toBe('BANK_CONNECTOR_VALIDATION_FAILED')
+    expect(String(sync.body.message ?? '')).toMatch(/AUTHORIZED consent/i)
+  })
+})
+
+describe('Finance Phase 5D4 — cron matcher (unit)', () => {
+  it('matches */15 and due-window logic', async () => {
+    const { cronMatchesAt, isConnectorDueForCron, isValidScheduleCron } = await import(
+      '../../src/modules/accounting/treasury/bank-connectors/bank-connector-cron.js'
+    )
+    expect(isValidScheduleCron('*/15 * * * *')).toBe(true)
+    expect(isValidScheduleCron('not-a-cron')).toBe(false)
+
+    const at = new Date('2026-07-30T10:00:00')
+    expect(cronMatchesAt('*/15 * * * *', at)).toBe(true)
+    expect(cronMatchesAt('5 * * * *', at)).toBe(false)
+
+    expect(
+      isConnectorDueForCron({
+        scheduleCron: '* * * * *',
+        lastSyncAt: null,
+        now: at,
+      }),
+    ).toBe(true)
+
+    expect(
+      isConnectorDueForCron({
+        scheduleCron: '* * * * *',
+        lastSyncAt: new Date('2026-07-30T10:00:30'),
+        now: at,
+      }),
+    ).toBe(false)
+
+    expect(
+      isConnectorDueForCron({
+        scheduleCron: '* * * * *',
+        lastSyncAt: new Date('2026-07-30T09:59:59'),
+        now: at,
+      }),
+    ).toBe(true)
+  })
+})
+
+describe.skipIf(!dbAvailable)('Finance Phase 5D4 — scheduled sync tick', () => {
+  let fx: ApAllocFixture
+  let bank: TreasuryTransferAccount
+
+  beforeAll(async () => {
+    process.env.BANK_CONNECTOR_SANDBOX_ENABLED = 'true'
+    process.env.BANK_CONNECTOR_SANDBOX_ROOTS = FIXTURES
+    process.env.BANK_CONNECTOR_AIS_PROVIDER = 'SIMULATED'
+    process.env.BANK_CONNECTOR_CRON_ENABLED = 'true'
+    process.env.FIELD_ENCRYPTION_KEY = Buffer.alloc(32, 11).toString('base64')
+    await ensurePermissions()
+    const ctx = await createFinanceAdminTenant(app, 'bconn5d4')
+    fx = await bootstrapApAllocFixture(app, ctx)
+    bank = await createAdjustmentBankAccount(app, fx, { namePrefix: 'BCONN5D4' })
+  }, 180_000)
+
+  afterAll(async () => {
+    if (fx?.tenantId) await cleanupTenant(fx.tenantId)
+  })
+
+  const base = () => `/api/v1/t/${fx.slug}/accounting/treasury/bank-connectors`
+
+  function auth() {
+    return { Authorization: `Bearer ${fx.token}` }
+  }
+
+  it('tickBankConnectorCron syncs due ENABLED connector with scheduleCron', async () => {
+    const { tickBankConnectorCron } = await import(
+      '../../src/modules/accounting/treasury/bank-connectors/bank-connector.scheduler.js'
+    )
+
+    const create = await request(app)
+      .post(base())
+      .set(auth())
+      .send({
+        legalEntityId: fx.legalEntityId,
+        treasuryAccountId: bank.id,
+        code: 'CRON-AIS-01',
+        name: 'Cron AIS',
+        provider: 'OPEN_BANKING',
+        scheduleCron: '* * * * *',
+        configJson: {
+          mode: 'SIMULATED',
+          sandboxRoot: FIXTURES,
+          expectedFormat: 'MT940',
+          fileNamePattern: '*.mt940',
+          authorizeUrl: 'https://openbanking.example/authorize',
+        },
+      })
+    expect(create.status, JSON.stringify(create.body)).toBe(201)
+    const id = create.body.data.id as string
+
+    const start = await request(app)
+      .post(`${base()}/${id}/consents/start`)
+      .set(auth())
+      .send({ redirectUri: 'https://app.example/oauth/callback' })
+    const state = new URL(start.body.data.authorizationUrl).searchParams.get('state')
+    await request(app)
+      .post(`${base()}/${id}/consents/callback`)
+      .set(auth())
+      .send({ state, accessToken: 'cron-ais-token' })
+
+    const enabled = await request(app)
+      .post(`${base()}/${id}/enable`)
+      .set(auth())
+      .send({ expectedUpdatedAt: (await request(app).get(`${base()}/${id}`).set(auth())).body.data.updatedAt })
+    expect(enabled.status).toBe(200)
+
+    const before = await prisma.bankStatement.count({
+      where: { tenantId: fx.tenantId, treasuryAccountId: bank.id, sourceType: 'BANK_API' },
+    })
+
+    const now = new Date()
+    now.setSeconds(0, 0)
+    const result = await tickBankConnectorCron(now)
+    expect(result.synced).toBeGreaterThanOrEqual(1)
+
+    const after = await prisma.bankStatement.count({
+      where: { tenantId: fx.tenantId, treasuryAccountId: bank.id, sourceType: 'BANK_API' },
+    })
+    expect(after).toBeGreaterThan(before)
+
+    const got = await request(app).get(`${base()}/${id}`).set(auth())
+    expect(got.body.data.lastSyncStatus).toBe('OK')
+    expect(got.body.data.lastSyncAt).toBeTruthy()
   })
 })

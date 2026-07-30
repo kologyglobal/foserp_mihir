@@ -70,9 +70,10 @@ export const BANK_CONNECTOR_PROVIDER_CATALOG = [
   },
   {
     provider: 'OPEN_BANKING' as const,
-    label: 'Open Banking / PSD2',
-    description: 'Consent lifecycle scaffold — AIS statement pull not implemented yet.',
-    implemented: false,
+    label: 'Open Banking / PSD2 AIS',
+    description:
+      'SIMULATED AIS statement pull (sandbox drop folder + consent). Live TPP / bank AIS download deferred.',
+    implemented: true,
     connectionMode: 'OAUTH' as const,
     consentSupported: true,
   },
