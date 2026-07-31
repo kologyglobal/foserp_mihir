@@ -77,11 +77,23 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
     // Never include raw SQL. meta.modelName / column / table are safe Prisma identifiers.
     if (err.code === 'P2021' || err.code === 'P2022') {
       const meta = (err.meta ?? {}) as Record<string, unknown>
-      sendError(res, 500, 'Database operation failed', undefined, err.code, {
+      const column =
+        (typeof meta.column === 'string' ? meta.column : null) ??
+        /column `([^`]+)`/i.exec(err.message)?.[1] ??
+        null
+      const table =
+        (typeof meta.table === 'string' ? meta.table : null) ??
+        /table `([^`]+)`/i.exec(err.message)?.[1] ??
+        null
+      const devHint =
+        !env.isProd && column
+          ? `Database schema mismatch: missing column \`${column}\`${table ? ` on \`${table}\`` : ''}. Run prisma migrate deploy or live-deploy purchase SQL scripts.`
+          : 'Database operation failed'
+      sendError(res, 500, devHint, undefined, err.code, {
         prismaCode: err.code,
         modelName: meta.modelName ?? null,
-        table: meta.table ?? null,
-        column: meta.column ?? null,
+        table,
+        column,
       })
       return
     }
