@@ -1,4 +1,4 @@
-import type { QuotationDocument, QuotationSection } from '../../types/crm'
+import type { CrmContact, QuotationDocument, QuotationSection } from '../../types/crm'
 import type { Quotation } from '../../types/sales'
 import type { Customer } from '../../types/master'
 import type { Opportunity } from '../../types/crm'
@@ -15,6 +15,7 @@ export interface QuotationMergeContext {
   quotation?: Quotation
   customer?: Customer
   opportunity?: Opportunity
+  contact?: CrmContact | null
   contactName?: string
 }
 
@@ -57,7 +58,7 @@ function fmtMoney(n: number) {
 }
 
 export function buildQuotationMergeMap(ctx: QuotationMergeContext): Record<QuotationPlaceholderKey, string> {
-  const { document, quotation, customer, opportunity, contactName } = ctx
+  const { document, quotation, customer, opportunity, contact, contactName } = ctx
   const lines = syncLineTotals(document.priceLines)
   const summary = calcPriceSummary(lines, document.freightAmount, document.installationAmount, document.customCharges)
   const primary = lines.find((l) => !l.isOptional) ?? lines[0]
@@ -71,9 +72,9 @@ export function buildQuotationMergeMap(ctx: QuotationMergeContext): Record<Quota
     reference_no: opportunity?.opportunityNo ?? quotation?.inquiryNo ?? '—',
     customer_name: customer?.customerName ?? '—',
     customer_address: customer ? [customer.addressLine1, customer.city, customer.state, customer.pincode].filter(Boolean).join(', ') : '—',
-    contact_person: contactName ?? customer?.contactPerson ?? '—',
-    contact_mobile: customer?.contactPhone ?? '—',
-    contact_email: customer?.contactEmail ?? '—',
+    contact_person: contactName ?? contact?.name ?? customer?.contactPerson ?? '—',
+    contact_mobile: contact?.phone?.trim() || customer?.contactPhone || '—',
+    contact_email: contact?.email?.trim() || customer?.contactEmail || '—',
     opportunity_no: opportunity?.opportunityNo ?? '—',
     product_name: primary?.productOrItem ?? opportunity?.opportunityName ?? '—',
     product_capacity:

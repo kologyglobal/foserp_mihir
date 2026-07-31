@@ -52,6 +52,10 @@ export async function fetchCompanies(params?: Record<string, string | number | u
   return apiRequest<Customer[]>(`${tenantPath('/crm/companies')}${buildQuery(params)}`)
 }
 
+export async function fetchCompany(id: string) {
+  return apiRequest<Customer>(tenantPath(`/crm/companies/${id}`))
+}
+
 export async function createCompanyApi(data: Partial<Customer>) {
   return apiRequest<Customer>(tenantPath('/crm/companies'), { method: 'POST', body: JSON.stringify(data) })
 }
@@ -68,6 +72,10 @@ export async function deleteCompanyApi(id: string) {
 
 export async function fetchContacts(params?: Record<string, string | number | undefined>) {
   return apiRequest<CrmContact[]>(`${tenantPath('/crm/contacts')}${buildQuery(params)}`)
+}
+
+export async function fetchContact(id: string) {
+  return apiRequest<CrmContact>(tenantPath(`/crm/contacts/${id}`))
 }
 
 export async function createContactApi(data: Partial<CrmContact>) {

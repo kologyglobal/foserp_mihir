@@ -1,9 +1,7 @@
-import { useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Eye, Printer, Download, Send, AlertTriangle } from 'lucide-react'
 import { useCrmStore } from '../../store/crmStore'
 import { useSalesStore } from '../../store/salesStore'
-import { useMasterStore } from '../../store/masterStore'
 import { QuotationPrintDocument } from './QuotationPrintDocument'
 import { ErpButton } from '../erp/ErpButton'
 import { ConvertQuotationToSOAction } from './ConvertQuotationToSOAction'
@@ -11,6 +9,7 @@ import { validateQuotationForPrint } from '../../utils/quotationEngine/validatio
 import { printQuotationDocument, downloadQuotationPdf, saveQuotationPdfToDms, quotationPdfFileName } from '../../utils/quotationEngine/pdfExport'
 import { resolveQuotationPrintLayout } from '../../utils/quotationEngine/printLayout'
 import { notify } from '../../store/toastStore'
+import { useQuotationPartyContext } from '../../hooks/useQuotationPartyContext'
 
 interface QuotationPreviewProps {
   documentId: string
@@ -21,14 +20,8 @@ export function QuotationPreview({ documentId }: QuotationPreviewProps) {
   const doc = useCrmStore((s) => s.getQuotationDocument(documentId))
   const opportunities = useCrmStore((s) => s.opportunities)
   const quotation = useSalesStore((s) => (doc ? s.getQuotation(doc.quotationId) : undefined))
-  const customers = useMasterStore((s) => s.customers)
-
-  const customer = useMemo(
-    () => customers.find((c) => c.id === quotation?.customerId),
-    [customers, quotation?.customerId],
-  )
+  const { customer, contact, contactName } = useQuotationPartyContext(quotation, doc)
   const opportunity = doc?.opportunityId ? opportunities.find((o) => o.id === doc.opportunityId) : undefined
-  const contact = doc?.contactId ? useCrmStore.getState().getContact(doc.contactId) : null
   const template = doc?.templateId ? useCrmStore.getState().getTemplate(doc.templateId) : undefined
   const printLayout = resolveQuotationPrintLayout(template)
 
@@ -106,7 +99,8 @@ export function QuotationPreview({ documentId }: QuotationPreviewProps) {
           quotation={quotation}
           customer={customer}
           opportunity={opportunity}
-          contactName={contact?.name}
+          contact={contact}
+          contactName={contactName}
           printLayout={printLayout}
         />
       </div>

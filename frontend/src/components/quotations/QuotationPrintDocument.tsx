@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import type { QuotationDocument, QuotationPrintLayout } from '../../types/crm'
+import type { CrmContact } from '../../types/crm'
 import type { Quotation } from '../../types/sales'
 import type { Customer } from '../../types/master'
 import type { Opportunity } from '../../types/crm'
@@ -15,12 +16,14 @@ import {
   sectionHasPageBreak,
 } from '../../utils/quotationEngine/printLayout'
 import { cn } from '../../utils/cn'
+import { resolveCustomerDetailsPrintContent } from '../../utils/quotationEngine/customerDetails'
 
 interface QuotationPrintDocumentProps {
   doc: QuotationDocument
   quotation: Quotation
   customer?: Customer
   opportunity?: Opportunity
+  contact?: CrmContact | null
   contactName?: string
   className?: string
   printLayout?: QuotationPrintLayout
@@ -151,13 +154,14 @@ export function QuotationPrintDocument({
   quotation,
   customer,
   opportunity,
+  contact,
   contactName,
   className,
   printLayout = DEFAULT_QUOTATION_PRINT_LAYOUT,
 }: QuotationPrintDocumentProps) {
   const map = useMemo(
-    () => buildQuotationMergeMap({ document: doc, quotation, customer, opportunity, contactName }),
-    [doc, quotation, customer, opportunity, contactName],
+    () => buildQuotationMergeMap({ document: doc, quotation, customer, opportunity, contact, contactName }),
+    [doc, quotation, customer, opportunity, contact, contactName],
   )
   const sorted = useMemo(() => [...doc.sections].sort((a, b) => a.sequenceNo - b.sequenceNo), [doc.sections])
   const lines = syncLineTotals(doc.priceLines)
@@ -332,7 +336,10 @@ export function QuotationPrintDocument({
           )
         }
 
-        const content = resolvePlaceholders(sec.content, map)
+        const content =
+          sec.sectionType === 'customer_details'
+            ? resolveCustomerDetailsPrintContent(sec.content, map, doc.salesOwnerName)
+            : resolvePlaceholders(sec.content, map)
         if (!content.trim()) return null
 
         if (sec.sectionType === 'customer_details' && printLayout.showCustomerBlock) {
